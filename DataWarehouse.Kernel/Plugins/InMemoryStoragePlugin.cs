@@ -1,5 +1,6 @@
 using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Primitives;
+using DataWarehouse.SDK.Utilities;
 using System.Collections.Concurrent;
 
 namespace DataWarehouse.Kernel.Plugins
@@ -40,10 +41,10 @@ namespace DataWarehouse.Kernel.Plugins
         {
             return new List<PluginCapabilityDescriptor>
             {
-                new() { Name = "Save", Description = "Store data in memory" },
-                new() { Name = "Load", Description = "Retrieve data from memory" },
-                new() { Name = "Delete", Description = "Remove data from memory" },
-                new() { Name = "List", Description = "Enumerate stored items" }
+                new() { DisplayName = "Save", Description = "Store data in memory" },
+                new() { DisplayName = "Load", Description = "Retrieve data from memory" },
+                new() { DisplayName = "Delete", Description = "Remove data from memory" },
+                new() { DisplayName = "List", Description = "Enumerate stored items" }
             };
         }
 
@@ -76,9 +77,9 @@ namespace DataWarehouse.Kernel.Plugins
             _storage[key] = new StoredBlob
             {
                 Key = key,
+                Uri = uri,
                 Data = bytes,
-                CreatedAt = DateTime.UtcNow,
-                ContentType = GetContentTypeFromUri(uri)
+                CreatedAt = DateTime.UtcNow
             };
         }
 
@@ -126,6 +127,7 @@ namespace DataWarehouse.Kernel.Plugins
 
         /// <summary>
         /// List all stored items.
+        /// Returns SDK's StorageListItem (Uri, SizeBytes).
         /// </summary>
         public async IAsyncEnumerable<StorageListItem> ListFilesAsync(
             string prefix = "",
@@ -138,13 +140,8 @@ namespace DataWarehouse.Kernel.Plugins
 
                 if (string.IsNullOrEmpty(prefix) || kvp.Key.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
                 {
-                    yield return new StorageListItem
-                    {
-                        Key = kvp.Key,
-                        Size = kvp.Value.Data.LongLength,
-                        LastModified = kvp.Value.CreatedAt,
-                        ContentType = kvp.Value.ContentType
-                    };
+                    // Return SDK's StorageListItem record
+                    yield return new StorageListItem(kvp.Value.Uri, kvp.Value.Data.LongLength);
                 }
 
                 await Task.Yield(); // Allow cancellation between items
@@ -162,14 +159,15 @@ namespace DataWarehouse.Kernel.Plugins
         /// <summary>
         /// Get statistics about the storage.
         /// </summary>
-        public StorageStats GetStats()
+        public InMemoryStorageStats GetStats()
         {
-            return new StorageStats
+            var blobs = _storage.Values.ToList();
+            return new InMemoryStorageStats
             {
-                ItemCount = _storage.Count,
-                TotalSizeBytes = TotalSizeBytes,
-                OldestItem = _storage.Values.Min(b => b.CreatedAt),
-                NewestItem = _storage.Values.Max(b => b.CreatedAt)
+                ItemCount = blobs.Count,
+                TotalSizeBytes = blobs.Sum(b => b.Data.LongLength),
+                OldestItem = blobs.Count > 0 ? blobs.Min(b => b.CreatedAt) : null,
+                NewestItem = blobs.Count > 0 ? blobs.Max(b => b.CreatedAt) : null
             };
         }
 
@@ -179,51 +177,20 @@ namespace DataWarehouse.Kernel.Plugins
             return uri.AbsolutePath.TrimStart('/');
         }
 
-        private static string GetContentTypeFromUri(Uri uri)
-        {
-            var extension = Path.GetExtension(uri.AbsolutePath).ToLowerInvariant();
-            return extension switch
-            {
-                ".json" => "application/json",
-                ".xml" => "application/xml",
-                ".txt" => "text/plain",
-                ".html" => "text/html",
-                ".css" => "text/css",
-                ".js" => "application/javascript",
-                ".png" => "image/png",
-                ".jpg" or ".jpeg" => "image/jpeg",
-                ".gif" => "image/gif",
-                ".pdf" => "application/pdf",
-                ".zip" => "application/zip",
-                _ => "application/octet-stream"
-            };
-        }
-
         private sealed class StoredBlob
         {
             public string Key { get; init; } = string.Empty;
+            public Uri Uri { get; init; } = null!;
             public byte[] Data { get; init; } = Array.Empty<byte>();
             public DateTime CreatedAt { get; init; }
             public DateTime LastAccessedAt { get; set; }
-            public string ContentType { get; init; } = "application/octet-stream";
         }
     }
 
     /// <summary>
-    /// Item returned when listing storage contents.
+    /// In-memory storage statistics.
     /// </summary>
-    public class StorageListItem
-    {
-        public string Key { get; init; } = string.Empty;
-        public long Size { get; init; }
-        public DateTime LastModified { get; init; }
-        public string ContentType { get; init; } = "application/octet-stream";
-    }
-
-    /// <summary>
-    /// Storage statistics.
-    /// </summary>
-    public class StorageStats
+    public class InMemoryStorageStats
     {
         public int ItemCount { get; init; }
         public long TotalSizeBytes { get; init; }

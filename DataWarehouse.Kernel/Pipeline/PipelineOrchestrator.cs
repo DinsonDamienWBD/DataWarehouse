@@ -1,5 +1,6 @@
 using DataWarehouse.Kernel.Messaging;
 using DataWarehouse.SDK.Contracts;
+using DataWarehouse.SDK.Primitives;
 using DataWarehouse.SDK.Utilities;
 using Microsoft.Extensions.Logging;
 using System.Collections.Concurrent;
@@ -238,7 +239,7 @@ namespace DataWarehouse.Kernel.Pipeline
             _logger?.LogDebug("Executing write pipeline with {Count} stages", orderedStages.Count);
 
             // Publish pipeline start event
-            await _messageBus.PublishAsync(MessageTopics.PipelineStart, new PluginMessage
+            await _messageBus.PublishAsync(MessageTopics.PipelineExecute, new PluginMessage
             {
                 Type = "pipeline.write.start",
                 Payload = new Dictionary<string, object>
@@ -271,7 +272,7 @@ namespace DataWarehouse.Kernel.Pipeline
                 }
 
                 // Publish pipeline complete event
-                await _messageBus.PublishAsync(MessageTopics.PipelineComplete, new PluginMessage
+                await _messageBus.PublishAsync(MessageTopics.PipelineCompleted, new PluginMessage
                 {
                     Type = "pipeline.write.complete",
                     Payload = new Dictionary<string, object>
@@ -315,7 +316,7 @@ namespace DataWarehouse.Kernel.Pipeline
 
             _logger?.LogDebug("Executing read pipeline with {Count} stages (reversed)", orderedStages.Count);
 
-            await _messageBus.PublishAsync(MessageTopics.PipelineStart, new PluginMessage
+            await _messageBus.PublishAsync(MessageTopics.PipelineExecute, new PluginMessage
             {
                 Type = "pipeline.read.start",
                 Payload = new Dictionary<string, object>
@@ -346,7 +347,7 @@ namespace DataWarehouse.Kernel.Pipeline
                     context.ExecutedStages.Add(stageConfig.StageType);
                 }
 
-                await _messageBus.PublishAsync(MessageTopics.PipelineComplete, new PluginMessage
+                await _messageBus.PublishAsync(MessageTopics.PipelineCompleted, new PluginMessage
                 {
                     Type = "pipeline.read.complete",
                     Payload = new Dictionary<string, object>
@@ -402,7 +403,7 @@ namespace DataWarehouse.Kernel.Pipeline
 
         private IKernelContext CreateDefaultKernelContext()
         {
-            return new DefaultKernelContext();
+            return new DefaultKernelContext(_registry);
         }
 
         /// <summary>
@@ -410,15 +411,23 @@ namespace DataWarehouse.Kernel.Pipeline
         /// </summary>
         private sealed class DefaultKernelContext : IKernelContext
         {
-            public string KernelId => "default";
-            public bool IsCancelled => false;
+            private readonly PluginRegistry _registry;
 
-            public void Log(string level, string message)
+            public DefaultKernelContext(PluginRegistry registry)
             {
-                // Default: no-op, can be overridden
+                _registry = registry;
             }
 
-            public T? GetService<T>() where T : class => null;
+            public OperatingMode Mode => _registry.OperatingMode;
+            public string RootPath => Environment.CurrentDirectory;
+
+            public void LogInfo(string message) { /* Default: no-op */ }
+            public void LogError(string message, Exception? ex = null) { /* Default: no-op */ }
+            public void LogWarning(string message) { /* Default: no-op */ }
+            public void LogDebug(string message) { /* Default: no-op */ }
+
+            public T? GetPlugin<T>() where T : class, IPlugin => _registry.GetPlugin<T>();
+            public IEnumerable<T> GetPlugins<T>() where T : class, IPlugin => _registry.GetPlugins<T>();
         }
     }
 }
