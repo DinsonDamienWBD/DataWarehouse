@@ -19,19 +19,14 @@ namespace DataWarehouse.Kernel.Messaging
     /// - Async-first design
     /// - Non-blocking operations
     /// </summary>
-    public sealed class DefaultMessageBus : IMessageBus
+    public sealed class DefaultMessageBus(ILogger? logger = null) : IMessageBus
     {
         private readonly ConcurrentDictionary<string, List<Subscription>> _subscriptions = new();
         private readonly ConcurrentDictionary<string, List<ResponseSubscription>> _responseSubscriptions = new();
         private readonly ConcurrentDictionary<string, PatternSubscription> _patternSubscriptions = new();
-        private readonly ILogger? _logger;
-        private readonly object _subscriptionLock = new();
+        private readonly ILogger? _logger = logger;
+        private readonly Lock _subscriptionLock = new();
         private long _subscriptionIdCounter;
-
-        public DefaultMessageBus(ILogger? logger = null)
-        {
-            _logger = logger;
-        }
 
         /// <summary>
         /// Publish a message to all subscribers (fire and forget).
@@ -160,7 +155,7 @@ namespace DataWarehouse.Kernel.Messaging
             {
                 if (!_subscriptions.TryGetValue(topic, out var list))
                 {
-                    list = new List<Subscription>();
+                    list = [];
                     _subscriptions[topic] = list;
                 }
                 list.Add(subscription);
@@ -198,7 +193,7 @@ namespace DataWarehouse.Kernel.Messaging
             {
                 if (!_responseSubscriptions.TryGetValue(topic, out var list))
                 {
-                    list = new List<ResponseSubscription>();
+                    list = [];
                     _responseSubscriptions[topic] = list;
                 }
                 list.Add(subscription);
@@ -335,12 +330,10 @@ namespace DataWarehouse.Kernel.Messaging
         private sealed record ResponseSubscription(long Id, string Topic, Func<PluginMessage, Task<MessageResponse>> Handler);
         private sealed record PatternSubscription(long Id, string Pattern, Regex Regex, Func<PluginMessage, Task> Handler);
 
-        private sealed class SubscriptionHandle : IDisposable
+        private sealed class SubscriptionHandle(Action unsubscribe) : IDisposable
         {
-            private readonly Action _unsubscribe;
+            private readonly Action _unsubscribe = unsubscribe;
             private bool _disposed;
-
-            public SubscriptionHandle(Action unsubscribe) => _unsubscribe = unsubscribe;
 
             public void Dispose()
             {

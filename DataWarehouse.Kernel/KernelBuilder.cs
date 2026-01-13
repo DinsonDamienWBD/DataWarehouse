@@ -12,8 +12,8 @@ namespace DataWarehouse.Kernel
     {
         private readonly KernelConfiguration _config = new();
         private ILogger<DataWarehouseKernel>? _logger;
-        private readonly List<IPlugin> _plugins = new();
-        private readonly List<Action<DataWarehouseKernel>> _postBuildActions = new();
+        private readonly List<IPlugin> _plugins = [];
+        private readonly List<Action<DataWarehouseKernel>> _postBuildActions = [];
 
         /// <summary>
         /// Create a new KernelBuilder.

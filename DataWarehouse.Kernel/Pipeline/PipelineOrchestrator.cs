@@ -20,26 +20,18 @@ namespace DataWarehouse.Kernel.Pipeline
     /// - Stage validation and dependency checking
     /// - Non-blocking async execution
     /// </summary>
-    public sealed class DefaultPipelineOrchestrator : IPipelineOrchestrator
+    public sealed class DefaultPipelineOrchestrator(
+        PluginRegistry registry,
+        DefaultMessageBus messageBus,
+        ILogger? logger = null) : IPipelineOrchestrator
     {
-        private readonly PluginRegistry _registry;
-        private readonly DefaultMessageBus _messageBus;
-        private readonly ILogger? _logger;
+        private readonly PluginRegistry _registry = registry ?? throw new ArgumentNullException(nameof(registry));
+        private readonly DefaultMessageBus _messageBus = messageBus ?? throw new ArgumentNullException(nameof(messageBus));
+        private readonly ILogger? _logger = logger;
         private readonly ConcurrentDictionary<string, IDataTransformation> _stages = new();
-        private readonly object _configLock = new();
+        private readonly Lock _configLock = new();
 
-        private PipelineConfiguration _currentConfig;
-
-        public DefaultPipelineOrchestrator(
-            PluginRegistry registry,
-            DefaultMessageBus messageBus,
-            ILogger? logger = null)
-        {
-            _registry = registry ?? throw new ArgumentNullException(nameof(registry));
-            _messageBus = messageBus ?? throw new ArgumentNullException(nameof(messageBus));
-            _logger = logger;
-            _currentConfig = PipelineConfiguration.CreateDefault();
-        }
+        private PipelineConfiguration _currentConfig = PipelineConfiguration.CreateDefault();
 
         /// <summary>
         /// Get the current pipeline configuration.
@@ -126,7 +118,7 @@ namespace DataWarehouse.Kernel.Pipeline
         /// </summary>
         public IEnumerable<PipelineStageInfo> GetRegisteredStages()
         {
-            return _stages.Select(kvp =>
+            return [.. _stages.Select(kvp =>
             {
                 var plugin = kvp.Value as IPlugin;
                 var pipelinePlugin = kvp.Value as PipelinePluginBase;
@@ -139,11 +131,11 @@ namespace DataWarehouse.Kernel.Pipeline
                     QualityLevel = kvp.Value.QualityLevel,
                     DefaultOrder = pipelinePlugin?.DefaultOrder ?? 100,
                     AllowBypass = pipelinePlugin?.AllowBypass ?? false,
-                    RequiredPrecedingStages = pipelinePlugin?.RequiredPrecedingStages ?? Array.Empty<string>(),
-                    IncompatibleStages = pipelinePlugin?.IncompatibleStages ?? Array.Empty<string>(),
+                    RequiredPrecedingStages = pipelinePlugin?.RequiredPrecedingStages ?? [],
+                    IncompatibleStages = pipelinePlugin?.IncompatibleStages ?? [],
                     Description = plugin?.Name ?? "Pipeline stage"
                 };
-            }).ToList();
+            })];
         }
 
         /// <summary>
@@ -401,7 +393,7 @@ namespace DataWarehouse.Kernel.Pipeline
                 .Select(kvp => kvp.Key);
         }
 
-        private IKernelContext CreateDefaultKernelContext()
+        private DefaultKernelContext CreateDefaultKernelContext()
         {
             return new DefaultKernelContext(_registry);
         }
@@ -409,14 +401,9 @@ namespace DataWarehouse.Kernel.Pipeline
         /// <summary>
         /// Default kernel context implementation for pipeline operations.
         /// </summary>
-        private sealed class DefaultKernelContext : IKernelContext
+        private sealed class DefaultKernelContext(PluginRegistry registry) : IKernelContext
         {
-            private readonly PluginRegistry _registry;
-
-            public DefaultKernelContext(PluginRegistry registry)
-            {
-                _registry = registry;
-            }
+            private readonly PluginRegistry _registry = registry;
 
             public OperatingMode Mode => _registry.OperatingMode;
             public string RootPath => Environment.CurrentDirectory;
