@@ -1,0 +1,1 @@
+All plugins go here as individual projects in this folder.

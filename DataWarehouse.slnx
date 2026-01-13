@@ -4,6 +4,8 @@
     <File Path="Metadata/RULES.md" />
     <File Path="Metadata/TODO.md" />
   </Folder>
-  <Folder Name="/Plugins/" />
+  <Folder Name="/Plugins/">
+    <File Path="Plugin Readme.txt" />
+  </Folder>
   <Project Path="DataWarehouse.SDK/DataWarehouse.SDK.csproj" />
 </Solution>
