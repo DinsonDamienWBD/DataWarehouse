@@ -223,4 +223,104 @@ namespace DataWarehouse.SDK.Contracts
         public TimeSpan AverageDeliveryTime { get; init; }
         public Dictionary<string, long> MessagesByTopic { get; init; } = new();
     }
+
+    /// <summary>
+    /// Abstract base class for IMessageBus implementations.
+    /// Provides common infrastructure to reduce boilerplate code.
+    /// </summary>
+    public abstract class MessageBusBase : IMessageBus
+    {
+        /// <summary>
+        /// Publish a message to all subscribers (fire and forget).
+        /// </summary>
+        public abstract Task PublishAsync(string topic, PluginMessage message, CancellationToken ct = default);
+
+        /// <summary>
+        /// Publish a message and wait for all handlers to complete.
+        /// Default implementation calls PublishAsync and awaits.
+        /// </summary>
+        public virtual Task PublishAndWaitAsync(string topic, PluginMessage message, CancellationToken ct = default)
+        {
+            return PublishAsync(topic, message, ct);
+        }
+
+        /// <summary>
+        /// Send a message and wait for a response.
+        /// </summary>
+        public abstract Task<MessageResponse> SendAsync(string topic, PluginMessage message, CancellationToken ct = default);
+
+        /// <summary>
+        /// Send a message with timeout. Default implementation wraps SendAsync with timeout.
+        /// </summary>
+        public virtual async Task<MessageResponse> SendAsync(string topic, PluginMessage message, TimeSpan timeout, CancellationToken ct = default)
+        {
+            using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            cts.CancelAfter(timeout);
+
+            try
+            {
+                return await SendAsync(topic, message, cts.Token);
+            }
+            catch (OperationCanceledException) when (!ct.IsCancellationRequested)
+            {
+                return MessageResponse.Error($"Request timed out after {timeout.TotalMilliseconds}ms", "TIMEOUT");
+            }
+        }
+
+        /// <summary>
+        /// Subscribe to messages on a topic.
+        /// </summary>
+        public abstract IDisposable Subscribe(string topic, Func<PluginMessage, Task> handler);
+
+        /// <summary>
+        /// Subscribe with response capability.
+        /// Default: wraps the handler and ignores response in publish scenarios.
+        /// </summary>
+        public virtual IDisposable Subscribe(string topic, Func<PluginMessage, Task<MessageResponse>> handler)
+        {
+            return Subscribe(topic, async msg => { await handler(msg); });
+        }
+
+        /// <summary>
+        /// Subscribe to pattern. Override for optimized implementation.
+        /// Default: not supported, throws NotSupportedException.
+        /// </summary>
+        public virtual IDisposable SubscribePattern(string pattern, Func<PluginMessage, Task> handler)
+        {
+            throw new NotSupportedException("Pattern subscriptions not supported by this message bus implementation");
+        }
+
+        /// <summary>
+        /// Unsubscribe all handlers for a topic.
+        /// </summary>
+        public abstract void Unsubscribe(string topic);
+
+        /// <summary>
+        /// Get all active topics.
+        /// </summary>
+        public abstract IEnumerable<string> GetActiveTopics();
+
+        /// <summary>
+        /// Helper to create a simple subscription handle.
+        /// </summary>
+        protected static IDisposable CreateHandle(Action onDispose)
+        {
+            return new SubscriptionHandle(onDispose);
+        }
+
+        private sealed class SubscriptionHandle : IDisposable
+        {
+            private readonly Action _onDispose;
+            private bool _disposed;
+
+            public SubscriptionHandle(Action onDispose) => _onDispose = onDispose;
+
+            public void Dispose()
+            {
+                if (_disposed) return;
+                _disposed = true;
+                _onDispose();
+            }
+        }
+    }
 }

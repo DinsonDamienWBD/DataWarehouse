@@ -2,61 +2,12 @@ using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Utilities;
 using Microsoft.Extensions.Logging;
 using System.Collections.Concurrent;
+using System.Text.RegularExpressions;
 
 namespace DataWarehouse.Kernel.Messaging
 {
-    /// <summary>
-    /// Well-known message topics for kernel events.
-    /// </summary>
-    public static class MessageTopics
-    {
-        public const string SystemStartup = "system.startup";
-        public const string SystemShutdown = "system.shutdown";
-        public const string PluginLoaded = "plugin.loaded";
-        public const string PluginUnloaded = "plugin.unloaded";
-        public const string StorageWrite = "storage.write";
-        public const string StorageRead = "storage.read";
-        public const string StorageDelete = "storage.delete";
-        public const string PipelineStart = "pipeline.start";
-        public const string PipelineComplete = "pipeline.complete";
-        public const string PipelineError = "pipeline.error";
-        public const string ConfigChanged = "config.changed";
-    }
-
-    /// <summary>
-    /// Response from a message send operation.
-    /// </summary>
-    public class MessageResponse
-    {
-        /// <summary>
-        /// Whether the message was handled successfully.
-        /// </summary>
-        public bool Success { get; init; }
-
-        /// <summary>
-        /// Response payload from handler.
-        /// </summary>
-        public object? Payload { get; init; }
-
-        /// <summary>
-        /// Error message if failed.
-        /// </summary>
-        public string? Error { get; init; }
-
-        /// <summary>
-        /// Which plugin handled the message.
-        /// </summary>
-        public string? HandledBy { get; init; }
-
-        public static MessageResponse Ok(object? payload = null, string? handledBy = null) =>
-            new() { Success = true, Payload = payload, HandledBy = handledBy };
-
-        public static MessageResponse Fail(string error) =>
-            new() { Success = false, Error = error };
-
-        public static MessageResponse NoHandler() =>
-            new() { Success = false, Error = "No handler registered for topic" };
-    }
+    // NOTE: MessageTopics and MessageResponse are defined in SDK (DataWarehouse.SDK.Contracts)
+    // Import with: using static DataWarehouse.SDK.Contracts.MessageTopics;
 
     /// <summary>
     /// Default implementation of the message bus for inter-plugin communication.
@@ -64,14 +15,15 @@ namespace DataWarehouse.Kernel.Messaging
     /// Features:
     /// - Pub/sub messaging pattern
     /// - Request/response pattern
-    /// - Topic-based routing
+    /// - Topic-based and pattern-based routing
     /// - Async-first design
     /// - Non-blocking operations
     /// </summary>
     public sealed class DefaultMessageBus : IMessageBus
     {
         private readonly ConcurrentDictionary<string, List<Subscription>> _subscriptions = new();
-        private readonly ConcurrentDictionary<string, Func<PluginMessage, Task<MessageResponse>>> _requestHandlers = new();
+        private readonly ConcurrentDictionary<string, List<ResponseSubscription>> _responseSubscriptions = new();
+        private readonly ConcurrentDictionary<string, PatternSubscription> _patternSubscriptions = new();
         private readonly ILogger? _logger;
         private readonly object _subscriptionLock = new();
         private long _subscriptionIdCounter;
@@ -79,6 +31,118 @@ namespace DataWarehouse.Kernel.Messaging
         public DefaultMessageBus(ILogger? logger = null)
         {
             _logger = logger;
+        }
+
+        /// <summary>
+        /// Publish a message to all subscribers (fire and forget).
+        /// </summary>
+        public async Task PublishAsync(string topic, PluginMessage message, CancellationToken ct = default)
+        {
+            ArgumentNullException.ThrowIfNull(topic);
+            ArgumentNullException.ThrowIfNull(message);
+
+            var handlers = GetHandlersForTopic(topic);
+            if (handlers.Count == 0) return;
+
+            _logger?.LogDebug("Publishing message to {Count} subscribers on topic {Topic}", handlers.Count, topic);
+
+            // Fire all handlers concurrently without waiting
+            foreach (var handler in handlers)
+            {
+                _ = Task.Run(async () =>
+                {
+                    try
+                    {
+                        await handler(message);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger?.LogError(ex, "Subscriber failed for topic {Topic}", topic);
+                    }
+                }, ct);
+            }
+        }
+
+        /// <summary>
+        /// Publish a message and wait for all handlers to complete.
+        /// </summary>
+        public async Task PublishAndWaitAsync(string topic, PluginMessage message, CancellationToken ct = default)
+        {
+            ArgumentNullException.ThrowIfNull(topic);
+            ArgumentNullException.ThrowIfNull(message);
+
+            var handlers = GetHandlersForTopic(topic);
+            if (handlers.Count == 0) return;
+
+            _logger?.LogDebug("Publishing (wait) message to {Count} subscribers on topic {Topic}", handlers.Count, topic);
+
+            var tasks = handlers.Select(async handler =>
+            {
+                try
+                {
+                    await handler(message);
+                }
+                catch (Exception ex)
+                {
+                    _logger?.LogError(ex, "Subscriber failed for topic {Topic}", topic);
+                }
+            });
+
+            await Task.WhenAll(tasks);
+        }
+
+        /// <summary>
+        /// Send a message and wait for a response.
+        /// </summary>
+        public async Task<MessageResponse> SendAsync(string topic, PluginMessage message, CancellationToken ct = default)
+        {
+            ArgumentNullException.ThrowIfNull(topic);
+            ArgumentNullException.ThrowIfNull(message);
+
+            // Find a response handler
+            List<ResponseSubscription>? responseHandlers;
+            lock (_subscriptionLock)
+            {
+                _responseSubscriptions.TryGetValue(topic, out responseHandlers);
+                responseHandlers = responseHandlers?.ToList();
+            }
+
+            if (responseHandlers == null || responseHandlers.Count == 0)
+            {
+                _logger?.LogWarning("No handler registered for topic {Topic}", topic);
+                return MessageResponse.Error("No handler registered for topic", "NO_HANDLER");
+            }
+
+            try
+            {
+                // Use first handler (could implement round-robin or load balancing later)
+                var response = await responseHandlers[0].Handler(message);
+                _logger?.LogDebug("Request handled for topic {Topic}", topic);
+                return response;
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogError(ex, "Handler failed for topic {Topic}", topic);
+                return MessageResponse.Error(ex.Message, "HANDLER_ERROR");
+            }
+        }
+
+        /// <summary>
+        /// Send a message and wait for a response with timeout.
+        /// </summary>
+        public async Task<MessageResponse> SendAsync(string topic, PluginMessage message, TimeSpan timeout, CancellationToken ct = default)
+        {
+            using var timeoutCts = new CancellationTokenSource(timeout);
+            using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(ct, timeoutCts.Token);
+
+            try
+            {
+                return await SendAsync(topic, message, linkedCts.Token);
+            }
+            catch (OperationCanceledException) when (timeoutCts.IsCancellationRequested)
+            {
+                return MessageResponse.Error($"Request timed out after {timeout.TotalMilliseconds}ms", "TIMEOUT");
+            }
         }
 
         /// <summary>
@@ -104,108 +168,101 @@ namespace DataWarehouse.Kernel.Messaging
 
             _logger?.LogDebug("Subscription {Id} created for topic {Topic}", subscriptionId, topic);
 
-            return new SubscriptionHandle(this, subscription);
+            return new SubscriptionHandle(() =>
+            {
+                lock (_subscriptionLock)
+                {
+                    if (_subscriptions.TryGetValue(topic, out var list))
+                    {
+                        list.RemoveAll(s => s.Id == subscriptionId);
+                        if (list.Count == 0)
+                            _subscriptions.TryRemove(topic, out _);
+                    }
+                }
+                _logger?.LogDebug("Subscription {Id} removed from topic {Topic}", subscriptionId, topic);
+            });
         }
 
         /// <summary>
-        /// Register a request handler for a topic.
+        /// Subscribe to messages on a topic with response capability.
         /// </summary>
-        public IDisposable RegisterHandler(string topic, Func<PluginMessage, Task<MessageResponse>> handler)
+        public IDisposable Subscribe(string topic, Func<PluginMessage, Task<MessageResponse>> handler)
         {
             ArgumentNullException.ThrowIfNull(topic);
             ArgumentNullException.ThrowIfNull(handler);
 
-            _requestHandlers[topic] = handler;
-            _logger?.LogDebug("Request handler registered for topic {Topic}", topic);
+            var subscriptionId = Interlocked.Increment(ref _subscriptionIdCounter);
+            var subscription = new ResponseSubscription(subscriptionId, topic, handler);
 
-            return new HandlerHandle(this, topic);
-        }
-
-        /// <summary>
-        /// Publish a message to all subscribers (fire and forget).
-        /// </summary>
-        public async Task PublishAsync(string topic, PluginMessage message, CancellationToken ct = default)
-        {
-            ArgumentNullException.ThrowIfNull(topic);
-            ArgumentNullException.ThrowIfNull(message);
-
-            List<Subscription>? subscribers;
             lock (_subscriptionLock)
             {
-                if (!_subscriptions.TryGetValue(topic, out subscribers))
+                if (!_responseSubscriptions.TryGetValue(topic, out var list))
                 {
-                    return;
+                    list = new List<ResponseSubscription>();
+                    _responseSubscriptions[topic] = list;
                 }
-                subscribers = subscribers.ToList(); // Copy for thread safety
+                list.Add(subscription);
             }
 
-            _logger?.LogDebug("Publishing message to {Count} subscribers on topic {Topic}",
-                subscribers.Count, topic);
+            _logger?.LogDebug("Response subscription {Id} created for topic {Topic}", subscriptionId, topic);
 
-            // Fire all handlers concurrently
-            var tasks = subscribers.Select(async sub =>
+            return new SubscriptionHandle(() =>
             {
-                try
+                lock (_subscriptionLock)
                 {
-                    await sub.Handler(message);
+                    if (_responseSubscriptions.TryGetValue(topic, out var list))
+                    {
+                        list.RemoveAll(s => s.Id == subscriptionId);
+                        if (list.Count == 0)
+                            _responseSubscriptions.TryRemove(topic, out _);
+                    }
                 }
-                catch (Exception ex)
-                {
-                    _logger?.LogError(ex, "Subscriber failed for topic {Topic}", topic);
-                }
+                _logger?.LogDebug("Response subscription {Id} removed from topic {Topic}", subscriptionId, topic);
             });
-
-            await Task.WhenAll(tasks);
         }
 
         /// <summary>
-        /// Send a message and wait for a response.
+        /// Subscribe to messages matching a pattern (e.g., "storage.*", "*.error").
         /// </summary>
-        public async Task<MessageResponse> SendAsync(string topic, PluginMessage message, CancellationToken ct = default)
+        public IDisposable SubscribePattern(string pattern, Func<PluginMessage, Task> handler)
+        {
+            ArgumentNullException.ThrowIfNull(pattern);
+            ArgumentNullException.ThrowIfNull(handler);
+
+            var subscriptionId = Interlocked.Increment(ref _subscriptionIdCounter);
+
+            // Convert glob pattern to regex
+            var regexPattern = "^" + Regex.Escape(pattern)
+                .Replace("\\*", ".*")
+                .Replace("\\?", ".") + "$";
+            var regex = new Regex(regexPattern, RegexOptions.Compiled | RegexOptions.IgnoreCase);
+
+            var subscription = new PatternSubscription(subscriptionId, pattern, regex, handler);
+            _patternSubscriptions[subscriptionId.ToString()] = subscription;
+
+            _logger?.LogDebug("Pattern subscription {Id} created for pattern {Pattern}", subscriptionId, pattern);
+
+            return new SubscriptionHandle(() =>
+            {
+                _patternSubscriptions.TryRemove(subscriptionId.ToString(), out _);
+                _logger?.LogDebug("Pattern subscription {Id} removed", subscriptionId);
+            });
+        }
+
+        /// <summary>
+        /// Unsubscribe all handlers for a topic.
+        /// </summary>
+        public void Unsubscribe(string topic)
         {
             ArgumentNullException.ThrowIfNull(topic);
-            ArgumentNullException.ThrowIfNull(message);
 
-            if (!_requestHandlers.TryGetValue(topic, out var handler))
-            {
-                _logger?.LogWarning("No handler registered for topic {Topic}", topic);
-                return MessageResponse.NoHandler();
-            }
-
-            try
-            {
-                var response = await handler(message);
-                _logger?.LogDebug("Request handled for topic {Topic}", topic);
-                return response;
-            }
-            catch (Exception ex)
-            {
-                _logger?.LogError(ex, "Handler failed for topic {Topic}", topic);
-                return MessageResponse.Fail(ex.Message);
-            }
-        }
-
-        /// <summary>
-        /// Get the number of subscribers for a topic.
-        /// </summary>
-        public int GetSubscriberCount(string topic)
-        {
             lock (_subscriptionLock)
             {
-                if (_subscriptions.TryGetValue(topic, out var list))
-                {
-                    return list.Count;
-                }
+                _subscriptions.TryRemove(topic, out _);
+                _responseSubscriptions.TryRemove(topic, out _);
             }
-            return 0;
-        }
 
-        /// <summary>
-        /// Check if a topic has a request handler.
-        /// </summary>
-        public bool HasHandler(string topic)
-        {
-            return _requestHandlers.ContainsKey(topic);
+            _logger?.LogDebug("All subscriptions removed for topic {Topic}", topic);
         }
 
         /// <summary>
@@ -217,91 +274,79 @@ namespace DataWarehouse.Kernel.Messaging
             lock (_subscriptionLock)
             {
                 foreach (var topic in _subscriptions.Keys)
-                {
                     topics.Add(topic);
-                }
-            }
-            foreach (var topic in _requestHandlers.Keys)
-            {
-                topics.Add(topic);
+                foreach (var topic in _responseSubscriptions.Keys)
+                    topics.Add(topic);
             }
             return topics;
         }
 
-        private void Unsubscribe(Subscription subscription)
+        /// <summary>
+        /// Get the number of subscribers for a topic.
+        /// </summary>
+        public int GetSubscriberCount(string topic)
         {
             lock (_subscriptionLock)
             {
-                if (_subscriptions.TryGetValue(subscription.Topic, out var list))
+                var count = 0;
+                if (_subscriptions.TryGetValue(topic, out var list))
+                    count += list.Count;
+                if (_responseSubscriptions.TryGetValue(topic, out var rlist))
+                    count += rlist.Count;
+                return count;
+            }
+        }
+
+        private List<Func<PluginMessage, Task>> GetHandlersForTopic(string topic)
+        {
+            var handlers = new List<Func<PluginMessage, Task>>();
+
+            lock (_subscriptionLock)
+            {
+                // Direct subscriptions
+                if (_subscriptions.TryGetValue(topic, out var list))
                 {
-                    list.RemoveAll(s => s.Id == subscription.Id);
-                    if (list.Count == 0)
+                    handlers.AddRange(list.Select(s => s.Handler));
+                }
+
+                // Response subscriptions (call but ignore response)
+                if (_responseSubscriptions.TryGetValue(topic, out var rlist))
+                {
+                    handlers.AddRange(rlist.Select(s => new Func<PluginMessage, Task>(async msg =>
                     {
-                        _subscriptions.TryRemove(subscription.Topic, out _);
-                    }
+                        await s.Handler(msg);
+                    })));
                 }
             }
-            _logger?.LogDebug("Subscription {Id} removed from topic {Topic}",
-                subscription.Id, subscription.Topic);
-        }
 
-        private void UnregisterHandler(string topic)
-        {
-            _requestHandlers.TryRemove(topic, out _);
-            _logger?.LogDebug("Handler removed for topic {Topic}", topic);
-        }
-
-        private sealed class Subscription
-        {
-            public long Id { get; }
-            public string Topic { get; }
-            public Func<PluginMessage, Task> Handler { get; }
-
-            public Subscription(long id, string topic, Func<PluginMessage, Task> handler)
+            // Pattern subscriptions
+            foreach (var ps in _patternSubscriptions.Values)
             {
-                Id = id;
-                Topic = topic;
-                Handler = handler;
+                if (ps.Regex.IsMatch(topic))
+                {
+                    handlers.Add(ps.Handler);
+                }
             }
+
+            return handlers;
         }
+
+        private sealed record Subscription(long Id, string Topic, Func<PluginMessage, Task> Handler);
+        private sealed record ResponseSubscription(long Id, string Topic, Func<PluginMessage, Task<MessageResponse>> Handler);
+        private sealed record PatternSubscription(long Id, string Pattern, Regex Regex, Func<PluginMessage, Task> Handler);
 
         private sealed class SubscriptionHandle : IDisposable
         {
-            private readonly DefaultMessageBus _bus;
-            private readonly Subscription _subscription;
+            private readonly Action _unsubscribe;
             private bool _disposed;
 
-            public SubscriptionHandle(DefaultMessageBus bus, Subscription subscription)
-            {
-                _bus = bus;
-                _subscription = subscription;
-            }
+            public SubscriptionHandle(Action unsubscribe) => _unsubscribe = unsubscribe;
 
             public void Dispose()
             {
                 if (_disposed) return;
                 _disposed = true;
-                _bus.Unsubscribe(_subscription);
-            }
-        }
-
-        private sealed class HandlerHandle : IDisposable
-        {
-            private readonly DefaultMessageBus _bus;
-            private readonly string _topic;
-            private bool _disposed;
-
-            public HandlerHandle(DefaultMessageBus bus, string topic)
-            {
-                _bus = bus;
-                _topic = topic;
-            }
-
-            public void Dispose()
-            {
-                if (_disposed) return;
-                _disposed = true;
-                _bus.UnregisterHandler(_topic);
+                _unsubscribe();
             }
         }
     }

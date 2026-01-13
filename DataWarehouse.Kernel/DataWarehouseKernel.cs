@@ -10,6 +10,9 @@ using Microsoft.Extensions.Logging;
 using System.Collections.Concurrent;
 using System.Reflection;
 
+// Use SDK's MessageTopics (not Kernel's removed duplicate)
+using static DataWarehouse.SDK.Contracts.MessageTopics;
+
 namespace DataWarehouse.Kernel
 {
     /// <summary>
@@ -101,7 +104,7 @@ namespace DataWarehouse.Kernel
                 // Publish startup event
                 await _messageBus.PublishAsync(MessageTopics.SystemStartup, new PluginMessage
                 {
-                    MessageType = "system.startup",
+                    Type = "system.startup",
                     Payload = new Dictionary<string, object>
                     {
                         ["KernelId"] = KernelId,
@@ -175,7 +178,7 @@ namespace DataWarehouse.Kernel
                 // Publish plugin loaded event
                 await _messageBus.PublishAsync(MessageTopics.PluginLoaded, new PluginMessage
                 {
-                    MessageType = "plugin.loaded",
+                    Type = "plugin.loaded",
                     Payload = new Dictionary<string, object>
                     {
                         ["PluginId"] = plugin.Id,
@@ -432,7 +435,7 @@ namespace DataWarehouse.Kernel
             {
                 await _messageBus.PublishAsync(MessageTopics.SystemShutdown, new PluginMessage
                 {
-                    MessageType = "system.shutdown",
+                    Type = "system.shutdown",
                     Payload = new Dictionary<string, object>
                     {
                         ["KernelId"] = KernelId,

@@ -4,6 +4,9 @@ using DataWarehouse.SDK.Utilities;
 using Microsoft.Extensions.Logging;
 using System.Collections.Concurrent;
 
+// Use SDK's MessageTopics
+using static DataWarehouse.SDK.Contracts.MessageTopics;
+
 namespace DataWarehouse.Kernel.Pipeline
 {
     /// <summary>
@@ -72,7 +75,7 @@ namespace DataWarehouse.Kernel.Pipeline
             // Publish config change event
             _ = _messageBus.PublishAsync(MessageTopics.ConfigChanged, new PluginMessage
             {
-                MessageType = "pipeline.config.changed",
+                Type = "pipeline.config.changed",
                 Payload = new Dictionary<string, object>
                 {
                     ["ConfigurationId"] = config.ConfigurationId,
@@ -237,7 +240,7 @@ namespace DataWarehouse.Kernel.Pipeline
             // Publish pipeline start event
             await _messageBus.PublishAsync(MessageTopics.PipelineStart, new PluginMessage
             {
-                MessageType = "pipeline.write.start",
+                Type = "pipeline.write.start",
                 Payload = new Dictionary<string, object>
                 {
                     ["StageCount"] = orderedStages.Count,
@@ -270,7 +273,7 @@ namespace DataWarehouse.Kernel.Pipeline
                 // Publish pipeline complete event
                 await _messageBus.PublishAsync(MessageTopics.PipelineComplete, new PluginMessage
                 {
-                    MessageType = "pipeline.write.complete",
+                    Type = "pipeline.write.complete",
                     Payload = new Dictionary<string, object>
                     {
                         ["ExecutedStages"] = context.ExecutedStages.ToArray()
@@ -283,7 +286,7 @@ namespace DataWarehouse.Kernel.Pipeline
             {
                 await _messageBus.PublishAsync(MessageTopics.PipelineError, new PluginMessage
                 {
-                    MessageType = "pipeline.write.error",
+                    Type = "pipeline.write.error",
                     Payload = new Dictionary<string, object>
                     {
                         ["Error"] = ex.Message,
@@ -314,7 +317,7 @@ namespace DataWarehouse.Kernel.Pipeline
 
             await _messageBus.PublishAsync(MessageTopics.PipelineStart, new PluginMessage
             {
-                MessageType = "pipeline.read.start",
+                Type = "pipeline.read.start",
                 Payload = new Dictionary<string, object>
                 {
                     ["StageCount"] = orderedStages.Count
@@ -345,7 +348,7 @@ namespace DataWarehouse.Kernel.Pipeline
 
                 await _messageBus.PublishAsync(MessageTopics.PipelineComplete, new PluginMessage
                 {
-                    MessageType = "pipeline.read.complete",
+                    Type = "pipeline.read.complete",
                     Payload = new Dictionary<string, object>
                     {
                         ["ExecutedStages"] = context.ExecutedStages.ToArray()
@@ -358,7 +361,7 @@ namespace DataWarehouse.Kernel.Pipeline
             {
                 await _messageBus.PublishAsync(MessageTopics.PipelineError, new PluginMessage
                 {
-                    MessageType = "pipeline.read.error",
+                    Type = "pipeline.read.error",
                     Payload = new Dictionary<string, object>
                     {
                         ["Error"] = ex.Message,

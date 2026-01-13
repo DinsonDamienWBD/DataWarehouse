@@ -850,4 +850,88 @@ namespace DataWarehouse.SDK.Contracts
             return metadata;
         }
     }
+
+    /// <summary>
+    /// Abstract base class for container/partition manager plugins.
+    /// Provides storage-agnostic partition management.
+    /// AI-native: Supports intelligent quota management and access suggestions.
+    /// </summary>
+    public abstract class ContainerManagerPluginBase : FeaturePluginBase, IContainerManager
+    {
+        /// <summary>
+        /// Category is always OrchestrationProvider for container managers.
+        /// </summary>
+        public override PluginCategory Category => PluginCategory.OrchestrationProvider;
+
+        public abstract Task<ContainerInfo> CreateContainerAsync(
+            Security.ISecurityContext context,
+            string containerId,
+            ContainerOptions? options = null,
+            CancellationToken ct = default);
+
+        public abstract Task<ContainerInfo?> GetContainerAsync(
+            Security.ISecurityContext context,
+            string containerId,
+            CancellationToken ct = default);
+
+        public abstract IAsyncEnumerable<ContainerInfo> ListContainersAsync(
+            Security.ISecurityContext context,
+            CancellationToken ct = default);
+
+        public abstract Task DeleteContainerAsync(
+            Security.ISecurityContext context,
+            string containerId,
+            CancellationToken ct = default);
+
+        public abstract Task GrantAccessAsync(
+            Security.ISecurityContext ownerContext,
+            string containerId,
+            string targetUserId,
+            ContainerAccessLevel level,
+            CancellationToken ct = default);
+
+        public abstract Task RevokeAccessAsync(
+            Security.ISecurityContext ownerContext,
+            string containerId,
+            string targetUserId,
+            CancellationToken ct = default);
+
+        public abstract Task<ContainerAccessLevel> GetAccessLevelAsync(
+            Security.ISecurityContext context,
+            string containerId,
+            string? userId = null,
+            CancellationToken ct = default);
+
+        public abstract IAsyncEnumerable<ContainerAccessEntry> ListAccessAsync(
+            Security.ISecurityContext context,
+            string containerId,
+            CancellationToken ct = default);
+
+        public virtual Task<ContainerQuota> GetQuotaAsync(
+            Security.ISecurityContext context,
+            string containerId,
+            CancellationToken ct = default)
+        {
+            return Task.FromResult(new ContainerQuota());
+        }
+
+        public virtual Task SetQuotaAsync(
+            Security.ISecurityContext adminContext,
+            string containerId,
+            ContainerQuota quota,
+            CancellationToken ct = default)
+        {
+            return Task.CompletedTask;
+        }
+
+        protected override Dictionary<string, object> GetMetadata()
+        {
+            var metadata = base.GetMetadata();
+            metadata["FeatureType"] = "ContainerManager";
+            metadata["SupportsQuotas"] = true;
+            metadata["SupportsAccessControl"] = true;
+            metadata["StorageAgnostic"] = true;
+            return metadata;
+        }
+    }
 }
