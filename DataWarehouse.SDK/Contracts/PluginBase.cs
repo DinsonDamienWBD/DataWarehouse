@@ -1,5 +1,6 @@
 ﻿using DataWarehouse.SDK.Primitives;
 using DataWarehouse.SDK.Utilities;
+using System;
 
 namespace DataWarehouse.SDK.Contracts
 {
@@ -13,8 +14,9 @@ namespace DataWarehouse.SDK.Contracts
     {
         /// <summary>
         /// Unique Plugin ID - must be set by derived classes.
+        /// Use a stable identifier like "com.company.plugin.name" for consistency.
         /// </summary>
-        public abstract Guid Id { get; }
+        public abstract string Id { get; }
 
         /// <summary>
         /// Gets the category of the plugin.
@@ -38,7 +40,7 @@ namespace DataWarehouse.SDK.Contracts
         {
             return Task.FromResult(new HandshakeResponse
             {
-                PluginId = Id.ToString(),
+                PluginId = Id,
                 Name = Name,
                 Version = Version.StartsWith("v") ? new Version(Version.Substring(1)) : new Version(Version),
                 Category = Category,
@@ -330,6 +332,126 @@ namespace DataWarehouse.SDK.Contracts
             metadata["SupportsWorkflows"] = false;
             metadata["SupportsPipelines"] = false;
             metadata["SupportsAIOrchestration"] = true;
+            return metadata;
+        }
+    }
+
+    /// <summary>
+    /// Abstract base class for intelligence/AI plugins (Embedding, Summarization, etc.).
+    /// Provides default implementations for AI-powered operations.
+    /// AI-native: Core class for integrating any AI/LLM provider.
+    /// </summary>
+    public abstract class IntelligencePluginBase : PluginBase
+    {
+        /// <summary>
+        /// Category is always OrchestrationProvider for intelligence plugins (AI orchestration).
+        /// </summary>
+        public override PluginCategory Category => PluginCategory.OrchestrationProvider;
+
+        /// <summary>
+        /// AI provider identifier (e.g., "openai", "claude", "ollama", "copilot").
+        /// </summary>
+        public abstract string ProviderType { get; }
+
+        /// <summary>
+        /// Model identifier (e.g., "gpt-4", "claude-3-opus", "llama3").
+        /// </summary>
+        public virtual string? ModelId => null;
+
+        /// <summary>
+        /// Whether this provider supports streaming responses.
+        /// </summary>
+        public virtual bool SupportsStreaming => false;
+
+        /// <summary>
+        /// Whether this provider supports embeddings.
+        /// </summary>
+        public virtual bool SupportsEmbeddings => false;
+
+        protected override Dictionary<string, object> GetMetadata()
+        {
+            var metadata = base.GetMetadata();
+            metadata["IntelligenceType"] = ProviderType;
+            metadata["ModelId"] = ModelId ?? "default";
+            metadata["SupportsStreaming"] = SupportsStreaming;
+            metadata["SupportsEmbeddings"] = SupportsEmbeddings;
+            metadata["AIAgnostic"] = true;
+            return metadata;
+        }
+    }
+
+    /// <summary>
+    /// Abstract base class for interface plugins (REST, SQL, gRPC, WebSocket).
+    /// Provides default implementations for external interface operations.
+    /// AI-native: Supports AI-driven interface discovery and usage.
+    /// </summary>
+    public abstract class InterfacePluginBase : FeaturePluginBase
+    {
+        /// <summary>
+        /// Interface protocol type (e.g., "rest", "grpc", "sql", "websocket").
+        /// </summary>
+        public abstract string Protocol { get; }
+
+        /// <summary>
+        /// Port the interface listens on (if applicable).
+        /// </summary>
+        public virtual int? Port => null;
+
+        /// <summary>
+        /// Base path or endpoint for the interface.
+        /// </summary>
+        public virtual string? BasePath => null;
+
+        protected override Dictionary<string, object> GetMetadata()
+        {
+            var metadata = base.GetMetadata();
+            metadata["FeatureType"] = "Interface";
+            metadata["Protocol"] = Protocol;
+            if (Port.HasValue) metadata["Port"] = Port.Value;
+            if (BasePath != null) metadata["BasePath"] = BasePath;
+            metadata["SupportsDiscovery"] = true;
+            return metadata;
+        }
+    }
+
+    /// <summary>
+    /// Abstract base class for pipeline stage plugins (compression, encryption stages).
+    /// Designed for runtime-configurable transformation pipelines.
+    /// AI-native: Supports AI-driven pipeline optimization and ordering.
+    /// </summary>
+    public abstract class PipelinePluginBase : DataTransformationPluginBase
+    {
+        /// <summary>
+        /// Default execution order (lower = earlier in pipeline).
+        /// Can be overridden at runtime by the kernel.
+        /// </summary>
+        public virtual int DefaultOrder => 100;
+
+        /// <summary>
+        /// Whether this stage can be bypassed based on content analysis.
+        /// </summary>
+        public virtual bool AllowBypass => false;
+
+        /// <summary>
+        /// Stage dependencies - other stages that must run before this one.
+        /// Empty means no dependencies.
+        /// </summary>
+        public virtual string[] RequiredPrecedingStages => Array.Empty<string>();
+
+        /// <summary>
+        /// Stage conflicts - stages that cannot run in the same pipeline.
+        /// </summary>
+        public virtual string[] IncompatibleStages => Array.Empty<string>();
+
+        protected override Dictionary<string, object> GetMetadata()
+        {
+            var metadata = base.GetMetadata();
+            metadata["PipelineStage"] = true;
+            metadata["DefaultOrder"] = DefaultOrder;
+            metadata["AllowBypass"] = AllowBypass;
+            metadata["RequiredPrecedingStages"] = RequiredPrecedingStages;
+            metadata["IncompatibleStages"] = IncompatibleStages;
+            metadata["RuntimeOrderingSupported"] = true;
             return metadata;
         }
     }

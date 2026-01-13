@@ -1,6 +1,7 @@
 ﻿using DataWarehouse.SDK.AI.Runtime;
 using DataWarehouse.SDK.Primitives;
 using DataWarehouse.SDK.Security;
+using DataWarehouse.SDK.Utilities;
 using Microsoft.Json.Schema;
 using System;
 using System.Collections.Generic;
