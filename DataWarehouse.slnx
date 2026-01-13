@@ -1,0 +1,9 @@
+<Solution>
+  <Folder Name="/Metadata/">
+    <File Path="Metadata/README.md" />
+    <File Path="Metadata/RULES.md" />
+    <File Path="Metadata/TODO.md" />
+  </Folder>
+  <Folder Name="/Plugins/" />
+  <Project Path="DataWarehouse.SDK/DataWarehouse.SDK.csproj" />
+</Solution>
