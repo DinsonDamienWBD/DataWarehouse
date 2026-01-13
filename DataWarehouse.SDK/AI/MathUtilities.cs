@@ -5,6 +5,31 @@ using System.Linq;
 namespace DataWarehouse.SDK.AI
 {
     /// <summary>
+    /// Basic math utilities for common operations.
+    /// Used by storage engines, RAID, and other low-level components.
+    /// </summary>
+    public static class MathUtils
+    {
+        /// <summary>Returns the smaller of two integers.</summary>
+        public static int Min(int a, int b) => Math.Min(a, b);
+
+        /// <summary>Returns the larger of two integers.</summary>
+        public static int Max(int a, int b) => Math.Max(a, b);
+
+        /// <summary>Returns the absolute value of an integer.</summary>
+        public static int Abs(int value) => Math.Abs(value);
+
+        /// <summary>Returns the smallest integral value greater than or equal to the specified number.</summary>
+        public static double Ceiling(double value) => Math.Ceiling(value);
+
+        /// <summary>Returns the largest integral value less than or equal to the specified number.</summary>
+        public static double Floor(double value) => Math.Floor(value);
+
+        /// <summary>Clamps an integer to a range.</summary>
+        public static int Clamp(int value, int min, int max) => Math.Max(min, Math.Min(max, value));
+    }
+
+    /// <summary>
     /// Mathematical utilities for AI operations, statistics, and data analysis.
     /// </summary>
     public static class AIMath
