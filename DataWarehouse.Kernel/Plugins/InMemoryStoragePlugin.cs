@@ -39,13 +39,13 @@ namespace DataWarehouse.Kernel.Plugins
 
         protected override List<PluginCapabilityDescriptor> GetCapabilities()
         {
-            return new List<PluginCapabilityDescriptor>
-            {
+            return
+            [
                 new() { DisplayName = "Save", Description = "Store data in memory" },
                 new() { DisplayName = "Load", Description = "Retrieve data from memory" },
                 new() { DisplayName = "Delete", Description = "Remove data from memory" },
                 new() { DisplayName = "List", Description = "Enumerate stored items" }
-            };
+            ];
         }
 
         protected override Dictionary<string, object> GetMetadata()
@@ -181,7 +181,7 @@ namespace DataWarehouse.Kernel.Plugins
         {
             public string Key { get; init; } = string.Empty;
             public Uri Uri { get; init; } = null!;
-            public byte[] Data { get; init; } = Array.Empty<byte>();
+            public byte[] Data { get; init; } = [];
             public DateTime CreatedAt { get; init; }
             public DateTime LastAccessedAt { get; set; }
         }
