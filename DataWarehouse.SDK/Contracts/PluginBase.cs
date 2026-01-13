@@ -455,4 +455,206 @@ namespace DataWarehouse.SDK.Contracts
             return metadata;
         }
     }
+
+    /// <summary>
+    /// Abstract base class for listable storage providers that support file enumeration.
+    /// Extends StorageProviderPluginBase with listing capabilities.
+    /// </summary>
+    public abstract class ListableStoragePluginBase : StorageProviderPluginBase, IListableStorage
+    {
+        /// <summary>
+        /// List all files in storage matching a prefix.
+        /// Must be implemented by derived classes.
+        /// </summary>
+        public abstract IAsyncEnumerable<StorageListItem> ListFilesAsync(string prefix = "", CancellationToken ct = default);
+
+        protected override Dictionary<string, object> GetMetadata()
+        {
+            var metadata = base.GetMetadata();
+            metadata["SupportsListing"] = true;
+            return metadata;
+        }
+    }
+
+    /// <summary>
+    /// Abstract base class for tiered storage providers that support data tiering.
+    /// Extends ListableStoragePluginBase with tier management capabilities.
+    /// </summary>
+    public abstract class TieredStoragePluginBase : ListableStoragePluginBase, ITieredStorage
+    {
+        /// <summary>
+        /// Move a blob to the specified storage tier.
+        /// Must be implemented by derived classes.
+        /// </summary>
+        public abstract Task<string> MoveToTierAsync(Manifest manifest, StorageTier targetTier);
+
+        /// <summary>
+        /// Get the current tier of a blob. Override for custom tier detection.
+        /// </summary>
+        public virtual Task<StorageTier> GetCurrentTierAsync(Uri uri)
+        {
+            return Task.FromResult(StorageTier.Hot);
+        }
+
+        protected override Dictionary<string, object> GetMetadata()
+        {
+            var metadata = base.GetMetadata();
+            metadata["SupportsTiering"] = true;
+            metadata["SupportedTiers"] = new[] { "Hot", "Cool", "Cold", "Archive" };
+            return metadata;
+        }
+    }
+
+    /// <summary>
+    /// Abstract base class for consensus engine plugins (Raft, Paxos, etc.).
+    /// Provides default implementations for distributed consensus operations.
+    /// AI-native: Supports intelligent leader election and quorum decisions.
+    /// </summary>
+    public abstract class ConsensusPluginBase : FeaturePluginBase, IConsensusEngine
+    {
+        /// <summary>
+        /// Category is always OrchestrationProvider for consensus plugins.
+        /// </summary>
+        public override PluginCategory Category => PluginCategory.OrchestrationProvider;
+
+        /// <summary>
+        /// Whether this node is currently the leader.
+        /// </summary>
+        public abstract bool IsLeader { get; }
+
+        /// <summary>
+        /// Propose a state change to the cluster. Returns when quorum is reached.
+        /// Must be implemented by derived classes.
+        /// </summary>
+        public abstract Task<bool> ProposeAsync(Proposal proposal);
+
+        /// <summary>
+        /// Subscribe to committed entries from other nodes.
+        /// Must be implemented by derived classes.
+        /// </summary>
+        public abstract void OnCommit(Action<Proposal> handler);
+
+        /// <summary>
+        /// Get current cluster state. Override for custom state reporting.
+        /// </summary>
+        public virtual Task<ClusterState> GetClusterStateAsync()
+        {
+            return Task.FromResult(new ClusterState { IsHealthy = true });
+        }
+
+        protected override Dictionary<string, object> GetMetadata()
+        {
+            var metadata = base.GetMetadata();
+            metadata["FeatureType"] = "Consensus";
+            metadata["ConsensusAlgorithm"] = "Generic";
+            metadata["SupportsLeaderElection"] = true;
+            return metadata;
+        }
+    }
+
+    /// <summary>
+    /// Cluster state information.
+    /// </summary>
+    public class ClusterState
+    {
+        /// <summary>Whether the cluster is healthy.</summary>
+        public bool IsHealthy { get; init; }
+        /// <summary>Current leader node ID.</summary>
+        public string? LeaderId { get; init; }
+        /// <summary>Number of nodes in the cluster.</summary>
+        public int NodeCount { get; init; }
+        /// <summary>Current term/epoch.</summary>
+        public long Term { get; init; }
+    }
+
+    /// <summary>
+    /// Abstract base class for real-time event providers (pub/sub, change feeds).
+    /// Provides default implementations for event publishing and subscription.
+    /// AI-native: Supports intelligent event routing and filtering.
+    /// </summary>
+    public abstract class RealTimePluginBase : FeaturePluginBase, IRealTimeProvider
+    {
+        /// <summary>
+        /// Category is always FeatureProvider for real-time plugins.
+        /// </summary>
+        public override PluginCategory Category => PluginCategory.FeatureProvider;
+
+        /// <summary>
+        /// Publish a storage event to the global fabric.
+        /// Must be implemented by derived classes.
+        /// </summary>
+        public abstract Task PublishAsync(StorageEvent evt);
+
+        /// <summary>
+        /// Subscribe to changes matching a URI pattern.
+        /// Must be implemented by derived classes.
+        /// </summary>
+        public abstract Task<IAsyncDisposable> SubscribeAsync(string uriPattern, Action<StorageEvent> handler);
+
+        /// <summary>
+        /// Publish multiple events in batch. Override for optimized batch publishing.
+        /// </summary>
+        public virtual async Task PublishBatchAsync(IEnumerable<StorageEvent> events)
+        {
+            foreach (var evt in events)
+                await PublishAsync(evt);
+        }
+
+        protected override Dictionary<string, object> GetMetadata()
+        {
+            var metadata = base.GetMetadata();
+            metadata["FeatureType"] = "RealTime";
+            metadata["SupportsPubSub"] = true;
+            metadata["SupportsPatternMatching"] = true;
+            return metadata;
+        }
+    }
+
+    /// <summary>
+    /// Abstract base class for cloud environment plugins (AWS, Azure, GCP, Local).
+    /// Provides default implementations for environment detection and provider creation.
+    /// AI-native: Supports intelligent cloud resource optimization.
+    /// </summary>
+    public abstract class CloudEnvironmentPluginBase : PluginBase, ICloudEnvironment
+    {
+        /// <summary>
+        /// Category is always FeatureProvider for environment plugins.
+        /// </summary>
+        public override PluginCategory Category => PluginCategory.FeatureProvider;
+
+        /// <summary>
+        /// Environment name (e.g., "AWS", "Azure", "Google", "Local").
+        /// Must be implemented by derived classes.
+        /// </summary>
+        public abstract string EnvironmentName { get; }
+
+        /// <summary>
+        /// Detect if running in this cloud environment.
+        /// Must be implemented by derived classes.
+        /// </summary>
+        public abstract bool IsCurrentEnvironment();
+
+        /// <summary>
+        /// Create the storage provider optimized for this cloud.
+        /// Must be implemented by derived classes.
+        /// </summary>
+        public abstract IStorageProvider CreateStorageProvider();
+
+        /// <summary>
+        /// Get environment-specific configuration. Override for custom config.
+        /// </summary>
+        public virtual Dictionary<string, string> GetEnvironmentConfig()
+        {
+            return new Dictionary<string, string>();
+        }
+
+        protected override Dictionary<string, object> GetMetadata()
+        {
+            var metadata = base.GetMetadata();
+            metadata["FeatureType"] = "CloudEnvironment";
+            metadata["EnvironmentName"] = EnvironmentName;
+            metadata["SupportsAutoDetection"] = true;
+            return metadata;
+        }
+    }
 }
