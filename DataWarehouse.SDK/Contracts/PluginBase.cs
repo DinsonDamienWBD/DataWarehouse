@@ -1,4 +1,6 @@
-﻿using DataWarehouse.SDK.Primitives;
+﻿using DataWarehouse.SDK.Governance;
+using DataWarehouse.SDK.Primitives;
+using DataWarehouse.SDK.Security;
 using DataWarehouse.SDK.Utilities;
 using System;
 
@@ -654,6 +656,197 @@ namespace DataWarehouse.SDK.Contracts
             metadata["FeatureType"] = "CloudEnvironment";
             metadata["EnvironmentName"] = EnvironmentName;
             metadata["SupportsAutoDetection"] = true;
+            return metadata;
+        }
+    }
+
+    /// <summary>
+    /// Abstract base class for replication service plugins.
+    /// Manages data redundancy, backups, and restoration.
+    /// AI-native: Supports intelligent replica selection and auto-healing.
+    /// </summary>
+    public abstract class ReplicationPluginBase : FeaturePluginBase, IReplicationService
+    {
+        /// <summary>
+        /// Category is always FederationProvider for replication plugins.
+        /// </summary>
+        public override PluginCategory Category => PluginCategory.FederationProvider;
+
+        /// <summary>
+        /// Restores a corrupted blob using a healthy replica.
+        /// Must be implemented by derived classes.
+        /// </summary>
+        public abstract Task<bool> RestoreAsync(string blobId, string? replicaId);
+
+        /// <summary>
+        /// Get all available replicas for a blob. Override for custom logic.
+        /// </summary>
+        public virtual Task<string[]> GetAvailableReplicasAsync(string blobId)
+        {
+            return Task.FromResult(Array.Empty<string>());
+        }
+
+        protected override Dictionary<string, object> GetMetadata()
+        {
+            var metadata = base.GetMetadata();
+            metadata["FeatureType"] = "Replication";
+            metadata["SupportsAutoHeal"] = true;
+            return metadata;
+        }
+    }
+
+    /// <summary>
+    /// Abstract base class for serialization plugins (JSON, MessagePack, Protobuf).
+    /// AI-native: Supports automatic format detection and optimization.
+    /// </summary>
+    public abstract class SerializerPluginBase : PluginBase, ISerializer
+    {
+        /// <summary>
+        /// Category is always SerializationProvider.
+        /// </summary>
+        public override PluginCategory Category => PluginCategory.SerializationProvider;
+
+        /// <summary>
+        /// Format name (e.g., "json", "msgpack", "protobuf").
+        /// </summary>
+        public abstract string FormatName { get; }
+
+        /// <summary>
+        /// MIME type for this format.
+        /// </summary>
+        public abstract string MimeType { get; }
+
+        public abstract string Serialize<T>(T value);
+        public abstract T? Deserialize<T>(string value);
+        public abstract object? Deserialize(string value, Type type);
+        public abstract Task SerializeAsync<T>(Stream stream, T value);
+        public abstract Task<T?> DeserializeAsync<T>(Stream stream);
+
+        protected override Dictionary<string, object> GetMetadata()
+        {
+            var metadata = base.GetMetadata();
+            metadata["FormatName"] = FormatName;
+            metadata["MimeType"] = MimeType;
+            return metadata;
+        }
+    }
+
+    /// <summary>
+    /// Abstract base class for semantic memory plugins.
+    /// Provides AI-native memory storage and retrieval with vector search.
+    /// </summary>
+    public abstract class SemanticMemoryPluginBase : PluginBase, ISemanticMemory
+    {
+        /// <summary>
+        /// Category is always AIProvider for semantic memory.
+        /// </summary>
+        public override PluginCategory Category => PluginCategory.AIProvider;
+
+        public abstract Task<string> MemorizeAsync(string content, string[] tags, string? summary = null);
+        public abstract Task<string> RecallAsync(string memoryId);
+        public abstract Task<string[]> SearchMemoriesAsync(string query, float[]? vector, int limit = 5);
+
+        /// <summary>
+        /// Embedding dimension used by this memory provider.
+        /// </summary>
+        public virtual int EmbeddingDimension => 1536;
+
+        protected override Dictionary<string, object> GetMetadata()
+        {
+            var metadata = base.GetMetadata();
+            metadata["FeatureType"] = "SemanticMemory";
+            metadata["EmbeddingDimension"] = EmbeddingDimension;
+            metadata["SupportsVectorSearch"] = true;
+            return metadata;
+        }
+    }
+
+    /// <summary>
+    /// Abstract base class for metrics and observability plugins.
+    /// AI-native: Supports intelligent alerting and anomaly detection.
+    /// </summary>
+    public abstract class MetricsPluginBase : PluginBase, IMetricsProvider
+    {
+        /// <summary>
+        /// Category is always MetricsProvider.
+        /// </summary>
+        public override PluginCategory Category => PluginCategory.MetricsProvider;
+
+        public abstract void IncrementCounter(string metric);
+        public abstract void RecordMetric(string metric, double value);
+        public abstract IDisposable TrackDuration(string metric);
+
+        /// <summary>
+        /// Flush metrics to backend. Override for batched sending.
+        /// </summary>
+        public virtual Task FlushAsync() => Task.CompletedTask;
+
+        protected override Dictionary<string, object> GetMetadata()
+        {
+            var metadata = base.GetMetadata();
+            metadata["FeatureType"] = "Metrics";
+            metadata["SupportsHistograms"] = false;
+            metadata["SupportsTags"] = false;
+            return metadata;
+        }
+    }
+
+    /// <summary>
+    /// Abstract base class for access control plugins.
+    /// Extends SecurityProviderPluginBase with ACL management.
+    /// AI-native: Supports intelligent permission suggestions.
+    /// </summary>
+    public abstract class AccessControlPluginBase : SecurityProviderPluginBase, Security.IAccessControl
+    {
+        public abstract void SetPermissions(string resource, string subject, Permission allow, Permission deny);
+        public abstract bool HasAccess(string resource, string subject, Permission requested);
+        public abstract void CreateScope(string resource, string owner);
+
+        protected override Dictionary<string, object> GetMetadata()
+        {
+            var metadata = base.GetMetadata();
+            metadata["SecurityType"] = "AccessControl";
+            metadata["SupportsGranularACL"] = true;
+            return metadata;
+        }
+    }
+
+    /// <summary>
+    /// Abstract base class for governance/sentinel plugins (Neural Sentinel).
+    /// AI-native: Core class for AI-driven governance and compliance.
+    /// </summary>
+    public abstract class GovernancePluginBase : PluginBase, Governance.INeuralSentinel
+    {
+        /// <summary>
+        /// Category is always GovernanceProvider.
+        /// </summary>
+        public override PluginCategory Category => PluginCategory.GovernanceProvider;
+
+        /// <summary>
+        /// Evaluates a data operation context and determines if intervention is required.
+        /// Must be implemented by derived classes.
+        /// </summary>
+        public abstract Task<Governance.GovernanceJudgment> EvaluateAsync(Governance.SentinelContext context);
+
+        /// <summary>
+        /// Registered sentinel modules for this governance plugin.
+        /// </summary>
+        protected List<Governance.ISentinelModule> Modules { get; } = new();
+
+        /// <summary>
+        /// Register a sentinel module.
+        /// </summary>
+        public void RegisterModule(Governance.ISentinelModule module)
+        {
+            Modules.Add(module);
+        }
+
+        protected override Dictionary<string, object> GetMetadata()
+        {
+            var metadata = base.GetMetadata();
+            metadata["GovernanceType"] = "NeuralSentinel";
+            metadata["ModuleCount"] = Modules.Count;
+            metadata["SupportsRealTimeScanning"] = true;
             return metadata;
         }
     }
