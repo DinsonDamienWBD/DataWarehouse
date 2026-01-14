@@ -724,11 +724,11 @@ namespace DataWarehouse.SDK.Contracts
             data.Position = 0;
             using System.Security.Cryptography.HashAlgorithm hashAlg = algorithm switch
             {
+                HashAlgorithmType.SHA256 => System.Security.Cryptography.SHA256.Create(),
                 HashAlgorithmType.SHA384 => System.Security.Cryptography.SHA384.Create(),
                 HashAlgorithmType.SHA512 => System.Security.Cryptography.SHA512.Create(),
-                HashAlgorithmType.SHA256 => throw new NotImplementedException(),
-                HashAlgorithmType.BLAKE2 => throw new NotImplementedException(),
-                HashAlgorithmType.BLAKE3 => throw new NotImplementedException(),
+                HashAlgorithmType.BLAKE2 => throw new NotSupportedException("BLAKE2 requires the CryptoPlugin. Install and register the BLAKE2 crypto plugin."),
+                HashAlgorithmType.BLAKE3 => throw new NotSupportedException("BLAKE3 requires the CryptoPlugin. Install and register the BLAKE3 crypto plugin."),
                 _ => System.Security.Cryptography.SHA256.Create()
             };
 
