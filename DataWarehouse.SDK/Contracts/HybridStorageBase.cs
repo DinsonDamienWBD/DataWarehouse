@@ -722,7 +722,7 @@ namespace DataWarehouse.SDK.Contracts
         protected virtual async Task<string> ComputeHashAsync(Stream data, HashAlgorithmType algorithm, CancellationToken ct)
         {
             data.Position = 0;
-            using var hashAlg = algorithm switch
+            using System.Security.Cryptography.HashAlgorithm hashAlg = algorithm switch
             {
                 HashAlgorithmType.SHA384 => System.Security.Cryptography.SHA384.Create(),
                 HashAlgorithmType.SHA512 => System.Security.Cryptography.SHA512.Create(),

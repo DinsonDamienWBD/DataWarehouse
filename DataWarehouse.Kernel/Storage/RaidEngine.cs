@@ -17,7 +17,16 @@ namespace DataWarehouse.Kernel.Storage
         private readonly ConcurrentDictionary<int, ProviderHealth> _providerHealth;
         private readonly Timer? _healthMonitorTimer;
         private readonly SemaphoreSlim _rebuildLock = new(1, 1);
+        private Func<int, IStorageProvider>? _getProvider;
         private bool _disposed;
+
+        /// <summary>
+        /// Sets the provider resolver function for rebuild operations.
+        /// </summary>
+        public void SetProviderResolver(Func<int, IStorageProvider> getProvider)
+        {
+            _getProvider = getProvider ?? throw new ArgumentNullException(nameof(getProvider));
+        }
 
         public RaidEngine(RaidConfiguration config, IKernelContext context)
         {
@@ -3394,7 +3403,7 @@ namespace DataWarehouse.Kernel.Storage
             for (int i = 0; i < _config.ProviderCount; i++)
             {
                 var provider = getProvider(i);
-                metadataTasks.Add(provider.WriteAsync($"{key}.raid.meta", new MemoryStream(System.Text.Encoding.UTF8.GetBytes(metadataJson))));
+                metadataTasks.Add(SaveStreamAsync(provider,$"{key}.raid.meta", new MemoryStream(System.Text.Encoding.UTF8.GetBytes(metadataJson))));
             }
             await Task.WhenAll(metadataTasks);
 
@@ -3417,7 +3426,7 @@ namespace DataWarehouse.Kernel.Storage
                         int driveIdx = baseDrive + copy;
                         var provider = getProvider(driveIdx);
                         var chunkKey = $"{key}.md10.{chunkIdx}.{copy}";
-                        saveTasks.Add(provider.WriteAsync(chunkKey, new MemoryStream(chunk)));
+                        saveTasks.Add(SaveStreamAsync(provider,chunkKey, new MemoryStream(chunk)));
                     }
                 }
                 else if (layout == MD10Layout.Far)
@@ -3431,7 +3440,7 @@ namespace DataWarehouse.Kernel.Storage
                         int driveIdx = (primaryDrive + copy * offset) % totalDrives;
                         var provider = getProvider(driveIdx);
                         var chunkKey = $"{key}.md10.{chunkIdx}.{copy}";
-                        saveTasks.Add(provider.WriteAsync(chunkKey, new MemoryStream(chunk)));
+                        saveTasks.Add(SaveStreamAsync(provider,chunkKey, new MemoryStream(chunk)));
                     }
                 }
                 else // Offset layout
@@ -3448,7 +3457,7 @@ namespace DataWarehouse.Kernel.Storage
                         {
                             var provider = getProvider(driveIdx);
                             var chunkKey = $"{key}.md10.{chunkIdx}.{copy}";
-                            saveTasks.Add(provider.WriteAsync(chunkKey, new MemoryStream(chunk)));
+                            saveTasks.Add(SaveStreamAsync(provider,chunkKey, new MemoryStream(chunk)));
                         }
                     }
                 }
@@ -3467,7 +3476,7 @@ namespace DataWarehouse.Kernel.Storage
                 try
                 {
                     var provider = getProvider(i);
-                    using var metaStream = await provider.ReadAsync($"{key}.raid.meta");
+                    using var metaStream = await LoadStreamAsync(provider,$"{key}.raid.meta");
                     if (metaStream != null)
                     {
                         var metaBytes = await ReadAllBytesAsync(metaStream);
@@ -3534,7 +3543,7 @@ namespace DataWarehouse.Kernel.Storage
                         {
                             var provider = getProvider(driveIdx);
                             var chunkKey = $"{key}.md10.{chunkIdx}.{copy}";
-                            using var stream = await provider.ReadAsync(chunkKey);
+                            using var stream = await LoadStreamAsync(provider,chunkKey);
                             if (stream != null)
                             {
                                 chunkData = await ReadAllBytesAsync(stream);
@@ -3733,7 +3742,7 @@ namespace DataWarehouse.Kernel.Storage
             for (int i = 0; i < n; i++)
             {
                 var provider = getProvider(i);
-                metadataTasks.Add(provider.WriteAsync($"{key}.raid.meta", new MemoryStream(System.Text.Encoding.UTF8.GetBytes(metadataJson))));
+                metadataTasks.Add(SaveStreamAsync(provider,$"{key}.raid.meta", new MemoryStream(System.Text.Encoding.UTF8.GetBytes(metadataJson))));
             }
             await Task.WhenAll(metadataTasks);
 
@@ -3749,7 +3758,7 @@ namespace DataWarehouse.Kernel.Storage
                     int driveIdx = stripe.driveAssignment[d];
                     var provider = getProvider(driveIdx);
                     var chunkKey = $"{key}.dcl.s{stripe.stripeIdx}.d{d}";
-                    saveTasks.Add(provider.WriteAsync(chunkKey, new MemoryStream(stripe.dataChunks[d])));
+                    saveTasks.Add(SaveStreamAsync(provider,chunkKey, new MemoryStream(stripe.dataChunks[d])));
                     globalChunkIdx++;
                 }
 
@@ -3777,7 +3786,7 @@ namespace DataWarehouse.Kernel.Storage
                 try
                 {
                     var provider = getProvider(i);
-                    using var metaStream = await provider.ReadAsync($"{key}.raid.meta");
+                    using var metaStream = await LoadStreamAsync(provider,$"{key}.raid.meta");
                     if (metaStream != null)
                     {
                         var metaBytes = await ReadAllBytesAsync(metaStream);
@@ -3852,7 +3861,7 @@ namespace DataWarehouse.Kernel.Storage
                     {
                         var provider = getProvider(driveIdx);
                         var chunkKey = $"{key}.dcl.s{stripeIdx}.d{d}";
-                        using var stream = await provider.ReadAsync(chunkKey);
+                        using var stream = await LoadStreamAsync(provider,chunkKey);
                         if (stream != null)
                         {
                             stripeChunks[d] = await ReadAllBytesAsync(stream);
@@ -5479,6 +5488,18 @@ namespace DataWarehouse.Kernel.Storage
             await provider.SaveAsync(uri, stream);
         }
 
+        private static async Task SaveStreamAsync(IStorageProvider provider, string key, Stream stream)
+        {
+            var uri = new Uri($"{provider.Scheme}://{key}");
+            await provider.SaveAsync(uri, stream);
+        }
+
+        private static async Task<Stream> LoadStreamAsync(IStorageProvider provider, string key)
+        {
+            var uri = new Uri($"{provider.Scheme}://{key}");
+            return await provider.LoadAsync(uri);
+        }
+
         private static async Task<byte[]> LoadChunkAsync(IStorageProvider provider, string key)
         {
             var uri = new Uri($"{provider.Scheme}://{key}");
@@ -5838,6 +5859,9 @@ namespace DataWarehouse.Kernel.Storage
 
         private async Task<List<string>> GetAllStoredKeysAsync(int excludeProviderIndex)
         {
+            if (_getProvider == null)
+                throw new InvalidOperationException("Provider resolver not set. Call SetProviderResolver first.");
+
             var keys = new HashSet<string>();
 
             // Scan metadata from all surviving providers
@@ -5873,6 +5897,9 @@ namespace DataWarehouse.Kernel.Storage
 
         private async Task RebuildKeyAsync(string key, int failedProviderIndex)
         {
+            if (_getProvider == null)
+                throw new InvalidOperationException("Provider resolver not set. Call SetProviderResolver first.");
+
             // Load data from surviving providers and rebuild the failed provider's chunk
             // This uses the existing Load logic which handles reconstruction
 
@@ -5887,7 +5914,7 @@ namespace DataWarehouse.Kernel.Storage
                     try
                     {
                         var provider = _getProvider(i);
-                        using var metaStream = await provider.ReadAsync($"{key}.raid.meta");
+                        using var metaStream = await LoadStreamAsync(provider,$"{key}.raid.meta");
                         if (metaStream != null)
                         {
                             var metaBytes = await ReadAllBytesAsync(metaStream);
@@ -6105,6 +6132,10 @@ namespace DataWarehouse.Kernel.Storage
         public long TotalSize { get; set; }
         public int ChunkCount { get; set; }
         public int MirrorCount { get; set; }
+        public int StripeSize { get; set; } = 65536; // Default 64KB stripe
+        public int ProviderCount { get; set; }
+        public int ParityDriveIndex { get; set; } = -1; // -1 means rotating parity
+        public string Layout { get; set; } = "left-symmetric"; // RAID layout description
         public Dictionary<int, List<int>> ProviderMapping { get; set; } = new();
     }
 
