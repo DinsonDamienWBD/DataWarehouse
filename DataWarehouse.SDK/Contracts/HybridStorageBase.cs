@@ -726,6 +726,9 @@ namespace DataWarehouse.SDK.Contracts
             {
                 HashAlgorithmType.SHA384 => System.Security.Cryptography.SHA384.Create(),
                 HashAlgorithmType.SHA512 => System.Security.Cryptography.SHA512.Create(),
+                HashAlgorithmType.SHA256 => throw new NotImplementedException(),
+                HashAlgorithmType.BLAKE2 => throw new NotImplementedException(),
+                HashAlgorithmType.BLAKE3 => throw new NotImplementedException(),
                 _ => System.Security.Cryptography.SHA256.Create()
             };
 
