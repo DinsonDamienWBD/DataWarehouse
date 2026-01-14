@@ -16,13 +16,31 @@ namespace DataWarehouse.Kernel.Storage
         private readonly IKernelContext _context;
         private readonly object _snapshotLock = new();
         private readonly RetentionPolicy _retentionPolicy;
+        private readonly string _id;
+        private bool _isRunning;
 
-        public override string PoolId => $"realtime-{Guid.NewGuid():N}"[..16];
+        public override string Id => _id;
+        public override string PoolId => _id;
 
         public RealTimeStorageManager(IKernelContext context, RetentionPolicy? retentionPolicy = null)
         {
             _context = context ?? throw new ArgumentNullException(nameof(context));
             _retentionPolicy = retentionPolicy ?? RetentionPolicy.Default;
+            _id = $"realtime-{Guid.NewGuid():N}"[..16];
+        }
+
+        public override Task StartAsync(CancellationToken ct = default)
+        {
+            _isRunning = true;
+            _context.LogInfo($"[RealTimeStorageManager] Started ({_id})");
+            return Task.CompletedTask;
+        }
+
+        public override Task StopAsync()
+        {
+            _isRunning = false;
+            _context.LogInfo($"[RealTimeStorageManager] Stopped ({_id})");
+            return Task.CompletedTask;
         }
 
         #region Point-in-Time Recovery
