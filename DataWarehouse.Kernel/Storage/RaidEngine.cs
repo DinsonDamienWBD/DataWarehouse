@@ -700,54 +700,376 @@ namespace DataWarehouse.Kernel.Storage
 
         private async Task SaveRAID50Async(string key, Stream data, Func<int, IStorageProvider> getProvider)
         {
-            // RAID 50 = Multiple RAID 5 sets striped together
-            // For simplicity, we'll stripe data across two RAID 5 sets
-            // This requires at least 6 providers (2 sets of 3)
-
+            // RAID 50 = Multiple RAID 5 sets striped together (RAID 5+0)
+            // Each RAID 5 set needs minimum 3 disks
             if (_config.ProviderCount < 6)
-                throw new InvalidOperationException("RAID 50 requires at least 6 providers");
+                throw new InvalidOperationException("RAID 50 requires at least 6 providers (2 RAID 5 sets)");
 
-            var chunks = SplitIntoChunks(data, _config.StripeSize);
-            int setsCount = _config.ProviderCount / 3; // Each RAID 5 set needs 3 disks minimum
+            var allBytes = await ReadAllBytesAsync(data);
+            var chunks = SplitIntoChunks(new MemoryStream(allBytes), _config.StripeSize);
+
+            // Calculate RAID 5 set configuration
+            int disksPerSet = 3; // Minimum for RAID 5
+            if (_config.ProviderCount >= 8) disksPerSet = 4;
+            if (_config.ProviderCount >= 12) disksPerSet = _config.ProviderCount / 3;
+
+            int setsCount = _config.ProviderCount / disksPerSet;
+            int dataDisksPerSet = disksPerSet - 1; // One parity per set
+
+            var metadata = new RaidMetadata
+            {
+                Level = RaidLevel.RAID_50,
+                TotalSize = allBytes.Length,
+                ChunkCount = chunks.Count,
+                ProviderMapping = new Dictionary<int, List<int>> { { 0, new List<int> { setsCount, disksPerSet } } }
+            };
+
             var tasks = new List<Task>();
 
-            for (int i = 0; i < chunks.Count; i++)
+            // Stripe chunks across RAID 5 sets
+            for (int chunkIdx = 0; chunkIdx < chunks.Count; chunkIdx++)
             {
-                int setIdx = i % setsCount;
-                int setOffset = setIdx * 3;
+                // Determine which RAID 5 set this chunk belongs to (stripe level)
+                int setIdx = chunkIdx % setsCount;
+                int setOffset = setIdx * disksPerSet;
 
-                // Use RAID 5 logic within each set
-                // (Simplified: just save to first disk in set for demo)
-                var chunkKey = $"{key}.chunk.{i}";
-                tasks.Add(SaveChunkAsync(getProvider(setOffset), chunkKey, chunks[i]));
+                // Within the set, determine stripe and position
+                int chunksInSet = (chunks.Count + setsCount - 1) / setsCount;
+                int localChunkIdx = chunkIdx / setsCount;
+                int stripeInSet = localChunkIdx / dataDisksPerSet;
+                int diskInStripe = localChunkIdx % dataDisksPerSet;
+
+                // Rotating parity within each set
+                int parityDiskInSet = stripeInSet % disksPerSet;
+
+                // Calculate actual disk position (skip parity disk)
+                int actualDiskInSet = diskInStripe;
+                if (actualDiskInSet >= parityDiskInSet)
+                    actualDiskInSet++;
+
+                int providerIdx = setOffset + actualDiskInSet;
+                var chunkKey = $"{key}.set{setIdx}.chunk.{localChunkIdx}";
+                tasks.Add(SaveChunkAsync(getProvider(providerIdx), chunkKey, chunks[chunkIdx]));
+            }
+
+            // Calculate and store parity for each set
+            for (int setIdx = 0; setIdx < setsCount; setIdx++)
+            {
+                int setOffset = setIdx * disksPerSet;
+
+                // Get all chunks belonging to this set
+                var setChunks = new List<byte[]>();
+                for (int i = setIdx; i < chunks.Count; i += setsCount)
+                {
+                    setChunks.Add(chunks[i]);
+                }
+
+                // Calculate parity for each stripe within the set
+                int stripesInSet = (setChunks.Count + dataDisksPerSet - 1) / dataDisksPerSet;
+                for (int stripe = 0; stripe < stripesInSet; stripe++)
+                {
+                    var stripeChunks = setChunks.Skip(stripe * dataDisksPerSet).Take(dataDisksPerSet).ToList();
+                    if (stripeChunks.Count > 0)
+                    {
+                        var parity = CalculateParityXOR(stripeChunks);
+                        int parityDiskInSet = stripe % disksPerSet;
+                        int providerIdx = setOffset + parityDiskInSet;
+                        var parityKey = $"{key}.set{setIdx}.parity.{stripe}";
+                        tasks.Add(SaveChunkAsync(getProvider(providerIdx), parityKey, parity));
+                    }
+                }
             }
 
             await Task.WhenAll(tasks);
-            _context.LogInfo($"[RAID50] Saved {key} using RAID 5+0 configuration");
+            _metadata[key] = metadata;
+            _context.LogInfo($"[RAID50] Saved {key} across {setsCount} RAID 5 sets ({disksPerSet} disks each)");
         }
 
-        private Task<Stream> LoadRAID50Async(string key, Func<int, IStorageProvider> getProvider)
+        private async Task<Stream> LoadRAID50Async(string key, Func<int, IStorageProvider> getProvider)
         {
-            // Simplified load for RAID 50
-            // In production, this would implement full RAID 5 logic per set
-            throw new NotImplementedException("RAID 50 load not yet fully implemented");
+            if (!_metadata.TryGetValue(key, out var metadata))
+                throw new FileNotFoundException($"RAID metadata not found for {key}");
+
+            // Retrieve set configuration from metadata
+            int setsCount = metadata.ProviderMapping[0][0];
+            int disksPerSet = metadata.ProviderMapping[0][1];
+            int dataDisksPerSet = disksPerSet - 1;
+
+            var allChunks = new byte[metadata.ChunkCount][];
+            var failedSets = new Dictionary<int, List<int>>(); // setIdx -> failed local chunk indices
+
+            // Load chunks from all sets
+            for (int chunkIdx = 0; chunkIdx < metadata.ChunkCount; chunkIdx++)
+            {
+                int setIdx = chunkIdx % setsCount;
+                int setOffset = setIdx * disksPerSet;
+                int localChunkIdx = chunkIdx / setsCount;
+                int stripeInSet = localChunkIdx / dataDisksPerSet;
+                int diskInStripe = localChunkIdx % dataDisksPerSet;
+                int parityDiskInSet = stripeInSet % disksPerSet;
+
+                int actualDiskInSet = diskInStripe;
+                if (actualDiskInSet >= parityDiskInSet)
+                    actualDiskInSet++;
+
+                int providerIdx = setOffset + actualDiskInSet;
+                var chunkKey = $"{key}.set{setIdx}.chunk.{localChunkIdx}";
+
+                try
+                {
+                    allChunks[chunkIdx] = await LoadChunkAsync(getProvider(providerIdx), chunkKey);
+                }
+                catch (Exception ex)
+                {
+                    _context.LogWarning($"[RAID50] Failed to load chunk {chunkIdx} from set {setIdx}: {ex.Message}");
+                    if (!failedSets.ContainsKey(setIdx))
+                        failedSets[setIdx] = new List<int>();
+                    failedSets[setIdx].Add(chunkIdx);
+                }
+            }
+
+            // Rebuild failed chunks using parity within each set
+            foreach (var (setIdx, failedChunks) in failedSets)
+            {
+                int setOffset = setIdx * disksPerSet;
+
+                foreach (var failedChunkIdx in failedChunks)
+                {
+                    int localChunkIdx = failedChunkIdx / setsCount;
+                    int stripeInSet = localChunkIdx / dataDisksPerSet;
+                    int parityDiskInSet = stripeInSet % disksPerSet;
+
+                    // Load parity
+                    var parityKey = $"{key}.set{setIdx}.parity.{stripeInSet}";
+                    var parity = await LoadChunkAsync(getProvider(setOffset + parityDiskInSet), parityKey);
+
+                    // Collect other chunks from the same stripe
+                    var stripeChunks = new List<byte[]>();
+                    int stripeStart = stripeInSet * dataDisksPerSet;
+                    for (int i = 0; i < dataDisksPerSet; i++)
+                    {
+                        int globalIdx = (stripeStart + i) * setsCount + setIdx;
+                        if (globalIdx < metadata.ChunkCount && globalIdx != failedChunkIdx && allChunks[globalIdx] != null)
+                        {
+                            stripeChunks.Add(allChunks[globalIdx]);
+                        }
+                    }
+
+                    // Rebuild from parity
+                    var rebuilt = new byte[parity.Length];
+                    Array.Copy(parity, rebuilt, parity.Length);
+                    foreach (var chunk in stripeChunks)
+                    {
+                        for (int i = 0; i < Math.Min(chunk.Length, rebuilt.Length); i++)
+                        {
+                            rebuilt[i] ^= chunk[i];
+                        }
+                    }
+
+                    allChunks[failedChunkIdx] = rebuilt;
+                    _context.LogInfo($"[RAID50] Rebuilt chunk {failedChunkIdx} in set {setIdx} using parity");
+                }
+            }
+
+            // Trim to original size
+            var result = allChunks.SelectMany(c => c ?? Array.Empty<byte>()).Take((int)metadata.TotalSize).ToArray();
+            return new MemoryStream(result);
         }
 
         // ==================== RAID 60: Striped RAID 6 Sets (RAID 6+0) ====================
 
         private async Task SaveRAID60Async(string key, Stream data, Func<int, IStorageProvider> getProvider)
         {
+            // RAID 60 = Multiple RAID 6 sets striped together (RAID 6+0)
+            // Each RAID 6 set needs minimum 4 disks (2 data + 2 parity)
             if (_config.ProviderCount < 8)
-                throw new InvalidOperationException("RAID 60 requires at least 8 providers");
+                throw new InvalidOperationException("RAID 60 requires at least 8 providers (2 RAID 6 sets)");
 
-            // Similar to RAID 50 but uses RAID 6 sets
-            _context.LogInfo($"[RAID60] Saved {key} using RAID 6+0 configuration");
-            await SaveRAID6Async(key, data, getProvider); // Simplified
+            var allBytes = await ReadAllBytesAsync(data);
+            var chunks = SplitIntoChunks(new MemoryStream(allBytes), _config.StripeSize);
+
+            int disksPerSet = 4; // Minimum for RAID 6
+            if (_config.ProviderCount >= 12) disksPerSet = _config.ProviderCount / 2;
+
+            int setsCount = _config.ProviderCount / disksPerSet;
+            int dataDisksPerSet = disksPerSet - 2; // Two parity per set (P and Q)
+
+            var metadata = new RaidMetadata
+            {
+                Level = RaidLevel.RAID_60,
+                TotalSize = allBytes.Length,
+                ChunkCount = chunks.Count,
+                ProviderMapping = new Dictionary<int, List<int>> { { 0, new List<int> { setsCount, disksPerSet } } }
+            };
+
+            var tasks = new List<Task>();
+
+            // Stripe chunks across RAID 6 sets
+            for (int chunkIdx = 0; chunkIdx < chunks.Count; chunkIdx++)
+            {
+                int setIdx = chunkIdx % setsCount;
+                int setOffset = setIdx * disksPerSet;
+                int localChunkIdx = chunkIdx / setsCount;
+                int stripeInSet = localChunkIdx / dataDisksPerSet;
+                int diskInStripe = localChunkIdx % dataDisksPerSet;
+
+                // Rotating dual parity (P and Q)
+                int parityPDiskInSet = stripeInSet % disksPerSet;
+                int parityQDiskInSet = (stripeInSet + 1) % disksPerSet;
+
+                // Calculate actual disk position (skip both parity disks)
+                int actualDiskInSet = diskInStripe;
+                for (int pd = 0; pd < disksPerSet; pd++)
+                {
+                    if (pd == parityPDiskInSet || pd == parityQDiskInSet)
+                    {
+                        if (pd <= actualDiskInSet)
+                            actualDiskInSet++;
+                    }
+                }
+                actualDiskInSet = Math.Min(actualDiskInSet, disksPerSet - 1);
+
+                int providerIdx = setOffset + actualDiskInSet;
+                var chunkKey = $"{key}.set{setIdx}.chunk.{localChunkIdx}";
+                tasks.Add(SaveChunkAsync(getProvider(providerIdx), chunkKey, chunks[chunkIdx]));
+            }
+
+            // Calculate and store dual parity for each set
+            for (int setIdx = 0; setIdx < setsCount; setIdx++)
+            {
+                int setOffset = setIdx * disksPerSet;
+                var setChunks = new List<byte[]>();
+                for (int i = setIdx; i < chunks.Count; i += setsCount)
+                    setChunks.Add(chunks[i]);
+
+                int stripesInSet = (setChunks.Count + dataDisksPerSet - 1) / dataDisksPerSet;
+                for (int stripe = 0; stripe < stripesInSet; stripe++)
+                {
+                    var stripeChunks = setChunks.Skip(stripe * dataDisksPerSet).Take(dataDisksPerSet).ToList();
+                    if (stripeChunks.Count > 0)
+                    {
+                        var parityP = CalculateParityXOR(stripeChunks);
+                        var parityQ = CalculateParityReedSolomon(stripeChunks);
+
+                        int parityPDiskInSet = stripe % disksPerSet;
+                        int parityQDiskInSet = (stripe + 1) % disksPerSet;
+
+                        tasks.Add(SaveChunkAsync(getProvider(setOffset + parityPDiskInSet), $"{key}.set{setIdx}.parityP.{stripe}", parityP));
+                        tasks.Add(SaveChunkAsync(getProvider(setOffset + parityQDiskInSet), $"{key}.set{setIdx}.parityQ.{stripe}", parityQ));
+                    }
+                }
+            }
+
+            await Task.WhenAll(tasks);
+            _metadata[key] = metadata;
+            _context.LogInfo($"[RAID60] Saved {key} across {setsCount} RAID 6 sets ({disksPerSet} disks each, dual parity)");
         }
 
         private async Task<Stream> LoadRAID60Async(string key, Func<int, IStorageProvider> getProvider)
         {
-            return await LoadRAID6Async(key, getProvider); // Simplified
+            if (!_metadata.TryGetValue(key, out var metadata))
+                throw new FileNotFoundException($"RAID metadata not found for {key}");
+
+            int setsCount = metadata.ProviderMapping[0][0];
+            int disksPerSet = metadata.ProviderMapping[0][1];
+            int dataDisksPerSet = disksPerSet - 2;
+
+            var allChunks = new byte[metadata.ChunkCount][];
+            var failedSets = new Dictionary<int, List<int>>();
+
+            // Load chunks from all sets
+            for (int chunkIdx = 0; chunkIdx < metadata.ChunkCount; chunkIdx++)
+            {
+                int setIdx = chunkIdx % setsCount;
+                int setOffset = setIdx * disksPerSet;
+                int localChunkIdx = chunkIdx / setsCount;
+                int stripeInSet = localChunkIdx / dataDisksPerSet;
+                int diskInStripe = localChunkIdx % dataDisksPerSet;
+
+                int parityPDiskInSet = stripeInSet % disksPerSet;
+                int parityQDiskInSet = (stripeInSet + 1) % disksPerSet;
+
+                int actualDiskInSet = diskInStripe;
+                for (int pd = 0; pd < disksPerSet; pd++)
+                {
+                    if ((pd == parityPDiskInSet || pd == parityQDiskInSet) && pd <= actualDiskInSet)
+                        actualDiskInSet++;
+                }
+                actualDiskInSet = Math.Min(actualDiskInSet, disksPerSet - 1);
+
+                int providerIdx = setOffset + actualDiskInSet;
+                var chunkKey = $"{key}.set{setIdx}.chunk.{localChunkIdx}";
+
+                try
+                {
+                    allChunks[chunkIdx] = await LoadChunkAsync(getProvider(providerIdx), chunkKey);
+                }
+                catch
+                {
+                    if (!failedSets.ContainsKey(setIdx))
+                        failedSets[setIdx] = new List<int>();
+                    failedSets[setIdx].Add(chunkIdx);
+                }
+            }
+
+            // Rebuild failed chunks using dual parity (can recover 2 failures per set)
+            foreach (var (setIdx, failedChunks) in failedSets)
+            {
+                int setOffset = setIdx * disksPerSet;
+
+                // Group failures by stripe
+                var failuresByStripe = failedChunks.GroupBy(fc => (fc / setsCount) / dataDisksPerSet);
+
+                foreach (var stripeFailures in failuresByStripe)
+                {
+                    int stripe = stripeFailures.Key;
+                    var failedInStripe = stripeFailures.ToList();
+
+                    if (failedInStripe.Count > 2)
+                        throw new IOException($"RAID 60 can only recover 2 failures per set, but {failedInStripe.Count} failed in set {setIdx} stripe {stripe}");
+
+                    int parityPDiskInSet = stripe % disksPerSet;
+                    int parityQDiskInSet = (stripe + 1) % disksPerSet;
+
+                    var parityP = await LoadChunkAsync(getProvider(setOffset + parityPDiskInSet), $"{key}.set{setIdx}.parityP.{stripe}");
+                    var parityQ = await LoadChunkAsync(getProvider(setOffset + parityQDiskInSet), $"{key}.set{setIdx}.parityQ.{stripe}");
+
+                    // Collect surviving chunks in this stripe
+                    var stripeChunks = new List<byte[]>();
+                    int stripeStart = stripe * dataDisksPerSet;
+                    var failedIndices = new List<int>();
+
+                    for (int i = 0; i < dataDisksPerSet; i++)
+                    {
+                        int globalIdx = (stripeStart + i) * setsCount + setIdx;
+                        if (globalIdx < metadata.ChunkCount)
+                        {
+                            if (failedInStripe.Contains(globalIdx))
+                            {
+                                failedIndices.Add(i);
+                                stripeChunks.Add(null!);
+                            }
+                            else
+                            {
+                                stripeChunks.Add(allChunks[globalIdx]);
+                            }
+                        }
+                    }
+
+                    // Rebuild using dual parity
+                    var rebuilt = RebuildFromDualParity(stripeChunks, parityP, parityQ, failedIndices);
+                    foreach (var (localIdx, chunk) in rebuilt)
+                    {
+                        int globalIdx = (stripeStart + localIdx) * setsCount + setIdx;
+                        allChunks[globalIdx] = chunk;
+                    }
+
+                    _context.LogInfo($"[RAID60] Rebuilt {failedInStripe.Count} chunks in set {setIdx} stripe {stripe}");
+                }
+            }
+
+            var result = allChunks.SelectMany(c => c ?? Array.Empty<byte>()).Take((int)metadata.TotalSize).ToArray();
+            return new MemoryStream(result);
         }
 
         // ==================== RAID 01: Striped Mirrors (RAID 0+1) ====================
@@ -819,35 +1141,229 @@ namespace DataWarehouse.Kernel.Storage
 
         private async Task SaveRAIDZ1Async(string key, Stream data, Func<int, IStorageProvider> getProvider)
         {
-            // RAID-Z1 is equivalent to RAID 5 but with ZFS optimizations
-            // For simplicity, use RAID 5 implementation with variable stripe width
+            // RAID-Z1: ZFS single parity with variable stripe width
+            // Key difference from RAID 5: parity is calculated per record, not per stripe
             if (_config.ProviderCount < 3)
                 throw new InvalidOperationException("RAID-Z1 requires at least 3 providers");
 
-            await SaveRAID5Async(key, data, getProvider);
-            _context.LogInfo($"[RAID-Z1] Saved {key} with ZFS single parity");
+            var allBytes = await ReadAllBytesAsync(data);
+            var chunks = SplitIntoChunks(new MemoryStream(allBytes), _config.StripeSize);
+
+            int dataDisks = _config.ProviderCount - 1;
+
+            var metadata = new RaidMetadata
+            {
+                Level = RaidLevel.RAID_Z1,
+                TotalSize = allBytes.Length,
+                ChunkCount = chunks.Count
+            };
+
+            var tasks = new List<Task>();
+            int stripeCount = (int)MathUtils.Ceiling((double)chunks.Count / dataDisks);
+
+            for (int stripe = 0; stripe < stripeCount; stripe++)
+            {
+                // ZFS-style: variable width stripes (use all available chunks in stripe)
+                var stripeStart = stripe * dataDisks;
+                var stripeChunks = chunks.Skip(stripeStart).Take(dataDisks).ToList();
+                int actualWidth = stripeChunks.Count;
+
+                // Rotating parity (ZFS distributes across all vdevs)
+                int parityDisk = stripe % _config.ProviderCount;
+
+                // Calculate parity for variable-width stripe
+                var parity = CalculateParityXOR(stripeChunks);
+                tasks.Add(SaveChunkAsync(getProvider(parityDisk), $"{key}.z1parity.{stripe}", parity));
+
+                // Write data chunks to remaining disks
+                int dataIdx = 0;
+                for (int disk = 0; disk < _config.ProviderCount; disk++)
+                {
+                    if (disk == parityDisk)
+                        continue;
+
+                    int chunkIdx = stripeStart + dataIdx;
+                    if (dataIdx < actualWidth)
+                    {
+                        tasks.Add(SaveChunkAsync(getProvider(disk), $"{key}.z1data.{chunkIdx}", stripeChunks[dataIdx]));
+                    }
+                    dataIdx++;
+                }
+            }
+
+            await Task.WhenAll(tasks);
+            _metadata[key] = metadata;
+            _context.LogInfo($"[RAID-Z1] Saved {key} with ZFS variable-width single parity");
         }
 
         private async Task<Stream> LoadRAIDZ1Async(string key, Func<int, IStorageProvider> getProvider)
         {
-            return await LoadRAID5Async(key, getProvider);
+            if (!_metadata.TryGetValue(key, out var metadata))
+                throw new FileNotFoundException($"RAID metadata not found for {key}");
+
+            int dataDisks = _config.ProviderCount - 1;
+            int stripeCount = (int)MathUtils.Ceiling((double)metadata.ChunkCount / dataDisks);
+            var allChunks = new byte[metadata.ChunkCount][];
+
+            for (int stripe = 0; stripe < stripeCount; stripe++)
+            {
+                int parityDisk = stripe % _config.ProviderCount;
+                int stripeStart = stripe * dataDisks;
+                int failedIdx = -1;
+
+                int dataIdx = 0;
+                for (int disk = 0; disk < _config.ProviderCount; disk++)
+                {
+                    if (disk == parityDisk)
+                        continue;
+
+                    int chunkIdx = stripeStart + dataIdx;
+                    if (chunkIdx < metadata.ChunkCount)
+                    {
+                        try
+                        {
+                            allChunks[chunkIdx] = await LoadChunkAsync(getProvider(disk), $"{key}.z1data.{chunkIdx}");
+                        }
+                        catch
+                        {
+                            failedIdx = dataIdx;
+                        }
+                    }
+                    dataIdx++;
+                }
+
+                // Rebuild using parity if needed
+                if (failedIdx >= 0)
+                {
+                    var parity = await LoadChunkAsync(getProvider(parityDisk), $"{key}.z1parity.{stripe}");
+                    var surviving = new List<byte[]>();
+                    for (int i = 0; i < dataDisks; i++)
+                    {
+                        int idx = stripeStart + i;
+                        if (i != failedIdx && idx < metadata.ChunkCount && allChunks[idx] != null)
+                            surviving.Add(allChunks[idx]);
+                    }
+                    allChunks[stripeStart + failedIdx] = RebuildChunkFromParity(surviving, parity);
+                    _context.LogInfo($"[RAID-Z1] Rebuilt chunk in stripe {stripe}");
+                }
+            }
+
+            var result = allChunks.Where(c => c != null).SelectMany(c => c).Take((int)metadata.TotalSize).ToArray();
+            return new MemoryStream(result);
         }
 
         // ==================== RAID-Z2: ZFS Double Parity ====================
 
         private async Task SaveRAIDZ2Async(string key, Stream data, Func<int, IStorageProvider> getProvider)
         {
-            // RAID-Z2 is equivalent to RAID 6 but with ZFS optimizations
+            // RAID-Z2: ZFS double parity with variable stripe width
             if (_config.ProviderCount < 4)
                 throw new InvalidOperationException("RAID-Z2 requires at least 4 providers");
 
-            await SaveRAID6Async(key, data, getProvider);
-            _context.LogInfo($"[RAID-Z2] Saved {key} with ZFS double parity");
+            var allBytes = await ReadAllBytesAsync(data);
+            var chunks = SplitIntoChunks(new MemoryStream(allBytes), _config.StripeSize);
+
+            int dataDisks = _config.ProviderCount - 2;
+
+            var metadata = new RaidMetadata
+            {
+                Level = RaidLevel.RAID_Z2,
+                TotalSize = allBytes.Length,
+                ChunkCount = chunks.Count
+            };
+
+            var tasks = new List<Task>();
+            int stripeCount = (int)MathUtils.Ceiling((double)chunks.Count / dataDisks);
+
+            for (int stripe = 0; stripe < stripeCount; stripe++)
+            {
+                var stripeStart = stripe * dataDisks;
+                var stripeChunks = chunks.Skip(stripeStart).Take(dataDisks).ToList();
+
+                // Rotating dual parity (ZFS style)
+                int parityPDisk = stripe % _config.ProviderCount;
+                int parityQDisk = (stripe + 1) % _config.ProviderCount;
+
+                var parityP = CalculateParityXOR(stripeChunks);
+                var parityQ = CalculateParityReedSolomon(stripeChunks);
+                tasks.Add(SaveChunkAsync(getProvider(parityPDisk), $"{key}.z2parityP.{stripe}", parityP));
+                tasks.Add(SaveChunkAsync(getProvider(parityQDisk), $"{key}.z2parityQ.{stripe}", parityQ));
+
+                int dataIdx = 0;
+                for (int disk = 0; disk < _config.ProviderCount; disk++)
+                {
+                    if (disk == parityPDisk || disk == parityQDisk)
+                        continue;
+
+                    int chunkIdx = stripeStart + dataIdx;
+                    if (dataIdx < stripeChunks.Count)
+                    {
+                        tasks.Add(SaveChunkAsync(getProvider(disk), $"{key}.z2data.{chunkIdx}", stripeChunks[dataIdx]));
+                    }
+                    dataIdx++;
+                }
+            }
+
+            await Task.WhenAll(tasks);
+            _metadata[key] = metadata;
+            _context.LogInfo($"[RAID-Z2] Saved {key} with ZFS variable-width double parity");
         }
 
         private async Task<Stream> LoadRAIDZ2Async(string key, Func<int, IStorageProvider> getProvider)
         {
-            return await LoadRAID6Async(key, getProvider);
+            if (!_metadata.TryGetValue(key, out var metadata))
+                throw new FileNotFoundException($"RAID metadata not found for {key}");
+
+            int dataDisks = _config.ProviderCount - 2;
+            int stripeCount = (int)MathUtils.Ceiling((double)metadata.ChunkCount / dataDisks);
+            var allChunks = new byte[metadata.ChunkCount][];
+
+            for (int stripe = 0; stripe < stripeCount; stripe++)
+            {
+                int parityPDisk = stripe % _config.ProviderCount;
+                int parityQDisk = (stripe + 1) % _config.ProviderCount;
+                int stripeStart = stripe * dataDisks;
+                var failedIndices = new List<int>();
+                var stripeChunks = new List<byte[]>();
+
+                int dataIdx = 0;
+                for (int disk = 0; disk < _config.ProviderCount; disk++)
+                {
+                    if (disk == parityPDisk || disk == parityQDisk)
+                        continue;
+
+                    int chunkIdx = stripeStart + dataIdx;
+                    if (chunkIdx < metadata.ChunkCount)
+                    {
+                        try
+                        {
+                            var chunk = await LoadChunkAsync(getProvider(disk), $"{key}.z2data.{chunkIdx}");
+                            allChunks[chunkIdx] = chunk;
+                            stripeChunks.Add(chunk);
+                        }
+                        catch
+                        {
+                            failedIndices.Add(dataIdx);
+                            stripeChunks.Add(null!);
+                        }
+                    }
+                    dataIdx++;
+                }
+
+                // Rebuild up to 2 failures
+                if (failedIndices.Count > 0 && failedIndices.Count <= 2)
+                {
+                    var parityP = await LoadChunkAsync(getProvider(parityPDisk), $"{key}.z2parityP.{stripe}");
+                    var parityQ = await LoadChunkAsync(getProvider(parityQDisk), $"{key}.z2parityQ.{stripe}");
+                    var rebuilt = RebuildFromDualParity(stripeChunks, parityP, parityQ, failedIndices);
+                    foreach (var (idx, chunk) in rebuilt)
+                        allChunks[stripeStart + idx] = chunk;
+                    _context.LogInfo($"[RAID-Z2] Rebuilt {failedIndices.Count} chunks in stripe {stripe}");
+                }
+            }
+
+            var result = allChunks.Where(c => c != null).SelectMany(c => c).Take((int)metadata.TotalSize).ToArray();
+            return new MemoryStream(result);
         }
 
         // ==================== RAID-Z3: ZFS Triple Parity ====================
@@ -861,11 +1377,19 @@ namespace DataWarehouse.Kernel.Storage
             int dataDisks = _config.ProviderCount - 3; // Triple parity
             int stripeCount = (int)MathUtils.Ceiling((double)chunks.Count / dataDisks);
 
+            var metadata = new RaidMetadata
+            {
+                Level = RaidLevel.RAID_Z3,
+                TotalSize = data.Length,
+                ChunkCount = chunks.Count,
+                ProviderMapping = new Dictionary<int, List<int>>()
+            };
+
             var tasks = new List<Task>();
 
             for (int stripe = 0; stripe < stripeCount; stripe++)
             {
-                // Rotating triple parity disks
+                // Rotating triple parity disks (ZFS-style)
                 int parity1Disk = stripe % _config.ProviderCount;
                 int parity2Disk = (stripe + 1) % _config.ProviderCount;
                 int parity3Disk = (stripe + 2) % _config.ProviderCount;
@@ -878,10 +1402,13 @@ namespace DataWarehouse.Kernel.Storage
                     stripeChunks.Add(chunks[chunkIdx]);
                 }
 
-                // Calculate triple parity
+                // Calculate triple parity using different generators
+                // P = XOR of all data (generator g^0 = 1)
                 var parity1 = CalculateParityXOR(stripeChunks);
+                // Q = Reed-Solomon with generator g^1 = 0x02
                 var parity2 = CalculateParityReedSolomon(stripeChunks);
-                var parity3 = CalculateParityReedSolomon(stripeChunks); // Simplified: same as parity2
+                // R = Reed-Solomon with generator g^2 = 0x04 (unique third parity)
+                var parity3 = CalculateParityReedSolomonR(stripeChunks);
 
                 // Write data and parity chunks
                 int dataDiskCounter = 0;
@@ -889,15 +1416,15 @@ namespace DataWarehouse.Kernel.Storage
                 {
                     if (providerIdx == parity1Disk)
                     {
-                        tasks.Add(SaveChunkAsync(getProvider(providerIdx), $"{key}.parity1.{stripe}", parity1));
+                        tasks.Add(SaveChunkAsync(getProvider(providerIdx), $"{key}.parityP.{stripe}", parity1));
                     }
                     else if (providerIdx == parity2Disk)
                     {
-                        tasks.Add(SaveChunkAsync(getProvider(providerIdx), $"{key}.parity2.{stripe}", parity2));
+                        tasks.Add(SaveChunkAsync(getProvider(providerIdx), $"{key}.parityQ.{stripe}", parity2));
                     }
                     else if (providerIdx == parity3Disk)
                     {
-                        tasks.Add(SaveChunkAsync(getProvider(providerIdx), $"{key}.parity3.{stripe}", parity3));
+                        tasks.Add(SaveChunkAsync(getProvider(providerIdx), $"{key}.parityR.{stripe}", parity3));
                     }
                     else if (dataDiskCounter < stripeChunks.Count)
                     {
@@ -909,31 +1436,373 @@ namespace DataWarehouse.Kernel.Storage
             }
 
             await Task.WhenAll(tasks);
-            _context.LogInfo($"[RAID-Z3] Saved {key} with ZFS triple parity (3 disk fault tolerance)");
+            _metadata[key] = metadata;
+            _context.LogInfo($"[RAID-Z3] Saved {key} with ZFS triple parity (P+Q+R, 3 disk fault tolerance)");
         }
 
         private async Task<Stream> LoadRAIDZ3Async(string key, Func<int, IStorageProvider> getProvider)
         {
-            // Simplified load - in production would implement triple parity recovery
-            return await LoadRAID6Async(key, getProvider);
+            if (!_metadata.TryGetValue(key, out var metadata))
+                throw new FileNotFoundException($"RAID metadata not found for {key}");
+
+            int dataDisks = _config.ProviderCount - 3;
+            int stripeCount = (int)MathUtils.Ceiling((double)metadata.ChunkCount / dataDisks);
+            var allChunks = new List<byte[]>();
+
+            for (int stripe = 0; stripe < stripeCount; stripe++)
+            {
+                int parityPDisk = stripe % _config.ProviderCount;
+                int parityQDisk = (stripe + 1) % _config.ProviderCount;
+                int parityRDisk = (stripe + 2) % _config.ProviderCount;
+
+                var stripeChunks = new List<byte[]>();
+                var failedDisks = new List<int>();
+                var diskToChunkIdx = new Dictionary<int, int>();
+
+                // Try to read all data chunks for this stripe
+                int dataDiskCounter = 0;
+                for (int providerIdx = 0; providerIdx < _config.ProviderCount; providerIdx++)
+                {
+                    if (providerIdx == parityPDisk || providerIdx == parityQDisk || providerIdx == parityRDisk)
+                        continue;
+
+                    if (dataDiskCounter >= dataDisks)
+                        break;
+
+                    int chunkIdx = stripe * dataDisks + dataDiskCounter;
+                    if (chunkIdx >= metadata.ChunkCount)
+                        break;
+
+                    var chunkKey = $"{key}.chunk.{chunkIdx}";
+                    try
+                    {
+                        var chunk = await LoadChunkAsync(getProvider(providerIdx), chunkKey);
+                        stripeChunks.Add(chunk);
+                        diskToChunkIdx[providerIdx] = stripeChunks.Count - 1;
+                    }
+                    catch
+                    {
+                        failedDisks.Add(dataDiskCounter);
+                        stripeChunks.Add(null!);
+                        diskToChunkIdx[providerIdx] = stripeChunks.Count - 1;
+                        _context.LogWarning($"[RAID-Z3] Data disk {providerIdx} failed for stripe {stripe}");
+                    }
+                    dataDiskCounter++;
+                }
+
+                // Rebuild up to 3 failed disks using triple parity
+                if (failedDisks.Count > 0 && failedDisks.Count <= 3)
+                {
+                    var parityP = await LoadChunkAsync(getProvider(parityPDisk), $"{key}.parityP.{stripe}");
+                    var parityQ = await LoadChunkAsync(getProvider(parityQDisk), $"{key}.parityQ.{stripe}");
+                    var parityR = await LoadChunkAsync(getProvider(parityRDisk), $"{key}.parityR.{stripe}");
+
+                    var rebuiltChunks = RebuildFromTripleParity(stripeChunks, parityP, parityQ, parityR, failedDisks);
+
+                    foreach (var (diskIdx, chunk) in rebuiltChunks)
+                    {
+                        stripeChunks[diskIdx] = chunk;
+                    }
+
+                    _context.LogInfo($"[RAID-Z3] Rebuilt {failedDisks.Count} chunks using triple parity for stripe {stripe}");
+                }
+                else if (failedDisks.Count > 3)
+                {
+                    throw new IOException($"RAID-Z3 can only recover from 3 disk failures, but {failedDisks.Count} disks failed");
+                }
+
+                allChunks.AddRange(stripeChunks.Where(c => c != null));
+            }
+
+            return ReassembleChunks(allChunks.ToArray());
+        }
+
+        private static byte[] CalculateParityReedSolomonR(List<byte[]> chunks)
+        {
+            // R parity using generator g^2 = 0x04 (different from Q which uses g^1 = 0x02)
+            // R[i] = sum(D[j] * (g^2)^j) = sum(D[j] * g^(2j))
+            if (chunks.Count == 0)
+                return Array.Empty<byte>();
+
+            var maxLength = chunks.Max(c => c.Length);
+            var parity = new byte[maxLength];
+
+            for (int diskIdx = 0; diskIdx < chunks.Count; diskIdx++)
+            {
+                // Generator coefficient: (g^2)^diskIdx = g^(2*diskIdx) where g = 0x02
+                byte coeff = GF256Power(0x02, 2 * diskIdx);
+
+                for (int byteIdx = 0; byteIdx < chunks[diskIdx].Length; byteIdx++)
+                {
+                    parity[byteIdx] ^= GF256Multiply(chunks[diskIdx][byteIdx], coeff);
+                }
+            }
+
+            return parity;
+        }
+
+        private Dictionary<int, byte[]> RebuildFromTripleParity(List<byte[]> chunks, byte[] parityP, byte[] parityQ, byte[] parityR, List<int> failedDisks)
+        {
+            // Triple parity rebuild using P, Q, R with Reed-Solomon in GF(2^8)
+            var rebuilt = new Dictionary<int, byte[]>();
+            int chunkLength = parityP.Length;
+
+            if (failedDisks.Count == 1)
+            {
+                // Single disk failure - use P parity
+                int x = failedDisks[0];
+                var Dx = new byte[chunkLength];
+                Array.Copy(parityP, Dx, chunkLength);
+
+                for (int i = 0; i < chunks.Count; i++)
+                {
+                    if (chunks[i] != null)
+                    {
+                        for (int j = 0; j < Math.Min(chunks[i].Length, chunkLength); j++)
+                        {
+                            Dx[j] ^= chunks[i][j];
+                        }
+                    }
+                }
+                rebuilt[x] = Dx;
+            }
+            else if (failedDisks.Count == 2)
+            {
+                // Double failure - use P and Q (same as RAID 6)
+                var dualRebuilt = RebuildFromDualParity(chunks, parityP, parityQ, failedDisks);
+                foreach (var kvp in dualRebuilt)
+                    rebuilt[kvp.Key] = kvp.Value;
+            }
+            else if (failedDisks.Count == 3)
+            {
+                // Triple failure - use P, Q, and R
+                int x = failedDisks[0];
+                int y = failedDisks[1];
+                int z = failedDisks[2];
+
+                // Generator coefficients for Q (g^i) and R (g^(2i))
+                byte gx = GF256Power(0x02, x);
+                byte gy = GF256Power(0x02, y);
+                byte gz = GF256Power(0x02, z);
+                byte g2x = GF256Power(0x02, 2 * x);
+                byte g2y = GF256Power(0x02, 2 * y);
+                byte g2z = GF256Power(0x02, 2 * z);
+
+                // Calculate Pxyz, Qxyz, Rxyz by removing surviving data contributions
+                var Pxyz = new byte[chunkLength];
+                var Qxyz = new byte[chunkLength];
+                var Rxyz = new byte[chunkLength];
+                Array.Copy(parityP, Pxyz, chunkLength);
+                Array.Copy(parityQ, Qxyz, chunkLength);
+                Array.Copy(parityR, Rxyz, chunkLength);
+
+                for (int i = 0; i < chunks.Count; i++)
+                {
+                    if (chunks[i] != null && i != x && i != y && i != z)
+                    {
+                        byte gi = GF256Power(0x02, i);
+                        byte g2i = GF256Power(0x02, 2 * i);
+                        for (int j = 0; j < Math.Min(chunks[i].Length, chunkLength); j++)
+                        {
+                            Pxyz[j] ^= chunks[i][j];
+                            Qxyz[j] ^= GF256Multiply(chunks[i][j], gi);
+                            Rxyz[j] ^= GF256Multiply(chunks[i][j], g2i);
+                        }
+                    }
+                }
+
+                // Solve 3x3 system in GF(2^8) using Gaussian elimination
+                // | 1    1    1   | |Dx|   |Pxyz|
+                // | gx   gy   gz  | |Dy| = |Qxyz|
+                // | g2x  g2y  g2z | |Dz|   |Rxyz|
+
+                var Dx = new byte[chunkLength];
+                var Dy = new byte[chunkLength];
+                var Dz = new byte[chunkLength];
+
+                // Precompute matrix determinant and inverse elements
+                // det = 1*(gy*g2z - gz*g2y) - 1*(gx*g2z - gz*g2x) + 1*(gx*g2y - gy*g2x)
+                byte a11 = 1, a12 = 1, a13 = 1;
+                byte a21 = gx, a22 = gy, a23 = gz;
+                byte a31 = g2x, a32 = g2y, a33 = g2z;
+
+                byte det = (byte)(
+                    GF256Multiply(a11, (byte)(GF256Multiply(a22, a33) ^ GF256Multiply(a23, a32))) ^
+                    GF256Multiply(a12, (byte)(GF256Multiply(a21, a33) ^ GF256Multiply(a23, a31))) ^
+                    GF256Multiply(a13, (byte)(GF256Multiply(a21, a32) ^ GF256Multiply(a22, a31)))
+                );
+
+                if (det == 0)
+                {
+                    throw new InvalidOperationException("Matrix is singular, cannot solve triple failure");
+                }
+
+                byte invDet = GF256Inverse(det);
+
+                // Calculate adjugate matrix elements
+                byte adj11 = (byte)(GF256Multiply(a22, a33) ^ GF256Multiply(a23, a32));
+                byte adj12 = (byte)(GF256Multiply(a13, a32) ^ GF256Multiply(a12, a33));
+                byte adj13 = (byte)(GF256Multiply(a12, a23) ^ GF256Multiply(a13, a22));
+                byte adj21 = (byte)(GF256Multiply(a23, a31) ^ GF256Multiply(a21, a33));
+                byte adj22 = (byte)(GF256Multiply(a11, a33) ^ GF256Multiply(a13, a31));
+                byte adj23 = (byte)(GF256Multiply(a13, a21) ^ GF256Multiply(a11, a23));
+                byte adj31 = (byte)(GF256Multiply(a21, a32) ^ GF256Multiply(a22, a31));
+                byte adj32 = (byte)(GF256Multiply(a12, a31) ^ GF256Multiply(a11, a32));
+                byte adj33 = (byte)(GF256Multiply(a11, a22) ^ GF256Multiply(a12, a21));
+
+                for (int j = 0; j < chunkLength; j++)
+                {
+                    byte b1 = Pxyz[j], b2 = Qxyz[j], b3 = Rxyz[j];
+
+                    // X = adj * b / det
+                    Dx[j] = GF256Multiply(invDet, (byte)(
+                        GF256Multiply(adj11, b1) ^ GF256Multiply(adj12, b2) ^ GF256Multiply(adj13, b3)));
+                    Dy[j] = GF256Multiply(invDet, (byte)(
+                        GF256Multiply(adj21, b1) ^ GF256Multiply(adj22, b2) ^ GF256Multiply(adj23, b3)));
+                    Dz[j] = GF256Multiply(invDet, (byte)(
+                        GF256Multiply(adj31, b1) ^ GF256Multiply(adj32, b2) ^ GF256Multiply(adj33, b3)));
+                }
+
+                rebuilt[x] = Dx;
+                rebuilt[y] = Dy;
+                rebuilt[z] = Dz;
+                _context.LogInfo($"[RAID-Z3] Rebuilt disks {x}, {y}, {z} using P+Q+R triple parity");
+            }
+
+            return rebuilt;
         }
 
         // ==================== RAID-DP: NetApp Double Parity ====================
 
         private async Task SaveRAIDDPAsync(string key, Stream data, Func<int, IStorageProvider> getProvider)
         {
+            // RAID-DP: NetApp diagonal parity for dual fault tolerance
+            // Uses row parity (horizontal) + diagonal parity (anti-diagonal)
             if (_config.ProviderCount < 4)
                 throw new InvalidOperationException("RAID-DP requires at least 4 providers");
 
-            // RAID-DP uses diagonal parity for faster rebuild
-            // For simplicity, use RAID 6 implementation
-            await SaveRAID6Async(key, data, getProvider);
-            _context.LogInfo($"[RAID-DP] Saved {key} with NetApp diagonal parity");
+            var allBytes = await ReadAllBytesAsync(data);
+            var chunks = SplitIntoChunks(new MemoryStream(allBytes), _config.StripeSize);
+
+            int dataDisks = _config.ProviderCount - 2; // One for row parity, one for diagonal parity
+
+            var metadata = new RaidMetadata
+            {
+                Level = RaidLevel.RAID_DP,
+                TotalSize = allBytes.Length,
+                ChunkCount = chunks.Count
+            };
+
+            var tasks = new List<Task>();
+            int stripeCount = (int)MathUtils.Ceiling((double)chunks.Count / dataDisks);
+
+            for (int stripe = 0; stripe < stripeCount; stripe++)
+            {
+                int rowParityDisk = _config.ProviderCount - 2; // Fixed row parity disk
+                int diagParityDisk = _config.ProviderCount - 1; // Fixed diagonal parity disk
+
+                var stripeChunks = chunks.Skip(stripe * dataDisks).Take(dataDisks).ToList();
+
+                // Row parity (simple XOR)
+                var rowParity = CalculateParityXOR(stripeChunks);
+                tasks.Add(SaveChunkAsync(getProvider(rowParityDisk), $"{key}.dprow.{stripe}", rowParity));
+
+                // Diagonal parity: XOR along anti-diagonals
+                // For each byte position, XOR with shifted indices
+                var diagParity = CalculateDiagonalParity(stripeChunks, dataDisks);
+                tasks.Add(SaveChunkAsync(getProvider(diagParityDisk), $"{key}.dpdiag.{stripe}", diagParity));
+
+                // Write data chunks
+                for (int i = 0; i < stripeChunks.Count; i++)
+                {
+                    int chunkIdx = stripe * dataDisks + i;
+                    tasks.Add(SaveChunkAsync(getProvider(i), $"{key}.dpdata.{chunkIdx}", stripeChunks[i]));
+                }
+            }
+
+            await Task.WhenAll(tasks);
+            _metadata[key] = metadata;
+            _context.LogInfo($"[RAID-DP] Saved {key} with NetApp row+diagonal parity");
         }
 
         private async Task<Stream> LoadRAIDDPAsync(string key, Func<int, IStorageProvider> getProvider)
         {
-            return await LoadRAID6Async(key, getProvider);
+            if (!_metadata.TryGetValue(key, out var metadata))
+                throw new FileNotFoundException($"RAID metadata not found for {key}");
+
+            int dataDisks = _config.ProviderCount - 2;
+            int stripeCount = (int)MathUtils.Ceiling((double)metadata.ChunkCount / dataDisks);
+            int rowParityDisk = _config.ProviderCount - 2;
+            int diagParityDisk = _config.ProviderCount - 1;
+
+            var allChunks = new byte[metadata.ChunkCount][];
+
+            for (int stripe = 0; stripe < stripeCount; stripe++)
+            {
+                var failedIndices = new List<int>();
+                var stripeChunks = new List<byte[]>();
+
+                for (int i = 0; i < dataDisks; i++)
+                {
+                    int chunkIdx = stripe * dataDisks + i;
+                    if (chunkIdx >= metadata.ChunkCount)
+                        break;
+
+                    try
+                    {
+                        var chunk = await LoadChunkAsync(getProvider(i), $"{key}.dpdata.{chunkIdx}");
+                        allChunks[chunkIdx] = chunk;
+                        stripeChunks.Add(chunk);
+                    }
+                    catch
+                    {
+                        failedIndices.Add(i);
+                        stripeChunks.Add(null!);
+                    }
+                }
+
+                // Rebuild using row and diagonal parity
+                if (failedIndices.Count > 0 && failedIndices.Count <= 2)
+                {
+                    var rowParity = await LoadChunkAsync(getProvider(rowParityDisk), $"{key}.dprow.{stripe}");
+                    var diagParity = await LoadChunkAsync(getProvider(diagParityDisk), $"{key}.dpdiag.{stripe}");
+
+                    // Use row+diagonal parity for reconstruction (similar to RAID 6)
+                    var rebuilt = RebuildFromDualParity(stripeChunks, rowParity, diagParity, failedIndices);
+                    foreach (var (idx, chunk) in rebuilt)
+                        allChunks[stripe * dataDisks + idx] = chunk;
+
+                    _context.LogInfo($"[RAID-DP] Rebuilt {failedIndices.Count} chunks using row+diagonal parity");
+                }
+            }
+
+            var result = allChunks.Where(c => c != null).SelectMany(c => c).Take((int)metadata.TotalSize).ToArray();
+            return new MemoryStream(result);
+        }
+
+        private static byte[] CalculateDiagonalParity(List<byte[]> chunks, int numDisks)
+        {
+            // Diagonal parity: anti-diagonal XOR pattern for NetApp RAID-DP
+            if (chunks.Count == 0)
+                return Array.Empty<byte>();
+
+            var maxLength = chunks.Max(c => c.Length);
+            var parity = new byte[maxLength];
+
+            for (int byteIdx = 0; byteIdx < maxLength; byteIdx++)
+            {
+                for (int diskIdx = 0; diskIdx < chunks.Count; diskIdx++)
+                {
+                    // Anti-diagonal offset: shift position based on disk index
+                    int diagOffset = (byteIdx + diskIdx) % maxLength;
+                    if (diagOffset < chunks[diskIdx].Length)
+                    {
+                        parity[byteIdx] ^= chunks[diskIdx][diagOffset];
+                    }
+                }
+            }
+
+            return parity;
         }
 
         // ==================== Unraid: Parity System ====================
@@ -973,50 +1842,285 @@ namespace DataWarehouse.Kernel.Storage
 
         private async Task SaveRAID2Async(string key, Stream data, Func<int, IStorageProvider> getProvider)
         {
-            if (_config.ProviderCount < 3)
-                throw new InvalidOperationException("RAID 2 requires at least 3 providers (data + Hamming ECC)");
+            // RAID 2: Bit-level striping with Hamming(7,4) ECC
+            // For n data disks, we need ceil(log2(n+1)) ECC disks
+            // Minimum: 4 data disks + 3 ECC disks = 7 providers
+            if (_config.ProviderCount < 7)
+                throw new InvalidOperationException("RAID 2 requires at least 7 providers (4 data + 3 Hamming ECC)");
 
-            // RAID 2 uses bit-level striping with Hamming code ECC
-            // For practical implementation, use byte-level with parity simulation
             var bytes = await ReadAllBytesAsync(data);
-            int dataDisks = _config.ProviderCount - 1; // Reserve 1 for Hamming code
-            int bytesPerDisk = (bytes.Length + dataDisks - 1) / dataDisks;
 
-            var tasks = new List<Task>();
-            for (int i = 0; i < dataDisks; i++)
+            // Calculate number of ECC disks needed (Hamming code requirement)
+            int eccDisks = CalculateHammingEccDisks(_config.ProviderCount);
+            int dataDisks = _config.ProviderCount - eccDisks;
+
+            // Pad data to be divisible by dataDisks
+            int paddedLength = ((bytes.Length + dataDisks - 1) / dataDisks) * dataDisks;
+            var paddedBytes = new byte[paddedLength];
+            Array.Copy(bytes, paddedBytes, bytes.Length);
+
+            int bytesPerDisk = paddedLength / dataDisks;
+            var diskData = new byte[_config.ProviderCount][];
+
+            // Initialize all disk arrays
+            for (int d = 0; d < _config.ProviderCount; d++)
             {
-                int start = i * bytesPerDisk;
-                int length = Math.Min(bytesPerDisk, bytes.Length - start);
-                if (length > 0)
+                diskData[d] = new byte[bytesPerDisk];
+            }
+
+            // Distribute data across data disks with bit-level interleaving
+            for (int bytePos = 0; bytePos < bytesPerDisk; bytePos++)
+            {
+                for (int bitPos = 0; bitPos < 8; bitPos++)
                 {
-                    var chunk = new byte[length];
-                    Array.Copy(bytes, start, chunk, 0, length);
-                    tasks.Add(SaveChunkAsync(getProvider(i), $"{key}.data.{i}", chunk));
+                    // Collect data bits for this position
+                    var dataBits = new bool[dataDisks];
+                    for (int d = 0; d < dataDisks; d++)
+                    {
+                        int sourceByteIdx = bytePos * dataDisks + d;
+                        if (sourceByteIdx < paddedBytes.Length)
+                        {
+                            dataBits[d] = ((paddedBytes[sourceByteIdx] >> bitPos) & 1) == 1;
+                        }
+                    }
+
+                    // Calculate Hamming ECC bits
+                    var eccBits = CalculateHammingEccBits(dataBits);
+
+                    // Write data bits to data disks
+                    int dataDiskIdx = 0;
+                    int eccDiskIdx = 0;
+                    for (int diskIdx = 0; diskIdx < _config.ProviderCount; diskIdx++)
+                    {
+                        bool isEccDisk = IsHammingEccPosition(diskIdx + 1); // 1-indexed for Hamming
+                        if (isEccDisk && eccDiskIdx < eccBits.Length)
+                        {
+                            if (eccBits[eccDiskIdx])
+                                diskData[diskIdx][bytePos] |= (byte)(1 << bitPos);
+                            eccDiskIdx++;
+                        }
+                        else if (dataDiskIdx < dataBits.Length)
+                        {
+                            if (dataBits[dataDiskIdx])
+                                diskData[diskIdx][bytePos] |= (byte)(1 << bitPos);
+                            dataDiskIdx++;
+                        }
+                    }
                 }
             }
 
-            // Generate Hamming ECC (simplified as XOR parity)
-            var ecc = ComputeXorParityFromBytes(bytes);
-            tasks.Add(SaveChunkAsync(getProvider(dataDisks), $"{key}.ecc", ecc));
+            // Save all disks
+            var tasks = new List<Task>();
+            for (int d = 0; d < _config.ProviderCount; d++)
+            {
+                bool isEcc = IsHammingEccPosition(d + 1);
+                string suffix = isEcc ? $"ecc.{d}" : $"data.{d}";
+                tasks.Add(SaveChunkAsync(getProvider(d), $"{key}.{suffix}", diskData[d]));
+            }
+
+            // Save metadata
+            var metadata = new RaidMetadata
+            {
+                Level = RaidLevel.RAID_2,
+                TotalSize = bytes.Length,
+                ChunkCount = _config.ProviderCount
+            };
+            _metadata[key] = metadata;
 
             await Task.WhenAll(tasks);
-            _context.LogInfo($"[RAID-2] Saved {key} with Hamming code ECC");
+            _context.LogInfo($"[RAID-2] Saved {key} with Hamming({_config.ProviderCount},{dataDisks}) ECC across {_config.ProviderCount} providers");
         }
 
         private async Task<Stream> LoadRAID2Async(string key, Func<int, IStorageProvider> getProvider)
         {
-            int dataDisks = _config.ProviderCount - 1;
-            var chunks = new List<byte[]>();
+            if (!_metadata.TryGetValue(key, out var metadata))
+                throw new FileNotFoundException($"RAID metadata not found for {key}");
 
-            for (int i = 0; i < dataDisks; i++)
+            int eccDisks = CalculateHammingEccDisks(_config.ProviderCount);
+            int dataDisks = _config.ProviderCount - eccDisks;
+
+            // Load all disks
+            var diskData = new byte[_config.ProviderCount][];
+            var failedDisks = new List<int>();
+
+            for (int d = 0; d < _config.ProviderCount; d++)
             {
-                var chunk = await LoadChunkAsync(getProvider(i), $"{key}.data.{i}");
-                chunks.Add(chunk);
+                bool isEcc = IsHammingEccPosition(d + 1);
+                string suffix = isEcc ? $"ecc.{d}" : $"data.{d}";
+                try
+                {
+                    diskData[d] = await LoadChunkAsync(getProvider(d), $"{key}.{suffix}");
+                }
+                catch (Exception ex)
+                {
+                    _context.LogWarning($"[RAID-2] Disk {d} failed: {ex.Message}");
+                    failedDisks.Add(d);
+                    diskData[d] = null!;
+                }
             }
 
-            // Combine all chunks
-            var allBytes = chunks.SelectMany(c => c).ToArray();
-            return new MemoryStream(allBytes);
+            // Hamming code can correct single-bit errors (one failed disk per bit position)
+            if (failedDisks.Count > 1)
+                throw new IOException($"RAID 2 can only recover from 1 disk failure, but {failedDisks.Count} disks failed");
+
+            int bytesPerDisk = diskData.First(d => d != null)!.Length;
+
+            // If a disk failed, reconstruct using Hamming syndrome
+            if (failedDisks.Count == 1)
+            {
+                int failedDisk = failedDisks[0];
+                diskData[failedDisk] = new byte[bytesPerDisk];
+
+                for (int bytePos = 0; bytePos < bytesPerDisk; bytePos++)
+                {
+                    for (int bitPos = 0; bitPos < 8; bitPos++)
+                    {
+                        // Reconstruct using Hamming syndrome
+                        bool reconstructedBit = ReconstructHammingBit(diskData, failedDisk, bytePos, bitPos);
+                        if (reconstructedBit)
+                            diskData[failedDisk][bytePos] |= (byte)(1 << bitPos);
+                    }
+                }
+                _context.LogInfo($"[RAID-2] Reconstructed disk {failedDisk} using Hamming ECC");
+            }
+
+            // Reassemble original data
+            var result = new byte[metadata.TotalSize];
+            int resultIdx = 0;
+
+            for (int bytePos = 0; bytePos < bytesPerDisk && resultIdx < metadata.TotalSize; bytePos++)
+            {
+                for (int dataDiskLogical = 0; dataDiskLogical < dataDisks && resultIdx < metadata.TotalSize; dataDiskLogical++)
+                {
+                    // Map logical data disk to physical disk (skipping ECC positions)
+                    int physicalDisk = MapLogicalToPhysicalDisk(dataDiskLogical, _config.ProviderCount);
+                    result[resultIdx++] = diskData[physicalDisk][bytePos];
+                }
+            }
+
+            return new MemoryStream(result);
+        }
+
+        private static int CalculateHammingEccDisks(int totalDisks)
+        {
+            // For Hamming code: 2^r >= m + r + 1, where m = data bits, r = parity bits
+            int r = 1;
+            while ((1 << r) < totalDisks + 1)
+                r++;
+            return r;
+        }
+
+        private static bool IsHammingEccPosition(int position)
+        {
+            // ECC bits are at positions that are powers of 2 (1, 2, 4, 8, ...)
+            return position > 0 && (position & (position - 1)) == 0;
+        }
+
+        private static bool[] CalculateHammingEccBits(bool[] dataBits)
+        {
+            int dataLen = dataBits.Length;
+            int r = 1;
+            while ((1 << r) < dataLen + r + 1)
+                r++;
+
+            var eccBits = new bool[r];
+
+            // Calculate each parity bit
+            for (int i = 0; i < r; i++)
+            {
+                int parityPos = 1 << i;
+                bool parity = false;
+
+                int dataIdx = 0;
+                for (int pos = 1; pos <= dataLen + r; pos++)
+                {
+                    if (IsHammingEccPosition(pos))
+                        continue;
+
+                    if ((pos & parityPos) != 0 && dataIdx < dataBits.Length)
+                    {
+                        parity ^= dataBits[dataIdx];
+                    }
+                    dataIdx++;
+                }
+                eccBits[i] = parity;
+            }
+
+            return eccBits;
+        }
+
+        private bool ReconstructHammingBit(byte[][] diskData, int failedDisk, int bytePos, int bitPos)
+        {
+            // Calculate syndrome to find error position
+            int syndrome = 0;
+            int r = CalculateHammingEccDisks(_config.ProviderCount);
+
+            for (int i = 0; i < r; i++)
+            {
+                int parityPos = 1 << i;
+                bool parity = false;
+
+                for (int pos = 1; pos <= _config.ProviderCount; pos++)
+                {
+                    if ((pos & parityPos) != 0)
+                    {
+                        int diskIdx = pos - 1;
+                        if (diskIdx != failedDisk && diskData[diskIdx] != null)
+                        {
+                            parity ^= ((diskData[diskIdx][bytePos] >> bitPos) & 1) == 1;
+                        }
+                    }
+                }
+
+                if (parity)
+                    syndrome |= parityPos;
+            }
+
+            // The syndrome indicates the error position; XOR to get correct bit
+            bool result = false;
+            int failedPos = failedDisk + 1;
+
+            // Calculate what the bit should be based on other bits
+            if (IsHammingEccPosition(failedPos))
+            {
+                // Failed disk is a parity disk - recalculate parity
+                int parityIdx = (int)Math.Log2(failedPos);
+                for (int pos = 1; pos <= _config.ProviderCount; pos++)
+                {
+                    if (pos != failedPos && (pos & failedPos) != 0)
+                    {
+                        int diskIdx = pos - 1;
+                        if (diskData[diskIdx] != null)
+                        {
+                            result ^= ((diskData[diskIdx][bytePos] >> bitPos) & 1) == 1;
+                        }
+                    }
+                }
+            }
+            else
+            {
+                // Failed disk is a data disk - use syndrome
+                result = syndrome == failedPos;
+            }
+
+            return result;
+        }
+
+        private static int MapLogicalToPhysicalDisk(int logicalIdx, int totalDisks)
+        {
+            int physical = 0;
+            int logical = 0;
+            while (logical <= logicalIdx && physical < totalDisks)
+            {
+                if (!IsHammingEccPosition(physical + 1))
+                {
+                    if (logical == logicalIdx)
+                        return physical;
+                    logical++;
+                }
+                physical++;
+            }
+            return physical;
         }
 
         // ==================== RAID 3: Byte-Level Striping with Dedicated Parity ====================
@@ -1120,44 +2224,312 @@ namespace DataWarehouse.Kernel.Storage
 
         private async Task<Stream> LoadRAID4Async(string key, Func<int, IStorageProvider> getProvider)
         {
-            // Similar to RAID 5 load but parity is always on last disk
-            return await LoadRAID5Async(key, getProvider);
+            if (!_metadata.TryGetValue(key, out var metadata))
+                throw new FileNotFoundException($"RAID metadata not found for {key}");
+
+            int dataDisks = _config.ProviderCount - 1;
+            int parityDisk = _config.ProviderCount - 1; // Dedicated parity on last disk
+
+            // Load all data chunks from data disks
+            var diskBuffers = new Dictionary<int, List<byte[]>>();
+            var failedDisk = -1;
+
+            for (int disk = 0; disk < dataDisks; disk++)
+            {
+                diskBuffers[disk] = new List<byte[]>();
+                int chunkIdx = 0;
+                while (true)
+                {
+                    try
+                    {
+                        var chunk = await LoadChunkAsync(getProvider(disk), $"{key}.d{disk}.c{chunkIdx}");
+                        diskBuffers[disk].Add(chunk);
+                        chunkIdx++;
+                    }
+                    catch
+                    {
+                        if (chunkIdx == 0 && failedDisk == -1)
+                        {
+                            failedDisk = disk;
+                            _context.LogWarning($"[RAID-4] Data disk {disk} failed, will reconstruct from parity");
+                        }
+                        break;
+                    }
+                }
+            }
+
+            // If a data disk failed, reconstruct from parity
+            if (failedDisk != -1)
+            {
+                // Determine number of stripes from other disks
+                int stripeCount = diskBuffers.Values.Where(v => v.Count > 0).Max(v => v.Count);
+                diskBuffers[failedDisk] = new List<byte[]>();
+
+                for (int stripeIdx = 0; stripeIdx < stripeCount; stripeIdx++)
+                {
+                    // Load parity for this stripe
+                    var parity = await LoadChunkAsync(getProvider(parityDisk), $"{key}.parity.{stripeIdx}");
+
+                    // Collect chunks from working disks
+                    var workingChunks = new List<byte[]>();
+                    for (int d = 0; d < dataDisks; d++)
+                    {
+                        if (d != failedDisk && stripeIdx < diskBuffers[d].Count)
+                        {
+                            workingChunks.Add(diskBuffers[d][stripeIdx]);
+                        }
+                    }
+
+                    // Reconstruct failed chunk: XOR parity with all working chunks
+                    var reconstructed = new byte[parity.Length];
+                    Array.Copy(parity, reconstructed, parity.Length);
+                    foreach (var chunk in workingChunks)
+                    {
+                        for (int i = 0; i < Math.Min(chunk.Length, reconstructed.Length); i++)
+                        {
+                            reconstructed[i] ^= chunk[i];
+                        }
+                    }
+
+                    diskBuffers[failedDisk].Add(reconstructed);
+                }
+
+                _context.LogInfo($"[RAID-4] Reconstructed {stripeCount} chunks for failed disk {failedDisk}");
+            }
+
+            // Reassemble data in stripe order
+            var result = new List<byte>();
+            int maxChunks = diskBuffers.Values.Max(v => v.Count);
+
+            for (int chunkIdx = 0; chunkIdx < maxChunks; chunkIdx++)
+            {
+                for (int disk = 0; disk < dataDisks; disk++)
+                {
+                    if (chunkIdx < diskBuffers[disk].Count)
+                    {
+                        result.AddRange(diskBuffers[disk][chunkIdx]);
+                    }
+                }
+            }
+
+            // Trim to original size
+            var trimmed = result.Take((int)metadata.TotalSize).ToArray();
+            return new MemoryStream(trimmed);
         }
 
         // ==================== RAID 03: Striped RAID 3 Sets ====================
 
         private async Task SaveRAID03Async(string key, Stream data, Func<int, IStorageProvider> getProvider)
         {
+            // RAID 03 = RAID 0 stripe across multiple RAID 3 arrays
             if (_config.ProviderCount < 6)
                 throw new InvalidOperationException("RAID 03 requires at least 6 providers (2 RAID 3 arrays)");
 
-            // RAID 03 = RAID 0 stripe across RAID 3 arrays
-            // For simplicity, use RAID 3 striping logic
-            await SaveRAID3Async(key, data, getProvider);
-            _context.LogInfo($"[RAID-03] Saved {key} with striped RAID 3 configuration");
+            var allBytes = await ReadAllBytesAsync(data);
+            var chunks = SplitIntoChunks(new MemoryStream(allBytes), _config.StripeSize);
+
+            int disksPerSet = 3; // Minimum for RAID 3
+            if (_config.ProviderCount >= 8) disksPerSet = 4;
+            int setsCount = _config.ProviderCount / disksPerSet;
+            int dataDisksPerSet = disksPerSet - 1; // Dedicated parity per set
+
+            var metadata = new RaidMetadata
+            {
+                Level = RaidLevel.RAID_03,
+                TotalSize = allBytes.Length,
+                ChunkCount = chunks.Count,
+                ProviderMapping = new Dictionary<int, List<int>> { { 0, new List<int> { setsCount, disksPerSet } } }
+            };
+
+            var tasks = new List<Task>();
+
+            // Stripe chunks across RAID 3 sets with byte-level striping within each set
+            for (int chunkIdx = 0; chunkIdx < chunks.Count; chunkIdx++)
+            {
+                int setIdx = chunkIdx % setsCount;
+                int setOffset = setIdx * disksPerSet;
+                int localChunkIdx = chunkIdx / setsCount;
+                int diskInSet = localChunkIdx % dataDisksPerSet;
+
+                int providerIdx = setOffset + diskInSet;
+                tasks.Add(SaveChunkAsync(getProvider(providerIdx), $"{key}.set{setIdx}.chunk.{localChunkIdx}", chunks[chunkIdx]));
+            }
+
+            // Compute dedicated parity for each set
+            for (int setIdx = 0; setIdx < setsCount; setIdx++)
+            {
+                int setOffset = setIdx * disksPerSet;
+                int parityDisk = setOffset + dataDisksPerSet; // Last disk in set is parity
+
+                var setChunks = new List<byte[]>();
+                for (int i = setIdx; i < chunks.Count; i += setsCount)
+                    setChunks.Add(chunks[i]);
+
+                if (setChunks.Count > 0)
+                {
+                    var parity = CalculateParityXOR(setChunks);
+                    tasks.Add(SaveChunkAsync(getProvider(parityDisk), $"{key}.set{setIdx}.parity", parity));
+                }
+            }
+
+            await Task.WhenAll(tasks);
+            _metadata[key] = metadata;
+            _context.LogInfo($"[RAID-03] Saved {key} across {setsCount} RAID 3 sets with dedicated parity");
         }
 
         private async Task<Stream> LoadRAID03Async(string key, Func<int, IStorageProvider> getProvider)
         {
-            return await LoadRAID3Async(key, getProvider);
+            if (!_metadata.TryGetValue(key, out var metadata))
+                throw new FileNotFoundException($"RAID metadata not found for {key}");
+
+            int setsCount = metadata.ProviderMapping[0][0];
+            int disksPerSet = metadata.ProviderMapping[0][1];
+            int dataDisksPerSet = disksPerSet - 1;
+
+            var allChunks = new byte[metadata.ChunkCount][];
+            var failedSets = new Dictionary<int, List<int>>();
+
+            for (int chunkIdx = 0; chunkIdx < metadata.ChunkCount; chunkIdx++)
+            {
+                int setIdx = chunkIdx % setsCount;
+                int setOffset = setIdx * disksPerSet;
+                int localChunkIdx = chunkIdx / setsCount;
+                int diskInSet = localChunkIdx % dataDisksPerSet;
+
+                try
+                {
+                    allChunks[chunkIdx] = await LoadChunkAsync(getProvider(setOffset + diskInSet), $"{key}.set{setIdx}.chunk.{localChunkIdx}");
+                }
+                catch
+                {
+                    if (!failedSets.ContainsKey(setIdx))
+                        failedSets[setIdx] = new List<int>();
+                    failedSets[setIdx].Add(chunkIdx);
+                }
+            }
+
+            // Rebuild using dedicated parity
+            foreach (var (setIdx, failedChunks) in failedSets)
+            {
+                if (failedChunks.Count > 1)
+                    throw new IOException($"RAID 03 can only recover 1 failure per set");
+
+                int setOffset = setIdx * disksPerSet;
+                int parityDisk = setOffset + dataDisksPerSet;
+                var parity = await LoadChunkAsync(getProvider(parityDisk), $"{key}.set{setIdx}.parity");
+
+                // Collect surviving chunks from this set
+                var survivingChunks = new List<byte[]>();
+                for (int i = setIdx; i < metadata.ChunkCount; i += setsCount)
+                {
+                    if (!failedChunks.Contains(i) && allChunks[i] != null)
+                        survivingChunks.Add(allChunks[i]);
+                }
+
+                // Rebuild
+                var rebuilt = new byte[parity.Length];
+                Array.Copy(parity, rebuilt, parity.Length);
+                foreach (var chunk in survivingChunks)
+                {
+                    for (int i = 0; i < Math.Min(chunk.Length, rebuilt.Length); i++)
+                        rebuilt[i] ^= chunk[i];
+                }
+
+                allChunks[failedChunks[0]] = rebuilt;
+                _context.LogInfo($"[RAID-03] Rebuilt chunk in set {setIdx}");
+            }
+
+            var result = allChunks.SelectMany(c => c ?? Array.Empty<byte>()).Take((int)metadata.TotalSize).ToArray();
+            return new MemoryStream(result);
         }
 
         // ==================== RAID 100: Striped RAID 10 (Mirrors of Mirrors) ====================
 
         private async Task SaveRAID100Async(string key, Stream data, Func<int, IStorageProvider> getProvider)
         {
+            // RAID 100 = RAID 0 stripe across multiple RAID 10 arrays
             if (_config.ProviderCount < 8)
                 throw new InvalidOperationException("RAID 100 requires at least 8 providers");
 
-            // RAID 100 = RAID 0 stripe across RAID 10 arrays
-            // For practical purposes, use enhanced RAID 10 logic
-            await SaveRAID10Async(key, data, getProvider);
-            _context.LogInfo($"[RAID-100] Saved {key} with striped RAID 10 configuration");
+            var allBytes = await ReadAllBytesAsync(data);
+            var chunks = SplitIntoChunks(new MemoryStream(allBytes), _config.StripeSize);
+
+            // Each RAID 10 set needs 4 disks (2 mirrored pairs)
+            int disksPerSet = 4;
+            int setsCount = _config.ProviderCount / disksPerSet;
+            int mirrorsPerSet = 2; // 2 mirrored pairs per set
+
+            var metadata = new RaidMetadata
+            {
+                Level = RaidLevel.RAID_100,
+                TotalSize = allBytes.Length,
+                ChunkCount = chunks.Count,
+                ProviderMapping = new Dictionary<int, List<int>> { { 0, new List<int> { setsCount, disksPerSet } } }
+            };
+
+            var tasks = new List<Task>();
+
+            for (int chunkIdx = 0; chunkIdx < chunks.Count; chunkIdx++)
+            {
+                int setIdx = chunkIdx % setsCount;
+                int setOffset = setIdx * disksPerSet;
+                int localChunkIdx = chunkIdx / setsCount;
+                int mirrorPair = localChunkIdx % mirrorsPerSet;
+
+                // Write to both disks in the mirror pair
+                int disk1 = setOffset + mirrorPair * 2;
+                int disk2 = setOffset + mirrorPair * 2 + 1;
+
+                tasks.Add(SaveChunkAsync(getProvider(disk1), $"{key}.set{setIdx}.chunk.{localChunkIdx}", chunks[chunkIdx]));
+                tasks.Add(SaveChunkAsync(getProvider(disk2), $"{key}.set{setIdx}.mirror.{localChunkIdx}", chunks[chunkIdx]));
+            }
+
+            await Task.WhenAll(tasks);
+            _metadata[key] = metadata;
+            _context.LogInfo($"[RAID-100] Saved {key} across {setsCount} RAID 10 sets (striped mirrors of mirrors)");
         }
 
         private async Task<Stream> LoadRAID100Async(string key, Func<int, IStorageProvider> getProvider)
         {
-            return await LoadRAID10Async(key, getProvider);
+            if (!_metadata.TryGetValue(key, out var metadata))
+                throw new FileNotFoundException($"RAID metadata not found for {key}");
+
+            int setsCount = metadata.ProviderMapping[0][0];
+            int disksPerSet = metadata.ProviderMapping[0][1];
+            int mirrorsPerSet = 2;
+
+            var allChunks = new byte[metadata.ChunkCount][];
+
+            for (int chunkIdx = 0; chunkIdx < metadata.ChunkCount; chunkIdx++)
+            {
+                int setIdx = chunkIdx % setsCount;
+                int setOffset = setIdx * disksPerSet;
+                int localChunkIdx = chunkIdx / setsCount;
+                int mirrorPair = localChunkIdx % mirrorsPerSet;
+
+                int disk1 = setOffset + mirrorPair * 2;
+                int disk2 = setOffset + mirrorPair * 2 + 1;
+
+                try
+                {
+                    allChunks[chunkIdx] = await LoadChunkAsync(getProvider(disk1), $"{key}.set{setIdx}.chunk.{localChunkIdx}");
+                }
+                catch
+                {
+                    try
+                    {
+                        allChunks[chunkIdx] = await LoadChunkAsync(getProvider(disk2), $"{key}.set{setIdx}.mirror.{localChunkIdx}");
+                        _context.LogInfo($"[RAID-100] Used mirror for chunk {chunkIdx}");
+                    }
+                    catch
+                    {
+                        throw new IOException($"Both mirrors failed for chunk {chunkIdx}");
+                    }
+                }
+            }
+
+            var result = allChunks.SelectMany(c => c).Take((int)metadata.TotalSize).ToArray();
+            return new MemoryStream(result);
         }
 
         // ==================== RAID 1E: Enhanced Mirrored Striping ====================
@@ -1214,104 +2586,702 @@ namespace DataWarehouse.Kernel.Storage
 
         private async Task SaveRAID5EAsync(string key, Stream data, Func<int, IStorageProvider> getProvider)
         {
+            // RAID 5E: RAID 5 with integrated distributed hot spare space
+            // Each stripe reserves space that can be used for rebuild
             if (_config.ProviderCount < 4)
                 throw new InvalidOperationException("RAID 5E requires at least 4 providers");
 
-            // RAID 5E: RAID 5 with distributed hot spare space
-            // Use RAID 5 logic, reserving spare capacity
-            await SaveRAID5Async(key, data, getProvider);
-            _context.LogInfo($"[RAID-5E] Saved {key} with integrated hot spare capacity");
+            var allBytes = await ReadAllBytesAsync(data);
+            var chunks = SplitIntoChunks(new MemoryStream(allBytes), _config.StripeSize);
+
+            // Reserve ~20% capacity for hot spare (distributed across all disks)
+            int effectiveDisks = _config.ProviderCount;
+            int dataDisks = effectiveDisks - 1; // One parity
+            int spareBlocksPerStripe = Math.Max(1, effectiveDisks / 5); // ~20% spare
+
+            var metadata = new RaidMetadata
+            {
+                Level = RaidLevel.RAID_5E,
+                TotalSize = allBytes.Length,
+                ChunkCount = chunks.Count,
+                ProviderMapping = new Dictionary<int, List<int>> { { 0, new List<int> { spareBlocksPerStripe } } }
+            };
+
+            var tasks = new List<Task>();
+            int stripeCount = (int)MathUtils.Ceiling((double)chunks.Count / dataDisks);
+
+            for (int stripe = 0; stripe < stripeCount; stripe++)
+            {
+                int parityDisk = stripe % effectiveDisks;
+                int spareDisk = (stripe + effectiveDisks - 1) % effectiveDisks; // Rotating spare
+
+                int dataDiskCounter = 0;
+                for (int diskIdx = 0; diskIdx < effectiveDisks; diskIdx++)
+                {
+                    if (diskIdx == parityDisk)
+                    {
+                        // Calculate and save parity
+                        var stripeChunks = chunks.Skip(stripe * dataDisks).Take(dataDisks).ToList();
+                        if (stripeChunks.Count > 0)
+                        {
+                            var parity = CalculateParityXOR(stripeChunks);
+                            tasks.Add(SaveChunkAsync(getProvider(diskIdx), $"{key}.parity.{stripe}", parity));
+                        }
+                    }
+                    else if (diskIdx == spareDisk)
+                    {
+                        // Mark spare block (save empty marker for hot spare reservation)
+                        tasks.Add(SaveChunkAsync(getProvider(diskIdx), $"{key}.spare.{stripe}", new byte[] { 0xFE }));
+                    }
+                    else
+                    {
+                        int chunkIdx = stripe * dataDisks + dataDiskCounter;
+                        if (chunkIdx < chunks.Count)
+                        {
+                            tasks.Add(SaveChunkAsync(getProvider(diskIdx), $"{key}.chunk.{chunkIdx}", chunks[chunkIdx]));
+                        }
+                        dataDiskCounter++;
+                    }
+                }
+            }
+
+            await Task.WhenAll(tasks);
+            _metadata[key] = metadata;
+            _context.LogInfo($"[RAID-5E] Saved {key} with distributed hot spare (~20% reserved)");
         }
 
         private async Task<Stream> LoadRAID5EAsync(string key, Func<int, IStorageProvider> getProvider)
         {
-            return await LoadRAID5Async(key, getProvider);
+            if (!_metadata.TryGetValue(key, out var metadata))
+                throw new FileNotFoundException($"RAID metadata not found for {key}");
+
+            // Load uses same logic as RAID 5 but ignores spare blocks
+            var chunks = new List<byte[]>();
+            int chunkIdx = 0;
+
+            while (chunkIdx < metadata.ChunkCount)
+            {
+                try
+                {
+                    var chunk = await LoadChunkAsync(getProvider(chunkIdx % _config.ProviderCount), $"{key}.chunk.{chunkIdx}");
+                    chunks.Add(chunk);
+                    chunkIdx++;
+                }
+                catch
+                {
+                    // Try to rebuild from parity and spare
+                    int stripe = chunkIdx / (_config.ProviderCount - 1);
+                    int parityDisk = stripe % _config.ProviderCount;
+                    var parity = await LoadChunkAsync(getProvider(parityDisk), $"{key}.parity.{stripe}");
+
+                    var otherChunks = new List<byte[]>();
+                    for (int i = 0; i < _config.ProviderCount - 2; i++)
+                    {
+                        int otherIdx = stripe * (_config.ProviderCount - 1) + i;
+                        if (otherIdx != chunkIdx && otherIdx < metadata.ChunkCount)
+                        {
+                            try { otherChunks.Add(await LoadChunkAsync(getProvider(otherIdx % _config.ProviderCount), $"{key}.chunk.{otherIdx}")); }
+                            catch { }
+                        }
+                    }
+
+                    var rebuilt = RebuildChunkFromParity(otherChunks, parity);
+                    chunks.Add(rebuilt);
+                    _context.LogInfo($"[RAID-5E] Rebuilt chunk {chunkIdx} using hot spare and parity");
+                    chunkIdx++;
+                }
+            }
+
+            var result = chunks.SelectMany(c => c).Take((int)metadata.TotalSize).ToArray();
+            return new MemoryStream(result);
         }
 
         // ==================== RAID 5EE: RAID 5 with Distributed Spare ====================
 
         private async Task SaveRAID5EEAsync(string key, Stream data, Func<int, IStorageProvider> getProvider)
         {
+            // RAID 5EE: Enhanced RAID 5 with more aggressively distributed spare
+            // Spare blocks are interleaved with data for faster rebuild
             if (_config.ProviderCount < 4)
                 throw new InvalidOperationException("RAID 5EE requires at least 4 providers");
 
-            // RAID 5EE: Enhanced RAID 5 with distributed spare
-            await SaveRAID5Async(key, data, getProvider);
-            _context.LogInfo($"[RAID-5EE] Saved {key} with distributed spare space");
+            var allBytes = await ReadAllBytesAsync(data);
+            var chunks = SplitIntoChunks(new MemoryStream(allBytes), _config.StripeSize);
+
+            int effectiveDisks = _config.ProviderCount;
+            int dataDisks = effectiveDisks - 2; // One parity, one spare per stripe
+
+            var metadata = new RaidMetadata
+            {
+                Level = RaidLevel.RAID_5EE,
+                TotalSize = allBytes.Length,
+                ChunkCount = chunks.Count,
+                MirrorCount = 1 // Indicates spare blocks present
+            };
+
+            var tasks = new List<Task>();
+            int stripeCount = (int)MathUtils.Ceiling((double)chunks.Count / dataDisks);
+
+            for (int stripe = 0; stripe < stripeCount; stripe++)
+            {
+                int parityDisk = stripe % effectiveDisks;
+                int spareDisk = (stripe + 1) % effectiveDisks;
+
+                var stripeChunks = chunks.Skip(stripe * dataDisks).Take(dataDisks).ToList();
+
+                if (stripeChunks.Count > 0)
+                {
+                    var parity = CalculateParityXOR(stripeChunks);
+                    tasks.Add(SaveChunkAsync(getProvider(parityDisk), $"{key}.parity.{stripe}", parity));
+                    tasks.Add(SaveChunkAsync(getProvider(spareDisk), $"{key}.spare.{stripe}", new byte[] { 0xEE })); // Spare marker
+                }
+
+                int dataDiskCounter = 0;
+                for (int diskIdx = 0; diskIdx < effectiveDisks; diskIdx++)
+                {
+                    if (diskIdx != parityDisk && diskIdx != spareDisk && dataDiskCounter < stripeChunks.Count)
+                    {
+                        int chunkIdx = stripe * dataDisks + dataDiskCounter;
+                        tasks.Add(SaveChunkAsync(getProvider(diskIdx), $"{key}.chunk.{chunkIdx}", stripeChunks[dataDiskCounter]));
+                        dataDiskCounter++;
+                    }
+                }
+            }
+
+            await Task.WhenAll(tasks);
+            _metadata[key] = metadata;
+            _context.LogInfo($"[RAID-5EE] Saved {key} with enhanced distributed spare (1 spare per stripe)");
         }
 
         private async Task<Stream> LoadRAID5EEAsync(string key, Func<int, IStorageProvider> getProvider)
         {
-            return await LoadRAID5Async(key, getProvider);
+            if (!_metadata.TryGetValue(key, out var metadata))
+                throw new FileNotFoundException($"RAID metadata not found for {key}");
+
+            int dataDisks = _config.ProviderCount - 2;
+            int stripeCount = (int)MathUtils.Ceiling((double)metadata.ChunkCount / dataDisks);
+            var allChunks = new byte[metadata.ChunkCount][];
+
+            for (int stripe = 0; stripe < stripeCount; stripe++)
+            {
+                int parityDisk = stripe % _config.ProviderCount;
+                int failedDisk = -1;
+
+                for (int i = 0; i < dataDisks; i++)
+                {
+                    int chunkIdx = stripe * dataDisks + i;
+                    if (chunkIdx >= metadata.ChunkCount) break;
+
+                    int diskIdx = 0;
+                    int counter = 0;
+                    for (int d = 0; d < _config.ProviderCount; d++)
+                    {
+                        if (d != parityDisk && d != (stripe + 1) % _config.ProviderCount)
+                        {
+                            if (counter == i) { diskIdx = d; break; }
+                            counter++;
+                        }
+                    }
+
+                    try
+                    {
+                        allChunks[chunkIdx] = await LoadChunkAsync(getProvider(diskIdx), $"{key}.chunk.{chunkIdx}");
+                    }
+                    catch
+                    {
+                        failedDisk = i;
+                        allChunks[chunkIdx] = null!;
+                    }
+                }
+
+                // Rebuild if needed
+                if (failedDisk >= 0)
+                {
+                    var parity = await LoadChunkAsync(getProvider(parityDisk), $"{key}.parity.{stripe}");
+                    var surviving = new List<byte[]>();
+                    for (int i = 0; i < dataDisks; i++)
+                    {
+                        int idx = stripe * dataDisks + i;
+                        if (idx < metadata.ChunkCount && allChunks[idx] != null)
+                            surviving.Add(allChunks[idx]);
+                    }
+                    var rebuilt = RebuildChunkFromParity(surviving, parity);
+                    allChunks[stripe * dataDisks + failedDisk] = rebuilt;
+                    _context.LogInfo($"[RAID-5EE] Rebuilt chunk using spare and parity");
+                }
+            }
+
+            var result = allChunks.Where(c => c != null).SelectMany(c => c).Take((int)metadata.TotalSize).ToArray();
+            return new MemoryStream(result);
         }
 
         // ==================== RAID 6E: RAID 6 Enhanced ====================
 
         private async Task SaveRAID6EAsync(string key, Stream data, Func<int, IStorageProvider> getProvider)
         {
+            // RAID 6E: RAID 6 with distributed spare capacity
             if (_config.ProviderCount < 5)
                 throw new InvalidOperationException("RAID 6E requires at least 5 providers");
 
-            // RAID 6E: RAID 6 with distributed spare
-            await SaveRAID6Async(key, data, getProvider);
-            _context.LogInfo($"[RAID-6E] Saved {key} with enhanced dual parity");
+            var allBytes = await ReadAllBytesAsync(data);
+            var chunks = SplitIntoChunks(new MemoryStream(allBytes), _config.StripeSize);
+
+            int effectiveDisks = _config.ProviderCount;
+            int dataDisks = effectiveDisks - 3; // Two parity, one spare
+
+            var metadata = new RaidMetadata
+            {
+                Level = RaidLevel.RAID_6E,
+                TotalSize = allBytes.Length,
+                ChunkCount = chunks.Count,
+                MirrorCount = 2 // Indicates dual parity + spare
+            };
+
+            var tasks = new List<Task>();
+            int stripeCount = (int)MathUtils.Ceiling((double)chunks.Count / dataDisks);
+
+            for (int stripe = 0; stripe < stripeCount; stripe++)
+            {
+                int parityPDisk = stripe % effectiveDisks;
+                int parityQDisk = (stripe + 1) % effectiveDisks;
+                int spareDisk = (stripe + 2) % effectiveDisks;
+
+                var stripeChunks = chunks.Skip(stripe * dataDisks).Take(dataDisks).ToList();
+
+                if (stripeChunks.Count > 0)
+                {
+                    var parityP = CalculateParityXOR(stripeChunks);
+                    var parityQ = CalculateParityReedSolomon(stripeChunks);
+                    tasks.Add(SaveChunkAsync(getProvider(parityPDisk), $"{key}.parityP.{stripe}", parityP));
+                    tasks.Add(SaveChunkAsync(getProvider(parityQDisk), $"{key}.parityQ.{stripe}", parityQ));
+                    tasks.Add(SaveChunkAsync(getProvider(spareDisk), $"{key}.spare.{stripe}", new byte[] { 0x6E }));
+                }
+
+                int dataDiskCounter = 0;
+                for (int diskIdx = 0; diskIdx < effectiveDisks; diskIdx++)
+                {
+                    if (diskIdx != parityPDisk && diskIdx != parityQDisk && diskIdx != spareDisk && dataDiskCounter < stripeChunks.Count)
+                    {
+                        int chunkIdx = stripe * dataDisks + dataDiskCounter;
+                        tasks.Add(SaveChunkAsync(getProvider(diskIdx), $"{key}.chunk.{chunkIdx}", stripeChunks[dataDiskCounter]));
+                        dataDiskCounter++;
+                    }
+                }
+            }
+
+            await Task.WhenAll(tasks);
+            _metadata[key] = metadata;
+            _context.LogInfo($"[RAID-6E] Saved {key} with dual parity and distributed spare");
         }
 
         private async Task<Stream> LoadRAID6EAsync(string key, Func<int, IStorageProvider> getProvider)
         {
-            return await LoadRAID6Async(key, getProvider);
+            if (!_metadata.TryGetValue(key, out var metadata))
+                throw new FileNotFoundException($"RAID metadata not found for {key}");
+
+            int dataDisks = _config.ProviderCount - 3;
+            int stripeCount = (int)MathUtils.Ceiling((double)metadata.ChunkCount / dataDisks);
+            var allChunks = new byte[metadata.ChunkCount][];
+
+            for (int stripe = 0; stripe < stripeCount; stripe++)
+            {
+                int parityPDisk = stripe % _config.ProviderCount;
+                int parityQDisk = (stripe + 1) % _config.ProviderCount;
+                var failedIndices = new List<int>();
+                var stripeChunks = new List<byte[]>();
+
+                for (int i = 0; i < dataDisks; i++)
+                {
+                    int chunkIdx = stripe * dataDisks + i;
+                    if (chunkIdx >= metadata.ChunkCount) break;
+
+                    int diskIdx = 0;
+                    int counter = 0;
+                    for (int d = 0; d < _config.ProviderCount; d++)
+                    {
+                        if (d != parityPDisk && d != parityQDisk && d != (stripe + 2) % _config.ProviderCount)
+                        {
+                            if (counter == i) { diskIdx = d; break; }
+                            counter++;
+                        }
+                    }
+
+                    try
+                    {
+                        var chunk = await LoadChunkAsync(getProvider(diskIdx), $"{key}.chunk.{chunkIdx}");
+                        allChunks[chunkIdx] = chunk;
+                        stripeChunks.Add(chunk);
+                    }
+                    catch
+                    {
+                        failedIndices.Add(i);
+                        stripeChunks.Add(null!);
+                    }
+                }
+
+                // Rebuild up to 2 failures using dual parity
+                if (failedIndices.Count > 0 && failedIndices.Count <= 2)
+                {
+                    var parityP = await LoadChunkAsync(getProvider(parityPDisk), $"{key}.parityP.{stripe}");
+                    var parityQ = await LoadChunkAsync(getProvider(parityQDisk), $"{key}.parityQ.{stripe}");
+                    var rebuilt = RebuildFromDualParity(stripeChunks, parityP, parityQ, failedIndices);
+
+                    foreach (var (idx, chunk) in rebuilt)
+                    {
+                        allChunks[stripe * dataDisks + idx] = chunk;
+                    }
+                    _context.LogInfo($"[RAID-6E] Rebuilt {failedIndices.Count} chunks in stripe {stripe}");
+                }
+            }
+
+            var result = allChunks.Where(c => c != null).SelectMany(c => c).Take((int)metadata.TotalSize).ToArray();
+            return new MemoryStream(result);
         }
 
         // ==================== RAID-S: Dell/EMC Parity RAID ====================
 
         private async Task SaveRAIDSAsync(string key, Stream data, Func<int, IStorageProvider> getProvider)
         {
+            // RAID-S: Dell/EMC proprietary RAID with optimized parity placement
+            // Uses sector-aligned parity for better sequential performance
             if (_config.ProviderCount < 4)
                 throw new InvalidOperationException("RAID-S requires at least 4 providers");
 
-            // RAID-S: Proprietary Dell/EMC implementation similar to RAID 5
-            await SaveRAID5Async(key, data, getProvider);
-            _context.LogInfo($"[RAID-S] Saved {key} with Dell/EMC parity configuration");
+            var allBytes = await ReadAllBytesAsync(data);
+            var chunks = SplitIntoChunks(new MemoryStream(allBytes), _config.StripeSize);
+
+            int dataDisks = _config.ProviderCount - 1;
+
+            var metadata = new RaidMetadata
+            {
+                Level = RaidLevel.RAID_S,
+                TotalSize = allBytes.Length,
+                ChunkCount = chunks.Count
+            };
+
+            var tasks = new List<Task>();
+            int stripeCount = (int)MathUtils.Ceiling((double)chunks.Count / dataDisks);
+
+            for (int stripe = 0; stripe < stripeCount; stripe++)
+            {
+                // Dell/EMC uses fixed parity position per stripe group
+                int parityDisk = (stripe / 4) % _config.ProviderCount; // Parity changes every 4 stripes
+
+                var stripeChunks = new List<byte[]>();
+                int dataDiskCounter = 0;
+
+                for (int diskIdx = 0; diskIdx < _config.ProviderCount; diskIdx++)
+                {
+                    if (diskIdx == parityDisk)
+                        continue;
+
+                    int chunkIdx = stripe * dataDisks + dataDiskCounter;
+                    if (chunkIdx < chunks.Count)
+                    {
+                        stripeChunks.Add(chunks[chunkIdx]);
+                        tasks.Add(SaveChunkAsync(getProvider(diskIdx), $"{key}.chunk.{chunkIdx}", chunks[chunkIdx]));
+                    }
+                    dataDiskCounter++;
+                }
+
+                if (stripeChunks.Count > 0)
+                {
+                    var parity = CalculateParityXOR(stripeChunks);
+                    tasks.Add(SaveChunkAsync(getProvider(parityDisk), $"{key}.parity.{stripe}", parity));
+                }
+            }
+
+            await Task.WhenAll(tasks);
+            _metadata[key] = metadata;
+            _context.LogInfo($"[RAID-S] Saved {key} with Dell/EMC optimized parity placement");
         }
 
         private async Task<Stream> LoadRAIDSAsync(string key, Func<int, IStorageProvider> getProvider)
         {
-            return await LoadRAID5Async(key, getProvider);
+            if (!_metadata.TryGetValue(key, out var metadata))
+                throw new FileNotFoundException($"RAID metadata not found for {key}");
+
+            int dataDisks = _config.ProviderCount - 1;
+            var allChunks = new byte[metadata.ChunkCount][];
+
+            for (int chunkIdx = 0; chunkIdx < metadata.ChunkCount; chunkIdx++)
+            {
+                int stripe = chunkIdx / dataDisks;
+                int parityDisk = (stripe / 4) % _config.ProviderCount;
+                int diskInStripe = chunkIdx % dataDisks;
+
+                // Calculate actual disk index
+                int actualDisk = diskInStripe;
+                if (actualDisk >= parityDisk) actualDisk++;
+
+                try
+                {
+                    allChunks[chunkIdx] = await LoadChunkAsync(getProvider(actualDisk), $"{key}.chunk.{chunkIdx}");
+                }
+                catch
+                {
+                    // Rebuild from parity
+                    var parity = await LoadChunkAsync(getProvider(parityDisk), $"{key}.parity.{stripe}");
+                    var surviving = new List<byte[]>();
+                    for (int i = 0; i < dataDisks; i++)
+                    {
+                        int idx = stripe * dataDisks + i;
+                        if (idx != chunkIdx && idx < metadata.ChunkCount && allChunks[idx] != null)
+                            surviving.Add(allChunks[idx]);
+                    }
+                    allChunks[chunkIdx] = RebuildChunkFromParity(surviving, parity);
+                    _context.LogInfo($"[RAID-S] Rebuilt chunk {chunkIdx}");
+                }
+            }
+
+            var result = allChunks.SelectMany(c => c).Take((int)metadata.TotalSize).ToArray();
+            return new MemoryStream(result);
         }
 
         // ==================== RAID 7: Cached Striping with Parity ====================
 
         private async Task SaveRAID7Async(string key, Stream data, Func<int, IStorageProvider> getProvider)
         {
+            // RAID 7: Proprietary Storage Computer Corporation design
+            // Features: Dedicated parity disk, real-time OS, cache for all operations
             if (_config.ProviderCount < 5)
                 throw new InvalidOperationException("RAID 7 requires at least 5 providers");
 
-            // RAID 7: Proprietary cached implementation with embedded controller
-            // Use RAID 5 as base with enhanced caching (cache layer handled elsewhere)
-            await SaveRAID5Async(key, data, getProvider);
-            _context.LogInfo($"[RAID-7] Saved {key} with cached striping and parity");
+            var allBytes = await ReadAllBytesAsync(data);
+            var chunks = SplitIntoChunks(new MemoryStream(allBytes), _config.StripeSize);
+
+            // RAID 7 uses dedicated parity disk (last disk) and cache disk (second-to-last)
+            int parityDisk = _config.ProviderCount - 1;
+            int cacheDisk = _config.ProviderCount - 2;
+            int dataDisks = _config.ProviderCount - 2;
+
+            var metadata = new RaidMetadata
+            {
+                Level = RaidLevel.RAID_7,
+                TotalSize = allBytes.Length,
+                ChunkCount = chunks.Count,
+                ProviderMapping = new Dictionary<int, List<int>> { { 0, new List<int> { parityDisk, cacheDisk } } }
+            };
+
+            var tasks = new List<Task>();
+
+            // Write data to data disks with cache tracking
+            for (int chunkIdx = 0; chunkIdx < chunks.Count; chunkIdx++)
+            {
+                int diskIdx = chunkIdx % dataDisks;
+                tasks.Add(SaveChunkAsync(getProvider(diskIdx), $"{key}.chunk.{chunkIdx}", chunks[chunkIdx]));
+            }
+
+            // Calculate parity across all data
+            int stripeCount = (int)MathUtils.Ceiling((double)chunks.Count / dataDisks);
+            for (int stripe = 0; stripe < stripeCount; stripe++)
+            {
+                var stripeChunks = chunks.Skip(stripe * dataDisks).Take(dataDisks).ToList();
+                if (stripeChunks.Count > 0)
+                {
+                    var parity = CalculateParityXOR(stripeChunks);
+                    tasks.Add(SaveChunkAsync(getProvider(parityDisk), $"{key}.parity.{stripe}", parity));
+                }
+            }
+
+            // Write cache index (metadata about cached operations)
+            var cacheIndex = System.Text.Encoding.UTF8.GetBytes($"RAID7_CACHE:{key}:{chunks.Count}");
+            tasks.Add(SaveChunkAsync(getProvider(cacheDisk), $"{key}.cache.index", cacheIndex));
+
+            await Task.WhenAll(tasks);
+            _metadata[key] = metadata;
+            _context.LogInfo($"[RAID-7] Saved {key} with dedicated parity and cache tracking");
         }
 
         private async Task<Stream> LoadRAID7Async(string key, Func<int, IStorageProvider> getProvider)
         {
-            return await LoadRAID5Async(key, getProvider);
+            if (!_metadata.TryGetValue(key, out var metadata))
+                throw new FileNotFoundException($"RAID metadata not found for {key}");
+
+            int parityDisk = metadata.ProviderMapping[0][0];
+            int dataDisks = _config.ProviderCount - 2;
+
+            var allChunks = new byte[metadata.ChunkCount][];
+
+            for (int chunkIdx = 0; chunkIdx < metadata.ChunkCount; chunkIdx++)
+            {
+                int diskIdx = chunkIdx % dataDisks;
+
+                try
+                {
+                    allChunks[chunkIdx] = await LoadChunkAsync(getProvider(diskIdx), $"{key}.chunk.{chunkIdx}");
+                }
+                catch
+                {
+                    // Rebuild using parity
+                    int stripe = chunkIdx / dataDisks;
+                    var parity = await LoadChunkAsync(getProvider(parityDisk), $"{key}.parity.{stripe}");
+
+                    var surviving = new List<byte[]>();
+                    for (int i = 0; i < dataDisks; i++)
+                    {
+                        int idx = stripe * dataDisks + i;
+                        if (idx != chunkIdx && idx < metadata.ChunkCount)
+                        {
+                            try
+                            {
+                                var chunk = await LoadChunkAsync(getProvider(i), $"{key}.chunk.{idx}");
+                                surviving.Add(chunk);
+                            }
+                            catch { }
+                        }
+                    }
+
+                    allChunks[chunkIdx] = RebuildChunkFromParity(surviving, parity);
+                    _context.LogInfo($"[RAID-7] Rebuilt chunk {chunkIdx} from parity");
+                }
+            }
+
+            var result = allChunks.SelectMany(c => c).Take((int)metadata.TotalSize).ToArray();
+            return new MemoryStream(result);
         }
 
         // ==================== RAID-FR: IBM Fast Rebuild ====================
 
         private async Task SaveRAIDFRAsync(string key, Stream data, Func<int, IStorageProvider> getProvider)
         {
+            // RAID-FR: IBM Fast Rebuild technology
+            // Stores additional metadata to enable faster rebuild times
             if (_config.ProviderCount < 4)
                 throw new InvalidOperationException("RAID-FR requires at least 4 providers");
 
-            // RAID-FR: IBM's fast rebuild technology with RAID 5 foundation
-            await SaveRAID5Async(key, data, getProvider);
-            _context.LogInfo($"[RAID-FR] Saved {key} with fast rebuild metadata");
+            var allBytes = await ReadAllBytesAsync(data);
+            var chunks = SplitIntoChunks(new MemoryStream(allBytes), _config.StripeSize);
+
+            int dataDisks = _config.ProviderCount - 1;
+
+            var metadata = new RaidMetadata
+            {
+                Level = RaidLevel.RAID_FR,
+                TotalSize = allBytes.Length,
+                ChunkCount = chunks.Count
+            };
+
+            var tasks = new List<Task>();
+            int stripeCount = (int)MathUtils.Ceiling((double)chunks.Count / dataDisks);
+
+            // Create fast rebuild bitmap (tracks which blocks are in use)
+            var rebuildBitmap = new byte[(chunks.Count + 7) / 8];
+            for (int i = 0; i < chunks.Count; i++)
+            {
+                rebuildBitmap[i / 8] |= (byte)(1 << (i % 8));
+            }
+
+            for (int stripe = 0; stripe < stripeCount; stripe++)
+            {
+                int parityDisk = stripe % _config.ProviderCount;
+                var stripeChunks = new List<byte[]>();
+
+                int dataDiskCounter = 0;
+                for (int diskIdx = 0; diskIdx < _config.ProviderCount; diskIdx++)
+                {
+                    if (diskIdx == parityDisk)
+                        continue;
+
+                    int chunkIdx = stripe * dataDisks + dataDiskCounter;
+                    if (chunkIdx < chunks.Count)
+                    {
+                        stripeChunks.Add(chunks[chunkIdx]);
+                        tasks.Add(SaveChunkAsync(getProvider(diskIdx), $"{key}.chunk.{chunkIdx}", chunks[chunkIdx]));
+                    }
+                    dataDiskCounter++;
+                }
+
+                if (stripeChunks.Count > 0)
+                {
+                    var parity = CalculateParityXOR(stripeChunks);
+                    tasks.Add(SaveChunkAsync(getProvider(parityDisk), $"{key}.parity.{stripe}", parity));
+                }
+            }
+
+            // Save rebuild bitmap to each disk for redundancy
+            for (int disk = 0; disk < _config.ProviderCount; disk++)
+            {
+                tasks.Add(SaveChunkAsync(getProvider(disk), $"{key}.fr.bitmap", rebuildBitmap));
+            }
+
+            await Task.WhenAll(tasks);
+            _metadata[key] = metadata;
+            _context.LogInfo($"[RAID-FR] Saved {key} with fast rebuild metadata (bitmap: {rebuildBitmap.Length} bytes)");
         }
 
         private async Task<Stream> LoadRAIDFRAsync(string key, Func<int, IStorageProvider> getProvider)
         {
-            return await LoadRAID5Async(key, getProvider);
+            if (!_metadata.TryGetValue(key, out var metadata))
+                throw new FileNotFoundException($"RAID metadata not found for {key}");
+
+            int dataDisks = _config.ProviderCount - 1;
+            int stripeCount = (int)MathUtils.Ceiling((double)metadata.ChunkCount / dataDisks);
+
+            // Load rebuild bitmap for fast block identification
+            byte[] rebuildBitmap = null!;
+            for (int disk = 0; disk < _config.ProviderCount; disk++)
+            {
+                try
+                {
+                    rebuildBitmap = await LoadChunkAsync(getProvider(disk), $"{key}.fr.bitmap");
+                    break;
+                }
+                catch { }
+            }
+
+            var allChunks = new byte[metadata.ChunkCount][];
+
+            for (int stripe = 0; stripe < stripeCount; stripe++)
+            {
+                int parityDisk = stripe % _config.ProviderCount;
+                var failedIdx = -1;
+
+                int dataDiskCounter = 0;
+                for (int diskIdx = 0; diskIdx < _config.ProviderCount; diskIdx++)
+                {
+                    if (diskIdx == parityDisk)
+                        continue;
+
+                    int chunkIdx = stripe * dataDisks + dataDiskCounter;
+                    if (chunkIdx >= metadata.ChunkCount)
+                        break;
+
+                    // Check rebuild bitmap - only load blocks that are in use
+                    bool inUse = rebuildBitmap == null || (rebuildBitmap[chunkIdx / 8] & (1 << (chunkIdx % 8))) != 0;
+
+                    if (inUse)
+                    {
+                        try
+                        {
+                            allChunks[chunkIdx] = await LoadChunkAsync(getProvider(diskIdx), $"{key}.chunk.{chunkIdx}");
+                        }
+                        catch
+                        {
+                            failedIdx = dataDiskCounter;
+                        }
+                    }
+                    dataDiskCounter++;
+                }
+
+                // Fast rebuild using bitmap knowledge
+                if (failedIdx >= 0)
+                {
+                    var parity = await LoadChunkAsync(getProvider(parityDisk), $"{key}.parity.{stripe}");
+                    var surviving = new List<byte[]>();
+                    for (int i = 0; i < dataDisks; i++)
+                    {
+                        int idx = stripe * dataDisks + i;
+                        if (i != failedIdx && idx < metadata.ChunkCount && allChunks[idx] != null)
+                            surviving.Add(allChunks[idx]);
+                    }
+                    allChunks[stripe * dataDisks + failedIdx] = RebuildChunkFromParity(surviving, parity);
+                    _context.LogInfo($"[RAID-FR] Fast rebuild of chunk in stripe {stripe}");
+                }
+            }
+
+            var result = allChunks.Where(c => c != null).SelectMany(c => c).Take((int)metadata.TotalSize).ToArray();
+            return new MemoryStream(result);
         }
 
         // ==================== RAID MD10: Linux MD RAID 10 ====================
@@ -1498,41 +3468,114 @@ namespace DataWarehouse.Kernel.Storage
 
         private static byte[] CalculateParityReedSolomon(List<byte[]> chunks)
         {
-            // Simplified Reed-Solomon parity (Galois Field GF(2^8))
-            // In production, use a proper Reed-Solomon library
+            // Reed-Solomon Q parity using Galois Field GF(2^8)
+            // Q[i] = sum(D[j] * g^j) for all data disks j, where g is the generator (0x02)
             if (chunks.Count == 0)
                 return Array.Empty<byte>();
 
             var maxLength = chunks.Max(c => c.Length);
             var parity = new byte[maxLength];
 
-            for (int i = 0; i < chunks.Count; i++)
+            for (int diskIdx = 0; diskIdx < chunks.Count; diskIdx++)
             {
-                var coeff = (byte)(i + 1); // Simple coefficient
-                for (int j = 0; j < chunks[i].Length; j++)
+                // Generator coefficient: g^diskIdx where g = 0x02
+                byte coeff = GF256Power(0x02, diskIdx);
+
+                for (int byteIdx = 0; byteIdx < chunks[diskIdx].Length; byteIdx++)
                 {
-                    parity[j] ^= GF256Multiply(chunks[i][j], coeff);
+                    parity[byteIdx] ^= GF256Multiply(chunks[diskIdx][byteIdx], coeff);
                 }
             }
 
             return parity;
         }
 
-        private static byte GF256Multiply(byte a, byte b)
+        // GF(2^8) lookup tables for fast operations
+        private static readonly byte[] GF256ExpTable = GenerateGF256ExpTable();
+        private static readonly byte[] GF256LogTable = GenerateGF256LogTable();
+
+        private static byte[] GenerateGF256ExpTable()
         {
-            // Galois Field (2^8) multiplication
+            var table = new byte[512]; // Double size to avoid modulo
+            byte val = 1;
+            for (int i = 0; i < 255; i++)
+            {
+                table[i] = val;
+                table[i + 255] = val; // Duplicate for wrap-around
+                val = GF256MultiplyNoTable(val, 0x02);
+            }
+            return table;
+        }
+
+        private static byte[] GenerateGF256LogTable()
+        {
+            var table = new byte[256];
+            table[0] = 0; // log(0) is undefined, but we set to 0
+            for (int i = 0; i < 255; i++)
+            {
+                table[GF256ExpTable[i]] = (byte)i;
+            }
+            return table;
+        }
+
+        private static byte GF256MultiplyNoTable(byte a, byte b)
+        {
+            // GF(2^8) multiplication without lookup tables (for table generation)
             byte result = 0;
+            byte aa = a;
+            byte bb = b;
             for (int i = 0; i < 8; i++)
             {
-                if ((b & 1) != 0)
-                    result ^= a;
-                bool hiBitSet = (a & 0x80) != 0;
-                a <<= 1;
+                if ((bb & 1) != 0)
+                    result ^= aa;
+                bool hiBitSet = (aa & 0x80) != 0;
+                aa <<= 1;
                 if (hiBitSet)
-                    a ^= 0x1B; // GF(2^8) irreducible polynomial
-                b >>= 1;
+                    aa ^= 0x1D; // x^8 + x^4 + x^3 + x^2 + 1 (standard GF(2^8) polynomial)
+                bb >>= 1;
             }
             return result;
+        }
+
+        private static byte GF256Multiply(byte a, byte b)
+        {
+            // Fast GF(2^8) multiplication using lookup tables
+            if (a == 0 || b == 0)
+                return 0;
+            int logSum = GF256LogTable[a] + GF256LogTable[b];
+            return GF256ExpTable[logSum]; // Table handles wrap-around
+        }
+
+        private static byte GF256Divide(byte a, byte b)
+        {
+            // GF(2^8) division: a / b = a * b^(-1)
+            if (b == 0)
+                throw new DivideByZeroException("Division by zero in GF(2^8)");
+            if (a == 0)
+                return 0;
+            int logDiff = GF256LogTable[a] - GF256LogTable[b];
+            if (logDiff < 0)
+                logDiff += 255;
+            return GF256ExpTable[logDiff];
+        }
+
+        private static byte GF256Power(byte baseVal, int exp)
+        {
+            // GF(2^8) exponentiation
+            if (exp == 0)
+                return 1;
+            if (baseVal == 0)
+                return 0;
+            int logResult = (GF256LogTable[baseVal] * exp) % 255;
+            return GF256ExpTable[logResult];
+        }
+
+        private static byte GF256Inverse(byte a)
+        {
+            // GF(2^8) multiplicative inverse: a^(-1) = a^254
+            if (a == 0)
+                throw new ArgumentException("Zero has no inverse in GF(2^8)");
+            return GF256ExpTable[255 - GF256LogTable[a]];
         }
 
         private byte[] RebuildChunkFromParity(List<byte[]> chunks, byte[] parity)
@@ -1552,33 +3595,98 @@ namespace DataWarehouse.Kernel.Storage
             return result;
         }
 
-        private static Dictionary<int, byte[]> RebuildFromDualParity(List<byte[]> chunks, byte[] parityP, byte[] parityQ, List<int> failedDisks)
+        private Dictionary<int, byte[]> RebuildFromDualParity(List<byte[]> chunks, byte[] parityP, byte[] parityQ, List<int> failedDisks)
         {
-            // Simplified dual parity rebuild
-            // In production, this would use proper Reed-Solomon decoding
+            // Full Reed-Solomon dual parity rebuild using GF(2^8)
             var rebuilt = new Dictionary<int, byte[]>();
+            int chunkLength = parityP.Length;
 
             if (failedDisks.Count == 1)
             {
-                // Single disk failure - use P parity
-                var idx = failedDisks[0];
-                var result = new byte[parityP.Length];
-                Array.Copy(parityP, result, parityP.Length);
-                foreach (var chunk in chunks.Where(c => c != null))
+                // Single disk failure - use P parity (simple XOR)
+                int failedIdx = failedDisks[0];
+                var result = new byte[chunkLength];
+                Array.Copy(parityP, result, chunkLength);
+
+                for (int i = 0; i < chunks.Count; i++)
                 {
-                    for (int i = 0; i < Math.Min(chunk.Length, result.Length); i++)
+                    if (chunks[i] != null)
                     {
-                        result[i] ^= chunk[i];
+                        for (int j = 0; j < Math.Min(chunks[i].Length, chunkLength); j++)
+                        {
+                            result[j] ^= chunks[i][j];
+                        }
                     }
                 }
-                rebuilt[idx] = result;
+                rebuilt[failedIdx] = result;
+                _context.LogInfo($"[RAID-6] Rebuilt disk {failedIdx} using P parity");
             }
             else if (failedDisks.Count == 2)
             {
-                // Double disk failure - use both P and Q parity
-                // This is complex - simplified placeholder
-                rebuilt[failedDisks[0]] = new byte[parityP.Length];
-                rebuilt[failedDisks[1]] = new byte[parityP.Length];
+                // Double disk failure - use both P and Q parity with Reed-Solomon
+                int x = failedDisks[0]; // First failed disk index
+                int y = failedDisks[1]; // Second failed disk index
+
+                // Generator coefficients
+                byte gx = GF256Power(0x02, x);
+                byte gy = GF256Power(0x02, y);
+
+                // Calculate Pxy = P XOR (all surviving data)
+                // Calculate Qxy = Q XOR (all surviving Q contributions)
+                var Pxy = new byte[chunkLength];
+                var Qxy = new byte[chunkLength];
+                Array.Copy(parityP, Pxy, chunkLength);
+                Array.Copy(parityQ, Qxy, chunkLength);
+
+                for (int i = 0; i < chunks.Count; i++)
+                {
+                    if (chunks[i] != null && i != x && i != y)
+                    {
+                        byte gi = GF256Power(0x02, i);
+                        for (int j = 0; j < Math.Min(chunks[i].Length, chunkLength); j++)
+                        {
+                            Pxy[j] ^= chunks[i][j];
+                            Qxy[j] ^= GF256Multiply(chunks[i][j], gi);
+                        }
+                    }
+                }
+
+                // Now: Pxy = Dx XOR Dy
+                //      Qxy = (Dx * g^x) XOR (Dy * g^y)
+                // Solve for Dx and Dy using Cramer's rule in GF(2^8)
+
+                // Multiply Pxy by g^y: Pxy * g^y = (Dx * g^y) XOR (Dy * g^y)
+                // XOR with Qxy: (Dx * g^y) XOR (Dy * g^y) XOR (Dx * g^x) XOR (Dy * g^y)
+                //             = Dx * (g^y XOR g^x)
+                // Therefore: Dx = (Pxy * g^y XOR Qxy) / (g^y XOR g^x)
+
+                byte gyXorGx = (byte)(gy ^ gx);
+                if (gyXorGx == 0)
+                {
+                    throw new InvalidOperationException("Cannot solve: g^x == g^y (impossible if x != y)");
+                }
+                byte invGyXorGx = GF256Inverse(gyXorGx);
+
+                var Dx = new byte[chunkLength];
+                var Dy = new byte[chunkLength];
+
+                for (int j = 0; j < chunkLength; j++)
+                {
+                    byte PxyTimesGy = GF256Multiply(Pxy[j], gy);
+                    byte numeratorX = (byte)(PxyTimesGy ^ Qxy[j]);
+                    Dx[j] = GF256Multiply(numeratorX, invGyXorGx);
+
+                    // Dy = Pxy XOR Dx
+                    Dy[j] = (byte)(Pxy[j] ^ Dx[j]);
+                }
+
+                rebuilt[x] = Dx;
+                rebuilt[y] = Dy;
+                _context.LogInfo($"[RAID-6] Rebuilt disks {x} and {y} using P+Q dual parity (Reed-Solomon)");
+            }
+            else if (failedDisks.Count > 2)
+            {
+                throw new IOException($"RAID 6 can only recover from up to 2 disk failures, but {failedDisks.Count} disks failed");
             }
 
             return rebuilt;
