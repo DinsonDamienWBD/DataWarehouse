@@ -1,5 +1,6 @@
 using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Primitives;
+using DataWarehouse.SDK.Security;
 using System.Collections.Concurrent;
 
 namespace DataWarehouse.Kernel.Storage
@@ -11,7 +12,7 @@ namespace DataWarehouse.Kernel.Storage
     public class ContainerManager : ContainerManagerPluginBase
     {
         private readonly ConcurrentDictionary<string, Container> _containers = new();
-        private readonly ConcurrentDictionary<string, ContainerQuota> _quotas = new();
+        private readonly ConcurrentDictionary<string, InternalQuota> _quotas = new();
         private readonly ConcurrentDictionary<string, List<AccessEntry>> _accessEntries = new();
         private readonly ConcurrentDictionary<string, ContainerUsage> _usage = new();
         private readonly IKernelContext _context;
@@ -27,39 +28,56 @@ namespace DataWarehouse.Kernel.Storage
             _config = config ?? new ContainerManagerConfig();
         }
 
+        #region Lifecycle
+
+        public override Task StartAsync(CancellationToken ct = default)
+        {
+            _context.LogInfo("[ContainerManager] Started");
+            return Task.CompletedTask;
+        }
+
+        public override Task StopAsync()
+        {
+            _context.LogInfo("[ContainerManager] Stopped");
+            return Task.CompletedTask;
+        }
+
+        #endregion
+
         #region Container Lifecycle
 
         public override async Task<ContainerInfo> CreateContainerAsync(
-            string name,
+            ISecurityContext context,
+            string containerId,
             ContainerOptions? options = null,
             CancellationToken ct = default)
         {
-            if (string.IsNullOrWhiteSpace(name))
-                throw new ArgumentException("Container name cannot be empty", nameof(name));
+            if (string.IsNullOrWhiteSpace(containerId))
+                throw new ArgumentException("Container name cannot be empty", nameof(containerId));
 
-            if (_containers.ContainsKey(name))
-                throw new InvalidOperationException($"Container '{name}' already exists");
+            if (_containers.ContainsKey(containerId))
+                throw new InvalidOperationException($"Container '{containerId}' already exists");
 
             options ??= new ContainerOptions();
 
             var container = new Container
             {
                 Id = Guid.NewGuid().ToString("N"),
-                Name = name,
+                Name = containerId,
                 CreatedAt = DateTime.UtcNow,
-                CreatedBy = options.Owner ?? "system",
+                CreatedBy = context.UserId,
                 State = ContainerState.Active,
                 Metadata = options.Metadata ?? new Dictionary<string, object>(),
                 Tags = options.Tags ?? new List<string>()
             };
 
             // Initialize quota
-            var quota = new ContainerQuota
+            var quota = new InternalQuota
             {
                 ContainerId = container.Id,
                 MaxSizeBytes = options.MaxSizeBytes ?? _config.DefaultMaxSizeBytes,
-                MaxItemCount = options.MaxItemCount ?? _config.DefaultMaxItemCount,
-                MaxBandwidthBytesPerSecond = options.MaxBandwidthBytesPerSecond
+                MaxItemCount = _config.DefaultMaxItemCount,
+                MaxBandwidthBytesPerSecond = null
             };
 
             // Initialize usage tracking
@@ -76,7 +94,7 @@ namespace DataWarehouse.Kernel.Storage
             {
                 new AccessEntry
                 {
-                    SubjectId = options.Owner ?? "system",
+                    SubjectId = context.UserId,
                     SubjectType = SubjectType.User,
                     AccessLevel = ContainerAccessLevel.Owner,
                     GrantedAt = DateTime.UtcNow,
@@ -84,21 +102,22 @@ namespace DataWarehouse.Kernel.Storage
                 }
             };
 
-            _containers[name] = container;
+            _containers[containerId] = container;
             _quotas[container.Id] = quota;
             _usage[container.Id] = usage;
             _accessEntries[container.Id] = accessEntries;
 
-            _context.LogInfo($"[Container] Created container '{name}' (ID: {container.Id})");
+            _context.LogInfo($"[Container] Created container '{containerId}' (ID: {container.Id})");
 
             return await Task.FromResult(ToContainerInfo(container, quota, usage));
         }
 
         public override async Task<ContainerInfo?> GetContainerAsync(
-            string name,
+            ISecurityContext context,
+            string containerId,
             CancellationToken ct = default)
         {
-            if (!_containers.TryGetValue(name, out var container))
+            if (!_containers.TryGetValue(containerId, out var container))
             {
                 return null;
             }
@@ -110,7 +129,29 @@ namespace DataWarehouse.Kernel.Storage
         }
 
         public override async IAsyncEnumerable<ContainerInfo> ListContainersAsync(
-            string? prefix = null,
+            ISecurityContext context,
+            [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct = default)
+        {
+            var containers = _containers.Values.AsEnumerable();
+
+            foreach (var container in containers.OrderBy(c => c.Name))
+            {
+                ct.ThrowIfCancellationRequested();
+
+                _quotas.TryGetValue(container.Id, out var quota);
+                _usage.TryGetValue(container.Id, out var usage);
+
+                yield return ToContainerInfo(container, quota, usage);
+                await Task.Yield();
+            }
+        }
+
+        /// <summary>
+        /// Lists containers matching a prefix filter (convenience overload).
+        /// </summary>
+        public async IAsyncEnumerable<ContainerInfo> ListContainersAsync(
+            ISecurityContext context,
+            string? prefix,
             [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct = default)
         {
             var containers = _containers.Values.AsEnumerable();
@@ -133,30 +174,47 @@ namespace DataWarehouse.Kernel.Storage
         }
 
         public override async Task DeleteContainerAsync(
-            string name,
-            bool force = false,
+            ISecurityContext context,
+            string containerId,
             CancellationToken ct = default)
         {
-            if (!_containers.TryGetValue(name, out var container))
+            if (!_containers.TryGetValue(containerId, out var container))
             {
-                throw new InvalidOperationException($"Container '{name}' not found");
+                throw new InvalidOperationException($"Container '{containerId}' not found");
+            }
+
+            _containers.TryRemove(containerId, out _);
+            _quotas.TryRemove(container.Id, out _);
+            _usage.TryRemove(container.Id, out _);
+            _accessEntries.TryRemove(container.Id, out _);
+
+            _context.LogInfo($"[Container] Deleted container '{containerId}' (ID: {container.Id})");
+
+            await Task.CompletedTask;
+        }
+
+        /// <summary>
+        /// Deletes a container with force option (convenience overload).
+        /// </summary>
+        public async Task DeleteContainerAsync(
+            ISecurityContext context,
+            string containerId,
+            bool force,
+            CancellationToken ct = default)
+        {
+            if (!_containers.TryGetValue(containerId, out var container))
+            {
+                throw new InvalidOperationException($"Container '{containerId}' not found");
             }
 
             // Check if container is empty (unless force)
             if (!force && _usage.TryGetValue(container.Id, out var usage) && usage.CurrentItemCount > 0)
             {
                 throw new InvalidOperationException(
-                    $"Container '{name}' is not empty ({usage.CurrentItemCount} items). Use force=true to delete anyway.");
+                    $"Container '{containerId}' is not empty ({usage.CurrentItemCount} items). Use force=true to delete anyway.");
             }
 
-            _containers.TryRemove(name, out _);
-            _quotas.TryRemove(container.Id, out _);
-            _usage.TryRemove(container.Id, out _);
-            _accessEntries.TryRemove(container.Id, out _);
-
-            _context.LogInfo($"[Container] Deleted container '{name}' (ID: {container.Id})");
-
-            await Task.CompletedTask;
+            await DeleteContainerAsync(context, containerId, ct);
         }
 
         #endregion
@@ -164,15 +222,15 @@ namespace DataWarehouse.Kernel.Storage
         #region Access Control
 
         public override async Task GrantAccessAsync(
-            string containerName,
-            string subjectId,
-            ContainerAccessLevel accessLevel,
-            string? grantedBy = null,
+            ISecurityContext ownerContext,
+            string containerId,
+            string targetUserId,
+            ContainerAccessLevel level,
             CancellationToken ct = default)
         {
-            if (!_containers.TryGetValue(containerName, out var container))
+            if (!_containers.TryGetValue(containerId, out var container))
             {
-                throw new InvalidOperationException($"Container '{containerName}' not found");
+                throw new InvalidOperationException($"Container '{containerId}' not found");
             }
 
             if (!_accessEntries.TryGetValue(container.Id, out var entries))
@@ -182,40 +240,40 @@ namespace DataWarehouse.Kernel.Storage
             }
 
             // Remove existing entry for this subject
-            entries.RemoveAll(e => e.SubjectId == subjectId);
+            entries.RemoveAll(e => e.SubjectId == targetUserId);
 
             // Add new entry
             entries.Add(new AccessEntry
             {
-                SubjectId = subjectId,
+                SubjectId = targetUserId,
                 SubjectType = SubjectType.User, // Could be extended to support groups
-                AccessLevel = accessLevel,
+                AccessLevel = level,
                 GrantedAt = DateTime.UtcNow,
-                GrantedBy = grantedBy ?? "system"
+                GrantedBy = ownerContext.UserId
             });
 
-            _context.LogInfo($"[Container] Granted {accessLevel} access to '{subjectId}' on '{containerName}'");
+            _context.LogInfo($"[Container] Granted {level} access to '{targetUserId}' on '{containerId}'");
 
             await Task.CompletedTask;
         }
 
         public override async Task RevokeAccessAsync(
-            string containerName,
-            string subjectId,
-            string? revokedBy = null,
+            ISecurityContext ownerContext,
+            string containerId,
+            string targetUserId,
             CancellationToken ct = default)
         {
-            if (!_containers.TryGetValue(containerName, out var container))
+            if (!_containers.TryGetValue(containerId, out var container))
             {
-                throw new InvalidOperationException($"Container '{containerName}' not found");
+                throw new InvalidOperationException($"Container '{containerId}' not found");
             }
 
             if (_accessEntries.TryGetValue(container.Id, out var entries))
             {
-                var removed = entries.RemoveAll(e => e.SubjectId == subjectId);
+                var removed = entries.RemoveAll(e => e.SubjectId == targetUserId);
                 if (removed > 0)
                 {
-                    _context.LogInfo($"[Container] Revoked access for '{subjectId}' on '{containerName}'");
+                    _context.LogInfo($"[Container] Revoked access for '{targetUserId}' on '{containerId}'");
                 }
             }
 
@@ -223,11 +281,12 @@ namespace DataWarehouse.Kernel.Storage
         }
 
         public override async Task<ContainerAccessLevel> GetAccessLevelAsync(
-            string containerName,
-            string subjectId,
+            ISecurityContext context,
+            string containerId,
+            string? userId = null,
             CancellationToken ct = default)
         {
-            if (!_containers.TryGetValue(containerName, out var container))
+            if (!_containers.TryGetValue(containerId, out var container))
             {
                 return ContainerAccessLevel.None;
             }
@@ -237,15 +296,17 @@ namespace DataWarehouse.Kernel.Storage
                 return ContainerAccessLevel.None;
             }
 
+            var subjectId = userId ?? context.UserId;
             var entry = entries.FirstOrDefault(e => e.SubjectId == subjectId);
             return await Task.FromResult(entry?.AccessLevel ?? ContainerAccessLevel.None);
         }
 
         public override async IAsyncEnumerable<ContainerAccessEntry> ListAccessAsync(
-            string containerName,
+            ISecurityContext context,
+            string containerId,
             [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct = default)
         {
-            if (!_containers.TryGetValue(containerName, out var container))
+            if (!_containers.TryGetValue(containerId, out var container))
             {
                 yield break;
             }
@@ -261,11 +322,11 @@ namespace DataWarehouse.Kernel.Storage
 
                 yield return new ContainerAccessEntry
                 {
-                    SubjectId = entry.SubjectId,
-                    SubjectType = entry.SubjectType.ToString(),
-                    AccessLevel = entry.AccessLevel,
+                    UserId = entry.SubjectId,
+                    Level = entry.AccessLevel,
                     GrantedAt = entry.GrantedAt,
-                    GrantedBy = entry.GrantedBy
+                    GrantedBy = entry.GrantedBy,
+                    ExpiresAt = null
                 };
 
                 await Task.Yield();
@@ -275,9 +336,9 @@ namespace DataWarehouse.Kernel.Storage
         /// <summary>
         /// Checks if a subject has at least the specified access level.
         /// </summary>
-        public bool HasAccess(string containerName, string subjectId, ContainerAccessLevel requiredLevel)
+        public bool HasAccess(ISecurityContext context, string containerId, ContainerAccessLevel requiredLevel)
         {
-            var level = GetAccessLevelAsync(containerName, subjectId).GetAwaiter().GetResult();
+            var level = GetAccessLevelAsync(context, containerId, context.UserId).GetAwaiter().GetResult();
             return level >= requiredLevel;
         }
 
@@ -288,32 +349,52 @@ namespace DataWarehouse.Kernel.Storage
         /// <summary>
         /// Gets the quota configuration for a container.
         /// </summary>
-        public Task<ContainerQuota?> GetQuotaAsync(string containerName, CancellationToken ct = default)
+        public override Task<ContainerQuota> GetQuotaAsync(
+            ISecurityContext context,
+            string containerId,
+            CancellationToken ct = default)
         {
-            if (!_containers.TryGetValue(containerName, out var container))
+            if (!_containers.TryGetValue(containerId, out var container))
             {
-                return Task.FromResult<ContainerQuota?>(null);
+                return Task.FromResult(new ContainerQuota());
             }
 
-            _quotas.TryGetValue(container.Id, out var quota);
-            return Task.FromResult(quota);
+            _quotas.TryGetValue(container.Id, out var internalQuota);
+            _usage.TryGetValue(container.Id, out var usage);
+
+            return Task.FromResult(new ContainerQuota
+            {
+                MaxSizeBytes = internalQuota?.MaxSizeBytes,
+                UsedSizeBytes = usage?.CurrentSizeBytes ?? 0,
+                MaxItems = internalQuota?.MaxItemCount,
+                UsedItems = usage?.CurrentItemCount ?? 0
+            });
         }
 
         /// <summary>
         /// Sets the quota configuration for a container.
         /// </summary>
-        public Task SetQuotaAsync(string containerName, ContainerQuota quota, CancellationToken ct = default)
+        public override Task SetQuotaAsync(
+            ISecurityContext adminContext,
+            string containerId,
+            ContainerQuota quota,
+            CancellationToken ct = default)
         {
-            if (!_containers.TryGetValue(containerName, out var container))
+            if (!_containers.TryGetValue(containerId, out var container))
             {
-                throw new InvalidOperationException($"Container '{containerName}' not found");
+                throw new InvalidOperationException($"Container '{containerId}' not found");
             }
 
-            quota.ContainerId = container.Id;
-            _quotas[container.Id] = quota;
+            var internalQuota = new InternalQuota
+            {
+                ContainerId = container.Id,
+                MaxSizeBytes = quota.MaxSizeBytes,
+                MaxItemCount = quota.MaxItems
+            };
+            _quotas[container.Id] = internalQuota;
 
-            _context.LogInfo($"[Container] Updated quota for '{containerName}': " +
-                           $"MaxSize={quota.MaxSizeBytes / (1024 * 1024)}MB, MaxItems={quota.MaxItemCount}");
+            _context.LogInfo($"[Container] Updated quota for '{containerId}': " +
+                           $"MaxSize={quota.MaxSizeBytes / (1024 * 1024)}MB, MaxItems={quota.MaxItems}");
 
             return Task.CompletedTask;
         }
@@ -342,7 +423,7 @@ namespace DataWarehouse.Kernel.Storage
                 return new QuotaCheckResult { Allowed = false, Reason = "Container not found" };
             }
 
-            if (!_quotas.TryGetValue(container.Id, out var quota))
+            if (!_quotas.TryGetValue(container.Id, out var internalQuota))
             {
                 return new QuotaCheckResult { Allowed = true }; // No quota set
             }
@@ -353,36 +434,36 @@ namespace DataWarehouse.Kernel.Storage
             }
 
             // Check size quota
-            if (quota.MaxSizeBytes.HasValue)
+            if (internalQuota.MaxSizeBytes.HasValue)
             {
                 var projectedSize = usage.CurrentSizeBytes + additionalBytes;
-                if (projectedSize > quota.MaxSizeBytes.Value)
+                if (projectedSize > internalQuota.MaxSizeBytes.Value)
                 {
                     return new QuotaCheckResult
                     {
                         Allowed = false,
-                        Reason = $"Size quota exceeded: {projectedSize} > {quota.MaxSizeBytes.Value}",
+                        Reason = $"Size quota exceeded: {projectedSize} > {internalQuota.MaxSizeBytes.Value}",
                         QuotaType = "Size",
                         Current = usage.CurrentSizeBytes,
-                        Limit = quota.MaxSizeBytes.Value,
+                        Limit = internalQuota.MaxSizeBytes.Value,
                         Requested = additionalBytes
                     };
                 }
             }
 
             // Check item count quota
-            if (quota.MaxItemCount.HasValue)
+            if (internalQuota.MaxItemCount.HasValue)
             {
                 var projectedCount = usage.CurrentItemCount + additionalItems;
-                if (projectedCount > quota.MaxItemCount.Value)
+                if (projectedCount > internalQuota.MaxItemCount.Value)
                 {
                     return new QuotaCheckResult
                     {
                         Allowed = false,
-                        Reason = $"Item count quota exceeded: {projectedCount} > {quota.MaxItemCount.Value}",
+                        Reason = $"Item count quota exceeded: {projectedCount} > {internalQuota.MaxItemCount.Value}",
                         QuotaType = "ItemCount",
                         Current = usage.CurrentItemCount,
-                        Limit = quota.MaxItemCount.Value,
+                        Limit = internalQuota.MaxItemCount.Value,
                         Requested = additionalItems
                     };
                 }
@@ -476,24 +557,21 @@ namespace DataWarehouse.Kernel.Storage
 
         #region Helper Methods
 
-        private static ContainerInfo ToContainerInfo(Container container, ContainerQuota? quota, ContainerUsage? usage)
+        private static ContainerInfo ToContainerInfo(Container container, InternalQuota? quota, ContainerUsage? usage)
         {
             return new ContainerInfo
             {
-                Id = container.Id,
-                Name = container.Name,
+                ContainerId = container.Id,
+                DisplayName = container.Name,
+                OwnerId = container.CreatedBy,
                 CreatedAt = container.CreatedAt,
-                CreatedBy = container.CreatedBy,
-                State = container.State,
-                Metadata = container.Metadata,
+                LastModifiedAt = usage?.LastUpdated ?? container.CreatedAt,
+                SizeBytes = usage?.CurrentSizeBytes ?? 0,
+                ItemCount = usage?.CurrentItemCount ?? 0,
+                EncryptByDefault = false,
+                CompressByDefault = false,
                 Tags = container.Tags,
-                // Quota info
-                MaxSizeBytes = quota?.MaxSizeBytes,
-                MaxItemCount = quota?.MaxItemCount,
-                // Usage info
-                CurrentSizeBytes = usage?.CurrentSizeBytes ?? 0,
-                CurrentItemCount = usage?.CurrentItemCount ?? 0,
-                LastUpdated = usage?.LastUpdated
+                Metadata = container.Metadata
             };
         }
 
@@ -529,6 +607,14 @@ namespace DataWarehouse.Kernel.Storage
             Service
         }
 
+        private class InternalQuota
+        {
+            public string ContainerId { get; set; } = string.Empty;
+            public long? MaxSizeBytes { get; set; }
+            public int? MaxItemCount { get; set; }
+            public long? MaxBandwidthBytesPerSecond { get; set; }
+        }
+
         #endregion
     }
 
@@ -545,31 +631,7 @@ namespace DataWarehouse.Kernel.Storage
     }
 
     /// <summary>
-    /// Options for creating a container.
-    /// </summary>
-    public class ContainerOptions
-    {
-        public string? Owner { get; set; }
-        public long? MaxSizeBytes { get; set; }
-        public int? MaxItemCount { get; set; }
-        public long? MaxBandwidthBytesPerSecond { get; set; }
-        public Dictionary<string, object>? Metadata { get; set; }
-        public List<string>? Tags { get; set; }
-    }
-
-    /// <summary>
-    /// Container quota configuration.
-    /// </summary>
-    public class ContainerQuota
-    {
-        public string ContainerId { get; set; } = string.Empty;
-        public long? MaxSizeBytes { get; set; }
-        public int? MaxItemCount { get; set; }
-        public long? MaxBandwidthBytesPerSecond { get; set; }
-    }
-
-    /// <summary>
-    /// Container usage statistics.
+    /// Container usage statistics (internal tracking).
     /// </summary>
     public class ContainerUsage
     {
@@ -603,37 +665,6 @@ namespace DataWarehouse.Kernel.Storage
         Suspended,
         ReadOnly,
         Deleted
-    }
-
-    /// <summary>
-    /// Container information.
-    /// </summary>
-    public class ContainerInfo
-    {
-        public string Id { get; set; } = string.Empty;
-        public string Name { get; set; } = string.Empty;
-        public DateTime CreatedAt { get; set; }
-        public string CreatedBy { get; set; } = string.Empty;
-        public ContainerState State { get; set; }
-        public Dictionary<string, object> Metadata { get; set; } = new();
-        public List<string> Tags { get; set; } = new();
-        public long? MaxSizeBytes { get; set; }
-        public int? MaxItemCount { get; set; }
-        public long CurrentSizeBytes { get; set; }
-        public int CurrentItemCount { get; set; }
-        public DateTime? LastUpdated { get; set; }
-    }
-
-    /// <summary>
-    /// Container access entry.
-    /// </summary>
-    public class ContainerAccessEntry
-    {
-        public string SubjectId { get; set; } = string.Empty;
-        public string SubjectType { get; set; } = string.Empty;
-        public ContainerAccessLevel AccessLevel { get; set; }
-        public DateTime GrantedAt { get; set; }
-        public string GrantedBy { get; set; } = string.Empty;
     }
 
     #endregion

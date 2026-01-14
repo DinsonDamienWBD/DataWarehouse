@@ -51,7 +51,7 @@ namespace DataWarehouse.Kernel.Messaging
                 try
                 {
                     await handlers[0](message);
-                    return MessageResponse.Success(null);
+                    return MessageResponse.Ok(null);
                 }
                 catch (Exception ex)
                 {
