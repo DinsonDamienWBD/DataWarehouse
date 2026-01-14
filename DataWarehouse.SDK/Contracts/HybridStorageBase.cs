@@ -17,7 +17,7 @@ namespace DataWarehouse.SDK.Contracts
         public override PluginCategory Category => PluginCategory.StorageProvider;
 
         public abstract string PoolId { get; }
-        public virtual string Name => $"StoragePool-{PoolId}";
+        public override string Name => $"StoragePool-{PoolId}";
         public IStorageStrategy Strategy => _strategy;
         public IReadOnlyList<IStorageProvider> Providers => _providers.Values.Select(p => p.Provider).ToList();
 
