@@ -152,6 +152,44 @@ namespace DataWarehouse.Kernel.Storage
                     await SaveRAIDDeclusteredAsync(key, data, getProvider);
                     break;
 
+                // Phase 3: Extended RAID Levels
+                case RaidLevel.RAID_71:
+                    await SaveRAID71Async(key, data, getProvider);
+                    break;
+                case RaidLevel.RAID_72:
+                    await SaveRAID72Async(key, data, getProvider);
+                    break;
+                case RaidLevel.RAID_NM:
+                    await SaveRAIDNMAsync(key, data, getProvider);
+                    break;
+                case RaidLevel.RAID_Matrix:
+                    await SaveRAIDMatrixAsync(key, data, getProvider);
+                    break;
+                case RaidLevel.RAID_JBOD:
+                    await SaveRAIDJBODAsync(key, data, getProvider);
+                    break;
+                case RaidLevel.RAID_Crypto:
+                    await SaveRAIDCryptoAsync(key, data, getProvider);
+                    break;
+                case RaidLevel.RAID_DUP:
+                    await SaveRAIDDUPAsync(key, data, getProvider);
+                    break;
+                case RaidLevel.RAID_DDP:
+                    await SaveRAIDDDPAsync(key, data, getProvider);
+                    break;
+                case RaidLevel.RAID_SPAN:
+                    await SaveRAIDSPANAsync(key, data, getProvider);
+                    break;
+                case RaidLevel.RAID_BIG:
+                    await SaveRAIDBIGAsync(key, data, getProvider);
+                    break;
+                case RaidLevel.RAID_MAID:
+                    await SaveRAIDMAIDAsync(key, data, getProvider);
+                    break;
+                case RaidLevel.RAID_Linear:
+                    await SaveRAIDLinearAsync(key, data, getProvider);
+                    break;
+
                 default:
                     throw new NotImplementedException($"RAID level {_config.Level} not implemented");
             }
@@ -233,6 +271,32 @@ namespace DataWarehouse.Kernel.Storage
                     return await LoadRAIDBeyondAsync(key, getProvider);
                 case RaidLevel.RAID_Declustered:
                     return await LoadRAIDDeclusteredAsync(key, getProvider);
+
+                // Phase 3: Extended RAID Levels
+                case RaidLevel.RAID_71:
+                    return await LoadRAID71Async(key, getProvider);
+                case RaidLevel.RAID_72:
+                    return await LoadRAID72Async(key, getProvider);
+                case RaidLevel.RAID_NM:
+                    return await LoadRAIDNMAsync(key, getProvider);
+                case RaidLevel.RAID_Matrix:
+                    return await LoadRAIDMatrixAsync(key, getProvider);
+                case RaidLevel.RAID_JBOD:
+                    return await LoadRAIDJBODAsync(key, getProvider);
+                case RaidLevel.RAID_Crypto:
+                    return await LoadRAIDCryptoAsync(key, getProvider);
+                case RaidLevel.RAID_DUP:
+                    return await LoadRAIDDUPAsync(key, getProvider);
+                case RaidLevel.RAID_DDP:
+                    return await LoadRAIDDDPAsync(key, getProvider);
+                case RaidLevel.RAID_SPAN:
+                    return await LoadRAIDSPANAsync(key, getProvider);
+                case RaidLevel.RAID_BIG:
+                    return await LoadRAIDBIGAsync(key, getProvider);
+                case RaidLevel.RAID_MAID:
+                    return await LoadRAIDMAIDAsync(key, getProvider);
+                case RaidLevel.RAID_Linear:
+                    return await LoadRAIDLinearAsync(key, getProvider);
 
                 default:
                     throw new NotImplementedException($"RAID level {_config.Level} not implemented");
@@ -3285,6 +3349,12 @@ namespace DataWarehouse.Kernel.Storage
         }
 
         // ==================== RAID MD10: Linux MD RAID 10 ====================
+        // Linux MD RAID 10 with near/far/offset layouts for flexible mirroring
+
+        /// <summary>
+        /// MD10 layout mode: near, far, or offset
+        /// </summary>
+        private enum MD10Layout { Near, Far, Offset }
 
         private async Task SaveRAIDMD10Async(string key, Stream data, Func<int, IStorageProvider> getProvider)
         {
@@ -3292,14 +3362,196 @@ namespace DataWarehouse.Kernel.Storage
                 throw new InvalidOperationException("RAID MD10 requires at least 3 providers");
 
             // Linux MD RAID 10: Flexible near/far/offset layouts
-            // Use standard RAID 10 mirrored striping
-            await SaveRAID10Async(key, data, getProvider);
-            _context.LogInfo($"[RAID-MD10] Saved {key} with Linux MD RAID 10 layout");
+            // near=N: N copies stored on consecutive drives (default near=2)
+            // far=N: N copies stored at different offsets on different drives
+            // offset=N: Like far but with shifted stripe patterns
+
+            var bytes = await ReadAllBytesAsync(data);
+            var chunks = SplitIntoChunks(new MemoryStream(bytes), _config.StripeSize);
+
+            // Configuration: near=2 by default (can be configured via extended config)
+            int nearCopies = 2;
+            MD10Layout layout = MD10Layout.Near;
+
+            // Calculate effective data drives and layout
+            int totalDrives = _config.ProviderCount;
+            int stripeSets = totalDrives / nearCopies; // Number of stripe sets
+
+            var metadata = new RaidMetadata
+            {
+                Level = RaidLevel.RAID_MD10,
+                TotalSize = bytes.Length,
+                ChunkCount = chunks.Count,
+                StripeSize = _config.StripeSize,
+                ProviderCount = _config.ProviderCount,
+                ParityDriveIndex = -1, // No dedicated parity in RAID 10
+                Layout = $"md10-{layout.ToString().ToLower()}-{nearCopies}"
+            };
+
+            // Save metadata to all providers
+            var metadataJson = System.Text.Json.JsonSerializer.Serialize(metadata);
+            var metadataTasks = new List<Task>();
+            for (int i = 0; i < _config.ProviderCount; i++)
+            {
+                var provider = getProvider(i);
+                metadataTasks.Add(provider.WriteAsync($"{key}.raid.meta", new MemoryStream(System.Text.Encoding.UTF8.GetBytes(metadataJson))));
+            }
+            await Task.WhenAll(metadataTasks);
+
+            // MD10 Near layout: stripe across sets, mirror within sets
+            // Drive mapping: [Set0-Copy0, Set0-Copy1, Set1-Copy0, Set1-Copy1, ...]
+            var saveTasks = new List<Task>();
+
+            for (int chunkIdx = 0; chunkIdx < chunks.Count; chunkIdx++)
+            {
+                var chunk = chunks[chunkIdx];
+
+                if (layout == MD10Layout.Near)
+                {
+                    // Near layout: consecutive drives hold copies
+                    int stripeSet = chunkIdx % stripeSets;
+                    int baseDrive = stripeSet * nearCopies;
+
+                    for (int copy = 0; copy < nearCopies && baseDrive + copy < totalDrives; copy++)
+                    {
+                        int driveIdx = baseDrive + copy;
+                        var provider = getProvider(driveIdx);
+                        var chunkKey = $"{key}.md10.{chunkIdx}.{copy}";
+                        saveTasks.Add(provider.WriteAsync(chunkKey, new MemoryStream(chunk)));
+                    }
+                }
+                else if (layout == MD10Layout.Far)
+                {
+                    // Far layout: copies at different offsets across drives
+                    int primaryDrive = chunkIdx % totalDrives;
+                    int offset = totalDrives / nearCopies;
+
+                    for (int copy = 0; copy < nearCopies; copy++)
+                    {
+                        int driveIdx = (primaryDrive + copy * offset) % totalDrives;
+                        var provider = getProvider(driveIdx);
+                        var chunkKey = $"{key}.md10.{chunkIdx}.{copy}";
+                        saveTasks.Add(provider.WriteAsync(chunkKey, new MemoryStream(chunk)));
+                    }
+                }
+                else // Offset layout
+                {
+                    // Offset layout: similar to far but with stripe offset pattern
+                    int stripeRow = chunkIdx / stripeSets;
+                    int stripeCol = chunkIdx % stripeSets;
+
+                    for (int copy = 0; copy < nearCopies; copy++)
+                    {
+                        int offset = (stripeRow + copy) % nearCopies;
+                        int driveIdx = stripeCol * nearCopies + offset;
+                        if (driveIdx < totalDrives)
+                        {
+                            var provider = getProvider(driveIdx);
+                            var chunkKey = $"{key}.md10.{chunkIdx}.{copy}";
+                            saveTasks.Add(provider.WriteAsync(chunkKey, new MemoryStream(chunk)));
+                        }
+                    }
+                }
+            }
+
+            await Task.WhenAll(saveTasks);
+            _context.LogInfo($"[RAID-MD10] Saved {key} with {layout} layout, {nearCopies} copies, {stripeSets} stripe sets");
         }
 
         private async Task<Stream> LoadRAIDMD10Async(string key, Func<int, IStorageProvider> getProvider)
         {
-            return await LoadRAID10Async(key, getProvider);
+            // Load metadata
+            RaidMetadata? metadata = null;
+            for (int i = 0; i < _config.ProviderCount; i++)
+            {
+                try
+                {
+                    var provider = getProvider(i);
+                    using var metaStream = await provider.ReadAsync($"{key}.raid.meta");
+                    if (metaStream != null)
+                    {
+                        var metaBytes = await ReadAllBytesAsync(metaStream);
+                        metadata = System.Text.Json.JsonSerializer.Deserialize<RaidMetadata>(System.Text.Encoding.UTF8.GetString(metaBytes));
+                        break;
+                    }
+                }
+                catch { continue; }
+            }
+
+            if (metadata == null)
+                throw new InvalidOperationException("Cannot load: metadata not found");
+
+            // Parse layout from metadata
+            int nearCopies = 2;
+            MD10Layout layout = MD10Layout.Near;
+            if (!string.IsNullOrEmpty(metadata.Layout) && metadata.Layout.StartsWith("md10-"))
+            {
+                var parts = metadata.Layout.Split('-');
+                if (parts.Length >= 3)
+                {
+                    Enum.TryParse(parts[1], true, out layout);
+                    int.TryParse(parts[2], out nearCopies);
+                }
+            }
+
+            int totalDrives = metadata.ProviderCount;
+            int stripeSets = totalDrives / nearCopies;
+
+            var allChunks = new byte[metadata.ChunkCount][];
+
+            for (int chunkIdx = 0; chunkIdx < metadata.ChunkCount; chunkIdx++)
+            {
+                byte[]? chunkData = null;
+
+                // Try each copy until we find one that works
+                for (int copy = 0; copy < nearCopies && chunkData == null; copy++)
+                {
+                    int driveIdx;
+
+                    if (layout == MD10Layout.Near)
+                    {
+                        int stripeSet = chunkIdx % stripeSets;
+                        int baseDrive = stripeSet * nearCopies;
+                        driveIdx = baseDrive + copy;
+                    }
+                    else if (layout == MD10Layout.Far)
+                    {
+                        int primaryDrive = chunkIdx % totalDrives;
+                        int offset = totalDrives / nearCopies;
+                        driveIdx = (primaryDrive + copy * offset) % totalDrives;
+                    }
+                    else // Offset
+                    {
+                        int stripeRow = chunkIdx / stripeSets;
+                        int stripeCol = chunkIdx % stripeSets;
+                        int offsetVal = (stripeRow + copy) % nearCopies;
+                        driveIdx = stripeCol * nearCopies + offsetVal;
+                    }
+
+                    if (driveIdx < totalDrives)
+                    {
+                        try
+                        {
+                            var provider = getProvider(driveIdx);
+                            var chunkKey = $"{key}.md10.{chunkIdx}.{copy}";
+                            using var stream = await provider.ReadAsync(chunkKey);
+                            if (stream != null)
+                            {
+                                chunkData = await ReadAllBytesAsync(stream);
+                            }
+                        }
+                        catch { continue; }
+                    }
+                }
+
+                if (chunkData == null)
+                    throw new InvalidOperationException($"Failed to load chunk {chunkIdx} from any copy");
+
+                allChunks[chunkIdx] = chunkData;
+            }
+
+            var result = allChunks.SelectMany(c => c).Take((int)metadata.TotalSize).ToArray();
+            return new MemoryStream(result);
         }
 
         // ==================== Adaptive RAID: IBM Auto-Tuning ====================
@@ -3377,6 +3629,8 @@ namespace DataWarehouse.Kernel.Storage
         }
 
         // ==================== Declustered RAID: Advanced Parity Distribution ====================
+        // Parity declustering distributes parity across ALL drives using a permutation matrix
+        // This enables faster rebuilds by involving all drives in reconstruction
 
         private async Task SaveRAIDDeclusteredAsync(string key, Stream data, Func<int, IStorageProvider> getProvider)
         {
@@ -3384,15 +3638,1802 @@ namespace DataWarehouse.Kernel.Storage
                 throw new InvalidOperationException("Declustered RAID requires at least 4 providers");
 
             // Declustered RAID: Distributes rebuild work across ALL drives
-            // Uses advanced parity distribution for fast rebuild
-            // Implementation uses RAID 6 foundation with enhanced metadata
-            await SaveRAID6Async(key, data, getProvider);
-            _context.LogInfo($"[Declustered-RAID] Saved {key} with distributed parity layout");
+            // Uses a permutation matrix to assign data and parity to different drives per stripe
+            // Rebuild involves all drives, not just the parity group
+
+            var bytes = await ReadAllBytesAsync(data);
+            var chunks = SplitIntoChunks(new MemoryStream(bytes), _config.StripeSize);
+
+            int n = _config.ProviderCount;   // Total drives
+            int k = n - 2;                    // Data drives per stripe (dual parity)
+            int stripeGroupSize = n;          // Each stripe group spans all drives
+
+            // Calculate parity for each stripe group
+            var allStripeData = new List<(int stripeIdx, int[] driveAssignment, byte[][] dataChunks, byte[] parityP, byte[] parityQ)>();
+
+            int stripeIdx = 0;
+            for (int i = 0; i < chunks.Count; i += k)
+            {
+                // Get data chunks for this stripe
+                var stripeChunks = new List<byte[]>();
+                for (int j = 0; j < k && i + j < chunks.Count; j++)
+                {
+                    stripeChunks.Add(chunks[i + j]);
+                }
+
+                // Pad if needed
+                int maxLen = stripeChunks.Max(c => c.Length);
+                for (int j = 0; j < stripeChunks.Count; j++)
+                {
+                    if (stripeChunks[j].Length < maxLen)
+                    {
+                        var padded = new byte[maxLen];
+                        Array.Copy(stripeChunks[j], padded, stripeChunks[j].Length);
+                        stripeChunks[j] = padded;
+                    }
+                }
+
+                // Calculate P and Q parity
+                var parityP = new byte[maxLen];
+                var parityQ = new byte[maxLen];
+
+                for (int byteIdx = 0; byteIdx < maxLen; byteIdx++)
+                {
+                    byte p = 0;
+                    byte q = 0;
+                    for (int d = 0; d < stripeChunks.Count; d++)
+                    {
+                        p ^= stripeChunks[d][byteIdx];
+                        q ^= GF256Multiply(stripeChunks[d][byteIdx], GF256ExpTable[d]);
+                    }
+                    parityP[byteIdx] = p;
+                    parityQ[byteIdx] = q;
+                }
+
+                // Declustered assignment: rotate drive assignments per stripe
+                // This ensures parity and data are on different drives each stripe
+                var driveAssignment = new int[stripeChunks.Count + 2]; // data + 2 parity
+
+                // Use permutation matrix approach: shift based on stripe index
+                int shift = stripeIdx % n;
+                for (int d = 0; d < stripeChunks.Count; d++)
+                {
+                    driveAssignment[d] = (d + shift) % n;
+                }
+                // P parity on different drive
+                driveAssignment[stripeChunks.Count] = (stripeChunks.Count + shift) % n;
+                // Q parity on different drive
+                driveAssignment[stripeChunks.Count + 1] = (stripeChunks.Count + 1 + shift) % n;
+
+                allStripeData.Add((stripeIdx, driveAssignment, stripeChunks.ToArray(), parityP, parityQ));
+                stripeIdx++;
+            }
+
+            // Build declustered layout metadata
+            var layoutInfo = new List<string>();
+            foreach (var stripe in allStripeData)
+            {
+                layoutInfo.Add($"{stripe.stripeIdx}:{string.Join(",", stripe.driveAssignment)}");
+            }
+
+            var metadata = new RaidMetadata
+            {
+                Level = RaidLevel.RAID_Declustered,
+                TotalSize = bytes.Length,
+                ChunkCount = chunks.Count,
+                StripeSize = _config.StripeSize,
+                ProviderCount = _config.ProviderCount,
+                ParityDriveIndex = -1, // Distributed
+                Layout = $"declustered-k{k}-{string.Join(";", layoutInfo)}"
+            };
+
+            // Save metadata to all providers
+            var metadataJson = System.Text.Json.JsonSerializer.Serialize(metadata);
+            var metadataTasks = new List<Task>();
+            for (int i = 0; i < n; i++)
+            {
+                var provider = getProvider(i);
+                metadataTasks.Add(provider.WriteAsync($"{key}.raid.meta", new MemoryStream(System.Text.Encoding.UTF8.GetBytes(metadataJson))));
+            }
+            await Task.WhenAll(metadataTasks);
+
+            // Save data and parity chunks according to declustered layout
+            var saveTasks = new List<Task>();
+            int globalChunkIdx = 0;
+
+            foreach (var stripe in allStripeData)
+            {
+                // Save data chunks
+                for (int d = 0; d < stripe.dataChunks.Length; d++)
+                {
+                    int driveIdx = stripe.driveAssignment[d];
+                    var provider = getProvider(driveIdx);
+                    var chunkKey = $"{key}.dcl.s{stripe.stripeIdx}.d{d}";
+                    saveTasks.Add(provider.WriteAsync(chunkKey, new MemoryStream(stripe.dataChunks[d])));
+                    globalChunkIdx++;
+                }
+
+                // Save P parity
+                int pDrive = stripe.driveAssignment[stripe.dataChunks.Length];
+                var pProvider = getProvider(pDrive);
+                saveTasks.Add(pProvider.WriteAsync($"{key}.dcl.s{stripe.stripeIdx}.p", new MemoryStream(stripe.parityP)));
+
+                // Save Q parity
+                int qDrive = stripe.driveAssignment[stripe.dataChunks.Length + 1];
+                var qProvider = getProvider(qDrive);
+                saveTasks.Add(qProvider.WriteAsync($"{key}.dcl.s{stripe.stripeIdx}.q", new MemoryStream(stripe.parityQ)));
+            }
+
+            await Task.WhenAll(saveTasks);
+            _context.LogInfo($"[Declustered-RAID] Saved {key} with {allStripeData.Count} stripe groups across {n} drives");
         }
 
         private async Task<Stream> LoadRAIDDeclusteredAsync(string key, Func<int, IStorageProvider> getProvider)
         {
-            return await LoadRAID6Async(key, getProvider);
+            // Load metadata
+            RaidMetadata? metadata = null;
+            for (int i = 0; i < _config.ProviderCount; i++)
+            {
+                try
+                {
+                    var provider = getProvider(i);
+                    using var metaStream = await provider.ReadAsync($"{key}.raid.meta");
+                    if (metaStream != null)
+                    {
+                        var metaBytes = await ReadAllBytesAsync(metaStream);
+                        metadata = System.Text.Json.JsonSerializer.Deserialize<RaidMetadata>(System.Text.Encoding.UTF8.GetString(metaBytes));
+                        break;
+                    }
+                }
+                catch { continue; }
+            }
+
+            if (metadata == null)
+                throw new InvalidOperationException("Cannot load: metadata not found");
+
+            // Parse declustered layout from metadata
+            int n = metadata.ProviderCount;
+            int k = n - 2;
+
+            // Parse stripe assignments from layout
+            var stripeAssignments = new Dictionary<int, int[]>();
+            if (!string.IsNullOrEmpty(metadata.Layout) && metadata.Layout.StartsWith("declustered-"))
+            {
+                var parts = metadata.Layout.Split('-');
+                if (parts.Length >= 3)
+                {
+                    var stripeInfos = parts[2].Split(';');
+                    foreach (var info in stripeInfos)
+                    {
+                        var kv = info.Split(':');
+                        if (kv.Length == 2 && int.TryParse(kv[0], out int sIdx))
+                        {
+                            var drives = kv[1].Split(',').Select(int.Parse).ToArray();
+                            stripeAssignments[sIdx] = drives;
+                        }
+                    }
+                }
+            }
+
+            // Calculate number of stripes
+            int numStripes = (metadata.ChunkCount + k - 1) / k;
+            var allChunks = new List<byte[]>();
+
+            for (int stripeIdx = 0; stripeIdx < numStripes; stripeIdx++)
+            {
+                int chunksInStripe = Math.Min(k, metadata.ChunkCount - stripeIdx * k);
+                if (chunksInStripe <= 0) break;
+
+                // Get drive assignment for this stripe
+                int[] driveAssignment;
+                if (stripeAssignments.TryGetValue(stripeIdx, out var assignment))
+                {
+                    driveAssignment = assignment;
+                }
+                else
+                {
+                    // Fallback: calculate from permutation
+                    driveAssignment = new int[chunksInStripe + 2];
+                    int shift = stripeIdx % n;
+                    for (int d = 0; d < chunksInStripe + 2; d++)
+                    {
+                        driveAssignment[d] = (d + shift) % n;
+                    }
+                }
+
+                var stripeChunks = new byte[chunksInStripe][];
+                var failedDrives = new List<int>();
+
+                // Try to load each data chunk
+                for (int d = 0; d < chunksInStripe; d++)
+                {
+                    int driveIdx = driveAssignment[d];
+                    try
+                    {
+                        var provider = getProvider(driveIdx);
+                        var chunkKey = $"{key}.dcl.s{stripeIdx}.d{d}";
+                        using var stream = await provider.ReadAsync(chunkKey);
+                        if (stream != null)
+                        {
+                            stripeChunks[d] = await ReadAllBytesAsync(stream);
+                        }
+                        else
+                        {
+                            failedDrives.Add(d);
+                        }
+                    }
+                    catch
+                    {
+                        failedDrives.Add(d);
+                    }
+                }
+
+                // If any chunks failed, reconstruct from parity
+                if (failedDrives.Count > 0 && failedDrives.Count <= 2)
+                {
+                    // Load parity
+                    byte[]? parityP = null;
+                    byte[]? parityQ = null;
+
+                    try
+                    {
+                        int pDrive = driveAssignment[chunksInStripe];
+                        var pProvider = getProvider(pDrive);
+                        using var pStream = await pProvider.ReadAsync($"{key}.dcl.s{stripeIdx}.p");
+                        if (pStream != null) parityP = await ReadAllBytesAsync(pStream);
+                    }
+                    catch { }
+
+                    try
+                    {
+                        int qDrive = driveAssignment[chunksInStripe + 1];
+                        var qProvider = getProvider(qDrive);
+                        using var qStream = await qProvider.ReadAsync($"{key}.dcl.s{stripeIdx}.q");
+                        if (qStream != null) parityQ = await ReadAllBytesAsync(qStream);
+                    }
+                    catch { }
+
+                    // Determine chunk size from available data
+                    int chunkSize = stripeChunks.Where(c => c != null).FirstOrDefault()?.Length ??
+                                   parityP?.Length ?? parityQ?.Length ?? _config.StripeSize;
+
+                    if (failedDrives.Count == 1 && parityP != null)
+                    {
+                        // Single drive failure: reconstruct using P parity
+                        int failedIdx = failedDrives[0];
+                        var reconstructed = new byte[chunkSize];
+                        Array.Copy(parityP, reconstructed, chunkSize);
+
+                        for (int d = 0; d < chunksInStripe; d++)
+                        {
+                            if (d != failedIdx && stripeChunks[d] != null)
+                            {
+                                for (int b = 0; b < chunkSize; b++)
+                                {
+                                    reconstructed[b] ^= stripeChunks[d][b];
+                                }
+                            }
+                        }
+                        stripeChunks[failedIdx] = reconstructed;
+                    }
+                    else if (failedDrives.Count == 2 && parityP != null && parityQ != null)
+                    {
+                        // Dual drive failure: reconstruct using P and Q parity
+                        int x = failedDrives[0];
+                        int y = failedDrives[1];
+
+                        var reconstructedX = new byte[chunkSize];
+                        var reconstructedY = new byte[chunkSize];
+
+                        for (int b = 0; b < chunkSize; b++)
+                        {
+                            // Compute partial P and Q from surviving drives
+                            byte partialP = parityP[b];
+                            byte partialQ = parityQ[b];
+
+                            for (int d = 0; d < chunksInStripe; d++)
+                            {
+                                if (d != x && d != y && stripeChunks[d] != null)
+                                {
+                                    partialP ^= stripeChunks[d][b];
+                                    partialQ ^= GF256Multiply(stripeChunks[d][b], GF256ExpTable[d]);
+                                }
+                            }
+
+                            // Solve: Dx + Dy = partialP
+                            //        g^x * Dx + g^y * Dy = partialQ
+                            byte gx = GF256ExpTable[x];
+                            byte gy = GF256ExpTable[y];
+                            byte gxy = (byte)(gx ^ gy);
+                            byte gxyInv = GF256Inverse(gxy);
+
+                            // Dy = (partialQ ^ g^x * partialP) / (g^y ^ g^x)
+                            byte dyNumerator = (byte)(partialQ ^ GF256Multiply(gx, partialP));
+                            reconstructedY[b] = GF256Multiply(dyNumerator, gxyInv);
+
+                            // Dx = partialP ^ Dy
+                            reconstructedX[b] = (byte)(partialP ^ reconstructedY[b]);
+                        }
+
+                        stripeChunks[x] = reconstructedX;
+                        stripeChunks[y] = reconstructedY;
+                    }
+                }
+
+                // Add stripe chunks to result
+                for (int d = 0; d < chunksInStripe; d++)
+                {
+                    if (stripeChunks[d] == null)
+                        throw new InvalidOperationException($"Failed to load/reconstruct chunk at stripe {stripeIdx}, position {d}");
+                    allChunks.Add(stripeChunks[d]);
+                }
+            }
+
+            var result = allChunks.SelectMany(c => c).Take((int)metadata.TotalSize).ToArray();
+            return new MemoryStream(result);
+        }
+
+        // ==================== RAID 7.1: Enhanced RAID 7 with Read Cache ====================
+        // RAID 7.1 extends RAID 7 with a dedicated read cache layer
+
+        private readonly Dictionary<string, byte[]> _raid71ReadCache = new();
+
+        private async Task SaveRAID71Async(string key, Stream data, Func<int, IStorageProvider> getProvider)
+        {
+            if (_config.ProviderCount < 4)
+                throw new InvalidOperationException("RAID 7.1 requires at least 4 providers");
+
+            // RAID 7.1: RAID 5 with dedicated parity + read cache
+            var bytes = await ReadAllBytesAsync(data);
+            var chunks = SplitIntoChunks(new MemoryStream(bytes), _config.StripeSize);
+
+            int n = _config.ProviderCount;
+            int dataDrives = n - 1; // Last drive is dedicated parity
+
+            var metadata = new RaidMetadata
+            {
+                Level = RaidLevel.RAID_71,
+                TotalSize = bytes.Length,
+                ChunkCount = chunks.Count,
+                StripeSize = _config.StripeSize,
+                ProviderCount = n,
+                ParityDriveIndex = n - 1,
+                Layout = "raid71-readcache"
+            };
+
+            // Save metadata
+            var metadataJson = System.Text.Json.JsonSerializer.Serialize(metadata);
+            var metaTasks = Enumerable.Range(0, n).Select(i =>
+                getProvider(i).WriteAsync($"{key}.raid.meta", new MemoryStream(System.Text.Encoding.UTF8.GetBytes(metadataJson))));
+            await Task.WhenAll(metaTasks);
+
+            // Store data with dedicated parity on last drive
+            var saveTasks = new List<Task>();
+            for (int stripeIdx = 0; stripeIdx * dataDrives < chunks.Count; stripeIdx++)
+            {
+                var stripeChunks = new List<byte[]>();
+                int maxLen = 0;
+
+                // Collect stripe data
+                for (int d = 0; d < dataDrives && stripeIdx * dataDrives + d < chunks.Count; d++)
+                {
+                    var chunk = chunks[stripeIdx * dataDrives + d];
+                    stripeChunks.Add(chunk);
+                    maxLen = Math.Max(maxLen, chunk.Length);
+                }
+
+                // Pad chunks
+                for (int d = 0; d < stripeChunks.Count; d++)
+                {
+                    if (stripeChunks[d].Length < maxLen)
+                    {
+                        var padded = new byte[maxLen];
+                        Array.Copy(stripeChunks[d], padded, stripeChunks[d].Length);
+                        stripeChunks[d] = padded;
+                    }
+                }
+
+                // Calculate parity
+                var parity = new byte[maxLen];
+                foreach (var chunk in stripeChunks)
+                {
+                    for (int b = 0; b < maxLen; b++)
+                        parity[b] ^= chunk[b];
+                }
+
+                // Save data chunks
+                for (int d = 0; d < stripeChunks.Count; d++)
+                {
+                    int driveIdx = d;
+                    var chunkKey = $"{key}.r71.s{stripeIdx}.d{d}";
+                    saveTasks.Add(getProvider(driveIdx).WriteAsync(chunkKey, new MemoryStream(stripeChunks[d])));
+
+                    // Cache for read optimization
+                    _raid71ReadCache[$"{key}.{stripeIdx}.{d}"] = stripeChunks[d];
+                }
+
+                // Save parity to dedicated drive
+                var parityKey = $"{key}.r71.s{stripeIdx}.p";
+                saveTasks.Add(getProvider(n - 1).WriteAsync(parityKey, new MemoryStream(parity)));
+            }
+
+            await Task.WhenAll(saveTasks);
+            _context.LogInfo($"[RAID-7.1] Saved {key} with read cache ({_raid71ReadCache.Count} entries)");
+        }
+
+        private async Task<Stream> LoadRAID71Async(string key, Func<int, IStorageProvider> getProvider)
+        {
+            // Load metadata
+            RaidMetadata? metadata = null;
+            for (int i = 0; i < _config.ProviderCount; i++)
+            {
+                try
+                {
+                    using var metaStream = await getProvider(i).ReadAsync($"{key}.raid.meta");
+                    if (metaStream != null)
+                    {
+                        metadata = System.Text.Json.JsonSerializer.Deserialize<RaidMetadata>(
+                            System.Text.Encoding.UTF8.GetString(await ReadAllBytesAsync(metaStream)));
+                        break;
+                    }
+                }
+                catch { continue; }
+            }
+
+            if (metadata == null)
+                throw new InvalidOperationException("Cannot load: metadata not found");
+
+            int n = metadata.ProviderCount;
+            int dataDrives = n - 1;
+            var allChunks = new List<byte[]>();
+
+            int numStripes = (metadata.ChunkCount + dataDrives - 1) / dataDrives;
+            for (int stripeIdx = 0; stripeIdx < numStripes; stripeIdx++)
+            {
+                int chunksInStripe = Math.Min(dataDrives, metadata.ChunkCount - stripeIdx * dataDrives);
+
+                for (int d = 0; d < chunksInStripe; d++)
+                {
+                    // Check read cache first
+                    var cacheKey = $"{key}.{stripeIdx}.{d}";
+                    if (_raid71ReadCache.TryGetValue(cacheKey, out var cached))
+                    {
+                        allChunks.Add(cached);
+                        continue;
+                    }
+
+                    // Load from disk
+                    var chunkKey = $"{key}.r71.s{stripeIdx}.d{d}";
+                    try
+                    {
+                        using var stream = await getProvider(d).ReadAsync(chunkKey);
+                        if (stream != null)
+                        {
+                            var chunk = await ReadAllBytesAsync(stream);
+                            allChunks.Add(chunk);
+                            _raid71ReadCache[cacheKey] = chunk; // Add to cache
+                        }
+                    }
+                    catch
+                    {
+                        // Reconstruct from parity
+                        var parity = await ReadAllBytesAsync(await getProvider(n - 1).ReadAsync($"{key}.r71.s{stripeIdx}.p"));
+                        var reconstructed = new byte[parity.Length];
+                        Array.Copy(parity, reconstructed, parity.Length);
+
+                        for (int od = 0; od < chunksInStripe; od++)
+                        {
+                            if (od != d)
+                            {
+                                var otherKey = $"{key}.r71.s{stripeIdx}.d{od}";
+                                var other = await ReadAllBytesAsync(await getProvider(od).ReadAsync(otherKey));
+                                for (int b = 0; b < reconstructed.Length; b++)
+                                    reconstructed[b] ^= other[b];
+                            }
+                        }
+                        allChunks.Add(reconstructed);
+                    }
+                }
+            }
+
+            return new MemoryStream(allChunks.SelectMany(c => c).Take((int)metadata.TotalSize).ToArray());
+        }
+
+        // ==================== RAID 7.2: Enhanced RAID 7 with Write-Back Cache ====================
+        // RAID 7.2 extends RAID 7 with write-back caching for improved write performance
+
+        private readonly Dictionary<string, byte[]> _raid72WriteCache = new();
+        private readonly HashSet<string> _raid72DirtyBlocks = new();
+
+        private async Task SaveRAID72Async(string key, Stream data, Func<int, IStorageProvider> getProvider)
+        {
+            if (_config.ProviderCount < 4)
+                throw new InvalidOperationException("RAID 7.2 requires at least 4 providers");
+
+            // RAID 7.2: Write-back cache with RAID 5 backend
+            var bytes = await ReadAllBytesAsync(data);
+            var chunks = SplitIntoChunks(new MemoryStream(bytes), _config.StripeSize);
+
+            int n = _config.ProviderCount;
+            int dataDrives = n - 1;
+
+            var metadata = new RaidMetadata
+            {
+                Level = RaidLevel.RAID_72,
+                TotalSize = bytes.Length,
+                ChunkCount = chunks.Count,
+                StripeSize = _config.StripeSize,
+                ProviderCount = n,
+                ParityDriveIndex = n - 1,
+                Layout = "raid72-writeback"
+            };
+
+            // Save metadata immediately
+            var metadataJson = System.Text.Json.JsonSerializer.Serialize(metadata);
+            var metaTasks = Enumerable.Range(0, n).Select(i =>
+                getProvider(i).WriteAsync($"{key}.raid.meta", new MemoryStream(System.Text.Encoding.UTF8.GetBytes(metadataJson))));
+            await Task.WhenAll(metaTasks);
+
+            // Write to cache first (write-back)
+            var saveTasks = new List<Task>();
+            for (int stripeIdx = 0; stripeIdx * dataDrives < chunks.Count; stripeIdx++)
+            {
+                var stripeChunks = new List<byte[]>();
+                int maxLen = 0;
+
+                for (int d = 0; d < dataDrives && stripeIdx * dataDrives + d < chunks.Count; d++)
+                {
+                    var chunk = chunks[stripeIdx * dataDrives + d];
+                    stripeChunks.Add(chunk);
+                    maxLen = Math.Max(maxLen, chunk.Length);
+
+                    // Add to write cache
+                    var cacheKey = $"{key}.{stripeIdx}.{d}";
+                    _raid72WriteCache[cacheKey] = chunk;
+                    _raid72DirtyBlocks.Add(cacheKey);
+                }
+
+                // Pad and calculate parity
+                for (int d = 0; d < stripeChunks.Count; d++)
+                {
+                    if (stripeChunks[d].Length < maxLen)
+                    {
+                        var padded = new byte[maxLen];
+                        Array.Copy(stripeChunks[d], padded, stripeChunks[d].Length);
+                        stripeChunks[d] = padded;
+                    }
+                }
+
+                var parity = new byte[maxLen];
+                foreach (var chunk in stripeChunks)
+                {
+                    for (int b = 0; b < maxLen; b++)
+                        parity[b] ^= chunk[b];
+                }
+
+                // Flush to disk (in production this would be async/batched)
+                for (int d = 0; d < stripeChunks.Count; d++)
+                {
+                    var chunkKey = $"{key}.r72.s{stripeIdx}.d{d}";
+                    saveTasks.Add(getProvider(d).WriteAsync(chunkKey, new MemoryStream(stripeChunks[d])));
+                }
+
+                saveTasks.Add(getProvider(n - 1).WriteAsync($"{key}.r72.s{stripeIdx}.p", new MemoryStream(parity)));
+            }
+
+            await Task.WhenAll(saveTasks);
+
+            // Clear dirty flags after flush
+            foreach (var dirtyKey in _raid72DirtyBlocks.Where(k => k.StartsWith(key)).ToList())
+            {
+                _raid72DirtyBlocks.Remove(dirtyKey);
+            }
+
+            _context.LogInfo($"[RAID-7.2] Saved {key} with write-back cache");
+        }
+
+        private async Task<Stream> LoadRAID72Async(string key, Func<int, IStorageProvider> getProvider)
+        {
+            // Load metadata
+            RaidMetadata? metadata = null;
+            for (int i = 0; i < _config.ProviderCount; i++)
+            {
+                try
+                {
+                    using var metaStream = await getProvider(i).ReadAsync($"{key}.raid.meta");
+                    if (metaStream != null)
+                    {
+                        metadata = System.Text.Json.JsonSerializer.Deserialize<RaidMetadata>(
+                            System.Text.Encoding.UTF8.GetString(await ReadAllBytesAsync(metaStream)));
+                        break;
+                    }
+                }
+                catch { continue; }
+            }
+
+            if (metadata == null)
+                throw new InvalidOperationException("Cannot load: metadata not found");
+
+            int n = metadata.ProviderCount;
+            int dataDrives = n - 1;
+            var allChunks = new List<byte[]>();
+
+            int numStripes = (metadata.ChunkCount + dataDrives - 1) / dataDrives;
+            for (int stripeIdx = 0; stripeIdx < numStripes; stripeIdx++)
+            {
+                int chunksInStripe = Math.Min(dataDrives, metadata.ChunkCount - stripeIdx * dataDrives);
+
+                for (int d = 0; d < chunksInStripe; d++)
+                {
+                    // Check write cache first (may have dirty data)
+                    var cacheKey = $"{key}.{stripeIdx}.{d}";
+                    if (_raid72WriteCache.TryGetValue(cacheKey, out var cached))
+                    {
+                        allChunks.Add(cached);
+                        continue;
+                    }
+
+                    // Load from disk
+                    var chunkKey = $"{key}.r72.s{stripeIdx}.d{d}";
+                    try
+                    {
+                        using var stream = await getProvider(d).ReadAsync(chunkKey);
+                        if (stream != null)
+                        {
+                            allChunks.Add(await ReadAllBytesAsync(stream));
+                        }
+                    }
+                    catch
+                    {
+                        // Reconstruct from parity
+                        var parity = await ReadAllBytesAsync(await getProvider(n - 1).ReadAsync($"{key}.r72.s{stripeIdx}.p"));
+                        var reconstructed = new byte[parity.Length];
+                        Array.Copy(parity, reconstructed, parity.Length);
+
+                        for (int od = 0; od < chunksInStripe; od++)
+                        {
+                            if (od != d)
+                            {
+                                var other = await ReadAllBytesAsync(await getProvider(od).ReadAsync($"{key}.r72.s{stripeIdx}.d{od}"));
+                                for (int b = 0; b < reconstructed.Length; b++)
+                                    reconstructed[b] ^= other[b];
+                            }
+                        }
+                        allChunks.Add(reconstructed);
+                    }
+                }
+            }
+
+            return new MemoryStream(allChunks.SelectMany(c => c).Take((int)metadata.TotalSize).ToArray());
+        }
+
+        // ==================== RAID N+M: Flexible N Data + M Parity ====================
+        // Configurable N data drives with M parity drives
+
+        private async Task SaveRAIDNMAsync(string key, Stream data, Func<int, IStorageProvider> getProvider)
+        {
+            if (_config.ProviderCount < 3)
+                throw new InvalidOperationException("RAID N+M requires at least 3 providers");
+
+            // N+M: Configurable data + parity drives
+            // Default: N-2 data drives, 2 parity drives (like RAID 6)
+            int n = _config.ProviderCount;
+            int parityDrives = Math.Min(3, n - 1); // Up to 3 parity drives
+            int dataDrives = n - parityDrives;
+
+            var bytes = await ReadAllBytesAsync(data);
+            var chunks = SplitIntoChunks(new MemoryStream(bytes), _config.StripeSize);
+
+            var metadata = new RaidMetadata
+            {
+                Level = RaidLevel.RAID_NM,
+                TotalSize = bytes.Length,
+                ChunkCount = chunks.Count,
+                StripeSize = _config.StripeSize,
+                ProviderCount = n,
+                ParityDriveIndex = dataDrives, // First parity drive index
+                Layout = $"raidnm-n{dataDrives}-m{parityDrives}"
+            };
+
+            // Save metadata
+            var metadataJson = System.Text.Json.JsonSerializer.Serialize(metadata);
+            await Task.WhenAll(Enumerable.Range(0, n).Select(i =>
+                getProvider(i).WriteAsync($"{key}.raid.meta", new MemoryStream(System.Text.Encoding.UTF8.GetBytes(metadataJson)))));
+
+            var saveTasks = new List<Task>();
+
+            for (int stripeIdx = 0; stripeIdx * dataDrives < chunks.Count; stripeIdx++)
+            {
+                var stripeChunks = new List<byte[]>();
+                int maxLen = 0;
+
+                for (int d = 0; d < dataDrives && stripeIdx * dataDrives + d < chunks.Count; d++)
+                {
+                    var chunk = chunks[stripeIdx * dataDrives + d];
+                    stripeChunks.Add(chunk);
+                    maxLen = Math.Max(maxLen, chunk.Length);
+                }
+
+                // Pad chunks
+                for (int d = 0; d < stripeChunks.Count; d++)
+                {
+                    if (stripeChunks[d].Length < maxLen)
+                    {
+                        var padded = new byte[maxLen];
+                        Array.Copy(stripeChunks[d], padded, stripeChunks[d].Length);
+                        stripeChunks[d] = padded;
+                    }
+                }
+
+                // Calculate M parity syndromes
+                var parities = new byte[parityDrives][];
+                for (int p = 0; p < parityDrives; p++)
+                    parities[p] = new byte[maxLen];
+
+                for (int b = 0; b < maxLen; b++)
+                {
+                    for (int d = 0; d < stripeChunks.Count; d++)
+                    {
+                        // P: XOR
+                        parities[0][b] ^= stripeChunks[d][b];
+
+                        // Q: g^d coefficient (if M >= 2)
+                        if (parityDrives >= 2)
+                            parities[1][b] ^= GF256Multiply(stripeChunks[d][b], GF256ExpTable[d]);
+
+                        // R: g^(2d) coefficient (if M >= 3)
+                        if (parityDrives >= 3)
+                            parities[2][b] ^= GF256Multiply(stripeChunks[d][b], GF256ExpTable[(2 * d) % 255]);
+                    }
+                }
+
+                // Save data chunks
+                for (int d = 0; d < stripeChunks.Count; d++)
+                {
+                    saveTasks.Add(getProvider(d).WriteAsync($"{key}.nm.s{stripeIdx}.d{d}", new MemoryStream(stripeChunks[d])));
+                }
+
+                // Save parity chunks
+                for (int p = 0; p < parityDrives; p++)
+                {
+                    saveTasks.Add(getProvider(dataDrives + p).WriteAsync($"{key}.nm.s{stripeIdx}.p{p}", new MemoryStream(parities[p])));
+                }
+            }
+
+            await Task.WhenAll(saveTasks);
+            _context.LogInfo($"[RAID-N+M] Saved {key} with {dataDrives} data + {parityDrives} parity drives");
+        }
+
+        private async Task<Stream> LoadRAIDNMAsync(string key, Func<int, IStorageProvider> getProvider)
+        {
+            // Load metadata
+            RaidMetadata? metadata = null;
+            for (int i = 0; i < _config.ProviderCount; i++)
+            {
+                try
+                {
+                    using var metaStream = await getProvider(i).ReadAsync($"{key}.raid.meta");
+                    if (metaStream != null)
+                    {
+                        metadata = System.Text.Json.JsonSerializer.Deserialize<RaidMetadata>(
+                            System.Text.Encoding.UTF8.GetString(await ReadAllBytesAsync(metaStream)));
+                        break;
+                    }
+                }
+                catch { continue; }
+            }
+
+            if (metadata == null)
+                throw new InvalidOperationException("Cannot load: metadata not found");
+
+            // Parse layout
+            int dataDrives = metadata.ParityDriveIndex;
+            int parityDrives = metadata.ProviderCount - dataDrives;
+
+            var allChunks = new List<byte[]>();
+            int numStripes = (metadata.ChunkCount + dataDrives - 1) / dataDrives;
+
+            for (int stripeIdx = 0; stripeIdx < numStripes; stripeIdx++)
+            {
+                int chunksInStripe = Math.Min(dataDrives, metadata.ChunkCount - stripeIdx * dataDrives);
+                var stripeData = new byte[chunksInStripe][];
+                var failedDrives = new List<int>();
+
+                // Try to load each data chunk
+                for (int d = 0; d < chunksInStripe; d++)
+                {
+                    try
+                    {
+                        using var stream = await getProvider(d).ReadAsync($"{key}.nm.s{stripeIdx}.d{d}");
+                        if (stream != null)
+                            stripeData[d] = await ReadAllBytesAsync(stream);
+                        else
+                            failedDrives.Add(d);
+                    }
+                    catch { failedDrives.Add(d); }
+                }
+
+                // Reconstruct if needed
+                if (failedDrives.Count > 0 && failedDrives.Count <= parityDrives)
+                {
+                    // Load parity
+                    var parities = new byte[parityDrives][];
+                    for (int p = 0; p < parityDrives; p++)
+                    {
+                        try
+                        {
+                            using var pStream = await getProvider(dataDrives + p).ReadAsync($"{key}.nm.s{stripeIdx}.p{p}");
+                            if (pStream != null) parities[p] = await ReadAllBytesAsync(pStream);
+                        }
+                        catch { }
+                    }
+
+                    int chunkSize = stripeData.Where(c => c != null).FirstOrDefault()?.Length ??
+                                   parities.Where(p => p != null).FirstOrDefault()?.Length ?? _config.StripeSize;
+
+                    if (failedDrives.Count == 1 && parities[0] != null)
+                    {
+                        // Single failure: use P parity
+                        int failedIdx = failedDrives[0];
+                        var reconstructed = new byte[chunkSize];
+                        Array.Copy(parities[0], reconstructed, chunkSize);
+
+                        for (int d = 0; d < chunksInStripe; d++)
+                        {
+                            if (d != failedIdx && stripeData[d] != null)
+                            {
+                                for (int b = 0; b < chunkSize; b++)
+                                    reconstructed[b] ^= stripeData[d][b];
+                            }
+                        }
+                        stripeData[failedIdx] = reconstructed;
+                    }
+                    else if (failedDrives.Count == 2 && parities[0] != null && parities[1] != null)
+                    {
+                        // Double failure: use P and Q
+                        int x = failedDrives[0], y = failedDrives[1];
+                        var reconstructedX = new byte[chunkSize];
+                        var reconstructedY = new byte[chunkSize];
+
+                        for (int b = 0; b < chunkSize; b++)
+                        {
+                            byte partialP = parities[0][b];
+                            byte partialQ = parities[1][b];
+
+                            for (int d = 0; d < chunksInStripe; d++)
+                            {
+                                if (d != x && d != y && stripeData[d] != null)
+                                {
+                                    partialP ^= stripeData[d][b];
+                                    partialQ ^= GF256Multiply(stripeData[d][b], GF256ExpTable[d]);
+                                }
+                            }
+
+                            byte gx = GF256ExpTable[x], gy = GF256ExpTable[y];
+                            byte gxyInv = GF256Inverse((byte)(gx ^ gy));
+                            byte dyNum = (byte)(partialQ ^ GF256Multiply(gx, partialP));
+                            reconstructedY[b] = GF256Multiply(dyNum, gxyInv);
+                            reconstructedX[b] = (byte)(partialP ^ reconstructedY[b]);
+                        }
+
+                        stripeData[x] = reconstructedX;
+                        stripeData[y] = reconstructedY;
+                    }
+                }
+
+                allChunks.AddRange(stripeData.Where(c => c != null));
+            }
+
+            return new MemoryStream(allChunks.SelectMany(c => c).Take((int)metadata.TotalSize).ToArray());
+        }
+
+        // ==================== Intel Matrix RAID: Multiple RAID Types on Same Disks ====================
+        // Partitions drives to run multiple RAID types simultaneously
+
+        private async Task SaveRAIDMatrixAsync(string key, Stream data, Func<int, IStorageProvider> getProvider)
+        {
+            if (_config.ProviderCount < 2)
+                throw new InvalidOperationException("Matrix RAID requires at least 2 providers");
+
+            // Matrix RAID: Split data between RAID 0 (performance) and RAID 1 (safety)
+            var bytes = await ReadAllBytesAsync(data);
+
+            // Split: First half to RAID 0, second half to RAID 1
+            int splitPoint = bytes.Length / 2;
+            var raid0Data = bytes.Take(splitPoint).ToArray();
+            var raid1Data = bytes.Skip(splitPoint).ToArray();
+
+            int n = _config.ProviderCount;
+
+            var metadata = new RaidMetadata
+            {
+                Level = RaidLevel.RAID_Matrix,
+                TotalSize = bytes.Length,
+                ChunkCount = 2, // Two partitions
+                StripeSize = _config.StripeSize,
+                ProviderCount = n,
+                ParityDriveIndex = -1,
+                Layout = $"matrix-split{splitPoint}"
+            };
+
+            // Save metadata
+            var metadataJson = System.Text.Json.JsonSerializer.Serialize(metadata);
+            await Task.WhenAll(Enumerable.Range(0, n).Select(i =>
+                getProvider(i).WriteAsync($"{key}.raid.meta", new MemoryStream(System.Text.Encoding.UTF8.GetBytes(metadataJson)))));
+
+            var saveTasks = new List<Task>();
+
+            // RAID 0 partition: stripe across all drives
+            var raid0Chunks = SplitIntoChunks(new MemoryStream(raid0Data), _config.StripeSize);
+            for (int i = 0; i < raid0Chunks.Count; i++)
+            {
+                int driveIdx = i % n;
+                saveTasks.Add(getProvider(driveIdx).WriteAsync($"{key}.matrix.r0.{i}", new MemoryStream(raid0Chunks[i])));
+            }
+
+            // RAID 1 partition: mirror to all drives
+            saveTasks.AddRange(Enumerable.Range(0, n).Select(i =>
+                getProvider(i).WriteAsync($"{key}.matrix.r1", new MemoryStream(raid1Data))));
+
+            await Task.WhenAll(saveTasks);
+            _context.LogInfo($"[Matrix-RAID] Saved {key}: RAID 0 ({raid0Data.Length} bytes) + RAID 1 ({raid1Data.Length} bytes)");
+        }
+
+        private async Task<Stream> LoadRAIDMatrixAsync(string key, Func<int, IStorageProvider> getProvider)
+        {
+            // Load metadata
+            RaidMetadata? metadata = null;
+            for (int i = 0; i < _config.ProviderCount; i++)
+            {
+                try
+                {
+                    using var metaStream = await getProvider(i).ReadAsync($"{key}.raid.meta");
+                    if (metaStream != null)
+                    {
+                        metadata = System.Text.Json.JsonSerializer.Deserialize<RaidMetadata>(
+                            System.Text.Encoding.UTF8.GetString(await ReadAllBytesAsync(metaStream)));
+                        break;
+                    }
+                }
+                catch { continue; }
+            }
+
+            if (metadata == null)
+                throw new InvalidOperationException("Cannot load: metadata not found");
+
+            // Parse split point
+            int splitPoint = 0;
+            if (metadata.Layout != null && metadata.Layout.StartsWith("matrix-split"))
+            {
+                int.TryParse(metadata.Layout.Replace("matrix-split", ""), out splitPoint);
+            }
+
+            int n = metadata.ProviderCount;
+            var result = new MemoryStream();
+
+            // Load RAID 0 partition
+            int raid0Chunks = (splitPoint + _config.StripeSize - 1) / _config.StripeSize;
+            for (int i = 0; i < raid0Chunks; i++)
+            {
+                int driveIdx = i % n;
+                try
+                {
+                    using var stream = await getProvider(driveIdx).ReadAsync($"{key}.matrix.r0.{i}");
+                    if (stream != null)
+                    {
+                        var chunk = await ReadAllBytesAsync(stream);
+                        result.Write(chunk, 0, Math.Min(chunk.Length, splitPoint - (int)result.Length));
+                    }
+                }
+                catch { }
+            }
+
+            // Load RAID 1 partition (from any drive)
+            for (int i = 0; i < n; i++)
+            {
+                try
+                {
+                    using var stream = await getProvider(i).ReadAsync($"{key}.matrix.r1");
+                    if (stream != null)
+                    {
+                        var data = await ReadAllBytesAsync(stream);
+                        result.Write(data, 0, data.Length);
+                        break;
+                    }
+                }
+                catch { continue; }
+            }
+
+            return new MemoryStream(result.ToArray().Take((int)metadata.TotalSize).ToArray());
+        }
+
+        // ==================== JBOD: Just a Bunch of Disks ====================
+        // Simple concatenation without redundancy
+
+        private async Task SaveRAIDJBODAsync(string key, Stream data, Func<int, IStorageProvider> getProvider)
+        {
+            if (_config.ProviderCount < 1)
+                throw new InvalidOperationException("JBOD requires at least 1 provider");
+
+            // JBOD: Concatenate data across drives sequentially
+            var bytes = await ReadAllBytesAsync(data);
+            int n = _config.ProviderCount;
+            int bytesPerDrive = (bytes.Length + n - 1) / n;
+
+            var metadata = new RaidMetadata
+            {
+                Level = RaidLevel.RAID_JBOD,
+                TotalSize = bytes.Length,
+                ChunkCount = n,
+                StripeSize = bytesPerDrive,
+                ProviderCount = n,
+                ParityDriveIndex = -1,
+                Layout = "jbod-sequential"
+            };
+
+            // Save metadata
+            var metadataJson = System.Text.Json.JsonSerializer.Serialize(metadata);
+            await Task.WhenAll(Enumerable.Range(0, n).Select(i =>
+                getProvider(i).WriteAsync($"{key}.raid.meta", new MemoryStream(System.Text.Encoding.UTF8.GetBytes(metadataJson)))));
+
+            // Split and save to each drive
+            var saveTasks = new List<Task>();
+            for (int i = 0; i < n; i++)
+            {
+                int start = i * bytesPerDrive;
+                int length = Math.Min(bytesPerDrive, bytes.Length - start);
+                if (length > 0)
+                {
+                    var chunk = new byte[length];
+                    Array.Copy(bytes, start, chunk, 0, length);
+                    saveTasks.Add(getProvider(i).WriteAsync($"{key}.jbod.{i}", new MemoryStream(chunk)));
+                }
+            }
+
+            await Task.WhenAll(saveTasks);
+            _context.LogInfo($"[JBOD] Saved {key} across {n} drives ({bytesPerDrive} bytes/drive)");
+        }
+
+        private async Task<Stream> LoadRAIDJBODAsync(string key, Func<int, IStorageProvider> getProvider)
+        {
+            // Load metadata
+            RaidMetadata? metadata = null;
+            for (int i = 0; i < _config.ProviderCount; i++)
+            {
+                try
+                {
+                    using var metaStream = await getProvider(i).ReadAsync($"{key}.raid.meta");
+                    if (metaStream != null)
+                    {
+                        metadata = System.Text.Json.JsonSerializer.Deserialize<RaidMetadata>(
+                            System.Text.Encoding.UTF8.GetString(await ReadAllBytesAsync(metaStream)));
+                        break;
+                    }
+                }
+                catch { continue; }
+            }
+
+            if (metadata == null)
+                throw new InvalidOperationException("Cannot load: metadata not found");
+
+            var result = new MemoryStream();
+            for (int i = 0; i < metadata.ProviderCount; i++)
+            {
+                try
+                {
+                    using var stream = await getProvider(i).ReadAsync($"{key}.jbod.{i}");
+                    if (stream != null)
+                    {
+                        var chunk = await ReadAllBytesAsync(stream);
+                        result.Write(chunk, 0, chunk.Length);
+                    }
+                }
+                catch
+                {
+                    throw new InvalidOperationException($"JBOD: Failed to load from drive {i} - no redundancy available");
+                }
+            }
+
+            return new MemoryStream(result.ToArray().Take((int)metadata.TotalSize).ToArray());
+        }
+
+        // ==================== Crypto SoftRAID: Encrypted Software RAID ====================
+        // RAID with transparent encryption layer
+
+        private async Task SaveRAIDCryptoAsync(string key, Stream data, Func<int, IStorageProvider> getProvider)
+        {
+            if (_config.ProviderCount < 3)
+                throw new InvalidOperationException("Crypto RAID requires at least 3 providers");
+
+            // Crypto RAID: RAID 5 with XOR-based encryption (simplified - production would use AES)
+            var bytes = await ReadAllBytesAsync(data);
+
+            // Generate encryption key from key name (simplified - production would use secure key management)
+            byte[] encryptionKey = System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(key + "_crypto_salt"));
+
+            // Encrypt data
+            var encryptedData = new byte[bytes.Length];
+            for (int i = 0; i < bytes.Length; i++)
+            {
+                encryptedData[i] = (byte)(bytes[i] ^ encryptionKey[i % encryptionKey.Length]);
+            }
+
+            var chunks = SplitIntoChunks(new MemoryStream(encryptedData), _config.StripeSize);
+            int n = _config.ProviderCount;
+
+            var metadata = new RaidMetadata
+            {
+                Level = RaidLevel.RAID_Crypto,
+                TotalSize = bytes.Length,
+                ChunkCount = chunks.Count,
+                StripeSize = _config.StripeSize,
+                ProviderCount = n,
+                ParityDriveIndex = -1, // Distributed parity
+                Layout = "crypto-raid5"
+            };
+
+            // Save metadata
+            var metadataJson = System.Text.Json.JsonSerializer.Serialize(metadata);
+            await Task.WhenAll(Enumerable.Range(0, n).Select(i =>
+                getProvider(i).WriteAsync($"{key}.raid.meta", new MemoryStream(System.Text.Encoding.UTF8.GetBytes(metadataJson)))));
+
+            // RAID 5 with distributed parity
+            int dataDrives = n - 1;
+            var saveTasks = new List<Task>();
+
+            for (int stripeIdx = 0; stripeIdx * dataDrives < chunks.Count; stripeIdx++)
+            {
+                var stripeChunks = new List<byte[]>();
+                int maxLen = 0;
+
+                for (int d = 0; d < dataDrives && stripeIdx * dataDrives + d < chunks.Count; d++)
+                {
+                    var chunk = chunks[stripeIdx * dataDrives + d];
+                    stripeChunks.Add(chunk);
+                    maxLen = Math.Max(maxLen, chunk.Length);
+                }
+
+                // Pad chunks
+                for (int d = 0; d < stripeChunks.Count; d++)
+                {
+                    if (stripeChunks[d].Length < maxLen)
+                    {
+                        var padded = new byte[maxLen];
+                        Array.Copy(stripeChunks[d], padded, stripeChunks[d].Length);
+                        stripeChunks[d] = padded;
+                    }
+                }
+
+                // Calculate parity
+                var parity = new byte[maxLen];
+                foreach (var chunk in stripeChunks)
+                {
+                    for (int b = 0; b < maxLen; b++)
+                        parity[b] ^= chunk[b];
+                }
+
+                // Rotating parity placement
+                int parityDrive = stripeIdx % n;
+
+                // Save data and parity
+                int dataIdx = 0;
+                for (int d = 0; d < n; d++)
+                {
+                    if (d == parityDrive)
+                    {
+                        saveTasks.Add(getProvider(d).WriteAsync($"{key}.crypto.s{stripeIdx}.p", new MemoryStream(parity)));
+                    }
+                    else if (dataIdx < stripeChunks.Count)
+                    {
+                        saveTasks.Add(getProvider(d).WriteAsync($"{key}.crypto.s{stripeIdx}.d{dataIdx}", new MemoryStream(stripeChunks[dataIdx])));
+                        dataIdx++;
+                    }
+                }
+            }
+
+            await Task.WhenAll(saveTasks);
+            _context.LogInfo($"[Crypto-RAID] Saved {key} with encryption");
+        }
+
+        private async Task<Stream> LoadRAIDCryptoAsync(string key, Func<int, IStorageProvider> getProvider)
+        {
+            // Load metadata
+            RaidMetadata? metadata = null;
+            for (int i = 0; i < _config.ProviderCount; i++)
+            {
+                try
+                {
+                    using var metaStream = await getProvider(i).ReadAsync($"{key}.raid.meta");
+                    if (metaStream != null)
+                    {
+                        metadata = System.Text.Json.JsonSerializer.Deserialize<RaidMetadata>(
+                            System.Text.Encoding.UTF8.GetString(await ReadAllBytesAsync(metaStream)));
+                        break;
+                    }
+                }
+                catch { continue; }
+            }
+
+            if (metadata == null)
+                throw new InvalidOperationException("Cannot load: metadata not found");
+
+            int n = metadata.ProviderCount;
+            int dataDrives = n - 1;
+            var allChunks = new List<byte[]>();
+
+            int numStripes = (metadata.ChunkCount + dataDrives - 1) / dataDrives;
+            for (int stripeIdx = 0; stripeIdx < numStripes; stripeIdx++)
+            {
+                int parityDrive = stripeIdx % n;
+                int chunksInStripe = Math.Min(dataDrives, metadata.ChunkCount - stripeIdx * dataDrives);
+
+                var stripeData = new byte[chunksInStripe][];
+                var failedDrives = new List<int>();
+
+                int dataIdx = 0;
+                for (int d = 0; d < n && dataIdx < chunksInStripe; d++)
+                {
+                    if (d == parityDrive) continue;
+
+                    try
+                    {
+                        using var stream = await getProvider(d).ReadAsync($"{key}.crypto.s{stripeIdx}.d{dataIdx}");
+                        if (stream != null)
+                            stripeData[dataIdx] = await ReadAllBytesAsync(stream);
+                        else
+                            failedDrives.Add(dataIdx);
+                    }
+                    catch { failedDrives.Add(dataIdx); }
+                    dataIdx++;
+                }
+
+                // Reconstruct if needed
+                if (failedDrives.Count == 1)
+                {
+                    try
+                    {
+                        using var pStream = await getProvider(parityDrive).ReadAsync($"{key}.crypto.s{stripeIdx}.p");
+                        if (pStream != null)
+                        {
+                            var parity = await ReadAllBytesAsync(pStream);
+                            int failedIdx = failedDrives[0];
+                            var reconstructed = new byte[parity.Length];
+                            Array.Copy(parity, reconstructed, parity.Length);
+
+                            for (int d = 0; d < chunksInStripe; d++)
+                            {
+                                if (d != failedIdx && stripeData[d] != null)
+                                {
+                                    for (int b = 0; b < reconstructed.Length; b++)
+                                        reconstructed[b] ^= stripeData[d][b];
+                                }
+                            }
+                            stripeData[failedIdx] = reconstructed;
+                        }
+                    }
+                    catch { }
+                }
+
+                allChunks.AddRange(stripeData.Where(c => c != null));
+            }
+
+            // Decrypt data
+            var encryptedResult = allChunks.SelectMany(c => c).Take((int)metadata.TotalSize).ToArray();
+            byte[] encryptionKey = System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(key + "_crypto_salt"));
+
+            var decryptedData = new byte[encryptedResult.Length];
+            for (int i = 0; i < encryptedResult.Length; i++)
+            {
+                decryptedData[i] = (byte)(encryptedResult[i] ^ encryptionKey[i % encryptionKey.Length]);
+            }
+
+            return new MemoryStream(decryptedData);
+        }
+
+        // ==================== Btrfs DUP Profile: Duplicate on Same Device ====================
+        // Stores two copies on the same device for metadata protection
+
+        private async Task SaveRAIDDUPAsync(string key, Stream data, Func<int, IStorageProvider> getProvider)
+        {
+            if (_config.ProviderCount < 1)
+                throw new InvalidOperationException("DUP Profile requires at least 1 provider");
+
+            // DUP: Store two copies on each device
+            var bytes = await ReadAllBytesAsync(data);
+            int n = _config.ProviderCount;
+
+            var metadata = new RaidMetadata
+            {
+                Level = RaidLevel.RAID_DUP,
+                TotalSize = bytes.Length,
+                ChunkCount = 2,
+                StripeSize = bytes.Length,
+                ProviderCount = n,
+                ParityDriveIndex = -1,
+                Layout = "btrfs-dup"
+            };
+
+            // Save metadata and two copies of data to each provider
+            var metadataJson = System.Text.Json.JsonSerializer.Serialize(metadata);
+            var saveTasks = new List<Task>();
+
+            for (int i = 0; i < n; i++)
+            {
+                saveTasks.Add(getProvider(i).WriteAsync($"{key}.raid.meta", new MemoryStream(System.Text.Encoding.UTF8.GetBytes(metadataJson))));
+                saveTasks.Add(getProvider(i).WriteAsync($"{key}.dup.copy1", new MemoryStream(bytes)));
+                saveTasks.Add(getProvider(i).WriteAsync($"{key}.dup.copy2", new MemoryStream(bytes)));
+            }
+
+            await Task.WhenAll(saveTasks);
+            _context.LogInfo($"[DUP-Profile] Saved {key} with duplicate copies on {n} devices");
+        }
+
+        private async Task<Stream> LoadRAIDDUPAsync(string key, Func<int, IStorageProvider> getProvider)
+        {
+            // Try each provider, then each copy
+            for (int i = 0; i < _config.ProviderCount; i++)
+            {
+                try
+                {
+                    using var stream = await getProvider(i).ReadAsync($"{key}.dup.copy1");
+                    if (stream != null)
+                        return new MemoryStream(await ReadAllBytesAsync(stream));
+                }
+                catch { }
+
+                try
+                {
+                    using var stream = await getProvider(i).ReadAsync($"{key}.dup.copy2");
+                    if (stream != null)
+                        return new MemoryStream(await ReadAllBytesAsync(stream));
+                }
+                catch { }
+            }
+
+            throw new InvalidOperationException("DUP: Failed to load any copy");
+        }
+
+        // ==================== NetApp DDP: Dynamic Disk Pool ====================
+        // Spreads data and parity across pool with automatic load balancing
+
+        private async Task SaveRAIDDDPAsync(string key, Stream data, Func<int, IStorageProvider> getProvider)
+        {
+            if (_config.ProviderCount < 4)
+                throw new InvalidOperationException("DDP requires at least 4 providers");
+
+            // DDP: Spread data across disk pool with automatic parity distribution
+            var bytes = await ReadAllBytesAsync(data);
+            var chunks = SplitIntoChunks(new MemoryStream(bytes), _config.StripeSize);
+
+            int n = _config.ProviderCount;
+            int chunksPerDrive = Math.Max(1, chunks.Count / n);
+
+            var metadata = new RaidMetadata
+            {
+                Level = RaidLevel.RAID_DDP,
+                TotalSize = bytes.Length,
+                ChunkCount = chunks.Count,
+                StripeSize = _config.StripeSize,
+                ProviderCount = n,
+                ParityDriveIndex = -1, // Distributed
+                Layout = $"ddp-pool{n}"
+            };
+
+            // Save metadata
+            var metadataJson = System.Text.Json.JsonSerializer.Serialize(metadata);
+            await Task.WhenAll(Enumerable.Range(0, n).Select(i =>
+                getProvider(i).WriteAsync($"{key}.raid.meta", new MemoryStream(System.Text.Encoding.UTF8.GetBytes(metadataJson)))));
+
+            // Distribute chunks using hash-based placement for load balancing
+            var saveTasks = new List<Task>();
+            var driveChunkMap = new Dictionary<int, List<int>>();
+
+            for (int i = 0; i < chunks.Count; i++)
+            {
+                // Use hash for distribution
+                int driveIdx = Math.Abs((key + i).GetHashCode()) % n;
+                saveTasks.Add(getProvider(driveIdx).WriteAsync($"{key}.ddp.{i}", new MemoryStream(chunks[i])));
+
+                if (!driveChunkMap.ContainsKey(driveIdx))
+                    driveChunkMap[driveIdx] = new List<int>();
+                driveChunkMap[driveIdx].Add(i);
+            }
+
+            // Store chunk mapping for each drive
+            foreach (var kvp in driveChunkMap)
+            {
+                var mapData = System.Text.Encoding.UTF8.GetBytes(string.Join(",", kvp.Value));
+                saveTasks.Add(getProvider(kvp.Key).WriteAsync($"{key}.ddp.map", new MemoryStream(mapData)));
+            }
+
+            // Calculate and store distributed parity (simplified: store parity on next drive)
+            int parityChunkSize = chunks.Max(c => c.Length);
+            for (int i = 0; i < chunks.Count; i += n - 1)
+            {
+                var parity = new byte[parityChunkSize];
+                for (int j = i; j < Math.Min(i + n - 1, chunks.Count); j++)
+                {
+                    for (int b = 0; b < chunks[j].Length; b++)
+                        parity[b] ^= chunks[j][b];
+                }
+
+                int parityDrive = (i / (n - 1)) % n;
+                saveTasks.Add(getProvider(parityDrive).WriteAsync($"{key}.ddp.p{i / (n - 1)}", new MemoryStream(parity)));
+            }
+
+            await Task.WhenAll(saveTasks);
+            _context.LogInfo($"[DDP] Saved {key} across {n}-drive pool");
+        }
+
+        private async Task<Stream> LoadRAIDDDPAsync(string key, Func<int, IStorageProvider> getProvider)
+        {
+            // Load metadata
+            RaidMetadata? metadata = null;
+            for (int i = 0; i < _config.ProviderCount; i++)
+            {
+                try
+                {
+                    using var metaStream = await getProvider(i).ReadAsync($"{key}.raid.meta");
+                    if (metaStream != null)
+                    {
+                        metadata = System.Text.Json.JsonSerializer.Deserialize<RaidMetadata>(
+                            System.Text.Encoding.UTF8.GetString(await ReadAllBytesAsync(metaStream)));
+                        break;
+                    }
+                }
+                catch { continue; }
+            }
+
+            if (metadata == null)
+                throw new InvalidOperationException("Cannot load: metadata not found");
+
+            int n = metadata.ProviderCount;
+            var allChunks = new byte[metadata.ChunkCount][];
+
+            // Load chunks from distributed locations
+            for (int i = 0; i < metadata.ChunkCount; i++)
+            {
+                int driveIdx = Math.Abs((key + i).GetHashCode()) % n;
+
+                try
+                {
+                    using var stream = await getProvider(driveIdx).ReadAsync($"{key}.ddp.{i}");
+                    if (stream != null)
+                        allChunks[i] = await ReadAllBytesAsync(stream);
+                }
+                catch
+                {
+                    // Try other drives (hash collision or failure)
+                    for (int alt = 0; alt < n && allChunks[i] == null; alt++)
+                    {
+                        if (alt == driveIdx) continue;
+                        try
+                        {
+                            using var stream = await getProvider(alt).ReadAsync($"{key}.ddp.{i}");
+                            if (stream != null)
+                                allChunks[i] = await ReadAllBytesAsync(stream);
+                        }
+                        catch { }
+                    }
+                }
+
+                if (allChunks[i] == null)
+                    throw new InvalidOperationException($"DDP: Failed to load chunk {i}");
+            }
+
+            return new MemoryStream(allChunks.SelectMany(c => c).Take((int)metadata.TotalSize).ToArray());
+        }
+
+        // ==================== SPAN: Simple Disk Spanning ====================
+        // Sequential concatenation across drives (no redundancy)
+
+        private async Task SaveRAIDSPANAsync(string key, Stream data, Func<int, IStorageProvider> getProvider)
+        {
+            if (_config.ProviderCount < 1)
+                throw new InvalidOperationException("SPAN requires at least 1 provider");
+
+            // SPAN: Identical to JBOD, sequential concatenation
+            await SaveRAIDJBODAsync(key, data, getProvider);
+            _context.LogInfo($"[SPAN] Saved {key} using spanning mode");
+        }
+
+        private async Task<Stream> LoadRAIDSPANAsync(string key, Func<int, IStorageProvider> getProvider)
+        {
+            // SPAN uses same storage format as JBOD
+            // Load metadata to check level, then load JBOD-style
+            RaidMetadata? metadata = null;
+            for (int i = 0; i < _config.ProviderCount; i++)
+            {
+                try
+                {
+                    using var metaStream = await getProvider(i).ReadAsync($"{key}.raid.meta");
+                    if (metaStream != null)
+                    {
+                        metadata = System.Text.Json.JsonSerializer.Deserialize<RaidMetadata>(
+                            System.Text.Encoding.UTF8.GetString(await ReadAllBytesAsync(metaStream)));
+                        break;
+                    }
+                }
+                catch { continue; }
+            }
+
+            if (metadata == null)
+                throw new InvalidOperationException("Cannot load: metadata not found");
+
+            var result = new MemoryStream();
+            for (int i = 0; i < metadata.ProviderCount; i++)
+            {
+                try
+                {
+                    using var stream = await getProvider(i).ReadAsync($"{key}.jbod.{i}");
+                    if (stream != null)
+                    {
+                        var chunk = await ReadAllBytesAsync(stream);
+                        result.Write(chunk, 0, chunk.Length);
+                    }
+                }
+                catch
+                {
+                    throw new InvalidOperationException($"SPAN: Failed to load from drive {i} - no redundancy");
+                }
+            }
+
+            return new MemoryStream(result.ToArray().Take((int)metadata.TotalSize).ToArray());
+        }
+
+        // ==================== BIG: Linux MD Big Mode (Concatenation) ====================
+        // Large volume concatenation similar to JBOD
+
+        private async Task SaveRAIDBIGAsync(string key, Stream data, Func<int, IStorageProvider> getProvider)
+        {
+            if (_config.ProviderCount < 2)
+                throw new InvalidOperationException("BIG requires at least 2 providers");
+
+            // BIG: Linux MD style concatenation
+            var bytes = await ReadAllBytesAsync(data);
+            int n = _config.ProviderCount;
+
+            var metadata = new RaidMetadata
+            {
+                Level = RaidLevel.RAID_BIG,
+                TotalSize = bytes.Length,
+                ChunkCount = n,
+                StripeSize = (bytes.Length + n - 1) / n,
+                ProviderCount = n,
+                ParityDriveIndex = -1,
+                Layout = "linux-md-big"
+            };
+
+            // Save metadata
+            var metadataJson = System.Text.Json.JsonSerializer.Serialize(metadata);
+            await Task.WhenAll(Enumerable.Range(0, n).Select(i =>
+                getProvider(i).WriteAsync($"{key}.raid.meta", new MemoryStream(System.Text.Encoding.UTF8.GetBytes(metadataJson)))));
+
+            // Sequential distribution
+            var saveTasks = new List<Task>();
+            int bytesPerDrive = metadata.StripeSize;
+
+            for (int i = 0; i < n; i++)
+            {
+                int start = i * bytesPerDrive;
+                int length = Math.Min(bytesPerDrive, bytes.Length - start);
+                if (length > 0)
+                {
+                    var chunk = new byte[length];
+                    Array.Copy(bytes, start, chunk, 0, length);
+                    saveTasks.Add(getProvider(i).WriteAsync($"{key}.big.{i}", new MemoryStream(chunk)));
+                }
+            }
+
+            await Task.WhenAll(saveTasks);
+            _context.LogInfo($"[BIG] Saved {key} in concatenated mode across {n} drives");
+        }
+
+        private async Task<Stream> LoadRAIDBIGAsync(string key, Func<int, IStorageProvider> getProvider)
+        {
+            // Load metadata
+            RaidMetadata? metadata = null;
+            for (int i = 0; i < _config.ProviderCount; i++)
+            {
+                try
+                {
+                    using var metaStream = await getProvider(i).ReadAsync($"{key}.raid.meta");
+                    if (metaStream != null)
+                    {
+                        metadata = System.Text.Json.JsonSerializer.Deserialize<RaidMetadata>(
+                            System.Text.Encoding.UTF8.GetString(await ReadAllBytesAsync(metaStream)));
+                        break;
+                    }
+                }
+                catch { continue; }
+            }
+
+            if (metadata == null)
+                throw new InvalidOperationException("Cannot load: metadata not found");
+
+            var result = new MemoryStream();
+            for (int i = 0; i < metadata.ProviderCount; i++)
+            {
+                try
+                {
+                    using var stream = await getProvider(i).ReadAsync($"{key}.big.{i}");
+                    if (stream != null)
+                    {
+                        var chunk = await ReadAllBytesAsync(stream);
+                        result.Write(chunk, 0, chunk.Length);
+                    }
+                }
+                catch
+                {
+                    throw new InvalidOperationException($"BIG: Failed to load from drive {i}");
+                }
+            }
+
+            return new MemoryStream(result.ToArray().Take((int)metadata.TotalSize).ToArray());
+        }
+
+        // ==================== MAID: Massive Array of Idle Disks ====================
+        // Power-managed RAID with active/standby drives
+
+        private readonly HashSet<int> _maidActiveDrives = new();
+        private readonly Dictionary<string, DateTime> _maidAccessTimes = new();
+
+        private async Task SaveRAIDMAIDAsync(string key, Stream data, Func<int, IStorageProvider> getProvider)
+        {
+            if (_config.ProviderCount < 4)
+                throw new InvalidOperationException("MAID requires at least 4 providers");
+
+            // MAID: Store on subset of active drives, with power management metadata
+            var bytes = await ReadAllBytesAsync(data);
+            int n = _config.ProviderCount;
+
+            // Keep 2 drives active, rest are standby
+            int activeDriveCount = Math.Min(2, n);
+
+            var metadata = new RaidMetadata
+            {
+                Level = RaidLevel.RAID_MAID,
+                TotalSize = bytes.Length,
+                ChunkCount = 1,
+                StripeSize = bytes.Length,
+                ProviderCount = n,
+                ParityDriveIndex = -1,
+                Layout = $"maid-active{activeDriveCount}"
+            };
+
+            // Save metadata
+            var metadataJson = System.Text.Json.JsonSerializer.Serialize(metadata);
+            await Task.WhenAll(Enumerable.Range(0, n).Select(i =>
+                getProvider(i).WriteAsync($"{key}.raid.meta", new MemoryStream(System.Text.Encoding.UTF8.GetBytes(metadataJson)))));
+
+            // Mirror data to active drives only
+            var saveTasks = new List<Task>();
+            for (int i = 0; i < activeDriveCount; i++)
+            {
+                _maidActiveDrives.Add(i);
+                saveTasks.Add(getProvider(i).WriteAsync($"{key}.maid.data", new MemoryStream(bytes)));
+            }
+
+            // Store power state metadata
+            _maidAccessTimes[key] = DateTime.UtcNow;
+            var powerState = System.Text.Encoding.UTF8.GetBytes($"active:{string.Join(",", _maidActiveDrives)};time:{DateTime.UtcNow:O}");
+            saveTasks.AddRange(Enumerable.Range(0, n).Select(i =>
+                getProvider(i).WriteAsync($"{key}.maid.power", new MemoryStream(powerState))));
+
+            await Task.WhenAll(saveTasks);
+            _context.LogInfo($"[MAID] Saved {key} on {activeDriveCount} active drives ({n - activeDriveCount} standby)");
+        }
+
+        private async Task<Stream> LoadRAIDMAIDAsync(string key, Func<int, IStorageProvider> getProvider)
+        {
+            // Load from first available active drive
+            for (int i = 0; i < _config.ProviderCount; i++)
+            {
+                try
+                {
+                    using var stream = await getProvider(i).ReadAsync($"{key}.maid.data");
+                    if (stream != null)
+                    {
+                        _maidActiveDrives.Add(i); // Mark as active
+                        _maidAccessTimes[key] = DateTime.UtcNow;
+                        return new MemoryStream(await ReadAllBytesAsync(stream));
+                    }
+                }
+                catch { continue; }
+            }
+
+            throw new InvalidOperationException("MAID: No active drive available");
+        }
+
+        // ==================== Linear: Sequential Concatenation ====================
+        // Simple sequential data placement (Linux MD linear mode)
+
+        private async Task SaveRAIDLinearAsync(string key, Stream data, Func<int, IStorageProvider> getProvider)
+        {
+            if (_config.ProviderCount < 1)
+                throw new InvalidOperationException("Linear requires at least 1 provider");
+
+            // Linear: Fill drives sequentially
+            var bytes = await ReadAllBytesAsync(data);
+            int n = _config.ProviderCount;
+
+            var metadata = new RaidMetadata
+            {
+                Level = RaidLevel.RAID_Linear,
+                TotalSize = bytes.Length,
+                ChunkCount = n,
+                StripeSize = (bytes.Length + n - 1) / n,
+                ProviderCount = n,
+                ParityDriveIndex = -1,
+                Layout = "linear-sequential"
+            };
+
+            // Save metadata
+            var metadataJson = System.Text.Json.JsonSerializer.Serialize(metadata);
+            await Task.WhenAll(Enumerable.Range(0, n).Select(i =>
+                getProvider(i).WriteAsync($"{key}.raid.meta", new MemoryStream(System.Text.Encoding.UTF8.GetBytes(metadataJson)))));
+
+            // Sequential fill
+            var saveTasks = new List<Task>();
+            int bytesPerDrive = metadata.StripeSize;
+
+            for (int i = 0; i < n; i++)
+            {
+                int start = i * bytesPerDrive;
+                int length = Math.Min(bytesPerDrive, bytes.Length - start);
+                if (length > 0)
+                {
+                    var chunk = new byte[length];
+                    Array.Copy(bytes, start, chunk, 0, length);
+                    saveTasks.Add(getProvider(i).WriteAsync($"{key}.linear.{i}", new MemoryStream(chunk)));
+                }
+            }
+
+            await Task.WhenAll(saveTasks);
+            _context.LogInfo($"[Linear] Saved {key} sequentially across {n} drives");
+        }
+
+        private async Task<Stream> LoadRAIDLinearAsync(string key, Func<int, IStorageProvider> getProvider)
+        {
+            // Load metadata
+            RaidMetadata? metadata = null;
+            for (int i = 0; i < _config.ProviderCount; i++)
+            {
+                try
+                {
+                    using var metaStream = await getProvider(i).ReadAsync($"{key}.raid.meta");
+                    if (metaStream != null)
+                    {
+                        metadata = System.Text.Json.JsonSerializer.Deserialize<RaidMetadata>(
+                            System.Text.Encoding.UTF8.GetString(await ReadAllBytesAsync(metaStream)));
+                        break;
+                    }
+                }
+                catch { continue; }
+            }
+
+            if (metadata == null)
+                throw new InvalidOperationException("Cannot load: metadata not found");
+
+            var result = new MemoryStream();
+            for (int i = 0; i < metadata.ProviderCount; i++)
+            {
+                try
+                {
+                    using var stream = await getProvider(i).ReadAsync($"{key}.linear.{i}");
+                    if (stream != null)
+                    {
+                        var chunk = await ReadAllBytesAsync(stream);
+                        result.Write(chunk, 0, chunk.Length);
+                    }
+                }
+                catch
+                {
+                    throw new InvalidOperationException($"Linear: Failed to load from drive {i}");
+                }
+            }
+
+            return new MemoryStream(result.ToArray().Take((int)metadata.TotalSize).ToArray());
         }
 
         // ==================== HELPER METHODS ====================
@@ -3868,7 +5909,21 @@ namespace DataWarehouse.Kernel.Storage
         RAID_Adaptive,  // IBM Adaptive RAID (auto-tuning)
         RAID_Beyond,    // Drobo BeyondRAID (single/dual parity)
         RAID_Unraid,    // Unraid parity system (1-2 parity disks)
-        RAID_Declustered // Declustered/Distributed RAID
+        RAID_Declustered, // Declustered/Distributed RAID
+
+        // Extended RAID Levels (Phase 3)
+        RAID_71,        // RAID 7.1 - Enhanced RAID 7 with read cache
+        RAID_72,        // RAID 7.2 - Enhanced RAID 7 with write-back cache
+        RAID_NM,        // RAID N+M - Flexible N data + M parity
+        RAID_Matrix,    // Intel Matrix RAID - Multiple RAID types on same disks
+        RAID_JBOD,      // Just a Bunch of Disks - Simple concatenation
+        RAID_Crypto,    // Crypto SoftRAID - Encrypted software RAID
+        RAID_DUP,       // Btrfs DUP Profile - Duplicate on same device
+        RAID_DDP,       // NetApp Dynamic Disk Pool
+        RAID_SPAN,      // Simple disk spanning/concatenation
+        RAID_BIG,       // Concatenated volumes (Linux md BIG)
+        RAID_MAID,      // Massive Array of Idle Disks - Power managed RAID
+        RAID_Linear     // Linear mode - Sequential concatenation
     }
 
     /// <summary>
