@@ -20,6 +20,8 @@ namespace DataWarehouse.Kernel.Messaging
         private readonly Timer _cleanupTimer;
         private readonly object _statsLock = new();
 
+        private readonly ConcurrentDictionary<string, List<Func<PluginMessage, Task>>> _subscriptions = new();
+
         public AdvancedMessageBus(IKernelContext context, AdvancedMessageBusConfig? config = null)
         {
             _context = context ?? throw new ArgumentNullException(nameof(context));
@@ -29,6 +31,62 @@ namespace DataWarehouse.Kernel.Messaging
             _retryTimer = new Timer(ProcessRetries, null, TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(1));
             _cleanupTimer = new Timer(CleanupExpiredMessages, null, TimeSpan.FromMinutes(1), TimeSpan.FromMinutes(1));
         }
+
+        #region Base Message Bus Implementation
+
+        public override async Task PublishAsync(string topic, PluginMessage message, CancellationToken ct = default)
+        {
+            if (_subscriptions.TryGetValue(topic, out var handlers))
+            {
+                var tasks = handlers.Select(h => h(message));
+                await Task.WhenAll(tasks);
+            }
+        }
+
+        public override async Task<MessageResponse> SendAsync(string topic, PluginMessage message, CancellationToken ct = default)
+        {
+            if (_subscriptions.TryGetValue(topic, out var handlers) && handlers.Count > 0)
+            {
+                try
+                {
+                    await handlers[0](message);
+                    return MessageResponse.Success(null);
+                }
+                catch (Exception ex)
+                {
+                    return MessageResponse.Error(ex.Message, "SEND_ERROR");
+                }
+            }
+            return MessageResponse.Error("No handler registered for topic", "NO_HANDLER");
+        }
+
+        public override IDisposable Subscribe(string topic, Func<PluginMessage, Task> handler)
+        {
+            var handlers = _subscriptions.GetOrAdd(topic, _ => new List<Func<PluginMessage, Task>>());
+            lock (handlers)
+            {
+                handlers.Add(handler);
+            }
+            return CreateHandle(() =>
+            {
+                lock (handlers)
+                {
+                    handlers.Remove(handler);
+                }
+            });
+        }
+
+        public override void Unsubscribe(string topic)
+        {
+            _subscriptions.TryRemove(topic, out _);
+        }
+
+        public override IEnumerable<string> GetActiveTopics()
+        {
+            return _subscriptions.Keys.ToList();
+        }
+
+        #endregion
 
         #region Reliable Publishing (At-Least-Once Delivery)
 
@@ -43,8 +101,8 @@ namespace DataWarehouse.Kernel.Messaging
             CancellationToken ct = default)
         {
             options ??= new ReliablePublishOptions();
+            // Use existing CorrelationId or generate a new one for tracking
             var messageId = message.CorrelationId ?? Guid.NewGuid().ToString("N");
-            message.CorrelationId = messageId;
 
             _context.LogDebug($"[MessageBus] Publishing reliable message {messageId} to {topic}");
 
@@ -271,6 +329,7 @@ namespace DataWarehouse.Kernel.Messaging
                         _context.LogError($"[MessageBus] Filtered handler error: {ex.Message}", ex);
                     }
                 }
+                return Task.CompletedTask;
             });
 
             _context.LogDebug($"[MessageBus] Created filtered subscription {subscriptionId} on {topic}");
