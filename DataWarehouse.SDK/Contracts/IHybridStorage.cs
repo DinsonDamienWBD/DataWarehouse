@@ -162,6 +162,10 @@ namespace DataWarehouse.SDK.Contracts
         public string? EmbeddingModel { get; init; }
         public string? SummaryModel { get; init; }
         public List<EventTriggerConfig> EventTriggers { get; init; } = new();
+        /// <summary>Stop indexing pipeline on first error, or continue with remaining stages.</summary>
+        public bool StopOnFirstError { get; init; } = false;
+        /// <summary>Maximum number of versions to retain for point-in-time recovery (0 = unlimited).</summary>
+        public int MaxVersionsToRetain { get; init; } = 100;
     }
 
     public class EventTriggerConfig
@@ -187,11 +191,26 @@ namespace DataWarehouse.SDK.Contracts
         public IndexingState State { get; init; }
         public DateTime? StartedAt { get; init; }
         public DateTime? CompletedAt { get; init; }
+        public DateTime? FailedAt { get; init; }
         public Dictionary<string, StageStatus> Stages { get; init; } = new();
         public string? Error { get; init; }
+        /// <summary>Unique identifier for the indexing job.</summary>
+        public string? JobId { get; init; }
+        /// <summary>Currently executing stage name.</summary>
+        public string? CurrentStage { get; init; }
+        /// <summary>List of completed stage names.</summary>
+        public string[] CompletedStages { get; init; } = Array.Empty<string>();
+        /// <summary>Total number of planned stages.</summary>
+        public int TotalStages { get; init; }
+        /// <summary>Errors by stage name.</summary>
+        public Dictionary<string, string> Errors { get; init; } = new();
+        /// <summary>Progress percentage (0.0 to 1.0).</summary>
+        public double Progress { get; init; }
+        /// <summary>Human-readable status message.</summary>
+        public string? Message { get; init; }
     }
 
-    public enum IndexingState { NotStarted, InProgress, Completed, PartiallyCompleted, Failed }
+    public enum IndexingState { NotStarted, InProgress, Completed, PartiallyCompleted, Failed, Cancelled }
 
     public class StageStatus
     {

@@ -15,12 +15,30 @@ namespace DataWarehouse.Kernel.Storage
         private readonly ConcurrentDictionary<Uri, IndexingStatus> _indexingStatus = new();
         private readonly IKernelContext _context;
         private readonly object _versionLock = new();
+        private readonly string _id;
+        private bool _isRunning;
 
-        public override string PoolId => $"hybrid-{Guid.NewGuid():N}"[..16];
+        public override string Id => _id;
+        public override string PoolId => _id;
 
         public HybridStorageManager(IKernelContext context)
         {
             _context = context ?? throw new ArgumentNullException(nameof(context));
+            _id = $"hybrid-{Guid.NewGuid():N}"[..16];
+        }
+
+        public override Task StartAsync(CancellationToken ct = default)
+        {
+            _isRunning = true;
+            _context.LogInfo($"[HybridStorageManager] Started ({_id})");
+            return Task.CompletedTask;
+        }
+
+        public override Task StopAsync()
+        {
+            _isRunning = false;
+            _context.LogInfo($"[HybridStorageManager] Stopped ({_id})");
+            return Task.CompletedTask;
         }
 
         #region Indexing Pipeline
@@ -188,7 +206,7 @@ namespace DataWarehouse.Kernel.Storage
             // Execute configured event triggers
             foreach (var trigger in _config.EventTriggers)
             {
-                _context.LogDebug($"[EventTriggers] Executing trigger: {trigger.Key} for {uri}");
+                _context.LogDebug($"[EventTriggers] Executing trigger: {trigger.Name} for {uri}");
             }
             return Task.CompletedTask;
         }
@@ -453,7 +471,10 @@ namespace DataWarehouse.Kernel.Storage
 
         #region Internal Classes
 
-        private class IndexingJob
+        /// <summary>
+        /// Represents an active indexing job.
+        /// </summary>
+        public class IndexingJob
         {
             public string JobId { get; set; } = string.Empty;
             public Uri Uri { get; set; } = null!;
