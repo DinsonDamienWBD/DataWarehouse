@@ -3765,12 +3765,12 @@ namespace DataWarehouse.Kernel.Storage
                 // Save P parity
                 int pDrive = stripe.driveAssignment[stripe.dataChunks.Length];
                 var pProvider = getProvider(pDrive);
-                saveTasks.Add(pProvider.WriteAsync($"{key}.dcl.s{stripe.stripeIdx}.p", new MemoryStream(stripe.parityP)));
+                saveTasks.Add(SaveStreamAsync(pProvider, $"{key}.dcl.s{stripe.stripeIdx}.p", new MemoryStream(stripe.parityP)));
 
                 // Save Q parity
                 int qDrive = stripe.driveAssignment[stripe.dataChunks.Length + 1];
                 var qProvider = getProvider(qDrive);
-                saveTasks.Add(qProvider.WriteAsync($"{key}.dcl.s{stripe.stripeIdx}.q", new MemoryStream(stripe.parityQ)));
+                saveTasks.Add(SaveStreamAsync(qProvider, $"{key}.dcl.s{stripe.stripeIdx}.q", new MemoryStream(stripe.parityQ)));
             }
 
             await Task.WhenAll(saveTasks);
@@ -3888,7 +3888,7 @@ namespace DataWarehouse.Kernel.Storage
                     {
                         int pDrive = driveAssignment[chunksInStripe];
                         var pProvider = getProvider(pDrive);
-                        using var pStream = await pProvider.ReadAsync($"{key}.dcl.s{stripeIdx}.p");
+                        using var pStream = await LoadStreamAsync(pProvider, $"{key}.dcl.s{stripeIdx}.p");
                         if (pStream != null) parityP = await ReadAllBytesAsync(pStream);
                     }
                     catch { }
@@ -3897,7 +3897,7 @@ namespace DataWarehouse.Kernel.Storage
                     {
                         int qDrive = driveAssignment[chunksInStripe + 1];
                         var qProvider = getProvider(qDrive);
-                        using var qStream = await qProvider.ReadAsync($"{key}.dcl.s{stripeIdx}.q");
+                        using var qStream = await LoadStreamAsync(qProvider, $"{key}.dcl.s{stripeIdx}.q");
                         if (qStream != null) parityQ = await ReadAllBytesAsync(qStream);
                     }
                     catch { }
@@ -4013,7 +4013,7 @@ namespace DataWarehouse.Kernel.Storage
             // Save metadata
             var metadataJson = System.Text.Json.JsonSerializer.Serialize(metadata);
             var metaTasks = Enumerable.Range(0, n).Select(i =>
-                getProvider(i).WriteAsync($"{key}.raid.meta", new MemoryStream(System.Text.Encoding.UTF8.GetBytes(metadataJson))));
+                SaveStreamAsync(getProvider(i),$"{key}.raid.meta", new MemoryStream(System.Text.Encoding.UTF8.GetBytes(metadataJson))));
             await Task.WhenAll(metaTasks);
 
             // Store data with dedicated parity on last drive
@@ -4055,7 +4055,7 @@ namespace DataWarehouse.Kernel.Storage
                 {
                     int driveIdx = d;
                     var chunkKey = $"{key}.r71.s{stripeIdx}.d{d}";
-                    saveTasks.Add(getProvider(driveIdx).WriteAsync(chunkKey, new MemoryStream(stripeChunks[d])));
+                    saveTasks.Add(SaveStreamAsync(getProvider(driveIdx),chunkKey, new MemoryStream(stripeChunks[d])));
 
                     // Cache for read optimization
                     _raid71ReadCache[$"{key}.{stripeIdx}.{d}"] = stripeChunks[d];
@@ -4063,7 +4063,7 @@ namespace DataWarehouse.Kernel.Storage
 
                 // Save parity to dedicated drive
                 var parityKey = $"{key}.r71.s{stripeIdx}.p";
-                saveTasks.Add(getProvider(n - 1).WriteAsync(parityKey, new MemoryStream(parity)));
+                saveTasks.Add(SaveStreamAsync(getProvider(n - 1),parityKey, new MemoryStream(parity)));
             }
 
             await Task.WhenAll(saveTasks);
@@ -4078,7 +4078,7 @@ namespace DataWarehouse.Kernel.Storage
             {
                 try
                 {
-                    using var metaStream = await getProvider(i).ReadAsync($"{key}.raid.meta");
+                    using var metaStream = await LoadStreamAsync(getProvider(i),$"{key}.raid.meta");
                     if (metaStream != null)
                     {
                         metadata = System.Text.Json.JsonSerializer.Deserialize<RaidMetadata>(
@@ -4115,7 +4115,7 @@ namespace DataWarehouse.Kernel.Storage
                     var chunkKey = $"{key}.r71.s{stripeIdx}.d{d}";
                     try
                     {
-                        using var stream = await getProvider(d).ReadAsync(chunkKey);
+                        using var stream = await LoadStreamAsync(getProvider(d),chunkKey);
                         if (stream != null)
                         {
                             var chunk = await ReadAllBytesAsync(stream);
@@ -4126,7 +4126,7 @@ namespace DataWarehouse.Kernel.Storage
                     catch
                     {
                         // Reconstruct from parity
-                        var parity = await ReadAllBytesAsync(await getProvider(n - 1).ReadAsync($"{key}.r71.s{stripeIdx}.p"));
+                        var parity = await ReadAllBytesAsync(await LoadStreamAsync(getProvider(n - 1),$"{key}.r71.s{stripeIdx}.p"));
                         var reconstructed = new byte[parity.Length];
                         Array.Copy(parity, reconstructed, parity.Length);
 
@@ -4135,7 +4135,7 @@ namespace DataWarehouse.Kernel.Storage
                             if (od != d)
                             {
                                 var otherKey = $"{key}.r71.s{stripeIdx}.d{od}";
-                                var other = await ReadAllBytesAsync(await getProvider(od).ReadAsync(otherKey));
+                                var other = await ReadAllBytesAsync(await LoadStreamAsync(getProvider(od),otherKey));
                                 for (int b = 0; b < reconstructed.Length; b++)
                                     reconstructed[b] ^= other[b];
                             }
@@ -4180,7 +4180,7 @@ namespace DataWarehouse.Kernel.Storage
             // Save metadata immediately
             var metadataJson = System.Text.Json.JsonSerializer.Serialize(metadata);
             var metaTasks = Enumerable.Range(0, n).Select(i =>
-                getProvider(i).WriteAsync($"{key}.raid.meta", new MemoryStream(System.Text.Encoding.UTF8.GetBytes(metadataJson))));
+                SaveStreamAsync(getProvider(i),$"{key}.raid.meta", new MemoryStream(System.Text.Encoding.UTF8.GetBytes(metadataJson))));
             await Task.WhenAll(metaTasks);
 
             // Write to cache first (write-back)
@@ -4224,10 +4224,10 @@ namespace DataWarehouse.Kernel.Storage
                 for (int d = 0; d < stripeChunks.Count; d++)
                 {
                     var chunkKey = $"{key}.r72.s{stripeIdx}.d{d}";
-                    saveTasks.Add(getProvider(d).WriteAsync(chunkKey, new MemoryStream(stripeChunks[d])));
+                    saveTasks.Add(SaveStreamAsync(getProvider(d),chunkKey, new MemoryStream(stripeChunks[d])));
                 }
 
-                saveTasks.Add(getProvider(n - 1).WriteAsync($"{key}.r72.s{stripeIdx}.p", new MemoryStream(parity)));
+                saveTasks.Add(SaveStreamAsync(getProvider(n - 1),$"{key}.r72.s{stripeIdx}.p", new MemoryStream(parity)));
             }
 
             await Task.WhenAll(saveTasks);
@@ -4249,7 +4249,7 @@ namespace DataWarehouse.Kernel.Storage
             {
                 try
                 {
-                    using var metaStream = await getProvider(i).ReadAsync($"{key}.raid.meta");
+                    using var metaStream = await LoadStreamAsync(getProvider(i),$"{key}.raid.meta");
                     if (metaStream != null)
                     {
                         metadata = System.Text.Json.JsonSerializer.Deserialize<RaidMetadata>(
@@ -4286,7 +4286,7 @@ namespace DataWarehouse.Kernel.Storage
                     var chunkKey = $"{key}.r72.s{stripeIdx}.d{d}";
                     try
                     {
-                        using var stream = await getProvider(d).ReadAsync(chunkKey);
+                        using var stream = await LoadStreamAsync(getProvider(d),chunkKey);
                         if (stream != null)
                         {
                             allChunks.Add(await ReadAllBytesAsync(stream));
@@ -4295,7 +4295,7 @@ namespace DataWarehouse.Kernel.Storage
                     catch
                     {
                         // Reconstruct from parity
-                        var parity = await ReadAllBytesAsync(await getProvider(n - 1).ReadAsync($"{key}.r72.s{stripeIdx}.p"));
+                        var parity = await ReadAllBytesAsync(await LoadStreamAsync(getProvider(n - 1),$"{key}.r72.s{stripeIdx}.p"));
                         var reconstructed = new byte[parity.Length];
                         Array.Copy(parity, reconstructed, parity.Length);
 
@@ -4303,7 +4303,7 @@ namespace DataWarehouse.Kernel.Storage
                         {
                             if (od != d)
                             {
-                                var other = await ReadAllBytesAsync(await getProvider(od).ReadAsync($"{key}.r72.s{stripeIdx}.d{od}"));
+                                var other = await ReadAllBytesAsync(await LoadStreamAsync(getProvider(od),$"{key}.r72.s{stripeIdx}.d{od}"));
                                 for (int b = 0; b < reconstructed.Length; b++)
                                     reconstructed[b] ^= other[b];
                             }
@@ -4347,7 +4347,7 @@ namespace DataWarehouse.Kernel.Storage
             // Save metadata
             var metadataJson = System.Text.Json.JsonSerializer.Serialize(metadata);
             await Task.WhenAll(Enumerable.Range(0, n).Select(i =>
-                getProvider(i).WriteAsync($"{key}.raid.meta", new MemoryStream(System.Text.Encoding.UTF8.GetBytes(metadataJson)))));
+                SaveStreamAsync(getProvider(i),$"{key}.raid.meta", new MemoryStream(System.Text.Encoding.UTF8.GetBytes(metadataJson)))));
 
             var saveTasks = new List<Task>();
 
@@ -4399,13 +4399,13 @@ namespace DataWarehouse.Kernel.Storage
                 // Save data chunks
                 for (int d = 0; d < stripeChunks.Count; d++)
                 {
-                    saveTasks.Add(getProvider(d).WriteAsync($"{key}.nm.s{stripeIdx}.d{d}", new MemoryStream(stripeChunks[d])));
+                    saveTasks.Add(SaveStreamAsync(getProvider(d),$"{key}.nm.s{stripeIdx}.d{d}", new MemoryStream(stripeChunks[d])));
                 }
 
                 // Save parity chunks
                 for (int p = 0; p < parityDrives; p++)
                 {
-                    saveTasks.Add(getProvider(dataDrives + p).WriteAsync($"{key}.nm.s{stripeIdx}.p{p}", new MemoryStream(parities[p])));
+                    saveTasks.Add(SaveStreamAsync(getProvider(dataDrives + p),$"{key}.nm.s{stripeIdx}.p{p}", new MemoryStream(parities[p])));
                 }
             }
 
@@ -4421,7 +4421,7 @@ namespace DataWarehouse.Kernel.Storage
             {
                 try
                 {
-                    using var metaStream = await getProvider(i).ReadAsync($"{key}.raid.meta");
+                    using var metaStream = await LoadStreamAsync(getProvider(i),$"{key}.raid.meta");
                     if (metaStream != null)
                     {
                         metadata = System.Text.Json.JsonSerializer.Deserialize<RaidMetadata>(
@@ -4453,7 +4453,7 @@ namespace DataWarehouse.Kernel.Storage
                 {
                     try
                     {
-                        using var stream = await getProvider(d).ReadAsync($"{key}.nm.s{stripeIdx}.d{d}");
+                        using var stream = await LoadStreamAsync(getProvider(d),$"{key}.nm.s{stripeIdx}.d{d}");
                         if (stream != null)
                             stripeData[d] = await ReadAllBytesAsync(stream);
                         else
@@ -4471,7 +4471,7 @@ namespace DataWarehouse.Kernel.Storage
                     {
                         try
                         {
-                            using var pStream = await getProvider(dataDrives + p).ReadAsync($"{key}.nm.s{stripeIdx}.p{p}");
+                            using var pStream = await LoadStreamAsync(getProvider(dataDrives + p),$"{key}.nm.s{stripeIdx}.p{p}");
                             if (pStream != null) parities[p] = await ReadAllBytesAsync(pStream);
                         }
                         catch { }
@@ -4568,7 +4568,7 @@ namespace DataWarehouse.Kernel.Storage
             // Save metadata
             var metadataJson = System.Text.Json.JsonSerializer.Serialize(metadata);
             await Task.WhenAll(Enumerable.Range(0, n).Select(i =>
-                getProvider(i).WriteAsync($"{key}.raid.meta", new MemoryStream(System.Text.Encoding.UTF8.GetBytes(metadataJson)))));
+                SaveStreamAsync(getProvider(i),$"{key}.raid.meta", new MemoryStream(System.Text.Encoding.UTF8.GetBytes(metadataJson)))));
 
             var saveTasks = new List<Task>();
 
@@ -4577,12 +4577,12 @@ namespace DataWarehouse.Kernel.Storage
             for (int i = 0; i < raid0Chunks.Count; i++)
             {
                 int driveIdx = i % n;
-                saveTasks.Add(getProvider(driveIdx).WriteAsync($"{key}.matrix.r0.{i}", new MemoryStream(raid0Chunks[i])));
+                saveTasks.Add(SaveStreamAsync(getProvider(driveIdx),$"{key}.matrix.r0.{i}", new MemoryStream(raid0Chunks[i])));
             }
 
             // RAID 1 partition: mirror to all drives
             saveTasks.AddRange(Enumerable.Range(0, n).Select(i =>
-                getProvider(i).WriteAsync($"{key}.matrix.r1", new MemoryStream(raid1Data))));
+                SaveStreamAsync(getProvider(i),$"{key}.matrix.r1", new MemoryStream(raid1Data))));
 
             await Task.WhenAll(saveTasks);
             _context.LogInfo($"[Matrix-RAID] Saved {key}: RAID 0 ({raid0Data.Length} bytes) + RAID 1 ({raid1Data.Length} bytes)");
@@ -4596,7 +4596,7 @@ namespace DataWarehouse.Kernel.Storage
             {
                 try
                 {
-                    using var metaStream = await getProvider(i).ReadAsync($"{key}.raid.meta");
+                    using var metaStream = await LoadStreamAsync(getProvider(i),$"{key}.raid.meta");
                     if (metaStream != null)
                     {
                         metadata = System.Text.Json.JsonSerializer.Deserialize<RaidMetadata>(
@@ -4627,7 +4627,7 @@ namespace DataWarehouse.Kernel.Storage
                 int driveIdx = i % n;
                 try
                 {
-                    using var stream = await getProvider(driveIdx).ReadAsync($"{key}.matrix.r0.{i}");
+                    using var stream = await LoadStreamAsync(getProvider(driveIdx),$"{key}.matrix.r0.{i}");
                     if (stream != null)
                     {
                         var chunk = await ReadAllBytesAsync(stream);
@@ -4642,7 +4642,7 @@ namespace DataWarehouse.Kernel.Storage
             {
                 try
                 {
-                    using var stream = await getProvider(i).ReadAsync($"{key}.matrix.r1");
+                    using var stream = await LoadStreamAsync(getProvider(i),$"{key}.matrix.r1");
                     if (stream != null)
                     {
                         var data = await ReadAllBytesAsync(stream);
@@ -4683,7 +4683,7 @@ namespace DataWarehouse.Kernel.Storage
             // Save metadata
             var metadataJson = System.Text.Json.JsonSerializer.Serialize(metadata);
             await Task.WhenAll(Enumerable.Range(0, n).Select(i =>
-                getProvider(i).WriteAsync($"{key}.raid.meta", new MemoryStream(System.Text.Encoding.UTF8.GetBytes(metadataJson)))));
+                SaveStreamAsync(getProvider(i),$"{key}.raid.meta", new MemoryStream(System.Text.Encoding.UTF8.GetBytes(metadataJson)))));
 
             // Split and save to each drive
             var saveTasks = new List<Task>();
@@ -4695,7 +4695,7 @@ namespace DataWarehouse.Kernel.Storage
                 {
                     var chunk = new byte[length];
                     Array.Copy(bytes, start, chunk, 0, length);
-                    saveTasks.Add(getProvider(i).WriteAsync($"{key}.jbod.{i}", new MemoryStream(chunk)));
+                    saveTasks.Add(SaveStreamAsync(getProvider(i),$"{key}.jbod.{i}", new MemoryStream(chunk)));
                 }
             }
 
@@ -4711,7 +4711,7 @@ namespace DataWarehouse.Kernel.Storage
             {
                 try
                 {
-                    using var metaStream = await getProvider(i).ReadAsync($"{key}.raid.meta");
+                    using var metaStream = await LoadStreamAsync(getProvider(i),$"{key}.raid.meta");
                     if (metaStream != null)
                     {
                         metadata = System.Text.Json.JsonSerializer.Deserialize<RaidMetadata>(
@@ -4730,7 +4730,7 @@ namespace DataWarehouse.Kernel.Storage
             {
                 try
                 {
-                    using var stream = await getProvider(i).ReadAsync($"{key}.jbod.{i}");
+                    using var stream = await LoadStreamAsync(getProvider(i),$"{key}.jbod.{i}");
                     if (stream != null)
                     {
                         var chunk = await ReadAllBytesAsync(stream);
@@ -4784,7 +4784,7 @@ namespace DataWarehouse.Kernel.Storage
             // Save metadata
             var metadataJson = System.Text.Json.JsonSerializer.Serialize(metadata);
             await Task.WhenAll(Enumerable.Range(0, n).Select(i =>
-                getProvider(i).WriteAsync($"{key}.raid.meta", new MemoryStream(System.Text.Encoding.UTF8.GetBytes(metadataJson)))));
+                SaveStreamAsync(getProvider(i),$"{key}.raid.meta", new MemoryStream(System.Text.Encoding.UTF8.GetBytes(metadataJson)))));
 
             // RAID 5 with distributed parity
             int dataDrives = n - 1;
@@ -4830,11 +4830,11 @@ namespace DataWarehouse.Kernel.Storage
                 {
                     if (d == parityDrive)
                     {
-                        saveTasks.Add(getProvider(d).WriteAsync($"{key}.crypto.s{stripeIdx}.p", new MemoryStream(parity)));
+                        saveTasks.Add(SaveStreamAsync(getProvider(d),$"{key}.crypto.s{stripeIdx}.p", new MemoryStream(parity)));
                     }
                     else if (dataIdx < stripeChunks.Count)
                     {
-                        saveTasks.Add(getProvider(d).WriteAsync($"{key}.crypto.s{stripeIdx}.d{dataIdx}", new MemoryStream(stripeChunks[dataIdx])));
+                        saveTasks.Add(SaveStreamAsync(getProvider(d),$"{key}.crypto.s{stripeIdx}.d{dataIdx}", new MemoryStream(stripeChunks[dataIdx])));
                         dataIdx++;
                     }
                 }
@@ -4852,7 +4852,7 @@ namespace DataWarehouse.Kernel.Storage
             {
                 try
                 {
-                    using var metaStream = await getProvider(i).ReadAsync($"{key}.raid.meta");
+                    using var metaStream = await LoadStreamAsync(getProvider(i),$"{key}.raid.meta");
                     if (metaStream != null)
                     {
                         metadata = System.Text.Json.JsonSerializer.Deserialize<RaidMetadata>(
@@ -4886,7 +4886,7 @@ namespace DataWarehouse.Kernel.Storage
 
                     try
                     {
-                        using var stream = await getProvider(d).ReadAsync($"{key}.crypto.s{stripeIdx}.d{dataIdx}");
+                        using var stream = await LoadStreamAsync(getProvider(d),$"{key}.crypto.s{stripeIdx}.d{dataIdx}");
                         if (stream != null)
                             stripeData[dataIdx] = await ReadAllBytesAsync(stream);
                         else
@@ -4901,7 +4901,7 @@ namespace DataWarehouse.Kernel.Storage
                 {
                     try
                     {
-                        using var pStream = await getProvider(parityDrive).ReadAsync($"{key}.crypto.s{stripeIdx}.p");
+                        using var pStream = await LoadStreamAsync(getProvider(parityDrive),$"{key}.crypto.s{stripeIdx}.p");
                         if (pStream != null)
                         {
                             var parity = await ReadAllBytesAsync(pStream);
@@ -4968,9 +4968,9 @@ namespace DataWarehouse.Kernel.Storage
 
             for (int i = 0; i < n; i++)
             {
-                saveTasks.Add(getProvider(i).WriteAsync($"{key}.raid.meta", new MemoryStream(System.Text.Encoding.UTF8.GetBytes(metadataJson))));
-                saveTasks.Add(getProvider(i).WriteAsync($"{key}.dup.copy1", new MemoryStream(bytes)));
-                saveTasks.Add(getProvider(i).WriteAsync($"{key}.dup.copy2", new MemoryStream(bytes)));
+                saveTasks.Add(SaveStreamAsync(getProvider(i),$"{key}.raid.meta", new MemoryStream(System.Text.Encoding.UTF8.GetBytes(metadataJson))));
+                saveTasks.Add(SaveStreamAsync(getProvider(i),$"{key}.dup.copy1", new MemoryStream(bytes)));
+                saveTasks.Add(SaveStreamAsync(getProvider(i),$"{key}.dup.copy2", new MemoryStream(bytes)));
             }
 
             await Task.WhenAll(saveTasks);
@@ -4984,7 +4984,7 @@ namespace DataWarehouse.Kernel.Storage
             {
                 try
                 {
-                    using var stream = await getProvider(i).ReadAsync($"{key}.dup.copy1");
+                    using var stream = await LoadStreamAsync(getProvider(i),$"{key}.dup.copy1");
                     if (stream != null)
                         return new MemoryStream(await ReadAllBytesAsync(stream));
                 }
@@ -4992,7 +4992,7 @@ namespace DataWarehouse.Kernel.Storage
 
                 try
                 {
-                    using var stream = await getProvider(i).ReadAsync($"{key}.dup.copy2");
+                    using var stream = await LoadStreamAsync(getProvider(i),$"{key}.dup.copy2");
                     if (stream != null)
                         return new MemoryStream(await ReadAllBytesAsync(stream));
                 }
@@ -5031,7 +5031,7 @@ namespace DataWarehouse.Kernel.Storage
             // Save metadata
             var metadataJson = System.Text.Json.JsonSerializer.Serialize(metadata);
             await Task.WhenAll(Enumerable.Range(0, n).Select(i =>
-                getProvider(i).WriteAsync($"{key}.raid.meta", new MemoryStream(System.Text.Encoding.UTF8.GetBytes(metadataJson)))));
+                SaveStreamAsync(getProvider(i),$"{key}.raid.meta", new MemoryStream(System.Text.Encoding.UTF8.GetBytes(metadataJson)))));
 
             // Distribute chunks using hash-based placement for load balancing
             var saveTasks = new List<Task>();
@@ -5041,7 +5041,7 @@ namespace DataWarehouse.Kernel.Storage
             {
                 // Use hash for distribution
                 int driveIdx = Math.Abs((key + i).GetHashCode()) % n;
-                saveTasks.Add(getProvider(driveIdx).WriteAsync($"{key}.ddp.{i}", new MemoryStream(chunks[i])));
+                saveTasks.Add(SaveStreamAsync(getProvider(driveIdx),$"{key}.ddp.{i}", new MemoryStream(chunks[i])));
 
                 if (!driveChunkMap.ContainsKey(driveIdx))
                     driveChunkMap[driveIdx] = new List<int>();
@@ -5052,7 +5052,7 @@ namespace DataWarehouse.Kernel.Storage
             foreach (var kvp in driveChunkMap)
             {
                 var mapData = System.Text.Encoding.UTF8.GetBytes(string.Join(",", kvp.Value));
-                saveTasks.Add(getProvider(kvp.Key).WriteAsync($"{key}.ddp.map", new MemoryStream(mapData)));
+                saveTasks.Add(SaveStreamAsync(getProvider(kvp.Key),$"{key}.ddp.map", new MemoryStream(mapData)));
             }
 
             // Calculate and store distributed parity (simplified: store parity on next drive)
@@ -5067,7 +5067,7 @@ namespace DataWarehouse.Kernel.Storage
                 }
 
                 int parityDrive = (i / (n - 1)) % n;
-                saveTasks.Add(getProvider(parityDrive).WriteAsync($"{key}.ddp.p{i / (n - 1)}", new MemoryStream(parity)));
+                saveTasks.Add(SaveStreamAsync(getProvider(parityDrive),$"{key}.ddp.p{i / (n - 1)}", new MemoryStream(parity)));
             }
 
             await Task.WhenAll(saveTasks);
@@ -5082,7 +5082,7 @@ namespace DataWarehouse.Kernel.Storage
             {
                 try
                 {
-                    using var metaStream = await getProvider(i).ReadAsync($"{key}.raid.meta");
+                    using var metaStream = await LoadStreamAsync(getProvider(i),$"{key}.raid.meta");
                     if (metaStream != null)
                     {
                         metadata = System.Text.Json.JsonSerializer.Deserialize<RaidMetadata>(
@@ -5106,7 +5106,7 @@ namespace DataWarehouse.Kernel.Storage
 
                 try
                 {
-                    using var stream = await getProvider(driveIdx).ReadAsync($"{key}.ddp.{i}");
+                    using var stream = await LoadStreamAsync(getProvider(driveIdx),$"{key}.ddp.{i}");
                     if (stream != null)
                         allChunks[i] = await ReadAllBytesAsync(stream);
                 }
@@ -5118,7 +5118,7 @@ namespace DataWarehouse.Kernel.Storage
                         if (alt == driveIdx) continue;
                         try
                         {
-                            using var stream = await getProvider(alt).ReadAsync($"{key}.ddp.{i}");
+                            using var stream = await LoadStreamAsync(getProvider(alt),$"{key}.ddp.{i}");
                             if (stream != null)
                                 allChunks[i] = await ReadAllBytesAsync(stream);
                         }
@@ -5155,7 +5155,7 @@ namespace DataWarehouse.Kernel.Storage
             {
                 try
                 {
-                    using var metaStream = await getProvider(i).ReadAsync($"{key}.raid.meta");
+                    using var metaStream = await LoadStreamAsync(getProvider(i),$"{key}.raid.meta");
                     if (metaStream != null)
                     {
                         metadata = System.Text.Json.JsonSerializer.Deserialize<RaidMetadata>(
@@ -5174,7 +5174,7 @@ namespace DataWarehouse.Kernel.Storage
             {
                 try
                 {
-                    using var stream = await getProvider(i).ReadAsync($"{key}.jbod.{i}");
+                    using var stream = await LoadStreamAsync(getProvider(i),$"{key}.jbod.{i}");
                     if (stream != null)
                     {
                         var chunk = await ReadAllBytesAsync(stream);
@@ -5216,7 +5216,7 @@ namespace DataWarehouse.Kernel.Storage
             // Save metadata
             var metadataJson = System.Text.Json.JsonSerializer.Serialize(metadata);
             await Task.WhenAll(Enumerable.Range(0, n).Select(i =>
-                getProvider(i).WriteAsync($"{key}.raid.meta", new MemoryStream(System.Text.Encoding.UTF8.GetBytes(metadataJson)))));
+                SaveStreamAsync(getProvider(i),$"{key}.raid.meta", new MemoryStream(System.Text.Encoding.UTF8.GetBytes(metadataJson)))));
 
             // Sequential distribution
             var saveTasks = new List<Task>();
@@ -5230,7 +5230,7 @@ namespace DataWarehouse.Kernel.Storage
                 {
                     var chunk = new byte[length];
                     Array.Copy(bytes, start, chunk, 0, length);
-                    saveTasks.Add(getProvider(i).WriteAsync($"{key}.big.{i}", new MemoryStream(chunk)));
+                    saveTasks.Add(SaveStreamAsync(getProvider(i),$"{key}.big.{i}", new MemoryStream(chunk)));
                 }
             }
 
@@ -5246,7 +5246,7 @@ namespace DataWarehouse.Kernel.Storage
             {
                 try
                 {
-                    using var metaStream = await getProvider(i).ReadAsync($"{key}.raid.meta");
+                    using var metaStream = await LoadStreamAsync(getProvider(i),$"{key}.raid.meta");
                     if (metaStream != null)
                     {
                         metadata = System.Text.Json.JsonSerializer.Deserialize<RaidMetadata>(
@@ -5265,7 +5265,7 @@ namespace DataWarehouse.Kernel.Storage
             {
                 try
                 {
-                    using var stream = await getProvider(i).ReadAsync($"{key}.big.{i}");
+                    using var stream = await LoadStreamAsync(getProvider(i),$"{key}.big.{i}");
                     if (stream != null)
                     {
                         var chunk = await ReadAllBytesAsync(stream);
@@ -5313,21 +5313,21 @@ namespace DataWarehouse.Kernel.Storage
             // Save metadata
             var metadataJson = System.Text.Json.JsonSerializer.Serialize(metadata);
             await Task.WhenAll(Enumerable.Range(0, n).Select(i =>
-                getProvider(i).WriteAsync($"{key}.raid.meta", new MemoryStream(System.Text.Encoding.UTF8.GetBytes(metadataJson)))));
+                SaveStreamAsync(getProvider(i),$"{key}.raid.meta", new MemoryStream(System.Text.Encoding.UTF8.GetBytes(metadataJson)))));
 
             // Mirror data to active drives only
             var saveTasks = new List<Task>();
             for (int i = 0; i < activeDriveCount; i++)
             {
                 _maidActiveDrives.Add(i);
-                saveTasks.Add(getProvider(i).WriteAsync($"{key}.maid.data", new MemoryStream(bytes)));
+                saveTasks.Add(SaveStreamAsync(getProvider(i),$"{key}.maid.data", new MemoryStream(bytes)));
             }
 
             // Store power state metadata
             _maidAccessTimes[key] = DateTime.UtcNow;
             var powerState = System.Text.Encoding.UTF8.GetBytes($"active:{string.Join(",", _maidActiveDrives)};time:{DateTime.UtcNow:O}");
             saveTasks.AddRange(Enumerable.Range(0, n).Select(i =>
-                getProvider(i).WriteAsync($"{key}.maid.power", new MemoryStream(powerState))));
+                SaveStreamAsync(getProvider(i),$"{key}.maid.power", new MemoryStream(powerState))));
 
             await Task.WhenAll(saveTasks);
             _context.LogInfo($"[MAID] Saved {key} on {activeDriveCount} active drives ({n - activeDriveCount} standby)");
@@ -5340,7 +5340,7 @@ namespace DataWarehouse.Kernel.Storage
             {
                 try
                 {
-                    using var stream = await getProvider(i).ReadAsync($"{key}.maid.data");
+                    using var stream = await LoadStreamAsync(getProvider(i),$"{key}.maid.data");
                     if (stream != null)
                     {
                         _maidActiveDrives.Add(i); // Mark as active
@@ -5380,7 +5380,7 @@ namespace DataWarehouse.Kernel.Storage
             // Save metadata
             var metadataJson = System.Text.Json.JsonSerializer.Serialize(metadata);
             await Task.WhenAll(Enumerable.Range(0, n).Select(i =>
-                getProvider(i).WriteAsync($"{key}.raid.meta", new MemoryStream(System.Text.Encoding.UTF8.GetBytes(metadataJson)))));
+                SaveStreamAsync(getProvider(i),$"{key}.raid.meta", new MemoryStream(System.Text.Encoding.UTF8.GetBytes(metadataJson)))));
 
             // Sequential fill
             var saveTasks = new List<Task>();
@@ -5394,7 +5394,7 @@ namespace DataWarehouse.Kernel.Storage
                 {
                     var chunk = new byte[length];
                     Array.Copy(bytes, start, chunk, 0, length);
-                    saveTasks.Add(getProvider(i).WriteAsync($"{key}.linear.{i}", new MemoryStream(chunk)));
+                    saveTasks.Add(SaveStreamAsync(getProvider(i),$"{key}.linear.{i}", new MemoryStream(chunk)));
                 }
             }
 
@@ -5410,7 +5410,7 @@ namespace DataWarehouse.Kernel.Storage
             {
                 try
                 {
-                    using var metaStream = await getProvider(i).ReadAsync($"{key}.raid.meta");
+                    using var metaStream = await LoadStreamAsync(getProvider(i),$"{key}.raid.meta");
                     if (metaStream != null)
                     {
                         metadata = System.Text.Json.JsonSerializer.Deserialize<RaidMetadata>(
@@ -5429,7 +5429,7 @@ namespace DataWarehouse.Kernel.Storage
             {
                 try
                 {
-                    using var stream = await getProvider(i).ReadAsync($"{key}.linear.{i}");
+                    using var stream = await LoadStreamAsync(getProvider(i),$"{key}.linear.{i}");
                     if (stream != null)
                     {
                         var chunk = await ReadAllBytesAsync(stream);
