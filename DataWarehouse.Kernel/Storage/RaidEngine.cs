@@ -5785,15 +5785,153 @@ namespace DataWarehouse.Kernel.Storage
             try
             {
                 _context.LogInfo($"[RAID] Starting rebuild for provider {failedProviderIndex}");
-                // Rebuild logic would iterate through all keys and rebuild chunks
-                // This is a placeholder for the rebuild process
-                await Task.Delay(100); // Simulated rebuild
-                _context.LogInfo($"[RAID] Rebuild complete for provider {failedProviderIndex}");
+
+                var rebuildStats = new RebuildStatistics
+                {
+                    StartTime = DateTime.UtcNow,
+                    FailedProviderIndex = failedProviderIndex
+                };
+
+                // Get list of all stored keys from metadata on surviving providers
+                var keysToRebuild = await GetAllStoredKeysAsync(failedProviderIndex);
+                rebuildStats.TotalKeys = keysToRebuild.Count;
+
+                _context.LogInfo($"[RAID] Found {keysToRebuild.Count} keys to rebuild");
+
+                foreach (var key in keysToRebuild)
+                {
+                    try
+                    {
+                        await RebuildKeyAsync(key, failedProviderIndex);
+                        rebuildStats.KeysRebuilt++;
+
+                        if (rebuildStats.KeysRebuilt % 100 == 0)
+                        {
+                            _context.LogInfo($"[RAID] Rebuild progress: {rebuildStats.KeysRebuilt}/{rebuildStats.TotalKeys} keys");
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        rebuildStats.KeysFailed++;
+                        _context.LogError($"[RAID] Failed to rebuild key '{key}': {ex.Message}", ex);
+                    }
+                }
+
+                rebuildStats.EndTime = DateTime.UtcNow;
+
+                // Mark provider as recovered if rebuild was successful
+                if (rebuildStats.KeysFailed == 0 && _providerHealth.TryGetValue(failedProviderIndex, out var health))
+                {
+                    health.Status = ProviderStatus.Healthy;
+                    health.FailureTime = null;
+                }
+
+                _context.LogInfo($"[RAID] Rebuild complete for provider {failedProviderIndex}. " +
+                               $"Keys: {rebuildStats.KeysRebuilt} rebuilt, {rebuildStats.KeysFailed} failed. " +
+                               $"Duration: {rebuildStats.Duration.TotalSeconds:F1}s");
             }
             finally
             {
                 _rebuildLock.Release();
             }
+        }
+
+        private async Task<List<string>> GetAllStoredKeysAsync(int excludeProviderIndex)
+        {
+            var keys = new HashSet<string>();
+
+            // Scan metadata from all surviving providers
+            for (int i = 0; i < _config.ProviderCount; i++)
+            {
+                if (i == excludeProviderIndex) continue;
+
+                try
+                {
+                    var provider = _getProvider(i);
+                    if (provider is IListableStorage listable)
+                    {
+                        await foreach (var item in listable.ListFilesAsync(""))
+                        {
+                            // Extract base key from stored files
+                            var path = item.Uri.AbsolutePath;
+                            if (path.EndsWith(".raid.meta"))
+                            {
+                                var baseKey = path.Replace(".raid.meta", "").TrimStart('/');
+                                keys.Add(baseKey);
+                            }
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _context.LogWarning($"[RAID] Failed to scan provider {i} for keys: {ex.Message}");
+                }
+            }
+
+            return keys.ToList();
+        }
+
+        private async Task RebuildKeyAsync(string key, int failedProviderIndex)
+        {
+            // Load data from surviving providers and rebuild the failed provider's chunk
+            // This uses the existing Load logic which handles reconstruction
+
+            try
+            {
+                // Read metadata to understand the RAID structure
+                RaidMetadata? metadata = null;
+                for (int i = 0; i < _config.ProviderCount; i++)
+                {
+                    if (i == failedProviderIndex) continue;
+
+                    try
+                    {
+                        var provider = _getProvider(i);
+                        using var metaStream = await provider.ReadAsync($"{key}.raid.meta");
+                        if (metaStream != null)
+                        {
+                            var metaBytes = await ReadAllBytesAsync(metaStream);
+                            metadata = System.Text.Json.JsonSerializer.Deserialize<RaidMetadata>(
+                                System.Text.Encoding.UTF8.GetString(metaBytes));
+                            break;
+                        }
+                    }
+                    catch { continue; }
+                }
+
+                if (metadata == null)
+                {
+                    _context.LogWarning($"[RAID] No metadata found for key '{key}', skipping rebuild");
+                    return;
+                }
+
+                // Reconstruct data using existing load logic
+                using var reconstructedData = await LoadAsync(key, _getProvider);
+
+                // Re-save to rebuild the failed provider's chunk
+                // The save logic will write to all providers including the recovered one
+                var dataBytes = await ReadAllBytesAsync(reconstructedData);
+                using var dataStream = new MemoryStream(dataBytes);
+
+                await SaveAsync(key, dataStream, _getProvider);
+
+                _context.LogDebug($"[RAID] Rebuilt key '{key}' successfully");
+            }
+            catch (Exception ex)
+            {
+                throw new InvalidOperationException($"Failed to rebuild key '{key}'", ex);
+            }
+        }
+
+        private class RebuildStatistics
+        {
+            public DateTime StartTime { get; set; }
+            public DateTime EndTime { get; set; }
+            public int FailedProviderIndex { get; set; }
+            public int TotalKeys { get; set; }
+            public int KeysRebuilt { get; set; }
+            public int KeysFailed { get; set; }
+            public TimeSpan Duration => EndTime - StartTime;
         }
 
         private void ValidateConfiguration()
