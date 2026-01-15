@@ -351,17 +351,17 @@ namespace DataWarehouse.Kernel.Storage
                 case ComplianceMode.HIPAA:
                     _context.LogInfo("[Compliance] HIPAA mode enabled: Enhanced audit, encryption required");
                     break;
-                case ComplianceMode.SOX:
-                    _context.LogInfo("[Compliance] SOX mode enabled: Financial data protection active");
+                case ComplianceMode.Financial:
+                    _context.LogInfo("[Compliance] Financial mode enabled: SOX/financial data protection active");
                     break;
                 case ComplianceMode.GDPR:
                     _context.LogInfo("[Compliance] GDPR mode enabled: Data subject rights enforced");
                     break;
-                case ComplianceMode.FIPS:
-                    _context.LogInfo("[Compliance] FIPS mode enabled: FIPS-compliant cryptography required");
+                case ComplianceMode.Government:
+                    _context.LogInfo("[Compliance] Government mode enabled: FIPS-compliant cryptography required");
                     break;
-                case ComplianceMode.PCI_DSS:
-                    _context.LogInfo("[Compliance] PCI-DSS mode enabled: Payment card data protection active");
+                case ComplianceMode.Custom:
+                    _context.LogInfo("[Compliance] Custom mode enabled: PCI-DSS/custom compliance rules active");
                     break;
             }
         }
