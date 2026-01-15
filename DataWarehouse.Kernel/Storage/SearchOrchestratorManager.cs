@@ -1,6 +1,7 @@
 using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Primitives;
 using System.Collections.Concurrent;
+using SdkMatchType = DataWarehouse.SDK.Contracts.MatchType;
 
 namespace DataWarehouse.Kernel.Storage
 {
@@ -29,35 +30,38 @@ namespace DataWarehouse.Kernel.Storage
             CancellationToken ct)
         {
             var sw = System.Diagnostics.Stopwatch.StartNew();
-            _context.LogDebug($"[Search] Executing {type} search for: {query.Query}");
+            _context.LogDebug($"[Search] Executing {type} search for: {query.QueryText}");
 
             try
             {
-                var result = type switch
+                var items = type switch
                 {
-                    SearchProviderType.SqlMetadata => await ExecuteSqlSearchAsync(query, ct),
-                    SearchProviderType.NoSqlKeyword => await ExecuteNoSqlSearchAsync(query, ct),
-                    SearchProviderType.VectorSemantic => await ExecuteVectorSearchAsync(query, ct),
-                    SearchProviderType.AiAgent => await ExecuteAiSearchAsync(query, ct),
-                    SearchProviderType.GraphTraversal => await ExecuteGraphSearchAsync(query, ct),
-                    _ => new ProviderSearchResult { Items = new List<SearchResultItem>() }
+                    SearchProviderType.SqlMetadata => await ExecuteSqlSearchInternalAsync(query, ct),
+                    SearchProviderType.NoSqlKeyword => await ExecuteNoSqlSearchInternalAsync(query, ct),
+                    SearchProviderType.VectorSemantic => await ExecuteVectorSearchInternalAsync(query, ct),
+                    SearchProviderType.AiAgent => await ExecuteAiSearchInternalAsync(query, ct),
+                    _ => new List<SearchResultItem>()
                 };
 
-                result.Provider = type;
-                result.Latency = sw.Elapsed;
-                result.Success = true;
+                sw.Stop();
+                _context.LogDebug($"[Search] {type} returned {items.Count} results in {sw.ElapsedMilliseconds}ms");
 
-                _context.LogDebug($"[Search] {type} returned {result.Items.Count} results in {sw.ElapsedMilliseconds}ms");
-
-                return result;
+                return new ProviderSearchResult
+                {
+                    Provider = type,
+                    Count = items.Count,
+                    Latency = sw.Elapsed,
+                    Items = items
+                };
             }
             catch (Exception ex)
             {
+                sw.Stop();
                 _context.LogError($"[Search] {type} search failed: {ex.Message}", ex);
                 return new ProviderSearchResult
                 {
                     Provider = type,
-                    Success = false,
+                    Count = 0,
                     Error = ex.Message,
                     Latency = sw.Elapsed,
                     Items = new List<SearchResultItem>()
@@ -69,10 +73,10 @@ namespace DataWarehouse.Kernel.Storage
 
         #region SQL Metadata Search
 
-        private Task<ProviderSearchResult> ExecuteSqlSearchAsync(SearchQuery query, CancellationToken ct)
+        private Task<List<SearchResultItem>> ExecuteSqlSearchInternalAsync(SearchQuery query, CancellationToken ct)
         {
             var items = new List<SearchResultItem>();
-            var queryLower = query.Query.ToLowerInvariant();
+            var queryLower = query.QueryText.ToLowerInvariant();
             var terms = queryLower.Split(' ', StringSplitOptions.RemoveEmptyEntries);
 
             foreach (var doc in _sqlIndex.Values)
@@ -121,7 +125,7 @@ namespace DataWarehouse.Kernel.Storage
                         Snippet = GenerateSnippet(doc, terms),
                         Score = score,
                         Source = SearchProviderType.SqlMetadata,
-                        MatchType = MatchType.MetadataMatch,
+                        MatchType = SdkMatchType.Exact,
                         Metadata = doc.Metadata
                     });
                 }
@@ -130,23 +134,20 @@ namespace DataWarehouse.Kernel.Storage
             // Apply filters
             items = ApplyFilters(items, query);
 
-            return Task.FromResult(new ProviderSearchResult
-            {
-                Items = items
+            return Task.FromResult(items
                     .OrderByDescending(i => i.Score)
                     .Take(query.MaxResultsPerProvider)
-                    .ToList()
-            });
+                    .ToList());
         }
 
         #endregion
 
         #region NoSQL Full-Text Search
 
-        private Task<ProviderSearchResult> ExecuteNoSqlSearchAsync(SearchQuery query, CancellationToken ct)
+        private Task<List<SearchResultItem>> ExecuteNoSqlSearchInternalAsync(SearchQuery query, CancellationToken ct)
         {
             var items = new List<SearchResultItem>();
-            var queryLower = query.Query.ToLowerInvariant();
+            var queryLower = query.QueryText.ToLowerInvariant();
             var terms = queryLower.Split(' ', StringSplitOptions.RemoveEmptyEntries);
 
             foreach (var doc in _noSqlIndex.Values)
@@ -188,7 +189,7 @@ namespace DataWarehouse.Kernel.Storage
                         Snippet = ExtractSnippetFromText(doc.FullText, terms),
                         Score = score,
                         Source = SearchProviderType.NoSqlKeyword,
-                        MatchType = MatchType.ContentMatch,
+                        MatchType = SdkMatchType.Keyword,
                         Metadata = doc.Metadata
                     });
                 }
@@ -196,30 +197,31 @@ namespace DataWarehouse.Kernel.Storage
 
             items = ApplyFilters(items, query);
 
-            return Task.FromResult(new ProviderSearchResult
-            {
-                Items = items
+            return Task.FromResult(items
                     .OrderByDescending(i => i.Score)
                     .Take(query.MaxResultsPerProvider)
-                    .ToList()
-            });
+                    .ToList());
         }
 
         #endregion
 
         #region Vector Semantic Search
 
-        private Task<ProviderSearchResult> ExecuteVectorSearchAsync(SearchQuery query, CancellationToken ct)
+        private Task<List<SearchResultItem>> ExecuteVectorSearchInternalAsync(SearchQuery query, CancellationToken ct)
         {
             var items = new List<SearchResultItem>();
 
             // Get query vector (would come from embedding model in production)
-            var queryVector = query.QueryVector ?? GenerateSimpleVector(query.Query);
+            var queryVector = query.QueryVector ?? GenerateSimpleVector(query.QueryText);
 
             if (queryVector == null || queryVector.Length == 0)
             {
-                return Task.FromResult(new ProviderSearchResult { Items = items });
+                return Task.FromResult(items);
             }
+
+            // Get minimum score threshold from filters or use default
+            var minScore = query.Filters?.TryGetValue("MinSemanticScore", out var scoreObj) == true
+                           && scoreObj is double d ? d : 0.5;
 
             foreach (var kvp in _vectorIndex)
             {
@@ -229,7 +231,7 @@ namespace DataWarehouse.Kernel.Storage
                 var similarity = CosineSimilarity(queryVector, docVector);
 
                 // Threshold for semantic relevance
-                if (similarity >= (query.MinSemanticScore ?? 0.5))
+                if (similarity >= minScore)
                 {
                     var uri = new Uri(kvp.Key);
                     var doc = _sqlIndex.Values.FirstOrDefault(d => d.Uri.ToString() == kvp.Key)
@@ -242,7 +244,7 @@ namespace DataWarehouse.Kernel.Storage
                         Snippet = doc?.FullText?.Substring(0, Math.Min(200, doc.FullText.Length)) ?? "",
                         Score = similarity * 100, // Scale to 0-100
                         Source = SearchProviderType.VectorSemantic,
-                        MatchType = MatchType.SemanticMatch,
+                        MatchType = SdkMatchType.Semantic,
                         Metadata = doc?.Metadata ?? new Dictionary<string, object>()
                     });
                 }
@@ -250,20 +252,17 @@ namespace DataWarehouse.Kernel.Storage
 
             items = ApplyFilters(items, query);
 
-            return Task.FromResult(new ProviderSearchResult
-            {
-                Items = items
+            return Task.FromResult(items
                     .OrderByDescending(i => i.Score)
                     .Take(query.MaxResultsPerProvider)
-                    .ToList()
-            });
+                    .ToList());
         }
 
         #endregion
 
         #region AI Agent Search
 
-        private async Task<ProviderSearchResult> ExecuteAiSearchAsync(SearchQuery query, CancellationToken ct)
+        private async Task<List<SearchResultItem>> ExecuteAiSearchInternalAsync(SearchQuery query, CancellationToken ct)
         {
             // AI-powered search with reasoning
             // In production, this would call an AI provider plugin
@@ -273,20 +272,20 @@ namespace DataWarehouse.Kernel.Storage
             var items = new List<SearchResultItem>();
 
             // Combine results from other providers for AI enhancement
-            var sqlResults = await ExecuteSqlSearchAsync(query, ct);
-            var noSqlResults = await ExecuteNoSqlSearchAsync(query, ct);
-            var vectorResults = await ExecuteVectorSearchAsync(query, ct);
+            var sqlResults = await ExecuteSqlSearchInternalAsync(query, ct);
+            var noSqlResults = await ExecuteNoSqlSearchInternalAsync(query, ct);
+            var vectorResults = await ExecuteVectorSearchInternalAsync(query, ct);
 
             // AI would analyze and re-rank these results
-            var allItems = sqlResults.Items
-                .Concat(noSqlResults.Items)
-                .Concat(vectorResults.Items)
+            var allItems = sqlResults
+                .Concat(noSqlResults)
+                .Concat(vectorResults)
                 .GroupBy(i => i.Uri.ToString())
                 .Select(g => g.OrderByDescending(i => i.Score).First())
                 .ToList();
 
             // Simulated AI reasoning
-            var reasoning = $"Analyzed {allItems.Count} documents for query '{query.Query}'. " +
+            var reasoning = $"Analyzed {allItems.Count} documents for query '{query.QueryText}'. " +
                           $"Found {allItems.Count(i => i.Score > 50)} highly relevant results.";
 
             // Add AI insight as first result
@@ -299,7 +298,7 @@ namespace DataWarehouse.Kernel.Storage
                     Snippet = reasoning,
                     Score = 100,
                     Source = SearchProviderType.AiAgent,
-                    MatchType = MatchType.AiReasoning,
+                    MatchType = SdkMatchType.AiInferred,
                     Metadata = new Dictionary<string, object>
                     {
                         ["DocumentsAnalyzed"] = allItems.Count,
@@ -318,56 +317,12 @@ namespace DataWarehouse.Kernel.Storage
                     Snippet = item.Snippet,
                     Score = item.Score * 1.1, // AI boost
                     Source = SearchProviderType.AiAgent,
-                    MatchType = MatchType.AiEnhanced,
+                    MatchType = SdkMatchType.AiInferred,
                     Metadata = item.Metadata
                 });
             }
 
-            return new ProviderSearchResult { Items = items };
-        }
-
-        #endregion
-
-        #region Graph Traversal Search
-
-        private Task<ProviderSearchResult> ExecuteGraphSearchAsync(SearchQuery query, CancellationToken ct)
-        {
-            // Graph-based search for relationship traversal
-            // Would integrate with knowledge graph in production
-
-            var items = new List<SearchResultItem>();
-
-            // For now, find documents that are related through metadata links
-            var queryLower = query.Query.ToLowerInvariant();
-
-            foreach (var doc in _sqlIndex.Values)
-            {
-                ct.ThrowIfCancellationRequested();
-
-                // Check for relationship metadata
-                if (doc.Metadata.TryGetValue("RelatedTo", out var related))
-                {
-                    var relatedStr = related?.ToString()?.ToLowerInvariant() ?? "";
-                    if (relatedStr.Contains(queryLower))
-                    {
-                        items.Add(new SearchResultItem
-                        {
-                            Uri = doc.Uri,
-                            Title = doc.Title ?? doc.Uri.ToString(),
-                            Snippet = $"Related to: {related}",
-                            Score = 50,
-                            Source = SearchProviderType.GraphTraversal,
-                            MatchType = MatchType.RelationshipMatch,
-                            Metadata = doc.Metadata
-                        });
-                    }
-                }
-            }
-
-            return Task.FromResult(new ProviderSearchResult
-            {
-                Items = items.Take(query.MaxResultsPerProvider).ToList()
-            });
+            return items;
         }
 
         #endregion
@@ -443,47 +398,50 @@ namespace DataWarehouse.Kernel.Storage
             var result = items.AsEnumerable();
 
             // Date range filter
-            if (query.DateFrom.HasValue || query.DateTo.HasValue)
+            if (query.DateRange != null && (query.DateRange.From.HasValue || query.DateRange.To.HasValue))
             {
                 result = result.Where(i =>
                 {
                     if (i.Metadata.TryGetValue("IndexedAt", out var dateObj) && dateObj is DateTime date)
                     {
-                        if (query.DateFrom.HasValue && date < query.DateFrom.Value)
+                        if (query.DateRange.From.HasValue && date < query.DateRange.From.Value)
                             return false;
-                        if (query.DateTo.HasValue && date > query.DateTo.Value)
+                        if (query.DateRange.To.HasValue && date > query.DateRange.To.Value)
                             return false;
                     }
                     return true;
                 });
             }
 
-            // Content type filter
-            if (query.ContentTypes != null && query.ContentTypes.Length > 0)
+            // Apply generic filters from Filters dictionary
+            if (query.Filters != null)
             {
-                var types = query.ContentTypes.Select(t => t.ToLowerInvariant()).ToHashSet();
-                result = result.Where(i =>
+                // Content type filter
+                if (query.Filters.TryGetValue("ContentTypes", out var contentTypesObj) && contentTypesObj is string[] contentTypes)
                 {
-                    if (i.Metadata.TryGetValue("ContentType", out var ct))
-                    {
-                        return types.Contains(ct?.ToString()?.ToLowerInvariant() ?? "");
-                    }
-                    return true;
-                });
-            }
-
-            // Metadata filters
-            if (query.MetadataFilters != null)
-            {
-                foreach (var filter in query.MetadataFilters)
-                {
+                    var types = contentTypes.Select(t => t.ToLowerInvariant()).ToHashSet();
                     result = result.Where(i =>
                     {
-                        if (i.Metadata.TryGetValue(filter.Key, out var value))
+                        if (i.Metadata.TryGetValue("ContentType", out var ct))
                         {
-                            return value?.ToString() == filter.Value?.ToString();
+                            return types.Contains(ct?.ToString()?.ToLowerInvariant() ?? "");
                         }
-                        return false;
+                        return true;
+                    });
+                }
+
+                // Apply other metadata filters
+                foreach (var filter in query.Filters.Where(f => f.Key != "ContentTypes" && f.Key != "MinSemanticScore"))
+                {
+                    var filterKey = filter.Key;
+                    var filterValue = filter.Value;
+                    result = result.Where(i =>
+                    {
+                        if (i.Metadata.TryGetValue(filterKey, out var value))
+                        {
+                            return value?.ToString() == filterValue?.ToString();
+                        }
+                        return true; // Don't exclude if metadata key doesn't exist
                     });
                 }
             }
