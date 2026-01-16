@@ -1,6 +1,6 @@
 # DataWarehouse Kernel - Diamond Level Production Readiness TODO
 
-**Analysis Date:** 2026-01-15
+**Analysis Date:** 2026-01-16
 **Analyst:** Claude Code Analysis
 **Target:** Diamond Level - Immediate Deployment Ready (Laptop to Hyperscale)
 
@@ -8,7 +8,14 @@
 
 ## Executive Summary
 
-The DataWarehouse Kernel has a solid architectural foundation with well-designed SDK contracts and core implementations. However, several critical gaps exist for true Diamond Level production readiness across all deployment scales.
+The DataWarehouse Kernel has a solid architectural foundation with well-designed SDK contracts and core implementations. This document identifies gaps and clearly distinguishes between **Kernel responsibilities** and **Plugin responsibilities**.
+
+### Design Principle
+
+> **Kernel = Infrastructure & Frameworks**
+> **Plugins = Features & Implementations**
+
+The kernel provides hooks, interfaces, and default behaviors. Plugins extend and customize.
 
 ### Overall Readiness Score: 72/100
 
@@ -27,207 +34,384 @@ The DataWarehouse Kernel has a solid architectural foundation with well-designed
 
 ---
 
-## CRITICAL ISSUES (P0) - Block Deployment
+## KERNEL vs PLUGIN RESPONSIBILITY MATRIX
 
-### 1. No Hot Plugin Reload Capability
-**Location:** `DataWarehouse.Kernel/PluginRegistry.cs`, `DataWarehouse.Kernel/DataWarehouseKernel.cs`
-**Impact:** Cannot update plugins without kernel restart - unacceptable for 24/7 operations
+| Feature | Kernel | Plugin | Notes |
+|---------|:------:|:------:|-------|
+| Hot Plugin Reload | ✅ | | Core infrastructure |
+| Circuit Breaker Framework | ✅ | ✅ Custom policies | Kernel provides defaults |
+| Distributed Consensus | Hook only | ✅ Raft Plugin | Enterprise feature |
+| Memory Pressure Monitor | ✅ | Responds | Kernel monitors, plugins respond |
+| Security Context Flow | ✅ Basic | ✅ ACL Plugin | Kernel flows, plugin enforces |
+| Metrics Collection | ✅ | ✅ Exporters | Always collect, optionally export |
+| AI Provider Registry | ✅ Registry | ✅ Providers | Like plugin registry |
+| Health Check | ✅ Aggregate | ✅ Self-check | Kernel aggregates plugin checks |
+| Config Hot Reload | ✅ | | Core infrastructure |
+| Transaction Coordination | ✅ Basic | ✅ Distributed | Basic in kernel, advanced in plugin |
+| Rate Limiting | ✅ Framework | ✅ Policies | Kernel enforces, plugin configures |
+| Audit Logging | ✅ Hooks | ✅ Loggers | Kernel emits events, plugin logs |
+
+---
+
+## PART 1: KERNEL WORK (Core Infrastructure)
+
+### K1. Hot Plugin Reload [P0 - CRITICAL]
+**Location:** `PluginRegistry.cs`, `DataWarehouseKernel.cs`
+**Why Kernel:** Only kernel owns plugin lifecycle and assembly contexts
+
 **Required:**
-- [ ] Implement `IPluginReloader` interface
-- [ ] Add assembly unloading support via `AssemblyLoadContext`
+- [ ] Implement `IPluginReloader` interface in SDK
+- [ ] Add `AssemblyLoadContext` per plugin for isolation
 - [ ] Plugin state preservation during reload
 - [ ] Graceful connection draining before unload
 - [ ] Rollback on failed plugin load
-
-### 2. No Circuit Breaker / Resilience Patterns
-**Location:** All storage managers, pipeline orchestrator
-**Impact:** Single provider failure cascades to entire system
-**Required:**
-- [ ] Implement circuit breaker for storage providers
-- [ ] Add retry policies with exponential backoff (exists in RaidEngine but not generalized)
-- [ ] Bulkhead pattern for resource isolation
-- [ ] Timeout policies for all external calls
-- [ ] Fallback strategies per provider type
-
-### 3. Missing Distributed Consensus Implementation
-**Location:** `DataWarehouse.SDK/Contracts/IConsensusEngine.cs` (interface only)
-**Impact:** Cannot achieve consistency in multi-node deployments (Government, Banks, Hyperscale)
-**Required:**
-- [ ] Implement Raft-based consensus for leader election
-- [ ] Add distributed locking mechanism
-- [ ] Implement fencing tokens for split-brain prevention
-- [ ] Add quorum-based write confirmation
-
-### 4. No Memory Pressure Management
-**Location:** Kernel-wide
-**Impact:** OOM kills under heavy load - critical for all deployment sizes
-**Required:**
-- [ ] Implement `IMemoryPressureMonitor` interface
-- [ ] Add GC pressure callbacks
-- [ ] Implement request throttling under memory pressure
-- [ ] Add stream processing with bounded memory
-- [ ] Memory-aware cache eviction in all managers
-
-### 5. Incomplete Security Context Propagation
-**Location:** `DataWarehouse.Kernel/Storage/*.cs`, `DataWarehouse.Kernel/Pipeline/PipelineOrchestrator.cs`
-**Impact:** Security bypass possible in cross-component operations
-**Required:**
-- [ ] Enforce `ISecurityContext` on all storage operations (partially done in ContainerManager)
-- [ ] Add security context to `PipelineContext`
-- [ ] Implement security context inheritance for background jobs
-- [ ] Add audit trail for all security context changes
-
----
-
-## HIGH PRIORITY (P1) - Required for Production
-
-### 6. No Built-in Metrics/Telemetry System
-**Location:** Kernel-wide
-**Impact:** Cannot monitor system health or performance in production
-**Required:**
-- [ ] Implement `IMetricsCollector` interface in SDK
-- [ ] Add kernel-level metrics (operations/sec, latency, errors)
-- [ ] Pipeline stage timing metrics
-- [ ] Storage provider metrics
-- [ ] Queue depth monitoring for message bus
-- [ ] Export to OpenTelemetry/Prometheus/StatsD
-
-### 7. AI Provider Registry Not Integrated
-**Location:** `DataWarehouse.SDK/AI/IAIProvider.cs` (interface), `DataWarehouse.Kernel/DataWarehouseKernel.cs`
-**Impact:** AI capabilities cannot be dynamically discovered or used
-**Required:**
-- [ ] Add `IAIProviderRegistry` implementation in Kernel
-- [ ] Integrate with plugin registry
-- [ ] Add AI provider selection based on capabilities
-- [ ] Implement fallback AI provider chain
-- [ ] Add cost-aware provider selection
-
-### 8. Health Check System Incomplete
-**Location:** `DataWarehouse.Kernel/Infrastructure/HealthCheck.cs`
-**Impact:** Cannot reliably determine system health for orchestrators (K8s, etc.)
-**Required:**
-- [ ] Implement comprehensive health check aggregation
-- [ ] Add liveness vs readiness distinction
-- [ ] Per-component health status
-- [ ] Dependency health checks (storage providers, AI providers)
-- [ ] Health check caching with configurable TTL
-
-### 9. No Configuration Hot Reload
-**Location:** `DataWarehouse.Kernel/Configuration/KernelConfiguration.cs`
-**Impact:** Configuration changes require kernel restart
-**Required:**
-- [ ] Implement `IOptionsMonitor<T>` pattern
-- [ ] Add file watcher for config changes
-- [ ] Support environment variable override
-- [ ] Implement config validation before apply
-- [ ] Add config change notifications to plugins
-
-### 10. Transaction Coordination Missing
-**Location:** Storage managers, pipeline orchestrator
-**Impact:** No ACID guarantees for multi-step operations
-**Required:**
-- [ ] Implement `ITransactionScope` for kernel operations
-- [ ] Add two-phase commit for multi-provider writes
-- [ ] Implement compensation/rollback handlers
-- [ ] Add transaction timeout management
-
----
-
-## MEDIUM PRIORITY (P2) - Required for Enterprise
-
-### 11. Rate Limiting Not Implemented
-**Location:** Kernel-wide
-**Impact:** No protection against resource exhaustion
-**Required:**
-- [ ] Implement token bucket rate limiter
-- [ ] Per-user/tenant rate limits
-- [ ] Per-operation rate limits
-- [ ] Rate limit configuration per operating mode
-- [ ] Rate limit bypass for admin operations
-
-### 12. Advanced Message Bus Features Incomplete
-**Location:** `DataWarehouse.Kernel/Messaging/AdvancedMessageBus.cs`
-**Impact:** Missing enterprise messaging guarantees
-**Required:**
-- [ ] Complete `IMessageGroup` implementation (transactional messaging)
-- [ ] Add message persistence for at-least-once delivery
-- [ ] Implement dead letter queue
-- [ ] Add message replay capability
-- [ ] Priority queue support
-
-### 13. Audit Logging Not Integrated
-**Location:** Kernel-wide
-**Impact:** Compliance requirements not met (HIPAA, SOX, GDPR)
-**Required:**
-- [ ] Implement `IAuditLogger` interface
-- [ ] Add audit logging to all storage operations
-- [ ] Add audit logging to security operations
-- [ ] Implement tamper-evident audit trail
-- [ ] Add audit log export capability
-
-### 14. Resource Quota Enforcement at Kernel Level
-**Location:** `DataWarehouse.Kernel/DataWarehouseKernel.cs`
-**Impact:** ContainerManager has quotas but not enforced globally
-**Required:**
-- [ ] Add kernel-level resource quota enforcement
-- [ ] Implement quota inheritance hierarchy
-- [ ] Add quota usage tracking/reporting
-- [ ] Implement soft/hard quota limits
-
-### 15. Graceful Degradation Strategy
-**Location:** Pipeline orchestrator, storage managers
-**Impact:** System fails hard instead of degrading gracefully
-**Required:**
-- [ ] Define degradation levels per component
-- [ ] Implement feature flags for degradation
-- [ ] Add automatic recovery detection
-- [ ] Implement partial result returns
-
----
-
-## LOWER PRIORITY (P3) - Nice to Have
-
-### 16. Plugin Dependency Resolution
-**Location:** `DataWarehouse.Kernel/PluginRegistry.cs`
-**Impact:** Plugins cannot declare dependencies on other plugins
-**Required:**
-- [ ] Add plugin dependency metadata
-- [ ] Implement topological sort for load order
-- [ ] Add circular dependency detection
 - [ ] Version compatibility checking
 
-### 17. Multi-Tenancy at Kernel Level
-**Location:** Kernel-wide
-**Impact:** Tenant isolation not enforced at kernel level
-**Required:**
-- [ ] Add tenant context to all operations
-- [ ] Implement tenant-aware resource allocation
-- [ ] Add tenant isolation for message bus
-- [ ] Implement tenant-specific configuration
-
-### 18. Async Enumerable Improvements
-**Location:** Storage managers (ListContainersAsync, etc.)
-**Impact:** Memory-inefficient for large result sets
-**Required:**
-- [ ] Review all IAsyncEnumerable implementations
-- [ ] Add pagination support
-- [ ] Implement server-side filtering
-- [ ] Add result set size limits
-
-### 19. Plugin Marketplace/Discovery
-**Location:** Not implemented
-**Impact:** Manual plugin distribution
-**Required:**
-- [ ] Plugin manifest format
-- [ ] Plugin version compatibility matrix
-- [ ] Secure plugin download/verification
-- [ ] Plugin auto-update mechanism
+```csharp
+// SDK Interface
+public interface IPluginReloader
+{
+    Task<ReloadResult> ReloadPluginAsync(string pluginId, CancellationToken ct);
+    Task<ReloadResult> ReloadAllAsync(CancellationToken ct);
+    event Action<PluginReloadEvent> OnPluginReloading;
+    event Action<PluginReloadEvent> OnPluginReloaded;
+}
+```
 
 ---
 
-## CODE QUALITY ISSUES
+### K2. Circuit Breaker Framework [P0 - CRITICAL]
+**Location:** New `DataWarehouse.Kernel/Resilience/` directory
+**Why Kernel:** Every storage/AI provider call needs protection consistently
 
-### 20. Inconsistent Async Patterns
+**Kernel provides:**
+- [ ] `IResiliencePolicy` interface in SDK
+- [ ] `CircuitBreakerManager` with default policies
+- [ ] Built-in circuit states: Closed → Open → Half-Open
+- [ ] Default retry with exponential backoff
+- [ ] Timeout wrapper for all external calls
+
+**Plugins can:**
+- Register custom policies per operation type
+- Override default thresholds
+- Add custom fallback strategies
+
+```csharp
+// SDK Interface
+public interface IResiliencePolicy
+{
+    Task<T> ExecuteAsync<T>(Func<CancellationToken, Task<T>> action, CancellationToken ct);
+    CircuitState State { get; }
+    void Reset();
+}
+
+public enum CircuitState { Closed, Open, HalfOpen }
+```
+
+---
+
+### K3. Memory Pressure Management [P0 - CRITICAL]
+**Location:** New `DataWarehouse.Kernel/Infrastructure/MemoryPressureMonitor.cs`
+**Why Kernel:** Only kernel has visibility across all components
+
+**What it does:**
+- Monitors GC pressure and available memory
+- Throttles incoming requests under pressure
+- Signals plugins to release resources
+- Prevents OOM crashes
+
+**Required:**
+- [ ] Implement `IMemoryPressureMonitor` interface
+- [ ] Add GC.RegisterForFullGCNotification callbacks
+- [ ] Request throttling when memory > 80%
+- [ ] Plugin notification: `OnMemoryPressure(MemoryPressureLevel level)`
+- [ ] Bounded memory for stream processing
+
+```csharp
+// SDK Interface
+public interface IMemoryPressureMonitor
+{
+    MemoryPressureLevel CurrentLevel { get; }
+    event Action<MemoryPressureLevel> OnPressureChanged;
+    bool ShouldThrottle { get; }
+}
+
+public enum MemoryPressureLevel { Normal, Elevated, High, Critical }
+```
+
+---
+
+### K4. Security Context Flow (Basic) [P1 - HIGH]
+**Location:** All kernel components
+**Why Kernel:** Context must flow through all operations consistently
+
+**Kernel provides:**
+- [ ] `ISecurityContext` passed through ALL operations
+- [ ] Default `LocalSecurityContext` for single-user/laptop mode
+- [ ] Security context inheritance for background jobs
+- [ ] Add `ISecurityContext` to `PipelineContext`
+- [ ] Audit event emission (plugins handle logging)
+
+**Already done:**
+- [x] ContainerManager uses `ISecurityContext` on all methods
+
+**Still needed:**
+- [ ] PipelineOrchestrator security context
+- [ ] HybridStorageManager security context
+- [ ] RealTimeStorageManager security context
+- [ ] Background job context propagation
+
+---
+
+### K5. Health Check Aggregation [P1 - HIGH]
+**Location:** `DataWarehouse.Kernel/Infrastructure/HealthCheck.cs`
+**Why Kernel:** Kernel aggregates all component health
+
+**Kernel provides:**
+- [ ] `IHealthCheck` interface in SDK
+- [ ] Kernel's own health check (memory, thread pool, etc.)
+- [ ] Plugin health check aggregation
+- [ ] Liveness vs Readiness distinction
+- [ ] Health check result caching (configurable TTL)
+- [ ] Degraded state support (not just healthy/unhealthy)
+
+```csharp
+// SDK Interface
+public interface IHealthCheck
+{
+    Task<HealthCheckResult> CheckHealthAsync(CancellationToken ct);
+}
+
+public class HealthCheckResult
+{
+    public HealthStatus Status { get; init; } // Healthy, Degraded, Unhealthy
+    public string? Message { get; init; }
+    public Dictionary<string, object> Data { get; init; }
+    public TimeSpan Duration { get; init; }
+}
+```
+
+**Plugins implement:**
+- Their own `IHealthCheck`
+- Register during handshake
+- Kernel calls all registered checks and aggregates
+
+---
+
+### K6. Configuration Hot Reload [P1 - HIGH]
+**Location:** `DataWarehouse.Kernel/Configuration/`
+**Why Kernel:** Kernel owns configuration lifecycle
+
+**What it does:**
+- Detect config file changes at runtime
+- Validate new config before applying
+- Apply changes without restart
+- Notify plugins of config changes
+
+**Required:**
+- [ ] File watcher for config changes
+- [ ] Config validation before apply
+- [ ] `IConfigurationChangeNotifier` interface
+- [ ] Plugin notification via message bus
+- [ ] Rollback on validation failure
+
+```csharp
+// Already have message bus, use it:
+await _messageBus.PublishAsync(MessageTopics.ConfigChanged, new PluginMessage {
+    Type = "kernel.config.changed",
+    Payload = new { Section = "pipeline", NewValue = ... }
+});
+```
+
+---
+
+### K7. Metrics Collection (Built-in) [P1 - HIGH]
+**Location:** New `DataWarehouse.Kernel/Telemetry/`
+**Why Kernel:** Metrics are always collected; export is optional (plugin)
+
+**Kernel provides:**
+- [ ] `IMetricsCollector` interface in SDK
+- [ ] Built-in in-memory metrics store
+- [ ] Kernel metrics: operations/sec, latency, errors, memory
+- [ ] Pipeline stage timing
+- [ ] Message bus queue depth
+- [ ] API for plugins to report their metrics
+
+```csharp
+// SDK Interface
+public interface IMetricsCollector
+{
+    void IncrementCounter(string name, string[]? tags = null);
+    void RecordValue(string name, double value, string[]? tags = null);
+    IDisposable StartTimer(string name, string[]? tags = null);
+    MetricsSnapshot GetSnapshot();
+}
+```
+
+**Plugins provide:**
+- `PrometheusExporterPlugin` - exports to Prometheus
+- `OpenTelemetryPlugin` - exports to OTel collectors
+- `DatadogPlugin`, `NewRelicPlugin`, etc.
+
+---
+
+### K8. AI Provider Registry [P1 - HIGH]
+**Location:** `DataWarehouse.Kernel/AI/AIProviderRegistry.cs`
+**Why Kernel:** Registry is infrastructure (like PluginRegistry)
+
+**Kernel provides:**
+- [ ] `IAIProviderRegistry` interface
+- [ ] Registration/discovery of AI providers
+- [ ] Capability-based selection ("give me embedding provider")
+- [ ] Fallback chain when primary unavailable
+- [ ] Cost-aware selection hints
+
+```csharp
+// SDK Interface
+public interface IAIProviderRegistry
+{
+    void Register(IAIProvider provider);
+    void Unregister(string providerId);
+    IAIProvider? GetProvider(AICapability capability);
+    IEnumerable<IAIProvider> GetProviders(AICapability capability);
+}
+
+public enum AICapability { TextGeneration, Embedding, ImageGeneration, Speech }
+```
+
+**Plugins provide:**
+- `OpenAIPlugin`, `ClaudePlugin`, `OllamaPlugin`, etc.
+- Each registers its capabilities on load
+
+---
+
+### K9. Transaction Coordination (Basic) [P2 - MEDIUM]
+**Location:** New `DataWarehouse.Kernel/Transactions/`
+**Why Kernel:** Basic coordination is infrastructure
+
+**Kernel provides:**
+- [ ] `ITransactionScope` interface in SDK
+- [ ] In-memory transaction tracking
+- [ ] Best-effort rollback for multi-step operations
+- [ ] Transaction timeout management
+
+```csharp
+// SDK Interface
+public interface ITransactionScope : IAsyncDisposable
+{
+    string TransactionId { get; }
+    Task CommitAsync(CancellationToken ct);
+    Task RollbackAsync(CancellationToken ct);
+    void RegisterCompensation(Func<Task> compensationAction);
+}
+```
+
+**Plugin provides (enterprise):**
+- `DistributedTransactionPlugin` - 2PC across providers
+- Saga pattern implementation
+- Outbox pattern for reliability
+
+---
+
+### K10. Rate Limiting Framework [P2 - MEDIUM]
+**Location:** New `DataWarehouse.Kernel/RateLimiting/`
+**Why Kernel:** Enforcement must be at kernel level
+
+**Kernel provides:**
+- [ ] `IRateLimiter` interface in SDK
+- [ ] Token bucket implementation
+- [ ] Per-operation rate limits
+- [ ] Rate limit exceeded events
+
+**Plugins configure:**
+- Per-user/tenant limits
+- Custom rate limit policies
+- Admin bypass rules
+
+---
+
+## PART 2: PLUGIN WORK (Future Plugins)
+
+### P1. Distributed Consensus Plugin [ENTERPRISE]
+**Why Plugin:** Laptop/desktop users don't need Raft
+
+**Plugin provides:**
+- Raft-based leader election
+- Distributed locking
+- Quorum-based writes
+- Fencing tokens for split-brain
+
+**Kernel provides:**
+- Optional hook: `if (consensusPlugin != null) await consensusPlugin.ProposeAsync(...)`
+- No hard dependency
+
+---
+
+### P2. Advanced ACL Plugin [ENTERPRISE]
+**Why Plugin:** Basic security is in kernel; granular ACL is enterprise
+
+**Plugin provides:**
+- Granular permission system
+- Role hierarchies
+- AD/LDAP integration
+- Policy-based access control
+
+**Kernel provides:**
+- `ISecurityContext` flow (basic)
+- Hooks for ACL plugin to intercept
+
+---
+
+### P3. Metrics Export Plugins [ENTERPRISE]
+**Why Plugin:** Collection is kernel; export destinations vary
+
+**Plugins:**
+- `PrometheusExporterPlugin`
+- `OpenTelemetryPlugin`
+- `DatadogPlugin`
+- `CloudWatchPlugin`
+
+---
+
+### P4. Audit Logging Plugins [COMPLIANCE]
+**Why Plugin:** Audit storage/format varies by compliance requirement
+
+**Plugins:**
+- `SplunkAuditPlugin`
+- `ElasticAuditPlugin`
+- `ImmutableAuditPlugin` (tamper-evident)
+- `ComplianceAuditPlugin` (HIPAA/SOX/GDPR formatters)
+
+**Kernel provides:**
+- Audit event emission via message bus
+- `AuditEvent` standard format
+
+---
+
+### P5. Advanced Transaction Plugin [ENTERPRISE]
+**Why Plugin:** Distributed transactions add complexity
+
+**Plugin provides:**
+- Two-phase commit (2PC)
+- Saga pattern orchestration
+- Outbox pattern
+- Distributed transaction coordinator
+
+---
+
+### P6. Advanced Message Bus Plugins [ENTERPRISE]
+**Why Plugin:** Persistence/clustering varies by deployment
+
+**Plugins:**
+- `KafkaMessageBusPlugin` - Kafka integration
+- `RabbitMQPlugin` - RabbitMQ integration
+- `PersistentMessageBusPlugin` - disk-backed for reliability
+
+---
+
+## PART 3: CODE QUALITY ISSUES
+
+### CQ1. Inconsistent Async Patterns
 **Locations:**
 - `ContainerManager.cs:257` - `await Task.CompletedTask` is redundant
 - `HybridStorageManager.cs:168` - Sync methods returning Task
@@ -235,111 +419,112 @@ The DataWarehouse Kernel has a solid architectural foundation with well-designed
 
 **Fix:** Audit all async methods for consistent patterns
 
-### 21. Missing Null Safety
+### CQ2. Missing Null Safety
 **Locations:**
 - `SearchOrchestratorManager.cs` - Multiple nullable dereferences
 - `RealTimeStorageManager.cs` - Provider null checks inconsistent
 
 **Fix:** Enable nullable reference types and fix all warnings
 
-### 22. Error Message Standardization
-**Impact:** Inconsistent error handling makes debugging difficult
+### CQ3. Error Message Standardization
 **Required:**
 - [ ] Implement `ErrorCode` enum for all error types
 - [ ] Standardize exception types
 - [ ] Add correlation ID to all errors
-- [ ] Implement error code documentation
 
 ---
 
-## TESTING REQUIREMENTS
+## PART 4: TESTING REQUIREMENTS
 
-### 23. Unit Test Coverage
-**Current:** Unknown (no test project visible)
-**Required:**
-- [ ] Core kernel tests (target: 90%)
+### Unit Tests (Target: 90% coverage)
+- [ ] Core kernel tests
 - [ ] Plugin registry tests
 - [ ] Pipeline orchestrator tests
 - [ ] Message bus tests
 - [ ] Storage manager tests
 
-### 24. Integration Tests
-**Required:**
+### Integration Tests
 - [ ] Multi-provider storage tests
 - [ ] Pipeline end-to-end tests
-- [ ] Message bus integration tests
 - [ ] Plugin lifecycle tests
 
-### 25. Chaos Engineering Tests
-**Required:**
-- [ ] Provider failure simulation
-- [ ] Network partition tests
-- [ ] Memory pressure tests
-- [ ] Clock skew tests
-
-### 26. Performance Benchmarks
-**Required:**
-- [ ] Baseline throughput per operation type
+### Performance Benchmarks
+- [ ] Baseline throughput
 - [ ] Latency percentiles (p50, p95, p99)
 - [ ] Memory allocation benchmarks
-- [ ] Concurrent operation scaling tests
 
 ---
 
-## DEPLOYMENT-SPECIFIC REQUIREMENTS
+## PART 5: DEPLOYMENT READINESS
 
-### For Laptop/Desktop (Workstation Mode)
+### Laptop/Desktop (Workstation Mode)
 - [x] In-memory storage support
 - [x] Single-thread safe operations
-- [ ] Battery-aware operation throttling
+- [x] Basic security context (LocalSecurityContext)
 - [ ] Offline mode support
 
-### For Network Storage/NAS
+### Network Storage/NAS
 - [x] Multi-provider support
-- [ ] RAID engine production hardening
-- [ ] SMB/NFS protocol integration points
+- [x] RAID engine
 - [ ] Quota enforcement per share
 
-### For SMB Servers
+### SMB Servers
 - [x] Container management
-- [ ] Active Directory integration points
-- [ ] Group policy configuration support
-- [ ] Windows Event Log integration
+- [ ] AD integration (via plugin)
+- [ ] Windows Event Log integration (via plugin)
 
-### For Government/Hospital/Banks
+### Government/Hospital/Banks
 - [x] Compliance mode framework
-- [ ] Complete FIPS 140-2 compliance path
-- [ ] Audit trail completeness
-- [ ] Data sovereignty controls
-- [ ] Air-gap deployment support
+- [ ] Audit logging (via plugin)
+- [ ] Advanced ACL (via plugin)
 
-### For Hyperscale (Google/Microsoft/Amazon Level)
-- [ ] Distributed consensus (CRITICAL)
-- [ ] Horizontal scaling support
-- [ ] Multi-region replication coordination
-- [ ] Petabyte-scale metadata handling
-- [ ] Sub-millisecond latency optimization
+### Hyperscale
+- [ ] Distributed consensus (via plugin)
+- [ ] Multi-region coordination (via plugin)
 
 ---
 
-## IMMEDIATE NEXT STEPS
+## REVISED IMPLEMENTATION TIMELINE
 
-1. **Week 1-2:** Implement circuit breaker and resilience patterns (P0 #2)
-2. **Week 2-3:** Add metrics/telemetry system (P1 #6)
-3. **Week 3-4:** Complete health check system (P1 #8)
-4. **Week 4-6:** Implement hot plugin reload (P0 #1)
-5. **Week 6-8:** Add distributed consensus (P0 #3)
+### Phase 1: Core Kernel (Weeks 1-4)
+| Week | Task | Priority |
+|------|------|----------|
+| 1 | K2: Circuit Breaker Framework | P0 |
+| 1-2 | K5: Health Check Aggregation | P1 |
+| 2 | K3: Memory Pressure Monitor | P0 |
+| 2-3 | K7: Metrics Collection | P1 |
+| 3-4 | K1: Hot Plugin Reload | P0 |
+
+### Phase 2: Security & Config (Weeks 4-6)
+| Week | Task | Priority |
+|------|------|----------|
+| 4 | K4: Security Context Flow | P1 |
+| 5 | K6: Configuration Hot Reload | P1 |
+| 5-6 | K8: AI Provider Registry | P1 |
+
+### Phase 3: Advanced Features (Weeks 6-8)
+| Week | Task | Priority |
+|------|------|----------|
+| 6-7 | K9: Transaction Coordination (Basic) | P2 |
+| 7-8 | K10: Rate Limiting Framework | P2 |
+
+### Phase 4: Plugins (After Core Complete)
+- P1: Distributed Consensus Plugin
+- P2: Advanced ACL Plugin
+- P3: Metrics Export Plugins
+- P4: Audit Logging Plugins
 
 ---
 
 ## NOTES
 
-- The SDK contracts are well-designed and provide good extension points
-- The pipeline orchestrator has solid runtime configuration support
-- Message bus implementation is production-quality for single-node
-- AI-Native design is present but integration is incomplete
-- Most managers need ISecurityContext propagation review
+- SDK contracts are well-designed with good extension points
+- Pipeline orchestrator has solid runtime configuration
+- Message bus is production-quality for single-node
+- Kernel should be lightweight; heavy features go to plugins
+- Laptop user should have fully functional system without enterprise plugins
 
 ---
 
+*Last Updated: 2026-01-16*
 *This document should be updated as issues are resolved and new requirements are identified.*
