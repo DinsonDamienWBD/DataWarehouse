@@ -178,6 +178,170 @@ namespace DataWarehouse.SDK.Contracts
             return Task.FromResult(new RepairResult { Success = true, ItemsChecked = 0, ItemsRepaired = 0 });
         }
 
+        /// <summary>
+        /// Saves multiple items in a batch with parallel execution.
+        /// </summary>
+        public virtual async Task<BatchStorageResult> SaveBatchAsync(
+            IEnumerable<BatchSaveItem> items,
+            StorageIntent? intent = null,
+            CancellationToken ct = default)
+        {
+            var sw = System.Diagnostics.Stopwatch.StartNew();
+            var itemList = items.ToList();
+            var results = new List<BatchItemResult>();
+            var successCount = 0;
+            var failureCount = 0;
+
+            // Use parallel execution with configurable concurrency
+            var semaphore = new SemaphoreSlim(Environment.ProcessorCount * 2);
+
+            var tasks = itemList.Select(async item =>
+            {
+                await semaphore.WaitAsync(ct);
+                try
+                {
+                    var result = await SaveAsync(item.Uri, item.Data, intent, ct);
+                    return new BatchItemResult
+                    {
+                        Uri = item.Uri,
+                        Success = result.Success,
+                        Error = result.Error,
+                        BytesWritten = result.BytesWritten
+                    };
+                }
+                catch (Exception ex)
+                {
+                    return new BatchItemResult
+                    {
+                        Uri = item.Uri,
+                        Success = false,
+                        Error = ex.Message
+                    };
+                }
+                finally
+                {
+                    semaphore.Release();
+                }
+            });
+
+            var batchResults = await Task.WhenAll(tasks);
+
+            foreach (var result in batchResults)
+            {
+                results.Add(result);
+                if (result.Success)
+                    successCount++;
+                else
+                    failureCount++;
+            }
+
+            return new BatchStorageResult
+            {
+                TotalItems = itemList.Count,
+                SuccessCount = successCount,
+                FailureCount = failureCount,
+                Duration = sw.Elapsed,
+                Results = results
+            };
+        }
+
+        /// <summary>
+        /// Deletes multiple items in a batch with parallel execution.
+        /// </summary>
+        public virtual async Task<BatchStorageResult> DeleteBatchAsync(
+            IEnumerable<Uri> uris,
+            CancellationToken ct = default)
+        {
+            var sw = System.Diagnostics.Stopwatch.StartNew();
+            var uriList = uris.ToList();
+            var results = new List<BatchItemResult>();
+            var successCount = 0;
+            var failureCount = 0;
+
+            var semaphore = new SemaphoreSlim(Environment.ProcessorCount * 2);
+
+            var tasks = uriList.Select(async uri =>
+            {
+                await semaphore.WaitAsync(ct);
+                try
+                {
+                    await DeleteAsync(uri, ct);
+                    return new BatchItemResult
+                    {
+                        Uri = uri,
+                        Success = true
+                    };
+                }
+                catch (Exception ex)
+                {
+                    return new BatchItemResult
+                    {
+                        Uri = uri,
+                        Success = false,
+                        Error = ex.Message
+                    };
+                }
+                finally
+                {
+                    semaphore.Release();
+                }
+            });
+
+            var batchResults = await Task.WhenAll(tasks);
+
+            foreach (var result in batchResults)
+            {
+                results.Add(result);
+                if (result.Success)
+                    successCount++;
+                else
+                    failureCount++;
+            }
+
+            return new BatchStorageResult
+            {
+                TotalItems = uriList.Count,
+                SuccessCount = successCount,
+                FailureCount = failureCount,
+                Duration = sw.Elapsed,
+                Results = results
+            };
+        }
+
+        /// <summary>
+        /// Checks existence of multiple items in a batch with parallel execution.
+        /// </summary>
+        public virtual async Task<Dictionary<Uri, bool>> ExistsBatchAsync(
+            IEnumerable<Uri> uris,
+            CancellationToken ct = default)
+        {
+            var uriList = uris.ToList();
+            var results = new Dictionary<Uri, bool>();
+            var resultsLock = new object();
+
+            var semaphore = new SemaphoreSlim(Environment.ProcessorCount * 4);
+
+            var tasks = uriList.Select(async uri =>
+            {
+                await semaphore.WaitAsync(ct);
+                try
+                {
+                    var exists = await Providers.FirstOrDefault()?.ExistsAsync(uri)! ?? false;
+                    lock (resultsLock)
+                    {
+                        results[uri] = exists;
+                    }
+                }
+                finally
+                {
+                    semaphore.Release();
+                }
+            });
+
+            await Task.WhenAll(tasks);
+            return results;
+        }
+
         public StorageRole GetProviderRole(string providerId)
         {
             return _providers.TryGetValue(providerId, out var p) ? p.Role : StorageRole.Primary;

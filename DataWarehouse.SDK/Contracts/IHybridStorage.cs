@@ -25,6 +25,64 @@ namespace DataWarehouse.SDK.Contracts
         Task DeleteAsync(Uri uri, CancellationToken ct = default);
         Task<StoragePoolHealth> GetHealthAsync(CancellationToken ct = default);
         Task<RepairResult> RepairAsync(string? targetProviderId = null, CancellationToken ct = default);
+
+        /// <summary>
+        /// Saves multiple items in a batch for improved performance.
+        /// </summary>
+        Task<BatchStorageResult> SaveBatchAsync(IEnumerable<BatchSaveItem> items, StorageIntent? intent = null, CancellationToken ct = default);
+
+        /// <summary>
+        /// Deletes multiple items in a batch for improved performance.
+        /// </summary>
+        Task<BatchStorageResult> DeleteBatchAsync(IEnumerable<Uri> uris, CancellationToken ct = default);
+
+        /// <summary>
+        /// Checks existence of multiple items in a batch.
+        /// </summary>
+        Task<Dictionary<Uri, bool>> ExistsBatchAsync(IEnumerable<Uri> uris, CancellationToken ct = default);
+    }
+
+    /// <summary>
+    /// Item for batch save operations.
+    /// </summary>
+    public class BatchSaveItem
+    {
+        public Uri Uri { get; init; } = null!;
+        public Stream Data { get; init; } = null!;
+
+        public BatchSaveItem() { }
+        public BatchSaveItem(Uri uri, Stream data)
+        {
+            Uri = uri;
+            Data = data;
+        }
+    }
+
+    /// <summary>
+    /// Result of a batch storage operation.
+    /// </summary>
+    public class BatchStorageResult
+    {
+        public int TotalItems { get; init; }
+        public int SuccessCount { get; init; }
+        public int FailureCount { get; init; }
+        public TimeSpan Duration { get; init; }
+        public List<BatchItemResult> Results { get; init; } = new();
+
+        public bool AllSucceeded => FailureCount == 0;
+        public bool AllFailed => SuccessCount == 0;
+        public bool PartialSuccess => SuccessCount > 0 && FailureCount > 0;
+    }
+
+    /// <summary>
+    /// Result for a single item in a batch operation.
+    /// </summary>
+    public class BatchItemResult
+    {
+        public Uri Uri { get; init; } = null!;
+        public bool Success { get; init; }
+        public string? Error { get; init; }
+        public long BytesWritten { get; init; }
     }
 
     /// <summary>Role of a storage provider within a pool.</summary>

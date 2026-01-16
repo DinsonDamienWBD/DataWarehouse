@@ -1,5 +1,6 @@
 using DataWarehouse.Kernel.Messaging;
 using DataWarehouse.Kernel.Security;
+using DataWarehouse.Kernel.Telemetry;
 using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Primitives;
 using DataWarehouse.SDK.Security;
@@ -21,15 +22,18 @@ namespace DataWarehouse.Kernel.Pipeline
     /// - User overrides supported
     /// - Stage validation and dependency checking
     /// - Non-blocking async execution
+    /// - Distributed tracing support
     /// </summary>
     public sealed class DefaultPipelineOrchestrator(
         PluginRegistry registry,
         DefaultMessageBus messageBus,
-        ILogger? logger = null) : IPipelineOrchestrator
+        ILogger? logger = null,
+        IDistributedTracing? tracing = null) : IPipelineOrchestrator
     {
         private readonly PluginRegistry _registry = registry ?? throw new ArgumentNullException(nameof(registry));
         private readonly DefaultMessageBus _messageBus = messageBus ?? throw new ArgumentNullException(nameof(messageBus));
         private readonly ILogger? _logger = logger;
+        private readonly IDistributedTracing? _tracing = tracing;
         private readonly ConcurrentDictionary<string, IDataTransformation> _stages = new();
         private readonly Lock _configLock = new();
 
@@ -224,6 +228,9 @@ namespace DataWarehouse.Kernel.Pipeline
             PipelineContext context,
             CancellationToken ct = default)
         {
+            // Start distributed trace span
+            using var traceScope = _tracing?.StartSpan("pipeline.write");
+
             var config = GetConfiguration();
             var orderedStages = config.WriteStages
                 .Where(s => s.Enabled)
@@ -233,19 +240,26 @@ namespace DataWarehouse.Kernel.Pipeline
             // Get security context from PipelineContext or ambient context
             var securityContext = context.SecurityContext ?? SecurityContextProvider.Current;
 
-            _logger?.LogDebug("Executing write pipeline with {Count} stages (User: {UserId})",
-                orderedStages.Count, securityContext.UserId);
+            // Add trace context
+            traceScope?.SetTag("stage_count", orderedStages.Count);
+            traceScope?.SetTag("user_id", securityContext.UserId);
+            traceScope?.SetTag("original_size", context.OriginalSize ?? -1);
 
-            // Publish pipeline start event with security audit
+            _logger?.LogDebug("Executing write pipeline with {Count} stages (User: {UserId}, TraceId: {TraceId})",
+                orderedStages.Count, securityContext.UserId, _tracing?.Current?.CorrelationId ?? "none");
+
+            // Publish pipeline start event with security audit and correlation ID
             await _messageBus.PublishAsync(MessageTopics.PipelineExecute, new PluginMessage
             {
                 Type = "pipeline.write.start",
+                CorrelationId = _tracing?.Current?.CorrelationId,
                 Payload = new Dictionary<string, object>
                 {
                     ["StageCount"] = orderedStages.Count,
                     ["OriginalSize"] = context.OriginalSize ?? -1,
                     ["UserId"] = securityContext.UserId,
-                    ["TenantId"] = securityContext.TenantId ?? "none"
+                    ["TenantId"] = securityContext.TenantId ?? "none",
+                    ["CorrelationId"] = _tracing?.Current?.CorrelationId ?? "none"
                 }
             }, ct);
 
@@ -308,6 +322,9 @@ namespace DataWarehouse.Kernel.Pipeline
             PipelineContext context,
             CancellationToken ct = default)
         {
+            // Start distributed trace span
+            using var traceScope = _tracing?.StartSpan("pipeline.read");
+
             var config = GetConfiguration();
             var orderedStages = config.WriteStages
                 .Where(s => s.Enabled)
@@ -317,17 +334,23 @@ namespace DataWarehouse.Kernel.Pipeline
             // Get security context from PipelineContext or ambient context
             var securityContext = context.SecurityContext ?? SecurityContextProvider.Current;
 
-            _logger?.LogDebug("Executing read pipeline with {Count} stages (reversed, User: {UserId})",
-                orderedStages.Count, securityContext.UserId);
+            // Add trace context
+            traceScope?.SetTag("stage_count", orderedStages.Count);
+            traceScope?.SetTag("user_id", securityContext.UserId);
+
+            _logger?.LogDebug("Executing read pipeline with {Count} stages (reversed, User: {UserId}, TraceId: {TraceId})",
+                orderedStages.Count, securityContext.UserId, _tracing?.Current?.CorrelationId ?? "none");
 
             await _messageBus.PublishAsync(MessageTopics.PipelineExecute, new PluginMessage
             {
                 Type = "pipeline.read.start",
+                CorrelationId = _tracing?.Current?.CorrelationId,
                 Payload = new Dictionary<string, object>
                 {
                     ["StageCount"] = orderedStages.Count,
                     ["UserId"] = securityContext.UserId,
-                    ["TenantId"] = securityContext.TenantId ?? "none"
+                    ["TenantId"] = securityContext.TenantId ?? "none",
+                    ["CorrelationId"] = _tracing?.Current?.CorrelationId ?? "none"
                 }
             }, ct);
 
