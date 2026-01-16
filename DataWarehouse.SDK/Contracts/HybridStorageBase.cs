@@ -326,7 +326,8 @@ namespace DataWarehouse.SDK.Contracts
                 await semaphore.WaitAsync(ct);
                 try
                 {
-                    var exists = await Providers.FirstOrDefault()?.ExistsAsync(uri)! ?? false;
+                    var provider = Providers.FirstOrDefault();
+                    var exists = provider != null && await provider.ExistsAsync(uri);
                     lock (resultsLock)
                     {
                         results[uri] = exists;

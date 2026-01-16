@@ -10,4 +10,5 @@
   </Folder>
   <Project Path="DataWarehouse.Kernel/DataWarehouse.Kernel.csproj" />
   <Project Path="DataWarehouse.SDK/DataWarehouse.SDK.csproj" />
+  <Project Path="DataWarehouse.Plugins.Storage/DataWarehouse.Plugins.Storage.csproj" />
 </Solution>

@@ -79,7 +79,7 @@ namespace DataWarehouse.SDK.Contracts
             }
 
             // Try to parse as a valid version
-            if (Version.TryParse(version, out var parsed))
+            if (System.Version.TryParse(version, out var parsed))
             {
                 return parsed;
             }
