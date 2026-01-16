@@ -1,6 +1,8 @@
 using DataWarehouse.Kernel.Messaging;
+using DataWarehouse.Kernel.Security;
 using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Primitives;
+using DataWarehouse.SDK.Security;
 using DataWarehouse.SDK.Utilities;
 using Microsoft.Extensions.Logging;
 using System.Collections.Concurrent;
@@ -228,16 +230,22 @@ namespace DataWarehouse.Kernel.Pipeline
                 .OrderBy(s => s.Order)
                 .ToList();
 
-            _logger?.LogDebug("Executing write pipeline with {Count} stages", orderedStages.Count);
+            // Get security context from PipelineContext or ambient context
+            var securityContext = context.SecurityContext ?? SecurityContextProvider.Current;
 
-            // Publish pipeline start event
+            _logger?.LogDebug("Executing write pipeline with {Count} stages (User: {UserId})",
+                orderedStages.Count, securityContext.UserId);
+
+            // Publish pipeline start event with security audit
             await _messageBus.PublishAsync(MessageTopics.PipelineExecute, new PluginMessage
             {
                 Type = "pipeline.write.start",
                 Payload = new Dictionary<string, object>
                 {
                     ["StageCount"] = orderedStages.Count,
-                    ["OriginalSize"] = context.OriginalSize ?? -1
+                    ["OriginalSize"] = context.OriginalSize ?? -1,
+                    ["UserId"] = securityContext.UserId,
+                    ["TenantId"] = securityContext.TenantId ?? "none"
                 }
             }, ct);
 
@@ -306,14 +314,20 @@ namespace DataWarehouse.Kernel.Pipeline
                 .OrderByDescending(s => s.Order) // Reverse order for read
                 .ToList();
 
-            _logger?.LogDebug("Executing read pipeline with {Count} stages (reversed)", orderedStages.Count);
+            // Get security context from PipelineContext or ambient context
+            var securityContext = context.SecurityContext ?? SecurityContextProvider.Current;
+
+            _logger?.LogDebug("Executing read pipeline with {Count} stages (reversed, User: {UserId})",
+                orderedStages.Count, securityContext.UserId);
 
             await _messageBus.PublishAsync(MessageTopics.PipelineExecute, new PluginMessage
             {
                 Type = "pipeline.read.start",
                 Payload = new Dictionary<string, object>
                 {
-                    ["StageCount"] = orderedStages.Count
+                    ["StageCount"] = orderedStages.Count,
+                    ["UserId"] = securityContext.UserId,
+                    ["TenantId"] = securityContext.TenantId ?? "none"
                 }
             }, ct);
 

@@ -1,4 +1,5 @@
 using DataWarehouse.SDK.Primitives;
+using DataWarehouse.SDK.Security;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -211,6 +212,12 @@ namespace DataWarehouse.SDK.Contracts
         /// Kernel context for logging and services.
         /// </summary>
         public IKernelContext? KernelContext { get; init; }
+
+        /// <summary>
+        /// Security context for authorization and audit.
+        /// Falls back to SecurityContextProvider.Current if not set.
+        /// </summary>
+        public ISecurityContext? SecurityContext { get; init; }
 
         /// <summary>
         /// Storage intent for AI-driven decisions.

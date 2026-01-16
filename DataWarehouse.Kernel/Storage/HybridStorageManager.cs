@@ -1,5 +1,7 @@
+using DataWarehouse.Kernel.Security;
 using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Primitives;
+using DataWarehouse.SDK.Security;
 using System.Collections.Concurrent;
 
 namespace DataWarehouse.Kernel.Storage
@@ -301,18 +303,22 @@ namespace DataWarehouse.Kernel.Storage
 
         public override async Task<StorageResult> SaveAsync(Uri uri, Stream data, StorageIntent? intent = null, CancellationToken ct = default)
         {
+            // Get security context for audit logging
+            var securityContext = SecurityContextProvider.Current;
+            _context.LogDebug($"[Storage] Save {uri} by user: {securityContext.UserId}");
+
             // Store version history for point-in-time recovery
             data.Position = 0;
             var dataBytes = await ReadStreamAsync(data, ct);
 
-            StoreVersion(uri, dataBytes);
+            StoreVersion(uri, dataBytes, securityContext);
 
             // Reset stream for base implementation
             data.Position = 0;
             return await base.SaveAsync(uri, data, intent, ct);
         }
 
-        private void StoreVersion(Uri uri, byte[] data)
+        private void StoreVersion(Uri uri, byte[] data, ISecurityContext? securityContext = null)
         {
             lock (_versionLock)
             {
@@ -322,13 +328,16 @@ namespace DataWarehouse.Kernel.Storage
                     _versionHistory[uri] = versions;
                 }
 
+                var effectiveContext = securityContext ?? SecurityContextProvider.Current;
+
                 var version = new VersionedData
                 {
                     Version = versions.Count + 1,
                     Timestamp = DateTime.UtcNow,
                     Data = data,
                     Hash = ComputeHash(data),
-                    Size = data.Length
+                    Size = data.Length,
+                    ModifiedBy = effectiveContext.UserId
                 };
 
                 versions.Add(version);
@@ -340,7 +349,7 @@ namespace DataWarehouse.Kernel.Storage
                     versions.RemoveAt(0);
                 }
 
-                _context.LogDebug($"[Versioning] Stored version {version.Version} for {uri}");
+                _context.LogDebug($"[Versioning] Stored version {version.Version} for {uri} by {effectiveContext.UserId}");
             }
         }
 
@@ -385,7 +394,8 @@ namespace DataWarehouse.Kernel.Storage
                 Version = v.Version,
                 Timestamp = v.Timestamp,
                 Size = v.Size,
-                Hash = v.Hash
+                Hash = v.Hash,
+                ModifiedBy = v.ModifiedBy
             }).ToList();
         }
 
@@ -495,6 +505,7 @@ namespace DataWarehouse.Kernel.Storage
             public byte[] Data { get; set; } = Array.Empty<byte>();
             public string Hash { get; set; } = string.Empty;
             public long Size { get; set; }
+            public string ModifiedBy { get; set; } = string.Empty;
         }
 
         #endregion
@@ -509,5 +520,6 @@ namespace DataWarehouse.Kernel.Storage
         public DateTime Timestamp { get; set; }
         public long Size { get; set; }
         public string Hash { get; set; } = string.Empty;
+        public string ModifiedBy { get; set; } = string.Empty;
     }
 }
