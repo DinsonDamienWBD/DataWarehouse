@@ -102,7 +102,7 @@ namespace DataWarehouse.Kernel
                 _logger?.LogInformation("Initializing DataWarehouse Kernel {KernelId}", KernelId);
 
                 // Publish startup event
-                await _messageBus.PublishAsync(MessageTopics.SystemStartup, new PluginMessage
+                await _messageBus.PublishAsync(SystemStartup, new PluginMessage
                 {
                     Type = "system.startup",
                     Payload = new Dictionary<string, object>
@@ -176,7 +176,7 @@ namespace DataWarehouse.Kernel
                 }
 
                 // Publish plugin loaded event
-                await _messageBus.PublishAsync(MessageTopics.PluginLoaded, new PluginMessage
+                await _messageBus.PublishAsync(PluginLoaded, new PluginMessage
                 {
                     Type = "plugin.loaded",
                     Payload = new Dictionary<string, object>
@@ -433,7 +433,7 @@ namespace DataWarehouse.Kernel
             // Publish shutdown event
             try
             {
-                await _messageBus.PublishAsync(MessageTopics.SystemShutdown, new PluginMessage
+                await _messageBus.PublishAsync(SystemShutdown, new PluginMessage
                 {
                     Type = "system.shutdown",
                     Payload = new Dictionary<string, object>

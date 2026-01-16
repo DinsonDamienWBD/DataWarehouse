@@ -281,7 +281,7 @@ namespace DataWarehouse.Kernel.Messaging
             options ??= PublishOptions.Default;
 
             var messageId = options.CorrelationId ?? message.CorrelationId ?? Guid.NewGuid().ToString("N")[..16];
-            message.CorrelationId = messageId;
+            // Note: CorrelationId is init-only; we track messageId separately for confirmation
 
             _context.LogDebug($"[MessageBus] Publishing with confirmation: {messageId} to {topic}");
 
@@ -729,13 +729,13 @@ namespace DataWarehouse.Kernel.Messaging
                     TotalAcknowledged = _statistics.TotalAcknowledged,
                     TotalFailed = _statistics.TotalFailed,
                     TotalRetried = _statistics.TotalRetried,
-                    TotalPendingRetry = _pendingMessages.Count(p => p.Value.State == MessageState.PendingRetry),
+                    TotalPendingRetry = _pendingMessages.Where(p => p.Value.State == MessageState.PendingRetry).Count(),
                     TotalFiltered = _statistics.TotalFiltered,
                     TotalGroupsCommitted = _statistics.TotalGroupsCommitted,
                     TotalGroupMessages = _statistics.TotalGroupMessages,
                     ActiveSubscriptions = GetActiveTopics().Count(),
                     FilteredSubscriptions = _filteredSubscriptions.Count,
-                    ActiveGroups = _messageGroups.Count(g => g.Value.State == GroupState.Open),
+                    ActiveGroups = _messageGroups.Where(g => g.Value.State == GroupState.Open).Count(),
                     PendingMessages = _pendingMessages.Count
                 };
             }
