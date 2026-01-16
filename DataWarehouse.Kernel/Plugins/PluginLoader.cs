@@ -1,4 +1,6 @@
 using DataWarehouse.SDK.Contracts;
+using DataWarehouse.SDK.Primitives;
+using DataWarehouse.SDK.Utilities;
 using System.Collections.Concurrent;
 using System.Reflection;
 using System.Runtime.Loader;
@@ -323,15 +325,18 @@ namespace DataWarehouse.Kernel.Plugins
                         // Perform handshake
                         var handshakeRequest = new HandshakeRequest
                         {
-                            KernelVersion = "1.0.0",
+                            KernelId = _kernelContext.RootPath,
+                            ProtocolVersion = "1.0",
                             Mode = _kernelContext.Mode,
-                            Capabilities = []
+                            RootPath = _kernelContext.RootPath,
+                            Timestamp = DateTime.UtcNow,
+                            AlreadyLoadedPlugins = []
                         };
 
                         var response = await plugin.OnHandshakeAsync(handshakeRequest);
-                        if (!response.Accepted)
+                        if (!response.Success)
                         {
-                            _kernelContext.LogWarning($"Plugin {plugin.Id} rejected handshake: {response.RejectReason}");
+                            _kernelContext.LogWarning($"Plugin {plugin.Id} rejected handshake: {response.ErrorMessage}");
                             continue;
                         }
 

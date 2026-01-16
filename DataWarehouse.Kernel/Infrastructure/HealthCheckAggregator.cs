@@ -1,6 +1,6 @@
-using DataWarehouse.SDK.Contracts;
 using System.Collections.Concurrent;
 using System.Diagnostics;
+using SdkContracts = DataWarehouse.SDK.Contracts;
 
 namespace DataWarehouse.Kernel.Infrastructure
 {
@@ -8,13 +8,13 @@ namespace DataWarehouse.Kernel.Infrastructure
     /// Aggregates health checks from all registered components.
     /// Provides liveness and readiness endpoints for orchestrators.
     /// </summary>
-    public sealed class HealthCheckAggregator : IHealthCheckAggregator
+    public sealed class HealthCheckAggregator : SdkContracts.IHealthCheckAggregator
     {
-        private readonly ConcurrentDictionary<string, IHealthCheck> _healthChecks = new();
+        private readonly ConcurrentDictionary<string, SdkContracts.IHealthCheck> _healthChecks = new();
         private readonly TimeSpan _cacheDuration;
         private readonly object _cacheLock = new();
 
-        private HealthReport? _cachedReport;
+        private SdkContracts.HealthReport? _cachedReport;
         private DateTime _cacheExpiry = DateTime.MinValue;
 
         public HealthCheckAggregator(TimeSpan? cacheDuration = null)
@@ -22,7 +22,7 @@ namespace DataWarehouse.Kernel.Infrastructure
             _cacheDuration = cacheDuration ?? TimeSpan.FromSeconds(5);
         }
 
-        public void Register(IHealthCheck healthCheck)
+        public void Register(SdkContracts.IHealthCheck healthCheck)
         {
             ArgumentNullException.ThrowIfNull(healthCheck);
 
@@ -38,7 +38,7 @@ namespace DataWarehouse.Kernel.Infrastructure
             InvalidateCache();
         }
 
-        public async Task<HealthReport> CheckHealthAsync(CancellationToken ct = default)
+        public async Task<SdkContracts.HealthReport> CheckHealthAsync(CancellationToken ct = default)
         {
             // Check cache
             lock (_cacheLock)
@@ -50,8 +50,8 @@ namespace DataWarehouse.Kernel.Infrastructure
             }
 
             var sw = Stopwatch.StartNew();
-            var entries = new Dictionary<string, HealthCheckResult>();
-            var overallStatus = HealthStatus.Healthy;
+            var entries = new Dictionary<string, SdkContracts.HealthCheckResult>();
+            var overallStatus = SdkContracts.HealthStatus.Healthy;
 
             // Run all health checks in parallel
             var tasks = _healthChecks.Select(async kvp =>
@@ -62,16 +62,27 @@ namespace DataWarehouse.Kernel.Infrastructure
                     var result = await kvp.Value.CheckHealthAsync(ct);
                     checkSw.Stop();
 
-                    return (kvp.Key, Result: result with { Duration = checkSw.Elapsed });
+                    // Create a new result with duration set
+                    return (kvp.Key, Result: new SdkContracts.HealthCheckResult
+                    {
+                        Status = result.Status,
+                        Message = result.Message,
+                        Duration = checkSw.Elapsed,
+                        Data = result.Data,
+                        Exception = result.Exception
+                    });
                 }
                 catch (Exception ex)
                 {
                     checkSw.Stop();
-                    return (kvp.Key, Result: HealthCheckResult.Unhealthy(
-                        $"Health check threw exception: {ex.Message}",
-                        ex,
-                        new Dictionary<string, object> { ["ExceptionType"] = ex.GetType().Name }
-                    ) with { Duration = checkSw.Elapsed });
+                    return (kvp.Key, Result: new SdkContracts.HealthCheckResult
+                    {
+                        Status = SdkContracts.HealthStatus.Unhealthy,
+                        Message = $"Health check threw exception: {ex.Message}",
+                        Exception = ex,
+                        Duration = checkSw.Elapsed,
+                        Data = new Dictionary<string, object> { ["ExceptionType"] = ex.GetType().Name }
+                    });
                 }
             });
 
@@ -82,19 +93,19 @@ namespace DataWarehouse.Kernel.Infrastructure
                 entries[name] = result;
 
                 // Determine overall status (worst wins)
-                if (result.Status == HealthStatus.Unhealthy)
+                if (result.Status == SdkContracts.HealthStatus.Unhealthy)
                 {
-                    overallStatus = HealthStatus.Unhealthy;
+                    overallStatus = SdkContracts.HealthStatus.Unhealthy;
                 }
-                else if (result.Status == HealthStatus.Degraded && overallStatus != HealthStatus.Unhealthy)
+                else if (result.Status == SdkContracts.HealthStatus.Degraded && overallStatus != SdkContracts.HealthStatus.Unhealthy)
                 {
-                    overallStatus = HealthStatus.Degraded;
+                    overallStatus = SdkContracts.HealthStatus.Degraded;
                 }
             }
 
             sw.Stop();
 
-            var report = new HealthReport
+            var report = new SdkContracts.HealthReport
             {
                 Status = overallStatus,
                 TotalDuration = sw.Elapsed,
@@ -112,11 +123,11 @@ namespace DataWarehouse.Kernel.Infrastructure
             return report;
         }
 
-        public async Task<HealthReport> CheckHealthAsync(string[] tags, CancellationToken ct = default)
+        public async Task<SdkContracts.HealthReport> CheckHealthAsync(string[] tags, CancellationToken ct = default)
         {
             var sw = Stopwatch.StartNew();
-            var entries = new Dictionary<string, HealthCheckResult>();
-            var overallStatus = HealthStatus.Healthy;
+            var entries = new Dictionary<string, SdkContracts.HealthCheckResult>();
+            var overallStatus = SdkContracts.HealthStatus.Healthy;
             var tagsSet = new HashSet<string>(tags, StringComparer.OrdinalIgnoreCase);
 
             // Filter health checks by tags and run in parallel
@@ -131,14 +142,25 @@ namespace DataWarehouse.Kernel.Infrastructure
                 {
                     var result = await kvp.Value.CheckHealthAsync(ct);
                     checkSw.Stop();
-                    return (kvp.Key, Result: result with { Duration = checkSw.Elapsed });
+                    return (kvp.Key, Result: new SdkContracts.HealthCheckResult
+                    {
+                        Status = result.Status,
+                        Message = result.Message,
+                        Duration = checkSw.Elapsed,
+                        Data = result.Data,
+                        Exception = result.Exception
+                    });
                 }
                 catch (Exception ex)
                 {
                     checkSw.Stop();
-                    return (kvp.Key, Result: HealthCheckResult.Unhealthy(
-                        $"Health check threw exception: {ex.Message}", ex
-                    ) with { Duration = checkSw.Elapsed });
+                    return (kvp.Key, Result: new SdkContracts.HealthCheckResult
+                    {
+                        Status = SdkContracts.HealthStatus.Unhealthy,
+                        Message = $"Health check threw exception: {ex.Message}",
+                        Exception = ex,
+                        Duration = checkSw.Elapsed
+                    });
                 }
             });
 
@@ -148,19 +170,19 @@ namespace DataWarehouse.Kernel.Infrastructure
             {
                 entries[name] = result;
 
-                if (result.Status == HealthStatus.Unhealthy)
+                if (result.Status == SdkContracts.HealthStatus.Unhealthy)
                 {
-                    overallStatus = HealthStatus.Unhealthy;
+                    overallStatus = SdkContracts.HealthStatus.Unhealthy;
                 }
-                else if (result.Status == HealthStatus.Degraded && overallStatus != HealthStatus.Unhealthy)
+                else if (result.Status == SdkContracts.HealthStatus.Degraded && overallStatus != SdkContracts.HealthStatus.Unhealthy)
                 {
-                    overallStatus = HealthStatus.Degraded;
+                    overallStatus = SdkContracts.HealthStatus.Degraded;
                 }
             }
 
             sw.Stop();
 
-            return new HealthReport
+            return new SdkContracts.HealthReport
             {
                 Status = overallStatus,
                 TotalDuration = sw.Elapsed,
@@ -181,7 +203,7 @@ namespace DataWarehouse.Kernel.Infrastructure
                 return true;
             }
 
-            return report.Status != HealthStatus.Unhealthy;
+            return report.Status != SdkContracts.HealthStatus.Unhealthy;
         }
 
         public async Task<bool> IsReadyAsync(CancellationToken ct = default)
@@ -196,7 +218,7 @@ namespace DataWarehouse.Kernel.Infrastructure
                 report = await CheckHealthAsync(ct);
             }
 
-            return report.Status == HealthStatus.Healthy;
+            return report.Status == SdkContracts.HealthStatus.Healthy;
         }
 
         private void InvalidateCache()
@@ -212,9 +234,9 @@ namespace DataWarehouse.Kernel.Infrastructure
     /// <summary>
     /// Built-in kernel health check that monitors core kernel health.
     /// </summary>
-    public sealed class KernelHealthCheck : IHealthCheck
+    public sealed class KernelHealthCheck : SdkContracts.IHealthCheck
     {
-        private readonly IMemoryPressureMonitor _memoryMonitor;
+        private readonly SdkContracts.IMemoryPressureMonitor _memoryMonitor;
         private readonly Func<int> _getPluginCount;
         private readonly Func<bool> _isRunning;
 
@@ -222,7 +244,7 @@ namespace DataWarehouse.Kernel.Infrastructure
         public string[] Tags => ["liveness", "readiness", "kernel"];
 
         public KernelHealthCheck(
-            IMemoryPressureMonitor memoryMonitor,
+            SdkContracts.IMemoryPressureMonitor memoryMonitor,
             Func<int> getPluginCount,
             Func<bool> isRunning)
         {
@@ -231,14 +253,14 @@ namespace DataWarehouse.Kernel.Infrastructure
             _isRunning = isRunning;
         }
 
-        public Task<HealthCheckResult> CheckHealthAsync(CancellationToken ct = default)
+        public Task<SdkContracts.HealthCheckResult> CheckHealthAsync(CancellationToken ct = default)
         {
             var data = new Dictionary<string, object>();
 
             // Check if kernel is running
             if (!_isRunning())
             {
-                return Task.FromResult(HealthCheckResult.Unhealthy(
+                return Task.FromResult(SdkContracts.HealthCheckResult.Unhealthy(
                     "Kernel is not running",
                     data: data
                 ));
@@ -254,17 +276,17 @@ namespace DataWarehouse.Kernel.Infrastructure
             data["pluginCount"] = _getPluginCount();
             data["gen2Collections"] = memoryStats.Gen2Collections;
 
-            if (memoryLevel == MemoryPressureLevel.Critical)
+            if (memoryLevel == SdkContracts.MemoryPressureLevel.Critical)
             {
-                return Task.FromResult(HealthCheckResult.Unhealthy(
+                return Task.FromResult(SdkContracts.HealthCheckResult.Unhealthy(
                     $"Critical memory pressure: {memoryStats.UsagePercent:F1}%",
                     data: data
                 ));
             }
 
-            if (memoryLevel == MemoryPressureLevel.High)
+            if (memoryLevel == SdkContracts.MemoryPressureLevel.High)
             {
-                return Task.FromResult(HealthCheckResult.Degraded(
+                return Task.FromResult(SdkContracts.HealthCheckResult.Degraded(
                     $"High memory pressure: {memoryStats.UsagePercent:F1}%",
                     data: data
                 ));
@@ -280,13 +302,13 @@ namespace DataWarehouse.Kernel.Infrastructure
             var workerUtilization = 1.0 - ((double)workerThreads / maxWorker);
             if (workerUtilization > 0.9)
             {
-                return Task.FromResult(HealthCheckResult.Degraded(
+                return Task.FromResult(SdkContracts.HealthCheckResult.Degraded(
                     $"Thread pool exhaustion: {workerUtilization:P0} utilized",
                     data: data
                 ));
             }
 
-            return Task.FromResult(HealthCheckResult.Healthy(
+            return Task.FromResult(SdkContracts.HealthCheckResult.Healthy(
                 $"Kernel healthy. Memory: {memoryStats.UsagePercent:F1}%, Plugins: {_getPluginCount()}",
                 data: data
             ));

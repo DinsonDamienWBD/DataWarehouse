@@ -140,7 +140,7 @@ namespace DataWarehouse.Kernel.AI
             }
         }
 
-        public async IAsyncEnumerable<string> CompleteStreamingAsync(AIRequest request, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct = default)
+        public async IAsyncEnumerable<AIStreamChunk> CompleteStreamingAsync(AIRequest request, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct = default)
         {
             await AcquireRateLimitAsync(_completionRateLimiter, ct);
             try
@@ -169,12 +169,12 @@ namespace DataWarehouse.Kernel.AI
             }
         }
 
-        public async Task<float[][]> GetBatchEmbeddingsAsync(IEnumerable<string> texts, CancellationToken ct = default)
+        public async Task<float[][]> GetEmbeddingsBatchAsync(string[] texts, CancellationToken ct = default)
         {
             await AcquireRateLimitAsync(_embeddingRateLimiter, ct);
             try
             {
-                return await _inner.GetBatchEmbeddingsAsync(texts, ct);
+                return await _inner.GetEmbeddingsBatchAsync(texts, ct);
             }
             finally
             {

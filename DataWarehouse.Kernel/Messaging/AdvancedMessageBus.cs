@@ -263,9 +263,9 @@ namespace DataWarehouse.Kernel.Messaging
         /// <summary>
         /// Implements IAdvancedMessageBus.PublishReliableAsync - simple reliable delivery.
         /// </summary>
-        async Task IAdvancedMessageBus.PublishReliableAsync(string topic, PluginMessage message, CancellationToken ct)
+        public async Task PublishReliableAsync(string topic, PluginMessage message, CancellationToken ct = default)
         {
-            await PublishReliableAsync(topic, message, null, ct);
+            await PublishWithConfirmationAsync(topic, message, null, ct);
         }
 
         /// <summary>

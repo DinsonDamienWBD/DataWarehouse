@@ -7,6 +7,19 @@ using System.Collections.Concurrent;
 namespace DataWarehouse.Kernel.Storage
 {
     /// <summary>
+    /// Version data for point-in-time recovery.
+    /// </summary>
+    internal sealed class VersionedData
+    {
+        public int Version { get; set; }
+        public DateTime Timestamp { get; set; }
+        public byte[] Data { get; set; } = Array.Empty<byte>();
+        public string Hash { get; set; } = string.Empty;
+        public long Size { get; set; }
+        public string ModifiedBy { get; set; } = string.Empty;
+    }
+
+    /// <summary>
     /// Efficient circular buffer for version history.
     /// Provides O(1) add and automatic eviction of oldest entries.
     /// </summary>
@@ -629,16 +642,6 @@ namespace DataWarehouse.Kernel.Storage
             public string? CurrentStage { get; set; }
             public List<string> CompletedStages { get; set; } = new();
             public Dictionary<string, string> Errors { get; set; } = new();
-        }
-
-        private class VersionedData
-        {
-            public int Version { get; set; }
-            public DateTime Timestamp { get; set; }
-            public byte[] Data { get; set; } = Array.Empty<byte>();
-            public string Hash { get; set; } = string.Empty;
-            public long Size { get; set; }
-            public string ModifiedBy { get; set; } = string.Empty;
         }
 
         #endregion
