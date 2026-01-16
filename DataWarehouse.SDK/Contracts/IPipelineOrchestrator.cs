@@ -205,8 +205,9 @@ namespace DataWarehouse.SDK.Contracts
 
     /// <summary>
     /// Context passed to pipeline stages during execution.
+    /// Implements IDisposable for proper cleanup of intermediate streams.
     /// </summary>
-    public class PipelineContext
+    public class PipelineContext : IDisposable
     {
         /// <summary>
         /// Kernel context for logging and services.
@@ -248,6 +249,29 @@ namespace DataWarehouse.SDK.Contracts
         /// Track which stages have been executed.
         /// </summary>
         public List<string> ExecutedStages { get; } = new();
+
+        /// <summary>
+        /// Intermediate streams created during pipeline execution.
+        /// These are tracked for proper disposal to prevent memory leaks.
+        /// Caller should dispose the context after processing the output stream.
+        /// </summary>
+        public List<Stream>? IntermediateStreams { get; set; }
+
+        /// <summary>
+        /// Disposes all intermediate streams to prevent memory leaks.
+        /// Call this after you are done with the pipeline output stream.
+        /// </summary>
+        public void Dispose()
+        {
+            if (IntermediateStreams == null) return;
+
+            foreach (var stream in IntermediateStreams)
+            {
+                try { stream.Dispose(); }
+                catch { /* Ignore disposal errors */ }
+            }
+            IntermediateStreams.Clear();
+        }
     }
 
     /// <summary>

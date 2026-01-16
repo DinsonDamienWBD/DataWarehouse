@@ -93,6 +93,26 @@ namespace DataWarehouse.SDK.Contracts
 
         /// <summary>Maximum delay between retries.</summary>
         public TimeSpan RetryMaxDelay { get; init; } = TimeSpan.FromSeconds(30);
+
+        /// <summary>
+        /// Exception types that should not be retried.
+        /// These are considered permanent failures that won't recover with retry.
+        /// Defaults to common non-transient exceptions.
+        /// </summary>
+        public HashSet<Type> NonRetryableExceptions { get; init; } = new()
+        {
+            typeof(ArgumentException),
+            typeof(ArgumentNullException),
+            typeof(NotSupportedException),
+            typeof(UnauthorizedAccessException)
+        };
+
+        /// <summary>
+        /// Custom predicate to determine if an exception should be retried.
+        /// Return true to retry, false to fail immediately.
+        /// If set, this takes precedence over NonRetryableExceptions.
+        /// </summary>
+        public Func<Exception, bool>? ShouldRetry { get; init; }
     }
 
     /// <summary>

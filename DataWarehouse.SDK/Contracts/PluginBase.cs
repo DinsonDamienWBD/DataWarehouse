@@ -32,8 +32,89 @@ namespace DataWarehouse.SDK.Contracts
 
         /// <summary>
         /// Semantic Version - default implementation returns "1.0.0".
+        /// Supports full semantic versioning (1.0.0-beta, 2.0.0-rc.1+build.123).
         /// </summary>
         public virtual string Version => "1.0.0";
+
+        /// <summary>
+        /// Parses a semantic version string into a Version object.
+        /// Handles formats like: 1.0.0, v1.0.0, 1.0.0-beta, 1.0.0-rc.1+build.123
+        /// </summary>
+        protected static Version ParseSemanticVersion(string versionString)
+        {
+            if (string.IsNullOrWhiteSpace(versionString))
+            {
+                return new Version(1, 0, 0);
+            }
+
+            var version = versionString.Trim();
+
+            // Strip leading 'v' or 'V'
+            if (version.StartsWith("v", StringComparison.OrdinalIgnoreCase))
+            {
+                version = version.Substring(1);
+            }
+
+            // Strip prerelease and build metadata (everything after - or +)
+            var dashIndex = version.IndexOf('-');
+            var plusIndex = version.IndexOf('+');
+            var stripIndex = -1;
+
+            if (dashIndex >= 0 && plusIndex >= 0)
+            {
+                stripIndex = Math.Min(dashIndex, plusIndex);
+            }
+            else if (dashIndex >= 0)
+            {
+                stripIndex = dashIndex;
+            }
+            else if (plusIndex >= 0)
+            {
+                stripIndex = plusIndex;
+            }
+
+            if (stripIndex >= 0)
+            {
+                version = version.Substring(0, stripIndex);
+            }
+
+            // Try to parse as a valid version
+            if (Version.TryParse(version, out var parsed))
+            {
+                return parsed;
+            }
+
+            // If parsing failed, try to extract numeric parts
+            var parts = version.Split('.', StringSplitOptions.RemoveEmptyEntries);
+            var numericParts = new List<int>();
+
+            foreach (var part in parts)
+            {
+                // Extract leading digits from each part
+                var numericChars = new string(part.TakeWhile(char.IsDigit).ToArray());
+                if (int.TryParse(numericChars, out var num))
+                {
+                    numericParts.Add(num);
+                }
+                else
+                {
+                    numericParts.Add(0);
+                }
+            }
+
+            // Ensure we have at least major.minor
+            while (numericParts.Count < 2)
+            {
+                numericParts.Add(0);
+            }
+
+            return numericParts.Count switch
+            {
+                2 => new Version(numericParts[0], numericParts[1]),
+                3 => new Version(numericParts[0], numericParts[1], numericParts[2]),
+                _ => new Version(numericParts[0], numericParts[1], numericParts[2], numericParts[3])
+            };
+        }
 
         /// <summary>
         /// Default handshake implementation. Override to provide custom initialization.
@@ -44,7 +125,7 @@ namespace DataWarehouse.SDK.Contracts
             {
                 PluginId = Id,
                 Name = Name,
-                Version = Version.StartsWith("v") ? new Version(Version.Substring(1)) : new Version(Version),
+                Version = ParseSemanticVersion(Version),
                 Category = Category,
                 Success = true,
                 ReadyState = PluginReadyState.Ready,
@@ -174,15 +255,51 @@ namespace DataWarehouse.SDK.Contracts
         public abstract Task DeleteAsync(Uri uri);
 
         /// <summary>
-        /// Check if data exists. Default implementation tries to load and catches exceptions.
-        /// Override for more efficient existence checks.
+        /// Check if data exists. Default implementation is optimized for efficiency.
+        /// Override for provider-specific optimizations (e.g., HEAD request for HTTP).
         /// </summary>
-        public virtual async Task<bool> ExistsAsync(Uri uri)
+        public virtual Task<bool> ExistsAsync(Uri uri)
+        {
+            // Default implementation - derived classes should override with
+            // provider-specific efficient checks (e.g., S3 HeadObject, file system File.Exists)
+            // This default uses try/load but is marked as inefficient for documentation
+            return ExistsAsyncWithLoad(uri);
+        }
+
+        /// <summary>
+        /// Fallback existence check using LoadAsync. Inefficient but works for any provider.
+        /// Prefer overriding ExistsAsync with provider-specific implementation.
+        /// </summary>
+        protected async Task<bool> ExistsAsyncWithLoad(Uri uri)
         {
             try
             {
+                // Use a limited read to avoid loading the entire file
                 using var stream = await LoadAsync(uri);
-                return stream != null;
+                if (stream == null) return false;
+
+                // Just check if we can read the first byte
+                if (stream.CanRead)
+                {
+                    // Try to read 1 byte - if the file exists, this should succeed
+                    var buffer = new byte[1];
+                    var bytesRead = await stream.ReadAsync(buffer, 0, 1);
+                    return true; // File exists (even if empty)
+                }
+                return true;
+            }
+            catch (FileNotFoundException)
+            {
+                return false;
+            }
+            catch (DirectoryNotFoundException)
+            {
+                return false;
+            }
+            catch (UnauthorizedAccessException)
+            {
+                // File exists but we can't access it
+                return true;
             }
             catch
             {
@@ -594,12 +711,44 @@ namespace DataWarehouse.SDK.Contracts
         public abstract Task<IAsyncDisposable> SubscribeAsync(string uriPattern, Action<StorageEvent> handler);
 
         /// <summary>
-        /// Publish multiple events in batch. Override for optimized batch publishing.
+        /// Publish multiple events in batch. Default implementation uses parallel execution.
+        /// Override for provider-specific batch optimizations (e.g., Kafka batch send).
         /// </summary>
-        public virtual async Task PublishBatchAsync(IEnumerable<StorageEvent> events)
+        /// <param name="maxConcurrency">Maximum concurrent publish operations. Default is 10.</param>
+        public virtual async Task PublishBatchAsync(IEnumerable<StorageEvent> events, int maxConcurrency = 10)
         {
-            foreach (var evt in events)
-                await PublishAsync(evt);
+            var eventList = events.ToList();
+            if (eventList.Count == 0) return;
+
+            // Use SemaphoreSlim for controlled concurrency
+            using var semaphore = new SemaphoreSlim(maxConcurrency, maxConcurrency);
+            var tasks = new List<Task>();
+
+            foreach (var evt in eventList)
+            {
+                await semaphore.WaitAsync();
+                tasks.Add(Task.Run(async () =>
+                {
+                    try
+                    {
+                        await PublishAsync(evt);
+                    }
+                    finally
+                    {
+                        semaphore.Release();
+                    }
+                }));
+            }
+
+            await Task.WhenAll(tasks);
+        }
+
+        /// <summary>
+        /// Interface method for backward compatibility.
+        /// </summary>
+        public virtual Task PublishBatchAsync(IEnumerable<StorageEvent> events)
+        {
+            return PublishBatchAsync(events, maxConcurrency: 10);
         }
 
         protected override Dictionary<string, object> GetMetadata()

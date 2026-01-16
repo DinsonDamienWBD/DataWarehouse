@@ -2,12 +2,83 @@ using DataWarehouse.SDK.Contracts;
 using System.Collections.Concurrent;
 using System.Reflection;
 using System.Runtime.Loader;
+using System.Security.Cryptography;
 
 namespace DataWarehouse.Kernel.Plugins
 {
     /// <summary>
+    /// Configuration for plugin loading security validation.
+    /// </summary>
+    public class PluginSecurityConfig
+    {
+        /// <summary>
+        /// Whether to require plugins to be signed with a strong name.
+        /// Default: false (development mode). Set to true for production.
+        /// </summary>
+        public bool RequireSignedAssemblies { get; set; } = false;
+
+        /// <summary>
+        /// List of trusted publisher public key tokens (hex strings).
+        /// If empty and RequireSignedAssemblies is true, all signed assemblies are trusted.
+        /// </summary>
+        public HashSet<string> TrustedPublicKeyTokens { get; set; } = new(StringComparer.OrdinalIgnoreCase);
+
+        /// <summary>
+        /// Allowed assembly prefixes. If non-empty, only assemblies whose names start with these prefixes are allowed.
+        /// </summary>
+        public HashSet<string> AllowedAssemblyPrefixes { get; set; } = new(StringComparer.OrdinalIgnoreCase);
+
+        /// <summary>
+        /// Blocked assembly names. Assemblies matching these names will not be loaded.
+        /// </summary>
+        public HashSet<string> BlockedAssemblies { get; set; } = new(StringComparer.OrdinalIgnoreCase);
+
+        /// <summary>
+        /// Whether to validate assembly hash against a known manifest.
+        /// </summary>
+        public bool ValidateAssemblyHash { get; set; } = false;
+
+        /// <summary>
+        /// Known assembly hashes (file name -> SHA256 hash).
+        /// Only used when ValidateAssemblyHash is true.
+        /// </summary>
+        public Dictionary<string, string> KnownAssemblyHashes { get; set; } = new(StringComparer.OrdinalIgnoreCase);
+
+        /// <summary>
+        /// Maximum assembly file size in bytes. 0 means unlimited.
+        /// </summary>
+        public long MaxAssemblySize { get; set; } = 50 * 1024 * 1024; // 50MB default
+
+        /// <summary>
+        /// Whether to log detailed security validation information.
+        /// </summary>
+        public bool EnableSecurityAuditLog { get; set; } = true;
+    }
+
+    /// <summary>
+    /// Result of plugin security validation.
+    /// </summary>
+    public class PluginSecurityValidationResult
+    {
+        public bool IsValid { get; init; }
+        public string AssemblyName { get; init; } = string.Empty;
+        public string AssemblyPath { get; init; } = string.Empty;
+        public string? PublicKeyToken { get; init; }
+        public string? Hash { get; init; }
+        public List<string> Errors { get; init; } = new();
+        public List<string> Warnings { get; init; } = new();
+    }
+
+    /// <summary>
     /// Manages hot plugin loading and unloading using AssemblyLoadContext.
     /// Enables updating plugins without kernel restart.
+    ///
+    /// Security features:
+    /// - Optional strong name signature validation
+    /// - Trusted publisher whitelist
+    /// - Assembly hash verification
+    /// - Size limits to prevent DoS
+    /// - Security audit logging
     /// </summary>
     public sealed class PluginLoader : IPluginReloader, IDisposable
     {
@@ -16,6 +87,7 @@ namespace DataWarehouse.Kernel.Plugins
         private readonly IKernelContext _kernelContext;
         private readonly string _pluginDirectory;
         private readonly object _reloadLock = new();
+        private readonly PluginSecurityConfig _securityConfig;
 
         public event Action<PluginReloadEvent>? OnPluginReloading;
         public event Action<PluginReloadEvent>? OnPluginReloaded;
@@ -23,11 +95,13 @@ namespace DataWarehouse.Kernel.Plugins
         public PluginLoader(
             PluginRegistry registry,
             IKernelContext kernelContext,
-            string? pluginDirectory = null)
+            string? pluginDirectory = null,
+            PluginSecurityConfig? securityConfig = null)
         {
             _registry = registry ?? throw new ArgumentNullException(nameof(registry));
             _kernelContext = kernelContext ?? throw new ArgumentNullException(nameof(kernelContext));
             _pluginDirectory = pluginDirectory ?? Path.Combine(kernelContext.RootPath, "plugins");
+            _securityConfig = securityConfig ?? new PluginSecurityConfig();
 
             // Ensure plugin directory exists
             if (!Directory.Exists(_pluginDirectory))
@@ -37,7 +111,150 @@ namespace DataWarehouse.Kernel.Plugins
         }
 
         /// <summary>
+        /// Validates a plugin assembly for security compliance before loading.
+        /// </summary>
+        public PluginSecurityValidationResult ValidateAssemblySecurity(string assemblyPath)
+        {
+            var errors = new List<string>();
+            var warnings = new List<string>();
+            var fileName = Path.GetFileName(assemblyPath);
+
+            if (!File.Exists(assemblyPath))
+            {
+                return new PluginSecurityValidationResult
+                {
+                    IsValid = false,
+                    AssemblyPath = assemblyPath,
+                    Errors = new List<string> { $"Assembly file not found: {assemblyPath}" }
+                };
+            }
+
+            var fileInfo = new FileInfo(assemblyPath);
+
+            // Check file size
+            if (_securityConfig.MaxAssemblySize > 0 && fileInfo.Length > _securityConfig.MaxAssemblySize)
+            {
+                errors.Add($"Assembly exceeds maximum size: {fileInfo.Length} bytes (max: {_securityConfig.MaxAssemblySize})");
+            }
+
+            // Check blocked assemblies
+            if (_securityConfig.BlockedAssemblies.Contains(fileName))
+            {
+                errors.Add($"Assembly is in blocked list: {fileName}");
+            }
+
+            // Check allowed prefixes
+            if (_securityConfig.AllowedAssemblyPrefixes.Count > 0)
+            {
+                var allowed = _securityConfig.AllowedAssemblyPrefixes.Any(prefix =>
+                    fileName.StartsWith(prefix, StringComparison.OrdinalIgnoreCase));
+                if (!allowed)
+                {
+                    errors.Add($"Assembly name does not match any allowed prefix: {fileName}");
+                }
+            }
+
+            // Compute hash
+            string? hash = null;
+            try
+            {
+                using var stream = File.OpenRead(assemblyPath);
+                using var sha256 = SHA256.Create();
+                var hashBytes = sha256.ComputeHash(stream);
+                hash = Convert.ToHexString(hashBytes);
+
+                // Validate hash if required
+                if (_securityConfig.ValidateAssemblyHash)
+                {
+                    if (_securityConfig.KnownAssemblyHashes.TryGetValue(fileName, out var expectedHash))
+                    {
+                        if (!hash.Equals(expectedHash, StringComparison.OrdinalIgnoreCase))
+                        {
+                            errors.Add($"Assembly hash mismatch. Expected: {expectedHash}, Got: {hash}");
+                        }
+                    }
+                    else
+                    {
+                        errors.Add($"Assembly not in known hash manifest: {fileName}");
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                warnings.Add($"Could not compute assembly hash: {ex.Message}");
+            }
+
+            // Check strong name / signature
+            string? publicKeyToken = null;
+            try
+            {
+                var assemblyName = AssemblyName.GetAssemblyName(assemblyPath);
+                var tokenBytes = assemblyName.GetPublicKeyToken();
+
+                if (tokenBytes != null && tokenBytes.Length > 0)
+                {
+                    publicKeyToken = Convert.ToHexString(tokenBytes);
+
+                    // Validate against trusted publishers
+                    if (_securityConfig.TrustedPublicKeyTokens.Count > 0)
+                    {
+                        if (!_securityConfig.TrustedPublicKeyTokens.Contains(publicKeyToken))
+                        {
+                            errors.Add($"Assembly signed with untrusted key: {publicKeyToken}");
+                        }
+                    }
+                }
+                else if (_securityConfig.RequireSignedAssemblies)
+                {
+                    errors.Add($"Assembly is not signed with a strong name: {fileName}");
+                }
+                else
+                {
+                    warnings.Add($"Assembly is not signed: {fileName}");
+                }
+            }
+            catch (Exception ex)
+            {
+                if (_securityConfig.RequireSignedAssemblies)
+                {
+                    errors.Add($"Could not validate assembly signature: {ex.Message}");
+                }
+                else
+                {
+                    warnings.Add($"Could not validate assembly signature: {ex.Message}");
+                }
+            }
+
+            var isValid = errors.Count == 0;
+
+            // Audit log
+            if (_securityConfig.EnableSecurityAuditLog)
+            {
+                if (isValid)
+                {
+                    _kernelContext.LogInfo($"[PluginSecurity] Validated assembly: {fileName} (Hash: {hash?[..16]}..., KeyToken: {publicKeyToken ?? "unsigned"})");
+                }
+                else
+                {
+                    _kernelContext.LogWarning($"[PluginSecurity] Rejected assembly: {fileName} - {string.Join("; ", errors)}");
+                }
+            }
+
+            return new PluginSecurityValidationResult
+            {
+                IsValid = isValid,
+                AssemblyName = fileName,
+                AssemblyPath = assemblyPath,
+                PublicKeyToken = publicKeyToken,
+                Hash = hash,
+                Errors = errors,
+                Warnings = warnings
+            };
+        }
+
+        /// <summary>
         /// Loads a plugin from an assembly file.
+        /// Performs security validation before loading.
         /// </summary>
         public async Task<PluginLoadResult> LoadPluginAsync(
             string assemblyPath,
@@ -49,6 +266,17 @@ namespace DataWarehouse.Kernel.Plugins
                 {
                     Success = false,
                     Error = $"Assembly file not found: {assemblyPath}"
+                };
+            }
+
+            // Security validation before loading
+            var securityResult = ValidateAssemblySecurity(assemblyPath);
+            if (!securityResult.IsValid)
+            {
+                return new PluginLoadResult
+                {
+                    Success = false,
+                    Error = $"Security validation failed: {string.Join("; ", securityResult.Errors)}"
                 };
             }
 

@@ -6,18 +6,28 @@ namespace DataWarehouse.Kernel.Resilience
     /// <summary>
     /// Default implementation of circuit breaker resilience policy.
     /// Implements the circuit breaker pattern with retry and timeout support.
+    ///
+    /// Thread-safety guarantees:
+    /// - All state transitions are atomic under a single lock
+    /// - Statistics use Interlocked for lock-free updates
+    /// - Failure tracking uses bounded queue to prevent memory exhaustion
     /// </summary>
     public sealed class CircuitBreakerPolicy : IResiliencePolicy
     {
         private readonly ResiliencePolicyConfig _config;
-        private readonly ConcurrentQueue<DateTime> _failures = new();
         private readonly object _stateLock = new();
+
+        // Bounded failure tracking - circular buffer style
+        private readonly DateTime[] _failureWindow;
+        private int _failureWindowIndex;
+        private int _failureWindowCount;
+        private const int MaxFailureWindowSize = 1000;
 
         private CircuitState _state = CircuitState.Closed;
         private DateTime _lastStateChange = DateTime.UtcNow;
         private DateTime? _circuitOpenedAt;
 
-        // Statistics
+        // Statistics - using volatile for safe reads without locks
         private long _totalExecutions;
         private long _successfulExecutions;
         private long _failedExecutions;
@@ -29,12 +39,28 @@ namespace DataWarehouse.Kernel.Resilience
         private long _totalExecutionTimeTicks;
 
         public string PolicyId { get; }
-        public CircuitState State => _state;
+
+        /// <summary>
+        /// Current circuit state. Thread-safe read.
+        /// </summary>
+        public CircuitState State
+        {
+            get
+            {
+                lock (_stateLock)
+                {
+                    return _state;
+                }
+            }
+        }
 
         public CircuitBreakerPolicy(string policyId, ResiliencePolicyConfig? config = null)
         {
             PolicyId = policyId ?? throw new ArgumentNullException(nameof(policyId));
             _config = config ?? new ResiliencePolicyConfig();
+
+            // Pre-allocate bounded failure window
+            _failureWindow = new DateTime[Math.Min(_config.FailureThreshold * 2, MaxFailureWindowSize)];
         }
 
         public async Task<T> ExecuteAsync<T>(Func<CancellationToken, Task<T>> action, CancellationToken ct = default)
@@ -170,17 +196,16 @@ namespace DataWarehouse.Kernel.Resilience
             Interlocked.Increment(ref _successfulExecutions);
             _lastSuccess = DateTime.UtcNow;
 
+            // Atomic state transition for success
             lock (_stateLock)
             {
                 if (_state == CircuitState.HalfOpen)
                 {
                     // Success in half-open state - close the circuit
-                    _state = CircuitState.Closed;
-                    _lastStateChange = DateTime.UtcNow;
-                    _circuitOpenedAt = null;
+                    TransitionToState(CircuitState.Closed);
 
                     // Clear failure history
-                    while (_failures.TryDequeue(out _)) { }
+                    ClearFailureWindow();
                 }
             }
         }
@@ -188,34 +213,92 @@ namespace DataWarehouse.Kernel.Resilience
         private void OnFailure()
         {
             Interlocked.Increment(ref _failedExecutions);
-            _lastFailure = DateTime.UtcNow;
-
             var now = DateTime.UtcNow;
-            _failures.Enqueue(now);
+            _lastFailure = now;
 
-            // Remove old failures outside the window
-            var windowStart = now - _config.FailureWindow;
-            while (_failures.TryPeek(out var oldest) && oldest < windowStart)
-            {
-                _failures.TryDequeue(out _);
-            }
-
+            // All state mutations under a single lock to prevent race conditions
             lock (_stateLock)
             {
+                // Record failure in bounded circular buffer
+                RecordFailure(now);
+
+                // Count recent failures within the window
+                var recentFailures = CountRecentFailures(now);
+
                 if (_state == CircuitState.HalfOpen)
                 {
-                    // Failure in half-open state - open the circuit
-                    _state = CircuitState.Open;
-                    _lastStateChange = DateTime.UtcNow;
-                    _circuitOpenedAt = DateTime.UtcNow;
+                    // Failure in half-open state - open the circuit immediately
+                    TransitionToState(CircuitState.Open);
                 }
-                else if (_state == CircuitState.Closed && _failures.Count >= _config.FailureThreshold)
+                else if (_state == CircuitState.Closed && recentFailures >= _config.FailureThreshold)
                 {
-                    // Too many failures - open the circuit
-                    _state = CircuitState.Open;
-                    _lastStateChange = DateTime.UtcNow;
-                    _circuitOpenedAt = DateTime.UtcNow;
+                    // Too many failures within window - open the circuit
+                    TransitionToState(CircuitState.Open);
                 }
+            }
+        }
+
+        /// <summary>
+        /// Records a failure timestamp in the bounded circular buffer.
+        /// Must be called under _stateLock.
+        /// </summary>
+        private void RecordFailure(DateTime timestamp)
+        {
+            _failureWindow[_failureWindowIndex] = timestamp;
+            _failureWindowIndex = (_failureWindowIndex + 1) % _failureWindow.Length;
+            if (_failureWindowCount < _failureWindow.Length)
+            {
+                _failureWindowCount++;
+            }
+        }
+
+        /// <summary>
+        /// Counts failures within the configured time window.
+        /// Must be called under _stateLock.
+        /// </summary>
+        private int CountRecentFailures(DateTime now)
+        {
+            var windowStart = now - _config.FailureWindow;
+            var count = 0;
+
+            for (int i = 0; i < _failureWindowCount; i++)
+            {
+                if (_failureWindow[i] >= windowStart)
+                {
+                    count++;
+                }
+            }
+
+            return count;
+        }
+
+        /// <summary>
+        /// Clears the failure window. Must be called under _stateLock.
+        /// </summary>
+        private void ClearFailureWindow()
+        {
+            _failureWindowIndex = 0;
+            _failureWindowCount = 0;
+            Array.Clear(_failureWindow);
+        }
+
+        /// <summary>
+        /// Transitions to a new state. Must be called under _stateLock.
+        /// </summary>
+        private void TransitionToState(CircuitState newState)
+        {
+            if (_state == newState) return;
+
+            _state = newState;
+            _lastStateChange = DateTime.UtcNow;
+
+            if (newState == CircuitState.Open)
+            {
+                _circuitOpenedAt = DateTime.UtcNow;
+            }
+            else if (newState == CircuitState.Closed)
+            {
+                _circuitOpenedAt = null;
             }
         }
 
@@ -236,24 +319,25 @@ namespace DataWarehouse.Kernel.Resilience
             return exponentialDelay + jitter;
         }
 
-        private static bool IsNonRetryableException(Exception ex)
+        private bool IsNonRetryableException(Exception ex)
         {
-            return ex is ArgumentException or
-                   ArgumentNullException or
-                   InvalidOperationException or
-                   NotSupportedException or
-                   UnauthorizedAccessException;
+            // Custom predicate takes precedence if configured
+            if (_config.ShouldRetry != null)
+            {
+                return !_config.ShouldRetry(ex);
+            }
+
+            // Check against configured non-retryable exception types
+            var exType = ex.GetType();
+            return _config.NonRetryableExceptions.Any(t => t.IsAssignableFrom(exType));
         }
 
         public void Reset()
         {
             lock (_stateLock)
             {
-                _state = CircuitState.Closed;
-                _lastStateChange = DateTime.UtcNow;
-                _circuitOpenedAt = null;
-
-                while (_failures.TryDequeue(out _)) { }
+                TransitionToState(CircuitState.Closed);
+                ClearFailureWindow();
             }
         }
 

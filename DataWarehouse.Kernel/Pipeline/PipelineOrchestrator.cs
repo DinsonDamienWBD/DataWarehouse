@@ -222,6 +222,7 @@ namespace DataWarehouse.Kernel.Pipeline
 
         /// <summary>
         /// Execute the write pipeline (user data → storage).
+        /// Properly manages stream lifecycle and positions between stages.
         /// </summary>
         public async Task<Stream> ExecuteWritePipelineAsync(
             Stream input,
@@ -266,6 +267,10 @@ namespace DataWarehouse.Kernel.Pipeline
             var currentStream = input;
             var kernelContext = context.KernelContext ?? CreateDefaultKernelContext();
 
+            // Track intermediate streams for proper disposal
+            var intermediateStreams = new List<Stream>();
+            var missingStages = new List<string>();
+
             try
             {
                 foreach (var stageConfig in orderedStages)
@@ -275,14 +280,44 @@ namespace DataWarehouse.Kernel.Pipeline
                     var stage = FindStage(stageConfig);
                     if (stage == null)
                     {
-                        _logger?.LogWarning("Stage not found: {StageType}", stageConfig.StageType);
+                        _logger?.LogWarning("Stage not found: {StageType} (PluginId: {PluginId})",
+                            stageConfig.StageType, stageConfig.PluginId ?? "auto");
+                        missingStages.Add(stageConfig.StageType);
+
+                        // Check if this is a critical stage that cannot be skipped
+                        if (stageConfig.StageType.Equals("Encryption", StringComparison.OrdinalIgnoreCase) ||
+                            stageConfig.StageType.Equals("Compress", StringComparison.OrdinalIgnoreCase))
+                        {
+                            _logger?.LogError("Critical pipeline stage missing: {StageType}. Data may be stored without proper transformation.",
+                                stageConfig.StageType);
+                        }
                         continue;
                     }
 
                     _logger?.LogDebug("Executing stage: {StageType}", stageConfig.StageType);
 
+                    // Ensure stream is at beginning before passing to stage
+                    if (currentStream.CanSeek)
+                    {
+                        currentStream.Position = 0;
+                    }
+
+                    var previousStream = currentStream;
                     currentStream = stage.OnWrite(currentStream, kernelContext, stageConfig.Parameters);
+
+                    // Track intermediate streams for cleanup (but not the original input)
+                    if (previousStream != input && !intermediateStreams.Contains(previousStream))
+                    {
+                        intermediateStreams.Add(previousStream);
+                    }
+
                     context.ExecutedStages.Add(stageConfig.StageType);
+                }
+
+                // Ensure final stream position is at beginning for caller
+                if (currentStream.CanSeek)
+                {
+                    currentStream.Position = 0;
                 }
 
                 // Publish pipeline complete event
@@ -291,21 +326,32 @@ namespace DataWarehouse.Kernel.Pipeline
                     Type = "pipeline.write.complete",
                     Payload = new Dictionary<string, object>
                     {
-                        ["ExecutedStages"] = context.ExecutedStages.ToArray()
+                        ["ExecutedStages"] = context.ExecutedStages.ToArray(),
+                        ["MissingStages"] = missingStages.ToArray()
                     }
                 }, ct);
+
+                // Store intermediate streams in context for later cleanup by caller
+                context.IntermediateStreams = intermediateStreams;
 
                 return currentStream;
             }
             catch (Exception ex)
             {
+                // Dispose intermediate streams on error
+                foreach (var stream in intermediateStreams)
+                {
+                    try { stream.Dispose(); } catch { /* Ignore disposal errors */ }
+                }
+
                 await _messageBus.PublishAsync(MessageTopics.PipelineError, new PluginMessage
                 {
                     Type = "pipeline.write.error",
                     Payload = new Dictionary<string, object>
                     {
                         ["Error"] = ex.Message,
-                        ["ExecutedStages"] = context.ExecutedStages.ToArray()
+                        ["ExecutedStages"] = context.ExecutedStages.ToArray(),
+                        ["MissingStages"] = missingStages.ToArray()
                     }
                 }, ct);
 
@@ -316,6 +362,7 @@ namespace DataWarehouse.Kernel.Pipeline
         /// <summary>
         /// Execute the read pipeline (storage → user data).
         /// Applies transformations in reverse order.
+        /// Properly manages stream lifecycle and positions between stages.
         /// </summary>
         public async Task<Stream> ExecuteReadPipelineAsync(
             Stream input,
@@ -357,6 +404,10 @@ namespace DataWarehouse.Kernel.Pipeline
             var currentStream = input;
             var kernelContext = context.KernelContext ?? CreateDefaultKernelContext();
 
+            // Track intermediate streams for proper disposal
+            var intermediateStreams = new List<Stream>();
+            var missingStages = new List<string>();
+
             try
             {
                 foreach (var stageConfig in orderedStages)
@@ -366,14 +417,36 @@ namespace DataWarehouse.Kernel.Pipeline
                     var stage = FindStage(stageConfig);
                     if (stage == null)
                     {
-                        _logger?.LogWarning("Stage not found: {StageType}", stageConfig.StageType);
+                        _logger?.LogWarning("Stage not found: {StageType} (PluginId: {PluginId})",
+                            stageConfig.StageType, stageConfig.PluginId ?? "auto");
+                        missingStages.Add(stageConfig.StageType);
                         continue;
                     }
 
                     _logger?.LogDebug("Executing reverse stage: {StageType}", stageConfig.StageType);
 
+                    // Ensure stream is at beginning before passing to stage
+                    if (currentStream.CanSeek)
+                    {
+                        currentStream.Position = 0;
+                    }
+
+                    var previousStream = currentStream;
                     currentStream = stage.OnRead(currentStream, kernelContext, stageConfig.Parameters);
+
+                    // Track intermediate streams for cleanup (but not the original input)
+                    if (previousStream != input && !intermediateStreams.Contains(previousStream))
+                    {
+                        intermediateStreams.Add(previousStream);
+                    }
+
                     context.ExecutedStages.Add(stageConfig.StageType);
+                }
+
+                // Ensure final stream position is at beginning for caller
+                if (currentStream.CanSeek)
+                {
+                    currentStream.Position = 0;
                 }
 
                 await _messageBus.PublishAsync(MessageTopics.PipelineCompleted, new PluginMessage
@@ -381,21 +454,32 @@ namespace DataWarehouse.Kernel.Pipeline
                     Type = "pipeline.read.complete",
                     Payload = new Dictionary<string, object>
                     {
-                        ["ExecutedStages"] = context.ExecutedStages.ToArray()
+                        ["ExecutedStages"] = context.ExecutedStages.ToArray(),
+                        ["MissingStages"] = missingStages.ToArray()
                     }
                 }, ct);
+
+                // Store intermediate streams in context for later cleanup by caller
+                context.IntermediateStreams = intermediateStreams;
 
                 return currentStream;
             }
             catch (Exception ex)
             {
+                // Dispose intermediate streams on error
+                foreach (var stream in intermediateStreams)
+                {
+                    try { stream.Dispose(); } catch { /* Ignore disposal errors */ }
+                }
+
                 await _messageBus.PublishAsync(MessageTopics.PipelineError, new PluginMessage
                 {
                     Type = "pipeline.read.error",
                     Payload = new Dictionary<string, object>
                     {
                         ["Error"] = ex.Message,
-                        ["ExecutedStages"] = context.ExecutedStages.ToArray()
+                        ["ExecutedStages"] = context.ExecutedStages.ToArray(),
+                        ["MissingStages"] = missingStages.ToArray()
                     }
                 }, ct);
 

@@ -6,13 +6,152 @@ using System.Collections.Concurrent;
 namespace DataWarehouse.Kernel.Messaging
 {
     /// <summary>
+    /// Thread-safe subscription list that ensures atomic operations.
+    /// Wraps a List with proper synchronization to avoid race conditions.
+    /// </summary>
+    internal sealed class ThreadSafeSubscriptionList<T>
+    {
+        private readonly List<T> _handlers = new();
+        private readonly ReaderWriterLockSlim _lock = new(LockRecursionPolicy.SupportsRecursion);
+
+        public int Count
+        {
+            get
+            {
+                _lock.EnterReadLock();
+                try { return _handlers.Count; }
+                finally { _lock.ExitReadLock(); }
+            }
+        }
+
+        public void Add(T handler)
+        {
+            _lock.EnterWriteLock();
+            try { _handlers.Add(handler); }
+            finally { _lock.ExitWriteLock(); }
+        }
+
+        public bool Remove(T handler)
+        {
+            _lock.EnterWriteLock();
+            try { return _handlers.Remove(handler); }
+            finally { _lock.ExitWriteLock(); }
+        }
+
+        public T[] ToArray()
+        {
+            _lock.EnterReadLock();
+            try { return _handlers.ToArray(); }
+            finally { _lock.ExitReadLock(); }
+        }
+
+        public T? FirstOrDefault()
+        {
+            _lock.EnterReadLock();
+            try { return _handlers.Count > 0 ? _handlers[0] : default; }
+            finally { _lock.ExitReadLock(); }
+        }
+
+        public void Clear()
+        {
+            _lock.EnterWriteLock();
+            try { _handlers.Clear(); }
+            finally { _lock.ExitWriteLock(); }
+        }
+    }
+
+    /// <summary>
+    /// Bounded concurrent dictionary that enforces a maximum capacity.
+    /// When capacity is reached, oldest entries are evicted.
+    /// </summary>
+    internal sealed class BoundedConcurrentDictionary<TKey, TValue> where TKey : notnull
+    {
+        private readonly ConcurrentDictionary<TKey, TValue> _dictionary = new();
+        private readonly ConcurrentQueue<TKey> _keyOrder = new();
+        private readonly int _maxCapacity;
+        private readonly object _evictionLock = new();
+
+        public BoundedConcurrentDictionary(int maxCapacity)
+        {
+            _maxCapacity = maxCapacity > 0 ? maxCapacity : int.MaxValue;
+        }
+
+        public int Count => _dictionary.Count;
+
+        public TValue this[TKey key]
+        {
+            get => _dictionary[key];
+            set => AddOrUpdate(key, value);
+        }
+
+        public bool TryGetValue(TKey key, out TValue? value) => _dictionary.TryGetValue(key, out value);
+
+        public bool TryRemove(TKey key, out TValue? value) => _dictionary.TryRemove(key, out value);
+
+        public bool ContainsKey(TKey key) => _dictionary.ContainsKey(key);
+
+        public ICollection<TValue> Values => _dictionary.Values;
+
+        public ICollection<TKey> Keys => _dictionary.Keys;
+
+        public void AddOrUpdate(TKey key, TValue value)
+        {
+            var isNew = !_dictionary.ContainsKey(key);
+            _dictionary[key] = value;
+
+            if (isNew)
+            {
+                _keyOrder.Enqueue(key);
+                EnforceCapacity();
+            }
+        }
+
+        public TValue GetOrAdd(TKey key, Func<TKey, TValue> valueFactory)
+        {
+            if (_dictionary.TryGetValue(key, out var existing))
+            {
+                return existing;
+            }
+
+            var value = _dictionary.GetOrAdd(key, valueFactory);
+            _keyOrder.Enqueue(key);
+            EnforceCapacity();
+            return value;
+        }
+
+        private void EnforceCapacity()
+        {
+            if (_dictionary.Count <= _maxCapacity) return;
+
+            lock (_evictionLock)
+            {
+                while (_dictionary.Count > _maxCapacity && _keyOrder.TryDequeue(out var oldKey))
+                {
+                    _dictionary.TryRemove(oldKey, out _);
+                }
+            }
+        }
+
+        public IEnumerable<KeyValuePair<TKey, TValue>> Where(Func<KeyValuePair<TKey, TValue>, bool> predicate)
+        {
+            return _dictionary.Where(predicate);
+        }
+    }
+
+    /// <summary>
     /// Production-ready advanced message bus with reliable delivery, transactional messaging,
     /// and comprehensive statistics. Suitable for hyperscale deployments.
+    ///
+    /// Thread-safety guarantees:
+    /// - All subscription operations are atomic and thread-safe
+    /// - Message delivery is non-blocking and handles concurrent publishes
+    /// - Statistics are protected by lock and use atomic operations
+    /// - Bounded collections prevent memory exhaustion under load
     /// </summary>
     public class AdvancedMessageBus : MessageBusBase, IAdvancedMessageBus
     {
-        private readonly ConcurrentDictionary<string, PendingMessage> _pendingMessages = new();
-        private readonly ConcurrentDictionary<string, MessageGroup> _messageGroups = new();
+        private readonly BoundedConcurrentDictionary<string, PendingMessage> _pendingMessages;
+        private readonly BoundedConcurrentDictionary<string, MessageGroup> _messageGroups;
         private readonly ConcurrentDictionary<string, FilteredSubscription> _filteredSubscriptions = new();
         private readonly MessageBusStatistics _statistics = new();
         private readonly IKernelContext _context;
@@ -21,12 +160,17 @@ namespace DataWarehouse.Kernel.Messaging
         private readonly Timer _cleanupTimer;
         private readonly object _statsLock = new();
 
-        private readonly ConcurrentDictionary<string, List<Func<PluginMessage, Task>>> _subscriptions = new();
+        // Thread-safe subscription storage - uses ThreadSafeSubscriptionList for atomic operations
+        private readonly ConcurrentDictionary<string, ThreadSafeSubscriptionList<Func<PluginMessage, Task>>> _subscriptions = new();
 
         public AdvancedMessageBus(IKernelContext context, AdvancedMessageBusConfig? config = null)
         {
             _context = context ?? throw new ArgumentNullException(nameof(context));
             _config = config ?? new AdvancedMessageBusConfig();
+
+            // Initialize bounded collections with configured limits
+            _pendingMessages = new BoundedConcurrentDictionary<string, PendingMessage>(_config.MaxPendingMessages);
+            _messageGroups = new BoundedConcurrentDictionary<string, MessageGroup>(_config.MaxMessageGroups);
 
             // Start background timers
             _retryTimer = new Timer(ProcessRetries, null, TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(1));
@@ -37,25 +181,54 @@ namespace DataWarehouse.Kernel.Messaging
 
         public override async Task PublishAsync(string topic, PluginMessage message, CancellationToken ct = default)
         {
-            if (_subscriptions.TryGetValue(topic, out var handlers))
+            if (_subscriptions.TryGetValue(topic, out var handlerList))
             {
-                var tasks = handlers.Select(h => h(message));
+                // Get a snapshot of handlers for thread-safe iteration
+                var handlers = handlerList.ToArray();
+                if (handlers.Length == 0) return;
+
+                // Execute all handlers with proper error handling
+                var exceptions = new List<Exception>();
+                var tasks = handlers.Select(async h =>
+                {
+                    try
+                    {
+                        await h(message);
+                    }
+                    catch (Exception ex)
+                    {
+                        lock (exceptions) { exceptions.Add(ex); }
+                        _context.LogError($"[MessageBus] Handler error on topic '{topic}': {ex.Message}", ex);
+                    }
+                });
+
                 await Task.WhenAll(tasks);
+
+                // If all handlers failed, record failure
+                if (exceptions.Count == handlers.Length && handlers.Length > 0)
+                {
+                    RecordStatistic(s => s.TotalFailed++);
+                }
             }
         }
 
         public override async Task<MessageResponse> SendAsync(string topic, PluginMessage message, CancellationToken ct = default)
         {
-            if (_subscriptions.TryGetValue(topic, out var handlers) && handlers.Count > 0)
+            if (_subscriptions.TryGetValue(topic, out var handlerList))
             {
-                try
+                var handler = handlerList.FirstOrDefault();
+                if (handler != null)
                 {
-                    await handlers[0](message);
-                    return MessageResponse.Ok(null);
-                }
-                catch (Exception ex)
-                {
-                    return MessageResponse.Error(ex.Message, "SEND_ERROR");
+                    try
+                    {
+                        await handler(message);
+                        return MessageResponse.Ok(null);
+                    }
+                    catch (Exception ex)
+                    {
+                        _context.LogError($"[MessageBus] SendAsync error on topic '{topic}': {ex.Message}", ex);
+                        return MessageResponse.Error(ex.Message, "SEND_ERROR");
+                    }
                 }
             }
             return MessageResponse.Error("No handler registered for topic", "NO_HANDLER");
@@ -63,23 +236,19 @@ namespace DataWarehouse.Kernel.Messaging
 
         public override IDisposable Subscribe(string topic, Func<PluginMessage, Task> handler)
         {
-            var handlers = _subscriptions.GetOrAdd(topic, _ => new List<Func<PluginMessage, Task>>());
-            lock (handlers)
-            {
-                handlers.Add(handler);
-            }
-            return CreateHandle(() =>
-            {
-                lock (handlers)
-                {
-                    handlers.Remove(handler);
-                }
-            });
+            // GetOrAdd with ThreadSafeSubscriptionList is atomic
+            var handlerList = _subscriptions.GetOrAdd(topic, _ => new ThreadSafeSubscriptionList<Func<PluginMessage, Task>>());
+            handlerList.Add(handler);
+
+            return CreateHandle(() => handlerList.Remove(handler));
         }
 
         public override void Unsubscribe(string topic)
         {
-            _subscriptions.TryRemove(topic, out _);
+            if (_subscriptions.TryRemove(topic, out var handlerList))
+            {
+                handlerList.Clear();
+            }
         }
 
         public override IEnumerable<string> GetActiveTopics()
@@ -118,11 +287,11 @@ namespace DataWarehouse.Kernel.Messaging
 
             try
             {
-                // Count subscribers
+                // Count subscribers - thread-safe access
                 var subscriberCount = 0;
-                if (_subscriptions.TryGetValue(topic, out var handlers))
+                if (_subscriptions.TryGetValue(topic, out var handlerList))
                 {
-                    subscriberCount = handlers.Count;
+                    subscriberCount = handlerList.Count;
                 }
 
                 // Deliver the message
@@ -190,7 +359,7 @@ namespace DataWarehouse.Kernel.Messaging
                 State = MessageState.Pending
             };
 
-            _pendingMessages[messageId] = pending;
+            _pendingMessages.AddOrUpdate(messageId, pending);
             RecordStatistic(s => s.TotalPublished++);
 
             try
@@ -437,7 +606,7 @@ namespace DataWarehouse.Kernel.Messaging
                 Messages = new List<GroupedMessage>()
             };
 
-            _messageGroups[groupId] = group;
+            _messageGroups.AddOrUpdate(groupId, group);
             _context.LogDebug($"[MessageBus] Created message group {groupId}");
 
             return new MessageGroupHandle(groupId, this);
