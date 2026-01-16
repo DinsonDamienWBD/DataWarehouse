@@ -92,6 +92,78 @@ namespace DataWarehouse.Kernel.Messaging
         #region Reliable Publishing (At-Least-Once Delivery)
 
         /// <summary>
+        /// Implements IAdvancedMessageBus.PublishReliableAsync - simple reliable delivery.
+        /// </summary>
+        async Task IAdvancedMessageBus.PublishReliableAsync(string topic, PluginMessage message, CancellationToken ct)
+        {
+            await PublishReliableAsync(topic, message, null, ct);
+        }
+
+        /// <summary>
+        /// Implements IAdvancedMessageBus.PublishWithConfirmationAsync - returns detailed publish result.
+        /// </summary>
+        public async Task<PublishResult> PublishWithConfirmationAsync(
+            string topic,
+            PluginMessage message,
+            PublishOptions? options = null,
+            CancellationToken ct = default)
+        {
+            var sw = System.Diagnostics.Stopwatch.StartNew();
+            options ??= PublishOptions.Default;
+
+            var messageId = options.CorrelationId ?? message.CorrelationId ?? Guid.NewGuid().ToString("N")[..16];
+            message.CorrelationId = messageId;
+
+            _context.LogDebug($"[MessageBus] Publishing with confirmation: {messageId} to {topic}");
+
+            try
+            {
+                // Count subscribers
+                var subscriberCount = 0;
+                if (_subscriptions.TryGetValue(topic, out var handlers))
+                {
+                    subscriberCount = handlers.Count;
+                }
+
+                // Deliver the message
+                var delivered = await DeliverMessageAsync(topic, message, ct);
+
+                sw.Stop();
+
+                if (delivered)
+                {
+                    RecordStatistic(s => s.TotalDelivered++);
+                    return PublishResult.Ok(messageId, subscriberCount, sw.Elapsed);
+                }
+                else
+                {
+                    return new PublishResult
+                    {
+                        Success = false,
+                        MessageId = messageId,
+                        SubscribersNotified = 0,
+                        Duration = sw.Elapsed,
+                        Error = "No subscribers for topic"
+                    };
+                }
+            }
+            catch (Exception ex)
+            {
+                sw.Stop();
+                RecordStatistic(s => s.TotalFailed++);
+                _context.LogError($"[MessageBus] Publish failed for {messageId}: {ex.Message}", ex);
+
+                return new PublishResult
+                {
+                    Success = false,
+                    MessageId = messageId,
+                    Duration = sw.Elapsed,
+                    Error = ex.Message
+                };
+            }
+        }
+
+        /// <summary>
         /// Publishes a message with at-least-once delivery guarantee.
         /// The message will be retried until acknowledged or max retries reached.
         /// </summary>

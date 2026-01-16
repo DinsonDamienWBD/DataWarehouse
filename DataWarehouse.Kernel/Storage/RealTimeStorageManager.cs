@@ -289,10 +289,14 @@ namespace DataWarehouse.Kernel.Storage
             {
                 entries.Add(entry);
 
-                // Limit audit trail size
-                while (entries.Count > 10000)
+                // Limit audit trail size based on retention policy
+                var maxEntries = _retentionPolicy.MaxAuditEntriesPerUri;
+                if (maxEntries > 0)
                 {
-                    entries.RemoveAt(0);
+                    while (entries.Count > maxEntries)
+                    {
+                        entries.RemoveAt(0);
+                    }
                 }
             }
         }
@@ -445,20 +449,28 @@ namespace DataWarehouse.Kernel.Storage
         public int MaxVersions { get; set; } = 100;
         public TimeSpan MaxAge { get; set; } = TimeSpan.FromDays(90);
 
+        /// <summary>
+        /// Maximum audit entries per URI before oldest are pruned.
+        /// Set to 0 for unlimited (not recommended for production).
+        /// </summary>
+        public int MaxAuditEntriesPerUri { get; set; } = 10000;
+
         public static RetentionPolicy Default => new();
 
         public static RetentionPolicy HighStakes => new()
         {
             MinVersions = 10,
             MaxVersions = 1000,
-            MaxAge = TimeSpan.FromDays(365 * 7) // 7 years for financial/medical
+            MaxAge = TimeSpan.FromDays(365 * 7), // 7 years for financial/medical
+            MaxAuditEntriesPerUri = 100000 // Keep more audit entries for compliance
         };
 
         public static RetentionPolicy Hyperscale => new()
         {
             MinVersions = 5,
             MaxVersions = 50,
-            MaxAge = TimeSpan.FromDays(30)
+            MaxAge = TimeSpan.FromDays(30),
+            MaxAuditEntriesPerUri = 5000 // Lower limit for hyperscale efficiency
         };
     }
 

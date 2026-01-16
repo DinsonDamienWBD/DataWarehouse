@@ -563,4 +563,187 @@ namespace DataWarehouse.SDK.Contracts
     }
 
     #endregion
+
+    #region Distributed Tracing
+
+    /// <summary>
+    /// Provides distributed tracing capabilities with correlation IDs.
+    /// </summary>
+    public interface IDistributedTracing
+    {
+        /// <summary>Gets the current trace context.</summary>
+        TraceContext? Current { get; }
+
+        /// <summary>Starts a new trace with a fresh correlation ID.</summary>
+        ITraceScope StartTrace(string operationName, Dictionary<string, string>? baggage = null);
+
+        /// <summary>Starts a child span within the current trace.</summary>
+        ITraceScope StartSpan(string operationName, Dictionary<string, string>? baggage = null);
+
+        /// <summary>Continues an existing trace from external correlation ID.</summary>
+        ITraceScope ContinueTrace(string correlationId, string operationName, Dictionary<string, string>? baggage = null);
+
+        /// <summary>Extracts trace context from headers/metadata.</summary>
+        TraceContext? ExtractContext(IDictionary<string, string> carrier);
+
+        /// <summary>Injects trace context into headers/metadata for propagation.</summary>
+        void InjectContext(IDictionary<string, string> carrier);
+    }
+
+    /// <summary>
+    /// Trace context containing correlation information.
+    /// </summary>
+    public class TraceContext
+    {
+        /// <summary>Unique correlation ID for the entire trace.</summary>
+        public string CorrelationId { get; init; } = string.Empty;
+
+        /// <summary>Span ID for this specific operation.</summary>
+        public string SpanId { get; init; } = string.Empty;
+
+        /// <summary>Parent span ID if this is a child span.</summary>
+        public string? ParentSpanId { get; init; }
+
+        /// <summary>Operation name being traced.</summary>
+        public string OperationName { get; init; } = string.Empty;
+
+        /// <summary>When the span started.</summary>
+        public DateTime StartTime { get; init; }
+
+        /// <summary>Baggage items propagated across service boundaries.</summary>
+        public Dictionary<string, string> Baggage { get; init; } = new();
+
+        /// <summary>Tags/attributes for this span.</summary>
+        public Dictionary<string, object> Tags { get; init; } = new();
+    }
+
+    /// <summary>
+    /// A trace scope that represents a span of work.
+    /// </summary>
+    public interface ITraceScope : IDisposable
+    {
+        /// <summary>Gets the trace context.</summary>
+        TraceContext Context { get; }
+
+        /// <summary>Adds a tag to this span.</summary>
+        void SetTag(string key, object value);
+
+        /// <summary>Adds baggage that propagates to child spans.</summary>
+        void SetBaggage(string key, string value);
+
+        /// <summary>Logs an event within this span.</summary>
+        void LogEvent(string eventName, Dictionary<string, object>? fields = null);
+
+        /// <summary>Marks the span as failed with an exception.</summary>
+        void SetError(Exception exception);
+
+        /// <summary>Sets the span status.</summary>
+        void SetStatus(TraceStatus status, string? message = null);
+    }
+
+    /// <summary>
+    /// Trace status values.
+    /// </summary>
+    public enum TraceStatus
+    {
+        Ok,
+        Error,
+        Cancelled
+    }
+
+    #endregion
+
+    #region Kernel Limits Configuration
+
+    /// <summary>
+    /// Configurable limits for kernel components.
+    /// </summary>
+    public class KernelLimitsConfig
+    {
+        /// <summary>Maximum audit entries per URI before oldest are removed.</summary>
+        public int MaxAuditEntriesPerUri { get; set; } = 10000;
+
+        /// <summary>Maximum histogram sample values for percentile calculation.</summary>
+        public int MaxHistogramSampleValues { get; set; } = 10000;
+
+        /// <summary>Maximum items in in-memory storage.</summary>
+        public int MaxInMemoryStorageItems { get; set; } = 10000;
+
+        /// <summary>Maximum message bus pending messages.</summary>
+        public int MaxPendingMessages { get; set; } = 100000;
+
+        /// <summary>Maximum version history entries per URI.</summary>
+        public int MaxVersionHistoryPerUri { get; set; } = 100;
+
+        /// <summary>Maximum concurrent indexing jobs.</summary>
+        public int MaxConcurrentIndexingJobs { get; set; } = 10;
+
+        /// <summary>Default singleton instance with default values.</summary>
+        public static KernelLimitsConfig Default { get; } = new();
+    }
+
+    #endregion
+
+    #region Reliable Message Publishing
+
+    /// <summary>
+    /// Result of a message publish operation.
+    /// </summary>
+    public class PublishResult
+    {
+        /// <summary>Whether the message was successfully published.</summary>
+        public bool Success { get; init; }
+
+        /// <summary>Unique message ID for tracking.</summary>
+        public string MessageId { get; init; } = string.Empty;
+
+        /// <summary>Number of subscribers that received the message.</summary>
+        public int SubscribersNotified { get; init; }
+
+        /// <summary>Error message if publish failed.</summary>
+        public string? Error { get; init; }
+
+        /// <summary>Time taken to publish.</summary>
+        public TimeSpan Duration { get; init; }
+
+        public static PublishResult Ok(string messageId, int subscribers, TimeSpan duration) =>
+            new() { Success = true, MessageId = messageId, SubscribersNotified = subscribers, Duration = duration };
+
+        public static PublishResult Failed(string error) =>
+            new() { Success = false, Error = error };
+    }
+
+    /// <summary>
+    /// Options for reliable message publishing.
+    /// </summary>
+    public class PublishOptions
+    {
+        /// <summary>Timeout for publish operation.</summary>
+        public TimeSpan Timeout { get; init; } = TimeSpan.FromSeconds(30);
+
+        /// <summary>Whether to wait for subscriber acknowledgement.</summary>
+        public bool RequireAcknowledgement { get; init; } = false;
+
+        /// <summary>Correlation ID for distributed tracing.</summary>
+        public string? CorrelationId { get; init; }
+
+        /// <summary>Priority level for the message.</summary>
+        public MessagePriority Priority { get; init; } = MessagePriority.Normal;
+
+        /// <summary>Default options.</summary>
+        public static PublishOptions Default { get; } = new();
+    }
+
+    /// <summary>
+    /// Message priority levels.
+    /// </summary>
+    public enum MessagePriority
+    {
+        Low = 0,
+        Normal = 1,
+        High = 2,
+        Critical = 3
+    }
+
+    #endregion
 }

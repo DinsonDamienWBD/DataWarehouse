@@ -13,6 +13,20 @@ namespace DataWarehouse.Kernel.Telemetry
         private readonly ConcurrentDictionary<string, CounterState> _counters = new();
         private readonly ConcurrentDictionary<string, GaugeState> _gauges = new();
         private readonly ConcurrentDictionary<string, HistogramState> _histograms = new();
+        private readonly KernelLimitsConfig _limits;
+
+        /// <summary>
+        /// Creates a new MetricsCollector with default limits.
+        /// </summary>
+        public MetricsCollector() : this(KernelLimitsConfig.Default) { }
+
+        /// <summary>
+        /// Creates a new MetricsCollector with custom limits.
+        /// </summary>
+        public MetricsCollector(KernelLimitsConfig limits)
+        {
+            _limits = limits ?? throw new ArgumentNullException(nameof(limits));
+        }
 
         public void IncrementCounter(string name, long value = 1, params string[] tags)
         {
@@ -43,11 +57,12 @@ namespace DataWarehouse.Kernel.Telemetry
         public void RecordHistogram(string name, double value, params string[] tags)
         {
             var key = BuildKey(name, tags);
+            var maxSamples = _limits.MaxHistogramSampleValues;
             _histograms.AddOrUpdate(
                 key,
                 _ =>
                 {
-                    var state = new HistogramState(name, tags);
+                    var state = new HistogramState(name, tags, maxSamples);
                     state.Record(value);
                     return state;
                 },
@@ -165,17 +180,18 @@ namespace DataWarehouse.Kernel.Telemetry
 
             private readonly object _lock = new();
             private readonly List<double> _values = new();
-            private const int MaxStoredValues = 10000;
+            private readonly int _maxStoredValues;
 
             public long Count { get; private set; }
             public double Sum { get; private set; }
             public double Min { get; private set; } = double.MaxValue;
             public double Max { get; private set; } = double.MinValue;
 
-            public HistogramState(string name, string[] tags)
+            public HistogramState(string name, string[] tags, int maxStoredValues = 10000)
             {
                 Name = name;
                 Tags = tags;
+                _maxStoredValues = maxStoredValues > 0 ? maxStoredValues : 10000;
             }
 
             public void Record(double value)
@@ -189,7 +205,7 @@ namespace DataWarehouse.Kernel.Telemetry
                     if (value > Max) Max = value;
 
                     // Keep a sample of values for percentile calculation
-                    if (_values.Count < MaxStoredValues)
+                    if (_values.Count < _maxStoredValues)
                     {
                         _values.Add(value);
                     }
@@ -197,7 +213,7 @@ namespace DataWarehouse.Kernel.Telemetry
                     {
                         // Reservoir sampling
                         var index = Random.Shared.Next((int)Count);
-                        if (index < MaxStoredValues)
+                        if (index < _maxStoredValues)
                         {
                             _values[index] = value;
                         }

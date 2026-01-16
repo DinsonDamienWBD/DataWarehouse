@@ -169,6 +169,12 @@ namespace DataWarehouse.SDK.Contracts
         Task PublishReliableAsync(string topic, PluginMessage message, CancellationToken ct = default);
 
         /// <summary>
+        /// Publish with confirmation - returns result indicating delivery status.
+        /// Use this when you need to know if the message was successfully delivered.
+        /// </summary>
+        Task<PublishResult> PublishWithConfirmationAsync(string topic, PluginMessage message, PublishOptions? options = null, CancellationToken ct = default);
+
+        /// <summary>
         /// Subscribe with message filtering.
         /// </summary>
         IDisposable Subscribe(string topic, Func<PluginMessage, bool> filter, Func<PluginMessage, Task> handler);
