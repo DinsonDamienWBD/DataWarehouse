@@ -14,6 +14,21 @@ namespace DataWarehouse.SDK.Contracts
         protected readonly ConcurrentDictionary<string, (IStorageProvider Provider, StorageRole Role)> _providers = new();
         protected IStorageStrategy _strategy;
 
+        /// <summary>
+        /// Per-URI locks to prevent concurrent writes to the same resource.
+        /// Uses SemaphoreSlim for async-safe locking.
+        /// </summary>
+        private readonly ConcurrentDictionary<string, SemaphoreSlim> _uriLocks = new();
+
+        /// <summary>
+        /// Gets or creates a lock for the specified URI.
+        /// </summary>
+        private SemaphoreSlim GetUriLock(Uri uri)
+        {
+            var key = uri.ToString();
+            return _uriLocks.GetOrAdd(key, _ => new SemaphoreSlim(1, 1));
+        }
+
         public override PluginCategory Category => PluginCategory.StorageProvider;
 
         public abstract string PoolId { get; }
@@ -46,55 +61,91 @@ namespace DataWarehouse.SDK.Contracts
         public virtual async Task<StorageResult> SaveAsync(Uri uri, Stream data, StorageIntent? intent = null, CancellationToken ct = default)
         {
             var sw = System.Diagnostics.Stopwatch.StartNew();
-            var providers = Providers;
-            var plans = _strategy.PlanWrite(providers, intent, data.Length).ToList();
-            var usedProviders = new List<string>();
-            long bytesWritten = 0;
+            var uriLock = GetUriLock(uri);
 
+            // Acquire per-URI lock to prevent concurrent writes to the same resource
+            await uriLock.WaitAsync(ct);
             try
             {
-                foreach (var plan in plans.Where(p => p.IsRequired).OrderBy(p => p.Priority))
-                {
-                    ct.ThrowIfCancellationRequested();
-                    data.Position = 0;
-                    await plan.Provider.SaveAsync(uri, data);
-                    usedProviders.Add((plan.Provider as IPlugin)?.Id ?? plan.Provider.Scheme);
-                    bytesWritten = data.Length;
-                }
+                var providers = Providers;
+                var plans = _strategy.PlanWrite(providers, intent, data.Length).ToList();
+                var usedProviders = new List<string>();
+                long bytesWritten = 0;
 
-                return new StorageResult
+                try
                 {
-                    Success = true,
-                    StoredUri = uri,
-                    BytesWritten = bytesWritten,
-                    Duration = sw.Elapsed,
-                    ProvidersUsed = usedProviders.ToArray()
-                };
+                    foreach (var plan in plans.Where(p => p.IsRequired).OrderBy(p => p.Priority))
+                    {
+                        ct.ThrowIfCancellationRequested();
+
+                        // Ensure stream is seekable before resetting position
+                        if (data.CanSeek)
+                            data.Position = 0;
+
+                        await plan.Provider.SaveAsync(uri, data);
+                        usedProviders.Add((plan.Provider as IPlugin)?.Id ?? plan.Provider.Scheme);
+                        bytesWritten = data.Length;
+                    }
+
+                    return new StorageResult
+                    {
+                        Success = true,
+                        StoredUri = uri,
+                        BytesWritten = bytesWritten,
+                        Duration = sw.Elapsed,
+                        ProvidersUsed = usedProviders.ToArray()
+                    };
+                }
+                catch (Exception ex)
+                {
+                    return new StorageResult
+                    {
+                        Success = false,
+                        Error = ex.Message,
+                        Duration = sw.Elapsed,
+                        ProvidersUsed = usedProviders.ToArray()
+                    };
+                }
             }
-            catch (Exception ex)
+            finally
             {
-                return new StorageResult
-                {
-                    Success = false,
-                    Error = ex.Message,
-                    Duration = sw.Elapsed,
-                    ProvidersUsed = usedProviders.ToArray()
-                };
+                uriLock.Release();
             }
         }
 
         public virtual async Task<Stream> LoadAsync(Uri uri, CancellationToken ct = default)
         {
-            var providers = _strategy.PlanRead(Providers, null);
+            var providers = _strategy.PlanRead(Providers, null).ToList();
+            var errors = new List<(string ProviderId, string Error)>();
+
             foreach (var provider in providers)
             {
+                var providerId = (provider as IPlugin)?.Id ?? provider.Scheme;
                 try
                 {
                     if (await provider.ExistsAsync(uri))
                         return await provider.LoadAsync(uri);
                 }
-                catch { /* Try next provider */ }
+                catch (FileNotFoundException)
+                {
+                    // Item doesn't exist in this provider - continue to next
+                    continue;
+                }
+                catch (Exception ex)
+                {
+                    // Log the error but continue to try other providers
+                    errors.Add((providerId, ex.Message));
+                }
             }
+
+            // Build informative error message
+            if (errors.Count > 0)
+            {
+                var errorDetails = string.Join("; ", errors.Select(e => $"{e.ProviderId}: {e.Error}"));
+                throw new InvalidOperationException(
+                    $"Item not found in any provider: {uri}. Provider errors: {errorDetails}");
+            }
+
             throw new FileNotFoundException($"Item not found in any provider: {uri}");
         }
 
@@ -465,6 +516,12 @@ namespace DataWarehouse.SDK.Contracts
         protected readonly ConcurrentDictionary<Uri, AuditEntry> _auditTrail = new();
         protected readonly ConcurrentDictionary<Uri, LockResult> _locks = new();
 
+        /// <summary>
+        /// Lock for synchronizing stream hash operations.
+        /// Prevents concurrent hash computations from corrupting stream position.
+        /// </summary>
+        private readonly SemaphoreSlim _hashLock = new(1, 1);
+
         public ComplianceMode ComplianceMode => _complianceMode;
 
         protected RealTimeStorageBase()
@@ -719,22 +776,61 @@ namespace DataWarehouse.SDK.Contracts
             return Task.CompletedTask;
         }
 
+        /// <summary>
+        /// Computes a cryptographic hash of the stream data.
+        /// Thread-safe: uses a lock to prevent concurrent hash operations from corrupting stream position.
+        /// </summary>
         protected virtual async Task<string> ComputeHashAsync(Stream data, HashAlgorithmType algorithm, CancellationToken ct)
         {
-            data.Position = 0;
-            using System.Security.Cryptography.HashAlgorithm hashAlg = algorithm switch
+            // For non-seekable streams, we need to copy to memory first
+            if (!data.CanSeek)
             {
-                HashAlgorithmType.SHA256 => System.Security.Cryptography.SHA256.Create(),
-                HashAlgorithmType.SHA384 => System.Security.Cryptography.SHA384.Create(),
-                HashAlgorithmType.SHA512 => System.Security.Cryptography.SHA512.Create(),
-                HashAlgorithmType.BLAKE2 => throw new NotSupportedException("BLAKE2 requires the CryptoPlugin. Install and register the BLAKE2 crypto plugin."),
-                HashAlgorithmType.BLAKE3 => throw new NotSupportedException("BLAKE3 requires the CryptoPlugin. Install and register the BLAKE3 crypto plugin."),
-                _ => System.Security.Cryptography.SHA256.Create()
-            };
+                using var ms = new MemoryStream();
+                await data.CopyToAsync(ms, ct);
+                ms.Position = 0;
+                return await ComputeHashFromSeekableStreamAsync(ms, algorithm, ct);
+            }
 
-            var hash = await hashAlg.ComputeHashAsync(data, ct);
+            // For seekable streams, use lock to prevent concurrent position manipulation
+            await _hashLock.WaitAsync(ct);
+            try
+            {
+                return await ComputeHashFromSeekableStreamAsync(data, algorithm, ct);
+            }
+            finally
+            {
+                _hashLock.Release();
+            }
+        }
+
+        /// <summary>
+        /// Internal hash computation for seekable streams. Caller must ensure thread-safety.
+        /// </summary>
+        private static async Task<string> ComputeHashFromSeekableStreamAsync(Stream data, HashAlgorithmType algorithm, CancellationToken ct)
+        {
+            var originalPosition = data.Position;
             data.Position = 0;
-            return Convert.ToHexString(hash);
+
+            try
+            {
+                using System.Security.Cryptography.HashAlgorithm hashAlg = algorithm switch
+                {
+                    HashAlgorithmType.SHA256 => System.Security.Cryptography.SHA256.Create(),
+                    HashAlgorithmType.SHA384 => System.Security.Cryptography.SHA384.Create(),
+                    HashAlgorithmType.SHA512 => System.Security.Cryptography.SHA512.Create(),
+                    HashAlgorithmType.BLAKE2 => throw new NotSupportedException("BLAKE2 requires the CryptoPlugin. Install and register the BLAKE2 crypto plugin."),
+                    HashAlgorithmType.BLAKE3 => throw new NotSupportedException("BLAKE3 requires the CryptoPlugin. Install and register the BLAKE3 crypto plugin."),
+                    _ => System.Security.Cryptography.SHA256.Create()
+                };
+
+                var hash = await hashAlg.ComputeHashAsync(data, ct);
+                return Convert.ToHexString(hash);
+            }
+            finally
+            {
+                // Restore original position for caller
+                data.Position = originalPosition;
+            }
         }
 
         protected override Dictionary<string, object> GetMetadata()
@@ -870,8 +966,8 @@ namespace DataWarehouse.SDK.Contracts
 
         public virtual async IAsyncEnumerable<SearchResultBatch> SearchStreamingAsync(SearchQuery query, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct = default)
         {
-            var enabledProviders = query.EnabledProviders ?? Enum.GetValues<SearchProviderType>();
-            var orderedProviders = enabledProviders.OrderBy(p => GetProviders().FirstOrDefault(pi => pi.Type == p)?.TypicalLatency ?? TimeSpan.MaxValue);
+            var enabledProviders = (query.EnabledProviders ?? Enum.GetValues<SearchProviderType>()).ToList();
+            var orderedProviders = enabledProviders.OrderBy(p => GetProviders().FirstOrDefault(pi => pi.Type == p)?.TypicalLatency ?? TimeSpan.MaxValue).ToList();
 
             foreach (var type in orderedProviders)
             {
@@ -879,22 +975,32 @@ namespace DataWarehouse.SDK.Contracts
                 var sw = System.Diagnostics.Stopwatch.StartNew();
 
                 ProviderSearchResult? result = null;
+                string? error = null;
+
                 try
                 {
                     result = await ExecuteProviderSearchAsync(type, query, ct);
                 }
-                catch { /* Skip failed provider */ }
-
-                if (result != null)
+                catch (OperationCanceledException) when (ct.IsCancellationRequested)
                 {
-                    yield return new SearchResultBatch
-                    {
-                        Source = type,
-                        Items = result.Items,
-                        Latency = sw.Elapsed,
-                        IsFinal = type == enabledProviders.Last()
-                    };
+                    // Cancellation requested - stop iteration
+                    yield break;
                 }
+                catch (Exception ex)
+                {
+                    // Capture error but continue with other providers
+                    error = ex.Message;
+                }
+
+                // Always yield a batch, even if provider failed (with error info)
+                yield return new SearchResultBatch
+                {
+                    Source = type,
+                    Items = result?.Items ?? new List<SearchResultItem>(),
+                    Latency = sw.Elapsed,
+                    IsFinal = type == orderedProviders.Last(),
+                    Error = error
+                };
             }
         }
 

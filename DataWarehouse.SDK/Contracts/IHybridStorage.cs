@@ -280,6 +280,16 @@ namespace DataWarehouse.SDK.Contracts
         public List<SearchResultItem> Items { get; init; } = new();
         public TimeSpan Latency { get; init; }
         public bool IsFinal { get; init; }
+
+        /// <summary>
+        /// Error message if this provider failed, null on success.
+        /// </summary>
+        public string? Error { get; init; }
+
+        /// <summary>
+        /// Whether this batch contains valid results (no error occurred).
+        /// </summary>
+        public bool Success => Error == null;
     }
 
     public class SearchResultItem
