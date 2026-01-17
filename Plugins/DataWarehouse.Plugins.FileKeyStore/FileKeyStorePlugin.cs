@@ -373,49 +373,89 @@ namespace DataWarehouse.Plugins.FileKeyStore
     internal class DpapiTier : IKeyProtectionTier
     {
         private readonly FileKeyStoreConfig _config;
+        private readonly byte[] _machineKey;
 
-        public string Name => "DPAPI";
-        public bool IsAvailable => RuntimeInformation.IsOSPlatform(OSPlatform.Windows);
+        public string Name => "MachineProtection";
+        public bool IsAvailable => true; // Cross-platform alternative to DPAPI
 
         public DpapiTier(FileKeyStoreConfig config)
         {
             _config = config;
+            _machineKey = DeriveMachineKey();
         }
 
         public byte[] Encrypt(byte[] data)
         {
-            if (!IsAvailable)
-                throw new PlatformNotSupportedException("DPAPI is only available on Windows");
+            // Use AES-GCM with machine-derived key (cross-platform DPAPI alternative)
+            var nonce = new byte[12];
+            RandomNumberGenerator.Fill(nonce);
 
-            var scope = _config.DpapiScope == DpapiScope.Machine
-                ? DataProtectionScope.LocalMachine
-                : DataProtectionScope.CurrentUser;
+            var tag = new byte[16];
+            var ciphertext = new byte[data.Length];
 
-            var entropy = GetEntropy();
-            return ProtectedData.Protect(data, entropy, scope);
+            using var aes = new AesGcm(_machineKey, 16);
+            aes.Encrypt(nonce, data, ciphertext, tag);
+
+            // Format: nonce (12) + tag (16) + ciphertext
+            var result = new byte[12 + 16 + ciphertext.Length];
+            Buffer.BlockCopy(nonce, 0, result, 0, 12);
+            Buffer.BlockCopy(tag, 0, result, 12, 16);
+            Buffer.BlockCopy(ciphertext, 0, result, 28, ciphertext.Length);
+
+            return result;
         }
 
         public byte[] Decrypt(byte[] encryptedData)
         {
-            if (!IsAvailable)
-                throw new PlatformNotSupportedException("DPAPI is only available on Windows");
+            if (encryptedData.Length < 28)
+                throw new CryptographicException("Invalid encrypted data format");
 
-            var entropy = GetEntropy();
+            var nonce = new byte[12];
+            var tag = new byte[16];
+            var ciphertext = new byte[encryptedData.Length - 28];
 
-            try
-            {
-                return ProtectedData.Unprotect(encryptedData, entropy, DataProtectionScope.CurrentUser);
-            }
-            catch
-            {
-                return ProtectedData.Unprotect(encryptedData, entropy, DataProtectionScope.LocalMachine);
-            }
+            Buffer.BlockCopy(encryptedData, 0, nonce, 0, 12);
+            Buffer.BlockCopy(encryptedData, 12, tag, 0, 16);
+            Buffer.BlockCopy(encryptedData, 28, ciphertext, 0, ciphertext.Length);
+
+            var plaintext = new byte[ciphertext.Length];
+
+            using var aes = new AesGcm(_machineKey, 16);
+            aes.Decrypt(nonce, ciphertext, tag, plaintext);
+
+            return plaintext;
         }
 
-        private byte[] GetEntropy()
+        private byte[] DeriveMachineKey()
         {
-            var entropyString = _config.DpapiEntropy ?? "DataWarehouse.KeyStore.Entropy.v1";
-            return SHA256.HashData(Encoding.UTF8.GetBytes(entropyString));
+            // Derive a machine-specific key using multiple entropy sources
+            var entropyParts = new List<string>
+            {
+                Environment.MachineName,
+                Environment.UserName,
+                Environment.OSVersion.ToString(),
+                _config.DpapiEntropy ?? "DataWarehouse.KeyStore.MachineKey.v1"
+            };
+
+            // Add hardware info if available
+            try
+            {
+                entropyParts.Add(Environment.ProcessorCount.ToString());
+                entropyParts.Add(Environment.SystemDirectory);
+            }
+            catch { /* Ignore if not available */ }
+
+            var combinedEntropy = string.Join("|", entropyParts);
+            var entropyBytes = Encoding.UTF8.GetBytes(combinedEntropy);
+
+            // Use PBKDF2 to derive a strong key
+            using var pbkdf2 = new Rfc2898DeriveBytes(
+                entropyBytes,
+                salt: SHA256.HashData(Encoding.UTF8.GetBytes("DataWarehouse.DPAPI.Salt.v1")),
+                iterations: 100000,
+                HashAlgorithmName.SHA256);
+
+            return pbkdf2.GetBytes(32); // 256-bit key
         }
     }
 
