@@ -183,34 +183,4 @@ namespace DataWarehouse.SDK.Utilities
         }
     }
 
-    /// <summary>
-    /// Standard response for message operations.
-    /// </summary>
-    public class MessageResponse
-    {
-        /// <summary>
-        /// Whether the operation was successful.
-        /// </summary>
-        public bool Success { get; init; }
-
-        /// <summary>
-        /// Response data (can be any object).
-        /// </summary>
-        public object? Data { get; init; }
-
-        /// <summary>
-        /// Error message if the operation failed.
-        /// </summary>
-        public string? ErrorMessage { get; init; }
-
-        /// <summary>
-        /// Creates a successful response with data.
-        /// </summary>
-        public static MessageResponse Ok(object? data = null) => new() { Success = true, Data = data };
-
-        /// <summary>
-        /// Creates an error response with a message.
-        /// </summary>
-        public static MessageResponse Error(string message) => new() { Success = false, ErrorMessage = message };
-    }
 }
