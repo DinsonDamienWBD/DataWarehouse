@@ -9,18 +9,23 @@ DataWarehouse is a production-grade, AI-native data warehouse SDK built in C#. I
 ```
 DataWarehouse/
 ├── DataWarehouse.SDK/           # Core SDK library
-│   ├── AI/                      # AI integration components
-│   ├── Attributes/              # Custom attributes (e.g., PluginPriority)
-│   ├── Contracts/               # Interface contracts
+│   ├── AI/                      # AI integration
+│   │   ├── IAIProvider.cs       # AI-agnostic provider interface
+│   │   ├── VectorOperations.cs  # Embeddings, similarity, IVectorStore
+│   │   ├── GraphStructures.cs   # Knowledge graphs, nodes, edges
+│   │   ├── MathUtilities.cs     # Statistics, normalization, activation
+│   │   └── Runtime/             # Runtime types
+│   ├── Attributes/              # Custom attributes
+│   ├── Contracts/               # Interfaces and base classes
 │   ├── Extensions/              # Extension methods
 │   ├── Governance/              # Governance contracts
-│   ├── IO/                      # I/O utilities (streams, adapters)
-│   ├── Primitives/              # Core types (Enums, Configuration, Manifest)
-│   ├── Security/                # Security contracts and access control
-│   ├── Services/                # Core services (PluginRegistry)
+│   ├── IO/                      # I/O utilities
+│   ├── Primitives/              # Core types
+│   ├── Security/                # Security contracts
+│   ├── Services/                # Core services
 │   └── Utilities/               # Helper utilities
 ├── Metadata/                    # Project documentation
-│   ├── CLAUDE.md                # This file - AI context
+│   ├── CLAUDE.md                # This file
 │   ├── README.md                # Project readme
 │   ├── RULES.md                 # The 12 Absolute Rules
 │   └── TODO.md                  # Task tracking
@@ -30,100 +35,168 @@ DataWarehouse/
 ## Key Concepts
 
 ### Message-Based Architecture
-- Components communicate via `PluginMessage` class, not direct method calls
-- All message handling is async (`OnMessageAsync`)
-- Responses use standardized `MessageResponse` format
+- Plugins NEVER reference each other directly
+- All communication via `IMessageBus` (pub/sub + request/response)
+- Standard topics in `MessageTopics` class
+- `PluginMessage` for all inter-plugin communication
 
-### Plugin Categories and Base Classes
-All plugins MUST extend category-specific abstract base classes:
+### Plugin Hierarchy (Use Base Classes, Not Interfaces Directly)
 
-| Category | Base Class | Purpose |
-|----------|-----------|---------|
-| Storage | `StorageProviderBase` | S3, Local, IPFS storage |
-| Features | `FeaturePluginBase` | Tiering, Caching |
-| Interface | `InterfacePluginBase` | REST, SQL, gRPC |
-| Metadata | `MetadataProviderBase` | SQLite, Postgres |
-| Intelligence | `IntelligencePluginBase` | AI/Governance |
-| Orchestration | `OrchestrationPluginBase` | Raft consensus |
-| Security | `SecurityProviderBase` | Security/ACL |
-| Pipeline | `PipelinePluginBase` | GZip, AES |
-
-### Plugin Directory Structure
 ```
-Plugins/DataWarehouse.Plugins.{Category}.{Name}/
-  Bootstrapper/Init.cs      # Plugin entry point
-  Engine/{Name}Engine.cs    # Core logic (stateless)
-  Service/{Name}Service.cs  # Optional: stateful services
-  Models/{Name}Models.cs    # Optional: data models
+PluginBase (IPlugin)
+├── DataTransformationPluginBase (IDataTransformation)
+│   └── PipelinePluginBase (runtime ordering)
+├── StorageProviderPluginBase (IStorageProvider)
+│   └── ListableStoragePluginBase (IListableStorage)
+│       └── TieredStoragePluginBase (ITieredStorage)
+├── MetadataIndexPluginBase (IMetadataIndex)
+├── FeaturePluginBase (IFeaturePlugin)
+│   ├── InterfacePluginBase (REST, gRPC, SQL)
+│   ├── ConsensusPluginBase (IConsensusEngine)
+│   └── RealTimePluginBase (IRealTimeProvider)
+├── SecurityProviderPluginBase
+├── OrchestrationProviderPluginBase
+├── IntelligencePluginBase (AI providers)
+└── CloudEnvironmentPluginBase (ICloudEnvironment)
 ```
+
+### Which Base Class to Use?
+
+| Plugin Type | Base Class |
+|-------------|-----------|
+| S3, Local, IPFS storage | `StorageProviderPluginBase` |
+| Storage with file listing | `ListableStoragePluginBase` |
+| Hot/Cold/Archive tiering | `TieredStoragePluginBase` |
+| Compression, Encryption | `DataTransformationPluginBase` |
+| Pipeline stage (orderable) | `PipelinePluginBase` |
+| SQLite, Postgres metadata | `MetadataIndexPluginBase` |
+| REST API, SQL listener | `InterfacePluginBase` |
+| Raft, Paxos consensus | `ConsensusPluginBase` |
+| Pub/Sub, Change feeds | `RealTimePluginBase` |
+| AWS, Azure, GCP detection | `CloudEnvironmentPluginBase` |
+| OpenAI, Claude, Ollama | `IntelligencePluginBase` |
+| ACL, Authentication | `SecurityProviderPluginBase` |
+| Workflow orchestration | `OrchestrationProviderPluginBase` |
+
+## AI Infrastructure
+
+### IAIProvider (AI-Agnostic)
+```csharp
+// Supports ANY AI provider without SDK changes
+interface IAIProvider {
+    string ProviderId { get; }           // "openai", "anthropic", "ollama"
+    AICapabilities Capabilities { get; } // Flags: Streaming, Embeddings, etc.
+    Task<AIResponse> CompleteAsync(AIRequest request);
+    IAsyncEnumerable<AIStreamChunk> CompleteStreamingAsync(AIRequest request);
+    Task<float[]> GetEmbeddingsAsync(string text);
+}
+```
+
+### VectorOperations
+```csharp
+// Embeddings and similarity
+IVectorOperations ops = new DefaultVectorOperations();
+float similarity = ops.CosineSimilarity(vectorA, vectorB);
+var matches = ops.FindTopK(query, candidates, k: 10);
+
+// Vector storage
+interface IVectorStore {
+    Task StoreAsync(string id, float[] vector, Dictionary<string, object>? metadata);
+    Task<IEnumerable<VectorMatch>> SearchAsync(float[] query, int topK);
+}
+```
+
+### GraphStructures
+```csharp
+// Knowledge graphs for relationships
+interface IKnowledgeGraph {
+    Task<GraphNode> AddNodeAsync(string label, Dictionary<string, object>? properties);
+    Task<GraphEdge> AddEdgeAsync(string fromId, string toId, string relationship);
+    Task<GraphPath?> FindPathAsync(string fromId, string toId);
+    Task<GraphTraversalResult> TraverseAsync(string startId, GraphTraversalOptions options);
+}
+```
+
+### MathUtilities
+```csharp
+// Statistical and ML utilities
+float mean = AIMath.Mean(values);
+float[] normalized = AIMath.MinMaxNormalize(values);
+float[] probs = AIMath.Softmax(logits);
+float entropy = AIMath.Entropy(probabilities);
+```
+
+## Pipeline Orchestration
+
+### Runtime Ordering
+```csharp
+// Default: Compress → Encrypt
+var config = PipelineConfiguration.CreateDefault();
+
+// User override: Encrypt → CustomCompress
+config.WriteStages = new List<PipelineStageConfig>
+{
+    new() { StageType = "Encryption", Order = 100 },
+    new() { StageType = "CustomCompression", Order = 200 }
+};
+```
+
+### PipelinePluginBase Properties
+- `DefaultOrder` - Execution order (lower = earlier)
+- `AllowBypass` - Can skip based on content analysis
+- `RequiredPrecedingStages` - Dependencies
+- `IncompatibleStages` - Conflicts
 
 ## Critical Patterns
 
-### Property Override Pattern (NOT Assignment)
+### Property Override (NOT Assignment)
 ```csharp
-// WRONG - causes CS0200 error
-public MyPlugin() : base(...) {
-    SemanticDescription = "..."; // ERROR!
-}
+// WRONG - CS0200 error
+public MyPlugin() { SemanticDescription = "..."; }
 
-// CORRECT - use property override
+// CORRECT - property override
 protected override string SemanticDescription => "...";
-protected override string[] SemanticTags => new[] { "tag1", "tag2" };
 ```
 
-### AI-Native Requirements
-Every component must include:
-- Semantic descriptions in natural language
-- Semantic tags for categorization
-- Performance profiles for optimization
-- Usage examples for learning
-- Standardized parameter schemas (JSON Schema)
+### Plugin ID Format
+```csharp
+public override string Id => "com.company.plugin.storage.s3";
+```
 
 ## The 12 Absolute Rules (Summary)
 
-See `RULES.md` for full details. Key points:
-
 1. **Production-Ready** - Full error handling, validation, thread safety
-2. **Comprehensive Documentation** - XML docs on ALL public APIs
-3. **Maximum Code Reuse** - No duplication, use base classes
-4. **Message-Based Architecture** - No direct function calls
-5. **Standardized Plugin Architecture** - Follow directory structure
-6. **CategoryBase Classes** - ALWAYS extend base classes, never implement interfaces directly
-7. **AI-Native Integration** - Semantic descriptions, tags, profiles
-8. **Error Handling & Resilience** - Retry logic, circuit breakers
-9. **Performance & Scalability** - Async I/O, connection pooling, streaming
-10. **Testing & Validation** - Dependency injection, testable code
-11. **Security & Safety** - Input validation, encryption, audit logging
-12. **Task Tracking** - Update TODO.md before/during/after work
+2. **Documentation** - XML docs on ALL public APIs
+3. **Code Reuse** - Use base classes, no duplication
+4. **Message-Based** - No direct plugin references
+5. **Plugin Architecture** - Follow directory structure
+6. **Base Classes** - ALWAYS extend, never implement interfaces directly
+7. **AI-Native** - Semantic descriptions, tags, profiles
+8. **Resilience** - Retry logic, circuit breakers
+9. **Performance** - Async I/O, streaming, pooling
+10. **Testing** - Dependency injection, testable code
+11. **Security** - Input validation, encryption, audit
+12. **Task Tracking** - Update TODO.md
 
 ## Forbidden Practices
 
+- Direct plugin-to-plugin references
+- Implementing interfaces directly (use base classes)
 - TODO comments in code
-- Placeholders or simulated responses
-- Hardcoded test data
-- Console logging (use proper logging)
+- Console logging
 - Empty catch blocks
 - Magic numbers
-- Generic `Exception` types
-- Direct function calls between components
 
-## Build and Development
+## Interfaces vs Base Classes
 
-- Solution file: `DataWarehouse.slnx`
-- SDK project: `DataWarehouse.SDK/DataWarehouse.SDK.csproj`
-- Target framework: See project file for current target
+**Keep interfaces minimal** - they define contracts.
+**Base classes do the work** - default implementations, metadata, AI integration.
 
-## Common Tasks
+Plugins extend base classes which implement interfaces:
+```csharp
+// DON'T do this
+class MyStorage : IStorageProvider { ... }
 
-### Adding a New Plugin
-1. Create directory: `Plugins/DataWarehouse.Plugins.{Category}.{Name}/`
-2. Add `Bootstrapper/Init.cs` extending appropriate `CategoryBase`
-3. Implement `Engine/{Name}Engine.cs` with core logic
-4. Override semantic properties (description, tags)
-5. Update TODO.md with task status
-
-### Modifying SDK Components
-1. Follow existing patterns in the relevant folder
-2. Add XML documentation to all public members
-3. Ensure thread safety where applicable
-4. Add appropriate logging and error handling
+// DO this
+class MyStorage : StorageProviderPluginBase { ... }
+```

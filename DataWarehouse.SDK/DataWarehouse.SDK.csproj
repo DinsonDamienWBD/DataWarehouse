@@ -7,9 +7,12 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Folder Include="AI\Graph\" />
-    <Folder Include="AI\Math\" />
-    <Folder Include="AI\Vectors\" />
+    <Compile Remove="AI\Graph\**" />
+    <Compile Remove="AI\Math\**" />
+    <EmbeddedResource Remove="AI\Graph\**" />
+    <EmbeddedResource Remove="AI\Math\**" />
+    <None Remove="AI\Graph\**" />
+    <None Remove="AI\Math\**" />
   </ItemGroup>
 
   <ItemGroup>

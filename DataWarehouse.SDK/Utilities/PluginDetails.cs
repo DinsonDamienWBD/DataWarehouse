@@ -26,14 +26,60 @@ namespace DataWarehouse.SDK.Utilities
 
     public class PluginCapabilityDescriptor
     {
-        public string CapabilityId { get; init; } = string.Empty;
+        private string _capabilityId = string.Empty;
+
+        /// <summary>
+        /// Unique capability identifier (e.g., "storage.s3.put").
+        /// </summary>
+        public string CapabilityId
+        {
+            get => _capabilityId;
+            init => _capabilityId = value;
+        }
+
+        /// <summary>
+        /// Alias for CapabilityId for convenience and backward compatibility.
+        /// </summary>
+        public string Name
+        {
+            get => _capabilityId;
+            init => _capabilityId = value;
+        }
+
+        /// <summary>
+        /// Human-readable display name for the capability.
+        /// </summary>
         public string DisplayName { get; init; } = string.Empty;
+
+        /// <summary>
+        /// Description of what this capability does.
+        /// </summary>
         public string Description { get; init; } = string.Empty;
+
+        /// <summary>
+        /// Category of the capability (Storage, Security, etc.).
+        /// </summary>
         public CapabilityCategory Category { get; init; }
+
+        /// <summary>
+        /// Whether this capability requires explicit approval before execution.
+        /// </summary>
         public bool RequiresApproval { get; init; }
+
+        /// <summary>
+        /// Permission required to invoke this capability.
+        /// </summary>
         public Permission RequiredPermission { get; init; }
-        // JSON schema as string (or JObject)
+
+        /// <summary>
+        /// JSON schema defining the parameter structure.
+        /// </summary>
         public string ParameterSchemaJson { get; init; } = "{}";
+
+        /// <summary>
+        /// Optional parameters dictionary for capability metadata.
+        /// </summary>
+        public Dictionary<string, object>? Parameters { get; init; }
     }
 
     /// <summary>
@@ -92,9 +138,10 @@ namespace DataWarehouse.SDK.Utilities
         public string Type { get; init; } = string.Empty;
 
         /// <summary>
-        /// Message payload (can be any object, JSON-serializable).
+        /// Message payload as a dictionary for structured access.
+        /// Use this for key-value payload data.
         /// </summary>
-        public object? Payload { get; init; }
+        public Dictionary<string, object?> Payload { get; init; } = new();
 
         /// <summary>
         /// Timestamp of the message.
@@ -120,5 +167,50 @@ namespace DataWarehouse.SDK.Utilities
         /// Additional metadata for the message.
         /// </summary>
         public Dictionary<string, object> Metadata { get; init; } = new();
+
+        /// <summary>
+        /// Creates a new PluginMessage with the specified type and payload.
+        /// </summary>
+        public static PluginMessage Create(string type, Dictionary<string, object?>? payload = null, string? correlationId = null)
+        {
+            return new PluginMessage
+            {
+                Type = type,
+                Payload = payload ?? new Dictionary<string, object?>(),
+                CorrelationId = correlationId,
+                Timestamp = DateTime.UtcNow
+            };
+        }
+    }
+
+    /// <summary>
+    /// Standard response for message operations.
+    /// </summary>
+    public class MessageResponse
+    {
+        /// <summary>
+        /// Whether the operation was successful.
+        /// </summary>
+        public bool Success { get; init; }
+
+        /// <summary>
+        /// Response data (can be any object).
+        /// </summary>
+        public object? Data { get; init; }
+
+        /// <summary>
+        /// Error message if the operation failed.
+        /// </summary>
+        public string? ErrorMessage { get; init; }
+
+        /// <summary>
+        /// Creates a successful response with data.
+        /// </summary>
+        public static MessageResponse Ok(object? data = null) => new() { Success = true, Data = data };
+
+        /// <summary>
+        /// Creates an error response with a message.
+        /// </summary>
+        public static MessageResponse Error(string message) => new() { Success = false, ErrorMessage = message };
     }
 }
