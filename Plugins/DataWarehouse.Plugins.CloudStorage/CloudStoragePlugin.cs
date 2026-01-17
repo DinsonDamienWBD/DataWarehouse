@@ -1,4 +1,5 @@
 using DataWarehouse.SDK.Contracts;
+using DataWarehouse.SDK.Infrastructure;
 using DataWarehouse.SDK.Primitives;
 using DataWarehouse.SDK.Utilities;
 using System.Text;
@@ -39,11 +40,25 @@ namespace DataWarehouse.Plugins.CloudStorage
     public sealed class CloudStoragePlugin : ListableStoragePluginBase
     {
         private readonly CloudStorageConfig _config;
-        private readonly HttpClient _httpClient;
+        private readonly IHttpClientFactory _httpClientFactory;
+        private readonly string _httpClientName;
         private string? _accessToken;
         private string? _refreshToken;
         private DateTime _tokenExpiry = DateTime.MinValue;
         private readonly SemaphoreSlim _tokenLock = new(1, 1);
+
+        /// <summary>
+        /// Default shared HTTP client factory for all CloudStoragePlugin instances.
+        /// This static factory ensures proper connection pooling across plugin instances.
+        /// </summary>
+        private static readonly Lazy<DefaultHttpClientFactory> SharedFactory = new(
+            () => new DefaultHttpClientFactory(options =>
+            {
+                options.EnableAutomaticDecompression = true;
+                options.PooledConnectionLifetime = TimeSpan.FromMinutes(5);
+                options.MaxConnectionsPerServer = 20;
+            }),
+            LazyThreadSafetyMode.ExecutionAndPublication);
 
         public override string Id => "datawarehouse.plugins.storage.cloud";
         public override string Name => "Cloud Storage";
@@ -59,19 +74,79 @@ namespace DataWarehouse.Plugins.CloudStorage
         };
 
         /// <summary>
-        /// Creates a cloud storage plugin with configuration.
+        /// Gets the HttpClient instance configured for this plugin's cloud provider.
+        /// Uses the injected factory for proper connection pooling.
         /// </summary>
+        private HttpClient HttpClient => _httpClientFactory.CreateClient(_httpClientName);
+
+        /// <summary>
+        /// Creates a cloud storage plugin with configuration.
+        /// Uses the shared default HTTP client factory for connection pooling.
+        /// </summary>
+        /// <param name="config">The cloud storage configuration.</param>
+        /// <remarks>
+        /// This constructor maintains backward compatibility by using a shared
+        /// <see cref="DefaultHttpClientFactory"/> instance. For production use
+        /// with dependency injection, prefer the constructor that accepts
+        /// <see cref="IHttpClientFactory"/>.
+        /// </remarks>
         public CloudStoragePlugin(CloudStorageConfig config)
+            : this(config, null)
+        {
+        }
+
+        /// <summary>
+        /// Creates a cloud storage plugin with configuration and HTTP client factory.
+        /// </summary>
+        /// <param name="config">The cloud storage configuration.</param>
+        /// <param name="httpClientFactory">
+        /// Optional HTTP client factory for connection pooling. When null, uses a
+        /// shared default factory that properly manages connection pooling.
+        /// </param>
+        /// <remarks>
+        /// <para>
+        /// This constructor is the recommended way to create CloudStoragePlugin
+        /// instances in applications using dependency injection.
+        /// </para>
+        /// <para>
+        /// <b>Anti-pattern avoided:</b> Creating HttpClient instances per request
+        /// leads to socket exhaustion. This implementation uses a factory pattern
+        /// to share HttpClient instances across requests while maintaining proper
+        /// connection pooling through SocketsHttpHandler.
+        /// </para>
+        /// </remarks>
+        /// <example>
+        /// Using with dependency injection:
+        /// <code>
+        /// // In DI configuration
+        /// services.AddSingleton&lt;IHttpClientFactory, DefaultHttpClientFactory&gt;();
+        /// services.AddTransient&lt;CloudStoragePlugin&gt;(sp =>
+        ///     new CloudStoragePlugin(
+        ///         config,
+        ///         sp.GetRequiredService&lt;IHttpClientFactory&gt;()));
+        /// </code>
+        /// </example>
+        public CloudStoragePlugin(CloudStorageConfig config, IHttpClientFactory? httpClientFactory)
         {
             _config = config ?? throw new ArgumentNullException(nameof(config));
             _accessToken = config.AccessToken;
             _refreshToken = config.RefreshToken;
             _tokenExpiry = config.TokenExpiry ?? DateTime.MinValue;
 
-            _httpClient = new HttpClient
+            // Use injected factory or fall back to shared static factory
+            _httpClientFactory = httpClientFactory ?? SharedFactory.Value;
+
+            // Create a unique client name based on provider for proper connection pooling
+            _httpClientName = $"cloud-storage-{_config.Provider.ToString().ToLowerInvariant()}";
+
+            // Configure the client with appropriate settings for this provider
+            _httpClientFactory.ConfigureClient(_httpClientName, options =>
             {
-                Timeout = TimeSpan.FromSeconds(_config.TimeoutSeconds)
-            };
+                options.Timeout = TimeSpan.FromSeconds(_config.TimeoutSeconds);
+                options.EnableAutomaticDecompression = true;
+                options.PooledConnectionLifetime = TimeSpan.FromMinutes(5);
+                options.PooledConnectionIdleTimeout = TimeSpan.FromMinutes(2);
+            });
         }
 
         protected override List<PluginCapabilityDescriptor> GetCapabilities()
@@ -373,7 +448,7 @@ namespace DataWarehouse.Plugins.CloudStorage
             };
             request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", _accessToken);
 
-            var response = await _httpClient.SendAsync(request);
+            var response = await HttpClient.SendAsync(request);
             response.EnsureSuccessStatusCode();
         }
 
@@ -384,7 +459,7 @@ namespace DataWarehouse.Plugins.CloudStorage
             var request = new HttpRequestMessage(HttpMethod.Get, $"https://www.googleapis.com/drive/v3/files/{fileId}?alt=media");
             request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", _accessToken);
 
-            var response = await _httpClient.SendAsync(request);
+            var response = await HttpClient.SendAsync(request);
             response.EnsureSuccessStatusCode();
 
             var ms = new MemoryStream();
@@ -400,7 +475,7 @@ namespace DataWarehouse.Plugins.CloudStorage
             var request = new HttpRequestMessage(HttpMethod.Delete, $"https://www.googleapis.com/drive/v3/files/{fileId}");
             request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", _accessToken);
 
-            var response = await _httpClient.SendAsync(request);
+            var response = await HttpClient.SendAsync(request);
             response.EnsureSuccessStatusCode();
         }
 
@@ -418,7 +493,7 @@ namespace DataWarehouse.Plugins.CloudStorage
                 var request = new HttpRequestMessage(HttpMethod.Get, url);
                 request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", _accessToken);
 
-                var response = await _httpClient.SendAsync(request, ct);
+                var response = await HttpClient.SendAsync(request, ct);
                 response.EnsureSuccessStatusCode();
 
                 var json = await response.Content.ReadAsStringAsync(ct);
@@ -449,7 +524,7 @@ namespace DataWarehouse.Plugins.CloudStorage
             var request = new HttpRequestMessage(HttpMethod.Get, url);
             request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", _accessToken);
 
-            var response = await _httpClient.SendAsync(request);
+            var response = await HttpClient.SendAsync(request);
             response.EnsureSuccessStatusCode();
 
             var json = await response.Content.ReadAsStringAsync();
@@ -482,7 +557,7 @@ namespace DataWarehouse.Plugins.CloudStorage
             };
             request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", _accessToken);
 
-            var response = await _httpClient.SendAsync(request);
+            var response = await HttpClient.SendAsync(request);
             response.EnsureSuccessStatusCode();
         }
 
@@ -497,7 +572,7 @@ namespace DataWarehouse.Plugins.CloudStorage
             var request = new HttpRequestMessage(HttpMethod.Get, url);
             request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", _accessToken);
 
-            var response = await _httpClient.SendAsync(request);
+            var response = await HttpClient.SendAsync(request);
             response.EnsureSuccessStatusCode();
 
             var ms = new MemoryStream();
@@ -517,7 +592,7 @@ namespace DataWarehouse.Plugins.CloudStorage
             var request = new HttpRequestMessage(HttpMethod.Delete, url);
             request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", _accessToken);
 
-            var response = await _httpClient.SendAsync(request);
+            var response = await HttpClient.SendAsync(request);
             response.EnsureSuccessStatusCode();
         }
 
@@ -535,7 +610,7 @@ namespace DataWarehouse.Plugins.CloudStorage
                 var request = new HttpRequestMessage(HttpMethod.Get, url);
                 request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", _accessToken);
 
-                var response = await _httpClient.SendAsync(request, ct);
+                var response = await HttpClient.SendAsync(request, ct);
                 response.EnsureSuccessStatusCode();
 
                 var json = await response.Content.ReadAsStringAsync(ct);
@@ -570,7 +645,7 @@ namespace DataWarehouse.Plugins.CloudStorage
             request.Headers.TryAddWithoutValidation("Dropbox-API-Arg", JsonSerializer.Serialize(new { path = $"/{path}", mode = "overwrite" }));
             request.Content.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("application/octet-stream");
 
-            var response = await _httpClient.SendAsync(request);
+            var response = await HttpClient.SendAsync(request);
             response.EnsureSuccessStatusCode();
         }
 
@@ -580,7 +655,7 @@ namespace DataWarehouse.Plugins.CloudStorage
             request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", _accessToken);
             request.Headers.TryAddWithoutValidation("Dropbox-API-Arg", JsonSerializer.Serialize(new { path = $"/{path}" }));
 
-            var response = await _httpClient.SendAsync(request);
+            var response = await HttpClient.SendAsync(request);
             response.EnsureSuccessStatusCode();
 
             var ms = new MemoryStream();
@@ -597,7 +672,7 @@ namespace DataWarehouse.Plugins.CloudStorage
             };
             request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", _accessToken);
 
-            var response = await _httpClient.SendAsync(request);
+            var response = await HttpClient.SendAsync(request);
             response.EnsureSuccessStatusCode();
         }
 
@@ -625,7 +700,7 @@ namespace DataWarehouse.Plugins.CloudStorage
                 }
                 request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", _accessToken);
 
-                var response = await _httpClient.SendAsync(request, ct);
+                var response = await HttpClient.SendAsync(request, ct);
                 response.EnsureSuccessStatusCode();
 
                 var json = await response.Content.ReadAsStringAsync(ct);
@@ -666,7 +741,7 @@ namespace DataWarehouse.Plugins.CloudStorage
             };
             request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", _accessToken);
 
-            var response = await _httpClient.SendAsync(request);
+            var response = await HttpClient.SendAsync(request);
             response.EnsureSuccessStatusCode();
         }
 
@@ -677,7 +752,7 @@ namespace DataWarehouse.Plugins.CloudStorage
             var request = new HttpRequestMessage(HttpMethod.Get, $"https://api.box.com/2.0/files/{fileId}/content");
             request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", _accessToken);
 
-            var response = await _httpClient.SendAsync(request);
+            var response = await HttpClient.SendAsync(request);
             response.EnsureSuccessStatusCode();
 
             var ms = new MemoryStream();
@@ -693,7 +768,7 @@ namespace DataWarehouse.Plugins.CloudStorage
             var request = new HttpRequestMessage(HttpMethod.Delete, $"https://api.box.com/2.0/files/{fileId}");
             request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", _accessToken);
 
-            var response = await _httpClient.SendAsync(request);
+            var response = await HttpClient.SendAsync(request);
             response.EnsureSuccessStatusCode();
         }
 
@@ -710,7 +785,7 @@ namespace DataWarehouse.Plugins.CloudStorage
                 var request = new HttpRequestMessage(HttpMethod.Get, url);
                 request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", _accessToken);
 
-                var response = await _httpClient.SendAsync(request, ct);
+                var response = await HttpClient.SendAsync(request, ct);
                 response.EnsureSuccessStatusCode();
 
                 var json = await response.Content.ReadAsStringAsync(ct);
@@ -745,7 +820,7 @@ namespace DataWarehouse.Plugins.CloudStorage
             var request = new HttpRequestMessage(HttpMethod.Get, url);
             request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", _accessToken);
 
-            var response = await _httpClient.SendAsync(request);
+            var response = await HttpClient.SendAsync(request);
             response.EnsureSuccessStatusCode();
 
             var json = await response.Content.ReadAsStringAsync();
@@ -846,7 +921,7 @@ namespace DataWarehouse.Plugins.CloudStorage
                 ["client_secret"] = _config.ClientSecret
             });
 
-            var response = await _httpClient.PostAsync(tokenUrl, content);
+            var response = await HttpClient.PostAsync(tokenUrl, content);
             response.EnsureSuccessStatusCode();
 
             var json = await response.Content.ReadAsStringAsync();
