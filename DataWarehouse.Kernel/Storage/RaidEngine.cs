@@ -2669,20 +2669,26 @@ namespace DataWarehouse.Kernel.Storage
             var diskBuffers = new Dictionary<int, List<byte[]>>();
             var failedDisk = -1;
 
+            const int MaxIterations = 10000;
             for (int disk = 0; disk < dataDisks; disk++)
             {
                 diskBuffers[disk] = new List<byte[]>();
                 int chunkIdx = 0;
+                int iteration = 0;
                 while (true)
                 {
+                    if (++iteration > MaxIterations)
+                        throw new InvalidOperationException($"[RAID-4] Exceeded max iterations ({MaxIterations}) loading disk {disk}");
                     try
                     {
                         var chunk = await LoadChunkAsync(getProvider(disk), $"{key}.d{disk}.c{chunkIdx}");
                         diskBuffers[disk].Add(chunk);
                         chunkIdx++;
                     }
-                    catch
+                    catch (Exception ex)
                     {
+                        // Log but continue - failure is non-critical for cleanup
+                        Console.Error.WriteLine($"[RAID] Load chunk failed for disk {disk}, chunk {chunkIdx}: {ex.Message}");
                         if (chunkIdx == 0 && failedDisk == -1)
                         {
                             failedDisk = disk;
@@ -2999,8 +3005,12 @@ namespace DataWarehouse.Kernel.Storage
             var chunks = new List<byte[]>();
             int chunkIdx = 0;
 
+            const int MaxIterations = 10000;
+            int iteration = 0;
             while (true)
             {
+                if (++iteration > MaxIterations)
+                    throw new InvalidOperationException($"[RAID-1E] Exceeded max iterations ({MaxIterations}) loading chunks");
                 try
                 {
                     int disk = chunkIdx % _config.ProviderCount;
@@ -3008,8 +3018,10 @@ namespace DataWarehouse.Kernel.Storage
                     chunks.Add(chunk);
                     chunkIdx++;
                 }
-                catch
+                catch (Exception ex)
                 {
+                    // Log but continue - failure is non-critical for cleanup
+                    Console.Error.WriteLine($"[RAID] Load chunk failed at index {chunkIdx}: {ex.Message}");
                     break; // No more chunks
                 }
             }
@@ -3116,7 +3128,11 @@ namespace DataWarehouse.Kernel.Storage
                         if (otherIdx != chunkIdx && otherIdx < metadata.ChunkCount)
                         {
                             try { otherChunks.Add(await LoadChunkAsync(getProvider(otherIdx % _config.ProviderCount), $"{key}.chunk.{otherIdx}")); }
-                            catch { }
+                            catch (Exception ex)
+                            {
+                                // Log but continue - failure is non-critical for cleanup
+                                Console.Error.WriteLine($"[RAID] Load other chunk failed at index {otherIdx}: {ex.Message}");
+                            }
                         }
                     }
 
@@ -3563,7 +3579,11 @@ namespace DataWarehouse.Kernel.Storage
                                 var chunk = await LoadChunkAsync(getProvider(i), $"{key}.chunk.{idx}");
                                 surviving.Add(chunk);
                             }
-                            catch { }
+                            catch (Exception ex)
+                            {
+                                // Log but continue - failure is non-critical for cleanup
+                                Console.Error.WriteLine($"[RAID] Load surviving chunk failed at index {idx}: {ex.Message}");
+                            }
                         }
                     }
 
@@ -3662,7 +3682,11 @@ namespace DataWarehouse.Kernel.Storage
                     rebuildBitmap = await LoadChunkAsync(getProvider(disk), $"{key}.fr.bitmap");
                     break;
                 }
-                catch { }
+                catch (Exception ex)
+                {
+                    // Log but continue - failure is non-critical for cleanup
+                    Console.Error.WriteLine($"[RAID] Load bitmap failed from disk {disk}: {ex.Message}");
+                }
             }
 
             var allChunks = new byte[metadata.ChunkCount][];
@@ -4253,7 +4277,11 @@ namespace DataWarehouse.Kernel.Storage
                         using var pStream = await LoadStreamAsync(pProvider, $"{key}.dcl.s{stripeIdx}.p");
                         if (pStream != null) parityP = await ReadAllBytesAsync(pStream);
                     }
-                    catch { }
+                    catch (Exception ex)
+                    {
+                        // Log but continue - failure is non-critical for cleanup
+                        Console.Error.WriteLine($"[RAID] Load parity P failed for stripe {stripeIdx}: {ex.Message}");
+                    }
 
                     try
                     {
@@ -4262,7 +4290,11 @@ namespace DataWarehouse.Kernel.Storage
                         using var qStream = await LoadStreamAsync(qProvider, $"{key}.dcl.s{stripeIdx}.q");
                         if (qStream != null) parityQ = await ReadAllBytesAsync(qStream);
                     }
-                    catch { }
+                    catch (Exception ex)
+                    {
+                        // Log but continue - failure is non-critical for cleanup
+                        Console.Error.WriteLine($"[RAID] Load parity Q failed for stripe {stripeIdx}: {ex.Message}");
+                    }
 
                     // Determine chunk size from available data
                     int chunkSize = stripeChunks.Where(c => c != null).FirstOrDefault()?.Length ??
@@ -4836,7 +4868,11 @@ namespace DataWarehouse.Kernel.Storage
                             using var pStream = await LoadStreamAsync(getProvider(dataDrives + p),$"{key}.nm.s{stripeIdx}.p{p}");
                             if (pStream != null) parities[p] = await ReadAllBytesAsync(pStream);
                         }
-                        catch { }
+                        catch (Exception ex)
+                        {
+                            // Log but continue - failure is non-critical for cleanup
+                            Console.Error.WriteLine($"[RAID] Load parity {p} failed for stripe {stripeIdx}: {ex.Message}");
+                        }
                     }
 
                     int chunkSize = stripeData.Where(c => c != null).FirstOrDefault()?.Length ??
@@ -4996,7 +5032,11 @@ namespace DataWarehouse.Kernel.Storage
                         result.Write(chunk, 0, Math.Min(chunk.Length, splitPoint - (int)result.Length));
                     }
                 }
-                catch { }
+                catch (Exception ex)
+                {
+                    // Log but continue - failure is non-critical for cleanup
+                    Console.Error.WriteLine($"[RAID] Load RAID0 chunk {i} failed from drive {driveIdx}: {ex.Message}");
+                }
             }
 
             // Load RAID 1 partition (from any drive)
@@ -5282,7 +5322,11 @@ namespace DataWarehouse.Kernel.Storage
                             stripeData[failedIdx] = reconstructed;
                         }
                     }
-                    catch { }
+                    catch (Exception ex)
+                    {
+                        // Log but continue - failure is non-critical for cleanup
+                        Console.Error.WriteLine($"[RAID] Crypto parity reconstruction failed for stripe {stripeIdx}: {ex.Message}");
+                    }
                 }
 
                 allChunks.AddRange(stripeData.Where(c => c != null));
@@ -5350,7 +5394,11 @@ namespace DataWarehouse.Kernel.Storage
                     if (stream != null)
                         return new MemoryStream(await ReadAllBytesAsync(stream));
                 }
-                catch { }
+                catch (Exception ex)
+                {
+                    // Log but continue - failure is non-critical for cleanup
+                    Console.Error.WriteLine($"[RAID] DUP copy1 load failed from provider {i}: {ex.Message}");
+                }
 
                 try
                 {
@@ -5358,7 +5406,11 @@ namespace DataWarehouse.Kernel.Storage
                     if (stream != null)
                         return new MemoryStream(await ReadAllBytesAsync(stream));
                 }
-                catch { }
+                catch (Exception ex)
+                {
+                    // Log but continue - failure is non-critical for cleanup
+                    Console.Error.WriteLine($"[RAID] DUP copy2 load failed from provider {i}: {ex.Message}");
+                }
             }
 
             throw new InvalidOperationException("DUP: Failed to load any copy");
@@ -5484,7 +5536,11 @@ namespace DataWarehouse.Kernel.Storage
                             if (stream != null)
                                 allChunks[i] = await ReadAllBytesAsync(stream);
                         }
-                        catch { }
+                        catch (Exception ex)
+                        {
+                            // Log but continue - failure is non-critical for cleanup
+                            Console.Error.WriteLine($"[RAID] DDP alternate load failed for chunk {i} from drive {alt}: {ex.Message}");
+                        }
                     }
                 }
 
@@ -5864,7 +5920,12 @@ namespace DataWarehouse.Kernel.Storage
                 {
                     tasks.Add(Task.Run(async () =>
                     {
-                        try { await DeleteChunkAsync(getProvider(p), chunkKey); } catch { }
+                        try { await DeleteChunkAsync(getProvider(p), chunkKey); }
+                        catch (Exception ex)
+                        {
+                            // Log but continue - failure is non-critical for cleanup
+                            Console.Error.WriteLine($"[RAID] Delete chunk failed for {chunkKey} on provider {p}: {ex.Message}");
+                        }
                     }));
                 }
             }

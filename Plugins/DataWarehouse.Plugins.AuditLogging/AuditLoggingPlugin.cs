@@ -447,7 +447,11 @@ namespace DataWarehouse.Plugins.AuditLogging
                         if (results.Count >= limit)
                             return results;
                     }
-                    catch { }
+                    catch (Exception ex)
+                    {
+                        // Log audit failure - critical for compliance
+                        Console.Error.WriteLine($"[AUDIT] Failed to process audit event: {ex.Message}");
+                    }
                 }
             }
 
@@ -511,7 +515,11 @@ namespace DataWarehouse.Plugins.AuditLogging
                                 _previousHash = Convert.FromHexString(lastEntry.Hash);
                             }
                         }
-                        catch { }
+                        catch (Exception ex)
+                        {
+                            // Log audit failure - critical for compliance
+                            Console.Error.WriteLine($"[AUDIT] Failed to process audit event: {ex.Message}");
+                        }
                     }
                 }
             }
@@ -556,10 +564,26 @@ namespace DataWarehouse.Plugins.AuditLogging
                 while (_buffer.TryDequeue(out var entry))
                 {
                     var json = JsonSerializer.Serialize(entry, AuditJsonContext.Default.AuditEntry);
-                    await _currentWriter!.WriteLineAsync(json);
+                    if (_currentWriter is { } writer)
+                    {
+                        await writer.WriteLineAsync(json);
+                    }
+                    else
+                    {
+                        // Log error for missed audit entry - compliance issue
+                        Console.Error.WriteLine($"[AUDIT] Writer not initialized - audit entry lost");
+                    }
                 }
 
-                await _currentWriter!.FlushAsync();
+                if (_currentWriter is { } flushWriter)
+                {
+                    await flushWriter.FlushAsync();
+                }
+                else
+                {
+                    // Log error for missed audit entry - compliance issue
+                    Console.Error.WriteLine($"[AUDIT] Writer not initialized - audit entry lost");
+                }
             }
             finally
             {
@@ -578,7 +602,11 @@ namespace DataWarehouse.Plugins.AuditLogging
                     await CleanupOldLogsAsync();
                 }
                 catch (OperationCanceledException) { break; }
-                catch { }
+                catch (Exception ex)
+                {
+                    // Log audit failure - critical for compliance
+                    Console.Error.WriteLine($"[AUDIT] Failed to process audit event: {ex.Message}");
+                }
             }
         }
 
