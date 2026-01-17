@@ -64,8 +64,23 @@ namespace DataWarehouse.Plugins.NetworkStorage
                 handler.Credentials = _credential;
             }
 
+            // Security Warning: AcceptAnyCertificate bypasses SSL/TLS validation.
+            // This should ONLY be used in development/testing environments.
             if (_config.AcceptAnyCertificate)
             {
+                if (!_config.IsDevelopmentMode)
+                {
+                    throw new InvalidOperationException(
+                        "Security Error: AcceptAnyCertificate requires IsDevelopmentMode=true. " +
+                        "Disabling certificate validation in production is a critical security vulnerability.");
+                }
+
+                // Log security warning
+                Console.Error.WriteLine(
+                    "[SECURITY WARNING] SSL certificate validation is DISABLED. " +
+                    "This is vulnerable to man-in-the-middle attacks. " +
+                    "Only use in development environments.");
+
                 handler.ServerCertificateCustomValidationCallback = (_, _, _, _) => true;
             }
 
@@ -679,8 +694,15 @@ namespace DataWarehouse.Plugins.NetworkStorage
 
         /// <summary>
         /// Accept any SSL certificate (for testing only).
+        /// SECURITY WARNING: Must also set IsDevelopmentMode=true.
         /// </summary>
         public bool AcceptAnyCertificate { get; set; }
+
+        /// <summary>
+        /// Indicates this is a development/testing environment.
+        /// Required to use AcceptAnyCertificate.
+        /// </summary>
+        public bool IsDevelopmentMode { get; set; }
 
         /// <summary>
         /// Creates configuration for UNC path.

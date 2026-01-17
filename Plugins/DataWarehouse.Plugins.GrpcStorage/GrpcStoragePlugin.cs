@@ -54,8 +54,24 @@ namespace DataWarehouse.Plugins.GrpcStorage
                 KeepAlivePingTimeout = TimeSpan.FromSeconds(30)
             };
 
+            // Security Warning: AcceptAnyCertificate bypasses SSL/TLS validation.
+            // This should ONLY be used in development/testing environments.
+            // In production, use proper certificate validation.
             if (_config.UseTls && _config.AcceptAnyCertificate)
             {
+                if (!_config.IsDevelopmentMode)
+                {
+                    throw new InvalidOperationException(
+                        "Security Error: AcceptAnyCertificate requires IsDevelopmentMode=true. " +
+                        "Disabling certificate validation in production is a critical security vulnerability.");
+                }
+
+                // Log security warning (would be logged by context in full implementation)
+                Console.Error.WriteLine(
+                    "[SECURITY WARNING] SSL certificate validation is DISABLED. " +
+                    "This is vulnerable to man-in-the-middle attacks. " +
+                    "Only use in development environments.");
+
                 handler.SslOptions = new System.Net.Security.SslClientAuthenticationOptions
                 {
                     RemoteCertificateValidationCallback = (_, _, _, _) => true
@@ -703,8 +719,15 @@ namespace DataWarehouse.Plugins.GrpcStorage
 
         /// <summary>
         /// Accept any TLS certificate (for testing only).
+        /// SECURITY WARNING: Must also set IsDevelopmentMode=true.
         /// </summary>
         public bool AcceptAnyCertificate { get; set; }
+
+        /// <summary>
+        /// Indicates this is a development/testing environment.
+        /// Required to use AcceptAnyCertificate.
+        /// </summary>
+        public bool IsDevelopmentMode { get; set; }
 
         /// <summary>
         /// Bearer token for authentication.
@@ -733,7 +756,8 @@ namespace DataWarehouse.Plugins.GrpcStorage
         {
             Endpoint = $"https://localhost:{port}",
             UseTls = true,
-            AcceptAnyCertificate = true
+            AcceptAnyCertificate = true,
+            IsDevelopmentMode = true  // Safe: explicitly a local development configuration
         };
 
         /// <summary>
