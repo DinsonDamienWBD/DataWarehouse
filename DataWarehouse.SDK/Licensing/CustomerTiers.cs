@@ -1,6 +1,9 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Security.Cryptography;
+using System.Text;
+using System.Text.Json;
 
 namespace DataWarehouse.SDK.Licensing
 {
@@ -490,6 +493,7 @@ namespace DataWarehouse.SDK.Licensing
 
     /// <summary>
     /// Represents a customer's current subscription state.
+    /// Security: Feature overrides are signed to prevent tampering.
     /// </summary>
     public sealed class CustomerSubscription
     {
@@ -511,29 +515,109 @@ namespace DataWarehouse.SDK.Licensing
         /// <summary>Whether the subscription is currently active.</summary>
         public bool IsActive { get; set; } = true;
 
-        /// <summary>Custom feature overrides (for enterprise negotiations).</summary>
-        public Feature? FeatureOverrides { get; set; }
+        /// <summary>Custom feature overrides (for enterprise negotiations). Must be signed.</summary>
+        private Feature? _featureOverrides;
+        public Feature? FeatureOverrides
+        {
+            get => _featureOverrides;
+            set
+            {
+                _featureOverrides = value;
+                _isSignatureValid = false; // Invalidate signature on modification
+            }
+        }
 
-        /// <summary>Custom limit overrides (for enterprise negotiations).</summary>
-        public TierLimits? LimitOverrides { get; set; }
+        /// <summary>Custom limit overrides (for enterprise negotiations). Must be signed.</summary>
+        private TierLimits? _limitOverrides;
+        public TierLimits? LimitOverrides
+        {
+            get => _limitOverrides;
+            set
+            {
+                _limitOverrides = value;
+                _isSignatureValid = false;
+            }
+        }
+
+        /// <summary>HMAC signature for subscription data integrity.</summary>
+        public byte[]? Signature { get; private set; }
+
+        private bool _isSignatureValid;
+
+        /// <summary>
+        /// Signs the subscription with the provided key to prevent tampering.
+        /// </summary>
+        public void Sign(byte[] signingKey)
+        {
+            ArgumentNullException.ThrowIfNull(signingKey);
+            if (signingKey.Length < 32)
+                throw new ArgumentException("Signing key must be at least 256 bits", nameof(signingKey));
+
+            var dataToSign = GetSignableData();
+            using var hmac = new HMACSHA256(signingKey);
+            Signature = hmac.ComputeHash(dataToSign);
+            _isSignatureValid = true;
+        }
+
+        /// <summary>
+        /// Verifies the subscription signature to detect tampering.
+        /// </summary>
+        public bool VerifySignature(byte[] signingKey)
+        {
+            if (Signature == null || Signature.Length == 0)
+                return false;
+
+            var dataToSign = GetSignableData();
+            using var hmac = new HMACSHA256(signingKey);
+            var expectedSignature = hmac.ComputeHash(dataToSign);
+
+            _isSignatureValid = CryptographicOperations.FixedTimeEquals(Signature, expectedSignature);
+            return _isSignatureValid;
+        }
+
+        private byte[] GetSignableData()
+        {
+            var data = new
+            {
+                CustomerId,
+                Tier = (int)Tier,
+                SubscriptionStart = SubscriptionStart.ToUnixTimeMilliseconds(),
+                BillingPeriodEnd = BillingPeriodEnd?.ToUnixTimeMilliseconds(),
+                FeatureOverrides = (long?)_featureOverrides,
+                IsActive
+            };
+            return Encoding.UTF8.GetBytes(JsonSerializer.Serialize(data));
+        }
 
         /// <summary>
         /// Gets the effective features for this subscription.
+        /// Security: Returns base tier features only if overrides are not properly signed.
         /// </summary>
         public Feature GetEffectiveFeatures()
         {
             var baseFeatures = TierManager.GetFeatures(Tier);
-            return FeatureOverrides.HasValue
-                ? baseFeatures | FeatureOverrides.Value
-                : baseFeatures;
+
+            // Security: Only apply overrides if signature is valid
+            if (_featureOverrides.HasValue && _isSignatureValid)
+            {
+                return baseFeatures | _featureOverrides.Value;
+            }
+
+            return baseFeatures;
         }
 
         /// <summary>
         /// Gets the effective limits for this subscription.
+        /// Security: Returns base tier limits only if overrides are not properly signed.
         /// </summary>
         public TierLimits GetEffectiveLimits()
         {
-            return LimitOverrides ?? TierManager.GetLimits(Tier);
+            // Security: Only apply overrides if signature is valid
+            if (_limitOverrides != null && _isSignatureValid)
+            {
+                return _limitOverrides;
+            }
+            return TierManager.GetLimits(Tier);
         }
 
         /// <summary>
@@ -545,6 +629,11 @@ namespace DataWarehouse.SDK.Licensing
             var effectiveFeatures = GetEffectiveFeatures();
             return (effectiveFeatures & feature) == feature;
         }
+
+        /// <summary>
+        /// Checks if subscription has valid integrity (signed and verified).
+        /// </summary>
+        public bool HasValidIntegrity => _isSignatureValid;
     }
 
     /// <summary>

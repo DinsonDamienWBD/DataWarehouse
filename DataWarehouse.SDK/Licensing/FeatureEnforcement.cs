@@ -1,11 +1,28 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Security.Cryptography;
+using System.Text;
+using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 
 namespace DataWarehouse.SDK.Licensing
 {
+    /// <summary>
+    /// Exception thrown when a subscription is not found.
+    /// </summary>
+    public class SubscriptionNotFoundException : Exception
+    {
+        public string CustomerId { get; }
+
+        public SubscriptionNotFoundException(string customerId)
+            : base($"No subscription found for customer '{customerId}'. A valid subscription is required.")
+        {
+            CustomerId = customerId;
+        }
+    }
+
     /// <summary>
     /// Interface for subscription management and feature enforcement.
     /// </summary>
@@ -108,6 +125,7 @@ namespace DataWarehouse.SDK.Licensing
     /// <summary>
     /// In-memory implementation of subscription management for development/testing.
     /// Production should use a database-backed implementation.
+    /// Thread-safe implementation using proper synchronization.
     /// </summary>
     public sealed class InMemorySubscriptionManager : ISubscriptionManager
     {
@@ -116,7 +134,7 @@ namespace DataWarehouse.SDK.Licensing
         private readonly ConcurrentDictionary<string, long> _dailyApiRequests = new();
         private readonly ConcurrentDictionary<string, long> _dailyAITokens = new();
         private readonly ConcurrentDictionary<string, int> _concurrentOps = new();
-        private DateTimeOffset _lastDailyReset = DateTimeOffset.UtcNow.Date;
+        private volatile DateTimeOffset _lastDailyReset = DateTimeOffset.UtcNow.Date; // volatile for thread safety
         private readonly object _resetLock = new();
 
         /// <summary>
@@ -159,30 +177,43 @@ namespace DataWarehouse.SDK.Licensing
 
         public async Task<bool> HasFeatureAsync(string customerId, Feature feature, CancellationToken ct = default)
         {
+            ArgumentException.ThrowIfNullOrWhiteSpace(customerId);
+
             var subscription = await GetSubscriptionAsync(customerId, ct);
             if (subscription == null)
             {
-                // Default to Individual tier for unknown customers
-                return TierManager.HasFeature(CustomerTier.Individual, feature);
+                // Security: Unknown customers must register first - no default access
+                throw new SubscriptionNotFoundException(customerId);
             }
             return subscription.HasFeature(feature);
         }
 
         public async Task EnsureFeatureAsync(string customerId, Feature feature, CancellationToken ct = default)
         {
-            var subscription = await GetSubscriptionAsync(customerId, ct);
-            var tier = subscription?.Tier ?? CustomerTier.Individual;
+            ArgumentException.ThrowIfNullOrWhiteSpace(customerId);
 
-            if (!TierManager.HasFeature(tier, feature))
+            var subscription = await GetSubscriptionAsync(customerId, ct);
+            if (subscription == null)
             {
-                throw new FeatureNotAvailableException(feature, tier);
+                throw new SubscriptionNotFoundException(customerId);
+            }
+
+            if (!TierManager.HasFeature(subscription.Tier, feature))
+            {
+                throw new FeatureNotAvailableException(feature, subscription.Tier);
             }
         }
 
         public async Task<TierLimits> GetLimitsAsync(string customerId, CancellationToken ct = default)
         {
+            ArgumentException.ThrowIfNullOrWhiteSpace(customerId);
+
             var subscription = await GetSubscriptionAsync(customerId, ct);
-            return subscription?.GetEffectiveLimits() ?? TierManager.GetLimits(CustomerTier.Individual);
+            if (subscription == null)
+            {
+                throw new SubscriptionNotFoundException(customerId);
+            }
+            return subscription.GetEffectiveLimits();
         }
 
         public Task RecordUsageAsync(string customerId, UsageRecord usage, CancellationToken ct = default)

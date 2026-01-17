@@ -358,11 +358,43 @@ namespace DataWarehouse.Plugins.LocalStorage
             if (OperatingSystem.IsWindows() && uri.LocalPath.Length >= 3 &&
                 char.IsLetter(uri.LocalPath[1]) && uri.LocalPath[2] == ':')
             {
-                return uri.LocalPath.TrimStart('/');
+                // For absolute Windows paths, still validate against BasePath if set
+                var windowsPath = uri.LocalPath.TrimStart('/');
+                if (!string.IsNullOrEmpty(_config.BasePath))
+                {
+                    var normalizedBase = Path.GetFullPath(_config.BasePath);
+                    var normalizedTarget = Path.GetFullPath(windowsPath);
+                    if (!normalizedTarget.StartsWith(normalizedBase, StringComparison.OrdinalIgnoreCase))
+                    {
+                        throw new UnauthorizedAccessException(
+                            $"Security violation: Path traversal attempt detected. Access denied.");
+                    }
+                }
+                return windowsPath;
             }
 
             if (!string.IsNullOrEmpty(_config.BasePath))
-                return Path.Combine(_config.BasePath, relativePath);
+            {
+                var fullPath = Path.GetFullPath(Path.Combine(_config.BasePath, relativePath));
+                var normalizedBasePath = Path.GetFullPath(_config.BasePath);
+
+                // Security: Prevent path traversal attacks
+                if (!fullPath.StartsWith(normalizedBasePath, StringComparison.OrdinalIgnoreCase))
+                {
+                    throw new UnauthorizedAccessException(
+                        $"Security violation: Path traversal attempt detected. Access denied.");
+                }
+                return fullPath;
+            }
+
+            // No base path - validate against current directory
+            var currentDir = Path.GetFullPath(Directory.GetCurrentDirectory());
+            var targetPath = Path.GetFullPath(relativePath);
+            if (!targetPath.StartsWith(currentDir, StringComparison.OrdinalIgnoreCase))
+            {
+                throw new UnauthorizedAccessException(
+                    $"Security violation: Path traversal attempt detected. Access denied.");
+            }
 
             return relativePath;
         }

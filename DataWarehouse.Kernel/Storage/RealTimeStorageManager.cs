@@ -17,7 +17,7 @@ namespace DataWarehouse.Kernel.Storage
         private readonly object _snapshotLock = new();
         private readonly RetentionPolicy _retentionPolicy;
         private readonly string _id;
-        private bool _isRunning;
+        private volatile bool _isRunning; // volatile for thread-safe access
 
         public override string Id => _id;
         public override string PoolId => _id;

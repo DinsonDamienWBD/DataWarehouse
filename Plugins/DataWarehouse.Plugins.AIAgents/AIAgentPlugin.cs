@@ -66,12 +66,58 @@ namespace DataWarehouse.Plugins.AIAgents
         private readonly HttpClient _httpClient;
         private readonly SemaphoreSlim _rateLimiter;
         private readonly CancellationTokenSource _shutdownCts = new();
+        private readonly Timer _conversationCleanupTimer;
+
+        // Resource management: Limits on conversation storage
+        private const int MaxConversations = 10_000;
+        private static readonly TimeSpan ConversationTTL = TimeSpan.FromHours(24);
 
         public AIAgentPlugin(AIAgentConfig? config = null)
         {
             _config = config ?? new AIAgentConfig();
             _httpClient = new HttpClient { Timeout = TimeSpan.FromMinutes(5) };
             _rateLimiter = new SemaphoreSlim(_config.MaxConcurrentRequests, _config.MaxConcurrentRequests);
+
+            // Start periodic cleanup of expired conversations (every 5 minutes)
+            _conversationCleanupTimer = new Timer(
+                CleanupExpiredConversations,
+                null,
+                TimeSpan.FromMinutes(5),
+                TimeSpan.FromMinutes(5));
+        }
+
+        /// <summary>
+        /// Cleans up expired conversations to prevent unbounded memory growth.
+        /// </summary>
+        private void CleanupExpiredConversations(object? state)
+        {
+            var now = DateTime.UtcNow;
+            var expiredConversations = _conversations
+                .Where(kvp => now - kvp.Value.LastAccessedAt > ConversationTTL)
+                .Select(kvp => kvp.Key)
+                .ToList();
+
+            foreach (var id in expiredConversations)
+            {
+                _conversations.TryRemove(id, out _);
+            }
+
+            // Also enforce max count by removing oldest if over limit
+            while (_conversations.Count > MaxConversations)
+            {
+                var oldest = _conversations
+                    .OrderBy(kvp => kvp.Value.LastAccessedAt)
+                    .FirstOrDefault();
+
+                if (!string.IsNullOrEmpty(oldest.Key))
+                {
+                    _conversations.TryRemove(oldest.Key, out _);
+                }
+                else
+                {
+                    break;
+                }
+            }
         }
 
         protected override List<PluginCapabilityDescriptor> GetCapabilities()
@@ -129,14 +175,28 @@ namespace DataWarehouse.Plugins.AIAgents
 
         public override async Task StopAsync()
         {
+            // Signal shutdown
             _shutdownCts.Cancel();
+
+            // Dispose cleanup timer first to stop background work
+            await _conversationCleanupTimer.DisposeAsync();
+
+            // Clear conversations to release memory
+            _conversations.Clear();
+
+            // Dispose HTTP client and rate limiter
             _httpClient.Dispose();
             _rateLimiter.Dispose();
 
+            // Dispose all providers
             foreach (var provider in _providers.Values.OfType<IDisposable>())
             {
                 provider.Dispose();
             }
+            _providers.Clear();
+
+            // Dispose cancellation token source
+            _shutdownCts.Dispose();
         }
 
         public override async Task OnMessageAsync(PluginMessage message)
@@ -929,8 +989,14 @@ namespace DataWarehouse.Plugins.AIAgents
     {
         public string Id { get; set; } = string.Empty;
         public DateTime CreatedAt { get; set; }
+        public DateTime LastAccessedAt { get; set; } = DateTime.UtcNow;
         public string? SystemPrompt { get; set; }
         public List<ChatMessage> Messages { get; set; } = new();
+
+        /// <summary>
+        /// Updates the last accessed time to prevent expiration.
+        /// </summary>
+        public void Touch() => LastAccessedAt = DateTime.UtcNow;
     }
 
     public class ProviderStats

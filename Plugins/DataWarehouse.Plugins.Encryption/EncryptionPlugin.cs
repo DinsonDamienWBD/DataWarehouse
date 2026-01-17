@@ -101,13 +101,29 @@ namespace DataWarehouse.Plugins.Encryption
             };
         }
 
+        /// <summary>
+        /// Encrypts data from the input stream using AES-256-GCM.
+        /// </summary>
+        /// <remarks>
+        /// IMPORTANT: This method is synchronous due to the PipelinePluginBase interface constraint.
+        /// The OnWrite method signature is defined as returning Stream (not Task&lt;Stream&gt;),
+        /// which means we cannot use async/await here. We use RunSyncWithErrorHandling to safely
+        /// execute async key store operations with proper error handling and context preservation.
+        /// </remarks>
         public override Stream OnWrite(Stream input, IKernelContext context, Dictionary<string, object> args)
         {
             var keyStore = GetKeyStore(args, context);
             var securityContext = GetSecurityContext(args);
 
-            var keyId = keyStore.GetCurrentKeyIdAsync().GetAwaiter().GetResult();
-            var key = keyStore.GetKeyAsync(keyId, securityContext).GetAwaiter().GetResult();
+            // Interface constraint: OnWrite must be synchronous, but IKeyStore methods are async.
+            // Using helper method with proper error handling for sync-over-async calls.
+            var keyId = RunSyncWithErrorHandling(
+                () => keyStore.GetCurrentKeyIdAsync(),
+                "Failed to retrieve current key ID from key store");
+
+            var key = RunSyncWithErrorHandling(
+                () => keyStore.GetKeyAsync(keyId, securityContext),
+                $"Failed to retrieve key '{keyId[..Math.Min(8, keyId.Length)]}...' from key store");
 
             if (key.Length != 32)
                 throw new CryptographicException("AES-256 requires a 256-bit (32-byte) key");
@@ -140,6 +156,15 @@ namespace DataWarehouse.Plugins.Encryption
             }
         }
 
+        /// <summary>
+        /// Decrypts data from the stored stream using AES-256-GCM.
+        /// </summary>
+        /// <remarks>
+        /// IMPORTANT: This method is synchronous due to the PipelinePluginBase interface constraint.
+        /// The OnRead method signature is defined as returning Stream (not Task&lt;Stream&gt;),
+        /// which means we cannot use async/await here. We use RunSyncWithErrorHandling to safely
+        /// execute async key store operations with proper error handling and context preservation.
+        /// </remarks>
         public override Stream OnRead(Stream stored, IKernelContext context, Dictionary<string, object> args)
         {
             var keyStore = GetKeyStore(args, context);
@@ -157,7 +182,12 @@ namespace DataWarehouse.Plugins.Encryption
                 throw new CryptographicException("Invalid key ID length in header");
 
             var keyId = System.Text.Encoding.UTF8.GetString(ciphertext, 4, keyIdLength).TrimEnd('\0');
-            var key = keyStore.GetKeyAsync(keyId, securityContext).GetAwaiter().GetResult();
+
+            // Interface constraint: OnRead must be synchronous, but IKeyStore methods are async.
+            // Using helper method with proper error handling for sync-over-async calls.
+            var key = RunSyncWithErrorHandling(
+                () => keyStore.GetKeyAsync(keyId, securityContext),
+                $"Failed to retrieve key '{keyId[..Math.Min(8, keyId.Length)]}...' from key store for decryption");
 
             if (key.Length != 32)
                 throw new CryptographicException("AES-256 requires a 256-bit (32-byte) key");
@@ -255,12 +285,96 @@ namespace DataWarehouse.Plugins.Encryption
             throw new InvalidOperationException("No IKeyStore available. Configure a key store before using encryption.");
         }
 
+        /// <summary>
+        /// Async version of GetKeyStore for use in async contexts.
+        /// Returns the configured key store, searching plugins if necessary.
+        /// </summary>
+        /// <param name="args">Arguments dictionary that may contain a key store.</param>
+        /// <param name="context">Kernel context for plugin discovery.</param>
+        /// <param name="cancellationToken">Cancellation token for async operations.</param>
+        /// <returns>The configured IKeyStore instance.</returns>
+        private Task<IKeyStore> GetKeyStoreAsync(Dictionary<string, object> args, IKernelContext context, CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            // Key store resolution is synchronous, but we provide an async wrapper
+            // for consistent async API usage and future extensibility (e.g., remote key store discovery)
+            return Task.FromResult(GetKeyStore(args, context));
+        }
+
         private ISecurityContext GetSecurityContext(Dictionary<string, object> args)
         {
             if (args.TryGetValue("securityContext", out var scObj) && scObj is ISecurityContext sc)
                 return sc;
 
             return _securityContext ?? new DefaultSecurityContext();
+        }
+
+        /// <summary>
+        /// Async version of GetSecurityContext for use in async contexts.
+        /// Returns the configured security context or creates a default one.
+        /// </summary>
+        /// <param name="args">Arguments dictionary that may contain a security context.</param>
+        /// <param name="cancellationToken">Cancellation token for async operations.</param>
+        /// <returns>The configured ISecurityContext instance.</returns>
+        private Task<ISecurityContext> GetSecurityContextAsync(Dictionary<string, object> args, CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            // Security context resolution is synchronous, but we provide an async wrapper
+            // for consistent async API usage and future extensibility (e.g., remote auth providers)
+            return Task.FromResult(GetSecurityContext(args));
+        }
+
+        /// <summary>
+        /// Safely executes an async operation synchronously with proper error handling.
+        /// </summary>
+        /// <remarks>
+        /// This helper is necessary because the PipelinePluginBase interface defines OnWrite/OnRead
+        /// as synchronous methods (returning Stream), but key store operations are async.
+        ///
+        /// We use Task.Run to avoid potential deadlocks that can occur when calling
+        /// .GetAwaiter().GetResult() directly on a task that may use the current synchronization context.
+        /// This approach schedules the async work on the thread pool, avoiding context capture issues.
+        ///
+        /// Error handling preserves the original exception type when possible, wrapping in
+        /// CryptographicException for consistent error handling in encryption operations.
+        /// </remarks>
+        /// <typeparam name="T">The return type of the async operation.</typeparam>
+        /// <param name="asyncOperation">The async operation to execute.</param>
+        /// <param name="errorContext">Context message for error reporting.</param>
+        /// <returns>The result of the async operation.</returns>
+        /// <exception cref="CryptographicException">Thrown when the async operation fails.</exception>
+        private static T RunSyncWithErrorHandling<T>(Func<Task<T>> asyncOperation, string errorContext)
+        {
+            try
+            {
+                // Use Task.Run to avoid synchronization context deadlocks
+                // This schedules the async work on the thread pool
+                return Task.Run(asyncOperation).GetAwaiter().GetResult();
+            }
+            catch (AggregateException ae) when (ae.InnerException != null)
+            {
+                // Unwrap AggregateException to get the actual exception
+                var innerException = ae.InnerException;
+
+                // Preserve CryptographicException as-is for consistent error handling
+                if (innerException is CryptographicException)
+                    throw innerException;
+
+                // Wrap other exceptions with context
+                throw new CryptographicException($"{errorContext}: {innerException.Message}", innerException);
+            }
+            catch (CryptographicException)
+            {
+                // Re-throw CryptographicExceptions without wrapping
+                throw;
+            }
+            catch (Exception ex)
+            {
+                // Wrap unexpected exceptions with context
+                throw new CryptographicException($"{errorContext}: {ex.Message}", ex);
+            }
         }
 
         private Task HandleConfigureAsync(PluginMessage message)
@@ -366,13 +480,29 @@ namespace DataWarehouse.Plugins.Encryption
             };
         }
 
+        /// <summary>
+        /// Encrypts data from the input stream using ChaCha20-Poly1305.
+        /// </summary>
+        /// <remarks>
+        /// IMPORTANT: This method is synchronous due to the PipelinePluginBase interface constraint.
+        /// The OnWrite method signature is defined as returning Stream (not Task&lt;Stream&gt;),
+        /// which means we cannot use async/await here. We use RunSyncWithErrorHandling to safely
+        /// execute async key store operations with proper error handling and context preservation.
+        /// </remarks>
         public override Stream OnWrite(Stream input, IKernelContext context, Dictionary<string, object> args)
         {
             var keyStore = GetKeyStore(args, context);
             var securityContext = GetSecurityContext(args);
 
-            var keyId = keyStore.GetCurrentKeyIdAsync().GetAwaiter().GetResult();
-            var key = keyStore.GetKeyAsync(keyId, securityContext).GetAwaiter().GetResult();
+            // Interface constraint: OnWrite must be synchronous, but IKeyStore methods are async.
+            // Using helper method with proper error handling for sync-over-async calls.
+            var keyId = RunSyncWithErrorHandling(
+                () => keyStore.GetCurrentKeyIdAsync(),
+                "Failed to retrieve current key ID from key store");
+
+            var key = RunSyncWithErrorHandling(
+                () => keyStore.GetKeyAsync(keyId, securityContext),
+                $"Failed to retrieve key '{keyId[..Math.Min(8, keyId.Length)]}...' from key store");
 
             if (key.Length != 32)
                 throw new CryptographicException("ChaCha20-Poly1305 requires a 256-bit (32-byte) key");
@@ -419,6 +549,15 @@ namespace DataWarehouse.Plugins.Encryption
             }
         }
 
+        /// <summary>
+        /// Decrypts data from the stored stream using ChaCha20-Poly1305.
+        /// </summary>
+        /// <remarks>
+        /// IMPORTANT: This method is synchronous due to the PipelinePluginBase interface constraint.
+        /// The OnRead method signature is defined as returning Stream (not Task&lt;Stream&gt;),
+        /// which means we cannot use async/await here. We use RunSyncWithErrorHandling to safely
+        /// execute async key store operations with proper error handling and context preservation.
+        /// </remarks>
         public override Stream OnRead(Stream stored, IKernelContext context, Dictionary<string, object> args)
         {
             var keyStore = GetKeyStore(args, context);
@@ -433,7 +572,11 @@ namespace DataWarehouse.Plugins.Encryption
             var keyId = System.Text.Encoding.UTF8.GetString(encryptedData, pos, keyIdLength).TrimEnd('\0');
             pos += KeyIdSize;
 
-            var key = keyStore.GetKeyAsync(keyId, securityContext).GetAwaiter().GetResult();
+            // Interface constraint: OnRead must be synchronous, but IKeyStore methods are async.
+            // Using helper method with proper error handling for sync-over-async calls.
+            var key = RunSyncWithErrorHandling(
+                () => keyStore.GetKeyAsync(keyId, securityContext),
+                $"Failed to retrieve key '{keyId[..Math.Min(8, keyId.Length)]}...' from key store for decryption");
 
             byte[]? plaintext = null;
             try
@@ -483,11 +626,95 @@ namespace DataWarehouse.Plugins.Encryption
             throw new InvalidOperationException("No IKeyStore available");
         }
 
+        /// <summary>
+        /// Async version of GetKeyStore for use in async contexts.
+        /// Returns the configured key store, searching plugins if necessary.
+        /// </summary>
+        /// <param name="args">Arguments dictionary that may contain a key store.</param>
+        /// <param name="context">Kernel context for plugin discovery.</param>
+        /// <param name="cancellationToken">Cancellation token for async operations.</param>
+        /// <returns>The configured IKeyStore instance.</returns>
+        private Task<IKeyStore> GetKeyStoreAsync(Dictionary<string, object> args, IKernelContext context, CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            // Key store resolution is synchronous, but we provide an async wrapper
+            // for consistent async API usage and future extensibility (e.g., remote key store discovery)
+            return Task.FromResult(GetKeyStore(args, context));
+        }
+
         private ISecurityContext GetSecurityContext(Dictionary<string, object> args)
         {
             if (args.TryGetValue("securityContext", out var scObj) && scObj is ISecurityContext sc)
                 return sc;
             return _securityContext ?? new DefaultSecurityContext();
+        }
+
+        /// <summary>
+        /// Async version of GetSecurityContext for use in async contexts.
+        /// Returns the configured security context or creates a default one.
+        /// </summary>
+        /// <param name="args">Arguments dictionary that may contain a security context.</param>
+        /// <param name="cancellationToken">Cancellation token for async operations.</param>
+        /// <returns>The configured ISecurityContext instance.</returns>
+        private Task<ISecurityContext> GetSecurityContextAsync(Dictionary<string, object> args, CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            // Security context resolution is synchronous, but we provide an async wrapper
+            // for consistent async API usage and future extensibility (e.g., remote auth providers)
+            return Task.FromResult(GetSecurityContext(args));
+        }
+
+        /// <summary>
+        /// Safely executes an async operation synchronously with proper error handling.
+        /// </summary>
+        /// <remarks>
+        /// This helper is necessary because the PipelinePluginBase interface defines OnWrite/OnRead
+        /// as synchronous methods (returning Stream), but key store operations are async.
+        ///
+        /// We use Task.Run to avoid potential deadlocks that can occur when calling
+        /// .GetAwaiter().GetResult() directly on a task that may use the current synchronization context.
+        /// This approach schedules the async work on the thread pool, avoiding context capture issues.
+        ///
+        /// Error handling preserves the original exception type when possible, wrapping in
+        /// CryptographicException for consistent error handling in encryption operations.
+        /// </remarks>
+        /// <typeparam name="T">The return type of the async operation.</typeparam>
+        /// <param name="asyncOperation">The async operation to execute.</param>
+        /// <param name="errorContext">Context message for error reporting.</param>
+        /// <returns>The result of the async operation.</returns>
+        /// <exception cref="CryptographicException">Thrown when the async operation fails.</exception>
+        private static T RunSyncWithErrorHandling<T>(Func<Task<T>> asyncOperation, string errorContext)
+        {
+            try
+            {
+                // Use Task.Run to avoid synchronization context deadlocks
+                // This schedules the async work on the thread pool
+                return Task.Run(asyncOperation).GetAwaiter().GetResult();
+            }
+            catch (AggregateException ae) when (ae.InnerException != null)
+            {
+                // Unwrap AggregateException to get the actual exception
+                var innerException = ae.InnerException;
+
+                // Preserve CryptographicException as-is for consistent error handling
+                if (innerException is CryptographicException)
+                    throw innerException;
+
+                // Wrap other exceptions with context
+                throw new CryptographicException($"{errorContext}: {innerException.Message}", innerException);
+            }
+            catch (CryptographicException)
+            {
+                // Re-throw CryptographicExceptions without wrapping
+                throw;
+            }
+            catch (Exception ex)
+            {
+                // Wrap unexpected exceptions with context
+                throw new CryptographicException($"{errorContext}: {ex.Message}", ex);
+            }
         }
 
         private Task HandleConfigureAsync(PluginMessage message)

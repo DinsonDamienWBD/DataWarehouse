@@ -8,12 +8,14 @@ namespace DataWarehouse.Plugins.AIAgents
     /// <summary>
     /// Google Gemini AI provider.
     /// Supports Gemini Pro, Ultra, Flash, and experimental models.
+    /// Security: API keys are sent via headers, not URL parameters.
     /// </summary>
     public class GeminiProvider : IAIProvider
     {
         private readonly HttpClient _httpClient;
         private readonly ProviderConfig _config;
         private const string BaseUrl = "https://generativelanguage.googleapis.com/v1beta";
+        private const string ApiKeyHeader = "x-goog-api-key";
 
         public string ProviderType => "Google Gemini";
         public string DefaultModel => _config.DefaultModel ?? "gemini-2.0-flash";
@@ -42,7 +44,7 @@ namespace DataWarehouse.Plugins.AIAgents
 
         public async Task<ChatResponse> ChatAsync(ChatRequest request, CancellationToken ct = default)
         {
-            var endpoint = $"{_config.Endpoint ?? BaseUrl}/models/{request.Model}:generateContent?key={_config.ApiKey}";
+            var endpoint = $"{_config.Endpoint ?? BaseUrl}/models/{request.Model}:generateContent";
 
             var contents = request.Messages.Select(m => new
             {
@@ -64,7 +66,11 @@ namespace DataWarehouse.Plugins.AIAgents
             var json = JsonSerializer.Serialize(payload, new JsonSerializerOptions { DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull });
             var content = new StringContent(json, Encoding.UTF8, "application/json");
 
-            var response = await _httpClient.PostAsync(endpoint, content, ct);
+            using var httpRequest = new HttpRequestMessage(HttpMethod.Post, endpoint);
+            httpRequest.Content = content;
+            httpRequest.Headers.Add(ApiKeyHeader, _config.ApiKey);
+
+            var response = await _httpClient.SendAsync(httpRequest, ct);
             var responseBody = await response.Content.ReadAsStringAsync(ct);
 
             if (!response.IsSuccessStatusCode)
@@ -115,7 +121,7 @@ namespace DataWarehouse.Plugins.AIAgents
         public async Task<double[][]> EmbedAsync(string[] texts, string? model = null, CancellationToken ct = default)
         {
             var embedModel = model ?? "text-embedding-004";
-            var endpoint = $"{_config.Endpoint ?? BaseUrl}/models/{embedModel}:batchEmbedContents?key={_config.ApiKey}";
+            var endpoint = $"{_config.Endpoint ?? BaseUrl}/models/{embedModel}:batchEmbedContents";
 
             var payload = new
             {
@@ -129,7 +135,11 @@ namespace DataWarehouse.Plugins.AIAgents
             var json = JsonSerializer.Serialize(payload);
             var content = new StringContent(json, Encoding.UTF8, "application/json");
 
-            var response = await _httpClient.PostAsync(endpoint, content, ct);
+            using var httpRequest = new HttpRequestMessage(HttpMethod.Post, endpoint);
+            httpRequest.Content = content;
+            httpRequest.Headers.Add(ApiKeyHeader, _config.ApiKey);
+
+            var response = await _httpClient.SendAsync(httpRequest, ct);
             var responseBody = await response.Content.ReadAsStringAsync(ct);
             var result = JsonDocument.Parse(responseBody);
 
@@ -144,7 +154,7 @@ namespace DataWarehouse.Plugins.AIAgents
 
         public async IAsyncEnumerable<string> StreamChatAsync(ChatRequest request, [EnumeratorCancellation] CancellationToken ct = default)
         {
-            var endpoint = $"{_config.Endpoint ?? BaseUrl}/models/{request.Model}:streamGenerateContent?key={_config.ApiKey}";
+            var endpoint = $"{_config.Endpoint ?? BaseUrl}/models/{request.Model}:streamGenerateContent";
 
             var contents = request.Messages.Select(m => new
             {
@@ -161,7 +171,11 @@ namespace DataWarehouse.Plugins.AIAgents
             var json = JsonSerializer.Serialize(payload);
             var content = new StringContent(json, Encoding.UTF8, "application/json");
 
-            var response = await _httpClient.PostAsync(endpoint, content, ct);
+            using var httpRequest = new HttpRequestMessage(HttpMethod.Post, endpoint);
+            httpRequest.Content = content;
+            httpRequest.Headers.Add(ApiKeyHeader, _config.ApiKey);
+
+            var response = await _httpClient.SendAsync(httpRequest, HttpCompletionOption.ResponseHeadersRead, ct);
             using var stream = await response.Content.ReadAsStreamAsync(ct);
             using var reader = new StreamReader(stream);
 
@@ -197,7 +211,7 @@ namespace DataWarehouse.Plugins.AIAgents
 
         public async Task<FunctionCallResponse> FunctionCallAsync(FunctionCallRequest request, CancellationToken ct = default)
         {
-            var endpoint = $"{_config.Endpoint ?? BaseUrl}/models/{request.Model}:generateContent?key={_config.ApiKey}";
+            var endpoint = $"{_config.Endpoint ?? BaseUrl}/models/{request.Model}:generateContent";
 
             var tools = new[]
             {
@@ -223,7 +237,11 @@ namespace DataWarehouse.Plugins.AIAgents
             var json = JsonSerializer.Serialize(payload);
             var content = new StringContent(json, Encoding.UTF8, "application/json");
 
-            var response = await _httpClient.PostAsync(endpoint, content, ct);
+            using var httpRequest = new HttpRequestMessage(HttpMethod.Post, endpoint);
+            httpRequest.Content = content;
+            httpRequest.Headers.Add(ApiKeyHeader, _config.ApiKey);
+
+            var response = await _httpClient.SendAsync(httpRequest, ct);
             var responseBody = await response.Content.ReadAsStringAsync(ct);
             var result = JsonDocument.Parse(responseBody);
 
@@ -251,7 +269,7 @@ namespace DataWarehouse.Plugins.AIAgents
 
         public async Task<VisionResponse> VisionAsync(VisionRequest request, CancellationToken ct = default)
         {
-            var endpoint = $"{_config.Endpoint ?? BaseUrl}/models/{request.Model}:generateContent?key={_config.ApiKey}";
+            var endpoint = $"{_config.Endpoint ?? BaseUrl}/models/{request.Model}:generateContent";
 
             var parts = new List<object> { new { text = request.Prompt } };
 
@@ -275,7 +293,11 @@ namespace DataWarehouse.Plugins.AIAgents
             var json = JsonSerializer.Serialize(payload);
             var content = new StringContent(json, Encoding.UTF8, "application/json");
 
-            var response = await _httpClient.PostAsync(endpoint, content, ct);
+            using var httpRequest = new HttpRequestMessage(HttpMethod.Post, endpoint);
+            httpRequest.Content = content;
+            httpRequest.Headers.Add(ApiKeyHeader, _config.ApiKey);
+
+            var response = await _httpClient.SendAsync(httpRequest, ct);
             var responseBody = await response.Content.ReadAsStringAsync(ct);
             var result = JsonDocument.Parse(responseBody);
 
