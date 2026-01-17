@@ -188,18 +188,24 @@ namespace DataWarehouse.Plugins.AIAgents
                 if (data == "[DONE]")
                     break;
 
+                string? contentValue = null;
                 try
                 {
                     var evt = JsonDocument.Parse(data);
                     var delta = evt.RootElement.GetProperty("choices")[0].GetProperty("delta");
                     if (delta.TryGetProperty("content", out var contentProp))
                     {
-                        yield return contentProp.GetString() ?? "";
+                        contentValue = contentProp.GetString() ?? "";
                     }
                 }
                 catch
                 {
                     continue;
+                }
+
+                if (contentValue != null)
+                {
+                    yield return contentValue;
                 }
             }
         }
@@ -224,7 +230,7 @@ namespace DataWarehouse.Plugins.AIAgents
                 model = request.Model,
                 messages = request.Messages.Select(m => new { role = m.Role, content = m.Content }),
                 tools = tools,
-                tool_choice = request.FunctionCall == "auto" ? "auto" : new { type = "function", function = new { name = request.FunctionCall } }
+                tool_choice = request.FunctionCall == "auto" ? (object)"auto" : new { type = "function", function = new { name = request.FunctionCall } }
             };
 
             var json = JsonSerializer.Serialize(payload, new JsonSerializerOptions { DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull });

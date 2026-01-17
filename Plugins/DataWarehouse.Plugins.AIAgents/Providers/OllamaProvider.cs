@@ -73,13 +73,13 @@ namespace DataWarehouse.Plugins.AIAgents
                 ["stream"] = false
             };
 
-            if (request.MaxTokens.HasValue || request.Temperature.HasValue)
+            if (request.MaxTokens != null || request.Temperature != null)
             {
                 var options = new Dictionary<string, object>();
-                if (request.MaxTokens.HasValue)
-                    options["num_predict"] = request.MaxTokens.Value;
-                if (request.Temperature.HasValue)
-                    options["temperature"] = request.Temperature.Value;
+                if (request.MaxTokens != null)
+                    options["num_predict"] = request.MaxTokens;
+                if (request.Temperature != null)
+                    options["temperature"] = request.Temperature;
                 if (request.StopSequences?.Any() == true)
                     options["stop"] = request.StopSequences;
                 payload["options"] = options;
@@ -127,13 +127,13 @@ namespace DataWarehouse.Plugins.AIAgents
                 ["stream"] = false
             };
 
-            if (request.MaxTokens.HasValue || request.Temperature.HasValue)
+            if (request.MaxTokens != null || request.Temperature != null)
             {
                 var options = new Dictionary<string, object>();
-                if (request.MaxTokens.HasValue)
-                    options["num_predict"] = request.MaxTokens.Value;
-                if (request.Temperature.HasValue)
-                    options["temperature"] = request.Temperature.Value;
+                if (request.MaxTokens != null)
+                    options["num_predict"] = request.MaxTokens;
+                if (request.Temperature != null)
+                    options["temperature"] = request.Temperature;
                 if (request.StopSequences?.Any() == true)
                     options["stop"] = request.StopSequences;
                 payload["options"] = options;
@@ -198,13 +198,13 @@ namespace DataWarehouse.Plugins.AIAgents
                 ["stream"] = true
             };
 
-            if (request.MaxTokens.HasValue || request.Temperature.HasValue)
+            if (request.MaxTokens != null || request.Temperature != null)
             {
                 var options = new Dictionary<string, object>();
-                if (request.MaxTokens.HasValue)
-                    options["num_predict"] = request.MaxTokens.Value;
-                if (request.Temperature.HasValue)
-                    options["temperature"] = request.Temperature.Value;
+                if (request.MaxTokens != null)
+                    options["num_predict"] = request.MaxTokens;
+                if (request.Temperature != null)
+                    options["temperature"] = request.Temperature;
                 payload["options"] = options;
             }
 
@@ -222,6 +222,9 @@ namespace DataWarehouse.Plugins.AIAgents
                 var line = await reader.ReadLineAsync(ct);
                 if (string.IsNullOrEmpty(line)) continue;
 
+                string? textToYield = null;
+                bool shouldBreak = false;
+
                 try
                 {
                     var evt = JsonDocument.Parse(line);
@@ -232,14 +235,20 @@ namespace DataWarehouse.Plugins.AIAgents
                     {
                         var text = msgContent.GetString();
                         if (!string.IsNullOrEmpty(text))
-                            yield return text;
+                            textToYield = text;
                     }
 
                     // Check if done
                     if (root.TryGetProperty("done", out var done) && done.GetBoolean())
-                        break;
+                        shouldBreak = true;
                 }
                 catch { }
+
+                if (textToYield != null)
+                    yield return textToYield;
+
+                if (shouldBreak)
+                    break;
             }
         }
 

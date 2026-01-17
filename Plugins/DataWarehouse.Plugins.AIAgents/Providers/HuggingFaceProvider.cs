@@ -231,6 +231,7 @@ namespace DataWarehouse.Plugins.AIAgents
                     var data = line.Substring(5).Trim();
                     if (string.IsNullOrEmpty(data)) continue;
 
+                    string? valueToYield = null;
                     try
                     {
                         var evt = JsonDocument.Parse(data);
@@ -239,10 +240,13 @@ namespace DataWarehouse.Plugins.AIAgents
                         {
                             var textStr = text.GetString();
                             if (!string.IsNullOrEmpty(textStr))
-                                yield return textStr;
+                                valueToYield = textStr;
                         }
                     }
                     catch { }
+
+                    if (valueToYield != null)
+                        yield return valueToYield;
                 }
             }
         }

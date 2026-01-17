@@ -815,8 +815,8 @@ namespace DataWarehouse.Plugins.AIAgents
     {
         public string Model { get; set; } = string.Empty;
         public List<ChatMessage> Messages { get; set; } = new();
-        public int MaxTokens { get; set; } = 4096;
-        public double Temperature { get; set; } = 0.7;
+        public int? MaxTokens { get; set; }
+        public double? Temperature { get; set; }
         public bool Stream { get; set; }
         public string[]? StopSequences { get; set; }
     }
@@ -842,8 +842,8 @@ namespace DataWarehouse.Plugins.AIAgents
     {
         public string Model { get; set; } = string.Empty;
         public string Prompt { get; set; } = string.Empty;
-        public int MaxTokens { get; set; } = 1024;
-        public double Temperature { get; set; } = 0.7;
+        public int? MaxTokens { get; set; }
+        public double? Temperature { get; set; }
         public string[]? StopSequences { get; set; }
     }
 
@@ -882,7 +882,7 @@ namespace DataWarehouse.Plugins.AIAgents
         public string? ImageUrl { get; set; }
         public string? ImageBase64 { get; set; }
         public string Prompt { get; set; } = string.Empty;
-        public int MaxTokens { get; set; } = 1024;
+        public int? MaxTokens { get; set; }
     }
 
     public class VisionResponse

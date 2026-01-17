@@ -160,7 +160,7 @@ namespace DataWarehouse.Plugins.AIAgents
                         content = m.Content
                     }),
                     system = request.Messages.FirstOrDefault(m => m.Role == "system")?.Content,
-                    temperature = request.Temperature
+                    temperature = request.Temperature ?? 0.7
                 };
             }
             else if (request.Model.StartsWith("meta."))
@@ -305,7 +305,7 @@ namespace DataWarehouse.Plugins.AIAgents
                         content = m.Content
                     }),
                     system = request.Messages.FirstOrDefault(m => m.Role == "system")?.Content,
-                    temperature = request.Temperature
+                    temperature = request.Temperature ?? 0.7
                 };
             }
             else
@@ -341,6 +341,7 @@ namespace DataWarehouse.Plugins.AIAgents
                 var line = await reader.ReadLineAsync(ct);
                 if (string.IsNullOrEmpty(line)) continue;
 
+                string? textToYield = null;
                 try
                 {
                     // Bedrock streaming uses event-stream format
@@ -351,12 +352,13 @@ namespace DataWarehouse.Plugins.AIAgents
                     if (evt.RootElement.TryGetProperty("delta", out var delta) &&
                         delta.TryGetProperty("text", out var text))
                     {
-                        var textStr = text.GetString();
-                        if (!string.IsNullOrEmpty(textStr))
-                            yield return textStr;
+                        textToYield = text.GetString();
                     }
                 }
                 catch { }
+
+                if (!string.IsNullOrEmpty(textToYield))
+                    yield return textToYield;
             }
         }
 

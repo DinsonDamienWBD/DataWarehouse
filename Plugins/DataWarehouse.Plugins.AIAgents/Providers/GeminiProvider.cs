@@ -174,6 +174,7 @@ namespace DataWarehouse.Plugins.AIAgents
                 buffer.Append(line);
                 if (line.EndsWith("}"))
                 {
+                    string? textToYield = null;
                     try
                     {
                         var evt = JsonDocument.Parse(buffer.ToString());
@@ -182,11 +183,14 @@ namespace DataWarehouse.Plugins.AIAgents
                         {
                             var text = candidates[0].GetProperty("content").GetProperty("parts")[0].GetProperty("text").GetString();
                             if (!string.IsNullOrEmpty(text))
-                                yield return text;
+                                textToYield = text;
                         }
                     }
                     catch { }
                     buffer.Clear();
+
+                    if (textToYield != null)
+                        yield return textToYield;
                 }
             }
         }

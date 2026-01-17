@@ -64,10 +64,10 @@ namespace DataWarehouse.Plugins.AIAgents
                 ["messages"] = messages
             };
 
-            if (request.MaxTokens.HasValue)
-                payload["max_tokens"] = request.MaxTokens.Value;
-            if (request.Temperature.HasValue)
-                payload["temperature"] = request.Temperature.Value;
+            if (request.MaxTokens != null)
+                payload["max_tokens"] = request.MaxTokens;
+            if (request.Temperature != null)
+                payload["temperature"] = request.Temperature;
             if (request.StopSequences?.Any() == true)
                 payload["stop"] = request.StopSequences;
 
@@ -141,10 +141,10 @@ namespace DataWarehouse.Plugins.AIAgents
                 ["stream"] = true
             };
 
-            if (request.MaxTokens.HasValue)
-                payload["max_tokens"] = request.MaxTokens.Value;
-            if (request.Temperature.HasValue)
-                payload["temperature"] = request.Temperature.Value;
+            if (request.MaxTokens != null)
+                payload["max_tokens"] = request.MaxTokens;
+            if (request.Temperature != null)
+                payload["temperature"] = request.Temperature;
 
             var json = JsonSerializer.Serialize(payload);
             var content = new StringContent(json, Encoding.UTF8, "application/json");
@@ -163,6 +163,7 @@ namespace DataWarehouse.Plugins.AIAgents
                 var data = line.Substring(6);
                 if (data == "[DONE]") break;
 
+                string? textToYield = null;
                 try
                 {
                     var evt = JsonDocument.Parse(data);
@@ -174,11 +175,14 @@ namespace DataWarehouse.Plugins.AIAgents
                         {
                             var text = deltaContent.GetString();
                             if (!string.IsNullOrEmpty(text))
-                                yield return text;
+                                textToYield = text;
                         }
                     }
                 }
                 catch { }
+
+                if (textToYield != null)
+                    yield return textToYield;
             }
         }
 

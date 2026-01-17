@@ -88,10 +88,10 @@ namespace DataWarehouse.Plugins.AIAgents
             if (systemMessage != null)
                 payload["preamble"] = systemMessage.Content;
 
-            if (request.MaxTokens.HasValue)
-                payload["max_tokens"] = request.MaxTokens.Value;
-            if (request.Temperature.HasValue)
-                payload["temperature"] = request.Temperature.Value;
+            if (request.MaxTokens != null)
+                payload["max_tokens"] = request.MaxTokens;
+            if (request.Temperature != null)
+                payload["temperature"] = request.Temperature;
             if (request.StopSequences?.Any() == true)
                 payload["stop_sequences"] = request.StopSequences;
 
@@ -141,10 +141,10 @@ namespace DataWarehouse.Plugins.AIAgents
                 ["prompt"] = request.Prompt
             };
 
-            if (request.MaxTokens.HasValue)
-                payload["max_tokens"] = request.MaxTokens.Value;
-            if (request.Temperature.HasValue)
-                payload["temperature"] = request.Temperature.Value;
+            if (request.MaxTokens != null)
+                payload["max_tokens"] = request.MaxTokens;
+            if (request.Temperature != null)
+                payload["temperature"] = request.Temperature;
             if (request.StopSequences?.Any() == true)
                 payload["stop_sequences"] = request.StopSequences;
 
@@ -227,10 +227,10 @@ namespace DataWarehouse.Plugins.AIAgents
                 ["stream"] = true
             };
 
-            if (request.MaxTokens.HasValue)
-                payload["max_tokens"] = request.MaxTokens.Value;
-            if (request.Temperature.HasValue)
-                payload["temperature"] = request.Temperature.Value;
+            if (request.MaxTokens != null)
+                payload["max_tokens"] = request.MaxTokens;
+            if (request.Temperature != null)
+                payload["temperature"] = request.Temperature;
 
             var json = JsonSerializer.Serialize(payload);
             var content = new StringContent(json, Encoding.UTF8, "application/json");
@@ -246,6 +246,7 @@ namespace DataWarehouse.Plugins.AIAgents
                 var line = await reader.ReadLineAsync(ct);
                 if (string.IsNullOrEmpty(line)) continue;
 
+                string? textStr = null;
                 try
                 {
                     var evt = JsonDocument.Parse(line);
@@ -255,12 +256,13 @@ namespace DataWarehouse.Plugins.AIAgents
                         eventType.GetString() == "text-generation" &&
                         root.TryGetProperty("text", out var text))
                     {
-                        var textStr = text.GetString();
-                        if (!string.IsNullOrEmpty(textStr))
-                            yield return textStr;
+                        textStr = text.GetString();
                     }
                 }
                 catch { }
+
+                if (!string.IsNullOrEmpty(textStr))
+                    yield return textStr;
             }
         }
 

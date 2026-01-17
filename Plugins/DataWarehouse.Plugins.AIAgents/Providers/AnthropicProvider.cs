@@ -174,19 +174,23 @@ namespace DataWarehouse.Plugins.AIAgents
                 if (data == "[DONE]")
                     break;
 
+                string? textChunk = null;
                 try
                 {
                     var evt = JsonDocument.Parse(data);
                     if (evt.RootElement.TryGetProperty("delta", out var delta) &&
                         delta.TryGetProperty("text", out var text))
                     {
-                        yield return text.GetString() ?? "";
+                        textChunk = text.GetString();
                     }
                 }
                 catch
                 {
-                    continue;
+                    // Skip malformed JSON
                 }
+
+                if (textChunk != null)
+                    yield return textChunk;
             }
         }
 
