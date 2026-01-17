@@ -29,9 +29,9 @@ namespace DataWarehouse.Plugins.Compression
         public override string SubCategory => "Compression";
         public override int QualityLevel => _config.Level switch
         {
-            CompressionLevel.Fastest => 20,
-            CompressionLevel.Optimal => 60,
-            CompressionLevel.SmallestSize => 90,
+            System.IO.Compression.CompressionLevel.Fastest => 20,
+            System.IO.Compression.CompressionLevel.Optimal => 60,
+            System.IO.Compression.CompressionLevel.SmallestSize => 90,
             _ => 50
         };
 
@@ -160,7 +160,7 @@ namespace DataWarehouse.Plugins.Compression
         {
             if (message.Payload.TryGetValue("level", out var levelObj) && levelObj is string levelStr)
             {
-                if (Enum.TryParse<CompressionLevel>(levelStr, true, out var level))
+                if (Enum.TryParse<System.IO.Compression.CompressionLevel>(levelStr, true, out var level))
                 {
                     _config.Level = level;
                 }
