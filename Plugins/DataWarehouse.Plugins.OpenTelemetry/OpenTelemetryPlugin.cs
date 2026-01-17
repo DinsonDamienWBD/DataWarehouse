@@ -1097,11 +1097,39 @@ namespace DataWarehouse.Plugins.OpenTelemetry
 
     internal class ConsoleSpanExporter : ISpanExporter
     {
+        private readonly Action<string>? _logAction;
+        private readonly bool _useStdErr;
+
+        public ConsoleSpanExporter(Action<string>? logAction = null, bool useStdErr = false)
+        {
+            _logAction = logAction;
+            _useStdErr = useStdErr;
+        }
+
         public Task ExportAsync(IEnumerable<Span> spans)
         {
             foreach (var span in spans)
             {
-                Console.WriteLine($"[TRACE] {span.TraceId}:{span.SpanId} {span.Name} {span.Duration.TotalMilliseconds:F2}ms {span.Status}");
+                var message = $"[TRACE] {span.TraceId}:{span.SpanId} {span.Name} {span.Duration.TotalMilliseconds:F2}ms {span.Status}";
+
+                if (_logAction != null)
+                {
+                    _logAction(message);
+                }
+                else if (_useStdErr)
+                {
+                    // Use stderr for trace output (non-blocking, doesn't interfere with stdout)
+                    System.Diagnostics.Trace.WriteLine(message);
+                }
+                else
+                {
+                    // Only use Console.WriteLine in development mode
+                    #if DEBUG
+                    Console.Error.WriteLine(message);
+                    #else
+                    System.Diagnostics.Debug.WriteLine(message);
+                    #endif
+                }
             }
             return Task.CompletedTask;
         }

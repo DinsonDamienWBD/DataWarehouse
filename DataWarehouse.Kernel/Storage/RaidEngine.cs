@@ -312,6 +312,270 @@ namespace DataWarehouse.Kernel.Storage
             }
         }
 
+        /// <summary>
+        /// Deletes data using the configured RAID level.
+        /// </summary>
+        public async Task DeleteAsync(string key, Func<int, IStorageProvider> getProvider)
+        {
+            switch (_config.Level)
+            {
+                // Standard RAID
+                case RaidLevel.RAID_0:
+                    await DeleteRAID0Async(key, getProvider);
+                    break;
+                case RaidLevel.RAID_1:
+                    await DeleteRAID1Async(key, getProvider);
+                    break;
+                case RaidLevel.RAID_2:
+                    await DeleteRAID2Async(key, getProvider);
+                    break;
+                case RaidLevel.RAID_3:
+                    await DeleteRAID3Async(key, getProvider);
+                    break;
+                case RaidLevel.RAID_4:
+                    await DeleteRAID4Async(key, getProvider);
+                    break;
+                case RaidLevel.RAID_5:
+                    await DeleteRAID5Async(key, getProvider);
+                    break;
+                case RaidLevel.RAID_6:
+                    await DeleteRAID6Async(key, getProvider);
+                    break;
+
+                // Nested RAID
+                case RaidLevel.RAID_10:
+                    await DeleteRAID10Async(key, getProvider);
+                    break;
+                case RaidLevel.RAID_01:
+                    await DeleteRAID01Async(key, getProvider);
+                    break;
+                case RaidLevel.RAID_03:
+                    await DeleteRAID03Async(key, getProvider);
+                    break;
+                case RaidLevel.RAID_50:
+                    await DeleteRAID50Async(key, getProvider);
+                    break;
+                case RaidLevel.RAID_60:
+                    await DeleteRAID60Async(key, getProvider);
+                    break;
+                case RaidLevel.RAID_100:
+                    await DeleteRAID100Async(key, getProvider);
+                    break;
+
+                // Enhanced RAID
+                case RaidLevel.RAID_1E:
+                    await DeleteRAID1EAsync(key, getProvider);
+                    break;
+                case RaidLevel.RAID_5E:
+                    await DeleteRAID5EAsync(key, getProvider);
+                    break;
+                case RaidLevel.RAID_5EE:
+                    await DeleteRAID5EEAsync(key, getProvider);
+                    break;
+                case RaidLevel.RAID_6E:
+                    await DeleteRAID6EAsync(key, getProvider);
+                    break;
+
+                // ZFS RAID
+                case RaidLevel.RAID_Z1:
+                    await DeleteRAIDZ1Async(key, getProvider);
+                    break;
+                case RaidLevel.RAID_Z2:
+                    await DeleteRAIDZ2Async(key, getProvider);
+                    break;
+                case RaidLevel.RAID_Z3:
+                    await DeleteRAIDZ3Async(key, getProvider);
+                    break;
+
+                // Vendor-Specific RAID
+                case RaidLevel.RAID_DP:
+                    await DeleteRAIDDPAsync(key, getProvider);
+                    break;
+                case RaidLevel.RAID_S:
+                    await DeleteRAIDSAsync(key, getProvider);
+                    break;
+                case RaidLevel.RAID_7:
+                    await DeleteRAID7Async(key, getProvider);
+                    break;
+                case RaidLevel.RAID_FR:
+                    await DeleteRAIDFRAsync(key, getProvider);
+                    break;
+                case RaidLevel.RAID_Unraid:
+                    await DeleteUnraidAsync(key, getProvider);
+                    break;
+
+                // Advanced/Proprietary RAID
+                case RaidLevel.RAID_MD10:
+                    await DeleteRAIDMD10Async(key, getProvider);
+                    break;
+                case RaidLevel.RAID_Adaptive:
+                    await DeleteRAIDAdaptiveAsync(key, getProvider);
+                    break;
+                case RaidLevel.RAID_Beyond:
+                    await DeleteRAIDBeyondAsync(key, getProvider);
+                    break;
+                case RaidLevel.RAID_Declustered:
+                    await DeleteRAIDDeclusteredAsync(key, getProvider);
+                    break;
+
+                // Phase 3: Extended RAID Levels
+                case RaidLevel.RAID_71:
+                    await DeleteRAID71Async(key, getProvider);
+                    break;
+                case RaidLevel.RAID_72:
+                    await DeleteRAID72Async(key, getProvider);
+                    break;
+                case RaidLevel.RAID_NM:
+                    await DeleteRAIDNMAsync(key, getProvider);
+                    break;
+                case RaidLevel.RAID_Matrix:
+                    await DeleteRAIDMatrixAsync(key, getProvider);
+                    break;
+                case RaidLevel.RAID_JBOD:
+                    await DeleteRAIDJBODAsync(key, getProvider);
+                    break;
+                case RaidLevel.RAID_Crypto:
+                    await DeleteRAIDCryptoAsync(key, getProvider);
+                    break;
+                case RaidLevel.RAID_DUP:
+                    await DeleteRAIDDUPAsync(key, getProvider);
+                    break;
+                case RaidLevel.RAID_DDP:
+                    await DeleteRAIDDDPAsync(key, getProvider);
+                    break;
+                case RaidLevel.RAID_SPAN:
+                    await DeleteRAIDSPANAsync(key, getProvider);
+                    break;
+                case RaidLevel.RAID_BIG:
+                    await DeleteRAIDBIGAsync(key, getProvider);
+                    break;
+                case RaidLevel.RAID_MAID:
+                    await DeleteRAIDMAIDAsync(key, getProvider);
+                    break;
+                case RaidLevel.RAID_Linear:
+                    await DeleteRAIDLinearAsync(key, getProvider);
+                    break;
+
+                default:
+                    throw new NotImplementedException($"RAID level {_config.Level} delete not implemented");
+            }
+
+            // Remove metadata after successful deletion
+            _metadata.TryRemove(key, out _);
+        }
+
+        /// <summary>
+        /// Checks if data exists using the configured RAID level.
+        /// </summary>
+        public async Task<bool> ExistsAsync(string key, Func<int, IStorageProvider> getProvider)
+        {
+            // First check metadata
+            if (!_metadata.TryGetValue(key, out var metadata))
+                return false;
+
+            switch (_config.Level)
+            {
+                // Standard RAID
+                case RaidLevel.RAID_0:
+                    return await ExistsRAID0Async(key, getProvider, metadata);
+                case RaidLevel.RAID_1:
+                    return await ExistsRAID1Async(key, getProvider, metadata);
+                case RaidLevel.RAID_2:
+                    return await ExistsRAID2Async(key, getProvider, metadata);
+                case RaidLevel.RAID_3:
+                    return await ExistsRAID3Async(key, getProvider, metadata);
+                case RaidLevel.RAID_4:
+                    return await ExistsRAID4Async(key, getProvider, metadata);
+                case RaidLevel.RAID_5:
+                    return await ExistsRAID5Async(key, getProvider, metadata);
+                case RaidLevel.RAID_6:
+                    return await ExistsRAID6Async(key, getProvider, metadata);
+
+                // Nested RAID
+                case RaidLevel.RAID_10:
+                    return await ExistsRAID10Async(key, getProvider, metadata);
+                case RaidLevel.RAID_01:
+                    return await ExistsRAID01Async(key, getProvider, metadata);
+                case RaidLevel.RAID_03:
+                    return await ExistsRAID03Async(key, getProvider, metadata);
+                case RaidLevel.RAID_50:
+                    return await ExistsRAID50Async(key, getProvider, metadata);
+                case RaidLevel.RAID_60:
+                    return await ExistsRAID60Async(key, getProvider, metadata);
+                case RaidLevel.RAID_100:
+                    return await ExistsRAID100Async(key, getProvider, metadata);
+
+                // Enhanced RAID
+                case RaidLevel.RAID_1E:
+                    return await ExistsRAID1EAsync(key, getProvider, metadata);
+                case RaidLevel.RAID_5E:
+                    return await ExistsRAID5EAsync(key, getProvider, metadata);
+                case RaidLevel.RAID_5EE:
+                    return await ExistsRAID5EEAsync(key, getProvider, metadata);
+                case RaidLevel.RAID_6E:
+                    return await ExistsRAID6EAsync(key, getProvider, metadata);
+
+                // ZFS RAID
+                case RaidLevel.RAID_Z1:
+                    return await ExistsRAIDZ1Async(key, getProvider, metadata);
+                case RaidLevel.RAID_Z2:
+                    return await ExistsRAIDZ2Async(key, getProvider, metadata);
+                case RaidLevel.RAID_Z3:
+                    return await ExistsRAIDZ3Async(key, getProvider, metadata);
+
+                // Vendor-Specific RAID
+                case RaidLevel.RAID_DP:
+                    return await ExistsRAIDDPAsync(key, getProvider, metadata);
+                case RaidLevel.RAID_S:
+                    return await ExistsRAIDSAsync(key, getProvider, metadata);
+                case RaidLevel.RAID_7:
+                    return await ExistsRAID7Async(key, getProvider, metadata);
+                case RaidLevel.RAID_FR:
+                    return await ExistsRAIDFRAsync(key, getProvider, metadata);
+                case RaidLevel.RAID_Unraid:
+                    return await ExistsUnraidAsync(key, getProvider, metadata);
+
+                // Advanced/Proprietary RAID
+                case RaidLevel.RAID_MD10:
+                    return await ExistsRAIDMD10Async(key, getProvider, metadata);
+                case RaidLevel.RAID_Adaptive:
+                    return await ExistsRAIDAdaptiveAsync(key, getProvider, metadata);
+                case RaidLevel.RAID_Beyond:
+                    return await ExistsRAIDBeyondAsync(key, getProvider, metadata);
+                case RaidLevel.RAID_Declustered:
+                    return await ExistsRAIDDeclusteredAsync(key, getProvider, metadata);
+
+                // Phase 3: Extended RAID Levels
+                case RaidLevel.RAID_71:
+                    return await ExistsRAID71Async(key, getProvider, metadata);
+                case RaidLevel.RAID_72:
+                    return await ExistsRAID72Async(key, getProvider, metadata);
+                case RaidLevel.RAID_NM:
+                    return await ExistsRAIDNMAsync(key, getProvider, metadata);
+                case RaidLevel.RAID_Matrix:
+                    return await ExistsRAIDMatrixAsync(key, getProvider, metadata);
+                case RaidLevel.RAID_JBOD:
+                    return await ExistsRAIDJBODAsync(key, getProvider, metadata);
+                case RaidLevel.RAID_Crypto:
+                    return await ExistsRAIDCryptoAsync(key, getProvider, metadata);
+                case RaidLevel.RAID_DUP:
+                    return await ExistsRAIDDUPAsync(key, getProvider, metadata);
+                case RaidLevel.RAID_DDP:
+                    return await ExistsRAIDDDPAsync(key, getProvider, metadata);
+                case RaidLevel.RAID_SPAN:
+                    return await ExistsRAIDSPANAsync(key, getProvider, metadata);
+                case RaidLevel.RAID_BIG:
+                    return await ExistsRAIDBIGAsync(key, getProvider, metadata);
+                case RaidLevel.RAID_MAID:
+                    return await ExistsRAIDMAIDAsync(key, getProvider, metadata);
+                case RaidLevel.RAID_Linear:
+                    return await ExistsRAIDLinearAsync(key, getProvider, metadata);
+
+                default:
+                    throw new NotImplementedException($"RAID level {_config.Level} exists check not implemented");
+            }
+        }
+
         // ==================== RAID 0: Striping (Performance) ====================
 
         private async Task SaveRAID0Async(string key, Stream data, Func<int, IStorageProvider> getProvider)
@@ -366,6 +630,34 @@ namespace DataWarehouse.Kernel.Storage
 
             await Task.WhenAll(tasks);
             return ReassembleChunks(chunks);
+        }
+
+        private async Task DeleteRAID0Async(string key, Func<int, IStorageProvider> getProvider)
+        {
+            if (!_metadata.TryGetValue(key, out var metadata))
+            {
+                _context.LogWarning($"[RAID0] Delete: No metadata found for {key}");
+                return;
+            }
+
+            var tasks = new List<Task>();
+            for (int i = 0; i < metadata.ChunkCount; i++)
+            {
+                int providerIndex = i % _config.ProviderCount;
+                var chunkKey = $"{key}.chunk.{i}";
+                tasks.Add(DeleteChunkAsync(getProvider(providerIndex), chunkKey));
+            }
+
+            await Task.WhenAll(tasks);
+            _context.LogInfo($"[RAID0] Deleted {key}: {metadata.ChunkCount} chunks");
+        }
+
+        private async Task<bool> ExistsRAID0Async(string key, Func<int, IStorageProvider> getProvider, RaidMetadata metadata)
+        {
+            // Check first chunk exists (at minimum)
+            var chunkKey = $"{key}.chunk.0";
+            int providerIndex = 0 % _config.ProviderCount;
+            return await ExistsChunkAsync(getProvider(providerIndex), chunkKey);
         }
 
         // ==================== RAID 1: Mirroring (Redundancy) ====================
@@ -427,6 +719,35 @@ namespace DataWarehouse.Kernel.Storage
             }
 
             throw new IOException($"All mirrors failed for {key}");
+        }
+
+        private async Task DeleteRAID1Async(string key, Func<int, IStorageProvider> getProvider)
+        {
+            if (!_metadata.TryGetValue(key, out var metadata))
+            {
+                _context.LogWarning($"[RAID1] Delete: No metadata found for {key}");
+                return;
+            }
+
+            var tasks = new List<Task>();
+            for (int i = 0; i < metadata.MirrorCount; i++)
+            {
+                tasks.Add(DeleteChunkAsync(getProvider(i), key));
+            }
+
+            await Task.WhenAll(tasks);
+            _context.LogInfo($"[RAID1] Deleted {key} from {metadata.MirrorCount} mirrors");
+        }
+
+        private async Task<bool> ExistsRAID1Async(string key, Func<int, IStorageProvider> getProvider, RaidMetadata metadata)
+        {
+            // Any mirror existing means data exists
+            for (int i = 0; i < metadata.MirrorCount; i++)
+            {
+                if (await ExistsChunkAsync(getProvider(i), key))
+                    return true;
+            }
+            return false;
         }
 
         // ==================== RAID 5: Distributed Parity ====================
@@ -547,6 +868,47 @@ namespace DataWarehouse.Kernel.Storage
             }
 
             return ReassembleChunks(allChunks.ToArray());
+        }
+
+        private async Task DeleteRAID5Async(string key, Func<int, IStorageProvider> getProvider)
+        {
+            if (!_metadata.TryGetValue(key, out var metadata))
+            {
+                _context.LogWarning($"[RAID5] Delete: No metadata found for {key}");
+                return;
+            }
+
+            int dataDisks = _config.ProviderCount - 1;
+            int stripeCount = (int)MathUtils.Ceiling((double)metadata.ChunkCount / dataDisks);
+
+            var tasks = new List<Task>();
+
+            // Delete all data chunks
+            for (int i = 0; i < metadata.ChunkCount; i++)
+            {
+                int providerIndex = i % _config.ProviderCount;
+                var chunkKey = $"{key}.chunk.{i}";
+                tasks.Add(DeleteChunkAsync(getProvider(providerIndex), chunkKey));
+            }
+
+            // Delete all parity chunks
+            for (int stripe = 0; stripe < stripeCount; stripe++)
+            {
+                int parityDisk = stripe % _config.ProviderCount;
+                var parityKey = $"{key}.parity.{stripe}";
+                tasks.Add(DeleteChunkAsync(getProvider(parityDisk), parityKey));
+            }
+
+            await Task.WhenAll(tasks);
+            _context.LogInfo($"[RAID5] Deleted {key}");
+        }
+
+        private async Task<bool> ExistsRAID5Async(string key, Func<int, IStorageProvider> getProvider, RaidMetadata metadata)
+        {
+            // Check first chunk exists
+            var chunkKey = $"{key}.chunk.0";
+            int providerIndex = 0 % _config.ProviderCount;
+            return await ExistsChunkAsync(getProvider(providerIndex), chunkKey);
         }
 
         // ==================== RAID 6: Dual Parity ====================
@@ -5445,6 +5807,699 @@ namespace DataWarehouse.Kernel.Storage
             return new MemoryStream(result.ToArray().Take((int)metadata.TotalSize).ToArray());
         }
 
+        // ==================== DELETE/EXISTS IMPLEMENTATIONS FOR ALL RAID LEVELS ====================
+
+        // --- RAID 2: Bit-level with Hamming code ---
+        private async Task DeleteRAID2Async(string key, Func<int, IStorageProvider> getProvider)
+        {
+            await DeleteGenericStripedAsync(key, getProvider, "RAID2");
+        }
+
+        private async Task<bool> ExistsRAID2Async(string key, Func<int, IStorageProvider> getProvider, RaidMetadata metadata)
+        {
+            return await ExistsGenericStripedAsync(key, getProvider, metadata);
+        }
+
+        // --- RAID 3: Byte-level with dedicated parity ---
+        private async Task DeleteRAID3Async(string key, Func<int, IStorageProvider> getProvider)
+        {
+            await DeleteGenericParityAsync(key, getProvider, "RAID3", 1);
+        }
+
+        private async Task<bool> ExistsRAID3Async(string key, Func<int, IStorageProvider> getProvider, RaidMetadata metadata)
+        {
+            return await ExistsGenericStripedAsync(key, getProvider, metadata);
+        }
+
+        // --- RAID 4: Block-level with dedicated parity ---
+        private async Task DeleteRAID4Async(string key, Func<int, IStorageProvider> getProvider)
+        {
+            await DeleteGenericParityAsync(key, getProvider, "RAID4", 1);
+        }
+
+        private async Task<bool> ExistsRAID4Async(string key, Func<int, IStorageProvider> getProvider, RaidMetadata metadata)
+        {
+            return await ExistsGenericStripedAsync(key, getProvider, metadata);
+        }
+
+        // --- RAID 6: Dual parity ---
+        private async Task DeleteRAID6Async(string key, Func<int, IStorageProvider> getProvider)
+        {
+            if (!_metadata.TryGetValue(key, out var metadata))
+            {
+                _context.LogWarning($"[RAID6] Delete: No metadata found for {key}");
+                return;
+            }
+
+            int dataDisks = _config.ProviderCount - 2;
+            int stripeCount = (int)MathUtils.Ceiling((double)metadata.ChunkCount / dataDisks);
+
+            var tasks = new List<Task>();
+
+            // Delete all data chunks
+            for (int i = 0; i < metadata.ChunkCount; i++)
+            {
+                var chunkKey = $"{key}.chunk.{i}";
+                for (int p = 0; p < _config.ProviderCount; p++)
+                {
+                    tasks.Add(Task.Run(async () =>
+                    {
+                        try { await DeleteChunkAsync(getProvider(p), chunkKey); } catch { }
+                    }));
+                }
+            }
+
+            // Delete all parity chunks
+            for (int stripe = 0; stripe < stripeCount; stripe++)
+            {
+                int parityP = stripe % _config.ProviderCount;
+                int parityQ = (stripe + 1) % _config.ProviderCount;
+
+                var keyP = $"{key}.parityP.{stripe}";
+                var keyQ = $"{key}.parityQ.{stripe}";
+                tasks.Add(DeleteChunkAsync(getProvider(parityP), keyP));
+                tasks.Add(DeleteChunkAsync(getProvider(parityQ), keyQ));
+            }
+
+            await Task.WhenAll(tasks);
+            _context.LogInfo($"[RAID6] Deleted {key}");
+        }
+
+        private async Task<bool> ExistsRAID6Async(string key, Func<int, IStorageProvider> getProvider, RaidMetadata metadata)
+        {
+            var chunkKey = $"{key}.chunk.0";
+            for (int p = 0; p < _config.ProviderCount; p++)
+            {
+                if (await ExistsChunkAsync(getProvider(p), chunkKey))
+                    return true;
+            }
+            return false;
+        }
+
+        // --- RAID 10: Mirrored stripes ---
+        private async Task DeleteRAID10Async(string key, Func<int, IStorageProvider> getProvider)
+        {
+            if (!_metadata.TryGetValue(key, out var metadata))
+            {
+                _context.LogWarning($"[RAID10] Delete: No metadata found for {key}");
+                return;
+            }
+
+            int stripeGroups = _config.ProviderCount / 2;
+            var tasks = new List<Task>();
+
+            for (int i = 0; i < metadata.ChunkCount; i++)
+            {
+                int groupIdx = i % stripeGroups;
+                int primaryProvider = groupIdx * 2;
+                int mirrorProvider = groupIdx * 2 + 1;
+                var chunkKey = $"{key}.chunk.{i}";
+
+                tasks.Add(DeleteChunkAsync(getProvider(primaryProvider), chunkKey));
+                tasks.Add(DeleteChunkAsync(getProvider(mirrorProvider), chunkKey));
+            }
+
+            await Task.WhenAll(tasks);
+            _context.LogInfo($"[RAID10] Deleted {key}");
+        }
+
+        private async Task<bool> ExistsRAID10Async(string key, Func<int, IStorageProvider> getProvider, RaidMetadata metadata)
+        {
+            var chunkKey = $"{key}.chunk.0";
+            return await ExistsChunkAsync(getProvider(0), chunkKey) ||
+                   await ExistsChunkAsync(getProvider(1), chunkKey);
+        }
+
+        // --- RAID 01: Striped mirrors ---
+        private async Task DeleteRAID01Async(string key, Func<int, IStorageProvider> getProvider)
+        {
+            await DeleteGenericMirroredAsync(key, getProvider, "RAID01");
+        }
+
+        private async Task<bool> ExistsRAID01Async(string key, Func<int, IStorageProvider> getProvider, RaidMetadata metadata)
+        {
+            return await ExistsGenericStripedAsync(key, getProvider, metadata);
+        }
+
+        // --- RAID 03: Striped dedicated parity ---
+        private async Task DeleteRAID03Async(string key, Func<int, IStorageProvider> getProvider)
+        {
+            await DeleteGenericParityAsync(key, getProvider, "RAID03", 1);
+        }
+
+        private async Task<bool> ExistsRAID03Async(string key, Func<int, IStorageProvider> getProvider, RaidMetadata metadata)
+        {
+            return await ExistsGenericStripedAsync(key, getProvider, metadata);
+        }
+
+        // --- RAID 50: Striped RAID 5 sets ---
+        private async Task DeleteRAID50Async(string key, Func<int, IStorageProvider> getProvider)
+        {
+            await DeleteGenericNestedAsync(key, getProvider, "RAID50");
+        }
+
+        private async Task<bool> ExistsRAID50Async(string key, Func<int, IStorageProvider> getProvider, RaidMetadata metadata)
+        {
+            return await ExistsGenericStripedAsync(key, getProvider, metadata);
+        }
+
+        // --- RAID 60: Striped RAID 6 sets ---
+        private async Task DeleteRAID60Async(string key, Func<int, IStorageProvider> getProvider)
+        {
+            await DeleteGenericNestedAsync(key, getProvider, "RAID60");
+        }
+
+        private async Task<bool> ExistsRAID60Async(string key, Func<int, IStorageProvider> getProvider, RaidMetadata metadata)
+        {
+            return await ExistsGenericStripedAsync(key, getProvider, metadata);
+        }
+
+        // --- RAID 100: Triple-mirrored stripes ---
+        private async Task DeleteRAID100Async(string key, Func<int, IStorageProvider> getProvider)
+        {
+            await DeleteGenericNestedAsync(key, getProvider, "RAID100");
+        }
+
+        private async Task<bool> ExistsRAID100Async(string key, Func<int, IStorageProvider> getProvider, RaidMetadata metadata)
+        {
+            return await ExistsGenericStripedAsync(key, getProvider, metadata);
+        }
+
+        // --- RAID 1E: Enhanced mirrored striping ---
+        private async Task DeleteRAID1EAsync(string key, Func<int, IStorageProvider> getProvider)
+        {
+            await DeleteGenericMirroredAsync(key, getProvider, "RAID1E");
+        }
+
+        private async Task<bool> ExistsRAID1EAsync(string key, Func<int, IStorageProvider> getProvider, RaidMetadata metadata)
+        {
+            return await ExistsGenericStripedAsync(key, getProvider, metadata);
+        }
+
+        // --- RAID 5E: RAID 5 with hot spare ---
+        private async Task DeleteRAID5EAsync(string key, Func<int, IStorageProvider> getProvider)
+        {
+            await DeleteGenericParityAsync(key, getProvider, "RAID5E", 1);
+        }
+
+        private async Task<bool> ExistsRAID5EAsync(string key, Func<int, IStorageProvider> getProvider, RaidMetadata metadata)
+        {
+            return await ExistsGenericStripedAsync(key, getProvider, metadata);
+        }
+
+        // --- RAID 5EE: RAID 5 enhanced with distributed spare ---
+        private async Task DeleteRAID5EEAsync(string key, Func<int, IStorageProvider> getProvider)
+        {
+            await DeleteGenericParityAsync(key, getProvider, "RAID5EE", 1);
+        }
+
+        private async Task<bool> ExistsRAID5EEAsync(string key, Func<int, IStorageProvider> getProvider, RaidMetadata metadata)
+        {
+            return await ExistsGenericStripedAsync(key, getProvider, metadata);
+        }
+
+        // --- RAID 6E: RAID 6 enhanced with extra parity ---
+        private async Task DeleteRAID6EAsync(string key, Func<int, IStorageProvider> getProvider)
+        {
+            await DeleteGenericParityAsync(key, getProvider, "RAID6E", 3);
+        }
+
+        private async Task<bool> ExistsRAID6EAsync(string key, Func<int, IStorageProvider> getProvider, RaidMetadata metadata)
+        {
+            return await ExistsGenericStripedAsync(key, getProvider, metadata);
+        }
+
+        // --- RAID Z1: ZFS single parity ---
+        private async Task DeleteRAIDZ1Async(string key, Func<int, IStorageProvider> getProvider)
+        {
+            await DeleteGenericParityAsync(key, getProvider, "RAIDZ1", 1);
+        }
+
+        private async Task<bool> ExistsRAIDZ1Async(string key, Func<int, IStorageProvider> getProvider, RaidMetadata metadata)
+        {
+            return await ExistsGenericStripedAsync(key, getProvider, metadata);
+        }
+
+        // --- RAID Z2: ZFS double parity ---
+        private async Task DeleteRAIDZ2Async(string key, Func<int, IStorageProvider> getProvider)
+        {
+            await DeleteGenericParityAsync(key, getProvider, "RAIDZ2", 2);
+        }
+
+        private async Task<bool> ExistsRAIDZ2Async(string key, Func<int, IStorageProvider> getProvider, RaidMetadata metadata)
+        {
+            return await ExistsGenericStripedAsync(key, getProvider, metadata);
+        }
+
+        // --- RAID Z3: ZFS triple parity ---
+        private async Task DeleteRAIDZ3Async(string key, Func<int, IStorageProvider> getProvider)
+        {
+            await DeleteGenericParityAsync(key, getProvider, "RAIDZ3", 3);
+        }
+
+        private async Task<bool> ExistsRAIDZ3Async(string key, Func<int, IStorageProvider> getProvider, RaidMetadata metadata)
+        {
+            return await ExistsGenericStripedAsync(key, getProvider, metadata);
+        }
+
+        // --- RAID DP: NetApp Double Parity ---
+        private async Task DeleteRAIDDPAsync(string key, Func<int, IStorageProvider> getProvider)
+        {
+            await DeleteGenericParityAsync(key, getProvider, "RAIDDP", 2);
+        }
+
+        private async Task<bool> ExistsRAIDDPAsync(string key, Func<int, IStorageProvider> getProvider, RaidMetadata metadata)
+        {
+            return await ExistsGenericStripedAsync(key, getProvider, metadata);
+        }
+
+        // --- RAID S: Dell/EMC Parity RAID ---
+        private async Task DeleteRAIDSAsync(string key, Func<int, IStorageProvider> getProvider)
+        {
+            await DeleteGenericParityAsync(key, getProvider, "RAIDS", 1);
+        }
+
+        private async Task<bool> ExistsRAIDSAsync(string key, Func<int, IStorageProvider> getProvider, RaidMetadata metadata)
+        {
+            return await ExistsGenericStripedAsync(key, getProvider, metadata);
+        }
+
+        // --- RAID 7: Cached striping with parity ---
+        private async Task DeleteRAID7Async(string key, Func<int, IStorageProvider> getProvider)
+        {
+            await DeleteGenericParityAsync(key, getProvider, "RAID7", 1);
+        }
+
+        private async Task<bool> ExistsRAID7Async(string key, Func<int, IStorageProvider> getProvider, RaidMetadata metadata)
+        {
+            return await ExistsGenericStripedAsync(key, getProvider, metadata);
+        }
+
+        // --- RAID FR: Fast Rebuild ---
+        private async Task DeleteRAIDFRAsync(string key, Func<int, IStorageProvider> getProvider)
+        {
+            await DeleteGenericParityAsync(key, getProvider, "RAIDFR", 2);
+        }
+
+        private async Task<bool> ExistsRAIDFRAsync(string key, Func<int, IStorageProvider> getProvider, RaidMetadata metadata)
+        {
+            return await ExistsGenericStripedAsync(key, getProvider, metadata);
+        }
+
+        // --- RAID Unraid: Parity system ---
+        private async Task DeleteUnraidAsync(string key, Func<int, IStorageProvider> getProvider)
+        {
+            await DeleteGenericParityAsync(key, getProvider, "Unraid", 2);
+        }
+
+        private async Task<bool> ExistsUnraidAsync(string key, Func<int, IStorageProvider> getProvider, RaidMetadata metadata)
+        {
+            return await ExistsGenericStripedAsync(key, getProvider, metadata);
+        }
+
+        // --- RAID MD10: Linux MD RAID 10 ---
+        private async Task DeleteRAIDMD10Async(string key, Func<int, IStorageProvider> getProvider)
+        {
+            await DeleteGenericMirroredAsync(key, getProvider, "RAIDMD10");
+        }
+
+        private async Task<bool> ExistsRAIDMD10Async(string key, Func<int, IStorageProvider> getProvider, RaidMetadata metadata)
+        {
+            return await ExistsGenericStripedAsync(key, getProvider, metadata);
+        }
+
+        // --- RAID Adaptive: IBM Adaptive RAID ---
+        private async Task DeleteRAIDAdaptiveAsync(string key, Func<int, IStorageProvider> getProvider)
+        {
+            await DeleteGenericParityAsync(key, getProvider, "RAIDAdaptive", 1);
+        }
+
+        private async Task<bool> ExistsRAIDAdaptiveAsync(string key, Func<int, IStorageProvider> getProvider, RaidMetadata metadata)
+        {
+            return await ExistsGenericStripedAsync(key, getProvider, metadata);
+        }
+
+        // --- RAID Beyond: Drobo BeyondRAID ---
+        private async Task DeleteRAIDBeyondAsync(string key, Func<int, IStorageProvider> getProvider)
+        {
+            await DeleteGenericParityAsync(key, getProvider, "RAIDBeyond", 2);
+        }
+
+        private async Task<bool> ExistsRAIDBeyondAsync(string key, Func<int, IStorageProvider> getProvider, RaidMetadata metadata)
+        {
+            return await ExistsGenericStripedAsync(key, getProvider, metadata);
+        }
+
+        // --- RAID Declustered: Distributed RAID ---
+        private async Task DeleteRAIDDeclusteredAsync(string key, Func<int, IStorageProvider> getProvider)
+        {
+            await DeleteGenericNestedAsync(key, getProvider, "RAIDDeclustered");
+        }
+
+        private async Task<bool> ExistsRAIDDeclusteredAsync(string key, Func<int, IStorageProvider> getProvider, RaidMetadata metadata)
+        {
+            return await ExistsGenericStripedAsync(key, getProvider, metadata);
+        }
+
+        // --- RAID 71: Enhanced RAID 7 with read cache ---
+        private async Task DeleteRAID71Async(string key, Func<int, IStorageProvider> getProvider)
+        {
+            await DeleteGenericParityAsync(key, getProvider, "RAID71", 1);
+        }
+
+        private async Task<bool> ExistsRAID71Async(string key, Func<int, IStorageProvider> getProvider, RaidMetadata metadata)
+        {
+            return await ExistsGenericStripedAsync(key, getProvider, metadata);
+        }
+
+        // --- RAID 72: Enhanced RAID 7 with write-back cache ---
+        private async Task DeleteRAID72Async(string key, Func<int, IStorageProvider> getProvider)
+        {
+            await DeleteGenericParityAsync(key, getProvider, "RAID72", 1);
+        }
+
+        private async Task<bool> ExistsRAID72Async(string key, Func<int, IStorageProvider> getProvider, RaidMetadata metadata)
+        {
+            return await ExistsGenericStripedAsync(key, getProvider, metadata);
+        }
+
+        // --- RAID NM: Flexible N data + M parity ---
+        private async Task DeleteRAIDNMAsync(string key, Func<int, IStorageProvider> getProvider)
+        {
+            await DeleteGenericParityAsync(key, getProvider, "RAIDNM", _config.MirrorCount);
+        }
+
+        private async Task<bool> ExistsRAIDNMAsync(string key, Func<int, IStorageProvider> getProvider, RaidMetadata metadata)
+        {
+            return await ExistsGenericStripedAsync(key, getProvider, metadata);
+        }
+
+        // --- RAID Matrix: Intel Matrix RAID ---
+        private async Task DeleteRAIDMatrixAsync(string key, Func<int, IStorageProvider> getProvider)
+        {
+            await DeleteGenericNestedAsync(key, getProvider, "RAIDMatrix");
+        }
+
+        private async Task<bool> ExistsRAIDMatrixAsync(string key, Func<int, IStorageProvider> getProvider, RaidMetadata metadata)
+        {
+            return await ExistsGenericStripedAsync(key, getProvider, metadata);
+        }
+
+        // --- RAID JBOD: Just a Bunch of Disks ---
+        private async Task DeleteRAIDJBODAsync(string key, Func<int, IStorageProvider> getProvider)
+        {
+            await DeleteGenericConcatenatedAsync(key, getProvider, "RAIDJBOD");
+        }
+
+        private async Task<bool> ExistsRAIDJBODAsync(string key, Func<int, IStorageProvider> getProvider, RaidMetadata metadata)
+        {
+            return await ExistsGenericConcatenatedAsync(key, getProvider, metadata);
+        }
+
+        // --- RAID Crypto: Encrypted software RAID ---
+        private async Task DeleteRAIDCryptoAsync(string key, Func<int, IStorageProvider> getProvider)
+        {
+            await DeleteGenericParityAsync(key, getProvider, "RAIDCrypto", 1);
+        }
+
+        private async Task<bool> ExistsRAIDCryptoAsync(string key, Func<int, IStorageProvider> getProvider, RaidMetadata metadata)
+        {
+            return await ExistsGenericStripedAsync(key, getProvider, metadata);
+        }
+
+        // --- RAID DUP: Btrfs DUP Profile ---
+        private async Task DeleteRAIDDUPAsync(string key, Func<int, IStorageProvider> getProvider)
+        {
+            await DeleteGenericMirroredAsync(key, getProvider, "RAIDDUP");
+        }
+
+        private async Task<bool> ExistsRAIDDUPAsync(string key, Func<int, IStorageProvider> getProvider, RaidMetadata metadata)
+        {
+            return await ExistsGenericStripedAsync(key, getProvider, metadata);
+        }
+
+        // --- RAID DDP: NetApp Dynamic Disk Pool ---
+        private async Task DeleteRAIDDDPAsync(string key, Func<int, IStorageProvider> getProvider)
+        {
+            await DeleteGenericNestedAsync(key, getProvider, "RAIDDDP");
+        }
+
+        private async Task<bool> ExistsRAIDDDPAsync(string key, Func<int, IStorageProvider> getProvider, RaidMetadata metadata)
+        {
+            return await ExistsGenericStripedAsync(key, getProvider, metadata);
+        }
+
+        // --- RAID SPAN: Simple disk spanning ---
+        private async Task DeleteRAIDSPANAsync(string key, Func<int, IStorageProvider> getProvider)
+        {
+            await DeleteGenericConcatenatedAsync(key, getProvider, "RAIDSPAN");
+        }
+
+        private async Task<bool> ExistsRAIDSPANAsync(string key, Func<int, IStorageProvider> getProvider, RaidMetadata metadata)
+        {
+            return await ExistsGenericConcatenatedAsync(key, getProvider, metadata);
+        }
+
+        // --- RAID BIG: Concatenated volumes ---
+        private async Task DeleteRAIDBIGAsync(string key, Func<int, IStorageProvider> getProvider)
+        {
+            await DeleteGenericConcatenatedAsync(key, getProvider, "RAIDBIG");
+        }
+
+        private async Task<bool> ExistsRAIDBIGAsync(string key, Func<int, IStorageProvider> getProvider, RaidMetadata metadata)
+        {
+            return await ExistsGenericConcatenatedAsync(key, getProvider, metadata);
+        }
+
+        // --- RAID MAID: Massive Array of Idle Disks ---
+        private async Task DeleteRAIDMAIDAsync(string key, Func<int, IStorageProvider> getProvider)
+        {
+            await DeleteGenericNestedAsync(key, getProvider, "RAIDMAID");
+        }
+
+        private async Task<bool> ExistsRAIDMAIDAsync(string key, Func<int, IStorageProvider> getProvider, RaidMetadata metadata)
+        {
+            return await ExistsGenericStripedAsync(key, getProvider, metadata);
+        }
+
+        // --- RAID Linear: Sequential concatenation ---
+        private async Task DeleteRAIDLinearAsync(string key, Func<int, IStorageProvider> getProvider)
+        {
+            await DeleteGenericConcatenatedAsync(key, getProvider, "RAIDLinear");
+        }
+
+        private async Task<bool> ExistsRAIDLinearAsync(string key, Func<int, IStorageProvider> getProvider, RaidMetadata metadata)
+        {
+            return await ExistsGenericConcatenatedAsync(key, getProvider, metadata);
+        }
+
+        // ==================== GENERIC DELETE/EXISTS HELPERS ====================
+
+        private async Task DeleteGenericStripedAsync(string key, Func<int, IStorageProvider> getProvider, string raidName)
+        {
+            if (!_metadata.TryGetValue(key, out var metadata))
+            {
+                _context.LogWarning($"[{raidName}] Delete: No metadata found for {key}");
+                return;
+            }
+
+            var tasks = new List<Task>();
+            for (int i = 0; i < metadata.ChunkCount; i++)
+            {
+                int providerIndex = i % _config.ProviderCount;
+                var chunkKey = $"{key}.chunk.{i}";
+                tasks.Add(Task.Run(async () =>
+                {
+                    try { await DeleteChunkAsync(getProvider(providerIndex), chunkKey); }
+                    catch (Exception ex) { _context.LogWarning($"[{raidName}] Failed to delete chunk {i}: {ex.Message}"); }
+                }));
+            }
+
+            await Task.WhenAll(tasks);
+            _context.LogInfo($"[{raidName}] Deleted {key}");
+        }
+
+        private async Task DeleteGenericMirroredAsync(string key, Func<int, IStorageProvider> getProvider, string raidName)
+        {
+            if (!_metadata.TryGetValue(key, out var metadata))
+            {
+                _context.LogWarning($"[{raidName}] Delete: No metadata found for {key}");
+                return;
+            }
+
+            var tasks = new List<Task>();
+            for (int i = 0; i < metadata.ChunkCount; i++)
+            {
+                var chunkKey = $"{key}.chunk.{i}";
+                for (int p = 0; p < _config.ProviderCount; p++)
+                {
+                    int provIdx = p;
+                    int chunkIdx = i;
+                    tasks.Add(Task.Run(async () =>
+                    {
+                        try { await DeleteChunkAsync(getProvider(provIdx), chunkKey); }
+                        catch (Exception ex) { _context.LogDebug($"[{raidName}] Chunk {chunkIdx} not on provider {provIdx}: {ex.Message}"); }
+                    }));
+                }
+            }
+
+            await Task.WhenAll(tasks);
+            _context.LogInfo($"[{raidName}] Deleted {key}");
+        }
+
+        private async Task DeleteGenericParityAsync(string key, Func<int, IStorageProvider> getProvider, string raidName, int parityCount)
+        {
+            if (!_metadata.TryGetValue(key, out var metadata))
+            {
+                _context.LogWarning($"[{raidName}] Delete: No metadata found for {key}");
+                return;
+            }
+
+            int dataDisks = _config.ProviderCount - parityCount;
+            int stripeCount = (int)MathUtils.Ceiling((double)metadata.ChunkCount / MathUtils.Max(dataDisks, 1));
+
+            var tasks = new List<Task>();
+
+            // Delete data chunks
+            for (int i = 0; i < metadata.ChunkCount; i++)
+            {
+                var chunkKey = $"{key}.chunk.{i}";
+                int chunkIdx = i;
+                for (int p = 0; p < _config.ProviderCount; p++)
+                {
+                    int provIdx = p;
+                    tasks.Add(Task.Run(async () =>
+                    {
+                        try { await DeleteChunkAsync(getProvider(provIdx), chunkKey); }
+                        catch (Exception ex) { _context.LogDebug($"[{raidName}] Chunk {chunkIdx} not on provider {provIdx}: {ex.Message}"); }
+                    }));
+                }
+            }
+
+            // Delete parity chunks
+            for (int stripe = 0; stripe < stripeCount; stripe++)
+            {
+                var parityKey = $"{key}.parity.{stripe}";
+                var parityPKey = $"{key}.parityP.{stripe}";
+                var parityQKey = $"{key}.parityQ.{stripe}";
+                var parityRKey = $"{key}.parityR.{stripe}";
+                int stripeIdx = stripe;
+
+                for (int p = 0; p < _config.ProviderCount; p++)
+                {
+                    int provIdx = p;
+                    tasks.Add(Task.Run(async () =>
+                    {
+                        try { await DeleteChunkAsync(getProvider(provIdx), parityKey); }
+                        catch (Exception ex) { _context.LogDebug($"[{raidName}] Parity {stripeIdx} delete: {ex.Message}"); }
+                        try { await DeleteChunkAsync(getProvider(provIdx), parityPKey); }
+                        catch (Exception ex) { _context.LogDebug($"[{raidName}] ParityP {stripeIdx} delete: {ex.Message}"); }
+                        try { await DeleteChunkAsync(getProvider(provIdx), parityQKey); }
+                        catch (Exception ex) { _context.LogDebug($"[{raidName}] ParityQ {stripeIdx} delete: {ex.Message}"); }
+                        try { await DeleteChunkAsync(getProvider(provIdx), parityRKey); }
+                        catch (Exception ex) { _context.LogDebug($"[{raidName}] ParityR {stripeIdx} delete: {ex.Message}"); }
+                    }));
+                }
+            }
+
+            await Task.WhenAll(tasks);
+            _context.LogInfo($"[{raidName}] Deleted {key}");
+        }
+
+        private async Task DeleteGenericNestedAsync(string key, Func<int, IStorageProvider> getProvider, string raidName)
+        {
+            if (!_metadata.TryGetValue(key, out var metadata))
+            {
+                _context.LogWarning($"[{raidName}] Delete: No metadata found for {key}");
+                return;
+            }
+
+            var tasks = new List<Task>();
+            int deletedCount = 0;
+
+            // Delete all possible chunk and parity patterns across all providers
+            for (int i = 0; i < metadata.ChunkCount + 100; i++) // Extra margin for parity
+            {
+                var chunkKey = $"{key}.chunk.{i}";
+                var parityKey = $"{key}.parity.{i}";
+                var setKey = $"{key}.set.{i}";
+                int idx = i;
+
+                for (int p = 0; p < _config.ProviderCount; p++)
+                {
+                    int provIdx = p;
+                    tasks.Add(Task.Run(async () =>
+                    {
+                        try { await DeleteChunkAsync(getProvider(provIdx), chunkKey); Interlocked.Increment(ref deletedCount); }
+                        catch (Exception ex) { _context.LogDebug($"[{raidName}] Nested chunk {idx} not on provider {provIdx}: {ex.Message}"); }
+                        try { await DeleteChunkAsync(getProvider(provIdx), parityKey); Interlocked.Increment(ref deletedCount); }
+                        catch (Exception ex) { _context.LogDebug($"[{raidName}] Nested parity {idx} not on provider {provIdx}: {ex.Message}"); }
+                        try { await DeleteChunkAsync(getProvider(provIdx), setKey); Interlocked.Increment(ref deletedCount); }
+                        catch (Exception ex) { _context.LogDebug($"[{raidName}] Nested set {idx} not on provider {provIdx}: {ex.Message}"); }
+                    }));
+                }
+            }
+
+            await Task.WhenAll(tasks);
+            _context.LogInfo($"[{raidName}] Deleted {key} ({deletedCount} chunks removed)");
+        }
+
+        private async Task DeleteGenericConcatenatedAsync(string key, Func<int, IStorageProvider> getProvider, string raidName)
+        {
+            if (!_metadata.TryGetValue(key, out var metadata))
+            {
+                _context.LogWarning($"[{raidName}] Delete: No metadata found for {key}");
+                return;
+            }
+
+            var tasks = new List<Task>();
+
+            // Delete from all providers
+            for (int p = 0; p < _config.ProviderCount; p++)
+            {
+                int provIdx = p;
+                var provKey = $"{key}.drive.{provIdx}";
+                tasks.Add(Task.Run(async () =>
+                {
+                    try { await DeleteChunkAsync(getProvider(provIdx), provKey); }
+                    catch (Exception ex) { _context.LogWarning($"[{raidName}] Failed to delete from drive {provIdx}: {ex.Message}"); }
+                }));
+            }
+
+            await Task.WhenAll(tasks);
+            _context.LogInfo($"[{raidName}] Deleted {key}");
+        }
+
+        private async Task<bool> ExistsGenericStripedAsync(string key, Func<int, IStorageProvider> getProvider, RaidMetadata metadata)
+        {
+            // Check if first chunk exists on its expected provider
+            var chunkKey = $"{key}.chunk.0";
+            int providerIndex = 0 % _config.ProviderCount;
+
+            try
+            {
+                return await ExistsChunkAsync(getProvider(providerIndex), chunkKey);
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        private async Task<bool> ExistsGenericConcatenatedAsync(string key, Func<int, IStorageProvider> getProvider, RaidMetadata metadata)
+        {
+            // Check if first drive segment exists
+            var provKey = $"{key}.drive.0";
+            try
+            {
+                return await ExistsChunkAsync(getProvider(0), provKey);
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
         // ==================== HELPER METHODS ====================
 
         private static async Task<byte[]> ReadAllBytesAsync(Stream stream)
@@ -5507,6 +6562,18 @@ namespace DataWarehouse.Kernel.Storage
             using var ms = new MemoryStream();
             await stream.CopyToAsync(ms);
             return ms.ToArray();
+        }
+
+        private static async Task DeleteChunkAsync(IStorageProvider provider, string key)
+        {
+            var uri = new Uri($"{provider.Scheme}://{key}");
+            await provider.DeleteAsync(uri);
+        }
+
+        private static async Task<bool> ExistsChunkAsync(IStorageProvider provider, string key)
+        {
+            var uri = new Uri($"{provider.Scheme}://{key}");
+            return await provider.ExistsAsync(uri);
         }
 
         private static byte[] CalculateParityXOR(List<byte[]> chunks)

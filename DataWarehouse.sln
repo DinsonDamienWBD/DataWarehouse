@@ -53,6 +53,10 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DataWarehouse.Plugins.Raft"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DataWarehouse.Plugins.OpenTelemetry", "Plugins\DataWarehouse.Plugins.OpenTelemetry\DataWarehouse.Plugins.OpenTelemetry.csproj", "{10000001-0000-0000-0000-000000000015}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DataWarehouse.Plugins.DistributedTransactions", "Plugins\DataWarehouse.Plugins.DistributedTransactions\DataWarehouse.Plugins.DistributedTransactions.csproj", "{10000001-0000-0000-0000-000000000016}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DataWarehouse.Plugins.Sharding", "Plugins\DataWarehouse.Plugins.Sharding\DataWarehouse.Plugins.Sharding.csproj", "{10000001-0000-0000-0000-000000000017}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -155,6 +159,14 @@ Global
 		{10000001-0000-0000-0000-000000000015}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{10000001-0000-0000-0000-000000000015}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{10000001-0000-0000-0000-000000000015}.Release|Any CPU.Build.0 = Release|Any CPU
+		{10000001-0000-0000-0000-000000000016}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{10000001-0000-0000-0000-000000000016}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{10000001-0000-0000-0000-000000000016}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{10000001-0000-0000-0000-000000000016}.Release|Any CPU.Build.0 = Release|Any CPU
+		{10000001-0000-0000-0000-000000000017}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{10000001-0000-0000-0000-000000000017}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{10000001-0000-0000-0000-000000000017}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{10000001-0000-0000-0000-000000000017}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
 		{10000001-0000-0000-0000-000000000001} = {00000002-0000-0000-0000-000000000000}
@@ -178,5 +190,7 @@ Global
 		{10000001-0000-0000-0000-000000000013} = {00000002-0000-0000-0000-000000000000}
 		{10000001-0000-0000-0000-000000000014} = {00000002-0000-0000-0000-000000000000}
 		{10000001-0000-0000-0000-000000000015} = {00000002-0000-0000-0000-000000000000}
+		{10000001-0000-0000-0000-000000000016} = {00000002-0000-0000-0000-000000000000}
+		{10000001-0000-0000-0000-000000000017} = {00000002-0000-0000-0000-000000000000}
 	EndGlobalSection
 EndGlobal

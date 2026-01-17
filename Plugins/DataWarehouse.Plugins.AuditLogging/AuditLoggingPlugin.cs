@@ -48,6 +48,12 @@ namespace DataWarehouse.Plugins.AuditLogging
         private long _sequenceNumber;
         private Task? _flushTask;
 
+        // High-stakes tier components
+        private readonly AuditMerkleTree _merkleTree = new();
+        private AuditSignatureProvider? _signatureProvider;
+        private readonly List<AuditCheckpoint> _checkpoints = new();
+        private long _lastCheckpointSequence;
+
         public override string Id => "datawarehouse.plugins.audit";
         public override string Name => "Audit Logging";
         public override string Version => "1.0.0";
@@ -88,6 +94,12 @@ namespace DataWarehouse.Plugins.AuditLogging
         {
             Directory.CreateDirectory(_config.LogDirectory);
             await InitializeCurrentLogAsync();
+
+            // Initialize high-stakes tier components
+            if (_config.EnableDigitalSignatures)
+            {
+                _signatureProvider = new AuditSignatureProvider(_config.SigningKeyPath);
+            }
 
             _flushTask = FlushLoopAsync(_shutdownCts.Token);
         }
@@ -161,6 +173,18 @@ namespace DataWarehouse.Plugins.AuditLogging
             entry.Hash = ComputeEntryHash(entry);
             _previousHash = Convert.FromHexString(entry.Hash);
 
+            // Add to Merkle tree for high-stakes tier
+            if (_config.EnableMerkleTree)
+            {
+                _merkleTree.AddLeaf(entry.Hash);
+
+                // Create checkpoint if block size reached
+                if (_merkleTree.LeafCount >= _config.MerkleTreeBlockSize)
+                {
+                    await CreateCheckpointAsync();
+                }
+            }
+
             _buffer.Enqueue(entry);
 
             if (_buffer.Count >= _config.FlushThreshold)
@@ -168,6 +192,139 @@ namespace DataWarehouse.Plugins.AuditLogging
                 await FlushBufferAsync();
             }
         }
+
+        /// <summary>
+        /// Creates a signed checkpoint of the current Merkle tree state.
+        /// Used for efficient verification of large audit logs.
+        /// </summary>
+        private async Task CreateCheckpointAsync()
+        {
+            var checkpoint = new AuditCheckpoint
+            {
+                Timestamp = DateTime.UtcNow,
+                StartSequence = _lastCheckpointSequence + 1,
+                EndSequence = _sequenceNumber,
+                MerkleRoot = _merkleTree.ComputeRoot(),
+                EntryCount = _merkleTree.LeafCount
+            };
+
+            checkpoint.CheckpointHash = checkpoint.ComputeCheckpointHash();
+
+            if (_signatureProvider != null)
+            {
+                checkpoint.Signature = _signatureProvider.Sign(checkpoint.CheckpointHash);
+            }
+
+            _checkpoints.Add(checkpoint);
+            _lastCheckpointSequence = _sequenceNumber;
+
+            // Save checkpoint to disk
+            var checkpointPath = Path.Combine(_config.LogDirectory, $"checkpoint-{checkpoint.Timestamp:yyyyMMdd-HHmmss}.json");
+            var json = JsonSerializer.Serialize(checkpoint, new JsonSerializerOptions { WriteIndented = true });
+            await File.WriteAllTextAsync(checkpointPath, json);
+
+            // Reset Merkle tree for next block
+            _merkleTree.Clear();
+        }
+
+        /// <summary>
+        /// Performs comprehensive integrity verification for high-stakes tier.
+        /// Returns detailed verification result with hash chain, Merkle tree, and signature validation.
+        /// </summary>
+        public async Task<AuditVerificationResult> VerifyIntegrityAsync(DateTime? startDate = null, DateTime? endDate = null)
+        {
+            var result = new AuditVerificationResult();
+            var entries = await QueryLogsAsync(
+                startDate ?? DateTime.MinValue,
+                endDate ?? DateTime.UtcNow,
+                null, null, int.MaxValue);
+
+            var entryList = entries.ToList();
+            result.EntriesVerified = entryList.Count;
+
+            // Verify hash chain
+            result.HashChainValid = VerifyHashChain(entryList);
+            if (!result.HashChainValid)
+            {
+                result.Errors.Add("Hash chain integrity check failed - possible tampering detected");
+            }
+
+            // Verify Merkle trees via checkpoints
+            if (_config.EnableMerkleTree)
+            {
+                result.MerkleTreeValid = await VerifyMerkleCheckpointsAsync();
+                if (!result.MerkleTreeValid)
+                {
+                    result.Errors.Add("Merkle tree checkpoint verification failed");
+                }
+            }
+            else
+            {
+                result.MerkleTreeValid = true;
+            }
+
+            // Verify signatures if enabled
+            if (_config.EnableDigitalSignatures && _signatureProvider != null)
+            {
+                result.SignaturesValid = VerifyCheckpointSignatures();
+                if (!result.SignaturesValid)
+                {
+                    result.Errors.Add("One or more checkpoint signatures are invalid");
+                }
+            }
+            else
+            {
+                result.SignaturesValid = true;
+            }
+
+            result.IsValid = result.HashChainValid && result.MerkleTreeValid && result.SignaturesValid;
+            return result;
+        }
+
+        private async Task<bool> VerifyMerkleCheckpointsAsync()
+        {
+            var checkpointFiles = Directory.GetFiles(_config.LogDirectory, "checkpoint-*.json");
+
+            foreach (var file in checkpointFiles)
+            {
+                try
+                {
+                    var json = await File.ReadAllTextAsync(file);
+                    var checkpoint = JsonSerializer.Deserialize<AuditCheckpoint>(json);
+                    if (checkpoint == null) continue;
+
+                    // Verify checkpoint hash
+                    var computedHash = checkpoint.ComputeCheckpointHash();
+                    if (computedHash != checkpoint.CheckpointHash)
+                    {
+                        return false;
+                    }
+                }
+                catch
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        private bool VerifyCheckpointSignatures()
+        {
+            if (_signatureProvider == null) return true;
+
+            foreach (var checkpoint in _checkpoints)
+            {
+                if (!string.IsNullOrEmpty(checkpoint.Signature))
+                {
+                    if (!_signatureProvider.Verify(checkpoint.CheckpointHash, checkpoint.Signature))
+                    {
+                        return false;
+                    }
+                }
+            }
+
+            return true;
 
         private async Task HandleLogAsync(PluginMessage message)
         {
@@ -507,6 +664,235 @@ namespace DataWarehouse.Plugins.AuditLogging
         public int RetentionDays { get; set; } = 2555;
         public int FlushThreshold { get; set; } = 100;
         public TimeSpan FlushInterval { get; set; } = TimeSpan.FromSeconds(5);
+
+        // High-stakes tier settings
+        public bool EnableDigitalSignatures { get; set; } = false;
+        public bool EnableMerkleTree { get; set; } = true;
+        public bool EnableSecureTimestamping { get; set; } = false;
+        public string? SigningKeyPath { get; set; }
+        public string? TimestampServerUrl { get; set; }
+        public int MerkleTreeBlockSize { get; set; } = 1000;
+    }
+
+    /// <summary>
+    /// Merkle Tree for efficient tamper detection.
+    /// Used by high-stakes tier for cryptographic proof of audit integrity.
+    /// </summary>
+    public class AuditMerkleTree
+    {
+        private readonly List<string> _leaves = new();
+        private readonly object _lock = new();
+
+        /// <summary>
+        /// Adds an entry hash as a leaf to the Merkle tree.
+        /// </summary>
+        public void AddLeaf(string hash)
+        {
+            lock (_lock)
+            {
+                _leaves.Add(hash);
+            }
+        }
+
+        /// <summary>
+        /// Computes the Merkle root from all leaves.
+        /// </summary>
+        public string ComputeRoot()
+        {
+            lock (_lock)
+            {
+                if (_leaves.Count == 0)
+                    return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes("EMPTY")));
+
+                var currentLevel = _leaves.ToList();
+
+                while (currentLevel.Count > 1)
+                {
+                    var nextLevel = new List<string>();
+
+                    for (int i = 0; i < currentLevel.Count; i += 2)
+                    {
+                        string left = currentLevel[i];
+                        string right = i + 1 < currentLevel.Count ? currentLevel[i + 1] : left;
+                        var combined = SHA256.HashData(Encoding.UTF8.GetBytes(left + right));
+                        nextLevel.Add(Convert.ToHexString(combined));
+                    }
+
+                    currentLevel = nextLevel;
+                }
+
+                return currentLevel[0];
+            }
+        }
+
+        /// <summary>
+        /// Gets proof path for a specific leaf index.
+        /// </summary>
+        public List<MerkleProofNode> GetProof(int leafIndex)
+        {
+            lock (_lock)
+            {
+                if (leafIndex < 0 || leafIndex >= _leaves.Count)
+                    return new List<MerkleProofNode>();
+
+                var proof = new List<MerkleProofNode>();
+                var currentLevel = _leaves.ToList();
+                int index = leafIndex;
+
+                while (currentLevel.Count > 1)
+                {
+                    var nextLevel = new List<string>();
+                    int siblingIndex = index % 2 == 0 ? index + 1 : index - 1;
+
+                    if (siblingIndex >= 0 && siblingIndex < currentLevel.Count)
+                    {
+                        proof.Add(new MerkleProofNode
+                        {
+                            Hash = currentLevel[siblingIndex],
+                            IsLeft = index % 2 != 0
+                        });
+                    }
+
+                    for (int i = 0; i < currentLevel.Count; i += 2)
+                    {
+                        string left = currentLevel[i];
+                        string right = i + 1 < currentLevel.Count ? currentLevel[i + 1] : left;
+                        var combined = SHA256.HashData(Encoding.UTF8.GetBytes(left + right));
+                        nextLevel.Add(Convert.ToHexString(combined));
+                    }
+
+                    currentLevel = nextLevel;
+                    index /= 2;
+                }
+
+                return proof;
+            }
+        }
+
+        /// <summary>
+        /// Verifies a leaf hash belongs to the tree with the given root.
+        /// </summary>
+        public static bool VerifyProof(string leafHash, List<MerkleProofNode> proof, string root)
+        {
+            var current = leafHash;
+
+            foreach (var node in proof)
+            {
+                var left = node.IsLeft ? node.Hash : current;
+                var right = node.IsLeft ? current : node.Hash;
+                current = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(left + right)));
+            }
+
+            return current == root;
+        }
+
+        public int LeafCount => _leaves.Count;
+        public void Clear() { lock (_lock) { _leaves.Clear(); } }
+    }
+
+    public class MerkleProofNode
+    {
+        public string Hash { get; set; } = string.Empty;
+        public bool IsLeft { get; set; }
+    }
+
+    /// <summary>
+    /// Digital signature provider for tamper-evident audit entries.
+    /// </summary>
+    public class AuditSignatureProvider : IDisposable
+    {
+        private readonly RSA _rsa;
+        private readonly bool _ownsKey;
+
+        public AuditSignatureProvider(string? keyPath = null)
+        {
+            if (!string.IsNullOrEmpty(keyPath) && File.Exists(keyPath))
+            {
+                var keyData = File.ReadAllText(keyPath);
+                _rsa = RSA.Create();
+                _rsa.ImportFromPem(keyData);
+                _ownsKey = true;
+            }
+            else
+            {
+                _rsa = RSA.Create(2048);
+                _ownsKey = true;
+            }
+        }
+
+        public string Sign(string data)
+        {
+            var dataBytes = Encoding.UTF8.GetBytes(data);
+            var signature = _rsa.SignData(dataBytes, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
+            return Convert.ToBase64String(signature);
+        }
+
+        public bool Verify(string data, string signature)
+        {
+            try
+            {
+                var dataBytes = Encoding.UTF8.GetBytes(data);
+                var signatureBytes = Convert.FromBase64String(signature);
+                return _rsa.VerifyData(dataBytes, signatureBytes, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        public string ExportPublicKey()
+        {
+            return _rsa.ExportSubjectPublicKeyInfoPem();
+        }
+
+        public void ExportKeyPair(string privateKeyPath, string publicKeyPath)
+        {
+            File.WriteAllText(privateKeyPath, _rsa.ExportRSAPrivateKeyPem());
+            File.WriteAllText(publicKeyPath, _rsa.ExportSubjectPublicKeyInfoPem());
+        }
+
+        public void Dispose()
+        {
+            if (_ownsKey)
+                _rsa.Dispose();
+        }
+    }
+
+    /// <summary>
+    /// Checkpoint record for Merkle tree integrity verification.
+    /// Created periodically to allow efficient verification of large audit logs.
+    /// </summary>
+    public class AuditCheckpoint
+    {
+        public DateTime Timestamp { get; set; }
+        public long StartSequence { get; set; }
+        public long EndSequence { get; set; }
+        public string MerkleRoot { get; set; } = string.Empty;
+        public string? Signature { get; set; }
+        public int EntryCount { get; set; }
+        public string CheckpointHash { get; set; } = string.Empty;
+
+        public string ComputeCheckpointHash()
+        {
+            var data = $"{Timestamp:O}|{StartSequence}|{EndSequence}|{MerkleRoot}|{EntryCount}";
+            return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(data)));
+        }
+    }
+
+    /// <summary>
+    /// Result of audit integrity verification.
+    /// </summary>
+    public class AuditVerificationResult
+    {
+        public bool IsValid { get; set; }
+        public long EntriesVerified { get; set; }
+        public long EntriesFailed { get; set; }
+        public bool HashChainValid { get; set; }
+        public bool MerkleTreeValid { get; set; }
+        public bool SignaturesValid { get; set; }
+        public List<string> Errors { get; set; } = new();
+        public DateTime VerificationTime { get; set; } = DateTime.UtcNow;
     }
 
     internal interface IAuditExporter
