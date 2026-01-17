@@ -325,6 +325,7 @@ namespace DataWarehouse.Plugins.AuditLogging
             }
 
             return true;
+        }
 
         private async Task HandleLogAsync(PluginMessage message)
         {
