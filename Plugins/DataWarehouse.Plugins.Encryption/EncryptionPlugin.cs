@@ -112,21 +112,32 @@ namespace DataWarehouse.Plugins.Encryption
             if (key.Length != 32)
                 throw new CryptographicException("AES-256 requires a 256-bit (32-byte) key");
 
-            using var inputMs = new MemoryStream();
-            input.CopyTo(inputMs);
-            var plaintext = inputMs.ToArray();
-
-            var ciphertext = Encrypt(plaintext, key, keyId);
-
-            lock (_statsLock)
+            byte[]? plaintext = null;
+            byte[]? ciphertext = null;
+            try
             {
-                _encryptionCount++;
-                _totalBytesEncrypted += plaintext.Length;
+                using var inputMs = new MemoryStream();
+                input.CopyTo(inputMs);
+                plaintext = inputMs.ToArray();
+
+                ciphertext = Encrypt(plaintext, key, keyId);
+
+                lock (_statsLock)
+                {
+                    _encryptionCount++;
+                    _totalBytesEncrypted += plaintext.Length;
+                }
+
+                context.LogDebug($"AES-256-GCM encrypted {plaintext.Length} bytes with key {keyId[..8]}...");
+
+                return new MemoryStream(ciphertext);
             }
-
-            context.LogDebug($"AES-256-GCM encrypted {plaintext.Length} bytes with key {keyId[..8]}...");
-
-            return new MemoryStream(ciphertext);
+            finally
+            {
+                // Security: Clear sensitive data from memory (PCI-DSS requirement)
+                if (plaintext != null) CryptographicOperations.ZeroMemory(plaintext);
+                CryptographicOperations.ZeroMemory(key);
+            }
         }
 
         public override Stream OnRead(Stream stored, IKernelContext context, Dictionary<string, object> args)
@@ -151,16 +162,30 @@ namespace DataWarehouse.Plugins.Encryption
             if (key.Length != 32)
                 throw new CryptographicException("AES-256 requires a 256-bit (32-byte) key");
 
-            var plaintext = Decrypt(ciphertext, key);
-
-            lock (_statsLock)
+            byte[]? plaintext = null;
+            try
             {
-                _decryptionCount++;
+                plaintext = Decrypt(ciphertext, key);
+
+                lock (_statsLock)
+                {
+                    _decryptionCount++;
+                }
+
+                context.LogDebug($"AES-256-GCM decrypted {ciphertext.Length} bytes with key {keyId[..Math.Min(8, keyId.Length)]}...");
+
+                // Return a copy since we'll zero the original
+                var result = new byte[plaintext.Length];
+                Array.Copy(plaintext, result, plaintext.Length);
+                return new MemoryStream(result);
             }
-
-            context.LogDebug($"AES-256-GCM decrypted {ciphertext.Length} bytes with key {keyId[..Math.Min(8, keyId.Length)]}...");
-
-            return new MemoryStream(plaintext);
+            finally
+            {
+                // Security: Clear sensitive data from memory (PCI-DSS requirement)
+                if (plaintext != null) CryptographicOperations.ZeroMemory(plaintext);
+                CryptographicOperations.ZeroMemory(key);
+                CryptographicOperations.ZeroMemory(ciphertext);
+            }
         }
 
         private byte[] Encrypt(byte[] plaintext, byte[] key, string keyId)
@@ -352,33 +377,46 @@ namespace DataWarehouse.Plugins.Encryption
             if (key.Length != 32)
                 throw new CryptographicException("ChaCha20-Poly1305 requires a 256-bit (32-byte) key");
 
-            using var inputMs = new MemoryStream();
-            input.CopyTo(inputMs);
-            var plaintext = inputMs.ToArray();
+            byte[]? plaintext = null;
+            byte[]? ciphertext = null;
+            byte[]? nonce = null;
+            byte[]? tag = null;
+            try
+            {
+                using var inputMs = new MemoryStream();
+                input.CopyTo(inputMs);
+                plaintext = inputMs.ToArray();
 
-            var nonce = RandomNumberGenerator.GetBytes(NonceSize);
-            var tag = new byte[TagSize];
-            var ciphertext = new byte[plaintext.Length];
+                nonce = RandomNumberGenerator.GetBytes(NonceSize);
+                tag = new byte[TagSize];
+                ciphertext = new byte[plaintext.Length];
 
-            using var chacha = new ChaCha20Poly1305(key);
-            chacha.Encrypt(nonce, plaintext, ciphertext, tag);
+                using var chacha = new ChaCha20Poly1305(key);
+                chacha.Encrypt(nonce, plaintext, ciphertext, tag);
 
-            var keyIdBytes = new byte[KeyIdSize];
-            var keyIdUtf8 = System.Text.Encoding.UTF8.GetBytes(keyId);
-            Array.Copy(keyIdUtf8, keyIdBytes, Math.Min(keyIdUtf8.Length, KeyIdSize));
+                var keyIdBytes = new byte[KeyIdSize];
+                var keyIdUtf8 = System.Text.Encoding.UTF8.GetBytes(keyId);
+                Array.Copy(keyIdUtf8, keyIdBytes, Math.Min(keyIdUtf8.Length, KeyIdSize));
 
-            var result = new byte[4 + KeyIdSize + NonceSize + TagSize + ciphertext.Length];
-            var pos = 0;
+                var result = new byte[4 + KeyIdSize + NonceSize + TagSize + ciphertext.Length];
+                var pos = 0;
 
-            BitConverter.GetBytes(keyIdUtf8.Length).CopyTo(result, pos); pos += 4;
-            keyIdBytes.CopyTo(result, pos); pos += KeyIdSize;
-            nonce.CopyTo(result, pos); pos += NonceSize;
-            tag.CopyTo(result, pos); pos += TagSize;
-            ciphertext.CopyTo(result, pos);
+                BitConverter.GetBytes(keyIdUtf8.Length).CopyTo(result, pos); pos += 4;
+                keyIdBytes.CopyTo(result, pos); pos += KeyIdSize;
+                nonce.CopyTo(result, pos); pos += NonceSize;
+                tag.CopyTo(result, pos); pos += TagSize;
+                ciphertext.CopyTo(result, pos);
 
-            context.LogDebug($"ChaCha20-Poly1305 encrypted {plaintext.Length} bytes");
+                context.LogDebug($"ChaCha20-Poly1305 encrypted {plaintext.Length} bytes");
 
-            return new MemoryStream(result);
+                return new MemoryStream(result);
+            }
+            finally
+            {
+                // Security: Clear sensitive data from memory (PCI-DSS requirement)
+                if (plaintext != null) CryptographicOperations.ZeroMemory(plaintext);
+                CryptographicOperations.ZeroMemory(key);
+            }
         }
 
         public override Stream OnRead(Stream stored, IKernelContext context, Dictionary<string, object> args)
@@ -397,23 +435,37 @@ namespace DataWarehouse.Plugins.Encryption
 
             var key = keyStore.GetKeyAsync(keyId, securityContext).GetAwaiter().GetResult();
 
-            var nonce = new byte[NonceSize];
-            Array.Copy(encryptedData, pos, nonce, 0, NonceSize); pos += NonceSize;
+            byte[]? plaintext = null;
+            try
+            {
+                var nonce = new byte[NonceSize];
+                Array.Copy(encryptedData, pos, nonce, 0, NonceSize); pos += NonceSize;
 
-            var tag = new byte[TagSize];
-            Array.Copy(encryptedData, pos, tag, 0, TagSize); pos += TagSize;
+                var tag = new byte[TagSize];
+                Array.Copy(encryptedData, pos, tag, 0, TagSize); pos += TagSize;
 
-            var ciphertext = new byte[encryptedData.Length - pos];
-            Array.Copy(encryptedData, pos, ciphertext, 0, ciphertext.Length);
+                var ciphertext = new byte[encryptedData.Length - pos];
+                Array.Copy(encryptedData, pos, ciphertext, 0, ciphertext.Length);
 
-            var plaintext = new byte[ciphertext.Length];
+                plaintext = new byte[ciphertext.Length];
 
-            using var chacha = new ChaCha20Poly1305(key);
-            chacha.Decrypt(nonce, ciphertext, tag, plaintext);
+                using var chacha = new ChaCha20Poly1305(key);
+                chacha.Decrypt(nonce, ciphertext, tag, plaintext);
 
-            context.LogDebug($"ChaCha20-Poly1305 decrypted {ciphertext.Length} bytes");
+                context.LogDebug($"ChaCha20-Poly1305 decrypted {ciphertext.Length} bytes");
 
-            return new MemoryStream(plaintext);
+                // Return a copy since we'll zero the original
+                var result = new byte[plaintext.Length];
+                Array.Copy(plaintext, result, plaintext.Length);
+                return new MemoryStream(result);
+            }
+            finally
+            {
+                // Security: Clear sensitive data from memory (PCI-DSS requirement)
+                if (plaintext != null) CryptographicOperations.ZeroMemory(plaintext);
+                CryptographicOperations.ZeroMemory(key);
+                CryptographicOperations.ZeroMemory(encryptedData);
+            }
         }
 
         private IKeyStore GetKeyStore(Dictionary<string, object> args, IKernelContext context)
