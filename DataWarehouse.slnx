@@ -7,8 +7,18 @@
   </Folder>
   <Folder Name="/Plugins/">
     <File Path="Plugin Readme.txt" />
-    <Project Path="Plugins/DataWarehouse.Plugins.Database/DataWarehouse.Plugins.Database.csproj" />
-    <Project Path="Plugins/DataWarehouse.Plugins.Storage/DataWarehouse.Plugins.Storage.csproj" />
+    <Project Path="Plugins/DataWarehouse.Plugins.AzureBlobStorage/DataWarehouse.Plugins.AzureBlobStorage.csproj" />
+    <Project Path="Plugins/DataWarehouse.Plugins.CloudStorage/DataWarehouse.Plugins.CloudStorage.csproj" />
+    <Project Path="Plugins/DataWarehouse.Plugins.EmbeddedDatabaseStorage/DataWarehouse.Plugins.EmbeddedDatabaseStorage.csproj" />
+    <Project Path="Plugins/DataWarehouse.Plugins.GcsStorage/DataWarehouse.Plugins.GcsStorage.csproj" />
+    <Project Path="Plugins/DataWarehouse.Plugins.GrpcStorage/DataWarehouse.Plugins.GrpcStorage.csproj" />
+    <Project Path="Plugins/DataWarehouse.Plugins.IpfsStorage/DataWarehouse.Plugins.IpfsStorage.csproj" />
+    <Project Path="Plugins/DataWarehouse.Plugins.LocalStorage/DataWarehouse.Plugins.LocalStorage.csproj" />
+    <Project Path="Plugins/DataWarehouse.Plugins.NetworkStorage/DataWarehouse.Plugins.NetworkStorage.csproj" />
+    <Project Path="Plugins/DataWarehouse.Plugins.NoSQLDatabaseStorage/DataWarehouse.Plugins.NoSQLDatabaseStorage.csproj" />
+    <Project Path="Plugins/DataWarehouse.Plugins.RAMDiskStorage/DataWarehouse.Plugins.RAMDiskStorage.csproj" />
+    <Project Path="Plugins/DataWarehouse.Plugins.RelationalDatabaseStorage/DataWarehouse.Plugins.RelationalDatabaseStorage.csproj" />
+    <Project Path="Plugins/DataWarehouse.Plugins.S3Storage/DataWarehouse.Plugins.S3Storage.csproj" />
   </Folder>
   <Project Path="DataWarehouse.Kernel/DataWarehouse.Kernel.csproj" />
   <Project Path="DataWarehouse.Plugins.Storage/DataWarehouse.Plugins.Storage.csproj" />
