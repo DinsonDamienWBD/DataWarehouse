@@ -48,7 +48,7 @@ namespace DataWarehouse.Plugins.AIAgents
             _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", config.ApiKey);
         }
 
-        public async Task<ChatResponse> ChatAsync(ChatRequest request)
+        public async Task<ChatResponse> ChatAsync(ChatRequest request, CancellationToken ct = default)
         {
             var endpoint = $"{_config.Endpoint ?? BaseUrl}/chat";
 
@@ -98,8 +98,8 @@ namespace DataWarehouse.Plugins.AIAgents
             var json = JsonSerializer.Serialize(payload);
             var content = new StringContent(json, Encoding.UTF8, "application/json");
 
-            var response = await _httpClient.PostAsync(endpoint, content);
-            var responseBody = await response.Content.ReadAsStringAsync();
+            var response = await _httpClient.PostAsync(endpoint, content, ct);
+            var responseBody = await response.Content.ReadAsStringAsync(ct);
 
             if (!response.IsSuccessStatusCode)
             {
@@ -131,7 +131,7 @@ namespace DataWarehouse.Plugins.AIAgents
             };
         }
 
-        public async Task<CompletionResponse> CompleteAsync(CompletionRequest request)
+        public async Task<CompletionResponse> CompleteAsync(CompletionRequest request, CancellationToken ct = default)
         {
             var endpoint = $"{_config.Endpoint ?? BaseUrl}/generate";
 
@@ -151,8 +151,8 @@ namespace DataWarehouse.Plugins.AIAgents
             var json = JsonSerializer.Serialize(payload);
             var content = new StringContent(json, Encoding.UTF8, "application/json");
 
-            var response = await _httpClient.PostAsync(endpoint, content);
-            var responseBody = await response.Content.ReadAsStringAsync();
+            var response = await _httpClient.PostAsync(endpoint, content, ct);
+            var responseBody = await response.Content.ReadAsStringAsync(ct);
             var result = JsonDocument.Parse(responseBody);
             var root = result.RootElement;
 
@@ -167,7 +167,7 @@ namespace DataWarehouse.Plugins.AIAgents
             };
         }
 
-        public async Task<double[][]> EmbedAsync(string[] texts, string? model = null)
+        public async Task<double[][]> EmbedAsync(string[] texts, string? model = null, CancellationToken ct = default)
         {
             var embedModel = model ?? "embed-english-v3.0";
             var endpoint = $"{_config.Endpoint ?? BaseUrl}/embed";
@@ -183,8 +183,8 @@ namespace DataWarehouse.Plugins.AIAgents
             var json = JsonSerializer.Serialize(payload);
             var content = new StringContent(json, Encoding.UTF8, "application/json");
 
-            var response = await _httpClient.PostAsync(endpoint, content);
-            var responseBody = await response.Content.ReadAsStringAsync();
+            var response = await _httpClient.PostAsync(endpoint, content, ct);
+            var responseBody = await response.Content.ReadAsStringAsync(ct);
             var result = JsonDocument.Parse(responseBody);
 
             return result.RootElement.GetProperty("embeddings")
@@ -264,7 +264,7 @@ namespace DataWarehouse.Plugins.AIAgents
             }
         }
 
-        public async Task<FunctionCallResponse> FunctionCallAsync(FunctionCallRequest request)
+        public async Task<FunctionCallResponse> FunctionCallAsync(FunctionCallRequest request, CancellationToken ct = default)
         {
             var endpoint = $"{_config.Endpoint ?? BaseUrl}/chat";
 
@@ -304,8 +304,8 @@ namespace DataWarehouse.Plugins.AIAgents
             var json = JsonSerializer.Serialize(payload);
             var content = new StringContent(json, Encoding.UTF8, "application/json");
 
-            var response = await _httpClient.PostAsync(endpoint, content);
-            var responseBody = await response.Content.ReadAsStringAsync();
+            var response = await _httpClient.PostAsync(endpoint, content, ct);
+            var responseBody = await response.Content.ReadAsStringAsync(ct);
             var result = JsonDocument.Parse(responseBody);
             var root = result.RootElement;
 
@@ -326,7 +326,7 @@ namespace DataWarehouse.Plugins.AIAgents
             };
         }
 
-        public Task<VisionResponse> VisionAsync(VisionRequest request)
+        public Task<VisionResponse> VisionAsync(VisionRequest request, CancellationToken ct = default)
         {
             throw new NotSupportedException("Cohere does not support vision capabilities");
         }
@@ -334,7 +334,7 @@ namespace DataWarehouse.Plugins.AIAgents
         /// <summary>
         /// Rerank documents based on relevance to a query.
         /// </summary>
-        public async Task<List<(int Index, double Score)>> RerankAsync(string query, string[] documents, string? model = null, int? topN = null)
+        public async Task<List<(int Index, double Score)>> RerankAsync(string query, string[] documents, string? model = null, int? topN = null, CancellationToken ct = default)
         {
             var rerankModel = model ?? "rerank-english-v3.0";
             var endpoint = $"{_config.Endpoint ?? BaseUrl}/rerank";
@@ -352,8 +352,8 @@ namespace DataWarehouse.Plugins.AIAgents
             var json = JsonSerializer.Serialize(payload);
             var content = new StringContent(json, Encoding.UTF8, "application/json");
 
-            var response = await _httpClient.PostAsync(endpoint, content);
-            var responseBody = await response.Content.ReadAsStringAsync();
+            var response = await _httpClient.PostAsync(endpoint, content, ct);
+            var responseBody = await response.Content.ReadAsStringAsync(ct);
             var result = JsonDocument.Parse(responseBody);
 
             return result.RootElement.GetProperty("results")

@@ -40,7 +40,7 @@ namespace DataWarehouse.Plugins.AIAgents
             _config = config;
         }
 
-        public async Task<ChatResponse> ChatAsync(ChatRequest request)
+        public async Task<ChatResponse> ChatAsync(ChatRequest request, CancellationToken ct = default)
         {
             var endpoint = $"{_config.Endpoint ?? BaseUrl}/models/{request.Model}:generateContent?key={_config.ApiKey}";
 
@@ -64,8 +64,8 @@ namespace DataWarehouse.Plugins.AIAgents
             var json = JsonSerializer.Serialize(payload, new JsonSerializerOptions { DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull });
             var content = new StringContent(json, Encoding.UTF8, "application/json");
 
-            var response = await _httpClient.PostAsync(endpoint, content);
-            var responseBody = await response.Content.ReadAsStringAsync();
+            var response = await _httpClient.PostAsync(endpoint, content, ct);
+            var responseBody = await response.Content.ReadAsStringAsync(ct);
 
             if (!response.IsSuccessStatusCode)
             {
@@ -80,7 +80,7 @@ namespace DataWarehouse.Plugins.AIAgents
 
             var usageMetadata = root.TryGetProperty("usageMetadata", out var usage) ? usage : default;
             var promptTokens = usageMetadata.ValueKind != JsonValueKind.Undefined && usageMetadata.TryGetProperty("promptTokenCount", out var pt) ? pt.GetInt32() : 0;
-            var candidateTokens = usageMetadata.ValueKind != JsonValueKind.Undefined && usageMetadata.TryGetProperty("candidatesTokenCount", out var ct) ? ct.GetInt32() : 0;
+            var candidateTokens = usageMetadata.ValueKind != JsonValueKind.Undefined && usageMetadata.TryGetProperty("candidatesTokenCount", out var ctTokens) ? ctTokens.GetInt32() : 0;
 
             return new ChatResponse
             {
@@ -92,7 +92,7 @@ namespace DataWarehouse.Plugins.AIAgents
             };
         }
 
-        public async Task<CompletionResponse> CompleteAsync(CompletionRequest request)
+        public async Task<CompletionResponse> CompleteAsync(CompletionRequest request, CancellationToken ct = default)
         {
             var chatRequest = new ChatRequest
             {
@@ -103,7 +103,7 @@ namespace DataWarehouse.Plugins.AIAgents
                 StopSequences = request.StopSequences
             };
 
-            var response = await ChatAsync(chatRequest);
+            var response = await ChatAsync(chatRequest, ct);
             return new CompletionResponse
             {
                 Text = response.Content,
@@ -112,7 +112,7 @@ namespace DataWarehouse.Plugins.AIAgents
             };
         }
 
-        public async Task<double[][]> EmbedAsync(string[] texts, string? model = null)
+        public async Task<double[][]> EmbedAsync(string[] texts, string? model = null, CancellationToken ct = default)
         {
             var embedModel = model ?? "text-embedding-004";
             var endpoint = $"{_config.Endpoint ?? BaseUrl}/models/{embedModel}:batchEmbedContents?key={_config.ApiKey}";
@@ -129,8 +129,8 @@ namespace DataWarehouse.Plugins.AIAgents
             var json = JsonSerializer.Serialize(payload);
             var content = new StringContent(json, Encoding.UTF8, "application/json");
 
-            var response = await _httpClient.PostAsync(endpoint, content);
-            var responseBody = await response.Content.ReadAsStringAsync();
+            var response = await _httpClient.PostAsync(endpoint, content, ct);
+            var responseBody = await response.Content.ReadAsStringAsync(ct);
             var result = JsonDocument.Parse(responseBody);
 
             return result.RootElement.GetProperty("embeddings")
@@ -191,7 +191,7 @@ namespace DataWarehouse.Plugins.AIAgents
             }
         }
 
-        public async Task<FunctionCallResponse> FunctionCallAsync(FunctionCallRequest request)
+        public async Task<FunctionCallResponse> FunctionCallAsync(FunctionCallRequest request, CancellationToken ct = default)
         {
             var endpoint = $"{_config.Endpoint ?? BaseUrl}/models/{request.Model}:generateContent?key={_config.ApiKey}";
 
@@ -219,8 +219,8 @@ namespace DataWarehouse.Plugins.AIAgents
             var json = JsonSerializer.Serialize(payload);
             var content = new StringContent(json, Encoding.UTF8, "application/json");
 
-            var response = await _httpClient.PostAsync(endpoint, content);
-            var responseBody = await response.Content.ReadAsStringAsync();
+            var response = await _httpClient.PostAsync(endpoint, content, ct);
+            var responseBody = await response.Content.ReadAsStringAsync(ct);
             var result = JsonDocument.Parse(responseBody);
 
             var candidate = result.RootElement.GetProperty("candidates")[0];
@@ -245,7 +245,7 @@ namespace DataWarehouse.Plugins.AIAgents
             return new FunctionCallResponse();
         }
 
-        public async Task<VisionResponse> VisionAsync(VisionRequest request)
+        public async Task<VisionResponse> VisionAsync(VisionRequest request, CancellationToken ct = default)
         {
             var endpoint = $"{_config.Endpoint ?? BaseUrl}/models/{request.Model}:generateContent?key={_config.ApiKey}";
 
@@ -258,7 +258,7 @@ namespace DataWarehouse.Plugins.AIAgents
             else if (!string.IsNullOrEmpty(request.ImageUrl))
             {
                 // Download and convert to base64 for Gemini
-                var imageBytes = await _httpClient.GetByteArrayAsync(request.ImageUrl);
+                var imageBytes = await _httpClient.GetByteArrayAsync(request.ImageUrl, ct);
                 parts.Add(new { inline_data = new { mime_type = "image/png", data = Convert.ToBase64String(imageBytes) } });
             }
 
@@ -271,8 +271,8 @@ namespace DataWarehouse.Plugins.AIAgents
             var json = JsonSerializer.Serialize(payload);
             var content = new StringContent(json, Encoding.UTF8, "application/json");
 
-            var response = await _httpClient.PostAsync(endpoint, content);
-            var responseBody = await response.Content.ReadAsStringAsync();
+            var response = await _httpClient.PostAsync(endpoint, content, ct);
+            var responseBody = await response.Content.ReadAsStringAsync(ct);
             var result = JsonDocument.Parse(responseBody);
 
             var textContent = result.RootElement.GetProperty("candidates")[0]

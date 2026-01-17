@@ -142,7 +142,7 @@ namespace DataWarehouse.Plugins.AIAgents
             return BitConverter.ToString(hash).Replace("-", "").ToLowerInvariant();
         }
 
-        public async Task<ChatResponse> ChatAsync(ChatRequest request)
+        public async Task<ChatResponse> ChatAsync(ChatRequest request, CancellationToken ct = default)
         {
             var endpoint = GetEndpoint(request.Model);
 
@@ -194,8 +194,8 @@ namespace DataWarehouse.Plugins.AIAgents
             }
 
             var json = JsonSerializer.Serialize(payload, new JsonSerializerOptions { DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull });
-            var response = await SendSignedRequestAsync(endpoint, json);
-            var responseBody = await response.Content.ReadAsStringAsync();
+            var response = await SendSignedRequestAsync(endpoint, json, ct);
+            var responseBody = await response.Content.ReadAsStringAsync(ct);
 
             if (!response.IsSuccessStatusCode)
             {
@@ -240,7 +240,7 @@ namespace DataWarehouse.Plugins.AIAgents
             };
         }
 
-        public async Task<CompletionResponse> CompleteAsync(CompletionRequest request)
+        public async Task<CompletionResponse> CompleteAsync(CompletionRequest request, CancellationToken ct = default)
         {
             var chatRequest = new ChatRequest
             {
@@ -251,7 +251,7 @@ namespace DataWarehouse.Plugins.AIAgents
                 StopSequences = request.StopSequences
             };
 
-            var response = await ChatAsync(chatRequest);
+            var response = await ChatAsync(chatRequest, ct);
             return new CompletionResponse
             {
                 Text = response.Content,
@@ -260,7 +260,7 @@ namespace DataWarehouse.Plugins.AIAgents
             };
         }
 
-        public async Task<double[][]> EmbedAsync(string[] texts, string? model = null)
+        public async Task<double[][]> EmbedAsync(string[] texts, string? model = null, CancellationToken ct = default)
         {
             var embedModel = model ?? "amazon.titan-embed-text-v2:0";
             var endpoint = GetEndpoint(embedModel);
@@ -269,11 +269,12 @@ namespace DataWarehouse.Plugins.AIAgents
 
             foreach (var text in texts)
             {
+                ct.ThrowIfCancellationRequested();
                 var payload = new { inputText = text };
                 var json = JsonSerializer.Serialize(payload);
 
-                var response = await SendSignedRequestAsync(endpoint, json);
-                var responseBody = await response.Content.ReadAsStringAsync();
+                var response = await SendSignedRequestAsync(endpoint, json, ct);
+                var responseBody = await response.Content.ReadAsStringAsync(ct);
                 var result = JsonDocument.Parse(responseBody);
 
                 var embedding = result.RootElement.GetProperty("embedding")
@@ -310,7 +311,7 @@ namespace DataWarehouse.Plugins.AIAgents
             else
             {
                 // Fallback to non-streaming for unsupported models
-                var response = await ChatAsync(request);
+                var response = await ChatAsync(request, ct);
                 yield return response.Content;
                 yield break;
             }
@@ -359,7 +360,7 @@ namespace DataWarehouse.Plugins.AIAgents
             }
         }
 
-        public async Task<FunctionCallResponse> FunctionCallAsync(FunctionCallRequest request)
+        public async Task<FunctionCallResponse> FunctionCallAsync(FunctionCallRequest request, CancellationToken ct = default)
         {
             if (!request.Model.StartsWith("anthropic."))
             {
@@ -389,8 +390,8 @@ namespace DataWarehouse.Plugins.AIAgents
             };
 
             var json = JsonSerializer.Serialize(payload, new JsonSerializerOptions { DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull });
-            var response = await SendSignedRequestAsync(endpoint, json);
-            var responseBody = await response.Content.ReadAsStringAsync();
+            var response = await SendSignedRequestAsync(endpoint, json, ct);
+            var responseBody = await response.Content.ReadAsStringAsync(ct);
             var result = JsonDocument.Parse(responseBody);
 
             foreach (var content in result.RootElement.GetProperty("content").EnumerateArray())
@@ -412,7 +413,7 @@ namespace DataWarehouse.Plugins.AIAgents
             return new FunctionCallResponse();
         }
 
-        public async Task<VisionResponse> VisionAsync(VisionRequest request)
+        public async Task<VisionResponse> VisionAsync(VisionRequest request, CancellationToken ct = default)
         {
             if (!request.Model.StartsWith("anthropic."))
             {
@@ -441,7 +442,7 @@ namespace DataWarehouse.Plugins.AIAgents
             }
             else if (!string.IsNullOrEmpty(request.ImageUrl))
             {
-                var imageBytes = await _httpClient.GetByteArrayAsync(request.ImageUrl);
+                var imageBytes = await _httpClient.GetByteArrayAsync(request.ImageUrl, ct);
                 contentParts.Insert(0, new
                 {
                     type = "image",
@@ -465,8 +466,8 @@ namespace DataWarehouse.Plugins.AIAgents
             };
 
             var json = JsonSerializer.Serialize(payload);
-            var response = await SendSignedRequestAsync(endpoint, json);
-            var responseBody = await response.Content.ReadAsStringAsync();
+            var response = await SendSignedRequestAsync(endpoint, json, ct);
+            var responseBody = await response.Content.ReadAsStringAsync(ct);
             var result = JsonDocument.Parse(responseBody);
 
             var textContent = result.RootElement.GetProperty("content")[0]

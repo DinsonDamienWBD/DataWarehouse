@@ -40,7 +40,7 @@ namespace DataWarehouse.Plugins.AIAgents
             _config = config;
         }
 
-        public async Task<ChatResponse> ChatAsync(ChatRequest request)
+        public async Task<ChatResponse> ChatAsync(ChatRequest request, CancellationToken ct = default)
         {
             var endpoint = $"{_config.Endpoint ?? BaseUrl}/messages";
 
@@ -71,8 +71,8 @@ namespace DataWarehouse.Plugins.AIAgents
             httpRequest.Headers.Add("x-api-key", _config.ApiKey);
             httpRequest.Headers.Add("anthropic-version", "2023-06-01");
 
-            var response = await _httpClient.SendAsync(httpRequest);
-            var responseBody = await response.Content.ReadAsStringAsync();
+            var response = await _httpClient.SendAsync(httpRequest, ct);
+            var responseBody = await response.Content.ReadAsStringAsync(ct);
 
             if (!response.IsSuccessStatusCode)
             {
@@ -100,7 +100,7 @@ namespace DataWarehouse.Plugins.AIAgents
             };
         }
 
-        public async Task<CompletionResponse> CompleteAsync(CompletionRequest request)
+        public async Task<CompletionResponse> CompleteAsync(CompletionRequest request, CancellationToken ct = default)
         {
             // Claude uses chat API for completions
             var chatRequest = new ChatRequest
@@ -115,7 +115,7 @@ namespace DataWarehouse.Plugins.AIAgents
                 StopSequences = request.StopSequences
             };
 
-            var response = await ChatAsync(chatRequest);
+            var response = await ChatAsync(chatRequest, ct);
             return new CompletionResponse
             {
                 Text = response.Content,
@@ -124,7 +124,7 @@ namespace DataWarehouse.Plugins.AIAgents
             };
         }
 
-        public Task<double[][]> EmbedAsync(string[] texts, string? model = null)
+        public Task<double[][]> EmbedAsync(string[] texts, string? model = null, CancellationToken ct = default)
         {
             throw new NotSupportedException("Anthropic does not support embeddings. Use OpenAI or Cohere for embeddings.");
         }
@@ -190,7 +190,7 @@ namespace DataWarehouse.Plugins.AIAgents
             }
         }
 
-        public async Task<FunctionCallResponse> FunctionCallAsync(FunctionCallRequest request)
+        public async Task<FunctionCallResponse> FunctionCallAsync(FunctionCallRequest request, CancellationToken ct = default)
         {
             var endpoint = $"{_config.Endpoint ?? BaseUrl}/messages";
 
@@ -227,8 +227,8 @@ namespace DataWarehouse.Plugins.AIAgents
             httpRequest.Headers.Add("x-api-key", _config.ApiKey);
             httpRequest.Headers.Add("anthropic-version", "2023-06-01");
 
-            var response = await _httpClient.SendAsync(httpRequest);
-            var responseBody = await response.Content.ReadAsStringAsync();
+            var response = await _httpClient.SendAsync(httpRequest, ct);
+            var responseBody = await response.Content.ReadAsStringAsync(ct);
             var result = JsonDocument.Parse(responseBody);
             var root = result.RootElement;
 
@@ -255,7 +255,7 @@ namespace DataWarehouse.Plugins.AIAgents
             return new FunctionCallResponse();
         }
 
-        public async Task<VisionResponse> VisionAsync(VisionRequest request)
+        public async Task<VisionResponse> VisionAsync(VisionRequest request, CancellationToken ct = default)
         {
             var endpoint = $"{_config.Endpoint ?? BaseUrl}/messages";
 
@@ -313,8 +313,8 @@ namespace DataWarehouse.Plugins.AIAgents
             httpRequest.Headers.Add("x-api-key", _config.ApiKey);
             httpRequest.Headers.Add("anthropic-version", "2023-06-01");
 
-            var response = await _httpClient.SendAsync(httpRequest);
-            var responseBody = await response.Content.ReadAsStringAsync();
+            var response = await _httpClient.SendAsync(httpRequest, ct);
+            var responseBody = await response.Content.ReadAsStringAsync(ct);
             var result = JsonDocument.Parse(responseBody);
             var root = result.RootElement;
 

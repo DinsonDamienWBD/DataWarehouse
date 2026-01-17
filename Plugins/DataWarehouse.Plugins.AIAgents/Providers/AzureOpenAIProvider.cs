@@ -55,7 +55,7 @@ namespace DataWarehouse.Plugins.AIAgents
             return $"{baseUrl}/openai/deployments/{deploymentName}/{operation}?api-version={_apiVersion}";
         }
 
-        public async Task<ChatResponse> ChatAsync(ChatRequest request)
+        public async Task<ChatResponse> ChatAsync(ChatRequest request, CancellationToken ct = default)
         {
             var endpoint = GetEndpoint(request.Model);
 
@@ -80,8 +80,9 @@ namespace DataWarehouse.Plugins.AIAgents
             var json = JsonSerializer.Serialize(payload);
             var content = new StringContent(json, Encoding.UTF8, "application/json");
 
-            var response = await _httpClient.PostAsync(endpoint, content);
-            var responseBody = await response.Content.ReadAsStringAsync();
+            var httpRequest = new HttpRequestMessage(HttpMethod.Post, endpoint) { Content = content };
+            var response = await _httpClient.SendAsync(httpRequest, ct);
+            var responseBody = await response.Content.ReadAsStringAsync(ct);
 
             if (!response.IsSuccessStatusCode)
             {
@@ -106,7 +107,7 @@ namespace DataWarehouse.Plugins.AIAgents
             };
         }
 
-        public async Task<CompletionResponse> CompleteAsync(CompletionRequest request)
+        public async Task<CompletionResponse> CompleteAsync(CompletionRequest request, CancellationToken ct = default)
         {
             var chatRequest = new ChatRequest
             {
@@ -117,7 +118,7 @@ namespace DataWarehouse.Plugins.AIAgents
                 StopSequences = request.StopSequences
             };
 
-            var response = await ChatAsync(chatRequest);
+            var response = await ChatAsync(chatRequest, ct);
             return new CompletionResponse
             {
                 Text = response.Content,
@@ -126,7 +127,7 @@ namespace DataWarehouse.Plugins.AIAgents
             };
         }
 
-        public async Task<double[][]> EmbedAsync(string[] texts, string? model = null)
+        public async Task<double[][]> EmbedAsync(string[] texts, string? model = null, CancellationToken ct = default)
         {
             var deploymentName = model ?? "text-embedding-ada-002";
             var endpoint = GetEndpoint(deploymentName, "embeddings");
@@ -135,8 +136,9 @@ namespace DataWarehouse.Plugins.AIAgents
             var json = JsonSerializer.Serialize(payload);
             var content = new StringContent(json, Encoding.UTF8, "application/json");
 
-            var response = await _httpClient.PostAsync(endpoint, content);
-            var responseBody = await response.Content.ReadAsStringAsync();
+            var httpRequest = new HttpRequestMessage(HttpMethod.Post, endpoint) { Content = content };
+            var response = await _httpClient.SendAsync(httpRequest, ct);
+            var responseBody = await response.Content.ReadAsStringAsync(ct);
             var result = JsonDocument.Parse(responseBody);
 
             return result.RootElement.GetProperty("data")
@@ -206,7 +208,7 @@ namespace DataWarehouse.Plugins.AIAgents
             }
         }
 
-        public async Task<FunctionCallResponse> FunctionCallAsync(FunctionCallRequest request)
+        public async Task<FunctionCallResponse> FunctionCallAsync(FunctionCallRequest request, CancellationToken ct = default)
         {
             var endpoint = GetEndpoint(request.Model);
 
@@ -232,8 +234,9 @@ namespace DataWarehouse.Plugins.AIAgents
             var json = JsonSerializer.Serialize(payload);
             var content = new StringContent(json, Encoding.UTF8, "application/json");
 
-            var response = await _httpClient.PostAsync(endpoint, content);
-            var responseBody = await response.Content.ReadAsStringAsync();
+            var httpRequest = new HttpRequestMessage(HttpMethod.Post, endpoint) { Content = content };
+            var response = await _httpClient.SendAsync(httpRequest, ct);
+            var responseBody = await response.Content.ReadAsStringAsync(ct);
             var result = JsonDocument.Parse(responseBody);
 
             var choice = result.RootElement.GetProperty("choices")[0];
@@ -256,7 +259,7 @@ namespace DataWarehouse.Plugins.AIAgents
             };
         }
 
-        public async Task<VisionResponse> VisionAsync(VisionRequest request)
+        public async Task<VisionResponse> VisionAsync(VisionRequest request, CancellationToken ct = default)
         {
             var endpoint = GetEndpoint(request.Model);
 
@@ -294,8 +297,9 @@ namespace DataWarehouse.Plugins.AIAgents
             var json = JsonSerializer.Serialize(payload);
             var content = new StringContent(json, Encoding.UTF8, "application/json");
 
-            var response = await _httpClient.PostAsync(endpoint, content);
-            var responseBody = await response.Content.ReadAsStringAsync();
+            var httpRequest = new HttpRequestMessage(HttpMethod.Post, endpoint) { Content = content };
+            var response = await _httpClient.SendAsync(httpRequest, ct);
+            var responseBody = await response.Content.ReadAsStringAsync(ct);
             var result = JsonDocument.Parse(responseBody);
 
             var textContent = result.RootElement.GetProperty("choices")[0]

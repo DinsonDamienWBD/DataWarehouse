@@ -56,7 +56,7 @@ namespace DataWarehouse.Plugins.AIAgents
 
         private string BaseUrl => _config.Endpoint ?? DefaultBaseUrl;
 
-        public async Task<ChatResponse> ChatAsync(ChatRequest request)
+        public async Task<ChatResponse> ChatAsync(ChatRequest request, CancellationToken ct = default)
         {
             var endpoint = $"{BaseUrl}/api/chat";
 
@@ -88,8 +88,8 @@ namespace DataWarehouse.Plugins.AIAgents
             var json = JsonSerializer.Serialize(payload);
             var content = new StringContent(json, Encoding.UTF8, "application/json");
 
-            var response = await _httpClient.PostAsync(endpoint, content);
-            var responseBody = await response.Content.ReadAsStringAsync();
+            var response = await _httpClient.PostAsync(endpoint, content, ct);
+            var responseBody = await response.Content.ReadAsStringAsync(ct);
 
             if (!response.IsSuccessStatusCode)
             {
@@ -104,7 +104,7 @@ namespace DataWarehouse.Plugins.AIAgents
 
             // Ollama provides token counts in eval_count and prompt_eval_count
             var promptTokens = root.TryGetProperty("prompt_eval_count", out var pt) ? pt.GetInt32() : 0;
-            var completionTokens = root.TryGetProperty("eval_count", out var ct) ? ct.GetInt32() : 0;
+            var completionTokens = root.TryGetProperty("eval_count", out var evalCount) ? evalCount.GetInt32() : 0;
 
             return new ChatResponse
             {
@@ -116,7 +116,7 @@ namespace DataWarehouse.Plugins.AIAgents
             };
         }
 
-        public async Task<CompletionResponse> CompleteAsync(CompletionRequest request)
+        public async Task<CompletionResponse> CompleteAsync(CompletionRequest request, CancellationToken ct = default)
         {
             var endpoint = $"{BaseUrl}/api/generate";
 
@@ -142,8 +142,8 @@ namespace DataWarehouse.Plugins.AIAgents
             var json = JsonSerializer.Serialize(payload);
             var content = new StringContent(json, Encoding.UTF8, "application/json");
 
-            var response = await _httpClient.PostAsync(endpoint, content);
-            var responseBody = await response.Content.ReadAsStringAsync();
+            var response = await _httpClient.PostAsync(endpoint, content, ct);
+            var responseBody = await response.Content.ReadAsStringAsync(ct);
             var result = JsonDocument.Parse(responseBody);
             var root = result.RootElement;
 
@@ -151,11 +151,11 @@ namespace DataWarehouse.Plugins.AIAgents
             {
                 Text = root.GetProperty("response").GetString() ?? "",
                 InputTokens = root.TryGetProperty("prompt_eval_count", out var pt) ? pt.GetInt32() : 0,
-                OutputTokens = root.TryGetProperty("eval_count", out var ct) ? ct.GetInt32() : 0
+                OutputTokens = root.TryGetProperty("eval_count", out var evalCount) ? evalCount.GetInt32() : 0
             };
         }
 
-        public async Task<double[][]> EmbedAsync(string[] texts, string? model = null)
+        public async Task<double[][]> EmbedAsync(string[] texts, string? model = null, CancellationToken ct = default)
         {
             var embedModel = model ?? "nomic-embed-text";
             var endpoint = $"{BaseUrl}/api/embed";
@@ -169,8 +169,8 @@ namespace DataWarehouse.Plugins.AIAgents
             var json = JsonSerializer.Serialize(payload);
             var content = new StringContent(json, Encoding.UTF8, "application/json");
 
-            var response = await _httpClient.PostAsync(endpoint, content);
-            var responseBody = await response.Content.ReadAsStringAsync();
+            var response = await _httpClient.PostAsync(endpoint, content, ct);
+            var responseBody = await response.Content.ReadAsStringAsync(ct);
             var result = JsonDocument.Parse(responseBody);
 
             return result.RootElement.GetProperty("embeddings")
@@ -243,7 +243,7 @@ namespace DataWarehouse.Plugins.AIAgents
             }
         }
 
-        public async Task<FunctionCallResponse> FunctionCallAsync(FunctionCallRequest request)
+        public async Task<FunctionCallResponse> FunctionCallAsync(FunctionCallRequest request, CancellationToken ct = default)
         {
             var endpoint = $"{BaseUrl}/api/chat";
 
@@ -275,8 +275,8 @@ namespace DataWarehouse.Plugins.AIAgents
             var json = JsonSerializer.Serialize(payload);
             var content = new StringContent(json, Encoding.UTF8, "application/json");
 
-            var response = await _httpClient.PostAsync(endpoint, content);
-            var responseBody = await response.Content.ReadAsStringAsync();
+            var response = await _httpClient.PostAsync(endpoint, content, ct);
+            var responseBody = await response.Content.ReadAsStringAsync(ct);
             var result = JsonDocument.Parse(responseBody);
 
             var message = result.RootElement.GetProperty("message");
@@ -299,7 +299,7 @@ namespace DataWarehouse.Plugins.AIAgents
             };
         }
 
-        public async Task<VisionResponse> VisionAsync(VisionRequest request)
+        public async Task<VisionResponse> VisionAsync(VisionRequest request, CancellationToken ct = default)
         {
             var endpoint = $"{BaseUrl}/api/chat";
 
@@ -311,7 +311,7 @@ namespace DataWarehouse.Plugins.AIAgents
             else if (!string.IsNullOrEmpty(request.ImageUrl))
             {
                 // Download and convert to base64
-                var imageBytes = await _httpClient.GetByteArrayAsync(request.ImageUrl);
+                var imageBytes = await _httpClient.GetByteArrayAsync(request.ImageUrl, ct);
                 images.Add(Convert.ToBase64String(imageBytes));
             }
 
@@ -334,8 +334,8 @@ namespace DataWarehouse.Plugins.AIAgents
             var json = JsonSerializer.Serialize(payload);
             var content = new StringContent(json, Encoding.UTF8, "application/json");
 
-            var response = await _httpClient.PostAsync(endpoint, content);
-            var responseBody = await response.Content.ReadAsStringAsync();
+            var response = await _httpClient.PostAsync(endpoint, content, ct);
+            var responseBody = await response.Content.ReadAsStringAsync(ct);
             var result = JsonDocument.Parse(responseBody);
 
             var textContent = result.RootElement.GetProperty("message")
@@ -347,11 +347,11 @@ namespace DataWarehouse.Plugins.AIAgents
         /// <summary>
         /// List available models from the Ollama server.
         /// </summary>
-        public async Task<string[]> ListModelsAsync()
+        public async Task<string[]> ListModelsAsync(CancellationToken ct = default)
         {
             var endpoint = $"{BaseUrl}/api/tags";
-            var response = await _httpClient.GetAsync(endpoint);
-            var responseBody = await response.Content.ReadAsStringAsync();
+            var response = await _httpClient.GetAsync(endpoint, ct);
+            var responseBody = await response.Content.ReadAsStringAsync(ct);
             var result = JsonDocument.Parse(responseBody);
 
             return result.RootElement.GetProperty("models")

@@ -53,7 +53,7 @@ namespace DataWarehouse.Plugins.AIAgents
             return $"{baseUrl}/models/{model}";
         }
 
-        public async Task<ChatResponse> ChatAsync(ChatRequest request)
+        public async Task<ChatResponse> ChatAsync(ChatRequest request, CancellationToken ct = default)
         {
             var endpoint = GetEndpoint(request.Model);
 
@@ -79,8 +79,8 @@ namespace DataWarehouse.Plugins.AIAgents
             var json = JsonSerializer.Serialize(payload);
             var content = new StringContent(json, Encoding.UTF8, "application/json");
 
-            var response = await _httpClient.PostAsync(endpoint, content);
-            var responseBody = await response.Content.ReadAsStringAsync();
+            var response = await _httpClient.PostAsync(endpoint, content, ct);
+            var responseBody = await response.Content.ReadAsStringAsync(ct);
 
             if (!response.IsSuccessStatusCode)
             {
@@ -132,7 +132,7 @@ namespace DataWarehouse.Plugins.AIAgents
             return sb.ToString();
         }
 
-        public async Task<CompletionResponse> CompleteAsync(CompletionRequest request)
+        public async Task<CompletionResponse> CompleteAsync(CompletionRequest request, CancellationToken ct = default)
         {
             var endpoint = GetEndpoint(request.Model);
 
@@ -150,8 +150,8 @@ namespace DataWarehouse.Plugins.AIAgents
             var json = JsonSerializer.Serialize(payload);
             var content = new StringContent(json, Encoding.UTF8, "application/json");
 
-            var response = await _httpClient.PostAsync(endpoint, content);
-            var responseBody = await response.Content.ReadAsStringAsync();
+            var response = await _httpClient.PostAsync(endpoint, content, ct);
+            var responseBody = await response.Content.ReadAsStringAsync(ct);
             var result = JsonDocument.Parse(responseBody);
             var root = result.RootElement;
 
@@ -173,7 +173,7 @@ namespace DataWarehouse.Plugins.AIAgents
             };
         }
 
-        public async Task<double[][]> EmbedAsync(string[] texts, string? model = null)
+        public async Task<double[][]> EmbedAsync(string[] texts, string? model = null, CancellationToken ct = default)
         {
             var embedModel = model ?? "sentence-transformers/all-MiniLM-L6-v2";
             var endpoint = GetEndpoint(embedModel);
@@ -182,8 +182,8 @@ namespace DataWarehouse.Plugins.AIAgents
             var json = JsonSerializer.Serialize(payload);
             var content = new StringContent(json, Encoding.UTF8, "application/json");
 
-            var response = await _httpClient.PostAsync(endpoint, content);
-            var responseBody = await response.Content.ReadAsStringAsync();
+            var response = await _httpClient.PostAsync(endpoint, content, ct);
+            var responseBody = await response.Content.ReadAsStringAsync(ct);
             var result = JsonDocument.Parse(responseBody);
 
             return result.RootElement.EnumerateArray()
@@ -247,12 +247,12 @@ namespace DataWarehouse.Plugins.AIAgents
             }
         }
 
-        public Task<FunctionCallResponse> FunctionCallAsync(FunctionCallRequest request)
+        public Task<FunctionCallResponse> FunctionCallAsync(FunctionCallRequest request, CancellationToken ct = default)
         {
             throw new NotSupportedException("HuggingFace Inference API does not support function calling");
         }
 
-        public async Task<VisionResponse> VisionAsync(VisionRequest request)
+        public async Task<VisionResponse> VisionAsync(VisionRequest request, CancellationToken ct = default)
         {
             var endpoint = GetEndpoint(request.Model);
 
@@ -263,7 +263,7 @@ namespace DataWarehouse.Plugins.AIAgents
             }
             else if (!string.IsNullOrEmpty(request.ImageUrl))
             {
-                imageData = await _httpClient.GetByteArrayAsync(request.ImageUrl);
+                imageData = await _httpClient.GetByteArrayAsync(request.ImageUrl, ct);
             }
             else
             {
@@ -283,8 +283,8 @@ namespace DataWarehouse.Plugins.AIAgents
             var json = JsonSerializer.Serialize(payload);
             var content = new StringContent(json, Encoding.UTF8, "application/json");
 
-            var response = await _httpClient.PostAsync(endpoint, content);
-            var responseBody = await response.Content.ReadAsStringAsync();
+            var response = await _httpClient.PostAsync(endpoint, content, ct);
+            var responseBody = await response.Content.ReadAsStringAsync(ct);
             var result = JsonDocument.Parse(responseBody);
 
             string textContent;

@@ -799,12 +799,12 @@ namespace DataWarehouse.Plugins.AIAgents
         bool SupportsEmbeddings { get; }
         string[] AvailableModels { get; }
 
-        Task<ChatResponse> ChatAsync(ChatRequest request);
-        Task<CompletionResponse> CompleteAsync(CompletionRequest request);
-        Task<double[][]> EmbedAsync(string[] texts, string? model = null);
-        IAsyncEnumerable<string> StreamChatAsync(ChatRequest request);
-        Task<FunctionCallResponse> FunctionCallAsync(FunctionCallRequest request);
-        Task<VisionResponse> VisionAsync(VisionRequest request);
+        Task<ChatResponse> ChatAsync(ChatRequest request, CancellationToken ct = default);
+        Task<CompletionResponse> CompleteAsync(CompletionRequest request, CancellationToken ct = default);
+        Task<double[][]> EmbedAsync(string[] texts, string? model = null, CancellationToken ct = default);
+        IAsyncEnumerable<string> StreamChatAsync(ChatRequest request, CancellationToken ct = default);
+        Task<FunctionCallResponse> FunctionCallAsync(FunctionCallRequest request, CancellationToken ct = default);
+        Task<VisionResponse> VisionAsync(VisionRequest request, CancellationToken ct = default);
     }
 
     #endregion
@@ -942,6 +942,304 @@ namespace DataWarehouse.Plugins.AIAgents
         public long TotalOutputTokens;
         public long TotalLatencyMs;
         public double EstimatedCostUsd;
+    }
+
+    #endregion
+
+    #region Authentication and Usage Limits
+
+    /// <summary>
+    /// User quota tier levels.
+    /// </summary>
+    public enum QuotaTier
+    {
+        /// <summary>Free tier - Limited requests, basic models only</summary>
+        Free,
+        /// <summary>Basic tier - More requests, standard models</summary>
+        Basic,
+        /// <summary>Pro tier - High volume, all models, priority</summary>
+        Pro,
+        /// <summary>Enterprise tier - Unlimited, custom models, dedicated support</summary>
+        Enterprise,
+        /// <summary>BYOK (Bring Your Own Key) - User provides their own API keys</summary>
+        BringYourOwnKey
+    }
+
+    /// <summary>
+    /// Usage limits per quota tier.
+    /// </summary>
+    public class UsageLimits
+    {
+        public int DailyRequestLimit { get; set; }
+        public int DailyTokenLimit { get; set; }
+        public int MaxTokensPerRequest { get; set; }
+        public int MaxConcurrentRequests { get; set; }
+        public string[] AllowedModels { get; set; } = Array.Empty<string>();
+        public string[] AllowedProviders { get; set; } = Array.Empty<string>();
+        public bool StreamingEnabled { get; set; }
+        public bool FunctionCallingEnabled { get; set; }
+        public bool VisionEnabled { get; set; }
+        public bool EmbeddingsEnabled { get; set; }
+        public double? MonthlyBudgetUsd { get; set; }
+
+        public static UsageLimits GetDefaultLimits(QuotaTier tier) => tier switch
+        {
+            QuotaTier.Free => new UsageLimits
+            {
+                DailyRequestLimit = 50,
+                DailyTokenLimit = 50_000,
+                MaxTokensPerRequest = 1024,
+                MaxConcurrentRequests = 1,
+                AllowedModels = new[] { "gpt-4o-mini", "claude-3-haiku-20240307", "gemini-1.5-flash" },
+                AllowedProviders = new[] { "openai", "anthropic", "google" },
+                StreamingEnabled = false,
+                FunctionCallingEnabled = false,
+                VisionEnabled = false,
+                EmbeddingsEnabled = false,
+                MonthlyBudgetUsd = null
+            },
+            QuotaTier.Basic => new UsageLimits
+            {
+                DailyRequestLimit = 500,
+                DailyTokenLimit = 500_000,
+                MaxTokensPerRequest = 4096,
+                MaxConcurrentRequests = 3,
+                AllowedModels = new[] { "gpt-4o-mini", "gpt-4o", "claude-3-haiku-20240307", "claude-3-sonnet-20240229", "gemini-1.5-flash", "gemini-1.5-pro" },
+                AllowedProviders = new[] { "openai", "anthropic", "google", "mistral" },
+                StreamingEnabled = true,
+                FunctionCallingEnabled = true,
+                VisionEnabled = false,
+                EmbeddingsEnabled = true,
+                MonthlyBudgetUsd = 20.0
+            },
+            QuotaTier.Pro => new UsageLimits
+            {
+                DailyRequestLimit = 5000,
+                DailyTokenLimit = 5_000_000,
+                MaxTokensPerRequest = 16384,
+                MaxConcurrentRequests = 10,
+                AllowedModels = new[] { "*" }, // All models
+                AllowedProviders = new[] { "*" }, // All providers
+                StreamingEnabled = true,
+                FunctionCallingEnabled = true,
+                VisionEnabled = true,
+                EmbeddingsEnabled = true,
+                MonthlyBudgetUsd = 100.0
+            },
+            QuotaTier.Enterprise => new UsageLimits
+            {
+                DailyRequestLimit = int.MaxValue,
+                DailyTokenLimit = int.MaxValue,
+                MaxTokensPerRequest = 128000,
+                MaxConcurrentRequests = 100,
+                AllowedModels = new[] { "*" },
+                AllowedProviders = new[] { "*" },
+                StreamingEnabled = true,
+                FunctionCallingEnabled = true,
+                VisionEnabled = true,
+                EmbeddingsEnabled = true,
+                MonthlyBudgetUsd = null // Unlimited
+            },
+            QuotaTier.BringYourOwnKey => new UsageLimits
+            {
+                DailyRequestLimit = int.MaxValue,
+                DailyTokenLimit = int.MaxValue,
+                MaxTokensPerRequest = 128000,
+                MaxConcurrentRequests = 50,
+                AllowedModels = new[] { "*" },
+                AllowedProviders = new[] { "*" },
+                StreamingEnabled = true,
+                FunctionCallingEnabled = true,
+                VisionEnabled = true,
+                EmbeddingsEnabled = true,
+                MonthlyBudgetUsd = null // User pays directly
+            },
+            _ => GetDefaultLimits(QuotaTier.Free)
+        };
+
+        public bool IsModelAllowed(string model)
+        {
+            if (AllowedModels.Contains("*")) return true;
+            return AllowedModels.Any(m => model.StartsWith(m, StringComparison.OrdinalIgnoreCase));
+        }
+
+        public bool IsProviderAllowed(string provider)
+        {
+            if (AllowedProviders.Contains("*")) return true;
+            return AllowedProviders.Contains(provider, StringComparer.OrdinalIgnoreCase);
+        }
+    }
+
+    /// <summary>
+    /// Per-user quota tracking.
+    /// </summary>
+    public class UserQuota
+    {
+        public string UserId { get; set; } = string.Empty;
+        public QuotaTier Tier { get; set; } = QuotaTier.Free;
+        public UsageLimits Limits { get; set; } = UsageLimits.GetDefaultLimits(QuotaTier.Free);
+        public DateTime PeriodStart { get; set; } = DateTime.UtcNow.Date;
+        public int RequestsToday { get; set; }
+        public int TokensToday { get; set; }
+        public double SpentThisMonth { get; set; }
+        public Dictionary<string, string>? UserApiKeys { get; set; } // Provider -> API Key for BYOK
+
+        public bool CanMakeRequest(int estimatedTokens, out string? reason)
+        {
+            reason = null;
+
+            // Check if period needs reset
+            if (DateTime.UtcNow.Date > PeriodStart)
+            {
+                RequestsToday = 0;
+                TokensToday = 0;
+                PeriodStart = DateTime.UtcNow.Date;
+            }
+
+            if (RequestsToday >= Limits.DailyRequestLimit)
+            {
+                reason = $"Daily request limit ({Limits.DailyRequestLimit}) exceeded. Upgrade tier or wait until tomorrow.";
+                return false;
+            }
+
+            if (TokensToday + estimatedTokens > Limits.DailyTokenLimit)
+            {
+                reason = $"Daily token limit ({Limits.DailyTokenLimit:N0}) exceeded. Upgrade tier or wait until tomorrow.";
+                return false;
+            }
+
+            if (Limits.MonthlyBudgetUsd.HasValue && SpentThisMonth >= Limits.MonthlyBudgetUsd.Value)
+            {
+                reason = $"Monthly budget (${Limits.MonthlyBudgetUsd:F2}) exceeded. Upgrade tier or add funds.";
+                return false;
+            }
+
+            return true;
+        }
+
+        public void RecordUsage(int inputTokens, int outputTokens, double costUsd)
+        {
+            RequestsToday++;
+            TokensToday += inputTokens + outputTokens;
+            SpentThisMonth += costUsd;
+        }
+
+        /// <summary>
+        /// Get API key for provider - either user's own key (BYOK) or null for system key.
+        /// </summary>
+        public string? GetApiKeyForProvider(string providerType)
+        {
+            if (Tier != QuotaTier.BringYourOwnKey || UserApiKeys == null)
+                return null;
+
+            return UserApiKeys.TryGetValue(providerType, out var key) ? key : null;
+        }
+    }
+
+    /// <summary>
+    /// Authentication result from external auth provider.
+    /// </summary>
+    public class AuthenticationResult
+    {
+        public bool IsAuthenticated { get; set; }
+        public string? UserId { get; set; }
+        public QuotaTier Tier { get; set; }
+        public Dictionary<string, string>? UserApiKeys { get; set; }
+        public string? ErrorMessage { get; set; }
+    }
+
+    /// <summary>
+    /// Interface for external authentication providers.
+    /// Implement this to integrate with OAuth, API keys, or subscription systems.
+    /// </summary>
+    public interface IAIAuthProvider
+    {
+        /// <summary>
+        /// Authenticate a request and return user quota information.
+        /// </summary>
+        Task<AuthenticationResult> AuthenticateAsync(string? token, Dictionary<string, object?>? context);
+
+        /// <summary>
+        /// Called after successful request to record usage for billing.
+        /// </summary>
+        Task RecordUsageAsync(string userId, string provider, string model, int inputTokens, int outputTokens, double costUsd);
+
+        /// <summary>
+        /// Get current quota status for a user.
+        /// </summary>
+        Task<UserQuota?> GetUserQuotaAsync(string userId);
+    }
+
+    /// <summary>
+    /// Default in-memory auth provider for development/testing.
+    /// Replace with database-backed implementation for production.
+    /// </summary>
+    public class InMemoryAuthProvider : IAIAuthProvider
+    {
+        private readonly ConcurrentDictionary<string, UserQuota> _quotas = new();
+        private readonly string? _defaultApiKey;
+
+        public InMemoryAuthProvider(string? defaultApiKey = null)
+        {
+            _defaultApiKey = defaultApiKey;
+        }
+
+        public Task<AuthenticationResult> AuthenticateAsync(string? token, Dictionary<string, object?>? context)
+        {
+            // Simple token-based auth for demo
+            if (string.IsNullOrEmpty(token))
+            {
+                // Anonymous user gets free tier
+                return Task.FromResult(new AuthenticationResult
+                {
+                    IsAuthenticated = true,
+                    UserId = "anonymous",
+                    Tier = QuotaTier.Free
+                });
+            }
+
+            // Check if token is a valid API key format (BYOK)
+            if (token.StartsWith("sk-") || token.StartsWith("pk-"))
+            {
+                return Task.FromResult(new AuthenticationResult
+                {
+                    IsAuthenticated = true,
+                    UserId = $"byok-{token.GetHashCode():X8}",
+                    Tier = QuotaTier.BringYourOwnKey,
+                    UserApiKeys = new Dictionary<string, string>
+                    {
+                        ["openai"] = token.StartsWith("sk-") ? token : "",
+                        ["anthropic"] = token.StartsWith("pk-") ? token : ""
+                    }
+                });
+            }
+
+            // Default authenticated user
+            return Task.FromResult(new AuthenticationResult
+            {
+                IsAuthenticated = true,
+                UserId = token,
+                Tier = QuotaTier.Basic
+            });
+        }
+
+        public Task RecordUsageAsync(string userId, string provider, string model, int inputTokens, int outputTokens, double costUsd)
+        {
+            var quota = _quotas.GetOrAdd(userId, id => new UserQuota
+            {
+                UserId = id,
+                Tier = QuotaTier.Free,
+                Limits = UsageLimits.GetDefaultLimits(QuotaTier.Free)
+            });
+
+            quota.RecordUsage(inputTokens, outputTokens, costUsd);
+            return Task.CompletedTask;
+        }
+
+        public Task<UserQuota?> GetUserQuotaAsync(string userId)
+        {
+            return Task.FromResult(_quotas.TryGetValue(userId, out var quota) ? quota : null);
+        }
     }
 
     #endregion
