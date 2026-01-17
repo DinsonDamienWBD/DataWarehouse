@@ -372,11 +372,12 @@ namespace DataWarehouse.Plugins.Database
 
         private async Task<MessageResponse> HandleAggregateAsync(PluginMessage message)
         {
-            if (message.Payload is not Dictionary<string, object> payload)
+            var payload = message.Payload;
+            if (payload == null)
                 return MessageResponse.Error("Invalid payload");
 
-            var database = GetStringOrDefault(payload, "database") ?? _nosqlConfig.DefaultDatabase;
-            var collection = GetStringOrDefault(payload, "collection");
+            var database = GetPayloadString(payload, "database") ?? _nosqlConfig.DefaultDatabase;
+            var collection = GetPayloadString(payload, "collection");
             var pipeline = payload.TryGetValue("pipeline", out var pObj) ? pObj : null;
 
             if (string.IsNullOrEmpty(collection) || pipeline == null)
@@ -389,12 +390,13 @@ namespace DataWarehouse.Plugins.Database
 
         private async Task<MessageResponse> HandleCreateIndexAsync(PluginMessage message)
         {
-            if (message.Payload is not Dictionary<string, object> payload)
+            var payload = message.Payload;
+            if (payload == null)
                 return MessageResponse.Error("Invalid payload");
 
-            var database = GetStringOrDefault(payload, "database") ?? _nosqlConfig.DefaultDatabase;
-            var collection = GetStringOrDefault(payload, "collection");
-            var indexName = GetStringOrDefault(payload, "indexName");
+            var database = GetPayloadString(payload, "database") ?? _nosqlConfig.DefaultDatabase;
+            var collection = GetPayloadString(payload, "collection");
+            var indexName = GetPayloadString(payload, "indexName");
             var fields = payload.TryGetValue("fields", out var fObj) ? fObj : null;
 
             if (string.IsNullOrEmpty(collection) || fields == null)
@@ -407,12 +409,13 @@ namespace DataWarehouse.Plugins.Database
 
         private async Task<MessageResponse> HandleDropIndexAsync(PluginMessage message)
         {
-            if (message.Payload is not Dictionary<string, object> payload)
+            var payload = message.Payload;
+            if (payload == null)
                 return MessageResponse.Error("Invalid payload");
 
-            var database = GetStringOrDefault(payload, "database") ?? _nosqlConfig.DefaultDatabase;
-            var collection = GetStringOrDefault(payload, "collection");
-            var indexName = GetStringOrDefault(payload, "indexName");
+            var database = GetPayloadString(payload, "database") ?? _nosqlConfig.DefaultDatabase;
+            var collection = GetPayloadString(payload, "collection");
+            var indexName = GetPayloadString(payload, "indexName");
 
             if (string.IsNullOrEmpty(collection) || string.IsNullOrEmpty(indexName))
                 return MessageResponse.Error("Missing required parameters: collection, indexName");
@@ -423,11 +426,12 @@ namespace DataWarehouse.Plugins.Database
 
         private async Task<MessageResponse> HandleBulkInsertAsync(PluginMessage message)
         {
-            if (message.Payload is not Dictionary<string, object> payload)
+            var payload = message.Payload;
+            if (payload == null)
                 return MessageResponse.Error("Invalid payload");
 
-            var database = GetStringOrDefault(payload, "database") ?? _nosqlConfig.DefaultDatabase;
-            var collection = GetStringOrDefault(payload, "collection");
+            var database = GetPayloadString(payload, "database") ?? _nosqlConfig.DefaultDatabase;
+            var collection = GetPayloadString(payload, "collection");
             var documents = payload.TryGetValue("documents", out var dObj) ? dObj as IEnumerable<object> : null;
 
             if (string.IsNullOrEmpty(collection) || documents == null)
@@ -449,12 +453,13 @@ namespace DataWarehouse.Plugins.Database
 
         private async Task<MessageResponse> HandleBulkDeleteAsync(PluginMessage message)
         {
-            if (message.Payload is not Dictionary<string, object> payload)
+            var payload = message.Payload;
+            if (payload == null)
                 return MessageResponse.Error("Invalid payload");
 
-            var database = GetStringOrDefault(payload, "database") ?? _nosqlConfig.DefaultDatabase;
-            var collection = GetStringOrDefault(payload, "collection");
-            var filter = GetStringOrDefault(payload, "filter");
+            var database = GetPayloadString(payload, "database") ?? _nosqlConfig.DefaultDatabase;
+            var collection = GetPayloadString(payload, "collection");
+            var filter = GetPayloadString(payload, "filter");
 
             if (string.IsNullOrEmpty(collection))
                 return MessageResponse.Error("Missing required parameter: collection");

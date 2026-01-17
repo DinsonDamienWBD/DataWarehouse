@@ -365,27 +365,45 @@ namespace DataWarehouse.Plugins.Storage
 
             while (!ct.IsCancellationRequested)
             {
+                // Read gRPC frame outside of yield to avoid try-catch yield issue
+                string? key = null;
+                long size = 0;
+                bool shouldBreak = false;
+
                 try
                 {
                     // Read gRPC frame (5-byte header: compressed flag + 4-byte length)
                     var header = reader.ReadBytes(5);
-                    if (header.Length < 5) break;
-
-                    var length = BitConverter.ToInt32(header.Skip(1).Reverse().ToArray(), 0);
-                    if (length <= 0) break;
-
-                    var messageBytes = reader.ReadBytes(length);
-                    var (key, size) = ParseListItem(messageBytes);
-
-                    if (!string.IsNullOrEmpty(key))
+                    if (header.Length < 5)
                     {
-                        var uri = new Uri($"grpc://{new Uri(_config.Endpoint).Host}/{key}");
-                        yield return new StorageListItem(uri, size);
+                        shouldBreak = true;
+                    }
+                    else
+                    {
+                        var length = BitConverter.ToInt32(header.Skip(1).Reverse().ToArray(), 0);
+                        if (length <= 0)
+                        {
+                            shouldBreak = true;
+                        }
+                        else
+                        {
+                            var messageBytes = reader.ReadBytes(length);
+                            (key, size) = ParseListItem(messageBytes);
+                        }
                     }
                 }
                 catch
                 {
+                    shouldBreak = true;
+                }
+
+                if (shouldBreak)
                     break;
+
+                if (!string.IsNullOrEmpty(key))
+                {
+                    var uri = new Uri($"grpc://{new Uri(_config.Endpoint).Host}/{key}");
+                    yield return new StorageListItem(uri, size);
                 }
 
                 await Task.Yield();

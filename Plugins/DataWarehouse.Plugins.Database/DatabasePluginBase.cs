@@ -130,12 +130,11 @@ namespace DataWarehouse.Plugins.Database
 
         protected virtual async Task<MessageResponse> HandleSaveAsync(PluginMessage message)
         {
-            if (message.Payload is not Dictionary<string, object> payload)
-                return MessageResponse.Error("Invalid payload");
+            var payload = message.Payload;
 
-            var database = GetStringOrDefault(payload, "database");
-            var collection = GetStringOrDefault(payload, "collection");
-            var id = GetStringOrDefault(payload, "id");
+            var database = GetPayloadString(payload, "database");
+            var collection = GetPayloadString(payload, "collection");
+            var id = GetPayloadString(payload, "id");
             var data = payload.TryGetValue("data", out var dataObj) ? dataObj : null;
 
             if (string.IsNullOrEmpty(collection) || data == null)
@@ -151,12 +150,11 @@ namespace DataWarehouse.Plugins.Database
 
         protected virtual async Task<MessageResponse> HandleLoadAsync(PluginMessage message)
         {
-            if (message.Payload is not Dictionary<string, object> payload)
-                return MessageResponse.Error("Invalid payload");
+            var payload = message.Payload;
 
-            var database = GetStringOrDefault(payload, "database");
-            var collection = GetStringOrDefault(payload, "collection");
-            var id = GetStringOrDefault(payload, "id");
+            var database = GetPayloadString(payload, "database");
+            var collection = GetPayloadString(payload, "collection");
+            var id = GetPayloadString(payload, "id");
 
             if (string.IsNullOrEmpty(collection) || string.IsNullOrEmpty(id))
                 return MessageResponse.Error("Missing required parameters: collection, id");
@@ -172,12 +170,11 @@ namespace DataWarehouse.Plugins.Database
 
         protected virtual async Task<MessageResponse> HandleDeleteAsync(PluginMessage message)
         {
-            if (message.Payload is not Dictionary<string, object> payload)
-                return MessageResponse.Error("Invalid payload");
+            var payload = message.Payload;
 
-            var database = GetStringOrDefault(payload, "database");
-            var collection = GetStringOrDefault(payload, "collection");
-            var id = GetStringOrDefault(payload, "id");
+            var database = GetPayloadString(payload, "database");
+            var collection = GetPayloadString(payload, "collection");
+            var id = GetPayloadString(payload, "id");
 
             if (string.IsNullOrEmpty(collection) || string.IsNullOrEmpty(id))
                 return MessageResponse.Error("Missing required parameters: collection, id");
@@ -189,12 +186,11 @@ namespace DataWarehouse.Plugins.Database
 
         protected virtual async Task<MessageResponse> HandleExistsAsync(PluginMessage message)
         {
-            if (message.Payload is not Dictionary<string, object> payload)
-                return MessageResponse.Error("Invalid payload");
+            var payload = message.Payload;
 
-            var database = GetStringOrDefault(payload, "database");
-            var collection = GetStringOrDefault(payload, "collection");
-            var id = GetStringOrDefault(payload, "id");
+            var database = GetPayloadString(payload, "database");
+            var collection = GetPayloadString(payload, "collection");
+            var id = GetPayloadString(payload, "id");
 
             if (string.IsNullOrEmpty(collection) || string.IsNullOrEmpty(id))
                 return MessageResponse.Error("Missing required parameters: collection, id");
@@ -206,13 +202,12 @@ namespace DataWarehouse.Plugins.Database
 
         protected virtual async Task<MessageResponse> HandleQueryAsync(PluginMessage message)
         {
-            if (message.Payload is not Dictionary<string, object> payload)
-                return MessageResponse.Error("Invalid payload");
+            var payload = message.Payload;
 
-            var database = GetStringOrDefault(payload, "database");
-            var collection = GetStringOrDefault(payload, "collection");
-            var query = GetStringOrDefault(payload, "query");
-            var parameters = payload.TryGetValue("parameters", out var pObj) ? pObj as Dictionary<string, object> : null;
+            var database = GetPayloadString(payload, "database");
+            var collection = GetPayloadString(payload, "collection");
+            var query = GetPayloadString(payload, "query");
+            var parameters = GetPayloadDictionary(payload, "parameters");
 
             var results = await ExecuteQueryAsync(database, collection, query, parameters);
             return MessageResponse.Ok(new { Database = database, Collection = collection, Results = results });
@@ -220,12 +215,11 @@ namespace DataWarehouse.Plugins.Database
 
         protected virtual async Task<MessageResponse> HandleCountAsync(PluginMessage message)
         {
-            if (message.Payload is not Dictionary<string, object> payload)
-                return MessageResponse.Error("Invalid payload");
+            var payload = message.Payload;
 
-            var database = GetStringOrDefault(payload, "database");
-            var collection = GetStringOrDefault(payload, "collection");
-            var filter = GetStringOrDefault(payload, "filter");
+            var database = GetPayloadString(payload, "database");
+            var collection = GetPayloadString(payload, "collection");
+            var filter = GetPayloadString(payload, "filter");
 
             var count = await CountAsync(database, collection, filter);
             return MessageResponse.Ok(new { Database = database, Collection = collection, Count = count });
@@ -245,10 +239,9 @@ namespace DataWarehouse.Plugins.Database
 
         protected virtual async Task<MessageResponse> HandleCreateDatabaseAsync(PluginMessage message)
         {
-            if (message.Payload is not Dictionary<string, object> payload)
-                return MessageResponse.Error("Invalid payload");
+            var payload = message.Payload;
 
-            var database = GetStringOrDefault(payload, "database");
+            var database = GetPayloadString(payload, "database");
             if (string.IsNullOrEmpty(database))
                 return MessageResponse.Error("Missing required parameter: database");
 
@@ -258,10 +251,9 @@ namespace DataWarehouse.Plugins.Database
 
         protected virtual async Task<MessageResponse> HandleDropDatabaseAsync(PluginMessage message)
         {
-            if (message.Payload is not Dictionary<string, object> payload)
-                return MessageResponse.Error("Invalid payload");
+            var payload = message.Payload;
 
-            var database = GetStringOrDefault(payload, "database");
+            var database = GetPayloadString(payload, "database");
             if (string.IsNullOrEmpty(database))
                 return MessageResponse.Error("Missing required parameter: database");
 
@@ -271,12 +263,11 @@ namespace DataWarehouse.Plugins.Database
 
         protected virtual async Task<MessageResponse> HandleCreateCollectionAsync(PluginMessage message)
         {
-            if (message.Payload is not Dictionary<string, object> payload)
-                return MessageResponse.Error("Invalid payload");
+            var payload = message.Payload;
 
-            var database = GetStringOrDefault(payload, "database");
-            var collection = GetStringOrDefault(payload, "collection");
-            var schema = payload.TryGetValue("schema", out var schemaObj) ? schemaObj as Dictionary<string, object> : null;
+            var database = GetPayloadString(payload, "database");
+            var collection = GetPayloadString(payload, "collection");
+            var schema = GetPayloadDictionary(payload, "schema");
 
             if (string.IsNullOrEmpty(collection))
                 return MessageResponse.Error("Missing required parameter: collection");
@@ -287,11 +278,10 @@ namespace DataWarehouse.Plugins.Database
 
         protected virtual async Task<MessageResponse> HandleDropCollectionAsync(PluginMessage message)
         {
-            if (message.Payload is not Dictionary<string, object> payload)
-                return MessageResponse.Error("Invalid payload");
+            var payload = message.Payload;
 
-            var database = GetStringOrDefault(payload, "database");
-            var collection = GetStringOrDefault(payload, "collection");
+            var database = GetPayloadString(payload, "database");
+            var collection = GetPayloadString(payload, "collection");
 
             if (string.IsNullOrEmpty(collection))
                 return MessageResponse.Error("Missing required parameter: collection");
@@ -308,10 +298,9 @@ namespace DataWarehouse.Plugins.Database
 
         protected virtual async Task<MessageResponse> HandleListCollectionsAsync(PluginMessage message)
         {
-            if (message.Payload is not Dictionary<string, object> payload)
-                return MessageResponse.Error("Invalid payload");
+            var payload = message.Payload;
 
-            var database = GetStringOrDefault(payload, "database");
+            var database = GetPayloadString(payload, "database");
             var collections = await ListCollectionsAsync(database);
             return MessageResponse.Ok(new { Database = database, Collections = collections });
         }
@@ -397,9 +386,22 @@ namespace DataWarehouse.Plugins.Database
             };
         }
 
-        protected static string? GetStringOrDefault(Dictionary<string, object> dict, string key)
+        /// <summary>
+        /// Gets a string value from a payload dictionary.
+        /// </summary>
+        protected static string? GetPayloadString(Dictionary<string, object?> dict, string key)
         {
             return dict.TryGetValue(key, out var value) ? value?.ToString() : null;
+        }
+
+        /// <summary>
+        /// Gets a dictionary value from a payload dictionary.
+        /// </summary>
+        protected static Dictionary<string, object>? GetPayloadDictionary(Dictionary<string, object?> dict, string key)
+        {
+            if (dict.TryGetValue(key, out var value) && value is Dictionary<string, object> result)
+                return result;
+            return null;
         }
 
         protected async Task EnsureConnectedAsync()
@@ -432,6 +434,74 @@ namespace DataWarehouse.Plugins.Database
         Embedded,
         /// <summary>Relational databases like MySQL, PostgreSQL, SQL Server.</summary>
         Relational
+    }
+
+    /// <summary>
+    /// Result of a database query operation.
+    /// </summary>
+    public class QueryResult
+    {
+        /// <summary>Whether the query executed successfully.</summary>
+        public bool Success { get; set; }
+
+        /// <summary>Number of rows affected by the query.</summary>
+        public int RowsAffected { get; set; }
+
+        /// <summary>Last inserted ID for insert operations.</summary>
+        public long? LastInsertId { get; set; }
+
+        /// <summary>Query execution time in milliseconds.</summary>
+        public double ExecutionTimeMs { get; set; }
+
+        /// <summary>Column names from the result set.</summary>
+        public List<string> Columns { get; set; } = new();
+
+        /// <summary>Row data as list of dictionaries.</summary>
+        public List<Dictionary<string, object?>> Rows { get; set; } = new();
+
+        /// <summary>Error message if the query failed.</summary>
+        public string? ErrorMessage { get; set; }
+
+        /// <summary>
+        /// Creates a successful query result with rows.
+        /// </summary>
+        public static QueryResult FromRows(List<Dictionary<string, object?>> rows, List<string>? columns = null, double executionTimeMs = 0)
+        {
+            return new QueryResult
+            {
+                Success = true,
+                Rows = rows,
+                Columns = columns ?? (rows.Count > 0 ? rows[0].Keys.ToList() : new List<string>()),
+                RowsAffected = rows.Count,
+                ExecutionTimeMs = executionTimeMs
+            };
+        }
+
+        /// <summary>
+        /// Creates a successful non-query result.
+        /// </summary>
+        public static QueryResult FromAffected(int rowsAffected, long? lastInsertId = null, double executionTimeMs = 0)
+        {
+            return new QueryResult
+            {
+                Success = true,
+                RowsAffected = rowsAffected,
+                LastInsertId = lastInsertId,
+                ExecutionTimeMs = executionTimeMs
+            };
+        }
+
+        /// <summary>
+        /// Creates an error result.
+        /// </summary>
+        public static QueryResult Error(string message)
+        {
+            return new QueryResult
+            {
+                Success = false,
+                ErrorMessage = message
+            };
+        }
     }
 
     /// <summary>

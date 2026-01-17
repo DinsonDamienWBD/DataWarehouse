@@ -272,23 +272,41 @@ namespace DataWarehouse.SDK.Primitives
 
     /// <summary>
     /// Represents the performance characteristic of a storage node.
+    /// Supports a wide range of storage tiers from hot (frequently accessed)
+    /// to deep archive (rarely accessed, long-term retention).
     /// </summary>
     public enum StorageTier
     {
         /// <summary>
-        /// Hot
+        /// Hot - Frequently accessed data with lowest latency.
         /// </summary>
         Hot,
 
         /// <summary>
-        /// Warm
+        /// Warm - Less frequently accessed data with moderate latency.
         /// </summary>
         Warm,
 
         /// <summary>
-        /// Cold
+        /// Cool - Infrequently accessed data (similar to AWS S3 Standard-IA or Azure Cool).
         /// </summary>
-        Cold
+        Cool,
+
+        /// <summary>
+        /// Cold - Rarely accessed data with higher access latency.
+        /// </summary>
+        Cold,
+
+        /// <summary>
+        /// Archive - Long-term storage with retrieval delays (similar to AWS Glacier or Azure Archive).
+        /// </summary>
+        Archive,
+
+        /// <summary>
+        /// DeepArchive - Lowest-cost storage for data that is rarely accessed
+        /// (similar to AWS Glacier Deep Archive).
+        /// </summary>
+        DeepArchive
     }
 
     /// <summary>

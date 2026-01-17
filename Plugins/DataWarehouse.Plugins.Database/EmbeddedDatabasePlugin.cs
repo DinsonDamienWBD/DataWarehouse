@@ -413,10 +413,11 @@ namespace DataWarehouse.Plugins.Database
 
         private async Task<MessageResponse> HandleExecuteAsync(PluginMessage message)
         {
-            if (message.Payload is not Dictionary<string, object> payload)
+            var payload = message.Payload;
+            if (payload == null)
                 return MessageResponse.Error("Invalid payload");
 
-            var sql = GetStringOrDefault(payload, "sql");
+            var sql = GetPayloadString(payload, "sql");
             var parameters = payload.TryGetValue("parameters", out var pObj) ? pObj as Dictionary<string, object> : null;
 
             if (string.IsNullOrEmpty(sql))
@@ -428,10 +429,11 @@ namespace DataWarehouse.Plugins.Database
 
         private async Task<MessageResponse> HandleBackupAsync(PluginMessage message)
         {
-            if (message.Payload is not Dictionary<string, object> payload)
+            var payload = message.Payload;
+            if (payload == null)
                 return MessageResponse.Error("Invalid payload");
 
-            var backupPath = GetStringOrDefault(payload, "path");
+            var backupPath = GetPayloadString(payload, "path");
             if (string.IsNullOrEmpty(backupPath))
             {
                 backupPath = _embeddedConfig.FilePath + ".backup." + DateTime.UtcNow.ToString("yyyyMMddHHmmss");
@@ -467,7 +469,8 @@ namespace DataWarehouse.Plugins.Database
 
         private async Task<MessageResponse> HandleTransactionAsync(PluginMessage message)
         {
-            if (message.Payload is not Dictionary<string, object> payload)
+            var payload = message.Payload;
+            if (payload == null)
                 return MessageResponse.Error("Invalid payload");
 
             var commands = payload.TryGetValue("commands", out var cObj) ? cObj as IEnumerable<object> : null;
@@ -515,10 +518,11 @@ namespace DataWarehouse.Plugins.Database
 
         private async Task<MessageResponse> HandleSchemaAsync(PluginMessage message)
         {
-            if (message.Payload is not Dictionary<string, object> payload)
+            var payload = message.Payload;
+            if (payload == null)
                 return MessageResponse.Error("Invalid payload");
 
-            var table = GetStringOrDefault(payload, "table");
+            var table = GetPayloadString(payload, "table");
 
             if (string.IsNullOrEmpty(table))
                 return MessageResponse.Error("Missing required parameter: table");

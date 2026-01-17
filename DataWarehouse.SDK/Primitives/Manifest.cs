@@ -16,9 +16,26 @@
         public string ContainerId { get; set; } = "default";
 
         /// <summary>
-        /// BLOB URI
+        /// BLOB URI - The primary storage location for the blob content.
         /// </summary>
         public string BlobUri { get; set; } = string.Empty;
+
+        /// <summary>
+        /// Storage URI - Alias for BlobUri for tiered storage operations.
+        /// Returns BlobUri if set, otherwise constructs from Id and ContainerId.
+        /// </summary>
+        public Uri StorageUri
+        {
+            get
+            {
+                if (!string.IsNullOrEmpty(BlobUri))
+                {
+                    return new Uri(BlobUri);
+                }
+                return new Uri($"blob://{ContainerId}/{Id}");
+            }
+            set => BlobUri = value?.ToString() ?? string.Empty;
+        }
 
         /// <summary>
         /// BLOB size in bytes
