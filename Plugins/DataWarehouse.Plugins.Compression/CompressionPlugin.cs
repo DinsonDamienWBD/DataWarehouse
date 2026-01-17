@@ -2,6 +2,7 @@ using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Primitives;
 using DataWarehouse.SDK.Utilities;
 using System.IO.Compression;
+using SysCompressionLevel = System.IO.Compression.CompressionLevel;
 
 namespace DataWarehouse.Plugins.Compression
 {
@@ -126,15 +127,15 @@ namespace DataWarehouse.Plugins.Compression
             return output;
         }
 
-        private CompressionLevel GetCompressionLevel(Dictionary<string, object> args)
+        private SysCompressionLevel GetCompressionLevel(Dictionary<string, object> args)
         {
             if (args.TryGetValue("level", out var levelObj))
             {
                 return levelObj switch
                 {
-                    CompressionLevel cl => cl,
-                    string s when Enum.TryParse<CompressionLevel>(s, true, out var parsed) => parsed,
-                    int i => (CompressionLevel)Math.Clamp(i, 0, 2),
+                    SysCompressionLevel cl => cl,
+                    string s when Enum.TryParse<SysCompressionLevel>(s, true, out var parsed) => parsed,
+                    int i => (SysCompressionLevel)Math.Clamp(i, 0, 2),
                     _ => _config.Level
                 };
             }
@@ -549,7 +550,7 @@ namespace DataWarehouse.Plugins.Compression
 
     public class GZipConfig
     {
-        public CompressionLevel Level { get; set; } = CompressionLevel.Optimal;
+        public SysCompressionLevel Level { get; set; } = SysCompressionLevel.Optimal;
         public int BufferSize { get; set; } = 81920;
     }
 

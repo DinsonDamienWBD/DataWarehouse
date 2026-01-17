@@ -154,7 +154,7 @@ namespace DataWarehouse.Plugins.AccessControl
                     new AclEntry
                     {
                         Subject = owner,
-                        Allow = Permission.Read | Permission.Write | Permission.Delete | Permission.Admin,
+                        Allow = Permission.FullControl,
                         Deny = Permission.None
                     }
                 ]
@@ -465,9 +465,9 @@ namespace DataWarehouse.Plugins.AccessControl
                 {
                     "read" => Permission.Read,
                     "write" => Permission.Write,
+                    "execute" => Permission.Execute,
                     "delete" => Permission.Delete,
-                    "admin" => Permission.Admin,
-                    "all" => Permission.Read | Permission.Write | Permission.Delete | Permission.Admin,
+                    "admin" or "fullcontrol" or "all" => Permission.FullControl,
                     _ => Permission.None
                 };
             }

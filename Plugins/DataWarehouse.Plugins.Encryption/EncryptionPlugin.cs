@@ -220,7 +220,10 @@ namespace DataWarehouse.Plugins.Encryption
             if (_keyStore != null)
                 return _keyStore;
 
-            var keyStorePlugin = context.GetPlugin<IKeyStore>();
+            // Search for a plugin that implements IKeyStore
+            var keyStorePlugin = context.GetPlugins<IPlugin>()
+                .OfType<IKeyStore>()
+                .FirstOrDefault();
             if (keyStorePlugin != null)
                 return keyStorePlugin;
 
@@ -419,7 +422,10 @@ namespace DataWarehouse.Plugins.Encryption
                 return ks;
             if (_keyStore != null)
                 return _keyStore;
-            var keyStorePlugin = context.GetPlugin<IKeyStore>();
+            // Search for a plugin that implements IKeyStore
+            var keyStorePlugin = context.GetPlugins<IPlugin>()
+                .OfType<IKeyStore>()
+                .FirstOrDefault();
             if (keyStorePlugin != null)
                 return keyStorePlugin;
             throw new InvalidOperationException("No IKeyStore available");

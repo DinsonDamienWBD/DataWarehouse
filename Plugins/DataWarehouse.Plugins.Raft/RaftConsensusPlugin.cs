@@ -126,7 +126,7 @@ namespace DataWarehouse.Plugins.Raft
                 {
                     Name = "propose",
                     Description = "Propose a state change to the cluster (quorum required)",
-                    InputSchema = new Dictionary<string, object>
+                    Parameters = new Dictionary<string, object>
                     {
                         ["type"] = "object",
                         ["properties"] = new Dictionary<string, object>
@@ -141,7 +141,7 @@ namespace DataWarehouse.Plugins.Raft
                 {
                     Name = "lock.acquire",
                     Description = "Acquire a distributed lock",
-                    InputSchema = new Dictionary<string, object>
+                    Parameters = new Dictionary<string, object>
                     {
                         ["type"] = "object",
                         ["properties"] = new Dictionary<string, object>
@@ -157,7 +157,7 @@ namespace DataWarehouse.Plugins.Raft
                 {
                     Name = "lock.release",
                     Description = "Release a distributed lock",
-                    InputSchema = new Dictionary<string, object>
+                    Parameters = new Dictionary<string, object>
                     {
                         ["type"] = "object",
                         ["properties"] = new Dictionary<string, object>
@@ -172,7 +172,7 @@ namespace DataWarehouse.Plugins.Raft
                 {
                     Name = "cluster.status",
                     Description = "Get cluster status and membership",
-                    InputSchema = new Dictionary<string, object>
+                    Parameters = new Dictionary<string, object>
                     {
                         ["type"] = "object",
                         ["properties"] = new Dictionary<string, object>()
@@ -227,6 +227,9 @@ namespace DataWarehouse.Plugins.Raft
         public override async Task<bool> ProposeAsync(Proposal proposal)
         {
             // Only leader can propose
+            RaftPeer? leaderToForward = null;
+            bool shouldForward = false;
+
             lock (_stateLock)
             {
                 if (_state != RaftState.Leader)
@@ -234,10 +237,19 @@ namespace DataWarehouse.Plugins.Raft
                     // Forward to leader if known
                     if (_leaderId != null && _peers.TryGetValue(_leaderId, out var leader))
                     {
-                        return await ForwardProposalAsync(leader, proposal);
+                        leaderToForward = leader;
+                        shouldForward = true;
                     }
-                    return false;
+                    else
+                    {
+                        return false;
+                    }
                 }
+            }
+
+            if (shouldForward && leaderToForward != null)
+            {
+                return await ForwardProposalAsync(leaderToForward, proposal);
             }
 
             // Create log entry

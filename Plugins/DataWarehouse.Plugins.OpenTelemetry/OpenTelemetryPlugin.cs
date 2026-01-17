@@ -101,7 +101,7 @@ namespace DataWarehouse.Plugins.OpenTelemetry
                 {
                     Name = "trace.start",
                     Description = "Start a new distributed trace span",
-                    InputSchema = new Dictionary<string, object>
+                    Parameters = new Dictionary<string, object>
                     {
                         ["type"] = "object",
                         ["properties"] = new Dictionary<string, object>
@@ -118,7 +118,7 @@ namespace DataWarehouse.Plugins.OpenTelemetry
                 {
                     Name = "metrics.counter",
                     Description = "Increment a counter metric",
-                    InputSchema = new Dictionary<string, object>
+                    Parameters = new Dictionary<string, object>
                     {
                         ["type"] = "object",
                         ["properties"] = new Dictionary<string, object>
@@ -134,7 +134,7 @@ namespace DataWarehouse.Plugins.OpenTelemetry
                 {
                     Name = "metrics.histogram",
                     Description = "Record a histogram observation",
-                    InputSchema = new Dictionary<string, object>
+                    Parameters = new Dictionary<string, object>
                     {
                         ["type"] = "object",
                         ["properties"] = new Dictionary<string, object>

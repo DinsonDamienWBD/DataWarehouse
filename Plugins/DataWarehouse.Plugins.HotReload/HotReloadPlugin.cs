@@ -80,7 +80,7 @@ namespace DataWarehouse.Plugins.HotReload
                 {
                     Name = "load",
                     Description = "Load a plugin from assembly path",
-                    InputSchema = new Dictionary<string, object>
+                    Parameters = new Dictionary<string, object>
                     {
                         ["type"] = "object",
                         ["properties"] = new Dictionary<string, object>
@@ -95,7 +95,7 @@ namespace DataWarehouse.Plugins.HotReload
                 {
                     Name = "unload",
                     Description = "Unload a plugin by ID with graceful draining",
-                    InputSchema = new Dictionary<string, object>
+                    Parameters = new Dictionary<string, object>
                     {
                         ["type"] = "object",
                         ["properties"] = new Dictionary<string, object>
@@ -111,7 +111,7 @@ namespace DataWarehouse.Plugins.HotReload
                 {
                     Name = "reload",
                     Description = "Reload a plugin (unload + load with state preservation)",
-                    InputSchema = new Dictionary<string, object>
+                    Parameters = new Dictionary<string, object>
                     {
                         ["type"] = "object",
                         ["properties"] = new Dictionary<string, object>
@@ -125,7 +125,7 @@ namespace DataWarehouse.Plugins.HotReload
                 {
                     Name = "watch",
                     Description = "Watch a directory for plugin changes",
-                    InputSchema = new Dictionary<string, object>
+                    Parameters = new Dictionary<string, object>
                     {
                         ["type"] = "object",
                         ["properties"] = new Dictionary<string, object>
