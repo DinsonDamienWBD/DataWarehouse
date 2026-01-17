@@ -7,8 +7,10 @@
   </Folder>
   <Folder Name="/Plugins/">
     <File Path="Plugin Readme.txt" />
+    <Project Path="Plugins/DataWarehouse.Plugins.Database/DataWarehouse.Plugins.Database.csproj" />
+    <Project Path="Plugins/DataWarehouse.Plugins.Storage/DataWarehouse.Plugins.Storage.csproj" />
   </Folder>
   <Project Path="DataWarehouse.Kernel/DataWarehouse.Kernel.csproj" />
-  <Project Path="DataWarehouse.SDK/DataWarehouse.SDK.csproj" />
   <Project Path="DataWarehouse.Plugins.Storage/DataWarehouse.Plugins.Storage.csproj" />
+  <Project Path="DataWarehouse.SDK/DataWarehouse.SDK.csproj" />
 </Solution>

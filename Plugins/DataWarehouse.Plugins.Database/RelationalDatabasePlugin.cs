@@ -4,6 +4,7 @@ using System.Runtime.CompilerServices;
 using System.Text;
 using System.Text.Json;
 using DataWarehouse.SDK.Contracts;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.Database;
 
