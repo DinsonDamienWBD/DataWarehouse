@@ -408,6 +408,12 @@ namespace DataWarehouse.Plugins.Encryption
                     ["DecryptionCount"] = _decryptionCount,
                     ["TotalBytesEncrypted"] = _totalBytesEncrypted
                 };
+
+                // Return stats via the message payload so the caller can access them
+                foreach (var kvp in stats)
+                {
+                    message.Payload[kvp.Key] = kvp.Value;
+                }
             }
             return Task.CompletedTask;
         }

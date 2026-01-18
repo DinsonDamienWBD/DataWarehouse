@@ -96,13 +96,17 @@ namespace DataWarehouse.Kernel.Messaging
 
         public void AddOrUpdate(TKey key, TValue value)
         {
-            var isNew = !_dictionary.ContainsKey(key);
-            _dictionary[key] = value;
-
-            if (isNew)
+            // Use TryAdd for atomic check-then-add to avoid race condition
+            if (_dictionary.TryAdd(key, value))
             {
+                // Key was new - track it for eviction ordering and enforce capacity
                 _keyOrder.Enqueue(key);
                 EnforceCapacity();
+            }
+            else
+            {
+                // Key already exists - just update the value
+                _dictionary[key] = value;
             }
         }
 

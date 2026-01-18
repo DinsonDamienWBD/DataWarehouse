@@ -134,7 +134,7 @@ namespace DataWarehouse.SDK.Licensing
         private readonly ConcurrentDictionary<string, long> _dailyApiRequests = new();
         private readonly ConcurrentDictionary<string, long> _dailyAITokens = new();
         private readonly ConcurrentDictionary<string, int> _concurrentOps = new();
-        private volatile DateTimeOffset _lastDailyReset = DateTimeOffset.UtcNow.Date; // volatile for thread safety
+        private long _lastDailyResetTicks = DateTimeOffset.UtcNow.Date.Ticks; // Use Interlocked for thread safety
         private readonly object _resetLock = new();
 
         /// <summary>
@@ -336,16 +336,20 @@ namespace DataWarehouse.SDK.Licensing
 
         private void ResetDailyCountersIfNeeded()
         {
-            var today = DateTimeOffset.UtcNow.Date;
-            if (today > _lastDailyReset)
+            var todayTicks = DateTimeOffset.UtcNow.Date.Ticks;
+            var lastResetTicks = Interlocked.Read(ref _lastDailyResetTicks);
+
+            if (todayTicks > lastResetTicks)
             {
                 lock (_resetLock)
                 {
-                    if (today > _lastDailyReset)
+                    // Double-check after acquiring lock
+                    lastResetTicks = Interlocked.Read(ref _lastDailyResetTicks);
+                    if (todayTicks > lastResetTicks)
                     {
                         _dailyApiRequests.Clear();
                         _dailyAITokens.Clear();
-                        _lastDailyReset = today;
+                        Interlocked.Exchange(ref _lastDailyResetTicks, todayTicks);
                     }
                 }
             }
