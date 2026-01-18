@@ -777,9 +777,18 @@ namespace DataWarehouse.Plugins.CloudStorage
             var folderId = _config.BaseFolderId ?? "0";
             var offset = 0;
             const int limit = 100;
+            const int MaxIterations = 10000; // Safety limit to prevent infinite loops
+            var iteration = 0;
 
             while (true)
             {
+                if (++iteration > MaxIterations)
+                {
+                    throw new InvalidOperationException(
+                        $"[Box] Exceeded maximum iterations ({MaxIterations}) listing files. " +
+                        $"This may indicate an API issue or extremely large folder.");
+                }
+
                 var url = $"https://api.box.com/2.0/folders/{folderId}/items?limit={limit}&offset={offset}";
 
                 var request = new HttpRequestMessage(HttpMethod.Get, url);
