@@ -854,7 +854,7 @@ public sealed class PredictiveAutoScaler : IAsyncDisposable
     private readonly IScalableResource _resource;
     private readonly AutoScalerOptions _options;
     private readonly IAutoScalerMetrics? _metrics;
-    private readonly List<MetricDataPoint> _metricsHistory = new();
+    private readonly List<ScalerMetricDataPoint> _metricsHistory = new();
     private readonly object _historyLock = new();
     private readonly Task _scalingTask;
     private readonly CancellationTokenSource _cts = new();
@@ -879,7 +879,7 @@ public sealed class PredictiveAutoScaler : IAsyncDisposable
     {
         lock (_historyLock)
         {
-            _metricsHistory.Add(new MetricDataPoint
+            _metricsHistory.Add(new ScalerMetricDataPoint
             {
                 MetricName = metricName,
                 Value = value,
@@ -1065,7 +1065,7 @@ public sealed class PredictiveAutoScaler : IAsyncDisposable
         }
     }
 
-    private double CalculateSeasonalAdjustment(List<MetricDataPoint> metrics, TimeSpan horizon)
+    private double CalculateSeasonalAdjustment(List<ScalerMetricDataPoint> metrics, TimeSpan horizon)
     {
         // Look for patterns at same time of day/week
         var targetTime = DateTime.UtcNow + horizon;
@@ -1203,7 +1203,7 @@ public sealed class AutoScalerOptions
     public int MaxCapacity { get; set; } = 100;
 }
 
-public sealed class MetricDataPoint
+public sealed class ScalerMetricDataPoint
 {
     public required string MetricName { get; init; }
     public double Value { get; init; }

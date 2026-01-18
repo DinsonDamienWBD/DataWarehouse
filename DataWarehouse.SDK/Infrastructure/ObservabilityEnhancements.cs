@@ -15,8 +15,8 @@ namespace DataWarehouse.SDK.Infrastructure;
 /// </summary>
 public sealed class DistributedTracingExporter : IAsyncDisposable
 {
-    private readonly ConcurrentDictionary<string, ITraceExporter> _exporters = new();
-    private readonly Channel<TraceSpan> _exportChannel;
+    private readonly ConcurrentDictionary<string, IDistributedTraceExporter> _exporters = new();
+    private readonly Channel<DistributedTraceSpan> _exportChannel;
     private readonly TracingExporterOptions _options;
     private readonly ITracingExporterMetrics? _metrics;
     private readonly Task _exportTask;
@@ -41,7 +41,7 @@ public sealed class DistributedTracingExporter : IAsyncDisposable
     /// <summary>
     /// Registers a trace exporter.
     /// </summary>
-    public void RegisterExporter(string name, ITraceExporter exporter)
+    public void RegisterExporter(string name, IDistributedTraceExporter exporter)
     {
         _exporters[name] = exporter;
     }
@@ -49,7 +49,7 @@ public sealed class DistributedTracingExporter : IAsyncDisposable
     /// <summary>
     /// Records a trace span for export.
     /// </summary>
-    public async ValueTask RecordSpanAsync(TraceSpan span)
+    public async ValueTask RecordSpanAsync(DistributedTraceSpan span)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
 
@@ -84,7 +84,7 @@ public sealed class DistributedTracingExporter : IAsyncDisposable
     /// </summary>
     public async Task FlushAsync(CancellationToken cancellationToken = default)
     {
-        var batch = new List<TraceSpan>();
+        var batch = new List<DistributedTraceSpan>();
         while (_exportChannel.Reader.TryRead(out var span))
         {
             batch.Add(span);
@@ -99,7 +99,7 @@ public sealed class DistributedTracingExporter : IAsyncDisposable
 
     private async Task ExportLoopAsync(CancellationToken cancellationToken)
     {
-        var batch = new List<TraceSpan>();
+        var batch = new List<DistributedTraceSpan>();
         var lastFlush = DateTime.UtcNow;
 
         while (!cancellationToken.IsCancellationRequested)
@@ -148,7 +148,7 @@ public sealed class DistributedTracingExporter : IAsyncDisposable
         }
     }
 
-    private async Task ExportBatchAsync(List<TraceSpan> batch, CancellationToken cancellationToken)
+    private async Task ExportBatchAsync(List<DistributedTraceSpan> batch, CancellationToken cancellationToken)
     {
         var tasks = _exporters.Values.Select(exporter =>
             ExportToExporterAsync(exporter, batch, cancellationToken));
@@ -158,8 +158,8 @@ public sealed class DistributedTracingExporter : IAsyncDisposable
     }
 
     private async Task ExportToExporterAsync(
-        ITraceExporter exporter,
-        List<TraceSpan> batch,
+        IDistributedTraceExporter exporter,
+        List<DistributedTraceSpan> batch,
         CancellationToken cancellationToken)
     {
         try
@@ -197,13 +197,13 @@ public sealed class DistributedTracingExporter : IAsyncDisposable
     }
 }
 
-public interface ITraceExporter
+public interface IDistributedTraceExporter
 {
     string Name { get; }
-    Task ExportAsync(IReadOnlyList<TraceSpan> spans, CancellationToken cancellationToken = default);
+    Task ExportAsync(IReadOnlyList<DistributedTraceSpan> spans, CancellationToken cancellationToken = default);
 }
 
-public sealed class TraceSpan
+public sealed class DistributedTraceSpan
 {
     public required string TraceId { get; init; }
     public required string SpanId { get; init; }
@@ -213,12 +213,12 @@ public sealed class TraceSpan
     public DateTime StartTime { get; init; }
     public DateTime? EndTime { get; set; }
     public TimeSpan Duration => (EndTime ?? DateTime.UtcNow) - StartTime;
-    public SpanStatus Status { get; set; } = SpanStatus.Ok;
+    public DistributedSpanStatus Status { get; set; } = DistributedSpanStatus.Ok;
     public string? StatusMessage { get; set; }
     public Dictionary<string, string> Tags { get; init; } = new();
-    public List<SpanLog> Logs { get; init; } = new();
+    public List<DistributedSpanLog> Logs { get; init; } = new();
 
-    public void End(SpanStatus status = SpanStatus.Ok, string? message = null)
+    public void End(DistributedSpanStatus status = DistributedSpanStatus.Ok, string? message = null)
     {
         EndTime = DateTime.UtcNow;
         Status = status;
@@ -229,7 +229,7 @@ public sealed class TraceSpan
 
     public void AddLog(string message, Dictionary<string, string>? fields = null)
     {
-        Logs.Add(new SpanLog
+        Logs.Add(new DistributedSpanLog
         {
             Timestamp = DateTime.UtcNow,
             Message = message,
@@ -238,14 +238,14 @@ public sealed class TraceSpan
     }
 }
 
-public sealed class SpanLog
+public sealed class DistributedSpanLog
 {
     public DateTime Timestamp { get; init; }
     public string Message { get; init; } = string.Empty;
     public Dictionary<string, string> Fields { get; init; } = new();
 }
 
-public enum SpanStatus
+public enum DistributedSpanStatus
 {
     Ok,
     Error,
@@ -272,7 +272,7 @@ public interface ITracingExporterMetrics
 /// <summary>
 /// Jaeger trace exporter.
 /// </summary>
-public sealed class JaegerExporter : ITraceExporter
+public sealed class JaegerExporter : IDistributedTraceExporter
 {
     public string Name => "Jaeger";
 
@@ -285,7 +285,7 @@ public sealed class JaegerExporter : ITraceExporter
         _httpClient = new HttpClient();
     }
 
-    public async Task ExportAsync(IReadOnlyList<TraceSpan> spans, CancellationToken cancellationToken = default)
+    public async Task ExportAsync(IReadOnlyList<DistributedTraceSpan> spans, CancellationToken cancellationToken = default)
     {
         var batch = new JaegerBatch
         {
@@ -301,7 +301,7 @@ public sealed class JaegerExporter : ITraceExporter
         await _httpClient.PostAsync(_endpoint, content, cancellationToken);
     }
 
-    private JaegerSpan ConvertSpan(TraceSpan span)
+    private JaegerSpan ConvertSpan(DistributedTraceSpan span)
     {
         return new JaegerSpan
         {
@@ -362,7 +362,7 @@ public sealed class JaegerExporter : ITraceExporter
 /// <summary>
 /// Zipkin trace exporter.
 /// </summary>
-public sealed class ZipkinExporter : ITraceExporter
+public sealed class ZipkinExporter : IDistributedTraceExporter
 {
     public string Name => "Zipkin";
 
@@ -375,14 +375,14 @@ public sealed class ZipkinExporter : ITraceExporter
         _httpClient = new HttpClient();
     }
 
-    public async Task ExportAsync(IReadOnlyList<TraceSpan> spans, CancellationToken cancellationToken = default)
+    public async Task ExportAsync(IReadOnlyList<DistributedTraceSpan> spans, CancellationToken cancellationToken = default)
     {
         var zipkinSpans = spans.Select(ConvertSpan).ToList();
         var content = JsonContent.Create(zipkinSpans);
         await _httpClient.PostAsync(_endpoint, content, cancellationToken);
     }
 
-    private ZipkinSpan ConvertSpan(TraceSpan span)
+    private ZipkinSpan ConvertSpan(DistributedTraceSpan span)
     {
         return new ZipkinSpan
         {
@@ -430,7 +430,7 @@ public sealed class ZipkinExporter : ITraceExporter
 /// <summary>
 /// AWS X-Ray trace exporter.
 /// </summary>
-public sealed class XRayExporter : ITraceExporter
+public sealed class XRayExporter : IDistributedTraceExporter
 {
     public string Name => "X-Ray";
 
@@ -443,7 +443,7 @@ public sealed class XRayExporter : ITraceExporter
         _httpClient = new HttpClient();
     }
 
-    public async Task ExportAsync(IReadOnlyList<TraceSpan> spans, CancellationToken cancellationToken = default)
+    public async Task ExportAsync(IReadOnlyList<DistributedTraceSpan> spans, CancellationToken cancellationToken = default)
     {
         var documents = spans.Select(ConvertSpan).ToList();
         var payload = string.Join("\n", documents.Select(d => JsonSerializer.Serialize(d)));
@@ -452,7 +452,7 @@ public sealed class XRayExporter : ITraceExporter
         await _httpClient.PostAsync(_endpoint, content, cancellationToken);
     }
 
-    private XRaySegment ConvertSpan(TraceSpan span)
+    private XRaySegment ConvertSpan(DistributedTraceSpan span)
     {
         var startTime = new DateTimeOffset(span.StartTime).ToUnixTimeSeconds() +
                         span.StartTime.Millisecond / 1000.0;
@@ -493,7 +493,7 @@ public sealed class XRayExporter : ITraceExporter
 /// <summary>
 /// OTLP (OpenTelemetry Protocol) trace exporter.
 /// </summary>
-public sealed class OtlpExporter : ITraceExporter
+public sealed class OtlpExporter : IDistributedTraceExporter
 {
     public string Name => "OTLP";
 
@@ -506,7 +506,7 @@ public sealed class OtlpExporter : ITraceExporter
         _httpClient = new HttpClient();
     }
 
-    public async Task ExportAsync(IReadOnlyList<TraceSpan> spans, CancellationToken cancellationToken = default)
+    public async Task ExportAsync(IReadOnlyList<DistributedTraceSpan> spans, CancellationToken cancellationToken = default)
     {
         var resourceSpans = new OtlpExportRequest
         {
@@ -536,7 +536,7 @@ public sealed class OtlpExporter : ITraceExporter
         await _httpClient.PostAsync(_endpoint, content, cancellationToken);
     }
 
-    private OtlpSpan ConvertSpan(TraceSpan span)
+    private OtlpSpan ConvertSpan(DistributedTraceSpan span)
     {
         return new OtlpSpan
         {
@@ -555,7 +555,7 @@ public sealed class OtlpExporter : ITraceExporter
                 Key = t.Key,
                 Value = new OtlpValue { StringValue = t.Value }
             }).ToArray(),
-            Status = new OtlpStatus { Code = span.Status == SpanStatus.Ok ? 1 : 2 }
+            Status = new OtlpStatus { Code = span.Status == DistributedSpanStatus.Ok ? 1 : 2 }
         };
     }
 
@@ -621,7 +621,7 @@ public sealed class AnomalyDetector : IAsyncDisposable
 {
     private readonly ConcurrentDictionary<string, MetricTimeSeries> _timeSeries = new();
     private readonly ConcurrentDictionary<string, AnomalyModel> _models = new();
-    private readonly Channel<MetricDataPoint> _inputChannel;
+    private readonly Channel<AnomalyMetricDataPoint> _inputChannel;
     private readonly AnomalyDetectorOptions _options;
     private readonly IAnomalyDetectorMetrics? _metrics;
     private readonly Task _processingTask;
@@ -638,7 +638,7 @@ public sealed class AnomalyDetector : IAsyncDisposable
         _options = options ?? new AnomalyDetectorOptions();
         _metrics = metrics;
 
-        _inputChannel = Channel.CreateBounded<MetricDataPoint>(new BoundedChannelOptions(_options.BufferSize)
+        _inputChannel = Channel.CreateBounded<AnomalyMetricDataPoint>(new BoundedChannelOptions(_options.BufferSize)
         {
             FullMode = BoundedChannelFullMode.DropOldest
         });
@@ -654,7 +654,7 @@ public sealed class AnomalyDetector : IAsyncDisposable
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
 
-        var dataPoint = new MetricDataPoint
+        var dataPoint = new AnomalyMetricDataPoint
         {
             MetricName = metricName,
             Value = value,
@@ -721,7 +721,7 @@ public sealed class AnomalyDetector : IAsyncDisposable
         }
     }
 
-    private void ProcessDataPoint(MetricDataPoint dataPoint)
+    private void ProcessDataPoint(AnomalyMetricDataPoint dataPoint)
     {
         // Update time series
         var timeSeries = _timeSeries.GetOrAdd(dataPoint.MetricName, _ => new MetricTimeSeries(dataPoint.MetricName));
@@ -789,7 +789,7 @@ public sealed class AnomalyDetector : IAsyncDisposable
         }
     }
 
-    private double CalculateAnomalyScore(MetricDataPoint dataPoint, AnomalyModel model, MetricTimeSeries timeSeries)
+    private double CalculateAnomalyScore(AnomalyMetricDataPoint dataPoint, AnomalyModel model, MetricTimeSeries timeSeries)
     {
         if (!model.IsTrained || model.StandardDeviation == 0)
         {
@@ -835,7 +835,7 @@ public sealed class AnomalyDetector : IAsyncDisposable
         return distanceFromCenter;
     }
 
-    private AnomalyType DetermineAnomalyType(MetricDataPoint dataPoint, AnomalyModel model)
+    private AnomalyType DetermineAnomalyType(AnomalyMetricDataPoint dataPoint, AnomalyModel model)
     {
         if (dataPoint.Value > model.ExpectedValue + 3 * model.StandardDeviation)
         {
@@ -963,7 +963,7 @@ public sealed class MetricTimeSeries
         _metricName = metricName;
     }
 
-    public void Add(MetricDataPoint dataPoint)
+    public void Add(AnomalyMetricDataPoint dataPoint)
     {
         lock (_lock)
         {
@@ -1030,7 +1030,7 @@ public sealed class AnomalyRule
     public required string Name { get; init; }
     public required string MetricName { get; init; }
     public AnomalySeverity Severity { get; init; } = AnomalySeverity.Medium;
-    public required Func<MetricDataPoint, AnomalyModel, MetricTimeSeries, bool> Evaluate { get; init; }
+    public required Func<AnomalyMetricDataPoint, AnomalyModel, MetricTimeSeries, bool> Evaluate { get; init; }
 }
 
 public sealed class DetectedAnomaly
@@ -1089,7 +1089,7 @@ public sealed class AnomalyDetectorOptions
     public int MinSamplesForTraining { get; set; } = 100;
 }
 
-public sealed class MetricDataPoint
+public sealed class AnomalyAnomalyMetricDataPoint
 {
     public required string MetricName { get; init; }
     public double Value { get; init; }
