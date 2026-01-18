@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
@@ -53,7 +52,12 @@ namespace DataWarehouse.SDK.Infrastructure
         /// </summary>
         public static IEnumerable<ExceptionRecord> GetRecentExceptions(int count = 100)
         {
-            return _exceptionLog.ToArray()[^Math.Min(count, _exceptionLog.Count)..];
+            var arr = _exceptionLog.ToArray();
+            var start = Math.Max(0, arr.Length - count);
+            for (int i = start; i < arr.Length; i++)
+            {
+                yield return arr[i];
+            }
         }
 
         /// <summary>
@@ -289,188 +293,181 @@ namespace DataWarehouse.SDK.Infrastructure
 
     #endregion
 
-    #region Standardized Domain Exceptions
+    #region Specialized Domain Exceptions
 
     /// <summary>
-    /// Base exception for all DataWarehouse domain exceptions.
+    /// Exception for storage-related errors.
+    /// Extends DataWarehouseException with storage-specific context.
     /// </summary>
-    public abstract class DataWarehouseException : Exception
+    public sealed class StorageOperationException : DataWarehouseException
     {
-        /// <summary>Error code for programmatic handling.</summary>
-        public string ErrorCode { get; }
+        /// <summary>The storage URI involved.</summary>
+        public Uri? StorageUri { get; init; }
 
-        /// <summary>Component where error originated.</summary>
-        public string Component { get; }
+        /// <summary>The container ID involved.</summary>
+        public string? ContainerId { get; init; }
 
-        /// <summary>Whether this error is transient and can be retried.</summary>
-        public bool IsTransient { get; }
+        /// <summary>Whether this is a transient failure that can be retried.</summary>
+        public bool IsTransient { get; init; }
 
         /// <summary>Suggested retry delay if transient.</summary>
         public TimeSpan? RetryAfter { get; init; }
 
-        protected DataWarehouseException(
-            string message,
-            string errorCode,
-            string component,
-            bool isTransient = false,
-            Exception? innerException = null)
-            : base(message, innerException)
-        {
-            ErrorCode = errorCode;
-            Component = component;
-            IsTransient = isTransient;
-        }
-    }
-
-    /// <summary>
-    /// Exception for storage-related errors.
-    /// </summary>
-    public sealed class StorageException : DataWarehouseException
-    {
-        public Uri? StorageUri { get; init; }
-        public string? ContainerId { get; init; }
-
-        public StorageException(
-            string message,
-            string errorCode = "STORAGE_ERROR",
-            string component = "Storage",
-            bool isTransient = false,
-            Exception? innerException = null)
-            : base(message, errorCode, component, isTransient, innerException)
+        public StorageOperationException(ErrorCode errorCode, string message, string? correlationId = null)
+            : base(errorCode, message, correlationId)
         {
         }
 
-        public static StorageException NotFound(string path, string? containerId = null) =>
-            new($"Storage item not found: {path}", "STORAGE_NOT_FOUND", "Storage")
+        public StorageOperationException(ErrorCode errorCode, string message, Exception innerException, string? correlationId = null)
+            : base(errorCode, message, innerException, correlationId)
+        {
+        }
+
+        public static StorageOperationException NotFound(string path, string? containerId = null) =>
+            new(ErrorCode.NotFound, $"Storage item not found: {path}")
             {
                 StorageUri = Uri.TryCreate(path, UriKind.RelativeOrAbsolute, out var uri) ? uri : null,
-                ContainerId = containerId
+                ContainerId = containerId,
+                IsTransient = false
             };
 
-        public static StorageException QuotaExceeded(string containerId, long current, long limit) =>
-            new($"Storage quota exceeded for container '{containerId}': {current}/{limit} bytes",
-                "STORAGE_QUOTA_EXCEEDED", "Storage")
+        public static StorageOperationException QuotaExceeded(string containerId, long current, long limit) =>
+            new(ErrorCode.QuotaExceeded, $"Storage quota exceeded for container '{containerId}': {current}/{limit} bytes")
             {
-                ContainerId = containerId
+                ContainerId = containerId,
+                IsTransient = false
             };
 
-        public static StorageException Unavailable(string provider, Exception? inner = null) =>
-            new($"Storage provider '{provider}' is unavailable", "STORAGE_UNAVAILABLE", "Storage",
-                isTransient: true, innerException: inner)
-            {
-                RetryAfter = TimeSpan.FromSeconds(30)
-            };
+        public static StorageOperationException Unavailable(string provider, Exception? inner = null)
+        {
+            var ex = inner != null
+                ? new StorageOperationException(ErrorCode.ServiceUnavailable, $"Storage provider '{provider}' is unavailable", inner)
+                : new StorageOperationException(ErrorCode.ServiceUnavailable, $"Storage provider '{provider}' is unavailable");
+
+            return ex with { IsTransient = true, RetryAfter = TimeSpan.FromSeconds(30) };
+        }
     }
 
     /// <summary>
     /// Exception for plugin-related errors.
     /// </summary>
-    public sealed class PluginException : DataWarehouseException
+    public sealed class PluginOperationException : DataWarehouseException
     {
+        /// <summary>The plugin identifier.</summary>
         public string PluginId { get; }
+
+        /// <summary>The plugin version if known.</summary>
         public string? PluginVersion { get; init; }
 
-        public PluginException(
-            string message,
-            string pluginId,
-            string errorCode = "PLUGIN_ERROR",
-            bool isTransient = false,
-            Exception? innerException = null)
-            : base(message, errorCode, $"Plugin:{pluginId}", isTransient, innerException)
+        /// <summary>Whether this is a transient failure.</summary>
+        public bool IsTransient { get; init; }
+
+        public PluginOperationException(string pluginId, ErrorCode errorCode, string message, string? correlationId = null)
+            : base(errorCode, message, correlationId)
         {
             PluginId = pluginId;
         }
 
-        public static PluginException LoadFailed(string pluginId, Exception inner) =>
-            new($"Failed to load plugin '{pluginId}'", pluginId, "PLUGIN_LOAD_FAILED",
-                innerException: inner);
+        public PluginOperationException(string pluginId, ErrorCode errorCode, string message, Exception innerException, string? correlationId = null)
+            : base(errorCode, message, innerException, correlationId)
+        {
+            PluginId = pluginId;
+        }
 
-        public static PluginException InitializationFailed(string pluginId, Exception inner) =>
-            new($"Plugin '{pluginId}' initialization failed", pluginId, "PLUGIN_INIT_FAILED",
-                innerException: inner);
+        public static PluginOperationException LoadFailed(string pluginId, Exception inner) =>
+            new(pluginId, ErrorCode.InternalError, $"Failed to load plugin '{pluginId}'", inner);
 
-        public static PluginException NotFound(string pluginId) =>
-            new($"Plugin '{pluginId}' not found", pluginId, "PLUGIN_NOT_FOUND");
+        public static PluginOperationException InitializationFailed(string pluginId, Exception inner) =>
+            new(pluginId, ErrorCode.InternalError, $"Plugin '{pluginId}' initialization failed", inner);
+
+        public static PluginOperationException NotFound(string pluginId) =>
+            new(pluginId, ErrorCode.NotFound, $"Plugin '{pluginId}' not found");
     }
 
     /// <summary>
     /// Exception for security-related errors.
     /// </summary>
-    public sealed class SecurityException : DataWarehouseException
+    public sealed class SecurityOperationException : DataWarehouseException
     {
+        /// <summary>The principal ID involved.</summary>
         public string? PrincipalId { get; init; }
+
+        /// <summary>The resource ID involved.</summary>
         public string? ResourceId { get; init; }
+
+        /// <summary>The required permission.</summary>
         public string? RequiredPermission { get; init; }
 
-        public SecurityException(
-            string message,
-            string errorCode = "SECURITY_ERROR",
-            Exception? innerException = null)
-            : base(message, errorCode, "Security", isTransient: false, innerException)
+        public SecurityOperationException(ErrorCode errorCode, string message, string? correlationId = null)
+            : base(errorCode, message, correlationId)
         {
         }
 
-        public static SecurityException AccessDenied(string principalId, string resourceId, string permission) =>
-            new($"Access denied: '{principalId}' lacks '{permission}' permission on '{resourceId}'",
-                "ACCESS_DENIED")
+        public static SecurityOperationException AccessDenied(string principalId, string resourceId, string permission) =>
+            new(ErrorCode.Forbidden, $"Access denied: '{principalId}' lacks '{permission}' permission on '{resourceId}'")
             {
                 PrincipalId = principalId,
                 ResourceId = resourceId,
                 RequiredPermission = permission
             };
 
-        public static SecurityException AuthenticationFailed(string reason) =>
-            new($"Authentication failed: {reason}", "AUTH_FAILED");
+        public static SecurityOperationException AuthenticationFailed(string reason) =>
+            new(ErrorCode.Unauthorized, $"Authentication failed: {reason}");
 
-        public static SecurityException TokenExpired() =>
-            new("Security token has expired", "TOKEN_EXPIRED");
+        public static SecurityOperationException TokenExpired() =>
+            new(ErrorCode.Unauthorized, "Security token has expired");
 
-        public static SecurityException PathTraversalAttempt(string path) =>
-            new($"Path traversal attack detected: {path}", "PATH_TRAVERSAL");
+        public static SecurityOperationException PathTraversalAttempt(string path) =>
+            new(ErrorCode.Forbidden, $"Path traversal attack detected: {path}");
     }
 
     /// <summary>
     /// Exception for configuration errors.
     /// </summary>
-    public sealed class ConfigurationException : DataWarehouseException
+    public sealed class ConfigurationOperationException : DataWarehouseException
     {
+        /// <summary>The configuration key involved.</summary>
         public string? ConfigKey { get; init; }
-        public object? InvalidValue { get; init; }
 
-        public ConfigurationException(
-            string message,
-            string? configKey = null,
-            Exception? innerException = null)
-            : base(message, "CONFIG_ERROR", "Configuration", isTransient: false, innerException)
+        /// <summary>The invalid value if applicable.</summary>
+        public object? InvalidConfigValue { get; init; }
+
+        public ConfigurationOperationException(string message, string? configKey = null, string? correlationId = null)
+            : base(ErrorCode.BadRequest, message, correlationId)
         {
             ConfigKey = configKey;
         }
 
-        public static ConfigurationException MissingRequired(string key) =>
+        public static ConfigurationOperationException MissingRequired(string key) =>
             new($"Required configuration key '{key}' is missing") { ConfigKey = key };
 
-        public static ConfigurationException InvalidValue(string key, object? value, string reason) =>
+        public static ConfigurationOperationException InvalidValue(string key, object? value, string reason) =>
             new($"Configuration key '{key}' has invalid value: {reason}")
             {
                 ConfigKey = key,
-                InvalidValue = value
+                InvalidConfigValue = value
             };
     }
 
     /// <summary>
     /// Exception for rate limiting.
     /// </summary>
-    public sealed class RateLimitException : DataWarehouseException
+    public sealed class RateLimitOperationException : DataWarehouseException
     {
+        /// <summary>The client that was rate limited.</summary>
         public string ClientId { get; }
+
+        /// <summary>Current request rate.</summary>
         public int CurrentRate { get; init; }
+
+        /// <summary>Maximum allowed rate.</summary>
         public int MaxRate { get; init; }
 
-        public RateLimitException(
-            string clientId,
-            TimeSpan retryAfter)
-            : base($"Rate limit exceeded for client '{clientId}'", "RATE_LIMITED", "RateLimiter",
-                isTransient: true)
+        /// <summary>Time to wait before retrying.</summary>
+        public TimeSpan RetryAfter { get; }
+
+        public RateLimitOperationException(string clientId, TimeSpan retryAfter, string? correlationId = null)
+            : base(ErrorCode.TooManyRequests, $"Rate limit exceeded for client '{clientId}'", correlationId)
         {
             ClientId = clientId;
             RetryAfter = retryAfter;
@@ -480,17 +477,16 @@ namespace DataWarehouse.SDK.Infrastructure
     /// <summary>
     /// Exception for compliance violations.
     /// </summary>
-    public sealed class ComplianceException : DataWarehouseException
+    public sealed class ComplianceViolationException : DataWarehouseException
     {
+        /// <summary>The compliance framework violated.</summary>
         public ComplianceFramework Framework { get; }
+
+        /// <summary>The specific requirement violated.</summary>
         public string Requirement { get; }
 
-        public ComplianceException(
-            ComplianceFramework framework,
-            string requirement,
-            string message)
-            : base($"[{framework}] Compliance violation - {requirement}: {message}",
-                $"COMPLIANCE_{framework}", "Compliance")
+        public ComplianceViolationException(ComplianceFramework framework, string requirement, string message, string? correlationId = null)
+            : base(ErrorCode.Forbidden, $"[{framework}] Compliance violation - {requirement}: {message}", correlationId)
         {
             Framework = framework;
             Requirement = requirement;
@@ -521,37 +517,15 @@ namespace DataWarehouse.SDK.Infrastructure
     public static class ExceptionHandlingExtensions
     {
         /// <summary>
-        /// Wraps an exception with additional context.
-        /// </summary>
-        public static DataWarehouseException WithContext<T>(
-            this T exception,
-            string additionalContext) where T : DataWarehouseException
-        {
-            // Re-create with additional context in message
-            return exception switch
-            {
-                StorageException se => new StorageException(
-                    $"{se.Message} | Context: {additionalContext}",
-                    se.ErrorCode, se.Component, se.IsTransient, se)
-                { StorageUri = se.StorageUri, ContainerId = se.ContainerId, RetryAfter = se.RetryAfter },
-
-                PluginException pe => new PluginException(
-                    $"{pe.Message} | Context: {additionalContext}",
-                    pe.PluginId, pe.ErrorCode, pe.IsTransient, pe)
-                { PluginVersion = pe.PluginVersion, RetryAfter = pe.RetryAfter },
-
-                _ => exception
-            };
-        }
-
-        /// <summary>
         /// Determines if an exception represents a transient failure that can be retried.
         /// </summary>
         public static bool IsTransientFailure(this Exception exception)
         {
             return exception switch
             {
-                DataWarehouseException dwe => dwe.IsTransient,
+                StorageOperationException soe => soe.IsTransient,
+                PluginOperationException poe => poe.IsTransient,
+                RateLimitOperationException => true,
                 TimeoutException => true,
                 TaskCanceledException => false, // User cancellation, don't retry
                 OperationCanceledException => false,
@@ -566,9 +540,15 @@ namespace DataWarehouse.SDK.Infrastructure
         /// </summary>
         public static TimeSpan GetRetryDelay(this Exception exception, int attempt = 1)
         {
-            if (exception is DataWarehouseException dwe && dwe.RetryAfter.HasValue)
+            // Check for specific retry after values
+            if (exception is StorageOperationException soe && soe.RetryAfter.HasValue)
             {
-                return dwe.RetryAfter.Value;
+                return soe.RetryAfter.Value;
+            }
+
+            if (exception is RateLimitOperationException rle)
+            {
+                return rle.RetryAfter;
             }
 
             // Exponential backoff with jitter

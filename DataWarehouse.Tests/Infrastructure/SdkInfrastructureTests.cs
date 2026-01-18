@@ -173,87 +173,85 @@ namespace DataWarehouse.Tests.Infrastructure
         #region Domain Exception Tests
 
         [Fact]
-        public void StorageException_NotFound_CreatesCorrectException()
+        public void StorageOperationException_NotFound_CreatesCorrectException()
         {
             // Act
-            var ex = StorageException.NotFound("/path/to/file", "container1");
+            var ex = StorageOperationException.NotFound("/path/to/file", "container1");
 
             // Assert
-            Assert.Equal("STORAGE_NOT_FOUND", ex.ErrorCode);
-            Assert.Equal("Storage", ex.Component);
+            Assert.Equal(ErrorCode.NotFound, ex.ErrorCode);
             Assert.Equal("container1", ex.ContainerId);
             Assert.False(ex.IsTransient);
         }
 
         [Fact]
-        public void StorageException_Unavailable_IsTransient()
+        public void StorageOperationException_Unavailable_IsTransient()
         {
             // Act
-            var ex = StorageException.Unavailable("S3");
+            var ex = StorageOperationException.Unavailable("S3");
 
             // Assert
-            Assert.Equal("STORAGE_UNAVAILABLE", ex.ErrorCode);
+            Assert.Equal(ErrorCode.ServiceUnavailable, ex.ErrorCode);
             Assert.True(ex.IsTransient);
             Assert.NotNull(ex.RetryAfter);
         }
 
         [Fact]
-        public void SecurityException_AccessDenied_CapturesDetails()
+        public void SecurityOperationException_AccessDenied_CapturesDetails()
         {
             // Act
-            var ex = SecurityException.AccessDenied("user1", "resource1", "write");
+            var ex = SecurityOperationException.AccessDenied("user1", "resource1", "write");
 
             // Assert
-            Assert.Equal("ACCESS_DENIED", ex.ErrorCode);
+            Assert.Equal(ErrorCode.Forbidden, ex.ErrorCode);
             Assert.Equal("user1", ex.PrincipalId);
             Assert.Equal("resource1", ex.ResourceId);
             Assert.Equal("write", ex.RequiredPermission);
         }
 
         [Fact]
-        public void PluginException_LoadFailed_IncludesInnerException()
+        public void PluginOperationException_LoadFailed_IncludesInnerException()
         {
             // Arrange
             var inner = new InvalidOperationException("Load error");
 
             // Act
-            var ex = PluginException.LoadFailed("TestPlugin", inner);
+            var ex = PluginOperationException.LoadFailed("TestPlugin", inner);
 
             // Assert
-            Assert.Equal("PLUGIN_LOAD_FAILED", ex.ErrorCode);
+            Assert.Equal(ErrorCode.InternalError, ex.ErrorCode);
             Assert.Equal("TestPlugin", ex.PluginId);
             Assert.Equal(inner, ex.InnerException);
         }
 
         [Fact]
-        public void ConfigurationException_MissingRequired_CreatesCorrectException()
+        public void ConfigurationOperationException_MissingRequired_CreatesCorrectException()
         {
             // Act
-            var ex = ConfigurationException.MissingRequired("ConnectionString");
+            var ex = ConfigurationOperationException.MissingRequired("ConnectionString");
 
             // Assert
-            Assert.Equal("CONFIG_ERROR", ex.ErrorCode);
+            Assert.Equal(ErrorCode.BadRequest, ex.ErrorCode);
             Assert.Equal("ConnectionString", ex.ConfigKey);
         }
 
         [Fact]
-        public void RateLimitException_HasRetryAfter()
+        public void RateLimitOperationException_HasRetryAfter()
         {
             // Act
-            var ex = new RateLimitException("client1", TimeSpan.FromSeconds(30));
+            var ex = new RateLimitOperationException("client1", TimeSpan.FromSeconds(30));
 
             // Assert
-            Assert.Equal("RATE_LIMITED", ex.ErrorCode);
+            Assert.Equal(ErrorCode.TooManyRequests, ex.ErrorCode);
             Assert.Equal("client1", ex.ClientId);
-            Assert.True(ex.IsTransient);
             Assert.Equal(TimeSpan.FromSeconds(30), ex.RetryAfter);
         }
 
         [Fact]
-        public void ComplianceException_IncludesFramework()
+        public void ComplianceViolationException_IncludesFramework()
         {
             // Act
-            var ex = new ComplianceException(
+            var ex = new ComplianceViolationException(
                 ComplianceFramework.HIPAA,
                 "164.312(a)",
                 "Access control violation");
@@ -261,7 +259,7 @@ namespace DataWarehouse.Tests.Infrastructure
             // Assert
             Assert.Equal(ComplianceFramework.HIPAA, ex.Framework);
             Assert.Equal("164.312(a)", ex.Requirement);
-            Assert.Contains("HIPAA", ex.ErrorCode);
+            Assert.Equal(ErrorCode.Forbidden, ex.ErrorCode);
         }
 
         #endregion
@@ -274,7 +272,7 @@ namespace DataWarehouse.Tests.Infrastructure
             Assert.True(new TimeoutException().IsTransientFailure());
             Assert.True(new System.Net.Http.HttpRequestException().IsTransientFailure());
             Assert.True(new System.IO.IOException().IsTransientFailure());
-            Assert.True(StorageException.Unavailable("S3").IsTransientFailure());
+            Assert.True(StorageOperationException.Unavailable("S3").IsTransientFailure());
         }
 
         [Fact]
@@ -283,7 +281,7 @@ namespace DataWarehouse.Tests.Infrastructure
             Assert.False(new ArgumentException().IsTransientFailure());
             Assert.False(new InvalidOperationException().IsTransientFailure());
             Assert.False(new OperationCanceledException().IsTransientFailure());
-            Assert.False(StorageException.NotFound("/path").IsTransientFailure());
+            Assert.False(StorageOperationException.NotFound("/path").IsTransientFailure());
         }
 
         [Fact]
@@ -303,7 +301,7 @@ namespace DataWarehouse.Tests.Infrastructure
         [Fact]
         public void GetRetryDelay_UsesExceptionRetryAfter()
         {
-            var ex = new RateLimitException("client1", TimeSpan.FromSeconds(60));
+            var ex = new RateLimitOperationException("client1", TimeSpan.FromSeconds(60));
 
             var delay = ex.GetRetryDelay(1);
 
