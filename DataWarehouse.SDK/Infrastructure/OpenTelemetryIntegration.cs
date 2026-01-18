@@ -843,52 +843,76 @@ namespace DataWarehouse.SDK.Infrastructure
 
             var snapshot = _metricsCollector.GetSnapshot();
 
-            // Sync counters
-            foreach (var (key, metric) in snapshot.Counters)
+            // Sync counters - key is metric name (with tags encoded), value is the count
+            foreach (var (key, value) in snapshot.Counters)
             {
-                var fullName = GetFullMetricName(metric.Name);
-                var attributes = ConvertTagsToAttributes(metric.Tags);
+                var (baseName, parsedTags) = ParseMetricKey(key);
+                var fullName = GetFullMetricName(baseName);
+                var attributes = ConvertTagsToAttributes(parsedTags);
 
                 var counter = _counters.GetOrAdd(fullName, n =>
-                    _meter.CreateCounter<long>(n, description: $"Counter for {metric.Name}"));
+                    _meter.CreateCounter<long>(n, description: $"Counter for {baseName}"));
 
                 // Note: Counters are cumulative, so we just record the current value
                 // In a real implementation, you'd track deltas
-                counter.Add(metric.Value, attributes);
+                counter.Add(value, attributes);
             }
 
-            // Sync gauges
-            foreach (var (key, metric) in snapshot.Gauges)
+            // Sync gauges - key is metric name (with tags encoded), value is the gauge value
+            foreach (var (key, value) in snapshot.Gauges)
             {
-                var fullName = GetFullMetricName(metric.Name);
-                var attributes = ConvertTagsToAttributes(metric.Tags);
+                var (baseName, parsedTags) = ParseMetricKey(key);
+                var fullName = GetFullMetricName(baseName);
+                var attributes = ConvertTagsToAttributes(parsedTags);
                 var gaugeKey = BuildGaugeKey(fullName, attributes);
 
-                _gaugeValues[gaugeKey] = metric.Value;
+                _gaugeValues[gaugeKey] = value;
 
                 _gauges.GetOrAdd(fullName, n =>
                     _meter.CreateObservableGauge(
                         n,
                         () => GetGaugeValues(fullName),
-                        description: $"Gauge for {metric.Name}"));
+                        description: $"Gauge for {baseName}"));
             }
 
-            // Sync histograms
-            foreach (var (key, metric) in snapshot.Histograms)
+            // Sync histograms - key is metric name, value is HistogramStatistics
+            foreach (var (key, stats) in snapshot.Histograms)
             {
-                var fullName = GetFullMetricName(metric.Name);
-                var attributes = ConvertTagsToAttributes(metric.Tags);
+                var (baseName, parsedTags) = ParseMetricKey(key);
+                var fullName = GetFullMetricName(baseName);
+                var attributes = ConvertTagsToAttributes(parsedTags);
 
                 var histogram = _histograms.GetOrAdd(fullName, n =>
-                    _meter.CreateHistogram<double>(n, description: $"Histogram for {metric.Name}"));
+                    _meter.CreateHistogram<double>(n, description: $"Histogram for {baseName}"));
 
                 // Record summary statistics as histogram observations
                 // Note: This is a simplification; real OTel histograms track buckets
-                if (metric.Count > 0)
+                if (stats.Count > 0)
                 {
-                    histogram.Record(metric.Mean, attributes);
+                    histogram.Record(stats.Mean, attributes);
                 }
             }
+        }
+
+        /// <summary>
+        /// Parses a metric key to extract the base name and tags.
+        /// Keys are in format "name" or "name[tag1=val1,tag2=val2]".
+        /// </summary>
+        private static (string baseName, string[] tags) ParseMetricKey(string key)
+        {
+            var bracketIndex = key.IndexOf('[');
+            if (bracketIndex < 0)
+            {
+                return (key, Array.Empty<string>());
+            }
+
+            var baseName = key[..bracketIndex];
+            var tagPart = key[(bracketIndex + 1)..].TrimEnd(']');
+            var tags = string.IsNullOrEmpty(tagPart)
+                ? Array.Empty<string>()
+                : tagPart.Split(',');
+
+            return (baseName, tags);
         }
 
         /// <summary>
@@ -901,52 +925,59 @@ namespace DataWarehouse.SDK.Infrastructure
             ArgumentNullException.ThrowIfNull(snapshot);
 
             var results = new List<OtelMetricDataPoint>();
+            var timestamp = snapshot.Timestamp.UtcDateTime;
 
-            foreach (var (key, metric) in snapshot.Counters)
+            // Convert counters - key is name with tags, value is long count
+            foreach (var (key, value) in snapshot.Counters)
             {
+                var (baseName, parsedTags) = ParseMetricKey(key);
                 results.Add(new OtelMetricDataPoint
                 {
-                    Name = GetFullMetricName(metric.Name),
+                    Name = GetFullMetricName(baseName),
                     Type = OtelMetricType.Counter,
-                    Value = metric.Value,
-                    Attributes = ConvertTagsToDictionary(metric.Tags),
-                    Timestamp = snapshot.Timestamp
+                    Value = value,
+                    Attributes = ConvertTagsToDictionary(parsedTags),
+                    Timestamp = timestamp
                 });
             }
 
-            foreach (var (key, metric) in snapshot.Gauges)
+            // Convert gauges - key is name with tags, value is double gauge value
+            foreach (var (key, value) in snapshot.Gauges)
             {
+                var (baseName, parsedTags) = ParseMetricKey(key);
                 results.Add(new OtelMetricDataPoint
                 {
-                    Name = GetFullMetricName(metric.Name),
+                    Name = GetFullMetricName(baseName),
                     Type = OtelMetricType.Gauge,
-                    Value = metric.Value,
-                    Attributes = ConvertTagsToDictionary(metric.Tags),
-                    Timestamp = snapshot.Timestamp
+                    Value = value,
+                    Attributes = ConvertTagsToDictionary(parsedTags),
+                    Timestamp = timestamp
                 });
             }
 
-            foreach (var (key, metric) in snapshot.Histograms)
+            // Convert histograms - key is name with tags, value is HistogramStatistics
+            foreach (var (key, stats) in snapshot.Histograms)
             {
+                var (baseName, parsedTags) = ParseMetricKey(key);
                 results.Add(new OtelMetricDataPoint
                 {
-                    Name = GetFullMetricName(metric.Name),
+                    Name = GetFullMetricName(baseName),
                     Type = OtelMetricType.Histogram,
                     HistogramData = new OtelHistogramData
                     {
-                        Count = metric.Count,
-                        Sum = metric.Sum,
-                        Min = metric.Min,
-                        Max = metric.Max,
+                        Count = stats.Count,
+                        Sum = stats.Sum,
+                        Min = stats.Min,
+                        Max = stats.Max,
                         Percentiles = new Dictionary<double, double>
                         {
-                            [0.50] = metric.P50,
-                            [0.95] = metric.P95,
-                            [0.99] = metric.P99
+                            [0.50] = stats.P50,
+                            [0.95] = stats.P95,
+                            [0.99] = stats.P99
                         }
                     },
-                    Attributes = ConvertTagsToDictionary(metric.Tags),
-                    Timestamp = snapshot.Timestamp
+                    Attributes = ConvertTagsToDictionary(parsedTags),
+                    Timestamp = timestamp
                 });
             }
 
