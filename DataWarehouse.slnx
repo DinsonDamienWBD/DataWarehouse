@@ -31,6 +31,5 @@
     <Project Path="Plugins/DataWarehouse.Plugins.VaultKeyStore/DataWarehouse.Plugins.VaultKeyStore.csproj" />
   </Folder>
   <Project Path="DataWarehouse.Kernel/DataWarehouse.Kernel.csproj" />
-  <Project Path="DataWarehouse.Plugins.Storage/DataWarehouse.Plugins.Storage.csproj" />
   <Project Path="DataWarehouse.SDK/DataWarehouse.SDK.csproj" />
 </Solution>
