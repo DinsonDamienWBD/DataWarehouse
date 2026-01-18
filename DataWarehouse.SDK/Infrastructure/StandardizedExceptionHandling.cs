@@ -332,7 +332,7 @@ namespace DataWarehouse.SDK.Infrastructure
             };
 
         public static StorageOperationException QuotaExceeded(string containerId, long current, long limit) =>
-            new(ErrorCode.QuotaExceeded, $"Storage quota exceeded for container '{containerId}': {current}/{limit} bytes")
+            new(ErrorCode.ResourceExhausted, $"Storage quota exceeded for container '{containerId}': {current}/{limit} bytes")
             {
                 ContainerId = containerId,
                 IsTransient = false
@@ -340,11 +340,11 @@ namespace DataWarehouse.SDK.Infrastructure
 
         public static StorageOperationException Unavailable(string provider, Exception? inner = null)
         {
-            var ex = inner != null
+            return inner != null
                 ? new StorageOperationException(ErrorCode.ServiceUnavailable, $"Storage provider '{provider}' is unavailable", inner)
-                : new StorageOperationException(ErrorCode.ServiceUnavailable, $"Storage provider '{provider}' is unavailable");
-
-            return ex with { IsTransient = true, RetryAfter = TimeSpan.FromSeconds(30) };
+                  { IsTransient = true, RetryAfter = TimeSpan.FromSeconds(30) }
+                : new StorageOperationException(ErrorCode.ServiceUnavailable, $"Storage provider '{provider}' is unavailable")
+                  { IsTransient = true, RetryAfter = TimeSpan.FromSeconds(30) };
         }
     }
 
@@ -433,7 +433,7 @@ namespace DataWarehouse.SDK.Infrastructure
         public object? InvalidConfigValue { get; init; }
 
         public ConfigurationOperationException(string message, string? configKey = null, string? correlationId = null)
-            : base(ErrorCode.BadRequest, message, correlationId)
+            : base(ErrorCode.InvalidInput, message, correlationId)
         {
             ConfigKey = configKey;
         }
@@ -467,7 +467,7 @@ namespace DataWarehouse.SDK.Infrastructure
         public TimeSpan RetryAfter { get; }
 
         public RateLimitOperationException(string clientId, TimeSpan retryAfter, string? correlationId = null)
-            : base(ErrorCode.TooManyRequests, $"Rate limit exceeded for client '{clientId}'", correlationId)
+            : base(ErrorCode.RateLimited, $"Rate limit exceeded for client '{clientId}'", correlationId)
         {
             ClientId = clientId;
             RetryAfter = retryAfter;
