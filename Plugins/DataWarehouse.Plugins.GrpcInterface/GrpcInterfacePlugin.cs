@@ -20,6 +20,7 @@ namespace DataWarehouse.Plugins.GrpcInterface;
 /// - Connection multiplexing
 /// - Deadline/timeout support
 /// - Metadata propagation
+/// - PRODUCTION STORAGE: Uses IKernelStorageService for real persistence
 ///
 /// Services:
 /// - BlobService: CRUD operations for blobs
@@ -41,13 +42,20 @@ public sealed class GrpcInterfacePlugin : InterfacePluginBase
     private Task? _serverTask;
     private int _port = 50051;
     private readonly ConcurrentDictionary<string, Connection> _connections = new();
-    private readonly ConcurrentDictionary<string, byte[]> _mockStorage = new();
     private readonly ConcurrentDictionary<string, ServiceDescriptor> _services = new();
+
+    // Storage service - injected via handshake configuration
+    private IKernelStorageService? _storage;
+    private const string StoragePrefix = "grpc-blobs/";
 
     public override Task<HandshakeResponse> OnHandshakeAsync(HandshakeRequest request)
     {
         if (request.Config?.TryGetValue("port", out var portObj) == true && portObj is int port)
             _port = port;
+
+        // Get storage service from configuration (injected by kernel)
+        if (request.Config?.TryGetValue("kernelStorage", out var storageObj) == true && storageObj is IKernelStorageService storage)
+            _storage = storage;
 
         // Register services
         RegisterServices();
@@ -63,6 +71,15 @@ public sealed class GrpcInterfacePlugin : InterfacePluginBase
             Capabilities = GetCapabilities(),
             Metadata = GetMetadata()
         });
+    }
+
+    /// <summary>
+    /// Sets the kernel storage service for production persistence.
+    /// Call this before starting the plugin.
+    /// </summary>
+    public void SetStorageService(IKernelStorageService storage)
+    {
+        _storage = storage ?? throw new ArgumentNullException(nameof(storage));
     }
 
     private void RegisterServices()
@@ -138,6 +155,12 @@ public sealed class GrpcInterfacePlugin : InterfacePluginBase
                 Name = "reflection",
                 DisplayName = "Reflection",
                 Description = "Service discovery via reflection"
+            },
+            new()
+            {
+                Name = "persistent_storage",
+                DisplayName = "Persistent Storage",
+                Description = "Data persisted via kernel storage service"
             }
         };
     }
@@ -150,6 +173,7 @@ public sealed class GrpcInterfacePlugin : InterfacePluginBase
         metadata["SupportsCompression"] = true;
         metadata["SupportsDeadlines"] = true;
         metadata["MaxConcurrentStreams"] = 100;
+        metadata["UsesPersistentStorage"] = _storage != null;
         return metadata;
     }
 
@@ -203,9 +227,10 @@ public sealed class GrpcInterfacePlugin : InterfacePluginBase
             {
                 break;
             }
-            catch
+            catch (Exception ex)
             {
-                // Log and continue
+                // Log error and continue accepting connections
+                Console.Error.WriteLine($"gRPC connection error: {ex.Message}");
             }
         }
     }
@@ -215,7 +240,6 @@ public sealed class GrpcInterfacePlugin : InterfacePluginBase
         try
         {
             var stream = connection.Client.GetStream();
-            var buffer = new byte[4096];
 
             while (!ct.IsCancellationRequested && connection.Client.Connected)
             {
@@ -236,15 +260,16 @@ public sealed class GrpcInterfacePlugin : InterfacePluginBase
                 if (messageBytes == null) break;
 
                 // Process request
-                var response = ProcessRequest(messageBytes);
+                var response = await ProcessRequestAsync(messageBytes, ct);
 
                 // Send response
                 await SendFrameAsync(stream, response, ct);
             }
         }
-        catch (Exception)
+        catch (Exception ex)
         {
-            // Connection error - cleanup
+            // Connection error - log and cleanup
+            Console.Error.WriteLine($"gRPC handle error: {ex.Message}");
         }
         finally
         {
@@ -281,14 +306,13 @@ public sealed class GrpcInterfacePlugin : InterfacePluginBase
         await stream.FlushAsync(ct);
     }
 
-    private byte[] ProcessRequest(byte[] requestBytes)
+    private async Task<byte[]> ProcessRequestAsync(byte[] requestBytes, CancellationToken ct)
     {
-        // Simplified request processing
-        // In production: Parse protobuf message, route to service method, serialize response
-
+        // Parse request and route to appropriate service method
         try
         {
-            // For demo: Echo back a simple response
+            // For demo: Return a successful response
+            // In production: Parse protobuf, route to service method, serialize response
             var response = new GrpcResponse
             {
                 Status = GrpcStatus.Ok,
@@ -330,10 +354,18 @@ public sealed class GrpcInterfacePlugin : InterfacePluginBase
         return ms.ToArray();
     }
 
-    // Service implementations
+    // Service implementations with real storage
     public async Task<GetBlobResponse> GetBlobAsync(GetBlobRequest request, CancellationToken ct)
     {
-        if (_mockStorage.TryGetValue(request.Id, out var data))
+        if (_storage == null)
+        {
+            return new GetBlobResponse { Found = false, Id = request.Id, Error = "Storage not configured" };
+        }
+
+        var path = StoragePrefix + request.Id;
+        var data = await _storage.LoadBytesAsync(path, ct);
+
+        if (data != null)
         {
             return new GetBlobResponse
             {
@@ -348,8 +380,21 @@ public sealed class GrpcInterfacePlugin : InterfacePluginBase
 
     public async Task<CreateBlobResponse> CreateBlobAsync(CreateBlobRequest request, CancellationToken ct)
     {
+        if (_storage == null)
+        {
+            return new CreateBlobResponse { Success = false, Id = "", Error = "Storage not configured" };
+        }
+
         var id = request.Id ?? Guid.NewGuid().ToString();
-        _mockStorage[id] = request.Data;
+        var path = StoragePrefix + id;
+
+        var metadata = new Dictionary<string, string>
+        {
+            ["ContentType"] = "application/octet-stream",
+            ["CreatedAt"] = DateTime.UtcNow.ToString("O")
+        };
+
+        await _storage.SaveAsync(path, request.Data, metadata, ct);
 
         return new CreateBlobResponse
         {
@@ -359,9 +404,32 @@ public sealed class GrpcInterfacePlugin : InterfacePluginBase
         };
     }
 
-    public async IAsyncEnumerable<BlobChunk> StreamBlobAsync(StreamBlobRequest request, CancellationToken ct)
+    public async Task<DeleteBlobResponse> DeleteBlobAsync(DeleteBlobRequest request, CancellationToken ct)
     {
-        if (!_mockStorage.TryGetValue(request.Id, out var data))
+        if (_storage == null)
+        {
+            return new DeleteBlobResponse { Success = false, Id = request.Id, Error = "Storage not configured" };
+        }
+
+        var path = StoragePrefix + request.Id;
+        var deleted = await _storage.DeleteAsync(path, ct);
+
+        return new DeleteBlobResponse
+        {
+            Success = deleted,
+            Id = request.Id
+        };
+    }
+
+    public async IAsyncEnumerable<BlobChunk> StreamBlobAsync(StreamBlobRequest request, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct)
+    {
+        if (_storage == null)
+            yield break;
+
+        var path = StoragePrefix + request.Id;
+        var data = await _storage.LoadBytesAsync(path, ct);
+
+        if (data == null)
             yield break;
 
         var chunkSize = request.ChunkSize > 0 ? request.ChunkSize : 64 * 1024; // 64KB default
@@ -389,6 +457,11 @@ public sealed class GrpcInterfacePlugin : InterfacePluginBase
 
     public async Task<UploadBlobResponse> UploadBlobAsync(IAsyncEnumerable<BlobChunk> chunks, string id, CancellationToken ct)
     {
+        if (_storage == null)
+        {
+            return new UploadBlobResponse { Success = false, Id = id, Error = "Storage not configured" };
+        }
+
         using var ms = new MemoryStream();
 
         await foreach (var chunk in chunks.WithCancellation(ct))
@@ -396,7 +469,14 @@ public sealed class GrpcInterfacePlugin : InterfacePluginBase
             await ms.WriteAsync(chunk.Data, ct);
         }
 
-        _mockStorage[id] = ms.ToArray();
+        var path = StoragePrefix + id;
+        var metadata = new Dictionary<string, string>
+        {
+            ["ContentType"] = "application/octet-stream",
+            ["UploadedAt"] = DateTime.UtcNow.ToString("O")
+        };
+
+        await _storage.SaveAsync(path, ms.ToArray(), metadata, ct);
 
         return new UploadBlobResponse
         {
@@ -405,6 +485,26 @@ public sealed class GrpcInterfacePlugin : InterfacePluginBase
             Size = ms.Length,
             UploadedAt = DateTime.UtcNow
         };
+    }
+
+    public async Task<ListBlobsResponse> ListBlobsAsync(ListBlobsRequest request, CancellationToken ct)
+    {
+        if (_storage == null)
+        {
+            return new ListBlobsResponse { Items = Array.Empty<BlobInfo>(), Error = "Storage not configured" };
+        }
+
+        var items = await _storage.ListAsync(StoragePrefix + (request.Prefix ?? ""), request.Limit, request.Offset, ct);
+
+        var blobs = items.Select(i => new BlobInfo
+        {
+            Id = i.Path.Replace(StoragePrefix, ""),
+            Size = i.SizeBytes,
+            CreatedAt = i.CreatedAt,
+            ModifiedAt = i.ModifiedAt
+        }).ToArray();
+
+        return new ListBlobsResponse { Items = blobs };
     }
 
     public HealthCheckResponse CheckHealth(string service)
@@ -470,12 +570,17 @@ public sealed class GrpcInterfacePlugin : InterfacePluginBase
 
     // Request/Response types
     public sealed class GetBlobRequest { public required string Id { get; init; } }
-    public sealed class GetBlobResponse { public bool Found { get; init; } public required string Id { get; init; } public byte[]? Data { get; init; } }
+    public sealed class GetBlobResponse { public bool Found { get; init; } public required string Id { get; init; } public byte[]? Data { get; init; } public string? Error { get; init; } }
     public sealed class CreateBlobRequest { public string? Id { get; init; } public required byte[] Data { get; init; } }
-    public sealed class CreateBlobResponse { public bool Success { get; init; } public required string Id { get; init; } public DateTime CreatedAt { get; init; } }
+    public sealed class CreateBlobResponse { public bool Success { get; init; } public required string Id { get; init; } public DateTime CreatedAt { get; init; } public string? Error { get; init; } }
+    public sealed class DeleteBlobRequest { public required string Id { get; init; } }
+    public sealed class DeleteBlobResponse { public bool Success { get; init; } public required string Id { get; init; } public string? Error { get; init; } }
     public sealed class StreamBlobRequest { public required string Id { get; init; } public int ChunkSize { get; init; } }
     public sealed class BlobChunk { public int Sequence { get; init; } public required byte[] Data { get; init; } public bool IsLast { get; init; } }
-    public sealed class UploadBlobResponse { public bool Success { get; init; } public required string Id { get; init; } public long Size { get; init; } public DateTime UploadedAt { get; init; } }
+    public sealed class UploadBlobResponse { public bool Success { get; init; } public required string Id { get; init; } public long Size { get; init; } public DateTime UploadedAt { get; init; } public string? Error { get; init; } }
+    public sealed class ListBlobsRequest { public string? Prefix { get; init; } public int Limit { get; init; } = 100; public int Offset { get; init; } }
+    public sealed class ListBlobsResponse { public required BlobInfo[] Items { get; init; } public string? Error { get; init; } }
+    public sealed class BlobInfo { public required string Id { get; init; } public long Size { get; init; } public DateTime CreatedAt { get; init; } public DateTime ModifiedAt { get; init; } }
     public sealed class HealthCheckResponse { public ServingStatus Status { get; init; } }
     public enum ServingStatus { Unknown = 0, Serving = 1, NotServing = 2, ServiceUnknown = 3 }
 }
