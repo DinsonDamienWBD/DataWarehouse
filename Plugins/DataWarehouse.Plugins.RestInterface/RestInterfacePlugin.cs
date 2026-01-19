@@ -21,6 +21,7 @@ namespace DataWarehouse.Plugins.RestInterface;
 /// - Rate limiting and throttling
 /// - OpenAPI specification generation
 /// - CORS support for web clients
+/// - PRODUCTION STORAGE: Uses IKernelStorageService for real persistence
 ///
 /// Endpoints:
 /// - GET    /api/v1/blobs/{id}          - Retrieve blob
@@ -47,12 +48,15 @@ public sealed class RestInterfacePlugin : InterfacePluginBase
     private Task? _serverTask;
     private int _port = 8080;
     private readonly ConcurrentDictionary<string, RateLimitEntry> _rateLimits = new();
-    private readonly ConcurrentDictionary<string, object> _mockStorage = new();
     private readonly JsonSerializerOptions _jsonOptions = new()
     {
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
         WriteIndented = true
     };
+
+    // Storage service - injected via handshake configuration
+    private IKernelStorageService? _storage;
+    private const string StoragePrefix = "rest-blobs/";
 
     // Configuration
     private int _maxRequestsPerMinute = 100;
@@ -68,6 +72,10 @@ public sealed class RestInterfacePlugin : InterfacePluginBase
         if (request.Config?.TryGetValue("rateLimit", out var rateLimitObj) == true && rateLimitObj is int rateLimit)
             _maxRequestsPerMinute = rateLimit;
 
+        // Get storage service from configuration (injected by kernel)
+        if (request.Config?.TryGetValue("kernelStorage", out var storageObj) == true && storageObj is IKernelStorageService storage)
+            _storage = storage;
+
         return Task.FromResult(new HandshakeResponse
         {
             PluginId = Id,
@@ -79,6 +87,15 @@ public sealed class RestInterfacePlugin : InterfacePluginBase
             Capabilities = GetCapabilities(),
             Metadata = GetMetadata()
         });
+    }
+
+    /// <summary>
+    /// Sets the kernel storage service for production persistence.
+    /// Call this before starting the plugin.
+    /// </summary>
+    public void SetStorageService(IKernelStorageService storage)
+    {
+        _storage = storage ?? throw new ArgumentNullException(nameof(storage));
     }
 
     protected override List<PluginCapabilityDescriptor> GetCapabilities()
@@ -108,6 +125,12 @@ public sealed class RestInterfacePlugin : InterfacePluginBase
                 Name = "openapi",
                 DisplayName = "OpenAPI",
                 Description = "OpenAPI specification for API discovery"
+            },
+            new()
+            {
+                Name = "persistent_storage",
+                DisplayName = "Persistent Storage",
+                Description = "Data persisted via kernel storage service"
             }
         };
     }
@@ -120,6 +143,7 @@ public sealed class RestInterfacePlugin : InterfacePluginBase
         metadata["SupportsCORS"] = true;
         metadata["SupportsStreaming"] = true;
         metadata["ContentTypes"] = new[] { "application/json", "application/octet-stream" };
+        metadata["UsesPersistentStorage"] = _storage != null;
         return metadata;
     }
 
@@ -172,9 +196,10 @@ public sealed class RestInterfacePlugin : InterfacePluginBase
             {
                 break;
             }
-            catch
+            catch (Exception ex)
             {
-                // Log and continue
+                // Log and continue - don't let one bad request crash the server
+                Console.Error.WriteLine($"REST API error: {ex.Message}");
             }
         }
     }
@@ -229,7 +254,16 @@ public sealed class RestInterfacePlugin : InterfacePluginBase
 
         // Health check
         if (path == "/api/v1/health" || path == "/health")
-            return new ApiResponse { StatusCode = 200, Data = new { status = "healthy", timestamp = DateTime.UtcNow } };
+            return new ApiResponse
+            {
+                StatusCode = 200,
+                Data = new
+                {
+                    status = "healthy",
+                    timestamp = DateTime.UtcNow,
+                    storageConfigured = _storage != null
+                }
+            };
 
         // OpenAPI spec
         if (path == "/api/v1/openapi.json" || path == "/openapi.json")
@@ -243,12 +277,12 @@ public sealed class RestInterfacePlugin : InterfacePluginBase
 
             return (method, blobId) switch
             {
-                ("GET", null) => HandleListBlobs(request),
-                ("GET", string id) => HandleGetBlob(id),
+                ("GET", null) => await HandleListBlobsAsync(request, ct),
+                ("GET", string id) => await HandleGetBlobAsync(id, ct),
                 ("POST", null) when path.EndsWith("/batch") => await HandleBatchOperationsAsync(request, ct),
                 ("POST", null) => await HandleCreateBlobAsync(request, ct),
                 ("PUT", string id) => await HandleUpdateBlobAsync(id, request, ct),
-                ("DELETE", string id) => HandleDeleteBlob(id),
+                ("DELETE", string id) => await HandleDeleteBlobAsync(id, ct),
                 _ => new ApiResponse { StatusCode = 405, Data = new { error = "Method not allowed" } }
             };
         }
@@ -256,19 +290,28 @@ public sealed class RestInterfacePlugin : InterfacePluginBase
         return new ApiResponse { StatusCode = 404, Data = new { error = "Not found" } };
     }
 
-    private ApiResponse HandleListBlobs(HttpListenerRequest request)
+    private async Task<ApiResponse> HandleListBlobsAsync(HttpListenerRequest request, CancellationToken ct)
     {
+        if (_storage == null)
+        {
+            return new ApiResponse { StatusCode = 503, Data = new { error = "Storage service not configured" } };
+        }
+
         var query = request.QueryString;
         var limit = int.TryParse(query["limit"], out var l) ? l : 100;
         var offset = int.TryParse(query["offset"], out var o) ? o : 0;
         var prefix = query["prefix"] ?? "";
 
-        var blobs = _mockStorage.Keys
-            .Where(k => k.StartsWith(prefix))
-            .Skip(offset)
-            .Take(limit)
-            .Select(k => new { id = k, uri = $"/api/v1/blobs/{k}" })
-            .ToList();
+        var items = await _storage.ListAsync(StoragePrefix + prefix, limit, offset, ct);
+
+        var blobs = items.Select(i => new
+        {
+            id = i.Path.Replace(StoragePrefix, ""),
+            uri = $"/api/v1/blobs/{i.Path.Replace(StoragePrefix, "")}",
+            size = i.SizeBytes,
+            created = i.CreatedAt,
+            modified = i.ModifiedAt
+        }).ToList();
 
         return new ApiResponse
         {
@@ -276,37 +319,72 @@ public sealed class RestInterfacePlugin : InterfacePluginBase
             Data = new
             {
                 items = blobs,
-                total = _mockStorage.Count,
+                total = blobs.Count,
                 limit,
                 offset
             }
         };
     }
 
-    private ApiResponse HandleGetBlob(string id)
+    private async Task<ApiResponse> HandleGetBlobAsync(string id, CancellationToken ct)
     {
-        if (_mockStorage.TryGetValue(id, out var data))
+        if (_storage == null)
         {
-            return new ApiResponse { StatusCode = 200, Data = data };
+            return new ApiResponse { StatusCode = 503, Data = new { error = "Storage service not configured" } };
         }
-        return new ApiResponse { StatusCode = 404, Data = new { error = "Blob not found" } };
+
+        var path = StoragePrefix + id;
+        var data = await _storage.LoadBytesAsync(path, ct);
+
+        if (data == null)
+        {
+            return new ApiResponse { StatusCode = 404, Data = new { error = "Blob not found" } };
+        }
+
+        // Try to deserialize as JSON, otherwise return raw
+        try
+        {
+            var content = Encoding.UTF8.GetString(data);
+            var obj = JsonSerializer.Deserialize<object>(content, _jsonOptions);
+            return new ApiResponse { StatusCode = 200, Data = obj };
+        }
+        catch
+        {
+            // Return as base64 if not JSON
+            return new ApiResponse
+            {
+                StatusCode = 200,
+                Data = new
+                {
+                    id,
+                    contentType = "application/octet-stream",
+                    data = Convert.ToBase64String(data),
+                    size = data.Length
+                }
+            };
+        }
     }
 
     private async Task<ApiResponse> HandleCreateBlobAsync(HttpListenerRequest request, CancellationToken ct)
     {
+        if (_storage == null)
+        {
+            return new ApiResponse { StatusCode = 503, Data = new { error = "Storage service not configured" } };
+        }
+
         using var reader = new StreamReader(request.InputStream, request.ContentEncoding);
         var body = await reader.ReadToEndAsync(ct);
 
         var id = Guid.NewGuid().ToString();
-        try
+        var path = StoragePrefix + id;
+
+        var metadata = new Dictionary<string, string>
         {
-            var data = JsonSerializer.Deserialize<Dictionary<string, object>>(body, _jsonOptions);
-            _mockStorage[id] = data ?? new Dictionary<string, object>();
-        }
-        catch
-        {
-            _mockStorage[id] = new { content = body };
-        }
+            ["ContentType"] = request.ContentType ?? "application/json",
+            ["CreatedAt"] = DateTime.UtcNow.ToString("O")
+        };
+
+        await _storage.SaveAsync(path, Encoding.UTF8.GetBytes(body), metadata, ct);
 
         return new ApiResponse
         {
@@ -317,7 +395,14 @@ public sealed class RestInterfacePlugin : InterfacePluginBase
 
     private async Task<ApiResponse> HandleUpdateBlobAsync(string id, HttpListenerRequest request, CancellationToken ct)
     {
-        if (!_mockStorage.ContainsKey(id))
+        if (_storage == null)
+        {
+            return new ApiResponse { StatusCode = 503, Data = new { error = "Storage service not configured" } };
+        }
+
+        var path = StoragePrefix + id;
+
+        if (!await _storage.ExistsAsync(path, ct))
         {
             return new ApiResponse { StatusCode = 404, Data = new { error = "Blob not found" } };
         }
@@ -325,15 +410,13 @@ public sealed class RestInterfacePlugin : InterfacePluginBase
         using var reader = new StreamReader(request.InputStream, request.ContentEncoding);
         var body = await reader.ReadToEndAsync(ct);
 
-        try
+        var metadata = new Dictionary<string, string>
         {
-            var data = JsonSerializer.Deserialize<Dictionary<string, object>>(body, _jsonOptions);
-            _mockStorage[id] = data ?? new Dictionary<string, object>();
-        }
-        catch
-        {
-            _mockStorage[id] = new { content = body };
-        }
+            ["ContentType"] = request.ContentType ?? "application/json",
+            ["ModifiedAt"] = DateTime.UtcNow.ToString("O")
+        };
+
+        await _storage.SaveAsync(path, Encoding.UTF8.GetBytes(body), metadata, ct);
 
         return new ApiResponse
         {
@@ -342,9 +425,17 @@ public sealed class RestInterfacePlugin : InterfacePluginBase
         };
     }
 
-    private ApiResponse HandleDeleteBlob(string id)
+    private async Task<ApiResponse> HandleDeleteBlobAsync(string id, CancellationToken ct)
     {
-        if (_mockStorage.TryRemove(id, out _))
+        if (_storage == null)
+        {
+            return new ApiResponse { StatusCode = 503, Data = new { error = "Storage service not configured" } };
+        }
+
+        var path = StoragePrefix + id;
+        var deleted = await _storage.DeleteAsync(path, ct);
+
+        if (deleted)
         {
             return new ApiResponse { StatusCode = 204 };
         }
@@ -353,6 +444,11 @@ public sealed class RestInterfacePlugin : InterfacePluginBase
 
     private async Task<ApiResponse> HandleBatchOperationsAsync(HttpListenerRequest request, CancellationToken ct)
     {
+        if (_storage == null)
+        {
+            return new ApiResponse { StatusCode = 503, Data = new { error = "Storage service not configured" } };
+        }
+
         using var reader = new StreamReader(request.InputStream, request.ContentEncoding);
         var body = await reader.ReadToEndAsync(ct);
 
@@ -365,8 +461,8 @@ public sealed class RestInterfacePlugin : InterfacePluginBase
             {
                 var result = op.Method switch
                 {
-                    "GET" => HandleGetBlob(op.Id),
-                    "DELETE" => HandleDeleteBlob(op.Id),
+                    "GET" => await HandleGetBlobAsync(op.Id, ct),
+                    "DELETE" => await HandleDeleteBlobAsync(op.Id, ct),
                     _ => new ApiResponse { StatusCode = 400, Data = new { error = "Invalid operation" } }
                 };
                 results.Add(new { op.Id, statusCode = result.StatusCode, data = result.Data });
@@ -445,7 +541,7 @@ public sealed class RestInterfacePlugin : InterfacePluginBase
             {
                 title = "DataWarehouse REST API",
                 version = _apiVersion,
-                description = "RESTful API for DataWarehouse blob operations"
+                description = "RESTful API for DataWarehouse blob operations with persistent storage"
             },
             servers = new[]
             {
