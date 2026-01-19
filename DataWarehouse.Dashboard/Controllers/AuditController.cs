@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using DataWarehouse.Dashboard.Services;
 using DataWarehouse.Dashboard.Security;
+using DataWarehouse.Dashboard.Models;
 
 namespace DataWarehouse.Dashboard.Controllers;
 
@@ -25,22 +26,36 @@ public class AuditController : ControllerBase
     }
 
     /// <summary>
-    /// Gets recent audit log entries.
+    /// Gets recent audit log entries with pagination.
     /// </summary>
     [HttpGet]
-    [ProducesResponseType(typeof(IEnumerable<AuditLogEntry>), StatusCodes.Status200OK)]
-    public ActionResult<IEnumerable<AuditLogEntry>> GetRecentLogs([FromQuery] int count = 100)
+    [ProducesResponseType(typeof(PaginatedResponse<AuditLogEntry>), StatusCodes.Status200OK)]
+    public ActionResult<PaginatedResponse<AuditLogEntry>> GetRecentLogs([FromQuery] PaginationQuery pagination)
     {
-        var logs = _auditService.GetRecentLogs(count);
-        return Ok(logs);
+        var allLogs = _auditService.GetRecentLogs(pagination.PageSize * pagination.Page + 100);
+
+        // Apply filtering if search query provided
+        if (!string.IsNullOrWhiteSpace(pagination.Query))
+        {
+            allLogs = allLogs.Where(l =>
+                l.Message.Contains(pagination.Query, StringComparison.OrdinalIgnoreCase) ||
+                (l.Category?.Contains(pagination.Query, StringComparison.OrdinalIgnoreCase) ?? false) ||
+                (l.Action?.Contains(pagination.Query, StringComparison.OrdinalIgnoreCase) ?? false));
+        }
+
+        var response = allLogs.ToPaginated(pagination);
+        Response.AddPaginationHeaders(response);
+        return Ok(response);
     }
 
     /// <summary>
-    /// Queries audit logs with filters.
+    /// Queries audit logs with filters and pagination.
     /// </summary>
     [HttpGet("query")]
-    [ProducesResponseType(typeof(AuditQueryResult), StatusCodes.Status200OK)]
-    public ActionResult<AuditQueryResult> QueryLogs([FromQuery] AuditLogQueryRequest request)
+    [ProducesResponseType(typeof(PaginatedResponse<AuditLogEntry>), StatusCodes.Status200OK)]
+    public ActionResult<PaginatedResponse<AuditLogEntry>> QueryLogs(
+        [FromQuery] AuditLogQueryRequest request,
+        [FromQuery] PaginationQuery pagination)
     {
         var query = new AuditLogQuery
         {
@@ -52,20 +67,16 @@ public class AuditController : ControllerBase
             TenantId = request.TenantId,
             MinSeverity = request.MinSeverity,
             SuccessOnly = request.SuccessOnly,
-            SearchText = request.SearchText,
-            Skip = request.Skip,
-            Take = request.Take
+            SearchText = request.SearchText ?? pagination.Query,
+            Skip = 0,
+            Take = int.MaxValue // Get all matching, then paginate
         };
 
-        var logs = _auditService.QueryLogs(query).ToList();
+        var allLogs = _auditService.QueryLogs(query).ToList();
+        var response = allLogs.ToPaginated(pagination);
 
-        return Ok(new AuditQueryResult
-        {
-            Entries = logs,
-            Count = logs.Count,
-            Skip = query.Skip,
-            Take = query.Take
-        });
+        Response.AddPaginationHeaders(response);
+        return Ok(response);
     }
 
     /// <summary>
@@ -108,51 +119,59 @@ public class AuditController : ControllerBase
     }
 
     /// <summary>
-    /// Gets entries by category.
+    /// Gets entries by category with pagination.
     /// </summary>
     [HttpGet("categories/{category}")]
-    [ProducesResponseType(typeof(IEnumerable<AuditLogEntry>), StatusCodes.Status200OK)]
-    public ActionResult<IEnumerable<AuditLogEntry>> GetByCategory(string category, [FromQuery] int count = 100)
+    [ProducesResponseType(typeof(PaginatedResponse<AuditLogEntry>), StatusCodes.Status200OK)]
+    public ActionResult<PaginatedResponse<AuditLogEntry>> GetByCategory(string category, [FromQuery] PaginationQuery pagination)
     {
-        var query = new AuditLogQuery { Category = category, Take = count };
+        var query = new AuditLogQuery { Category = category, Take = int.MaxValue };
         var logs = _auditService.QueryLogs(query);
-        return Ok(logs);
+        var response = logs.ToPaginated(pagination);
+        Response.AddPaginationHeaders(response);
+        return Ok(response);
     }
 
     /// <summary>
-    /// Gets entries by user.
+    /// Gets entries by user with pagination.
     /// </summary>
     [HttpGet("users/{userId}")]
-    [ProducesResponseType(typeof(IEnumerable<AuditLogEntry>), StatusCodes.Status200OK)]
-    public ActionResult<IEnumerable<AuditLogEntry>> GetByUser(string userId, [FromQuery] int count = 100)
+    [ProducesResponseType(typeof(PaginatedResponse<AuditLogEntry>), StatusCodes.Status200OK)]
+    public ActionResult<PaginatedResponse<AuditLogEntry>> GetByUser(string userId, [FromQuery] PaginationQuery pagination)
     {
-        var query = new AuditLogQuery { UserId = userId, Take = count };
+        var query = new AuditLogQuery { UserId = userId, Take = int.MaxValue };
         var logs = _auditService.QueryLogs(query);
-        return Ok(logs);
+        var response = logs.ToPaginated(pagination);
+        Response.AddPaginationHeaders(response);
+        return Ok(response);
     }
 
     /// <summary>
-    /// Gets security-related entries.
+    /// Gets security-related entries with pagination.
     /// </summary>
     [HttpGet("security")]
-    [ProducesResponseType(typeof(IEnumerable<AuditLogEntry>), StatusCodes.Status200OK)]
-    public ActionResult<IEnumerable<AuditLogEntry>> GetSecurityLogs([FromQuery] int count = 100)
+    [ProducesResponseType(typeof(PaginatedResponse<AuditLogEntry>), StatusCodes.Status200OK)]
+    public ActionResult<PaginatedResponse<AuditLogEntry>> GetSecurityLogs([FromQuery] PaginationQuery pagination)
     {
-        var query = new AuditLogQuery { MinSeverity = AuditSeverity.Security, Take = count };
+        var query = new AuditLogQuery { MinSeverity = AuditSeverity.Security, Take = int.MaxValue };
         var logs = _auditService.QueryLogs(query);
-        return Ok(logs);
+        var response = logs.ToPaginated(pagination);
+        Response.AddPaginationHeaders(response);
+        return Ok(response);
     }
 
     /// <summary>
-    /// Gets failed operations.
+    /// Gets failed operations with pagination.
     /// </summary>
     [HttpGet("failures")]
-    [ProducesResponseType(typeof(IEnumerable<AuditLogEntry>), StatusCodes.Status200OK)]
-    public ActionResult<IEnumerable<AuditLogEntry>> GetFailures([FromQuery] int count = 100)
+    [ProducesResponseType(typeof(PaginatedResponse<AuditLogEntry>), StatusCodes.Status200OK)]
+    public ActionResult<PaginatedResponse<AuditLogEntry>> GetFailures([FromQuery] PaginationQuery pagination)
     {
-        var query = new AuditLogQuery { SuccessOnly = false, Take = count };
+        var query = new AuditLogQuery { SuccessOnly = false, Take = int.MaxValue };
         var logs = _auditService.QueryLogs(query).Where(e => !e.Success);
-        return Ok(logs);
+        var response = logs.ToPaginated(pagination);
+        Response.AddPaginationHeaders(response);
+        return Ok(response);
     }
 }
 
