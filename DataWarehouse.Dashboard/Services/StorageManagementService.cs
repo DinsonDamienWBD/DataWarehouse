@@ -8,44 +8,14 @@ namespace DataWarehouse.Dashboard.Services;
 /// </summary>
 public interface IStorageManagementService
 {
-    /// <summary>
-    /// Gets all storage pools.
-    /// </summary>
     IEnumerable<StoragePoolInfo> GetStoragePools();
-
-    /// <summary>
-    /// Gets storage pool by ID.
-    /// </summary>
-    StoragePoolInfo? GetStoragePool(string poolId);
-
-    /// <summary>
-    /// Gets storage usage statistics.
-    /// </summary>
-    StorageUsageStats GetUsageStats();
-
-    /// <summary>
-    /// Gets RAID status for a pool.
-    /// </summary>
-    RaidStatusInfo? GetRaidStatus(string poolId);
-
-    /// <summary>
-    /// Gets all storage instances across all plugins.
-    /// </summary>
-    IEnumerable<StorageInstanceInfo> GetAllInstances();
-
-    /// <summary>
-    /// Creates a new storage pool.
-    /// </summary>
-    Task<StoragePoolInfo?> CreatePoolAsync(CreatePoolRequest request);
-
-    /// <summary>
-    /// Deletes a storage pool.
-    /// </summary>
+    StoragePoolInfo? GetPool(string poolId);
+    Task<StoragePoolInfo> CreatePoolAsync(string name, string poolType, long capacityBytes);
     Task<bool> DeletePoolAsync(string poolId);
-
-    /// <summary>
-    /// Event raised when storage changes.
-    /// </summary>
+    IEnumerable<RaidConfiguration> GetRaidConfigurations();
+    RaidConfiguration? GetRaidConfiguration(string id);
+    Task<StorageInstance?> AddInstanceAsync(string poolId, string name, string pluginId, Dictionary<string, object>? config);
+    Task<bool> RemoveInstanceAsync(string poolId, string instanceId);
     event EventHandler<StorageChangedEventArgs>? StorageChanged;
 }
 
@@ -53,124 +23,69 @@ public class StoragePoolInfo
 {
     public string Id { get; set; } = string.Empty;
     public string Name { get; set; } = string.Empty;
-    public string Strategy { get; set; } = string.Empty; // RAID0, RAID1, RAID5, Mirrored, etc.
-    public long TotalCapacityBytes { get; set; }
-    public long UsedCapacityBytes { get; set; }
-    public double UsagePercent => TotalCapacityBytes > 0 ? (double)UsedCapacityBytes / TotalCapacityBytes * 100 : 0;
-    public int ProviderCount { get; set; }
-    public int HealthyProviders { get; set; }
-    public bool IsHealthy { get; set; }
-    public bool IsDegraded { get; set; }
-    public DateTime CreatedAt { get; set; }
-    public DateTime? LastActivity { get; set; }
-    public List<StorageProviderInfo> Providers { get; set; } = new();
+    public string PoolType { get; set; } = "Standard";
+    public long CapacityBytes { get; set; }
+    public long UsedBytes { get; set; }
+    public PoolHealth Health { get; set; } = PoolHealth.Healthy;
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public List<StorageInstance> Instances { get; set; } = new();
+    public StoragePoolStats? Stats { get; set; }
 }
 
-public class StorageProviderInfo
+public class StorageInstance
 {
     public string Id { get; set; } = string.Empty;
     public string Name { get; set; } = string.Empty;
     public string PluginId { get; set; } = string.Empty;
-    public StorageRole Role { get; set; }
+    public string Status { get; set; } = "Active";
     public long CapacityBytes { get; set; }
     public long UsedBytes { get; set; }
-    public bool IsHealthy { get; set; }
-    public TimeSpan? LastResponseTime { get; set; }
-    public string? LastError { get; set; }
+    public Dictionary<string, object> Config { get; set; } = new();
 }
 
-public class StorageUsageStats
+public class StoragePoolStats
 {
-    public long TotalCapacityBytes { get; set; }
-    public long UsedCapacityBytes { get; set; }
-    public long AvailableCapacityBytes => TotalCapacityBytes - UsedCapacityBytes;
-    public double UsagePercent => TotalCapacityBytes > 0 ? (double)UsedCapacityBytes / TotalCapacityBytes * 100 : 0;
-    public int TotalPools { get; set; }
-    public int HealthyPools { get; set; }
-    public int DegradedPools { get; set; }
-    public long ObjectCount { get; set; }
-    public long ReadOperationsPerMinute { get; set; }
-    public long WriteOperationsPerMinute { get; set; }
-    public double AverageReadLatencyMs { get; set; }
-    public double AverageWriteLatencyMs { get; set; }
-    public Dictionary<string, long> UsageByTier { get; set; } = new();
+    public long ReadOperations { get; set; }
+    public long WriteOperations { get; set; }
+    public double ReadThroughputMBps { get; set; }
+    public double WriteThroughputMBps { get; set; }
+    public double AverageLatencyMs { get; set; }
+    public int ActiveConnections { get; set; }
 }
 
-public class RaidStatusInfo
-{
-    public string PoolId { get; set; } = string.Empty;
-    public string RaidLevel { get; set; } = string.Empty;
-    public RaidState State { get; set; }
-    public int TotalDisks { get; set; }
-    public int ActiveDisks { get; set; }
-    public int SpareDisks { get; set; }
-    public int FailedDisks { get; set; }
-    public double RebuildProgress { get; set; }
-    public TimeSpan? EstimatedRebuildTime { get; set; }
-    public List<RaidDiskInfo> Disks { get; set; } = new();
-}
-
-public enum RaidState
+public enum PoolHealth
 {
     Healthy,
+    Degraded,
+    Offline
+}
+
+public class RaidConfiguration
+{
+    public string Id { get; set; } = string.Empty;
+    public string Name { get; set; } = string.Empty;
+    public string Level { get; set; } = "RAID5";
+    public RaidStatus Status { get; set; } = RaidStatus.Optimal;
+    public int DiskCount { get; set; }
+    public int ActiveDisks { get; set; }
+    public int SpareDisks { get; set; }
+    public long TotalCapacityBytes { get; set; }
+    public int StripeSizeKB { get; set; } = 64;
+    public double RebuildProgress { get; set; }
+}
+
+public enum RaidStatus
+{
+    Optimal,
     Degraded,
     Rebuilding,
     Failed
 }
 
-public class RaidDiskInfo
-{
-    public int Position { get; set; }
-    public string ProviderId { get; set; } = string.Empty;
-    public RaidDiskState State { get; set; }
-    public long CapacityBytes { get; set; }
-}
-
-public enum RaidDiskState
-{
-    Active,
-    Spare,
-    Rebuilding,
-    Failed,
-    Missing
-}
-
-public class StorageInstanceInfo
-{
-    public string InstanceId { get; set; } = string.Empty;
-    public string PluginId { get; set; } = string.Empty;
-    public string PluginName { get; set; } = string.Empty;
-    public StorageRole Roles { get; set; }
-    public bool IsConnected { get; set; }
-    public int ActiveConnections { get; set; }
-    public int PooledConnections { get; set; }
-    public DateTime CreatedAt { get; set; }
-    public DateTime? LastActivity { get; set; }
-    public Dictionary<string, object> Config { get; set; } = new();
-}
-
-public class CreatePoolRequest
-{
-    public string Name { get; set; } = string.Empty;
-    public string Strategy { get; set; } = "Simple";
-    public List<string> ProviderIds { get; set; } = new();
-    public Dictionary<string, object> Options { get; set; } = new();
-}
-
 public class StorageChangedEventArgs : EventArgs
 {
     public string PoolId { get; set; } = string.Empty;
-    public StorageChangeType ChangeType { get; set; }
-}
-
-public enum StorageChangeType
-{
-    PoolCreated,
-    PoolDeleted,
-    PoolUpdated,
-    ProviderAdded,
-    ProviderRemoved,
-    HealthChanged
+    public string ChangeType { get; set; } = string.Empty;
 }
 
 /// <summary>
@@ -179,6 +94,7 @@ public enum StorageChangeType
 public class StorageManagementService : IStorageManagementService
 {
     private readonly ConcurrentDictionary<string, StoragePoolInfo> _pools = new();
+    private readonly ConcurrentDictionary<string, RaidConfiguration> _raidConfigs = new();
     private readonly IPluginDiscoveryService _pluginService;
     private readonly ILogger<StorageManagementService> _logger;
 
@@ -188,160 +104,211 @@ public class StorageManagementService : IStorageManagementService
     {
         _pluginService = pluginService;
         _logger = logger;
-
-        // Initialize with sample data
         InitializeSamplePools();
     }
 
     public IEnumerable<StoragePoolInfo> GetStoragePools() => _pools.Values.OrderBy(p => p.Name);
 
-    public StoragePoolInfo? GetStoragePool(string poolId) =>
+    public StoragePoolInfo? GetPool(string poolId) =>
         _pools.TryGetValue(poolId, out var pool) ? pool : null;
 
-    public StorageUsageStats GetUsageStats()
-    {
-        var pools = _pools.Values.ToList();
-        return new StorageUsageStats
-        {
-            TotalCapacityBytes = pools.Sum(p => p.TotalCapacityBytes),
-            UsedCapacityBytes = pools.Sum(p => p.UsedCapacityBytes),
-            TotalPools = pools.Count,
-            HealthyPools = pools.Count(p => p.IsHealthy && !p.IsDegraded),
-            DegradedPools = pools.Count(p => p.IsDegraded),
-            UsageByTier = new Dictionary<string, long>
-            {
-                ["Hot"] = pools.Sum(p => p.UsedCapacityBytes) / 3,
-                ["Warm"] = pools.Sum(p => p.UsedCapacityBytes) / 3,
-                ["Cold"] = pools.Sum(p => p.UsedCapacityBytes) / 3
-            }
-        };
-    }
-
-    public RaidStatusInfo? GetRaidStatus(string poolId)
-    {
-        if (!_pools.TryGetValue(poolId, out var pool))
-            return null;
-
-        return new RaidStatusInfo
-        {
-            PoolId = poolId,
-            RaidLevel = pool.Strategy,
-            State = pool.IsDegraded ? RaidState.Degraded : (pool.IsHealthy ? RaidState.Healthy : RaidState.Failed),
-            TotalDisks = pool.ProviderCount,
-            ActiveDisks = pool.HealthyProviders,
-            FailedDisks = pool.ProviderCount - pool.HealthyProviders,
-            Disks = pool.Providers.Select((p, i) => new RaidDiskInfo
-            {
-                Position = i,
-                ProviderId = p.Id,
-                State = p.IsHealthy ? RaidDiskState.Active : RaidDiskState.Failed,
-                CapacityBytes = p.CapacityBytes
-            }).ToList()
-        };
-    }
-
-    public IEnumerable<StorageInstanceInfo> GetAllInstances()
-    {
-        // Get instances from active storage plugins
-        var storagePlugins = _pluginService.GetPluginsByCategory(SDK.Primitives.PluginCategory.StorageProvider);
-
-        foreach (var plugin in storagePlugins.Where(p => p.IsActive))
-        {
-            if (plugin.Metadata.TryGetValue("RegisteredInstances", out var countObj) && countObj is int count)
-            {
-                for (int i = 0; i < count; i++)
-                {
-                    yield return new StorageInstanceInfo
-                    {
-                        InstanceId = $"{plugin.Id}-{i}",
-                        PluginId = plugin.Id,
-                        PluginName = plugin.Name,
-                        IsConnected = true,
-                        CreatedAt = DateTime.UtcNow.AddHours(-i)
-                    };
-                }
-            }
-        }
-    }
-
-    public async Task<StoragePoolInfo?> CreatePoolAsync(CreatePoolRequest request)
+    public Task<StoragePoolInfo> CreatePoolAsync(string name, string poolType, long capacityBytes)
     {
         var pool = new StoragePoolInfo
         {
             Id = Guid.NewGuid().ToString("N")[..8],
-            Name = request.Name,
-            Strategy = request.Strategy,
+            Name = name,
+            PoolType = poolType,
+            CapacityBytes = capacityBytes,
+            UsedBytes = 0,
+            Health = PoolHealth.Healthy,
             CreatedAt = DateTime.UtcNow,
-            IsHealthy = true
+            Stats = new StoragePoolStats()
         };
 
-        if (_pools.TryAdd(pool.Id, pool))
-        {
-            StorageChanged?.Invoke(this, new StorageChangedEventArgs
-            {
-                PoolId = pool.Id,
-                ChangeType = StorageChangeType.PoolCreated
-            });
-            return pool;
-        }
+        _pools[pool.Id] = pool;
 
-        return null;
+        StorageChanged?.Invoke(this, new StorageChangedEventArgs
+        {
+            PoolId = pool.Id,
+            ChangeType = "Created"
+        });
+
+        _logger.LogInformation("Created storage pool {Name} ({Id})", name, pool.Id);
+        return Task.FromResult(pool);
     }
 
-    public async Task<bool> DeletePoolAsync(string poolId)
+    public Task<bool> DeletePoolAsync(string poolId)
     {
-        if (_pools.TryRemove(poolId, out _))
+        if (_pools.TryRemove(poolId, out var pool))
         {
             StorageChanged?.Invoke(this, new StorageChangedEventArgs
             {
                 PoolId = poolId,
-                ChangeType = StorageChangeType.PoolDeleted
+                ChangeType = "Deleted"
             });
-            return true;
+            _logger.LogInformation("Deleted storage pool {Name} ({Id})", pool.Name, poolId);
+            return Task.FromResult(true);
         }
-        return false;
+        return Task.FromResult(false);
+    }
+
+    public IEnumerable<RaidConfiguration> GetRaidConfigurations() => _raidConfigs.Values;
+
+    public RaidConfiguration? GetRaidConfiguration(string id) =>
+        _raidConfigs.TryGetValue(id, out var config) ? config : null;
+
+    public Task<StorageInstance?> AddInstanceAsync(string poolId, string name, string pluginId, Dictionary<string, object>? config)
+    {
+        if (!_pools.TryGetValue(poolId, out var pool))
+            return Task.FromResult<StorageInstance?>(null);
+
+        var instance = new StorageInstance
+        {
+            Id = Guid.NewGuid().ToString("N")[..8],
+            Name = name,
+            PluginId = pluginId,
+            Status = "Active",
+            Config = config ?? new()
+        };
+
+        pool.Instances.Add(instance);
+
+        StorageChanged?.Invoke(this, new StorageChangedEventArgs
+        {
+            PoolId = poolId,
+            ChangeType = "InstanceAdded"
+        });
+
+        return Task.FromResult<StorageInstance?>(instance);
+    }
+
+    public Task<bool> RemoveInstanceAsync(string poolId, string instanceId)
+    {
+        if (!_pools.TryGetValue(poolId, out var pool))
+            return Task.FromResult(false);
+
+        var instance = pool.Instances.FirstOrDefault(i => i.Id == instanceId);
+        if (instance == null)
+            return Task.FromResult(false);
+
+        pool.Instances.Remove(instance);
+
+        StorageChanged?.Invoke(this, new StorageChangedEventArgs
+        {
+            PoolId = poolId,
+            ChangeType = "InstanceRemoved"
+        });
+
+        return Task.FromResult(true);
     }
 
     private void InitializeSamplePools()
     {
-        // Sample primary pool
+        // Primary storage pool
         _pools["primary"] = new StoragePoolInfo
         {
             Id = "primary",
             Name = "Primary Storage Pool",
-            Strategy = "RAID5",
-            TotalCapacityBytes = 10L * 1024 * 1024 * 1024 * 1024, // 10 TB
-            UsedCapacityBytes = 3L * 1024 * 1024 * 1024 * 1024,   // 3 TB
-            ProviderCount = 4,
-            HealthyProviders = 4,
-            IsHealthy = true,
+            PoolType = "RAID5",
+            CapacityBytes = 10L * 1024 * 1024 * 1024 * 1024, // 10 TB
+            UsedBytes = 3L * 1024 * 1024 * 1024 * 1024,      // 3 TB
+            Health = PoolHealth.Healthy,
             CreatedAt = DateTime.UtcNow.AddDays(-30),
-            Providers = new()
+            Instances = new()
             {
-                new() { Id = "disk1", Name = "Disk 1", Role = StorageRole.Primary, CapacityBytes = (long)(2.5 * 1024L * 1024 * 1024 * 1024), IsHealthy = true },
-                new() { Id = "disk2", Name = "Disk 2", Role = StorageRole.Primary, CapacityBytes = (long)(2.5 * 1024L * 1024 * 1024 * 1024), IsHealthy = true },
-                new() { Id = "disk3", Name = "Disk 3", Role = StorageRole.Primary, CapacityBytes = (long)(2.5 * 1024L * 1024 * 1024 * 1024), IsHealthy = true },
-                new() { Id = "disk4", Name = "Disk 4", Role = StorageRole.Parity, CapacityBytes = (long)(2.5 * 1024L * 1024 * 1024 * 1024), IsHealthy = true }
+                new() { Id = "disk1", Name = "Disk 1", PluginId = "filesystem", CapacityBytes = (long)(2.5 * 1024L * 1024 * 1024 * 1024), Status = "Active" },
+                new() { Id = "disk2", Name = "Disk 2", PluginId = "filesystem", CapacityBytes = (long)(2.5 * 1024L * 1024 * 1024 * 1024), Status = "Active" },
+                new() { Id = "disk3", Name = "Disk 3", PluginId = "filesystem", CapacityBytes = (long)(2.5 * 1024L * 1024 * 1024 * 1024), Status = "Active" },
+                new() { Id = "disk4", Name = "Disk 4", PluginId = "filesystem", CapacityBytes = (long)(2.5 * 1024L * 1024 * 1024 * 1024), Status = "Active" }
+            },
+            Stats = new StoragePoolStats
+            {
+                ReadOperations = 15420,
+                WriteOperations = 8932,
+                ReadThroughputMBps = 450.5,
+                WriteThroughputMBps = 320.2,
+                AverageLatencyMs = 2.3,
+                ActiveConnections = 45
             }
         };
 
-        // Sample cache pool
+        // Cache pool
         _pools["cache"] = new StoragePoolInfo
         {
             Id = "cache",
             Name = "SSD Cache Pool",
-            Strategy = "RAID1",
-            TotalCapacityBytes = 1L * 1024 * 1024 * 1024 * 1024, // 1 TB
-            UsedCapacityBytes = 512L * 1024 * 1024 * 1024,       // 512 GB
-            ProviderCount = 2,
-            HealthyProviders = 2,
-            IsHealthy = true,
+            PoolType = "RAID1",
+            CapacityBytes = 1L * 1024 * 1024 * 1024 * 1024, // 1 TB
+            UsedBytes = 512L * 1024 * 1024 * 1024,          // 512 GB
+            Health = PoolHealth.Healthy,
             CreatedAt = DateTime.UtcNow.AddDays(-15),
-            Providers = new()
+            Instances = new()
             {
-                new() { Id = "ssd1", Name = "SSD 1", Role = StorageRole.Cache, CapacityBytes = 512L * 1024 * 1024 * 1024, IsHealthy = true },
-                new() { Id = "ssd2", Name = "SSD 2", Role = StorageRole.Mirror, CapacityBytes = 512L * 1024 * 1024 * 1024, IsHealthy = true }
+                new() { Id = "ssd1", Name = "SSD 1", PluginId = "filesystem", CapacityBytes = 512L * 1024 * 1024 * 1024, Status = "Active" },
+                new() { Id = "ssd2", Name = "SSD 2", PluginId = "filesystem", CapacityBytes = 512L * 1024 * 1024 * 1024, Status = "Active" }
+            },
+            Stats = new StoragePoolStats
+            {
+                ReadOperations = 45230,
+                WriteOperations = 23100,
+                ReadThroughputMBps = 1200.0,
+                WriteThroughputMBps = 950.5,
+                AverageLatencyMs = 0.8,
+                ActiveConnections = 120
             }
+        };
+
+        // Archive pool
+        _pools["archive"] = new StoragePoolInfo
+        {
+            Id = "archive",
+            Name = "Archive Pool",
+            PoolType = "Standard",
+            CapacityBytes = 50L * 1024 * 1024 * 1024 * 1024, // 50 TB
+            UsedBytes = 35L * 1024 * 1024 * 1024 * 1024,     // 35 TB
+            Health = PoolHealth.Healthy,
+            CreatedAt = DateTime.UtcNow.AddDays(-90),
+            Instances = new()
+            {
+                new() { Id = "archive1", Name = "Archive Drive 1", PluginId = "s3", CapacityBytes = 50L * 1024 * 1024 * 1024 * 1024, Status = "Active" }
+            },
+            Stats = new StoragePoolStats
+            {
+                ReadOperations = 1250,
+                WriteOperations = 890,
+                ReadThroughputMBps = 100.0,
+                WriteThroughputMBps = 80.5,
+                AverageLatencyMs = 15.2,
+                ActiveConnections = 5
+            }
+        };
+
+        // RAID configurations
+        _raidConfigs["raid-primary"] = new RaidConfiguration
+        {
+            Id = "raid-primary",
+            Name = "Primary RAID5 Array",
+            Level = "RAID5",
+            Status = RaidStatus.Optimal,
+            DiskCount = 4,
+            ActiveDisks = 4,
+            SpareDisks = 0,
+            TotalCapacityBytes = 10L * 1024 * 1024 * 1024 * 1024,
+            StripeSizeKB = 64
+        };
+
+        _raidConfigs["raid-cache"] = new RaidConfiguration
+        {
+            Id = "raid-cache",
+            Name = "Cache RAID1 Mirror",
+            Level = "RAID1",
+            Status = RaidStatus.Optimal,
+            DiskCount = 2,
+            ActiveDisks = 2,
+            SpareDisks = 0,
+            TotalCapacityBytes = 1L * 1024 * 1024 * 1024 * 1024,
+            StripeSizeKB = 128
         };
     }
 }

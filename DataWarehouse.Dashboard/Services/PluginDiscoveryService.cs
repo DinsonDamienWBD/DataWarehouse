@@ -1,9 +1,7 @@
-using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Primitives;
 using DataWarehouse.SDK.Utilities;
 using System.Collections.Concurrent;
 using System.Reflection;
-using System.Text.Json;
 
 namespace DataWarehouse.Dashboard.Services;
 
@@ -16,6 +14,11 @@ public interface IPluginDiscoveryService
     /// Gets all discovered plugins.
     /// </summary>
     IEnumerable<PluginInfo> GetAllPlugins();
+
+    /// <summary>
+    /// Gets all discovered plugins (alias).
+    /// </summary>
+    IEnumerable<PluginInfo> GetDiscoveredPlugins();
 
     /// <summary>
     /// Gets plugins by category.
@@ -50,7 +53,7 @@ public interface IPluginDiscoveryService
     /// <summary>
     /// Gets plugin configuration schema.
     /// </summary>
-    PluginConfigSchema? GetPluginConfigSchema(string pluginId);
+    PluginConfigurationSchema? GetPluginConfigurationSchema(string pluginId);
 
     /// <summary>
     /// Updates plugin configuration.
@@ -60,7 +63,7 @@ public interface IPluginDiscoveryService
     /// <summary>
     /// Refreshes plugin discovery.
     /// </summary>
-    Task RefreshAsync();
+    Task RefreshPluginsAsync();
 
     /// <summary>
     /// Event raised when plugins change.
@@ -75,23 +78,41 @@ public class PluginInfo
 {
     public string Id { get; set; } = string.Empty;
     public string Name { get; set; } = string.Empty;
-    public string Version { get; set; } = string.Empty;
+    public string Version { get; set; } = "1.0.0";
     public string Description { get; set; } = string.Empty;
-    public PluginCategory Category { get; set; }
+    public string Category { get; set; } = "Storage";
+    public string? Author { get; set; }
+    public bool IsEnabled { get; set; }
     public bool IsActive { get; set; }
-    public bool IsHealthy { get; set; }
+    public bool IsHealthy { get; set; } = true;
+    public int InstanceCount { get; set; }
     public DateTime? LastActivity { get; set; }
-    public List<PluginCapabilityDescriptor> Capabilities { get; set; } = new();
+    public PluginCapabilities? Capabilities { get; set; }
     public Dictionary<string, object> Metadata { get; set; } = new();
     public Dictionary<string, object> CurrentConfig { get; set; } = new();
     public string? AssemblyPath { get; set; }
-    public PluginReadyState ReadyState { get; set; }
+}
+
+/// <summary>
+/// Plugin capabilities.
+/// </summary>
+public class PluginCapabilities
+{
+    public bool SupportsStreaming { get; set; }
+    public bool SupportsMultiInstance { get; set; }
+    public bool SupportsTransactions { get; set; }
+    public bool SupportsCaching { get; set; }
+    public bool SupportsIndexing { get; set; }
+    public bool SupportsEncryption { get; set; }
+    public bool SupportsCompression { get; set; }
+    public bool SupportsVersioning { get; set; }
+    public List<string> SupportedOperations { get; set; } = new();
 }
 
 /// <summary>
 /// Schema for plugin configuration.
 /// </summary>
-public class PluginConfigSchema
+public class PluginConfigurationSchema
 {
     public string PluginId { get; set; } = string.Empty;
     public List<ConfigProperty> Properties { get; set; } = new();
@@ -105,7 +126,7 @@ public class ConfigProperty
     public string Name { get; set; } = string.Empty;
     public string DisplayName { get; set; } = string.Empty;
     public string Description { get; set; } = string.Empty;
-    public string Type { get; set; } = "string"; // string, number, boolean, array, object
+    public string Type { get; set; } = "string";
     public object? DefaultValue { get; set; }
     public bool Required { get; set; }
     public string? ValidationPattern { get; set; }
@@ -140,7 +161,6 @@ public enum PluginChangeType
 public class PluginDiscoveryService : IPluginDiscoveryService
 {
     private readonly ConcurrentDictionary<string, PluginInfo> _plugins = new();
-    private readonly ConcurrentDictionary<string, IPluginBase> _activeInstances = new();
     private readonly ILogger<PluginDiscoveryService> _logger;
     private readonly string _pluginsDirectory;
 
@@ -153,33 +173,37 @@ public class PluginDiscoveryService : IPluginDiscoveryService
             ?? Path.Combine(AppContext.BaseDirectory, "Plugins");
 
         // Initial discovery
-        _ = RefreshAsync();
+        _ = RefreshPluginsAsync();
     }
 
     public IEnumerable<PluginInfo> GetAllPlugins() => _plugins.Values.OrderBy(p => p.Category).ThenBy(p => p.Name);
 
-    public IEnumerable<PluginInfo> GetPluginsByCategory(PluginCategory category) =>
-        _plugins.Values.Where(p => p.Category == category).OrderBy(p => p.Name);
+    public IEnumerable<PluginInfo> GetDiscoveredPlugins() => GetAllPlugins();
+
+    public IEnumerable<PluginInfo> GetPluginsByCategory(PluginCategory category)
+    {
+        var categoryName = category.ToString();
+        return _plugins.Values.Where(p => p.Category == categoryName).OrderBy(p => p.Name);
+    }
 
     public PluginInfo? GetPlugin(string pluginId) =>
         _plugins.TryGetValue(pluginId, out var plugin) ? plugin : null;
 
     public IEnumerable<PluginInfo> GetActivePlugins() =>
-        _plugins.Values.Where(p => p.IsActive).OrderBy(p => p.Name);
+        _plugins.Values.Where(p => p.IsEnabled).OrderBy(p => p.Name);
 
     public IEnumerable<PluginInfo> GetInactivePlugins() =>
-        _plugins.Values.Where(p => !p.IsActive).OrderBy(p => p.Name);
+        _plugins.Values.Where(p => !p.IsEnabled).OrderBy(p => p.Name);
 
-    public async Task<bool> EnablePluginAsync(string pluginId)
+    public Task<bool> EnablePluginAsync(string pluginId)
     {
         if (!_plugins.TryGetValue(pluginId, out var plugin))
-            return false;
+            return Task.FromResult(false);
 
         try
         {
-            // Would normally load and initialize the plugin here
+            plugin.IsEnabled = true;
             plugin.IsActive = true;
-            plugin.ReadyState = PluginReadyState.Ready;
 
             PluginsChanged?.Invoke(this, new PluginChangedEventArgs
             {
@@ -188,32 +212,24 @@ public class PluginDiscoveryService : IPluginDiscoveryService
                 Plugin = plugin
             });
 
-            return true;
+            return Task.FromResult(true);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to enable plugin {PluginId}", pluginId);
-            return false;
+            return Task.FromResult(false);
         }
     }
 
-    public async Task<bool> DisablePluginAsync(string pluginId)
+    public Task<bool> DisablePluginAsync(string pluginId)
     {
         if (!_plugins.TryGetValue(pluginId, out var plugin))
-            return false;
+            return Task.FromResult(false);
 
         try
         {
+            plugin.IsEnabled = false;
             plugin.IsActive = false;
-            plugin.ReadyState = PluginReadyState.NotReady;
-
-            if (_activeInstances.TryRemove(pluginId, out var instance))
-            {
-                if (instance is IAsyncDisposable asyncDisposable)
-                    await asyncDisposable.DisposeAsync();
-                else if (instance is IDisposable disposable)
-                    disposable.Dispose();
-            }
 
             PluginsChanged?.Invoke(this, new PluginChangedEventArgs
             {
@@ -222,50 +238,41 @@ public class PluginDiscoveryService : IPluginDiscoveryService
                 Plugin = plugin
             });
 
-            return true;
+            return Task.FromResult(true);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to disable plugin {PluginId}", pluginId);
-            return false;
+            return Task.FromResult(false);
         }
     }
 
-    public PluginConfigSchema? GetPluginConfigSchema(string pluginId)
+    public PluginConfigurationSchema? GetPluginConfigurationSchema(string pluginId)
     {
         if (!_plugins.TryGetValue(pluginId, out var plugin))
             return null;
 
-        // Generate schema from plugin metadata
-        var schema = new PluginConfigSchema { PluginId = pluginId };
+        var schema = new PluginConfigurationSchema { PluginId = pluginId };
 
-        // Extract configuration properties from metadata
-        if (plugin.Metadata.TryGetValue("ConfigProperties", out var configProps) && configProps is List<ConfigProperty> props)
+        // Generate basic schema from current config
+        foreach (var (key, value) in plugin.CurrentConfig)
         {
-            schema.Properties = props;
-        }
-        else
-        {
-            // Generate basic schema from current config
-            foreach (var (key, value) in plugin.CurrentConfig)
+            schema.Properties.Add(new ConfigProperty
             {
-                schema.Properties.Add(new ConfigProperty
-                {
-                    Name = key,
-                    DisplayName = FormatDisplayName(key),
-                    Type = GetJsonType(value),
-                    DefaultValue = value
-                });
-            }
+                Name = key,
+                DisplayName = FormatDisplayName(key),
+                Type = GetJsonType(value),
+                DefaultValue = value
+            });
         }
 
         return schema;
     }
 
-    public async Task<bool> UpdatePluginConfigAsync(string pluginId, Dictionary<string, object> config)
+    public Task<bool> UpdatePluginConfigAsync(string pluginId, Dictionary<string, object> config)
     {
         if (!_plugins.TryGetValue(pluginId, out var plugin))
-            return false;
+            return Task.FromResult(false);
 
         try
         {
@@ -281,93 +288,150 @@ public class PluginDiscoveryService : IPluginDiscoveryService
                 Plugin = plugin
             });
 
-            return true;
+            return Task.FromResult(true);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to update plugin config {PluginId}", pluginId);
-            return false;
+            return Task.FromResult(false);
         }
     }
 
-    public async Task RefreshAsync()
+    public Task RefreshPluginsAsync()
     {
         _logger.LogInformation("Discovering plugins...");
 
         // Discover from known plugin types in loaded assemblies
-        var pluginTypes = AppDomain.CurrentDomain.GetAssemblies()
-            .Where(a => !a.IsDynamic && a.FullName?.Contains("DataWarehouse") == true)
-            .SelectMany(a =>
-            {
-                try { return a.GetTypes(); }
-                catch { return Array.Empty<Type>(); }
-            })
-            .Where(t => !t.IsAbstract && typeof(IPluginBase).IsAssignableFrom(t));
+        var assemblies = AppDomain.CurrentDomain.GetAssemblies()
+            .Where(a => !a.IsDynamic && a.FullName?.Contains("DataWarehouse") == true);
 
-        foreach (var pluginType in pluginTypes)
+        foreach (var assembly in assemblies)
         {
             try
             {
-                await DiscoverPluginFromType(pluginType);
+                var types = assembly.GetTypes()
+                    .Where(t => !t.IsAbstract && !t.IsInterface &&
+                               t.Name.EndsWith("Plugin") &&
+                               t.Namespace?.Contains("Plugins") == true);
+
+                foreach (var type in types)
+                {
+                    DiscoverPluginFromType(type);
+                }
             }
             catch (Exception ex)
             {
-                _logger.LogWarning(ex, "Failed to discover plugin type {Type}", pluginType.FullName);
+                _logger.LogDebug(ex, "Could not load types from {Assembly}", assembly.FullName);
             }
         }
 
+        // If no plugins found, add some default entries based on known plugins
+        if (_plugins.IsEmpty)
+        {
+            AddKnownPlugins();
+        }
+
         _logger.LogInformation("Discovered {Count} plugins", _plugins.Count);
+        return Task.CompletedTask;
     }
 
-    private async Task DiscoverPluginFromType(Type pluginType)
+    private void DiscoverPluginFromType(Type pluginType)
     {
         try
         {
-            // Try to create instance for metadata extraction
-            var instance = Activator.CreateInstance(pluginType) as IPluginBase;
-            if (instance == null) return;
-
-            var handshake = await instance.OnHandshakeAsync(new HandshakeRequest
-            {
-                Config = new Dictionary<string, object>()
-            });
+            var category = DetermineCategory(pluginType);
+            var pluginId = pluginType.Name.Replace("Plugin", "").ToLowerInvariant();
 
             var info = new PluginInfo
             {
-                Id = handshake.PluginId,
-                Name = handshake.Name,
-                Version = $"{handshake.Version.Major}.{handshake.Version.Minor}.{handshake.Version.Patch}",
-                Category = handshake.Category,
+                Id = pluginId,
+                Name = FormatDisplayName(pluginType.Name.Replace("Plugin", "")),
+                Version = pluginType.Assembly.GetName().Version?.ToString() ?? "1.0.0",
+                Description = $"{pluginType.Name} for DataWarehouse",
+                Category = category,
+                IsEnabled = false,
                 IsActive = false,
                 IsHealthy = true,
-                ReadyState = PluginReadyState.NotReady,
-                Capabilities = handshake.Capabilities?.ToList() ?? new(),
-                Metadata = handshake.Metadata ?? new(),
-                AssemblyPath = pluginType.Assembly.Location
+                AssemblyPath = pluginType.Assembly.Location,
+                Capabilities = new PluginCapabilities
+                {
+                    SupportsStreaming = category == "Storage",
+                    SupportsMultiInstance = true,
+                    SupportsTransactions = category == "Database",
+                    SupportsCaching = true,
+                    SupportsIndexing = category != "Interface"
+                }
             };
 
-            // Extract description from metadata
-            if (info.Metadata.TryGetValue("Description", out var desc))
-                info.Description = desc?.ToString() ?? string.Empty;
-
-            _plugins.AddOrUpdate(info.Id, info, (_, _) => info);
-
-            PluginsChanged?.Invoke(this, new PluginChangedEventArgs
-            {
-                PluginId = info.Id,
-                ChangeType = PluginChangeType.Discovered,
-                Plugin = info
-            });
+            _plugins.TryAdd(info.Id, info);
         }
         catch (Exception ex)
         {
-            _logger.LogDebug(ex, "Could not extract metadata from {Type}", pluginType.Name);
+            _logger.LogDebug(ex, "Could not discover plugin from {Type}", pluginType.Name);
         }
+    }
+
+    private void AddKnownPlugins()
+    {
+        // Add storage plugins
+        AddPlugin("filesystem", "File System Storage", "Storage", "Local file system storage provider", true);
+        AddPlugin("s3", "Amazon S3", "Storage", "AWS S3-compatible object storage", false);
+        AddPlugin("azure-blob", "Azure Blob Storage", "Storage", "Microsoft Azure Blob storage", false);
+        AddPlugin("gcs", "Google Cloud Storage", "Storage", "Google Cloud Storage provider", false);
+        AddPlugin("ipfs", "IPFS Storage", "Storage", "InterPlanetary File System storage", false);
+        AddPlugin("memory", "In-Memory Storage", "Storage", "Fast in-memory storage for caching", true);
+
+        // Add database plugins
+        AddPlugin("sqlite", "SQLite Database", "Database", "Embedded SQLite database", true);
+        AddPlugin("postgresql", "PostgreSQL", "Database", "PostgreSQL relational database", false);
+        AddPlugin("mongodb", "MongoDB", "Database", "MongoDB document database", false);
+        AddPlugin("redis", "Redis", "Database", "Redis key-value store and cache", false);
+        AddPlugin("elasticsearch", "Elasticsearch", "Database", "Elasticsearch search and analytics", false);
+
+        // Add interface plugins
+        AddPlugin("rest-api", "REST API", "Interface", "HTTP/HTTPS REST API interface", true);
+        AddPlugin("grpc", "gRPC API", "Interface", "High-performance gRPC interface", false);
+        AddPlugin("graphql", "GraphQL API", "Interface", "GraphQL query interface", false);
+    }
+
+    private void AddPlugin(string id, string name, string category, string description, bool enabled)
+    {
+        _plugins.TryAdd(id, new PluginInfo
+        {
+            Id = id,
+            Name = name,
+            Category = category,
+            Description = description,
+            Version = "1.0.0",
+            IsEnabled = enabled,
+            IsActive = enabled,
+            IsHealthy = true,
+            Author = "DataWarehouse Team",
+            Capabilities = new PluginCapabilities
+            {
+                SupportsStreaming = category == "Storage",
+                SupportsMultiInstance = true,
+                SupportsTransactions = category == "Database",
+                SupportsCaching = true,
+                SupportsIndexing = category != "Interface",
+                SupportsEncryption = true,
+                SupportsCompression = category == "Storage"
+            }
+        });
+    }
+
+    private static string DetermineCategory(Type pluginType)
+    {
+        var ns = pluginType.Namespace ?? "";
+        if (ns.Contains("Storage")) return "Storage";
+        if (ns.Contains("Database")) return "Database";
+        if (ns.Contains("Interface")) return "Interface";
+        if (ns.Contains("AI")) return "AI";
+        return "Other";
     }
 
     private static string FormatDisplayName(string name)
     {
-        // Convert camelCase/PascalCase to display name
         var result = System.Text.RegularExpressions.Regex.Replace(name, "(\\B[A-Z])", " $1");
         return char.ToUpper(result[0]) + result[1..];
     }

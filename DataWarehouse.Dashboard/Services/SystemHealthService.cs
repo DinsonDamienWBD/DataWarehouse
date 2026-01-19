@@ -9,19 +9,34 @@ namespace DataWarehouse.Dashboard.Services;
 public interface ISystemHealthService
 {
     /// <summary>
-    /// Gets current system health status.
+    /// Gets current system health status asynchronously.
     /// </summary>
-    SystemHealth GetCurrentHealth();
+    Task<SystemHealthStatus> GetSystemHealthAsync();
+
+    /// <summary>
+    /// Gets current system metrics.
+    /// </summary>
+    SystemMetrics GetCurrentMetrics();
 
     /// <summary>
     /// Gets historical metrics.
     /// </summary>
-    IEnumerable<MetricSnapshot> GetMetricHistory(string metricName, TimeSpan duration);
+    IEnumerable<SystemMetrics> GetMetricsHistory(TimeSpan duration, TimeSpan resolution);
 
     /// <summary>
-    /// Gets all current metrics.
+    /// Gets system alerts.
     /// </summary>
-    Dictionary<string, object> GetAllMetrics();
+    IEnumerable<SystemAlert> GetAlerts(bool activeOnly = true);
+
+    /// <summary>
+    /// Acknowledges an alert.
+    /// </summary>
+    Task<bool> AcknowledgeAlertAsync(string alertId, string acknowledgedBy);
+
+    /// <summary>
+    /// Clears an alert.
+    /// </summary>
+    Task<bool> ClearAlertAsync(string alertId);
 
     /// <summary>
     /// Event raised when health status changes.
@@ -31,15 +46,48 @@ public interface ISystemHealthService
     /// <summary>
     /// Event raised when new metrics are recorded.
     /// </summary>
-    event EventHandler<MetricSnapshot>? MetricRecorded;
+    event EventHandler<SystemMetrics>? MetricRecorded;
 }
 
 /// <summary>
-/// Current system health status.
+/// System health status.
 /// </summary>
-public class SystemHealth
+public class SystemHealthStatus
 {
+    public HealthStatus OverallStatus { get; set; }
+    public DateTime Timestamp { get; set; } = DateTime.UtcNow;
+    public List<ComponentHealth> Components { get; set; } = new();
+    public string? Message { get; set; }
+}
+
+/// <summary>
+/// Individual component health.
+/// </summary>
+public class ComponentHealth
+{
+    public string Name { get; set; } = string.Empty;
     public HealthStatus Status { get; set; }
+    public string? Message { get; set; }
+    public TimeSpan? ResponseTime { get; set; }
+    public DateTime LastChecked { get; set; } = DateTime.UtcNow;
+}
+
+/// <summary>
+/// Health status enum.
+/// </summary>
+public enum HealthStatus
+{
+    Healthy,
+    Degraded,
+    Critical,
+    Unknown
+}
+
+/// <summary>
+/// System metrics snapshot.
+/// </summary>
+public class SystemMetrics
+{
     public DateTime Timestamp { get; set; } = DateTime.UtcNow;
     public double CpuUsagePercent { get; set; }
     public long MemoryUsedBytes { get; set; }
@@ -49,33 +97,34 @@ public class SystemHealth
     public long DiskTotalBytes { get; set; }
     public double DiskUsagePercent => DiskTotalBytes > 0 ? (double)DiskUsedBytes / DiskTotalBytes * 100 : 0;
     public int ActiveConnections { get; set; }
-    public int ActivePlugins { get; set; }
-    public int HealthyPlugins { get; set; }
-    public int UnhealthyPlugins { get; set; }
-    public long RequestsPerMinute { get; set; }
+    public double RequestsPerSecond { get; set; }
+    public int ThreadCount { get; set; }
+    public long UptimeSeconds { get; set; }
+    public long ErrorCount { get; set; }
     public double AverageLatencyMs { get; set; }
-    public long ErrorsPerMinute { get; set; }
-    public TimeSpan Uptime { get; set; }
-    public List<HealthIssue> Issues { get; set; } = new();
 }
 
-public enum HealthStatus
+/// <summary>
+/// System alert.
+/// </summary>
+public class SystemAlert
 {
-    Healthy,
-    Degraded,
-    Unhealthy,
-    Unknown
-}
-
-public class HealthIssue
-{
-    public string Component { get; set; } = string.Empty;
+    public string Id { get; set; } = Guid.NewGuid().ToString("N")[..8];
+    public string Title { get; set; } = string.Empty;
     public string Message { get; set; } = string.Empty;
-    public IssueSeverity Severity { get; set; }
-    public DateTime DetectedAt { get; set; }
+    public AlertSeverity Severity { get; set; }
+    public DateTime Timestamp { get; set; } = DateTime.UtcNow;
+    public bool IsAcknowledged { get; set; }
+    public string? AcknowledgedBy { get; set; }
+    public DateTime? AcknowledgedAt { get; set; }
+    public string? Source { get; set; }
+    public Dictionary<string, object> Data { get; set; } = new();
 }
 
-public enum IssueSeverity
+/// <summary>
+/// Alert severity levels.
+/// </summary>
+public enum AlertSeverity
 {
     Info,
     Warning,
@@ -83,19 +132,11 @@ public enum IssueSeverity
     Critical
 }
 
-public class MetricSnapshot
-{
-    public string Name { get; set; } = string.Empty;
-    public double Value { get; set; }
-    public DateTime Timestamp { get; set; }
-    public Dictionary<string, string> Tags { get; set; } = new();
-}
-
 public class HealthChangedEventArgs : EventArgs
 {
     public HealthStatus PreviousStatus { get; set; }
     public HealthStatus NewStatus { get; set; }
-    public List<HealthIssue> Issues { get; set; } = new();
+    public string? Message { get; set; }
 }
 
 /// <summary>
@@ -105,14 +146,15 @@ public class SystemHealthService : ISystemHealthService
 {
     private readonly ILogger<SystemHealthService> _logger;
     private readonly IPluginDiscoveryService _pluginService;
-    private readonly ConcurrentDictionary<string, ConcurrentQueue<MetricSnapshot>> _metricHistory = new();
+    private readonly ConcurrentQueue<SystemMetrics> _metricsHistory = new();
+    private readonly ConcurrentDictionary<string, SystemAlert> _alerts = new();
     private readonly DateTime _startTime = DateTime.UtcNow;
     private HealthStatus _lastStatus = HealthStatus.Unknown;
     private readonly Process _currentProcess = Process.GetCurrentProcess();
-    private const int MaxHistoryPerMetric = 1000;
+    private const int MaxMetricsHistory = 1440; // 24 hours at 1-minute intervals
 
     public event EventHandler<HealthChangedEventArgs>? HealthChanged;
-    public event EventHandler<MetricSnapshot>? MetricRecorded;
+    public event EventHandler<SystemMetrics>? MetricRecorded;
 
     public SystemHealthService(ILogger<SystemHealthService> logger, IPluginDiscoveryService pluginService)
     {
@@ -120,193 +162,249 @@ public class SystemHealthService : ISystemHealthService
         _pluginService = pluginService;
     }
 
-    public SystemHealth GetCurrentHealth()
+    public async Task<SystemHealthStatus> GetSystemHealthAsync()
     {
-        var health = new SystemHealth
+        var status = new SystemHealthStatus
         {
             Timestamp = DateTime.UtcNow,
-            Uptime = DateTime.UtcNow - _startTime
+            Components = new List<ComponentHealth>()
         };
 
         try
         {
-            // CPU and Memory
-            _currentProcess.Refresh();
-            health.MemoryUsedBytes = _currentProcess.WorkingSet64;
-            health.MemoryTotalBytes = GC.GetGCMemoryInfo().TotalAvailableMemoryBytes;
-            health.CpuUsagePercent = GetCpuUsage();
-
-            // Disk (root drive)
-            var drives = DriveInfo.GetDrives().Where(d => d.IsReady).ToList();
-            if (drives.Any())
+            // Check kernel component
+            status.Components.Add(new ComponentHealth
             {
-                health.DiskTotalBytes = drives.Sum(d => d.TotalSize);
-                health.DiskUsedBytes = drives.Sum(d => d.TotalSize - d.AvailableFreeSpace);
-            }
+                Name = "Kernel",
+                Status = HealthStatus.Healthy,
+                Message = "Running",
+                LastChecked = DateTime.UtcNow
+            });
 
-            // Plugin health
+            // Check plugins
             var plugins = _pluginService.GetAllPlugins().ToList();
-            health.ActivePlugins = plugins.Count(p => p.IsActive);
-            health.HealthyPlugins = plugins.Count(p => p.IsHealthy);
-            health.UnhealthyPlugins = plugins.Count(p => !p.IsHealthy);
+            var activePlugins = plugins.Count(p => p.IsActive);
+            var healthyPlugins = plugins.Count(p => p.IsHealthy);
+            var pluginStatus = activePlugins == healthyPlugins ? HealthStatus.Healthy :
+                               healthyPlugins > 0 ? HealthStatus.Degraded : HealthStatus.Critical;
+
+            status.Components.Add(new ComponentHealth
+            {
+                Name = "Plugins",
+                Status = pluginStatus,
+                Message = $"{healthyPlugins}/{activePlugins} healthy",
+                LastChecked = DateTime.UtcNow
+            });
+
+            // Check memory
+            var metrics = GetCurrentMetrics();
+            var memoryStatus = metrics.MemoryUsagePercent < 80 ? HealthStatus.Healthy :
+                               metrics.MemoryUsagePercent < 95 ? HealthStatus.Degraded : HealthStatus.Critical;
+
+            status.Components.Add(new ComponentHealth
+            {
+                Name = "Memory",
+                Status = memoryStatus,
+                Message = $"{metrics.MemoryUsagePercent:F1}% used",
+                LastChecked = DateTime.UtcNow
+            });
+
+            // Check disk
+            var diskStatus = metrics.DiskUsagePercent < 80 ? HealthStatus.Healthy :
+                             metrics.DiskUsagePercent < 95 ? HealthStatus.Degraded : HealthStatus.Critical;
+
+            status.Components.Add(new ComponentHealth
+            {
+                Name = "Disk",
+                Status = diskStatus,
+                Message = $"{metrics.DiskUsagePercent:F1}% used",
+                LastChecked = DateTime.UtcNow
+            });
+
+            // Check CPU
+            var cpuStatus = metrics.CpuUsagePercent < 80 ? HealthStatus.Healthy :
+                            metrics.CpuUsagePercent < 95 ? HealthStatus.Degraded : HealthStatus.Critical;
+
+            status.Components.Add(new ComponentHealth
+            {
+                Name = "CPU",
+                Status = cpuStatus,
+                Message = $"{metrics.CpuUsagePercent:F1}% used",
+                LastChecked = DateTime.UtcNow
+            });
 
             // Determine overall status
-            health.Status = DetermineStatus(health);
+            if (status.Components.Any(c => c.Status == HealthStatus.Critical))
+                status.OverallStatus = HealthStatus.Critical;
+            else if (status.Components.Any(c => c.Status == HealthStatus.Degraded))
+                status.OverallStatus = HealthStatus.Degraded;
+            else
+                status.OverallStatus = HealthStatus.Healthy;
 
-            // Check for issues
-            health.Issues = DetectIssues(health);
+            // Generate alerts for issues
+            await GenerateAlertsAsync(status, metrics);
 
             // Notify if status changed
-            if (health.Status != _lastStatus)
+            if (status.OverallStatus != _lastStatus)
             {
-                var args = new HealthChangedEventArgs
+                HealthChanged?.Invoke(this, new HealthChangedEventArgs
                 {
                     PreviousStatus = _lastStatus,
-                    NewStatus = health.Status,
-                    Issues = health.Issues
-                };
-                _lastStatus = health.Status;
-                HealthChanged?.Invoke(this, args);
+                    NewStatus = status.OverallStatus
+                });
+                _lastStatus = status.OverallStatus;
             }
-
-            // Record metrics
-            RecordMetric("cpu_usage", health.CpuUsagePercent);
-            RecordMetric("memory_usage", health.MemoryUsagePercent);
-            RecordMetric("disk_usage", health.DiskUsagePercent);
-            RecordMetric("active_plugins", health.ActivePlugins);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error collecting health metrics");
-            health.Status = HealthStatus.Unknown;
+            _logger.LogError(ex, "Error checking system health");
+            status.OverallStatus = HealthStatus.Unknown;
+            status.Message = "Error checking health: " + ex.Message;
         }
 
-        return health;
+        return status;
     }
 
-    public IEnumerable<MetricSnapshot> GetMetricHistory(string metricName, TimeSpan duration)
+    public SystemMetrics GetCurrentMetrics()
     {
-        if (!_metricHistory.TryGetValue(metricName, out var queue))
-            return Enumerable.Empty<MetricSnapshot>();
-
-        var cutoff = DateTime.UtcNow - duration;
-        return queue.Where(m => m.Timestamp >= cutoff).OrderBy(m => m.Timestamp);
-    }
-
-    public Dictionary<string, object> GetAllMetrics()
-    {
-        var metrics = new Dictionary<string, object>();
-
-        foreach (var (name, queue) in _metricHistory)
+        var metrics = new SystemMetrics
         {
-            if (queue.TryPeek(out var latest))
+            Timestamp = DateTime.UtcNow,
+            UptimeSeconds = (long)(DateTime.UtcNow - _startTime).TotalSeconds,
+            ThreadCount = Process.GetCurrentProcess().Threads.Count
+        };
+
+        try
+        {
+            _currentProcess.Refresh();
+            metrics.MemoryUsedBytes = _currentProcess.WorkingSet64;
+            metrics.MemoryTotalBytes = GC.GetGCMemoryInfo().TotalAvailableMemoryBytes;
+            metrics.CpuUsagePercent = GetCpuUsage();
+
+            var drives = DriveInfo.GetDrives().Where(d => d.IsReady).ToList();
+            if (drives.Any())
             {
-                metrics[name] = latest.Value;
+                metrics.DiskTotalBytes = drives.Sum(d => d.TotalSize);
+                metrics.DiskUsedBytes = drives.Sum(d => d.TotalSize - d.AvailableFreeSpace);
             }
+
+            // Store in history
+            _metricsHistory.Enqueue(metrics);
+            while (_metricsHistory.Count > MaxMetricsHistory && _metricsHistory.TryDequeue(out _)) { }
+
+            MetricRecorded?.Invoke(this, metrics);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error collecting metrics");
         }
 
         return metrics;
     }
 
-    private void RecordMetric(string name, double value, Dictionary<string, string>? tags = null)
+    public IEnumerable<SystemMetrics> GetMetricsHistory(TimeSpan duration, TimeSpan resolution)
     {
-        var snapshot = new MetricSnapshot
+        var cutoff = DateTime.UtcNow - duration;
+        var metrics = _metricsHistory.Where(m => m.Timestamp >= cutoff).OrderBy(m => m.Timestamp).ToList();
+
+        if (resolution.TotalSeconds < 60 || metrics.Count < 2)
+            return metrics;
+
+        // Downsample to resolution
+        var result = new List<SystemMetrics>();
+        var bucketStart = metrics.First().Timestamp;
+
+        while (bucketStart < DateTime.UtcNow)
         {
-            Name = name,
-            Value = value,
-            Timestamp = DateTime.UtcNow,
-            Tags = tags ?? new()
-        };
+            var bucketEnd = bucketStart + resolution;
+            var bucketMetrics = metrics.Where(m => m.Timestamp >= bucketStart && m.Timestamp < bucketEnd).ToList();
 
-        var queue = _metricHistory.GetOrAdd(name, _ => new ConcurrentQueue<MetricSnapshot>());
-        queue.Enqueue(snapshot);
+            if (bucketMetrics.Any())
+            {
+                result.Add(new SystemMetrics
+                {
+                    Timestamp = bucketStart,
+                    CpuUsagePercent = bucketMetrics.Average(m => m.CpuUsagePercent),
+                    MemoryUsedBytes = (long)bucketMetrics.Average(m => m.MemoryUsedBytes),
+                    MemoryTotalBytes = bucketMetrics.First().MemoryTotalBytes,
+                    DiskUsedBytes = (long)bucketMetrics.Average(m => m.DiskUsedBytes),
+                    DiskTotalBytes = bucketMetrics.First().DiskTotalBytes,
+                    ActiveConnections = (int)bucketMetrics.Average(m => m.ActiveConnections),
+                    RequestsPerSecond = bucketMetrics.Average(m => m.RequestsPerSecond),
+                    ThreadCount = (int)bucketMetrics.Average(m => m.ThreadCount),
+                    UptimeSeconds = bucketMetrics.Last().UptimeSeconds
+                });
+            }
 
-        // Trim old entries
-        while (queue.Count > MaxHistoryPerMetric && queue.TryDequeue(out _)) { }
+            bucketStart = bucketEnd;
+        }
 
-        MetricRecorded?.Invoke(this, snapshot);
+        return result;
     }
 
-    private static HealthStatus DetermineStatus(SystemHealth health)
+    public IEnumerable<SystemAlert> GetAlerts(bool activeOnly = true)
     {
-        if (health.UnhealthyPlugins > 0 || health.CpuUsagePercent > 90 || health.MemoryUsagePercent > 95)
-            return HealthStatus.Unhealthy;
-
-        if (health.CpuUsagePercent > 80 || health.MemoryUsagePercent > 85 || health.DiskUsagePercent > 90)
-            return HealthStatus.Degraded;
-
-        return HealthStatus.Healthy;
+        var alerts = _alerts.Values.OrderByDescending(a => a.Timestamp);
+        return activeOnly ? alerts.Where(a => !a.IsAcknowledged) : alerts;
     }
 
-    private static List<HealthIssue> DetectIssues(SystemHealth health)
+    public Task<bool> AcknowledgeAlertAsync(string alertId, string acknowledgedBy)
     {
-        var issues = new List<HealthIssue>();
+        if (_alerts.TryGetValue(alertId, out var alert))
+        {
+            alert.IsAcknowledged = true;
+            alert.AcknowledgedBy = acknowledgedBy;
+            alert.AcknowledgedAt = DateTime.UtcNow;
+            return Task.FromResult(true);
+        }
+        return Task.FromResult(false);
+    }
 
-        if (health.CpuUsagePercent > 90)
-        {
-            issues.Add(new HealthIssue
-            {
-                Component = "CPU",
-                Message = $"CPU usage is critically high ({health.CpuUsagePercent:F1}%)",
-                Severity = IssueSeverity.Critical,
-                DetectedAt = DateTime.UtcNow
-            });
-        }
-        else if (health.CpuUsagePercent > 80)
-        {
-            issues.Add(new HealthIssue
-            {
-                Component = "CPU",
-                Message = $"CPU usage is high ({health.CpuUsagePercent:F1}%)",
-                Severity = IssueSeverity.Warning,
-                DetectedAt = DateTime.UtcNow
-            });
-        }
+    public Task<bool> ClearAlertAsync(string alertId)
+    {
+        return Task.FromResult(_alerts.TryRemove(alertId, out _));
+    }
 
-        if (health.MemoryUsagePercent > 95)
+    private Task GenerateAlertsAsync(SystemHealthStatus status, SystemMetrics metrics)
+    {
+        // CPU alert
+        if (metrics.CpuUsagePercent > 90)
         {
-            issues.Add(new HealthIssue
-            {
-                Component = "Memory",
-                Message = $"Memory usage is critically high ({health.MemoryUsagePercent:F1}%)",
-                Severity = IssueSeverity.Critical,
-                DetectedAt = DateTime.UtcNow
-            });
+            AddOrUpdateAlert("cpu_critical", "CPU Critical", $"CPU usage at {metrics.CpuUsagePercent:F1}%", AlertSeverity.Critical);
         }
-        else if (health.MemoryUsagePercent > 85)
+        else if (metrics.CpuUsagePercent > 80)
         {
-            issues.Add(new HealthIssue
-            {
-                Component = "Memory",
-                Message = $"Memory usage is high ({health.MemoryUsagePercent:F1}%)",
-                Severity = IssueSeverity.Warning,
-                DetectedAt = DateTime.UtcNow
-            });
+            AddOrUpdateAlert("cpu_warning", "CPU Warning", $"CPU usage at {metrics.CpuUsagePercent:F1}%", AlertSeverity.Warning);
         }
 
-        if (health.DiskUsagePercent > 95)
+        // Memory alert
+        if (metrics.MemoryUsagePercent > 95)
         {
-            issues.Add(new HealthIssue
-            {
-                Component = "Disk",
-                Message = $"Disk space critically low ({100 - health.DiskUsagePercent:F1}% free)",
-                Severity = IssueSeverity.Critical,
-                DetectedAt = DateTime.UtcNow
-            });
+            AddOrUpdateAlert("memory_critical", "Memory Critical", $"Memory usage at {metrics.MemoryUsagePercent:F1}%", AlertSeverity.Critical);
+        }
+        else if (metrics.MemoryUsagePercent > 85)
+        {
+            AddOrUpdateAlert("memory_warning", "Memory Warning", $"Memory usage at {metrics.MemoryUsagePercent:F1}%", AlertSeverity.Warning);
         }
 
-        if (health.UnhealthyPlugins > 0)
+        // Disk alert
+        if (metrics.DiskUsagePercent > 95)
         {
-            issues.Add(new HealthIssue
-            {
-                Component = "Plugins",
-                Message = $"{health.UnhealthyPlugins} plugin(s) are unhealthy",
-                Severity = IssueSeverity.Error,
-                DetectedAt = DateTime.UtcNow
-            });
+            AddOrUpdateAlert("disk_critical", "Disk Critical", $"Disk usage at {metrics.DiskUsagePercent:F1}%", AlertSeverity.Critical);
+        }
+        else if (metrics.DiskUsagePercent > 85)
+        {
+            AddOrUpdateAlert("disk_warning", "Disk Warning", $"Disk usage at {metrics.DiskUsagePercent:F1}%", AlertSeverity.Warning);
         }
 
-        return issues;
+        return Task.CompletedTask;
+    }
+
+    private void AddOrUpdateAlert(string id, string title, string message, AlertSeverity severity)
+    {
+        _alerts.AddOrUpdate(id,
+            _ => new SystemAlert { Id = id, Title = title, Message = message, Severity = severity, Source = "System" },
+            (_, existing) => { existing.Message = message; existing.Timestamp = DateTime.UtcNow; return existing; });
     }
 
     private double GetCpuUsage()
@@ -315,17 +413,13 @@ public class SystemHealthService : ISystemHealthService
         {
             var startTime = DateTime.UtcNow;
             var startCpuUsage = _currentProcess.TotalProcessorTime;
-
-            Thread.Sleep(100); // Brief sample
-
+            Thread.Sleep(50);
             _currentProcess.Refresh();
             var endTime = DateTime.UtcNow;
             var endCpuUsage = _currentProcess.TotalProcessorTime;
-
             var cpuUsedMs = (endCpuUsage - startCpuUsage).TotalMilliseconds;
             var totalMsPassed = (endTime - startTime).TotalMilliseconds;
-
-            return cpuUsedMs / (Environment.ProcessorCount * totalMsPassed) * 100;
+            return Math.Min(100, cpuUsedMs / (Environment.ProcessorCount * totalMsPassed) * 100);
         }
         catch
         {
@@ -355,7 +449,7 @@ public class HealthMonitorService : BackgroundService
         {
             try
             {
-                _healthService.GetCurrentHealth();
+                await _healthService.GetSystemHealthAsync();
             }
             catch (Exception ex)
             {
