@@ -398,7 +398,7 @@ namespace DataWarehouse.SDK.Infrastructure
                 }
             }
 
-            return value;
+            return value!;
         }
 
         /// <summary>
