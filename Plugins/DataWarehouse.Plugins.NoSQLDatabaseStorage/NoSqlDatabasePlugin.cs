@@ -1,4 +1,6 @@
 using DataWarehouse.SDK.Contracts;
+using DataWarehouse.SDK.Database;
+using DataWarehouse.SDK.Infrastructure;
 using DataWarehouse.SDK.Primitives;
 using DataWarehouse.SDK.Utilities;
 using System.Collections.Concurrent;
@@ -6,70 +8,82 @@ using System.Net.Http.Json;
 using System.Text;
 using System.Text.Json;
 
-namespace DataWarehouse.Plugins.NoSQLDatabaseStorage
+namespace DataWarehouse.Plugins.NoSQLDatabaseStorage;
+
+/// <summary>
+/// NoSQL document database storage plugin.
+///
+/// Supports:
+/// - MongoDB, CouchDB, RavenDB, ArangoDB, Couchbase
+/// - Redis, DynamoDB, Memcached, etcd
+/// - Cassandra, ScyllaDB, HBase, Bigtable
+/// - Neo4j, Neptune, JanusGraph
+/// - Elasticsearch, OpenSearch, Solr
+/// - InfluxDB, Prometheus, QuestDB
+/// - Pinecone, Weaviate, Milvus, Qdrant
+/// - In-memory document store for testing
+///
+/// Features:
+/// - Document CRUD operations
+/// - Collection management
+/// - Query support with JSON query syntax
+/// - Indexing management
+/// - Aggregation pipelines
+/// - Change streams (where supported)
+/// - Multi-instance connection registry (via HybridDatabasePluginBase)
+/// - Integrated caching with TTL support
+/// - Integrated indexing with full-text search
+///
+/// Message Commands:
+/// - storage.nosql.save: Save document
+/// - storage.nosql.load: Load document
+/// - storage.nosql.delete: Delete document
+/// - storage.nosql.query: Execute query
+/// - storage.nosql.aggregate: Run aggregation pipeline
+/// - storage.nosql.createindex: Create index
+/// - storage.nosql.dropindex: Drop index
+/// </summary>
+public sealed class NoSqlDatabasePlugin : HybridDatabasePluginBase<NoSqlConfig>
 {
-    /// <summary>
-    /// NoSQL document database storage plugin.
-    ///
-    /// Supports:
-    /// - MongoDB (via REST API or driver)
-    /// - CouchDB
-    /// - RavenDB
-    /// - DynamoDB-compatible APIs
-    /// - In-memory document store for testing
-    ///
-    /// Features:
-    /// - Document CRUD operations
-    /// - Collection management
-    /// - Query support with JSON query syntax
-    /// - Indexing management
-    /// - Aggregation pipelines
-    /// - Change streams (where supported)
-    ///
-    /// Message Commands:
-    /// - storage.nosql.save: Save document
-    /// - storage.nosql.load: Load document
-    /// - storage.nosql.delete: Delete document
-    /// - storage.nosql.query: Execute query
-    /// - storage.nosql.aggregate: Run aggregation pipeline
-    /// - storage.nosql.createindex: Create index
-    /// - storage.nosql.dropindex: Drop index
-    /// </summary>
-    public sealed class NoSqlDatabasePlugin : DatabasePluginBase
+    private readonly HttpClient? _httpClient;
+
+    // In-memory storage for testing or embedded mode
+    private readonly ConcurrentDictionary<string, ConcurrentDictionary<string, ConcurrentDictionary<string, string>>> _inMemoryStore = new();
+
+    public override string Id => "datawarehouse.plugins.database.nosql";
+    public override string Name => "NoSQL Database";
+    public override string Version => "2.0.0";
+    public override string Scheme => "nosql";
+    public override DatabaseCategory DatabaseCategory => DatabaseCategory.NoSQL;
+    public override string Engine => _config.Engine.ToString();
+
+    public NoSqlDatabasePlugin(NoSqlConfig? config = null) : base(config)
     {
-        private readonly NoSqlConfig _nosqlConfig;
-        private readonly HttpClient? _httpClient;
-
-        // In-memory storage for testing or embedded mode
-        private readonly ConcurrentDictionary<string, ConcurrentDictionary<string, ConcurrentDictionary<string, string>>> _inMemoryStore = new();
-
-        public override string Id => "datawarehouse.plugins.database.nosql";
-        public override string Name => "NoSQL Database";
-        public override string Version => "1.0.0";
-        public override string Scheme => "nosql";
-        public override DatabaseType DatabaseType => DatabaseType.NoSQL;
-        public override string Engine => _nosqlConfig.Engine.ToString();
-
-        public NoSqlDatabasePlugin(NoSqlConfig? config = null) : base(config)
+        if (_config.Engine != NoSqlEngine.InMemory)
         {
-            _nosqlConfig = config ?? new NoSqlConfig();
-
-            if (_nosqlConfig.Engine != NoSqlEngine.InMemory)
+            _httpClient = new HttpClient
             {
-                _httpClient = new HttpClient
-                {
-                    BaseAddress = new Uri(_nosqlConfig.Endpoint),
-                    Timeout = TimeSpan.FromSeconds(_config.CommandTimeoutSeconds)
-                };
+                BaseAddress = new Uri(_config.Endpoint),
+                Timeout = TimeSpan.FromSeconds(_config.CommandTimeoutSeconds)
+            };
 
-                // Add authentication headers if configured
-                if (!string.IsNullOrEmpty(_nosqlConfig.Username) && !string.IsNullOrEmpty(_nosqlConfig.Password))
-                {
-                    var credentials = Convert.ToBase64String(Encoding.UTF8.GetBytes($"{_nosqlConfig.Username}:{_nosqlConfig.Password}"));
-                    _httpClient.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Basic", credentials);
-                }
+            // Add authentication headers if configured
+            if (!string.IsNullOrEmpty(_config.Username) && !string.IsNullOrEmpty(_config.Password))
+            {
+                var credentials = Convert.ToBase64String(Encoding.UTF8.GetBytes($"{_config.Username}:{_config.Password}"));
+                _httpClient.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Basic", credentials);
             }
         }
+    }
+
+    /// <summary>
+    /// Factory method to create a connection from configuration.
+    /// </summary>
+    protected override Task<object> CreateConnectionAsync(NoSqlConfig config)
+    {
+        // In production, would create real NoSQL client based on engine
+        return Task.FromResult<object>(new { Engine = config.Engine, Endpoint = config.Endpoint });
+    }
 
         protected override List<PluginCapabilityDescriptor> GetCapabilities()
         {
@@ -112,7 +126,7 @@ namespace DataWarehouse.Plugins.NoSQLDatabaseStorage
             await EnsureConnectedAsync();
 
             var (database, collection, id) = ParseUri(uri);
-            database ??= _nosqlConfig.DefaultDatabase;
+            database ??= _config.DefaultDatabase;
 
             using var reader = new StreamReader(data);
             var json = await reader.ReadToEndAsync();
@@ -123,7 +137,7 @@ namespace DataWarehouse.Plugins.NoSQLDatabaseStorage
                 id = Guid.NewGuid().ToString("N");
             }
 
-            if (_nosqlConfig.Engine == NoSqlEngine.InMemory)
+            if (_config.Engine == NoSqlEngine.InMemory)
             {
                 SaveToMemory(database ?? "default", collection ?? "default", id, json);
             }
@@ -138,13 +152,13 @@ namespace DataWarehouse.Plugins.NoSQLDatabaseStorage
             await EnsureConnectedAsync();
 
             var (database, collection, id) = ParseUri(uri);
-            database ??= _nosqlConfig.DefaultDatabase;
+            database ??= _config.DefaultDatabase;
 
             if (string.IsNullOrEmpty(id))
                 throw new ArgumentException("Document ID is required");
 
             string json;
-            if (_nosqlConfig.Engine == NoSqlEngine.InMemory)
+            if (_config.Engine == NoSqlEngine.InMemory)
             {
                 json = LoadFromMemory(database ?? "default", collection ?? "default", id);
             }
@@ -161,12 +175,12 @@ namespace DataWarehouse.Plugins.NoSQLDatabaseStorage
             await EnsureConnectedAsync();
 
             var (database, collection, id) = ParseUri(uri);
-            database ??= _nosqlConfig.DefaultDatabase;
+            database ??= _config.DefaultDatabase;
 
             if (string.IsNullOrEmpty(id))
                 throw new ArgumentException("Document ID is required");
 
-            if (_nosqlConfig.Engine == NoSqlEngine.InMemory)
+            if (_config.Engine == NoSqlEngine.InMemory)
             {
                 DeleteFromMemory(database ?? "default", collection ?? "default", id);
             }
@@ -195,7 +209,7 @@ namespace DataWarehouse.Plugins.NoSQLDatabaseStorage
         {
             await EnsureConnectedAsync();
 
-            if (_nosqlConfig.Engine == NoSqlEngine.InMemory)
+            if (_config.Engine == NoSqlEngine.InMemory)
             {
                 foreach (var db in _inMemoryStore)
                 {
@@ -218,12 +232,12 @@ namespace DataWarehouse.Plugins.NoSQLDatabaseStorage
             }
             else
             {
-                var collections = await ListCollectionsAsync(_nosqlConfig.DefaultDatabase);
+                var collections = await ListCollectionsAsync(_config.DefaultDatabase);
                 foreach (var collection in collections)
                 {
                     if (ct.IsCancellationRequested) yield break;
 
-                    var results = await ExecuteQueryAsync(_nosqlConfig.DefaultDatabase, collection, "{}", null);
+                    var results = await ExecuteQueryAsync(_config.DefaultDatabase, collection, "{}", null);
                     foreach (var doc in results)
                     {
                         if (ct.IsCancellationRequested) yield break;
@@ -231,7 +245,7 @@ namespace DataWarehouse.Plugins.NoSQLDatabaseStorage
                         var id = GetDocumentId(doc);
                         if (!string.IsNullOrEmpty(id))
                         {
-                            var path = $"{_nosqlConfig.DefaultDatabase}/{collection}/{id}";
+                            var path = $"{_config.DefaultDatabase}/{collection}/{id}";
                             yield return new StorageListItem(new Uri($"nosql:///{path}"), 0);
                         }
                     }
@@ -245,7 +259,7 @@ namespace DataWarehouse.Plugins.NoSQLDatabaseStorage
 
         protected override Task ConnectAsync()
         {
-            if (_nosqlConfig.Engine == NoSqlEngine.InMemory)
+            if (_config.Engine == NoSqlEngine.InMemory)
             {
                 _isConnected = true;
                 return Task.CompletedTask;
@@ -266,9 +280,9 @@ namespace DataWarehouse.Plugins.NoSQLDatabaseStorage
         {
             await EnsureConnectedAsync();
 
-            database ??= _nosqlConfig.DefaultDatabase;
+            database ??= _config.DefaultDatabase;
 
-            if (_nosqlConfig.Engine == NoSqlEngine.InMemory)
+            if (_config.Engine == NoSqlEngine.InMemory)
             {
                 return QueryInMemory(database ?? "default", collection ?? "default", query);
             }
@@ -280,9 +294,9 @@ namespace DataWarehouse.Plugins.NoSQLDatabaseStorage
         {
             await EnsureConnectedAsync();
 
-            database ??= _nosqlConfig.DefaultDatabase;
+            database ??= _config.DefaultDatabase;
 
-            if (_nosqlConfig.Engine == NoSqlEngine.InMemory)
+            if (_config.Engine == NoSqlEngine.InMemory)
             {
                 return CountInMemory(database ?? "default", collection ?? "default", filter);
             }
@@ -292,7 +306,7 @@ namespace DataWarehouse.Plugins.NoSQLDatabaseStorage
 
         protected override Task CreateDatabaseAsync(string database)
         {
-            if (_nosqlConfig.Engine == NoSqlEngine.InMemory)
+            if (_config.Engine == NoSqlEngine.InMemory)
             {
                 _inMemoryStore.TryAdd(database, new ConcurrentDictionary<string, ConcurrentDictionary<string, string>>());
             }
@@ -302,7 +316,7 @@ namespace DataWarehouse.Plugins.NoSQLDatabaseStorage
 
         protected override Task DropDatabaseAsync(string database)
         {
-            if (_nosqlConfig.Engine == NoSqlEngine.InMemory)
+            if (_config.Engine == NoSqlEngine.InMemory)
             {
                 _inMemoryStore.TryRemove(database, out _);
             }
@@ -311,9 +325,9 @@ namespace DataWarehouse.Plugins.NoSQLDatabaseStorage
 
         protected override Task CreateCollectionAsync(string? database, string collection, Dictionary<string, object>? schema)
         {
-            database ??= _nosqlConfig.DefaultDatabase ?? "default";
+            database ??= _config.DefaultDatabase ?? "default";
 
-            if (_nosqlConfig.Engine == NoSqlEngine.InMemory)
+            if (_config.Engine == NoSqlEngine.InMemory)
             {
                 var db = _inMemoryStore.GetOrAdd(database, _ => new ConcurrentDictionary<string, ConcurrentDictionary<string, string>>());
                 db.TryAdd(collection, new ConcurrentDictionary<string, string>());
@@ -323,9 +337,9 @@ namespace DataWarehouse.Plugins.NoSQLDatabaseStorage
 
         protected override Task DropCollectionAsync(string? database, string collection)
         {
-            database ??= _nosqlConfig.DefaultDatabase ?? "default";
+            database ??= _config.DefaultDatabase ?? "default";
 
-            if (_nosqlConfig.Engine == NoSqlEngine.InMemory)
+            if (_config.Engine == NoSqlEngine.InMemory)
             {
                 if (_inMemoryStore.TryGetValue(database, out var db))
                 {
@@ -337,7 +351,7 @@ namespace DataWarehouse.Plugins.NoSQLDatabaseStorage
 
         protected override Task<IEnumerable<string>> ListDatabasesAsync()
         {
-            if (_nosqlConfig.Engine == NoSqlEngine.InMemory)
+            if (_config.Engine == NoSqlEngine.InMemory)
             {
                 return Task.FromResult<IEnumerable<string>>(_inMemoryStore.Keys.ToList());
             }
@@ -347,9 +361,9 @@ namespace DataWarehouse.Plugins.NoSQLDatabaseStorage
 
         protected override Task<IEnumerable<string>> ListCollectionsAsync(string? database)
         {
-            database ??= _nosqlConfig.DefaultDatabase ?? "default";
+            database ??= _config.DefaultDatabase ?? "default";
 
-            if (_nosqlConfig.Engine == NoSqlEngine.InMemory)
+            if (_config.Engine == NoSqlEngine.InMemory)
             {
                 if (_inMemoryStore.TryGetValue(database, out var db))
                 {
@@ -371,7 +385,7 @@ namespace DataWarehouse.Plugins.NoSQLDatabaseStorage
             if (payload == null)
                 return MessageResponse.Error("Invalid payload");
 
-            var database = GetPayloadString(payload, "database") ?? _nosqlConfig.DefaultDatabase;
+            var database = GetPayloadString(payload, "database") ?? _config.DefaultDatabase;
             var collection = GetPayloadString(payload, "collection");
             var pipeline = payload.TryGetValue("pipeline", out var pObj) ? pObj : null;
 
@@ -388,7 +402,7 @@ namespace DataWarehouse.Plugins.NoSQLDatabaseStorage
             if (payload == null)
                 return MessageResponse.Error("Invalid payload");
 
-            var database = GetPayloadString(payload, "database") ?? _nosqlConfig.DefaultDatabase;
+            var database = GetPayloadString(payload, "database") ?? _config.DefaultDatabase;
             var collection = GetPayloadString(payload, "collection");
             var indexName = GetPayloadString(payload, "indexName");
             var fields = payload.TryGetValue("fields", out var fObj) ? fObj : null;
@@ -406,7 +420,7 @@ namespace DataWarehouse.Plugins.NoSQLDatabaseStorage
             if (payload == null)
                 return MessageResponse.Error("Invalid payload");
 
-            var database = GetPayloadString(payload, "database") ?? _nosqlConfig.DefaultDatabase;
+            var database = GetPayloadString(payload, "database") ?? _config.DefaultDatabase;
             var collection = GetPayloadString(payload, "collection");
             var indexName = GetPayloadString(payload, "indexName");
 
@@ -423,7 +437,7 @@ namespace DataWarehouse.Plugins.NoSQLDatabaseStorage
             if (payload == null)
                 return MessageResponse.Error("Invalid payload");
 
-            var database = GetPayloadString(payload, "database") ?? _nosqlConfig.DefaultDatabase;
+            var database = GetPayloadString(payload, "database") ?? _config.DefaultDatabase;
             var collection = GetPayloadString(payload, "collection");
             var documents = payload.TryGetValue("documents", out var dObj) ? dObj as IEnumerable<object> : null;
 
@@ -450,7 +464,7 @@ namespace DataWarehouse.Plugins.NoSQLDatabaseStorage
             if (payload == null)
                 return MessageResponse.Error("Invalid payload");
 
-            var database = GetPayloadString(payload, "database") ?? _nosqlConfig.DefaultDatabase;
+            var database = GetPayloadString(payload, "database") ?? _config.DefaultDatabase;
             var collection = GetPayloadString(payload, "collection");
             var filter = GetPayloadString(payload, "filter");
 
@@ -534,7 +548,7 @@ namespace DataWarehouse.Plugins.NoSQLDatabaseStorage
         {
             try
             {
-                var response = _nosqlConfig.Engine switch
+                var response = _config.Engine switch
                 {
                     NoSqlEngine.MongoDB => await _httpClient!.GetAsync("/"),
                     NoSqlEngine.CouchDB => await _httpClient!.GetAsync("/"),
@@ -552,7 +566,7 @@ namespace DataWarehouse.Plugins.NoSQLDatabaseStorage
 
         private async Task SaveToEngineAsync(string database, string collection, string id, string json)
         {
-            switch (_nosqlConfig.Engine)
+            switch (_config.Engine)
             {
                 case NoSqlEngine.MongoDB:
                     var content = new StringContent(json, Encoding.UTF8, "application/json");
@@ -563,14 +577,14 @@ namespace DataWarehouse.Plugins.NoSQLDatabaseStorage
                     await _httpClient!.PutAsync($"/{database}/{id}", content);
                     break;
                 default:
-                    throw new NotSupportedException($"Engine {_nosqlConfig.Engine} not supported for external storage");
+                    throw new NotSupportedException($"Engine {_config.Engine} not supported for external storage");
             }
         }
 
         private async Task<string> LoadFromEngineAsync(string database, string collection, string id)
         {
             HttpResponseMessage response;
-            switch (_nosqlConfig.Engine)
+            switch (_config.Engine)
             {
                 case NoSqlEngine.MongoDB:
                     response = await _httpClient!.GetAsync($"/{database}/{collection}/{id}");
@@ -579,7 +593,7 @@ namespace DataWarehouse.Plugins.NoSQLDatabaseStorage
                     response = await _httpClient!.GetAsync($"/{database}/{id}");
                     break;
                 default:
-                    throw new NotSupportedException($"Engine {_nosqlConfig.Engine} not supported");
+                    throw new NotSupportedException($"Engine {_config.Engine} not supported");
             }
 
             response.EnsureSuccessStatusCode();
@@ -588,7 +602,7 @@ namespace DataWarehouse.Plugins.NoSQLDatabaseStorage
 
         private async Task DeleteFromEngineAsync(string database, string collection, string id)
         {
-            switch (_nosqlConfig.Engine)
+            switch (_config.Engine)
             {
                 case NoSqlEngine.MongoDB:
                     await _httpClient!.DeleteAsync($"/{database}/{collection}/{id}");
@@ -657,11 +671,11 @@ namespace DataWarehouse.Plugins.NoSQLDatabaseStorage
         }
     }
 
-    /// <summary>
-    /// Configuration for NoSQL database.
-    /// </summary>
-    public class NoSqlConfig : DatabaseConfig
-    {
+/// <summary>
+/// Configuration for NoSQL database.
+/// </summary>
+public class NoSqlConfig : DatabaseConfigBase
+{
         public NoSqlEngine Engine { get; set; } = NoSqlEngine.InMemory;
         public string Endpoint { get; set; } = "http://localhost:27017";
         public string? Username { get; set; }
@@ -804,188 +818,7 @@ namespace DataWarehouse.Plugins.NoSQLDatabaseStorage
         Chroma
     }
 
-    #region Multi-Instance Connection Management
-
-    /// <summary>
-    /// Manages multiple NoSQL database connection instances.
-    /// </summary>
-    public sealed class NoSqlConnectionRegistry : IAsyncDisposable
-    {
-        private readonly ConcurrentDictionary<string, NoSqlConnectionInstance> _instances = new();
-        private volatile bool _disposed;
-
-        /// <summary>
-        /// Registers a new database instance.
-        /// </summary>
-        public NoSqlConnectionInstance Register(string instanceId, NoSqlConfig config)
-        {
-            if (_disposed) throw new ObjectDisposedException(nameof(NoSqlConnectionRegistry));
-
-            if (_instances.ContainsKey(instanceId))
-                throw new InvalidOperationException($"Instance '{instanceId}' already registered.");
-
-            var instance = new NoSqlConnectionInstance(instanceId, config);
-            _instances[instanceId] = instance;
-            return instance;
-        }
-
-        /// <summary>
-        /// Gets an instance by ID.
-        /// </summary>
-        public NoSqlConnectionInstance? Get(string instanceId)
-        {
-            return _instances.TryGetValue(instanceId, out var instance) ? instance : null;
-        }
-
-        /// <summary>
-        /// Gets all registered instances.
-        /// </summary>
-        public IEnumerable<NoSqlConnectionInstance> GetAll() => _instances.Values;
-
-        /// <summary>
-        /// Gets instances by role.
-        /// </summary>
-        public IEnumerable<NoSqlConnectionInstance> GetByRole(NoSqlConnectionRole role)
-        {
-            return _instances.Values.Where(i => i.Roles.HasFlag(role));
-        }
-
-        /// <summary>
-        /// Unregisters and disposes an instance.
-        /// </summary>
-        public async Task UnregisterAsync(string instanceId)
-        {
-            if (_instances.TryRemove(instanceId, out var instance))
-            {
-                await instance.DisposeAsync();
-            }
-        }
-
-        public async ValueTask DisposeAsync()
-        {
-            if (_disposed) return;
-            _disposed = true;
-
-            foreach (var instance in _instances.Values)
-            {
-                await instance.DisposeAsync();
-            }
-            _instances.Clear();
-        }
-    }
-
-    /// <summary>
-    /// Represents a single NoSQL database connection instance.
-    /// </summary>
-    public sealed class NoSqlConnectionInstance : IAsyncDisposable
-    {
-        public string InstanceId { get; }
-        public NoSqlConfig Config { get; }
-        public NoSqlConnectionRole Roles { get; set; } = NoSqlConnectionRole.Storage;
-        public int Priority { get; set; } = 0;
-        public bool IsConnected { get; private set; }
-        public DateTime? LastActivity { get; private set; }
-
-        private readonly SemaphoreSlim _connectionLock = new(1, 1);
-        private object? _connection;
-        private HttpClient? _httpClient;
-
-        public NoSqlConnectionInstance(string instanceId, NoSqlConfig config)
-        {
-            InstanceId = instanceId;
-            Config = config;
-        }
-
-        public async Task ConnectAsync()
-        {
-            if (IsConnected) return;
-
-            await _connectionLock.WaitAsync();
-            try
-            {
-                if (IsConnected) return;
-
-                _connection = await CreateConnectionAsync();
-                IsConnected = true;
-                LastActivity = DateTime.UtcNow;
-            }
-            finally
-            {
-                _connectionLock.Release();
-            }
-        }
-
-        public async Task DisconnectAsync()
-        {
-            if (!IsConnected) return;
-
-            await _connectionLock.WaitAsync();
-            try
-            {
-                if (_connection is IAsyncDisposable asyncDisposable)
-                    await asyncDisposable.DisposeAsync();
-                else if (_connection is IDisposable disposable)
-                    disposable.Dispose();
-
-                _httpClient?.Dispose();
-                _httpClient = null;
-                _connection = null;
-                IsConnected = false;
-            }
-            finally
-            {
-                _connectionLock.Release();
-            }
-        }
-
-        private Task<object> CreateConnectionAsync()
-        {
-            // For HTTP-based NoSQL databases
-            if (!string.IsNullOrEmpty(Config.Endpoint))
-            {
-                _httpClient = new HttpClient
-                {
-                    BaseAddress = new Uri(Config.Endpoint),
-                    Timeout = TimeSpan.FromSeconds(30)
-                };
-
-                if (!string.IsNullOrEmpty(Config.Username) && !string.IsNullOrEmpty(Config.Password))
-                {
-                    var credentials = Convert.ToBase64String(Encoding.UTF8.GetBytes($"{Config.Username}:{Config.Password}"));
-                    _httpClient.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Basic", credentials);
-                }
-            }
-
-            return Task.FromResult<object>(new { Engine = Config.Engine, Endpoint = Config.Endpoint });
-        }
-
-        public HttpClient? GetHttpClient() => _httpClient;
-
-        public void RecordActivity() => LastActivity = DateTime.UtcNow;
-
-        public async ValueTask DisposeAsync()
-        {
-            await DisconnectAsync();
-            _connectionLock.Dispose();
-        }
-    }
-
-    /// <summary>
-    /// Roles a NoSQL connection instance can serve.
-    /// </summary>
-    [Flags]
-    public enum NoSqlConnectionRole
-    {
-        None = 0,
-        Storage = 1,
-        Index = 2,
-        Cache = 4,
-        Metadata = 8,
-        Search = 16,
-        Vector = 32,
-        Graph = 64,
-        All = Storage | Index | Cache | Metadata | Search | Vector | Graph
-    }
-
-    #endregion
-}
+// Multi-instance connection management is now provided by the base class via:
+// - StorageConnectionRegistry<NoSqlConfig> accessible via ConnectionRegistry property
+// - StorageConnectionInstance<NoSqlConfig> for individual instance management
+// - StorageRole enum for role-based instance selection

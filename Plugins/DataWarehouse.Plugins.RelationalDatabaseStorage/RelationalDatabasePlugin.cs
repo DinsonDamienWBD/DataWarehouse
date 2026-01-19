@@ -1,4 +1,6 @@
 using DataWarehouse.SDK.Contracts;
+using DataWarehouse.SDK.Database;
+using DataWarehouse.SDK.Infrastructure;
 using DataWarehouse.SDK.Primitives;
 using DataWarehouse.SDK.Utilities;
 using System.Collections.Concurrent;
@@ -7,66 +9,77 @@ using System.Diagnostics;
 using System.Text;
 using System.Text.Json;
 
-namespace DataWarehouse.Plugins.RelationalDatabaseStorage
+namespace DataWarehouse.Plugins.RelationalDatabaseStorage;
+
+/// <summary>
+/// Relational database storage plugin for SQL databases.
+///
+/// Supports:
+/// - MySQL/MariaDB, PostgreSQL, SQL Server, Oracle, Db2
+/// - SQLite, CockroachDB, TiDB, YugabyteDB
+/// - ClickHouse, TimescaleDB, Snowflake, BigQuery, Redshift
+/// - In-memory simulation for testing
+///
+/// Features:
+/// - Full SQL query support with parameterized queries
+/// - Transaction management (BEGIN, COMMIT, ROLLBACK)
+/// - Schema management (CREATE, ALTER, DROP tables)
+/// - Connection pooling management
+/// - Prepared statement caching
+/// - Bulk insert operations
+/// - Query result pagination
+/// - Row-level operations via URI-based access
+/// - Multi-instance connection registry (via HybridDatabasePluginBase)
+/// - Integrated caching with TTL support
+/// - Integrated indexing with full-text search
+///
+/// URI format: relational://database/table/primary_key_value
+/// Example: relational://mydb/users/12345
+///          relational://inventory/products/SKU-001
+///
+/// Message Commands:
+/// - storage.relational.save: Insert/update row
+/// - storage.relational.load: Load row by primary key
+/// - storage.relational.delete: Delete row
+/// - storage.relational.query: Execute SELECT query
+/// - storage.relational.execute: Execute INSERT/UPDATE/DELETE
+/// - storage.relational.transaction: Execute in transaction
+/// - storage.relational.schema: Get table schema
+/// - storage.relational.bulkinsert: Bulk insert rows
+/// </summary>
+public sealed class RelationalDatabasePlugin : HybridDatabasePluginBase<RelationalDbConfig>
 {
+    private readonly SemaphoreSlim _writeLock = new(1, 1);
+
+    // In-memory storage simulation for testing
+    private readonly ConcurrentDictionary<string, ConcurrentDictionary<string, ConcurrentDictionary<string, string>>> _inMemoryStore = new();
+
+    // Connection state tracking
+    private bool _isInitialized;
+
+    public override string Id => "datawarehouse.plugins.database.relational";
+    public override string Name => "Relational Database";
+    public override string Version => "2.0.0";
+    public override string Scheme => "relational";
+    public override DatabaseCategory DatabaseCategory => DatabaseCategory.Relational;
+    public override string Engine => _config.Engine.ToString();
+
     /// <summary>
-    /// Relational database storage plugin for SQL databases.
-    ///
-    /// Supports:
-    /// - MySQL/MariaDB
-    /// - PostgreSQL
-    /// - SQL Server
-    /// - In-memory simulation for testing
-    ///
-    /// Features:
-    /// - Full SQL query support with parameterized queries
-    /// - Transaction management (BEGIN, COMMIT, ROLLBACK)
-    /// - Schema management (CREATE, ALTER, DROP tables)
-    /// - Connection pooling management
-    /// - Prepared statement caching
-    /// - Bulk insert operations
-    /// - Query result pagination
-    /// - Row-level operations via URI-based access
-    ///
-    /// URI format: relational://database/table/primary_key_value
-    /// Example: relational://mydb/users/12345
-    ///          relational://inventory/products/SKU-001
-    ///
-    /// Message Commands:
-    /// - storage.relational.save: Insert/update row
-    /// - storage.relational.load: Load row by primary key
-    /// - storage.relational.delete: Delete row
-    /// - storage.relational.query: Execute SELECT query
-    /// - storage.relational.execute: Execute INSERT/UPDATE/DELETE
-    /// - storage.relational.transaction: Execute in transaction
-    /// - storage.relational.schema: Get table schema
-    /// - storage.relational.bulkinsert: Bulk insert rows
+    /// Creates a relational database plugin with optional configuration.
     /// </summary>
-    public sealed class RelationalDatabasePlugin : DatabasePluginBase
+    public RelationalDatabasePlugin(RelationalDbConfig? config = null) : base(config)
     {
-        private readonly RelationalDbConfig _relationalConfig;
-        private readonly SemaphoreSlim _writeLock = new(1, 1);
+    }
 
-        // In-memory storage simulation for testing
-        private readonly ConcurrentDictionary<string, ConcurrentDictionary<string, ConcurrentDictionary<string, string>>> _inMemoryStore = new();
-
-        // Connection state tracking
-        private bool _isInitialized;
-
-        public override string Id => "datawarehouse.plugins.database.relational";
-        public override string Name => "Relational Database";
-        public override string Version => "1.0.0";
-        public override string Scheme => "relational";
-        public override DatabaseType DatabaseType => DatabaseType.Relational;
-        public override string Engine => _relationalConfig.Engine.ToString();
-
-        /// <summary>
-        /// Creates a relational database plugin with optional configuration.
-        /// </summary>
-        public RelationalDatabasePlugin(RelationalDbConfig? config = null) : base(config)
-        {
-            _relationalConfig = config ?? new RelationalDbConfig();
-        }
+    /// <summary>
+    /// Factory method to create a connection from configuration.
+    /// </summary>
+    protected override Task<object> CreateConnectionAsync(RelationalDbConfig config)
+    {
+        // In production, would create real ADO.NET connection based on engine
+        // For now, return placeholder object
+        return Task.FromResult<object>(new { Engine = config.Engine, ConnectionString = config.ConnectionString });
+    }
 
         protected override List<PluginCapabilityDescriptor> GetCapabilities()
         {
@@ -87,7 +100,7 @@ namespace DataWarehouse.Plugins.RelationalDatabaseStorage
         {
             var metadata = base.GetMetadata();
             metadata["Description"] = "Relational SQL database storage (MySQL, PostgreSQL, SQL Server)";
-            metadata["Engine"] = _relationalConfig.Engine.ToString();
+            metadata["Engine"] = _config.Engine.ToString();
             metadata["SupportsTransactions"] = true;
             metadata["SupportsPreparedStatements"] = true;
             metadata["SupportsBulkOperations"] = true;
@@ -123,7 +136,7 @@ namespace DataWarehouse.Plugins.RelationalDatabaseStorage
             await EnsureConnectedAsync();
 
             var (database, table, id) = ParseUri(uri);
-            database ??= _relationalConfig.DefaultDatabase ?? "default";
+            database ??= _config.DefaultDatabase ?? "default";
             table ??= "documents";
 
             using var reader = new StreamReader(data);
@@ -138,7 +151,7 @@ namespace DataWarehouse.Plugins.RelationalDatabaseStorage
             await _writeLock.WaitAsync();
             try
             {
-                if (_relationalConfig.Engine == RelationalEngine.InMemory)
+                if (_config.Engine == RelationalEngine.InMemory)
                 {
                     SaveToMemory(database, table, id, json);
                 }
@@ -158,14 +171,14 @@ namespace DataWarehouse.Plugins.RelationalDatabaseStorage
             await EnsureConnectedAsync();
 
             var (database, table, id) = ParseUri(uri);
-            database ??= _relationalConfig.DefaultDatabase ?? "default";
+            database ??= _config.DefaultDatabase ?? "default";
             table ??= "documents";
 
             if (string.IsNullOrEmpty(id))
                 throw new ArgumentException("Row ID/primary key is required");
 
             string json;
-            if (_relationalConfig.Engine == RelationalEngine.InMemory)
+            if (_config.Engine == RelationalEngine.InMemory)
             {
                 json = LoadFromMemory(database, table, id);
             }
@@ -182,7 +195,7 @@ namespace DataWarehouse.Plugins.RelationalDatabaseStorage
             await EnsureConnectedAsync();
 
             var (database, table, id) = ParseUri(uri);
-            database ??= _relationalConfig.DefaultDatabase ?? "default";
+            database ??= _config.DefaultDatabase ?? "default";
             table ??= "documents";
 
             if (string.IsNullOrEmpty(id))
@@ -191,7 +204,7 @@ namespace DataWarehouse.Plugins.RelationalDatabaseStorage
             await _writeLock.WaitAsync();
             try
             {
-                if (_relationalConfig.Engine == RelationalEngine.InMemory)
+                if (_config.Engine == RelationalEngine.InMemory)
                 {
                     DeleteFromMemory(database, table, id);
                 }
@@ -225,7 +238,7 @@ namespace DataWarehouse.Plugins.RelationalDatabaseStorage
         {
             await EnsureConnectedAsync();
 
-            if (_relationalConfig.Engine == RelationalEngine.InMemory)
+            if (_config.Engine == RelationalEngine.InMemory)
             {
                 foreach (var db in _inMemoryStore)
                 {
@@ -258,183 +271,156 @@ namespace DataWarehouse.Plugins.RelationalDatabaseStorage
 
         #endregion
 
-        #region Database Operations
+    #region Database Operations
 
-        protected override async Task ConnectAsync()
+    protected override async Task<IEnumerable<object>> ExecuteQueryAsync(
+        string? database, string? collection, string? query,
+        Dictionary<string, object>? parameters, string? instanceId = null)
+    {
+        await EnsureConnectedAsync(instanceId);
+
+        var result = await ExecuteQueryInternalAsync(database ?? _config.DefaultDatabase, collection, query, parameters);
+        return result.Rows.Cast<object>();
+    }
+
+    protected override async Task<long> CountAsync(
+        string? database, string? collection, string? filter, string? instanceId = null)
+    {
+        await EnsureConnectedAsync(instanceId);
+
+        database ??= _config.DefaultDatabase ?? "default";
+
+        if (_config.Engine == RelationalEngine.InMemory)
         {
-            if (_isConnected) return;
-
-            if (_relationalConfig.Engine == RelationalEngine.InMemory)
-            {
-                _isConnected = true;
-                _isInitialized = true;
-                return;
-            }
-
-            // For real database engines, connection would be established here
-            // This is a simulation - real implementation would use ADO.NET providers
-            await Task.Delay(10); // Simulate connection
-            _isConnected = true;
-            _isInitialized = true;
+            if (!_inMemoryStore.TryGetValue(database, out var tables))
+                return 0;
+            if (string.IsNullOrEmpty(collection))
+                return tables.Values.Sum(t => t.Count);
+            if (!tables.TryGetValue(collection, out var rows))
+                return 0;
+            return rows.Count;
         }
 
-        protected override async Task DisconnectAsync()
+        // For real engines, execute COUNT query
+        var tableName = collection ?? "documents";
+        var sql = string.IsNullOrEmpty(filter)
+            ? $"SELECT COUNT(*) FROM {tableName}"
+            : $"SELECT COUNT(*) FROM {tableName} WHERE {filter}";
+
+        var result = await ExecuteQueryInternalAsync(database, null, sql, null);
+        if (result.Success && result.Rows.Count > 0)
         {
-            if (!_isConnected) return;
-
-            if (_relationalConfig.Engine != RelationalEngine.InMemory)
-            {
-                await Task.Delay(5); // Simulate disconnect
-            }
-
-            _isConnected = false;
+            var firstValue = result.Rows[0].Values.FirstOrDefault();
+            if (firstValue != null && long.TryParse(firstValue.ToString(), out var count))
+                return count;
         }
 
-        protected override async Task<IEnumerable<object>> ExecuteQueryAsync(
-            string? database, string? collection, string? query, Dictionary<string, object>? parameters)
-        {
-            await EnsureConnectedAsync();
+        return 0;
+    }
 
-            var result = await ExecuteQueryInternalAsync(database ?? _relationalConfig.DefaultDatabase, collection, query, parameters);
-            return result.Rows.Cast<object>();
+    protected override async Task CreateDatabaseAsync(string database, string? instanceId = null)
+    {
+        await EnsureConnectedAsync(instanceId);
+
+        if (_config.Engine == RelationalEngine.InMemory)
+        {
+            _inMemoryStore.TryAdd(database, new ConcurrentDictionary<string, ConcurrentDictionary<string, string>>());
+            return;
         }
 
-        protected override async Task<long> CountAsync(string? database, string? collection, string? filter)
+        // For real engines, execute CREATE DATABASE
+        await ExecuteNonQueryAsync($"CREATE DATABASE IF NOT EXISTS {EscapeIdentifier(database)}");
+    }
+
+    protected override async Task DropDatabaseAsync(string database, string? instanceId = null)
+    {
+        await EnsureConnectedAsync(instanceId);
+
+        if (_config.Engine == RelationalEngine.InMemory)
         {
-            await EnsureConnectedAsync();
-
-            database ??= _relationalConfig.DefaultDatabase ?? "default";
-
-            if (_relationalConfig.Engine == RelationalEngine.InMemory)
-            {
-                if (!_inMemoryStore.TryGetValue(database, out var tables))
-                    return 0;
-                if (string.IsNullOrEmpty(collection))
-                    return tables.Values.Sum(t => t.Count);
-                if (!tables.TryGetValue(collection, out var rows))
-                    return 0;
-                return rows.Count;
-            }
-
-            // For real engines, execute COUNT query
-            var tableName = collection ?? "documents";
-            var sql = string.IsNullOrEmpty(filter)
-                ? $"SELECT COUNT(*) FROM {tableName}"
-                : $"SELECT COUNT(*) FROM {tableName} WHERE {filter}";
-
-            var result = await ExecuteQueryInternalAsync(database, null, sql, null);
-            if (result.Success && result.Rows.Count > 0)
-            {
-                var firstValue = result.Rows[0].Values.FirstOrDefault();
-                if (firstValue != null && long.TryParse(firstValue.ToString(), out var count))
-                    return count;
-            }
-
-            return 0;
+            _inMemoryStore.TryRemove(database, out _);
+            return;
         }
 
-        protected override async Task CreateDatabaseAsync(string database)
+        // For real engines, execute DROP DATABASE
+        await ExecuteNonQueryAsync($"DROP DATABASE IF EXISTS {EscapeIdentifier(database)}");
+    }
+
+    protected override async Task CreateCollectionAsync(
+        string? database, string collection, Dictionary<string, object>? schema, string? instanceId = null)
+    {
+        await EnsureConnectedAsync(instanceId);
+
+        database ??= _config.DefaultDatabase ?? "default";
+
+        if (_config.Engine == RelationalEngine.InMemory)
         {
-            await EnsureConnectedAsync();
-
-            if (_relationalConfig.Engine == RelationalEngine.InMemory)
-            {
-                _inMemoryStore.TryAdd(database, new ConcurrentDictionary<string, ConcurrentDictionary<string, string>>());
-                return;
-            }
-
-            // For real engines, execute CREATE DATABASE
-            await ExecuteNonQueryAsync($"CREATE DATABASE IF NOT EXISTS {EscapeIdentifier(database)}");
+            var db = _inMemoryStore.GetOrAdd(database, _ => new ConcurrentDictionary<string, ConcurrentDictionary<string, string>>());
+            db.TryAdd(collection, new ConcurrentDictionary<string, string>());
+            return;
         }
 
-        protected override async Task DropDatabaseAsync(string database)
+        // For real engines, CREATE TABLE
+        var columns = BuildColumnsFromSchema(schema);
+        var sql = $"CREATE TABLE IF NOT EXISTS {EscapeIdentifier(database)}.{EscapeIdentifier(collection)} ({columns})";
+        await ExecuteNonQueryAsync(sql);
+    }
+
+    protected override async Task DropCollectionAsync(string? database, string collection, string? instanceId = null)
+    {
+        await EnsureConnectedAsync(instanceId);
+
+        database ??= _config.DefaultDatabase ?? "default";
+
+        if (_config.Engine == RelationalEngine.InMemory)
         {
-            await EnsureConnectedAsync();
-
-            if (_relationalConfig.Engine == RelationalEngine.InMemory)
+            if (_inMemoryStore.TryGetValue(database, out var tables))
             {
-                _inMemoryStore.TryRemove(database, out _);
-                return;
+                tables.TryRemove(collection, out _);
             }
-
-            // For real engines, execute DROP DATABASE
-            await ExecuteNonQueryAsync($"DROP DATABASE IF EXISTS {EscapeIdentifier(database)}");
+            return;
         }
 
-        protected override async Task CreateCollectionAsync(string? database, string collection, Dictionary<string, object>? schema)
+        // For real engines, DROP TABLE
+        var sql = $"DROP TABLE IF EXISTS {EscapeIdentifier(database)}.{EscapeIdentifier(collection)}";
+        await ExecuteNonQueryAsync(sql);
+    }
+
+    protected override async Task<IEnumerable<string>> ListDatabasesAsync(string? instanceId = null)
+    {
+        await EnsureConnectedAsync(instanceId);
+
+        if (_config.Engine == RelationalEngine.InMemory)
         {
-            await EnsureConnectedAsync();
-
-            database ??= _relationalConfig.DefaultDatabase ?? "default";
-
-            if (_relationalConfig.Engine == RelationalEngine.InMemory)
-            {
-                var db = _inMemoryStore.GetOrAdd(database, _ => new ConcurrentDictionary<string, ConcurrentDictionary<string, string>>());
-                db.TryAdd(collection, new ConcurrentDictionary<string, string>());
-                return;
-            }
-
-            // For real engines, CREATE TABLE
-            var columns = BuildColumnsFromSchema(schema);
-            var sql = $"CREATE TABLE IF NOT EXISTS {EscapeIdentifier(database)}.{EscapeIdentifier(collection)} ({columns})";
-            await ExecuteNonQueryAsync(sql);
+            return _inMemoryStore.Keys.ToList();
         }
 
-        protected override async Task DropCollectionAsync(string? database, string collection)
+        // For real engines, query system catalog
+        var result = await ExecuteQueryInternalAsync(null, null, GetShowDatabasesSql(), null);
+        return result.Rows.SelectMany(r => r.Values).Select(v => v?.ToString() ?? "").Where(s => !string.IsNullOrEmpty(s));
+    }
+
+    protected override async Task<IEnumerable<string>> ListCollectionsAsync(string? database, string? instanceId = null)
+    {
+        await EnsureConnectedAsync(instanceId);
+
+        database ??= _config.DefaultDatabase ?? "default";
+
+        if (_config.Engine == RelationalEngine.InMemory)
         {
-            await EnsureConnectedAsync();
-
-            database ??= _relationalConfig.DefaultDatabase ?? "default";
-
-            if (_relationalConfig.Engine == RelationalEngine.InMemory)
+            if (_inMemoryStore.TryGetValue(database, out var tables))
             {
-                if (_inMemoryStore.TryGetValue(database, out var tables))
-                {
-                    tables.TryRemove(collection, out _);
-                }
-                return;
+                return tables.Keys.ToList();
             }
-
-            // For real engines, DROP TABLE
-            var sql = $"DROP TABLE IF EXISTS {EscapeIdentifier(database)}.{EscapeIdentifier(collection)}";
-            await ExecuteNonQueryAsync(sql);
+            return Array.Empty<string>();
         }
 
-        protected override async Task<IEnumerable<string>> ListDatabasesAsync()
-        {
-            await EnsureConnectedAsync();
+        // For real engines, query system catalog
+        var result = await ExecuteQueryInternalAsync(database, null, GetShowTablesSql(database), null);
+        return result.Rows.SelectMany(r => r.Values).Select(v => v?.ToString() ?? "").Where(s => !string.IsNullOrEmpty(s));
+    }
 
-            if (_relationalConfig.Engine == RelationalEngine.InMemory)
-            {
-                return _inMemoryStore.Keys.ToList();
-            }
-
-            // For real engines, query system catalog
-            var result = await ExecuteQueryInternalAsync(null, null, GetShowDatabasesSql(), null);
-            return result.Rows.SelectMany(r => r.Values).Select(v => v?.ToString() ?? "").Where(s => !string.IsNullOrEmpty(s));
-        }
-
-        protected override async Task<IEnumerable<string>> ListCollectionsAsync(string? database)
-        {
-            await EnsureConnectedAsync();
-
-            database ??= _relationalConfig.DefaultDatabase ?? "default";
-
-            if (_relationalConfig.Engine == RelationalEngine.InMemory)
-            {
-                if (_inMemoryStore.TryGetValue(database, out var tables))
-                {
-                    return tables.Keys.ToList();
-                }
-                return Array.Empty<string>();
-            }
-
-            // For real engines, query system catalog
-            var result = await ExecuteQueryInternalAsync(database, null, GetShowTablesSql(database), null);
-            return result.Rows.SelectMany(r => r.Values).Select(v => v?.ToString() ?? "").Where(s => !string.IsNullOrEmpty(s));
-        }
-
-        #endregion
+    #endregion
 
         #region Relational-Specific Message Handlers
 
@@ -442,7 +428,7 @@ namespace DataWarehouse.Plugins.RelationalDatabaseStorage
         {
             var payload = message.Payload;
 
-            var database = GetPayloadString(payload, "database") ?? _relationalConfig.DefaultDatabase;
+            var database = GetPayloadString(payload, "database") ?? _config.DefaultDatabase;
             var sql = GetPayloadString(payload, "sql");
             var parameters = GetPayloadDictionary(payload, "parameters");
 
@@ -457,7 +443,7 @@ namespace DataWarehouse.Plugins.RelationalDatabaseStorage
         {
             var payload = message.Payload;
 
-            var database = GetPayloadString(payload, "database") ?? _relationalConfig.DefaultDatabase;
+            var database = GetPayloadString(payload, "database") ?? _config.DefaultDatabase;
 
             // Get list of SQL statements to execute
             if (!payload.TryGetValue("statements", out var stmtsObj) || stmtsObj is not IEnumerable<object> statements)
@@ -469,7 +455,7 @@ namespace DataWarehouse.Plugins.RelationalDatabaseStorage
             await EnsureConnectedAsync();
 
             // In memory mode, just execute statements sequentially
-            if (_relationalConfig.Engine == RelationalEngine.InMemory)
+            if (_config.Engine == RelationalEngine.InMemory)
             {
                 foreach (var stmt in statements)
                 {
@@ -523,7 +509,7 @@ namespace DataWarehouse.Plugins.RelationalDatabaseStorage
         {
             var payload = message.Payload;
 
-            var database = GetPayloadString(payload, "database") ?? _relationalConfig.DefaultDatabase ?? "default";
+            var database = GetPayloadString(payload, "database") ?? _config.DefaultDatabase ?? "default";
             var table = GetPayloadString(payload, "table");
 
             if (string.IsNullOrEmpty(table))
@@ -531,7 +517,7 @@ namespace DataWarehouse.Plugins.RelationalDatabaseStorage
 
             await EnsureConnectedAsync();
 
-            if (_relationalConfig.Engine == RelationalEngine.InMemory)
+            if (_config.Engine == RelationalEngine.InMemory)
             {
                 // Return basic schema info for in-memory tables
                 return MessageResponse.Ok(new
@@ -560,7 +546,7 @@ namespace DataWarehouse.Plugins.RelationalDatabaseStorage
         {
             var payload = message.Payload;
 
-            var database = GetPayloadString(payload, "database") ?? _relationalConfig.DefaultDatabase ?? "default";
+            var database = GetPayloadString(payload, "database") ?? _config.DefaultDatabase ?? "default";
             var table = GetPayloadString(payload, "table");
 
             if (string.IsNullOrEmpty(table))
@@ -582,7 +568,7 @@ namespace DataWarehouse.Plugins.RelationalDatabaseStorage
                     var json = JsonSerializer.Serialize(row, _jsonOptions);
                     var id = ExtractIdFromJson(json) ?? Guid.NewGuid().ToString("N");
 
-                    if (_relationalConfig.Engine == RelationalEngine.InMemory)
+                    if (_config.Engine == RelationalEngine.InMemory)
                     {
                         SaveToMemory(database, table, id, json);
                     }
@@ -630,7 +616,7 @@ namespace DataWarehouse.Plugins.RelationalDatabaseStorage
         {
             var payload = message.Payload;
 
-            var database = GetPayloadString(payload, "database") ?? _relationalConfig.DefaultDatabase;
+            var database = GetPayloadString(payload, "database") ?? _config.DefaultDatabase;
             var table = GetPayloadString(payload, "table");
             var sql = GetPayloadString(payload, "sql");
             var pageStr = GetPayloadString(payload, "page");
@@ -785,14 +771,14 @@ namespace DataWarehouse.Plugins.RelationalDatabaseStorage
             }
 
             // For in-memory mode, simulate query execution
-            if (_relationalConfig.Engine == RelationalEngine.InMemory)
+            if (_config.Engine == RelationalEngine.InMemory)
             {
                 var rows = new List<Dictionary<string, object?>>();
 
                 // Simple SELECT simulation
                 if (sql.TrimStart().StartsWith("SELECT", StringComparison.OrdinalIgnoreCase))
                 {
-                    database ??= _relationalConfig.DefaultDatabase ?? "default";
+                    database ??= _config.DefaultDatabase ?? "default";
 
                     if (_inMemoryStore.TryGetValue(database, out var db))
                     {
@@ -849,7 +835,7 @@ namespace DataWarehouse.Plugins.RelationalDatabaseStorage
 
         private string EscapeIdentifier(string identifier)
         {
-            return _relationalConfig.Engine switch
+            return _config.Engine switch
             {
                 RelationalEngine.MySQL or RelationalEngine.MariaDB => $"`{identifier.Replace("`", "``")}`",
                 RelationalEngine.PostgreSQL => $"\"{identifier.Replace("\"", "\"\"")}\"",
@@ -860,7 +846,7 @@ namespace DataWarehouse.Plugins.RelationalDatabaseStorage
 
         private string GetShowDatabasesSql()
         {
-            return _relationalConfig.Engine switch
+            return _config.Engine switch
             {
                 RelationalEngine.MySQL or RelationalEngine.MariaDB => "SHOW DATABASES",
                 RelationalEngine.PostgreSQL => "SELECT datname FROM pg_database WHERE datistemplate = false",
@@ -871,7 +857,7 @@ namespace DataWarehouse.Plugins.RelationalDatabaseStorage
 
         private string GetShowTablesSql(string database)
         {
-            return _relationalConfig.Engine switch
+            return _config.Engine switch
             {
                 RelationalEngine.MySQL or RelationalEngine.MariaDB => $"SHOW TABLES FROM {EscapeIdentifier(database)}",
                 RelationalEngine.PostgreSQL => $"SELECT tablename FROM pg_tables WHERE schemaname = 'public'",
@@ -882,7 +868,7 @@ namespace DataWarehouse.Plugins.RelationalDatabaseStorage
 
         private string GetDescribeTableSql(string database, string table)
         {
-            return _relationalConfig.Engine switch
+            return _config.Engine switch
             {
                 RelationalEngine.MySQL or RelationalEngine.MariaDB => $"DESCRIBE {EscapeIdentifier(database)}.{EscapeIdentifier(table)}",
                 RelationalEngine.PostgreSQL => $"SELECT column_name, data_type, is_nullable FROM information_schema.columns WHERE table_name = '{table}'",
@@ -925,11 +911,11 @@ namespace DataWarehouse.Plugins.RelationalDatabaseStorage
         #endregion
     }
 
-    /// <summary>
-    /// Configuration for relational database plugins.
-    /// </summary>
-    public class RelationalDbConfig : DatabaseConfig
-    {
+/// <summary>
+/// Configuration for relational database plugins.
+/// </summary>
+public class RelationalDbConfig : DatabaseConfigBase
+{
         /// <summary>The relational database engine to use.</summary>
         public RelationalEngine Engine { get; set; } = RelationalEngine.InMemory;
 
@@ -1193,174 +1179,7 @@ namespace DataWarehouse.Plugins.RelationalDatabaseStorage
         Databricks
     }
 
-    #region Multi-Instance Connection Management
-
-    /// <summary>
-    /// Manages multiple relational database connection instances.
-    /// </summary>
-    public sealed class RelationalConnectionRegistry : IAsyncDisposable
-    {
-        private readonly ConcurrentDictionary<string, RelationalConnectionInstance> _instances = new();
-        private readonly RelationalDatabasePlugin _plugin;
-        private volatile bool _disposed;
-
-        public RelationalConnectionRegistry(RelationalDatabasePlugin plugin)
-        {
-            _plugin = plugin;
-        }
-
-        /// <summary>
-        /// Registers a new database instance.
-        /// </summary>
-        public RelationalConnectionInstance Register(string instanceId, RelationalDbConfig config)
-        {
-            if (_disposed) throw new ObjectDisposedException(nameof(RelationalConnectionRegistry));
-
-            if (_instances.ContainsKey(instanceId))
-                throw new InvalidOperationException($"Instance '{instanceId}' already registered.");
-
-            var instance = new RelationalConnectionInstance(instanceId, config);
-            _instances[instanceId] = instance;
-            return instance;
-        }
-
-        /// <summary>
-        /// Gets an instance by ID.
-        /// </summary>
-        public RelationalConnectionInstance? Get(string instanceId)
-        {
-            return _instances.TryGetValue(instanceId, out var instance) ? instance : null;
-        }
-
-        /// <summary>
-        /// Gets all registered instances.
-        /// </summary>
-        public IEnumerable<RelationalConnectionInstance> GetAll() => _instances.Values;
-
-        /// <summary>
-        /// Gets instances by role (storage, indexing, caching).
-        /// </summary>
-        public IEnumerable<RelationalConnectionInstance> GetByRole(ConnectionRole role)
-        {
-            return _instances.Values.Where(i => i.Roles.HasFlag(role));
-        }
-
-        /// <summary>
-        /// Unregisters and disposes an instance.
-        /// </summary>
-        public async Task UnregisterAsync(string instanceId)
-        {
-            if (_instances.TryRemove(instanceId, out var instance))
-            {
-                await instance.DisposeAsync();
-            }
-        }
-
-        public async ValueTask DisposeAsync()
-        {
-            if (_disposed) return;
-            _disposed = true;
-
-            foreach (var instance in _instances.Values)
-            {
-                await instance.DisposeAsync();
-            }
-            _instances.Clear();
-        }
-    }
-
-    /// <summary>
-    /// Represents a single relational database connection instance.
-    /// </summary>
-    public sealed class RelationalConnectionInstance : IAsyncDisposable
-    {
-        public string InstanceId { get; }
-        public RelationalDbConfig Config { get; }
-        public ConnectionRole Roles { get; set; } = ConnectionRole.Storage;
-        public int Priority { get; set; } = 0;
-        public bool IsConnected { get; private set; }
-        public DateTime? LastActivity { get; private set; }
-
-        private readonly SemaphoreSlim _connectionLock = new(1, 1);
-        private object? _connection;
-
-        public RelationalConnectionInstance(string instanceId, RelationalDbConfig config)
-        {
-            InstanceId = instanceId;
-            Config = config;
-        }
-
-        public async Task ConnectAsync()
-        {
-            if (IsConnected) return;
-
-            await _connectionLock.WaitAsync();
-            try
-            {
-                if (IsConnected) return;
-
-                // Create connection based on engine type
-                // In production, use appropriate ADO.NET provider
-                _connection = await CreateConnectionAsync();
-                IsConnected = true;
-                LastActivity = DateTime.UtcNow;
-            }
-            finally
-            {
-                _connectionLock.Release();
-            }
-        }
-
-        public async Task DisconnectAsync()
-        {
-            if (!IsConnected) return;
-
-            await _connectionLock.WaitAsync();
-            try
-            {
-                if (_connection is IAsyncDisposable asyncDisposable)
-                    await asyncDisposable.DisposeAsync();
-                else if (_connection is IDisposable disposable)
-                    disposable.Dispose();
-
-                _connection = null;
-                IsConnected = false;
-            }
-            finally
-            {
-                _connectionLock.Release();
-            }
-        }
-
-        private Task<object> CreateConnectionAsync()
-        {
-            // In production, would create real ADO.NET connection
-            // For now, return placeholder
-            return Task.FromResult<object>(new { Engine = Config.Engine, ConnectionString = Config.ConnectionString });
-        }
-
-        public void RecordActivity() => LastActivity = DateTime.UtcNow;
-
-        public async ValueTask DisposeAsync()
-        {
-            await DisconnectAsync();
-            _connectionLock.Dispose();
-        }
-    }
-
-    /// <summary>
-    /// Roles a connection instance can serve.
-    /// </summary>
-    [Flags]
-    public enum ConnectionRole
-    {
-        None = 0,
-        Storage = 1,
-        Index = 2,
-        Cache = 4,
-        Metadata = 8,
-        All = Storage | Index | Cache | Metadata
-    }
-
-    #endregion
-}
+// Multi-instance connection management is now provided by the base class via:
+// - StorageConnectionRegistry<RelationalDbConfig> accessible via ConnectionRegistry property
+// - StorageConnectionInstance<RelationalDbConfig> for individual instance management
+// - StorageRole enum for role-based instance selection

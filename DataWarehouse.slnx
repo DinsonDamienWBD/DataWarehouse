@@ -13,7 +13,7 @@
     <Project Path="Plugins/DataWarehouse.Plugins.AzureBlobStorage/DataWarehouse.Plugins.AzureBlobStorage.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.CloudStorage/DataWarehouse.Plugins.CloudStorage.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.Compression/DataWarehouse.Plugins.Compression.csproj" />
-    <Project Path="Plugins/DataWarehouse.Plugins.DatabaseIndexing/DataWarehouse.Plugins.DatabaseIndexing.csproj" />
+    <!-- Removed: DatabaseIndexing - functionality now integrated in HybridDatabasePluginBase -->
     <Project Path="Plugins/DataWarehouse.Plugins.DistributedTransactions/DataWarehouse.Plugins.DistributedTransactions.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.EmbeddedDatabaseStorage/DataWarehouse.Plugins.EmbeddedDatabaseStorage.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.Encryption/DataWarehouse.Plugins.Encryption.csproj" />
@@ -35,7 +35,7 @@
     <Project Path="Plugins/DataWarehouse.Plugins.S3Storage/DataWarehouse.Plugins.S3Storage.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.Sharding/DataWarehouse.Plugins.Sharding.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.SqlInterface/DataWarehouse.Plugins.SqlInterface.csproj" />
-    <Project Path="Plugins/DataWarehouse.Plugins.SqliteIndexing/DataWarehouse.Plugins.SqliteIndexing.csproj" />
+    <!-- Removed: SqliteIndexing - functionality now integrated in IndexableStoragePluginBase -->
     <Project Path="Plugins/DataWarehouse.Plugins.Tiering/DataWarehouse.Plugins.Tiering.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.VaultKeyStore/DataWarehouse.Plugins.VaultKeyStore.csproj" />
   </Folder>

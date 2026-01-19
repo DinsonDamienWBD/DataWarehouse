@@ -624,6 +624,458 @@ namespace DataWarehouse.SDK.Contracts
         }
     }
 
+    #region Hybrid Storage Plugin Base Classes
+
+    /// <summary>
+    /// Abstract base class for cacheable storage providers.
+    /// Adds TTL-based caching, expiration, and cache statistics to storage plugins.
+    /// Plugins extending this class automatically gain caching capabilities.
+    /// </summary>
+    public abstract class CacheableStoragePluginBase : ListableStoragePluginBase, ICacheableStorage
+    {
+        private readonly System.Collections.Concurrent.ConcurrentDictionary<string, CacheEntryMetadata> _cacheMetadata = new();
+        private readonly Timer? _cleanupTimer;
+        private readonly CacheOptions _cacheOptions;
+
+        /// <summary>
+        /// Default cache options. Override to customize.
+        /// </summary>
+        protected virtual CacheOptions DefaultCacheOptions => new()
+        {
+            DefaultTtl = TimeSpan.FromHours(1),
+            MaxEntries = 10000,
+            EvictionPolicy = CacheEvictionPolicy.LRU,
+            EnableStatistics = true
+        };
+
+        protected CacheableStoragePluginBase()
+        {
+            _cacheOptions = DefaultCacheOptions;
+            if (_cacheOptions.CleanupInterval > TimeSpan.Zero)
+            {
+                _cleanupTimer = new Timer(
+                    async _ => await CleanupExpiredAsync(),
+                    null,
+                    _cacheOptions.CleanupInterval,
+                    _cacheOptions.CleanupInterval);
+            }
+        }
+
+        /// <summary>
+        /// Save data with a specific TTL.
+        /// </summary>
+        public virtual async Task SaveWithTtlAsync(Uri uri, Stream data, TimeSpan ttl, CancellationToken ct = default)
+        {
+            await SaveAsync(uri, data);
+            var key = uri.ToString();
+            _cacheMetadata[key] = new CacheEntryMetadata
+            {
+                Key = key,
+                CreatedAt = DateTime.UtcNow,
+                ExpiresAt = DateTime.UtcNow.Add(ttl),
+                LastAccessedAt = DateTime.UtcNow,
+                Size = data.Length
+            };
+        }
+
+        /// <summary>
+        /// Get the remaining TTL for an entry.
+        /// </summary>
+        public virtual Task<TimeSpan?> GetTtlAsync(Uri uri, CancellationToken ct = default)
+        {
+            var key = uri.ToString();
+            if (_cacheMetadata.TryGetValue(key, out var metadata) && metadata.ExpiresAt.HasValue)
+            {
+                var remaining = metadata.ExpiresAt.Value - DateTime.UtcNow;
+                return Task.FromResult<TimeSpan?>(remaining > TimeSpan.Zero ? remaining : null);
+            }
+            return Task.FromResult<TimeSpan?>(null);
+        }
+
+        /// <summary>
+        /// Set or update TTL for an existing entry.
+        /// </summary>
+        public virtual Task<bool> SetTtlAsync(Uri uri, TimeSpan ttl, CancellationToken ct = default)
+        {
+            var key = uri.ToString();
+            if (_cacheMetadata.TryGetValue(key, out var metadata))
+            {
+                metadata.ExpiresAt = DateTime.UtcNow.Add(ttl);
+                return Task.FromResult(true);
+            }
+            return Task.FromResult(false);
+        }
+
+        /// <summary>
+        /// Invalidate all entries matching a pattern.
+        /// </summary>
+        public virtual async Task<int> InvalidatePatternAsync(string pattern, CancellationToken ct = default)
+        {
+            var regex = new System.Text.RegularExpressions.Regex(
+                "^" + System.Text.RegularExpressions.Regex.Escape(pattern).Replace("\\*", ".*") + "$");
+
+            var keysToRemove = _cacheMetadata.Keys.Where(k => regex.IsMatch(k)).ToList();
+            var count = 0;
+
+            foreach (var key in keysToRemove)
+            {
+                if (ct.IsCancellationRequested) break;
+                try
+                {
+                    await DeleteAsync(new Uri(key));
+                    _cacheMetadata.TryRemove(key, out _);
+                    count++;
+                }
+                catch { /* Ignore errors during invalidation */ }
+            }
+
+            return count;
+        }
+
+        /// <summary>
+        /// Get cache statistics.
+        /// </summary>
+        public virtual Task<CacheStatistics> GetCacheStatisticsAsync(CancellationToken ct = default)
+        {
+            var now = DateTime.UtcNow;
+            var entries = _cacheMetadata.Values.ToList();
+
+            return Task.FromResult(new CacheStatistics
+            {
+                TotalEntries = entries.Count,
+                TotalSizeBytes = entries.Sum(e => e.Size),
+                ExpiredEntries = entries.Count(e => e.ExpiresAt.HasValue && e.ExpiresAt < now),
+                HitCount = entries.Sum(e => e.HitCount),
+                MissCount = 0, // Would need separate tracking
+                OldestEntry = entries.MinBy(e => e.CreatedAt)?.CreatedAt,
+                NewestEntry = entries.MaxBy(e => e.CreatedAt)?.CreatedAt
+            });
+        }
+
+        /// <summary>
+        /// Remove all expired entries.
+        /// </summary>
+        public virtual Task<int> CleanupExpiredAsync(CancellationToken ct = default)
+        {
+            var now = DateTime.UtcNow;
+            var expiredKeys = _cacheMetadata
+                .Where(kv => kv.Value.ExpiresAt.HasValue && kv.Value.ExpiresAt < now)
+                .Select(kv => kv.Key)
+                .ToList();
+
+            var count = 0;
+            foreach (var key in expiredKeys)
+            {
+                if (ct.IsCancellationRequested) break;
+                if (_cacheMetadata.TryRemove(key, out _))
+                {
+                    try { DeleteAsync(new Uri(key)).Wait(); } catch { }
+                    count++;
+                }
+            }
+
+            return Task.FromResult(count);
+        }
+
+        /// <summary>
+        /// Touch an entry to update its last access time and reset sliding expiration.
+        /// </summary>
+        public virtual Task<bool> TouchAsync(Uri uri, CancellationToken ct = default)
+        {
+            var key = uri.ToString();
+            if (_cacheMetadata.TryGetValue(key, out var metadata))
+            {
+                metadata.LastAccessedAt = DateTime.UtcNow;
+                metadata.HitCount++;
+                return Task.FromResult(true);
+            }
+            return Task.FromResult(false);
+        }
+
+        /// <summary>
+        /// Override LoadAsync to track cache hits.
+        /// </summary>
+        public override async Task<Stream> LoadAsync(Uri uri)
+        {
+            await TouchAsync(uri);
+            return await base.LoadAsync(uri);
+        }
+
+        protected override Dictionary<string, object> GetMetadata()
+        {
+            var metadata = base.GetMetadata();
+            metadata["SupportsCaching"] = true;
+            metadata["SupportsTTL"] = true;
+            metadata["SupportsExpiration"] = true;
+            metadata["CacheEvictionPolicy"] = _cacheOptions.EvictionPolicy.ToString();
+            return metadata;
+        }
+
+        /// <summary>
+        /// Dispose cleanup timer.
+        /// </summary>
+        protected virtual void Dispose(bool disposing)
+        {
+            if (disposing)
+            {
+                _cleanupTimer?.Dispose();
+            }
+        }
+    }
+
+    /// <summary>
+    /// Abstract base class for indexable storage providers.
+    /// Combines storage with full-text and metadata indexing capabilities.
+    /// Plugins extending this class automatically gain indexing support.
+    /// </summary>
+    public abstract class IndexableStoragePluginBase : CacheableStoragePluginBase, IIndexableStorage
+    {
+        private readonly System.Collections.Concurrent.ConcurrentDictionary<string, Dictionary<string, object>> _indexStore = new();
+        private long _indexedCount;
+        private DateTime? _lastIndexRebuild;
+
+        /// <summary>
+        /// Index a document with its metadata.
+        /// </summary>
+        public virtual Task IndexDocumentAsync(string id, Dictionary<string, object> metadata, CancellationToken ct = default)
+        {
+            metadata["_indexed_at"] = DateTime.UtcNow;
+            _indexStore[id] = metadata;
+            Interlocked.Increment(ref _indexedCount);
+            return Task.CompletedTask;
+        }
+
+        /// <summary>
+        /// Remove a document from the index.
+        /// </summary>
+        public virtual Task<bool> RemoveFromIndexAsync(string id, CancellationToken ct = default)
+        {
+            var removed = _indexStore.TryRemove(id, out _);
+            if (removed) Interlocked.Decrement(ref _indexedCount);
+            return Task.FromResult(removed);
+        }
+
+        /// <summary>
+        /// Search the index with a text query.
+        /// </summary>
+        public virtual Task<string[]> SearchIndexAsync(string query, int limit = 100, CancellationToken ct = default)
+        {
+            var queryLower = query.ToLowerInvariant();
+            var results = _indexStore
+                .Where(kv => kv.Value.Values.Any(v =>
+                    v?.ToString()?.Contains(queryLower, StringComparison.OrdinalIgnoreCase) == true))
+                .Take(limit)
+                .Select(kv => kv.Key)
+                .ToArray();
+
+            return Task.FromResult(results);
+        }
+
+        /// <summary>
+        /// Query by specific metadata criteria.
+        /// </summary>
+        public virtual Task<string[]> QueryByMetadataAsync(Dictionary<string, object> criteria, CancellationToken ct = default)
+        {
+            var results = _indexStore
+                .Where(kv => criteria.All(c =>
+                    kv.Value.TryGetValue(c.Key, out var v) &&
+                    Equals(v?.ToString(), c.Value?.ToString())))
+                .Select(kv => kv.Key)
+                .ToArray();
+
+            return Task.FromResult(results);
+        }
+
+        /// <summary>
+        /// Get index statistics.
+        /// </summary>
+        public virtual Task<IndexStatistics> GetIndexStatisticsAsync(CancellationToken ct = default)
+        {
+            return Task.FromResult(new IndexStatistics
+            {
+                TotalDocuments = _indexStore.Count,
+                IndexedFields = _indexStore.Values
+                    .SelectMany(v => v.Keys)
+                    .Distinct()
+                    .Count(),
+                LastRebuildAt = _lastIndexRebuild,
+                IndexSizeBytes = _indexStore.Sum(kv =>
+                    kv.Key.Length + kv.Value.Sum(v => (v.Key?.Length ?? 0) + (v.Value?.ToString()?.Length ?? 0)))
+            });
+        }
+
+        /// <summary>
+        /// Rebuild the entire index.
+        /// </summary>
+        public virtual async Task<int> RebuildIndexAsync(CancellationToken ct = default)
+        {
+            _indexStore.Clear();
+            _indexedCount = 0;
+            var count = 0;
+
+            await foreach (var item in ListFilesAsync("", ct))
+            {
+                if (ct.IsCancellationRequested) break;
+
+                // Index with basic metadata
+                var id = item.Uri.ToString();
+                await IndexDocumentAsync(id, new Dictionary<string, object>
+                {
+                    ["uri"] = id,
+                    ["size"] = item.Size,
+                    ["path"] = item.Uri.AbsolutePath
+                }, ct);
+                count++;
+            }
+
+            _lastIndexRebuild = DateTime.UtcNow;
+            return count;
+        }
+
+        #region IMetadataIndex Implementation
+
+        /// <summary>
+        /// Index a manifest.
+        /// </summary>
+        public virtual async Task IndexManifestAsync(Manifest manifest)
+        {
+            var metadata = new Dictionary<string, object>
+            {
+                ["id"] = manifest.Id,
+                ["hash"] = manifest.ContentHash,
+                ["size"] = manifest.OriginalSize,
+                ["created"] = manifest.CreatedAt,
+                ["contentType"] = manifest.ContentType ?? ""
+            };
+
+            if (manifest.Metadata != null)
+            {
+                foreach (var kv in manifest.Metadata)
+                {
+                    metadata[kv.Key] = kv.Value;
+                }
+            }
+
+            await IndexDocumentAsync(manifest.Id, metadata);
+        }
+
+        /// <summary>
+        /// Search manifests with optional vector.
+        /// </summary>
+        public virtual Task<string[]> SearchAsync(string query, float[]? vector, int limit)
+        {
+            // Vector search would require specialized implementation
+            return SearchIndexAsync(query, limit);
+        }
+
+        /// <summary>
+        /// Enumerate all manifests in the index.
+        /// </summary>
+        public virtual async IAsyncEnumerable<Manifest> EnumerateAllAsync(
+            [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct = default)
+        {
+            foreach (var kv in _indexStore)
+            {
+                if (ct.IsCancellationRequested) yield break;
+
+                yield return new Manifest
+                {
+                    Id = kv.Key,
+                    ContentHash = kv.Value.TryGetValue("hash", out var h) ? h?.ToString() ?? "" : "",
+                    OriginalSize = kv.Value.TryGetValue("size", out var s) && s is long size ? size : 0,
+                    CreatedAt = kv.Value.TryGetValue("created", out var c) && c is DateTime dt ? dt : DateTime.UtcNow,
+                    Metadata = kv.Value.Where(x => !x.Key.StartsWith("_"))
+                        .ToDictionary(x => x.Key, x => x.Value?.ToString() ?? "")
+                };
+
+                await Task.Yield();
+            }
+        }
+
+        /// <summary>
+        /// Update last access time for a manifest.
+        /// </summary>
+        public virtual Task UpdateLastAccessAsync(string id, long timestamp)
+        {
+            if (_indexStore.TryGetValue(id, out var metadata))
+            {
+                metadata["_last_access"] = DateTimeOffset.FromUnixTimeMilliseconds(timestamp).UtcDateTime;
+            }
+            return Task.CompletedTask;
+        }
+
+        /// <summary>
+        /// Get a manifest by ID.
+        /// </summary>
+        public virtual Task<Manifest?> GetManifestAsync(string id)
+        {
+            if (_indexStore.TryGetValue(id, out var metadata))
+            {
+                return Task.FromResult<Manifest?>(new Manifest
+                {
+                    Id = id,
+                    ContentHash = metadata.TryGetValue("hash", out var h) ? h?.ToString() ?? "" : "",
+                    OriginalSize = metadata.TryGetValue("size", out var s) && s is long size ? size : 0,
+                    CreatedAt = metadata.TryGetValue("created", out var c) && c is DateTime dt ? dt : DateTime.UtcNow,
+                    Metadata = metadata.Where(x => !x.Key.StartsWith("_"))
+                        .ToDictionary(x => x.Key, x => x.Value?.ToString() ?? "")
+                });
+            }
+            return Task.FromResult<Manifest?>(null);
+        }
+
+        /// <summary>
+        /// Execute a text query.
+        /// </summary>
+        public virtual Task<string[]> ExecuteQueryAsync(string query, int limit)
+        {
+            return SearchIndexAsync(query, limit);
+        }
+
+        /// <summary>
+        /// Execute a composite query.
+        /// </summary>
+        public virtual Task<string[]> ExecuteQueryAsync(CompositeQuery query, int limit = 50)
+        {
+            return ExecuteQueryAsync(query.ToString() ?? "", limit);
+        }
+
+        #endregion
+
+        protected override Dictionary<string, object> GetMetadata()
+        {
+            var metadata = base.GetMetadata();
+            metadata["SupportsIndexing"] = true;
+            metadata["SupportsFullTextSearch"] = true;
+            metadata["SupportsMetadataQuery"] = true;
+            metadata["IndexedDocuments"] = _indexedCount;
+            return metadata;
+        }
+    }
+
+    /// <summary>
+    /// Index statistics.
+    /// </summary>
+    public class IndexStatistics
+    {
+        /// <summary>Total documents in the index.</summary>
+        public long TotalDocuments { get; set; }
+
+        /// <summary>Number of unique indexed fields.</summary>
+        public int IndexedFields { get; set; }
+
+        /// <summary>Estimated index size in bytes.</summary>
+        public long IndexSizeBytes { get; set; }
+
+        /// <summary>Last rebuild timestamp.</summary>
+        public DateTime? LastRebuildAt { get; set; }
+
+        /// <summary>Average document size in the index.</summary>
+        public double AverageDocumentSize => TotalDocuments > 0 ? (double)IndexSizeBytes / TotalDocuments : 0;
+    }
+
+    #endregion
+
     /// <summary>
     /// Abstract base class for consensus engine plugins (Raft, Paxos, etc.).
     /// Provides default implementations for distributed consensus operations.
