@@ -8,8 +8,11 @@ namespace DataWarehouse.Kernel.Storage
     /// Production-ready real-time storage manager for high-stakes scenarios.
     /// Provides synchronous replication, point-in-time recovery, and comprehensive audit trails.
     /// Suitable for hospitals, banks, governments, and hyperscale deployments.
+    ///
+    /// This is a KERNEL-LEVEL orchestrator that combines multiple storage PLUGINS.
+    /// For individual plugin multi-instance support, use HybridStoragePluginBase&lt;TConfig&gt;.
     /// </summary>
-    public class RealTimeStorageManager : RealTimeStorageBase
+    public class RealTimeStorageManager : RealTimeStorageOrchestratorBase
     {
         private readonly ConcurrentDictionary<Uri, List<VersionedSnapshot>> _snapshots = new();
         private readonly ConcurrentDictionary<Uri, List<AuditEntry>> _fullAuditTrail = new();

@@ -538,12 +538,18 @@ namespace DataWarehouse.SDK.Contracts
 
     #endregion
 
-    #region Hybrid Storage Base
+    #region Indexing Storage Orchestrator Base
 
     /// <summary>
-    /// Abstract base class for hybrid storage with automatic indexing pipeline.
+    /// Abstract base class for storage orchestration with automatic indexing pipeline.
+    /// Combines multiple storage providers and triggers indexing stages on write.
+    ///
+    /// Pipeline: Save → SQL metadata → OCR → NoSQL text → Embeddings → Vector DB → AI Summary
+    ///
+    /// Note: This is a KERNEL-LEVEL orchestrator that combines multiple PLUGINS.
+    /// For individual plugin multi-instance support, use HybridStoragePluginBase&lt;TConfig&gt;.
     /// </summary>
-    public abstract class HybridStorageBase : StoragePoolBase, IHybridStorage
+    public abstract class IndexingStorageOrchestratorBase : StoragePoolBase, IHybridStorage
     {
         protected HybridStorageConfig _config = new();
         protected ISearchOrchestrator? _searchOrchestrator;
@@ -669,13 +675,24 @@ namespace DataWarehouse.SDK.Contracts
 
     #endregion
 
-    #region Real-Time Storage Base
+    #region Real-Time Storage Orchestrator Base
 
     /// <summary>
-    /// Abstract base class for real-time high-stakes storage.
+    /// Abstract base class for real-time high-stakes storage orchestration.
     /// Provides synchronous multi-site replication, audit trails, and compliance features.
+    /// Suitable for government, healthcare, and financial data.
+    ///
+    /// Features:
+    /// - Synchronous multi-site replication with configurable quorum
+    /// - Immutable audit trails for compliance
+    /// - Cryptographic integrity verification
+    /// - Point-in-time recovery support
+    /// - Legal hold and retention policies
+    ///
+    /// Note: This is a KERNEL-LEVEL orchestrator that combines multiple PLUGINS.
+    /// For individual plugin multi-instance support, use HybridStoragePluginBase&lt;TConfig&gt;.
     /// </summary>
-    public abstract class RealTimeStorageBase : StoragePoolBase, IRealTimeStorage
+    public abstract class RealTimeStorageOrchestratorBase : StoragePoolBase, IRealTimeStorage
     {
         protected ComplianceMode _complianceMode = ComplianceMode.None;
         protected readonly ConcurrentDictionary<Uri, AuditEntry> _auditTrail = new();
@@ -689,7 +706,7 @@ namespace DataWarehouse.SDK.Contracts
 
         public ComplianceMode ComplianceMode => _complianceMode;
 
-        protected RealTimeStorageBase()
+        protected RealTimeStorageOrchestratorBase()
         {
             _strategy = new RealTimeStrategy();
         }
@@ -1016,6 +1033,15 @@ namespace DataWarehouse.SDK.Contracts
 
     /// <summary>
     /// Abstract base class for search orchestration across multiple providers.
+    /// Coordinates parallel search across SQL, NoSQL, Vector, and AI providers.
+    ///
+    /// Typical latencies:
+    /// - Thread A (SQL): ~10ms
+    /// - Thread B (NoSQL): ~50ms
+    /// - Thread C (Vector): ~200ms
+    /// - Thread D (AI): ~3-10s
+    ///
+    /// Supports multiple merge strategies: Union, ScoreWeighted, ReciprocalRankFusion.
     /// </summary>
     public abstract class SearchOrchestratorBase : ISearchOrchestrator
     {

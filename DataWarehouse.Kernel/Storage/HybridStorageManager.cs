@@ -163,15 +163,18 @@ namespace DataWarehouse.Kernel.Storage
     }
 
     /// <summary>
-    /// Production-ready hybrid storage manager implementing all abstract methods from HybridStorageBase.
+    /// Production-ready hybrid storage manager implementing all abstract methods from IndexingStorageOrchestratorBase.
     /// Provides background indexing, point-in-time recovery, and multi-provider search orchestration.
     ///
     /// Performance optimizations:
     /// - Uses CircularVersionBuffer for O(1) version history operations
     /// - Bounded indexing job tracking
     /// - Thread-safe operations throughout
+    ///
+    /// This is a KERNEL-LEVEL orchestrator that combines multiple storage PLUGINS.
+    /// For individual plugin multi-instance support, use HybridStoragePluginBase&lt;TConfig&gt;.
     /// </summary>
-    public class HybridStorageManager : HybridStorageBase
+    public class HybridStorageManager : IndexingStorageOrchestratorBase
     {
         private readonly ConcurrentDictionary<string, IndexingJob> _indexingJobs = new();
         private readonly ConcurrentDictionary<Uri, CircularVersionBuffer> _versionHistory = new();
