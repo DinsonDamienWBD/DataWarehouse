@@ -2,6 +2,7 @@ using DataWarehouse.Dashboard.Hubs;
 using DataWarehouse.Dashboard.Services;
 using DataWarehouse.Dashboard.Security;
 using DataWarehouse.Dashboard.Middleware;
+using DataWarehouse.Dashboard.Validation;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.OpenApi.Models;
 
@@ -11,7 +12,8 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddRazorPages();
 builder.Services.AddServerSideBlazor();
 builder.Services.AddSignalR();
-builder.Services.AddControllers();
+builder.Services.AddControllers()
+    .AddValidation();
 
 // Configure JWT Authentication
 var jwtOptions = new JwtAuthenticationOptions();

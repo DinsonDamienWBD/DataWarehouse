@@ -1,3 +1,4 @@
+using System.ComponentModel.DataAnnotations;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using DataWarehouse.Dashboard.Services;
@@ -205,15 +206,34 @@ public class StorageController : ControllerBase
 
 public class CreatePoolRequest
 {
+    [Required(ErrorMessage = "Pool name is required.")]
+    [StringLength(100, MinimumLength = 1, ErrorMessage = "Pool name must be between 1 and 100 characters.")]
+    [DataWarehouse.Dashboard.Validation.ValidIdentifier(ErrorMessage = "Pool name must be a valid identifier (letters, numbers, underscores, hyphens).")]
+    [DataWarehouse.Dashboard.Validation.SafeString]
     public string Name { get; set; } = string.Empty;
+
+    [StringLength(50, ErrorMessage = "Pool type must be at most 50 characters.")]
+    [DataWarehouse.Dashboard.Validation.SafeString]
     public string PoolType { get; set; } = "Standard";
+
+    [Range(1024L * 1024, 1024L * 1024 * 1024 * 1024 * 100, ErrorMessage = "Capacity must be between 1 MB and 100 TB.")]
     public long CapacityBytes { get; set; } = 1024L * 1024 * 1024 * 10; // 10 GB default
 }
 
 public class AddInstanceRequest
 {
+    [Required(ErrorMessage = "Instance name is required.")]
+    [StringLength(100, MinimumLength = 1, ErrorMessage = "Instance name must be between 1 and 100 characters.")]
+    [DataWarehouse.Dashboard.Validation.ValidIdentifier(ErrorMessage = "Instance name must be a valid identifier.")]
+    [DataWarehouse.Dashboard.Validation.SafeString]
     public string Name { get; set; } = string.Empty;
+
+    [Required(ErrorMessage = "Plugin ID is required.")]
+    [StringLength(100, MinimumLength = 1, ErrorMessage = "Plugin ID must be between 1 and 100 characters.")]
+    [DataWarehouse.Dashboard.Validation.SafeString]
     public string PluginId { get; set; } = string.Empty;
+
+    [DataWarehouse.Dashboard.Validation.SafeDictionary(MaxEntries = 50)]
     public Dictionary<string, object>? Config { get; set; }
 }
 
