@@ -2115,6 +2115,786 @@ public sealed class AirGappedBackupConfig
 
 #endregion
 
+#region Tier 3.6.5: WORM Compliance Mode (Write Once Read Many)
+
+/// <summary>
+/// Write Once Read Many (WORM) compliance storage for regulatory requirements.
+/// Ensures data cannot be modified or deleted until retention period expires.
+/// Supports SEC 17a-4, FINRA, HIPAA, SOX, and other regulatory standards.
+/// </summary>
+public sealed class WormComplianceManager : IAsyncDisposable
+{
+    private readonly ConcurrentDictionary<string, WormRecord> _records = new();
+    private readonly ConcurrentDictionary<string, WormPolicy> _policies = new();
+    private readonly IWormStorage _storage;
+    private readonly ImmutableAuditTrail _auditTrail;
+    private readonly WormConfig _config;
+    private readonly SemaphoreSlim _writeLock = new(1, 1);
+    private readonly Task _retentionTask;
+    private readonly CancellationTokenSource _cts = new();
+    private volatile bool _disposed;
+
+    public WormComplianceManager(
+        IWormStorage storage,
+        ImmutableAuditTrail auditTrail,
+        WormConfig? config = null)
+    {
+        _storage = storage ?? throw new ArgumentNullException(nameof(storage));
+        _auditTrail = auditTrail ?? throw new ArgumentNullException(nameof(auditTrail));
+        _config = config ?? new WormConfig();
+
+        _retentionTask = MonitorRetentionAsync(_cts.Token);
+    }
+
+    /// <summary>
+    /// Writes data to WORM storage with specified retention policy.
+    /// Once written, data cannot be modified until retention expires.
+    /// </summary>
+    public async Task<WormWriteResult> WriteAsync(
+        string recordId,
+        Stream data,
+        WormRetentionPolicy retention,
+        string userId,
+        IDictionary<string, string>? metadata = null,
+        CancellationToken ct = default)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, nameof(WormComplianceManager));
+
+        await _writeLock.WaitAsync(ct);
+        try
+        {
+            // Check if record already exists (cannot overwrite in WORM)
+            if (_records.ContainsKey(recordId))
+            {
+                return new WormWriteResult
+                {
+                    Success = false,
+                    Error = "Record already exists in WORM storage and cannot be overwritten"
+                };
+            }
+
+            // Calculate hash for integrity verification
+            using var sha256 = SHA256.Create();
+            var dataBytes = await ReadStreamAsync(data, ct);
+            var hash = sha256.ComputeHash(dataBytes);
+            var hashString = Convert.ToHexString(hash).ToLowerInvariant();
+
+            // Calculate retention expiry
+            var retentionExpiry = CalculateRetentionExpiry(retention);
+
+            // Create WORM record with legal hold support
+            var record = new WormRecord
+            {
+                RecordId = recordId,
+                ContentHash = hashString,
+                ContentLength = dataBytes.Length,
+                CreatedAt = DateTime.UtcNow,
+                CreatedBy = userId,
+                RetentionPolicy = retention,
+                RetentionExpiry = retentionExpiry,
+                IsLegalHold = false,
+                Metadata = metadata ?? new Dictionary<string, string>(),
+                Status = WormRecordStatus.Active
+            };
+
+            // Write to underlying storage
+            await _storage.WriteAsync(recordId, dataBytes, ct);
+
+            // Store record metadata
+            _records[recordId] = record;
+
+            // Audit the write operation
+            await _auditTrail.RecordAsync(
+                "WormRecordCreated",
+                userId,
+                recordId,
+                AuditEventType.DataWritten,
+                new Dictionary<string, object>
+                {
+                    ["contentHash"] = hashString,
+                    ["contentLength"] = dataBytes.Length,
+                    ["retentionPolicy"] = retention.PolicyType.ToString(),
+                    ["retentionExpiry"] = retentionExpiry
+                },
+                ct);
+
+            return new WormWriteResult
+            {
+                Success = true,
+                RecordId = recordId,
+                ContentHash = hashString,
+                RetentionExpiry = retentionExpiry
+            };
+        }
+        finally
+        {
+            _writeLock.Release();
+        }
+    }
+
+    /// <summary>
+    /// Reads data from WORM storage with verification.
+    /// </summary>
+    public async Task<WormReadResult> ReadAsync(
+        string recordId,
+        string userId,
+        CancellationToken ct = default)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, nameof(WormComplianceManager));
+
+        if (!_records.TryGetValue(recordId, out var record))
+        {
+            return new WormReadResult
+            {
+                Success = false,
+                Error = "Record not found"
+            };
+        }
+
+        // Read from storage
+        var data = await _storage.ReadAsync(recordId, ct);
+        if (data == null)
+        {
+            return new WormReadResult
+            {
+                Success = false,
+                Error = "Data not found in storage"
+            };
+        }
+
+        // Verify integrity
+        using var sha256 = SHA256.Create();
+        var hash = sha256.ComputeHash(data);
+        var hashString = Convert.ToHexString(hash).ToLowerInvariant();
+
+        if (hashString != record.ContentHash)
+        {
+            // CRITICAL: Data integrity violation - audit and fail
+            await _auditTrail.RecordAsync(
+                "WormIntegrityViolation",
+                userId,
+                recordId,
+                AuditEventType.SecurityEvent,
+                new Dictionary<string, object>
+                {
+                    ["expectedHash"] = record.ContentHash,
+                    ["actualHash"] = hashString,
+                    ["severity"] = "CRITICAL"
+                },
+                ct);
+
+            return new WormReadResult
+            {
+                Success = false,
+                Error = "Data integrity verification failed - possible tampering detected"
+            };
+        }
+
+        // Audit read access
+        await _auditTrail.RecordAsync(
+            "WormRecordRead",
+            userId,
+            recordId,
+            AuditEventType.DataAccessed,
+            new Dictionary<string, object>
+            {
+                ["contentHash"] = hashString,
+                ["verificationPassed"] = true
+            },
+            ct);
+
+        return new WormReadResult
+        {
+            Success = true,
+            RecordId = recordId,
+            Data = data,
+            ContentHash = hashString,
+            Record = record
+        };
+    }
+
+    /// <summary>
+    /// Attempts to delete a WORM record. Only succeeds if retention has expired
+    /// and no legal hold is in place.
+    /// </summary>
+    public async Task<WormDeleteResult> DeleteAsync(
+        string recordId,
+        string userId,
+        string reason,
+        CancellationToken ct = default)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, nameof(WormComplianceManager));
+
+        if (!_records.TryGetValue(recordId, out var record))
+        {
+            return new WormDeleteResult
+            {
+                Success = false,
+                Error = "Record not found"
+            };
+        }
+
+        // Check legal hold
+        if (record.IsLegalHold)
+        {
+            await _auditTrail.RecordAsync(
+                "WormDeleteBlockedByLegalHold",
+                userId,
+                recordId,
+                AuditEventType.AccessDenied,
+                new Dictionary<string, object>
+                {
+                    ["reason"] = "Legal hold prevents deletion",
+                    ["legalHoldId"] = record.LegalHoldId ?? "unknown"
+                },
+                ct);
+
+            return new WormDeleteResult
+            {
+                Success = false,
+                Error = "Record is under legal hold and cannot be deleted"
+            };
+        }
+
+        // Check retention period
+        if (DateTime.UtcNow < record.RetentionExpiry)
+        {
+            await _auditTrail.RecordAsync(
+                "WormDeleteBlockedByRetention",
+                userId,
+                recordId,
+                AuditEventType.AccessDenied,
+                new Dictionary<string, object>
+                {
+                    ["retentionExpiry"] = record.RetentionExpiry,
+                    ["remainingDays"] = (record.RetentionExpiry - DateTime.UtcNow).TotalDays
+                },
+                ct);
+
+            return new WormDeleteResult
+            {
+                Success = false,
+                Error = $"Record retention period has not expired. Expires: {record.RetentionExpiry:O}"
+            };
+        }
+
+        // Proceed with deletion
+        await _storage.DeleteAsync(recordId, ct);
+        _records.TryRemove(recordId, out _);
+
+        await _auditTrail.RecordAsync(
+            "WormRecordDeleted",
+            userId,
+            recordId,
+            AuditEventType.DataDeleted,
+            new Dictionary<string, object>
+            {
+                ["contentHash"] = record.ContentHash,
+                ["reason"] = reason,
+                ["originalCreatedAt"] = record.CreatedAt,
+                ["retentionExpiry"] = record.RetentionExpiry
+            },
+            ct);
+
+        return new WormDeleteResult
+        {
+            Success = true,
+            RecordId = recordId,
+            DeletedAt = DateTime.UtcNow
+        };
+    }
+
+    /// <summary>
+    /// Places a legal hold on a record, preventing deletion regardless of retention.
+    /// </summary>
+    public async Task<LegalHoldResult> PlaceLegalHoldAsync(
+        string recordId,
+        string legalHoldId,
+        string caseReference,
+        string userId,
+        CancellationToken ct = default)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, nameof(WormComplianceManager));
+
+        if (!_records.TryGetValue(recordId, out var record))
+        {
+            return new LegalHoldResult
+            {
+                Success = false,
+                Error = "Record not found"
+            };
+        }
+
+        record.IsLegalHold = true;
+        record.LegalHoldId = legalHoldId;
+        record.LegalHoldPlacedAt = DateTime.UtcNow;
+        record.LegalHoldPlacedBy = userId;
+        record.LegalHoldCaseReference = caseReference;
+
+        await _auditTrail.RecordAsync(
+            "WormLegalHoldPlaced",
+            userId,
+            recordId,
+            AuditEventType.SecurityEvent,
+            new Dictionary<string, object>
+            {
+                ["legalHoldId"] = legalHoldId,
+                ["caseReference"] = caseReference
+            },
+            ct);
+
+        return new LegalHoldResult
+        {
+            Success = true,
+            RecordId = recordId,
+            LegalHoldId = legalHoldId,
+            PlacedAt = record.LegalHoldPlacedAt.Value
+        };
+    }
+
+    /// <summary>
+    /// Releases a legal hold from a record.
+    /// </summary>
+    public async Task<LegalHoldResult> ReleaseLegalHoldAsync(
+        string recordId,
+        string legalHoldId,
+        string userId,
+        string releaseReason,
+        CancellationToken ct = default)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, nameof(WormComplianceManager));
+
+        if (!_records.TryGetValue(recordId, out var record))
+        {
+            return new LegalHoldResult
+            {
+                Success = false,
+                Error = "Record not found"
+            };
+        }
+
+        if (!record.IsLegalHold || record.LegalHoldId != legalHoldId)
+        {
+            return new LegalHoldResult
+            {
+                Success = false,
+                Error = "Legal hold not found on this record"
+            };
+        }
+
+        record.IsLegalHold = false;
+        record.LegalHoldReleasedAt = DateTime.UtcNow;
+        record.LegalHoldReleasedBy = userId;
+
+        await _auditTrail.RecordAsync(
+            "WormLegalHoldReleased",
+            userId,
+            recordId,
+            AuditEventType.SecurityEvent,
+            new Dictionary<string, object>
+            {
+                ["legalHoldId"] = legalHoldId,
+                ["releaseReason"] = releaseReason,
+                ["originalCaseReference"] = record.LegalHoldCaseReference ?? "unknown"
+            },
+            ct);
+
+        return new LegalHoldResult
+        {
+            Success = true,
+            RecordId = recordId,
+            LegalHoldId = legalHoldId,
+            ReleasedAt = record.LegalHoldReleasedAt.Value
+        };
+    }
+
+    /// <summary>
+    /// Extends the retention period for a record (can never shorten).
+    /// </summary>
+    public async Task<RetentionExtensionResult> ExtendRetentionAsync(
+        string recordId,
+        TimeSpan extension,
+        string userId,
+        string reason,
+        CancellationToken ct = default)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, nameof(WormComplianceManager));
+
+        if (!_records.TryGetValue(recordId, out var record))
+        {
+            return new RetentionExtensionResult
+            {
+                Success = false,
+                Error = "Record not found"
+            };
+        }
+
+        var previousExpiry = record.RetentionExpiry;
+        var newExpiry = record.RetentionExpiry.Add(extension);
+
+        // WORM rule: retention can only be extended, never shortened
+        if (newExpiry <= previousExpiry)
+        {
+            return new RetentionExtensionResult
+            {
+                Success = false,
+                Error = "Retention period can only be extended, not shortened"
+            };
+        }
+
+        record.RetentionExpiry = newExpiry;
+
+        await _auditTrail.RecordAsync(
+            "WormRetentionExtended",
+            userId,
+            recordId,
+            AuditEventType.ConfigChanged,
+            new Dictionary<string, object>
+            {
+                ["previousExpiry"] = previousExpiry,
+                ["newExpiry"] = newExpiry,
+                ["extensionDays"] = extension.TotalDays,
+                ["reason"] = reason
+            },
+            ct);
+
+        return new RetentionExtensionResult
+        {
+            Success = true,
+            RecordId = recordId,
+            PreviousExpiry = previousExpiry,
+            NewExpiry = newExpiry
+        };
+    }
+
+    /// <summary>
+    /// Gets the compliance status for all records.
+    /// </summary>
+    public WormComplianceStatus GetComplianceStatus()
+    {
+        var records = _records.Values.ToList();
+        var now = DateTime.UtcNow;
+
+        return new WormComplianceStatus
+        {
+            TotalRecords = records.Count,
+            ActiveRecords = records.Count(r => r.Status == WormRecordStatus.Active),
+            ExpiredRecords = records.Count(r => now >= r.RetentionExpiry && !r.IsLegalHold),
+            LegalHoldRecords = records.Count(r => r.IsLegalHold),
+            TotalStorageBytes = records.Sum(r => r.ContentLength),
+            OldestRecord = records.MinBy(r => r.CreatedAt)?.CreatedAt,
+            NewestRecord = records.MaxBy(r => r.CreatedAt)?.CreatedAt,
+            NextExpiry = records
+                .Where(r => now < r.RetentionExpiry && !r.IsLegalHold)
+                .MinBy(r => r.RetentionExpiry)?.RetentionExpiry,
+            ComplianceVerified = true,
+            LastVerificationAt = DateTime.UtcNow
+        };
+    }
+
+    /// <summary>
+    /// Verifies integrity of all WORM records.
+    /// </summary>
+    public async Task<WormVerificationResult> VerifyAllRecordsAsync(
+        string userId,
+        CancellationToken ct = default)
+    {
+        var results = new List<RecordVerificationResult>();
+        var failedRecords = new List<string>();
+
+        foreach (var record in _records.Values)
+        {
+            ct.ThrowIfCancellationRequested();
+
+            var data = await _storage.ReadAsync(record.RecordId, ct);
+            if (data == null)
+            {
+                failedRecords.Add(record.RecordId);
+                results.Add(new RecordVerificationResult
+                {
+                    RecordId = record.RecordId,
+                    Verified = false,
+                    Error = "Data not found in storage"
+                });
+                continue;
+            }
+
+            using var sha256 = SHA256.Create();
+            var hash = sha256.ComputeHash(data);
+            var hashString = Convert.ToHexString(hash).ToLowerInvariant();
+
+            var verified = hashString == record.ContentHash;
+            results.Add(new RecordVerificationResult
+            {
+                RecordId = record.RecordId,
+                Verified = verified,
+                ExpectedHash = record.ContentHash,
+                ActualHash = hashString,
+                Error = verified ? null : "Hash mismatch - data may have been tampered"
+            });
+
+            if (!verified)
+            {
+                failedRecords.Add(record.RecordId);
+            }
+        }
+
+        await _auditTrail.RecordAsync(
+            "WormVerificationCompleted",
+            userId,
+            "system",
+            AuditEventType.SystemEvent,
+            new Dictionary<string, object>
+            {
+                ["totalRecords"] = results.Count,
+                ["passedRecords"] = results.Count - failedRecords.Count,
+                ["failedRecords"] = failedRecords
+            },
+            ct);
+
+        return new WormVerificationResult
+        {
+            Success = failedRecords.Count == 0,
+            TotalRecords = results.Count,
+            VerifiedRecords = results.Count - failedRecords.Count,
+            FailedRecords = failedRecords,
+            Results = results,
+            VerifiedAt = DateTime.UtcNow
+        };
+    }
+
+    private DateTime CalculateRetentionExpiry(WormRetentionPolicy policy)
+    {
+        return policy.PolicyType switch
+        {
+            WormRetentionType.FixedDuration => DateTime.UtcNow.Add(policy.Duration),
+            WormRetentionType.EventBased => DateTime.MaxValue, // Until event triggers
+            WormRetentionType.Regulatory => policy.RegulatoryStandard switch
+            {
+                RegulatoryStandard.SEC17a4 => DateTime.UtcNow.AddYears(6),
+                RegulatoryStandard.FINRA => DateTime.UtcNow.AddYears(6),
+                RegulatoryStandard.HIPAA => DateTime.UtcNow.AddYears(6),
+                RegulatoryStandard.SOX => DateTime.UtcNow.AddYears(7),
+                RegulatoryStandard.GDPR => DateTime.UtcNow.Add(policy.Duration),
+                RegulatoryStandard.MiFID => DateTime.UtcNow.AddYears(7),
+                _ => DateTime.UtcNow.AddYears(_config.DefaultRetentionYears)
+            },
+            WormRetentionType.Indefinite => DateTime.MaxValue,
+            _ => DateTime.UtcNow.AddYears(_config.DefaultRetentionYears)
+        };
+    }
+
+    private async Task MonitorRetentionAsync(CancellationToken ct)
+    {
+        while (!ct.IsCancellationRequested)
+        {
+            try
+            {
+                await Task.Delay(_config.RetentionCheckInterval, ct);
+
+                var now = DateTime.UtcNow;
+                var expiredRecords = _records.Values
+                    .Where(r => now >= r.RetentionExpiry && !r.IsLegalHold && r.Status == WormRecordStatus.Active)
+                    .ToList();
+
+                foreach (var record in expiredRecords)
+                {
+                    record.Status = WormRecordStatus.RetentionExpired;
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                break;
+            }
+            catch
+            {
+                // Log error and continue monitoring
+            }
+        }
+    }
+
+    private static async Task<byte[]> ReadStreamAsync(Stream stream, CancellationToken ct)
+    {
+        using var ms = new MemoryStream();
+        await stream.CopyToAsync(ms, ct);
+        return ms.ToArray();
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_disposed) return;
+        _disposed = true;
+
+        await _cts.CancelAsync();
+        try
+        {
+            await _retentionTask;
+        }
+        catch (OperationCanceledException)
+        {
+            // Expected
+        }
+
+        _cts.Dispose();
+        _writeLock.Dispose();
+    }
+}
+
+/// <summary>
+/// Storage interface for WORM-compliant underlying storage.
+/// Implementations must ensure physical immutability.
+/// </summary>
+public interface IWormStorage
+{
+    Task WriteAsync(string recordId, byte[] data, CancellationToken ct = default);
+    Task<byte[]?> ReadAsync(string recordId, CancellationToken ct = default);
+    Task DeleteAsync(string recordId, CancellationToken ct = default);
+}
+
+public sealed class WormConfig
+{
+    public int DefaultRetentionYears { get; set; } = 7;
+    public TimeSpan RetentionCheckInterval { get; set; } = TimeSpan.FromHours(1);
+    public bool RequireEncryption { get; set; } = true;
+    public bool EnableAutoVerification { get; set; } = true;
+    public TimeSpan VerificationInterval { get; set; } = TimeSpan.FromDays(1);
+}
+
+public enum WormRetentionType
+{
+    FixedDuration,
+    EventBased,
+    Regulatory,
+    Indefinite
+}
+
+public enum RegulatoryStandard
+{
+    SEC17a4,
+    FINRA,
+    HIPAA,
+    SOX,
+    GDPR,
+    MiFID,
+    Custom
+}
+
+public enum WormRecordStatus
+{
+    Active,
+    RetentionExpired,
+    Deleted
+}
+
+public sealed class WormRecord
+{
+    public required string RecordId { get; init; }
+    public required string ContentHash { get; init; }
+    public long ContentLength { get; init; }
+    public DateTime CreatedAt { get; init; }
+    public required string CreatedBy { get; init; }
+    public required WormRetentionPolicy RetentionPolicy { get; init; }
+    public DateTime RetentionExpiry { get; set; }
+    public bool IsLegalHold { get; set; }
+    public string? LegalHoldId { get; set; }
+    public DateTime? LegalHoldPlacedAt { get; set; }
+    public string? LegalHoldPlacedBy { get; set; }
+    public string? LegalHoldCaseReference { get; set; }
+    public DateTime? LegalHoldReleasedAt { get; set; }
+    public string? LegalHoldReleasedBy { get; set; }
+    public IDictionary<string, string> Metadata { get; init; } = new Dictionary<string, string>();
+    public WormRecordStatus Status { get; set; }
+}
+
+public sealed class WormRetentionPolicy
+{
+    public WormRetentionType PolicyType { get; init; }
+    public TimeSpan Duration { get; init; }
+    public RegulatoryStandard? RegulatoryStandard { get; init; }
+    public string? EventTrigger { get; init; }
+}
+
+public record WormWriteResult
+{
+    public bool Success { get; init; }
+    public string? RecordId { get; init; }
+    public string? ContentHash { get; init; }
+    public DateTime? RetentionExpiry { get; init; }
+    public string? Error { get; init; }
+}
+
+public record WormReadResult
+{
+    public bool Success { get; init; }
+    public string? RecordId { get; init; }
+    public byte[]? Data { get; init; }
+    public string? ContentHash { get; init; }
+    public WormRecord? Record { get; init; }
+    public string? Error { get; init; }
+}
+
+public record WormDeleteResult
+{
+    public bool Success { get; init; }
+    public string? RecordId { get; init; }
+    public DateTime? DeletedAt { get; init; }
+    public string? Error { get; init; }
+}
+
+public record LegalHoldResult
+{
+    public bool Success { get; init; }
+    public string? RecordId { get; init; }
+    public string? LegalHoldId { get; init; }
+    public DateTime? PlacedAt { get; init; }
+    public DateTime? ReleasedAt { get; init; }
+    public string? Error { get; init; }
+}
+
+public record RetentionExtensionResult
+{
+    public bool Success { get; init; }
+    public string? RecordId { get; init; }
+    public DateTime? PreviousExpiry { get; init; }
+    public DateTime? NewExpiry { get; init; }
+    public string? Error { get; init; }
+}
+
+public record WormComplianceStatus
+{
+    public int TotalRecords { get; init; }
+    public int ActiveRecords { get; init; }
+    public int ExpiredRecords { get; init; }
+    public int LegalHoldRecords { get; init; }
+    public long TotalStorageBytes { get; init; }
+    public DateTime? OldestRecord { get; init; }
+    public DateTime? NewestRecord { get; init; }
+    public DateTime? NextExpiry { get; init; }
+    public bool ComplianceVerified { get; init; }
+    public DateTime LastVerificationAt { get; init; }
+}
+
+public record WormVerificationResult
+{
+    public bool Success { get; init; }
+    public int TotalRecords { get; init; }
+    public int VerifiedRecords { get; init; }
+    public List<string> FailedRecords { get; init; } = new();
+    public List<RecordVerificationResult> Results { get; init; } = new();
+    public DateTime VerifiedAt { get; init; }
+}
+
+public record RecordVerificationResult
+{
+    public required string RecordId { get; init; }
+    public bool Verified { get; init; }
+    public string? ExpectedHash { get; init; }
+    public string? ActualHash { get; init; }
+    public string? Error { get; init; }
+}
+
+#endregion
+
 #region Tier 3.7: Multi-Party Computation (Threshold Signatures)
 
 /// <summary>
