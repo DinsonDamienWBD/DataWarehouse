@@ -417,7 +417,7 @@ namespace DataWarehouse.Kernel.Infrastructure
     /// </summary>
     public interface IHealthCheck
     {
-        Task<HealthCheckResult> CheckAsync(CancellationToken ct = default);
+        Task<HealthCheckResult> CheckHealthAsync(CancellationToken ct = default);
     }
 
     /// <summary>

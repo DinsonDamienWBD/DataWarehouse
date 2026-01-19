@@ -475,7 +475,7 @@ namespace DataWarehouse.Plugins.AccessControl
             return result;
         }
 
-        private static string? GetString(Dictionary<string, object?> payload, string key)
+        private static string? GetString(Dictionary<string, object> payload, string key)
         {
             return payload.TryGetValue(key, out var val) && val is string s ? s : null;
         }

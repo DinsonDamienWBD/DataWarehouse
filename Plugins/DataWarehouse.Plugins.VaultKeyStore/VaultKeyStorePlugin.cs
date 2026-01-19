@@ -283,7 +283,7 @@ namespace DataWarehouse.Plugins.VaultKeyStore
             var isHealthy = await _activeBackend!.IsHealthyAsync();
         }
 
-        private static string? GetString(Dictionary<string, object?> payload, string key)
+        private static string? GetString(Dictionary<string, object> payload, string key)
         {
             return payload.TryGetValue(key, out var val) && val is string s ? s : null;
         }

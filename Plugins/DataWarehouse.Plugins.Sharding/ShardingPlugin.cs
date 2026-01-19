@@ -128,7 +128,7 @@ namespace DataWarehouse.Plugins.Sharding
 
         #region Consistent Hash Routing
 
-        private object HandleRoute(Dictionary<string, object?>? payload)
+        private object HandleRoute(Dictionary<string, object>? payload)
         {
             var key = GetString(payload, "key");
             if (string.IsNullOrEmpty(key))
@@ -160,7 +160,7 @@ namespace DataWarehouse.Plugins.Sharding
             };
         }
 
-        private object HandleRouteMulti(Dictionary<string, object?>? payload)
+        private object HandleRouteMulti(Dictionary<string, object>? payload)
         {
             if (payload?.TryGetValue("keys", out var keysObj) != true || keysObj is not IEnumerable<object> keys)
             {
@@ -207,7 +207,7 @@ namespace DataWarehouse.Plugins.Sharding
 
         #region Node Management
 
-        private async Task<object> HandleAddNodeAsync(Dictionary<string, object?>? payload)
+        private async Task<object> HandleAddNodeAsync(Dictionary<string, object>? payload)
         {
             var nodeId = GetString(payload, "nodeId");
             var endpoint = GetString(payload, "endpoint");
@@ -253,7 +253,7 @@ namespace DataWarehouse.Plugins.Sharding
             }
         }
 
-        private async Task<object> HandleRemoveNodeAsync(Dictionary<string, object?>? payload)
+        private async Task<object> HandleRemoveNodeAsync(Dictionary<string, object>? payload)
         {
             var nodeId = GetString(payload, "nodeId");
             if (string.IsNullOrEmpty(nodeId))
@@ -331,7 +331,7 @@ namespace DataWarehouse.Plugins.Sharding
 
         #region Split and Merge
 
-        private async Task<object> HandleSplitAsync(Dictionary<string, object?>? payload)
+        private async Task<object> HandleSplitAsync(Dictionary<string, object>? payload)
         {
             var shardId = GetString(payload, "shardId");
             if (string.IsNullOrEmpty(shardId))
@@ -377,7 +377,7 @@ namespace DataWarehouse.Plugins.Sharding
             };
         }
 
-        private async Task<object> HandleMergeAsync(Dictionary<string, object?>? payload)
+        private async Task<object> HandleMergeAsync(Dictionary<string, object>? payload)
         {
             if (payload?.TryGetValue("shardIds", out var idsObj) != true || idsObj is not IEnumerable<object> ids)
             {
@@ -422,7 +422,7 @@ namespace DataWarehouse.Plugins.Sharding
 
         #region Range Partitioning
 
-        private object HandleRangeCreate(Dictionary<string, object?>? payload)
+        private object HandleRangeCreate(Dictionary<string, object>? payload)
         {
             var partitionName = GetString(payload, "name");
             var column = GetString(payload, "column");
@@ -467,7 +467,7 @@ namespace DataWarehouse.Plugins.Sharding
             };
         }
 
-        private object HandleRangeRoute(Dictionary<string, object?>? payload)
+        private object HandleRangeRoute(Dictionary<string, object>? payload)
         {
             var partitionName = GetString(payload, "partition");
             var value = GetString(payload, "value");
@@ -510,7 +510,7 @@ namespace DataWarehouse.Plugins.Sharding
 
         #region Migration
 
-        private async Task<object> HandleMigrateAsync(Dictionary<string, object?>? payload)
+        private async Task<object> HandleMigrateAsync(Dictionary<string, object>? payload)
         {
             var sourceShardId = GetString(payload, "source");
             var targetShardId = GetString(payload, "target");
@@ -622,12 +622,12 @@ namespace DataWarehouse.Plugins.Sharding
 
         #region Helpers
 
-        private static string? GetString(Dictionary<string, object?>? payload, string key)
+        private static string? GetString(Dictionary<string, object>? payload, string key)
         {
             return payload?.TryGetValue(key, out var val) == true && val is string s ? s : null;
         }
 
-        private static double? GetDouble(Dictionary<string, object?>? payload, string key)
+        private static double? GetDouble(Dictionary<string, object>? payload, string key)
         {
             if (payload?.TryGetValue(key, out var val) != true) return null;
             return val switch

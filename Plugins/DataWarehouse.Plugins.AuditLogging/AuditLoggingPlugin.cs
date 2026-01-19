@@ -1772,7 +1772,7 @@ For detailed verification, use the VerifyChainIntegrityAsync() method in the SDK
                 System.Globalization.DateTimeStyles.None, out date);
         }
 
-        private static string? GetString(Dictionary<string, object?> payload, string key)
+        private static string? GetString(Dictionary<string, object> payload, string key)
         {
             return payload.TryGetValue(key, out var val) && val is string s ? s : null;
         }

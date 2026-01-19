@@ -389,7 +389,7 @@ namespace DataWarehouse.Plugins.RelationalDatabaseStorage
         /// <summary>
         /// Gets a string value from a payload dictionary.
         /// </summary>
-        protected static string? GetPayloadString(Dictionary<string, object?> dict, string key)
+        protected static string? GetPayloadString(Dictionary<string, object> dict, string key)
         {
             return dict.TryGetValue(key, out var value) ? value?.ToString() : null;
         }
@@ -397,7 +397,7 @@ namespace DataWarehouse.Plugins.RelationalDatabaseStorage
         /// <summary>
         /// Gets a dictionary value from a payload dictionary.
         /// </summary>
-        protected static Dictionary<string, object>? GetPayloadDictionary(Dictionary<string, object?> dict, string key)
+        protected static Dictionary<string, object>? GetPayloadDictionary(Dictionary<string, object> dict, string key)
         {
             if (dict.TryGetValue(key, out var value) && value is Dictionary<string, object> result)
                 return result;

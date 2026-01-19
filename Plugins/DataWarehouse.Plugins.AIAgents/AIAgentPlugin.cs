@@ -227,7 +227,7 @@ namespace DataWarehouse.Plugins.AIAgents
 
         #region Message Handlers
 
-        private async Task<object> HandleChatAsync(Dictionary<string, object?>? payload)
+        private async Task<object> HandleChatAsync(Dictionary<string, object>? payload)
         {
             var providerName = GetString(payload, "provider") ?? _config.DefaultProvider;
             var model = GetString(payload, "model");
@@ -302,7 +302,7 @@ namespace DataWarehouse.Plugins.AIAgents
             }
         }
 
-        private async Task<object> HandleCompleteAsync(Dictionary<string, object?>? payload)
+        private async Task<object> HandleCompleteAsync(Dictionary<string, object>? payload)
         {
             var providerName = GetString(payload, "provider") ?? _config.DefaultProvider;
             var prompt = GetString(payload, "prompt");
@@ -346,7 +346,7 @@ namespace DataWarehouse.Plugins.AIAgents
             }
         }
 
-        private async Task<object> HandleEmbedAsync(Dictionary<string, object?>? payload)
+        private async Task<object> HandleEmbedAsync(Dictionary<string, object>? payload)
         {
             var providerName = GetString(payload, "provider") ?? _config.DefaultEmbeddingProvider;
             var text = GetString(payload, "text");
@@ -376,7 +376,7 @@ namespace DataWarehouse.Plugins.AIAgents
             };
         }
 
-        private async Task<object> HandleStreamAsync(Dictionary<string, object?>? payload)
+        private async Task<object> HandleStreamAsync(Dictionary<string, object>? payload)
         {
             // Streaming would typically use Server-Sent Events or WebSocket
             // For message-based architecture, we return chunks in response
@@ -417,7 +417,7 @@ namespace DataWarehouse.Plugins.AIAgents
             };
         }
 
-        private async Task<object> HandleFunctionAsync(Dictionary<string, object?>? payload)
+        private async Task<object> HandleFunctionAsync(Dictionary<string, object>? payload)
         {
             var providerName = GetString(payload, "provider") ?? _config.DefaultProvider;
             var message = GetString(payload, "message");
@@ -459,7 +459,7 @@ namespace DataWarehouse.Plugins.AIAgents
             };
         }
 
-        private async Task<object> HandleAnalyzeAsync(Dictionary<string, object?>? payload)
+        private async Task<object> HandleAnalyzeAsync(Dictionary<string, object>? payload)
         {
             var providerName = GetString(payload, "provider") ?? _config.DefaultProvider;
             var data = GetString(payload, "data");
@@ -510,7 +510,7 @@ namespace DataWarehouse.Plugins.AIAgents
             };
         }
 
-        private async Task<object> HandleVisionAsync(Dictionary<string, object?>? payload)
+        private async Task<object> HandleVisionAsync(Dictionary<string, object>? payload)
         {
             var providerName = GetString(payload, "provider") ?? _config.DefaultVisionProvider;
             var imageUrl = GetString(payload, "imageUrl");
@@ -567,7 +567,7 @@ namespace DataWarehouse.Plugins.AIAgents
             };
         }
 
-        private object HandleConfigure(Dictionary<string, object?>? payload)
+        private object HandleConfigure(Dictionary<string, object>? payload)
         {
             var providerName = GetString(payload, "provider");
             var apiKey = GetString(payload, "apiKey");
@@ -620,7 +620,7 @@ namespace DataWarehouse.Plugins.AIAgents
             };
         }
 
-        private object HandleConversationCreate(Dictionary<string, object?>? payload)
+        private object HandleConversationCreate(Dictionary<string, object>? payload)
         {
             var conversationId = Guid.NewGuid().ToString("N");
             var systemPrompt = GetString(payload, "system");
@@ -637,7 +637,7 @@ namespace DataWarehouse.Plugins.AIAgents
             return new { success = true, conversationId };
         }
 
-        private async Task<object> HandleConversationContinueAsync(Dictionary<string, object?>? payload)
+        private async Task<object> HandleConversationContinueAsync(Dictionary<string, object>? payload)
         {
             var conversationId = GetString(payload, "conversationId");
             if (string.IsNullOrEmpty(conversationId) || !_conversations.ContainsKey(conversationId))
@@ -650,7 +650,7 @@ namespace DataWarehouse.Plugins.AIAgents
             return await HandleChatAsync(payload);
         }
 
-        private object HandleConversationClear(Dictionary<string, object?>? payload)
+        private object HandleConversationClear(Dictionary<string, object>? payload)
         {
             var conversationId = GetString(payload, "conversationId");
             if (string.IsNullOrEmpty(conversationId))
@@ -692,7 +692,7 @@ namespace DataWarehouse.Plugins.AIAgents
             };
         }
 
-        private async Task<object> TryFailoverAsync(Dictionary<string, object?>? payload, string failedProvider, Exception ex)
+        private async Task<object> TryFailoverAsync(Dictionary<string, object>? payload, string failedProvider, Exception ex)
         {
             var fallbackProviders = _config.FailoverOrder
                 .Where(p => p != failedProvider && _providers.ContainsKey(p))
@@ -783,7 +783,7 @@ namespace DataWarehouse.Plugins.AIAgents
             return messages;
         }
 
-        private List<FunctionDefinition> ExtractFunctions(Dictionary<string, object?>? payload)
+        private List<FunctionDefinition> ExtractFunctions(Dictionary<string, object>? payload)
         {
             if (payload?.TryGetValue("functions", out var funcs) != true || funcs == null)
                 return new List<FunctionDefinition>();
@@ -796,7 +796,7 @@ namespace DataWarehouse.Plugins.AIAgents
             return new List<FunctionDefinition>();
         }
 
-        private static string? GetString(Dictionary<string, object?>? payload, string key)
+        private static string? GetString(Dictionary<string, object>? payload, string key)
         {
             if (payload?.TryGetValue(key, out var val) != true) return null;
             return val switch
@@ -807,7 +807,7 @@ namespace DataWarehouse.Plugins.AIAgents
             };
         }
 
-        private static int? GetInt(Dictionary<string, object?>? payload, string key)
+        private static int? GetInt(Dictionary<string, object>? payload, string key)
         {
             if (payload?.TryGetValue(key, out var val) != true) return null;
             return val switch
@@ -820,7 +820,7 @@ namespace DataWarehouse.Plugins.AIAgents
             };
         }
 
-        private static double? GetDouble(Dictionary<string, object?>? payload, string key)
+        private static double? GetDouble(Dictionary<string, object>? payload, string key)
         {
             if (payload?.TryGetValue(key, out var val) != true) return null;
             return val switch
@@ -833,7 +833,7 @@ namespace DataWarehouse.Plugins.AIAgents
             };
         }
 
-        private static string[]? GetStringArray(Dictionary<string, object?>? payload, string key)
+        private static string[]? GetStringArray(Dictionary<string, object>? payload, string key)
         {
             if (payload?.TryGetValue(key, out var val) != true || val == null) return null;
             if (val is string[] arr) return arr;
@@ -982,7 +982,7 @@ namespace DataWarehouse.Plugins.AIAgents
         /// <summary>
         /// Additional provider-specific settings (e.g., api_version for Azure, region for Bedrock).
         /// </summary>
-        public Dictionary<string, object?>? AdditionalSettings { get; set; }
+        public Dictionary<string, object>? AdditionalSettings { get; set; }
     }
 
     public class ConversationHistory
@@ -1224,7 +1224,7 @@ namespace DataWarehouse.Plugins.AIAgents
         /// <summary>
         /// Authenticate a request and return user quota information.
         /// </summary>
-        Task<AuthenticationResult> AuthenticateAsync(string? token, Dictionary<string, object?>? context);
+        Task<AuthenticationResult> AuthenticateAsync(string? token, Dictionary<string, object>? context);
 
         /// <summary>
         /// Called after successful request to record usage for billing.
@@ -1251,7 +1251,7 @@ namespace DataWarehouse.Plugins.AIAgents
             _defaultApiKey = defaultApiKey;
         }
 
-        public Task<AuthenticationResult> AuthenticateAsync(string? token, Dictionary<string, object?>? context)
+        public Task<AuthenticationResult> AuthenticateAsync(string? token, Dictionary<string, object>? context)
         {
             // Simple token-based auth for demo
             if (string.IsNullOrEmpty(token))

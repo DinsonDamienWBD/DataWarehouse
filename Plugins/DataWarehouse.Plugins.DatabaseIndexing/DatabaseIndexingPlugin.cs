@@ -45,11 +45,11 @@ public sealed class DatabaseIndexingPlugin : MetadataIndexPluginBase
     /// </summary>
     public enum DatabaseEngine { PostgreSQL, MySQL, SQLServer, SQLite, Oracle }
 
-    protected override string SemanticDescription =>
+    protected string SemanticDescription =>
         "Database-agnostic metadata indexing supporting PostgreSQL, MySQL, SQL Server. " +
         "Features GIN indexes, full-text search, and connection pooling.";
 
-    protected override string[] SemanticTags => new[]
+    protected string[] SemanticTags => new[]
     {
         "indexing", "database", "postgresql", "mysql", "sqlserver",
         "full-text-search", "gin-index", "connection-pooling"
@@ -301,7 +301,7 @@ public sealed class DatabaseIndexingPlugin : MetadataIndexPluginBase
         return Task.FromResult<Manifest?>(null);
     }
 
-    public override Task RemoveAsync(string id)
+    public Task RemoveAsync(string id)
     {
         _cache.TryRemove(id, out _);
         _vectors.TryRemove(id, out _);

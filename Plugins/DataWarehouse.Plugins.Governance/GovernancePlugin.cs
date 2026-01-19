@@ -484,7 +484,7 @@ public sealed class GovernancePlugin : GovernancePluginBase
                 .Take(10)
                 .Select(s => new { s.ManifestId, s.Timestamp, s.FindingCount })
         };
-        return MessageResponse.Success(stats);
+        return MessageResponse.Ok(stats);
     }
 
     private MessageResponse HandleCreatePolicy(PluginMessage message)
@@ -502,7 +502,7 @@ public sealed class GovernancePlugin : GovernancePluginBase
         };
 
         _policies[policyId] = policy;
-        return MessageResponse.Success(new { created = true, policyId });
+        return MessageResponse.Ok(new { created = true, policyId });
     }
 
     private MessageResponse HandleListPolicies(PluginMessage message)
@@ -516,7 +516,7 @@ public sealed class GovernancePlugin : GovernancePluginBase
             RuleCount = p.Rules.Count
         }).ToList();
 
-        return MessageResponse.Success(new { policies });
+        return MessageResponse.Ok(new { policies });
     }
 
     private MessageResponse HandleReport(PluginMessage message)
@@ -536,7 +536,7 @@ public sealed class GovernancePlugin : GovernancePluginBase
             policies = _policies.Values.Select(p => new { p.Id, p.Name, p.Enabled })
         };
 
-        return MessageResponse.Success(report);
+        return MessageResponse.Ok(report);
     }
 
     private MessageResponse HandleClassify(PluginMessage message)
@@ -549,7 +549,7 @@ public sealed class GovernancePlugin : GovernancePluginBase
             recommendedPolicies = new[] { "security-baseline" }
         };
 
-        return MessageResponse.Success(classification);
+        return MessageResponse.Ok(classification);
     }
 
     // Inner types

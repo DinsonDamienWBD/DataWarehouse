@@ -134,7 +134,7 @@ namespace DataWarehouse.Plugins.DistributedTransactions
 
         #region Two-Phase Commit
 
-        private async Task<object> HandleBeginAsync(Dictionary<string, object?>? payload)
+        private async Task<object> HandleBeginAsync(Dictionary<string, object>? payload)
         {
             var txId = GenerateTransactionId();
             var participants = ExtractParticipants(payload);
@@ -162,7 +162,7 @@ namespace DataWarehouse.Plugins.DistributedTransactions
             return new { success = true, transactionId = txId };
         }
 
-        private async Task<object> HandlePrepareAsync(Dictionary<string, object?>? payload)
+        private async Task<object> HandlePrepareAsync(Dictionary<string, object>? payload)
         {
             var txId = GetString(payload, "transactionId");
             if (string.IsNullOrEmpty(txId) || !_transactions.TryGetValue(txId, out var tx))
@@ -225,7 +225,7 @@ namespace DataWarehouse.Plugins.DistributedTransactions
             };
         }
 
-        private async Task<object> HandleCommitAsync(Dictionary<string, object?>? payload)
+        private async Task<object> HandleCommitAsync(Dictionary<string, object>? payload)
         {
             var txId = GetString(payload, "transactionId");
             if (string.IsNullOrEmpty(txId) || !_transactions.TryGetValue(txId, out var tx))
@@ -276,7 +276,7 @@ namespace DataWarehouse.Plugins.DistributedTransactions
             return new { success = true, transactionId = txId };
         }
 
-        private async Task<object> HandleRollbackAsync(Dictionary<string, object?>? payload)
+        private async Task<object> HandleRollbackAsync(Dictionary<string, object>? payload)
         {
             var txId = GetString(payload, "transactionId");
             if (string.IsNullOrEmpty(txId) || !_transactions.TryGetValue(txId, out var tx))
@@ -351,7 +351,7 @@ namespace DataWarehouse.Plugins.DistributedTransactions
 
         #region Saga Pattern
 
-        private async Task<object> HandleSagaStartAsync(Dictionary<string, object?>? payload)
+        private async Task<object> HandleSagaStartAsync(Dictionary<string, object>? payload)
         {
             var sagaId = GenerateSagaId();
             var steps = ExtractSagaSteps(payload);
@@ -378,7 +378,7 @@ namespace DataWarehouse.Plugins.DistributedTransactions
             return new { success = true, sagaId, totalSteps = steps.Count };
         }
 
-        private async Task<object> HandleSagaStepAsync(Dictionary<string, object?>? payload)
+        private async Task<object> HandleSagaStepAsync(Dictionary<string, object>? payload)
         {
             var sagaId = GetString(payload, "sagaId");
             if (string.IsNullOrEmpty(sagaId) || !_sagas.TryGetValue(sagaId, out var saga))
@@ -449,7 +449,7 @@ namespace DataWarehouse.Plugins.DistributedTransactions
             }
         }
 
-        private async Task<object> HandleSagaCompensateAsync(Dictionary<string, object?>? payload)
+        private async Task<object> HandleSagaCompensateAsync(Dictionary<string, object>? payload)
         {
             var sagaId = GetString(payload, "sagaId");
             if (string.IsNullOrEmpty(sagaId) || !_sagas.TryGetValue(sagaId, out var saga))
@@ -501,7 +501,7 @@ namespace DataWarehouse.Plugins.DistributedTransactions
 
         #region Distributed Locks
 
-        private async Task<object> HandleLockAcquireAsync(Dictionary<string, object?>? payload)
+        private async Task<object> HandleLockAcquireAsync(Dictionary<string, object>? payload)
         {
             var resourceId = GetString(payload, "resourceId");
             var ownerId = GetString(payload, "ownerId");
@@ -543,7 +543,7 @@ namespace DataWarehouse.Plugins.DistributedTransactions
             return new { success = false, error = "Lock acquisition timeout" };
         }
 
-        private object HandleLockRelease(Dictionary<string, object?>? payload)
+        private object HandleLockRelease(Dictionary<string, object>? payload)
         {
             var resourceId = GetString(payload, "resourceId");
             var lockToken = GetString(payload, "lockToken");
@@ -573,7 +573,7 @@ namespace DataWarehouse.Plugins.DistributedTransactions
 
         #region Recovery and Status
 
-        private object HandleStatus(Dictionary<string, object?>? payload)
+        private object HandleStatus(Dictionary<string, object>? payload)
         {
             var txId = GetString(payload, "transactionId");
             var sagaId = GetString(payload, "sagaId");
@@ -728,12 +728,12 @@ namespace DataWarehouse.Plugins.DistributedTransactions
             return $"saga-{Convert.ToHexString(bytes).ToLowerInvariant()}";
         }
 
-        private static string? GetString(Dictionary<string, object?>? payload, string key)
+        private static string? GetString(Dictionary<string, object>? payload, string key)
         {
             return payload?.TryGetValue(key, out var val) == true && val is string s ? s : null;
         }
 
-        private static double? GetDouble(Dictionary<string, object?>? payload, string key)
+        private static double? GetDouble(Dictionary<string, object>? payload, string key)
         {
             if (payload?.TryGetValue(key, out var val) != true) return null;
             return val switch
@@ -745,7 +745,7 @@ namespace DataWarehouse.Plugins.DistributedTransactions
             };
         }
 
-        private static List<TransactionParticipant> ExtractParticipants(Dictionary<string, object?>? payload)
+        private static List<TransactionParticipant> ExtractParticipants(Dictionary<string, object>? payload)
         {
             if (payload?.TryGetValue("participants", out var p) == true && p is IEnumerable<object> list)
             {
@@ -754,7 +754,7 @@ namespace DataWarehouse.Plugins.DistributedTransactions
             return new List<TransactionParticipant>();
         }
 
-        private static List<SagaStep> ExtractSagaSteps(Dictionary<string, object?>? payload)
+        private static List<SagaStep> ExtractSagaSteps(Dictionary<string, object>? payload)
         {
             if (payload?.TryGetValue("steps", out var s) == true && s is IEnumerable<object> list)
             {

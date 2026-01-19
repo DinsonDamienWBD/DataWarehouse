@@ -44,14 +44,14 @@ public sealed class SqliteIndexingPlugin : MetadataIndexPluginBase
     /// <summary>
     /// Semantic description for AI integration.
     /// </summary>
-    protected override string SemanticDescription =>
+    protected string SemanticDescription =>
         "SQLite-based metadata indexing for single-node deployments with full-text search, " +
         "JSON queries, and vector similarity support. Optimized for embedded scenarios.";
 
     /// <summary>
     /// Semantic tags for AI discoverability.
     /// </summary>
-    protected override string[] SemanticTags => new[]
+    protected string[] SemanticTags => new[]
     {
         "indexing", "sqlite", "fts5", "full-text-search", "metadata",
         "embedded", "single-node", "json-query", "vector-search"
@@ -391,7 +391,7 @@ public sealed class SqliteIndexingPlugin : MetadataIndexPluginBase
     /// <summary>
     /// Removes a manifest from the index.
     /// </summary>
-    public override Task RemoveAsync(string id)
+    public Task RemoveAsync(string id)
     {
         _index.TryRemove(id, out _);
         _vectors.TryRemove(id, out _);

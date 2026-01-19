@@ -302,12 +302,12 @@ namespace DataWarehouse.Plugins.EmbeddedDatabaseStorage
             };
         }
 
-        protected static string? GetPayloadString(Dictionary<string, object?> dict, string key)
+        protected static string? GetPayloadString(Dictionary<string, object> dict, string key)
         {
             return dict.TryGetValue(key, out var value) ? value?.ToString() : null;
         }
 
-        protected static Dictionary<string, object>? GetPayloadDictionary(Dictionary<string, object?> dict, string key)
+        protected static Dictionary<string, object>? GetPayloadDictionary(Dictionary<string, object> dict, string key)
         {
             if (dict.TryGetValue(key, out var value) && value is Dictionary<string, object> result)
                 return result;

@@ -37,11 +37,11 @@ public sealed class TieringPlugin : TieredStoragePluginBase
     private readonly CancellationTokenSource _cts = new();
     private Task? _migrationTask;
 
-    protected override string SemanticDescription =>
+    protected string SemanticDescription =>
         "Automatic data tiering with policy-based hot/warm/cold/archive transitions, " +
         "lifecycle rules, cost optimization, and background migration.";
 
-    protected override string[] SemanticTags => new[]
+    protected string[] SemanticTags => new[]
     {
         "tiering", "storage", "hot-cold", "lifecycle", "cost-optimization",
         "migration", "access-patterns", "archival"
