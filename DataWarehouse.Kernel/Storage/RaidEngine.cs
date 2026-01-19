@@ -3870,7 +3870,7 @@ namespace DataWarehouse.Kernel.Storage
                         break;
                     }
                 }
-                catch { continue; }
+                catch (Exception ex) { _context.LogWarning($"RAID operation failed on drive, continuing: {ex.Message}"); continue; }
             }
 
             if (metadata == null)
@@ -3935,7 +3935,7 @@ namespace DataWarehouse.Kernel.Storage
                                 chunkData = await ReadAllBytesAsync(stream);
                             }
                         }
-                        catch { continue; }
+                        catch (Exception ex) { _context.LogWarning($"RAID operation failed on drive, continuing: {ex.Message}"); continue; }
                     }
                 }
 
@@ -4180,7 +4180,7 @@ namespace DataWarehouse.Kernel.Storage
                         break;
                     }
                 }
-                catch { continue; }
+                catch (Exception ex) { _context.LogWarning($"RAID operation failed on drive, continuing: {ex.Message}"); continue; }
             }
 
             if (metadata == null)
@@ -4480,7 +4480,7 @@ namespace DataWarehouse.Kernel.Storage
                         break;
                     }
                 }
-                catch { continue; }
+                catch (Exception ex) { _context.LogWarning($"RAID operation failed on drive, continuing: {ex.Message}"); continue; }
             }
 
             if (metadata == null)
@@ -4651,7 +4651,7 @@ namespace DataWarehouse.Kernel.Storage
                         break;
                     }
                 }
-                catch { continue; }
+                catch (Exception ex) { _context.LogWarning($"RAID operation failed on drive, continuing: {ex.Message}"); continue; }
             }
 
             if (metadata == null)
@@ -4823,7 +4823,7 @@ namespace DataWarehouse.Kernel.Storage
                         break;
                     }
                 }
-                catch { continue; }
+                catch (Exception ex) { _context.LogWarning($"RAID operation failed on drive, continuing: {ex.Message}"); continue; }
             }
 
             if (metadata == null)
@@ -5002,7 +5002,7 @@ namespace DataWarehouse.Kernel.Storage
                         break;
                     }
                 }
-                catch { continue; }
+                catch (Exception ex) { _context.LogWarning($"RAID operation failed on drive, continuing: {ex.Message}"); continue; }
             }
 
             if (metadata == null)
@@ -5052,7 +5052,7 @@ namespace DataWarehouse.Kernel.Storage
                         break;
                     }
                 }
-                catch { continue; }
+                catch (Exception ex) { _context.LogWarning($"RAID operation failed on drive, continuing: {ex.Message}"); continue; }
             }
 
             return new MemoryStream(result.ToArray().Take((int)metadata.TotalSize).ToArray());
@@ -5121,7 +5121,7 @@ namespace DataWarehouse.Kernel.Storage
                         break;
                     }
                 }
-                catch { continue; }
+                catch (Exception ex) { _context.LogWarning($"RAID operation failed on drive, continuing: {ex.Message}"); continue; }
             }
 
             if (metadata == null)
@@ -5262,7 +5262,7 @@ namespace DataWarehouse.Kernel.Storage
                         break;
                     }
                 }
-                catch { continue; }
+                catch (Exception ex) { _context.LogWarning($"RAID operation failed on drive, continuing: {ex.Message}"); continue; }
             }
 
             if (metadata == null)
@@ -5504,7 +5504,7 @@ namespace DataWarehouse.Kernel.Storage
                         break;
                     }
                 }
-                catch { continue; }
+                catch (Exception ex) { _context.LogWarning($"RAID operation failed on drive, continuing: {ex.Message}"); continue; }
             }
 
             if (metadata == null)
@@ -5581,7 +5581,7 @@ namespace DataWarehouse.Kernel.Storage
                         break;
                     }
                 }
-                catch { continue; }
+                catch (Exception ex) { _context.LogWarning($"RAID operation failed on drive, continuing: {ex.Message}"); continue; }
             }
 
             if (metadata == null)
@@ -5672,7 +5672,7 @@ namespace DataWarehouse.Kernel.Storage
                         break;
                     }
                 }
-                catch { continue; }
+                catch (Exception ex) { _context.LogWarning($"RAID operation failed on drive, continuing: {ex.Message}"); continue; }
             }
 
             if (metadata == null)
@@ -5766,7 +5766,7 @@ namespace DataWarehouse.Kernel.Storage
                         return new MemoryStream(await ReadAllBytesAsync(stream));
                     }
                 }
-                catch { continue; }
+                catch (Exception ex) { _context.LogWarning($"RAID operation failed on drive, continuing: {ex.Message}"); continue; }
             }
 
             throw new InvalidOperationException("MAID: No active drive available");
@@ -5836,7 +5836,7 @@ namespace DataWarehouse.Kernel.Storage
                         break;
                     }
                 }
-                catch { continue; }
+                catch (Exception ex) { _context.LogWarning($"RAID operation failed on drive, continuing: {ex.Message}"); continue; }
             }
 
             if (metadata == null)
@@ -7051,7 +7051,7 @@ namespace DataWarehouse.Kernel.Storage
                             break;
                         }
                     }
-                    catch { continue; }
+                    catch (Exception ex) { _context.LogWarning($"RAID operation failed on drive, continuing: {ex.Message}"); continue; }
                 }
 
                 if (metadata == null)
