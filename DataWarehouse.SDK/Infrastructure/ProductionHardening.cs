@@ -25,7 +25,7 @@ namespace DataWarehouse.SDK.Infrastructure;
 public sealed class ConfigurationValidator
 {
     private readonly List<IConfigurationRule> _rules = new();
-    private readonly ConcurrentDictionary<string, ValidationResult> _validationCache = new();
+    private readonly ConcurrentDictionary<string, RuleValidationResult> _validationCache = new();
 
     /// <summary>
     /// Registers a configuration validation rule.
@@ -401,12 +401,12 @@ public sealed class AuditLogger : IAsyncDisposable
 /// <summary>
 /// Compliance framework manager supporting GDPR, HIPAA, SOC2, and PCI-DSS requirements.
 /// </summary>
-public sealed class ComplianceFramework
+public sealed class ComplianceManager
 {
     private readonly ConcurrentDictionary<string, ICompliancePolicy> _policies = new();
     private readonly AuditLogger _auditLogger;
 
-    public ComplianceFramework(AuditLogger auditLogger)
+    public ComplianceManager(AuditLogger auditLogger)
     {
         _auditLogger = auditLogger ?? throw new ArgumentNullException(nameof(auditLogger));
         RegisterDefaultPolicies();
