@@ -966,8 +966,8 @@ The Kernel can be shipped to customers for testing while additional plugins are 
 | # | Status | Improvement | Description | Implementation |
 |---|--------|-------------|-------------|----------------|
 | 1 | ✅ | **Zero-Config Deployment** | Single-file executable with embedded defaults | `ZeroConfigurationStartup` |
-| 2 | 🔶 | **Battery-Aware Storage** | Automatic SSD vs RAM disk selection based on power state | Planned |
-| 3 | 🔶 | **Incremental Backup Agent** | Background delta-sync to cloud with bandwidth limiting | Planned |
+| 2 | ✅ | **Battery-Aware Storage** | Automatic SSD vs RAM disk selection based on power state | `BatteryAwareStorageManager` |
+| 3 | ✅ | **Incremental Backup Agent** | Background delta-sync to cloud with bandwidth limiting | `IncrementalBackupAgent` |
 
 ### Tier 2: SMB/Server (Competing with: MinIO, Ceph, TrueNAS)
 
@@ -1222,6 +1222,28 @@ Standalone executable for production deployments:
   - Optimal time window recommendations via carbon forecasts
   - Sustainability metrics: carbon saved, equivalent tree years
 - Methods: SelectOptimalRegionAsync, GetOptimalTimeWindowAsync, GetStats
+
+### Tier 1 Implementations (2026-01-19)
+
+**Battery-Aware Storage** (`DataWarehouse.SDK/Infrastructure/GodTierFeatures.cs`)
+- `BatteryAwareStorageManager` - Power-aware storage tier selection
+- Features:
+  - Automatic tier selection based on power state (AC, Battery, Low, Critical)
+  - Storage modes: Performance, Balanced, PowerSaver, Emergency
+  - Auto-migration between RAM disk and SSD on power changes
+  - Auto-flush RAM to SSD when AC power restored
+  - Power savings tracking and statistics
+- Methods: SelectStorageTierAsync, MigrateOnPowerChangeAsync, FlushRamDiskAsync, GetStats
+
+**Incremental Backup Agent** (`DataWarehouse.SDK/Infrastructure/GodTierFeatures.cs`)
+- `IncrementalBackupAgent` - Background delta-sync backup
+- Features:
+  - Rolling hash delta computation (rsync-style)
+  - SHA256 change detection
+  - Bandwidth limiting for uploads
+  - Point-in-time recovery support
+  - Priority-based backup scheduling
+- Methods: TrackPath, BackupNowAsync, FullBackupAsync, RestoreFileAsync, GetStats
 
 ---
 

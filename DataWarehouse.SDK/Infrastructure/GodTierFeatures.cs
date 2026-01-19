@@ -1662,3 +1662,1096 @@ public sealed class VersionHistoryOptions
 }
 
 #endregion
+
+#region Tier 1.5: Battery-Aware Storage
+
+/// <summary>
+/// Automatic storage tier selection based on device power state.
+/// Optimizes for performance on AC power and battery life on battery.
+/// </summary>
+public sealed class BatteryAwareStorageManager : IAsyncDisposable
+{
+    private readonly ConcurrentDictionary<string, StorageTierAssignment> _assignments = new();
+    private readonly IPowerStateProvider _powerProvider;
+    private readonly IStorageProvider _storageProvider;
+    private readonly BatteryAwareConfig _config;
+    private readonly Task _monitorTask;
+    private readonly CancellationTokenSource _cts = new();
+    private volatile bool _disposed;
+    private PowerState _currentPowerState = PowerState.Unknown;
+    private StorageMode _currentMode = StorageMode.Balanced;
+    private long _operationsOnBattery;
+    private long _bytesWrittenOnBattery;
+    private long _powerSavingsMs;
+
+    public BatteryAwareStorageManager(
+        IPowerStateProvider powerProvider,
+        IStorageProvider storageProvider,
+        BatteryAwareConfig? config = null)
+    {
+        _powerProvider = powerProvider ?? throw new ArgumentNullException(nameof(powerProvider));
+        _storageProvider = storageProvider ?? throw new ArgumentNullException(nameof(storageProvider));
+        _config = config ?? new BatteryAwareConfig();
+        _monitorTask = MonitorPowerStateAsync(_cts.Token);
+    }
+
+    /// <summary>
+    /// Gets the current power state and storage mode.
+    /// </summary>
+    public PowerStateInfo GetCurrentState()
+    {
+        return new PowerStateInfo
+        {
+            PowerState = _currentPowerState,
+            StorageMode = _currentMode,
+            BatteryLevel = _powerProvider.GetBatteryLevel(),
+            IsPluggedIn = _currentPowerState == PowerState.ACPower,
+            CurrentTier = GetCurrentStorageTier()
+        };
+    }
+
+    /// <summary>
+    /// Selects optimal storage tier for a write operation based on power state.
+    /// </summary>
+    public async Task<StorageTierSelection> SelectStorageTierAsync(
+        WriteRequest request,
+        CancellationToken ct = default)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, nameof(BatteryAwareStorageManager));
+
+        var powerState = await _powerProvider.GetPowerStateAsync(ct);
+        _currentPowerState = powerState;
+
+        var selection = powerState switch
+        {
+            PowerState.ACPower => SelectACPowerTier(request),
+            PowerState.Battery => SelectBatteryTier(request),
+            PowerState.LowBattery => SelectLowBatteryTier(request),
+            PowerState.CriticalBattery => SelectCriticalBatteryTier(request),
+            _ => SelectBalancedTier(request)
+        };
+
+        // Track battery usage
+        if (powerState != PowerState.ACPower)
+        {
+            Interlocked.Increment(ref _operationsOnBattery);
+            Interlocked.Add(ref _bytesWrittenOnBattery, request.DataSize);
+        }
+
+        // Record assignment
+        _assignments[request.DataId] = new StorageTierAssignment
+        {
+            DataId = request.DataId,
+            Tier = selection.SelectedTier,
+            AssignedAt = DateTime.UtcNow,
+            PowerStateAtAssignment = powerState,
+            DataSize = request.DataSize
+        };
+
+        return selection;
+    }
+
+    /// <summary>
+    /// Migrates data between tiers when power state changes.
+    /// </summary>
+    public async Task<MigrationResult> MigrateOnPowerChangeAsync(
+        PowerState newState,
+        CancellationToken ct = default)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, nameof(BatteryAwareStorageManager));
+
+        var migratedItems = new List<string>();
+        var failedItems = new List<string>();
+
+        // Find items that should be migrated based on new power state
+        foreach (var assignment in _assignments.Values.ToList())
+        {
+            ct.ThrowIfCancellationRequested();
+
+            var shouldMigrate = ShouldMigrateOnPowerChange(assignment, newState);
+            if (!shouldMigrate.Migrate) continue;
+
+            try
+            {
+                await _storageProvider.MigrateAsync(
+                    assignment.DataId,
+                    assignment.Tier,
+                    shouldMigrate.TargetTier,
+                    ct);
+
+                assignment.Tier = shouldMigrate.TargetTier;
+                assignment.LastMigrated = DateTime.UtcNow;
+                migratedItems.Add(assignment.DataId);
+
+                // Track power savings from deferring to RAM
+                if (shouldMigrate.TargetTier == StorageTier.RamDisk)
+                {
+                    Interlocked.Add(ref _powerSavingsMs, EstimateDiskAccessTimeMs(assignment.DataSize));
+                }
+            }
+            catch
+            {
+                failedItems.Add(assignment.DataId);
+            }
+        }
+
+        return new MigrationResult
+        {
+            Success = failedItems.Count == 0,
+            MigratedCount = migratedItems.Count,
+            FailedCount = failedItems.Count,
+            MigratedItems = migratedItems,
+            FailedItems = failedItems
+        };
+    }
+
+    /// <summary>
+    /// Flushes RAM disk to SSD when power is available.
+    /// </summary>
+    public async Task<FlushResult> FlushRamDiskAsync(CancellationToken ct = default)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, nameof(BatteryAwareStorageManager));
+
+        var ramItems = _assignments.Values
+            .Where(a => a.Tier == StorageTier.RamDisk)
+            .ToList();
+
+        var flushedItems = new List<string>();
+        var failedItems = new List<string>();
+
+        foreach (var item in ramItems)
+        {
+            ct.ThrowIfCancellationRequested();
+
+            try
+            {
+                await _storageProvider.MigrateAsync(
+                    item.DataId,
+                    StorageTier.RamDisk,
+                    StorageTier.SSD,
+                    ct);
+
+                item.Tier = StorageTier.SSD;
+                item.LastMigrated = DateTime.UtcNow;
+                flushedItems.Add(item.DataId);
+            }
+            catch
+            {
+                failedItems.Add(item.DataId);
+            }
+        }
+
+        return new FlushResult
+        {
+            Success = failedItems.Count == 0,
+            FlushedCount = flushedItems.Count,
+            FailedCount = failedItems.Count,
+            TotalBytesFlushed = ramItems.Where(i => flushedItems.Contains(i.DataId)).Sum(i => i.DataSize)
+        };
+    }
+
+    /// <summary>
+    /// Gets battery-aware storage statistics.
+    /// </summary>
+    public BatteryAwareStats GetStats()
+    {
+        return new BatteryAwareStats
+        {
+            CurrentPowerState = _currentPowerState,
+            CurrentStorageMode = _currentMode,
+            BatteryLevel = _powerProvider.GetBatteryLevel(),
+            OperationsOnBattery = Interlocked.Read(ref _operationsOnBattery),
+            BytesWrittenOnBattery = Interlocked.Read(ref _bytesWrittenOnBattery),
+            EstimatedPowerSavingsMs = Interlocked.Read(ref _powerSavingsMs),
+            ItemsInRamDisk = _assignments.Values.Count(a => a.Tier == StorageTier.RamDisk),
+            ItemsInSSD = _assignments.Values.Count(a => a.Tier == StorageTier.SSD),
+            ItemsInHDD = _assignments.Values.Count(a => a.Tier == StorageTier.HDD),
+            TotalTrackedItems = _assignments.Count
+        };
+    }
+
+    private StorageTierSelection SelectACPowerTier(WriteRequest request)
+    {
+        _currentMode = StorageMode.Performance;
+
+        // On AC power, use fastest storage
+        return new StorageTierSelection
+        {
+            SelectedTier = request.Priority == WritePriority.RealTime
+                ? StorageTier.RamDisk
+                : StorageTier.SSD,
+            Mode = StorageMode.Performance,
+            Reason = "AC power available - optimizing for performance",
+            WriteMode = WriteMode.Immediate,
+            DeferUntilPluggedIn = false
+        };
+    }
+
+    private StorageTierSelection SelectBatteryTier(WriteRequest request)
+    {
+        _currentMode = StorageMode.Balanced;
+
+        // On battery, balance performance and power
+        var tier = request.Priority switch
+        {
+            WritePriority.RealTime => StorageTier.RamDisk,
+            WritePriority.High => StorageTier.SSD,
+            WritePriority.Normal => StorageTier.SSD,
+            WritePriority.Low => StorageTier.RamDisk, // Defer to RAM, flush later
+            _ => StorageTier.SSD
+        };
+
+        return new StorageTierSelection
+        {
+            SelectedTier = tier,
+            Mode = StorageMode.Balanced,
+            Reason = "On battery - balancing performance and power",
+            WriteMode = request.Priority == WritePriority.Low ? WriteMode.Deferred : WriteMode.Immediate,
+            DeferUntilPluggedIn = request.Priority == WritePriority.Low
+        };
+    }
+
+    private StorageTierSelection SelectLowBatteryTier(WriteRequest request)
+    {
+        _currentMode = StorageMode.PowerSaver;
+
+        // On low battery, minimize disk writes
+        return new StorageTierSelection
+        {
+            SelectedTier = request.Priority == WritePriority.RealTime
+                ? StorageTier.RamDisk
+                : StorageTier.RamDisk, // All non-critical goes to RAM
+            Mode = StorageMode.PowerSaver,
+            Reason = "Low battery - minimizing disk activity",
+            WriteMode = WriteMode.Deferred,
+            DeferUntilPluggedIn = true
+        };
+    }
+
+    private StorageTierSelection SelectCriticalBatteryTier(WriteRequest request)
+    {
+        _currentMode = StorageMode.Emergency;
+
+        // On critical battery, only essential writes
+        if (request.Priority != WritePriority.RealTime)
+        {
+            return new StorageTierSelection
+            {
+                SelectedTier = StorageTier.RamDisk,
+                Mode = StorageMode.Emergency,
+                Reason = "Critical battery - deferring non-essential writes",
+                WriteMode = WriteMode.Rejected,
+                DeferUntilPluggedIn = true
+            };
+        }
+
+        return new StorageTierSelection
+        {
+            SelectedTier = StorageTier.RamDisk,
+            Mode = StorageMode.Emergency,
+            Reason = "Critical battery - using RAM only",
+            WriteMode = WriteMode.Immediate,
+            DeferUntilPluggedIn = false
+        };
+    }
+
+    private StorageTierSelection SelectBalancedTier(WriteRequest request)
+    {
+        _currentMode = StorageMode.Balanced;
+
+        return new StorageTierSelection
+        {
+            SelectedTier = StorageTier.SSD,
+            Mode = StorageMode.Balanced,
+            Reason = "Unknown power state - using balanced mode",
+            WriteMode = WriteMode.Immediate,
+            DeferUntilPluggedIn = false
+        };
+    }
+
+    private StorageTier GetCurrentStorageTier()
+    {
+        return _currentMode switch
+        {
+            StorageMode.Performance => StorageTier.SSD,
+            StorageMode.Balanced => StorageTier.SSD,
+            StorageMode.PowerSaver => StorageTier.RamDisk,
+            StorageMode.Emergency => StorageTier.RamDisk,
+            _ => StorageTier.SSD
+        };
+    }
+
+    private (bool Migrate, StorageTier TargetTier) ShouldMigrateOnPowerChange(
+        StorageTierAssignment assignment,
+        PowerState newState)
+    {
+        // Migrate to RAM on battery to reduce disk access
+        if (newState == PowerState.LowBattery || newState == PowerState.CriticalBattery)
+        {
+            if (assignment.Tier == StorageTier.SSD || assignment.Tier == StorageTier.HDD)
+            {
+                // Only migrate if data is small enough for RAM
+                if (assignment.DataSize < _config.MaxRamDiskItemSize)
+                {
+                    return (true, StorageTier.RamDisk);
+                }
+            }
+        }
+
+        // Migrate from RAM to SSD on AC power
+        if (newState == PowerState.ACPower && assignment.Tier == StorageTier.RamDisk)
+        {
+            return (true, StorageTier.SSD);
+        }
+
+        return (false, assignment.Tier);
+    }
+
+    private static long EstimateDiskAccessTimeMs(long dataSize)
+    {
+        // Estimate ~10ms per MB for SSD access
+        return Math.Max(10, dataSize / (1024 * 1024) * 10);
+    }
+
+    private async Task MonitorPowerStateAsync(CancellationToken ct)
+    {
+        var previousState = PowerState.Unknown;
+
+        while (!ct.IsCancellationRequested)
+        {
+            try
+            {
+                await Task.Delay(_config.PowerCheckInterval, ct);
+
+                var currentState = await _powerProvider.GetPowerStateAsync(ct);
+                _currentPowerState = currentState;
+
+                // Auto-migrate on significant power state changes
+                if (currentState != previousState && _config.AutoMigrateOnPowerChange)
+                {
+                    await MigrateOnPowerChangeAsync(currentState, ct);
+                    previousState = currentState;
+                }
+
+                // Auto-flush when plugged in
+                if (currentState == PowerState.ACPower &&
+                    previousState != PowerState.ACPower &&
+                    _config.AutoFlushOnACPower)
+                {
+                    await FlushRamDiskAsync(ct);
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                break;
+            }
+            catch
+            {
+                // Continue monitoring
+            }
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_disposed) return;
+        _disposed = true;
+
+        await _cts.CancelAsync();
+        try
+        {
+            await _monitorTask;
+        }
+        catch (OperationCanceledException)
+        {
+            // Expected
+        }
+
+        _cts.Dispose();
+    }
+}
+
+public interface IPowerStateProvider
+{
+    Task<PowerState> GetPowerStateAsync(CancellationToken ct = default);
+    int GetBatteryLevel();
+}
+
+public interface IStorageProvider
+{
+    Task MigrateAsync(string dataId, StorageTier from, StorageTier to, CancellationToken ct = default);
+}
+
+public enum PowerState { Unknown, ACPower, Battery, LowBattery, CriticalBattery }
+public enum StorageMode { Performance, Balanced, PowerSaver, Emergency }
+public enum StorageTier { RamDisk, SSD, HDD, Cloud }
+public enum WritePriority { RealTime, High, Normal, Low }
+public enum WriteMode { Immediate, Deferred, Rejected }
+
+public sealed class BatteryAwareConfig
+{
+    public TimeSpan PowerCheckInterval { get; set; } = TimeSpan.FromSeconds(30);
+    public bool AutoMigrateOnPowerChange { get; set; } = true;
+    public bool AutoFlushOnACPower { get; set; } = true;
+    public long MaxRamDiskItemSize { get; set; } = 100 * 1024 * 1024; // 100 MB
+    public int LowBatteryThreshold { get; set; } = 20;
+    public int CriticalBatteryThreshold { get; set; } = 10;
+}
+
+public sealed class WriteRequest
+{
+    public required string DataId { get; init; }
+    public long DataSize { get; init; }
+    public WritePriority Priority { get; init; } = WritePriority.Normal;
+}
+
+public sealed class StorageTierAssignment
+{
+    public required string DataId { get; init; }
+    public StorageTier Tier { get; set; }
+    public DateTime AssignedAt { get; init; }
+    public PowerState PowerStateAtAssignment { get; init; }
+    public long DataSize { get; init; }
+    public DateTime? LastMigrated { get; set; }
+}
+
+public record PowerStateInfo
+{
+    public PowerState PowerState { get; init; }
+    public StorageMode StorageMode { get; init; }
+    public int BatteryLevel { get; init; }
+    public bool IsPluggedIn { get; init; }
+    public StorageTier CurrentTier { get; init; }
+}
+
+public record StorageTierSelection
+{
+    public StorageTier SelectedTier { get; init; }
+    public StorageMode Mode { get; init; }
+    public required string Reason { get; init; }
+    public WriteMode WriteMode { get; init; }
+    public bool DeferUntilPluggedIn { get; init; }
+}
+
+public record MigrationResult
+{
+    public bool Success { get; init; }
+    public int MigratedCount { get; init; }
+    public int FailedCount { get; init; }
+    public List<string> MigratedItems { get; init; } = new();
+    public List<string> FailedItems { get; init; } = new();
+}
+
+public record FlushResult
+{
+    public bool Success { get; init; }
+    public int FlushedCount { get; init; }
+    public int FailedCount { get; init; }
+    public long TotalBytesFlushed { get; init; }
+}
+
+public record BatteryAwareStats
+{
+    public PowerState CurrentPowerState { get; init; }
+    public StorageMode CurrentStorageMode { get; init; }
+    public int BatteryLevel { get; init; }
+    public long OperationsOnBattery { get; init; }
+    public long BytesWrittenOnBattery { get; init; }
+    public long EstimatedPowerSavingsMs { get; init; }
+    public int ItemsInRamDisk { get; init; }
+    public int ItemsInSSD { get; init; }
+    public int ItemsInHDD { get; init; }
+    public int TotalTrackedItems { get; init; }
+}
+
+#endregion
+
+#region Tier 1.6: Incremental Backup Agent
+
+/// <summary>
+/// Background delta-sync backup agent with bandwidth limiting.
+/// Provides continuous incremental backups to cloud or local targets.
+/// </summary>
+public sealed class IncrementalBackupAgent : IAsyncDisposable
+{
+    private readonly ConcurrentDictionary<string, FileTrackingInfo> _trackedFiles = new();
+    private readonly ConcurrentDictionary<string, BackupSession> _sessions = new();
+    private readonly IBackupTarget _backupTarget;
+    private readonly IncrementalBackupConfig _config;
+    private readonly SemaphoreSlim _bandwidthLimiter;
+    private readonly Task _syncTask;
+    private readonly CancellationTokenSource _cts = new();
+    private volatile bool _disposed;
+    private long _totalBytesBackedUp;
+    private long _totalFilesSynced;
+    private long _totalDeltaBytes;
+    private DateTime? _lastFullBackup;
+    private DateTime? _lastIncrementalBackup;
+
+    public IncrementalBackupAgent(
+        IBackupTarget backupTarget,
+        IncrementalBackupConfig? config = null)
+    {
+        _backupTarget = backupTarget ?? throw new ArgumentNullException(nameof(backupTarget));
+        _config = config ?? new IncrementalBackupConfig();
+        _bandwidthLimiter = new SemaphoreSlim(_config.MaxConcurrentUploads, _config.MaxConcurrentUploads);
+        _syncTask = RunBackupLoopAsync(_cts.Token);
+    }
+
+    /// <summary>
+    /// Adds a file or directory to be tracked for backup.
+    /// </summary>
+    public void TrackPath(string path, BackupPriority priority = BackupPriority.Normal)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, nameof(IncrementalBackupAgent));
+
+        var info = new FileTrackingInfo
+        {
+            Path = path,
+            Priority = priority,
+            TrackedAt = DateTime.UtcNow,
+            Status = BackupStatus.Pending
+        };
+
+        _trackedFiles[path] = info;
+    }
+
+    /// <summary>
+    /// Removes a path from backup tracking.
+    /// </summary>
+    public bool UntrackPath(string path)
+    {
+        return _trackedFiles.TryRemove(path, out _);
+    }
+
+    /// <summary>
+    /// Forces an immediate backup of all tracked files.
+    /// </summary>
+    public async Task<BackupResult> BackupNowAsync(CancellationToken ct = default)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, nameof(IncrementalBackupAgent));
+
+        var sessionId = Guid.NewGuid().ToString("N");
+        var session = new BackupSession
+        {
+            SessionId = sessionId,
+            StartedAt = DateTime.UtcNow,
+            Type = BackupType.Incremental,
+            Status = BackupSessionStatus.Running
+        };
+        _sessions[sessionId] = session;
+
+        var results = new List<FileBackupResult>();
+        var changedFiles = await DetectChangedFilesAsync(ct);
+
+        foreach (var file in changedFiles.OrderByDescending(f => f.Priority))
+        {
+            ct.ThrowIfCancellationRequested();
+
+            var result = await BackupFileAsync(file, session, ct);
+            results.Add(result);
+
+            if (result.Success)
+            {
+                Interlocked.Increment(ref _totalFilesSynced);
+                Interlocked.Add(ref _totalBytesBackedUp, result.BytesUploaded);
+                Interlocked.Add(ref _totalDeltaBytes, result.DeltaBytes);
+            }
+        }
+
+        session.CompletedAt = DateTime.UtcNow;
+        session.Status = BackupSessionStatus.Completed;
+        session.FileCount = results.Count;
+        session.BytesTransferred = results.Sum(r => r.BytesUploaded);
+
+        _lastIncrementalBackup = DateTime.UtcNow;
+
+        return new BackupResult
+        {
+            Success = results.All(r => r.Success),
+            SessionId = sessionId,
+            FilesBackedUp = results.Count(r => r.Success),
+            FilesFailed = results.Count(r => !r.Success),
+            TotalBytesTransferred = results.Sum(r => r.BytesUploaded),
+            DeltaBytesOnly = results.Sum(r => r.DeltaBytes),
+            Duration = session.CompletedAt!.Value - session.StartedAt,
+            Results = results
+        };
+    }
+
+    /// <summary>
+    /// Performs a full backup of all tracked files.
+    /// </summary>
+    public async Task<BackupResult> FullBackupAsync(CancellationToken ct = default)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, nameof(IncrementalBackupAgent));
+
+        var sessionId = Guid.NewGuid().ToString("N");
+        var session = new BackupSession
+        {
+            SessionId = sessionId,
+            StartedAt = DateTime.UtcNow,
+            Type = BackupType.Full,
+            Status = BackupSessionStatus.Running
+        };
+        _sessions[sessionId] = session;
+
+        var results = new List<FileBackupResult>();
+
+        // Reset all file hashes to force full backup
+        foreach (var file in _trackedFiles.Values)
+        {
+            file.LastBackupHash = null;
+        }
+
+        foreach (var file in _trackedFiles.Values.OrderByDescending(f => f.Priority))
+        {
+            ct.ThrowIfCancellationRequested();
+
+            var result = await BackupFileAsync(file, session, ct);
+            results.Add(result);
+
+            if (result.Success)
+            {
+                Interlocked.Increment(ref _totalFilesSynced);
+                Interlocked.Add(ref _totalBytesBackedUp, result.BytesUploaded);
+            }
+        }
+
+        session.CompletedAt = DateTime.UtcNow;
+        session.Status = BackupSessionStatus.Completed;
+        session.FileCount = results.Count;
+        session.BytesTransferred = results.Sum(r => r.BytesUploaded);
+
+        _lastFullBackup = DateTime.UtcNow;
+
+        return new BackupResult
+        {
+            Success = results.All(r => r.Success),
+            SessionId = sessionId,
+            FilesBackedUp = results.Count(r => r.Success),
+            FilesFailed = results.Count(r => !r.Success),
+            TotalBytesTransferred = results.Sum(r => r.BytesUploaded),
+            DeltaBytesOnly = 0, // Full backup
+            Duration = session.CompletedAt!.Value - session.StartedAt,
+            Results = results
+        };
+    }
+
+    /// <summary>
+    /// Restores a file from backup.
+    /// </summary>
+    public async Task<RestoreResult> RestoreFileAsync(
+        string path,
+        DateTime? pointInTime = null,
+        CancellationToken ct = default)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, nameof(IncrementalBackupAgent));
+
+        try
+        {
+            var data = await _backupTarget.RetrieveAsync(path, pointInTime, ct);
+            if (data == null)
+            {
+                return new RestoreResult
+                {
+                    Success = false,
+                    Error = "Backup not found for specified path"
+                };
+            }
+
+            // Write to original location
+            await File.WriteAllBytesAsync(path, data, ct);
+
+            return new RestoreResult
+            {
+                Success = true,
+                Path = path,
+                RestoredBytes = data.Length,
+                RestoredAt = DateTime.UtcNow,
+                PointInTime = pointInTime ?? DateTime.UtcNow
+            };
+        }
+        catch (Exception ex)
+        {
+            return new RestoreResult
+            {
+                Success = false,
+                Path = path,
+                Error = ex.Message
+            };
+        }
+    }
+
+    /// <summary>
+    /// Gets backup statistics.
+    /// </summary>
+    public BackupStats GetStats()
+    {
+        return new BackupStats
+        {
+            TotalTrackedFiles = _trackedFiles.Count,
+            TotalBytesBackedUp = Interlocked.Read(ref _totalBytesBackedUp),
+            TotalFilesSynced = Interlocked.Read(ref _totalFilesSynced),
+            TotalDeltaBytes = Interlocked.Read(ref _totalDeltaBytes),
+            LastFullBackup = _lastFullBackup,
+            LastIncrementalBackup = _lastIncrementalBackup,
+            PendingFiles = _trackedFiles.Values.Count(f => f.Status == BackupStatus.Pending),
+            FailedFiles = _trackedFiles.Values.Count(f => f.Status == BackupStatus.Failed),
+            DeltaEfficiency = CalculateDeltaEfficiency(),
+            ActiveSessions = _sessions.Values.Count(s => s.Status == BackupSessionStatus.Running)
+        };
+    }
+
+    private async Task<List<FileTrackingInfo>> DetectChangedFilesAsync(CancellationToken ct)
+    {
+        var changedFiles = new List<FileTrackingInfo>();
+
+        foreach (var file in _trackedFiles.Values)
+        {
+            ct.ThrowIfCancellationRequested();
+
+            try
+            {
+                if (!File.Exists(file.Path))
+                {
+                    file.Status = BackupStatus.Deleted;
+                    continue;
+                }
+
+                var currentHash = await ComputeFileHashAsync(file.Path, ct);
+
+                if (file.LastBackupHash == null || file.LastBackupHash != currentHash)
+                {
+                    file.CurrentHash = currentHash;
+                    file.Status = BackupStatus.Changed;
+                    changedFiles.Add(file);
+                }
+            }
+            catch
+            {
+                file.Status = BackupStatus.Failed;
+            }
+        }
+
+        return changedFiles;
+    }
+
+    private async Task<FileBackupResult> BackupFileAsync(
+        FileTrackingInfo file,
+        BackupSession session,
+        CancellationToken ct)
+    {
+        await _bandwidthLimiter.WaitAsync(ct);
+        try
+        {
+            file.Status = BackupStatus.InProgress;
+
+            var fileInfo = new FileInfo(file.Path);
+            var fileData = await File.ReadAllBytesAsync(file.Path, ct);
+
+            // Calculate delta if we have a previous backup
+            byte[] dataToUpload;
+            long deltaBytes = 0;
+
+            if (_config.UseDeltaSync && file.LastBackupHash != null)
+            {
+                var delta = await ComputeDeltaAsync(file.Path, fileData, ct);
+                dataToUpload = delta.DeltaData;
+                deltaBytes = delta.DeltaData.Length;
+            }
+            else
+            {
+                dataToUpload = fileData;
+            }
+
+            // Apply bandwidth limiting
+            if (_config.MaxBandwidthBytesPerSecond > 0)
+            {
+                await ThrottleUploadAsync(dataToUpload.Length, ct);
+            }
+
+            // Upload to backup target
+            await _backupTarget.StoreAsync(
+                file.Path,
+                dataToUpload,
+                new BackupMetadata
+                {
+                    OriginalSize = fileData.Length,
+                    CompressedSize = dataToUpload.Length,
+                    Hash = file.CurrentHash!,
+                    BackupTime = DateTime.UtcNow,
+                    SessionId = session.SessionId,
+                    IsDelta = deltaBytes > 0
+                },
+                ct);
+
+            file.LastBackupHash = file.CurrentHash;
+            file.LastBackupTime = DateTime.UtcNow;
+            file.Status = BackupStatus.Completed;
+            file.BackupVersion++;
+
+            return new FileBackupResult
+            {
+                Success = true,
+                Path = file.Path,
+                BytesUploaded = dataToUpload.Length,
+                OriginalSize = fileData.Length,
+                DeltaBytes = deltaBytes,
+                BackupVersion = file.BackupVersion
+            };
+        }
+        catch (Exception ex)
+        {
+            file.Status = BackupStatus.Failed;
+            file.LastError = ex.Message;
+
+            return new FileBackupResult
+            {
+                Success = false,
+                Path = file.Path,
+                Error = ex.Message
+            };
+        }
+        finally
+        {
+            _bandwidthLimiter.Release();
+        }
+    }
+
+    private async Task<(byte[] DeltaData, bool IsDelta)> ComputeDeltaAsync(
+        string path,
+        byte[] currentData,
+        CancellationToken ct)
+    {
+        // Simple rolling hash delta computation (rsync-style)
+        // In production, use a proper rsync library
+        var previousData = await _backupTarget.RetrieveAsync(path, null, ct);
+        if (previousData == null)
+        {
+            return (currentData, false);
+        }
+
+        // Find changed blocks
+        var blockSize = _config.DeltaBlockSize;
+        var changedBlocks = new List<(int Index, byte[] Data)>();
+
+        for (int i = 0; i < currentData.Length; i += blockSize)
+        {
+            var blockLength = Math.Min(blockSize, currentData.Length - i);
+            var currentBlock = new byte[blockLength];
+            Array.Copy(currentData, i, currentBlock, 0, blockLength);
+
+            var blockIndex = i / blockSize;
+            var prevBlockStart = blockIndex * blockSize;
+
+            if (prevBlockStart >= previousData.Length)
+            {
+                // New block
+                changedBlocks.Add((blockIndex, currentBlock));
+            }
+            else
+            {
+                var prevBlockLength = Math.Min(blockSize, previousData.Length - prevBlockStart);
+                var prevBlock = new byte[prevBlockLength];
+                Array.Copy(previousData, prevBlockStart, prevBlock, 0, prevBlockLength);
+
+                if (!currentBlock.SequenceEqual(prevBlock))
+                {
+                    changedBlocks.Add((blockIndex, currentBlock));
+                }
+            }
+        }
+
+        // Serialize delta
+        using var ms = new MemoryStream();
+        using var writer = new BinaryWriter(ms);
+
+        writer.Write(changedBlocks.Count);
+        foreach (var (index, data) in changedBlocks)
+        {
+            writer.Write(index);
+            writer.Write(data.Length);
+            writer.Write(data);
+        }
+
+        return (ms.ToArray(), true);
+    }
+
+    private static async Task<string> ComputeFileHashAsync(string path, CancellationToken ct)
+    {
+        await using var stream = File.OpenRead(path);
+        var hash = await SHA256.HashDataAsync(stream, ct);
+        return Convert.ToHexString(hash).ToLowerInvariant();
+    }
+
+    private async Task ThrottleUploadAsync(int bytes, CancellationToken ct)
+    {
+        var maxBps = _config.MaxBandwidthBytesPerSecond;
+        if (maxBps <= 0) return;
+
+        var delayMs = (int)(bytes * 1000.0 / maxBps);
+        if (delayMs > 0)
+        {
+            await Task.Delay(delayMs, ct);
+        }
+    }
+
+    private double CalculateDeltaEfficiency()
+    {
+        var totalBytes = Interlocked.Read(ref _totalBytesBackedUp);
+        var deltaBytes = Interlocked.Read(ref _totalDeltaBytes);
+
+        if (totalBytes == 0) return 0;
+        return (double)deltaBytes / totalBytes * 100;
+    }
+
+    private async Task RunBackupLoopAsync(CancellationToken ct)
+    {
+        while (!ct.IsCancellationRequested)
+        {
+            try
+            {
+                await Task.Delay(_config.BackupInterval, ct);
+
+                if (_config.AutoBackupEnabled)
+                {
+                    await BackupNowAsync(ct);
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                break;
+            }
+            catch
+            {
+                // Continue backup loop
+            }
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_disposed) return;
+        _disposed = true;
+
+        await _cts.CancelAsync();
+        try
+        {
+            await _syncTask;
+        }
+        catch (OperationCanceledException)
+        {
+            // Expected
+        }
+
+        _cts.Dispose();
+        _bandwidthLimiter.Dispose();
+    }
+}
+
+public interface IBackupTarget
+{
+    Task StoreAsync(string path, byte[] data, BackupMetadata metadata, CancellationToken ct = default);
+    Task<byte[]?> RetrieveAsync(string path, DateTime? pointInTime, CancellationToken ct = default);
+    Task<bool> DeleteAsync(string path, CancellationToken ct = default);
+}
+
+public sealed class BackupMetadata
+{
+    public long OriginalSize { get; init; }
+    public long CompressedSize { get; init; }
+    public required string Hash { get; init; }
+    public DateTime BackupTime { get; init; }
+    public required string SessionId { get; init; }
+    public bool IsDelta { get; init; }
+}
+
+public sealed class IncrementalBackupConfig
+{
+    public TimeSpan BackupInterval { get; set; } = TimeSpan.FromHours(1);
+    public bool AutoBackupEnabled { get; set; } = true;
+    public bool UseDeltaSync { get; set; } = true;
+    public int DeltaBlockSize { get; set; } = 4096;
+    public int MaxConcurrentUploads { get; set; } = 4;
+    public long MaxBandwidthBytesPerSecond { get; set; } = 0; // 0 = unlimited
+    public int MaxVersionsToKeep { get; set; } = 30;
+}
+
+public enum BackupPriority { Critical, High, Normal, Low }
+public enum BackupStatus { Pending, Changed, InProgress, Completed, Failed, Deleted }
+public enum BackupType { Full, Incremental, Differential }
+public enum BackupSessionStatus { Running, Completed, Failed, Cancelled }
+
+public sealed class FileTrackingInfo
+{
+    public required string Path { get; init; }
+    public BackupPriority Priority { get; init; }
+    public DateTime TrackedAt { get; init; }
+    public BackupStatus Status { get; set; }
+    public string? CurrentHash { get; set; }
+    public string? LastBackupHash { get; set; }
+    public DateTime? LastBackupTime { get; set; }
+    public int BackupVersion { get; set; }
+    public string? LastError { get; set; }
+}
+
+public sealed class BackupSession
+{
+    public required string SessionId { get; init; }
+    public DateTime StartedAt { get; init; }
+    public DateTime? CompletedAt { get; set; }
+    public BackupType Type { get; init; }
+    public BackupSessionStatus Status { get; set; }
+    public int FileCount { get; set; }
+    public long BytesTransferred { get; set; }
+}
+
+public record BackupResult
+{
+    public bool Success { get; init; }
+    public required string SessionId { get; init; }
+    public int FilesBackedUp { get; init; }
+    public int FilesFailed { get; init; }
+    public long TotalBytesTransferred { get; init; }
+    public long DeltaBytesOnly { get; init; }
+    public TimeSpan Duration { get; init; }
+    public List<FileBackupResult> Results { get; init; } = new();
+}
+
+public record FileBackupResult
+{
+    public bool Success { get; init; }
+    public required string Path { get; init; }
+    public long BytesUploaded { get; init; }
+    public long OriginalSize { get; init; }
+    public long DeltaBytes { get; init; }
+    public int BackupVersion { get; init; }
+    public string? Error { get; init; }
+}
+
+public record RestoreResult
+{
+    public bool Success { get; init; }
+    public string? Path { get; init; }
+    public long RestoredBytes { get; init; }
+    public DateTime? RestoredAt { get; init; }
+    public DateTime? PointInTime { get; init; }
+    public string? Error { get; init; }
+}
+
+public record BackupStats
+{
+    public int TotalTrackedFiles { get; init; }
+    public long TotalBytesBackedUp { get; init; }
+    public long TotalFilesSynced { get; init; }
+    public long TotalDeltaBytes { get; init; }
+    public DateTime? LastFullBackup { get; init; }
+    public DateTime? LastIncrementalBackup { get; init; }
+    public int PendingFiles { get; init; }
+    public int FailedFiles { get; init; }
+    public double DeltaEfficiency { get; init; }
+    public int ActiveSessions { get; init; }
+}
+
+#endregion
