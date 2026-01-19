@@ -3409,3 +3409,684 @@ public sealed class MultiPartyConfig
 }
 
 #endregion
+
+#region Tier 3.8: Zero-Trust Data Access
+
+/// <summary>
+/// Zero-Trust data access with per-file encryption and attribute-based access control (ABAC).
+/// Implements the "never trust, always verify" security model for data protection.
+/// </summary>
+public sealed class ZeroTrustDataAccess : IAsyncDisposable
+{
+    private readonly ConcurrentDictionary<string, EncryptedFileMetadata> _fileMetadata = new();
+    private readonly ConcurrentDictionary<string, AccessPolicy> _policies = new();
+    private readonly ConcurrentDictionary<string, AccessSession> _sessions = new();
+    private readonly IKeyManagementService _keyService;
+    private readonly ImmutableAuditTrail _auditTrail;
+    private readonly ZeroTrustConfig _config;
+    private readonly Task _sessionCleanupTask;
+    private readonly CancellationTokenSource _cts = new();
+    private volatile bool _disposed;
+
+    public ZeroTrustDataAccess(
+        IKeyManagementService keyService,
+        ImmutableAuditTrail auditTrail,
+        ZeroTrustConfig? config = null)
+    {
+        _keyService = keyService ?? throw new ArgumentNullException(nameof(keyService));
+        _auditTrail = auditTrail ?? throw new ArgumentNullException(nameof(auditTrail));
+        _config = config ?? new ZeroTrustConfig();
+        _sessionCleanupTask = CleanupSessionsAsync(_cts.Token);
+    }
+
+    /// <summary>
+    /// Encrypts and stores data with attribute-based access policies.
+    /// </summary>
+    public async Task<ZeroTrustWriteResult> EncryptAndStoreAsync(
+        string fileId,
+        Stream data,
+        AccessPolicy policy,
+        SubjectContext subject,
+        CancellationToken ct = default)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, nameof(ZeroTrustDataAccess));
+
+        // Validate subject has write permissions
+        if (!EvaluatePolicy(policy, subject, AccessAction.Write))
+        {
+            await AuditAccessDenied(fileId, subject, AccessAction.Write, "Policy evaluation failed", ct);
+            return new ZeroTrustWriteResult
+            {
+                Success = false,
+                Error = "Access denied: subject does not meet policy requirements"
+            };
+        }
+
+        // Generate per-file encryption key
+        var fileKeyId = $"zt-{fileId}-{Guid.NewGuid():N}";
+        var fileKey = await _keyService.GenerateKeyAsync(fileKeyId, KeyType.AES256, ct);
+
+        // Read and encrypt data
+        using var ms = new MemoryStream();
+        await data.CopyToAsync(ms, ct);
+        var plaintext = ms.ToArray();
+
+        var iv = new byte[16];
+        RandomNumberGenerator.Fill(iv);
+
+        var ciphertext = await EncryptDataAsync(plaintext, fileKey.KeyMaterial, iv, ct);
+
+        // Calculate integrity hash
+        var integrityHash = SHA256.HashData(plaintext);
+
+        // Create file metadata
+        var metadata = new EncryptedFileMetadata
+        {
+            FileId = fileId,
+            KeyId = fileKeyId,
+            IV = iv,
+            IntegrityHash = integrityHash,
+            OriginalSize = plaintext.Length,
+            EncryptedSize = ciphertext.Length,
+            EncryptedAt = DateTime.UtcNow,
+            EncryptedBy = subject.SubjectId,
+            Algorithm = "AES-256-GCM",
+            PolicyId = policy.PolicyId
+        };
+
+        _fileMetadata[fileId] = metadata;
+        _policies[policy.PolicyId] = policy;
+
+        // Audit the write
+        await _auditTrail.RecordAsync(
+            "ZeroTrustDataEncrypted",
+            subject.SubjectId,
+            fileId,
+            AuditEventType.DataWritten,
+            new Dictionary<string, object>
+            {
+                ["keyId"] = fileKeyId,
+                ["algorithm"] = "AES-256-GCM",
+                ["originalSize"] = plaintext.Length,
+                ["policyId"] = policy.PolicyId
+            },
+            ct);
+
+        return new ZeroTrustWriteResult
+        {
+            Success = true,
+            FileId = fileId,
+            EncryptedData = ciphertext,
+            KeyId = fileKeyId,
+            IntegrityHash = Convert.ToHexString(integrityHash).ToLowerInvariant()
+        };
+    }
+
+    /// <summary>
+    /// Decrypts and retrieves data after policy evaluation.
+    /// </summary>
+    public async Task<ZeroTrustReadResult> DecryptAndRetrieveAsync(
+        string fileId,
+        byte[] encryptedData,
+        SubjectContext subject,
+        EnvironmentContext? environment = null,
+        CancellationToken ct = default)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, nameof(ZeroTrustDataAccess));
+
+        // Get file metadata
+        if (!_fileMetadata.TryGetValue(fileId, out var metadata))
+        {
+            return new ZeroTrustReadResult
+            {
+                Success = false,
+                Error = "File not found or not encrypted with Zero-Trust"
+            };
+        }
+
+        // Get access policy
+        if (!_policies.TryGetValue(metadata.PolicyId, out var policy))
+        {
+            return new ZeroTrustReadResult
+            {
+                Success = false,
+                Error = "Access policy not found"
+            };
+        }
+
+        // Zero-Trust: Always verify, never trust
+        // Evaluate policy with current context
+        var accessDecision = EvaluatePolicyWithContext(policy, subject, environment, AccessAction.Read);
+
+        if (!accessDecision.Allowed)
+        {
+            await AuditAccessDenied(fileId, subject, AccessAction.Read, accessDecision.Reason, ct);
+            return new ZeroTrustReadResult
+            {
+                Success = false,
+                Error = $"Access denied: {accessDecision.Reason}"
+            };
+        }
+
+        // Retrieve decryption key
+        var keyResult = await _keyService.GetKeyAsync(metadata.KeyId, ct);
+        if (!keyResult.Success)
+        {
+            return new ZeroTrustReadResult
+            {
+                Success = false,
+                Error = "Decryption key not available"
+            };
+        }
+
+        // Decrypt data
+        var plaintext = await DecryptDataAsync(encryptedData, keyResult.KeyMaterial, metadata.IV, ct);
+
+        // Verify integrity
+        var actualHash = SHA256.HashData(plaintext);
+        if (!actualHash.SequenceEqual(metadata.IntegrityHash))
+        {
+            await _auditTrail.RecordAsync(
+                "ZeroTrustIntegrityViolation",
+                subject.SubjectId,
+                fileId,
+                AuditEventType.SecurityEvent,
+                new Dictionary<string, object>
+                {
+                    ["expectedHash"] = Convert.ToHexString(metadata.IntegrityHash),
+                    ["actualHash"] = Convert.ToHexString(actualHash),
+                    ["severity"] = "CRITICAL"
+                },
+                ct);
+
+            return new ZeroTrustReadResult
+            {
+                Success = false,
+                Error = "Data integrity verification failed"
+            };
+        }
+
+        // Create limited-time access session
+        var session = CreateAccessSession(fileId, subject, policy);
+
+        // Audit successful access
+        await _auditTrail.RecordAsync(
+            "ZeroTrustDataDecrypted",
+            subject.SubjectId,
+            fileId,
+            AuditEventType.DataAccessed,
+            new Dictionary<string, object>
+            {
+                ["sessionId"] = session.SessionId,
+                ["accessGranted"] = true,
+                ["policyId"] = policy.PolicyId,
+                ["matchedConditions"] = accessDecision.MatchedConditions
+            },
+            ct);
+
+        return new ZeroTrustReadResult
+        {
+            Success = true,
+            FileId = fileId,
+            Data = plaintext,
+            SessionId = session.SessionId,
+            SessionExpiry = session.ExpiresAt,
+            IntegrityVerified = true
+        };
+    }
+
+    /// <summary>
+    /// Creates an access policy with attribute-based conditions.
+    /// </summary>
+    public AccessPolicy CreatePolicy(
+        string policyId,
+        string name,
+        params AccessCondition[] conditions)
+    {
+        var policy = new AccessPolicy
+        {
+            PolicyId = policyId,
+            Name = name,
+            Conditions = conditions.ToList(),
+            CreatedAt = DateTime.UtcNow,
+            Version = 1
+        };
+
+        _policies[policyId] = policy;
+        return policy;
+    }
+
+    /// <summary>
+    /// Evaluates if a subject meets the policy requirements.
+    /// </summary>
+    private bool EvaluatePolicy(AccessPolicy policy, SubjectContext subject, AccessAction action)
+    {
+        return EvaluatePolicyWithContext(policy, subject, null, action).Allowed;
+    }
+
+    /// <summary>
+    /// Evaluates policy with full context including environment.
+    /// </summary>
+    private AccessDecision EvaluatePolicyWithContext(
+        AccessPolicy policy,
+        SubjectContext subject,
+        EnvironmentContext? environment,
+        AccessAction action)
+    {
+        var matchedConditions = new List<string>();
+        var failedConditions = new List<string>();
+
+        foreach (var condition in policy.Conditions)
+        {
+            var matched = condition.Type switch
+            {
+                ConditionType.Role => subject.Roles.Contains(condition.Value),
+                ConditionType.Department => subject.Attributes.GetValueOrDefault("department") == condition.Value,
+                ConditionType.ClearanceLevel => CompareClearance(subject.Attributes.GetValueOrDefault("clearance"), condition.Value, condition.Operator),
+                ConditionType.TimeOfDay => IsWithinTimeRange(condition.Value),
+                ConditionType.IPRange => environment != null && IsInIPRange(environment.ClientIP, condition.Value),
+                ConditionType.MFARequired => subject.MFAVerified,
+                ConditionType.DeviceTrust => environment != null && environment.DeviceTrustLevel >= ParseTrustLevel(condition.Value),
+                ConditionType.Location => environment != null && IsInAllowedLocation(environment.GeoLocation, condition.Value),
+                ConditionType.Action => condition.Value == action.ToString() || condition.Value == "*",
+                ConditionType.DataClassification => EvaluateDataClassification(subject, condition.Value),
+                ConditionType.Custom => EvaluateCustomCondition(subject, environment, condition),
+                _ => false
+            };
+
+            if (matched)
+            {
+                matchedConditions.Add(condition.Name);
+            }
+            else if (condition.Required)
+            {
+                failedConditions.Add(condition.Name);
+            }
+        }
+
+        var allowed = failedConditions.Count == 0 &&
+            matchedConditions.Count >= policy.MinimumMatchingConditions;
+
+        return new AccessDecision
+        {
+            Allowed = allowed,
+            MatchedConditions = matchedConditions,
+            FailedConditions = failedConditions,
+            Reason = allowed
+                ? "All required conditions met"
+                : $"Failed conditions: {string.Join(", ", failedConditions)}"
+        };
+    }
+
+    private bool CompareClearance(string? subjectLevel, string requiredLevel, ConditionOperator op)
+    {
+        var levels = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["unclassified"] = 0,
+            ["confidential"] = 1,
+            ["secret"] = 2,
+            ["top-secret"] = 3
+        };
+
+        if (!levels.TryGetValue(subjectLevel ?? "", out var subjectValue)) return false;
+        if (!levels.TryGetValue(requiredLevel, out var requiredValue)) return false;
+
+        return op switch
+        {
+            ConditionOperator.Equals => subjectValue == requiredValue,
+            ConditionOperator.GreaterThanOrEqual => subjectValue >= requiredValue,
+            ConditionOperator.LessThan => subjectValue < requiredValue,
+            _ => false
+        };
+    }
+
+    private static bool IsWithinTimeRange(string rangeSpec)
+    {
+        // Format: "HH:mm-HH:mm" (e.g., "09:00-17:00")
+        var parts = rangeSpec.Split('-');
+        if (parts.Length != 2) return false;
+
+        if (!TimeOnly.TryParse(parts[0], out var start) ||
+            !TimeOnly.TryParse(parts[1], out var end))
+            return false;
+
+        var now = TimeOnly.FromDateTime(DateTime.Now);
+        return now >= start && now <= end;
+    }
+
+    private static bool IsInIPRange(string? clientIP, string range)
+    {
+        if (string.IsNullOrEmpty(clientIP)) return false;
+
+        // Simple CIDR check
+        if (!range.Contains('/'))
+        {
+            return clientIP == range;
+        }
+
+        var parts = range.Split('/');
+        if (parts.Length != 2) return false;
+
+        if (!IPAddress.TryParse(parts[0], out var network) ||
+            !int.TryParse(parts[1], out var prefixLength))
+            return false;
+
+        if (!IPAddress.TryParse(clientIP, out var client))
+            return false;
+
+        var networkBytes = network.GetAddressBytes();
+        var clientBytes = client.GetAddressBytes();
+
+        var bytesToCompare = prefixLength / 8;
+        var bitsToCompare = prefixLength % 8;
+
+        for (int i = 0; i < bytesToCompare; i++)
+        {
+            if (networkBytes[i] != clientBytes[i]) return false;
+        }
+
+        if (bitsToCompare > 0 && bytesToCompare < networkBytes.Length)
+        {
+            var mask = (byte)(0xFF << (8 - bitsToCompare));
+            if ((networkBytes[bytesToCompare] & mask) != (clientBytes[bytesToCompare] & mask))
+                return false;
+        }
+
+        return true;
+    }
+
+    private static DeviceTrustLevel ParseTrustLevel(string value)
+    {
+        return Enum.TryParse<DeviceTrustLevel>(value, true, out var level)
+            ? level
+            : DeviceTrustLevel.Unknown;
+    }
+
+    private static bool IsInAllowedLocation(string? geoLocation, string allowedLocations)
+    {
+        if (string.IsNullOrEmpty(geoLocation)) return false;
+        var allowed = allowedLocations.Split(',').Select(l => l.Trim());
+        return allowed.Any(l => geoLocation.Contains(l, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private static bool EvaluateDataClassification(SubjectContext subject, string requiredClassification)
+    {
+        var subjectClassifications = subject.Attributes.GetValueOrDefault("data_classifications", "")
+            .Split(',')
+            .Select(c => c.Trim().ToLowerInvariant());
+        return subjectClassifications.Contains(requiredClassification.ToLowerInvariant());
+    }
+
+    private static bool EvaluateCustomCondition(SubjectContext subject, EnvironmentContext? environment, AccessCondition condition)
+    {
+        // Custom conditions evaluated via attribute lookup
+        if (condition.CustomAttributeName != null)
+        {
+            var attrValue = subject.Attributes.GetValueOrDefault(condition.CustomAttributeName);
+            return condition.Operator switch
+            {
+                ConditionOperator.Equals => attrValue == condition.Value,
+                ConditionOperator.Contains => attrValue?.Contains(condition.Value) == true,
+                ConditionOperator.StartsWith => attrValue?.StartsWith(condition.Value) == true,
+                _ => false
+            };
+        }
+        return false;
+    }
+
+    private AccessSession CreateAccessSession(string fileId, SubjectContext subject, AccessPolicy policy)
+    {
+        var session = new AccessSession
+        {
+            SessionId = Guid.NewGuid().ToString("N"),
+            FileId = fileId,
+            SubjectId = subject.SubjectId,
+            PolicyId = policy.PolicyId,
+            CreatedAt = DateTime.UtcNow,
+            ExpiresAt = DateTime.UtcNow.Add(_config.SessionDuration),
+            AccessCount = 0,
+            MaxAccesses = _config.MaxAccessesPerSession
+        };
+
+        _sessions[session.SessionId] = session;
+        return session;
+    }
+
+    private async Task AuditAccessDenied(string fileId, SubjectContext subject, AccessAction action, string reason, CancellationToken ct)
+    {
+        await _auditTrail.RecordAsync(
+            "ZeroTrustAccessDenied",
+            subject.SubjectId,
+            fileId,
+            AuditEventType.AccessDenied,
+            new Dictionary<string, object>
+            {
+                ["action"] = action.ToString(),
+                ["reason"] = reason,
+                ["subjectRoles"] = subject.Roles,
+                ["mfaVerified"] = subject.MFAVerified
+            },
+            ct);
+    }
+
+    private async Task<byte[]> EncryptDataAsync(byte[] plaintext, byte[] key, byte[] iv, CancellationToken ct)
+    {
+        using var aes = Aes.Create();
+        aes.Key = key;
+        aes.IV = iv;
+        aes.Mode = CipherMode.CBC;
+        aes.Padding = PaddingMode.PKCS7;
+
+        using var ms = new MemoryStream();
+        await using var cs = new CryptoStream(ms, aes.CreateEncryptor(), CryptoStreamMode.Write);
+        await cs.WriteAsync(plaintext, ct);
+        await cs.FlushFinalBlockAsync(ct);
+        return ms.ToArray();
+    }
+
+    private async Task<byte[]> DecryptDataAsync(byte[] ciphertext, byte[] key, byte[] iv, CancellationToken ct)
+    {
+        using var aes = Aes.Create();
+        aes.Key = key;
+        aes.IV = iv;
+        aes.Mode = CipherMode.CBC;
+        aes.Padding = PaddingMode.PKCS7;
+
+        using var ms = new MemoryStream();
+        await using var cs = new CryptoStream(ms, aes.CreateDecryptor(), CryptoStreamMode.Write);
+        await cs.WriteAsync(ciphertext, ct);
+        await cs.FlushFinalBlockAsync(ct);
+        return ms.ToArray();
+    }
+
+    private async Task CleanupSessionsAsync(CancellationToken ct)
+    {
+        while (!ct.IsCancellationRequested)
+        {
+            try
+            {
+                await Task.Delay(_config.SessionCleanupInterval, ct);
+
+                var now = DateTime.UtcNow;
+                var expiredSessions = _sessions
+                    .Where(kvp => kvp.Value.ExpiresAt < now)
+                    .Select(kvp => kvp.Key)
+                    .ToList();
+
+                foreach (var sessionId in expiredSessions)
+                {
+                    _sessions.TryRemove(sessionId, out _);
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                break;
+            }
+            catch
+            {
+                // Continue cleanup
+            }
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_disposed) return;
+        _disposed = true;
+
+        await _cts.CancelAsync();
+        try
+        {
+            await _sessionCleanupTask;
+        }
+        catch (OperationCanceledException)
+        {
+            // Expected
+        }
+
+        _cts.Dispose();
+    }
+}
+
+public interface IKeyManagementService
+{
+    Task<KeyGenerationResult> GenerateKeyAsync(string keyId, KeyType keyType, CancellationToken ct = default);
+    Task<KeyRetrievalResult> GetKeyAsync(string keyId, CancellationToken ct = default);
+}
+
+public enum KeyType { AES256, AES128, RSA2048, RSA4096 }
+
+public record KeyGenerationResult
+{
+    public bool Success { get; init; }
+    public string? KeyId { get; init; }
+    public byte[] KeyMaterial { get; init; } = Array.Empty<byte>();
+}
+
+public record KeyRetrievalResult
+{
+    public bool Success { get; init; }
+    public byte[] KeyMaterial { get; init; } = Array.Empty<byte>();
+}
+
+public sealed class ZeroTrustConfig
+{
+    public TimeSpan SessionDuration { get; set; } = TimeSpan.FromHours(1);
+    public int MaxAccessesPerSession { get; set; } = 100;
+    public TimeSpan SessionCleanupInterval { get; set; } = TimeSpan.FromMinutes(5);
+    public bool RequireMFA { get; set; } = true;
+    public DeviceTrustLevel MinimumDeviceTrust { get; set; } = DeviceTrustLevel.Managed;
+}
+
+public sealed class EncryptedFileMetadata
+{
+    public required string FileId { get; init; }
+    public required string KeyId { get; init; }
+    public required byte[] IV { get; init; }
+    public required byte[] IntegrityHash { get; init; }
+    public long OriginalSize { get; init; }
+    public long EncryptedSize { get; init; }
+    public DateTime EncryptedAt { get; init; }
+    public required string EncryptedBy { get; init; }
+    public required string Algorithm { get; init; }
+    public required string PolicyId { get; init; }
+}
+
+public sealed class AccessPolicy
+{
+    public required string PolicyId { get; init; }
+    public required string Name { get; init; }
+    public List<AccessCondition> Conditions { get; init; } = new();
+    public int MinimumMatchingConditions { get; init; } = 1;
+    public DateTime CreatedAt { get; init; }
+    public int Version { get; init; }
+}
+
+public sealed class AccessCondition
+{
+    public required string Name { get; init; }
+    public ConditionType Type { get; init; }
+    public required string Value { get; init; }
+    public ConditionOperator Operator { get; init; } = ConditionOperator.Equals;
+    public bool Required { get; init; } = true;
+    public string? CustomAttributeName { get; init; }
+}
+
+public enum ConditionType
+{
+    Role,
+    Department,
+    ClearanceLevel,
+    TimeOfDay,
+    IPRange,
+    MFARequired,
+    DeviceTrust,
+    Location,
+    Action,
+    DataClassification,
+    Custom
+}
+
+public enum ConditionOperator { Equals, Contains, GreaterThanOrEqual, LessThan, StartsWith }
+public enum AccessAction { Read, Write, Delete, Admin }
+public enum DeviceTrustLevel { Unknown, Unmanaged, Managed, Compliant, FullyTrusted }
+
+public sealed class SubjectContext
+{
+    public required string SubjectId { get; init; }
+    public HashSet<string> Roles { get; init; } = new();
+    public Dictionary<string, string> Attributes { get; init; } = new();
+    public bool MFAVerified { get; init; }
+}
+
+public sealed class EnvironmentContext
+{
+    public string? ClientIP { get; init; }
+    public string? GeoLocation { get; init; }
+    public DeviceTrustLevel DeviceTrustLevel { get; init; }
+    public string? DeviceId { get; init; }
+    public DateTime RequestTime { get; init; } = DateTime.UtcNow;
+}
+
+public sealed class AccessSession
+{
+    public required string SessionId { get; init; }
+    public required string FileId { get; init; }
+    public required string SubjectId { get; init; }
+    public required string PolicyId { get; init; }
+    public DateTime CreatedAt { get; init; }
+    public DateTime ExpiresAt { get; init; }
+    public int AccessCount { get; set; }
+    public int MaxAccesses { get; init; }
+}
+
+public record AccessDecision
+{
+    public bool Allowed { get; init; }
+    public List<string> MatchedConditions { get; init; } = new();
+    public List<string> FailedConditions { get; init; } = new();
+    public required string Reason { get; init; }
+}
+
+public record ZeroTrustWriteResult
+{
+    public bool Success { get; init; }
+    public string? FileId { get; init; }
+    public byte[]? EncryptedData { get; init; }
+    public string? KeyId { get; init; }
+    public string? IntegrityHash { get; init; }
+    public string? Error { get; init; }
+}
+
+public record ZeroTrustReadResult
+{
+    public bool Success { get; init; }
+    public string? FileId { get; init; }
+    public byte[]? Data { get; init; }
+    public string? SessionId { get; init; }
+    public DateTime? SessionExpiry { get; init; }
+    public bool IntegrityVerified { get; init; }
+    public string? Error { get; init; }
+}
+
+#endregion
