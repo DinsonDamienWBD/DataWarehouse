@@ -364,7 +364,7 @@ public class PluginDiscoveryService : IPluginDiscoveryService
                 {
                     SupportsStreaming = kernelPlugin.Category == PluginCategory.StorageProvider,
                     SupportsMultiInstance = true,
-                    SupportsTransactions = kernelPlugin.Category == PluginCategory.DatabaseProvider,
+                    SupportsTransactions = kernelPlugin.Category == PluginCategory.MetadataIndexingProvider,
                     SupportsCaching = true,
                     SupportsIndexing = kernelPlugin.Category != PluginCategory.InterfaceProvider
                 }

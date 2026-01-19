@@ -3,7 +3,8 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using DataWarehouse.Dashboard.Services;
 using DataWarehouse.Dashboard.Security;
-using DataWarehouse.Kernel.Storage;
+// Using alias to avoid ambiguity with Kernel types
+using RaidConfiguration = DataWarehouse.Dashboard.Services.RaidConfiguration;
 
 namespace DataWarehouse.Dashboard.Controllers;
 

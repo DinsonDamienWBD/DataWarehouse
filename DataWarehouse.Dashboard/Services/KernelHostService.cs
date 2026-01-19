@@ -3,6 +3,8 @@ using DataWarehouse.Kernel.Plugins;
 using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Infrastructure;
 using DataWarehouse.SDK.Primitives;
+// Using alias to avoid ambiguity with SDK.Infrastructure.IConfiguration
+using IConfiguration = Microsoft.Extensions.Configuration.IConfiguration;
 
 namespace DataWarehouse.Dashboard.Services;
 

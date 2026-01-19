@@ -2,7 +2,9 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using DataWarehouse.Dashboard.Services;
 using DataWarehouse.Dashboard.Security;
-using DataWarehouse.SDK.Infrastructure;
+// Using aliases to avoid ambiguity with SDK types
+using ComponentHealth = DataWarehouse.Dashboard.Services.ComponentHealth;
+using SystemMetrics = DataWarehouse.Dashboard.Services.SystemMetrics;
 
 namespace DataWarehouse.Dashboard.Controllers;
 
