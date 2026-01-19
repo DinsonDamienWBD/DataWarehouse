@@ -318,10 +318,10 @@ public class StorageManagementService : IStorageManagementService
             CreatedAt = DateTime.UtcNow.AddDays(-30),
             Providers = new()
             {
-                new() { Id = "disk1", Name = "Disk 1", Role = StorageRole.Primary, CapacityBytes = 2.5L * 1024 * 1024 * 1024 * 1024, IsHealthy = true },
-                new() { Id = "disk2", Name = "Disk 2", Role = StorageRole.Primary, CapacityBytes = 2.5L * 1024 * 1024 * 1024 * 1024, IsHealthy = true },
-                new() { Id = "disk3", Name = "Disk 3", Role = StorageRole.Primary, CapacityBytes = 2.5L * 1024 * 1024 * 1024 * 1024, IsHealthy = true },
-                new() { Id = "disk4", Name = "Disk 4", Role = StorageRole.Parity, CapacityBytes = 2.5L * 1024 * 1024 * 1024 * 1024, IsHealthy = true }
+                new() { Id = "disk1", Name = "Disk 1", Role = StorageRole.Primary, CapacityBytes = (long)(2.5 * 1024L * 1024 * 1024 * 1024), IsHealthy = true },
+                new() { Id = "disk2", Name = "Disk 2", Role = StorageRole.Primary, CapacityBytes = (long)(2.5 * 1024L * 1024 * 1024 * 1024), IsHealthy = true },
+                new() { Id = "disk3", Name = "Disk 3", Role = StorageRole.Primary, CapacityBytes = (long)(2.5 * 1024L * 1024 * 1024 * 1024), IsHealthy = true },
+                new() { Id = "disk4", Name = "Disk 4", Role = StorageRole.Parity, CapacityBytes = (long)(2.5 * 1024L * 1024 * 1024 * 1024), IsHealthy = true }
             }
         };
 
