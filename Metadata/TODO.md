@@ -778,3 +778,218 @@ The Kernel can be shipped to customers for testing while plugins are developed:
 - Hyperscale deployments
 
 **Status: SHIP IT! 🚀**
+
+---
+
+## IMPLEMENTATION SPRINT: Hybrid Plugin Architecture
+
+### Overview
+Consolidate storage, indexing, and caching functionality into unified hybrid plugins.
+Following Rule 6: Plugins extend abstract base classes for 80% code reduction.
+
+---
+
+### Task H1: SDK Infrastructure - ICacheableStorage Interface & Base Class
+**File:** `DataWarehouse.SDK/Contracts/ICacheableStorage.cs`
+**Status:** [ ] IN PROGRESS
+**Estimated Lines:** ~150
+
+Add caching capabilities to storage plugins:
+- [ ] `ICacheableStorage` interface extending `IStorageProvider`
+- [ ] `SaveWithTtlAsync(Uri uri, Stream data, TimeSpan ttl)` - Save with expiration
+- [ ] `GetTtlAsync(Uri uri)` - Get remaining TTL
+- [ ] `SetTtlAsync(Uri uri, TimeSpan ttl)` - Update TTL
+- [ ] `InvalidatePatternAsync(string pattern)` - Pattern-based invalidation
+- [ ] `GetCacheStatsAsync()` - Cache hit/miss statistics
+
+**File:** `DataWarehouse.SDK/Contracts/PluginBase.cs` (additions)
+**Estimated Lines:** ~100
+
+- [ ] `CacheableStoragePluginBase` extending `ListableStoragePluginBase`
+- [ ] Default TTL tracking via metadata sidecar
+- [ ] Background expiration cleanup timer
+- [ ] LRU/LFU eviction policy support
+
+---
+
+### Task H2: SDK Infrastructure - IIndexableStorage Interface & Base Class
+**File:** `DataWarehouse.SDK/Contracts/IIndexableStorage.cs`
+**Status:** [ ] NOT STARTED
+**Estimated Lines:** ~100
+
+Add indexing capabilities to storage plugins:
+- [ ] `IIndexableStorage` interface
+- [ ] `IndexDocumentAsync(string id, Dictionary<string, object> metadata)` - Index document
+- [ ] `RemoveFromIndexAsync(string id)` - Remove from index
+- [ ] `SearchIndexAsync(string query, int limit)` - Full-text search
+- [ ] `QueryByMetadataAsync(Dictionary<string, object> criteria)` - Metadata query
+
+**File:** `DataWarehouse.SDK/Contracts/PluginBase.cs` (additions)
+**Estimated Lines:** ~150
+
+- [ ] `IndexableStoragePluginBase` extending `CacheableStoragePluginBase`
+- [ ] Implements `IMetadataIndex` via composition
+- [ ] Default SQLite-based index sidecar for any storage
+- [ ] Pluggable index backend (SQLite, in-memory, external)
+
+---
+
+### Task H3: SDK Infrastructure - HybridDatabasePluginBase
+**File:** `DataWarehouse.SDK/Contracts/PluginBase.cs` (additions)
+**Status:** [ ] NOT STARTED
+**Estimated Lines:** ~200
+
+Unified base class for database plugins with all three capabilities:
+- [ ] Extends `IndexableStoragePluginBase`
+- [ ] Implements `IMetadataIndex` directly (databases can self-index)
+- [ ] Implements `ICacheableStorage` with engine-native TTL where available
+- [ ] Multi-instance support via `ConnectionRegistry<TConfig>`
+- [ ] Role-based connection selection (Storage, Index, Cache, Metadata)
+
+---
+
+### Task H4: SDK Infrastructure - StorageConnectionRegistry
+**File:** `DataWarehouse.SDK/Storage/StorageConnectionRegistry.cs`
+**Status:** [ ] NOT STARTED
+**Estimated Lines:** ~250
+
+Generic multi-instance connection management for all storage plugins:
+- [ ] `StorageConnectionRegistry<TConfig>` generic registry
+- [ ] `StorageConnectionInstance<TConfig>` connection wrapper
+- [ ] `StorageRole` flags enum (Primary, Cache, Index, Archive)
+- [ ] Thread-safe instance management
+- [ ] Connection health monitoring
+- [ ] Automatic failover support
+
+---
+
+### Task H5: Update Database Plugins - Hybrid Capabilities
+**Files:**
+- `Plugins/DataWarehouse.Plugins.RelationalDatabaseStorage/RelationalDatabasePlugin.cs`
+- `Plugins/DataWarehouse.Plugins.NoSQLDatabaseStorage/NoSqlDatabasePlugin.cs`
+- `Plugins/DataWarehouse.Plugins.EmbeddedDatabaseStorage/EmbeddedDatabasePlugin.cs`
+**Status:** [ ] NOT STARTED
+**Estimated Lines:** ~300 per plugin
+
+Add to each database plugin:
+- [ ] Implement `IMetadataIndex` methods using native query capabilities
+- [ ] Implement `ICacheableStorage` with TTL support
+- [ ] Engine-native TTL where available (Redis TTL, SQL scheduled cleanup)
+- [ ] Self-indexing capabilities (no separate index plugin needed)
+
+---
+
+### Task H6: Update Storage Plugins - Multi-Instance + Hybrid
+**Files:**
+- `Plugins/DataWarehouse.Plugins.LocalStorage/LocalStoragePlugin.cs`
+- `Plugins/DataWarehouse.Plugins.RAMDiskStorage/RamDiskStoragePlugin.cs`
+- `Plugins/DataWarehouse.Plugins.S3Storage/S3StoragePlugin.cs`
+- `Plugins/DataWarehouse.Plugins.AzureBlobStorage/AzureBlobStoragePlugin.cs`
+- `Plugins/DataWarehouse.Plugins.GcsStorage/GcsStoragePlugin.cs`
+- `Plugins/DataWarehouse.Plugins.IpfsStorage/IpfsStoragePlugin.cs`
+- `Plugins/DataWarehouse.Plugins.NetworkStorage/NetworkStoragePlugin.cs`
+- `Plugins/DataWarehouse.Plugins.GrpcStorage/GrpcStoragePlugin.cs`
+- `Plugins/DataWarehouse.Plugins.CloudStorage/CloudStoragePlugin.cs`
+**Status:** [ ] NOT STARTED
+**Estimated Lines:** ~100 per plugin
+
+Add to each storage plugin:
+- [ ] Multi-instance support via `StorageConnectionRegistry`
+- [ ] Extend `IndexableStoragePluginBase` for hybrid capabilities
+- [ ] Optional sidecar SQLite index (default from base class)
+- [ ] TTL support via metadata + cleanup timer
+
+---
+
+### Task H7: Remove Duplicate Plugins
+**Status:** [ ] NOT STARTED
+
+Plugins to DELETE (functionality absorbed by hybrid DB plugins):
+
+| Plugin to Remove | Replaced By |
+|------------------|-------------|
+| `DataWarehouse.Plugins.SqliteIndexing` | `EmbeddedDatabasePlugin` (SQLite engine) |
+| `DataWarehouse.Plugins.DatabaseIndexing` | `RelationalDatabasePlugin` |
+| `DataWarehouse.Plugins.Metadata.SQLite` | `EmbeddedDatabasePlugin` (SQLite engine) |
+| `DataWarehouse.Plugins.Metadata.Postgres` | `RelationalDatabasePlugin` (PostgreSQL engine) |
+
+Steps:
+- [ ] Verify all functionality migrated to hybrid plugins
+- [ ] Remove plugin directories
+- [ ] Remove from solution file (DataWarehouse.slnx)
+- [ ] Update any references in documentation
+
+---
+
+### Task H8: Update Solution File
+**File:** `DataWarehouse.slnx`
+**Status:** [ ] NOT STARTED
+
+- [ ] Remove `DataWarehouse.Plugins.SqliteIndexing` project reference
+- [ ] Remove `DataWarehouse.Plugins.DatabaseIndexing` project reference
+- [ ] Remove `DataWarehouse.Plugins.Metadata.SQLite` project reference
+- [ ] Remove `DataWarehouse.Plugins.Metadata.Postgres` project reference
+
+---
+
+### Architecture Summary
+
+```
+Before (Separate Plugins):
+┌──────────────────┐  ┌──────────────────┐  ┌──────────────────┐
+│ RelationalDB     │  │ SqliteIndexing   │  │ Metadata.Postgres│
+│ (Storage only)   │  │ (Index only)     │  │ (Metadata only)  │
+└──────────────────┘  └──────────────────┘  └──────────────────┘
+
+After (Hybrid Plugins):
+┌────────────────────────────────────────────────────────────────┐
+│                    RelationalDatabasePlugin                     │
+│  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────────┐   │
+│  │ Storage  │  │ Indexing │  │ Caching  │  │ Multi-Instance│   │
+│  │ Provider │  │ Provider │  │ Provider │  │ Registry     │   │
+│  └──────────┘  └──────────┘  └──────────┘  └──────────────┘   │
+└────────────────────────────────────────────────────────────────┘
+
+Base Class Hierarchy (following Rule 6):
+PluginBase
+└── StorageProviderPluginBase (IStorageProvider)
+    └── ListableStoragePluginBase (IListableStorage)
+        └── CacheableStoragePluginBase (ICacheableStorage) ← NEW
+            └── IndexableStoragePluginBase (IIndexableStorage, IMetadataIndex) ← NEW
+                └── HybridDatabasePluginBase ← NEW
+                    ├── RelationalDatabasePlugin
+                    ├── NoSqlDatabasePlugin
+                    └── EmbeddedDatabasePlugin
+```
+
+---
+
+### Implementation Order
+
+1. **H1** - Create `ICacheableStorage` interface and `CacheableStoragePluginBase`
+2. **H2** - Create `IIndexableStorage` interface and `IndexableStoragePluginBase`
+3. **H3** - Create `HybridDatabasePluginBase` combining all capabilities
+4. **H4** - Create generic `StorageConnectionRegistry<TConfig>`
+5. **H5** - Update database plugins to extend hybrid base
+6. **H6** - Update storage plugins with multi-instance support
+7. **H7** - Remove duplicate plugins
+8. **H8** - Update solution file
+
+---
+
+### Code Quality Checklist
+
+Per Rule 3 (Maximum Code Reuse):
+- [ ] No code duplication between plugins
+- [ ] All common functionality in base classes
+- [ ] Plugins implement ONLY engine-specific logic
+
+Per Rule 6 (CategoryBase Classes):
+- [ ] All plugins extend appropriate base classes
+- [ ] Property overrides, not assignments
+- [ ] 80%+ code reduction achieved
+
+Per Rule 12 (Task Tracking):
+- [ ] TODO.md updated before implementation
+- [ ] Status updated as work progresses
+- [ ] File paths included for all changes
