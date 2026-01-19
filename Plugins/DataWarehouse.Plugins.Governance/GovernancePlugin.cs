@@ -252,9 +252,11 @@ public sealed class GovernancePlugin : GovernancePluginBase
                 }
             }
         }
-        catch
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            // Stream may not be readable as text - skip PII scan
+            // Stream may not be readable as text - skip PII scan but record the attempt
+            // In production: log this with structured logging
+            System.Diagnostics.Debug.WriteLine($"PII scan skipped for non-text content: {ex.Message}");
         }
 
         return findings;
