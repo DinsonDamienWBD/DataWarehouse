@@ -1,3 +1,4 @@
+using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Primitives;
 using DataWarehouse.SDK.Utilities;
 using System.Collections.Concurrent;
@@ -7,6 +8,7 @@ namespace DataWarehouse.Dashboard.Services;
 
 /// <summary>
 /// Service for discovering and managing plugins dynamically.
+/// Integrates with Kernel's PluginRegistry when available.
 /// </summary>
 public interface IPluginDiscoveryService
 {
@@ -157,23 +159,43 @@ public enum PluginChangeType
 
 /// <summary>
 /// Implementation of plugin discovery service.
+/// Integrates with Kernel's PluginRegistry when available.
 /// </summary>
 public class PluginDiscoveryService : IPluginDiscoveryService
 {
     private readonly ConcurrentDictionary<string, PluginInfo> _plugins = new();
     private readonly ILogger<PluginDiscoveryService> _logger;
+    private readonly IKernelHostService? _kernelHost;
     private readonly string _pluginsDirectory;
 
     public event EventHandler<PluginChangedEventArgs>? PluginsChanged;
 
-    public PluginDiscoveryService(ILogger<PluginDiscoveryService> logger, IConfiguration configuration)
+    public PluginDiscoveryService(
+        ILogger<PluginDiscoveryService> logger,
+        IConfiguration configuration,
+        IKernelHostService? kernelHost = null)
     {
         _logger = logger;
+        _kernelHost = kernelHost;
         _pluginsDirectory = configuration.GetValue<string>("PluginsDirectory")
             ?? Path.Combine(AppContext.BaseDirectory, "Plugins");
 
+        // Subscribe to kernel state changes
+        if (_kernelHost != null)
+        {
+            _kernelHost.StateChanged += OnKernelStateChanged;
+        }
+
         // Initial discovery
         _ = RefreshPluginsAsync();
+    }
+
+    private void OnKernelStateChanged(object? sender, KernelStateChangedEventArgs e)
+    {
+        if (e.IsReady)
+        {
+            _ = RefreshPluginsAsync();
+        }
     }
 
     public IEnumerable<PluginInfo> GetAllPlugins() => _plugins.Values.OrderBy(p => p.Category).ThenBy(p => p.Name);
@@ -301,7 +323,59 @@ public class PluginDiscoveryService : IPluginDiscoveryService
     {
         _logger.LogInformation("Discovering plugins...");
 
-        // Discover from known plugin types in loaded assemblies
+        // First, try to get plugins from the Kernel's registry
+        if (_kernelHost?.IsReady == true && _kernelHost.Plugins != null)
+        {
+            _logger.LogInformation("Using Kernel's plugin registry");
+            DiscoverFromKernel();
+        }
+        else
+        {
+            // Fallback: Discover from known plugin types in loaded assemblies
+            DiscoverFromAssemblies();
+        }
+
+        // If no plugins found, add some default entries based on known plugins
+        if (_plugins.IsEmpty)
+        {
+            AddKnownPlugins();
+        }
+
+        _logger.LogInformation("Discovered {Count} plugins", _plugins.Count);
+        return Task.CompletedTask;
+    }
+
+    private void DiscoverFromKernel()
+    {
+        var registry = _kernelHost!.Plugins!;
+        foreach (var kernelPlugin in registry.GetAll())
+        {
+            var info = new PluginInfo
+            {
+                Id = kernelPlugin.Id,
+                Name = kernelPlugin.Name,
+                Version = kernelPlugin.Version,
+                Description = $"{kernelPlugin.Name} - {kernelPlugin.Category} plugin",
+                Category = kernelPlugin.Category.ToString(),
+                IsEnabled = true,
+                IsActive = true,
+                IsHealthy = true,
+                Capabilities = new PluginCapabilities
+                {
+                    SupportsStreaming = kernelPlugin.Category == PluginCategory.StorageProvider,
+                    SupportsMultiInstance = true,
+                    SupportsTransactions = kernelPlugin.Category == PluginCategory.DatabaseProvider,
+                    SupportsCaching = true,
+                    SupportsIndexing = kernelPlugin.Category != PluginCategory.InterfaceProvider
+                }
+            };
+
+            _plugins.AddOrUpdate(info.Id, info, (_, _) => info);
+        }
+    }
+
+    private void DiscoverFromAssemblies()
+    {
         var assemblies = AppDomain.CurrentDomain.GetAssemblies()
             .Where(a => !a.IsDynamic && a.FullName?.Contains("DataWarehouse") == true);
 
@@ -324,15 +398,6 @@ public class PluginDiscoveryService : IPluginDiscoveryService
                 _logger.LogDebug(ex, "Could not load types from {Assembly}", assembly.FullName);
             }
         }
-
-        // If no plugins found, add some default entries based on known plugins
-        if (_plugins.IsEmpty)
-        {
-            AddKnownPlugins();
-        }
-
-        _logger.LogInformation("Discovered {Count} plugins", _plugins.Count);
-        return Task.CompletedTask;
     }
 
     private void DiscoverPluginFromType(Type pluginType)

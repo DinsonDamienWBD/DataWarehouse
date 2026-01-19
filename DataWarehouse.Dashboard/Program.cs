@@ -9,6 +9,11 @@ builder.Services.AddServerSideBlazor();
 builder.Services.AddSignalR();
 builder.Services.AddControllers();
 
+// Add Kernel host service (manages the DataWarehouse Kernel)
+builder.Services.AddSingleton<KernelHostService>();
+builder.Services.AddSingleton<IKernelHostService>(sp => sp.GetRequiredService<KernelHostService>());
+builder.Services.AddHostedService(sp => sp.GetRequiredService<KernelHostService>());
+
 // Add dashboard services
 builder.Services.AddSingleton<IPluginDiscoveryService, PluginDiscoveryService>();
 builder.Services.AddSingleton<ISystemHealthService, SystemHealthService>();
