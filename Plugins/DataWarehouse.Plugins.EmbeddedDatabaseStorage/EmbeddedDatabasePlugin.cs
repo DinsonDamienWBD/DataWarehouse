@@ -629,5 +629,249 @@ namespace DataWarehouse.Plugins.EmbeddedDatabaseStorage
         };
     }
 
-    public enum EmbeddedEngine { InMemory, SQLite, LiteDB }
+    /// <summary>
+    /// Supported embedded database engines.
+    /// </summary>
+    public enum EmbeddedEngine
+    {
+        // In-Memory / Testing
+        /// <summary>In-memory storage for testing.</summary>
+        InMemory,
+
+        // SQL Embedded
+        /// <summary>SQLite embedded database.</summary>
+        SQLite,
+        /// <summary>DuckDB OLAP embedded database.</summary>
+        DuckDB,
+        /// <summary>H2 Database (Java-based, for JVM interop).</summary>
+        H2,
+        /// <summary>HSQLDB HyperSQL Database.</summary>
+        HSQLDB,
+        /// <summary>Firebird embedded.</summary>
+        Firebird,
+
+        // Document Embedded
+        /// <summary>LiteDB embedded NoSQL database.</summary>
+        LiteDB,
+        /// <summary>Realm embedded mobile database.</summary>
+        Realm,
+        /// <summary>ObjectBox high-performance embedded.</summary>
+        ObjectBox,
+        /// <summary>Nitrite embedded NoSQL database.</summary>
+        Nitrite,
+
+        // Key-Value Embedded
+        /// <summary>RocksDB high-performance key-value store.</summary>
+        RocksDB,
+        /// <summary>LevelDB key-value storage library.</summary>
+        LevelDB,
+        /// <summary>LMDB Lightning Memory-Mapped Database.</summary>
+        LMDB,
+        /// <summary>Berkeley DB embedded database.</summary>
+        BerkeleyDB,
+        /// <summary>Badger LSM-based key-value store.</summary>
+        Badger,
+        /// <summary>Bolt embedded key-value database.</summary>
+        Bolt,
+        /// <summary>FASTER concurrent key-value store.</summary>
+        FASTER,
+
+        // Graph Embedded
+        /// <summary>Neo4j embedded graph database.</summary>
+        Neo4jEmbedded,
+        /// <summary>Apache TinkerGraph in-memory graph.</summary>
+        TinkerGraph,
+
+        // Time Series Embedded
+        /// <summary>QuestDB embedded time series.</summary>
+        QuestDBEmbedded,
+        /// <summary>TimescaleDB embedded (via SQLite extension).</summary>
+        TimescaleDBLite,
+
+        // Vector Embedded
+        /// <summary>Chroma embedded vector database.</summary>
+        ChromaEmbedded,
+        /// <summary>LanceDB embedded vector database.</summary>
+        LanceDB,
+        /// <summary>FAISS vector similarity search.</summary>
+        FAISS,
+        /// <summary>Annoy Approximate Nearest Neighbors.</summary>
+        Annoy,
+        /// <summary>Hnswlib fast ANN search.</summary>
+        Hnswlib,
+
+        // Specialized
+        /// <summary>SQLCipher encrypted SQLite.</summary>
+        SQLCipher,
+        /// <summary>SpatiaLite spatial SQLite extension.</summary>
+        SpatiaLite,
+        /// <summary>EdgeDB embedded TypeQL database.</summary>
+        EdgeDBEmbedded
+    }
+
+    #region Multi-Instance Connection Management
+
+    /// <summary>
+    /// Manages multiple embedded database instances.
+    /// </summary>
+    public sealed class EmbeddedConnectionRegistry : IAsyncDisposable
+    {
+        private readonly ConcurrentDictionary<string, EmbeddedConnectionInstance> _instances = new();
+        private volatile bool _disposed;
+
+        /// <summary>
+        /// Registers a new database instance.
+        /// </summary>
+        public EmbeddedConnectionInstance Register(string instanceId, EmbeddedDbConfig config)
+        {
+            if (_disposed) throw new ObjectDisposedException(nameof(EmbeddedConnectionRegistry));
+
+            if (_instances.ContainsKey(instanceId))
+                throw new InvalidOperationException($"Instance '{instanceId}' already registered.");
+
+            var instance = new EmbeddedConnectionInstance(instanceId, config);
+            _instances[instanceId] = instance;
+            return instance;
+        }
+
+        /// <summary>
+        /// Gets an instance by ID.
+        /// </summary>
+        public EmbeddedConnectionInstance? Get(string instanceId)
+        {
+            return _instances.TryGetValue(instanceId, out var instance) ? instance : null;
+        }
+
+        /// <summary>
+        /// Gets all registered instances.
+        /// </summary>
+        public IEnumerable<EmbeddedConnectionInstance> GetAll() => _instances.Values;
+
+        /// <summary>
+        /// Gets instances by role.
+        /// </summary>
+        public IEnumerable<EmbeddedConnectionInstance> GetByRole(EmbeddedConnectionRole role)
+        {
+            return _instances.Values.Where(i => i.Roles.HasFlag(role));
+        }
+
+        /// <summary>
+        /// Unregisters and disposes an instance.
+        /// </summary>
+        public async Task UnregisterAsync(string instanceId)
+        {
+            if (_instances.TryRemove(instanceId, out var instance))
+            {
+                await instance.DisposeAsync();
+            }
+        }
+
+        public async ValueTask DisposeAsync()
+        {
+            if (_disposed) return;
+            _disposed = true;
+
+            foreach (var instance in _instances.Values)
+            {
+                await instance.DisposeAsync();
+            }
+            _instances.Clear();
+        }
+    }
+
+    /// <summary>
+    /// Represents a single embedded database instance.
+    /// </summary>
+    public sealed class EmbeddedConnectionInstance : IAsyncDisposable
+    {
+        public string InstanceId { get; }
+        public EmbeddedDbConfig Config { get; }
+        public EmbeddedConnectionRole Roles { get; set; } = EmbeddedConnectionRole.Storage;
+        public int Priority { get; set; } = 0;
+        public bool IsConnected { get; private set; }
+        public DateTime? LastActivity { get; private set; }
+        public string? FilePath => Config.FilePath;
+
+        private readonly SemaphoreSlim _connectionLock = new(1, 1);
+        private object? _connection;
+
+        public EmbeddedConnectionInstance(string instanceId, EmbeddedDbConfig config)
+        {
+            InstanceId = instanceId;
+            Config = config;
+        }
+
+        public async Task ConnectAsync()
+        {
+            if (IsConnected) return;
+
+            await _connectionLock.WaitAsync();
+            try
+            {
+                if (IsConnected) return;
+
+                _connection = await CreateConnectionAsync();
+                IsConnected = true;
+                LastActivity = DateTime.UtcNow;
+            }
+            finally
+            {
+                _connectionLock.Release();
+            }
+        }
+
+        public async Task DisconnectAsync()
+        {
+            if (!IsConnected) return;
+
+            await _connectionLock.WaitAsync();
+            try
+            {
+                if (_connection is IAsyncDisposable asyncDisposable)
+                    await asyncDisposable.DisposeAsync();
+                else if (_connection is IDisposable disposable)
+                    disposable.Dispose();
+
+                _connection = null;
+                IsConnected = false;
+            }
+            finally
+            {
+                _connectionLock.Release();
+            }
+        }
+
+        private Task<object> CreateConnectionAsync()
+        {
+            // In production, would create actual embedded DB connection
+            return Task.FromResult<object>(new { Engine = Config.Engine, FilePath = Config.FilePath });
+        }
+
+        public T? GetConnection<T>() where T : class => _connection as T;
+
+        public void RecordActivity() => LastActivity = DateTime.UtcNow;
+
+        public async ValueTask DisposeAsync()
+        {
+            await DisconnectAsync();
+            _connectionLock.Dispose();
+        }
+    }
+
+    /// <summary>
+    /// Roles an embedded connection instance can serve.
+    /// </summary>
+    [Flags]
+    public enum EmbeddedConnectionRole
+    {
+        None = 0,
+        Storage = 1,
+        Index = 2,
+        Cache = 4,
+        Metadata = 8,
+        Vector = 16,
+        All = Storage | Index | Cache | Metadata | Vector
+    }
+
+    #endregion
 }

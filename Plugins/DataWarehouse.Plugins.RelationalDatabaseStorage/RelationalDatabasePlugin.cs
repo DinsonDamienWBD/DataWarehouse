@@ -995,6 +995,141 @@ namespace DataWarehouse.Plugins.RelationalDatabaseStorage
             Engine = RelationalEngine.InMemory,
             DefaultDatabase = "default"
         };
+
+        /// <summary>Creates configuration for Oracle Database.</summary>
+        public static RelationalDbConfig ForOracle(string host, string serviceName, string username, string password, int port = 1521) => new()
+        {
+            Engine = RelationalEngine.Oracle,
+            Host = host,
+            Port = port,
+            DefaultDatabase = serviceName,
+            Username = username,
+            Password = password,
+            ConnectionString = $"Data Source=(DESCRIPTION=(ADDRESS=(PROTOCOL=TCP)(HOST={host})(PORT={port}))(CONNECT_DATA=(SERVICE_NAME={serviceName})));User Id={username};Password={password};"
+        };
+
+        /// <summary>Creates configuration for IBM Db2.</summary>
+        public static RelationalDbConfig ForDb2(string host, string database, string username, string password, int port = 50000) => new()
+        {
+            Engine = RelationalEngine.Db2,
+            Host = host,
+            Port = port,
+            DefaultDatabase = database,
+            Username = username,
+            Password = password,
+            ConnectionString = $"Server={host}:{port};Database={database};UID={username};PWD={password};"
+        };
+
+        /// <summary>Creates configuration for SQLite.</summary>
+        public static RelationalDbConfig ForSQLite(string filePath, string? password = null) => new()
+        {
+            Engine = RelationalEngine.SQLite,
+            DefaultDatabase = Path.GetFileNameWithoutExtension(filePath),
+            ConnectionString = password != null
+                ? $"Data Source={filePath};Password={password};"
+                : $"Data Source={filePath};"
+        };
+
+        /// <summary>Creates configuration for CockroachDB (PostgreSQL-compatible).</summary>
+        public static RelationalDbConfig ForCockroachDB(string host, string database, string username, string password, int port = 26257) => new()
+        {
+            Engine = RelationalEngine.CockroachDB,
+            Host = host,
+            Port = port,
+            DefaultDatabase = database,
+            Username = username,
+            Password = password,
+            ConnectionString = $"Host={host};Port={port};Database={database};Username={username};Password={password};SslMode=VerifyFull;"
+        };
+
+        /// <summary>Creates configuration for TiDB (MySQL-compatible).</summary>
+        public static RelationalDbConfig ForTiDB(string host, string database, string username, string password, int port = 4000) => new()
+        {
+            Engine = RelationalEngine.TiDB,
+            Host = host,
+            Port = port,
+            DefaultDatabase = database,
+            Username = username,
+            Password = password,
+            ConnectionString = $"Server={host};Port={port};Database={database};User={username};Password={password};"
+        };
+
+        /// <summary>Creates configuration for ClickHouse (OLAP).</summary>
+        public static RelationalDbConfig ForClickHouse(string host, string database, string username, string password, int port = 8123) => new()
+        {
+            Engine = RelationalEngine.ClickHouse,
+            Host = host,
+            Port = port,
+            DefaultDatabase = database,
+            Username = username,
+            Password = password,
+            ConnectionString = $"Host={host};Port={port};Database={database};User={username};Password={password};"
+        };
+
+        /// <summary>Creates configuration for TimescaleDB.</summary>
+        public static RelationalDbConfig ForTimescaleDB(string host, string database, string username, string password, int port = 5432) => new()
+        {
+            Engine = RelationalEngine.TimescaleDB,
+            Host = host,
+            Port = port,
+            DefaultDatabase = database,
+            Username = username,
+            Password = password,
+            ConnectionString = $"Host={host};Port={port};Database={database};Username={username};Password={password};"
+        };
+
+        /// <summary>Creates configuration for Snowflake.</summary>
+        public static RelationalDbConfig ForSnowflake(string account, string database, string schema, string username, string password, string warehouse) => new()
+        {
+            Engine = RelationalEngine.Snowflake,
+            DefaultDatabase = database,
+            Username = username,
+            Password = password,
+            ConnectionString = $"account={account};user={username};password={password};db={database};schema={schema};warehouse={warehouse};"
+        };
+
+        /// <summary>Creates configuration for Amazon Redshift.</summary>
+        public static RelationalDbConfig ForRedshift(string host, string database, string username, string password, int port = 5439) => new()
+        {
+            Engine = RelationalEngine.Redshift,
+            Host = host,
+            Port = port,
+            DefaultDatabase = database,
+            Username = username,
+            Password = password,
+            ConnectionString = $"Host={host};Port={port};Database={database};Username={username};Password={password};ServerCompatibilityMode=Redshift;"
+        };
+
+        /// <summary>Creates configuration for Google BigQuery.</summary>
+        public static RelationalDbConfig ForBigQuery(string projectId, string datasetId, string credentialsPath) => new()
+        {
+            Engine = RelationalEngine.BigQuery,
+            DefaultDatabase = datasetId,
+            ConnectionString = $"ProjectId={projectId};DataSetId={datasetId};GoogleCredentialsFile={credentialsPath};"
+        };
+
+        /// <summary>Creates configuration for Azure Synapse Analytics.</summary>
+        public static RelationalDbConfig ForAzureSynapse(string server, string database, string username, string password) => new()
+        {
+            Engine = RelationalEngine.AzureSynapse,
+            Host = server,
+            DefaultDatabase = database,
+            Username = username,
+            Password = password,
+            ConnectionString = $"Server={server}.sql.azuresynapse.net;Database={database};User Id={username};Password={password};Encrypt=True;TrustServerCertificate=False;"
+        };
+
+        /// <summary>Creates configuration for SAP HANA.</summary>
+        public static RelationalDbConfig ForHANA(string host, string database, string username, string password, int port = 30015) => new()
+        {
+            Engine = RelationalEngine.HANA,
+            Host = host,
+            Port = port,
+            DefaultDatabase = database,
+            Username = username,
+            Password = password,
+            ConnectionString = $"Server={host}:{port};UserName={username};Password={password};CurrentSchema={database};"
+        };
     }
 
     /// <summary>
@@ -1011,6 +1146,221 @@ namespace DataWarehouse.Plugins.RelationalDatabaseStorage
         /// <summary>PostgreSQL database.</summary>
         PostgreSQL,
         /// <summary>Microsoft SQL Server.</summary>
-        SQLServer
+        SQLServer,
+        /// <summary>Oracle Database.</summary>
+        Oracle,
+        /// <summary>IBM Db2.</summary>
+        Db2,
+        /// <summary>SQLite (also works as embedded).</summary>
+        SQLite,
+        /// <summary>CockroachDB (PostgreSQL-compatible).</summary>
+        CockroachDB,
+        /// <summary>TiDB (MySQL-compatible distributed).</summary>
+        TiDB,
+        /// <summary>Vitess (MySQL-compatible sharded).</summary>
+        Vitess,
+        /// <summary>YugabyteDB (PostgreSQL-compatible distributed).</summary>
+        YugabyteDB,
+        /// <summary>Amazon Aurora (MySQL/PostgreSQL compatible).</summary>
+        Aurora,
+        /// <summary>Google Cloud Spanner.</summary>
+        Spanner,
+        /// <summary>PlanetScale (MySQL-compatible serverless).</summary>
+        PlanetScale,
+        /// <summary>SingleStore (MemSQL).</summary>
+        SingleStore,
+        /// <summary>ClickHouse (OLAP).</summary>
+        ClickHouse,
+        /// <summary>TimescaleDB (time-series on PostgreSQL).</summary>
+        TimescaleDB,
+        /// <summary>Vertica (OLAP).</summary>
+        Vertica,
+        /// <summary>Greenplum (data warehouse).</summary>
+        Greenplum,
+        /// <summary>SAP HANA.</summary>
+        HANA,
+        /// <summary>Teradata.</summary>
+        Teradata,
+        /// <summary>Snowflake (cloud data warehouse).</summary>
+        Snowflake,
+        /// <summary>Azure Synapse Analytics.</summary>
+        AzureSynapse,
+        /// <summary>Amazon Redshift.</summary>
+        Redshift,
+        /// <summary>Google BigQuery.</summary>
+        BigQuery,
+        /// <summary>Databricks SQL.</summary>
+        Databricks
     }
+
+    #region Multi-Instance Connection Management
+
+    /// <summary>
+    /// Manages multiple relational database connection instances.
+    /// </summary>
+    public sealed class RelationalConnectionRegistry : IAsyncDisposable
+    {
+        private readonly ConcurrentDictionary<string, RelationalConnectionInstance> _instances = new();
+        private readonly RelationalDatabasePlugin _plugin;
+        private volatile bool _disposed;
+
+        public RelationalConnectionRegistry(RelationalDatabasePlugin plugin)
+        {
+            _plugin = plugin;
+        }
+
+        /// <summary>
+        /// Registers a new database instance.
+        /// </summary>
+        public RelationalConnectionInstance Register(string instanceId, RelationalDbConfig config)
+        {
+            if (_disposed) throw new ObjectDisposedException(nameof(RelationalConnectionRegistry));
+
+            if (_instances.ContainsKey(instanceId))
+                throw new InvalidOperationException($"Instance '{instanceId}' already registered.");
+
+            var instance = new RelationalConnectionInstance(instanceId, config);
+            _instances[instanceId] = instance;
+            return instance;
+        }
+
+        /// <summary>
+        /// Gets an instance by ID.
+        /// </summary>
+        public RelationalConnectionInstance? Get(string instanceId)
+        {
+            return _instances.TryGetValue(instanceId, out var instance) ? instance : null;
+        }
+
+        /// <summary>
+        /// Gets all registered instances.
+        /// </summary>
+        public IEnumerable<RelationalConnectionInstance> GetAll() => _instances.Values;
+
+        /// <summary>
+        /// Gets instances by role (storage, indexing, caching).
+        /// </summary>
+        public IEnumerable<RelationalConnectionInstance> GetByRole(ConnectionRole role)
+        {
+            return _instances.Values.Where(i => i.Roles.HasFlag(role));
+        }
+
+        /// <summary>
+        /// Unregisters and disposes an instance.
+        /// </summary>
+        public async Task UnregisterAsync(string instanceId)
+        {
+            if (_instances.TryRemove(instanceId, out var instance))
+            {
+                await instance.DisposeAsync();
+            }
+        }
+
+        public async ValueTask DisposeAsync()
+        {
+            if (_disposed) return;
+            _disposed = true;
+
+            foreach (var instance in _instances.Values)
+            {
+                await instance.DisposeAsync();
+            }
+            _instances.Clear();
+        }
+    }
+
+    /// <summary>
+    /// Represents a single relational database connection instance.
+    /// </summary>
+    public sealed class RelationalConnectionInstance : IAsyncDisposable
+    {
+        public string InstanceId { get; }
+        public RelationalDbConfig Config { get; }
+        public ConnectionRole Roles { get; set; } = ConnectionRole.Storage;
+        public int Priority { get; set; } = 0;
+        public bool IsConnected { get; private set; }
+        public DateTime? LastActivity { get; private set; }
+
+        private readonly SemaphoreSlim _connectionLock = new(1, 1);
+        private object? _connection;
+
+        public RelationalConnectionInstance(string instanceId, RelationalDbConfig config)
+        {
+            InstanceId = instanceId;
+            Config = config;
+        }
+
+        public async Task ConnectAsync()
+        {
+            if (IsConnected) return;
+
+            await _connectionLock.WaitAsync();
+            try
+            {
+                if (IsConnected) return;
+
+                // Create connection based on engine type
+                // In production, use appropriate ADO.NET provider
+                _connection = await CreateConnectionAsync();
+                IsConnected = true;
+                LastActivity = DateTime.UtcNow;
+            }
+            finally
+            {
+                _connectionLock.Release();
+            }
+        }
+
+        public async Task DisconnectAsync()
+        {
+            if (!IsConnected) return;
+
+            await _connectionLock.WaitAsync();
+            try
+            {
+                if (_connection is IAsyncDisposable asyncDisposable)
+                    await asyncDisposable.DisposeAsync();
+                else if (_connection is IDisposable disposable)
+                    disposable.Dispose();
+
+                _connection = null;
+                IsConnected = false;
+            }
+            finally
+            {
+                _connectionLock.Release();
+            }
+        }
+
+        private Task<object> CreateConnectionAsync()
+        {
+            // In production, would create real ADO.NET connection
+            // For now, return placeholder
+            return Task.FromResult<object>(new { Engine = Config.Engine, ConnectionString = Config.ConnectionString });
+        }
+
+        public void RecordActivity() => LastActivity = DateTime.UtcNow;
+
+        public async ValueTask DisposeAsync()
+        {
+            await DisconnectAsync();
+            _connectionLock.Dispose();
+        }
+    }
+
+    /// <summary>
+    /// Roles a connection instance can serve.
+    /// </summary>
+    [Flags]
+    public enum ConnectionRole
+    {
+        None = 0,
+        Storage = 1,
+        Index = 2,
+        Cache = 4,
+        Metadata = 8,
+        All = Storage | Index | Cache | Metadata
+    }
+
+    #endregion
 }

@@ -692,5 +692,300 @@ namespace DataWarehouse.Plugins.NoSQLDatabaseStorage
         }
     }
 
-    public enum NoSqlEngine { InMemory, MongoDB, CouchDB, RavenDB, DynamoDB }
+    /// <summary>
+    /// Supported NoSQL database engines.
+    /// </summary>
+    public enum NoSqlEngine
+    {
+        // In-Memory / Testing
+        /// <summary>In-memory document store for testing.</summary>
+        InMemory,
+
+        // Document Databases
+        /// <summary>MongoDB document database.</summary>
+        MongoDB,
+        /// <summary>CouchDB document database.</summary>
+        CouchDB,
+        /// <summary>RavenDB document database.</summary>
+        RavenDB,
+        /// <summary>ArangoDB multi-model database.</summary>
+        ArangoDB,
+        /// <summary>Couchbase Server.</summary>
+        Couchbase,
+        /// <summary>Amazon DocumentDB (MongoDB-compatible).</summary>
+        DocumentDB,
+        /// <summary>Azure Cosmos DB.</summary>
+        CosmosDB,
+        /// <summary>Firebase Firestore.</summary>
+        Firestore,
+        /// <summary>FaunaDB (serverless).</summary>
+        FaunaDB,
+
+        // Key-Value Stores
+        /// <summary>Redis in-memory data store.</summary>
+        Redis,
+        /// <summary>Amazon DynamoDB.</summary>
+        DynamoDB,
+        /// <summary>Memcached distributed cache.</summary>
+        Memcached,
+        /// <summary>etcd distributed key-value store.</summary>
+        Etcd,
+        /// <summary>Consul KV store.</summary>
+        Consul,
+        /// <summary>Apache Ignite.</summary>
+        Ignite,
+        /// <summary>Hazelcast in-memory data grid.</summary>
+        Hazelcast,
+        /// <summary>Aerospike real-time data platform.</summary>
+        Aerospike,
+
+        // Wide-Column Stores
+        /// <summary>Apache Cassandra distributed database.</summary>
+        Cassandra,
+        /// <summary>ScyllaDB (Cassandra-compatible).</summary>
+        ScyllaDB,
+        /// <summary>Apache HBase.</summary>
+        HBase,
+        /// <summary>Google Cloud Bigtable.</summary>
+        Bigtable,
+        /// <summary>Azure Table Storage.</summary>
+        AzureTables,
+
+        // Graph Databases
+        /// <summary>Neo4j graph database.</summary>
+        Neo4j,
+        /// <summary>Amazon Neptune.</summary>
+        Neptune,
+        /// <summary>JanusGraph distributed graph database.</summary>
+        JanusGraph,
+        /// <summary>TigerGraph enterprise graph.</summary>
+        TigerGraph,
+        /// <summary>Dgraph distributed graph database.</summary>
+        Dgraph,
+        /// <summary>OrientDB multi-model database.</summary>
+        OrientDB,
+
+        // Search Engines
+        /// <summary>Elasticsearch search and analytics.</summary>
+        Elasticsearch,
+        /// <summary>OpenSearch (Elasticsearch fork).</summary>
+        OpenSearch,
+        /// <summary>Apache Solr search platform.</summary>
+        Solr,
+        /// <summary>Typesense search engine.</summary>
+        Typesense,
+        /// <summary>Meilisearch search engine.</summary>
+        Meilisearch,
+        /// <summary>Algolia search service.</summary>
+        Algolia,
+
+        // Time Series
+        /// <summary>InfluxDB time series database.</summary>
+        InfluxDB,
+        /// <summary>Prometheus monitoring system.</summary>
+        Prometheus,
+        /// <summary>QuestDB time series database.</summary>
+        QuestDB,
+        /// <summary>TDengine time series database.</summary>
+        TDengine,
+        /// <summary>Victoria Metrics.</summary>
+        VictoriaMetrics,
+
+        // Vector Databases
+        /// <summary>Pinecone vector database.</summary>
+        Pinecone,
+        /// <summary>Weaviate vector database.</summary>
+        Weaviate,
+        /// <summary>Milvus vector database.</summary>
+        Milvus,
+        /// <summary>Qdrant vector database.</summary>
+        Qdrant,
+        /// <summary>Chroma vector database.</summary>
+        Chroma
+    }
+
+    #region Multi-Instance Connection Management
+
+    /// <summary>
+    /// Manages multiple NoSQL database connection instances.
+    /// </summary>
+    public sealed class NoSqlConnectionRegistry : IAsyncDisposable
+    {
+        private readonly ConcurrentDictionary<string, NoSqlConnectionInstance> _instances = new();
+        private volatile bool _disposed;
+
+        /// <summary>
+        /// Registers a new database instance.
+        /// </summary>
+        public NoSqlConnectionInstance Register(string instanceId, NoSqlConfig config)
+        {
+            if (_disposed) throw new ObjectDisposedException(nameof(NoSqlConnectionRegistry));
+
+            if (_instances.ContainsKey(instanceId))
+                throw new InvalidOperationException($"Instance '{instanceId}' already registered.");
+
+            var instance = new NoSqlConnectionInstance(instanceId, config);
+            _instances[instanceId] = instance;
+            return instance;
+        }
+
+        /// <summary>
+        /// Gets an instance by ID.
+        /// </summary>
+        public NoSqlConnectionInstance? Get(string instanceId)
+        {
+            return _instances.TryGetValue(instanceId, out var instance) ? instance : null;
+        }
+
+        /// <summary>
+        /// Gets all registered instances.
+        /// </summary>
+        public IEnumerable<NoSqlConnectionInstance> GetAll() => _instances.Values;
+
+        /// <summary>
+        /// Gets instances by role.
+        /// </summary>
+        public IEnumerable<NoSqlConnectionInstance> GetByRole(NoSqlConnectionRole role)
+        {
+            return _instances.Values.Where(i => i.Roles.HasFlag(role));
+        }
+
+        /// <summary>
+        /// Unregisters and disposes an instance.
+        /// </summary>
+        public async Task UnregisterAsync(string instanceId)
+        {
+            if (_instances.TryRemove(instanceId, out var instance))
+            {
+                await instance.DisposeAsync();
+            }
+        }
+
+        public async ValueTask DisposeAsync()
+        {
+            if (_disposed) return;
+            _disposed = true;
+
+            foreach (var instance in _instances.Values)
+            {
+                await instance.DisposeAsync();
+            }
+            _instances.Clear();
+        }
+    }
+
+    /// <summary>
+    /// Represents a single NoSQL database connection instance.
+    /// </summary>
+    public sealed class NoSqlConnectionInstance : IAsyncDisposable
+    {
+        public string InstanceId { get; }
+        public NoSqlConfig Config { get; }
+        public NoSqlConnectionRole Roles { get; set; } = NoSqlConnectionRole.Storage;
+        public int Priority { get; set; } = 0;
+        public bool IsConnected { get; private set; }
+        public DateTime? LastActivity { get; private set; }
+
+        private readonly SemaphoreSlim _connectionLock = new(1, 1);
+        private object? _connection;
+        private HttpClient? _httpClient;
+
+        public NoSqlConnectionInstance(string instanceId, NoSqlConfig config)
+        {
+            InstanceId = instanceId;
+            Config = config;
+        }
+
+        public async Task ConnectAsync()
+        {
+            if (IsConnected) return;
+
+            await _connectionLock.WaitAsync();
+            try
+            {
+                if (IsConnected) return;
+
+                _connection = await CreateConnectionAsync();
+                IsConnected = true;
+                LastActivity = DateTime.UtcNow;
+            }
+            finally
+            {
+                _connectionLock.Release();
+            }
+        }
+
+        public async Task DisconnectAsync()
+        {
+            if (!IsConnected) return;
+
+            await _connectionLock.WaitAsync();
+            try
+            {
+                if (_connection is IAsyncDisposable asyncDisposable)
+                    await asyncDisposable.DisposeAsync();
+                else if (_connection is IDisposable disposable)
+                    disposable.Dispose();
+
+                _httpClient?.Dispose();
+                _httpClient = null;
+                _connection = null;
+                IsConnected = false;
+            }
+            finally
+            {
+                _connectionLock.Release();
+            }
+        }
+
+        private Task<object> CreateConnectionAsync()
+        {
+            // For HTTP-based NoSQL databases
+            if (!string.IsNullOrEmpty(Config.Endpoint))
+            {
+                _httpClient = new HttpClient
+                {
+                    BaseAddress = new Uri(Config.Endpoint),
+                    Timeout = TimeSpan.FromSeconds(30)
+                };
+
+                if (!string.IsNullOrEmpty(Config.Username) && !string.IsNullOrEmpty(Config.Password))
+                {
+                    var credentials = Convert.ToBase64String(Encoding.UTF8.GetBytes($"{Config.Username}:{Config.Password}"));
+                    _httpClient.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Basic", credentials);
+                }
+            }
+
+            return Task.FromResult<object>(new { Engine = Config.Engine, Endpoint = Config.Endpoint });
+        }
+
+        public HttpClient? GetHttpClient() => _httpClient;
+
+        public void RecordActivity() => LastActivity = DateTime.UtcNow;
+
+        public async ValueTask DisposeAsync()
+        {
+            await DisconnectAsync();
+            _connectionLock.Dispose();
+        }
+    }
+
+    /// <summary>
+    /// Roles a NoSQL connection instance can serve.
+    /// </summary>
+    [Flags]
+    public enum NoSqlConnectionRole
+    {
+        None = 0,
+        Storage = 1,
+        Index = 2,
+        Cache = 4,
+        Metadata = 8,
+        Search = 16,
+        Vector = 32,
+        Graph = 64,
+        All = Storage | Index | Cache | Metadata | Search | Vector | Graph
+    }
+
+    #endregion
 }
