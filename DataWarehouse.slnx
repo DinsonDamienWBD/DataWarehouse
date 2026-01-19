@@ -25,6 +25,8 @@
     <Project Path="Plugins/DataWarehouse.Plugins.HotReload/DataWarehouse.Plugins.HotReload.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.IpfsStorage/DataWarehouse.Plugins.IpfsStorage.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.LocalStorage/DataWarehouse.Plugins.LocalStorage.csproj" />
+    <Project Path="Plugins/DataWarehouse.Plugins.Metadata.Postgres/DataWarehouse.Plugins.Metadata.Postgres.csproj" />
+    <Project Path="Plugins/DataWarehouse.Plugins.Metadata.SQLite/DataWarehouse.Plugins.Metadata.SQLite.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.NetworkStorage/DataWarehouse.Plugins.NetworkStorage.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.NoSQLDatabaseStorage/DataWarehouse.Plugins.NoSQLDatabaseStorage.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.OpenTelemetry/DataWarehouse.Plugins.OpenTelemetry.csproj" />
