@@ -445,7 +445,7 @@ namespace DataWarehouse.Plugins.DistributedTransactions
                 });
 
                 // Trigger compensation
-                return await HandleSagaCompensateAsync(new Dictionary<string, object?> { ["sagaId"] = sagaId });
+                return await HandleSagaCompensateAsync(new Dictionary<string, object> { ["sagaId"] = sagaId! });
             }
         }
 
@@ -687,7 +687,7 @@ namespace DataWarehouse.Plugins.DistributedTransactions
                         {
                             if (now - tx.StartTime > tx.Timeout)
                             {
-                                await HandleRollbackAsync(new Dictionary<string, object?> { ["transactionId"] = tx.Id });
+                                await HandleRollbackAsync(new Dictionary<string, object> { ["transactionId"] = tx.Id });
                             }
                         }
                     }

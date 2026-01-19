@@ -244,11 +244,11 @@ public sealed class RestInterfacePlugin : InterfacePluginBase
             return (method, blobId) switch
             {
                 ("GET", null) => HandleListBlobs(request),
-                ("GET", _) => HandleGetBlob(blobId),
+                ("GET", string id) => HandleGetBlob(id),
                 ("POST", null) when path.EndsWith("/batch") => await HandleBatchOperationsAsync(request, ct),
                 ("POST", null) => await HandleCreateBlobAsync(request, ct),
-                ("PUT", _) => await HandleUpdateBlobAsync(blobId, request, ct),
-                ("DELETE", _) => HandleDeleteBlob(blobId),
+                ("PUT", string id) => await HandleUpdateBlobAsync(id, request, ct),
+                ("DELETE", string id) => HandleDeleteBlob(id),
                 _ => new ApiResponse { StatusCode = 405, Data = new { error = "Method not allowed" } }
             };
         }

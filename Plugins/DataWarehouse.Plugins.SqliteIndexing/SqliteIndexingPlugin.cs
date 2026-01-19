@@ -181,7 +181,7 @@ public sealed class SqliteIndexingPlugin : MetadataIndexPluginBase
             return MessageResponse.Error("Invalid manifest");
 
         await IndexManifestAsync(manifest);
-        return MessageResponse.Success(new { indexed = manifest.Id });
+        return MessageResponse.Ok(new { indexed = manifest.Id });
     }
 
     private async Task<MessageResponse> HandleSearchAsync(PluginMessage message)
@@ -194,7 +194,7 @@ public sealed class SqliteIndexingPlugin : MetadataIndexPluginBase
             vector = vec;
 
         var results = await SearchAsync(query!, vector, limit);
-        return MessageResponse.Success(new { results, count = results.Length });
+        return MessageResponse.Ok(new { results, count = results.Length });
     }
 
     private async Task<MessageResponse> HandleQueryAsync(PluginMessage message)
@@ -204,7 +204,7 @@ public sealed class SqliteIndexingPlugin : MetadataIndexPluginBase
 
         var sql = sqlObj.ToString()!;
         var results = await ExecuteDetailedQueryAsync(sql);
-        return MessageResponse.Success(new { rows = results });
+        return MessageResponse.Ok(new { rows = results });
     }
 
     private Task<MessageResponse> HandleVacuumAsync(PluginMessage message)
@@ -222,7 +222,7 @@ public sealed class SqliteIndexingPlugin : MetadataIndexPluginBase
             }
         }
 
-        return Task.FromResult(MessageResponse.Success(new { compacted = true, removed }));
+        return Task.FromResult(MessageResponse.Ok(new { compacted = true, removed }));
     }
 
     private MessageResponse HandleStatsAsync(PluginMessage message)
@@ -236,7 +236,7 @@ public sealed class SqliteIndexingPlugin : MetadataIndexPluginBase
             newestEntry = _index.Values.Max(m => m.IndexedAt)
         };
 
-        return MessageResponse.Success(stats);
+        return MessageResponse.Ok(stats);
     }
 
     /// <summary>

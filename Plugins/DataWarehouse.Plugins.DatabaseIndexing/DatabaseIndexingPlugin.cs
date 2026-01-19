@@ -154,7 +154,7 @@ public sealed class DatabaseIndexingPlugin : MetadataIndexPluginBase
         }
 
         _initialized = true;
-        return MessageResponse.Success(new { configured = true, engine = _engine.ToString() });
+        return MessageResponse.Ok(new { configured = true, engine = _engine.ToString() });
     }
 
     private async Task<MessageResponse> HandleIndexAsync(PluginMessage message)
@@ -169,7 +169,7 @@ public sealed class DatabaseIndexingPlugin : MetadataIndexPluginBase
             return MessageResponse.Error("Invalid manifest");
 
         await IndexManifestAsync(manifest);
-        return MessageResponse.Success(new { indexed = manifest.Id });
+        return MessageResponse.Ok(new { indexed = manifest.Id });
     }
 
     private async Task<MessageResponse> HandleSearchMessageAsync(PluginMessage message)
@@ -178,7 +178,7 @@ public sealed class DatabaseIndexingPlugin : MetadataIndexPluginBase
         var limit = message.Payload.TryGetValue("limit", out var l) ? Convert.ToInt32(l) : 20;
 
         var results = await SearchAsync(query!, null, limit);
-        return MessageResponse.Success(new { results, count = results.Length });
+        return MessageResponse.Ok(new { results, count = results.Length });
     }
 
     private async Task<MessageResponse> HandleQueryMessageAsync(PluginMessage message)
@@ -187,7 +187,7 @@ public sealed class DatabaseIndexingPlugin : MetadataIndexPluginBase
             return MessageResponse.Error("Missing SQL query");
 
         var results = await ExecuteDetailedQueryAsync(sqlObj.ToString()!);
-        return MessageResponse.Success(new { rows = results });
+        return MessageResponse.Ok(new { rows = results });
     }
 
     public override async Task IndexManifestAsync(Manifest manifest)

@@ -473,7 +473,7 @@ namespace DataWarehouse.Kernel.Infrastructure
             _checkFunc = checkFunc;
         }
 
-        public Task<HealthCheckResult> CheckAsync(CancellationToken ct = default)
+        public Task<HealthCheckResult> CheckHealthAsync(CancellationToken ct = default)
         {
             return _checkFunc(ct);
         }

@@ -596,7 +596,7 @@ namespace DataWarehouse.Plugins.Sharding
                             if (stats.RequestCount > _config.HotShardThreshold)
                             {
                                 // Auto-split hot shard
-                                await HandleSplitAsync(new Dictionary<string, object?> { ["shardId"] = stats.ShardId });
+                                await HandleSplitAsync(new Dictionary<string, object> { ["shardId"] = stats.ShardId });
                             }
                         }
                     }

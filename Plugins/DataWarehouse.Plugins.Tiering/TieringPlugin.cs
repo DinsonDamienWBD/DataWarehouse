@@ -175,7 +175,7 @@ public sealed class TieringPlugin : TieredStoragePluginBase
         var manifest = new Manifest { Id = id, Name = id };
         var result = await MoveToTierAsync(manifest, tier);
 
-        return MessageResponse.Success(new { movedTo = tier.ToString(), path = result });
+        return MessageResponse.Ok(new { movedTo = tier.ToString(), path = result });
     }
 
     private MessageResponse HandleAnalyze(PluginMessage message)
@@ -199,7 +199,7 @@ public sealed class TieringPlugin : TieredStoragePluginBase
             }
         }
 
-        return MessageResponse.Success(new { recommendations, count = recommendations.Count });
+        return MessageResponse.Ok(new { recommendations, count = recommendations.Count });
     }
 
     private MessageResponse HandleCreatePolicy(PluginMessage message)
@@ -215,7 +215,7 @@ public sealed class TieringPlugin : TieredStoragePluginBase
         };
 
         _policies[policyId] = policy;
-        return MessageResponse.Success(new { created = true, policyId });
+        return MessageResponse.Ok(new { created = true, policyId });
     }
 
     private MessageResponse HandleListPolicies(PluginMessage message)
@@ -227,7 +227,7 @@ public sealed class TieringPlugin : TieredStoragePluginBase
             ruleCount = p.Rules.Count
         }).ToList();
 
-        return MessageResponse.Success(new { policies });
+        return MessageResponse.Ok(new { policies });
     }
 
     private MessageResponse HandleStats(PluginMessage message)
@@ -240,7 +240,7 @@ public sealed class TieringPlugin : TieredStoragePluginBase
             policies = _policies.Count
         };
 
-        return MessageResponse.Success(stats);
+        return MessageResponse.Ok(stats);
     }
 
     /// <summary>
@@ -331,12 +331,7 @@ public sealed class TieringPlugin : TieredStoragePluginBase
             if (ct.IsCancellationRequested) yield break;
             if (!id.StartsWith(prefix)) continue;
 
-            yield return new StorageListItem
-            {
-                Path = id,
-                Size = 0,
-                LastModified = info.LastMigration ?? info.CreatedAt
-            };
+            yield return new StorageListItem(new Uri($"tier://{id}"), 0);
         }
 
         await Task.CompletedTask;

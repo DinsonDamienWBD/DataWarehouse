@@ -72,7 +72,8 @@ namespace DataWarehouse.Plugins.IpfsStorage
             var metadata = base.GetMetadata();
             metadata["Description"] = "Content-addressed storage using IPFS network.";
             metadata["ApiEndpoint"] = _config.ApiEndpoint;
-            metadata["GatewayUrl"] = _config.GatewayUrl;
+            if (_config.GatewayUrl != null)
+                metadata["GatewayUrl"] = _config.GatewayUrl;
             metadata["AutoPin"] = _config.AutoPin;
             metadata["ContentAddressed"] = true;
             metadata["Distributed"] = true;

@@ -530,7 +530,7 @@ namespace DataWarehouse.Plugins.AIAgents
 
             var request = new VisionRequest
             {
-                Model = GetString(payload, "model") ?? provider.DefaultVisionModel,
+                Model = GetString(payload, "model") ?? provider.DefaultVisionModel ?? "gpt-4-vision-preview",
                 ImageUrl = imageUrl,
                 ImageBase64 = imageBase64,
                 Prompt = prompt,
