@@ -793,6 +793,46 @@ namespace DataWarehouse.SDK.Contracts
         }
 
         /// <summary>
+        /// Remove TTL from an item, making it permanent.
+        /// </summary>
+        public virtual Task<bool> RemoveTtlAsync(Uri uri, CancellationToken ct = default)
+        {
+            var key = uri.ToString();
+            if (_cacheMetadata.TryGetValue(key, out var metadata))
+            {
+                metadata.ExpiresAt = null;
+                return Task.FromResult(true);
+            }
+            return Task.FromResult(false);
+        }
+
+        /// <summary>
+        /// Invalidate all cached items with a specific tag.
+        /// </summary>
+        public virtual async Task<int> InvalidateByTagAsync(string tag, CancellationToken ct = default)
+        {
+            var keysWithTag = _cacheMetadata
+                .Where(kv => kv.Value.Tags?.Contains(tag) == true)
+                .Select(kv => kv.Key)
+                .ToList();
+
+            var count = 0;
+            foreach (var key in keysWithTag)
+            {
+                if (ct.IsCancellationRequested) break;
+                try
+                {
+                    await DeleteAsync(new Uri(key));
+                    _cacheMetadata.TryRemove(key, out _);
+                    count++;
+                }
+                catch { /* Ignore errors during invalidation */ }
+            }
+
+            return count;
+        }
+
+        /// <summary>
         /// Override LoadAsync to track cache hits.
         /// </summary>
         public override async Task<Stream> LoadAsync(Uri uri)
@@ -893,15 +933,26 @@ namespace DataWarehouse.SDK.Contracts
         {
             return Task.FromResult(new IndexStatistics
             {
-                TotalDocuments = _indexStore.Count,
-                IndexedFields = _indexStore.Values
+                DocumentCount = _indexStore.Count,
+                TermCount = _indexStore.Values
                     .SelectMany(v => v.Keys)
                     .Distinct()
                     .Count(),
-                LastRebuildAt = _lastIndexRebuild,
+                LastUpdated = _lastIndexRebuild ?? DateTime.UtcNow,
                 IndexSizeBytes = _indexStore.Sum(kv =>
-                    kv.Key.Length + kv.Value.Sum(v => (v.Key?.Length ?? 0) + (v.Value?.ToString()?.Length ?? 0)))
+                    kv.Key.Length + kv.Value.Sum(v => (v.Key?.Length ?? 0) + (v.Value?.ToString()?.Length ?? 0))),
+                IndexType = "InMemory"
             });
+        }
+
+        /// <summary>
+        /// Optimize the index for better query performance.
+        /// </summary>
+        public virtual Task OptimizeIndexAsync(CancellationToken ct = default)
+        {
+            // Default implementation: no-op for in-memory index
+            // Derived classes should override for actual optimization (compact, defrag, merge segments)
+            return Task.CompletedTask;
         }
 
         /// <summary>
@@ -1051,27 +1102,6 @@ namespace DataWarehouse.SDK.Contracts
             metadata["IndexedDocuments"] = _indexedCount;
             return metadata;
         }
-    }
-
-    /// <summary>
-    /// Index statistics.
-    /// </summary>
-    public class IndexStatistics
-    {
-        /// <summary>Total documents in the index.</summary>
-        public long TotalDocuments { get; set; }
-
-        /// <summary>Number of unique indexed fields.</summary>
-        public int IndexedFields { get; set; }
-
-        /// <summary>Estimated index size in bytes.</summary>
-        public long IndexSizeBytes { get; set; }
-
-        /// <summary>Last rebuild timestamp.</summary>
-        public DateTime? LastRebuildAt { get; set; }
-
-        /// <summary>Average document size in the index.</summary>
-        public double AverageDocumentSize => TotalDocuments > 0 ? (double)IndexSizeBytes / TotalDocuments : 0;
     }
 
     #endregion

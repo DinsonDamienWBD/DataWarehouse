@@ -95,17 +95,29 @@ public class CacheStatistics
     /// <summary>Total number of items currently in cache.</summary>
     public long ItemCount { get; set; }
 
+    /// <summary>TotalEntries alias for backward compatibility.</summary>
+    public long TotalEntries { get => ItemCount; set => ItemCount = value; }
+
     /// <summary>Total size of cached data in bytes.</summary>
     public long TotalSizeBytes { get; set; }
 
     /// <summary>Number of cache hits (successful retrievals).</summary>
     public long Hits { get; set; }
 
+    /// <summary>HitCount alias for backward compatibility.</summary>
+    public long HitCount { get => Hits; set => Hits = value; }
+
     /// <summary>Number of cache misses (item not found).</summary>
     public long Misses { get; set; }
 
+    /// <summary>MissCount alias for backward compatibility.</summary>
+    public long MissCount { get => Misses; set => Misses = value; }
+
     /// <summary>Number of items evicted due to expiration.</summary>
     public long Evictions { get; set; }
+
+    /// <summary>Number of expired entries (may differ from Evictions).</summary>
+    public long ExpiredEntries { get; set; }
 
     /// <summary>Number of items with TTL set.</summary>
     public long ItemsWithTtl { get; set; }
@@ -115,6 +127,12 @@ public class CacheStatistics
 
     /// <summary>Time when statistics were captured.</summary>
     public DateTime Timestamp { get; set; } = DateTime.UtcNow;
+
+    /// <summary>Timestamp of the oldest entry.</summary>
+    public DateTime? OldestEntry { get; set; }
+
+    /// <summary>Timestamp of the newest entry.</summary>
+    public DateTime? NewestEntry { get; set; }
 
     /// <summary>
     /// Cache hit ratio (0.0 to 1.0).
@@ -236,8 +254,14 @@ public class CacheEntryMetadata
     /// <summary>URI of the cached item.</summary>
     public Uri Uri { get; set; } = null!;
 
+    /// <summary>String key for the cached item (alternative to Uri).</summary>
+    public string Key { get => Uri?.ToString() ?? ""; set => Uri = string.IsNullOrEmpty(value) ? null! : new Uri(value); }
+
     /// <summary>Size of the cached data in bytes.</summary>
     public long SizeBytes { get; set; }
+
+    /// <summary>Size alias for backward compatibility.</summary>
+    public long Size { get => SizeBytes; set => SizeBytes = value; }
 
     /// <summary>When the item was created/cached.</summary>
     public DateTime CreatedAt { get; set; }
@@ -248,11 +272,14 @@ public class CacheEntryMetadata
     /// <summary>Number of times the item has been accessed.</summary>
     public long AccessCount { get; set; }
 
+    /// <summary>HitCount alias for backward compatibility.</summary>
+    public long HitCount { get => AccessCount; set => AccessCount = value; }
+
     /// <summary>When the item expires (null = never).</summary>
     public DateTime? ExpiresAt { get; set; }
 
     /// <summary>Tags associated with this cache entry.</summary>
-    public string[] Tags { get; set; } = Array.Empty<string>();
+    public string[]? Tags { get; set; }
 
     /// <summary>
     /// Remaining time until expiration.

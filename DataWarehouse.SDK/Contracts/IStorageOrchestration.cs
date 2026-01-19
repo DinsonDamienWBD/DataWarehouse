@@ -85,10 +85,57 @@ namespace DataWarehouse.SDK.Contracts
         public long BytesWritten { get; init; }
     }
 
-    /// <summary>Role of a storage provider within a pool.</summary>
+    /// <summary>
+    /// Roles a storage provider can serve within a pool.
+    /// Multiple roles can be combined with flags.
+    /// </summary>
+    [Flags]
     public enum StorageRole
     {
-        Primary, Cache, WriteAheadLog, Journal, Mirror, Parity, Archive, HotStandby
+        /// <summary>No specific role.</summary>
+        None = 0,
+
+        /// <summary>Primary storage for data persistence.</summary>
+        Primary = 1,
+
+        /// <summary>Cache storage for fast access.</summary>
+        Cache = 2,
+
+        /// <summary>Index storage for search operations.</summary>
+        Index = 4,
+
+        /// <summary>Archive storage for long-term retention.</summary>
+        Archive = 8,
+
+        /// <summary>Backup storage for disaster recovery.</summary>
+        Backup = 16,
+
+        /// <summary>Metadata storage for manifest/index data.</summary>
+        Metadata = 32,
+
+        /// <summary>Temporary storage for transient data.</summary>
+        Temporary = 64,
+
+        /// <summary>Read replica for load distribution.</summary>
+        ReadReplica = 128,
+
+        /// <summary>Write-ahead log for transaction durability.</summary>
+        WriteAheadLog = 256,
+
+        /// <summary>Journal storage for transaction logging.</summary>
+        Journal = 512,
+
+        /// <summary>Mirror storage for redundancy.</summary>
+        Mirror = 1024,
+
+        /// <summary>Parity storage for RAID-like protection.</summary>
+        Parity = 2048,
+
+        /// <summary>Hot standby for failover.</summary>
+        HotStandby = 4096,
+
+        /// <summary>All roles combined.</summary>
+        All = Primary | Cache | Index | Archive | Backup | Metadata | Temporary | ReadReplica | WriteAheadLog | Journal | Mirror | Parity | HotStandby
     }
 
     /// <summary>Result of a storage operation.</summary>

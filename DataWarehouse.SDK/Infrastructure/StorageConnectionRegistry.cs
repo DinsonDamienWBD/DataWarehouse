@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using DataWarehouse.SDK.Contracts;
 
 namespace DataWarehouse.SDK.Infrastructure;
 
@@ -672,44 +673,6 @@ public sealed class PooledStorageConnection<TConfig> : IAsyncDisposable where TC
 #endregion
 
 #region Supporting Types
-
-/// <summary>
-/// Roles a storage connection can serve.
-/// Multiple roles can be combined with flags.
-/// </summary>
-[Flags]
-public enum StorageRole
-{
-    /// <summary>No specific role.</summary>
-    None = 0,
-
-    /// <summary>Primary storage for data persistence.</summary>
-    Primary = 1,
-
-    /// <summary>Cache storage for fast access.</summary>
-    Cache = 2,
-
-    /// <summary>Index storage for search operations.</summary>
-    Index = 4,
-
-    /// <summary>Archive storage for long-term retention.</summary>
-    Archive = 8,
-
-    /// <summary>Backup storage for disaster recovery.</summary>
-    Backup = 16,
-
-    /// <summary>Metadata storage for manifest/index data.</summary>
-    Metadata = 32,
-
-    /// <summary>Temporary storage for transient data.</summary>
-    Temporary = 64,
-
-    /// <summary>Read replica for load distribution.</summary>
-    ReadReplica = 128,
-
-    /// <summary>All roles combined.</summary>
-    All = Primary | Cache | Index | Archive | Backup | Metadata | Temporary | ReadReplica
-}
 
 /// <summary>
 /// Health status of a connection instance.
