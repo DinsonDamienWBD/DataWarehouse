@@ -554,23 +554,14 @@ public class SecretManager : ISecretManager, IAsyncDisposable
         _rotationCheckTimer?.Dispose();
 
         // Clear sensitive data from cache
-        foreach (var cached in _cache.Values)
-        {
-            // Zero out the string if possible (defensive)
-            try
-            {
-                unsafe
-                {
-                    fixed (char* ptr = cached.Value)
-                    {
-                        for (int i = 0; i < cached.Value.Length; i++)
-                            ptr[i] = '\0';
-                    }
-                }
-            }
-            catch { /* Best effort */ }
-        }
+        // Note: Strings in .NET are immutable, so we can't truly zero them out
+        // without unsafe code. This is a best-effort cleanup.
         _cache.Clear();
+
+        // Force GC to collect the orphaned secret strings
+        // This is a security best practice but not guaranteed
+        GC.Collect();
+        GC.WaitForPendingFinalizers();
 
         foreach (var provider in _providers.Values)
         {

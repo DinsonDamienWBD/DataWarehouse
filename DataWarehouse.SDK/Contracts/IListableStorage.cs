@@ -3,7 +3,11 @@
     /// <summary>
     /// Represents a file found during a storage scan
     /// </summary>
-    public record StorageListItem(Uri Uri, long SizeBytes);
+    public record StorageListItem(Uri Uri, long SizeBytes)
+    {
+        /// <summary>Size alias for backward compatibility.</summary>
+        public long Size => SizeBytes;
+    }
 
     /// <summary>
     /// List all files

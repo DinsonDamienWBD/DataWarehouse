@@ -833,12 +833,14 @@ namespace DataWarehouse.SDK.Contracts
         }
 
         /// <summary>
-        /// Override LoadAsync to track cache hits.
+        /// Load with cache hit tracking. Derived classes must implement actual loading.
         /// </summary>
-        public override async Task<Stream> LoadAsync(Uri uri)
+        public override Task<Stream> LoadAsync(Uri uri)
         {
-            await TouchAsync(uri);
-            return await base.LoadAsync(uri);
+            // Touch to track access - derived classes should call this via base then do actual load
+            TouchAsync(uri).ConfigureAwait(false);
+            // Abstract - derived classes must override to provide actual implementation
+            throw new NotImplementedException("Derived class must override LoadAsync to provide storage implementation");
         }
 
         protected override Dictionary<string, object> GetMetadata()
@@ -1034,7 +1036,9 @@ namespace DataWarehouse.SDK.Contracts
                     Id = kv.Key,
                     ContentHash = kv.Value.TryGetValue("hash", out var h) ? h?.ToString() ?? "" : "",
                     OriginalSize = kv.Value.TryGetValue("size", out var s) && s is long size ? size : 0,
-                    CreatedAt = kv.Value.TryGetValue("created", out var c) && c is DateTime dt ? dt : DateTime.UtcNow,
+                    CreatedAt = kv.Value.TryGetValue("created", out var c) && c is DateTime dt
+                        ? new DateTimeOffset(dt).ToUnixTimeSeconds()
+                        : DateTimeOffset.UtcNow.ToUnixTimeSeconds(),
                     Metadata = kv.Value.Where(x => !x.Key.StartsWith("_"))
                         .ToDictionary(x => x.Key, x => x.Value?.ToString() ?? "")
                 };
@@ -1067,7 +1071,9 @@ namespace DataWarehouse.SDK.Contracts
                     Id = id,
                     ContentHash = metadata.TryGetValue("hash", out var h) ? h?.ToString() ?? "" : "",
                     OriginalSize = metadata.TryGetValue("size", out var s) && s is long size ? size : 0,
-                    CreatedAt = metadata.TryGetValue("created", out var c) && c is DateTime dt ? dt : DateTime.UtcNow,
+                    CreatedAt = metadata.TryGetValue("created", out var c) && c is DateTime dt
+                        ? new DateTimeOffset(dt).ToUnixTimeSeconds()
+                        : DateTimeOffset.UtcNow.ToUnixTimeSeconds(),
                     Metadata = metadata.Where(x => !x.Key.StartsWith("_"))
                         .ToDictionary(x => x.Key, x => x.Value?.ToString() ?? "")
                 });

@@ -62,6 +62,24 @@
         }
 
         /// <summary>
+        /// OriginalSize alias for backward compatibility.
+        /// </summary>
+        public long OriginalSize
+        {
+            get => SizeBytes;
+            set => SizeBytes = value;
+        }
+
+        /// <summary>
+        /// Size alias for backward compatibility.
+        /// </summary>
+        public long Size
+        {
+            get => SizeBytes;
+            set => SizeBytes = value;
+        }
+
+        /// <summary>
         /// Custom metadata key-value pairs
         /// </summary>
         public Dictionary<string, string> Metadata { get; set; } = new();
@@ -117,6 +135,24 @@
         /// Integrity Checksum (SHA256/CRC32).
         /// </summary>
         public string Checksum { get; set; } = string.Empty;
+
+        /// <summary>
+        /// ContentHash alias for Checksum (backward compatibility).
+        /// </summary>
+        public string ContentHash
+        {
+            get => Checksum;
+            set => Checksum = value;
+        }
+
+        /// <summary>
+        /// Hash alias for Checksum (backward compatibility).
+        /// </summary>
+        public string Hash
+        {
+            get => Checksum;
+            set => Checksum = value;
+        }
 
         /// <summary>
         /// [NEW] System-managed tags for Governance and Sentinel state.

@@ -165,6 +165,9 @@ public class CacheOptions
     /// <summary>Maximum number of items in cache (0 = unlimited).</summary>
     public long MaxItems { get; set; }
 
+    /// <summary>MaxEntries alias for backward compatibility.</summary>
+    public long MaxEntries { get => MaxItems; set => MaxItems = value; }
+
     /// <summary>Maximum total size in bytes (0 = unlimited).</summary>
     public long MaxSizeBytes { get; set; }
 
@@ -179,6 +182,9 @@ public class CacheOptions
 
     /// <summary>Amount to extend TTL by on access.</summary>
     public TimeSpan TtlExtensionAmount { get; set; } = TimeSpan.FromMinutes(15);
+
+    /// <summary>Whether to track and report statistics.</summary>
+    public bool EnableStatistics { get; set; } = true;
 
     /// <summary>
     /// Creates default cache options suitable for most use cases.
