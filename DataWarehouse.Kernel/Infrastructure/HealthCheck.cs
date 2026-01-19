@@ -417,6 +417,11 @@ namespace DataWarehouse.Kernel.Infrastructure
     /// </summary>
     public interface IHealthCheck
     {
+        /// <summary>
+        /// Name of this health check.
+        /// </summary>
+        string Name { get; }
+
         Task<HealthCheckResult> CheckHealthAsync(CancellationToken ct = default);
     }
 
@@ -427,6 +432,10 @@ namespace DataWarehouse.Kernel.Infrastructure
     {
         public HealthStatus Status { get; set; }
         public string Description { get; set; } = string.Empty;
+        /// <summary>
+        /// Message alias for Description (for compatibility).
+        /// </summary>
+        public string Message { get => Description; set => Description = value; }
         public Dictionary<string, object> Data { get; set; } = new();
         public TimeSpan Duration { get; set; }
         public Exception? Exception { get; set; }
@@ -459,6 +468,7 @@ namespace DataWarehouse.Kernel.Infrastructure
         public HealthStatus Status { get; set; }
         public TimeSpan TotalDuration { get; set; }
         public Dictionary<string, HealthCheckResult> Entries { get; set; } = new();
+        public DateTime Timestamp { get; set; } = DateTime.UtcNow;
     }
 
     /// <summary>
@@ -468,9 +478,12 @@ namespace DataWarehouse.Kernel.Infrastructure
     {
         private readonly Func<CancellationToken, Task<HealthCheckResult>> _checkFunc;
 
-        public DelegateHealthCheck(Func<CancellationToken, Task<HealthCheckResult>> checkFunc)
+        public string Name { get; }
+
+        public DelegateHealthCheck(Func<CancellationToken, Task<HealthCheckResult>> checkFunc, string name = "delegate-check")
         {
             _checkFunc = checkFunc;
+            Name = name;
         }
 
         public Task<HealthCheckResult> CheckHealthAsync(CancellationToken ct = default)

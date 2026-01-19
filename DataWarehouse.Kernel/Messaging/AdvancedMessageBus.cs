@@ -435,7 +435,7 @@ namespace DataWarehouse.Kernel.Messaging
         /// </summary>
         public Task AcknowledgeAsync(string messageId, CancellationToken ct = default)
         {
-            if (_pendingMessages.TryGetValue(messageId, out var pending))
+            if (_pendingMessages.TryGetValue(messageId, out var pending) && pending != null)
             {
                 pending.State = MessageState.Acknowledged;
                 pending.AcknowledgedAt = DateTime.UtcNow;
@@ -466,7 +466,7 @@ namespace DataWarehouse.Kernel.Messaging
                 ct.ThrowIfCancellationRequested();
 
                 if (_pendingMessages.TryGetValue(messageId, out var pending) &&
-                    pending.State == MessageState.Acknowledged)
+                    pending != null && pending.State == MessageState.Acknowledged)
                 {
                     return true;
                 }
@@ -618,7 +618,7 @@ namespace DataWarehouse.Kernel.Messaging
 
         internal void AddToGroup(string groupId, string topic, PluginMessage message)
         {
-            if (!_messageGroups.TryGetValue(groupId, out var group))
+            if (!_messageGroups.TryGetValue(groupId, out var group) || group == null)
             {
                 throw new InvalidOperationException($"Message group '{groupId}' not found");
             }
@@ -638,7 +638,7 @@ namespace DataWarehouse.Kernel.Messaging
 
         internal async Task<GroupCommitResult> CommitGroupAsync(string groupId, CancellationToken ct)
         {
-            if (!_messageGroups.TryGetValue(groupId, out var group))
+            if (!_messageGroups.TryGetValue(groupId, out var group) || group == null)
             {
                 throw new InvalidOperationException($"Message group '{groupId}' not found");
             }
@@ -702,7 +702,7 @@ namespace DataWarehouse.Kernel.Messaging
 
         internal void RollbackGroup(string groupId)
         {
-            if (_messageGroups.TryGetValue(groupId, out var group))
+            if (_messageGroups.TryGetValue(groupId, out var group) && group != null)
             {
                 group.State = GroupState.RolledBack;
                 group.Messages.Clear();
