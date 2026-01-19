@@ -439,7 +439,7 @@ namespace DataWarehouse.SDK.Infrastructure
     /// <summary>
     /// Configuration for a chaos experiment.
     /// </summary>
-    public sealed class ChaosExperiment
+    public sealed class ChaosMonkeyExperiment
     {
         /// <summary>Unique identifier for this experiment.</summary>
         public string ExperimentId { get; init; } = Guid.NewGuid().ToString("N")[..8];
@@ -482,7 +482,7 @@ namespace DataWarehouse.SDK.Infrastructure
         public bool WasInjected { get; init; }
 
         /// <summary>The experiment that caused the injection.</summary>
-        public ChaosExperiment? Experiment { get; init; }
+        public ChaosMonkeyExperiment? Experiment { get; init; }
 
         /// <summary>Target that was affected.</summary>
         public string? Target { get; init; }
@@ -497,7 +497,7 @@ namespace DataWarehouse.SDK.Infrastructure
     /// </summary>
     public sealed class ChaosEngine : IDisposable
     {
-        private readonly ConcurrentDictionary<string, ChaosExperiment> _experiments = new();
+        private readonly ConcurrentDictionary<string, ChaosMonkeyExperiment> _experiments = new();
         private readonly ConcurrentQueue<ChaosInjectionResult> _injectionLog = new();
         private readonly Random _random = new();
         private readonly object _disposeLock = new();
@@ -532,7 +532,7 @@ namespace DataWarehouse.SDK.Infrastructure
         /// <summary>
         /// Registers a chaos experiment.
         /// </summary>
-        public void RegisterExperiment(ChaosExperiment experiment)
+        public void RegisterExperiment(ChaosMonkeyExperiment experiment)
         {
             ThrowIfDisposed();
             ArgumentNullException.ThrowIfNull(experiment);
@@ -663,7 +663,7 @@ namespace DataWarehouse.SDK.Infrastructure
         /// <summary>
         /// Gets all registered experiments.
         /// </summary>
-        public IEnumerable<ChaosExperiment> GetExperiments()
+        public IEnumerable<ChaosMonkeyExperiment> GetExperiments()
         {
             return _experiments.Values.ToList();
         }
@@ -757,7 +757,7 @@ namespace DataWarehouse.SDK.Infrastructure
         /// <summary>
         /// Event raised when a request is rate limited.
         /// </summary>
-        public event Action<string, RateLimitResult>? OnRateLimited;
+        public event Action<string, AdaptiveRateLimitResult>? OnRateLimited;
 
         /// <summary>
         /// Creates a new adaptive rate limiter.
@@ -797,7 +797,7 @@ namespace DataWarehouse.SDK.Infrastructure
         /// <param name="clientId">The client identifier.</param>
         /// <param name="weight">Weight of this request (default 1).</param>
         /// <returns>Result indicating if the request is allowed.</returns>
-        public RateLimitResult TryAcquire(string clientId, int weight = 1)
+        public AdaptiveRateLimitResult TryAcquire(string clientId, int weight = 1)
         {
             ThrowIfDisposed();
             Interlocked.Increment(ref _totalRequests);
@@ -821,7 +821,7 @@ namespace DataWarehouse.SDK.Infrastructure
                 if (currentCount + weight > effectiveLimit)
                 {
                     Interlocked.Increment(ref _rejectedRequests);
-                    var result = new RateLimitResult
+                    var result = new AdaptiveRateLimitResult
                     {
                         Allowed = false,
                         ClientId = clientId,
@@ -839,7 +839,7 @@ namespace DataWarehouse.SDK.Infrastructure
                     state.RequestTimes.Enqueue(now);
                 }
 
-                return new RateLimitResult
+                return new AdaptiveRateLimitResult
                 {
                     Allowed = true,
                     ClientId = clientId,
@@ -1000,7 +1000,7 @@ namespace DataWarehouse.SDK.Infrastructure
     /// <summary>
     /// Result of a rate limit check.
     /// </summary>
-    public sealed class RateLimitResult
+    public sealed class AdaptiveRateLimitResult
     {
         /// <summary>Whether the request is allowed.</summary>
         public bool Allowed { get; init; }

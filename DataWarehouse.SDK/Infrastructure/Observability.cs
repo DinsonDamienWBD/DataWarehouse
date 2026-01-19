@@ -708,7 +708,7 @@ namespace DataWarehouse.SDK.Infrastructure
     /// Represents a point-in-time snapshot of all collected metrics.
     /// This class is immutable and thread-safe.
     /// </summary>
-    public sealed class MetricsSnapshot
+    public sealed class ObsMetricsSnapshot
     {
         /// <summary>
         /// Gets the timestamp when this snapshot was taken.
@@ -736,13 +736,13 @@ namespace DataWarehouse.SDK.Infrastructure
         public TimeSpan CollectionDuration { get; }
 
         /// <summary>
-        /// Initializes a new instance of the <see cref="MetricsSnapshot"/> class.
+        /// Initializes a new instance of the <see cref="ObsMetricsSnapshot"/> class.
         /// </summary>
         /// <param name="counters">The counter metrics.</param>
         /// <param name="gauges">The gauge metrics.</param>
         /// <param name="histograms">The histogram metrics.</param>
         /// <param name="collectionDuration">The duration of the collection period.</param>
-        public MetricsSnapshot(
+        public ObsMetricsSnapshot(
             IReadOnlyDictionary<string, long> counters,
             IReadOnlyDictionary<string, double> gauges,
             IReadOnlyDictionary<string, HistogramStatistics> histograms,
@@ -758,7 +758,7 @@ namespace DataWarehouse.SDK.Infrastructure
         /// <summary>
         /// Creates an empty metrics snapshot.
         /// </summary>
-        public static MetricsSnapshot Empty => new(
+        public static ObsMetricsSnapshot Empty => new(
             new Dictionary<string, long>(),
             new Dictionary<string, double>(),
             new Dictionary<string, HistogramStatistics>(),
@@ -805,8 +805,8 @@ namespace DataWarehouse.SDK.Infrastructure
         /// <summary>
         /// Gets a snapshot of all currently collected metrics.
         /// </summary>
-        /// <returns>A <see cref="MetricsSnapshot"/> containing all metrics.</returns>
-        MetricsSnapshot GetSnapshot();
+        /// <returns>A <see cref="ObsMetricsSnapshot"/> containing all metrics.</returns>
+        ObsMetricsSnapshot GetSnapshot();
 
         /// <summary>
         /// Resets all metrics to their initial state.
@@ -1050,7 +1050,7 @@ namespace DataWarehouse.SDK.Infrastructure
         }
 
         /// <inheritdoc />
-        public MetricsSnapshot GetSnapshot()
+        public ObsMetricsSnapshot GetSnapshot()
         {
             ThrowIfDisposed();
 
@@ -1069,7 +1069,7 @@ namespace DataWarehouse.SDK.Infrastructure
                     histograms[kvp.Key] = kvp.Value.GetStatistics();
                 }
 
-                return new MetricsSnapshot(counters, gauges, histograms, duration);
+                return new ObsMetricsSnapshot(counters, gauges, histograms, duration);
             }
         }
 

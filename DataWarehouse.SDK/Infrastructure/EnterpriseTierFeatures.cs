@@ -1194,7 +1194,7 @@ public sealed class MonitoringDashboard : IAsyncDisposable
     /// <summary>
     /// Gets metric time series data.
     /// </summary>
-    public MetricTimeSeries? GetMetricTimeSeries(string name, TimeSpan? duration = null)
+    public DashboardMetricTimeSeries? GetDashboardMetricTimeSeries(string name, TimeSpan? duration = null)
     {
         if (!_metrics.TryGetValue(name, out var series))
             return null;
@@ -1203,7 +1203,7 @@ public sealed class MonitoringDashboard : IAsyncDisposable
 
         lock (series)
         {
-            return new MetricTimeSeries
+            return new DashboardMetricTimeSeries
             {
                 Name = name,
                 DataPoints = series.DataPoints
@@ -1426,7 +1426,7 @@ public record MetricSummary
     public int DataPointCount { get; init; }
 }
 
-public record MetricTimeSeries
+public record DashboardMetricTimeSeries
 {
     public required string Name { get; init; }
     public List<MetricDataPointRecord> DataPoints { get; init; } = new();

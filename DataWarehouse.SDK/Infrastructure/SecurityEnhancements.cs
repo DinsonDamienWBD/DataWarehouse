@@ -16,7 +16,7 @@ namespace DataWarehouse.SDK.Infrastructure;
 public sealed class AssemblySignatureVerifier
 {
     private readonly ConcurrentDictionary<string, TrustedPublisher> _trustedPublishers = new();
-    private readonly ConcurrentDictionary<string, VerificationResult> _verificationCache = new();
+    private readonly ConcurrentDictionary<string, AssemblyVerificationResult> _verificationCache = new();
     private readonly AssemblyVerificationOptions _options;
     private readonly IAssemblyVerificationMetrics? _metrics;
 
@@ -39,11 +39,11 @@ public sealed class AssemblySignatureVerifier
     /// <summary>
     /// Verifies an assembly file before loading.
     /// </summary>
-    public VerificationResult VerifyAssembly(string assemblyPath)
+    public AssemblyVerificationResult VerifyAssembly(string assemblyPath)
     {
         if (!File.Exists(assemblyPath))
         {
-            return VerificationResult.Failed("Assembly file not found", assemblyPath);
+            return AssemblyVerificationResult.Failed("Assembly file not found", assemblyPath);
         }
 
         // Check cache
@@ -90,18 +90,18 @@ public sealed class AssemblySignatureVerifier
     /// <summary>
     /// Verifies all assemblies in a directory.
     /// </summary>
-    public IReadOnlyList<VerificationResult> VerifyDirectory(string directoryPath, string pattern = "*.dll")
+    public IReadOnlyList<AssemblyVerificationResult> VerifyDirectory(string directoryPath, string pattern = "*.dll")
     {
         if (!Directory.Exists(directoryPath))
         {
-            return Array.Empty<VerificationResult>();
+            return Array.Empty<AssemblyVerificationResult>();
         }
 
         var assemblies = Directory.GetFiles(directoryPath, pattern, SearchOption.AllDirectories);
         return assemblies.Select(VerifyAssembly).ToList();
     }
 
-    private VerificationResult PerformVerification(string assemblyPath)
+    private AssemblyVerificationResult PerformVerification(string assemblyPath)
     {
         var checks = new List<VerificationCheck>();
         var overallValid = true;
@@ -146,7 +146,7 @@ public sealed class AssemblySignatureVerifier
             if (!apiCheck.Passed && _options.BlockDangerousAPIs) overallValid = false;
         }
 
-        return new VerificationResult
+        return new AssemblyVerificationResult
         {
             AssemblyPath = assemblyPath,
             IsValid = overallValid,
@@ -467,7 +467,7 @@ public sealed class TrustedPublisher
     public DateTime? ValidUntil { get; init; }
 }
 
-public sealed class VerificationResult
+public sealed class AssemblyVerificationResult
 {
     public required string AssemblyPath { get; init; }
     public bool IsValid { get; init; }
@@ -475,7 +475,7 @@ public sealed class VerificationResult
     public DateTime VerifiedAt { get; init; }
     public string? FailureReason { get; init; }
 
-    public static VerificationResult Failed(string reason, string path) => new()
+    public static AssemblyVerificationResult Failed(string reason, string path) => new()
     {
         AssemblyPath = path,
         IsValid = false,
@@ -553,7 +553,7 @@ public sealed class CryptographicAuditLog : IAsyncDisposable
     /// <summary>
     /// Appends an audit entry to the log.
     /// </summary>
-    public async Task<AuditEntry> AppendAsync(
+    public async Task<CryptoAuditEntry> AppendAsync(
         AuditEventData eventData,
         CancellationToken cancellationToken = default)
     {
@@ -566,7 +566,7 @@ public sealed class CryptographicAuditLog : IAsyncDisposable
             var timestamp = DateTime.UtcNow;
 
             // Create entry
-            var entry = new AuditEntry
+            var entry = new CryptoAuditEntry
             {
                 Id = Guid.NewGuid().ToString("N"),
                 SequenceNumber = sequenceNumber,
@@ -608,7 +608,7 @@ public sealed class CryptographicAuditLog : IAsyncDisposable
     /// <summary>
     /// Verifies the integrity of the entire audit log chain.
     /// </summary>
-    public async Task<ChainVerificationResult> VerifyChainAsync(CancellationToken cancellationToken = default)
+    public async Task<ChainAssemblyVerificationResult> VerifyChainAsync(CancellationToken cancellationToken = default)
     {
         var stopwatch = Stopwatch.StartNew();
         var entries = await _storage.GetAllEntriesAsync(cancellationToken);
@@ -674,7 +674,7 @@ public sealed class CryptographicAuditLog : IAsyncDisposable
 
         stopwatch.Stop();
 
-        var result = new ChainVerificationResult
+        var result = new ChainAssemblyVerificationResult
         {
             IsValid = issues.Count == 0,
             TotalEntries = entries.Count,
@@ -690,7 +690,7 @@ public sealed class CryptographicAuditLog : IAsyncDisposable
     /// <summary>
     /// Queries audit entries with filtering.
     /// </summary>
-    public async Task<IReadOnlyList<AuditEntry>> QueryAsync(
+    public async Task<IReadOnlyList<CryptoAuditEntry>> QueryAsync(
         AuditQuery query,
         CancellationToken cancellationToken = default)
     {
@@ -730,7 +730,7 @@ public sealed class CryptographicAuditLog : IAsyncDisposable
         };
     }
 
-    private string CalculateEntryHash(AuditEntry entry)
+    private string CalculateEntryHash(CryptoAuditEntry entry)
     {
         var dataToHash = $"{entry.SequenceNumber}|{entry.Timestamp:O}|{entry.EventType}|" +
                          $"{entry.Actor}|{entry.Resource}|{entry.Action}|{entry.Details}|" +
@@ -741,7 +741,7 @@ public sealed class CryptographicAuditLog : IAsyncDisposable
         return Convert.ToBase64String(hashBytes);
     }
 
-    private string SignEntry(AuditEntry entry)
+    private string SignEntry(CryptoAuditEntry entry)
     {
         using var rsa = RSA.Create();
         rsa.ImportRSAPrivateKey(_options.SigningKey, out _);
@@ -752,7 +752,7 @@ public sealed class CryptographicAuditLog : IAsyncDisposable
         return Convert.ToBase64String(signature);
     }
 
-    private bool VerifySignature(AuditEntry entry)
+    private bool VerifySignature(CryptoAuditEntry entry)
     {
         if (string.IsNullOrEmpty(entry.Signature) || _options.VerificationKey == null)
         {
@@ -828,13 +828,13 @@ public sealed class CryptographicAuditLog : IAsyncDisposable
 
 public interface IAuditLogStorage
 {
-    Task AppendAsync(AuditEntry entry, CancellationToken cancellationToken = default);
-    Task<AuditEntry?> GetLastEntryAsync(CancellationToken cancellationToken = default);
-    Task<IReadOnlyList<AuditEntry>> GetAllEntriesAsync(CancellationToken cancellationToken = default);
-    Task<IReadOnlyList<AuditEntry>> QueryAsync(AuditQuery query, CancellationToken cancellationToken = default);
+    Task AppendAsync(CryptoAuditEntry entry, CancellationToken cancellationToken = default);
+    Task<CryptoAuditEntry?> GetLastEntryAsync(CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<CryptoAuditEntry>> GetAllEntriesAsync(CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<CryptoAuditEntry>> QueryAsync(AuditQuery query, CancellationToken cancellationToken = default);
 }
 
-public sealed class AuditEntry
+public sealed class CryptoAuditEntry
 {
     public required string Id { get; init; }
     public long SequenceNumber { get; init; }
@@ -879,7 +879,7 @@ public sealed class CryptographicAuditOptions
     public byte[]? VerificationKey { get; set; }
 }
 
-public sealed class ChainVerificationResult
+public sealed class ChainAssemblyVerificationResult
 {
     public bool IsValid { get; init; }
     public int TotalEntries { get; init; }
@@ -901,7 +901,7 @@ public sealed class AuditLogExport
     public DateTime? FromTimestamp { get; init; }
     public DateTime? ToTimestamp { get; init; }
     public int EntryCount { get; init; }
-    public IReadOnlyList<AuditEntry> Entries { get; init; } = Array.Empty<AuditEntry>();
+    public IReadOnlyList<CryptoAuditEntry> Entries { get; init; } = Array.Empty<CryptoAuditEntry>();
     public string MerkleRoot { get; init; } = string.Empty;
     public string ChainStartHash { get; init; } = string.Empty;
     public string ChainEndHash { get; init; } = string.Empty;
@@ -918,10 +918,10 @@ public interface ICryptographicAuditMetrics
 /// </summary>
 public sealed class InMemoryAuditLogStorage : IAuditLogStorage
 {
-    private readonly List<AuditEntry> _entries = new();
+    private readonly List<CryptoAuditEntry> _entries = new();
     private readonly object _lock = new();
 
-    public Task AppendAsync(AuditEntry entry, CancellationToken cancellationToken = default)
+    public Task AppendAsync(CryptoAuditEntry entry, CancellationToken cancellationToken = default)
     {
         lock (_lock)
         {
@@ -930,7 +930,7 @@ public sealed class InMemoryAuditLogStorage : IAuditLogStorage
         return Task.CompletedTask;
     }
 
-    public Task<AuditEntry?> GetLastEntryAsync(CancellationToken cancellationToken = default)
+    public Task<CryptoAuditEntry?> GetLastEntryAsync(CancellationToken cancellationToken = default)
     {
         lock (_lock)
         {
@@ -938,15 +938,15 @@ public sealed class InMemoryAuditLogStorage : IAuditLogStorage
         }
     }
 
-    public Task<IReadOnlyList<AuditEntry>> GetAllEntriesAsync(CancellationToken cancellationToken = default)
+    public Task<IReadOnlyList<CryptoAuditEntry>> GetAllEntriesAsync(CancellationToken cancellationToken = default)
     {
         lock (_lock)
         {
-            return Task.FromResult<IReadOnlyList<AuditEntry>>(_entries.ToList());
+            return Task.FromResult<IReadOnlyList<CryptoAuditEntry>>(_entries.ToList());
         }
     }
 
-    public Task<IReadOnlyList<AuditEntry>> QueryAsync(AuditQuery query, CancellationToken cancellationToken = default)
+    public Task<IReadOnlyList<CryptoAuditEntry>> QueryAsync(AuditQuery query, CancellationToken cancellationToken = default)
     {
         lock (_lock)
         {
@@ -967,7 +967,7 @@ public sealed class InMemoryAuditLogStorage : IAuditLogStorage
             if (!string.IsNullOrEmpty(query.Resource))
                 filtered = filtered.Where(e => e.Resource == query.Resource);
 
-            return Task.FromResult<IReadOnlyList<AuditEntry>>(
+            return Task.FromResult<IReadOnlyList<CryptoAuditEntry>>(
                 filtered.Skip(query.Offset).Take(query.Limit).ToList());
         }
     }

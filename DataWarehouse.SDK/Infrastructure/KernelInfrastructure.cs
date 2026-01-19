@@ -1124,7 +1124,15 @@ public sealed class HealthCheckAggregator : IAsyncDisposable
             timeoutCts.CancelAfter(_options.Timeout);
 
             var result = await check.CheckHealthAsync(timeoutCts.Token);
-            var finalResult = result with { Duration = sw.Elapsed };
+            var finalResult = new HealthCheckResult
+            {
+                Status = result.Status,
+                Message = result.Message,
+                Data = result.Data,
+                Duration = sw.Elapsed,
+                Exception = result.Exception,
+                Timestamp = result.Timestamp
+            };
 
             // Cache result
             if (_options.CacheDuration.HasValue)

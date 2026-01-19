@@ -1636,7 +1636,7 @@ public sealed class MultiRegionReplicator : IAsyncDisposable
     private readonly string _localRegion;
     private readonly ConcurrentDictionary<string, RegionConnection> _regions = new();
     private readonly ConcurrentDictionary<string, CrdtValue> _localState = new();
-    private readonly ConcurrentDictionary<string, VectorClock> _vectorClocks = new();
+    private readonly ConcurrentDictionary<string, RegionVectorClock> _vectorClocks = new();
     private readonly Channel<ReplicationEvent> _outboundChannel;
     private readonly MultiRegionOptions _options;
     private readonly IMultiRegionMetrics? _metrics;
@@ -1760,17 +1760,17 @@ public sealed class MultiRegionReplicator : IAsyncDisposable
 
             switch (comparison)
             {
-                case ClockComparison.Before:
+                case RegionClockComparison.Before:
                     // Incoming is newer, accept it
                     _localState[incomingValue.Key] = incomingValue;
                     MergeClock(incomingValue.Key, incomingValue.Clock);
                     break;
 
-                case ClockComparison.After:
+                case RegionClockComparison.After:
                     // Local is newer, ignore incoming
                     break;
 
-                case ClockComparison.Concurrent:
+                case RegionClockComparison.Concurrent:
                     // Conflict! Use last-write-wins with region tiebreaker
                     var resolved = ResolveConflict(localValue, incomingValue);
                     _localState[incomingValue.Key] = resolved;
@@ -1822,9 +1822,9 @@ public sealed class MultiRegionReplicator : IAsyncDisposable
         };
     }
 
-    private VectorClock IncrementClock(string key)
+    private RegionVectorClock IncrementClock(string key)
     {
-        var clock = _vectorClocks.GetOrAdd(key, _ => new VectorClock());
+        var clock = _vectorClocks.GetOrAdd(key, _ => new RegionVectorClock());
         lock (clock)
         {
             clock.Increment(_localRegion);
@@ -1832,16 +1832,16 @@ public sealed class MultiRegionReplicator : IAsyncDisposable
         return clock.Clone();
     }
 
-    private void MergeClock(string key, VectorClock remoteClock)
+    private void MergeClock(string key, RegionVectorClock remoteClock)
     {
-        var clock = _vectorClocks.GetOrAdd(key, _ => new VectorClock());
+        var clock = _vectorClocks.GetOrAdd(key, _ => new RegionVectorClock());
         lock (clock)
         {
             clock.Merge(remoteClock);
         }
     }
 
-    private static ClockComparison CompareClocks(VectorClock local, VectorClock remote)
+    private static RegionClockComparison CompareClocks(RegionVectorClock local, RegionVectorClock remote)
     {
         bool localAhead = false;
         bool remoteAhead = false;
@@ -1857,10 +1857,10 @@ public sealed class MultiRegionReplicator : IAsyncDisposable
             if (remoteValue > localValue) remoteAhead = true;
         }
 
-        if (localAhead && !remoteAhead) return ClockComparison.After;
-        if (remoteAhead && !localAhead) return ClockComparison.Before;
-        if (localAhead && remoteAhead) return ClockComparison.Concurrent;
-        return ClockComparison.Equal;
+        if (localAhead && !remoteAhead) return RegionClockComparison.After;
+        if (remoteAhead && !localAhead) return RegionClockComparison.Before;
+        if (localAhead && remoteAhead) return RegionClockComparison.Concurrent;
+        return RegionClockComparison.Equal;
     }
 
     private CrdtValue ResolveConflict(CrdtValue local, CrdtValue remote)
@@ -2034,13 +2034,13 @@ public sealed class CrdtValue
 {
     public required string Key { get; init; }
     public required string Value { get; init; }
-    public required VectorClock Clock { get; init; }
+    public required RegionVectorClock Clock { get; init; }
     public required string Origin { get; init; }
     public DateTime Timestamp { get; init; }
     public bool IsTombstone { get; init; }
 }
 
-public sealed class VectorClock
+public sealed class RegionVectorClock
 {
     public Dictionary<string, long> Entries { get; } = new();
 
@@ -2050,7 +2050,7 @@ public sealed class VectorClock
         Entries[region] = current + 1;
     }
 
-    public void Merge(VectorClock other)
+    public void Merge(RegionVectorClock other)
     {
         foreach (var (region, value) in other.Entries)
         {
@@ -2059,9 +2059,9 @@ public sealed class VectorClock
         }
     }
 
-    public VectorClock Clone()
+    public RegionVectorClock Clone()
     {
-        var clone = new VectorClock();
+        var clone = new RegionVectorClock();
         foreach (var (region, value) in Entries)
         {
             clone.Entries[region] = value;
@@ -2070,7 +2070,7 @@ public sealed class VectorClock
     }
 }
 
-public enum ClockComparison
+public enum RegionClockComparison
 {
     Before,
     After,

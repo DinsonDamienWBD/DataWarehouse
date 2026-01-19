@@ -265,7 +265,7 @@ public sealed class FipsConfig
 public sealed class ImmutableAuditTrail : IAsyncDisposable
 {
     private readonly ConcurrentDictionary<string, AuditBlock> _blocks = new();
-    private readonly Channel<AuditEntry> _entryChannel;
+    private readonly Channel<BlockchainAuditEntry> _entryChannel;
     private readonly IAuditStorage _storage;
     private readonly AuditTrailConfig _config;
     private readonly Task _processingTask;
@@ -280,7 +280,7 @@ public sealed class ImmutableAuditTrail : IAsyncDisposable
         _storage = storage ?? throw new ArgumentNullException(nameof(storage));
         _config = config ?? new AuditTrailConfig();
 
-        _entryChannel = Channel.CreateBounded<AuditEntry>(new BoundedChannelOptions(10000)
+        _entryChannel = Channel.CreateBounded<BlockchainAuditEntry>(new BoundedChannelOptions(10000)
         {
             FullMode = BoundedChannelFullMode.Wait
         });
@@ -299,7 +299,7 @@ public sealed class ImmutableAuditTrail : IAsyncDisposable
         Dictionary<string, object>? details = null,
         CancellationToken ct = default)
     {
-        var entry = new AuditEntry
+        var entry = new BlockchainAuditEntry
         {
             EntryId = Guid.NewGuid().ToString("N"),
             Timestamp = DateTime.UtcNow,
@@ -369,7 +369,7 @@ public sealed class ImmutableAuditTrail : IAsyncDisposable
     /// <summary>
     /// Gets audit entries for a specific resource.
     /// </summary>
-    public async IAsyncEnumerable<AuditEntry> GetEntriesAsync(
+    public async IAsyncEnumerable<BlockchainAuditEntry> GetEntriesAsync(
         string? resource = null,
         DateTime? from = null,
         DateTime? to = null,
@@ -400,7 +400,7 @@ public sealed class ImmutableAuditTrail : IAsyncDisposable
         AuditExportRequest request,
         CancellationToken ct = default)
     {
-        var entries = new List<AuditEntry>();
+        var entries = new List<BlockchainAuditEntry>();
 
         await foreach (var entry in GetEntriesAsync(request.Resource, request.From, request.To, ct))
         {
@@ -424,7 +424,7 @@ public sealed class ImmutableAuditTrail : IAsyncDisposable
 
     private async Task ProcessEntriesAsync(CancellationToken ct)
     {
-        var pendingEntries = new List<AuditEntry>();
+        var pendingEntries = new List<BlockchainAuditEntry>();
         var lastBlockTime = DateTime.UtcNow;
 
         while (!ct.IsCancellationRequested)
@@ -475,7 +475,7 @@ public sealed class ImmutableAuditTrail : IAsyncDisposable
         }
     }
 
-    private async Task CreateBlockAsync(List<AuditEntry> entries, CancellationToken ct)
+    private async Task CreateBlockAsync(List<BlockchainAuditEntry> entries, CancellationToken ct)
     {
         AuditBlock block;
 
@@ -509,7 +509,7 @@ public sealed class ImmutableAuditTrail : IAsyncDisposable
         return Convert.ToHexString(hash).ToLowerInvariant();
     }
 
-    private static string ComputeMerkleRoot(IEnumerable<AuditEntry> entries)
+    private static string ComputeMerkleRoot(IEnumerable<BlockchainAuditEntry> entries)
     {
         var hashes = entries.Select(e =>
         {
@@ -536,7 +536,7 @@ public sealed class ImmutableAuditTrail : IAsyncDisposable
         return Convert.ToHexString(hashes[0]).ToLowerInvariant();
     }
 
-    private static string ComputeExportHash(List<AuditEntry> entries)
+    private static string ComputeExportHash(List<BlockchainAuditEntry> entries)
     {
         var data = string.Join("|", entries.Select(e => e.EntryId));
         var hash = SHA256.HashData(Encoding.UTF8.GetBytes(data));
@@ -576,7 +576,7 @@ public enum AuditEventType
     EmergencyAccess, KeyRotation
 }
 
-public sealed class AuditEntry
+public sealed class BlockchainAuditEntry
 {
     public required string EntryId { get; init; }
     public DateTime Timestamp { get; init; }
@@ -596,7 +596,7 @@ public sealed class AuditBlock
     public required string PreviousBlockHash { get; init; }
     public string BlockHash { get; set; } = string.Empty;
     public required string MerkleRoot { get; init; }
-    public List<AuditEntry> Entries { get; init; } = new();
+    public List<BlockchainAuditEntry> Entries { get; init; } = new();
     public int EntryCount { get; init; }
 }
 
@@ -620,7 +620,7 @@ public record AuditExportRequest
 public record AuditExport
 {
     public DateTime ExportedAt { get; init; }
-    public List<AuditEntry> Entries { get; init; } = new();
+    public List<BlockchainAuditEntry> Entries { get; init; } = new();
     public int TotalEntries { get; init; }
     public bool ChainVerified { get; init; }
     public string ExportHash { get; init; } = string.Empty;
@@ -2540,7 +2540,7 @@ public sealed class KeyShare
 public sealed class ShareData
 {
     public required string ShareId { get; init; }
-    public required byte[] ShareData { get; init; }
+    public required byte[] Data { get; init; }
     public required string Commitment { get; init; }
 }
 

@@ -1089,7 +1089,7 @@ public sealed class AnomalyDetectorOptions
     public int MinSamplesForTraining { get; set; } = 100;
 }
 
-public sealed class AnomalyAnomalyMetricDataPoint
+public sealed class AnomalyMetricDataPoint
 {
     public required string MetricName { get; init; }
     public double Value { get; init; }
@@ -1360,8 +1360,8 @@ public sealed class PerformanceProfiler : IAsyncDisposable
             Gen1CollectionsDelta = last.Gen1Collections - first.Gen1Collections,
             Gen2CollectionsDelta = last.Gen2Collections - first.Gen2Collections,
             MemoryPressure = last.GCTotalMemory > _options.MemoryPressureThreshold
-                ? MemoryPressureLevel.High
-                : MemoryPressureLevel.Normal
+                ? ProfileMemoryPressureLevel.High
+                : ProfileMemoryPressureLevel.Normal
         };
     }
 
@@ -1581,10 +1581,10 @@ public sealed class MemoryAnalysis
     public int Gen0CollectionsDelta { get; init; }
     public int Gen1CollectionsDelta { get; init; }
     public int Gen2CollectionsDelta { get; init; }
-    public MemoryPressureLevel MemoryPressure { get; init; }
+    public ProfileMemoryPressureLevel MemoryPressure { get; init; }
 }
 
-public enum MemoryPressureLevel
+public enum ProfileMemoryPressureLevel
 {
     Normal,
     Elevated,

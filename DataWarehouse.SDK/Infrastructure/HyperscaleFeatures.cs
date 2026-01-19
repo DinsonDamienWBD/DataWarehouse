@@ -2395,7 +2395,7 @@ public sealed class HyperscaleObservability : IAsyncDisposable
     private readonly ConcurrentDictionary<string, MetricCounter> _counters = new();
     private readonly ConcurrentDictionary<string, MetricHistogram> _histograms = new();
     private readonly ConcurrentDictionary<string, MetricGauge> _gauges = new();
-    private readonly ConcurrentDictionary<string, TraceSpan> _activeSpans = new();
+    private readonly ConcurrentDictionary<string, TelemetryTraceSpan> _activeSpans = new();
     private readonly Channel<TelemetryEvent> _eventChannel;
     private readonly ObservabilityConfig _config;
     private readonly Task _exportTask;
@@ -2522,9 +2522,9 @@ public sealed class HyperscaleObservability : IAsyncDisposable
     /// <summary>
     /// Starts a trace span.
     /// </summary>
-    public TraceSpan StartSpan(string operationName, string? parentSpanId = null)
+    public TelemetryTraceSpan StartSpan(string operationName, string? parentSpanId = null)
     {
-        var span = new TraceSpan
+        var span = new TelemetryTraceSpan
         {
             SpanId = Guid.NewGuid().ToString(),
             TraceId = parentSpanId != null && _activeSpans.TryGetValue(parentSpanId, out var parent)
@@ -2542,7 +2542,7 @@ public sealed class HyperscaleObservability : IAsyncDisposable
     /// <summary>
     /// Ends a trace span.
     /// </summary>
-    public void EndSpan(string spanId, SpanStatus status = SpanStatus.Ok, string? errorMessage = null)
+    public void EndSpan(string spanId, TelemetrySpanStatus status = TelemetrySpanStatus.Ok, string? errorMessage = null)
     {
         if (_activeSpans.TryRemove(spanId, out var span))
         {
@@ -2612,9 +2612,9 @@ public sealed class HyperscaleObservability : IAsyncDisposable
     /// <summary>
     /// Gets current metrics snapshot.
     /// </summary>
-    public MetricsSnapshot GetMetricsSnapshot()
+    public HyperscaleMetricsSnapshot GetHyperscaleMetricsSnapshot()
     {
-        return new MetricsSnapshot
+        return new HyperscaleMetricsSnapshot
         {
             Timestamp = DateTime.UtcNow,
             Counters = _counters.ToDictionary(
@@ -2731,7 +2731,7 @@ public sealed class MetricGauge
     public DateTime LastUpdated { get; set; }
 }
 
-public sealed class TraceSpan
+public sealed class TelemetryTraceSpan
 {
     public required string SpanId { get; init; }
     public required string TraceId { get; init; }
@@ -2739,20 +2739,20 @@ public sealed class TraceSpan
     public required string OperationName { get; init; }
     public DateTime StartTime { get; init; }
     public DateTime? EndTime { get; set; }
-    public SpanStatus Status { get; set; }
+    public TelemetrySpanStatus Status { get; set; }
     public string? ErrorMessage { get; set; }
     public Dictionary<string, string> Tags { get; } = new();
     public TimeSpan Duration => EndTime.HasValue ? EndTime.Value - StartTime : TimeSpan.Zero;
 }
 
-public enum SpanStatus { Ok, Error, Cancelled }
+public enum TelemetrySpanStatus { Ok, Error, Cancelled }
 public enum RaidOperationType { Read, Write, Rebuild, Scrub, Verify }
 public enum TelemetryEventType { Metric, Span, Log }
 
 public record TelemetryEvent
 {
     public TelemetryEventType Type { get; init; }
-    public TraceSpan? Span { get; init; }
+    public TelemetryTraceSpan? Span { get; init; }
     public DateTime Timestamp { get; init; }
 }
 
@@ -2764,7 +2764,7 @@ public record RaidHealthReport
     public int DegradedArrayCount { get; init; }
 }
 
-public record MetricsSnapshot
+public record HyperscaleMetricsSnapshot
 {
     public DateTime Timestamp { get; init; }
     public Dictionary<string, long> Counters { get; init; } = new();

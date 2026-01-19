@@ -360,13 +360,13 @@ public sealed class AdaptivePipelineOptimizer
             AverageCompressionRatio = profile.AverageCompressionRatio,
             AverageExecutionTimeMs = profile.AverageExecutionTimeMs,
             BestStages = profile.BestPerformingStages.ToList(),
-            DataCharacteristics = profile.Characteristics
+            PipelineDataCharacteristics = profile.Characteristics
         };
     }
 
     private DataPatternProfile AnalyzeDataPattern(byte[] data, string? contentType)
     {
-        var characteristics = new DataCharacteristics
+        var characteristics = new PipelineDataCharacteristics
         {
             Size = data.Length,
             ContentType = contentType ?? "unknown",
@@ -487,7 +487,7 @@ public sealed class AdaptivePipelineOptimizer
             .ToDictionary(x => x.Byte, x => x.Frequency);
     }
 
-    private static double EstimateCompressionRatio(DataCharacteristics characteristics)
+    private static double EstimateCompressionRatio(PipelineDataCharacteristics characteristics)
     {
         // Empirical estimation based on entropy
         if (characteristics.Entropy >= 7.9) return 1.0; // Incompressible
@@ -497,7 +497,7 @@ public sealed class AdaptivePipelineOptimizer
         return 0.3;
     }
 
-    private static string GenerateReasoning(DataCharacteristics characteristics, List<RecommendedStage> stages)
+    private static string GenerateReasoning(PipelineDataCharacteristics characteristics, List<RecommendedStage> stages)
     {
         var reasons = new List<string>();
 
@@ -555,10 +555,10 @@ public sealed class PipelineStatistics
     public double AverageCompressionRatio { get; init; }
     public double AverageExecutionTimeMs { get; init; }
     public IReadOnlyList<string> BestStages { get; init; } = Array.Empty<string>();
-    public DataCharacteristics DataCharacteristics { get; init; } = new();
+    public PipelineDataCharacteristics PipelineDataCharacteristics { get; init; } = new();
 }
 
-public sealed class DataCharacteristics
+public sealed class PipelineDataCharacteristics
 {
     public long Size { get; init; }
     public string ContentType { get; init; } = "unknown";
@@ -570,7 +570,7 @@ public sealed class DataCharacteristics
 
 public sealed class DataPatternProfile
 {
-    public DataCharacteristics Characteristics { get; }
+    public PipelineDataCharacteristics Characteristics { get; }
     public int SampleCount { get; private set; }
     public double AverageCompressionRatio { get; private set; } = 1.0;
     public double AverageExecutionTimeMs { get; private set; }
@@ -578,7 +578,7 @@ public sealed class DataPatternProfile
 
     private readonly List<ExecutionMetrics> _executions = new();
 
-    public DataPatternProfile(DataCharacteristics characteristics)
+    public DataPatternProfile(PipelineDataCharacteristics characteristics)
     {
         Characteristics = characteristics;
     }
@@ -1136,7 +1136,7 @@ public sealed class TieredStorageManager : IAsyncDisposable
 {
     private readonly IReadOnlyList<StorageTier> _tiers;
     private readonly ConcurrentDictionary<string, DataLocationInfo> _locationIndex = new();
-    private readonly ConcurrentDictionary<string, AccessPattern> _accessPatterns = new();
+    private readonly ConcurrentDictionary<string, CacheAccessPattern> _accessPatterns = new();
     private readonly TieredStorageOptions _options;
     private readonly ITieredStorageMetrics? _metrics;
     private readonly Task _migrationTask;
@@ -1180,7 +1180,7 @@ public sealed class TieredStorageManager : IAsyncDisposable
             LastAccessed = DateTime.UtcNow
         };
 
-        _accessPatterns.TryAdd(key, new AccessPattern(key));
+        _accessPatterns.TryAdd(key, new CacheAccessPattern(key));
         _metrics?.RecordWrite(tier.Id, data.Length);
     }
 
@@ -1314,7 +1314,7 @@ public sealed class TieredStorageManager : IAsyncDisposable
     {
         _accessPatterns.AddOrUpdate(
             key,
-            _ => new AccessPattern(key),
+            _ => new CacheAccessPattern(key),
             (_, pattern) => pattern.RecordAccess());
 
         if (_locationIndex.TryGetValue(key, out var location))
@@ -1499,18 +1499,18 @@ public sealed record DataLocationInfo
     public required DateTime LastAccessed { get; init; }
 }
 
-public sealed class AccessPattern
+public sealed class CacheAccessPattern
 {
     private readonly string _key;
     private readonly Queue<DateTime> _accessTimes = new();
     private readonly object _lock = new();
 
-    public AccessPattern(string key)
+    public CacheAccessPattern(string key)
     {
         _key = key;
     }
 
-    public AccessPattern RecordAccess()
+    public CacheAccessPattern RecordAccess()
     {
         lock (_lock)
         {
