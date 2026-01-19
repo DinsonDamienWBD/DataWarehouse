@@ -1,6 +1,7 @@
 using DataWarehouse.Kernel;
 using DataWarehouse.Kernel.Plugins;
 using DataWarehouse.SDK.Contracts;
+using DataWarehouse.SDK.Infrastructure;
 using DataWarehouse.SDK.Primitives;
 
 namespace DataWarehouse.Dashboard.Services;
@@ -74,7 +75,16 @@ public class KernelHostService : BackgroundService, IKernelHostService
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        _logger.LogInformation("Initializing DataWarehouse Kernel...");
+        _logger.LogInformation("Initializing DataWarehouse Kernel with retry logic...");
+
+        // Configure retry policy: 5 retries with exponential backoff (2s, 4s, 8s, 16s, 32s)
+        var retryPolicy = new RetryPolicy(
+            maxRetries: 5,
+            baseDelay: TimeSpan.FromSeconds(2),
+            backoffMultiplier: 2.0,
+            maxDelay: TimeSpan.FromMinutes(1),
+            jitterFactor: 0.25,
+            shouldRetry: ex => ex is not OperationCanceledException);
 
         try
         {
@@ -83,12 +93,16 @@ public class KernelHostService : BackgroundService, IKernelHostService
             var pluginPath = _configuration.GetValue<string>("Kernel:PluginPath")
                 ?? Path.Combine(AppContext.BaseDirectory, "Plugins");
 
-            // Build and initialize the Kernel
-            _kernel = await KernelBuilder.Create()
-                .WithKernelId($"dashboard-{Environment.MachineName}")
-                .WithOperatingMode(Enum.Parse<OperatingMode>(operatingMode, ignoreCase: true))
-                .WithPluginPath(pluginPath)
-                .BuildAndInitializeAsync(stoppingToken);
+            // Build and initialize the Kernel with retry logic
+            _kernel = await retryPolicy.ExecuteAsync(async ct =>
+            {
+                _logger.LogDebug("Attempting to initialize Kernel...");
+                return await KernelBuilder.Create()
+                    .WithKernelId($"dashboard-{Environment.MachineName}")
+                    .WithOperatingMode(Enum.Parse<OperatingMode>(operatingMode, ignoreCase: true))
+                    .WithPluginPath(pluginPath)
+                    .BuildAndInitializeAsync(ct);
+            }, stoppingToken);
 
             _isReady = true;
             _logger.LogInformation("DataWarehouse Kernel initialized successfully. KernelId: {KernelId}", _kernel.KernelId);
@@ -108,11 +122,11 @@ public class KernelHostService : BackgroundService, IKernelHostService
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to initialize DataWarehouse Kernel");
+            _logger.LogError(ex, "Failed to initialize DataWarehouse Kernel after all retries");
             StateChanged?.Invoke(this, new KernelStateChangedEventArgs
             {
                 IsReady = false,
-                Message = $"Kernel initialization failed: {ex.Message}"
+                Message = $"Kernel initialization failed after retries: {ex.Message}"
             });
         }
     }

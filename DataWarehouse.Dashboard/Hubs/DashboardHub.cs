@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.SignalR;
 using DataWarehouse.Dashboard.Services;
+using DataWarehouse.SDK.Infrastructure;
 
 namespace DataWarehouse.Dashboard.Hubs;
 
@@ -172,6 +173,7 @@ public class DashboardHub : Hub
 
 /// <summary>
 /// Background service that broadcasts real-time updates via SignalR.
+/// Uses retry logic for resilient broadcasting.
 /// </summary>
 public class DashboardBroadcastService : BackgroundService
 {
@@ -180,6 +182,7 @@ public class DashboardBroadcastService : BackgroundService
     private readonly IStorageManagementService _storageService;
     private readonly IAuditLogService _auditService;
     private readonly ILogger<DashboardBroadcastService> _logger;
+    private readonly RetryPolicy _retryPolicy;
 
     public DashboardBroadcastService(
         IHubContext<DashboardHub> hubContext,
@@ -194,29 +197,47 @@ public class DashboardBroadcastService : BackgroundService
         _auditService = auditService;
         _logger = logger;
 
+        // Configure retry policy for broadcasts: 3 retries with exponential backoff
+        _retryPolicy = new RetryPolicy(
+            maxRetries: 3,
+            baseDelay: TimeSpan.FromMilliseconds(100),
+            backoffMultiplier: 2.0,
+            maxDelay: TimeSpan.FromSeconds(2),
+            jitterFactor: 0.25,
+            shouldRetry: ex => ex is not OperationCanceledException);
+
         // Subscribe to audit log events
         _auditService.EntryLogged += OnAuditEntryLogged;
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        _logger.LogInformation("Dashboard broadcast service started");
+        _logger.LogInformation("Dashboard broadcast service started with retry logic");
 
         while (!stoppingToken.IsCancellationRequested)
         {
             try
             {
-                // Broadcast health status every 10 seconds
-                var health = await _healthService.GetSystemHealthAsync();
-                await _hubContext.Clients.Group("health").SendAsync("HealthStatusUpdate", health, stoppingToken);
+                // Broadcast health status with retry
+                await _retryPolicy.ExecuteAsync(async ct =>
+                {
+                    var health = await _healthService.GetSystemHealthAsync();
+                    await _hubContext.Clients.Group("health").SendAsync("HealthStatusUpdate", health, ct);
+                }, stoppingToken);
 
-                // Broadcast metrics every 5 seconds
-                var metrics = _healthService.GetCurrentMetrics();
-                await _hubContext.Clients.Group("metrics").SendAsync("MetricsUpdate", metrics, stoppingToken);
+                // Broadcast metrics with retry
+                await _retryPolicy.ExecuteAsync(async ct =>
+                {
+                    var metrics = _healthService.GetCurrentMetrics();
+                    await _hubContext.Clients.Group("metrics").SendAsync("MetricsUpdate", metrics, ct);
+                }, stoppingToken);
 
-                // Broadcast storage stats every 30 seconds
-                var pools = _storageService.GetStoragePools();
-                await _hubContext.Clients.Group("storage").SendAsync("StoragePoolsUpdate", pools, stoppingToken);
+                // Broadcast storage stats with retry
+                await _retryPolicy.ExecuteAsync(async ct =>
+                {
+                    var pools = _storageService.GetStoragePools();
+                    await _hubContext.Clients.Group("storage").SendAsync("StoragePoolsUpdate", pools, ct);
+                }, stoppingToken);
 
                 await Task.Delay(TimeSpan.FromSeconds(5), stoppingToken);
             }
@@ -226,7 +247,7 @@ public class DashboardBroadcastService : BackgroundService
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error broadcasting dashboard updates");
+                _logger.LogWarning(ex, "Failed to broadcast dashboard updates after retries");
                 await Task.Delay(TimeSpan.FromSeconds(1), stoppingToken);
             }
         }
@@ -238,11 +259,14 @@ public class DashboardBroadcastService : BackgroundService
     {
         try
         {
-            await _hubContext.Clients.Group("audit").SendAsync("NewAuditEntry", entry);
+            await _retryPolicy.ExecuteAsync(async ct =>
+            {
+                await _hubContext.Clients.Group("audit").SendAsync("NewAuditEntry", entry, ct);
+            }, CancellationToken.None);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error broadcasting audit entry");
+            _logger.LogWarning(ex, "Failed to broadcast audit entry after retries");
         }
     }
 }
