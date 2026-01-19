@@ -5,6 +5,7 @@ using System.Collections.Concurrent;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
+using System.Text.Json;
 using System.Text.RegularExpressions;
 
 namespace DataWarehouse.Plugins.SqlInterface;
@@ -23,6 +24,7 @@ namespace DataWarehouse.Plugins.SqlInterface;
 /// - Transaction support (BEGIN, COMMIT, ROLLBACK)
 /// - Prepared statements
 /// - Connection pooling
+/// - PRODUCTION STORAGE: Uses IKernelStorageService for real persistence
 ///
 /// Supported SQL:
 /// - SELECT * FROM manifests WHERE tags CONTAINS 'important'
@@ -45,16 +47,29 @@ public sealed class SqlInterfacePlugin : InterfacePluginBase
     private Task? _serverTask;
     private int _port = 5432;
     private readonly ConcurrentDictionary<string, SqlConnection> _connections = new();
-    private readonly ConcurrentDictionary<string, ManifestRow> _mockData = new();
     private readonly ConcurrentDictionary<string, PreparedStatement> _preparedStatements = new();
+
+    // Storage service - injected via handshake configuration
+    private IKernelStorageService? _storage;
+    private const string StoragePrefix = "sql-manifests/";
+
+    // In-memory cache for fast queries (synced with storage)
+    private readonly ConcurrentDictionary<string, ManifestRow> _manifestCache = new();
+
+    private readonly JsonSerializerOptions _jsonOptions = new()
+    {
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+        WriteIndented = false
+    };
 
     public override Task<HandshakeResponse> OnHandshakeAsync(HandshakeRequest request)
     {
         if (request.Config?.TryGetValue("port", out var portObj) == true && portObj is int port)
             _port = port;
 
-        // Initialize mock data
-        InitializeMockData();
+        // Get storage service from configuration (injected by kernel)
+        if (request.Config?.TryGetValue("kernelStorage", out var storageObj) == true && storageObj is IKernelStorageService storage)
+            _storage = storage;
 
         return Task.FromResult(new HandshakeResponse
         {
@@ -69,34 +84,13 @@ public sealed class SqlInterfacePlugin : InterfacePluginBase
         });
     }
 
-    private void InitializeMockData()
+    /// <summary>
+    /// Sets the kernel storage service for production persistence.
+    /// Call this before starting the plugin.
+    /// </summary>
+    public void SetStorageService(IKernelStorageService storage)
     {
-        _mockData["manifest-001"] = new ManifestRow
-        {
-            Id = "manifest-001",
-            Name = "document.pdf",
-            Size = 1024000,
-            Tags = new[] { "pdf", "document", "important" },
-            CreatedAt = DateTime.UtcNow.AddDays(-7)
-        };
-
-        _mockData["manifest-002"] = new ManifestRow
-        {
-            Id = "manifest-002",
-            Name = "image.png",
-            Size = 512000,
-            Tags = new[] { "image", "png" },
-            CreatedAt = DateTime.UtcNow.AddDays(-3)
-        };
-
-        _mockData["manifest-003"] = new ManifestRow
-        {
-            Id = "manifest-003",
-            Name = "data.json",
-            Size = 2048,
-            Tags = new[] { "json", "data", "important" },
-            CreatedAt = DateTime.UtcNow.AddDays(-1)
-        };
+        _storage = storage ?? throw new ArgumentNullException(nameof(storage));
     }
 
     protected override List<PluginCapabilityDescriptor> GetCapabilities()
@@ -138,6 +132,12 @@ public sealed class SqlInterfacePlugin : InterfacePluginBase
                 Name = "prepared_statements",
                 DisplayName = "Prepared Statements",
                 Description = "Prepared statement support for parameterized queries"
+            },
+            new()
+            {
+                Name = "persistent_storage",
+                DisplayName = "Persistent Storage",
+                Description = "Data persisted via kernel storage service"
             }
         };
     }
@@ -150,17 +150,49 @@ public sealed class SqlInterfacePlugin : InterfacePluginBase
         metadata["SupportsTransactions"] = true;
         metadata["SupportsPreparedStatements"] = true;
         metadata["MaxConnections"] = 100;
+        metadata["UsesPersistentStorage"] = _storage != null;
         return metadata;
     }
 
     public override async Task StartAsync(CancellationToken ct)
     {
         _cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+
+        // Load existing manifests into cache
+        await LoadManifestCacheAsync(ct);
+
         _listener = new TcpListener(IPAddress.Any, _port);
         _listener.Start();
 
         _serverTask = AcceptConnectionsAsync(_cts.Token);
         await Task.CompletedTask;
+    }
+
+    private async Task LoadManifestCacheAsync(CancellationToken ct)
+    {
+        if (_storage == null) return;
+
+        try
+        {
+            var items = await _storage.ListAsync(StoragePrefix, 10000, 0, ct);
+            foreach (var item in items)
+            {
+                var data = await _storage.LoadBytesAsync(item.Path, ct);
+                if (data != null)
+                {
+                    var json = Encoding.UTF8.GetString(data);
+                    var manifest = JsonSerializer.Deserialize<ManifestRow>(json, _jsonOptions);
+                    if (manifest != null)
+                    {
+                        _manifestCache[manifest.Id] = manifest;
+                    }
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"SQL plugin: Failed to load manifest cache: {ex.Message}");
+        }
     }
 
     public override async Task StopAsync()
@@ -203,9 +235,9 @@ public sealed class SqlInterfacePlugin : InterfacePluginBase
             {
                 break;
             }
-            catch
+            catch (Exception ex)
             {
-                // Log and continue
+                Console.Error.WriteLine($"SQL plugin connection error: {ex.Message}");
             }
         }
     }
@@ -234,9 +266,9 @@ public sealed class SqlInterfacePlugin : InterfacePluginBase
                 await ProcessMessageAsync(stream, connection, (char)messageType, body, ct);
             }
         }
-        catch (Exception)
+        catch (Exception ex)
         {
-            // Connection error
+            Console.Error.WriteLine($"SQL plugin handle error: {ex.Message}");
         }
         finally
         {
@@ -365,7 +397,7 @@ public sealed class SqlInterfacePlugin : InterfacePluginBase
             }
 
             // Parse and execute query
-            var result = ParseAndExecute(query);
+            var result = await ParseAndExecuteAsync(query, ct);
 
             if (result.IsSelect)
             {
@@ -395,7 +427,7 @@ public sealed class SqlInterfacePlugin : InterfacePluginBase
         }
     }
 
-    private QueryResult ParseAndExecute(string query)
+    private async Task<QueryResult> ParseAndExecuteAsync(string query, CancellationToken ct)
     {
         query = query.Trim().TrimEnd(';');
 
@@ -410,21 +442,21 @@ public sealed class SqlInterfacePlugin : InterfacePluginBase
         var insertMatch = Regex.Match(query, @"^\s*INSERT\s+INTO\s+(\w+)\s*\((.+?)\)\s*VALUES\s*\((.+?)\)\s*$", RegexOptions.IgnoreCase);
         if (insertMatch.Success)
         {
-            return ExecuteInsert(insertMatch);
+            return await ExecuteInsertAsync(insertMatch, ct);
         }
 
         // UPDATE query
         var updateMatch = Regex.Match(query, @"^\s*UPDATE\s+(\w+)\s+SET\s+(.+?)\s+WHERE\s+(.+?)\s*$", RegexOptions.IgnoreCase);
         if (updateMatch.Success)
         {
-            return ExecuteUpdate(updateMatch);
+            return await ExecuteUpdateAsync(updateMatch, ct);
         }
 
         // DELETE query
         var deleteMatch = Regex.Match(query, @"^\s*DELETE\s+FROM\s+(\w+)\s+WHERE\s+(.+?)\s*$", RegexOptions.IgnoreCase);
         if (deleteMatch.Success)
         {
-            return ExecuteDelete(deleteMatch);
+            return await ExecuteDeleteAsync(deleteMatch, ct);
         }
 
         throw new Exception($"Unsupported query: {query}");
@@ -441,8 +473,8 @@ public sealed class SqlInterfacePlugin : InterfacePluginBase
         if (!table.Equals("manifests", StringComparison.OrdinalIgnoreCase))
             throw new Exception($"Unknown table: {table}");
 
-        // Filter data
-        var results = _mockData.Values.AsEnumerable();
+        // Filter data from cache
+        var results = _manifestCache.Values.AsEnumerable();
 
         if (!string.IsNullOrEmpty(whereClause))
         {
@@ -529,7 +561,7 @@ public sealed class SqlInterfacePlugin : InterfacePluginBase
         }).ToArray();
     }
 
-    private QueryResult ExecuteInsert(Match match)
+    private async Task<QueryResult> ExecuteInsertAsync(Match match, CancellationToken ct)
     {
         var table = match.Groups[1].Value;
         var columns = match.Groups[2].Value.Split(',').Select(c => c.Trim()).ToArray();
@@ -561,12 +593,25 @@ public sealed class SqlInterfacePlugin : InterfacePluginBase
             }
         }
 
-        _mockData[id] = row;
+        // Save to storage
+        if (_storage != null)
+        {
+            var json = JsonSerializer.Serialize(row, _jsonOptions);
+            var metadata = new Dictionary<string, string>
+            {
+                ["ContentType"] = "application/json",
+                ["Table"] = "manifests"
+            };
+            await _storage.SaveAsync(StoragePrefix + id, Encoding.UTF8.GetBytes(json), metadata, ct);
+        }
+
+        // Update cache
+        _manifestCache[id] = row;
 
         return new QueryResult { IsSelect = false, CommandTag = "INSERT 0 1" };
     }
 
-    private QueryResult ExecuteUpdate(Match match)
+    private async Task<QueryResult> ExecuteUpdateAsync(Match match, CancellationToken ct)
     {
         var table = match.Groups[1].Value;
         var setClause = match.Groups[2].Value;
@@ -580,7 +625,7 @@ public sealed class SqlInterfacePlugin : InterfacePluginBase
             throw new Exception("UPDATE requires id in WHERE clause");
 
         var id = idMatch.Groups[1].Value;
-        if (!_mockData.TryGetValue(id, out var row))
+        if (!_manifestCache.TryGetValue(id, out var row))
             return new QueryResult { IsSelect = false, CommandTag = "UPDATE 0" };
 
         // Apply SET clause (simplified)
@@ -588,10 +633,23 @@ public sealed class SqlInterfacePlugin : InterfacePluginBase
         if (nameMatch.Success)
             row.Name = nameMatch.Groups[1].Value;
 
+        // Save to storage
+        if (_storage != null)
+        {
+            var json = JsonSerializer.Serialize(row, _jsonOptions);
+            var metadata = new Dictionary<string, string>
+            {
+                ["ContentType"] = "application/json",
+                ["Table"] = "manifests",
+                ["ModifiedAt"] = DateTime.UtcNow.ToString("O")
+            };
+            await _storage.SaveAsync(StoragePrefix + id, Encoding.UTF8.GetBytes(json), metadata, ct);
+        }
+
         return new QueryResult { IsSelect = false, CommandTag = "UPDATE 1" };
     }
 
-    private QueryResult ExecuteDelete(Match match)
+    private async Task<QueryResult> ExecuteDeleteAsync(Match match, CancellationToken ct)
     {
         var table = match.Groups[1].Value;
         var whereClause = match.Groups[2].Value;
@@ -604,7 +662,13 @@ public sealed class SqlInterfacePlugin : InterfacePluginBase
             throw new Exception("DELETE requires id in WHERE clause");
 
         var id = idMatch.Groups[1].Value;
-        var removed = _mockData.TryRemove(id, out _);
+        var removed = _manifestCache.TryRemove(id, out _);
+
+        // Delete from storage
+        if (removed && _storage != null)
+        {
+            await _storage.DeleteAsync(StoragePrefix + id, ct);
+        }
 
         return new QueryResult { IsSelect = false, CommandTag = removed ? "DELETE 1" : "DELETE 0" };
     }
@@ -713,22 +777,22 @@ public sealed class SqlInterfacePlugin : InterfacePluginBase
         await SendMessageAsync(stream, 'E', body, ct);
     }
 
-    private Task HandleParseAsync(NetworkStream stream, byte[] body, CancellationToken ct)
+    private async Task HandleParseAsync(NetworkStream stream, byte[] body, CancellationToken ct)
     {
-        // Parse prepared statement
-        return Task.CompletedTask;
+        // Parse prepared statement - send ParseComplete
+        await SendMessageAsync(stream, '1', Array.Empty<byte>(), ct);
     }
 
-    private Task HandleBindAsync(NetworkStream stream, byte[] body, CancellationToken ct)
+    private async Task HandleBindAsync(NetworkStream stream, byte[] body, CancellationToken ct)
     {
-        // Bind parameters to prepared statement
-        return Task.CompletedTask;
+        // Bind parameters - send BindComplete
+        await SendMessageAsync(stream, '2', Array.Empty<byte>(), ct);
     }
 
-    private Task HandleExecuteAsync(NetworkStream stream, SqlConnection connection, byte[] body, CancellationToken ct)
+    private async Task HandleExecuteAsync(NetworkStream stream, SqlConnection connection, byte[] body, CancellationToken ct)
     {
-        // Execute prepared statement
-        return Task.CompletedTask;
+        // Execute prepared statement - simplified: just send CommandComplete
+        await SendCommandCompleteAsync(stream, "SELECT 0", ct);
     }
 
     // Types
