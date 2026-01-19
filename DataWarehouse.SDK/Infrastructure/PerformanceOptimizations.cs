@@ -1274,7 +1274,7 @@ public sealed class TieredStorageManager : IAsyncDisposable
             TierStatistics = tierStats,
             TotalObjects = _locationIndex.Count,
             TotalBytes = _locationIndex.Values.Sum(l => l.Size),
-            EstimatedMonthlyCost = tierStats.Sum(t => t.TotalBytes / (1024.0 * 1024 * 1024) * t.CostPerGbMonth)
+            EstimatedMonthlyCost = tierStats.Sum(t => (decimal)(t.TotalBytes / (1024.0 * 1024 * 1024)) * t.CostPerGbMonth)
         };
     }
 

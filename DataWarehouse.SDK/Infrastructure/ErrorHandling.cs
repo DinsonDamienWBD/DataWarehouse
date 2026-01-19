@@ -361,7 +361,7 @@ namespace DataWarehouse.SDK.Infrastructure
             // Check for path traversal attempts
             var normalizedPath = Path.GetFullPath(value!);
             var pathRoot = Path.GetPathRoot(value) ?? "/";
-            if (value.Contains("..") && !normalizedPath.StartsWith(Path.GetFullPath(pathRoot)))
+            if (value?.Contains("..") == true && !normalizedPath.StartsWith(Path.GetFullPath(pathRoot)))
             {
                 throw new DataWarehouseException(
                     ErrorCode.ValidationFailed,

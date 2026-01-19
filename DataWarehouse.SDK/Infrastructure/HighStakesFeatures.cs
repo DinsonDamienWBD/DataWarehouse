@@ -1561,11 +1561,11 @@ public sealed class AirGappedBackupManager : IAsyncDisposable
         CancellationToken ct = default)
     {
         if (!_archives.TryGetValue(archiveId, out var archive))
-            return new TapeVerificationResult { Success = false, Error = "Archive not found" };
+            return new TapeVerificationResult { Success = false, Errors = new List<string> { "Archive not found" } };
 
         var tape = await _tapeLibrary.LoadTapeAsync(archive.TapeId, ct);
         if (tape == null)
-            return new TapeVerificationResult { Success = false, Error = "Tape not available" };
+            return new TapeVerificationResult { Success = false, Errors = new List<string> { "Tape not available" } };
 
         try
         {
@@ -2184,7 +2184,7 @@ public sealed class MultiPartyComputationManager : IAsyncDisposable
             {
                 ShareId = shares[i].ShareId,
                 PartyIndex = i,
-                ShareData = shares[i].ShareData,
+                ShareData = shares[i].Data,
                 Commitment = shares[i].Commitment
             };
         }
@@ -2404,7 +2404,7 @@ public sealed class MultiPartyComputationManager : IAsyncDisposable
             shares.Add(new ShareData
             {
                 ShareId = $"{keySetId}-share-{i}",
-                ShareData = shareData,
+                Data = shareData,
                 Commitment = commitment
             });
         }

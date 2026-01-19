@@ -30,7 +30,7 @@ public sealed class DistributedTracingExporter : IAsyncDisposable
         _options = options ?? new TracingExporterOptions();
         _metrics = metrics;
 
-        _exportChannel = Channel.CreateBounded<TraceSpan>(new BoundedChannelOptions(_options.BufferSize)
+        _exportChannel = Channel.CreateBounded<DistributedTraceSpan>(new BoundedChannelOptions(_options.BufferSize)
         {
             FullMode = BoundedChannelFullMode.DropOldest
         });
@@ -64,9 +64,9 @@ public sealed class DistributedTracingExporter : IAsyncDisposable
     /// <summary>
     /// Creates a new trace span.
     /// </summary>
-    public TraceSpan StartSpan(string operationName, string? parentSpanId = null, string? traceId = null)
+    public DistributedTraceSpan StartSpan(string operationName, string? parentSpanId = null, string? traceId = null)
     {
-        return new TraceSpan
+        return new DistributedTraceSpan
         {
             TraceId = traceId ?? GenerateId(),
             SpanId = GenerateId(),
@@ -75,7 +75,7 @@ public sealed class DistributedTracingExporter : IAsyncDisposable
             ServiceName = _options.ServiceName,
             StartTime = DateTime.UtcNow,
             Tags = new Dictionary<string, string>(),
-            Logs = new List<SpanLog>()
+            Logs = new List<DistributedSpanLog>()
         };
     }
 

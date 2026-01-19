@@ -926,31 +926,31 @@ namespace DataWarehouse.SDK.Infrastructure
             ArgumentNullException.ThrowIfNull(snapshot);
 
             var results = new List<OtelMetricDataPoint>();
-            var timestamp = snapshot.Timestamp.UtcDateTime;
+            var timestamp = snapshot.Timestamp;
 
-            // Convert counters - key is name with tags, value is long count
-            foreach (var (key, value) in snapshot.Counters)
+            // Convert counters - key is name with tags, value is CounterMetric
+            foreach (var (key, counter) in snapshot.Counters)
             {
                 var (baseName, parsedTags) = ParseMetricKey(key);
                 results.Add(new OtelMetricDataPoint
                 {
                     Name = GetFullMetricName(baseName),
                     Type = OtelMetricType.Counter,
-                    Value = value,
+                    Value = counter.Value,
                     Attributes = ConvertTagsToDictionary(parsedTags),
                     Timestamp = timestamp
                 });
             }
 
-            // Convert gauges - key is name with tags, value is double gauge value
-            foreach (var (key, value) in snapshot.Gauges)
+            // Convert gauges - key is name with tags, value is GaugeMetric
+            foreach (var (key, gauge) in snapshot.Gauges)
             {
                 var (baseName, parsedTags) = ParseMetricKey(key);
                 results.Add(new OtelMetricDataPoint
                 {
                     Name = GetFullMetricName(baseName),
                     Type = OtelMetricType.Gauge,
-                    Value = value,
+                    Value = gauge.Value,
                     Attributes = ConvertTagsToDictionary(parsedTags),
                     Timestamp = timestamp
                 });
