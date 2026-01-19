@@ -1,6 +1,7 @@
 using DataWarehouse.Dashboard.Hubs;
 using DataWarehouse.Dashboard.Services;
 using DataWarehouse.Dashboard.Security;
+using DataWarehouse.Dashboard.Middleware;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.OpenApi.Models;
 
@@ -110,6 +111,9 @@ builder.Services.AddSingleton<IConfigurationService, ConfigurationService>();
 builder.Services.AddHostedService<HealthMonitorService>();
 builder.Services.AddHostedService<DashboardBroadcastService>();
 
+// Configure Rate Limiting
+builder.Services.AddRateLimiting(builder.Configuration);
+
 // Configure CORS for API access (SECURITY: Do NOT use AllowAnyOrigin in production)
 var corsOptions = new CorsOptions();
 builder.Configuration.GetSection(CorsOptions.SectionName).Bind(corsOptions);
@@ -195,6 +199,9 @@ app.UseHttpsRedirection();
 app.UseStaticFiles();
 app.UseRouting();
 app.UseCors("ConfiguredOrigins");
+
+// Rate limiting middleware (before authentication for early rejection)
+app.UseRateLimiting();
 
 // Authentication & Authorization middleware
 app.UseAuthentication();
