@@ -342,12 +342,12 @@
         _ => "bg-secondary"
     };
 
-    private string GetCircleClass(double percent) => percent switch
+    private string GetCircleClass(double percent)
     {
-        < 60 => "green",
-        < 80 => "yellow",
-        _ => "red"
-    };
+        if (percent < 60) return "green";
+        if (percent < 80) return "yellow";
+        return "red";
+    }
 
     private string FormatBytes(long bytes)
     {

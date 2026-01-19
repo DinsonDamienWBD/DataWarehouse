@@ -2,22 +2,26 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Serilog;
 using Serilog.Events;
-using DataWarehouse.Kernel;
-using DataWarehouse.SDK.Primitives;
+using DataWarehouse.Launcher.Adapters;
 
 namespace DataWarehouse.Launcher;
 
 /// <summary>
-/// DataWarehouse Production Launcher
+/// DataWarehouse Production Launcher with Plug-and-Play Adapter Pattern
 ///
-/// A lightweight, production-ready launcher that initializes and runs the DataWarehouse Kernel
-/// as a standalone process. Supports all deployment scenarios from laptops to hyperscale clusters.
+/// This launcher uses a reusable adapter pattern that can be copied to other projects.
+/// To use this pattern in your own project:
+/// 1. Copy the entire Adapters folder to your project
+/// 2. Implement IKernelAdapter for your specific kernel/service
+/// 3. Register your adapter with AdapterFactory
+/// 4. Use AdapterRunner to execute your application
 ///
 /// Usage:
 ///   DataWarehouse.Launcher [options]
 ///
 /// Options:
 ///   --mode <mode>           Operating mode: Laptop, Workstation, Server, Hyperscale (default: Workstation)
+///   --adapter <type>        Adapter type to use (default: DataWarehouse)
 ///   --kernel-id <id>        Unique kernel identifier (default: auto-generated)
 ///   --plugin-path <path>    Path to plugins directory (default: ./plugins)
 ///   --config <path>         Path to configuration file (default: appsettings.json)
@@ -28,10 +32,6 @@ namespace DataWarehouse.Launcher;
 /// </summary>
 public static class Program
 {
-    private static DataWarehouseKernel? _kernel;
-    private static readonly CancellationTokenSource _cts = new();
-    private static ILogger<DataWarehouseKernel>? _logger;
-
     public static async Task<int> Main(string[] args)
     {
         // Setup configuration from multiple sources
@@ -47,24 +47,37 @@ public static class Program
         var options = LauncherOptions.FromConfiguration(configuration);
 
         // Setup logging
-        SetupLogging(options);
+        var loggerFactory = SetupLogging(options);
 
         // Display banner
         DisplayBanner(options);
 
+        // Register adapters
+        RegisterAdapters();
+
+        // Create the runner
+        await using var runner = new AdapterRunner(loggerFactory);
+
         // Setup graceful shutdown handlers
-        SetupShutdownHandlers();
+        SetupShutdownHandlers(runner);
 
         try
         {
-            // Initialize and run the kernel
-            await RunKernelAsync(options, _cts.Token);
-            return 0;
-        }
-        catch (OperationCanceledException)
-        {
-            Log.Information("DataWarehouse shutdown requested");
-            return 0;
+            // Convert to adapter options
+            var adapterOptions = new AdapterOptions
+            {
+                KernelId = options.KernelId,
+                OperatingMode = options.Mode,
+                PluginPath = options.PluginPath,
+                ConfigPath = options.ConfigPath,
+                LoggerFactory = loggerFactory
+            };
+
+            // Run the adapter
+            var result = await runner.RunAsync(adapterOptions, options.AdapterType);
+
+            Log.Information("DataWarehouse shutdown complete");
+            return result;
         }
         catch (Exception ex)
         {
@@ -77,7 +90,23 @@ public static class Program
         }
     }
 
-    private static void SetupLogging(LauncherOptions options)
+    /// <summary>
+    /// Registers all available adapters with the factory.
+    /// Add custom adapters here or load them dynamically from plugins.
+    /// </summary>
+    private static void RegisterAdapters()
+    {
+        // Register the DataWarehouse adapter as default
+        AdapterFactory.Register<DataWarehouseAdapter>("DataWarehouse");
+        AdapterFactory.SetDefault("DataWarehouse");
+
+        // Additional adapters can be registered here:
+        // AdapterFactory.Register("CustomKernel", () => new CustomKernelAdapter());
+
+        Log.Debug("Registered adapters: {Types}", string.Join(", ", AdapterFactory.GetRegisteredTypes()));
+    }
+
+    private static ILoggerFactory SetupLogging(LauncherOptions options)
     {
         var logConfig = new LoggerConfiguration()
             .MinimumLevel.Is(options.LogLevel)
@@ -103,12 +132,10 @@ public static class Program
 
         Log.Logger = logConfig.CreateLogger();
 
-        var loggerFactory = LoggerFactory.Create(builder =>
+        return LoggerFactory.Create(builder =>
         {
             builder.AddSerilog(Log.Logger);
         });
-
-        _logger = loggerFactory.CreateLogger<DataWarehouseKernel>();
     }
 
     private static void DisplayBanner(LauncherOptions options)
@@ -125,31 +152,25 @@ public static class Program
         Console.ResetColor();
 
         Console.WriteLine($"  Version 1.0.0 | .NET {Environment.Version}");
-        Console.WriteLine($"  Mode: {options.Mode} | Kernel ID: {options.KernelId}");
+        Console.WriteLine($"  Mode: {options.Mode} | Adapter: {options.AdapterType} | Kernel ID: {options.KernelId}");
         Console.WriteLine();
     }
 
-    private static void SetupShutdownHandlers()
+    private static void SetupShutdownHandlers(AdapterRunner runner)
     {
         // Handle Ctrl+C (SIGINT)
         Console.CancelKeyPress += (_, e) =>
         {
             e.Cancel = true;
             Log.Information("Shutdown signal received (Ctrl+C)");
-            _cts.Cancel();
+            runner.RequestShutdown();
         };
 
         // Handle process termination (SIGTERM on Linux/macOS)
         AppDomain.CurrentDomain.ProcessExit += (_, _) =>
         {
             Log.Information("Process exit requested");
-            _cts.Cancel();
-
-            // Give kernel time to shutdown gracefully
-            if (_kernel != null)
-            {
-                _kernel.DisposeAsync().AsTask().Wait(TimeSpan.FromSeconds(30));
-            }
+            runner.RequestShutdown();
         };
 
         // Handle unhandled exceptions
@@ -165,56 +186,6 @@ public static class Program
             e.SetObserved();
         };
     }
-
-    private static async Task RunKernelAsync(LauncherOptions options, CancellationToken cancellationToken)
-    {
-        Log.Information("Initializing DataWarehouse Kernel...");
-        Log.Information("Operating Mode: {Mode}", options.Mode);
-        Log.Information("Plugin Path: {PluginPath}", options.PluginPath);
-
-        // Build and initialize the kernel
-        var builder = KernelBuilder.Create()
-            .WithKernelId(options.KernelId)
-            .WithOperatingMode(options.Mode);
-
-        if (!string.IsNullOrEmpty(options.PluginPath))
-        {
-            builder.WithPluginPath(options.PluginPath);
-        }
-
-        _kernel = await builder.BuildAndInitializeAsync(cancellationToken);
-
-        Log.Information("DataWarehouse Kernel initialized successfully");
-        Log.Information("Kernel ID: {KernelId}", _kernel.KernelId);
-        Log.Information("Plugins loaded: {PluginCount}", _kernel.Plugins.GetAllPlugins().Count());
-
-        // Print loaded plugins
-        foreach (var plugin in _kernel.Plugins.GetAllPlugins())
-        {
-            Log.Debug("  Plugin: {PluginId} ({Category})", plugin.PluginId, plugin.Category);
-        }
-
-        Log.Information("DataWarehouse is now running. Press Ctrl+C to shutdown.");
-        Console.WriteLine();
-
-        // Keep running until cancellation
-        try
-        {
-            await Task.Delay(Timeout.Infinite, cancellationToken);
-        }
-        catch (OperationCanceledException)
-        {
-            // Expected on shutdown
-        }
-
-        // Graceful shutdown
-        Log.Information("Initiating graceful shutdown...");
-
-        await _kernel.DisposeAsync();
-        _kernel = null;
-
-        Log.Information("DataWarehouse shutdown complete");
-    }
 }
 
 /// <summary>
@@ -223,9 +194,14 @@ public static class Program
 public sealed class LauncherOptions
 {
     /// <summary>
+    /// Adapter type to use.
+    /// </summary>
+    public string AdapterType { get; set; } = "DataWarehouse";
+
+    /// <summary>
     /// Operating mode (Laptop, Workstation, Server, Hyperscale).
     /// </summary>
-    public OperatingMode Mode { get; set; } = OperatingMode.Workstation;
+    public string Mode { get; set; } = "Workstation";
 
     /// <summary>
     /// Unique kernel identifier.
@@ -236,6 +212,11 @@ public sealed class LauncherOptions
     /// Path to plugins directory.
     /// </summary>
     public string PluginPath { get; set; } = "./plugins";
+
+    /// <summary>
+    /// Path to configuration file.
+    /// </summary>
+    public string? ConfigPath { get; set; }
 
     /// <summary>
     /// Log level.
@@ -259,11 +240,18 @@ public sealed class LauncherOptions
     {
         var options = new LauncherOptions();
 
+        // Parse adapter type
+        var adapterType = configuration["adapter"] ?? configuration["Adapter"] ?? configuration["Kernel:Adapter"];
+        if (!string.IsNullOrEmpty(adapterType))
+        {
+            options.AdapterType = adapterType;
+        }
+
         // Parse mode
         var modeStr = configuration["mode"] ?? configuration["Mode"] ?? configuration["Kernel:Mode"];
-        if (!string.IsNullOrEmpty(modeStr) && Enum.TryParse<OperatingMode>(modeStr, ignoreCase: true, out var mode))
+        if (!string.IsNullOrEmpty(modeStr))
         {
-            options.Mode = mode;
+            options.Mode = modeStr;
         }
 
         // Parse kernel ID
@@ -278,6 +266,13 @@ public sealed class LauncherOptions
         if (!string.IsNullOrEmpty(pluginPath))
         {
             options.PluginPath = pluginPath;
+        }
+
+        // Parse config path
+        var configPath = configuration["config"] ?? configuration["ConfigPath"];
+        if (!string.IsNullOrEmpty(configPath))
+        {
+            options.ConfigPath = configPath;
         }
 
         // Parse log level

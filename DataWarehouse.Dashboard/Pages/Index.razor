@@ -313,12 +313,12 @@
         _ => "badge bg-secondary"
     };
 
-    private string GetProgressBarClass(double percent) => percent switch
+    private string GetProgressBarClass(double percent)
     {
-        < 60 => "bg-success",
-        < 80 => "bg-warning",
-        _ => "bg-danger"
-    };
+        if (percent < 60) return "bg-success";
+        if (percent < 80) return "bg-warning";
+        return "bg-danger";
+    }
 
     private string GetAlertClass(AlertSeverity severity) => severity switch
     {
