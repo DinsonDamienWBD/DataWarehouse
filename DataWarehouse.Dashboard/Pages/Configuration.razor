@@ -1,0 +1,444 @@
+@page "/configuration"
+@inject IConfigurationService ConfigService
+
+<PageTitle>Configuration - DataWarehouse</PageTitle>
+
+<div class="mb-4">
+    <h4 class="mb-0">Configuration</h4>
+    <small class="text-muted">Manage system settings, security policies, and tenant configurations</small>
+</div>
+
+<!-- Tabs -->
+<ul class="nav nav-tabs mb-4">
+    <li class="nav-item">
+        <button class="nav-link @(_activeTab == "system" ? "active" : "")" @onclick='() => _activeTab = "system"'>
+            <i class="bi bi-gear me-1"></i> System
+        </button>
+    </li>
+    <li class="nav-item">
+        <button class="nav-link @(_activeTab == "security" ? "active" : "")" @onclick='() => _activeTab = "security"'>
+            <i class="bi bi-shield-lock me-1"></i> Security
+        </button>
+    </li>
+    <li class="nav-item">
+        <button class="nav-link @(_activeTab == "tenants" ? "active" : "")" @onclick='() => _activeTab = "tenants"'>
+            <i class="bi bi-people me-1"></i> Tenants
+        </button>
+    </li>
+</ul>
+
+<!-- System Configuration -->
+@if (_activeTab == "system")
+{
+    <div class="card border-0 shadow-sm">
+        <div class="card-header bg-white">
+            <h5 class="mb-0">System Configuration</h5>
+        </div>
+        <div class="card-body">
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <label class="form-label">Instance Name</label>
+                    <input type="text" class="form-control" @bind="_systemConfig.InstanceName" />
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">Environment</label>
+                    <select class="form-select" @bind="_systemConfig.Environment">
+                        <option value="Development">Development</option>
+                        <option value="Staging">Staging</option>
+                        <option value="Production">Production</option>
+                    </select>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">Data Directory</label>
+                    <input type="text" class="form-control" @bind="_systemConfig.DataDirectory" />
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">Log Directory</label>
+                    <input type="text" class="form-control" @bind="_systemConfig.LogDirectory" />
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">Max Concurrent Operations</label>
+                    <input type="number" class="form-control" @bind="_systemConfig.MaxConcurrentOperations" />
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">Max Storage Size (GB)</label>
+                    <input type="number" class="form-control" @bind="_maxStorageGb" />
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">Backup Retention (Days)</label>
+                    <input type="number" class="form-control" @bind="_systemConfig.BackupRetentionDays" />
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">Health Check Interval (Minutes)</label>
+                    <input type="number" class="form-control" @bind="_healthCheckMinutes" />
+                </div>
+                <div class="col-12">
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" @bind="_systemConfig.EnableTelemetry" />
+                        <label class="form-check-label">Enable Telemetry</label>
+                    </div>
+                </div>
+                <div class="col-12">
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" @bind="_systemConfig.EnableAutoBackup" />
+                        <label class="form-check-label">Enable Auto Backup</label>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="card-footer bg-white">
+            <button class="btn btn-primary" @onclick="SaveSystemConfig">
+                <i class="bi bi-check-lg me-1"></i> Save Changes
+            </button>
+        </div>
+    </div>
+}
+
+<!-- Security Policies -->
+@if (_activeTab == "security")
+{
+    <div class="card border-0 shadow-sm">
+        <div class="card-header bg-white">
+            <h5 class="mb-0">Security Policies</h5>
+        </div>
+        <div class="card-body">
+            <h6 class="text-muted mb-3">Authentication</h6>
+            <div class="row g-3 mb-4">
+                <div class="col-md-6">
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" @bind="_securityPolicies.RequireAuthentication" />
+                        <label class="form-check-label">Require Authentication</label>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" @bind="_securityPolicies.RequireMfa" />
+                        <label class="form-check-label">Require MFA</label>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">Max Failed Login Attempts</label>
+                    <input type="number" class="form-control" @bind="_securityPolicies.MaxFailedLoginAttempts" />
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">Lockout Duration (Minutes)</label>
+                    <input type="number" class="form-control" @bind="_lockoutMinutes" />
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">Session Timeout (Hours)</label>
+                    <input type="number" class="form-control" @bind="_sessionTimeoutHours" />
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">Token Expiration (Hours)</label>
+                    <input type="number" class="form-control" @bind="_tokenExpirationHours" />
+                </div>
+            </div>
+
+            <h6 class="text-muted mb-3">Password Policy</h6>
+            <div class="row g-3 mb-4">
+                <div class="col-md-6">
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" @bind="_securityPolicies.EnforcePasswordComplexity" />
+                        <label class="form-check-label">Enforce Password Complexity</label>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">Minimum Password Length</label>
+                    <input type="number" class="form-control" @bind="_securityPolicies.MinPasswordLength" />
+                </div>
+            </div>
+
+            <h6 class="text-muted mb-3">Transport Security</h6>
+            <div class="row g-3 mb-4">
+                <div class="col-md-6">
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" @bind="_securityPolicies.RequireHttps" />
+                        <label class="form-check-label">Require HTTPS</label>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" @bind="_securityPolicies.EnableEncryptionInTransit" />
+                        <label class="form-check-label">Enable Encryption in Transit</label>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" @bind="_securityPolicies.EnableEncryptionAtRest" />
+                        <label class="form-check-label">Enable Encryption at Rest</label>
+                    </div>
+                </div>
+            </div>
+
+            <h6 class="text-muted mb-3">Rate Limiting</h6>
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" @bind="_securityPolicies.EnableRateLimiting" />
+                        <label class="form-check-label">Enable Rate Limiting</label>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">Max Requests per Minute</label>
+                    <input type="number" class="form-control" @bind="_securityPolicies.MaxRequestsPerMinute" />
+                </div>
+            </div>
+        </div>
+        <div class="card-footer bg-white">
+            <button class="btn btn-primary" @onclick="SaveSecurityPolicies">
+                <i class="bi bi-check-lg me-1"></i> Save Changes
+            </button>
+        </div>
+    </div>
+}
+
+<!-- Tenants -->
+@if (_activeTab == "tenants")
+{
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h5 class="mb-0">Tenants</h5>
+        <button class="btn btn-primary btn-sm" @onclick="ShowCreateTenantModal">
+            <i class="bi bi-plus-lg me-1"></i> Add Tenant
+        </button>
+    </div>
+
+    <div class="card border-0 shadow-sm">
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Tenant ID</th>
+                            <th>Name</th>
+                            <th>Status</th>
+                            <th>Storage Quota</th>
+                            <th>Created</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var tenant in _tenants)
+                        {
+                            <tr>
+                                <td><code>@tenant.TenantId</code></td>
+                                <td>@tenant.Name</td>
+                                <td>
+                                    @if (tenant.IsEnabled)
+                                    {
+                                        <span class="badge bg-success">Active</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="badge bg-secondary">Disabled</span>
+                                    }
+                                </td>
+                                <td>@FormatBytes(tenant.Quotas.MaxStorageBytes)</td>
+                                <td class="small text-muted">@tenant.CreatedAt.ToString("yyyy-MM-dd")</td>
+                                <td>
+                                    <button class="btn btn-sm btn-outline-primary me-1" @onclick="() => EditTenant(tenant)">
+                                        <i class="bi bi-pencil"></i>
+                                    </button>
+                                    <button class="btn btn-sm btn-outline-danger" @onclick="() => DeleteTenant(tenant.TenantId)">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+}
+
+<!-- Tenant Modal -->
+@if (_showTenantModal)
+{
+    <div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">@(_editingTenant == null ? "Create" : "Edit") Tenant</h5>
+                    <button type="button" class="btn-close" @onclick="CloseModal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Tenant ID</label>
+                        <input type="text" class="form-control" @bind="_tenantForm.TenantId" disabled="@(_editingTenant != null)" />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Name</label>
+                        <input type="text" class="form-control" @bind="_tenantForm.Name" />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Description</label>
+                        <textarea class="form-control" @bind="_tenantForm.Description"></textarea>
+                    </div>
+                    <div class="mb-3">
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" @bind="_tenantForm.IsEnabled" />
+                            <label class="form-check-label">Enabled</label>
+                        </div>
+                    </div>
+                    <hr />
+                    <h6>Quotas</h6>
+                    <div class="mb-3">
+                        <label class="form-label">Max Storage (GB)</label>
+                        <input type="number" class="form-control" @bind="_tenantQuotaStorageGb" />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Max Operations/Hour</label>
+                        <input type="number" class="form-control" @bind="_tenantForm.Quotas.MaxOperationsPerHour" />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Max Connections</label>
+                        <input type="number" class="form-control" @bind="_tenantForm.Quotas.MaxConcurrentConnections" />
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" @onclick="CloseModal">Cancel</button>
+                    <button type="button" class="btn btn-primary" @onclick="SaveTenant">Save</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@if (_showSuccessMessage)
+{
+    <div class="position-fixed bottom-0 end-0 p-3" style="z-index: 1050;">
+        <div class="toast show" role="alert">
+            <div class="toast-header bg-success text-white">
+                <strong class="me-auto">Success</strong>
+                <button type="button" class="btn-close btn-close-white" @onclick="() => _showSuccessMessage = false"></button>
+            </div>
+            <div class="toast-body">
+                Configuration saved successfully.
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private string _activeTab = "system";
+    private SystemConfiguration _systemConfig = new();
+    private SecurityPolicySettings _securityPolicies = new();
+    private List<TenantConfiguration> _tenants = new();
+    private bool _showTenantModal;
+    private TenantConfiguration? _editingTenant;
+    private TenantConfiguration _tenantForm = new();
+    private bool _showSuccessMessage;
+
+    // Helper bindings
+    private long _maxStorageGb;
+    private int _healthCheckMinutes;
+    private int _lockoutMinutes;
+    private int _sessionTimeoutHours;
+    private int _tokenExpirationHours;
+    private long _tenantQuotaStorageGb;
+
+    protected override void OnInitialized()
+    {
+        LoadData();
+    }
+
+    private void LoadData()
+    {
+        _systemConfig = ConfigService.GetSystemConfiguration();
+        _securityPolicies = ConfigService.GetSecurityPolicies();
+        _tenants = ConfigService.GetTenants().ToList();
+
+        _maxStorageGb = _systemConfig.MaxStorageSizeBytes / (1024L * 1024 * 1024);
+        _healthCheckMinutes = (int)_systemConfig.HealthCheckInterval.TotalMinutes;
+        _lockoutMinutes = (int)_securityPolicies.LockoutDuration.TotalMinutes;
+        _sessionTimeoutHours = (int)_securityPolicies.SessionTimeout.TotalHours;
+        _tokenExpirationHours = (int)_securityPolicies.TokenExpiration.TotalHours;
+    }
+
+    private async Task SaveSystemConfig()
+    {
+        _systemConfig.MaxStorageSizeBytes = _maxStorageGb * 1024L * 1024 * 1024;
+        _systemConfig.HealthCheckInterval = TimeSpan.FromMinutes(_healthCheckMinutes);
+        await ConfigService.UpdateSystemConfigurationAsync(_systemConfig);
+        ShowSuccess();
+    }
+
+    private async Task SaveSecurityPolicies()
+    {
+        _securityPolicies.LockoutDuration = TimeSpan.FromMinutes(_lockoutMinutes);
+        _securityPolicies.SessionTimeout = TimeSpan.FromHours(_sessionTimeoutHours);
+        _securityPolicies.TokenExpiration = TimeSpan.FromHours(_tokenExpirationHours);
+        await ConfigService.UpdateSecurityPoliciesAsync(_securityPolicies);
+        ShowSuccess();
+    }
+
+    private void ShowCreateTenantModal()
+    {
+        _editingTenant = null;
+        _tenantForm = new TenantConfiguration { Quotas = new TenantQuotas() };
+        _tenantQuotaStorageGb = 10;
+        _showTenantModal = true;
+    }
+
+    private void EditTenant(TenantConfiguration tenant)
+    {
+        _editingTenant = tenant;
+        _tenantForm = new TenantConfiguration
+        {
+            TenantId = tenant.TenantId,
+            Name = tenant.Name,
+            Description = tenant.Description,
+            IsEnabled = tenant.IsEnabled,
+            Quotas = new TenantQuotas
+            {
+                MaxStorageBytes = tenant.Quotas.MaxStorageBytes,
+                MaxOperationsPerHour = tenant.Quotas.MaxOperationsPerHour,
+                MaxConcurrentConnections = tenant.Quotas.MaxConcurrentConnections,
+                MaxDatabases = tenant.Quotas.MaxDatabases,
+                MaxUsers = tenant.Quotas.MaxUsers
+            }
+        };
+        _tenantQuotaStorageGb = tenant.Quotas.MaxStorageBytes / (1024L * 1024 * 1024);
+        _showTenantModal = true;
+    }
+
+    private async Task SaveTenant()
+    {
+        _tenantForm.Quotas.MaxStorageBytes = _tenantQuotaStorageGb * 1024L * 1024 * 1024;
+        await ConfigService.SaveTenantAsync(_tenantForm);
+        _tenants = ConfigService.GetTenants().ToList();
+        CloseModal();
+        ShowSuccess();
+    }
+
+    private async Task DeleteTenant(string tenantId)
+    {
+        await ConfigService.DeleteTenantAsync(tenantId);
+        _tenants = ConfigService.GetTenants().ToList();
+    }
+
+    private void CloseModal()
+    {
+        _showTenantModal = false;
+        _editingTenant = null;
+    }
+
+    private void ShowSuccess()
+    {
+        _showSuccessMessage = true;
+        Task.Delay(3000).ContinueWith(_ =>
+        {
+            _showSuccessMessage = false;
+            InvokeAsync(StateHasChanged);
+        });
+    }
+
+    private string FormatBytes(long bytes)
+    {
+        string[] sizes = { "B", "KB", "MB", "GB", "TB" };
+        int order = 0;
+        double size = bytes;
+        while (size >= 1024 && order < sizes.Length - 1) { order++; size /= 1024; }
+        return $"{size:F0} {sizes[order]}";
+    }
+}
