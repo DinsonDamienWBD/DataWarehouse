@@ -10,6 +10,11 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="MongoDB.Driver" Version="3.6.0" />
+    <PackageReference Include="StackExchange.Redis" Version="2.10.1" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\..\DataWarehouse.SDK\DataWarehouse.SDK.csproj" />
   </ItemGroup>
 

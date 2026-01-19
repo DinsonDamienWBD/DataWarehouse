@@ -9,6 +9,13 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="Anthropic" Version="12.2.0" />
+    <PackageReference Include="AWSSDK.BedrockAgentRuntime" Version="4.0.8.6" />
+    <PackageReference Include="Google.Cloud.AIPlatform.V1" Version="3.60.0" />
+    <PackageReference Include="OpenAI" Version="2.8.0" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\..\DataWarehouse.SDK\DataWarehouse.SDK.csproj" />
   </ItemGroup>
 

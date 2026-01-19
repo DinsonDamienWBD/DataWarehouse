@@ -10,6 +10,10 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="AWSSDK.S3" Version="4.0.17.2" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\..\DataWarehouse.SDK\DataWarehouse.SDK.csproj" />
   </ItemGroup>
 
