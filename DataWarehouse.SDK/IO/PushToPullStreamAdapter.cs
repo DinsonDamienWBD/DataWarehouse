@@ -58,7 +58,11 @@ namespace DataWarehouse.SDK.IO
             {
                 _cts.Cancel();
                 _pipeReaderStream.Dispose();
-                try { _pumpingTask.Wait(500); } catch { }
+                try { _pumpingTask.Wait(500); }
+                catch
+                {
+                    // Best-effort task completion during disposal - pumping may have already failed or been cancelled
+                }
             }
             base.Dispose(disposing);
         }

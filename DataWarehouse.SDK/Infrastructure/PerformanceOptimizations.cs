@@ -1044,14 +1044,20 @@ public sealed class WriteBehindCache : IAsyncDisposable
         {
             await Task.WhenAll(_flushTask, _batchTask).WaitAsync(TimeSpan.FromSeconds(30));
         }
-        catch (OperationCanceledException) { }
+        catch (OperationCanceledException)
+        {
+            // Expected during graceful shutdown - tasks were cancelled
+        }
 
         // Final flush
         try
         {
             await FlushAllAsync(CancellationToken.None);
         }
-        catch { }
+        catch
+        {
+            // Best-effort final flush during disposal - data loss is acceptable at shutdown
+        }
 
         _cts.Dispose();
         _flushLock.Dispose();
@@ -1466,7 +1472,10 @@ public sealed class TieredStorageManager : IAsyncDisposable
         {
             await _migrationTask.WaitAsync(TimeSpan.FromSeconds(30));
         }
-        catch (OperationCanceledException) { }
+        catch (OperationCanceledException)
+        {
+            // Expected during graceful shutdown - migration task was cancelled
+        }
 
         _cts.Dispose();
     }

@@ -299,7 +299,10 @@
             _alerts = HealthService.GetAlerts(false).ToList();
             await InvokeAsync(StateHasChanged);
         }
-        catch { }
+        catch
+        {
+            // Silently ignore refresh failures - UI will show stale data until next successful refresh
+        }
     }
 
     private async Task AcknowledgeAlert(string alertId)

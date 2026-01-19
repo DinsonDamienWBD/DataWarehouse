@@ -393,7 +393,11 @@ public sealed class AuditLogger : IAsyncDisposable
     {
         _eventChannel.Writer.Complete();
         _cts.Cancel();
-        try { await _processingTask; } catch { }
+        try { await _processingTask; }
+        catch
+        {
+            // Best-effort task completion during disposal - ignore cancellation/errors
+        }
         _cts.Dispose();
     }
 }
@@ -576,7 +580,11 @@ public sealed class SlaMonitor : IAsyncDisposable
     {
         _violationChannel.Writer.Complete();
         _cts.Cancel();
-        try { await _monitoringTask; } catch { }
+        try { await _monitoringTask; }
+        catch
+        {
+            // Best-effort task completion during disposal - ignore cancellation/errors
+        }
         _cts.Dispose();
     }
 
@@ -761,7 +769,11 @@ public sealed class AdaptiveLoadBalancer : IAsyncDisposable
     public async ValueTask DisposeAsync()
     {
         _cts.Cancel();
-        try { await _healthCheckTask; } catch { }
+        try { await _healthCheckTask; }
+        catch
+        {
+            // Best-effort task completion during disposal - ignore cancellation/errors
+        }
         _cts.Dispose();
     }
 }
@@ -960,7 +972,11 @@ public sealed class HorizontalScalingCoordinator : IAsyncDisposable
     {
         _eventChannel.Writer.Complete();
         _cts.Cancel();
-        try { await _processingTask; } catch { }
+        try { await _processingTask; }
+        catch
+        {
+            // Best-effort task completion during disposal - ignore cancellation/errors
+        }
         _cts.Dispose();
     }
 }
@@ -1082,7 +1098,11 @@ public sealed class SelfHealingSystem : IAsyncDisposable
     {
         _incidentChannel.Writer.Complete();
         _cts.Cancel();
-        try { await Task.WhenAll(_monitoringTask, _healingTask); } catch { }
+        try { await Task.WhenAll(_monitoringTask, _healingTask); }
+        catch
+        {
+            // Best-effort task completion during disposal - ignore cancellation/errors
+        }
         _cts.Dispose();
     }
 }

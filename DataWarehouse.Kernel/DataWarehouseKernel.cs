@@ -443,7 +443,10 @@ namespace DataWarehouse.Kernel
                     }
                 });
             }
-            catch { }
+            catch
+            {
+                // Best-effort shutdown notification - ignore failures during disposal
+            }
 
             // Stop all feature plugins
             foreach (var feature in _registry.GetPlugins<IFeaturePlugin>())
