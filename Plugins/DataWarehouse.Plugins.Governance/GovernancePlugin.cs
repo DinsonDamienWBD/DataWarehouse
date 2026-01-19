@@ -1,6 +1,7 @@
 using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Governance;
 using DataWarehouse.SDK.Primitives;
+using DataWarehouse.SDK.Utilities;
 using System.Collections.Concurrent;
 using System.Text;
 using System.Text.RegularExpressions;
