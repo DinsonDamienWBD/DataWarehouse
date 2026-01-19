@@ -4,11 +4,11 @@ using System.Diagnostics;
 namespace DataWarehouse.Kernel.Infrastructure
 {
     /// <summary>
-    /// Production-ready health check system for the kernel.
+    /// Basic health check system for the kernel.
     /// Supports liveness, readiness, and component health checks.
     /// Essential for Kubernetes, load balancers, and orchestration systems.
     /// </summary>
-    public class HealthCheckManager : IDisposable
+    public class BasicHealthCheckManager : IDisposable
     {
         private readonly ConcurrentDictionary<string, IHealthCheck> _checks = new();
         private readonly ConcurrentDictionary<string, HealthCheckResult> _lastResults = new();
@@ -29,7 +29,7 @@ namespace DataWarehouse.Kernel.Infrastructure
         /// </summary>
         public TimeSpan Uptime => DateTime.UtcNow - _startTime;
 
-        public HealthCheckManager(IKernelContext context, HealthCheckConfig? config = null)
+        public BasicHealthCheckManager(IKernelContext context, HealthCheckConfig? config = null)
         {
             _context = context ?? throw new ArgumentNullException(nameof(context));
             _config = config ?? new HealthCheckConfig();

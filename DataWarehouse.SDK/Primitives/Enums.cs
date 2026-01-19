@@ -66,7 +66,12 @@ namespace DataWarehouse.SDK.Primitives
         /// <summary>
         /// Serialization providers (JSON, MessagePack, Protobuf).
         /// </summary>
-        SerializationProvider
+        SerializationProvider,
+
+        /// <summary>
+        /// Interface providers for external access (REST, gRPC, SQL, WebSocket).
+        /// </summary>
+        InterfaceProvider
     }
 
     /// <summary>

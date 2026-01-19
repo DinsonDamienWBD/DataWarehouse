@@ -289,7 +289,7 @@ public sealed class TieringPlugin : TieredStoragePluginBase
     }
 
     // Storage operations (delegated to underlying storage)
-    public override Task SaveAsync(Uri uri, Stream data, CancellationToken ct = default)
+    public override Task SaveAsync(Uri uri, Stream data)
     {
         var id = uri.AbsolutePath.TrimStart('/');
         _tierAssignments[id] = new DataTierInfo
@@ -301,14 +301,14 @@ public sealed class TieringPlugin : TieredStoragePluginBase
         return Task.CompletedTask;
     }
 
-    public override Task<Stream> LoadAsync(Uri uri, CancellationToken ct = default)
+    public override Task<Stream> LoadAsync(Uri uri)
     {
         var id = uri.AbsolutePath.TrimStart('/');
         RecordAccess(id);
         return Task.FromResult<Stream>(Stream.Null);
     }
 
-    public override Task DeleteAsync(Uri uri, CancellationToken ct = default)
+    public override Task DeleteAsync(Uri uri)
     {
         var id = uri.AbsolutePath.TrimStart('/');
         _tierAssignments.TryRemove(id, out _);
@@ -316,7 +316,7 @@ public sealed class TieringPlugin : TieredStoragePluginBase
         return Task.CompletedTask;
     }
 
-    public override Task<bool> ExistsAsync(Uri uri, CancellationToken ct = default)
+    public override Task<bool> ExistsAsync(Uri uri)
     {
         var id = uri.AbsolutePath.TrimStart('/');
         return Task.FromResult(_tierAssignments.ContainsKey(id));

@@ -203,7 +203,7 @@ public sealed class SqliteIndexingPlugin : MetadataIndexPluginBase
             return MessageResponse.Error("Missing SQL query");
 
         var sql = sqlObj.ToString()!;
-        var results = await ExecuteQueryAsync(sql);
+        var results = await ExecuteDetailedQueryAsync(sql);
         return MessageResponse.Success(new { rows = results });
     }
 
@@ -249,7 +249,7 @@ public sealed class SqliteIndexingPlugin : MetadataIndexPluginBase
             ManifestId = manifest.Id,
             Name = manifest.Name,
             ContentType = manifest.ContentType,
-            Tags = manifest.Tags?.ToList() ?? new List<string>(),
+            Tags = manifest.Tags?.Keys.ToList() ?? new List<string>(),
             Metadata = manifest.Metadata ?? new Dictionary<string, string>(),
             SizeBytes = manifest.TotalSize,
             IndexedAt = DateTime.UtcNow,
@@ -345,7 +345,7 @@ public sealed class SqliteIndexingPlugin : MetadataIndexPluginBase
                 Id = indexed.ManifestId,
                 Name = indexed.Name,
                 ContentType = indexed.ContentType,
-                Tags = indexed.Tags,
+                Tags = indexed.Tags.ToDictionary(t => t, t => string.Empty),
                 Metadata = indexed.Metadata,
                 TotalSize = indexed.SizeBytes
             };
@@ -379,7 +379,7 @@ public sealed class SqliteIndexingPlugin : MetadataIndexPluginBase
                 Id = indexed.ManifestId,
                 Name = indexed.Name,
                 ContentType = indexed.ContentType,
-                Tags = indexed.Tags,
+                Tags = indexed.Tags.ToDictionary(t => t, t => string.Empty),
                 Metadata = indexed.Metadata,
                 TotalSize = indexed.SizeBytes
             });
@@ -411,7 +411,21 @@ public sealed class SqliteIndexingPlugin : MetadataIndexPluginBase
     /// <summary>
     /// Executes a SQL-like query against the index.
     /// </summary>
-    public override Task<IEnumerable<Dictionary<string, object>>> ExecuteQueryAsync(string query)
+    public override Task<string[]> ExecuteQueryAsync(string query, int limit)
+    {
+        // Return matching IDs
+        var results = _index.Values
+            .Take(limit)
+            .Select(m => m.ManifestId)
+            .ToArray();
+
+        return Task.FromResult(results);
+    }
+
+    /// <summary>
+    /// Executes a SQL-like query and returns detailed results.
+    /// </summary>
+    public Task<IEnumerable<Dictionary<string, object>>> ExecuteDetailedQueryAsync(string query)
     {
         // Simple query parser for demonstration
         // In production, would use a proper SQL parser

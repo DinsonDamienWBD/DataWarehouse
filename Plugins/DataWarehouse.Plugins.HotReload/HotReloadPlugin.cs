@@ -798,10 +798,14 @@ namespace DataWarehouse.Plugins.HotReload
             {
                 if (plugin is IStatefulPlugin stateful)
                 {
-                    var stateObj = JsonSerializer.Deserialize<Dictionary<string, object>>(state);
+                    var stateObj = JsonSerializer.Deserialize<Dictionary<string, object?>>(state);
                     if (stateObj != null)
                     {
-                        await stateful.SetStateAsync(stateObj);
+                        // Convert to non-nullable dictionary for interface compatibility
+                        var nonNullableState = stateObj
+                            .Where(kv => kv.Value != null)
+                            .ToDictionary(kv => kv.Key, kv => kv.Value!);
+                        await stateful.SetStateAsync(nonNullableState);
                     }
                     return;
                 }

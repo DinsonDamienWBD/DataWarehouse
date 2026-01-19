@@ -186,7 +186,7 @@ public sealed class DatabaseIndexingPlugin : MetadataIndexPluginBase
         if (!message.Payload.TryGetValue("sql", out var sqlObj))
             return MessageResponse.Error("Missing SQL query");
 
-        var results = await ExecuteQueryAsync(sqlObj.ToString()!);
+        var results = await ExecuteDetailedQueryAsync(sqlObj.ToString()!);
         return MessageResponse.Success(new { rows = results });
     }
 
@@ -197,7 +197,7 @@ public sealed class DatabaseIndexingPlugin : MetadataIndexPluginBase
             Id = manifest.Id,
             Name = manifest.Name,
             ContentType = manifest.ContentType,
-            Tags = manifest.Tags?.ToList() ?? new List<string>(),
+            Tags = manifest.Tags?.Keys.ToList() ?? new List<string>(),
             Metadata = manifest.Metadata ?? new Dictionary<string, string>(),
             SizeBytes = manifest.TotalSize,
             IndexedAt = DateTime.UtcNow,
@@ -265,7 +265,7 @@ public sealed class DatabaseIndexingPlugin : MetadataIndexPluginBase
                 Id = record.Id,
                 Name = record.Name,
                 ContentType = record.ContentType,
-                Tags = record.Tags,
+                Tags = record.Tags.ToDictionary(t => t, t => string.Empty),
                 Metadata = record.Metadata,
                 TotalSize = record.SizeBytes
             };
@@ -292,7 +292,7 @@ public sealed class DatabaseIndexingPlugin : MetadataIndexPluginBase
                 Id = record.Id,
                 Name = record.Name,
                 ContentType = record.ContentType,
-                Tags = record.Tags,
+                Tags = record.Tags.ToDictionary(t => t, t => string.Empty),
                 Metadata = record.Metadata,
                 TotalSize = record.SizeBytes
             });
@@ -308,7 +308,21 @@ public sealed class DatabaseIndexingPlugin : MetadataIndexPluginBase
         return Task.CompletedTask;
     }
 
-    public override Task<IEnumerable<Dictionary<string, object>>> ExecuteQueryAsync(string query)
+    public override Task<string[]> ExecuteQueryAsync(string query, int limit)
+    {
+        // Simulate query execution - return matching IDs
+        var results = _cache.Values
+            .Take(limit)
+            .Select(r => r.Id)
+            .ToArray();
+
+        return Task.FromResult(results);
+    }
+
+    /// <summary>
+    /// Executes a query and returns detailed results.
+    /// </summary>
+    public Task<IEnumerable<Dictionary<string, object>>> ExecuteDetailedQueryAsync(string query)
     {
         var results = new List<Dictionary<string, object>>();
 

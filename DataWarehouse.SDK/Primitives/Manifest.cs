@@ -11,6 +11,16 @@
         public string Id { get; set; } = Guid.NewGuid().ToString("N");
 
         /// <summary>
+        /// Human-readable name for the manifest
+        /// </summary>
+        public string Name { get; set; } = string.Empty;
+
+        /// <summary>
+        /// MIME content type
+        /// </summary>
+        public string ContentType { get; set; } = "application/octet-stream";
+
+        /// <summary>
         /// Container ID
         /// </summary>
         public string ContainerId { get; set; } = "default";
@@ -41,6 +51,20 @@
         /// BLOB size in bytes
         /// </summary>
         public long SizeBytes { get; set; }
+
+        /// <summary>
+        /// Total size in bytes (alias for SizeBytes for compatibility)
+        /// </summary>
+        public long TotalSize
+        {
+            get => SizeBytes;
+            set => SizeBytes = value;
+        }
+
+        /// <summary>
+        /// Custom metadata key-value pairs
+        /// </summary>
+        public Dictionary<string, string> Metadata { get; set; } = new();
 
         /// <summary>
         /// Created datetime in offset

@@ -200,11 +200,11 @@ public sealed class GovernancePlugin : GovernancePluginBase
         // Run built-in scans based on trigger type
         switch (context.Trigger)
         {
-            case TriggerType.BeforeWrite:
+            case TriggerType.OnWrite:
                 findings.AddRange(await ScanForPiiAsync(context));
                 findings.AddRange(await ScanForMalwareAsync(context));
                 break;
-            case TriggerType.AfterRead:
+            case TriggerType.OnRead:
                 findings.AddRange(await VerifyIntegrityAsync(context));
                 break;
             case TriggerType.OnDelete:
@@ -305,7 +305,7 @@ public sealed class GovernancePlugin : GovernancePluginBase
         var findings = new List<ScanFinding>();
 
         // Check if manifest has integrity info
-        if (context.Metadata.ContentHash != null && context.DataStream != null)
+        if (!string.IsNullOrEmpty(context.Metadata.Checksum) && context.DataStream != null)
         {
             // In production: compute hash and compare
             // For now, assume integrity is valid
@@ -325,7 +325,8 @@ public sealed class GovernancePlugin : GovernancePluginBase
             {
                 if (rule.MaxRetentionDays.HasValue)
                 {
-                    var age = DateTime.UtcNow - context.Metadata.CreatedAt;
+                    var createdTime = DateTimeOffset.FromUnixTimeSeconds(context.Metadata.CreatedAt).UtcDateTime;
+                    var age = DateTime.UtcNow - createdTime;
                     if (age.TotalDays > rule.MaxRetentionDays.Value)
                     {
                         findings.Add(new ScanFinding
@@ -398,11 +399,9 @@ public sealed class GovernancePlugin : GovernancePluginBase
             case PolicyAction.Encrypt:
                 judgment.EnforcePipeline = new PipelineConfig
                 {
-                    Name = "encryption-pipeline",
-                    Stages = new List<PipelineStageConfig>
-                    {
-                        new() { Name = "aes256-encryption", Order = 1 }
-                    }
+                    EnableEncryption = true,
+                    CryptoProviderId = "aes256",
+                    TransformationOrder = new List<string> { "encrypt" }
                 };
                 judgment.AddTags.Add($"encrypted:{finding.Category}");
                 break;

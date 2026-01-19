@@ -25,6 +25,11 @@ namespace DataWarehouse.SDK.Primitives
 
         // For dependency resolution
         public List<PluginDescriptor> AlreadyLoadedPlugins { get; init; } = [];
+
+        /// <summary>
+        /// Optional configuration dictionary for plugin initialization
+        /// </summary>
+        public Dictionary<string, object>? Config { get; init; }
     }
 
     // SDK/Messaging/HandshakeResponse.cs
