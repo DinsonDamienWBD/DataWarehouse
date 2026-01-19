@@ -636,7 +636,7 @@ public sealed class SelfHealingStorage : IAsyncDisposable
     private readonly ConcurrentDictionary<string, DataIntegrity> _integrityMap = new();
     private readonly IStorageProvider _primaryStorage;
     private readonly IStorageProvider? _redundantStorage;
-    private readonly SelfHealingOptions _options;
+    private readonly DataSelfHealingOptions _options;
     private readonly Channel<RepairTask> _repairQueue;
     private readonly Task _integrityCheckTask;
     private readonly Task _repairTask;
@@ -649,11 +649,11 @@ public sealed class SelfHealingStorage : IAsyncDisposable
     public SelfHealingStorage(
         IStorageProvider primaryStorage,
         IStorageProvider? redundantStorage = null,
-        SelfHealingOptions? options = null)
+        DataSelfHealingOptions? options = null)
     {
         _primaryStorage = primaryStorage ?? throw new ArgumentNullException(nameof(primaryStorage));
         _redundantStorage = redundantStorage;
-        _options = options ?? new SelfHealingOptions();
+        _options = options ?? new DataSelfHealingOptions();
 
         _repairQueue = Channel.CreateBounded<RepairTask>(new BoundedChannelOptions(10000)
         {
@@ -961,7 +961,7 @@ public record HealingStatistics
     public int RepairQueueDepth { get; init; }
 }
 
-public sealed class SelfHealingOptions
+public sealed class DataSelfHealingOptions
 {
     public TimeSpan IntegrityCheckInterval { get; set; } = TimeSpan.FromHours(1);
     public int SampleSize { get; set; } = 100;

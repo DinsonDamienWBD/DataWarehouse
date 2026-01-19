@@ -1600,11 +1600,11 @@ public sealed class ZeroDowntimeUpgradeManager : IAsyncDisposable
         return session;
     }
 
-    private async Task<HealthCheckResult> PerformHealthCheckAsync(CancellationToken ct)
+    private async Task<UpgradeHealthCheckResult> PerformHealthCheckAsync(CancellationToken ct)
     {
         // Would perform comprehensive health checks
         await Task.Delay(100, ct);
-        return new HealthCheckResult { IsHealthy = true };
+        return new UpgradeHealthCheckResult { IsHealthy = true };
     }
 
     private async Task DrainConnectionsAsync(TimeSpan timeout, CancellationToken ct)
@@ -1740,7 +1740,7 @@ public record UpgradeResult
     public string? Error { get; init; }
 }
 
-public record HealthCheckResult
+public record UpgradeHealthCheckResult
 {
     public bool IsHealthy { get; init; }
 }

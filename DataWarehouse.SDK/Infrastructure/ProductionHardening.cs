@@ -55,7 +55,7 @@ public sealed class ConfigurationValidator
 
                 if (!ruleResult.IsValid)
                 {
-                    if (ruleResult.Severity == ValidationSeverity.Error)
+                    if (ruleResult.Severity == ConfigValidationSeverity.Error)
                     {
                         failures.Add(new ConfigurationFailure
                         {
@@ -1184,7 +1184,7 @@ public sealed class PredictiveMaintenanceSystem
                     Value = points[i].Value,
                     ExpectedValue = expected,
                     Deviation = deviation,
-                    Severity = deviation > stdDev * 4 ? AnomalySeverity.Critical : AnomalySeverity.Warning
+                    Severity = deviation > stdDev * 4 ? TelemetryAnomalySeverity.Critical : TelemetryAnomalySeverity.Warning
                 });
             }
         }

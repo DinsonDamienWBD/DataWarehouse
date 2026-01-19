@@ -48,7 +48,7 @@ namespace DataWarehouse.SDK.Infrastructure
     /// <summary>
     /// Defines the health status of a component or service.
     /// </summary>
-    public enum HealthStatus
+    public enum ObsHealthStatus
     {
         /// <summary>
         /// The component is fully healthy and operational.
@@ -70,12 +70,12 @@ namespace DataWarehouse.SDK.Infrastructure
     /// Represents the result of a health check operation.
     /// This class is immutable and thread-safe.
     /// </summary>
-    public sealed class HealthCheckResult
+    public sealed class ObsHealthCheckResult
     {
         /// <summary>
         /// Gets the health status of the checked component.
         /// </summary>
-        public HealthStatus Status { get; }
+        public ObsHealthStatus Status { get; }
 
         /// <summary>
         /// Gets the human-readable message describing the health state.
@@ -109,7 +109,7 @@ namespace DataWarehouse.SDK.Infrastructure
         public string? CheckName { get; }
 
         /// <summary>
-        /// Initializes a new instance of the <see cref="HealthCheckResult"/> class.
+        /// Initializes a new instance of the <see cref="ObsHealthCheckResult"/> class.
         /// </summary>
         /// <param name="status">The health status.</param>
         /// <param name="message">A descriptive message about the health state.</param>
@@ -117,8 +117,8 @@ namespace DataWarehouse.SDK.Infrastructure
         /// <param name="data">Optional additional data associated with the result.</param>
         /// <param name="exception">Optional exception if the check failed.</param>
         /// <param name="checkName">Optional name of the health check.</param>
-        public HealthCheckResult(
-            HealthStatus status,
+        public ObsHealthCheckResult(
+            ObsHealthStatus status,
             string message,
             TimeSpan duration,
             IReadOnlyDictionary<string, object>? data = null,
@@ -142,14 +142,14 @@ namespace DataWarehouse.SDK.Infrastructure
         /// <param name="message">Optional message describing the healthy state.</param>
         /// <param name="duration">The duration of the health check.</param>
         /// <param name="data">Optional additional data.</param>
-        /// <returns>A healthy <see cref="HealthCheckResult"/>.</returns>
-        public static HealthCheckResult Healthy(
+        /// <returns>A healthy <see cref="ObsHealthCheckResult"/>.</returns>
+        public static ObsHealthCheckResult Healthy(
             string message = "Component is healthy",
             TimeSpan? duration = null,
             IReadOnlyDictionary<string, object>? data = null)
         {
-            return new HealthCheckResult(
-                HealthStatus.Healthy,
+            return new ObsHealthCheckResult(
+                ObsHealthStatus.Healthy,
                 message,
                 duration ?? TimeSpan.Zero,
                 data);
@@ -162,15 +162,15 @@ namespace DataWarehouse.SDK.Infrastructure
         /// <param name="duration">The duration of the health check.</param>
         /// <param name="data">Optional additional data.</param>
         /// <param name="exception">Optional exception that caused degradation.</param>
-        /// <returns>A degraded <see cref="HealthCheckResult"/>.</returns>
-        public static HealthCheckResult Degraded(
+        /// <returns>A degraded <see cref="ObsHealthCheckResult"/>.</returns>
+        public static ObsHealthCheckResult Degraded(
             string message,
             TimeSpan? duration = null,
             IReadOnlyDictionary<string, object>? data = null,
             Exception? exception = null)
         {
-            return new HealthCheckResult(
-                HealthStatus.Degraded,
+            return new ObsHealthCheckResult(
+                ObsHealthStatus.Degraded,
                 message,
                 duration ?? TimeSpan.Zero,
                 data,
@@ -184,15 +184,15 @@ namespace DataWarehouse.SDK.Infrastructure
         /// <param name="duration">The duration of the health check.</param>
         /// <param name="data">Optional additional data.</param>
         /// <param name="exception">Optional exception that caused the failure.</param>
-        /// <returns>An unhealthy <see cref="HealthCheckResult"/>.</returns>
-        public static HealthCheckResult Unhealthy(
+        /// <returns>An unhealthy <see cref="ObsHealthCheckResult"/>.</returns>
+        public static ObsHealthCheckResult Unhealthy(
             string message,
             TimeSpan? duration = null,
             IReadOnlyDictionary<string, object>? data = null,
             Exception? exception = null)
         {
-            return new HealthCheckResult(
-                HealthStatus.Unhealthy,
+            return new ObsHealthCheckResult(
+                ObsHealthStatus.Unhealthy,
                 message,
                 duration ?? TimeSpan.Zero,
                 data,
@@ -204,7 +204,7 @@ namespace DataWarehouse.SDK.Infrastructure
     /// Defines a contract for performing health checks on a component or service.
     /// Implementations should be thread-safe and handle their own timeouts.
     /// </summary>
-    public interface IHealthCheck
+    public interface IObsHealthCheck
     {
         /// <summary>
         /// Gets the unique name of this health check.
@@ -215,8 +215,8 @@ namespace DataWarehouse.SDK.Infrastructure
         /// Performs the health check asynchronously.
         /// </summary>
         /// <param name="cancellationToken">Cancellation token for the operation.</param>
-        /// <returns>A <see cref="HealthCheckResult"/> describing the component's health.</returns>
-        Task<HealthCheckResult> CheckHealthAsync(CancellationToken cancellationToken = default);
+        /// <returns>A <see cref="ObsHealthCheckResult"/> describing the component's health.</returns>
+        Task<ObsHealthCheckResult> CheckHealthAsync(CancellationToken cancellationToken = default);
     }
 
     /// <summary>
@@ -243,7 +243,7 @@ namespace DataWarehouse.SDK.Infrastructure
     /// <summary>
     /// Configuration options for the health check aggregator.
     /// </summary>
-    public class HealthCheckAggregatorOptions
+    public class ObsObsHealthCheckAggregatorOptions
     {
         /// <summary>
         /// Gets or sets the cache time-to-live for health check results.
@@ -275,13 +275,13 @@ namespace DataWarehouse.SDK.Infrastructure
     /// Supports caching, parallel execution, and Kubernetes-style liveness/readiness probes.
     /// Thread-safe implementation suitable for production use.
     /// </summary>
-    public sealed class HealthCheckAggregator : IDisposable
+    public sealed class ObsHealthCheckAggregator : IDisposable
     {
-        private readonly ConcurrentDictionary<string, IHealthCheck> _livenessChecks;
-        private readonly ConcurrentDictionary<string, IHealthCheck> _readinessChecks;
-        private readonly ConcurrentDictionary<string, IHealthCheck> _startupChecks;
+        private readonly ConcurrentDictionary<string, IObsHealthCheck> _livenessChecks;
+        private readonly ConcurrentDictionary<string, IObsHealthCheck> _readinessChecks;
+        private readonly ConcurrentDictionary<string, IObsHealthCheck> _startupChecks;
         private readonly ConcurrentDictionary<string, CachedHealthResult> _cache;
-        private readonly HealthCheckAggregatorOptions _options;
+        private readonly ObsObsHealthCheckAggregatorOptions _options;
         private readonly SemaphoreSlim _concurrencyLimiter;
         private readonly object _disposeLock = new();
         private bool _disposed;
@@ -291,10 +291,10 @@ namespace DataWarehouse.SDK.Infrastructure
         /// </summary>
         private sealed class CachedHealthResult
         {
-            public HealthCheckResult Result { get; }
+            public ObsHealthCheckResult Result { get; }
             public DateTimeOffset ExpiresAt { get; }
 
-            public CachedHealthResult(HealthCheckResult result, TimeSpan ttl)
+            public CachedHealthResult(ObsHealthCheckResult result, TimeSpan ttl)
             {
                 Result = result;
                 ExpiresAt = DateTimeOffset.UtcNow.Add(ttl);
@@ -304,15 +304,15 @@ namespace DataWarehouse.SDK.Infrastructure
         }
 
         /// <summary>
-        /// Initializes a new instance of the <see cref="HealthCheckAggregator"/> class.
+        /// Initializes a new instance of the <see cref="ObsHealthCheckAggregator"/> class.
         /// </summary>
         /// <param name="options">Configuration options for the aggregator. If null, defaults are used.</param>
-        public HealthCheckAggregator(HealthCheckAggregatorOptions? options = null)
+        public ObsHealthCheckAggregator(ObsObsHealthCheckAggregatorOptions? options = null)
         {
-            _options = options ?? new HealthCheckAggregatorOptions();
-            _livenessChecks = new ConcurrentDictionary<string, IHealthCheck>(StringComparer.OrdinalIgnoreCase);
-            _readinessChecks = new ConcurrentDictionary<string, IHealthCheck>(StringComparer.OrdinalIgnoreCase);
-            _startupChecks = new ConcurrentDictionary<string, IHealthCheck>(StringComparer.OrdinalIgnoreCase);
+            _options = options ?? new ObsObsHealthCheckAggregatorOptions();
+            _livenessChecks = new ConcurrentDictionary<string, IObsHealthCheck>(StringComparer.OrdinalIgnoreCase);
+            _readinessChecks = new ConcurrentDictionary<string, IObsHealthCheck>(StringComparer.OrdinalIgnoreCase);
+            _startupChecks = new ConcurrentDictionary<string, IObsHealthCheck>(StringComparer.OrdinalIgnoreCase);
             _cache = new ConcurrentDictionary<string, CachedHealthResult>(StringComparer.OrdinalIgnoreCase);
             _concurrencyLimiter = new SemaphoreSlim(_options.MaxConcurrentChecks, _options.MaxConcurrentChecks);
         }
@@ -324,7 +324,7 @@ namespace DataWarehouse.SDK.Infrastructure
         /// <param name="checkType">The type of health check (liveness, readiness, or startup).</param>
         /// <exception cref="ArgumentNullException">Thrown when healthCheck is null.</exception>
         /// <exception cref="ObjectDisposedException">Thrown when the aggregator has been disposed.</exception>
-        public void RegisterCheck(IHealthCheck healthCheck, HealthCheckType checkType = HealthCheckType.Readiness)
+        public void RegisterCheck(IObsHealthCheck healthCheck, HealthCheckType checkType = HealthCheckType.Readiness)
         {
             ThrowIfDisposed();
             ArgumentNullException.ThrowIfNull(healthCheck);
@@ -357,8 +357,8 @@ namespace DataWarehouse.SDK.Infrastructure
         /// Performs all liveness checks and returns the aggregated result.
         /// </summary>
         /// <param name="cancellationToken">Cancellation token for the operation.</param>
-        /// <returns>A composite <see cref="HealthCheckResult"/> representing overall liveness.</returns>
-        public Task<HealthCheckResult> CheckLivenessAsync(CancellationToken cancellationToken = default)
+        /// <returns>A composite <see cref="ObsHealthCheckResult"/> representing overall liveness.</returns>
+        public Task<ObsHealthCheckResult> CheckLivenessAsync(CancellationToken cancellationToken = default)
         {
             return CheckHealthInternalAsync(HealthCheckType.Liveness, cancellationToken);
         }
@@ -367,8 +367,8 @@ namespace DataWarehouse.SDK.Infrastructure
         /// Performs all readiness checks and returns the aggregated result.
         /// </summary>
         /// <param name="cancellationToken">Cancellation token for the operation.</param>
-        /// <returns>A composite <see cref="HealthCheckResult"/> representing overall readiness.</returns>
-        public Task<HealthCheckResult> CheckReadinessAsync(CancellationToken cancellationToken = default)
+        /// <returns>A composite <see cref="ObsHealthCheckResult"/> representing overall readiness.</returns>
+        public Task<ObsHealthCheckResult> CheckReadinessAsync(CancellationToken cancellationToken = default)
         {
             return CheckHealthInternalAsync(HealthCheckType.Readiness, cancellationToken);
         }
@@ -377,8 +377,8 @@ namespace DataWarehouse.SDK.Infrastructure
         /// Performs all startup checks and returns the aggregated result.
         /// </summary>
         /// <param name="cancellationToken">Cancellation token for the operation.</param>
-        /// <returns>A composite <see cref="HealthCheckResult"/> representing startup health.</returns>
-        public Task<HealthCheckResult> CheckStartupAsync(CancellationToken cancellationToken = default)
+        /// <returns>A composite <see cref="ObsHealthCheckResult"/> representing startup health.</returns>
+        public Task<ObsHealthCheckResult> CheckStartupAsync(CancellationToken cancellationToken = default)
         {
             return CheckHealthInternalAsync(HealthCheckType.Startup, cancellationToken);
         }
@@ -389,14 +389,14 @@ namespace DataWarehouse.SDK.Infrastructure
         /// <param name="checkType">The type of health checks to run.</param>
         /// <param name="cancellationToken">Cancellation token for the operation.</param>
         /// <returns>A dictionary of check names to their individual results.</returns>
-        public async Task<IReadOnlyDictionary<string, HealthCheckResult>> CheckAllAsync(
+        public async Task<IReadOnlyDictionary<string, ObsHealthCheckResult>> CheckAllAsync(
             HealthCheckType checkType = HealthCheckType.Readiness,
             CancellationToken cancellationToken = default)
         {
             ThrowIfDisposed();
 
             var checks = GetCheckCollection(checkType);
-            var results = new ConcurrentDictionary<string, HealthCheckResult>(StringComparer.OrdinalIgnoreCase);
+            var results = new ConcurrentDictionary<string, ObsHealthCheckResult>(StringComparer.OrdinalIgnoreCase);
 
             if (checks.IsEmpty)
             {
@@ -450,7 +450,7 @@ namespace DataWarehouse.SDK.Infrastructure
             return GetCheckCollection(checkType).Count;
         }
 
-        private ConcurrentDictionary<string, IHealthCheck> GetCheckCollection(HealthCheckType checkType)
+        private ConcurrentDictionary<string, IObsHealthCheck> GetCheckCollection(HealthCheckType checkType)
         {
             return checkType switch
             {
@@ -460,7 +460,7 @@ namespace DataWarehouse.SDK.Infrastructure
             };
         }
 
-        private async Task<HealthCheckResult> CheckHealthInternalAsync(
+        private async Task<ObsHealthCheckResult> CheckHealthInternalAsync(
             HealthCheckType checkType,
             CancellationToken cancellationToken)
         {
@@ -472,13 +472,13 @@ namespace DataWarehouse.SDK.Infrastructure
 
             if (results.Count == 0)
             {
-                return HealthCheckResult.Healthy(
+                return ObsHealthCheckResult.Healthy(
                     $"No {checkType} checks registered",
                     stopwatch.Elapsed);
             }
 
             // Aggregate status - worst status wins
-            var worstStatus = HealthStatus.Healthy;
+            var worstStatus = ObsHealthStatus.Healthy;
             var messages = new List<string>();
             var aggregatedData = new Dictionary<string, object>();
 
@@ -491,7 +491,7 @@ namespace DataWarehouse.SDK.Infrastructure
                     worstStatus = result.Status;
                 }
 
-                if (result.Status != HealthStatus.Healthy)
+                if (result.Status != ObsHealthStatus.Healthy)
                 {
                     messages.Add($"{kvp.Key}: {result.Message}");
                 }
@@ -500,19 +500,19 @@ namespace DataWarehouse.SDK.Infrastructure
                 aggregatedData[$"{kvp.Key}_duration_ms"] = result.Duration.TotalMilliseconds;
             }
 
-            var aggregatedMessage = worstStatus == HealthStatus.Healthy
+            var aggregatedMessage = worstStatus == ObsHealthStatus.Healthy
                 ? $"All {results.Count} {checkType} checks passed"
                 : string.Join("; ", messages);
 
-            return new HealthCheckResult(
+            return new ObsHealthCheckResult(
                 worstStatus,
                 aggregatedMessage,
                 stopwatch.Elapsed,
                 aggregatedData);
         }
 
-        private async Task<HealthCheckResult> RunCheckWithCachingAsync(
-            IHealthCheck check,
+        private async Task<ObsHealthCheckResult> RunCheckWithCachingAsync(
+            IObsHealthCheck check,
             HealthCheckType checkType,
             CancellationToken cancellationToken)
         {
@@ -546,8 +546,8 @@ namespace DataWarehouse.SDK.Infrastructure
             }
         }
 
-        private async Task<HealthCheckResult> RunCheckWithTimeoutAsync(
-            IHealthCheck check,
+        private async Task<ObsHealthCheckResult> RunCheckWithTimeoutAsync(
+            IObsHealthCheck check,
             CancellationToken cancellationToken)
         {
             var stopwatch = Stopwatch.StartNew();
@@ -563,7 +563,7 @@ namespace DataWarehouse.SDK.Infrastructure
                 // Ensure the result has the check name
                 if (result.CheckName != check.Name)
                 {
-                    return new HealthCheckResult(
+                    return new ObsHealthCheckResult(
                         result.Status,
                         result.Message,
                         stopwatch.Elapsed,
@@ -577,7 +577,7 @@ namespace DataWarehouse.SDK.Infrastructure
             catch (OperationCanceledException) when (timeoutCts.IsCancellationRequested && !cancellationToken.IsCancellationRequested)
             {
                 stopwatch.Stop();
-                return HealthCheckResult.Unhealthy(
+                return ObsHealthCheckResult.Unhealthy(
                     $"Health check '{check.Name}' timed out after {_options.Timeout.TotalSeconds}s",
                     stopwatch.Elapsed,
                     new Dictionary<string, object> { ["timeout_seconds"] = _options.Timeout.TotalSeconds });
@@ -585,7 +585,7 @@ namespace DataWarehouse.SDK.Infrastructure
             catch (Exception ex)
             {
                 stopwatch.Stop();
-                return HealthCheckResult.Unhealthy(
+                return ObsHealthCheckResult.Unhealthy(
                     $"Health check '{check.Name}' failed: {ex.Message}",
                     stopwatch.Elapsed,
                     exception: ex);
@@ -596,7 +596,7 @@ namespace DataWarehouse.SDK.Infrastructure
         {
             if (_disposed)
             {
-                throw new ObjectDisposedException(nameof(HealthCheckAggregator));
+                throw new ObjectDisposedException(nameof(ObsHealthCheckAggregator));
             }
         }
 
@@ -1761,7 +1761,7 @@ namespace DataWarehouse.SDK.Infrastructure
     public sealed class ObservabilityFacade : IDisposable
     {
         private readonly IMetricsCollector _metrics;
-        private readonly HealthCheckAggregator _healthChecks;
+        private readonly ObsHealthCheckAggregator _healthChecks;
         private readonly IStructuredLogger _logger;
         private bool _disposed;
 
@@ -1773,7 +1773,7 @@ namespace DataWarehouse.SDK.Infrastructure
         /// <summary>
         /// Gets the health check aggregator.
         /// </summary>
-        public HealthCheckAggregator HealthChecks => _healthChecks;
+        public ObsHealthCheckAggregator HealthChecks => _healthChecks;
 
         /// <summary>
         /// Gets the structured logger.
@@ -1784,7 +1784,7 @@ namespace DataWarehouse.SDK.Infrastructure
         /// Initializes a new instance of the <see cref="ObservabilityFacade"/> class with default implementations.
         /// </summary>
         public ObservabilityFacade()
-            : this(new InMemoryMetricsCollector(), new HealthCheckAggregator(), new InMemoryStructuredLogger())
+            : this(new InMemoryMetricsCollector(), new ObsHealthCheckAggregator(), new InMemoryStructuredLogger())
         {
         }
 
@@ -1796,7 +1796,7 @@ namespace DataWarehouse.SDK.Infrastructure
         /// <param name="logger">The structured logger to use.</param>
         public ObservabilityFacade(
             IMetricsCollector metrics,
-            HealthCheckAggregator healthChecks,
+            ObsHealthCheckAggregator healthChecks,
             IStructuredLogger logger)
         {
             _metrics = metrics ?? throw new ArgumentNullException(nameof(metrics));
