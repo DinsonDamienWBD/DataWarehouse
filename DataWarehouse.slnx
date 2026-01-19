@@ -13,10 +13,14 @@
     <Project Path="Plugins/DataWarehouse.Plugins.AzureBlobStorage/DataWarehouse.Plugins.AzureBlobStorage.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.CloudStorage/DataWarehouse.Plugins.CloudStorage.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.Compression/DataWarehouse.Plugins.Compression.csproj" />
+    <Project Path="Plugins/DataWarehouse.Plugins.DatabaseIndexing/DataWarehouse.Plugins.DatabaseIndexing.csproj" />
+    <Project Path="Plugins/DataWarehouse.Plugins.DistributedTransactions/DataWarehouse.Plugins.DistributedTransactions.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.EmbeddedDatabaseStorage/DataWarehouse.Plugins.EmbeddedDatabaseStorage.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.Encryption/DataWarehouse.Plugins.Encryption.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.FileKeyStore/DataWarehouse.Plugins.FileKeyStore.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.GcsStorage/DataWarehouse.Plugins.GcsStorage.csproj" />
+    <Project Path="Plugins/DataWarehouse.Plugins.Governance/DataWarehouse.Plugins.Governance.csproj" />
+    <Project Path="Plugins/DataWarehouse.Plugins.GrpcInterface/DataWarehouse.Plugins.GrpcInterface.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.GrpcStorage/DataWarehouse.Plugins.GrpcStorage.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.HotReload/DataWarehouse.Plugins.HotReload.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.IpfsStorage/DataWarehouse.Plugins.IpfsStorage.csproj" />
@@ -27,7 +31,12 @@
     <Project Path="Plugins/DataWarehouse.Plugins.Raft/DataWarehouse.Plugins.Raft.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.RAMDiskStorage/DataWarehouse.Plugins.RAMDiskStorage.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.RelationalDatabaseStorage/DataWarehouse.Plugins.RelationalDatabaseStorage.csproj" />
+    <Project Path="Plugins/DataWarehouse.Plugins.RestInterface/DataWarehouse.Plugins.RestInterface.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.S3Storage/DataWarehouse.Plugins.S3Storage.csproj" />
+    <Project Path="Plugins/DataWarehouse.Plugins.Sharding/DataWarehouse.Plugins.Sharding.csproj" />
+    <Project Path="Plugins/DataWarehouse.Plugins.SqlInterface/DataWarehouse.Plugins.SqlInterface.csproj" />
+    <Project Path="Plugins/DataWarehouse.Plugins.SqliteIndexing/DataWarehouse.Plugins.SqliteIndexing.csproj" />
+    <Project Path="Plugins/DataWarehouse.Plugins.Tiering/DataWarehouse.Plugins.Tiering.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.VaultKeyStore/DataWarehouse.Plugins.VaultKeyStore.csproj" />
   </Folder>
   <Project Path="DataWarehouse.Kernel/DataWarehouse.Kernel.csproj" />
