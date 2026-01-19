@@ -141,7 +141,7 @@ namespace DataWarehouse.SDK.Utilities
         /// Message payload as a dictionary for structured access.
         /// Use this for key-value payload data.
         /// </summary>
-        public Dictionary<string, object?> Payload { get; init; } = new();
+        public Dictionary<string, object> Payload { get; init; } = new();
 
         /// <summary>
         /// Timestamp of the message.
@@ -171,12 +171,12 @@ namespace DataWarehouse.SDK.Utilities
         /// <summary>
         /// Creates a new PluginMessage with the specified type and payload.
         /// </summary>
-        public static PluginMessage Create(string type, Dictionary<string, object?>? payload = null, string? correlationId = null)
+        public static PluginMessage Create(string type, Dictionary<string, object>? payload = null, string? correlationId = null)
         {
             return new PluginMessage
             {
                 Type = type,
-                Payload = payload ?? new Dictionary<string, object?>(),
+                Payload = payload ?? new Dictionary<string, object>(),
                 CorrelationId = correlationId,
                 Timestamp = DateTime.UtcNow
             };

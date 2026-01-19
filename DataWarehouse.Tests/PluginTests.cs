@@ -128,7 +128,7 @@ public class AesEncryptionPluginTests : IDisposable
         var message = new PluginMessage
         {
             Type = "encryption.aes.rotate",
-            Payload = new Dictionary<string, object?>()
+            Payload = new Dictionary<string, object>()
         };
 
         // Act
@@ -630,7 +630,7 @@ public class AIAgentPluginTests : IAsyncLifetime
         var message = new PluginMessage
         {
             Type = "ai.conversation.create",
-            Payload = new Dictionary<string, object?> { ["system"] = "You are a helpful assistant." }
+            Payload = new Dictionary<string, object> { ["system"] = "You are a helpful assistant." }
         };
 
         // Act
@@ -649,7 +649,7 @@ public class AIAgentPluginTests : IAsyncLifetime
         var createMessage = new PluginMessage
         {
             Type = "ai.conversation.create",
-            Payload = new Dictionary<string, object?>()
+            Payload = new Dictionary<string, object>()
         };
         await _plugin.OnMessageAsync(createMessage);
 
@@ -661,7 +661,7 @@ public class AIAgentPluginTests : IAsyncLifetime
         var clearMessage = new PluginMessage
         {
             Type = "ai.conversation.clear",
-            Payload = new Dictionary<string, object?> { ["conversationId"] = conversationId }
+            Payload = new Dictionary<string, object> { ["conversationId"] = conversationId }
         };
         await _plugin.OnMessageAsync(clearMessage);
 
@@ -676,7 +676,7 @@ public class AIAgentPluginTests : IAsyncLifetime
         var message = new PluginMessage
         {
             Type = "ai.providers",
-            Payload = new Dictionary<string, object?>()
+            Payload = new Dictionary<string, object>()
         };
 
         // Act
@@ -741,7 +741,7 @@ public class AIAgentPluginTests : IAsyncLifetime
         var message = new PluginMessage
         {
             Type = "ai.stats",
-            Payload = new Dictionary<string, object?>()
+            Payload = new Dictionary<string, object>()
         };
 
         // Act
