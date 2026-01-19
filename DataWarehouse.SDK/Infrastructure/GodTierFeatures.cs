@@ -552,7 +552,7 @@ public sealed class SmartAutoBackup : IAsyncDisposable
         _backupQueue.Writer.Complete();
 
         try { await Task.WhenAll(_schedulerTask, _analyzerTask).WaitAsync(TimeSpan.FromSeconds(5)); }
-        catch { /* Ignore */ }
+        catch (Exception ex) { Console.Error.WriteLine($"[GodTierFeatures] Operation error: {ex.Message}"); }
 
         _cts.Dispose();
     }
@@ -909,7 +909,7 @@ public sealed class SelfHealingStorage : IAsyncDisposable
         _repairQueue.Writer.Complete();
 
         try { await Task.WhenAll(_integrityCheckTask, _repairTask).WaitAsync(TimeSpan.FromSeconds(5)); }
-        catch { /* Ignore */ }
+        catch (Exception ex) { Console.Error.WriteLine($"[GodTierFeatures] Operation error: {ex.Message}"); }
 
         _cts.Dispose();
     }
@@ -1228,7 +1228,7 @@ public sealed class InstantSearchEngine : IAsyncDisposable
         _indexQueue.Writer.Complete();
 
         try { await _indexerTask.WaitAsync(TimeSpan.FromSeconds(5)); }
-        catch { /* Ignore */ }
+        catch (Exception ex) { Console.Error.WriteLine($"[GodTierFeatures] Operation error: {ex.Message}"); }
 
         _cts.Dispose();
     }

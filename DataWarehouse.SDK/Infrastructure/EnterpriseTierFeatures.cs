@@ -967,7 +967,7 @@ public sealed class RealTimeSyncEngine : IAsyncDisposable
         _syncQueue.Writer.Complete();
 
         try { await _syncTask.WaitAsync(TimeSpan.FromSeconds(5)); }
-        catch { /* Ignore */ }
+        catch (Exception ex) { Console.Error.WriteLine($"[EnterpriseTierFeatures] Operation error: {ex.Message}"); }
 
         _cts.Dispose();
     }
@@ -1353,7 +1353,7 @@ public sealed class MonitoringDashboard : IAsyncDisposable
         _eventChannel.Writer.Complete();
 
         try { await _monitoringTask.WaitAsync(TimeSpan.FromSeconds(5)); }
-        catch { /* Ignore */ }
+        catch (Exception ex) { Console.Error.WriteLine($"[EnterpriseTierFeatures] Operation error: {ex.Message}"); }
 
         _cts.Dispose();
     }
@@ -1677,7 +1677,7 @@ public sealed class ZeroDowntimeUpgradeManager : IAsyncDisposable
         _cts.Cancel();
 
         try { await _schedulerTask.WaitAsync(TimeSpan.FromSeconds(5)); }
-        catch { /* Ignore */ }
+        catch (Exception ex) { Console.Error.WriteLine($"[EnterpriseTierFeatures] Operation error: {ex.Message}"); }
 
         _cts.Dispose();
     }

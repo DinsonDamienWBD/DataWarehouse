@@ -869,7 +869,7 @@ public sealed class GeoDistributedConsensus : IAsyncDisposable
         _messageQueue.Writer.Complete();
 
         try { await _consensusTask.WaitAsync(TimeSpan.FromSeconds(5)); }
-        catch { /* Ignore */ }
+        catch (Exception ex) { Console.Error.WriteLine($"[HyperscaleFeatures] Operation error: {ex.Message}"); }
 
         _cts.Dispose();
     }
@@ -1272,7 +1272,7 @@ public sealed class DistributedBPlusTree<TKey, TValue> : IAsyncDisposable
         _compactionQueue.Writer.Complete();
 
         try { await _compactionTask.WaitAsync(TimeSpan.FromSeconds(5)); }
-        catch { /* Ignore */ }
+        catch (Exception ex) { Console.Error.WriteLine($"[HyperscaleFeatures] Operation error: {ex.Message}"); }
 
         foreach (var shard in _shards.Values)
         {
@@ -1779,7 +1779,7 @@ public sealed class PredictiveTiering : IAsyncDisposable
         _decisionQueue.Writer.Complete();
 
         try { await Task.WhenAll(_predictionTask, _migrationTask).WaitAsync(TimeSpan.FromSeconds(5)); }
-        catch { /* Ignore */ }
+        catch (Exception ex) { Console.Error.WriteLine($"[HyperscaleFeatures] Operation error: {ex.Message}"); }
 
         _cts.Dispose();
     }
@@ -2175,7 +2175,7 @@ public sealed class ChaosEngineeringFramework : IAsyncDisposable
         }
 
         try { await _experimentTask.WaitAsync(TimeSpan.FromSeconds(5)); }
-        catch { /* Ignore */ }
+        catch (Exception ex) { Console.Error.WriteLine($"[HyperscaleFeatures] Operation error: {ex.Message}"); }
 
         _cts.Dispose();
     }
@@ -2298,7 +2298,7 @@ public sealed class CpuStressInjector : FaultInjector
         if (_stressTasks != null)
         {
             try { await Task.WhenAll(_stressTasks).WaitAsync(TimeSpan.FromSeconds(2)); }
-            catch { /* Ignore */ }
+            catch (Exception ex) { Console.Error.WriteLine($"[HyperscaleFeatures] Operation error: {ex.Message}"); }
         }
         _stressCts?.Dispose();
         _stressCts = null;
@@ -2692,7 +2692,7 @@ public sealed class HyperscaleObservability : IAsyncDisposable
         _eventChannel.Writer.Complete();
 
         try { await _exportTask.WaitAsync(TimeSpan.FromSeconds(5)); }
-        catch { /* Ignore */ }
+        catch (Exception ex) { Console.Error.WriteLine($"[HyperscaleFeatures] Operation error: {ex.Message}"); }
 
         _cts.Dispose();
     }
@@ -2953,7 +2953,7 @@ public sealed class KubernetesOperator : IAsyncDisposable
         await foreach (var evt in _reconcileQueue.Reader.ReadAllAsync(ct))
         {
             try { await ReconcileClusterAsync(evt.ClusterName, evt.Namespace, ct); }
-            catch { /* Log and continue */ }
+            catch (Exception ex) { Console.Error.WriteLine($"[HyperscaleFeatures] Error during operation: {ex.Message}"); }
         }
     }
 
@@ -3019,7 +3019,7 @@ public sealed class KubernetesOperator : IAsyncDisposable
                 }
             }
             catch (OperationCanceledException) when (ct.IsCancellationRequested) { break; }
-            catch { /* Log and continue */ }
+            catch (Exception ex) { Console.Error.WriteLine($"[HyperscaleFeatures] Error during operation: {ex.Message}"); }
         }
     }
 
@@ -3032,7 +3032,7 @@ public sealed class KubernetesOperator : IAsyncDisposable
         _cts.Cancel();
         _reconcileQueue.Writer.Complete();
         try { await Task.WhenAll(_reconcileTask, _autoscaleTask).WaitAsync(TimeSpan.FromSeconds(5)); }
-        catch { /* Ignore */ }
+        catch (Exception ex) { Console.Error.WriteLine($"[HyperscaleFeatures] Operation error: {ex.Message}"); }
         _cts.Dispose();
     }
 }

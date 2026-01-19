@@ -464,7 +464,7 @@ public sealed class ImmutableAuditTrail : IAsyncDisposable
                 if (pendingEntries.Count > 0)
                 {
                     try { await CreateBlockAsync(pendingEntries, default); }
-                    catch { /* Best effort */ }
+                    catch (Exception ex) { Console.Error.WriteLine($"[HighStakesFeatures] Best effort operation failed: {ex.Message}"); }
                 }
                 break;
             }
@@ -555,7 +555,7 @@ public sealed class ImmutableAuditTrail : IAsyncDisposable
         _cts.Cancel();
 
         try { await _processingTask.WaitAsync(TimeSpan.FromSeconds(10)); }
-        catch { /* Ignore */ }
+        catch (Exception ex) { Console.Error.WriteLine($"[HighStakesFeatures] Operation error: {ex.Message}"); }
 
         _cts.Dispose();
     }
@@ -1120,7 +1120,7 @@ public sealed class BreakGlassAccessManager : IAsyncDisposable
         _cts.Cancel();
 
         try { await _monitorTask.WaitAsync(TimeSpan.FromSeconds(5)); }
-        catch { /* Ignore */ }
+        catch (Exception ex) { Console.Error.WriteLine($"[HighStakesFeatures] Operation error: {ex.Message}"); }
 
         _cts.Dispose();
     }
@@ -1917,7 +1917,7 @@ public sealed class AirGappedBackupManager : IAsyncDisposable
         _jobQueue.Writer.Complete();
 
         try { await _processingTask.WaitAsync(TimeSpan.FromSeconds(5)); }
-        catch { /* Ignore */ }
+        catch (Exception ex) { Console.Error.WriteLine($"[HighStakesFeatures] Operation error: {ex.Message}"); }
 
         _cts.Dispose();
     }
@@ -2510,7 +2510,7 @@ public sealed class MultiPartyComputationManager : IAsyncDisposable
         _messageChannel.Writer.Complete();
 
         try { await _processingTask.WaitAsync(TimeSpan.FromSeconds(5)); }
-        catch { /* Ignore */ }
+        catch (Exception ex) { Console.Error.WriteLine($"[HighStakesFeatures] Operation error: {ex.Message}"); }
 
         _cts.Dispose();
     }

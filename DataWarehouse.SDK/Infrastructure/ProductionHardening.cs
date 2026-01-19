@@ -198,7 +198,7 @@ public sealed class GracefulShutdownCoordinator : IAsyncDisposable
             var disposeTasks = _resources.Values.Select(async r =>
             {
                 try { await r.DisposeAsync(); }
-                catch { /* Log and continue */ }
+                catch (Exception ex) { Console.Error.WriteLine($"[ProductionHardening] Error during operation: {ex.Message}"); }
             });
 
             await Task.WhenAll(disposeTasks).WaitAsync(forcedCts.Token);
@@ -571,7 +571,7 @@ public sealed class SlaMonitor : IAsyncDisposable
             if (OnViolation != null)
             {
                 try { await OnViolation(violation, ct); }
-                catch { /* Log and continue */ }
+                catch (Exception ex) { Console.Error.WriteLine($"[ProductionHardening] Error during operation: {ex.Message}"); }
             }
         }
     }
@@ -922,7 +922,7 @@ public sealed class HorizontalScalingCoordinator : IAsyncDisposable
             if (recommendation.Action != AutoScalingAction.None && OnScaleRecommendation != null)
             {
                 try { await OnScaleRecommendation(recommendation, ct); }
-                catch { /* Log and continue */ }
+                catch (Exception ex) { Console.Error.WriteLine($"[ProductionHardening] Error during operation: {ex.Message}"); }
             }
         }
     }
