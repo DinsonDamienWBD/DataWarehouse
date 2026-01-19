@@ -1,5 +1,7 @@
 using DataWarehouse.SDK.Contracts;
+using DataWarehouse.SDK.Infrastructure;
 using DataWarehouse.SDK.Primitives;
+using DataWarehouse.SDK.Storage;
 using DataWarehouse.SDK.Utilities;
 using System.Net;
 
@@ -23,6 +25,9 @@ namespace DataWarehouse.Plugins.NetworkStorage
     /// - Automatic reconnection on failure
     /// - Support for authenticated and anonymous access
     /// - Chunked transfer for large files
+    /// - Multi-instance support with role-based selection
+    /// - TTL-based caching support
+    /// - Document indexing and search
     ///
     /// Message Commands:
     /// - storage.network.save: Save data to network storage
@@ -31,10 +36,10 @@ namespace DataWarehouse.Plugins.NetworkStorage
     /// - storage.network.exists: Check if resource exists
     /// - storage.network.list: List resources
     /// - storage.network.ping: Test network connectivity
+    /// - storage.instance.*: Multi-instance management
     /// </summary>
-    public sealed class NetworkStoragePlugin : ListableStoragePluginBase
+    public sealed class NetworkStoragePlugin : HybridStoragePluginBase<NetworkStorageConfig>
     {
-        private readonly NetworkStorageConfig _config;
         private readonly HttpClient _httpClient;
         private readonly SemaphoreSlim _connectionLock = new(1, 1);
         private NetworkCredential? _credential;
@@ -42,16 +47,16 @@ namespace DataWarehouse.Plugins.NetworkStorage
 
         public override string Id => "datawarehouse.plugins.storage.network";
         public override string Name => "Network Storage";
-        public override string Version => "1.0.0";
+        public override string Version => "2.0.0";
         public override string Scheme => "network";
+        public override string StorageCategory => "Network";
 
         /// <summary>
         /// Creates a network storage plugin with optional configuration.
         /// </summary>
         public NetworkStoragePlugin(NetworkStorageConfig? config = null)
+            : base(config ?? new NetworkStorageConfig())
         {
-            _config = config ?? new NetworkStorageConfig();
-
             var handler = new HttpClientHandler
             {
                 AllowAutoRedirect = true,
@@ -90,19 +95,55 @@ namespace DataWarehouse.Plugins.NetworkStorage
             };
         }
 
+        /// <summary>
+        /// Creates a connection for the given configuration.
+        /// </summary>
+        protected override Task<object> CreateConnectionAsync(NetworkStorageConfig config)
+        {
+            var handler = new HttpClientHandler
+            {
+                AllowAutoRedirect = true,
+                MaxAutomaticRedirections = 5
+            };
+
+            if (config.Credentials != null)
+            {
+                handler.Credentials = config.Credentials;
+            }
+
+            if (config.AcceptAnyCertificate && config.IsDevelopmentMode)
+            {
+                handler.ServerCertificateCustomValidationCallback = (_, _, _, _) => true;
+            }
+
+            var client = new HttpClient(handler)
+            {
+                Timeout = TimeSpan.FromSeconds(config.TimeoutSeconds)
+            };
+
+            return Task.FromResult<object>(new NetworkStorageConnection
+            {
+                Config = config,
+                HttpClient = client,
+                Credential = config.Credentials
+            });
+        }
+
         protected override List<PluginCapabilityDescriptor> GetCapabilities()
         {
-            return
-            [
-                new() { Name = "storage.network.save", DisplayName = "Save", Description = "Store data to network location" },
-                new() { Name = "storage.network.load", DisplayName = "Load", Description = "Retrieve data from network location" },
-                new() { Name = "storage.network.delete", DisplayName = "Delete", Description = "Remove data from network location" },
-                new() { Name = "storage.network.exists", DisplayName = "Exists", Description = "Check if network resource exists" },
-                new() { Name = "storage.network.list", DisplayName = "List", Description = "List network resources" },
-                new() { Name = "storage.network.ping", DisplayName = "Ping", Description = "Test network connectivity" },
-                new() { Name = "storage.network.connect", DisplayName = "Connect", Description = "Establish network connection" },
-                new() { Name = "storage.network.disconnect", DisplayName = "Disconnect", Description = "Close network connection" }
-            ];
+            var capabilities = base.GetCapabilities();
+            capabilities.AddRange(new[]
+            {
+                new PluginCapabilityDescriptor { Name = "storage.network.save", DisplayName = "Save", Description = "Store data to network location" },
+                new PluginCapabilityDescriptor { Name = "storage.network.load", DisplayName = "Load", Description = "Retrieve data from network location" },
+                new PluginCapabilityDescriptor { Name = "storage.network.delete", DisplayName = "Delete", Description = "Remove data from network location" },
+                new PluginCapabilityDescriptor { Name = "storage.network.exists", DisplayName = "Exists", Description = "Check if network resource exists" },
+                new PluginCapabilityDescriptor { Name = "storage.network.list", DisplayName = "List", Description = "List network resources" },
+                new PluginCapabilityDescriptor { Name = "storage.network.ping", DisplayName = "Ping", Description = "Test network connectivity" },
+                new PluginCapabilityDescriptor { Name = "storage.network.connect", DisplayName = "Connect", Description = "Establish network connection" },
+                new PluginCapabilityDescriptor { Name = "storage.network.disconnect", DisplayName = "Disconnect", Description = "Close network connection" }
+            });
+            return capabilities;
         }
 
         protected override Dictionary<string, object> GetMetadata()
@@ -134,6 +175,12 @@ namespace DataWarehouse.Plugins.NetworkStorage
                 "storage.network.disconnect" => HandleDisconnect(message),
                 _ => null
             };
+
+            // If not handled, delegate to base for multi-instance management
+            if (response == null)
+            {
+                await base.OnMessageAsync(message);
+            }
         }
 
         private async Task<MessageResponse> HandleSaveAsync(PluginMessage message)
@@ -154,8 +201,11 @@ namespace DataWarehouse.Plugins.NetworkStorage
                 _ => throw new ArgumentException("Data must be Stream, byte[], or string")
             };
 
-            await SaveAsync(uri, data);
-            return MessageResponse.Ok(new { Uri = uri.ToString(), Success = true });
+            // Optional: get instanceId for multi-instance support
+            var instanceId = payload.TryGetValue("instanceId", out var instId) ? instId?.ToString() : null;
+
+            await SaveAsync(uri, data, instanceId);
+            return MessageResponse.Ok(new { Uri = uri.ToString(), Success = true, InstanceId = instanceId });
         }
 
         private async Task<MessageResponse> HandleLoadAsync(PluginMessage message)
@@ -167,10 +217,12 @@ namespace DataWarehouse.Plugins.NetworkStorage
             }
 
             var uri = uriObj is Uri u ? u : new Uri(uriObj.ToString()!);
-            var stream = await LoadAsync(uri);
+            var instanceId = payload.TryGetValue("instanceId", out var instId) ? instId?.ToString() : null;
+
+            var stream = await LoadAsync(uri, instanceId);
             using var ms = new MemoryStream();
             await stream.CopyToAsync(ms);
-            return MessageResponse.Ok(new { Uri = uri.ToString(), Data = ms.ToArray() });
+            return MessageResponse.Ok(new { Uri = uri.ToString(), Data = ms.ToArray(), InstanceId = instanceId });
         }
 
         private async Task<MessageResponse> HandleDeleteAsync(PluginMessage message)
@@ -182,8 +234,10 @@ namespace DataWarehouse.Plugins.NetworkStorage
             }
 
             var uri = uriObj is Uri u ? u : new Uri(uriObj.ToString()!);
-            await DeleteAsync(uri);
-            return MessageResponse.Ok(new { Uri = uri.ToString(), Deleted = true });
+            var instanceId = payload.TryGetValue("instanceId", out var instId) ? instId?.ToString() : null;
+
+            await DeleteAsync(uri, instanceId);
+            return MessageResponse.Ok(new { Uri = uri.ToString(), Deleted = true, InstanceId = instanceId });
         }
 
         private async Task<MessageResponse> HandleExistsAsync(PluginMessage message)
@@ -195,15 +249,22 @@ namespace DataWarehouse.Plugins.NetworkStorage
             }
 
             var uri = uriObj is Uri u ? u : new Uri(uriObj.ToString()!);
-            var exists = await ExistsAsync(uri);
-            return MessageResponse.Ok(new { Uri = uri.ToString(), Exists = exists });
+            var instanceId = payload.TryGetValue("instanceId", out var instId) ? instId?.ToString() : null;
+
+            var exists = await ExistsAsync(uri, instanceId);
+            return MessageResponse.Ok(new { Uri = uri.ToString(), Exists = exists, InstanceId = instanceId });
         }
 
         private async Task<MessageResponse> HandlePingAsync(PluginMessage message)
         {
-            var targetUri = _config.BaseUri;
-            if (message.Payload is Dictionary<string, object> payload &&
-                payload.TryGetValue("uri", out var uriObj))
+            var instanceId = message.Payload is Dictionary<string, object> payload &&
+                payload.TryGetValue("instanceId", out var instId) ? instId?.ToString() : null;
+
+            var config = GetConfig(instanceId);
+            var targetUri = config.BaseUri;
+
+            if (message.Payload is Dictionary<string, object> p &&
+                p.TryGetValue("uri", out var uriObj))
             {
                 targetUri = uriObj is Uri u ? u : new Uri(uriObj.ToString()!);
             }
@@ -214,14 +275,15 @@ namespace DataWarehouse.Plugins.NetworkStorage
             try
             {
                 var sw = System.Diagnostics.Stopwatch.StartNew();
-                var isReachable = await PingAsync(targetUri);
+                var isReachable = await PingAsync(targetUri, instanceId);
                 sw.Stop();
 
                 return MessageResponse.Ok(new
                 {
                     Uri = targetUri.ToString(),
                     Reachable = isReachable,
-                    LatencyMs = sw.ElapsedMilliseconds
+                    LatencyMs = sw.ElapsedMilliseconds,
+                    InstanceId = instanceId
                 });
             }
             catch (Exception ex)
@@ -252,12 +314,18 @@ namespace DataWarehouse.Plugins.NetworkStorage
             return MessageResponse.Ok(new { Disconnected = true });
         }
 
-        public override async Task SaveAsync(Uri uri, Stream data)
+        #region Storage Operations with Instance Support
+
+        /// <summary>
+        /// Save data to network storage, optionally targeting a specific instance.
+        /// </summary>
+        public async Task SaveAsync(Uri uri, Stream data, string? instanceId = null)
         {
             ArgumentNullException.ThrowIfNull(uri);
             ArgumentNullException.ThrowIfNull(data);
 
-            var resolvedUri = ResolveUri(uri);
+            var config = GetConfig(instanceId);
+            var resolvedUri = ResolveUri(uri, config);
             var networkType = DetectNetworkType(resolvedUri);
 
             await ExecuteWithRetryAsync(async () =>
@@ -272,41 +340,70 @@ namespace DataWarehouse.Plugins.NetworkStorage
                     case NetworkType.HTTP:
                     case NetworkType.HTTPS:
                     case NetworkType.WebDAV:
-                        await SaveToHttpAsync(resolvedUri, data);
+                        await SaveToHttpAsync(resolvedUri, data, instanceId);
                         break;
                     case NetworkType.FTP:
-                        await SaveToFtpAsync(resolvedUri, data);
+                        await SaveToFtpAsync(resolvedUri, data, instanceId);
                         break;
                     default:
                         throw new NotSupportedException($"Network type not supported: {networkType}");
                 }
-            });
+            }, config);
+
+            // Auto-index if enabled
+            if (config.EnableIndexing)
+            {
+                await IndexDocumentAsync(uri.ToString(), new Dictionary<string, object>
+                {
+                    ["uri"] = uri.ToString(),
+                    ["resolvedUri"] = resolvedUri.ToString(),
+                    ["networkType"] = networkType.ToString(),
+                    ["instanceId"] = instanceId ?? "default"
+                });
+            }
         }
 
-        public override async Task<Stream> LoadAsync(Uri uri)
+        public override Task SaveAsync(Uri uri, Stream data) => SaveAsync(uri, data, null);
+
+        /// <summary>
+        /// Load data from network storage, optionally from a specific instance.
+        /// </summary>
+        public async Task<Stream> LoadAsync(Uri uri, string? instanceId = null)
         {
             ArgumentNullException.ThrowIfNull(uri);
 
-            var resolvedUri = ResolveUri(uri);
+            var config = GetConfig(instanceId);
+            var resolvedUri = ResolveUri(uri, config);
             var networkType = DetectNetworkType(resolvedUri);
 
-            return await ExecuteWithRetryAsync(async () =>
+            var stream = await ExecuteWithRetryAsync(async () =>
             {
                 return networkType switch
                 {
                     NetworkType.UNC or NetworkType.MappedDrive or NetworkType.SMB => await LoadFromFileSystemAsync(resolvedUri),
-                    NetworkType.HTTP or NetworkType.HTTPS or NetworkType.WebDAV => await LoadFromHttpAsync(resolvedUri),
-                    NetworkType.FTP => await LoadFromFtpAsync(resolvedUri),
+                    NetworkType.HTTP or NetworkType.HTTPS or NetworkType.WebDAV => await LoadFromHttpAsync(resolvedUri, instanceId),
+                    NetworkType.FTP => await LoadFromFtpAsync(resolvedUri, instanceId),
                     _ => throw new NotSupportedException($"Network type not supported: {networkType}")
                 };
-            });
+            }, config);
+
+            // Update last access for caching
+            await TouchAsync(uri);
+
+            return stream;
         }
 
-        public override async Task DeleteAsync(Uri uri)
+        public override Task<Stream> LoadAsync(Uri uri) => LoadAsync(uri, null);
+
+        /// <summary>
+        /// Delete data from network storage, optionally from a specific instance.
+        /// </summary>
+        public async Task DeleteAsync(Uri uri, string? instanceId = null)
         {
             ArgumentNullException.ThrowIfNull(uri);
 
-            var resolvedUri = ResolveUri(uri);
+            var config = GetConfig(instanceId);
+            var resolvedUri = ResolveUri(uri, config);
             var networkType = DetectNetworkType(resolvedUri);
 
             await ExecuteWithRetryAsync(async () =>
@@ -321,22 +418,31 @@ namespace DataWarehouse.Plugins.NetworkStorage
                     case NetworkType.HTTP:
                     case NetworkType.HTTPS:
                     case NetworkType.WebDAV:
-                        await DeleteFromHttpAsync(resolvedUri);
+                        await DeleteFromHttpAsync(resolvedUri, instanceId);
                         break;
                     case NetworkType.FTP:
-                        await DeleteFromFtpAsync(resolvedUri);
+                        await DeleteFromFtpAsync(resolvedUri, instanceId);
                         break;
                     default:
                         throw new NotSupportedException($"Network type not supported: {networkType}");
                 }
-            });
+            }, config);
+
+            // Remove from index
+            _ = RemoveFromIndexAsync(uri.ToString());
         }
 
-        public override async Task<bool> ExistsAsync(Uri uri)
+        public override Task DeleteAsync(Uri uri) => DeleteAsync(uri, null);
+
+        /// <summary>
+        /// Check if data exists in network storage, optionally in a specific instance.
+        /// </summary>
+        public async Task<bool> ExistsAsync(Uri uri, string? instanceId = null)
         {
             ArgumentNullException.ThrowIfNull(uri);
 
-            var resolvedUri = ResolveUri(uri);
+            var config = GetConfig(instanceId);
+            var resolvedUri = ResolveUri(uri, config);
             var networkType = DetectNetworkType(resolvedUri);
 
             try
@@ -346,17 +452,19 @@ namespace DataWarehouse.Plugins.NetworkStorage
                     return networkType switch
                     {
                         NetworkType.UNC or NetworkType.MappedDrive or NetworkType.SMB => File.Exists(GetLocalPath(resolvedUri)),
-                        NetworkType.HTTP or NetworkType.HTTPS or NetworkType.WebDAV => await ExistsHttpAsync(resolvedUri),
-                        NetworkType.FTP => await ExistsFtpAsync(resolvedUri),
+                        NetworkType.HTTP or NetworkType.HTTPS or NetworkType.WebDAV => await ExistsHttpAsync(resolvedUri, instanceId),
+                        NetworkType.FTP => await ExistsFtpAsync(resolvedUri, instanceId),
                         _ => false
                     };
-                });
+                }, config);
             }
             catch
             {
                 return false;
             }
         }
+
+        public override Task<bool> ExistsAsync(Uri uri) => ExistsAsync(uri, null);
 
         public override async IAsyncEnumerable<StorageListItem> ListFilesAsync(
             string prefix = "",
@@ -391,7 +499,44 @@ namespace DataWarehouse.Plugins.NetworkStorage
             // HTTP/FTP listing would require protocol-specific implementations
         }
 
-        private async Task<bool> PingAsync(Uri uri)
+        #endregion
+
+        #region Helper Methods
+
+        private NetworkStorageConfig GetConfig(string? instanceId)
+        {
+            if (string.IsNullOrEmpty(instanceId))
+                return _config;
+
+            var instance = _connectionRegistry.Get(instanceId);
+            return instance?.Config ?? _config;
+        }
+
+        private HttpClient GetHttpClient(string? instanceId)
+        {
+            if (string.IsNullOrEmpty(instanceId))
+                return _httpClient;
+
+            var instance = _connectionRegistry.Get(instanceId);
+            if (instance?.Connection is NetworkStorageConnection conn)
+                return conn.HttpClient;
+
+            return _httpClient;
+        }
+
+        private NetworkCredential? GetCredential(string? instanceId)
+        {
+            if (string.IsNullOrEmpty(instanceId))
+                return _credential;
+
+            var instance = _connectionRegistry.Get(instanceId);
+            if (instance?.Connection is NetworkStorageConnection conn)
+                return conn.Credential;
+
+            return _credential;
+        }
+
+        private async Task<bool> PingAsync(Uri uri, string? instanceId = null)
         {
             var networkType = DetectNetworkType(uri);
 
@@ -399,7 +544,8 @@ namespace DataWarehouse.Plugins.NetworkStorage
             {
                 try
                 {
-                    using var response = await _httpClient.SendAsync(new HttpRequestMessage(HttpMethod.Head, uri));
+                    var client = GetHttpClient(instanceId);
+                    using var response = await client.SendAsync(new HttpRequestMessage(HttpMethod.Head, uri));
                     return response.IsSuccessStatusCode;
                 }
                 catch
@@ -440,13 +586,13 @@ namespace DataWarehouse.Plugins.NetworkStorage
             }
         }
 
-        private Uri ResolveUri(Uri uri)
+        private Uri ResolveUri(Uri uri, NetworkStorageConfig config)
         {
             if (uri.IsAbsoluteUri)
                 return uri;
 
-            if (_config.BaseUri != null)
-                return new Uri(_config.BaseUri, uri);
+            if (config.BaseUri != null)
+                return new Uri(config.BaseUri, uri);
 
             return uri;
         }
@@ -518,16 +664,18 @@ namespace DataWarehouse.Plugins.NetworkStorage
             return Task.CompletedTask;
         }
 
-        private async Task SaveToHttpAsync(Uri uri, Stream data)
+        private async Task SaveToHttpAsync(Uri uri, Stream data, string? instanceId = null)
         {
+            var client = GetHttpClient(instanceId);
             using var content = new StreamContent(data);
-            using var response = await _httpClient.PutAsync(uri, content);
+            using var response = await client.PutAsync(uri, content);
             response.EnsureSuccessStatusCode();
         }
 
-        private async Task<Stream> LoadFromHttpAsync(Uri uri)
+        private async Task<Stream> LoadFromHttpAsync(Uri uri, string? instanceId = null)
         {
-            var response = await _httpClient.GetAsync(uri);
+            var client = GetHttpClient(instanceId);
+            var response = await client.GetAsync(uri);
             response.EnsureSuccessStatusCode();
             var ms = new MemoryStream();
             await response.Content.CopyToAsync(ms);
@@ -535,17 +683,19 @@ namespace DataWarehouse.Plugins.NetworkStorage
             return ms;
         }
 
-        private async Task DeleteFromHttpAsync(Uri uri)
+        private async Task DeleteFromHttpAsync(Uri uri, string? instanceId = null)
         {
-            using var response = await _httpClient.DeleteAsync(uri);
+            var client = GetHttpClient(instanceId);
+            using var response = await client.DeleteAsync(uri);
             response.EnsureSuccessStatusCode();
         }
 
-        private async Task<bool> ExistsHttpAsync(Uri uri)
+        private async Task<bool> ExistsHttpAsync(Uri uri, string? instanceId = null)
         {
             try
             {
-                using var response = await _httpClient.SendAsync(new HttpRequestMessage(HttpMethod.Head, uri));
+                var client = GetHttpClient(instanceId);
+                using var response = await client.SendAsync(new HttpRequestMessage(HttpMethod.Head, uri));
                 return response.IsSuccessStatusCode;
             }
             catch
@@ -554,12 +704,13 @@ namespace DataWarehouse.Plugins.NetworkStorage
             }
         }
 
-        private async Task SaveToFtpAsync(Uri uri, Stream data)
+        private async Task SaveToFtpAsync(Uri uri, Stream data, string? instanceId = null)
         {
+            var credential = GetCredential(instanceId);
             var request = (FtpWebRequest)WebRequest.Create(uri);
             request.Method = WebRequestMethods.Ftp.UploadFile;
-            if (_credential != null)
-                request.Credentials = _credential;
+            if (credential != null)
+                request.Credentials = credential;
 
             await using var requestStream = await request.GetRequestStreamAsync();
             await data.CopyToAsync(requestStream);
@@ -567,12 +718,13 @@ namespace DataWarehouse.Plugins.NetworkStorage
             using var response = (FtpWebResponse)await request.GetResponseAsync();
         }
 
-        private async Task<Stream> LoadFromFtpAsync(Uri uri)
+        private async Task<Stream> LoadFromFtpAsync(Uri uri, string? instanceId = null)
         {
+            var credential = GetCredential(instanceId);
             var request = (FtpWebRequest)WebRequest.Create(uri);
             request.Method = WebRequestMethods.Ftp.DownloadFile;
-            if (_credential != null)
-                request.Credentials = _credential;
+            if (credential != null)
+                request.Credentials = credential;
 
             using var response = (FtpWebResponse)await request.GetResponseAsync();
             var ms = new MemoryStream();
@@ -582,24 +734,26 @@ namespace DataWarehouse.Plugins.NetworkStorage
             return ms;
         }
 
-        private async Task DeleteFromFtpAsync(Uri uri)
+        private async Task DeleteFromFtpAsync(Uri uri, string? instanceId = null)
         {
+            var credential = GetCredential(instanceId);
             var request = (FtpWebRequest)WebRequest.Create(uri);
             request.Method = WebRequestMethods.Ftp.DeleteFile;
-            if (_credential != null)
-                request.Credentials = _credential;
+            if (credential != null)
+                request.Credentials = credential;
 
             using var response = (FtpWebResponse)await request.GetResponseAsync();
         }
 
-        private async Task<bool> ExistsFtpAsync(Uri uri)
+        private async Task<bool> ExistsFtpAsync(Uri uri, string? instanceId = null)
         {
             try
             {
+                var credential = GetCredential(instanceId);
                 var request = (FtpWebRequest)WebRequest.Create(uri);
                 request.Method = WebRequestMethods.Ftp.GetFileSize;
-                if (_credential != null)
-                    request.Credentials = _credential;
+                if (credential != null)
+                    request.Credentials = credential;
 
                 using var response = (FtpWebResponse)await request.GetResponseAsync();
                 return true;
@@ -610,10 +764,10 @@ namespace DataWarehouse.Plugins.NetworkStorage
             }
         }
 
-        private async Task ExecuteWithRetryAsync(Func<Task> action)
+        private async Task ExecuteWithRetryAsync(Func<Task> action, NetworkStorageConfig config)
         {
-            var retries = _config.EnableRetry ? _config.MaxRetries : 0;
-            var delay = _config.RetryDelayMs;
+            var retries = config.EnableRetry ? config.MaxRetries : 0;
+            var delay = config.RetryDelayMs;
 
             for (var attempt = 0; attempt <= retries; attempt++)
             {
@@ -630,10 +784,10 @@ namespace DataWarehouse.Plugins.NetworkStorage
             }
         }
 
-        private async Task<T> ExecuteWithRetryAsync<T>(Func<Task<T>> action)
+        private async Task<T> ExecuteWithRetryAsync<T>(Func<Task<T>> action, NetworkStorageConfig config)
         {
-            var retries = _config.EnableRetry ? _config.MaxRetries : 0;
-            var delay = _config.RetryDelayMs;
+            var retries = config.EnableRetry ? config.MaxRetries : 0;
+            var delay = config.RetryDelayMs;
 
             for (var attempt = 0; attempt <= retries; attempt++)
             {
@@ -650,12 +804,29 @@ namespace DataWarehouse.Plugins.NetworkStorage
 
             return await action(); // Final attempt - let exception propagate
         }
+
+        #endregion
+    }
+
+    /// <summary>
+    /// Internal connection wrapper for network storage instances.
+    /// </summary>
+    internal class NetworkStorageConnection : IDisposable
+    {
+        public required NetworkStorageConfig Config { get; init; }
+        public required HttpClient HttpClient { get; init; }
+        public NetworkCredential? Credential { get; init; }
+
+        public void Dispose()
+        {
+            HttpClient?.Dispose();
+        }
     }
 
     /// <summary>
     /// Configuration for network storage.
     /// </summary>
-    public class NetworkStorageConfig
+    public class NetworkStorageConfig : StorageConfigBase
     {
         /// <summary>
         /// Base URI for network storage.
@@ -676,16 +847,6 @@ namespace DataWarehouse.Plugins.NetworkStorage
         /// Enable automatic retry on failure.
         /// </summary>
         public bool EnableRetry { get; set; } = true;
-
-        /// <summary>
-        /// Maximum retry attempts.
-        /// </summary>
-        public int MaxRetries { get; set; } = 3;
-
-        /// <summary>
-        /// Initial retry delay in milliseconds.
-        /// </summary>
-        public int RetryDelayMs { get; set; } = 1000;
 
         /// <summary>
         /// Enable chunked transfer for large files.
@@ -717,6 +878,19 @@ namespace DataWarehouse.Plugins.NetworkStorage
         }
 
         /// <summary>
+        /// Creates configuration for UNC path with instance ID.
+        /// </summary>
+        public static NetworkStorageConfig ForUnc(string uncPath, string instanceId, string? username = null, string? password = null, string? domain = null)
+        {
+            return new NetworkStorageConfig
+            {
+                BaseUri = new Uri(uncPath),
+                Credentials = username != null ? new NetworkCredential(username, password, domain) : null,
+                InstanceId = instanceId
+            };
+        }
+
+        /// <summary>
         /// Creates configuration for HTTP/HTTPS endpoint.
         /// </summary>
         public static NetworkStorageConfig ForHttp(string url, string? username = null, string? password = null)
@@ -729,6 +903,19 @@ namespace DataWarehouse.Plugins.NetworkStorage
         }
 
         /// <summary>
+        /// Creates configuration for HTTP/HTTPS endpoint with instance ID.
+        /// </summary>
+        public static NetworkStorageConfig ForHttp(string url, string instanceId, string? username = null, string? password = null)
+        {
+            return new NetworkStorageConfig
+            {
+                BaseUri = new Uri(url),
+                Credentials = username != null ? new NetworkCredential(username, password) : null,
+                InstanceId = instanceId
+            };
+        }
+
+        /// <summary>
         /// Creates configuration for FTP server.
         /// </summary>
         public static NetworkStorageConfig ForFtp(string host, string? username = null, string? password = null)
@@ -737,6 +924,19 @@ namespace DataWarehouse.Plugins.NetworkStorage
             {
                 BaseUri = new Uri($"ftp://{host}"),
                 Credentials = username != null ? new NetworkCredential(username, password) : null
+            };
+        }
+
+        /// <summary>
+        /// Creates configuration for FTP server with instance ID.
+        /// </summary>
+        public static NetworkStorageConfig ForFtp(string host, string instanceId, string? username = null, string? password = null)
+        {
+            return new NetworkStorageConfig
+            {
+                BaseUri = new Uri($"ftp://{host}"),
+                Credentials = username != null ? new NetworkCredential(username, password) : null,
+                InstanceId = instanceId
             };
         }
     }

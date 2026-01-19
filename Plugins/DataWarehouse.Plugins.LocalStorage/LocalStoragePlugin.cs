@@ -1,5 +1,7 @@
 using DataWarehouse.SDK.Contracts;
+using DataWarehouse.SDK.Infrastructure;
 using DataWarehouse.SDK.Primitives;
+using DataWarehouse.SDK.Storage;
 using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.LocalStorage
@@ -16,6 +18,9 @@ namespace DataWarehouse.Plugins.LocalStorage
     /// - Support for removable media with eject/mount detection
     /// - Atomic write operations using temp files and rename
     /// - Concurrent access with file locking
+    /// - Multi-instance support with role-based selection
+    /// - TTL-based caching support
+    /// - Document indexing and search
     ///
     /// Message Commands:
     /// - storage.local.save: Save data to local storage
@@ -24,25 +29,25 @@ namespace DataWarehouse.Plugins.LocalStorage
     /// - storage.local.exists: Check if file exists
     /// - storage.local.list: List files in directory
     /// - storage.local.info: Get storage media information
+    /// - storage.instance.*: Multi-instance management
     /// </summary>
-    public sealed class LocalStoragePlugin : ListableStoragePluginBase
+    public sealed class LocalStoragePlugin : HybridStoragePluginBase<LocalStorageConfig>
     {
-        private readonly LocalStorageConfig _config;
         private readonly SemaphoreSlim _writeLock = new(10, 10); // Allow 10 concurrent writes
         private MediaType _detectedMediaType = MediaType.Unknown;
 
         public override string Id => "datawarehouse.plugins.storage.local";
         public override string Name => "Local Storage";
-        public override string Version => "1.0.0";
+        public override string Version => "2.0.0";
         public override string Scheme => "file";
+        public override string StorageCategory => "Local";
 
         /// <summary>
         /// Creates a local storage plugin with optional configuration.
         /// </summary>
         public LocalStoragePlugin(LocalStorageConfig? config = null)
+            : base(config ?? new LocalStorageConfig())
         {
-            _config = config ?? new LocalStorageConfig();
-
             if (!string.IsNullOrEmpty(_config.BasePath))
             {
                 Directory.CreateDirectory(_config.BasePath);
@@ -55,19 +60,40 @@ namespace DataWarehouse.Plugins.LocalStorage
         /// </summary>
         public MediaType DetectedMediaType => _detectedMediaType;
 
+        /// <summary>
+        /// Creates a connection (file handle wrapper) for the given configuration.
+        /// </summary>
+        protected override Task<object> CreateConnectionAsync(LocalStorageConfig config)
+        {
+            var basePath = config.BasePath ?? Directory.GetCurrentDirectory();
+            if (!Directory.Exists(basePath))
+            {
+                Directory.CreateDirectory(basePath);
+            }
+
+            return Task.FromResult<object>(new LocalStorageConnection
+            {
+                BasePath = basePath,
+                Config = config,
+                DetectedMediaType = DetectMediaType(basePath)
+            });
+        }
+
         protected override List<PluginCapabilityDescriptor> GetCapabilities()
         {
-            return
-            [
-                new() { Name = "storage.local.save", DisplayName = "Save", Description = "Store data to local filesystem" },
-                new() { Name = "storage.local.load", DisplayName = "Load", Description = "Retrieve data from local filesystem" },
-                new() { Name = "storage.local.delete", DisplayName = "Delete", Description = "Remove data from local filesystem" },
-                new() { Name = "storage.local.exists", DisplayName = "Exists", Description = "Check if file exists" },
-                new() { Name = "storage.local.list", DisplayName = "List", Description = "List files in directory" },
-                new() { Name = "storage.local.info", DisplayName = "Info", Description = "Get storage media information" },
-                new() { Name = "storage.local.copy", DisplayName = "Copy", Description = "Copy file within storage" },
-                new() { Name = "storage.local.move", DisplayName = "Move", Description = "Move/rename file" }
-            ];
+            var capabilities = base.GetCapabilities();
+            capabilities.AddRange(new[]
+            {
+                new PluginCapabilityDescriptor { Name = "storage.local.save", DisplayName = "Save", Description = "Store data to local filesystem" },
+                new PluginCapabilityDescriptor { Name = "storage.local.load", DisplayName = "Load", Description = "Retrieve data from local filesystem" },
+                new PluginCapabilityDescriptor { Name = "storage.local.delete", DisplayName = "Delete", Description = "Remove data from local filesystem" },
+                new PluginCapabilityDescriptor { Name = "storage.local.exists", DisplayName = "Exists", Description = "Check if file exists" },
+                new PluginCapabilityDescriptor { Name = "storage.local.list", DisplayName = "List", Description = "List files in directory" },
+                new PluginCapabilityDescriptor { Name = "storage.local.info", DisplayName = "Info", Description = "Get storage media information" },
+                new PluginCapabilityDescriptor { Name = "storage.local.copy", DisplayName = "Copy", Description = "Copy file within storage" },
+                new PluginCapabilityDescriptor { Name = "storage.local.move", DisplayName = "Move", Description = "Move/rename file" }
+            });
+            return capabilities;
         }
 
         protected override Dictionary<string, object> GetMetadata()
@@ -77,7 +103,7 @@ namespace DataWarehouse.Plugins.LocalStorage
             metadata["BasePath"] = _config.BasePath ?? "current directory";
             metadata["MediaType"] = _detectedMediaType.ToString();
             metadata["AtomicWrites"] = _config.UseAtomicWrites;
-            metadata["AccessPattern"] = GetOptimalAccessPattern().ToString();
+            metadata["AccessPattern"] = GetOptimalAccessPattern(_config, _detectedMediaType).ToString();
             metadata["SupportsConcurrency"] = true;
             metadata["SupportsListing"] = true;
             return metadata;
@@ -88,6 +114,7 @@ namespace DataWarehouse.Plugins.LocalStorage
         /// </summary>
         public override async Task OnMessageAsync(PluginMessage message)
         {
+            // Handle local storage specific messages
             var response = message.Type switch
             {
                 "storage.local.save" => await HandleSaveAsync(message),
@@ -99,6 +126,12 @@ namespace DataWarehouse.Plugins.LocalStorage
                 "storage.local.move" => await HandleMoveAsync(message),
                 _ => null
             };
+
+            // If not handled, delegate to base for multi-instance management
+            if (response == null)
+            {
+                await base.OnMessageAsync(message);
+            }
         }
 
         private async Task<MessageResponse> HandleSaveAsync(PluginMessage message)
@@ -119,8 +152,11 @@ namespace DataWarehouse.Plugins.LocalStorage
                 _ => throw new ArgumentException("Data must be Stream, byte[], or string")
             };
 
-            await SaveAsync(uri, data);
-            return MessageResponse.Ok(new { Uri = uri.ToString(), Success = true });
+            // Optional: get instanceId for multi-instance support
+            var instanceId = payload.TryGetValue("instanceId", out var instId) ? instId?.ToString() : null;
+
+            await SaveAsync(uri, data, instanceId);
+            return MessageResponse.Ok(new { Uri = uri.ToString(), Success = true, InstanceId = instanceId });
         }
 
         private async Task<MessageResponse> HandleLoadAsync(PluginMessage message)
@@ -132,10 +168,12 @@ namespace DataWarehouse.Plugins.LocalStorage
             }
 
             var uri = uriObj is Uri u ? u : new Uri(uriObj.ToString()!);
-            var stream = await LoadAsync(uri);
+            var instanceId = payload.TryGetValue("instanceId", out var instId) ? instId?.ToString() : null;
+
+            var stream = await LoadAsync(uri, instanceId);
             using var ms = new MemoryStream();
             await stream.CopyToAsync(ms);
-            return MessageResponse.Ok(new { Uri = uri.ToString(), Data = ms.ToArray() });
+            return MessageResponse.Ok(new { Uri = uri.ToString(), Data = ms.ToArray(), InstanceId = instanceId });
         }
 
         private async Task<MessageResponse> HandleDeleteAsync(PluginMessage message)
@@ -147,8 +185,10 @@ namespace DataWarehouse.Plugins.LocalStorage
             }
 
             var uri = uriObj is Uri u ? u : new Uri(uriObj.ToString()!);
-            await DeleteAsync(uri);
-            return MessageResponse.Ok(new { Uri = uri.ToString(), Deleted = true });
+            var instanceId = payload.TryGetValue("instanceId", out var instId) ? instId?.ToString() : null;
+
+            await DeleteAsync(uri, instanceId);
+            return MessageResponse.Ok(new { Uri = uri.ToString(), Deleted = true, InstanceId = instanceId });
         }
 
         private async Task<MessageResponse> HandleExistsAsync(PluginMessage message)
@@ -160,8 +200,10 @@ namespace DataWarehouse.Plugins.LocalStorage
             }
 
             var uri = uriObj is Uri u ? u : new Uri(uriObj.ToString()!);
-            var exists = await ExistsAsync(uri);
-            return MessageResponse.Ok(new { Uri = uri.ToString(), Exists = exists });
+            var instanceId = payload.TryGetValue("instanceId", out var instId) ? instId?.ToString() : null;
+
+            var exists = await ExistsAsync(uri, instanceId);
+            return MessageResponse.Ok(new { Uri = uri.ToString(), Exists = exists, InstanceId = instanceId });
         }
 
         private MessageResponse HandleInfo(PluginMessage message)
@@ -170,8 +212,9 @@ namespace DataWarehouse.Plugins.LocalStorage
             return MessageResponse.Ok(new
             {
                 MediaType = _detectedMediaType.ToString(),
-                AccessPattern = GetOptimalAccessPattern().ToString(),
-                DriveInfo = driveInfo
+                AccessPattern = GetOptimalAccessPattern(_config, _detectedMediaType).ToString(),
+                DriveInfo = driveInfo,
+                Instances = _connectionRegistry.Count
             });
         }
 
@@ -186,9 +229,11 @@ namespace DataWarehouse.Plugins.LocalStorage
 
             var sourceUri = sourceObj is Uri su ? su : new Uri(sourceObj.ToString()!);
             var destUri = destObj is Uri du ? du : new Uri(destObj.ToString()!);
+            var instanceId = payload.TryGetValue("instanceId", out var instId) ? instId?.ToString() : null;
 
-            var sourcePath = GetFilePath(sourceUri);
-            var destPath = GetFilePath(destUri);
+            var basePath = GetBasePath(instanceId);
+            var sourcePath = GetFilePath(sourceUri, basePath);
+            var destPath = GetFilePath(destUri, basePath);
 
             var destDir = Path.GetDirectoryName(destPath);
             if (!string.IsNullOrEmpty(destDir))
@@ -209,9 +254,11 @@ namespace DataWarehouse.Plugins.LocalStorage
 
             var sourceUri = sourceObj is Uri su ? su : new Uri(sourceObj.ToString()!);
             var destUri = destObj is Uri du ? du : new Uri(destObj.ToString()!);
+            var instanceId = payload.TryGetValue("instanceId", out var instId) ? instId?.ToString() : null;
 
-            var sourcePath = GetFilePath(sourceUri);
-            var destPath = GetFilePath(destUri);
+            var basePath = GetBasePath(instanceId);
+            var sourcePath = GetFilePath(sourceUri, basePath);
+            var destPath = GetFilePath(destUri, basePath);
 
             var destDir = Path.GetDirectoryName(destPath);
             if (!string.IsNullOrEmpty(destDir))
@@ -221,12 +268,19 @@ namespace DataWarehouse.Plugins.LocalStorage
             return MessageResponse.Ok(new { Source = sourceUri.ToString(), Destination = destUri.ToString(), Success = true });
         }
 
-        public override async Task SaveAsync(Uri uri, Stream data)
+        #region Storage Operations with Instance Support
+
+        /// <summary>
+        /// Save data to storage, optionally targeting a specific instance.
+        /// </summary>
+        public async Task SaveAsync(Uri uri, Stream data, string? instanceId = null)
         {
             ArgumentNullException.ThrowIfNull(uri);
             ArgumentNullException.ThrowIfNull(data);
 
-            var filePath = GetFilePath(uri);
+            var basePath = GetBasePath(instanceId);
+            var config = GetConfig(instanceId);
+            var filePath = GetFilePath(uri, basePath);
             var directory = Path.GetDirectoryName(filePath);
             if (!string.IsNullOrEmpty(directory))
                 Directory.CreateDirectory(directory);
@@ -234,16 +288,16 @@ namespace DataWarehouse.Plugins.LocalStorage
             await _writeLock.WaitAsync();
             try
             {
-                var bufferSize = GetOptimalBufferSize();
+                var bufferSize = GetOptimalBufferSize(config);
 
-                if (_config.UseAtomicWrites)
+                if (config.UseAtomicWrites)
                 {
                     // Atomic write using temp file and rename
                     var tempPath = filePath + ".tmp." + Guid.NewGuid().ToString("N")[..8];
                     try
                     {
                         await using (var fs = new FileStream(tempPath, FileMode.Create, FileAccess.Write,
-                            FileShare.None, bufferSize, GetFileOptions()))
+                            FileShare.None, bufferSize, GetFileOptions(config, GetMediaType(instanceId))))
                         {
                             await data.CopyToAsync(fs);
                             await fs.FlushAsync();
@@ -261,9 +315,23 @@ namespace DataWarehouse.Plugins.LocalStorage
                 else
                 {
                     await using var fs = new FileStream(filePath, FileMode.Create, FileAccess.Write,
-                        FileShare.None, bufferSize, GetFileOptions());
+                        FileShare.None, bufferSize, GetFileOptions(config, GetMediaType(instanceId)));
                     await data.CopyToAsync(fs);
                     await fs.FlushAsync();
+                }
+
+                // Auto-index if enabled
+                if (config.EnableIndexing)
+                {
+                    var fileInfo = new FileInfo(filePath);
+                    await IndexDocumentAsync(uri.ToString(), new Dictionary<string, object>
+                    {
+                        ["uri"] = uri.ToString(),
+                        ["path"] = filePath,
+                        ["size"] = fileInfo.Length,
+                        ["lastModified"] = fileInfo.LastWriteTimeUtc,
+                        ["instanceId"] = instanceId ?? "default"
+                    });
                 }
             }
             finally
@@ -272,23 +340,34 @@ namespace DataWarehouse.Plugins.LocalStorage
             }
         }
 
-        public override async Task<Stream> LoadAsync(Uri uri)
+        public override Task SaveAsync(Uri uri, Stream data) => SaveAsync(uri, data, null);
+
+        /// <summary>
+        /// Load data from storage, optionally from a specific instance.
+        /// </summary>
+        public async Task<Stream> LoadAsync(Uri uri, string? instanceId = null)
         {
             ArgumentNullException.ThrowIfNull(uri);
 
-            var filePath = GetFilePath(uri);
+            var basePath = GetBasePath(instanceId);
+            var config = GetConfig(instanceId);
+            var filePath = GetFilePath(uri, basePath);
 
             if (!File.Exists(filePath))
                 throw new FileNotFoundException($"File not found: {filePath}");
 
-            var bufferSize = GetOptimalBufferSize();
+            var bufferSize = GetOptimalBufferSize(config);
+
+            // Update last access for caching
+            await TouchAsync(uri);
 
             // Return buffered stream for optimal read performance
+            var mediaType = GetMediaType(instanceId);
             var fs = new FileStream(filePath, FileMode.Open, FileAccess.Read,
-                FileShare.Read, bufferSize, GetFileOptions());
+                FileShare.Read, bufferSize, GetFileOptions(config, mediaType));
 
             // For sequential media (tape, optical), read entire file into memory
-            if (GetOptimalAccessPattern() == AccessPattern.Sequential)
+            if (GetOptimalAccessPattern(config, mediaType) == AccessPattern.Sequential)
             {
                 var ms = new MemoryStream();
                 await fs.CopyToAsync(ms);
@@ -300,23 +379,40 @@ namespace DataWarehouse.Plugins.LocalStorage
             return fs;
         }
 
-        public override Task DeleteAsync(Uri uri)
+        public override Task<Stream> LoadAsync(Uri uri) => LoadAsync(uri, null);
+
+        /// <summary>
+        /// Delete data from storage, optionally from a specific instance.
+        /// </summary>
+        public Task DeleteAsync(Uri uri, string? instanceId = null)
         {
             ArgumentNullException.ThrowIfNull(uri);
 
-            var filePath = GetFilePath(uri);
+            var basePath = GetBasePath(instanceId);
+            var filePath = GetFilePath(uri, basePath);
             if (File.Exists(filePath))
                 File.Delete(filePath);
+
+            // Remove from index
+            _ = RemoveFromIndexAsync(uri.ToString());
 
             return Task.CompletedTask;
         }
 
-        public override Task<bool> ExistsAsync(Uri uri)
+        public override Task DeleteAsync(Uri uri) => DeleteAsync(uri, null);
+
+        /// <summary>
+        /// Check if data exists in storage, optionally in a specific instance.
+        /// </summary>
+        public Task<bool> ExistsAsync(Uri uri, string? instanceId = null)
         {
             ArgumentNullException.ThrowIfNull(uri);
-            var filePath = GetFilePath(uri);
+            var basePath = GetBasePath(instanceId);
+            var filePath = GetFilePath(uri, basePath);
             return Task.FromResult(File.Exists(filePath));
         }
+
+        public override Task<bool> ExistsAsync(Uri uri) => ExistsAsync(uri, null);
 
         public override async IAsyncEnumerable<StorageListItem> ListFilesAsync(
             string prefix = "",
@@ -350,7 +446,41 @@ namespace DataWarehouse.Plugins.LocalStorage
             }
         }
 
-        private string GetFilePath(Uri uri)
+        #endregion
+
+        #region Helper Methods
+
+        private string GetBasePath(string? instanceId)
+        {
+            if (string.IsNullOrEmpty(instanceId))
+                return _config.BasePath ?? Directory.GetCurrentDirectory();
+
+            var instance = _connectionRegistry.Get(instanceId);
+            return instance?.Config.BasePath ?? _config.BasePath ?? Directory.GetCurrentDirectory();
+        }
+
+        private LocalStorageConfig GetConfig(string? instanceId)
+        {
+            if (string.IsNullOrEmpty(instanceId))
+                return _config;
+
+            var instance = _connectionRegistry.Get(instanceId);
+            return instance?.Config ?? _config;
+        }
+
+        private MediaType GetMediaType(string? instanceId)
+        {
+            if (string.IsNullOrEmpty(instanceId))
+                return _detectedMediaType;
+
+            var instance = _connectionRegistry.Get(instanceId);
+            if (instance?.Metadata.TryGetValue("mediaType", out var mt) == true && mt is MediaType mediaType)
+                return mediaType;
+
+            return _detectedMediaType;
+        }
+
+        private string GetFilePath(Uri uri, string basePath)
         {
             var relativePath = uri.LocalPath.TrimStart('/').Replace('/', Path.DirectorySeparatorChar);
 
@@ -360,49 +490,32 @@ namespace DataWarehouse.Plugins.LocalStorage
             {
                 // For absolute Windows paths, still validate against BasePath if set
                 var windowsPath = uri.LocalPath.TrimStart('/');
-                if (!string.IsNullOrEmpty(_config.BasePath))
-                {
-                    var normalizedBase = Path.GetFullPath(_config.BasePath);
-                    var normalizedTarget = Path.GetFullPath(windowsPath);
-                    if (!normalizedTarget.StartsWith(normalizedBase, StringComparison.OrdinalIgnoreCase))
-                    {
-                        throw new UnauthorizedAccessException(
-                            $"Security violation: Path traversal attempt detected. Access denied.");
-                    }
-                }
-                return windowsPath;
-            }
-
-            if (!string.IsNullOrEmpty(_config.BasePath))
-            {
-                var fullPath = Path.GetFullPath(Path.Combine(_config.BasePath, relativePath));
-                var normalizedBasePath = Path.GetFullPath(_config.BasePath);
-
-                // Security: Prevent path traversal attacks
-                if (!fullPath.StartsWith(normalizedBasePath, StringComparison.OrdinalIgnoreCase))
+                var normalizedBase = Path.GetFullPath(basePath);
+                var normalizedTarget = Path.GetFullPath(windowsPath);
+                if (!normalizedTarget.StartsWith(normalizedBase, StringComparison.OrdinalIgnoreCase))
                 {
                     throw new UnauthorizedAccessException(
                         $"Security violation: Path traversal attempt detected. Access denied.");
                 }
-                return fullPath;
+                return windowsPath;
             }
 
-            // No base path - validate against current directory
-            var currentDir = Path.GetFullPath(Directory.GetCurrentDirectory());
-            var targetPath = Path.GetFullPath(relativePath);
-            if (!targetPath.StartsWith(currentDir, StringComparison.OrdinalIgnoreCase))
+            var fullPath = Path.GetFullPath(Path.Combine(basePath, relativePath));
+            var normalizedBasePath = Path.GetFullPath(basePath);
+
+            // Security: Prevent path traversal attacks
+            if (!fullPath.StartsWith(normalizedBasePath, StringComparison.OrdinalIgnoreCase))
             {
                 throw new UnauthorizedAccessException(
                     $"Security violation: Path traversal attempt detected. Access denied.");
             }
-
-            return relativePath;
+            return fullPath;
         }
 
-        private int GetOptimalBufferSize()
+        private int GetOptimalBufferSize(LocalStorageConfig config)
         {
-            if (_config.BufferSize.HasValue)
-                return _config.BufferSize.Value;
+            if (config.BufferSize.HasValue)
+                return config.BufferSize.Value;
 
             return _detectedMediaType switch
             {
@@ -416,34 +529,34 @@ namespace DataWarehouse.Plugins.LocalStorage
             };
         }
 
-        private FileOptions GetFileOptions()
+        private FileOptions GetFileOptions(LocalStorageConfig config, MediaType mediaType)
         {
             var options = FileOptions.Asynchronous;
 
-            if (GetOptimalAccessPattern() == AccessPattern.Sequential)
+            if (GetOptimalAccessPattern(config, mediaType) == AccessPattern.Sequential)
                 options |= FileOptions.SequentialScan;
             else
                 options |= FileOptions.RandomAccess;
 
-            if (_config.UseWriteThrough)
+            if (config.UseWriteThrough)
                 options |= FileOptions.WriteThrough;
 
             return options;
         }
 
-        private AccessPattern GetOptimalAccessPattern()
+        private AccessPattern GetOptimalAccessPattern(LocalStorageConfig config, MediaType mediaType)
         {
-            if (_config.ForceAccessPattern.HasValue)
-                return _config.ForceAccessPattern.Value;
+            if (config.ForceAccessPattern.HasValue)
+                return config.ForceAccessPattern.Value;
 
-            return _detectedMediaType switch
+            return mediaType switch
             {
                 MediaType.Tape or MediaType.Optical => AccessPattern.Sequential,
                 _ => AccessPattern.Random
             };
         }
 
-        private MediaType DetectMediaType(string path)
+        private static MediaType DetectMediaType(string path)
         {
             try
             {
@@ -499,12 +612,24 @@ namespace DataWarehouse.Plugins.LocalStorage
                 return null;
             }
         }
+
+        #endregion
+    }
+
+    /// <summary>
+    /// Internal connection wrapper for local storage instances.
+    /// </summary>
+    internal class LocalStorageConnection
+    {
+        public required string BasePath { get; init; }
+        public required LocalStorageConfig Config { get; init; }
+        public MediaType DetectedMediaType { get; init; }
     }
 
     /// <summary>
     /// Configuration for local storage.
     /// </summary>
-    public class LocalStorageConfig
+    public class LocalStorageConfig : StorageConfigBase
     {
         /// <summary>
         /// Base path for storage (null = current directory).
@@ -540,6 +665,16 @@ namespace DataWarehouse.Plugins.LocalStorage
         /// Creates configuration for a specific path.
         /// </summary>
         public static LocalStorageConfig ForPath(string path) => new() { BasePath = path };
+
+        /// <summary>
+        /// Creates configuration for a specific path with instance settings.
+        /// </summary>
+        public static LocalStorageConfig ForPath(string path, string instanceId, bool enableCaching = true) => new()
+        {
+            BasePath = path,
+            InstanceId = instanceId,
+            EnableCaching = enableCaching
+        };
 
         /// <summary>
         /// Creates configuration optimized for tape storage.

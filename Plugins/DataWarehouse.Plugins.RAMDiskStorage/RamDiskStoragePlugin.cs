@@ -1,5 +1,7 @@
 using DataWarehouse.SDK.Contracts;
+using DataWarehouse.SDK.Infrastructure;
 using DataWarehouse.SDK.Primitives;
+using DataWarehouse.SDK.Storage;
 using DataWarehouse.SDK.Utilities;
 using System.Collections.Concurrent;
 
@@ -15,6 +17,9 @@ namespace DataWarehouse.Plugins.RAMDiskStorage
     /// - Automatic recovery from persistence on startup
     /// - Memory-mapped file support for large datasets
     /// - Thread-safe concurrent access
+    /// - Multi-instance support with role-based selection
+    /// - TTL-based caching support
+    /// - Document indexing and search
     ///
     /// Message Commands:
     /// - storage.ramdisk.save: Save data to RAM disk
@@ -22,11 +27,12 @@ namespace DataWarehouse.Plugins.RAMDiskStorage
     /// - storage.ramdisk.delete: Delete data from RAM disk
     /// - storage.ramdisk.flush: Flush all pending writes to disk
     /// - storage.ramdisk.stats: Get storage statistics
+    /// - storage.ramdisk.exists: Check if item exists
+    /// - storage.instance.*: Multi-instance management
     /// </summary>
-    public sealed class RamDiskStoragePlugin : ListableStoragePluginBase
+    public sealed class RamDiskStoragePlugin : HybridStoragePluginBase<RamDiskConfig>
     {
-        private readonly ConcurrentDictionary<string, RamDiskEntry> _storage = new();
-        private readonly RamDiskConfig _config;
+        private readonly ConcurrentDictionary<string, RamDiskEntryData> _storage = new();
         private readonly SemaphoreSlim _persistLock = new(1, 1);
         private readonly ConcurrentQueue<PersistenceOperation> _pendingWrites = new();
         private readonly CancellationTokenSource _backgroundCts = new();
@@ -36,16 +42,16 @@ namespace DataWarehouse.Plugins.RAMDiskStorage
 
         public override string Id => "datawarehouse.plugins.storage.ramdisk";
         public override string Name => "RAMDisk Storage";
-        public override string Version => "1.0.0";
+        public override string Version => "2.0.0";
         public override string Scheme => "ramdisk";
+        public override string StorageCategory => "Memory";
 
         /// <summary>
         /// Creates a RAMDisk storage plugin with optional configuration.
         /// </summary>
         public RamDiskStoragePlugin(RamDiskConfig? config = null)
+            : base(config ?? new RamDiskConfig())
         {
-            _config = config ?? new RamDiskConfig();
-
             if (_config.EnablePersistence && !string.IsNullOrEmpty(_config.PersistencePath))
             {
                 Directory.CreateDirectory(_config.PersistencePath);
@@ -64,18 +70,40 @@ namespace DataWarehouse.Plugins.RAMDiskStorage
         /// </summary>
         public long TotalSizeBytes => Interlocked.Read(ref _currentSizeBytes);
 
+        /// <summary>
+        /// Creates a connection for the given configuration.
+        /// </summary>
+        protected override Task<object> CreateConnectionAsync(RamDiskConfig config)
+        {
+            var storage = new ConcurrentDictionary<string, RamDiskEntryData>();
+
+            // Recover from persistence if enabled
+            if (config.EnablePersistence && !string.IsNullOrEmpty(config.PersistencePath))
+            {
+                Directory.CreateDirectory(config.PersistencePath);
+            }
+
+            return Task.FromResult<object>(new RamDiskConnection
+            {
+                Config = config,
+                Storage = storage
+            });
+        }
+
         protected override List<PluginCapabilityDescriptor> GetCapabilities()
         {
-            return
-            [
-                new() { Name = "storage.ramdisk.save", DisplayName = "Save", Description = "Store data in RAM disk with optional persistence" },
-                new() { Name = "storage.ramdisk.load", DisplayName = "Load", Description = "Retrieve data from RAM disk" },
-                new() { Name = "storage.ramdisk.delete", DisplayName = "Delete", Description = "Remove data from RAM disk" },
-                new() { Name = "storage.ramdisk.list", DisplayName = "List", Description = "Enumerate stored items" },
-                new() { Name = "storage.ramdisk.flush", DisplayName = "Flush", Description = "Flush pending writes to disk" },
-                new() { Name = "storage.ramdisk.stats", DisplayName = "Stats", Description = "Get storage statistics" },
-                new() { Name = "storage.ramdisk.exists", DisplayName = "Exists", Description = "Check if item exists" }
-            ];
+            var capabilities = base.GetCapabilities();
+            capabilities.AddRange(new[]
+            {
+                new PluginCapabilityDescriptor { Name = "storage.ramdisk.save", DisplayName = "Save", Description = "Store data in RAM disk with optional persistence" },
+                new PluginCapabilityDescriptor { Name = "storage.ramdisk.load", DisplayName = "Load", Description = "Retrieve data from RAM disk" },
+                new PluginCapabilityDescriptor { Name = "storage.ramdisk.delete", DisplayName = "Delete", Description = "Remove data from RAM disk" },
+                new PluginCapabilityDescriptor { Name = "storage.ramdisk.list", DisplayName = "List", Description = "Enumerate stored items" },
+                new PluginCapabilityDescriptor { Name = "storage.ramdisk.flush", DisplayName = "Flush", Description = "Flush pending writes to disk" },
+                new PluginCapabilityDescriptor { Name = "storage.ramdisk.stats", DisplayName = "Stats", Description = "Get storage statistics" },
+                new PluginCapabilityDescriptor { Name = "storage.ramdisk.exists", DisplayName = "Exists", Description = "Check if item exists" }
+            });
+            return capabilities;
         }
 
         protected override Dictionary<string, object> GetMetadata()
@@ -106,6 +134,12 @@ namespace DataWarehouse.Plugins.RAMDiskStorage
                 "storage.ramdisk.exists" => await HandleExistsAsync(message),
                 _ => null
             };
+
+            // If not handled, delegate to base for multi-instance management
+            if (response == null)
+            {
+                await base.OnMessageAsync(message);
+            }
         }
 
         private async Task<MessageResponse> HandleSaveAsync(PluginMessage message)
@@ -126,8 +160,11 @@ namespace DataWarehouse.Plugins.RAMDiskStorage
                 _ => throw new ArgumentException("Data must be Stream, byte[], or string")
             };
 
-            await SaveAsync(uri, data);
-            return MessageResponse.Ok(new { Uri = uri.ToString(), Success = true });
+            // Optional: get instanceId for multi-instance support
+            var instanceId = payload.TryGetValue("instanceId", out var instId) ? instId?.ToString() : null;
+
+            await SaveAsync(uri, data, instanceId);
+            return MessageResponse.Ok(new { Uri = uri.ToString(), Success = true, InstanceId = instanceId });
         }
 
         private async Task<MessageResponse> HandleLoadAsync(PluginMessage message)
@@ -139,10 +176,12 @@ namespace DataWarehouse.Plugins.RAMDiskStorage
             }
 
             var uri = uriObj is Uri u ? u : new Uri(uriObj.ToString()!);
-            var stream = await LoadAsync(uri);
+            var instanceId = payload.TryGetValue("instanceId", out var instId) ? instId?.ToString() : null;
+
+            var stream = await LoadAsync(uri, instanceId);
             using var ms = new MemoryStream();
             await stream.CopyToAsync(ms);
-            return MessageResponse.Ok(new { Uri = uri.ToString(), Data = ms.ToArray() });
+            return MessageResponse.Ok(new { Uri = uri.ToString(), Data = ms.ToArray(), InstanceId = instanceId });
         }
 
         private async Task<MessageResponse> HandleDeleteAsync(PluginMessage message)
@@ -154,24 +193,39 @@ namespace DataWarehouse.Plugins.RAMDiskStorage
             }
 
             var uri = uriObj is Uri u ? u : new Uri(uriObj.ToString()!);
-            await DeleteAsync(uri);
-            return MessageResponse.Ok(new { Uri = uri.ToString(), Deleted = true });
+            var instanceId = payload.TryGetValue("instanceId", out var instId) ? instId?.ToString() : null;
+
+            await DeleteAsync(uri, instanceId);
+            return MessageResponse.Ok(new { Uri = uri.ToString(), Deleted = true, InstanceId = instanceId });
         }
 
         private async Task<MessageResponse> HandleFlushAsync(PluginMessage message)
         {
-            await FlushAsync();
-            return MessageResponse.Ok(new { Flushed = true, PendingWrites = 0 });
+            var instanceId = (message.Payload as Dictionary<string, object>)?.TryGetValue("instanceId", out var instId) == true
+                ? instId?.ToString()
+                : null;
+
+            await FlushAsync(instanceId);
+            return MessageResponse.Ok(new { Flushed = true, PendingWrites = 0, InstanceId = instanceId });
         }
 
         private MessageResponse HandleStats(PluginMessage message)
         {
+            var instanceId = (message.Payload as Dictionary<string, object>)?.TryGetValue("instanceId", out var instId) == true
+                ? instId?.ToString()
+                : null;
+
+            var storage = GetStorage(instanceId);
+            var config = GetConfig(instanceId);
+
             return MessageResponse.Ok(new
             {
-                ItemCount = Count,
+                ItemCount = storage.Count,
                 TotalSizeBytes = TotalSizeBytes,
                 PendingWrites = _pendingWrites.Count,
-                PersistenceEnabled = _config.EnablePersistence
+                PersistenceEnabled = config.EnablePersistence,
+                InstanceId = instanceId,
+                Instances = _connectionRegistry.Count
             });
         }
 
@@ -184,69 +238,96 @@ namespace DataWarehouse.Plugins.RAMDiskStorage
             }
 
             var uri = uriObj is Uri u ? u : new Uri(uriObj.ToString()!);
-            var exists = await ExistsAsync(uri);
-            return MessageResponse.Ok(new { Uri = uri.ToString(), Exists = exists });
+            var instanceId = payload.TryGetValue("instanceId", out var instId) ? instId?.ToString() : null;
+
+            var exists = await ExistsAsync(uri, instanceId);
+            return MessageResponse.Ok(new { Uri = uri.ToString(), Exists = exists, InstanceId = instanceId });
         }
 
-        public override async Task SaveAsync(Uri uri, Stream data)
+        #region Storage Operations with Instance Support
+
+        /// <summary>
+        /// Save data to storage, optionally targeting a specific instance.
+        /// </summary>
+        public async Task SaveAsync(Uri uri, Stream data, string? instanceId = null)
         {
             ArgumentNullException.ThrowIfNull(uri);
             ArgumentNullException.ThrowIfNull(data);
 
             var key = GetKey(uri);
+            var storage = GetStorage(instanceId);
+            var config = GetConfig(instanceId);
 
             using var ms = new MemoryStream();
             await data.CopyToAsync(ms);
             var bytes = ms.ToArray();
 
             // Check memory limits
-            if (_config.MaxMemoryBytes.HasValue &&
-                TotalSizeBytes + bytes.LongLength > _config.MaxMemoryBytes.Value)
+            if (config.MaxMemoryBytes.HasValue &&
+                TotalSizeBytes + bytes.LongLength > config.MaxMemoryBytes.Value)
             {
                 throw new InvalidOperationException(
-                    $"RAMDisk memory limit exceeded. Current: {TotalSizeBytes:N0}, Requested: {bytes.LongLength:N0}, Max: {_config.MaxMemoryBytes.Value:N0}");
+                    $"RAMDisk memory limit exceeded. Current: {TotalSizeBytes:N0}, Requested: {bytes.LongLength:N0}, Max: {config.MaxMemoryBytes.Value:N0}");
             }
 
             // Remove old version if exists
-            if (_storage.TryRemove(key, out var oldEntry))
+            if (storage.TryRemove(key, out var oldEntry))
             {
                 Interlocked.Add(ref _currentSizeBytes, -oldEntry.Data.LongLength);
             }
 
-            var entry = new RamDiskEntry
+            var entry = new RamDiskEntryData
             {
                 Key = key,
                 Uri = uri,
                 Data = bytes,
                 CreatedAt = DateTime.UtcNow,
                 LastModifiedAt = DateTime.UtcNow,
-                IsDirty = _config.EnablePersistence
+                IsDirty = config.EnablePersistence
             };
 
-            _storage[key] = entry;
+            storage[key] = entry;
             Interlocked.Add(ref _currentSizeBytes, bytes.LongLength);
 
             // Handle persistence
-            if (_config.EnablePersistence)
+            if (config.EnablePersistence)
             {
-                if (_config.PersistenceMode == PersistenceMode.WriteThrough)
+                if (config.PersistenceMode == PersistenceMode.WriteThrough)
                 {
-                    await PersistEntryAsync(entry);
+                    await PersistEntryAsync(entry, config);
                 }
                 else
                 {
-                    _pendingWrites.Enqueue(new PersistenceOperation { Key = key, Type = OperationType.Write });
+                    _pendingWrites.Enqueue(new PersistenceOperation { Key = key, Type = OperationType.Write, InstanceId = instanceId });
                 }
+            }
+
+            // Auto-index if enabled
+            if (config.EnableIndexing)
+            {
+                await IndexDocumentAsync(uri.ToString(), new Dictionary<string, object>
+                {
+                    ["uri"] = uri.ToString(),
+                    ["key"] = key,
+                    ["size"] = bytes.LongLength,
+                    ["instanceId"] = instanceId ?? "default"
+                });
             }
         }
 
-        public override Task<Stream> LoadAsync(Uri uri)
+        public override Task SaveAsync(Uri uri, Stream data) => SaveAsync(uri, data, null);
+
+        /// <summary>
+        /// Load data from storage, optionally from a specific instance.
+        /// </summary>
+        public Task<Stream> LoadAsync(Uri uri, string? instanceId = null)
         {
             ArgumentNullException.ThrowIfNull(uri);
 
             var key = GetKey(uri);
+            var storage = GetStorage(instanceId);
 
-            if (!_storage.TryGetValue(key, out var entry))
+            if (!storage.TryGetValue(key, out var entry))
             {
                 throw new FileNotFoundException($"Item not found in RAMDisk storage: {key}");
             }
@@ -254,38 +335,60 @@ namespace DataWarehouse.Plugins.RAMDiskStorage
             entry.LastAccessedAt = DateTime.UtcNow;
             entry.AccessCount++;
 
+            // Update last access for caching
+            _ = TouchAsync(uri);
+
             return Task.FromResult<Stream>(new MemoryStream(entry.Data));
         }
 
-        public override async Task DeleteAsync(Uri uri)
+        public override Task<Stream> LoadAsync(Uri uri) => LoadAsync(uri, null);
+
+        /// <summary>
+        /// Delete data from storage, optionally from a specific instance.
+        /// </summary>
+        public async Task DeleteAsync(Uri uri, string? instanceId = null)
         {
             ArgumentNullException.ThrowIfNull(uri);
 
             var key = GetKey(uri);
-            if (_storage.TryRemove(key, out var entry))
+            var storage = GetStorage(instanceId);
+            var config = GetConfig(instanceId);
+
+            if (storage.TryRemove(key, out var entry))
             {
                 Interlocked.Add(ref _currentSizeBytes, -entry.Data.LongLength);
 
-                if (_config.EnablePersistence)
+                if (config.EnablePersistence)
                 {
-                    if (_config.PersistenceMode == PersistenceMode.WriteThrough)
+                    if (config.PersistenceMode == PersistenceMode.WriteThrough)
                     {
-                        await DeletePersistedEntryAsync(key);
+                        await DeletePersistedEntryAsync(key, config);
                     }
                     else
                     {
-                        _pendingWrites.Enqueue(new PersistenceOperation { Key = key, Type = OperationType.Delete });
+                        _pendingWrites.Enqueue(new PersistenceOperation { Key = key, Type = OperationType.Delete, InstanceId = instanceId });
                     }
                 }
             }
+
+            // Remove from index
+            _ = RemoveFromIndexAsync(uri.ToString());
         }
 
-        public override Task<bool> ExistsAsync(Uri uri)
+        public override Task DeleteAsync(Uri uri) => DeleteAsync(uri, null);
+
+        /// <summary>
+        /// Check if data exists in storage, optionally in a specific instance.
+        /// </summary>
+        public Task<bool> ExistsAsync(Uri uri, string? instanceId = null)
         {
             ArgumentNullException.ThrowIfNull(uri);
             var key = GetKey(uri);
-            return Task.FromResult(_storage.ContainsKey(key));
+            var storage = GetStorage(instanceId);
+            return Task.FromResult(storage.ContainsKey(key));
         }
+
+        public override Task<bool> ExistsAsync(Uri uri) => ExistsAsync(uri, null);
 
         public override async IAsyncEnumerable<StorageListItem> ListFilesAsync(
             string prefix = "",
@@ -305,27 +408,67 @@ namespace DataWarehouse.Plugins.RAMDiskStorage
             }
         }
 
+        #endregion
+
+        #region Helper Methods
+
+        private ConcurrentDictionary<string, RamDiskEntryData> GetStorage(string? instanceId)
+        {
+            if (string.IsNullOrEmpty(instanceId))
+                return _storage;
+
+            var instance = _connectionRegistry.Get(instanceId);
+            if (instance?.Connection is RamDiskConnection conn)
+                return conn.Storage;
+
+            return _storage;
+        }
+
+        private RamDiskConfig GetConfig(string? instanceId)
+        {
+            if (string.IsNullOrEmpty(instanceId))
+                return _config;
+
+            var instance = _connectionRegistry.Get(instanceId);
+            return instance?.Config ?? _config;
+        }
+
+        #endregion
+
+        #region Persistence
+
         /// <summary>
         /// Flushes all pending writes to disk persistence.
         /// </summary>
-        public async Task FlushAsync()
+        public async Task FlushAsync(string? instanceId = null)
         {
-            if (!_config.EnablePersistence)
+            var config = GetConfig(instanceId);
+            if (!config.EnablePersistence)
                 return;
+
+            var storage = GetStorage(instanceId);
 
             await _persistLock.WaitAsync();
             try
             {
                 while (_pendingWrites.TryDequeue(out var op))
                 {
-                    if (op.Type == OperationType.Write && _storage.TryGetValue(op.Key, out var entry))
+                    // Skip operations for other instances
+                    if (op.InstanceId != instanceId)
                     {
-                        await PersistEntryAsync(entry);
+                        // Re-enqueue for later
+                        _pendingWrites.Enqueue(op);
+                        continue;
+                    }
+
+                    if (op.Type == OperationType.Write && storage.TryGetValue(op.Key, out var entry))
+                    {
+                        await PersistEntryAsync(entry, config);
                         entry.IsDirty = false;
                     }
                     else if (op.Type == OperationType.Delete)
                     {
-                        await DeletePersistedEntryAsync(op.Key);
+                        await DeletePersistedEntryAsync(op.Key, config);
                     }
                 }
             }
@@ -335,12 +478,12 @@ namespace DataWarehouse.Plugins.RAMDiskStorage
             }
         }
 
-        private async Task PersistEntryAsync(RamDiskEntry entry)
+        private async Task PersistEntryAsync(RamDiskEntryData entry, RamDiskConfig config)
         {
-            if (string.IsNullOrEmpty(_config.PersistencePath))
+            if (string.IsNullOrEmpty(config.PersistencePath))
                 return;
 
-            var filePath = GetPersistencePath(entry.Key);
+            var filePath = GetPersistencePath(entry.Key, config);
             var directory = Path.GetDirectoryName(filePath);
             if (!string.IsNullOrEmpty(directory))
                 Directory.CreateDirectory(directory);
@@ -348,12 +491,12 @@ namespace DataWarehouse.Plugins.RAMDiskStorage
             await File.WriteAllBytesAsync(filePath, entry.Data);
         }
 
-        private Task DeletePersistedEntryAsync(string key)
+        private Task DeletePersistedEntryAsync(string key, RamDiskConfig config)
         {
-            if (string.IsNullOrEmpty(_config.PersistencePath))
+            if (string.IsNullOrEmpty(config.PersistencePath))
                 return Task.CompletedTask;
 
-            var filePath = GetPersistencePath(key);
+            var filePath = GetPersistencePath(key, config);
             if (File.Exists(filePath))
                 File.Delete(filePath);
 
@@ -374,7 +517,7 @@ namespace DataWarehouse.Plugins.RAMDiskStorage
                     var key = relativePath.Replace(Path.DirectorySeparatorChar, '/');
                     var bytes = await File.ReadAllBytesAsync(file);
 
-                    var entry = new RamDiskEntry
+                    var entry = new RamDiskEntryData
                     {
                         Key = key,
                         Uri = new Uri($"ramdisk:///{key}"),
@@ -403,7 +546,7 @@ namespace DataWarehouse.Plugins.RAMDiskStorage
                     try
                     {
                         await Task.Delay(_config.FlushIntervalMs, _backgroundCts.Token);
-                        await FlushAsync();
+                        await FlushAsync(null);
                     }
                     catch (OperationCanceledException)
                     {
@@ -417,15 +560,19 @@ namespace DataWarehouse.Plugins.RAMDiskStorage
             }, _backgroundCts.Token);
         }
 
-        private string GetPersistencePath(string key)
+        private string GetPersistencePath(string key, RamDiskConfig config)
         {
-            return Path.Combine(_config.PersistencePath!, key.Replace('/', Path.DirectorySeparatorChar));
+            return Path.Combine(config.PersistencePath!, key.Replace('/', Path.DirectorySeparatorChar));
         }
 
         private static string GetKey(Uri uri)
         {
             return uri.AbsolutePath.TrimStart('/');
         }
+
+        #endregion
+
+        #region Disposal
 
         public void Dispose()
         {
@@ -436,37 +583,56 @@ namespace DataWarehouse.Plugins.RAMDiskStorage
             try { _backgroundPersister?.Wait(TimeSpan.FromSeconds(5)); } catch { }
 
             // Final flush
-            FlushAsync().GetAwaiter().GetResult();
+            FlushAsync(null).GetAwaiter().GetResult();
 
             _backgroundCts.Dispose();
             _persistLock.Dispose();
         }
 
-        private sealed class RamDiskEntry
-        {
-            public string Key { get; init; } = string.Empty;
-            public Uri Uri { get; init; } = null!;
-            public byte[] Data { get; init; } = [];
-            public DateTime CreatedAt { get; init; }
-            public DateTime LastModifiedAt { get; set; }
-            public DateTime LastAccessedAt { get; set; }
-            public long AccessCount { get; set; }
-            public bool IsDirty { get; set; }
-        }
+        #endregion
+
+        #region Internal Types
 
         private sealed class PersistenceOperation
         {
             public string Key { get; init; } = string.Empty;
             public OperationType Type { get; init; }
+            public string? InstanceId { get; init; }
         }
 
         private enum OperationType { Write, Delete }
+
+        #endregion
+    }
+
+    /// <summary>
+    /// Internal connection wrapper for RAMDisk instances.
+    /// </summary>
+    internal class RamDiskConnection
+    {
+        public required RamDiskConfig Config { get; init; }
+        public required ConcurrentDictionary<string, RamDiskEntryData> Storage { get; init; }
+    }
+
+    /// <summary>
+    /// Represents a single entry in the RAMDisk storage.
+    /// </summary>
+    internal sealed class RamDiskEntryData
+    {
+        public string Key { get; init; } = string.Empty;
+        public Uri Uri { get; init; } = null!;
+        public byte[] Data { get; init; } = [];
+        public DateTime CreatedAt { get; init; }
+        public DateTime LastModifiedAt { get; set; }
+        public DateTime LastAccessedAt { get; set; }
+        public long AccessCount { get; set; }
+        public bool IsDirty { get; set; }
     }
 
     /// <summary>
     /// Configuration for RAMDisk storage.
     /// </summary>
-    public class RamDiskConfig
+    public class RamDiskConfig : StorageConfigBase
     {
         /// <summary>
         /// Maximum memory allowed in bytes (null = unlimited).
@@ -509,6 +675,18 @@ namespace DataWarehouse.Plugins.RAMDiskStorage
         };
 
         /// <summary>
+        /// Creates a persistent configuration with write-back and instance ID.
+        /// </summary>
+        public static RamDiskConfig Persistent(string path, string instanceId, bool enableCaching = true) => new()
+        {
+            EnablePersistence = true,
+            PersistencePath = path,
+            PersistenceMode = PersistenceMode.WriteBack,
+            InstanceId = instanceId,
+            EnableCaching = enableCaching
+        };
+
+        /// <summary>
         /// Creates a persistent configuration with write-through for maximum durability.
         /// </summary>
         public static RamDiskConfig Durable(string path) => new()
@@ -516,6 +694,17 @@ namespace DataWarehouse.Plugins.RAMDiskStorage
             EnablePersistence = true,
             PersistencePath = path,
             PersistenceMode = PersistenceMode.WriteThrough
+        };
+
+        /// <summary>
+        /// Creates a persistent configuration with write-through and instance ID.
+        /// </summary>
+        public static RamDiskConfig Durable(string path, string instanceId) => new()
+        {
+            EnablePersistence = true,
+            PersistencePath = path,
+            PersistenceMode = PersistenceMode.WriteThrough,
+            InstanceId = instanceId
         };
     }
 

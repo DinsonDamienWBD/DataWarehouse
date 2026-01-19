@@ -1,6 +1,7 @@
 using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Infrastructure;
 using DataWarehouse.SDK.Primitives;
+using DataWarehouse.SDK.Storage;
 using DataWarehouse.SDK.Utilities;
 using System.Text;
 using System.Text.Json;
@@ -25,6 +26,9 @@ namespace DataWarehouse.Plugins.CloudStorage
     /// - File versioning
     /// - Chunked uploads for large files
     /// - Real-time change notifications (where supported)
+    /// - Multi-instance support with role-based selection
+    /// - TTL-based caching support
+    /// - Document indexing and search
     ///
     /// Message Commands:
     /// - storage.cloud.upload: Upload file to cloud storage
@@ -36,10 +40,10 @@ namespace DataWarehouse.Plugins.CloudStorage
     /// - storage.cloud.move: Move/rename file
     /// - storage.cloud.search: Search for files
     /// - storage.cloud.auth: Initiate OAuth flow
+    /// - storage.instance.*: Multi-instance management
     /// </summary>
-    public sealed class CloudStoragePlugin : ListableStoragePluginBase
+    public sealed class CloudStoragePlugin : HybridStoragePluginBase<CloudStorageConfig>
     {
-        private readonly CloudStorageConfig _config;
         private readonly IHttpClientFactory _httpClientFactory;
         private readonly string _httpClientName;
         private string? _accessToken;
@@ -62,7 +66,7 @@ namespace DataWarehouse.Plugins.CloudStorage
 
         public override string Id => "datawarehouse.plugins.storage.cloud";
         public override string Name => "Cloud Storage";
-        public override string Version => "1.0.0";
+        public override string Version => "2.0.0";
         public override string Scheme => _config.Provider switch
         {
             CloudProvider.GoogleDrive => "gdrive",
@@ -72,6 +76,7 @@ namespace DataWarehouse.Plugins.CloudStorage
             CloudProvider.Box => "box",
             _ => "cloud"
         };
+        public override string StorageCategory => "Cloud";
 
         /// <summary>
         /// Gets the HttpClient instance configured for this plugin's cloud provider.
@@ -127,8 +132,8 @@ namespace DataWarehouse.Plugins.CloudStorage
         /// </code>
         /// </example>
         public CloudStoragePlugin(CloudStorageConfig config, IHttpClientFactory? httpClientFactory)
+            : base(config ?? throw new ArgumentNullException(nameof(config)))
         {
-            _config = config ?? throw new ArgumentNullException(nameof(config));
             _accessToken = config.AccessToken;
             _refreshToken = config.RefreshToken;
             _tokenExpiry = config.TokenExpiry ?? DateTime.MinValue;
@@ -149,20 +154,49 @@ namespace DataWarehouse.Plugins.CloudStorage
             });
         }
 
+        /// <summary>
+        /// Creates a connection for the given configuration.
+        /// </summary>
+        protected override Task<object> CreateConnectionAsync(CloudStorageConfig config)
+        {
+            // Create a unique client name based on provider and instance
+            var clientName = $"cloud-storage-{config.Provider.ToString().ToLowerInvariant()}-{config.InstanceId ?? "default"}";
+
+            _httpClientFactory.ConfigureClient(clientName, options =>
+            {
+                options.Timeout = TimeSpan.FromSeconds(config.TimeoutSeconds);
+                options.EnableAutomaticDecompression = true;
+                options.PooledConnectionLifetime = TimeSpan.FromMinutes(5);
+                options.PooledConnectionIdleTimeout = TimeSpan.FromMinutes(2);
+            });
+
+            return Task.FromResult<object>(new CloudStorageConnection
+            {
+                Config = config,
+                HttpClientFactory = _httpClientFactory,
+                HttpClientName = clientName,
+                AccessToken = config.AccessToken,
+                RefreshToken = config.RefreshToken,
+                TokenExpiry = config.TokenExpiry ?? DateTime.MinValue
+            });
+        }
+
         protected override List<PluginCapabilityDescriptor> GetCapabilities()
         {
-            return
-            [
-                new() { Name = "storage.cloud.upload", DisplayName = "Upload", Description = "Upload file to cloud storage" },
-                new() { Name = "storage.cloud.download", DisplayName = "Download", Description = "Download file from cloud storage" },
-                new() { Name = "storage.cloud.delete", DisplayName = "Delete", Description = "Delete file from cloud storage" },
-                new() { Name = "storage.cloud.list", DisplayName = "List", Description = "List files in folder" },
-                new() { Name = "storage.cloud.metadata", DisplayName = "Metadata", Description = "Get file metadata" },
-                new() { Name = "storage.cloud.share", DisplayName = "Share", Description = "Create sharing link" },
-                new() { Name = "storage.cloud.move", DisplayName = "Move", Description = "Move/rename file" },
-                new() { Name = "storage.cloud.search", DisplayName = "Search", Description = "Search for files" },
-                new() { Name = "storage.cloud.auth", DisplayName = "Auth", Description = "Initiate OAuth flow" }
-            ];
+            var capabilities = base.GetCapabilities();
+            capabilities.AddRange(new[]
+            {
+                new PluginCapabilityDescriptor { Name = "storage.cloud.upload", DisplayName = "Upload", Description = "Upload file to cloud storage" },
+                new PluginCapabilityDescriptor { Name = "storage.cloud.download", DisplayName = "Download", Description = "Download file from cloud storage" },
+                new PluginCapabilityDescriptor { Name = "storage.cloud.delete", DisplayName = "Delete", Description = "Delete file from cloud storage" },
+                new PluginCapabilityDescriptor { Name = "storage.cloud.list", DisplayName = "List", Description = "List files in folder" },
+                new PluginCapabilityDescriptor { Name = "storage.cloud.metadata", DisplayName = "Metadata", Description = "Get file metadata" },
+                new PluginCapabilityDescriptor { Name = "storage.cloud.share", DisplayName = "Share", Description = "Create sharing link" },
+                new PluginCapabilityDescriptor { Name = "storage.cloud.move", DisplayName = "Move", Description = "Move/rename file" },
+                new PluginCapabilityDescriptor { Name = "storage.cloud.search", DisplayName = "Search", Description = "Search for files" },
+                new PluginCapabilityDescriptor { Name = "storage.cloud.auth", DisplayName = "Auth", Description = "Initiate OAuth flow" }
+            });
+            return capabilities;
         }
 
         protected override Dictionary<string, object> GetMetadata()
@@ -196,6 +230,12 @@ namespace DataWarehouse.Plugins.CloudStorage
                 "storage.cloud.auth" => HandleAuth(message),
                 _ => null
             };
+
+            // If not handled, delegate to base for multi-instance management
+            if (response == null)
+            {
+                await base.OnMessageAsync(message);
+            }
         }
 
         private async Task<MessageResponse> HandleUploadAsync(PluginMessage message)
@@ -216,9 +256,12 @@ namespace DataWarehouse.Plugins.CloudStorage
                 _ => throw new ArgumentException("Data must be Stream, byte[], or string")
             };
 
-            var uri = new Uri($"{Scheme}:///{path}");
-            await SaveAsync(uri, data);
-            return MessageResponse.Ok(new { Path = path, Success = true });
+            var instanceId = payload.TryGetValue("instanceId", out var instId) ? instId?.ToString() : null;
+            var config = GetConfig(instanceId);
+
+            var uri = new Uri($"{GetScheme(config)}:///{path}");
+            await SaveAsync(uri, data, instanceId);
+            return MessageResponse.Ok(new { Path = path, Success = true, InstanceId = instanceId });
         }
 
         private async Task<MessageResponse> HandleDownloadAsync(PluginMessage message)
@@ -230,11 +273,14 @@ namespace DataWarehouse.Plugins.CloudStorage
             }
 
             var path = pathObj.ToString()!;
-            var uri = new Uri($"{Scheme}:///{path}");
-            var stream = await LoadAsync(uri);
+            var instanceId = payload.TryGetValue("instanceId", out var instId) ? instId?.ToString() : null;
+            var config = GetConfig(instanceId);
+
+            var uri = new Uri($"{GetScheme(config)}:///{path}");
+            var stream = await LoadAsync(uri, instanceId);
             using var ms = new MemoryStream();
             await stream.CopyToAsync(ms);
-            return MessageResponse.Ok(new { Path = path, Data = ms.ToArray() });
+            return MessageResponse.Ok(new { Path = path, Data = ms.ToArray(), InstanceId = instanceId });
         }
 
         private async Task<MessageResponse> HandleDeleteAsync(PluginMessage message)
@@ -246,9 +292,12 @@ namespace DataWarehouse.Plugins.CloudStorage
             }
 
             var path = pathObj.ToString()!;
-            var uri = new Uri($"{Scheme}:///{path}");
-            await DeleteAsync(uri);
-            return MessageResponse.Ok(new { Path = path, Deleted = true });
+            var instanceId = payload.TryGetValue("instanceId", out var instId) ? instId?.ToString() : null;
+            var config = GetConfig(instanceId);
+
+            var uri = new Uri($"{GetScheme(config)}:///{path}");
+            await DeleteAsync(uri, instanceId);
+            return MessageResponse.Ok(new { Path = path, Deleted = true, InstanceId = instanceId });
         }
 
         private async Task<MessageResponse> HandleMetadataAsync(PluginMessage message)
@@ -260,7 +309,9 @@ namespace DataWarehouse.Plugins.CloudStorage
             }
 
             var path = pathObj.ToString()!;
-            var metadata = await GetFileMetadataAsync(path);
+            var instanceId = payload.TryGetValue("instanceId", out var instId) ? instId?.ToString() : null;
+
+            var metadata = await GetFileMetadataAsync(path, instanceId);
             return MessageResponse.Ok(metadata);
         }
 
@@ -273,8 +324,10 @@ namespace DataWarehouse.Plugins.CloudStorage
             }
 
             var path = pathObj.ToString()!;
-            var shareLink = await CreateShareLinkAsync(path);
-            return MessageResponse.Ok(new { Path = path, ShareLink = shareLink });
+            var instanceId = payload.TryGetValue("instanceId", out var instId) ? instId?.ToString() : null;
+
+            var shareLink = await CreateShareLinkAsync(path, instanceId);
+            return MessageResponse.Ok(new { Path = path, ShareLink = shareLink, InstanceId = instanceId });
         }
 
         private async Task<MessageResponse> HandleMoveAsync(PluginMessage message)
@@ -288,8 +341,10 @@ namespace DataWarehouse.Plugins.CloudStorage
 
             var sourcePath = sourceObj.ToString()!;
             var destPath = destObj.ToString()!;
-            await MoveFileAsync(sourcePath, destPath);
-            return MessageResponse.Ok(new { SourcePath = sourcePath, DestinationPath = destPath, Success = true });
+            var instanceId = payload.TryGetValue("instanceId", out var instId) ? instId?.ToString() : null;
+
+            await MoveFileAsync(sourcePath, destPath, instanceId);
+            return MessageResponse.Ok(new { SourcePath = sourcePath, DestinationPath = destPath, Success = true, InstanceId = instanceId });
         }
 
         private async Task<MessageResponse> HandleSearchAsync(PluginMessage message)
@@ -301,26 +356,41 @@ namespace DataWarehouse.Plugins.CloudStorage
             }
 
             var query = queryObj.ToString()!;
-            var results = await SearchFilesAsync(query);
-            return MessageResponse.Ok(new { Query = query, Results = results });
+            var instanceId = payload.TryGetValue("instanceId", out var instId) ? instId?.ToString() : null;
+
+            var results = await SearchFilesAsync(query, instanceId);
+            return MessageResponse.Ok(new { Query = query, Results = results, InstanceId = instanceId });
         }
 
         private MessageResponse HandleAuth(PluginMessage message)
         {
-            var authUrl = GetAuthorizationUrl();
+            var instanceId = (message.Payload as Dictionary<string, object>)?.TryGetValue("instanceId", out var instId) == true
+                ? instId?.ToString()
+                : null;
+            var config = GetConfig(instanceId);
+
+            var authUrl = GetAuthorizationUrl(config);
             return MessageResponse.Ok(new
             {
                 AuthorizationUrl = authUrl,
-                Instructions = "Open the URL in a browser, authorize the app, and provide the authorization code"
+                Instructions = "Open the URL in a browser, authorize the app, and provide the authorization code",
+                InstanceId = instanceId
             });
         }
 
-        public override async Task SaveAsync(Uri uri, Stream data)
+        #region Storage Operations with Instance Support
+
+        /// <summary>
+        /// Save data to cloud storage, optionally targeting a specific instance.
+        /// </summary>
+        public async Task SaveAsync(Uri uri, Stream data, string? instanceId = null)
         {
             ArgumentNullException.ThrowIfNull(uri);
             ArgumentNullException.ThrowIfNull(data);
 
-            await EnsureTokenValidAsync();
+            var config = GetConfig(instanceId);
+            var client = GetHttpClient(instanceId);
+            await EnsureTokenValidAsync(instanceId);
 
             var path = uri.AbsolutePath.TrimStart('/');
 
@@ -328,75 +398,113 @@ namespace DataWarehouse.Plugins.CloudStorage
             await data.CopyToAsync(ms);
             var content = ms.ToArray();
 
-            switch (_config.Provider)
+            switch (config.Provider)
             {
                 case CloudProvider.GoogleDrive:
-                    await UploadToGoogleDriveAsync(path, content);
+                    await UploadToGoogleDriveAsync(path, content, config, client);
                     break;
                 case CloudProvider.OneDrive:
                 case CloudProvider.SharePoint:
-                    await UploadToOneDriveAsync(path, content);
+                    await UploadToOneDriveAsync(path, content, config, client);
                     break;
                 case CloudProvider.Dropbox:
-                    await UploadToDropboxAsync(path, content);
+                    await UploadToDropboxAsync(path, content, config, client);
                     break;
                 case CloudProvider.Box:
-                    await UploadToBoxAsync(path, content);
+                    await UploadToBoxAsync(path, content, config, client);
                     break;
                 default:
-                    throw new NotSupportedException($"Provider {_config.Provider} not supported");
+                    throw new NotSupportedException($"Provider {config.Provider} not supported");
+            }
+
+            // Auto-index if enabled
+            if (config.EnableIndexing)
+            {
+                await IndexDocumentAsync(uri.ToString(), new Dictionary<string, object>
+                {
+                    ["uri"] = uri.ToString(),
+                    ["path"] = path,
+                    ["size"] = content.Length,
+                    ["provider"] = config.Provider.ToString(),
+                    ["instanceId"] = instanceId ?? "default"
+                });
             }
         }
 
-        public override async Task<Stream> LoadAsync(Uri uri)
+        public override Task SaveAsync(Uri uri, Stream data) => SaveAsync(uri, data, null);
+
+        /// <summary>
+        /// Load data from cloud storage, optionally from a specific instance.
+        /// </summary>
+        public async Task<Stream> LoadAsync(Uri uri, string? instanceId = null)
         {
             ArgumentNullException.ThrowIfNull(uri);
 
-            await EnsureTokenValidAsync();
+            var config = GetConfig(instanceId);
+            var client = GetHttpClient(instanceId);
+            await EnsureTokenValidAsync(instanceId);
 
             var path = uri.AbsolutePath.TrimStart('/');
 
-            return _config.Provider switch
+            // Update last access for caching
+            await TouchAsync(uri);
+
+            return config.Provider switch
             {
-                CloudProvider.GoogleDrive => await DownloadFromGoogleDriveAsync(path),
-                CloudProvider.OneDrive or CloudProvider.SharePoint => await DownloadFromOneDriveAsync(path),
-                CloudProvider.Dropbox => await DownloadFromDropboxAsync(path),
-                CloudProvider.Box => await DownloadFromBoxAsync(path),
-                _ => throw new NotSupportedException($"Provider {_config.Provider} not supported")
+                CloudProvider.GoogleDrive => await DownloadFromGoogleDriveAsync(path, config, client),
+                CloudProvider.OneDrive or CloudProvider.SharePoint => await DownloadFromOneDriveAsync(path, config, client),
+                CloudProvider.Dropbox => await DownloadFromDropboxAsync(path, config, client),
+                CloudProvider.Box => await DownloadFromBoxAsync(path, config, client),
+                _ => throw new NotSupportedException($"Provider {config.Provider} not supported")
             };
         }
 
-        public override async Task DeleteAsync(Uri uri)
+        public override Task<Stream> LoadAsync(Uri uri) => LoadAsync(uri, null);
+
+        /// <summary>
+        /// Delete data from cloud storage, optionally from a specific instance.
+        /// </summary>
+        public async Task DeleteAsync(Uri uri, string? instanceId = null)
         {
             ArgumentNullException.ThrowIfNull(uri);
 
-            await EnsureTokenValidAsync();
+            var config = GetConfig(instanceId);
+            var client = GetHttpClient(instanceId);
+            await EnsureTokenValidAsync(instanceId);
 
             var path = uri.AbsolutePath.TrimStart('/');
 
-            switch (_config.Provider)
+            switch (config.Provider)
             {
                 case CloudProvider.GoogleDrive:
-                    await DeleteFromGoogleDriveAsync(path);
+                    await DeleteFromGoogleDriveAsync(path, config, client);
                     break;
                 case CloudProvider.OneDrive:
                 case CloudProvider.SharePoint:
-                    await DeleteFromOneDriveAsync(path);
+                    await DeleteFromOneDriveAsync(path, config, client);
                     break;
                 case CloudProvider.Dropbox:
-                    await DeleteFromDropboxAsync(path);
+                    await DeleteFromDropboxAsync(path, config, client);
                     break;
                 case CloudProvider.Box:
-                    await DeleteFromBoxAsync(path);
+                    await DeleteFromBoxAsync(path, config, client);
                     break;
             }
+
+            // Remove from index
+            _ = RemoveFromIndexAsync(uri.ToString());
         }
 
-        public override async Task<bool> ExistsAsync(Uri uri)
+        public override Task DeleteAsync(Uri uri) => DeleteAsync(uri, null);
+
+        /// <summary>
+        /// Check if data exists in cloud storage, optionally in a specific instance.
+        /// </summary>
+        public async Task<bool> ExistsAsync(Uri uri, string? instanceId = null)
         {
             try
             {
-                var metadata = await GetFileMetadataAsync(uri.AbsolutePath.TrimStart('/'));
+                var metadata = await GetFileMetadataAsync(uri.AbsolutePath.TrimStart('/'), instanceId);
                 return metadata != null;
             }
             catch
@@ -405,18 +513,20 @@ namespace DataWarehouse.Plugins.CloudStorage
             }
         }
 
+        public override Task<bool> ExistsAsync(Uri uri) => ExistsAsync(uri, null);
+
         public override async IAsyncEnumerable<StorageListItem> ListFilesAsync(
             string prefix = "",
             [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct = default)
         {
-            await EnsureTokenValidAsync();
+            await EnsureTokenValidAsync(null);
 
             var items = _config.Provider switch
             {
-                CloudProvider.GoogleDrive => ListGoogleDriveFilesAsync(prefix, ct),
-                CloudProvider.OneDrive or CloudProvider.SharePoint => ListOneDriveFilesAsync(prefix, ct),
-                CloudProvider.Dropbox => ListDropboxFilesAsync(prefix, ct),
-                CloudProvider.Box => ListBoxFilesAsync(prefix, ct),
+                CloudProvider.GoogleDrive => ListGoogleDriveFilesAsync(prefix, _config, GetHttpClient(null), ct),
+                CloudProvider.OneDrive or CloudProvider.SharePoint => ListOneDriveFilesAsync(prefix, _config, GetHttpClient(null), ct),
+                CloudProvider.Dropbox => ListDropboxFilesAsync(prefix, _config, GetHttpClient(null), ct),
+                CloudProvider.Box => ListBoxFilesAsync(prefix, _config, GetHttpClient(null), ct),
                 _ => throw new NotSupportedException($"Provider {_config.Provider} not supported")
             };
 
@@ -428,12 +538,64 @@ namespace DataWarehouse.Plugins.CloudStorage
             }
         }
 
+        #endregion
+
+        #region Helper Methods
+
+        private CloudStorageConfig GetConfig(string? instanceId)
+        {
+            if (string.IsNullOrEmpty(instanceId))
+                return _config;
+
+            var instance = _connectionRegistry.Get(instanceId);
+            return instance?.Config ?? _config;
+        }
+
+        private HttpClient GetHttpClient(string? instanceId)
+        {
+            if (string.IsNullOrEmpty(instanceId))
+                return HttpClient;
+
+            var instance = _connectionRegistry.Get(instanceId);
+            if (instance?.Connection is CloudStorageConnection conn)
+                return conn.HttpClientFactory.CreateClient(conn.HttpClientName);
+
+            return HttpClient;
+        }
+
+        private string GetScheme(CloudStorageConfig config)
+        {
+            return config.Provider switch
+            {
+                CloudProvider.GoogleDrive => "gdrive",
+                CloudProvider.OneDrive => "onedrive",
+                CloudProvider.SharePoint => "sharepoint",
+                CloudProvider.Dropbox => "dropbox",
+                CloudProvider.Box => "box",
+                _ => "cloud"
+            };
+        }
+
+        private string? GetAccessToken(string? instanceId)
+        {
+            if (string.IsNullOrEmpty(instanceId))
+                return _accessToken;
+
+            var instance = _connectionRegistry.Get(instanceId);
+            if (instance?.Connection is CloudStorageConnection conn)
+                return conn.AccessToken;
+
+            return _accessToken;
+        }
+
+        #endregion
+
         #region Google Drive Implementation
 
-        private async Task UploadToGoogleDriveAsync(string path, byte[] content)
+        private async Task UploadToGoogleDriveAsync(string path, byte[] content, CloudStorageConfig config, HttpClient client)
         {
             var fileName = Path.GetFileName(path);
-            var folderId = await EnsureFolderExistsAsync(Path.GetDirectoryName(path) ?? "");
+            var folderId = await EnsureFolderExistsAsync(Path.GetDirectoryName(path) ?? "", config, client);
 
             var metadata = new { name = fileName, parents = new[] { folderId ?? "root" } };
             var metadataJson = JsonSerializer.Serialize(metadata);
@@ -448,18 +610,18 @@ namespace DataWarehouse.Plugins.CloudStorage
             };
             request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", _accessToken);
 
-            var response = await HttpClient.SendAsync(request);
+            var response = await client.SendAsync(request);
             response.EnsureSuccessStatusCode();
         }
 
-        private async Task<Stream> DownloadFromGoogleDriveAsync(string path)
+        private async Task<Stream> DownloadFromGoogleDriveAsync(string path, CloudStorageConfig config, HttpClient client)
         {
-            var fileId = await GetGoogleDriveFileIdAsync(path);
+            var fileId = await GetGoogleDriveFileIdAsync(path, config, client);
 
             var request = new HttpRequestMessage(HttpMethod.Get, $"https://www.googleapis.com/drive/v3/files/{fileId}?alt=media");
             request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", _accessToken);
 
-            var response = await HttpClient.SendAsync(request);
+            var response = await client.SendAsync(request);
             response.EnsureSuccessStatusCode();
 
             var ms = new MemoryStream();
@@ -468,18 +630,18 @@ namespace DataWarehouse.Plugins.CloudStorage
             return ms;
         }
 
-        private async Task DeleteFromGoogleDriveAsync(string path)
+        private async Task DeleteFromGoogleDriveAsync(string path, CloudStorageConfig config, HttpClient client)
         {
-            var fileId = await GetGoogleDriveFileIdAsync(path);
+            var fileId = await GetGoogleDriveFileIdAsync(path, config, client);
 
             var request = new HttpRequestMessage(HttpMethod.Delete, $"https://www.googleapis.com/drive/v3/files/{fileId}");
             request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", _accessToken);
 
-            var response = await HttpClient.SendAsync(request);
+            var response = await client.SendAsync(request);
             response.EnsureSuccessStatusCode();
         }
 
-        private async IAsyncEnumerable<StorageListItem> ListGoogleDriveFilesAsync(string prefix, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct)
+        private async IAsyncEnumerable<StorageListItem> ListGoogleDriveFilesAsync(string prefix, CloudStorageConfig config, HttpClient client, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct)
         {
             string? pageToken = null;
             var query = string.IsNullOrEmpty(prefix) ? "" : $"name contains '{prefix}'";
@@ -493,7 +655,7 @@ namespace DataWarehouse.Plugins.CloudStorage
                 var request = new HttpRequestMessage(HttpMethod.Get, url);
                 request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", _accessToken);
 
-                var response = await HttpClient.SendAsync(request, ct);
+                var response = await client.SendAsync(request, ct);
                 response.EnsureSuccessStatusCode();
 
                 var json = await response.Content.ReadAsStringAsync(ct);
@@ -516,7 +678,7 @@ namespace DataWarehouse.Plugins.CloudStorage
             } while (pageToken != null);
         }
 
-        private async Task<string?> GetGoogleDriveFileIdAsync(string path)
+        private async Task<string?> GetGoogleDriveFileIdAsync(string path, CloudStorageConfig config, HttpClient client)
         {
             var fileName = Path.GetFileName(path);
             var url = $"https://www.googleapis.com/drive/v3/files?q=name='{fileName}'&fields=files(id)";
@@ -524,7 +686,7 @@ namespace DataWarehouse.Plugins.CloudStorage
             var request = new HttpRequestMessage(HttpMethod.Get, url);
             request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", _accessToken);
 
-            var response = await HttpClient.SendAsync(request);
+            var response = await client.SendAsync(request);
             response.EnsureSuccessStatusCode();
 
             var json = await response.Content.ReadAsStringAsync();
@@ -532,21 +694,21 @@ namespace DataWarehouse.Plugins.CloudStorage
             return result?.Files?.FirstOrDefault()?.Id;
         }
 
-        private async Task<string?> EnsureFolderExistsAsync(string folderPath)
+        private async Task<string?> EnsureFolderExistsAsync(string folderPath, CloudStorageConfig config, HttpClient client)
         {
-            if (string.IsNullOrEmpty(folderPath)) return _config.BaseFolderId;
+            if (string.IsNullOrEmpty(folderPath)) return config.BaseFolderId;
             // Simplified - in production, create folder hierarchy
-            return _config.BaseFolderId;
+            return config.BaseFolderId;
         }
 
         #endregion
 
         #region OneDrive/SharePoint Implementation
 
-        private async Task UploadToOneDriveAsync(string path, byte[] content)
+        private async Task UploadToOneDriveAsync(string path, byte[] content, CloudStorageConfig config, HttpClient client)
         {
-            var baseUrl = _config.Provider == CloudProvider.SharePoint
-                ? $"https://graph.microsoft.com/v1.0/sites/{_config.SiteId}/drive"
+            var baseUrl = config.Provider == CloudProvider.SharePoint
+                ? $"https://graph.microsoft.com/v1.0/sites/{config.SiteId}/drive"
                 : "https://graph.microsoft.com/v1.0/me/drive";
 
             var url = $"{baseUrl}/root:/{path}:/content";
@@ -557,14 +719,14 @@ namespace DataWarehouse.Plugins.CloudStorage
             };
             request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", _accessToken);
 
-            var response = await HttpClient.SendAsync(request);
+            var response = await client.SendAsync(request);
             response.EnsureSuccessStatusCode();
         }
 
-        private async Task<Stream> DownloadFromOneDriveAsync(string path)
+        private async Task<Stream> DownloadFromOneDriveAsync(string path, CloudStorageConfig config, HttpClient client)
         {
-            var baseUrl = _config.Provider == CloudProvider.SharePoint
-                ? $"https://graph.microsoft.com/v1.0/sites/{_config.SiteId}/drive"
+            var baseUrl = config.Provider == CloudProvider.SharePoint
+                ? $"https://graph.microsoft.com/v1.0/sites/{config.SiteId}/drive"
                 : "https://graph.microsoft.com/v1.0/me/drive";
 
             var url = $"{baseUrl}/root:/{path}:/content";
@@ -572,7 +734,7 @@ namespace DataWarehouse.Plugins.CloudStorage
             var request = new HttpRequestMessage(HttpMethod.Get, url);
             request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", _accessToken);
 
-            var response = await HttpClient.SendAsync(request);
+            var response = await client.SendAsync(request);
             response.EnsureSuccessStatusCode();
 
             var ms = new MemoryStream();
@@ -581,10 +743,10 @@ namespace DataWarehouse.Plugins.CloudStorage
             return ms;
         }
 
-        private async Task DeleteFromOneDriveAsync(string path)
+        private async Task DeleteFromOneDriveAsync(string path, CloudStorageConfig config, HttpClient client)
         {
-            var baseUrl = _config.Provider == CloudProvider.SharePoint
-                ? $"https://graph.microsoft.com/v1.0/sites/{_config.SiteId}/drive"
+            var baseUrl = config.Provider == CloudProvider.SharePoint
+                ? $"https://graph.microsoft.com/v1.0/sites/{config.SiteId}/drive"
                 : "https://graph.microsoft.com/v1.0/me/drive";
 
             var url = $"{baseUrl}/root:/{path}";
@@ -592,14 +754,14 @@ namespace DataWarehouse.Plugins.CloudStorage
             var request = new HttpRequestMessage(HttpMethod.Delete, url);
             request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", _accessToken);
 
-            var response = await HttpClient.SendAsync(request);
+            var response = await client.SendAsync(request);
             response.EnsureSuccessStatusCode();
         }
 
-        private async IAsyncEnumerable<StorageListItem> ListOneDriveFilesAsync(string prefix, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct)
+        private async IAsyncEnumerable<StorageListItem> ListOneDriveFilesAsync(string prefix, CloudStorageConfig config, HttpClient client, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct)
         {
-            var baseUrl = _config.Provider == CloudProvider.SharePoint
-                ? $"https://graph.microsoft.com/v1.0/sites/{_config.SiteId}/drive"
+            var baseUrl = config.Provider == CloudProvider.SharePoint
+                ? $"https://graph.microsoft.com/v1.0/sites/{config.SiteId}/drive"
                 : "https://graph.microsoft.com/v1.0/me/drive";
 
             var folderPath = string.IsNullOrEmpty(prefix) ? "root" : $"root:/{prefix}:";
@@ -610,7 +772,7 @@ namespace DataWarehouse.Plugins.CloudStorage
                 var request = new HttpRequestMessage(HttpMethod.Get, url);
                 request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", _accessToken);
 
-                var response = await HttpClient.SendAsync(request, ct);
+                var response = await client.SendAsync(request, ct);
                 response.EnsureSuccessStatusCode();
 
                 var json = await response.Content.ReadAsStringAsync(ct);
@@ -635,7 +797,7 @@ namespace DataWarehouse.Plugins.CloudStorage
 
         #region Dropbox Implementation
 
-        private async Task UploadToDropboxAsync(string path, byte[] content)
+        private async Task UploadToDropboxAsync(string path, byte[] content, CloudStorageConfig config, HttpClient client)
         {
             var request = new HttpRequestMessage(HttpMethod.Post, "https://content.dropboxapi.com/2/files/upload")
             {
@@ -645,17 +807,17 @@ namespace DataWarehouse.Plugins.CloudStorage
             request.Headers.TryAddWithoutValidation("Dropbox-API-Arg", JsonSerializer.Serialize(new { path = $"/{path}", mode = "overwrite" }));
             request.Content.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("application/octet-stream");
 
-            var response = await HttpClient.SendAsync(request);
+            var response = await client.SendAsync(request);
             response.EnsureSuccessStatusCode();
         }
 
-        private async Task<Stream> DownloadFromDropboxAsync(string path)
+        private async Task<Stream> DownloadFromDropboxAsync(string path, CloudStorageConfig config, HttpClient client)
         {
             var request = new HttpRequestMessage(HttpMethod.Post, "https://content.dropboxapi.com/2/files/download");
             request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", _accessToken);
             request.Headers.TryAddWithoutValidation("Dropbox-API-Arg", JsonSerializer.Serialize(new { path = $"/{path}" }));
 
-            var response = await HttpClient.SendAsync(request);
+            var response = await client.SendAsync(request);
             response.EnsureSuccessStatusCode();
 
             var ms = new MemoryStream();
@@ -664,7 +826,7 @@ namespace DataWarehouse.Plugins.CloudStorage
             return ms;
         }
 
-        private async Task DeleteFromDropboxAsync(string path)
+        private async Task DeleteFromDropboxAsync(string path, CloudStorageConfig config, HttpClient client)
         {
             var request = new HttpRequestMessage(HttpMethod.Post, "https://api.dropboxapi.com/2/files/delete_v2")
             {
@@ -672,11 +834,11 @@ namespace DataWarehouse.Plugins.CloudStorage
             };
             request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", _accessToken);
 
-            var response = await HttpClient.SendAsync(request);
+            var response = await client.SendAsync(request);
             response.EnsureSuccessStatusCode();
         }
 
-        private async IAsyncEnumerable<StorageListItem> ListDropboxFilesAsync(string prefix, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct)
+        private async IAsyncEnumerable<StorageListItem> ListDropboxFilesAsync(string prefix, CloudStorageConfig config, HttpClient client, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct)
         {
             var cursor = (string?)null;
             var hasMore = true;
@@ -700,7 +862,7 @@ namespace DataWarehouse.Plugins.CloudStorage
                 }
                 request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", _accessToken);
 
-                var response = await HttpClient.SendAsync(request, ct);
+                var response = await client.SendAsync(request, ct);
                 response.EnsureSuccessStatusCode();
 
                 var json = await response.Content.ReadAsStringAsync(ct);
@@ -726,10 +888,10 @@ namespace DataWarehouse.Plugins.CloudStorage
 
         #region Box Implementation
 
-        private async Task UploadToBoxAsync(string path, byte[] content)
+        private async Task UploadToBoxAsync(string path, byte[] content, CloudStorageConfig config, HttpClient client)
         {
             var fileName = Path.GetFileName(path);
-            var folderId = _config.BaseFolderId ?? "0";
+            var folderId = config.BaseFolderId ?? "0";
 
             using var multipartContent = new MultipartFormDataContent();
             multipartContent.Add(new StringContent(JsonSerializer.Serialize(new { name = fileName, parent = new { id = folderId } })), "attributes");
@@ -741,18 +903,18 @@ namespace DataWarehouse.Plugins.CloudStorage
             };
             request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", _accessToken);
 
-            var response = await HttpClient.SendAsync(request);
+            var response = await client.SendAsync(request);
             response.EnsureSuccessStatusCode();
         }
 
-        private async Task<Stream> DownloadFromBoxAsync(string path)
+        private async Task<Stream> DownloadFromBoxAsync(string path, CloudStorageConfig config, HttpClient client)
         {
-            var fileId = await GetBoxFileIdAsync(path);
+            var fileId = await GetBoxFileIdAsync(path, config, client);
 
             var request = new HttpRequestMessage(HttpMethod.Get, $"https://api.box.com/2.0/files/{fileId}/content");
             request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", _accessToken);
 
-            var response = await HttpClient.SendAsync(request);
+            var response = await client.SendAsync(request);
             response.EnsureSuccessStatusCode();
 
             var ms = new MemoryStream();
@@ -761,20 +923,20 @@ namespace DataWarehouse.Plugins.CloudStorage
             return ms;
         }
 
-        private async Task DeleteFromBoxAsync(string path)
+        private async Task DeleteFromBoxAsync(string path, CloudStorageConfig config, HttpClient client)
         {
-            var fileId = await GetBoxFileIdAsync(path);
+            var fileId = await GetBoxFileIdAsync(path, config, client);
 
             var request = new HttpRequestMessage(HttpMethod.Delete, $"https://api.box.com/2.0/files/{fileId}");
             request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", _accessToken);
 
-            var response = await HttpClient.SendAsync(request);
+            var response = await client.SendAsync(request);
             response.EnsureSuccessStatusCode();
         }
 
-        private async IAsyncEnumerable<StorageListItem> ListBoxFilesAsync(string prefix, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct)
+        private async IAsyncEnumerable<StorageListItem> ListBoxFilesAsync(string prefix, CloudStorageConfig config, HttpClient client, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct)
         {
-            var folderId = _config.BaseFolderId ?? "0";
+            var folderId = config.BaseFolderId ?? "0";
             var offset = 0;
             const int limit = 100;
             const int MaxIterations = 10000; // Safety limit to prevent infinite loops
@@ -794,7 +956,7 @@ namespace DataWarehouse.Plugins.CloudStorage
                 var request = new HttpRequestMessage(HttpMethod.Get, url);
                 request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", _accessToken);
 
-                var response = await HttpClient.SendAsync(request, ct);
+                var response = await client.SendAsync(request, ct);
                 response.EnsureSuccessStatusCode();
 
                 var json = await response.Content.ReadAsStringAsync(ct);
@@ -820,7 +982,7 @@ namespace DataWarehouse.Plugins.CloudStorage
             }
         }
 
-        private async Task<string> GetBoxFileIdAsync(string path)
+        private async Task<string> GetBoxFileIdAsync(string path, CloudStorageConfig config, HttpClient client)
         {
             // Search for file by name
             var fileName = Path.GetFileName(path);
@@ -829,7 +991,7 @@ namespace DataWarehouse.Plugins.CloudStorage
             var request = new HttpRequestMessage(HttpMethod.Get, url);
             request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", _accessToken);
 
-            var response = await HttpClient.SendAsync(request);
+            var response = await client.SendAsync(request);
             response.EnsureSuccessStatusCode();
 
             var json = await response.Content.ReadAsStringAsync();
@@ -841,51 +1003,54 @@ namespace DataWarehouse.Plugins.CloudStorage
 
         #region Common Methods
 
-        private async Task<Dictionary<string, object>> GetFileMetadataAsync(string path)
+        private async Task<Dictionary<string, object>> GetFileMetadataAsync(string path, string? instanceId = null)
         {
-            await EnsureTokenValidAsync();
+            await EnsureTokenValidAsync(instanceId);
+            var config = GetConfig(instanceId);
 
             // Provider-specific metadata retrieval would go here
             return new Dictionary<string, object>
             {
                 ["Path"] = path,
-                ["Provider"] = _config.Provider.ToString()
+                ["Provider"] = config.Provider.ToString(),
+                ["InstanceId"] = instanceId ?? "default"
             };
         }
 
-        private async Task<string> CreateShareLinkAsync(string path)
+        private async Task<string> CreateShareLinkAsync(string path, string? instanceId = null)
         {
-            await EnsureTokenValidAsync();
+            await EnsureTokenValidAsync(instanceId);
+            var config = GetConfig(instanceId);
             // Provider-specific share link creation
-            return $"https://share.{_config.Provider.ToString().ToLower()}.com/{path}";
+            return $"https://share.{config.Provider.ToString().ToLower()}.com/{path}";
         }
 
-        private async Task MoveFileAsync(string sourcePath, string destPath)
+        private async Task MoveFileAsync(string sourcePath, string destPath, string? instanceId = null)
         {
-            await EnsureTokenValidAsync();
+            await EnsureTokenValidAsync(instanceId);
             // Provider-specific move operation
         }
 
-        private async Task<List<string>> SearchFilesAsync(string query)
+        private async Task<List<string>> SearchFilesAsync(string query, string? instanceId = null)
         {
-            await EnsureTokenValidAsync();
+            await EnsureTokenValidAsync(instanceId);
             // Provider-specific search
             return new List<string>();
         }
 
-        private string GetAuthorizationUrl()
+        private string GetAuthorizationUrl(CloudStorageConfig config)
         {
-            return _config.Provider switch
+            return config.Provider switch
             {
-                CloudProvider.GoogleDrive => $"https://accounts.google.com/o/oauth2/v2/auth?client_id={_config.ClientId}&redirect_uri={_config.RedirectUri}&response_type=code&scope=https://www.googleapis.com/auth/drive.file",
-                CloudProvider.OneDrive or CloudProvider.SharePoint => $"https://login.microsoftonline.com/common/oauth2/v2.0/authorize?client_id={_config.ClientId}&redirect_uri={_config.RedirectUri}&response_type=code&scope=Files.ReadWrite.All",
-                CloudProvider.Dropbox => $"https://www.dropbox.com/oauth2/authorize?client_id={_config.ClientId}&redirect_uri={_config.RedirectUri}&response_type=code",
-                CloudProvider.Box => $"https://account.box.com/api/oauth2/authorize?client_id={_config.ClientId}&redirect_uri={_config.RedirectUri}&response_type=code",
+                CloudProvider.GoogleDrive => $"https://accounts.google.com/o/oauth2/v2/auth?client_id={config.ClientId}&redirect_uri={config.RedirectUri}&response_type=code&scope=https://www.googleapis.com/auth/drive.file",
+                CloudProvider.OneDrive or CloudProvider.SharePoint => $"https://login.microsoftonline.com/common/oauth2/v2.0/authorize?client_id={config.ClientId}&redirect_uri={config.RedirectUri}&response_type=code&scope=Files.ReadWrite.All",
+                CloudProvider.Dropbox => $"https://www.dropbox.com/oauth2/authorize?client_id={config.ClientId}&redirect_uri={config.RedirectUri}&response_type=code",
+                CloudProvider.Box => $"https://account.box.com/api/oauth2/authorize?client_id={config.ClientId}&redirect_uri={config.RedirectUri}&response_type=code",
                 _ => throw new NotSupportedException()
             };
         }
 
-        private async Task EnsureTokenValidAsync()
+        private async Task EnsureTokenValidAsync(string? instanceId = null)
         {
             if (_accessToken != null && DateTime.UtcNow < _tokenExpiry.AddMinutes(-5))
                 return;
@@ -898,7 +1063,7 @@ namespace DataWarehouse.Plugins.CloudStorage
 
                 if (_refreshToken != null)
                 {
-                    await RefreshTokenAsync();
+                    await RefreshTokenAsync(instanceId);
                 }
                 else if (_accessToken == null)
                 {
@@ -911,9 +1076,12 @@ namespace DataWarehouse.Plugins.CloudStorage
             }
         }
 
-        private async Task RefreshTokenAsync()
+        private async Task RefreshTokenAsync(string? instanceId = null)
         {
-            var tokenUrl = _config.Provider switch
+            var config = GetConfig(instanceId);
+            var client = GetHttpClient(instanceId);
+
+            var tokenUrl = config.Provider switch
             {
                 CloudProvider.GoogleDrive => "https://oauth2.googleapis.com/token",
                 CloudProvider.OneDrive or CloudProvider.SharePoint => "https://login.microsoftonline.com/common/oauth2/v2.0/token",
@@ -926,11 +1094,11 @@ namespace DataWarehouse.Plugins.CloudStorage
             {
                 ["grant_type"] = "refresh_token",
                 ["refresh_token"] = _refreshToken!,
-                ["client_id"] = _config.ClientId,
-                ["client_secret"] = _config.ClientSecret
+                ["client_id"] = config.ClientId,
+                ["client_secret"] = config.ClientSecret
             });
 
-            var response = await HttpClient.PostAsync(tokenUrl, content);
+            var response = await client.PostAsync(tokenUrl, content);
             response.EnsureSuccessStatusCode();
 
             var json = await response.Content.ReadAsStringAsync();
@@ -1008,9 +1176,22 @@ namespace DataWarehouse.Plugins.CloudStorage
     }
 
     /// <summary>
+    /// Internal connection wrapper for cloud storage instances.
+    /// </summary>
+    internal class CloudStorageConnection
+    {
+        public required CloudStorageConfig Config { get; init; }
+        public required IHttpClientFactory HttpClientFactory { get; init; }
+        public required string HttpClientName { get; init; }
+        public string? AccessToken { get; set; }
+        public string? RefreshToken { get; set; }
+        public DateTime TokenExpiry { get; set; }
+    }
+
+    /// <summary>
     /// Configuration for cloud storage.
     /// </summary>
-    public class CloudStorageConfig
+    public class CloudStorageConfig : StorageConfigBase
     {
         /// <summary>
         /// Cloud storage provider.
@@ -1074,6 +1255,18 @@ namespace DataWarehouse.Plugins.CloudStorage
         };
 
         /// <summary>
+        /// Creates configuration for Google Drive with instance ID.
+        /// </summary>
+        public static CloudStorageConfig GoogleDrive(string clientId, string clientSecret, string instanceId, string? accessToken = null) => new()
+        {
+            Provider = CloudProvider.GoogleDrive,
+            ClientId = clientId,
+            ClientSecret = clientSecret,
+            AccessToken = accessToken,
+            InstanceId = instanceId
+        };
+
+        /// <summary>
         /// Creates configuration for OneDrive.
         /// </summary>
         public static CloudStorageConfig OneDrive(string clientId, string clientSecret, string? accessToken = null) => new()
@@ -1082,6 +1275,18 @@ namespace DataWarehouse.Plugins.CloudStorage
             ClientId = clientId,
             ClientSecret = clientSecret,
             AccessToken = accessToken
+        };
+
+        /// <summary>
+        /// Creates configuration for OneDrive with instance ID.
+        /// </summary>
+        public static CloudStorageConfig OneDrive(string clientId, string clientSecret, string instanceId, string? accessToken = null) => new()
+        {
+            Provider = CloudProvider.OneDrive,
+            ClientId = clientId,
+            ClientSecret = clientSecret,
+            AccessToken = accessToken,
+            InstanceId = instanceId
         };
 
         /// <summary>
@@ -1097,6 +1302,19 @@ namespace DataWarehouse.Plugins.CloudStorage
         };
 
         /// <summary>
+        /// Creates configuration for SharePoint with instance ID.
+        /// </summary>
+        public static CloudStorageConfig SharePoint(string clientId, string clientSecret, string siteId, string instanceId, string? accessToken = null) => new()
+        {
+            Provider = CloudProvider.SharePoint,
+            ClientId = clientId,
+            ClientSecret = clientSecret,
+            SiteId = siteId,
+            AccessToken = accessToken,
+            InstanceId = instanceId
+        };
+
+        /// <summary>
         /// Creates configuration for Dropbox.
         /// </summary>
         public static CloudStorageConfig Dropbox(string clientId, string clientSecret, string? accessToken = null) => new()
@@ -1108,6 +1326,18 @@ namespace DataWarehouse.Plugins.CloudStorage
         };
 
         /// <summary>
+        /// Creates configuration for Dropbox with instance ID.
+        /// </summary>
+        public static CloudStorageConfig Dropbox(string clientId, string clientSecret, string instanceId, string? accessToken = null) => new()
+        {
+            Provider = CloudProvider.Dropbox,
+            ClientId = clientId,
+            ClientSecret = clientSecret,
+            AccessToken = accessToken,
+            InstanceId = instanceId
+        };
+
+        /// <summary>
         /// Creates configuration for Box.
         /// </summary>
         public static CloudStorageConfig Box(string clientId, string clientSecret, string? accessToken = null) => new()
@@ -1116,6 +1346,18 @@ namespace DataWarehouse.Plugins.CloudStorage
             ClientId = clientId,
             ClientSecret = clientSecret,
             AccessToken = accessToken
+        };
+
+        /// <summary>
+        /// Creates configuration for Box with instance ID.
+        /// </summary>
+        public static CloudStorageConfig Box(string clientId, string clientSecret, string instanceId, string? accessToken = null) => new()
+        {
+            Provider = CloudProvider.Box,
+            ClientId = clientId,
+            ClientSecret = clientSecret,
+            AccessToken = accessToken,
+            InstanceId = instanceId
         };
     }
 

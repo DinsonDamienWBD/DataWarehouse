@@ -1,5 +1,7 @@
 using DataWarehouse.SDK.Contracts;
+using DataWarehouse.SDK.Infrastructure;
 using DataWarehouse.SDK.Primitives;
+using DataWarehouse.SDK.Storage;
 using DataWarehouse.SDK.Utilities;
 using System.Text;
 using System.Text.Json;
@@ -18,6 +20,9 @@ namespace DataWarehouse.Plugins.GcsStorage
     /// - Lifecycle management awareness
     /// - Resumable uploads for large files
     /// - Customer-managed encryption keys (CMEK)
+    /// - Multi-instance support with role-based selection
+    /// - TTL-based caching support
+    /// - Document indexing and search
     ///
     /// Message Commands:
     /// - storage.gcs.upload: Upload object to GCS
@@ -29,10 +34,10 @@ namespace DataWarehouse.Plugins.GcsStorage
     /// - storage.gcs.sign: Generate signed URL
     /// - storage.gcs.copy: Copy object
     /// - storage.gcs.compose: Compose multiple objects
+    /// - storage.instance.*: Multi-instance management
     /// </summary>
-    public sealed class GcsStoragePlugin : ListableStoragePluginBase, ITieredStorage
+    public sealed class GcsStoragePlugin : HybridStoragePluginBase<GcsConfig>, ITieredStorage
     {
-        private readonly GcsConfig _config;
         private readonly HttpClient _httpClient;
         private string? _accessToken;
         private DateTime _tokenExpiry = DateTime.MinValue;
@@ -40,35 +45,55 @@ namespace DataWarehouse.Plugins.GcsStorage
 
         public override string Id => "datawarehouse.plugins.storage.gcs";
         public override string Name => "Google Cloud Storage";
-        public override string Version => "1.0.0";
+        public override string Version => "2.0.0";
         public override string Scheme => "gs";
+        public override string StorageCategory => "Cloud";
 
         /// <summary>
         /// Creates a GCS storage plugin with configuration.
         /// </summary>
         public GcsStoragePlugin(GcsConfig config)
+            : base(config ?? throw new ArgumentNullException(nameof(config)))
         {
-            _config = config ?? throw new ArgumentNullException(nameof(config));
             _httpClient = new HttpClient
             {
                 Timeout = TimeSpan.FromSeconds(_config.TimeoutSeconds)
             };
         }
 
+        /// <summary>
+        /// Creates a connection for the given configuration.
+        /// </summary>
+        protected override Task<object> CreateConnectionAsync(GcsConfig config)
+        {
+            var client = new HttpClient
+            {
+                Timeout = TimeSpan.FromSeconds(config.TimeoutSeconds)
+            };
+
+            return Task.FromResult<object>(new GcsConnection
+            {
+                Config = config,
+                HttpClient = client
+            });
+        }
+
         protected override List<PluginCapabilityDescriptor> GetCapabilities()
         {
-            return
-            [
-                new() { Name = "storage.gcs.upload", DisplayName = "Upload", Description = "Upload object to GCS" },
-                new() { Name = "storage.gcs.download", DisplayName = "Download", Description = "Download object from GCS" },
-                new() { Name = "storage.gcs.delete", DisplayName = "Delete", Description = "Delete object from GCS" },
-                new() { Name = "storage.gcs.list", DisplayName = "List", Description = "List objects in bucket" },
-                new() { Name = "storage.gcs.metadata", DisplayName = "Metadata", Description = "Get object metadata" },
-                new() { Name = "storage.gcs.class", DisplayName = "Class", Description = "Set storage class" },
-                new() { Name = "storage.gcs.sign", DisplayName = "Sign", Description = "Generate signed URL" },
-                new() { Name = "storage.gcs.copy", DisplayName = "Copy", Description = "Copy object" },
-                new() { Name = "storage.gcs.compose", DisplayName = "Compose", Description = "Compose multiple objects" }
-            ];
+            var capabilities = base.GetCapabilities();
+            capabilities.AddRange(new[]
+            {
+                new PluginCapabilityDescriptor { Name = "storage.gcs.upload", DisplayName = "Upload", Description = "Upload object to GCS" },
+                new PluginCapabilityDescriptor { Name = "storage.gcs.download", DisplayName = "Download", Description = "Download object from GCS" },
+                new PluginCapabilityDescriptor { Name = "storage.gcs.delete", DisplayName = "Delete", Description = "Delete object from GCS" },
+                new PluginCapabilityDescriptor { Name = "storage.gcs.list", DisplayName = "List", Description = "List objects in bucket" },
+                new PluginCapabilityDescriptor { Name = "storage.gcs.metadata", DisplayName = "Metadata", Description = "Get object metadata" },
+                new PluginCapabilityDescriptor { Name = "storage.gcs.class", DisplayName = "Class", Description = "Set storage class" },
+                new PluginCapabilityDescriptor { Name = "storage.gcs.sign", DisplayName = "Sign", Description = "Generate signed URL" },
+                new PluginCapabilityDescriptor { Name = "storage.gcs.copy", DisplayName = "Copy", Description = "Copy object" },
+                new PluginCapabilityDescriptor { Name = "storage.gcs.compose", DisplayName = "Compose", Description = "Compose multiple objects" }
+            });
+            return capabilities;
         }
 
         protected override Dictionary<string, object> GetMetadata()
@@ -103,6 +128,12 @@ namespace DataWarehouse.Plugins.GcsStorage
                 "storage.gcs.compose" => await HandleComposeAsync(message),
                 _ => null
             };
+
+            // If not handled, delegate to base for multi-instance management
+            if (response == null)
+            {
+                await base.OnMessageAsync(message);
+            }
         }
 
         private async Task<MessageResponse> HandleUploadAsync(PluginMessage message)
@@ -123,9 +154,12 @@ namespace DataWarehouse.Plugins.GcsStorage
                 _ => throw new ArgumentException("Data must be Stream, byte[], or string")
             };
 
-            var uri = new Uri($"gs://{_config.Bucket}/{objectName}");
-            await SaveAsync(uri, data);
-            return MessageResponse.Ok(new { Bucket = _config.Bucket, ObjectName = objectName, Success = true });
+            var instanceId = payload.TryGetValue("instanceId", out var instId) ? instId?.ToString() : null;
+            var config = GetConfig(instanceId);
+
+            var uri = new Uri($"gs://{config.Bucket}/{objectName}");
+            await SaveAsync(uri, data, instanceId);
+            return MessageResponse.Ok(new { Bucket = config.Bucket, ObjectName = objectName, Success = true, InstanceId = instanceId });
         }
 
         private async Task<MessageResponse> HandleDownloadAsync(PluginMessage message)
@@ -137,11 +171,14 @@ namespace DataWarehouse.Plugins.GcsStorage
             }
 
             var objectName = nameObj.ToString()!;
-            var uri = new Uri($"gs://{_config.Bucket}/{objectName}");
-            var stream = await LoadAsync(uri);
+            var instanceId = payload.TryGetValue("instanceId", out var instId) ? instId?.ToString() : null;
+            var config = GetConfig(instanceId);
+
+            var uri = new Uri($"gs://{config.Bucket}/{objectName}");
+            var stream = await LoadAsync(uri, instanceId);
             using var ms = new MemoryStream();
             await stream.CopyToAsync(ms);
-            return MessageResponse.Ok(new { Bucket = _config.Bucket, ObjectName = objectName, Data = ms.ToArray() });
+            return MessageResponse.Ok(new { Bucket = config.Bucket, ObjectName = objectName, Data = ms.ToArray(), InstanceId = instanceId });
         }
 
         private async Task<MessageResponse> HandleDeleteAsync(PluginMessage message)
@@ -153,9 +190,12 @@ namespace DataWarehouse.Plugins.GcsStorage
             }
 
             var objectName = nameObj.ToString()!;
-            var uri = new Uri($"gs://{_config.Bucket}/{objectName}");
-            await DeleteAsync(uri);
-            return MessageResponse.Ok(new { Bucket = _config.Bucket, ObjectName = objectName, Deleted = true });
+            var instanceId = payload.TryGetValue("instanceId", out var instId) ? instId?.ToString() : null;
+            var config = GetConfig(instanceId);
+
+            var uri = new Uri($"gs://{config.Bucket}/{objectName}");
+            await DeleteAsync(uri, instanceId);
+            return MessageResponse.Ok(new { Bucket = config.Bucket, ObjectName = objectName, Deleted = true, InstanceId = instanceId });
         }
 
         private async Task<MessageResponse> HandleMetadataAsync(PluginMessage message)
@@ -167,7 +207,9 @@ namespace DataWarehouse.Plugins.GcsStorage
             }
 
             var objectName = nameObj.ToString()!;
-            var metadata = await GetObjectMetadataAsync(objectName);
+            var instanceId = payload.TryGetValue("instanceId", out var instId) ? instId?.ToString() : null;
+
+            var metadata = await GetObjectMetadataAsync(objectName, instanceId);
             return MessageResponse.Ok(metadata);
         }
 
@@ -182,8 +224,10 @@ namespace DataWarehouse.Plugins.GcsStorage
 
             var objectName = nameObj.ToString()!;
             var storageClass = classObj.ToString()!;
-            await SetStorageClassAsync(objectName, storageClass);
-            return MessageResponse.Ok(new { ObjectName = objectName, StorageClass = storageClass, Success = true });
+            var instanceId = payload.TryGetValue("instanceId", out var instId) ? instId?.ToString() : null;
+
+            await SetStorageClassAsync(objectName, storageClass, instanceId);
+            return MessageResponse.Ok(new { ObjectName = objectName, StorageClass = storageClass, Success = true, InstanceId = instanceId });
         }
 
         private async Task<MessageResponse> HandleSignAsync(PluginMessage message)
@@ -198,9 +242,10 @@ namespace DataWarehouse.Plugins.GcsStorage
             var expiresIn = payload.TryGetValue("expiresIn", out var expObj) && expObj is int exp
                 ? TimeSpan.FromSeconds(exp)
                 : TimeSpan.FromHours(1);
+            var instanceId = payload.TryGetValue("instanceId", out var instId) ? instId?.ToString() : null;
 
-            var signedUrl = await GenerateSignedUrlAsync(objectName, expiresIn);
-            return MessageResponse.Ok(new { ObjectName = objectName, SignedUrl = signedUrl, ExpiresIn = expiresIn.TotalSeconds });
+            var signedUrl = await GenerateSignedUrlAsync(objectName, expiresIn, instanceId);
+            return MessageResponse.Ok(new { ObjectName = objectName, SignedUrl = signedUrl, ExpiresIn = expiresIn.TotalSeconds, InstanceId = instanceId });
         }
 
         private async Task<MessageResponse> HandleCopyAsync(PluginMessage message)
@@ -214,8 +259,10 @@ namespace DataWarehouse.Plugins.GcsStorage
 
             var sourceObjectName = sourceObj.ToString()!;
             var destObjectName = destObj.ToString()!;
-            await CopyObjectAsync(sourceObjectName, destObjectName);
-            return MessageResponse.Ok(new { SourceObjectName = sourceObjectName, DestinationObjectName = destObjectName, Success = true });
+            var instanceId = payload.TryGetValue("instanceId", out var instId) ? instId?.ToString() : null;
+
+            await CopyObjectAsync(sourceObjectName, destObjectName, instanceId);
+            return MessageResponse.Ok(new { SourceObjectName = sourceObjectName, DestinationObjectName = destObjectName, Success = true, InstanceId = instanceId });
         }
 
         private async Task<MessageResponse> HandleComposeAsync(PluginMessage message)
@@ -236,17 +283,23 @@ namespace DataWarehouse.Plugins.GcsStorage
             };
 
             var destObjectName = destObj.ToString()!;
-            await ComposeObjectsAsync(sourceObjects, destObjectName);
-            return MessageResponse.Ok(new { SourceObjects = sourceObjects, DestinationObjectName = destObjectName, Success = true });
+            var instanceId = payload.TryGetValue("instanceId", out var instId) ? instId?.ToString() : null;
+
+            await ComposeObjectsAsync(sourceObjects, destObjectName, instanceId);
+            return MessageResponse.Ok(new { SourceObjects = sourceObjects, DestinationObjectName = destObjectName, Success = true, InstanceId = instanceId });
         }
 
-        public override async Task SaveAsync(Uri uri, Stream data)
+        #region Storage Operations with Instance Support
+
+        public async Task SaveAsync(Uri uri, Stream data, string? instanceId = null)
         {
             ArgumentNullException.ThrowIfNull(uri);
             ArgumentNullException.ThrowIfNull(data);
 
+            var config = GetConfig(instanceId);
+            var client = GetHttpClient(instanceId);
             var objectName = GetObjectName(uri);
-            var endpoint = $"https://storage.googleapis.com/upload/storage/v1/b/{_config.Bucket}/o?uploadType=media&name={Uri.EscapeDataString(objectName)}";
+            var endpoint = $"https://storage.googleapis.com/upload/storage/v1/b/{config.Bucket}/o?uploadType=media&name={Uri.EscapeDataString(objectName)}";
 
             using var ms = new MemoryStream();
             await data.CopyToAsync(ms);
@@ -256,29 +309,49 @@ namespace DataWarehouse.Plugins.GcsStorage
             request.Content = new ByteArrayContent(content);
             request.Content.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("application/octet-stream");
 
-            await AddAuthHeaderAsync(request);
+            await AddAuthHeaderAsync(request, instanceId);
 
-            if (!string.IsNullOrEmpty(_config.DefaultStorageClass))
+            if (!string.IsNullOrEmpty(config.DefaultStorageClass))
             {
-                request.Headers.TryAddWithoutValidation("x-goog-storage-class", _config.DefaultStorageClass);
+                request.Headers.TryAddWithoutValidation("x-goog-storage-class", config.DefaultStorageClass);
             }
 
-            var response = await _httpClient.SendAsync(request);
+            var response = await client.SendAsync(request);
             response.EnsureSuccessStatusCode();
+
+            // Auto-index if enabled
+            if (config.EnableIndexing)
+            {
+                await IndexDocumentAsync(uri.ToString(), new Dictionary<string, object>
+                {
+                    ["uri"] = uri.ToString(),
+                    ["bucket"] = config.Bucket,
+                    ["objectName"] = objectName,
+                    ["size"] = content.Length,
+                    ["instanceId"] = instanceId ?? "default"
+                });
+            }
         }
 
-        public override async Task<Stream> LoadAsync(Uri uri)
+        public override Task SaveAsync(Uri uri, Stream data) => SaveAsync(uri, data, null);
+
+        public async Task<Stream> LoadAsync(Uri uri, string? instanceId = null)
         {
             ArgumentNullException.ThrowIfNull(uri);
 
+            var config = GetConfig(instanceId);
+            var client = GetHttpClient(instanceId);
             var objectName = GetObjectName(uri);
-            var endpoint = $"https://storage.googleapis.com/storage/v1/b/{_config.Bucket}/o/{Uri.EscapeDataString(objectName)}?alt=media";
+            var endpoint = $"https://storage.googleapis.com/storage/v1/b/{config.Bucket}/o/{Uri.EscapeDataString(objectName)}?alt=media";
 
             var request = new HttpRequestMessage(HttpMethod.Get, endpoint);
-            await AddAuthHeaderAsync(request);
+            await AddAuthHeaderAsync(request, instanceId);
 
-            var response = await _httpClient.SendAsync(request);
+            var response = await client.SendAsync(request);
             response.EnsureSuccessStatusCode();
+
+            // Update last access for caching
+            await TouchAsync(uri);
 
             var ms = new MemoryStream();
             await response.Content.CopyToAsync(ms);
@@ -286,28 +359,37 @@ namespace DataWarehouse.Plugins.GcsStorage
             return ms;
         }
 
-        public override async Task DeleteAsync(Uri uri)
+        public override Task<Stream> LoadAsync(Uri uri) => LoadAsync(uri, null);
+
+        public async Task DeleteAsync(Uri uri, string? instanceId = null)
         {
             ArgumentNullException.ThrowIfNull(uri);
 
+            var config = GetConfig(instanceId);
+            var client = GetHttpClient(instanceId);
             var objectName = GetObjectName(uri);
-            var endpoint = $"https://storage.googleapis.com/storage/v1/b/{_config.Bucket}/o/{Uri.EscapeDataString(objectName)}";
+            var endpoint = $"https://storage.googleapis.com/storage/v1/b/{config.Bucket}/o/{Uri.EscapeDataString(objectName)}";
 
             var request = new HttpRequestMessage(HttpMethod.Delete, endpoint);
-            await AddAuthHeaderAsync(request);
+            await AddAuthHeaderAsync(request, instanceId);
 
-            var response = await _httpClient.SendAsync(request);
+            var response = await client.SendAsync(request);
             response.EnsureSuccessStatusCode();
+
+            // Remove from index
+            _ = RemoveFromIndexAsync(uri.ToString());
         }
 
-        public override async Task<bool> ExistsAsync(Uri uri)
+        public override Task DeleteAsync(Uri uri) => DeleteAsync(uri, null);
+
+        public async Task<bool> ExistsAsync(Uri uri, string? instanceId = null)
         {
             ArgumentNullException.ThrowIfNull(uri);
 
             var objectName = GetObjectName(uri);
             try
             {
-                await GetObjectMetadataAsync(objectName);
+                await GetObjectMetadataAsync(objectName, instanceId);
                 return true;
             }
             catch
@@ -315,6 +397,8 @@ namespace DataWarehouse.Plugins.GcsStorage
                 return false;
             }
         }
+
+        public override Task<bool> ExistsAsync(Uri uri) => ExistsAsync(uri, null);
 
         public override async IAsyncEnumerable<StorageListItem> ListFilesAsync(
             string prefix = "",
@@ -329,7 +413,7 @@ namespace DataWarehouse.Plugins.GcsStorage
                     endpoint += $"&pageToken={Uri.EscapeDataString(pageToken)}";
 
                 var request = new HttpRequestMessage(HttpMethod.Get, endpoint);
-                await AddAuthHeaderAsync(request);
+                await AddAuthHeaderAsync(request, null);
 
                 var response = await _httpClient.SendAsync(request, ct);
                 response.EnsureSuccessStatusCode();
@@ -355,17 +439,23 @@ namespace DataWarehouse.Plugins.GcsStorage
             } while (pageToken != null);
         }
 
+        #endregion
+
+        #region GCS-Specific Operations
+
         /// <summary>
         /// Get object metadata.
         /// </summary>
-        public async Task<Dictionary<string, object>> GetObjectMetadataAsync(string objectName)
+        public async Task<Dictionary<string, object>> GetObjectMetadataAsync(string objectName, string? instanceId = null)
         {
-            var endpoint = $"https://storage.googleapis.com/storage/v1/b/{_config.Bucket}/o/{Uri.EscapeDataString(objectName)}";
+            var config = GetConfig(instanceId);
+            var client = GetHttpClient(instanceId);
+            var endpoint = $"https://storage.googleapis.com/storage/v1/b/{config.Bucket}/o/{Uri.EscapeDataString(objectName)}";
 
             var request = new HttpRequestMessage(HttpMethod.Get, endpoint);
-            await AddAuthHeaderAsync(request);
+            await AddAuthHeaderAsync(request, instanceId);
 
-            var response = await _httpClient.SendAsync(request);
+            var response = await client.SendAsync(request);
             response.EnsureSuccessStatusCode();
 
             var json = await response.Content.ReadAsStringAsync();
@@ -386,23 +476,26 @@ namespace DataWarehouse.Plugins.GcsStorage
         /// <summary>
         /// Set storage class for an object.
         /// </summary>
-        public async Task SetStorageClassAsync(string objectName, string storageClass)
+        public async Task SetStorageClassAsync(string objectName, string storageClass, string? instanceId = null)
         {
+            var config = GetConfig(instanceId);
+            var client = GetHttpClient(instanceId);
+
             // GCS requires rewrite to change storage class
-            var endpoint = $"https://storage.googleapis.com/storage/v1/b/{_config.Bucket}/o/{Uri.EscapeDataString(objectName)}/rewriteTo/b/{_config.Bucket}/o/{Uri.EscapeDataString(objectName)}";
+            var endpoint = $"https://storage.googleapis.com/storage/v1/b/{config.Bucket}/o/{Uri.EscapeDataString(objectName)}/rewriteTo/b/{config.Bucket}/o/{Uri.EscapeDataString(objectName)}";
 
             var request = new HttpRequestMessage(HttpMethod.Post, endpoint);
             request.Content = new StringContent(JsonSerializer.Serialize(new { storageClass }), Encoding.UTF8, "application/json");
-            await AddAuthHeaderAsync(request);
+            await AddAuthHeaderAsync(request, instanceId);
 
-            var response = await _httpClient.SendAsync(request);
+            var response = await client.SendAsync(request);
             response.EnsureSuccessStatusCode();
         }
 
         /// <summary>
         /// Move object to a different storage tier.
         /// </summary>
-        public async Task<string> MoveToTierAsync(Manifest manifest, StorageTier targetTier)
+        public async Task<string> MoveToTierAsync(Manifest manifest, StorageTier targetTier, string? instanceId = null)
         {
             var objectName = GetObjectName(manifest.StorageUri);
             var storageClass = targetTier switch
@@ -414,9 +507,12 @@ namespace DataWarehouse.Plugins.GcsStorage
                 _ => "STANDARD"
             };
 
-            await SetStorageClassAsync(objectName, storageClass);
+            await SetStorageClassAsync(objectName, storageClass, instanceId);
             return manifest.StorageUri.ToString();
         }
+
+        public Task<string> MoveToTierAsync(Manifest manifest, StorageTier targetTier)
+            => MoveToTierAsync(manifest, targetTier, null);
 
         public Task<StorageTier> GetCurrentTierAsync(Uri uri)
         {
@@ -426,36 +522,38 @@ namespace DataWarehouse.Plugins.GcsStorage
         /// <summary>
         /// Generate signed URL.
         /// </summary>
-        public async Task<string> GenerateSignedUrlAsync(string objectName, TimeSpan expiresIn)
+        public async Task<string> GenerateSignedUrlAsync(string objectName, TimeSpan expiresIn, string? instanceId = null)
         {
+            var config = GetConfig(instanceId);
+
             // For service account key-based signing
-            if (_config.ServiceAccountKey != null)
+            if (config.ServiceAccountKey != null)
             {
-                return GenerateV4SignedUrl(objectName, expiresIn);
+                return GenerateV4SignedUrl(objectName, expiresIn, config);
             }
 
             // For metadata-based token auth, return a simple authenticated URL
-            var token = await GetAccessTokenAsync();
-            return $"https://storage.googleapis.com/{_config.Bucket}/{Uri.EscapeDataString(objectName)}?access_token={token}";
+            var token = await GetAccessTokenAsync(instanceId);
+            return $"https://storage.googleapis.com/{config.Bucket}/{Uri.EscapeDataString(objectName)}?access_token={token}";
         }
 
-        private string GenerateV4SignedUrl(string objectName, TimeSpan expiresIn)
+        private string GenerateV4SignedUrl(string objectName, TimeSpan expiresIn, GcsConfig config)
         {
             var now = DateTime.UtcNow;
             var expires = (int)expiresIn.TotalSeconds;
             var credentialScope = $"{now:yyyyMMdd}/auto/storage/goog4_request";
             var signedHeaders = "host";
 
-            var canonicalRequest = $"GET\n/{_config.Bucket}/{objectName}\n\nhost:storage.googleapis.com\n\n{signedHeaders}\nUNSIGNED-PAYLOAD";
+            var canonicalRequest = $"GET\n/{config.Bucket}/{objectName}\n\nhost:storage.googleapis.com\n\n{signedHeaders}\nUNSIGNED-PAYLOAD";
             var stringToSign = $"GOOG4-RSA-SHA256\n{now:yyyyMMddTHHmmssZ}\n{credentialScope}\n{Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(canonicalRequest))).ToLower()}";
 
             // Sign with service account private key
-            var signature = SignWithServiceAccountKey(stringToSign);
+            var signature = SignWithServiceAccountKey(stringToSign, config);
 
             var queryParams = new Dictionary<string, string>
             {
                 ["X-Goog-Algorithm"] = "GOOG4-RSA-SHA256",
-                ["X-Goog-Credential"] = $"{_config.ServiceAccountEmail}/{credentialScope}",
+                ["X-Goog-Credential"] = $"{config.ServiceAccountEmail}/{credentialScope}",
                 ["X-Goog-Date"] = now.ToString("yyyyMMddTHHmmssZ"),
                 ["X-Goog-Expires"] = expires.ToString(),
                 ["X-Goog-SignedHeaders"] = signedHeaders,
@@ -463,36 +561,40 @@ namespace DataWarehouse.Plugins.GcsStorage
             };
 
             var queryString = string.Join("&", queryParams.Select(kvp => $"{kvp.Key}={Uri.EscapeDataString(kvp.Value)}"));
-            return $"https://storage.googleapis.com/{_config.Bucket}/{Uri.EscapeDataString(objectName)}?{queryString}";
+            return $"https://storage.googleapis.com/{config.Bucket}/{Uri.EscapeDataString(objectName)}?{queryString}";
         }
 
-        private string SignWithServiceAccountKey(string stringToSign)
+        private string SignWithServiceAccountKey(string stringToSign, GcsConfig config)
         {
             // Simplified - in production, use proper RSA signing with the service account key
-            using var hmac = new HMACSHA256(Encoding.UTF8.GetBytes(_config.ServiceAccountKey ?? ""));
+            using var hmac = new HMACSHA256(Encoding.UTF8.GetBytes(config.ServiceAccountKey ?? ""));
             return Convert.ToHexString(hmac.ComputeHash(Encoding.UTF8.GetBytes(stringToSign))).ToLower();
         }
 
         /// <summary>
         /// Copy object within GCS.
         /// </summary>
-        public async Task CopyObjectAsync(string sourceObjectName, string destObjectName)
+        public async Task CopyObjectAsync(string sourceObjectName, string destObjectName, string? instanceId = null)
         {
-            var endpoint = $"https://storage.googleapis.com/storage/v1/b/{_config.Bucket}/o/{Uri.EscapeDataString(sourceObjectName)}/copyTo/b/{_config.Bucket}/o/{Uri.EscapeDataString(destObjectName)}";
+            var config = GetConfig(instanceId);
+            var client = GetHttpClient(instanceId);
+            var endpoint = $"https://storage.googleapis.com/storage/v1/b/{config.Bucket}/o/{Uri.EscapeDataString(sourceObjectName)}/copyTo/b/{config.Bucket}/o/{Uri.EscapeDataString(destObjectName)}";
 
             var request = new HttpRequestMessage(HttpMethod.Post, endpoint);
-            await AddAuthHeaderAsync(request);
+            await AddAuthHeaderAsync(request, instanceId);
 
-            var response = await _httpClient.SendAsync(request);
+            var response = await client.SendAsync(request);
             response.EnsureSuccessStatusCode();
         }
 
         /// <summary>
         /// Compose multiple objects into one.
         /// </summary>
-        public async Task ComposeObjectsAsync(List<string> sourceObjects, string destObjectName)
+        public async Task ComposeObjectsAsync(List<string> sourceObjects, string destObjectName, string? instanceId = null)
         {
-            var endpoint = $"https://storage.googleapis.com/storage/v1/b/{_config.Bucket}/o/{Uri.EscapeDataString(destObjectName)}/compose";
+            var config = GetConfig(instanceId);
+            var client = GetHttpClient(instanceId);
+            var endpoint = $"https://storage.googleapis.com/storage/v1/b/{config.Bucket}/o/{Uri.EscapeDataString(destObjectName)}/compose";
 
             var body = new
             {
@@ -501,10 +603,35 @@ namespace DataWarehouse.Plugins.GcsStorage
 
             var request = new HttpRequestMessage(HttpMethod.Post, endpoint);
             request.Content = new StringContent(JsonSerializer.Serialize(body), Encoding.UTF8, "application/json");
-            await AddAuthHeaderAsync(request);
+            await AddAuthHeaderAsync(request, instanceId);
 
-            var response = await _httpClient.SendAsync(request);
+            var response = await client.SendAsync(request);
             response.EnsureSuccessStatusCode();
+        }
+
+        #endregion
+
+        #region Helper Methods
+
+        private GcsConfig GetConfig(string? instanceId)
+        {
+            if (string.IsNullOrEmpty(instanceId))
+                return _config;
+
+            var instance = _connectionRegistry.Get(instanceId);
+            return instance?.Config ?? _config;
+        }
+
+        private HttpClient GetHttpClient(string? instanceId)
+        {
+            if (string.IsNullOrEmpty(instanceId))
+                return _httpClient;
+
+            var instance = _connectionRegistry.Get(instanceId);
+            if (instance?.Connection is GcsConnection conn)
+                return conn.HttpClient;
+
+            return _httpClient;
         }
 
         private string GetObjectName(Uri uri)
@@ -515,13 +642,13 @@ namespace DataWarehouse.Plugins.GcsStorage
             return uri.AbsolutePath.TrimStart('/');
         }
 
-        private async Task AddAuthHeaderAsync(HttpRequestMessage request)
+        private async Task AddAuthHeaderAsync(HttpRequestMessage request, string? instanceId)
         {
-            var token = await GetAccessTokenAsync();
+            var token = await GetAccessTokenAsync(instanceId);
             request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
         }
 
-        private async Task<string> GetAccessTokenAsync()
+        private async Task<string> GetAccessTokenAsync(string? instanceId = null)
         {
             if (_accessToken != null && DateTime.UtcNow < _tokenExpiry)
                 return _accessToken;
@@ -532,9 +659,11 @@ namespace DataWarehouse.Plugins.GcsStorage
                 if (_accessToken != null && DateTime.UtcNow < _tokenExpiry)
                     return _accessToken;
 
-                if (!string.IsNullOrEmpty(_config.AccessToken))
+                var config = GetConfig(instanceId);
+
+                if (!string.IsNullOrEmpty(config.AccessToken))
                 {
-                    _accessToken = _config.AccessToken;
+                    _accessToken = config.AccessToken;
                     _tokenExpiry = DateTime.UtcNow.AddHours(1);
                     return _accessToken;
                 }
@@ -570,6 +699,8 @@ namespace DataWarehouse.Plugins.GcsStorage
             }
         }
 
+        #endregion
+
         // JSON response models
         private sealed class GcsListResult
         {
@@ -597,9 +728,23 @@ namespace DataWarehouse.Plugins.GcsStorage
     }
 
     /// <summary>
+    /// Internal connection wrapper for GCS instances.
+    /// </summary>
+    internal class GcsConnection : IDisposable
+    {
+        public required GcsConfig Config { get; init; }
+        public required HttpClient HttpClient { get; init; }
+
+        public void Dispose()
+        {
+            HttpClient?.Dispose();
+        }
+    }
+
+    /// <summary>
     /// Configuration for Google Cloud Storage.
     /// </summary>
-    public class GcsConfig
+    public class GcsConfig : StorageConfigBase
     {
         /// <summary>
         /// GCP project ID.
@@ -647,12 +792,44 @@ namespace DataWarehouse.Plugins.GcsStorage
         };
 
         /// <summary>
+        /// Creates configuration with access token and instance ID.
+        /// </summary>
+        public static GcsConfig WithToken(string projectId, string bucket, string accessToken, string instanceId) => new()
+        {
+            ProjectId = projectId,
+            Bucket = bucket,
+            AccessToken = accessToken,
+            InstanceId = instanceId
+        };
+
+        /// <summary>
         /// Creates configuration for GCE/GKE/Cloud Run (uses metadata server).
         /// </summary>
         public static GcsConfig ForGcp(string projectId, string bucket) => new()
         {
             ProjectId = projectId,
             Bucket = bucket
+        };
+
+        /// <summary>
+        /// Creates configuration for GCE/GKE/Cloud Run with instance ID.
+        /// </summary>
+        public static GcsConfig ForGcp(string projectId, string bucket, string instanceId) => new()
+        {
+            ProjectId = projectId,
+            Bucket = bucket,
+            InstanceId = instanceId
+        };
+
+        /// <summary>
+        /// Creates configuration with service account credentials.
+        /// </summary>
+        public static GcsConfig WithServiceAccount(string projectId, string bucket, string serviceAccountEmail, string serviceAccountKey) => new()
+        {
+            ProjectId = projectId,
+            Bucket = bucket,
+            ServiceAccountEmail = serviceAccountEmail,
+            ServiceAccountKey = serviceAccountKey
         };
     }
 }

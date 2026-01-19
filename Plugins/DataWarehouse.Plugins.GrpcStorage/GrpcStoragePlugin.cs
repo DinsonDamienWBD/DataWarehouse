@@ -1,5 +1,7 @@
 using DataWarehouse.SDK.Contracts;
+using DataWarehouse.SDK.Infrastructure;
 using DataWarehouse.SDK.Primitives;
+using DataWarehouse.SDK.Storage;
 using DataWarehouse.SDK.Utilities;
 using System.Text;
 
@@ -16,6 +18,9 @@ namespace DataWarehouse.Plugins.GrpcStorage
     /// - Support for TLS/mTLS
     /// - Health checking and load balancing
     /// - Deadline propagation
+    /// - Multi-instance support with role-based selection
+    /// - TTL-based caching support
+    /// - Document indexing and search
     ///
     /// Message Commands:
     /// - storage.grpc.put: Store data via gRPC
@@ -26,26 +31,34 @@ namespace DataWarehouse.Plugins.GrpcStorage
     /// - storage.grpc.stream.upload: Upload via streaming
     /// - storage.grpc.stream.download: Download via streaming
     /// - storage.grpc.health: Check server health
+    /// - storage.instance.*: Multi-instance management
     /// </summary>
-    public sealed class GrpcStoragePlugin : ListableStoragePluginBase
+    public sealed class GrpcStoragePlugin : HybridStoragePluginBase<GrpcStorageConfig>
     {
-        private readonly GrpcStorageConfig _config;
         private readonly HttpClient _httpClient; // Using HTTP/2 for gRPC-like functionality
         private readonly SemaphoreSlim _connectionLock = new(1, 1);
         private bool _isConnected;
 
         public override string Id => "datawarehouse.plugins.storage.grpc";
         public override string Name => "gRPC Storage";
-        public override string Version => "1.0.0";
+        public override string Version => "2.0.0";
         public override string Scheme => "grpc";
+        public override string StorageCategory => "Remote";
 
         /// <summary>
         /// Creates a gRPC storage plugin with configuration.
         /// </summary>
         public GrpcStoragePlugin(GrpcStorageConfig config)
+            : base(config ?? throw new ArgumentNullException(nameof(config)))
         {
-            _config = config ?? throw new ArgumentNullException(nameof(config));
+            _httpClient = CreateHttpClientForConfig(_config);
+        }
 
+        /// <summary>
+        /// Creates an HttpClient configured for gRPC communication.
+        /// </summary>
+        private HttpClient CreateHttpClientForConfig(GrpcStorageConfig config)
+        {
             var handler = new SocketsHttpHandler
             {
                 EnableMultipleHttp2Connections = true,
@@ -57,9 +70,9 @@ namespace DataWarehouse.Plugins.GrpcStorage
             // Security Warning: AcceptAnyCertificate bypasses SSL/TLS validation.
             // This should ONLY be used in development/testing environments.
             // In production, use proper certificate validation.
-            if (_config.UseTls && _config.AcceptAnyCertificate)
+            if (config.UseTls && config.AcceptAnyCertificate)
             {
-                if (!_config.IsDevelopmentMode)
+                if (!config.IsDevelopmentMode)
                 {
                     throw new InvalidOperationException(
                         "Security Error: AcceptAnyCertificate requires IsDevelopmentMode=true. " +
@@ -78,28 +91,44 @@ namespace DataWarehouse.Plugins.GrpcStorage
                 };
             }
 
-            _httpClient = new HttpClient(handler)
+            return new HttpClient(handler)
             {
-                BaseAddress = new Uri(_config.Endpoint),
-                Timeout = TimeSpan.FromSeconds(_config.TimeoutSeconds),
+                BaseAddress = new Uri(config.Endpoint),
+                Timeout = TimeSpan.FromSeconds(config.TimeoutSeconds),
                 DefaultRequestVersion = new Version(2, 0),
                 DefaultVersionPolicy = HttpVersionPolicy.RequestVersionOrHigher
             };
         }
 
+        /// <summary>
+        /// Creates a connection for the given configuration.
+        /// </summary>
+        protected override Task<object> CreateConnectionAsync(GrpcStorageConfig config)
+        {
+            var client = CreateHttpClientForConfig(config);
+
+            return Task.FromResult<object>(new GrpcStorageConnection
+            {
+                Config = config,
+                HttpClient = client
+            });
+        }
+
         protected override List<PluginCapabilityDescriptor> GetCapabilities()
         {
-            return
-            [
-                new() { Name = "storage.grpc.put", DisplayName = "Put", Description = "Store data via gRPC" },
-                new() { Name = "storage.grpc.get", DisplayName = "Get", Description = "Retrieve data via gRPC" },
-                new() { Name = "storage.grpc.delete", DisplayName = "Delete", Description = "Delete data via gRPC" },
-                new() { Name = "storage.grpc.exists", DisplayName = "Exists", Description = "Check if data exists" },
-                new() { Name = "storage.grpc.list", DisplayName = "List", Description = "List stored items" },
-                new() { Name = "storage.grpc.stream.upload", DisplayName = "Stream Upload", Description = "Upload via streaming" },
-                new() { Name = "storage.grpc.stream.download", DisplayName = "Stream Download", Description = "Download via streaming" },
-                new() { Name = "storage.grpc.health", DisplayName = "Health", Description = "Check server health" }
-            ];
+            var capabilities = base.GetCapabilities();
+            capabilities.AddRange(new[]
+            {
+                new PluginCapabilityDescriptor { Name = "storage.grpc.put", DisplayName = "Put", Description = "Store data via gRPC" },
+                new PluginCapabilityDescriptor { Name = "storage.grpc.get", DisplayName = "Get", Description = "Retrieve data via gRPC" },
+                new PluginCapabilityDescriptor { Name = "storage.grpc.delete", DisplayName = "Delete", Description = "Delete data via gRPC" },
+                new PluginCapabilityDescriptor { Name = "storage.grpc.exists", DisplayName = "Exists", Description = "Check if data exists" },
+                new PluginCapabilityDescriptor { Name = "storage.grpc.list", DisplayName = "List", Description = "List stored items" },
+                new PluginCapabilityDescriptor { Name = "storage.grpc.stream.upload", DisplayName = "Stream Upload", Description = "Upload via streaming" },
+                new PluginCapabilityDescriptor { Name = "storage.grpc.stream.download", DisplayName = "Stream Download", Description = "Download via streaming" },
+                new PluginCapabilityDescriptor { Name = "storage.grpc.health", DisplayName = "Health", Description = "Check server health" }
+            });
+            return capabilities;
         }
 
         protected override Dictionary<string, object> GetMetadata()
@@ -132,6 +161,12 @@ namespace DataWarehouse.Plugins.GrpcStorage
                 "storage.grpc.stream.download" => await HandleStreamDownloadAsync(message),
                 _ => null
             };
+
+            // If not handled, delegate to base for multi-instance management
+            if (response == null)
+            {
+                await base.OnMessageAsync(message);
+            }
         }
 
         private async Task<MessageResponse> HandlePutAsync(PluginMessage message)
@@ -152,9 +187,12 @@ namespace DataWarehouse.Plugins.GrpcStorage
                 _ => throw new ArgumentException("Data must be Stream, byte[], or string")
             };
 
-            var uri = new Uri($"grpc://{new Uri(_config.Endpoint).Host}/{key}");
-            await SaveAsync(uri, data);
-            return MessageResponse.Ok(new { Key = key, Success = true });
+            var instanceId = payload.TryGetValue("instanceId", out var instId) ? instId?.ToString() : null;
+            var config = GetConfig(instanceId);
+
+            var uri = new Uri($"grpc://{new Uri(config.Endpoint).Host}/{key}");
+            await SaveAsync(uri, data, instanceId);
+            return MessageResponse.Ok(new { Key = key, Success = true, InstanceId = instanceId });
         }
 
         private async Task<MessageResponse> HandleGetAsync(PluginMessage message)
@@ -166,11 +204,14 @@ namespace DataWarehouse.Plugins.GrpcStorage
             }
 
             var key = keyObj.ToString()!;
-            var uri = new Uri($"grpc://{new Uri(_config.Endpoint).Host}/{key}");
-            var stream = await LoadAsync(uri);
+            var instanceId = payload.TryGetValue("instanceId", out var instId) ? instId?.ToString() : null;
+            var config = GetConfig(instanceId);
+
+            var uri = new Uri($"grpc://{new Uri(config.Endpoint).Host}/{key}");
+            var stream = await LoadAsync(uri, instanceId);
             using var ms = new MemoryStream();
             await stream.CopyToAsync(ms);
-            return MessageResponse.Ok(new { Key = key, Data = ms.ToArray() });
+            return MessageResponse.Ok(new { Key = key, Data = ms.ToArray(), InstanceId = instanceId });
         }
 
         private async Task<MessageResponse> HandleDeleteAsync(PluginMessage message)
@@ -182,9 +223,12 @@ namespace DataWarehouse.Plugins.GrpcStorage
             }
 
             var key = keyObj.ToString()!;
-            var uri = new Uri($"grpc://{new Uri(_config.Endpoint).Host}/{key}");
-            await DeleteAsync(uri);
-            return MessageResponse.Ok(new { Key = key, Deleted = true });
+            var instanceId = payload.TryGetValue("instanceId", out var instId) ? instId?.ToString() : null;
+            var config = GetConfig(instanceId);
+
+            var uri = new Uri($"grpc://{new Uri(config.Endpoint).Host}/{key}");
+            await DeleteAsync(uri, instanceId);
+            return MessageResponse.Ok(new { Key = key, Deleted = true, InstanceId = instanceId });
         }
 
         private async Task<MessageResponse> HandleExistsAsync(PluginMessage message)
@@ -196,14 +240,21 @@ namespace DataWarehouse.Plugins.GrpcStorage
             }
 
             var key = keyObj.ToString()!;
-            var uri = new Uri($"grpc://{new Uri(_config.Endpoint).Host}/{key}");
-            var exists = await ExistsAsync(uri);
-            return MessageResponse.Ok(new { Key = key, Exists = exists });
+            var instanceId = payload.TryGetValue("instanceId", out var instId) ? instId?.ToString() : null;
+            var config = GetConfig(instanceId);
+
+            var uri = new Uri($"grpc://{new Uri(config.Endpoint).Host}/{key}");
+            var exists = await ExistsAsync(uri, instanceId);
+            return MessageResponse.Ok(new { Key = key, Exists = exists, InstanceId = instanceId });
         }
 
         private async Task<MessageResponse> HandleHealthAsync(PluginMessage message)
         {
-            var health = await CheckHealthAsync();
+            var instanceId = (message.Payload as Dictionary<string, object>)?.TryGetValue("instanceId", out var instId) == true
+                ? instId?.ToString()
+                : null;
+
+            var health = await CheckHealthAsync(instanceId);
             return MessageResponse.Ok(health);
         }
 
@@ -224,8 +275,10 @@ namespace DataWarehouse.Plugins.GrpcStorage
                 _ => throw new ArgumentException("Data must be Stream or byte[]")
             };
 
-            await StreamUploadAsync(key, data);
-            return MessageResponse.Ok(new { Key = key, Streamed = true });
+            var instanceId = payload.TryGetValue("instanceId", out var instId) ? instId?.ToString() : null;
+
+            await StreamUploadAsync(key, data, instanceId: instanceId);
+            return MessageResponse.Ok(new { Key = key, Streamed = true, InstanceId = instanceId });
         }
 
         private async Task<MessageResponse> HandleStreamDownloadAsync(PluginMessage message)
@@ -237,18 +290,28 @@ namespace DataWarehouse.Plugins.GrpcStorage
             }
 
             var key = keyObj.ToString()!;
-            var stream = await StreamDownloadAsync(key);
+            var instanceId = payload.TryGetValue("instanceId", out var instId) ? instId?.ToString() : null;
+
+            var stream = await StreamDownloadAsync(key, instanceId);
             using var ms = new MemoryStream();
             await stream.CopyToAsync(ms);
-            return MessageResponse.Ok(new { Key = key, Data = ms.ToArray() });
+            return MessageResponse.Ok(new { Key = key, Data = ms.ToArray(), InstanceId = instanceId });
         }
 
-        public override async Task SaveAsync(Uri uri, Stream data)
+        #region Storage Operations with Instance Support
+
+        /// <summary>
+        /// Save data to storage, optionally targeting a specific instance.
+        /// </summary>
+        public async Task SaveAsync(Uri uri, Stream data, string? instanceId = null)
         {
             ArgumentNullException.ThrowIfNull(uri);
             ArgumentNullException.ThrowIfNull(data);
 
-            await EnsureConnectedAsync();
+            var config = GetConfig(instanceId);
+            var client = GetHttpClient(instanceId);
+
+            await EnsureConnectedAsync(instanceId);
 
             var key = GetKey(uri);
 
@@ -262,22 +325,43 @@ namespace DataWarehouse.Plugins.GrpcStorage
                 Content = new ByteArrayContent(BuildGrpcRequest(key, content))
             };
             request.Content.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("application/grpc");
-            request.Headers.TryAddWithoutValidation("grpc-timeout", $"{_config.TimeoutSeconds}S");
+            request.Headers.TryAddWithoutValidation("grpc-timeout", $"{config.TimeoutSeconds}S");
 
-            if (!string.IsNullOrEmpty(_config.AuthToken))
+            if (!string.IsNullOrEmpty(config.AuthToken))
             {
-                request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", _config.AuthToken);
+                request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", config.AuthToken);
             }
 
-            var response = await _httpClient.SendAsync(request);
+            var response = await client.SendAsync(request);
             await ValidateGrpcResponseAsync(response);
+
+            // Auto-index if enabled
+            if (config.EnableIndexing)
+            {
+                await IndexDocumentAsync(uri.ToString(), new Dictionary<string, object>
+                {
+                    ["uri"] = uri.ToString(),
+                    ["endpoint"] = config.Endpoint,
+                    ["key"] = key,
+                    ["size"] = content.Length,
+                    ["instanceId"] = instanceId ?? "default"
+                });
+            }
         }
 
-        public override async Task<Stream> LoadAsync(Uri uri)
+        public override Task SaveAsync(Uri uri, Stream data) => SaveAsync(uri, data, null);
+
+        /// <summary>
+        /// Load data from storage, optionally from a specific instance.
+        /// </summary>
+        public async Task<Stream> LoadAsync(Uri uri, string? instanceId = null)
         {
             ArgumentNullException.ThrowIfNull(uri);
 
-            await EnsureConnectedAsync();
+            var config = GetConfig(instanceId);
+            var client = GetHttpClient(instanceId);
+
+            await EnsureConnectedAsync(instanceId);
 
             var key = GetKey(uri);
 
@@ -287,24 +371,35 @@ namespace DataWarehouse.Plugins.GrpcStorage
             };
             request.Content.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("application/grpc");
 
-            if (!string.IsNullOrEmpty(_config.AuthToken))
+            if (!string.IsNullOrEmpty(config.AuthToken))
             {
-                request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", _config.AuthToken);
+                request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", config.AuthToken);
             }
 
-            var response = await _httpClient.SendAsync(request);
+            var response = await client.SendAsync(request);
             await ValidateGrpcResponseAsync(response);
+
+            // Update last access for caching
+            await TouchAsync(uri);
 
             var responseData = await response.Content.ReadAsByteArrayAsync();
             var payload = ParseGrpcResponse(responseData);
             return new MemoryStream(payload);
         }
 
-        public override async Task DeleteAsync(Uri uri)
+        public override Task<Stream> LoadAsync(Uri uri) => LoadAsync(uri, null);
+
+        /// <summary>
+        /// Delete data from storage, optionally from a specific instance.
+        /// </summary>
+        public async Task DeleteAsync(Uri uri, string? instanceId = null)
         {
             ArgumentNullException.ThrowIfNull(uri);
 
-            await EnsureConnectedAsync();
+            var config = GetConfig(instanceId);
+            var client = GetHttpClient(instanceId);
+
+            await EnsureConnectedAsync(instanceId);
 
             var key = GetKey(uri);
 
@@ -314,22 +409,33 @@ namespace DataWarehouse.Plugins.GrpcStorage
             };
             request.Content.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("application/grpc");
 
-            if (!string.IsNullOrEmpty(_config.AuthToken))
+            if (!string.IsNullOrEmpty(config.AuthToken))
             {
-                request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", _config.AuthToken);
+                request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", config.AuthToken);
             }
 
-            var response = await _httpClient.SendAsync(request);
+            var response = await client.SendAsync(request);
             await ValidateGrpcResponseAsync(response);
+
+            // Remove from index
+            _ = RemoveFromIndexAsync(uri.ToString());
         }
 
-        public override async Task<bool> ExistsAsync(Uri uri)
+        public override Task DeleteAsync(Uri uri) => DeleteAsync(uri, null);
+
+        /// <summary>
+        /// Check if data exists in storage, optionally in a specific instance.
+        /// </summary>
+        public async Task<bool> ExistsAsync(Uri uri, string? instanceId = null)
         {
             ArgumentNullException.ThrowIfNull(uri);
 
             try
             {
-                await EnsureConnectedAsync();
+                var config = GetConfig(instanceId);
+                var client = GetHttpClient(instanceId);
+
+                await EnsureConnectedAsync(instanceId);
 
                 var key = GetKey(uri);
 
@@ -339,12 +445,12 @@ namespace DataWarehouse.Plugins.GrpcStorage
                 };
                 request.Content.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("application/grpc");
 
-                if (!string.IsNullOrEmpty(_config.AuthToken))
+                if (!string.IsNullOrEmpty(config.AuthToken))
                 {
-                    request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", _config.AuthToken);
+                    request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", config.AuthToken);
                 }
 
-                var response = await _httpClient.SendAsync(request);
+                var response = await client.SendAsync(request);
                 return response.IsSuccessStatusCode;
             }
             catch
@@ -353,11 +459,13 @@ namespace DataWarehouse.Plugins.GrpcStorage
             }
         }
 
+        public override Task<bool> ExistsAsync(Uri uri) => ExistsAsync(uri, null);
+
         public override async IAsyncEnumerable<StorageListItem> ListFilesAsync(
             string prefix = "",
             [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct = default)
         {
-            await EnsureConnectedAsync();
+            await EnsureConnectedAsync(null);
 
             var request = new HttpRequestMessage(HttpMethod.Post, $"/storage.StorageService/List")
             {
@@ -426,11 +534,18 @@ namespace DataWarehouse.Plugins.GrpcStorage
             }
         }
 
+        #endregion
+
+        #region gRPC-Specific Operations
+
         /// <summary>
         /// Check server health.
         /// </summary>
-        public async Task<object> CheckHealthAsync()
+        public async Task<object> CheckHealthAsync(string? instanceId = null)
         {
+            var config = GetConfig(instanceId);
+            var client = GetHttpClient(instanceId);
+
             try
             {
                 var request = new HttpRequestMessage(HttpMethod.Post, "/grpc.health.v1.Health/Check")
@@ -439,13 +554,14 @@ namespace DataWarehouse.Plugins.GrpcStorage
                 };
                 request.Content.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("application/grpc");
 
-                var response = await _httpClient.SendAsync(request);
+                var response = await client.SendAsync(request);
 
                 return new
                 {
                     Healthy = response.IsSuccessStatusCode,
                     StatusCode = (int)response.StatusCode,
-                    Endpoint = _config.Endpoint
+                    Endpoint = config.Endpoint,
+                    InstanceId = instanceId
                 };
             }
             catch (Exception ex)
@@ -454,7 +570,8 @@ namespace DataWarehouse.Plugins.GrpcStorage
                 {
                     Healthy = false,
                     Error = ex.Message,
-                    Endpoint = _config.Endpoint
+                    Endpoint = config.Endpoint,
+                    InstanceId = instanceId
                 };
             }
         }
@@ -462,48 +579,81 @@ namespace DataWarehouse.Plugins.GrpcStorage
         /// <summary>
         /// Stream upload using bidirectional streaming.
         /// </summary>
-        public async Task StreamUploadAsync(string key, Stream data, int chunkSize = 65536)
+        public async Task StreamUploadAsync(string key, Stream data, int chunkSize = 65536, string? instanceId = null)
         {
-            await EnsureConnectedAsync();
+            var config = GetConfig(instanceId);
+
+            await EnsureConnectedAsync(instanceId);
 
             // For simplicity, use a single request with the full data
             // In production, implement proper bidirectional streaming
             using var ms = new MemoryStream();
             await data.CopyToAsync(ms);
 
-            var uri = new Uri($"grpc://{new Uri(_config.Endpoint).Host}/{key}");
+            var uri = new Uri($"grpc://{new Uri(config.Endpoint).Host}/{key}");
             ms.Position = 0;
-            await SaveAsync(uri, ms);
+            await SaveAsync(uri, ms, instanceId);
         }
 
         /// <summary>
         /// Stream download using server-side streaming.
         /// </summary>
-        public async Task<Stream> StreamDownloadAsync(string key)
+        public async Task<Stream> StreamDownloadAsync(string key, string? instanceId = null)
         {
-            var uri = new Uri($"grpc://{new Uri(_config.Endpoint).Host}/{key}");
-            return await LoadAsync(uri);
+            var config = GetConfig(instanceId);
+            var uri = new Uri($"grpc://{new Uri(config.Endpoint).Host}/{key}");
+            return await LoadAsync(uri, instanceId);
         }
 
-        private async Task EnsureConnectedAsync()
+        #endregion
+
+        #region Helper Methods
+
+        private GrpcStorageConfig GetConfig(string? instanceId)
         {
-            if (_isConnected) return;
+            if (string.IsNullOrEmpty(instanceId))
+                return _config;
+
+            var instance = _connectionRegistry.Get(instanceId);
+            return instance?.Config ?? _config;
+        }
+
+        private HttpClient GetHttpClient(string? instanceId)
+        {
+            if (string.IsNullOrEmpty(instanceId))
+                return _httpClient;
+
+            var instance = _connectionRegistry.Get(instanceId);
+            if (instance?.Connection is GrpcStorageConnection conn)
+                return conn.HttpClient;
+
+            return _httpClient;
+        }
+
+        private async Task EnsureConnectedAsync(string? instanceId)
+        {
+            if (_isConnected && string.IsNullOrEmpty(instanceId)) return;
 
             await _connectionLock.WaitAsync();
             try
             {
-                if (_isConnected) return;
+                if (_isConnected && string.IsNullOrEmpty(instanceId)) return;
+
+                var config = GetConfig(instanceId);
 
                 // Check connectivity
-                var health = await CheckHealthAsync();
-                _isConnected = health is IDictionary<string, object> h && h.TryGetValue("Healthy", out var val) && val is bool b && b;
+                var health = await CheckHealthAsync(instanceId);
+                var isHealthy = health is IDictionary<string, object> h && h.TryGetValue("Healthy", out var val) && val is bool b && b;
 
-                if (!_isConnected && !_config.AllowUnhealthyConnection)
+                if (!isHealthy && !config.AllowUnhealthyConnection)
                 {
-                    throw new InvalidOperationException($"Cannot connect to gRPC server at {_config.Endpoint}");
+                    throw new InvalidOperationException($"Cannot connect to gRPC server at {config.Endpoint}");
                 }
 
-                _isConnected = true;
+                if (string.IsNullOrEmpty(instanceId))
+                {
+                    _isConnected = true;
+                }
             }
             finally
             {
@@ -700,12 +850,28 @@ namespace DataWarehouse.Plugins.GrpcStorage
                 }
             }
         }
+
+        #endregion
+    }
+
+    /// <summary>
+    /// Internal connection wrapper for gRPC storage instances.
+    /// </summary>
+    internal class GrpcStorageConnection : IDisposable
+    {
+        public required GrpcStorageConfig Config { get; init; }
+        public required HttpClient HttpClient { get; init; }
+
+        public void Dispose()
+        {
+            HttpClient?.Dispose();
+        }
     }
 
     /// <summary>
     /// Configuration for gRPC storage.
     /// </summary>
-    public class GrpcStorageConfig
+    public class GrpcStorageConfig : StorageConfigBase
     {
         /// <summary>
         /// gRPC server endpoint (e.g., "https://localhost:5001").
@@ -745,11 +911,6 @@ namespace DataWarehouse.Plugins.GrpcStorage
         public bool AllowUnhealthyConnection { get; set; } = true;
 
         /// <summary>
-        /// Maximum number of retry attempts.
-        /// </summary>
-        public int MaxRetries { get; set; } = 3;
-
-        /// <summary>
         /// Creates configuration for local development.
         /// </summary>
         public static GrpcStorageConfig Local(int port = 5001) => new()
@@ -761,6 +922,18 @@ namespace DataWarehouse.Plugins.GrpcStorage
         };
 
         /// <summary>
+        /// Creates configuration for local development with instance ID.
+        /// </summary>
+        public static GrpcStorageConfig Local(int port, string instanceId) => new()
+        {
+            Endpoint = $"https://localhost:{port}",
+            UseTls = true,
+            AcceptAnyCertificate = true,
+            IsDevelopmentMode = true,
+            InstanceId = instanceId
+        };
+
+        /// <summary>
         /// Creates configuration for production.
         /// </summary>
         public static GrpcStorageConfig Production(string endpoint, string? authToken = null) => new()
@@ -768,6 +941,17 @@ namespace DataWarehouse.Plugins.GrpcStorage
             Endpoint = endpoint,
             UseTls = true,
             AuthToken = authToken
+        };
+
+        /// <summary>
+        /// Creates configuration for production with instance ID.
+        /// </summary>
+        public static GrpcStorageConfig Production(string endpoint, string? authToken, string instanceId) => new()
+        {
+            Endpoint = endpoint,
+            UseTls = true,
+            AuthToken = authToken,
+            InstanceId = instanceId
         };
     }
 }

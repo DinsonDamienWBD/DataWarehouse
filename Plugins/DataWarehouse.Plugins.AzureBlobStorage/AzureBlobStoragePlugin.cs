@@ -1,5 +1,7 @@
 using DataWarehouse.SDK.Contracts;
+using DataWarehouse.SDK.Infrastructure;
 using DataWarehouse.SDK.Primitives;
+using DataWarehouse.SDK.Storage;
 using DataWarehouse.SDK.Utilities;
 using System.Security.Cryptography;
 using System.Text;
@@ -18,6 +20,9 @@ namespace DataWarehouse.Plugins.AzureBlobStorage
     /// - Container management
     /// - Blob versioning and snapshots
     /// - Soft delete support
+    /// - Multi-instance support with role-based selection
+    /// - TTL-based caching support
+    /// - Document indexing and search
     ///
     /// Message Commands:
     /// - storage.azure.put: Upload blob
@@ -29,43 +34,63 @@ namespace DataWarehouse.Plugins.AzureBlobStorage
     /// - storage.azure.sas: Generate SAS token
     /// - storage.azure.snapshot: Create snapshot
     /// - storage.azure.copy: Copy blob
+    /// - storage.instance.*: Multi-instance management
     /// </summary>
-    public sealed class AzureBlobStoragePlugin : ListableStoragePluginBase, ITieredStorage
+    public sealed class AzureBlobStoragePlugin : HybridStoragePluginBase<AzureBlobConfig>, ITieredStorage
     {
-        private readonly AzureBlobConfig _config;
         private readonly HttpClient _httpClient;
 
         public override string Id => "datawarehouse.plugins.storage.azure";
         public override string Name => "Azure Blob Storage";
-        public override string Version => "1.0.0";
+        public override string Version => "2.0.0";
         public override string Scheme => "azure";
+        public override string StorageCategory => "Cloud";
 
         /// <summary>
         /// Creates an Azure Blob storage plugin with configuration.
         /// </summary>
         public AzureBlobStoragePlugin(AzureBlobConfig config)
+            : base(config ?? throw new ArgumentNullException(nameof(config)))
         {
-            _config = config ?? throw new ArgumentNullException(nameof(config));
             _httpClient = new HttpClient
             {
                 Timeout = TimeSpan.FromSeconds(_config.TimeoutSeconds)
             };
         }
 
+        /// <summary>
+        /// Creates a connection for the given configuration.
+        /// </summary>
+        protected override Task<object> CreateConnectionAsync(AzureBlobConfig config)
+        {
+            var client = new HttpClient
+            {
+                Timeout = TimeSpan.FromSeconds(config.TimeoutSeconds)
+            };
+
+            return Task.FromResult<object>(new AzureBlobConnection
+            {
+                Config = config,
+                HttpClient = client
+            });
+        }
+
         protected override List<PluginCapabilityDescriptor> GetCapabilities()
         {
-            return
-            [
-                new() { Name = "storage.azure.put", DisplayName = "Put", Description = "Upload blob to Azure" },
-                new() { Name = "storage.azure.get", DisplayName = "Get", Description = "Download blob from Azure" },
-                new() { Name = "storage.azure.delete", DisplayName = "Delete", Description = "Delete blob from Azure" },
-                new() { Name = "storage.azure.list", DisplayName = "List", Description = "List blobs in container" },
-                new() { Name = "storage.azure.tier", DisplayName = "Tier", Description = "Set blob access tier" },
-                new() { Name = "storage.azure.properties", DisplayName = "Properties", Description = "Get blob properties" },
-                new() { Name = "storage.azure.sas", DisplayName = "SAS", Description = "Generate SAS token" },
-                new() { Name = "storage.azure.snapshot", DisplayName = "Snapshot", Description = "Create blob snapshot" },
-                new() { Name = "storage.azure.copy", DisplayName = "Copy", Description = "Copy blob" }
-            ];
+            var capabilities = base.GetCapabilities();
+            capabilities.AddRange(new[]
+            {
+                new PluginCapabilityDescriptor { Name = "storage.azure.put", DisplayName = "Put", Description = "Upload blob to Azure" },
+                new PluginCapabilityDescriptor { Name = "storage.azure.get", DisplayName = "Get", Description = "Download blob from Azure" },
+                new PluginCapabilityDescriptor { Name = "storage.azure.delete", DisplayName = "Delete", Description = "Delete blob from Azure" },
+                new PluginCapabilityDescriptor { Name = "storage.azure.list", DisplayName = "List", Description = "List blobs in container" },
+                new PluginCapabilityDescriptor { Name = "storage.azure.tier", DisplayName = "Tier", Description = "Set blob access tier" },
+                new PluginCapabilityDescriptor { Name = "storage.azure.properties", DisplayName = "Properties", Description = "Get blob properties" },
+                new PluginCapabilityDescriptor { Name = "storage.azure.sas", DisplayName = "SAS", Description = "Generate SAS token" },
+                new PluginCapabilityDescriptor { Name = "storage.azure.snapshot", DisplayName = "Snapshot", Description = "Create blob snapshot" },
+                new PluginCapabilityDescriptor { Name = "storage.azure.copy", DisplayName = "Copy", Description = "Copy blob" }
+            });
+            return capabilities;
         }
 
         protected override Dictionary<string, object> GetMetadata()
@@ -100,6 +125,12 @@ namespace DataWarehouse.Plugins.AzureBlobStorage
                 "storage.azure.copy" => await HandleCopyAsync(message),
                 _ => null
             };
+
+            // If not handled, delegate to base for multi-instance management
+            if (response == null)
+            {
+                await base.OnMessageAsync(message);
+            }
         }
 
         private async Task<MessageResponse> HandlePutAsync(PluginMessage message)
@@ -120,9 +151,12 @@ namespace DataWarehouse.Plugins.AzureBlobStorage
                 _ => throw new ArgumentException("Data must be Stream, byte[], or string")
             };
 
-            var uri = new Uri($"azure://{_config.Container}/{blobName}");
-            await SaveAsync(uri, data);
-            return MessageResponse.Ok(new { Container = _config.Container, BlobName = blobName, Success = true });
+            var instanceId = payload.TryGetValue("instanceId", out var instId) ? instId?.ToString() : null;
+            var config = GetConfig(instanceId);
+
+            var uri = new Uri($"azure://{config.Container}/{blobName}");
+            await SaveAsync(uri, data, instanceId);
+            return MessageResponse.Ok(new { Container = config.Container, BlobName = blobName, Success = true, InstanceId = instanceId });
         }
 
         private async Task<MessageResponse> HandleGetAsync(PluginMessage message)
@@ -134,11 +168,14 @@ namespace DataWarehouse.Plugins.AzureBlobStorage
             }
 
             var blobName = nameObj.ToString()!;
-            var uri = new Uri($"azure://{_config.Container}/{blobName}");
-            var stream = await LoadAsync(uri);
+            var instanceId = payload.TryGetValue("instanceId", out var instId) ? instId?.ToString() : null;
+            var config = GetConfig(instanceId);
+
+            var uri = new Uri($"azure://{config.Container}/{blobName}");
+            var stream = await LoadAsync(uri, instanceId);
             using var ms = new MemoryStream();
             await stream.CopyToAsync(ms);
-            return MessageResponse.Ok(new { Container = _config.Container, BlobName = blobName, Data = ms.ToArray() });
+            return MessageResponse.Ok(new { Container = config.Container, BlobName = blobName, Data = ms.ToArray(), InstanceId = instanceId });
         }
 
         private async Task<MessageResponse> HandleDeleteAsync(PluginMessage message)
@@ -150,9 +187,12 @@ namespace DataWarehouse.Plugins.AzureBlobStorage
             }
 
             var blobName = nameObj.ToString()!;
-            var uri = new Uri($"azure://{_config.Container}/{blobName}");
-            await DeleteAsync(uri);
-            return MessageResponse.Ok(new { Container = _config.Container, BlobName = blobName, Deleted = true });
+            var instanceId = payload.TryGetValue("instanceId", out var instId) ? instId?.ToString() : null;
+            var config = GetConfig(instanceId);
+
+            var uri = new Uri($"azure://{config.Container}/{blobName}");
+            await DeleteAsync(uri, instanceId);
+            return MessageResponse.Ok(new { Container = config.Container, BlobName = blobName, Deleted = true, InstanceId = instanceId });
         }
 
         private async Task<MessageResponse> HandleTierAsync(PluginMessage message)
@@ -167,10 +207,12 @@ namespace DataWarehouse.Plugins.AzureBlobStorage
             var blobName = nameObj.ToString()!;
             var tierStr = tierObj.ToString()!;
             var tier = Enum.Parse<StorageTier>(tierStr, ignoreCase: true);
+            var instanceId = payload.TryGetValue("instanceId", out var instId) ? instId?.ToString() : null;
+            var config = GetConfig(instanceId);
 
-            var manifest = new Manifest { Id = blobName, StorageUri = new Uri($"azure://{_config.Container}/{blobName}") };
-            await MoveToTierAsync(manifest, tier);
-            return MessageResponse.Ok(new { BlobName = blobName, Tier = tier.ToString(), Success = true });
+            var manifest = new Manifest { Id = blobName, StorageUri = new Uri($"azure://{config.Container}/{blobName}") };
+            await MoveToTierAsync(manifest, tier, instanceId);
+            return MessageResponse.Ok(new { BlobName = blobName, Tier = tier.ToString(), Success = true, InstanceId = instanceId });
         }
 
         private async Task<MessageResponse> HandlePropertiesAsync(PluginMessage message)
@@ -182,7 +224,9 @@ namespace DataWarehouse.Plugins.AzureBlobStorage
             }
 
             var blobName = nameObj.ToString()!;
-            var properties = await GetBlobPropertiesAsync(blobName);
+            var instanceId = payload.TryGetValue("instanceId", out var instId) ? instId?.ToString() : null;
+
+            var properties = await GetBlobPropertiesAsync(blobName, instanceId);
             return MessageResponse.Ok(properties);
         }
 
@@ -198,9 +242,10 @@ namespace DataWarehouse.Plugins.AzureBlobStorage
             var expiresIn = payload.TryGetValue("expiresIn", out var expObj) && expObj is int exp
                 ? TimeSpan.FromSeconds(exp)
                 : TimeSpan.FromHours(1);
+            var instanceId = payload.TryGetValue("instanceId", out var instId) ? instId?.ToString() : null;
 
-            var sasUrl = GenerateSasUrl(blobName, expiresIn);
-            return MessageResponse.Ok(new { BlobName = blobName, SasUrl = sasUrl, ExpiresIn = expiresIn.TotalSeconds });
+            var sasUrl = GenerateSasUrl(blobName, expiresIn, instanceId);
+            return MessageResponse.Ok(new { BlobName = blobName, SasUrl = sasUrl, ExpiresIn = expiresIn.TotalSeconds, InstanceId = instanceId });
         }
 
         private async Task<MessageResponse> HandleSnapshotAsync(PluginMessage message)
@@ -212,8 +257,10 @@ namespace DataWarehouse.Plugins.AzureBlobStorage
             }
 
             var blobName = nameObj.ToString()!;
-            var snapshotTime = await CreateSnapshotAsync(blobName);
-            return MessageResponse.Ok(new { BlobName = blobName, SnapshotTime = snapshotTime });
+            var instanceId = payload.TryGetValue("instanceId", out var instId) ? instId?.ToString() : null;
+
+            var snapshotTime = await CreateSnapshotAsync(blobName, instanceId);
+            return MessageResponse.Ok(new { BlobName = blobName, SnapshotTime = snapshotTime, InstanceId = instanceId });
         }
 
         private async Task<MessageResponse> HandleCopyAsync(PluginMessage message)
@@ -227,17 +274,26 @@ namespace DataWarehouse.Plugins.AzureBlobStorage
 
             var sourceBlobName = sourceObj.ToString()!;
             var destBlobName = destObj.ToString()!;
-            await CopyBlobAsync(sourceBlobName, destBlobName);
-            return MessageResponse.Ok(new { SourceBlobName = sourceBlobName, DestinationBlobName = destBlobName, Success = true });
+            var instanceId = payload.TryGetValue("instanceId", out var instId) ? instId?.ToString() : null;
+
+            await CopyBlobAsync(sourceBlobName, destBlobName, instanceId);
+            return MessageResponse.Ok(new { SourceBlobName = sourceBlobName, DestinationBlobName = destBlobName, Success = true, InstanceId = instanceId });
         }
 
-        public override async Task SaveAsync(Uri uri, Stream data)
+        #region Storage Operations with Instance Support
+
+        /// <summary>
+        /// Save data to storage, optionally targeting a specific instance.
+        /// </summary>
+        public async Task SaveAsync(Uri uri, Stream data, string? instanceId = null)
         {
             ArgumentNullException.ThrowIfNull(uri);
             ArgumentNullException.ThrowIfNull(data);
 
+            var config = GetConfig(instanceId);
+            var client = GetHttpClient(instanceId);
             var blobName = GetBlobName(uri);
-            var endpoint = GetBlobUrl(blobName);
+            var endpoint = GetBlobUrl(blobName, config);
 
             using var ms = new MemoryStream();
             await data.CopyToAsync(ms);
@@ -249,29 +305,52 @@ namespace DataWarehouse.Plugins.AzureBlobStorage
             request.Content.Headers.ContentLength = content.Length;
             request.Headers.TryAddWithoutValidation("x-ms-blob-type", "BlockBlob");
 
-            if (!string.IsNullOrEmpty(_config.DefaultAccessTier))
+            if (!string.IsNullOrEmpty(config.DefaultAccessTier))
             {
-                request.Headers.TryAddWithoutValidation("x-ms-access-tier", _config.DefaultAccessTier);
+                request.Headers.TryAddWithoutValidation("x-ms-access-tier", config.DefaultAccessTier);
             }
 
-            SignRequest(request);
+            SignRequest(request, config);
 
-            var response = await _httpClient.SendAsync(request);
+            var response = await client.SendAsync(request);
             response.EnsureSuccessStatusCode();
+
+            // Auto-index if enabled
+            if (config.EnableIndexing)
+            {
+                await IndexDocumentAsync(uri.ToString(), new Dictionary<string, object>
+                {
+                    ["uri"] = uri.ToString(),
+                    ["container"] = config.Container,
+                    ["blobName"] = blobName,
+                    ["size"] = content.Length,
+                    ["instanceId"] = instanceId ?? "default"
+                });
+            }
         }
 
-        public override async Task<Stream> LoadAsync(Uri uri)
+        public override Task SaveAsync(Uri uri, Stream data) => SaveAsync(uri, data, null);
+
+        /// <summary>
+        /// Load data from storage, optionally from a specific instance.
+        /// </summary>
+        public async Task<Stream> LoadAsync(Uri uri, string? instanceId = null)
         {
             ArgumentNullException.ThrowIfNull(uri);
 
+            var config = GetConfig(instanceId);
+            var client = GetHttpClient(instanceId);
             var blobName = GetBlobName(uri);
-            var endpoint = GetBlobUrl(blobName);
+            var endpoint = GetBlobUrl(blobName, config);
 
             var request = new HttpRequestMessage(HttpMethod.Get, endpoint);
-            SignRequest(request);
+            SignRequest(request, config);
 
-            var response = await _httpClient.SendAsync(request);
+            var response = await client.SendAsync(request);
             response.EnsureSuccessStatusCode();
+
+            // Update last access for caching
+            await TouchAsync(uri);
 
             var ms = new MemoryStream();
             await response.Content.CopyToAsync(ms);
@@ -279,28 +358,43 @@ namespace DataWarehouse.Plugins.AzureBlobStorage
             return ms;
         }
 
-        public override async Task DeleteAsync(Uri uri)
+        public override Task<Stream> LoadAsync(Uri uri) => LoadAsync(uri, null);
+
+        /// <summary>
+        /// Delete data from storage, optionally from a specific instance.
+        /// </summary>
+        public async Task DeleteAsync(Uri uri, string? instanceId = null)
         {
             ArgumentNullException.ThrowIfNull(uri);
 
+            var config = GetConfig(instanceId);
+            var client = GetHttpClient(instanceId);
             var blobName = GetBlobName(uri);
-            var endpoint = GetBlobUrl(blobName);
+            var endpoint = GetBlobUrl(blobName, config);
 
             var request = new HttpRequestMessage(HttpMethod.Delete, endpoint);
-            SignRequest(request);
+            SignRequest(request, config);
 
-            var response = await _httpClient.SendAsync(request);
+            var response = await client.SendAsync(request);
             response.EnsureSuccessStatusCode();
+
+            // Remove from index
+            _ = RemoveFromIndexAsync(uri.ToString());
         }
 
-        public override async Task<bool> ExistsAsync(Uri uri)
+        public override Task DeleteAsync(Uri uri) => DeleteAsync(uri, null);
+
+        /// <summary>
+        /// Check if data exists in storage, optionally in a specific instance.
+        /// </summary>
+        public async Task<bool> ExistsAsync(Uri uri, string? instanceId = null)
         {
             ArgumentNullException.ThrowIfNull(uri);
 
             var blobName = GetBlobName(uri);
             try
             {
-                await GetBlobPropertiesAsync(blobName);
+                await GetBlobPropertiesAsync(blobName, instanceId);
                 return true;
             }
             catch
@@ -308,6 +402,8 @@ namespace DataWarehouse.Plugins.AzureBlobStorage
                 return false;
             }
         }
+
+        public override Task<bool> ExistsAsync(Uri uri) => ExistsAsync(uri, null);
 
         public override async IAsyncEnumerable<StorageListItem> ListFilesAsync(
             string prefix = "",
@@ -317,12 +413,12 @@ namespace DataWarehouse.Plugins.AzureBlobStorage
 
             do
             {
-                var endpoint = $"{GetContainerUrl()}?restype=container&comp=list&prefix={Uri.EscapeDataString(prefix)}";
+                var endpoint = $"{GetContainerUrl(_config)}?restype=container&comp=list&prefix={Uri.EscapeDataString(prefix)}";
                 if (marker != null)
                     endpoint += $"&marker={Uri.EscapeDataString(marker)}";
 
                 var request = new HttpRequestMessage(HttpMethod.Get, endpoint);
-                SignRequest(request);
+                SignRequest(request, _config);
 
                 var response = await _httpClient.SendAsync(request, ct);
                 response.EnsureSuccessStatusCode();
@@ -354,16 +450,22 @@ namespace DataWarehouse.Plugins.AzureBlobStorage
             } while (marker != null);
         }
 
+        #endregion
+
+        #region Azure-Specific Operations
+
         /// <summary>
         /// Get blob properties.
         /// </summary>
-        public async Task<Dictionary<string, object>> GetBlobPropertiesAsync(string blobName)
+        public async Task<Dictionary<string, object>> GetBlobPropertiesAsync(string blobName, string? instanceId = null)
         {
-            var endpoint = GetBlobUrl(blobName);
+            var config = GetConfig(instanceId);
+            var client = GetHttpClient(instanceId);
+            var endpoint = GetBlobUrl(blobName, config);
             var request = new HttpRequestMessage(HttpMethod.Head, endpoint);
-            SignRequest(request);
+            SignRequest(request, config);
 
-            var response = await _httpClient.SendAsync(request);
+            var response = await client.SendAsync(request);
             response.EnsureSuccessStatusCode();
 
             var properties = new Dictionary<string, object>
@@ -386,8 +488,10 @@ namespace DataWarehouse.Plugins.AzureBlobStorage
         /// <summary>
         /// Move blob to a different access tier.
         /// </summary>
-        public async Task<string> MoveToTierAsync(Manifest manifest, StorageTier targetTier)
+        public async Task<string> MoveToTierAsync(Manifest manifest, StorageTier targetTier, string? instanceId = null)
         {
+            var config = GetConfig(instanceId);
+            var client = GetHttpClient(instanceId);
             var blobName = GetBlobName(manifest.StorageUri);
             var azureTier = targetTier switch
             {
@@ -398,16 +502,19 @@ namespace DataWarehouse.Plugins.AzureBlobStorage
                 _ => "Hot"
             };
 
-            var endpoint = $"{GetBlobUrl(blobName)}?comp=tier";
+            var endpoint = $"{GetBlobUrl(blobName, config)}?comp=tier";
             var request = new HttpRequestMessage(HttpMethod.Put, endpoint);
             request.Headers.TryAddWithoutValidation("x-ms-access-tier", azureTier);
-            SignRequest(request);
+            SignRequest(request, config);
 
-            var response = await _httpClient.SendAsync(request);
+            var response = await client.SendAsync(request);
             response.EnsureSuccessStatusCode();
 
             return manifest.StorageUri.ToString();
         }
+
+        public Task<string> MoveToTierAsync(Manifest manifest, StorageTier targetTier)
+            => MoveToTierAsync(manifest, targetTier, null);
 
         public Task<StorageTier> GetCurrentTierAsync(Uri uri)
         {
@@ -417,32 +524,35 @@ namespace DataWarehouse.Plugins.AzureBlobStorage
         /// <summary>
         /// Generate SAS URL.
         /// </summary>
-        public string GenerateSasUrl(string blobName, TimeSpan expiresIn)
+        public string GenerateSasUrl(string blobName, TimeSpan expiresIn, string? instanceId = null)
         {
+            var config = GetConfig(instanceId);
             var start = DateTime.UtcNow.AddMinutes(-5).ToString("yyyy-MM-ddTHH:mm:ssZ");
             var expiry = DateTime.UtcNow.Add(expiresIn).ToString("yyyy-MM-ddTHH:mm:ssZ");
 
-            var canonicalizedResource = $"/blob/{_config.AccountName}/{_config.Container}/{blobName}";
+            var canonicalizedResource = $"/blob/{config.AccountName}/{config.Container}/{blobName}";
             var stringToSign = $"r\n{start}\n{expiry}\n{canonicalizedResource}\n\n\nhttps\n2021-06-08\nb\n\n\n\n\n";
 
-            var keyBytes = Convert.FromBase64String(_config.AccountKey);
+            var keyBytes = Convert.FromBase64String(config.AccountKey);
             using var hmac = new HMACSHA256(keyBytes);
             var signature = Convert.ToBase64String(hmac.ComputeHash(Encoding.UTF8.GetBytes(stringToSign)));
 
             var sasToken = $"sv=2021-06-08&ss=b&srt=o&sp=r&se={Uri.EscapeDataString(expiry)}&st={Uri.EscapeDataString(start)}&spr=https&sig={Uri.EscapeDataString(signature)}";
-            return $"{GetBlobUrl(blobName)}?{sasToken}";
+            return $"{GetBlobUrl(blobName, config)}?{sasToken}";
         }
 
         /// <summary>
         /// Create blob snapshot.
         /// </summary>
-        public async Task<string> CreateSnapshotAsync(string blobName)
+        public async Task<string> CreateSnapshotAsync(string blobName, string? instanceId = null)
         {
-            var endpoint = $"{GetBlobUrl(blobName)}?comp=snapshot";
+            var config = GetConfig(instanceId);
+            var client = GetHttpClient(instanceId);
+            var endpoint = $"{GetBlobUrl(blobName, config)}?comp=snapshot";
             var request = new HttpRequestMessage(HttpMethod.Put, endpoint);
-            SignRequest(request);
+            SignRequest(request, config);
 
-            var response = await _httpClient.SendAsync(request);
+            var response = await client.SendAsync(request);
             response.EnsureSuccessStatusCode();
 
             if (response.Headers.TryGetValues("x-ms-snapshot", out var snapshotValues))
@@ -454,17 +564,44 @@ namespace DataWarehouse.Plugins.AzureBlobStorage
         /// <summary>
         /// Copy blob.
         /// </summary>
-        public async Task CopyBlobAsync(string sourceBlobName, string destBlobName)
+        public async Task CopyBlobAsync(string sourceBlobName, string destBlobName, string? instanceId = null)
         {
-            var sourceUrl = GetBlobUrl(sourceBlobName);
-            var destUrl = GetBlobUrl(destBlobName);
+            var config = GetConfig(instanceId);
+            var client = GetHttpClient(instanceId);
+            var sourceUrl = GetBlobUrl(sourceBlobName, config);
+            var destUrl = GetBlobUrl(destBlobName, config);
 
             var request = new HttpRequestMessage(HttpMethod.Put, destUrl);
             request.Headers.TryAddWithoutValidation("x-ms-copy-source", sourceUrl);
-            SignRequest(request);
+            SignRequest(request, config);
 
-            var response = await _httpClient.SendAsync(request);
+            var response = await client.SendAsync(request);
             response.EnsureSuccessStatusCode();
+        }
+
+        #endregion
+
+        #region Helper Methods
+
+        private AzureBlobConfig GetConfig(string? instanceId)
+        {
+            if (string.IsNullOrEmpty(instanceId))
+                return _config;
+
+            var instance = _connectionRegistry.Get(instanceId);
+            return instance?.Config ?? _config;
+        }
+
+        private HttpClient GetHttpClient(string? instanceId)
+        {
+            if (string.IsNullOrEmpty(instanceId))
+                return _httpClient;
+
+            var instance = _connectionRegistry.Get(instanceId);
+            if (instance?.Connection is AzureBlobConnection conn)
+                return conn.HttpClient;
+
+            return _httpClient;
         }
 
         private string GetBlobName(Uri uri)
@@ -475,17 +612,17 @@ namespace DataWarehouse.Plugins.AzureBlobStorage
             return uri.AbsolutePath.TrimStart('/');
         }
 
-        private string GetBlobUrl(string blobName)
+        private string GetBlobUrl(string blobName, AzureBlobConfig config)
         {
-            return $"https://{_config.AccountName}.blob.core.windows.net/{_config.Container}/{blobName}";
+            return $"https://{config.AccountName}.blob.core.windows.net/{config.Container}/{blobName}";
         }
 
-        private string GetContainerUrl()
+        private string GetContainerUrl(AzureBlobConfig config)
         {
-            return $"https://{_config.AccountName}.blob.core.windows.net/{_config.Container}";
+            return $"https://{config.AccountName}.blob.core.windows.net/{config.Container}";
         }
 
-        private void SignRequest(HttpRequestMessage request)
+        private void SignRequest(HttpRequestMessage request, AzureBlobConfig config)
         {
             var now = DateTime.UtcNow.ToString("R", CultureInfo.InvariantCulture);
             request.Headers.TryAddWithoutValidation("x-ms-date", now);
@@ -500,7 +637,7 @@ namespace DataWarehouse.Plugins.AzureBlobStorage
 
             // Build canonical resource
             var uri = request.RequestUri!;
-            var canonicalResource = $"/{_config.AccountName}{uri.AbsolutePath}";
+            var canonicalResource = $"/{config.AccountName}{uri.AbsolutePath}";
             if (!string.IsNullOrEmpty(uri.Query))
             {
                 var queryParams = uri.Query.TrimStart('?').Split('&')
@@ -516,11 +653,11 @@ namespace DataWarehouse.Plugins.AzureBlobStorage
 
             var stringToSign = $"{request.Method}\n\n\n{contentLength}\n\n{contentType}\n\n\n\n\n\n\n{canonicalHeaders}{canonicalResource}";
 
-            var keyBytes = Convert.FromBase64String(_config.AccountKey);
+            var keyBytes = Convert.FromBase64String(config.AccountKey);
             using var hmac = new HMACSHA256(keyBytes);
             var signature = Convert.ToBase64String(hmac.ComputeHash(Encoding.UTF8.GetBytes(stringToSign)));
 
-            request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("SharedKey", $"{_config.AccountName}:{signature}");
+            request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("SharedKey", $"{config.AccountName}:{signature}");
         }
 
         private static string ExtractXmlValue(string xml, string tag)
@@ -537,12 +674,28 @@ namespace DataWarehouse.Plugins.AzureBlobStorage
 
             return string.Empty;
         }
+
+        #endregion
+    }
+
+    /// <summary>
+    /// Internal connection wrapper for Azure Blob Storage instances.
+    /// </summary>
+    internal class AzureBlobConnection : IDisposable
+    {
+        public required AzureBlobConfig Config { get; init; }
+        public required HttpClient HttpClient { get; init; }
+
+        public void Dispose()
+        {
+            HttpClient?.Dispose();
+        }
     }
 
     /// <summary>
     /// Configuration for Azure Blob Storage.
     /// </summary>
-    public class AzureBlobConfig
+    public class AzureBlobConfig : StorageConfigBase
     {
         /// <summary>
         /// Azure Storage account name.
@@ -595,5 +748,59 @@ namespace DataWarehouse.Plugins.AzureBlobStorage
 
             return config;
         }
+
+        /// <summary>
+        /// Creates configuration for Azure Blob Storage.
+        /// </summary>
+        public static AzureBlobConfig Create(string accountName, string accountKey, string container) => new()
+        {
+            AccountName = accountName,
+            AccountKey = accountKey,
+            Container = container
+        };
+
+        /// <summary>
+        /// Creates configuration for Azure Blob Storage with instance ID.
+        /// </summary>
+        public static AzureBlobConfig Create(string accountName, string accountKey, string container, string instanceId) => new()
+        {
+            AccountName = accountName,
+            AccountKey = accountKey,
+            Container = container,
+            InstanceId = instanceId
+        };
+
+        /// <summary>
+        /// Creates configuration for Azure Blob Storage with specific tier.
+        /// </summary>
+        public static AzureBlobConfig CreateWithTier(string accountName, string accountKey, string container, string tier) => new()
+        {
+            AccountName = accountName,
+            AccountKey = accountKey,
+            Container = container,
+            DefaultAccessTier = tier
+        };
+
+        /// <summary>
+        /// Creates configuration for cool tier storage.
+        /// </summary>
+        public static AzureBlobConfig CoolTier(string accountName, string accountKey, string container) => new()
+        {
+            AccountName = accountName,
+            AccountKey = accountKey,
+            Container = container,
+            DefaultAccessTier = "Cool"
+        };
+
+        /// <summary>
+        /// Creates configuration for archive tier storage.
+        /// </summary>
+        public static AzureBlobConfig ArchiveTier(string accountName, string accountKey, string container) => new()
+        {
+            AccountName = accountName,
+            AccountKey = accountKey,
+            Container = container,
+            DefaultAccessTier = "Archive"
+        };
     }
 }
