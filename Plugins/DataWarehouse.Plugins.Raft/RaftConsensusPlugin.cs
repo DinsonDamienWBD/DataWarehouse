@@ -1328,8 +1328,134 @@ namespace DataWarehouse.Plugins.Raft
 
         private async Task CreateSnapshotAsync()
         {
-            // TODO: Implement snapshot creation for log compaction
-            await Task.CompletedTask;
+            // Snapshot creation for log compaction
+            // Captures the current state machine state and allows truncating the log
+
+            Snapshot snapshot;
+            int entriesCompacted;
+
+            lock (_logLock)
+            {
+                if (_log.Count <= _snapshotThreshold / 2)
+                {
+                    // Not enough entries to compact
+                    return;
+                }
+
+                // Capture current state
+                var lastIncludedIndex = _commitIndex;
+                var lastIncludedTerm = _log.Count > 0 && lastIncludedIndex <= _log.Count
+                    ? _log[(int)lastIncludedIndex - 1].Term
+                    : _currentTerm;
+
+                // Serialize the committed state
+                var stateData = SerializeCommittedState();
+
+                snapshot = new Snapshot
+                {
+                    LastIncludedIndex = lastIncludedIndex,
+                    LastIncludedTerm = lastIncludedTerm,
+                    Data = stateData,
+                    CreatedAt = DateTime.UtcNow,
+                    NodeId = _nodeId
+                };
+
+                // Truncate log - keep entries after snapshot
+                entriesCompacted = (int)lastIncludedIndex;
+                if (entriesCompacted > 0 && entriesCompacted <= _log.Count)
+                {
+                    _log.RemoveRange(0, entriesCompacted);
+                }
+            }
+
+            // Persist snapshot to storage
+            await PersistSnapshotAsync(snapshot);
+
+            Console.WriteLine($"[Raft] Snapshot created: index={snapshot.LastIncludedIndex}, term={snapshot.LastIncludedTerm}, compacted={entriesCompacted} entries");
+        }
+
+        private byte[] SerializeCommittedState()
+        {
+            // Serialize the current committed state for snapshot
+            var state = new Dictionary<string, object>
+            {
+                ["commitIndex"] = _commitIndex,
+                ["lastApplied"] = _lastApplied,
+                ["currentTerm"] = _currentTerm,
+                ["locks"] = _locks.ToDictionary(kv => kv.Key, kv => new
+                {
+                    kv.Value.LockId,
+                    kv.Value.OwnerId,
+                    kv.Value.AcquiredAt,
+                    kv.Value.LeaseExpires
+                }),
+                ["nodeId"] = _nodeId,
+                ["votedFor"] = _votedFor ?? ""
+            };
+
+            return JsonSerializer.SerializeToUtf8Bytes(state);
+        }
+
+        private async Task PersistSnapshotAsync(Snapshot snapshot)
+        {
+            // Persist snapshot to file system or storage provider
+            var snapshotPath = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                "DataWarehouse", "Raft", $"snapshot-{_nodeId}");
+
+            Directory.CreateDirectory(snapshotPath);
+
+            var snapshotFile = Path.Combine(snapshotPath, $"snapshot-{snapshot.LastIncludedIndex}.json");
+            var json = JsonSerializer.Serialize(snapshot, new JsonSerializerOptions { WriteIndented = true });
+            await File.WriteAllTextAsync(snapshotFile, json);
+
+            // Keep only the latest 3 snapshots
+            var snapshots = Directory.GetFiles(snapshotPath, "snapshot-*.json")
+                .OrderByDescending(f => f)
+                .Skip(3)
+                .ToList();
+
+            foreach (var oldSnapshot in snapshots)
+            {
+                try { File.Delete(oldSnapshot); }
+                catch { /* Ignore cleanup errors */ }
+            }
+        }
+
+        private async Task<Snapshot?> LoadLatestSnapshotAsync()
+        {
+            var snapshotPath = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                "DataWarehouse", "Raft", $"snapshot-{_nodeId}");
+
+            if (!Directory.Exists(snapshotPath))
+                return null;
+
+            var latestFile = Directory.GetFiles(snapshotPath, "snapshot-*.json")
+                .OrderByDescending(f => f)
+                .FirstOrDefault();
+
+            if (latestFile == null)
+                return null;
+
+            try
+            {
+                var json = await File.ReadAllTextAsync(latestFile);
+                return JsonSerializer.Deserialize<Snapshot>(json);
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        private sealed class Snapshot
+        {
+            public long LastIncludedIndex { get; init; }
+            public long LastIncludedTerm { get; init; }
+            public byte[] Data { get; init; } = Array.Empty<byte>();
+            public DateTime CreatedAt { get; init; }
+            public string NodeId { get; init; } = "";
         }
 
         private async Task<Dictionary<string, object>> HandleProposeAsync(Dictionary<string, object> payload)
