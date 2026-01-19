@@ -246,7 +246,7 @@ namespace DataWarehouse.Kernel.Infrastructure
                         using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
                         cts.CancelAfter(_config.CheckTimeout);
 
-                        result = await _checks[name].CheckAsync(cts.Token);
+                        result = await _checks[name].CheckHealthAsync(cts.Token);
                         result.Duration = checkSw.Elapsed;
                     }
                     catch (OperationCanceledException)

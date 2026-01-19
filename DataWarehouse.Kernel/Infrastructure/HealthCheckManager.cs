@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using System.Diagnostics;
+using System.Runtime;
 using DataWarehouse.SDK.Contracts;
 
 namespace DataWarehouse.Kernel.Infrastructure
