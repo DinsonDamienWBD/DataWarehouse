@@ -1,5 +1,7 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using DataWarehouse.Dashboard.Services;
+using DataWarehouse.Dashboard.Security;
 
 namespace DataWarehouse.Dashboard.Controllers;
 
@@ -9,6 +11,7 @@ namespace DataWarehouse.Dashboard.Controllers;
 [ApiController]
 [Route("api/[controller]")]
 [Produces("application/json")]
+[Authorize(Policy = AuthorizationPolicies.Authenticated)]
 public class PluginsController : ControllerBase
 {
     private readonly IPluginDiscoveryService _pluginService;
@@ -76,6 +79,7 @@ public class PluginsController : ControllerBase
     /// Enables a plugin.
     /// </summary>
     [HttpPost("{id}/enable")]
+    [Authorize(Policy = AuthorizationPolicies.AdminOnly)]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
@@ -97,6 +101,7 @@ public class PluginsController : ControllerBase
     /// Disables a plugin.
     /// </summary>
     [HttpPost("{id}/disable")]
+    [Authorize(Policy = AuthorizationPolicies.AdminOnly)]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
@@ -118,6 +123,7 @@ public class PluginsController : ControllerBase
     /// Reloads plugin list from disk.
     /// </summary>
     [HttpPost("reload")]
+    [Authorize(Policy = AuthorizationPolicies.AdminOnly)]
     [ProducesResponseType(StatusCodes.Status200OK)]
     public async Task<ActionResult> ReloadPlugins()
     {
@@ -145,6 +151,7 @@ public class PluginsController : ControllerBase
     /// Updates plugin configuration.
     /// </summary>
     [HttpPut("{id}/config")]
+    [Authorize(Policy = AuthorizationPolicies.AdminOnly)]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]

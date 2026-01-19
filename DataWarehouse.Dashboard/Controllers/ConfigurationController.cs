@@ -1,5 +1,7 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using DataWarehouse.Dashboard.Services;
+using DataWarehouse.Dashboard.Security;
 
 namespace DataWarehouse.Dashboard.Controllers;
 
@@ -9,6 +11,7 @@ namespace DataWarehouse.Dashboard.Controllers;
 [ApiController]
 [Route("api/[controller]")]
 [Produces("application/json")]
+[Authorize(Policy = AuthorizationPolicies.OperatorOrAdmin)]
 public class ConfigurationController : ControllerBase
 {
     private readonly IConfigurationService _configService;
@@ -35,6 +38,7 @@ public class ConfigurationController : ControllerBase
     /// Updates the system configuration.
     /// </summary>
     [HttpPut("system")]
+    [Authorize(Policy = AuthorizationPolicies.AdminOnly)]
     [ProducesResponseType(StatusCodes.Status200OK)]
     public async Task<ActionResult> UpdateSystemConfiguration([FromBody] SystemConfiguration config)
     {
@@ -58,6 +62,7 @@ public class ConfigurationController : ControllerBase
     /// Updates security policy settings.
     /// </summary>
     [HttpPut("security")]
+    [Authorize(Policy = AuthorizationPolicies.AdminOnly)]
     [ProducesResponseType(StatusCodes.Status200OK)]
     public async Task<ActionResult> UpdateSecurityPolicies([FromBody] SecurityPolicySettings policies)
     {
@@ -96,6 +101,7 @@ public class ConfigurationController : ControllerBase
     /// Creates a new tenant.
     /// </summary>
     [HttpPost("tenants")]
+    [Authorize(Policy = AuthorizationPolicies.AdminOnly)]
     [ProducesResponseType(typeof(TenantConfiguration), StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<ActionResult<TenantConfiguration>> CreateTenant([FromBody] TenantConfiguration tenant)
@@ -117,6 +123,7 @@ public class ConfigurationController : ControllerBase
     /// Updates an existing tenant.
     /// </summary>
     [HttpPut("tenants/{tenantId}")]
+    [Authorize(Policy = AuthorizationPolicies.AdminOnly)]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult> UpdateTenant(string tenantId, [FromBody] TenantConfiguration tenant)
@@ -137,6 +144,7 @@ public class ConfigurationController : ControllerBase
     /// Deletes a tenant.
     /// </summary>
     [HttpDelete("tenants/{tenantId}")]
+    [Authorize(Policy = AuthorizationPolicies.AdminOnly)]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult> DeleteTenant(string tenantId)
@@ -169,6 +177,7 @@ public class ConfigurationController : ControllerBase
     /// Updates plugin-specific configuration.
     /// </summary>
     [HttpPut("plugins/{pluginId}")]
+    [Authorize(Policy = AuthorizationPolicies.AdminOnly)]
     [ProducesResponseType(StatusCodes.Status200OK)]
     public async Task<ActionResult> UpdatePluginConfiguration(string pluginId, [FromBody] Dictionary<string, object> config)
     {

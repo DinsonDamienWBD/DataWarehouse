@@ -1,5 +1,7 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using DataWarehouse.Dashboard.Services;
+using DataWarehouse.Dashboard.Security;
 using DataWarehouse.SDK.Infrastructure;
 
 namespace DataWarehouse.Dashboard.Controllers;
@@ -10,6 +12,7 @@ namespace DataWarehouse.Dashboard.Controllers;
 [ApiController]
 [Route("api/[controller]")]
 [Produces("application/json")]
+[Authorize(Policy = AuthorizationPolicies.Authenticated)]
 public class HealthController : ControllerBase
 {
     private readonly ISystemHealthService _healthService;
@@ -36,6 +39,7 @@ public class HealthController : ControllerBase
     /// Gets simple health check for load balancers.
     /// </summary>
     [HttpGet("ping")]
+    [AllowAnonymous]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status503ServiceUnavailable)]
     public async Task<ActionResult> Ping()
@@ -97,6 +101,7 @@ public class HealthController : ControllerBase
     /// Acknowledges an alert.
     /// </summary>
     [HttpPost("alerts/{id}/acknowledge")]
+    [Authorize(Policy = AuthorizationPolicies.OperatorOrAdmin)]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult> AcknowledgeAlert(string id, [FromBody] AcknowledgeRequest request)
@@ -113,6 +118,7 @@ public class HealthController : ControllerBase
     /// Clears an alert.
     /// </summary>
     [HttpPost("alerts/{id}/clear")]
+    [Authorize(Policy = AuthorizationPolicies.OperatorOrAdmin)]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult> ClearAlert(string id)

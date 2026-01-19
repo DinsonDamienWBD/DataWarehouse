@@ -1,5 +1,7 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using DataWarehouse.Dashboard.Services;
+using DataWarehouse.Dashboard.Security;
 using DataWarehouse.Kernel.Storage;
 
 namespace DataWarehouse.Dashboard.Controllers;
@@ -10,6 +12,7 @@ namespace DataWarehouse.Dashboard.Controllers;
 [ApiController]
 [Route("api/[controller]")]
 [Produces("application/json")]
+[Authorize(Policy = AuthorizationPolicies.Authenticated)]
 public class StorageController : ControllerBase
 {
     private readonly IStorageManagementService _storageService;
@@ -51,6 +54,7 @@ public class StorageController : ControllerBase
     /// Creates a new storage pool.
     /// </summary>
     [HttpPost("pools")]
+    [Authorize(Policy = AuthorizationPolicies.AdminOnly)]
     [ProducesResponseType(typeof(StoragePoolInfo), StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<ActionResult<StoragePoolInfo>> CreatePool([FromBody] CreatePoolRequest request)
@@ -68,6 +72,7 @@ public class StorageController : ControllerBase
     /// Deletes a storage pool.
     /// </summary>
     [HttpDelete("pools/{id}")]
+    [Authorize(Policy = AuthorizationPolicies.AdminOnly)]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult> DeletePool(string id)
@@ -140,6 +145,7 @@ public class StorageController : ControllerBase
     /// Adds a storage instance to a pool.
     /// </summary>
     [HttpPost("pools/{poolId}/instances")]
+    [Authorize(Policy = AuthorizationPolicies.AdminOnly)]
     [ProducesResponseType(typeof(StorageInstance), StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<StorageInstance>> AddInstance(string poolId, [FromBody] AddInstanceRequest request)
@@ -160,6 +166,7 @@ public class StorageController : ControllerBase
     /// Removes a storage instance from a pool.
     /// </summary>
     [HttpDelete("pools/{poolId}/instances/{instanceId}")]
+    [Authorize(Policy = AuthorizationPolicies.AdminOnly)]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult> RemoveInstance(string poolId, string instanceId)

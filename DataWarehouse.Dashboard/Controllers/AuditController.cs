@@ -1,14 +1,18 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using DataWarehouse.Dashboard.Services;
+using DataWarehouse.Dashboard.Security;
 
 namespace DataWarehouse.Dashboard.Controllers;
 
 /// <summary>
 /// API controller for audit logging.
+/// Audit logs are sensitive and require elevated permissions.
 /// </summary>
 [ApiController]
 [Route("api/[controller]")]
 [Produces("application/json")]
+[Authorize(Policy = AuthorizationPolicies.OperatorOrAdmin)]
 public class AuditController : ControllerBase
 {
     private readonly IAuditLogService _auditService;
