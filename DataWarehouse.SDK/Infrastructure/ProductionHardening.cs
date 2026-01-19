@@ -7,6 +7,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using System.Threading.Channels;
 
 namespace DataWarehouse.SDK.Infrastructure;
 
@@ -326,12 +327,12 @@ public sealed class StartupHealthVerifier
 public sealed class AuditLogger : IAsyncDisposable
 {
     private readonly Channel<AuditEvent> _eventChannel;
-    private readonly IAuditStorage _storage;
+    private readonly IAuditEventStorage _storage;
     private readonly Task _processingTask;
     private readonly CancellationTokenSource _cts = new();
     private byte[] _previousHash = Array.Empty<byte>();
 
-    public AuditLogger(IAuditStorage storage, int bufferSize = 10000)
+    public AuditLogger(IAuditEventStorage storage, int bufferSize = 10000)
     {
         _storage = storage ?? throw new ArgumentNullException(nameof(storage));
         _eventChannel = Channel.CreateBounded<AuditEvent>(new BoundedChannelOptions(bufferSize)
@@ -876,7 +877,7 @@ public sealed class HorizontalScalingCoordinator : IAsyncDisposable
     /// <summary>
     /// Event raised when scaling actions are recommended.
     /// </summary>
-    public event Func<ScalingRecommendation, CancellationToken, Task>? OnScaleRecommendation;
+    public event Func<AutoScalingRecommendation, CancellationToken, Task>? OnScaleRecommendation;
 
     /// <summary>
     /// Defines a scaling group with policies.
@@ -906,7 +907,7 @@ public sealed class HorizontalScalingCoordinator : IAsyncDisposable
             if (!_groups.TryGetValue(evt.GroupName, out var group)) continue;
 
             var recommendation = EvaluateScaling(group, evt.Metrics);
-            if (recommendation.Action != ScalingAction.None && OnScaleRecommendation != null)
+            if (recommendation.Action != AutoScalingAction.None && OnScaleRecommendation != null)
             {
                 try { await OnScaleRecommendation(recommendation, ct); }
                 catch { /* Log and continue */ }
@@ -914,9 +915,9 @@ public sealed class HorizontalScalingCoordinator : IAsyncDisposable
         }
     }
 
-    private ScalingRecommendation EvaluateScaling(ScalingGroup group, ScalingMetrics metrics)
+    private AutoScalingRecommendation EvaluateScaling(ScalingGroup group, ScalingMetrics metrics)
     {
-        var recommendation = new ScalingRecommendation
+        var recommendation = new AutoScalingRecommendation
         {
             GroupName = group.Name,
             CurrentInstances = group.CurrentInstances,
@@ -930,7 +931,7 @@ public sealed class HorizontalScalingCoordinator : IAsyncDisposable
         {
             if (group.CurrentInstances < group.MaxInstances)
             {
-                recommendation.Action = ScalingAction.ScaleUp;
+                recommendation.Action = AutoScalingAction.ScaleUp;
                 recommendation.TargetInstances = Math.Min(
                     group.CurrentInstances + group.ScaleUpIncrement,
                     group.MaxInstances);
@@ -944,7 +945,7 @@ public sealed class HorizontalScalingCoordinator : IAsyncDisposable
         {
             if (group.CurrentInstances > group.MinInstances)
             {
-                recommendation.Action = ScalingAction.ScaleDown;
+                recommendation.Action = AutoScalingAction.ScaleDown;
                 recommendation.TargetInstances = Math.Max(
                     group.CurrentInstances - group.ScaleDownIncrement,
                     group.MinInstances);
@@ -1399,10 +1400,10 @@ public class RuleValidationResult
     public string? ExpectedValue { get; init; }
     public string? ActualValue { get; init; }
     public string? Recommendation { get; init; }
-    public ValidationSeverity Severity { get; init; } = ValidationSeverity.Error;
+    public ConfigValidationSeverity Severity { get; init; } = ConfigValidationSeverity.Error;
 }
 
-public enum ValidationSeverity { Error, Warning, Info }
+public enum ConfigValidationSeverity { Error, Warning, Info }
 
 public class ConfigurationValidationResult
 {
@@ -1498,7 +1499,7 @@ public class ProductionEnvironmentRule : IConfigurationRule
             return Task.FromResult(new RuleValidationResult
             {
                 IsValid = true,
-                Severity = ValidationSeverity.Warning,
+                Severity = ConfigValidationSeverity.Warning,
                 Message = $"Running in {env ?? "unknown"} environment",
                 Recommendation = "Ensure production configuration is used for production deployments"
             });
@@ -1651,7 +1652,7 @@ public class NetworkConnectivityCheck : IStartupCheck
 }
 
 // Audit types
-public interface IAuditStorage
+public interface IAuditEventStorage
 {
     Task StoreAsync(AuditEvent evt, CancellationToken ct);
 }
@@ -1873,14 +1874,14 @@ public class ScalingEvent
     public required ScalingMetrics Metrics { get; init; }
 }
 
-public enum ScalingAction { None, ScaleUp, ScaleDown }
+public enum AutoScalingAction { None, ScaleUp, ScaleDown }
 
-public class ScalingRecommendation
+public class AutoScalingRecommendation
 {
     public required string GroupName { get; init; }
     public int CurrentInstances { get; init; }
     public int TargetInstances { get; set; }
-    public ScalingAction Action { get; set; }
+    public AutoScalingAction Action { get; set; }
     public string? Reason { get; set; }
     public DateTime Timestamp { get; init; }
 }
@@ -1976,10 +1977,10 @@ public class TelemetryAnomaly
     public double Value { get; init; }
     public double ExpectedValue { get; init; }
     public double Deviation { get; init; }
-    public AnomalySeverity Severity { get; init; }
+    public TelemetryAnomalySeverity Severity { get; init; }
 }
 
-public enum AnomalySeverity { Info, Warning, Critical }
+public enum TelemetryAnomalySeverity { Info, Warning, Critical }
 
 // Deployment types
 public enum DeploymentStrategy { Rolling, BlueGreen, Canary }
