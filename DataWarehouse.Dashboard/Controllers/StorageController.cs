@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using DataWarehouse.Dashboard.Services;
+using DataWarehouse.Kernel.Storage;
 
 namespace DataWarehouse.Dashboard.Controllers;
 
