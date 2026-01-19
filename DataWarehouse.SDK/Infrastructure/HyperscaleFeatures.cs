@@ -3574,3 +3574,560 @@ public sealed class S3ApiConfig
 }
 
 #endregion
+
+#region H9: Carbon-Aware Data Tiering
+
+/// <summary>
+/// Carbon-aware data placement that considers grid carbon intensity for sustainability.
+/// Places data operations in regions/times with lower carbon footprint when possible.
+/// </summary>
+public sealed class CarbonAwareTiering : IAsyncDisposable
+{
+    private readonly ConcurrentDictionary<string, RegionCarbonData> _regionData = new();
+    private readonly ConcurrentDictionary<string, DataPlacementRecord> _placementHistory = new();
+    private readonly ICarbonIntensityProvider _carbonProvider;
+    private readonly CarbonAwareConfig _config;
+    private readonly Task _updateTask;
+    private readonly CancellationTokenSource _cts = new();
+    private volatile bool _disposed;
+    private long _totalOperations;
+    private long _deferredOperations;
+    private double _totalCarbonSaved;
+
+    public CarbonAwareTiering(
+        ICarbonIntensityProvider carbonProvider,
+        CarbonAwareConfig? config = null)
+    {
+        _carbonProvider = carbonProvider ?? throw new ArgumentNullException(nameof(carbonProvider));
+        _config = config ?? new CarbonAwareConfig();
+        _updateTask = UpdateCarbonDataAsync(_cts.Token);
+    }
+
+    /// <summary>
+    /// Selects the optimal region for data placement based on carbon intensity.
+    /// </summary>
+    public async Task<CarbonAwarePlacementResult> SelectOptimalRegionAsync(
+        DataPlacementRequest request,
+        CancellationToken ct = default)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, nameof(CarbonAwareTiering));
+
+        Interlocked.Increment(ref _totalOperations);
+
+        // Get current carbon intensity for all available regions
+        var regionScores = new List<RegionScore>();
+
+        foreach (var region in request.AvailableRegions)
+        {
+            var carbonData = await GetRegionCarbonDataAsync(region, ct);
+            var score = CalculateRegionScore(carbonData, request);
+            regionScores.Add(new RegionScore
+            {
+                RegionId = region,
+                CarbonIntensity = carbonData.CurrentIntensity,
+                LatencyScore = CalculateLatencyScore(region, request.ClientRegion),
+                CostScore = CalculateCostScore(region, request.DataSize),
+                ForecastIntensity = carbonData.ForecastIntensity,
+                RenewablePercentage = carbonData.RenewablePercentage,
+                TotalScore = score
+            });
+        }
+
+        // Sort by total score (lower is better for carbon)
+        var rankedRegions = regionScores.OrderBy(r => r.TotalScore).ToList();
+        var selectedRegion = rankedRegions.First();
+        var baselineRegion = rankedRegions.FirstOrDefault(r => r.RegionId == request.PreferredRegion)
+            ?? rankedRegions.Last();
+
+        // Calculate carbon savings
+        var carbonSaved = (baselineRegion.CarbonIntensity - selectedRegion.CarbonIntensity) *
+            EstimateOperationCarbonImpact(request.DataSize, request.OperationType);
+
+        if (carbonSaved > 0)
+        {
+            Interlocked.Add(ref _totalCarbonSaved, (long)(carbonSaved * 1000));
+        }
+
+        // Check if we should defer the operation
+        var shouldDefer = ShouldDeferOperation(selectedRegion, request);
+        if (shouldDefer.Defer)
+        {
+            Interlocked.Increment(ref _deferredOperations);
+        }
+
+        // Record placement decision
+        var placement = new DataPlacementRecord
+        {
+            PlacementId = Guid.NewGuid().ToString("N"),
+            DataId = request.DataId,
+            SelectedRegion = selectedRegion.RegionId,
+            CarbonIntensity = selectedRegion.CarbonIntensity,
+            AlternativeIntensity = baselineRegion.CarbonIntensity,
+            CarbonSaved = carbonSaved,
+            DecisionTime = DateTime.UtcNow,
+            WasDeferred = shouldDefer.Defer
+        };
+        _placementHistory[placement.PlacementId] = placement;
+
+        return new CarbonAwarePlacementResult
+        {
+            Success = true,
+            SelectedRegion = selectedRegion.RegionId,
+            CarbonIntensity = selectedRegion.CarbonIntensity,
+            RenewablePercentage = selectedRegion.RenewablePercentage,
+            EstimatedCarbonSaved = carbonSaved,
+            ShouldDefer = shouldDefer.Defer,
+            DeferUntil = shouldDefer.DeferUntil,
+            DeferReason = shouldDefer.Reason,
+            AlternativeRegions = rankedRegions.Skip(1).Take(3).Select(r => new AlternativeRegion
+            {
+                RegionId = r.RegionId,
+                CarbonIntensity = r.CarbonIntensity,
+                AdditionalLatencyMs = CalculateAdditionalLatency(r.RegionId, selectedRegion.RegionId)
+            }).ToList(),
+            SustainabilityScore = CalculateSustainabilityScore(selectedRegion)
+        };
+    }
+
+    /// <summary>
+    /// Gets the optimal time window for data operations based on carbon forecast.
+    /// </summary>
+    public async Task<CarbonForecastResult> GetOptimalTimeWindowAsync(
+        string region,
+        TimeSpan windowDuration,
+        TimeSpan lookAheadPeriod,
+        CancellationToken ct = default)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, nameof(CarbonAwareTiering));
+
+        var forecast = await _carbonProvider.GetForecastAsync(region, lookAheadPeriod, ct);
+
+        // Find the window with lowest average carbon intensity
+        var windows = new List<TimeWindow>();
+        var windowCount = (int)(lookAheadPeriod.TotalMinutes / 30); // 30-min intervals
+
+        for (int i = 0; i < windowCount; i++)
+        {
+            var windowStart = DateTime.UtcNow.AddMinutes(i * 30);
+            var windowEnd = windowStart.Add(windowDuration);
+
+            var windowData = forecast.DataPoints
+                .Where(d => d.Timestamp >= windowStart && d.Timestamp < windowEnd)
+                .ToList();
+
+            if (windowData.Count == 0) continue;
+
+            windows.Add(new TimeWindow
+            {
+                StartTime = windowStart,
+                EndTime = windowEnd,
+                AverageCarbonIntensity = windowData.Average(d => d.CarbonIntensity),
+                MinCarbonIntensity = windowData.Min(d => d.CarbonIntensity),
+                MaxCarbonIntensity = windowData.Max(d => d.CarbonIntensity),
+                RenewablePercentage = windowData.Average(d => d.RenewablePercentage)
+            });
+        }
+
+        var optimalWindow = windows.OrderBy(w => w.AverageCarbonIntensity).FirstOrDefault();
+        var currentWindow = windows.FirstOrDefault();
+
+        return new CarbonForecastResult
+        {
+            Success = true,
+            Region = region,
+            OptimalWindow = optimalWindow,
+            CurrentWindow = currentWindow,
+            AllWindows = windows.OrderBy(w => w.AverageCarbonIntensity).Take(5).ToList(),
+            PotentialSavings = currentWindow != null && optimalWindow != null
+                ? (currentWindow.AverageCarbonIntensity - optimalWindow.AverageCarbonIntensity) / currentWindow.AverageCarbonIntensity * 100
+                : 0
+        };
+    }
+
+    /// <summary>
+    /// Gets sustainability statistics.
+    /// </summary>
+    public CarbonAwareStats GetStats()
+    {
+        var totalOps = Interlocked.Read(ref _totalOperations);
+        var deferredOps = Interlocked.Read(ref _deferredOperations);
+        var carbonSaved = _totalCarbonSaved / 1000.0; // Convert back from stored long
+
+        return new CarbonAwareStats
+        {
+            TotalOperations = totalOps,
+            DeferredOperations = deferredOps,
+            DeferralRate = totalOps > 0 ? (double)deferredOps / totalOps : 0,
+            TotalCarbonSavedGrams = carbonSaved,
+            TotalCarbonSavedKg = carbonSaved / 1000.0,
+            EquivalentTreeYears = carbonSaved / 21000.0, // ~21kg CO2 per tree per year
+            RegionStats = _regionData.Values.Select(r => new RegionCarbonStats
+            {
+                RegionId = r.RegionId,
+                CurrentIntensity = r.CurrentIntensity,
+                AverageIntensity = r.AverageIntensity,
+                RenewablePercentage = r.RenewablePercentage,
+                LastUpdated = r.LastUpdated
+            }).ToList()
+        };
+    }
+
+    private async Task<RegionCarbonData> GetRegionCarbonDataAsync(string region, CancellationToken ct)
+    {
+        if (_regionData.TryGetValue(region, out var cached) &&
+            cached.LastUpdated > DateTime.UtcNow.AddMinutes(-_config.CacheMinutes))
+        {
+            return cached;
+        }
+
+        var intensity = await _carbonProvider.GetCurrentIntensityAsync(region, ct);
+        var forecast = await _carbonProvider.GetForecastAsync(region, TimeSpan.FromHours(24), ct);
+
+        var data = new RegionCarbonData
+        {
+            RegionId = region,
+            CurrentIntensity = intensity.CarbonIntensity,
+            ForecastIntensity = forecast.DataPoints.FirstOrDefault()?.CarbonIntensity ?? intensity.CarbonIntensity,
+            RenewablePercentage = intensity.RenewablePercentage,
+            AverageIntensity = forecast.DataPoints.Any()
+                ? forecast.DataPoints.Average(d => d.CarbonIntensity)
+                : intensity.CarbonIntensity,
+            LastUpdated = DateTime.UtcNow
+        };
+
+        _regionData[region] = data;
+        return data;
+    }
+
+    private double CalculateRegionScore(RegionCarbonData carbonData, DataPlacementRequest request)
+    {
+        // Weighted scoring: carbon intensity is primary, but consider latency for real-time data
+        var carbonWeight = request.OperationType switch
+        {
+            DataOperationType.Archive => 0.9, // Archival can prioritize carbon
+            DataOperationType.Backup => 0.7,
+            DataOperationType.RealTime => 0.3, // Real-time needs low latency
+            _ => 0.5
+        };
+
+        var latencyWeight = 1.0 - carbonWeight;
+
+        var normalizedCarbon = carbonData.CurrentIntensity / 500.0; // Normalize to ~0-1 range
+        var normalizedLatency = CalculateLatencyScore(carbonData.RegionId, request.ClientRegion) / 200.0;
+
+        return normalizedCarbon * carbonWeight + normalizedLatency * latencyWeight;
+    }
+
+    private static double CalculateLatencyScore(string targetRegion, string? clientRegion)
+    {
+        if (string.IsNullOrEmpty(clientRegion)) return 50; // Default mid-range
+
+        // Simplified latency estimation based on region distance
+        var sameContinent = GetContinent(targetRegion) == GetContinent(clientRegion);
+        var sameCountry = GetCountry(targetRegion) == GetCountry(clientRegion);
+
+        return (sameCountry, sameContinent) switch
+        {
+            (true, true) => 10,
+            (false, true) => 50,
+            _ => 150
+        };
+    }
+
+    private static string GetContinent(string region)
+    {
+        return region.ToLowerInvariant() switch
+        {
+            var r when r.StartsWith("us-") || r.StartsWith("ca-") => "NA",
+            var r when r.StartsWith("eu-") || r.StartsWith("uk-") => "EU",
+            var r when r.StartsWith("ap-") || r.StartsWith("au-") => "APAC",
+            var r when r.StartsWith("sa-") => "SA",
+            _ => "OTHER"
+        };
+    }
+
+    private static string GetCountry(string region)
+    {
+        var parts = region.Split('-');
+        return parts.Length > 0 ? parts[0].ToUpperInvariant() : "UNKNOWN";
+    }
+
+    private static double CalculateCostScore(string region, long dataSize)
+    {
+        // Simplified cost estimation
+        var baseCost = region.ToLowerInvariant() switch
+        {
+            var r when r.StartsWith("us-") => 1.0,
+            var r when r.StartsWith("eu-") => 1.1,
+            var r when r.StartsWith("ap-") => 1.2,
+            _ => 1.0
+        };
+
+        return baseCost * (dataSize / (1024.0 * 1024.0)); // Per MB
+    }
+
+    private static double EstimateOperationCarbonImpact(long dataSize, DataOperationType operationType)
+    {
+        // Estimate grams of CO2 per operation based on data size and type
+        var baseImpact = dataSize / (1024.0 * 1024.0) * 0.1; // ~0.1g per MB base
+
+        return operationType switch
+        {
+            DataOperationType.Write => baseImpact * 2, // Write operations use more energy
+            DataOperationType.Read => baseImpact * 0.5,
+            DataOperationType.Archive => baseImpact * 3, // Archival includes compression
+            DataOperationType.Backup => baseImpact * 2.5,
+            DataOperationType.RealTime => baseImpact * 1.5,
+            _ => baseImpact
+        };
+    }
+
+    private DeferralDecision ShouldDeferOperation(RegionScore selectedRegion, DataPlacementRequest request)
+    {
+        // Don't defer real-time operations
+        if (request.OperationType == DataOperationType.RealTime)
+        {
+            return new DeferralDecision { Defer = false };
+        }
+
+        // Check if carbon intensity is above threshold
+        if (selectedRegion.CarbonIntensity > _config.DeferralThreshold)
+        {
+            // Check if forecast shows better times ahead
+            if (selectedRegion.ForecastIntensity < selectedRegion.CarbonIntensity * 0.7)
+            {
+                return new DeferralDecision
+                {
+                    Defer = true,
+                    DeferUntil = DateTime.UtcNow.AddHours(_config.MaxDeferralHours),
+                    Reason = $"Carbon intensity ({selectedRegion.CarbonIntensity:F0}g/kWh) above threshold. " +
+                        $"Forecast: {selectedRegion.ForecastIntensity:F0}g/kWh"
+                };
+            }
+        }
+
+        return new DeferralDecision { Defer = false };
+    }
+
+    private static double CalculateAdditionalLatency(string targetRegion, string baseRegion)
+    {
+        if (targetRegion == baseRegion) return 0;
+        if (GetContinent(targetRegion) == GetContinent(baseRegion)) return 30;
+        return 100;
+    }
+
+    private static double CalculateSustainabilityScore(RegionScore region)
+    {
+        // Score from 0-100, higher is more sustainable
+        var carbonScore = Math.Max(0, 100 - region.CarbonIntensity / 5);
+        var renewableScore = region.RenewablePercentage;
+
+        return (carbonScore * 0.6 + renewableScore * 0.4);
+    }
+
+    private async Task UpdateCarbonDataAsync(CancellationToken ct)
+    {
+        while (!ct.IsCancellationRequested)
+        {
+            try
+            {
+                await Task.Delay(_config.UpdateInterval, ct);
+
+                // Refresh carbon data for tracked regions
+                foreach (var region in _regionData.Keys.ToList())
+                {
+                    try
+                    {
+                        await GetRegionCarbonDataAsync(region, ct);
+                    }
+                    catch
+                    {
+                        // Continue with other regions
+                    }
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                break;
+            }
+            catch
+            {
+                // Continue updating
+            }
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_disposed) return;
+        _disposed = true;
+
+        await _cts.CancelAsync();
+        try
+        {
+            await _updateTask;
+        }
+        catch (OperationCanceledException)
+        {
+            // Expected
+        }
+
+        _cts.Dispose();
+    }
+}
+
+/// <summary>
+/// Provider interface for carbon intensity data.
+/// Implementations can use APIs like WattTime, ElectricityMap, etc.
+/// </summary>
+public interface ICarbonIntensityProvider
+{
+    Task<CarbonIntensityData> GetCurrentIntensityAsync(string region, CancellationToken ct = default);
+    Task<CarbonForecast> GetForecastAsync(string region, TimeSpan period, CancellationToken ct = default);
+}
+
+public sealed class CarbonAwareConfig
+{
+    public int CacheMinutes { get; set; } = 5;
+    public TimeSpan UpdateInterval { get; set; } = TimeSpan.FromMinutes(5);
+    public double DeferralThreshold { get; set; } = 400; // gCO2/kWh
+    public int MaxDeferralHours { get; set; } = 6;
+    public bool EnableAutoDeferral { get; set; } = true;
+}
+
+public sealed class RegionCarbonData
+{
+    public required string RegionId { get; init; }
+    public double CurrentIntensity { get; init; } // gCO2/kWh
+    public double ForecastIntensity { get; init; }
+    public double RenewablePercentage { get; init; }
+    public double AverageIntensity { get; init; }
+    public DateTime LastUpdated { get; init; }
+}
+
+public sealed class DataPlacementRequest
+{
+    public required string DataId { get; init; }
+    public long DataSize { get; init; }
+    public DataOperationType OperationType { get; init; }
+    public List<string> AvailableRegions { get; init; } = new();
+    public string? PreferredRegion { get; init; }
+    public string? ClientRegion { get; init; }
+    public bool AllowDeferral { get; init; } = true;
+}
+
+public enum DataOperationType { Read, Write, Archive, Backup, RealTime }
+
+public sealed class DataPlacementRecord
+{
+    public required string PlacementId { get; init; }
+    public required string DataId { get; init; }
+    public required string SelectedRegion { get; init; }
+    public double CarbonIntensity { get; init; }
+    public double AlternativeIntensity { get; init; }
+    public double CarbonSaved { get; init; }
+    public DateTime DecisionTime { get; init; }
+    public bool WasDeferred { get; init; }
+}
+
+public record RegionScore
+{
+    public required string RegionId { get; init; }
+    public double CarbonIntensity { get; init; }
+    public double LatencyScore { get; init; }
+    public double CostScore { get; init; }
+    public double ForecastIntensity { get; init; }
+    public double RenewablePercentage { get; init; }
+    public double TotalScore { get; init; }
+}
+
+public record DeferralDecision
+{
+    public bool Defer { get; init; }
+    public DateTime? DeferUntil { get; init; }
+    public string? Reason { get; init; }
+}
+
+public record CarbonAwarePlacementResult
+{
+    public bool Success { get; init; }
+    public string? SelectedRegion { get; init; }
+    public double CarbonIntensity { get; init; }
+    public double RenewablePercentage { get; init; }
+    public double EstimatedCarbonSaved { get; init; }
+    public bool ShouldDefer { get; init; }
+    public DateTime? DeferUntil { get; init; }
+    public string? DeferReason { get; init; }
+    public List<AlternativeRegion> AlternativeRegions { get; init; } = new();
+    public double SustainabilityScore { get; init; }
+    public string? Error { get; init; }
+}
+
+public record AlternativeRegion
+{
+    public required string RegionId { get; init; }
+    public double CarbonIntensity { get; init; }
+    public double AdditionalLatencyMs { get; init; }
+}
+
+public record CarbonIntensityData
+{
+    public double CarbonIntensity { get; init; }
+    public double RenewablePercentage { get; init; }
+    public DateTime Timestamp { get; init; }
+}
+
+public sealed class CarbonForecast
+{
+    public List<CarbonForecastPoint> DataPoints { get; init; } = new();
+}
+
+public record CarbonForecastPoint
+{
+    public DateTime Timestamp { get; init; }
+    public double CarbonIntensity { get; init; }
+    public double RenewablePercentage { get; init; }
+}
+
+public record CarbonForecastResult
+{
+    public bool Success { get; init; }
+    public string? Region { get; init; }
+    public TimeWindow? OptimalWindow { get; init; }
+    public TimeWindow? CurrentWindow { get; init; }
+    public List<TimeWindow> AllWindows { get; init; } = new();
+    public double PotentialSavings { get; init; }
+    public string? Error { get; init; }
+}
+
+public record TimeWindow
+{
+    public DateTime StartTime { get; init; }
+    public DateTime EndTime { get; init; }
+    public double AverageCarbonIntensity { get; init; }
+    public double MinCarbonIntensity { get; init; }
+    public double MaxCarbonIntensity { get; init; }
+    public double RenewablePercentage { get; init; }
+}
+
+public record CarbonAwareStats
+{
+    public long TotalOperations { get; init; }
+    public long DeferredOperations { get; init; }
+    public double DeferralRate { get; init; }
+    public double TotalCarbonSavedGrams { get; init; }
+    public double TotalCarbonSavedKg { get; init; }
+    public double EquivalentTreeYears { get; init; }
+    public List<RegionCarbonStats> RegionStats { get; init; } = new();
+}
+
+public record RegionCarbonStats
+{
+    public required string RegionId { get; init; }
+    public double CurrentIntensity { get; init; }
+    public double AverageIntensity { get; init; }
+    public double RenewablePercentage { get; init; }
+    public DateTime LastUpdated { get; init; }
+}
+
+#endregion
