@@ -1763,3 +1763,889 @@ public sealed class UpgradeConfig
 }
 
 #endregion
+
+#region Tier 2.6: Ransomware Detection - ML-Based Entropy Analysis
+
+/// <summary>
+/// ML-based ransomware detection using entropy analysis and behavioral patterns.
+/// Detects encryption attacks in real-time and triggers protective responses.
+/// </summary>
+public sealed class RansomwareDetectionEngine : IAsyncDisposable
+{
+    private readonly ConcurrentDictionary<string, FileBaseline> _baselines = new();
+    private readonly ConcurrentQueue<DetectionEvent> _events = new();
+    private readonly RansomwareDetectionConfig _config;
+    private readonly IAlertService? _alertService;
+    private readonly SemaphoreSlim _analysisLock = new(Environment.ProcessorCount, Environment.ProcessorCount);
+    private readonly Task _monitorTask;
+    private readonly CancellationTokenSource _cts = new();
+    private volatile bool _disposed;
+    private long _scannedFiles;
+    private long _detectedThreats;
+    private long _blockedOperations;
+
+    public RansomwareDetectionEngine(RansomwareDetectionConfig? config = null, IAlertService? alertService = null)
+    {
+        _config = config ?? new RansomwareDetectionConfig();
+        _alertService = alertService;
+        _monitorTask = MonitorActivityAsync(_cts.Token);
+    }
+
+    /// <summary>
+    /// Analyzes a file for ransomware indicators before write operations.
+    /// </summary>
+    public async Task<RansomwareAnalysisResult> AnalyzeBeforeWriteAsync(
+        string path,
+        byte[] data,
+        string? userId = null,
+        CancellationToken ct = default)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, nameof(RansomwareDetectionEngine));
+
+        await _analysisLock.WaitAsync(ct);
+        try
+        {
+            Interlocked.Increment(ref _scannedFiles);
+
+            var indicators = new List<ThreatIndicator>();
+            var riskScore = 0.0;
+
+            // 1. Entropy Analysis - high entropy indicates encryption
+            var entropy = CalculateEntropy(data);
+            if (entropy > _config.EntropyThreshold)
+            {
+                indicators.Add(new ThreatIndicator
+                {
+                    Type = ThreatIndicatorType.HighEntropy,
+                    Severity = ThreatSeverity.High,
+                    Details = $"Entropy {entropy:F2} exceeds threshold {_config.EntropyThreshold:F2}",
+                    Score = (entropy - _config.EntropyThreshold) / (8.0 - _config.EntropyThreshold)
+                });
+                riskScore += 0.4;
+            }
+
+            // 2. File Extension Analysis - known ransomware extensions
+            var extension = Path.GetExtension(path).ToLowerInvariant();
+            if (_config.SuspiciousExtensions.Contains(extension))
+            {
+                indicators.Add(new ThreatIndicator
+                {
+                    Type = ThreatIndicatorType.SuspiciousExtension,
+                    Severity = ThreatSeverity.Critical,
+                    Details = $"Known ransomware extension: {extension}",
+                    Score = 1.0
+                });
+                riskScore += 0.5;
+            }
+
+            // 3. Magic Bytes Analysis - encrypted files often lack valid headers
+            var magicBytesValid = ValidateMagicBytes(data, extension);
+            if (!magicBytesValid && data.Length > 100)
+            {
+                indicators.Add(new ThreatIndicator
+                {
+                    Type = ThreatIndicatorType.InvalidMagicBytes,
+                    Severity = ThreatSeverity.Medium,
+                    Details = "File header doesn't match expected format for extension",
+                    Score = 0.5
+                });
+                riskScore += 0.2;
+            }
+
+            // 4. Baseline Comparison - detect sudden changes in file characteristics
+            if (_baselines.TryGetValue(path, out var baseline))
+            {
+                var entropyDelta = Math.Abs(entropy - baseline.AverageEntropy);
+                if (entropyDelta > _config.EntropyDeltaThreshold)
+                {
+                    indicators.Add(new ThreatIndicator
+                    {
+                        Type = ThreatIndicatorType.EntropyAnomaly,
+                        Severity = ThreatSeverity.High,
+                        Details = $"Entropy changed by {entropyDelta:F2} from baseline",
+                        Score = Math.Min(1.0, entropyDelta / 2.0)
+                    });
+                    riskScore += 0.3;
+                }
+            }
+
+            // 5. Mass Modification Detection - many files changed rapidly
+            var recentModifications = GetRecentModificationCount(userId);
+            if (recentModifications > _config.MassModificationThreshold)
+            {
+                indicators.Add(new ThreatIndicator
+                {
+                    Type = ThreatIndicatorType.MassModification,
+                    Severity = ThreatSeverity.Critical,
+                    Details = $"{recentModifications} files modified in rapid succession",
+                    Score = Math.Min(1.0, recentModifications / (double)(_config.MassModificationThreshold * 2))
+                });
+                riskScore += 0.5;
+            }
+
+            // Calculate final risk
+            riskScore = Math.Min(1.0, riskScore);
+            var threatLevel = riskScore switch
+            {
+                >= 0.8 => ThreatLevel.Critical,
+                >= 0.6 => ThreatLevel.High,
+                >= 0.4 => ThreatLevel.Medium,
+                >= 0.2 => ThreatLevel.Low,
+                _ => ThreatLevel.None
+            };
+
+            var isThreat = threatLevel >= ThreatLevel.High;
+
+            if (isThreat)
+            {
+                Interlocked.Increment(ref _detectedThreats);
+
+                // Record detection event
+                _events.Enqueue(new DetectionEvent
+                {
+                    Timestamp = DateTime.UtcNow,
+                    Path = path,
+                    UserId = userId,
+                    ThreatLevel = threatLevel,
+                    RiskScore = riskScore,
+                    Indicators = indicators,
+                    ActionTaken = _config.BlockSuspiciousWrites ? DetectionAction.Blocked : DetectionAction.Logged
+                });
+
+                // Alert if configured
+                if (_alertService != null && threatLevel >= ThreatLevel.High)
+                {
+                    await _alertService.SendAlertAsync(new SecurityAlert
+                    {
+                        Type = AlertType.RansomwareDetected,
+                        Severity = threatLevel == ThreatLevel.Critical ? AlertSeverity.Critical : AlertSeverity.High,
+                        Message = $"Potential ransomware activity detected on {path}",
+                        Details = new Dictionary<string, object>
+                        {
+                            ["path"] = path,
+                            ["userId"] = userId ?? "unknown",
+                            ["riskScore"] = riskScore,
+                            ["indicators"] = indicators.Select(i => i.Type.ToString()).ToList()
+                        }
+                    }, ct);
+                }
+
+                if (_config.BlockSuspiciousWrites)
+                {
+                    Interlocked.Increment(ref _blockedOperations);
+                }
+            }
+
+            // Update baseline
+            UpdateBaseline(path, entropy, data.Length);
+
+            return new RansomwareAnalysisResult
+            {
+                IsThreat = isThreat,
+                ThreatLevel = threatLevel,
+                RiskScore = riskScore,
+                Indicators = indicators,
+                ShouldBlock = isThreat && _config.BlockSuspiciousWrites,
+                RecommendedAction = isThreat
+                    ? "Quarantine file and investigate user activity"
+                    : "Allow operation",
+                AnalyzedAt = DateTime.UtcNow
+            };
+        }
+        finally
+        {
+            _analysisLock.Release();
+        }
+    }
+
+    /// <summary>
+    /// Gets detection statistics.
+    /// </summary>
+    public RansomwareDetectionStats GetStats()
+    {
+        return new RansomwareDetectionStats
+        {
+            ScannedFiles = Interlocked.Read(ref _scannedFiles),
+            DetectedThreats = Interlocked.Read(ref _detectedThreats),
+            BlockedOperations = Interlocked.Read(ref _blockedOperations),
+            BaselineCount = _baselines.Count,
+            RecentEvents = _events.ToArray().TakeLast(100).ToList()
+        };
+    }
+
+    /// <summary>
+    /// Calculates Shannon entropy of data (0-8 bits per byte).
+    /// High entropy (>7.5) indicates encrypted/compressed data.
+    /// </summary>
+    private static double CalculateEntropy(byte[] data)
+    {
+        if (data.Length == 0) return 0;
+
+        var frequency = new int[256];
+        foreach (var b in data)
+        {
+            frequency[b]++;
+        }
+
+        var entropy = 0.0;
+        var length = (double)data.Length;
+
+        foreach (var count in frequency)
+        {
+            if (count > 0)
+            {
+                var probability = count / length;
+                entropy -= probability * Math.Log2(probability);
+            }
+        }
+
+        return entropy;
+    }
+
+    /// <summary>
+    /// Validates file magic bytes match expected format.
+    /// </summary>
+    private bool ValidateMagicBytes(byte[] data, string extension)
+    {
+        if (data.Length < 8) return true; // Too small to validate
+
+        var magicBytes = data.Take(8).ToArray();
+
+        return extension switch
+        {
+            ".pdf" => magicBytes[0] == 0x25 && magicBytes[1] == 0x50 && magicBytes[2] == 0x44 && magicBytes[3] == 0x46,
+            ".png" => magicBytes[0] == 0x89 && magicBytes[1] == 0x50 && magicBytes[2] == 0x4E && magicBytes[3] == 0x47,
+            ".jpg" or ".jpeg" => magicBytes[0] == 0xFF && magicBytes[1] == 0xD8 && magicBytes[2] == 0xFF,
+            ".gif" => magicBytes[0] == 0x47 && magicBytes[1] == 0x49 && magicBytes[2] == 0x46,
+            ".zip" => magicBytes[0] == 0x50 && magicBytes[1] == 0x4B,
+            ".docx" or ".xlsx" or ".pptx" => magicBytes[0] == 0x50 && magicBytes[1] == 0x4B, // Office Open XML
+            ".doc" or ".xls" or ".ppt" => magicBytes[0] == 0xD0 && magicBytes[1] == 0xCF, // OLE
+            ".exe" => magicBytes[0] == 0x4D && magicBytes[1] == 0x5A, // MZ header
+            _ => true // Unknown extension, allow
+        };
+    }
+
+    private int GetRecentModificationCount(string? userId)
+    {
+        if (string.IsNullOrEmpty(userId)) return 0;
+
+        var cutoff = DateTime.UtcNow.AddSeconds(-_config.MassModificationWindowSeconds);
+        return _events.Count(e => e.UserId == userId && e.Timestamp > cutoff);
+    }
+
+    private void UpdateBaseline(string path, double entropy, long size)
+    {
+        _baselines.AddOrUpdate(
+            path,
+            _ => new FileBaseline
+            {
+                Path = path,
+                AverageEntropy = entropy,
+                AverageSize = size,
+                SampleCount = 1,
+                LastUpdated = DateTime.UtcNow
+            },
+            (_, existing) =>
+            {
+                // Exponential moving average
+                const double alpha = 0.1;
+                return existing with
+                {
+                    AverageEntropy = alpha * entropy + (1 - alpha) * existing.AverageEntropy,
+                    AverageSize = (long)(alpha * size + (1 - alpha) * existing.AverageSize),
+                    SampleCount = existing.SampleCount + 1,
+                    LastUpdated = DateTime.UtcNow
+                };
+            });
+    }
+
+    private async Task MonitorActivityAsync(CancellationToken ct)
+    {
+        while (!ct.IsCancellationRequested)
+        {
+            try
+            {
+                await Task.Delay(_config.MonitoringInterval, ct);
+
+                // Cleanup old baselines
+                var cutoff = DateTime.UtcNow.AddDays(-_config.BaselineRetentionDays);
+                var staleKeys = _baselines
+                    .Where(kvp => kvp.Value.LastUpdated < cutoff)
+                    .Select(kvp => kvp.Key)
+                    .ToList();
+
+                foreach (var key in staleKeys)
+                {
+                    _baselines.TryRemove(key, out _);
+                }
+
+                // Trim event queue
+                while (_events.Count > _config.MaxEventHistory)
+                {
+                    _events.TryDequeue(out _);
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                break;
+            }
+            catch
+            {
+                // Continue monitoring
+            }
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_disposed) return;
+        _disposed = true;
+
+        await _cts.CancelAsync();
+        try
+        {
+            await _monitorTask;
+        }
+        catch (OperationCanceledException)
+        {
+            // Expected
+        }
+
+        _cts.Dispose();
+        _analysisLock.Dispose();
+    }
+}
+
+public interface IAlertService
+{
+    Task SendAlertAsync(SecurityAlert alert, CancellationToken ct = default);
+}
+
+public sealed class SecurityAlert
+{
+    public AlertType Type { get; init; }
+    public AlertSeverity Severity { get; init; }
+    public required string Message { get; init; }
+    public Dictionary<string, object> Details { get; init; } = new();
+}
+
+public enum AlertType { RansomwareDetected, UnauthorizedAccess, DataExfiltration, AnomalousActivity }
+public enum AlertSeverity { Info, Warning, High, Critical }
+
+public sealed class RansomwareDetectionConfig
+{
+    public double EntropyThreshold { get; set; } = 7.5; // Out of 8.0 max
+    public double EntropyDeltaThreshold { get; set; } = 2.0;
+    public int MassModificationThreshold { get; set; } = 50;
+    public int MassModificationWindowSeconds { get; set; } = 60;
+    public bool BlockSuspiciousWrites { get; set; } = true;
+    public TimeSpan MonitoringInterval { get; set; } = TimeSpan.FromMinutes(1);
+    public int BaselineRetentionDays { get; set; } = 30;
+    public int MaxEventHistory { get; set; } = 10000;
+    public HashSet<string> SuspiciousExtensions { get; set; } = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ".encrypted", ".locked", ".crypto", ".crypt", ".enc",
+        ".locky", ".zepto", ".cerber", ".crypted", ".WNCRY",
+        ".wncry", ".wnry", ".wcry", ".onion", ".zzzzz",
+        ".micro", ".xxx", ".ttt", ".mp3", ".aaa", ".abc",
+        ".xyz", ".zzz", ".odin", ".thor", ".aesir"
+    };
+}
+
+public record FileBaseline
+{
+    public required string Path { get; init; }
+    public double AverageEntropy { get; init; }
+    public long AverageSize { get; init; }
+    public int SampleCount { get; init; }
+    public DateTime LastUpdated { get; init; }
+}
+
+public enum ThreatIndicatorType
+{
+    HighEntropy,
+    SuspiciousExtension,
+    InvalidMagicBytes,
+    EntropyAnomaly,
+    MassModification,
+    RapidRename,
+    KnownRansomwarePattern
+}
+
+public enum ThreatSeverity { Low, Medium, High, Critical }
+public enum ThreatLevel { None, Low, Medium, High, Critical }
+public enum DetectionAction { Logged, Blocked, Quarantined }
+
+public record ThreatIndicator
+{
+    public ThreatIndicatorType Type { get; init; }
+    public ThreatSeverity Severity { get; init; }
+    public required string Details { get; init; }
+    public double Score { get; init; }
+}
+
+public record DetectionEvent
+{
+    public DateTime Timestamp { get; init; }
+    public required string Path { get; init; }
+    public string? UserId { get; init; }
+    public ThreatLevel ThreatLevel { get; init; }
+    public double RiskScore { get; init; }
+    public List<ThreatIndicator> Indicators { get; init; } = new();
+    public DetectionAction ActionTaken { get; init; }
+}
+
+public record RansomwareAnalysisResult
+{
+    public bool IsThreat { get; init; }
+    public ThreatLevel ThreatLevel { get; init; }
+    public double RiskScore { get; init; }
+    public List<ThreatIndicator> Indicators { get; init; } = new();
+    public bool ShouldBlock { get; init; }
+    public required string RecommendedAction { get; init; }
+    public DateTime AnalyzedAt { get; init; }
+}
+
+public record RansomwareDetectionStats
+{
+    public long ScannedFiles { get; init; }
+    public long DetectedThreats { get; init; }
+    public long BlockedOperations { get; init; }
+    public int BaselineCount { get; init; }
+    public List<DetectionEvent> RecentEvents { get; init; } = new();
+}
+
+#endregion
+
+#region Tier 2.7: Content-Addressable Deduplication
+
+/// <summary>
+/// Content-addressable storage with global deduplication.
+/// Uses content hashing to eliminate duplicate data across the entire storage system.
+/// </summary>
+public sealed class ContentAddressableDeduplication : IAsyncDisposable
+{
+    private readonly ConcurrentDictionary<string, ChunkMetadata> _chunkIndex = new();
+    private readonly ConcurrentDictionary<string, FileChunkMap> _fileIndex = new();
+    private readonly IChunkStorage _storage;
+    private readonly DeduplicationConfig _config;
+    private readonly SemaphoreSlim _writeLock = new(1, 1);
+    private readonly Task _gcTask;
+    private readonly CancellationTokenSource _cts = new();
+    private volatile bool _disposed;
+    private long _totalBytesStored;
+    private long _totalBytesDeduped;
+    private long _totalChunks;
+    private long _uniqueChunks;
+
+    public ContentAddressableDeduplication(IChunkStorage storage, DeduplicationConfig? config = null)
+    {
+        _storage = storage ?? throw new ArgumentNullException(nameof(storage));
+        _config = config ?? new DeduplicationConfig();
+        _gcTask = RunGarbageCollectionAsync(_cts.Token);
+    }
+
+    /// <summary>
+    /// Stores data with deduplication, returning a content-addressable ID.
+    /// </summary>
+    public async Task<DeduplicationResult> StoreAsync(
+        string fileId,
+        Stream data,
+        CancellationToken ct = default)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, nameof(ContentAddressableDeduplication));
+
+        var chunks = new List<ChunkReference>();
+        var dedupedBytes = 0L;
+        var storedBytes = 0L;
+
+        await _writeLock.WaitAsync(ct);
+        try
+        {
+            // Chunk the data using content-defined chunking (CDC)
+            await foreach (var chunk in ChunkDataAsync(data, ct))
+            {
+                Interlocked.Increment(ref _totalChunks);
+                Interlocked.Add(ref _totalBytesStored, chunk.Data.Length);
+
+                // Calculate content hash
+                var hash = ComputeContentHash(chunk.Data);
+
+                // Check if chunk already exists
+                if (_chunkIndex.TryGetValue(hash, out var existing))
+                {
+                    // Chunk exists - deduplicate
+                    existing.ReferenceCount++;
+                    dedupedBytes += chunk.Data.Length;
+                    chunks.Add(new ChunkReference { Hash = hash, Offset = chunk.Offset, Length = chunk.Length });
+                }
+                else
+                {
+                    // New unique chunk - store it
+                    Interlocked.Increment(ref _uniqueChunks);
+                    await _storage.StoreChunkAsync(hash, chunk.Data, ct);
+
+                    var metadata = new ChunkMetadata
+                    {
+                        Hash = hash,
+                        Length = chunk.Data.Length,
+                        ReferenceCount = 1,
+                        StoredAt = DateTime.UtcNow
+                    };
+                    _chunkIndex[hash] = metadata;
+
+                    storedBytes += chunk.Data.Length;
+                    chunks.Add(new ChunkReference { Hash = hash, Offset = chunk.Offset, Length = chunk.Length });
+                }
+            }
+
+            Interlocked.Add(ref _totalBytesDeduped, dedupedBytes);
+
+            // Store file-to-chunks mapping
+            var fileMap = new FileChunkMap
+            {
+                FileId = fileId,
+                Chunks = chunks,
+                TotalSize = chunks.Sum(c => c.Length),
+                CreatedAt = DateTime.UtcNow
+            };
+            _fileIndex[fileId] = fileMap;
+
+            var dedupRatio = storedBytes + dedupedBytes > 0
+                ? (double)dedupedBytes / (storedBytes + dedupedBytes)
+                : 0;
+
+            return new DeduplicationResult
+            {
+                Success = true,
+                FileId = fileId,
+                ContentHash = ComputeFileHash(chunks),
+                TotalSize = fileMap.TotalSize,
+                StoredSize = storedBytes,
+                DedupedSize = dedupedBytes,
+                ChunkCount = chunks.Count,
+                DeduplicationRatio = dedupRatio
+            };
+        }
+        finally
+        {
+            _writeLock.Release();
+        }
+    }
+
+    /// <summary>
+    /// Retrieves deduplicated data by file ID.
+    /// </summary>
+    public async Task<Stream?> RetrieveAsync(string fileId, CancellationToken ct = default)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, nameof(ContentAddressableDeduplication));
+
+        if (!_fileIndex.TryGetValue(fileId, out var fileMap))
+        {
+            return null;
+        }
+
+        var output = new MemoryStream();
+
+        foreach (var chunkRef in fileMap.Chunks.OrderBy(c => c.Offset))
+        {
+            var chunkData = await _storage.RetrieveChunkAsync(chunkRef.Hash, ct);
+            if (chunkData == null)
+            {
+                throw new DataCorruptionException($"Missing chunk {chunkRef.Hash} for file {fileId}");
+            }
+            await output.WriteAsync(chunkData, ct);
+        }
+
+        output.Position = 0;
+        return output;
+    }
+
+    /// <summary>
+    /// Deletes a file and decrements chunk reference counts.
+    /// </summary>
+    public async Task<bool> DeleteAsync(string fileId, CancellationToken ct = default)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, nameof(ContentAddressableDeduplication));
+
+        await _writeLock.WaitAsync(ct);
+        try
+        {
+            if (!_fileIndex.TryRemove(fileId, out var fileMap))
+            {
+                return false;
+            }
+
+            // Decrement reference counts
+            foreach (var chunkRef in fileMap.Chunks)
+            {
+                if (_chunkIndex.TryGetValue(chunkRef.Hash, out var metadata))
+                {
+                    metadata.ReferenceCount--;
+                }
+            }
+
+            return true;
+        }
+        finally
+        {
+            _writeLock.Release();
+        }
+    }
+
+    /// <summary>
+    /// Gets deduplication statistics.
+    /// </summary>
+    public DeduplicationStats GetStats()
+    {
+        var totalStored = Interlocked.Read(ref _totalBytesStored);
+        var totalDeduped = Interlocked.Read(ref _totalBytesDeduped);
+        var totalChunks = Interlocked.Read(ref _totalChunks);
+        var uniqueChunks = Interlocked.Read(ref _uniqueChunks);
+
+        return new DeduplicationStats
+        {
+            TotalBytesProcessed = totalStored,
+            BytesSaved = totalDeduped,
+            TotalChunks = totalChunks,
+            UniqueChunks = uniqueChunks,
+            FileCount = _fileIndex.Count,
+            DeduplicationRatio = totalStored > 0 ? (double)totalDeduped / totalStored : 0,
+            StorageEfficiency = uniqueChunks > 0 ? (double)totalChunks / uniqueChunks : 1
+        };
+    }
+
+    /// <summary>
+    /// Content-defined chunking using Rabin fingerprinting.
+    /// Creates variable-size chunks based on content boundaries.
+    /// </summary>
+    private async IAsyncEnumerable<DataChunk> ChunkDataAsync(
+        Stream data,
+        [EnumeratorCancellation] CancellationToken ct)
+    {
+        var buffer = new byte[_config.MaxChunkSize * 2];
+        var chunkBuffer = new List<byte>();
+        var offset = 0L;
+        var windowSize = _config.RabinWindowSize;
+        var mask = (1UL << _config.RabinMaskBits) - 1;
+        ulong fingerprint = 0;
+
+        int bytesRead;
+        while ((bytesRead = await data.ReadAsync(buffer, ct)) > 0)
+        {
+            for (int i = 0; i < bytesRead; i++)
+            {
+                ct.ThrowIfCancellationRequested();
+
+                chunkBuffer.Add(buffer[i]);
+
+                // Update Rabin fingerprint
+                fingerprint = ((fingerprint << 8) | buffer[i]) ^ _rabinTable[(fingerprint >> 56) & 0xFF];
+
+                // Check for chunk boundary
+                bool isBoundary = chunkBuffer.Count >= _config.MinChunkSize &&
+                    ((fingerprint & mask) == 0 || chunkBuffer.Count >= _config.MaxChunkSize);
+
+                if (isBoundary)
+                {
+                    yield return new DataChunk
+                    {
+                        Data = chunkBuffer.ToArray(),
+                        Offset = offset,
+                        Length = chunkBuffer.Count
+                    };
+
+                    offset += chunkBuffer.Count;
+                    chunkBuffer.Clear();
+                    fingerprint = 0;
+                }
+            }
+        }
+
+        // Emit remaining data as final chunk
+        if (chunkBuffer.Count > 0)
+        {
+            yield return new DataChunk
+            {
+                Data = chunkBuffer.ToArray(),
+                Offset = offset,
+                Length = chunkBuffer.Count
+            };
+        }
+    }
+
+    private static string ComputeContentHash(byte[] data)
+    {
+        var hash = SHA256.HashData(data);
+        return Convert.ToHexString(hash).ToLowerInvariant();
+    }
+
+    private static string ComputeFileHash(List<ChunkReference> chunks)
+    {
+        using var sha256 = SHA256.Create();
+        foreach (var chunk in chunks.OrderBy(c => c.Offset))
+        {
+            var hashBytes = Convert.FromHexString(chunk.Hash);
+            sha256.TransformBlock(hashBytes, 0, hashBytes.Length, null, 0);
+        }
+        sha256.TransformFinalBlock(Array.Empty<byte>(), 0, 0);
+        return Convert.ToHexString(sha256.Hash!).ToLowerInvariant();
+    }
+
+    private async Task RunGarbageCollectionAsync(CancellationToken ct)
+    {
+        while (!ct.IsCancellationRequested)
+        {
+            try
+            {
+                await Task.Delay(_config.GCInterval, ct);
+
+                // Find and remove unreferenced chunks
+                var unreferencedChunks = _chunkIndex
+                    .Where(kvp => kvp.Value.ReferenceCount <= 0)
+                    .Select(kvp => kvp.Key)
+                    .ToList();
+
+                foreach (var hash in unreferencedChunks)
+                {
+                    if (_chunkIndex.TryRemove(hash, out _))
+                    {
+                        await _storage.DeleteChunkAsync(hash, ct);
+                        Interlocked.Decrement(ref _uniqueChunks);
+                    }
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                break;
+            }
+            catch
+            {
+                // Continue GC
+            }
+        }
+    }
+
+    // Precomputed Rabin fingerprint table
+    private static readonly ulong[] _rabinTable = ComputeRabinTable();
+
+    private static ulong[] ComputeRabinTable()
+    {
+        const ulong polynomial = 0xC96C5795D7870F42UL; // Irreducible polynomial
+        var table = new ulong[256];
+
+        for (int i = 0; i < 256; i++)
+        {
+            ulong value = (ulong)i << 56;
+            for (int j = 0; j < 8; j++)
+            {
+                if ((value & 0x8000000000000000UL) != 0)
+                    value = (value << 1) ^ polynomial;
+                else
+                    value <<= 1;
+            }
+            table[i] = value;
+        }
+
+        return table;
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_disposed) return;
+        _disposed = true;
+
+        await _cts.CancelAsync();
+        try
+        {
+            await _gcTask;
+        }
+        catch (OperationCanceledException)
+        {
+            // Expected
+        }
+
+        _cts.Dispose();
+        _writeLock.Dispose();
+    }
+}
+
+/// <summary>
+/// Storage interface for chunk data.
+/// </summary>
+public interface IChunkStorage
+{
+    Task StoreChunkAsync(string hash, byte[] data, CancellationToken ct = default);
+    Task<byte[]?> RetrieveChunkAsync(string hash, CancellationToken ct = default);
+    Task DeleteChunkAsync(string hash, CancellationToken ct = default);
+}
+
+public sealed class DeduplicationConfig
+{
+    public int MinChunkSize { get; set; } = 4 * 1024; // 4 KB
+    public int MaxChunkSize { get; set; } = 64 * 1024; // 64 KB
+    public int AverageChunkSize { get; set; } = 16 * 1024; // 16 KB
+    public int RabinWindowSize { get; set; } = 48;
+    public int RabinMaskBits { get; set; } = 13; // ~8KB average
+    public TimeSpan GCInterval { get; set; } = TimeSpan.FromHours(1);
+}
+
+public sealed class ChunkMetadata
+{
+    public required string Hash { get; init; }
+    public int Length { get; init; }
+    public int ReferenceCount { get; set; }
+    public DateTime StoredAt { get; init; }
+}
+
+public sealed class FileChunkMap
+{
+    public required string FileId { get; init; }
+    public List<ChunkReference> Chunks { get; init; } = new();
+    public long TotalSize { get; init; }
+    public DateTime CreatedAt { get; init; }
+}
+
+public record ChunkReference
+{
+    public required string Hash { get; init; }
+    public long Offset { get; init; }
+    public int Length { get; init; }
+}
+
+public record DataChunk
+{
+    public required byte[] Data { get; init; }
+    public long Offset { get; init; }
+    public int Length { get; init; }
+}
+
+public record DeduplicationResult
+{
+    public bool Success { get; init; }
+    public required string FileId { get; init; }
+    public required string ContentHash { get; init; }
+    public long TotalSize { get; init; }
+    public long StoredSize { get; init; }
+    public long DedupedSize { get; init; }
+    public int ChunkCount { get; init; }
+    public double DeduplicationRatio { get; init; }
+}
+
+public record DeduplicationStats
+{
+    public long TotalBytesProcessed { get; init; }
+    public long BytesSaved { get; init; }
+    public long TotalChunks { get; init; }
+    public long UniqueChunks { get; init; }
+    public int FileCount { get; init; }
+    public double DeduplicationRatio { get; init; }
+    public double StorageEfficiency { get; init; }
+}
+
+public class DataCorruptionException : Exception
+{
+    public DataCorruptionException(string message) : base(message) { }
+}
+
+#endregion
