@@ -108,6 +108,7 @@ builder.Services.AddSingleton<ISystemHealthService, SystemHealthService>();
 builder.Services.AddSingleton<IStorageManagementService, StorageManagementService>();
 builder.Services.AddSingleton<IAuditLogService, AuditLogService>();
 builder.Services.AddSingleton<IConfigurationService, ConfigurationService>();
+builder.Services.AddSingleton<DataWarehouse.Dashboard.Controllers.IBackupService, DataWarehouse.Dashboard.Controllers.InMemoryBackupService>();
 
 // Add hosted services for background monitoring
 builder.Services.AddHostedService<HealthMonitorService>();
