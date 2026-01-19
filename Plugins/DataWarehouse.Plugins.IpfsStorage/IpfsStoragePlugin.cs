@@ -684,7 +684,7 @@ namespace DataWarehouse.Plugins.IpfsStorage
         /// <summary>
         /// Creates configuration for local IPFS node with instance ID.
         /// </summary>
-        public static IpfsConfig Local(string instanceId) => new() { InstanceId = instanceId };
+        public static IpfsConfig LocalWithInstance(string instanceId) => new() { InstanceId = instanceId };
 
         /// <summary>
         /// Creates configuration using Infura IPFS.

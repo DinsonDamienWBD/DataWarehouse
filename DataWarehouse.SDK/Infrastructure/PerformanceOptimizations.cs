@@ -1134,7 +1134,7 @@ public interface IWriteBehindMetrics
 /// </summary>
 public sealed class TieredStorageManager : IAsyncDisposable
 {
-    private readonly IReadOnlyList<StorageTier> _tiers;
+    private readonly IReadOnlyList<StorageTierDefinition> _tiers;
     private readonly ConcurrentDictionary<string, DataLocationInfo> _locationIndex = new();
     private readonly ConcurrentDictionary<string, CacheAccessPattern> _accessPatterns = new();
     private readonly TieredStorageOptions _options;
@@ -1144,7 +1144,7 @@ public sealed class TieredStorageManager : IAsyncDisposable
     private volatile bool _disposed;
 
     public TieredStorageManager(
-        IReadOnlyList<StorageTier> tiers,
+        IReadOnlyList<StorageTierDefinition> tiers,
         TieredStorageOptions? options = null,
         ITieredStorageMetrics? metrics = null)
     {
@@ -1291,7 +1291,7 @@ public sealed class TieredStorageManager : IAsyncDisposable
         }
     }
 
-    private StorageTier SelectTierForWrite(long dataSize, StorageHints? hints)
+    private StorageTierDefinition SelectTierForWrite(long dataSize, StorageHints? hints)
     {
         // If explicit tier requested
         if (hints?.PreferredTier != null)
@@ -1472,7 +1472,11 @@ public sealed class TieredStorageManager : IAsyncDisposable
     }
 }
 
-public sealed class StorageTier
+/// <summary>
+/// Defines a storage tier with provider and cost information.
+/// Not to be confused with StorageTier enum in Primitives.
+/// </summary>
+public sealed class StorageTierDefinition
 {
     public required string Id { get; init; }
     public required string Name { get; init; }

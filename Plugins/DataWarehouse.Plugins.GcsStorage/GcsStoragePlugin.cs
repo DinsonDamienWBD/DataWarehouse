@@ -6,6 +6,7 @@ using DataWarehouse.SDK.Utilities;
 using System.Text;
 using System.Text.Json;
 using System.Security.Cryptography;
+using StorageTier = DataWarehouse.SDK.Primitives.StorageTier;
 
 namespace DataWarehouse.Plugins.GcsStorage
 {

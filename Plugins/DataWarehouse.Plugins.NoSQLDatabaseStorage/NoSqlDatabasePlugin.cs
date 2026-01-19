@@ -257,7 +257,7 @@ public sealed class NoSqlDatabasePlugin : HybridDatabasePluginBase<NoSqlConfig>
 
         #region Database Operations
 
-        protected override Task ConnectAsync()
+        private Task ConnectInternalAsync()
         {
             if (_config.Engine == NoSqlEngine.InMemory)
             {
@@ -269,14 +269,14 @@ public sealed class NoSqlDatabasePlugin : HybridDatabasePluginBase<NoSqlConfig>
             return TestConnectionAsync();
         }
 
-        protected override Task DisconnectAsync()
+        private Task DisconnectInternalAsync()
         {
             _isConnected = false;
             return Task.CompletedTask;
         }
 
         protected override async Task<IEnumerable<object>> ExecuteQueryAsync(
-            string? database, string? collection, string? query, Dictionary<string, object>? parameters)
+            string? database, string? collection, string? query, Dictionary<string, object>? parameters, string? instanceId = null)
         {
             await EnsureConnectedAsync();
 
@@ -290,7 +290,7 @@ public sealed class NoSqlDatabasePlugin : HybridDatabasePluginBase<NoSqlConfig>
             return await QueryEngineAsync(database!, collection!, query, parameters);
         }
 
-        protected override async Task<long> CountAsync(string? database, string? collection, string? filter)
+        protected override async Task<long> CountAsync(string? database, string? collection, string? filter, string? instanceId = null)
         {
             await EnsureConnectedAsync();
 
@@ -304,7 +304,7 @@ public sealed class NoSqlDatabasePlugin : HybridDatabasePluginBase<NoSqlConfig>
             return await CountEngineAsync(database!, collection!, filter);
         }
 
-        protected override Task CreateDatabaseAsync(string database)
+        protected override Task CreateDatabaseAsync(string database, string? instanceId = null)
         {
             if (_config.Engine == NoSqlEngine.InMemory)
             {
@@ -314,7 +314,7 @@ public sealed class NoSqlDatabasePlugin : HybridDatabasePluginBase<NoSqlConfig>
             return Task.CompletedTask;
         }
 
-        protected override Task DropDatabaseAsync(string database)
+        protected override Task DropDatabaseAsync(string database, string? instanceId = null)
         {
             if (_config.Engine == NoSqlEngine.InMemory)
             {
@@ -323,7 +323,7 @@ public sealed class NoSqlDatabasePlugin : HybridDatabasePluginBase<NoSqlConfig>
             return Task.CompletedTask;
         }
 
-        protected override Task CreateCollectionAsync(string? database, string collection, Dictionary<string, object>? schema)
+        protected override Task CreateCollectionAsync(string? database, string collection, Dictionary<string, object>? schema, string? instanceId = null)
         {
             database ??= _config.DefaultDatabase ?? "default";
 
@@ -335,7 +335,7 @@ public sealed class NoSqlDatabasePlugin : HybridDatabasePluginBase<NoSqlConfig>
             return Task.CompletedTask;
         }
 
-        protected override Task DropCollectionAsync(string? database, string collection)
+        protected override Task DropCollectionAsync(string? database, string collection, string? instanceId = null)
         {
             database ??= _config.DefaultDatabase ?? "default";
 
@@ -349,7 +349,7 @@ public sealed class NoSqlDatabasePlugin : HybridDatabasePluginBase<NoSqlConfig>
             return Task.CompletedTask;
         }
 
-        protected override Task<IEnumerable<string>> ListDatabasesAsync()
+        protected override Task<IEnumerable<string>> ListDatabasesAsync(string? instanceId = null)
         {
             if (_config.Engine == NoSqlEngine.InMemory)
             {
@@ -359,7 +359,7 @@ public sealed class NoSqlDatabasePlugin : HybridDatabasePluginBase<NoSqlConfig>
             return ListDatabasesFromEngineAsync();
         }
 
-        protected override Task<IEnumerable<string>> ListCollectionsAsync(string? database)
+        protected override Task<IEnumerable<string>> ListCollectionsAsync(string? database, string? instanceId = null)
         {
             database ??= _config.DefaultDatabase ?? "default";
 

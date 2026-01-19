@@ -6,6 +6,7 @@ using DataWarehouse.SDK.Utilities;
 using System.Net;
 using System.Security.Cryptography;
 using System.Text;
+using StorageTier = DataWarehouse.SDK.Primitives.StorageTier;
 
 namespace DataWarehouse.Plugins.S3Storage
 {

@@ -6,6 +6,7 @@ using DataWarehouse.SDK.Utilities;
 using System.Security.Cryptography;
 using System.Text;
 using System.Globalization;
+using StorageTier = DataWarehouse.SDK.Primitives.StorageTier;
 
 namespace DataWarehouse.Plugins.AzureBlobStorage
 {

@@ -271,7 +271,7 @@ public sealed class EmbeddedDatabasePlugin : HybridDatabasePluginBase<EmbeddedDb
 
         #region Database Operations
 
-        protected override Task ConnectAsync()
+        protected Task ConnectInternalAsync()
         {
             switch (_config.Engine)
             {
@@ -286,7 +286,7 @@ public sealed class EmbeddedDatabasePlugin : HybridDatabasePluginBase<EmbeddedDb
             return Task.CompletedTask;
         }
 
-        protected override Task DisconnectAsync()
+        protected Task DisconnectInternalAsync()
         {
             if (_connection is IDisposable disposable)
             {
@@ -298,28 +298,28 @@ public sealed class EmbeddedDatabasePlugin : HybridDatabasePluginBase<EmbeddedDb
         }
 
         protected override async Task<IEnumerable<object>> ExecuteQueryAsync(
-            string? database, string? table, string? query, Dictionary<string, object>? parameters)
+            string? database, string? collection, string? query, Dictionary<string, object>? parameters, string? instanceId = null)
         {
             await EnsureConnectedAsync();
 
             if (_config.Engine == EmbeddedEngine.InMemory)
             {
-                return QueryInMemory(table ?? "documents", query);
+                return QueryInMemory(collection ?? "documents", query);
             }
 
-            return await ExecuteEngineQueryAsync(table, query, parameters);
+            return await ExecuteEngineQueryAsync(collection, query, parameters);
         }
 
-        protected override async Task<long> CountAsync(string? database, string? table, string? filter)
+        protected override async Task<long> CountAsync(string? database, string? collection, string? filter, string? instanceId = null)
         {
             await EnsureConnectedAsync();
 
             if (_config.Engine == EmbeddedEngine.InMemory)
             {
-                return _inMemoryTables.TryGetValue(table ?? "documents", out var t) ? t.Count : 0;
+                return _inMemoryTables.TryGetValue(collection ?? "documents", out var t) ? t.Count : 0;
             }
 
-            var results = await ExecuteQueryAsync(database, table, $"SELECT COUNT(*) as count FROM {table}", null);
+            var results = await ExecuteQueryAsync(database, collection, $"SELECT COUNT(*) as count FROM {collection}", null, instanceId);
             var first = results.FirstOrDefault();
             if (first is JsonElement element && element.TryGetProperty("count", out var countProp))
             {
@@ -328,12 +328,12 @@ public sealed class EmbeddedDatabasePlugin : HybridDatabasePluginBase<EmbeddedDb
             return 0;
         }
 
-        protected override Task CreateDatabaseAsync(string database)
+        protected override Task CreateDatabaseAsync(string database, string? instanceId = null)
         {
             return Task.CompletedTask;
         }
 
-        protected override Task DropDatabaseAsync(string database)
+        protected override Task DropDatabaseAsync(string database, string? instanceId = null)
         {
             if (!string.IsNullOrEmpty(_config.FilePath) && File.Exists(_config.FilePath))
             {
@@ -342,7 +342,7 @@ public sealed class EmbeddedDatabasePlugin : HybridDatabasePluginBase<EmbeddedDb
             return Task.CompletedTask;
         }
 
-        protected override async Task CreateCollectionAsync(string? database, string collection, Dictionary<string, object>? schema)
+        protected override async Task CreateCollectionAsync(string? database, string collection, Dictionary<string, object>? schema, string? instanceId = null)
         {
             if (_config.Engine == EmbeddedEngine.InMemory)
             {
@@ -365,7 +365,7 @@ public sealed class EmbeddedDatabasePlugin : HybridDatabasePluginBase<EmbeddedDb
             }
         }
 
-        protected override async Task DropCollectionAsync(string? database, string collection)
+        protected override async Task DropCollectionAsync(string? database, string collection, string? instanceId = null)
         {
             if (_config.Engine == EmbeddedEngine.InMemory)
             {
@@ -376,12 +376,12 @@ public sealed class EmbeddedDatabasePlugin : HybridDatabasePluginBase<EmbeddedDb
             await ExecuteNonQueryAsync($"DROP TABLE IF EXISTS {collection}");
         }
 
-        protected override Task<IEnumerable<string>> ListDatabasesAsync()
+        protected override Task<IEnumerable<string>> ListDatabasesAsync(string? instanceId = null)
         {
             return Task.FromResult<IEnumerable<string>>(new[] { _config.FilePath ?? "memory" });
         }
 
-        protected override async Task<IEnumerable<string>> ListCollectionsAsync(string? database)
+        protected override async Task<IEnumerable<string>> ListCollectionsAsync(string? database, string? instanceId = null)
         {
             if (_config.Engine == EmbeddedEngine.InMemory)
             {
@@ -391,7 +391,7 @@ public sealed class EmbeddedDatabasePlugin : HybridDatabasePluginBase<EmbeddedDb
             if (_config.Engine == EmbeddedEngine.SQLite)
             {
                 var results = await ExecuteQueryAsync(null, null,
-                    "SELECT name FROM sqlite_master WHERE type='table'", null);
+                    "SELECT name FROM sqlite_master WHERE type='table'", null, instanceId);
                 return results.Select(r =>
                 {
                     if (r is JsonElement elem && elem.TryGetProperty("name", out var name))

@@ -398,6 +398,32 @@ public sealed class StorageConnectionInstance<TConfig> : IAsyncDisposable where 
     /// </summary>
     public Dictionary<string, object> Metadata { get; } = new();
 
+    /// <summary>
+    /// Gets the primary connection object. Creates one if not exists.
+    /// For pooled access, use GetConnectionAsync() instead.
+    /// </summary>
+    public object? Connection => _primaryConnection;
+
+    /// <summary>
+    /// Gets or creates the primary connection synchronously.
+    /// Prefer GetConnectionAsync for async contexts.
+    /// </summary>
+    public async Task<object> GetOrCreateConnectionAsync(CancellationToken ct = default)
+    {
+        if (_primaryConnection != null) return _primaryConnection;
+
+        await _createLock.WaitAsync(ct);
+        try
+        {
+            _primaryConnection ??= await _connectionFactory(Config);
+            return _primaryConnection;
+        }
+        finally
+        {
+            _createLock.Release();
+        }
+    }
+
     public StorageConnectionInstance(
         string instanceId,
         TConfig config,
