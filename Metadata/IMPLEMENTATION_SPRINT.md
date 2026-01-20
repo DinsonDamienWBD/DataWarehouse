@@ -346,14 +346,14 @@
 - [x] Add share access audit logging
 
 ### Scenario 2: Sneakernet (U1 → USB → U2)
-**File:** `DataWarehouse.SDK/Federation/DormantNode.cs` (Enhance)
-**Status:** 🔄 IN PROGRESS
+**File:** `DataWarehouse.SDK/Federation/DormantNode.cs` (Enhanced)
+**Status:** ✅ COMPLETE
 **Extends:** `NodeDehydrator`, `NodeHydrator`, `DormantNodeWatcher`
 **Reuse:** Existing encryption support (AES-256-GCM), DormantNodeManifest
-- [ ] Add `IncrementalSyncManager` for partial transfers (delta sync using checksums)
-- [ ] Add `SneakernetConflictQueue` for offline changes with three-way merge
-- [ ] Add `AutoResyncTrigger` integration with DormantNodeWatcher
-- [ ] Add `OfflineChangeTracker` for tracking modifications during disconnect
+- [x] Add `IncrementalSyncManager` for partial transfers (delta sync using checksums)
+- [x] Add `SneakernetConflictQueue` for offline changes with three-way merge
+- [x] Add `AutoResyncTrigger` integration with DormantNodeWatcher
+- [x] Add `OfflineChangeTracker` for tracking modifications during disconnect
 
 ### Scenario 3: Unified Pool (DWH + DW1)
 **File:** `DataWarehouse.SDK/Federation/StoragePool.cs` (Enhance)
