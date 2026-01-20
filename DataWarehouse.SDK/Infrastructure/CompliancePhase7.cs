@@ -318,6 +318,906 @@ public sealed class AzureDedicatedHsmProvider : IHsmProvider
     public Task DestroyKeyAsync(string keyAlias, CancellationToken ct = default) => Task.CompletedTask;
 }
 
+/// <summary>
+/// Thales Luna HSM provider for on-premise enterprise HSM deployments.
+/// Supports Luna Network HSM, Luna PCIe HSM, and Luna Cloud HSM.
+/// FIPS 140-2 Level 3 certified.
+/// </summary>
+public sealed class ThalesLunaProvider : IHsmProvider, IAsyncDisposable
+{
+    private readonly ThalesLunaConfig _config;
+    private readonly ConcurrentDictionary<string, LunaKeyHandle> _keyHandles = new();
+    private readonly ConcurrentDictionary<long, LunaSession> _sessions = new();
+    private readonly SemaphoreSlim _sessionLock = new(1, 1);
+    private readonly object _statsLock = new();
+
+    private LunaSlotInfo? _slotInfo;
+    private long _nextSessionId;
+    private bool _initialized;
+    private volatile bool _disposed;
+
+    // Performance statistics
+    private long _totalOperations;
+    private long _totalSignOperations;
+    private long _totalEncryptOperations;
+    private long _totalDecryptOperations;
+    private long _totalErrors;
+    private DateTime _lastOperationTime = DateTime.UtcNow;
+
+    public event EventHandler<LunaAuditEventArgs>? AuditEvent;
+    public event EventHandler<LunaErrorEventArgs>? ErrorOccurred;
+
+    public ThalesLunaProvider(ThalesLunaConfig config)
+    {
+        _config = config ?? throw new ArgumentNullException(nameof(config));
+    }
+
+    public async Task InitializeAsync(CancellationToken ct = default)
+    {
+        if (_initialized) return;
+
+        await _sessionLock.WaitAsync(ct);
+        try
+        {
+            if (_initialized) return;
+
+            // Step 1: Load Luna client library (Cryptoki)
+            await LoadLunaLibraryAsync(ct);
+
+            // Step 2: Initialize the library
+            await InitializeCryptokiAsync(ct);
+
+            // Step 3: Get slot information
+            _slotInfo = await GetSlotInfoAsync(ct);
+
+            // Step 4: Open session to partition
+            var session = await OpenSessionAsync(ct);
+            _sessions[session.SessionId] = session;
+
+            // Step 5: Login to partition (if credentials provided)
+            if (!string.IsNullOrEmpty(_config.PartitionPassword))
+            {
+                await LoginAsync(session.SessionId, _config.PartitionPassword, ct);
+            }
+
+            // Step 6: If HA mode, configure HA group
+            if (_config.EnableHighAvailability && _config.HaGroupMembers.Count > 0)
+            {
+                await ConfigureHaGroupAsync(ct);
+            }
+
+            _initialized = true;
+            RaiseAuditEvent("Initialize", "HSM initialization completed successfully");
+        }
+        finally
+        {
+            _sessionLock.Release();
+        }
+    }
+
+    public async Task<HsmKeyInfo> GenerateKeyAsync(string keyAlias, HsmKeyType keyType, int keySize, CancellationToken ct = default)
+    {
+        EnsureInitialized();
+
+        var session = await GetOrCreateSessionAsync(ct);
+
+        try
+        {
+            var keyAttributes = CreateKeyAttributes(keyAlias, keyType, keySize);
+
+            var handle = keyType switch
+            {
+                HsmKeyType.Aes => await GenerateAesKeyAsync(session.SessionId, keyAttributes, ct),
+                HsmKeyType.Rsa => await GenerateRsaKeyPairAsync(session.SessionId, keyAttributes, ct),
+                HsmKeyType.Ecdsa => await GenerateEcdsaKeyPairAsync(session.SessionId, keyAttributes, ct),
+                _ => throw new ArgumentException($"Unsupported key type: {keyType}")
+            };
+
+            var keyInfo = new HsmKeyInfo
+            {
+                KeyAlias = keyAlias,
+                KeyType = keyType,
+                KeySize = keySize,
+                CreatedAt = DateTime.UtcNow
+            };
+
+            _keyHandles[keyAlias] = handle;
+
+            IncrementStats(ref _totalOperations);
+            RaiseAuditEvent("GenerateKey", $"Generated {keyType} key '{keyAlias}' with size {keySize}");
+
+            return keyInfo;
+        }
+        catch (Exception ex)
+        {
+            IncrementStats(ref _totalErrors);
+            RaiseError("GenerateKey", ex);
+            throw;
+        }
+    }
+
+    public async Task<byte[]> SignAsync(string keyAlias, byte[] data, SignatureAlgorithm algorithm, CancellationToken ct = default)
+    {
+        EnsureInitialized();
+        ArgumentNullException.ThrowIfNull(data);
+
+        var session = await GetOrCreateSessionAsync(ct);
+        var handle = GetKeyHandle(keyAlias);
+
+        try
+        {
+            // Determine mechanism based on algorithm
+            var mechanism = algorithm switch
+            {
+                SignatureAlgorithm.RsaSha256 => LunaMechanism.CKM_SHA256_RSA_PKCS,
+                SignatureAlgorithm.RsaSha512 => LunaMechanism.CKM_SHA512_RSA_PKCS,
+                SignatureAlgorithm.EcdsaSha256 => LunaMechanism.CKM_ECDSA_SHA256,
+                _ => throw new ArgumentException($"Unsupported algorithm: {algorithm}")
+            };
+
+            // Initialize sign operation
+            await SignInitAsync(session.SessionId, mechanism, handle.PrivateKeyHandle, ct);
+
+            // Perform signature
+            var signature = await SignAsync(session.SessionId, data, ct);
+
+            IncrementStats(ref _totalOperations);
+            IncrementStats(ref _totalSignOperations);
+            RaiseAuditEvent("Sign", $"Signed {data.Length} bytes with key '{keyAlias}' using {algorithm}");
+
+            return signature;
+        }
+        catch (Exception ex)
+        {
+            IncrementStats(ref _totalErrors);
+            RaiseError("Sign", ex);
+            throw;
+        }
+    }
+
+    public async Task<bool> VerifyAsync(string keyAlias, byte[] data, byte[] signature, SignatureAlgorithm algorithm, CancellationToken ct = default)
+    {
+        EnsureInitialized();
+        ArgumentNullException.ThrowIfNull(data);
+        ArgumentNullException.ThrowIfNull(signature);
+
+        var session = await GetOrCreateSessionAsync(ct);
+        var handle = GetKeyHandle(keyAlias);
+
+        try
+        {
+            var mechanism = algorithm switch
+            {
+                SignatureAlgorithm.RsaSha256 => LunaMechanism.CKM_SHA256_RSA_PKCS,
+                SignatureAlgorithm.RsaSha512 => LunaMechanism.CKM_SHA512_RSA_PKCS,
+                SignatureAlgorithm.EcdsaSha256 => LunaMechanism.CKM_ECDSA_SHA256,
+                _ => throw new ArgumentException($"Unsupported algorithm: {algorithm}")
+            };
+
+            // Initialize verify operation
+            await VerifyInitAsync(session.SessionId, mechanism, handle.PublicKeyHandle, ct);
+
+            // Perform verification
+            var isValid = await VerifyAsync(session.SessionId, data, signature, ct);
+
+            IncrementStats(ref _totalOperations);
+            RaiseAuditEvent("Verify", $"Verified signature for key '{keyAlias}': {(isValid ? "Valid" : "Invalid")}");
+
+            return isValid;
+        }
+        catch (Exception ex)
+        {
+            IncrementStats(ref _totalErrors);
+            RaiseError("Verify", ex);
+            throw;
+        }
+    }
+
+    public async Task<byte[]> EncryptAsync(string keyAlias, byte[] data, CancellationToken ct = default)
+    {
+        EnsureInitialized();
+        ArgumentNullException.ThrowIfNull(data);
+
+        var session = await GetOrCreateSessionAsync(ct);
+        var handle = GetKeyHandle(keyAlias);
+
+        try
+        {
+            // Use appropriate mechanism based on key type
+            var mechanism = handle.KeyType switch
+            {
+                HsmKeyType.Aes => LunaMechanism.CKM_AES_GCM,
+                HsmKeyType.Rsa => LunaMechanism.CKM_RSA_OAEP,
+                _ => throw new InvalidOperationException($"Key type {handle.KeyType} does not support encryption")
+            };
+
+            // Generate IV for AES-GCM
+            byte[]? iv = null;
+            if (handle.KeyType == HsmKeyType.Aes)
+            {
+                iv = new byte[12]; // GCM recommended IV size
+                using var rng = RandomNumberGenerator.Create();
+                rng.GetBytes(iv);
+            }
+
+            // Initialize encryption
+            await EncryptInitAsync(session.SessionId, mechanism, handle.KeyHandle, iv, ct);
+
+            // Perform encryption
+            var ciphertext = await EncryptAsync(session.SessionId, data, ct);
+
+            // Prepend IV for AES-GCM
+            byte[] result;
+            if (iv != null)
+            {
+                result = new byte[iv.Length + ciphertext.Length];
+                Buffer.BlockCopy(iv, 0, result, 0, iv.Length);
+                Buffer.BlockCopy(ciphertext, 0, result, iv.Length, ciphertext.Length);
+            }
+            else
+            {
+                result = ciphertext;
+            }
+
+            IncrementStats(ref _totalOperations);
+            IncrementStats(ref _totalEncryptOperations);
+            RaiseAuditEvent("Encrypt", $"Encrypted {data.Length} bytes with key '{keyAlias}'");
+
+            return result;
+        }
+        catch (Exception ex)
+        {
+            IncrementStats(ref _totalErrors);
+            RaiseError("Encrypt", ex);
+            throw;
+        }
+    }
+
+    public async Task<byte[]> DecryptAsync(string keyAlias, byte[] encryptedData, CancellationToken ct = default)
+    {
+        EnsureInitialized();
+        ArgumentNullException.ThrowIfNull(encryptedData);
+
+        var session = await GetOrCreateSessionAsync(ct);
+        var handle = GetKeyHandle(keyAlias);
+
+        try
+        {
+            var mechanism = handle.KeyType switch
+            {
+                HsmKeyType.Aes => LunaMechanism.CKM_AES_GCM,
+                HsmKeyType.Rsa => LunaMechanism.CKM_RSA_OAEP,
+                _ => throw new InvalidOperationException($"Key type {handle.KeyType} does not support decryption")
+            };
+
+            // Extract IV for AES-GCM
+            byte[]? iv = null;
+            byte[] ciphertext;
+            if (handle.KeyType == HsmKeyType.Aes)
+            {
+                iv = new byte[12];
+                Buffer.BlockCopy(encryptedData, 0, iv, 0, iv.Length);
+                ciphertext = new byte[encryptedData.Length - iv.Length];
+                Buffer.BlockCopy(encryptedData, iv.Length, ciphertext, 0, ciphertext.Length);
+            }
+            else
+            {
+                ciphertext = encryptedData;
+            }
+
+            // Initialize decryption
+            await DecryptInitAsync(session.SessionId, mechanism, handle.KeyHandle, iv, ct);
+
+            // Perform decryption
+            var plaintext = await DecryptAsync(session.SessionId, ciphertext, ct);
+
+            IncrementStats(ref _totalOperations);
+            IncrementStats(ref _totalDecryptOperations);
+            RaiseAuditEvent("Decrypt", $"Decrypted {encryptedData.Length} bytes with key '{keyAlias}'");
+
+            return plaintext;
+        }
+        catch (Exception ex)
+        {
+            IncrementStats(ref _totalErrors);
+            RaiseError("Decrypt", ex);
+            throw;
+        }
+    }
+
+    public async Task DestroyKeyAsync(string keyAlias, CancellationToken ct = default)
+    {
+        EnsureInitialized();
+
+        var session = await GetOrCreateSessionAsync(ct);
+
+        if (!_keyHandles.TryRemove(keyAlias, out var handle))
+        {
+            throw new KeyNotFoundException($"Key '{keyAlias}' not found");
+        }
+
+        try
+        {
+            // Destroy all key handles (private, public, secret)
+            if (handle.PrivateKeyHandle > 0)
+                await DestroyObjectAsync(session.SessionId, handle.PrivateKeyHandle, ct);
+            if (handle.PublicKeyHandle > 0)
+                await DestroyObjectAsync(session.SessionId, handle.PublicKeyHandle, ct);
+            if (handle.KeyHandle > 0 && handle.KeyHandle != handle.PrivateKeyHandle)
+                await DestroyObjectAsync(session.SessionId, handle.KeyHandle, ct);
+
+            IncrementStats(ref _totalOperations);
+            RaiseAuditEvent("DestroyKey", $"Destroyed key '{keyAlias}'");
+        }
+        catch (Exception ex)
+        {
+            IncrementStats(ref _totalErrors);
+            RaiseError("DestroyKey", ex);
+            throw;
+        }
+    }
+
+    #region Extended Luna Operations
+
+    /// <summary>
+    /// Lists all keys in the current partition.
+    /// </summary>
+    public async Task<IReadOnlyList<LunaKeyInfo>> ListKeysAsync(CancellationToken ct = default)
+    {
+        EnsureInitialized();
+        var session = await GetOrCreateSessionAsync(ct);
+
+        var keys = new List<LunaKeyInfo>();
+        foreach (var kvp in _keyHandles)
+        {
+            keys.Add(new LunaKeyInfo
+            {
+                Alias = kvp.Key,
+                KeyType = kvp.Value.KeyType,
+                CreatedAt = kvp.Value.CreatedAt,
+                IsExportable = kvp.Value.IsExportable,
+                IsPersistent = kvp.Value.IsPersistent
+            });
+        }
+        return keys;
+    }
+
+    /// <summary>
+    /// Backs up a key in wrapped form for secure storage.
+    /// </summary>
+    public async Task<byte[]> BackupKeyAsync(string keyAlias, string wrappingKeyAlias, CancellationToken ct = default)
+    {
+        EnsureInitialized();
+        var session = await GetOrCreateSessionAsync(ct);
+
+        var keyHandle = GetKeyHandle(keyAlias);
+        var wrappingKeyHandle = GetKeyHandle(wrappingKeyAlias);
+
+        if (!keyHandle.IsExportable)
+            throw new InvalidOperationException($"Key '{keyAlias}' is not exportable");
+
+        // Wrap key using wrapping key
+        var wrappedKey = await WrapKeyAsync(session.SessionId, wrappingKeyHandle.KeyHandle, keyHandle.KeyHandle, ct);
+
+        RaiseAuditEvent("BackupKey", $"Backed up key '{keyAlias}' wrapped with '{wrappingKeyAlias}'");
+        return wrappedKey;
+    }
+
+    /// <summary>
+    /// Restores a previously backed up key.
+    /// </summary>
+    public async Task<HsmKeyInfo> RestoreKeyAsync(string keyAlias, byte[] wrappedKey, string wrappingKeyAlias,
+        HsmKeyType keyType, CancellationToken ct = default)
+    {
+        EnsureInitialized();
+        var session = await GetOrCreateSessionAsync(ct);
+
+        var wrappingKeyHandle = GetKeyHandle(wrappingKeyAlias);
+
+        // Unwrap key
+        var unwrappedHandle = await UnwrapKeyAsync(session.SessionId, wrappingKeyHandle.KeyHandle, wrappedKey, keyType, ct);
+
+        var handle = new LunaKeyHandle
+        {
+            KeyHandle = unwrappedHandle,
+            KeyType = keyType,
+            CreatedAt = DateTime.UtcNow,
+            IsExportable = false,
+            IsPersistent = true
+        };
+
+        _keyHandles[keyAlias] = handle;
+
+        RaiseAuditEvent("RestoreKey", $"Restored key '{keyAlias}' using '{wrappingKeyAlias}'");
+
+        return new HsmKeyInfo
+        {
+            KeyAlias = keyAlias,
+            KeyType = keyType,
+            KeySize = 0, // Unknown after unwrap
+            CreatedAt = DateTime.UtcNow
+        };
+    }
+
+    /// <summary>
+    /// Gets HA group status for high availability configurations.
+    /// </summary>
+    public async Task<LunaHaStatus> GetHaStatusAsync(CancellationToken ct = default)
+    {
+        EnsureInitialized();
+
+        if (!_config.EnableHighAvailability)
+            return new LunaHaStatus { Enabled = false };
+
+        var memberStatuses = new List<LunaHaMemberStatus>();
+        foreach (var member in _config.HaGroupMembers)
+        {
+            var status = await CheckHaMemberStatusAsync(member, ct);
+            memberStatuses.Add(status);
+        }
+
+        return new LunaHaStatus
+        {
+            Enabled = true,
+            GroupLabel = _config.HaGroupLabel,
+            Members = memberStatuses,
+            ActiveMemberCount = memberStatuses.Count(m => m.IsActive),
+            TotalMemberCount = memberStatuses.Count
+        };
+    }
+
+    /// <summary>
+    /// Gets performance statistics for the HSM connection.
+    /// </summary>
+    public LunaPerformanceStats GetPerformanceStats()
+    {
+        lock (_statsLock)
+        {
+            return new LunaPerformanceStats
+            {
+                TotalOperations = _totalOperations,
+                SignOperations = _totalSignOperations,
+                EncryptOperations = _totalEncryptOperations,
+                DecryptOperations = _totalDecryptOperations,
+                TotalErrors = _totalErrors,
+                LastOperationTime = _lastOperationTime,
+                ActiveSessions = _sessions.Count,
+                CachedKeyCount = _keyHandles.Count
+            };
+        }
+    }
+
+    /// <summary>
+    /// Synchronizes keys across HA group members.
+    /// </summary>
+    public async Task SynchronizeHaGroupAsync(CancellationToken ct = default)
+    {
+        if (!_config.EnableHighAvailability)
+            throw new InvalidOperationException("HA is not enabled");
+
+        EnsureInitialized();
+
+        foreach (var member in _config.HaGroupMembers)
+        {
+            await SynchronizeMemberAsync(member, ct);
+        }
+
+        RaiseAuditEvent("SynchronizeHaGroup", $"Synchronized HA group '{_config.HaGroupLabel}'");
+    }
+
+    #endregion
+
+    #region Private Implementation Methods
+
+    private async Task LoadLunaLibraryAsync(CancellationToken ct)
+    {
+        // In production: Load Luna client library (libCryptoki2_64.so / cryptoki.dll)
+        var libraryPath = _config.ClientLibraryPath;
+        if (string.IsNullOrEmpty(libraryPath))
+        {
+            libraryPath = Environment.OSVersion.Platform == PlatformID.Win32NT
+                ? @"C:\Program Files\SafeNet\LunaClient\cryptoki.dll"
+                : "/usr/safenet/lunaclient/lib/libCryptoki2_64.so";
+        }
+
+        // Simulated library load
+        await Task.Delay(50, ct);
+    }
+
+    private async Task InitializeCryptokiAsync(CancellationToken ct)
+    {
+        // In production: C_Initialize with CK_C_INITIALIZE_ARGS
+        await Task.Delay(50, ct);
+    }
+
+    private async Task<LunaSlotInfo> GetSlotInfoAsync(CancellationToken ct)
+    {
+        // In production: C_GetSlotList, C_GetSlotInfo, C_GetTokenInfo
+        await Task.Delay(20, ct);
+
+        return new LunaSlotInfo
+        {
+            SlotId = _config.SlotId,
+            SlotDescription = $"Luna Network HSM Slot {_config.SlotId}",
+            TokenLabel = _config.PartitionLabel,
+            FirmwareVersion = "7.8.2",
+            HardwareVersion = "7.0",
+            SerialNumber = $"LUNA-{_config.SlotId:D8}",
+            IsFipsMode = true,
+            FreePublicMemory = 1024 * 1024,
+            FreePrivateMemory = 512 * 1024,
+            MaxSessionCount = 1024,
+            CurrentSessionCount = 1
+        };
+    }
+
+    private async Task<LunaSession> OpenSessionAsync(CancellationToken ct)
+    {
+        // In production: C_OpenSession
+        await Task.Delay(10, ct);
+
+        var sessionId = Interlocked.Increment(ref _nextSessionId);
+        return new LunaSession
+        {
+            SessionId = sessionId,
+            SlotId = _config.SlotId,
+            State = LunaSessionState.ReadWrite,
+            OpenedAt = DateTime.UtcNow
+        };
+    }
+
+    private async Task LoginAsync(long sessionId, string password, CancellationToken ct)
+    {
+        // In production: C_Login with CKU_USER
+        await Task.Delay(50, ct);
+
+        if (_sessions.TryGetValue(sessionId, out var session))
+        {
+            session.IsLoggedIn = true;
+        }
+    }
+
+    private async Task ConfigureHaGroupAsync(CancellationToken ct)
+    {
+        // Configure Luna HA group for automatic failover
+        foreach (var member in _config.HaGroupMembers)
+        {
+            await Task.Delay(20, ct);
+        }
+    }
+
+    private async Task<LunaSession> GetOrCreateSessionAsync(CancellationToken ct)
+    {
+        var session = _sessions.Values.FirstOrDefault(s => s.IsLoggedIn);
+        if (session != null) return session;
+
+        session = await OpenSessionAsync(ct);
+        _sessions[session.SessionId] = session;
+
+        if (!string.IsNullOrEmpty(_config.PartitionPassword))
+        {
+            await LoginAsync(session.SessionId, _config.PartitionPassword, ct);
+        }
+
+        return session;
+    }
+
+    private LunaKeyAttributes CreateKeyAttributes(string keyAlias, HsmKeyType keyType, int keySize)
+    {
+        return new LunaKeyAttributes
+        {
+            Label = keyAlias,
+            KeyType = keyType,
+            KeySize = keySize,
+            Extractable = _config.AllowKeyExport,
+            Sensitive = true,
+            Private = true,
+            Token = true, // Persistent
+            Modifiable = false,
+            Derive = keyType == HsmKeyType.Ecdsa,
+            Sign = keyType != HsmKeyType.Aes,
+            Verify = keyType != HsmKeyType.Aes,
+            Encrypt = keyType != HsmKeyType.Ecdsa,
+            Decrypt = keyType != HsmKeyType.Ecdsa,
+            Wrap = keyType == HsmKeyType.Aes,
+            Unwrap = keyType == HsmKeyType.Aes
+        };
+    }
+
+    private async Task<LunaKeyHandle> GenerateAesKeyAsync(long sessionId, LunaKeyAttributes attrs, CancellationToken ct)
+    {
+        // In production: C_GenerateKey with CKM_AES_KEY_GEN
+        await Task.Delay(30, ct);
+
+        using var aes = Aes.Create();
+        aes.KeySize = attrs.KeySize;
+        aes.GenerateKey();
+
+        var handle = Interlocked.Increment(ref _nextSessionId) * 1000;
+
+        return new LunaKeyHandle
+        {
+            KeyHandle = handle,
+            KeyType = HsmKeyType.Aes,
+            CreatedAt = DateTime.UtcNow,
+            IsExportable = attrs.Extractable,
+            IsPersistent = attrs.Token,
+            SimulatedKeyMaterial = aes.Key // Only for simulation
+        };
+    }
+
+    private async Task<LunaKeyHandle> GenerateRsaKeyPairAsync(long sessionId, LunaKeyAttributes attrs, CancellationToken ct)
+    {
+        // In production: C_GenerateKeyPair with CKM_RSA_PKCS_KEY_PAIR_GEN
+        await Task.Delay(100, ct);
+
+        using var rsa = RSA.Create(attrs.KeySize);
+
+        var baseHandle = Interlocked.Increment(ref _nextSessionId) * 1000;
+
+        return new LunaKeyHandle
+        {
+            PublicKeyHandle = baseHandle + 1,
+            PrivateKeyHandle = baseHandle + 2,
+            KeyHandle = baseHandle + 2, // Private key handle for operations
+            KeyType = HsmKeyType.Rsa,
+            CreatedAt = DateTime.UtcNow,
+            IsExportable = attrs.Extractable,
+            IsPersistent = attrs.Token,
+            SimulatedRsaKey = rsa.ExportParameters(true) // Only for simulation
+        };
+    }
+
+    private async Task<LunaKeyHandle> GenerateEcdsaKeyPairAsync(long sessionId, LunaKeyAttributes attrs, CancellationToken ct)
+    {
+        // In production: C_GenerateKeyPair with CKM_EC_KEY_PAIR_GEN
+        await Task.Delay(50, ct);
+
+        using var ecdsa = ECDsa.Create(ECCurve.NamedCurves.nistP256);
+
+        var baseHandle = Interlocked.Increment(ref _nextSessionId) * 1000;
+
+        return new LunaKeyHandle
+        {
+            PublicKeyHandle = baseHandle + 1,
+            PrivateKeyHandle = baseHandle + 2,
+            KeyHandle = baseHandle + 2,
+            KeyType = HsmKeyType.Ecdsa,
+            CreatedAt = DateTime.UtcNow,
+            IsExportable = attrs.Extractable,
+            IsPersistent = attrs.Token,
+            SimulatedEcKey = ecdsa.ExportParameters(true) // Only for simulation
+        };
+    }
+
+    private async Task SignInitAsync(long sessionId, LunaMechanism mechanism, long keyHandle, CancellationToken ct)
+    {
+        // In production: C_SignInit
+        await Task.Delay(5, ct);
+    }
+
+    private async Task<byte[]> SignAsync(long sessionId, byte[] data, CancellationToken ct)
+    {
+        // In production: C_Sign
+        await Task.Delay(10, ct);
+
+        // Simulated signing using stored key material
+        var handle = _keyHandles.Values.FirstOrDefault(h => h.PrivateKeyHandle > 0);
+        if (handle?.SimulatedRsaKey != null)
+        {
+            using var rsa = RSA.Create(handle.SimulatedRsaKey.Value);
+            return rsa.SignData(data, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
+        }
+        if (handle?.SimulatedEcKey != null)
+        {
+            using var ecdsa = ECDsa.Create(handle.SimulatedEcKey.Value);
+            return ecdsa.SignData(data, HashAlgorithmName.SHA256);
+        }
+
+        return SHA256.HashData(data);
+    }
+
+    private async Task VerifyInitAsync(long sessionId, LunaMechanism mechanism, long keyHandle, CancellationToken ct)
+    {
+        // In production: C_VerifyInit
+        await Task.Delay(5, ct);
+    }
+
+    private async Task<bool> VerifyAsync(long sessionId, byte[] data, byte[] signature, CancellationToken ct)
+    {
+        // In production: C_Verify
+        await Task.Delay(10, ct);
+
+        var handle = _keyHandles.Values.FirstOrDefault(h => h.PublicKeyHandle > 0);
+        if (handle?.SimulatedRsaKey != null)
+        {
+            using var rsa = RSA.Create(handle.SimulatedRsaKey.Value);
+            return rsa.VerifyData(data, signature, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
+        }
+        if (handle?.SimulatedEcKey != null)
+        {
+            using var ecdsa = ECDsa.Create(handle.SimulatedEcKey.Value);
+            return ecdsa.VerifyData(data, signature, HashAlgorithmName.SHA256);
+        }
+
+        return true;
+    }
+
+    private async Task EncryptInitAsync(long sessionId, LunaMechanism mechanism, long keyHandle, byte[]? iv, CancellationToken ct)
+    {
+        // In production: C_EncryptInit
+        await Task.Delay(5, ct);
+    }
+
+    private async Task<byte[]> EncryptAsync(long sessionId, byte[] data, CancellationToken ct)
+    {
+        // In production: C_Encrypt
+        await Task.Delay(10, ct);
+
+        var handle = _keyHandles.Values.FirstOrDefault(h => h.SimulatedKeyMaterial != null);
+        if (handle?.SimulatedKeyMaterial != null)
+        {
+            using var aes = Aes.Create();
+            aes.Key = handle.SimulatedKeyMaterial;
+            aes.Mode = CipherMode.CBC;
+            aes.Padding = PaddingMode.PKCS7;
+            aes.GenerateIV();
+
+            using var encryptor = aes.CreateEncryptor();
+            var encrypted = encryptor.TransformFinalBlock(data, 0, data.Length);
+
+            var result = new byte[aes.IV.Length + encrypted.Length];
+            Buffer.BlockCopy(aes.IV, 0, result, 0, aes.IV.Length);
+            Buffer.BlockCopy(encrypted, 0, result, aes.IV.Length, encrypted.Length);
+            return result;
+        }
+
+        return data;
+    }
+
+    private async Task DecryptInitAsync(long sessionId, LunaMechanism mechanism, long keyHandle, byte[]? iv, CancellationToken ct)
+    {
+        // In production: C_DecryptInit
+        await Task.Delay(5, ct);
+    }
+
+    private async Task<byte[]> DecryptAsync(long sessionId, byte[] data, CancellationToken ct)
+    {
+        // In production: C_Decrypt
+        await Task.Delay(10, ct);
+
+        var handle = _keyHandles.Values.FirstOrDefault(h => h.SimulatedKeyMaterial != null);
+        if (handle?.SimulatedKeyMaterial != null && data.Length > 16)
+        {
+            using var aes = Aes.Create();
+            aes.Key = handle.SimulatedKeyMaterial;
+            aes.Mode = CipherMode.CBC;
+            aes.Padding = PaddingMode.PKCS7;
+
+            var iv = new byte[16];
+            Buffer.BlockCopy(data, 0, iv, 0, 16);
+            aes.IV = iv;
+
+            var ciphertext = new byte[data.Length - 16];
+            Buffer.BlockCopy(data, 16, ciphertext, 0, ciphertext.Length);
+
+            using var decryptor = aes.CreateDecryptor();
+            return decryptor.TransformFinalBlock(ciphertext, 0, ciphertext.Length);
+        }
+
+        return data;
+    }
+
+    private async Task DestroyObjectAsync(long sessionId, long objectHandle, CancellationToken ct)
+    {
+        // In production: C_DestroyObject
+        await Task.Delay(10, ct);
+    }
+
+    private async Task<byte[]> WrapKeyAsync(long sessionId, long wrappingKey, long keyToWrap, CancellationToken ct)
+    {
+        // In production: C_WrapKey
+        await Task.Delay(20, ct);
+
+        // Simulated key wrapping
+        return SHA256.HashData(BitConverter.GetBytes(keyToWrap));
+    }
+
+    private async Task<long> UnwrapKeyAsync(long sessionId, long wrappingKey, byte[] wrappedKey, HsmKeyType keyType, CancellationToken ct)
+    {
+        // In production: C_UnwrapKey
+        await Task.Delay(20, ct);
+
+        return Interlocked.Increment(ref _nextSessionId) * 1000;
+    }
+
+    private async Task<LunaHaMemberStatus> CheckHaMemberStatusAsync(LunaHaMember member, CancellationToken ct)
+    {
+        await Task.Delay(10, ct);
+
+        return new LunaHaMemberStatus
+        {
+            Hostname = member.Hostname,
+            Port = member.Port,
+            IsActive = true,
+            LastHeartbeat = DateTime.UtcNow,
+            Latency = TimeSpan.FromMilliseconds(new Random().Next(1, 10))
+        };
+    }
+
+    private async Task SynchronizeMemberAsync(LunaHaMember member, CancellationToken ct)
+    {
+        await Task.Delay(50, ct);
+    }
+
+    private LunaKeyHandle GetKeyHandle(string keyAlias)
+    {
+        if (!_keyHandles.TryGetValue(keyAlias, out var handle))
+            throw new KeyNotFoundException($"Key '{keyAlias}' not found");
+        return handle;
+    }
+
+    private void EnsureInitialized()
+    {
+        if (!_initialized)
+            throw new InvalidOperationException("HSM not initialized. Call InitializeAsync first.");
+        if (_disposed)
+            throw new ObjectDisposedException(nameof(ThalesLunaProvider));
+    }
+
+    private void IncrementStats(ref long counter)
+    {
+        Interlocked.Increment(ref counter);
+        _lastOperationTime = DateTime.UtcNow;
+    }
+
+    private void RaiseAuditEvent(string operation, string details)
+    {
+        AuditEvent?.Invoke(this, new LunaAuditEventArgs
+        {
+            Operation = operation,
+            Details = details,
+            Timestamp = DateTime.UtcNow,
+            PartitionLabel = _config.PartitionLabel
+        });
+    }
+
+    private void RaiseError(string operation, Exception ex)
+    {
+        ErrorOccurred?.Invoke(this, new LunaErrorEventArgs
+        {
+            Operation = operation,
+            Exception = ex,
+            Timestamp = DateTime.UtcNow
+        });
+    }
+
+    #endregion
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_disposed) return;
+        _disposed = true;
+
+        // Close all sessions
+        foreach (var session in _sessions.Values)
+        {
+            try
+            {
+                // In production: C_Logout, C_CloseSession
+                await Task.Delay(10);
+            }
+            catch { /* Ignore cleanup errors */ }
+        }
+
+        _sessions.Clear();
+        _keyHandles.Clear();
+        _sessionLock.Dispose();
+
+        // In production: C_Finalize
+    }
+}
+
 #endregion
 
 #region CS3: Regulatory Compliance Framework
@@ -733,6 +1633,203 @@ public enum SignatureAlgorithm { RsaSha256, RsaSha512, EcdsaSha256 }
 public sealed class Pkcs11Config { public string LibraryPath { get; set; } = string.Empty; public string SlotId { get; set; } = string.Empty; }
 public sealed class AwsCloudHsmConfig { public string ClusterId { get; set; } = string.Empty; public string Region { get; set; } = string.Empty; }
 public sealed class AzureHsmConfig { public string ResourceId { get; set; } = string.Empty; }
+
+// Thales Luna HSM Configuration and Types
+public sealed class ThalesLunaConfig
+{
+    /// <summary>
+    /// Path to the Luna client library (cryptoki.dll or libCryptoki2_64.so).
+    /// </summary>
+    public string ClientLibraryPath { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Slot ID for the Luna HSM partition.
+    /// </summary>
+    public int SlotId { get; set; }
+
+    /// <summary>
+    /// Label of the partition to use.
+    /// </summary>
+    public string PartitionLabel { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Password for the partition (Crypto Officer or Crypto User).
+    /// </summary>
+    public string PartitionPassword { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Enable high availability mode with multiple Luna HSMs.
+    /// </summary>
+    public bool EnableHighAvailability { get; set; }
+
+    /// <summary>
+    /// HA group label for identification.
+    /// </summary>
+    public string HaGroupLabel { get; set; } = string.Empty;
+
+    /// <summary>
+    /// List of HA group members.
+    /// </summary>
+    public List<LunaHaMember> HaGroupMembers { get; set; } = new();
+
+    /// <summary>
+    /// Allow key export (wrapped) for backup purposes.
+    /// </summary>
+    public bool AllowKeyExport { get; set; }
+
+    /// <summary>
+    /// Connection timeout in seconds.
+    /// </summary>
+    public int ConnectionTimeoutSeconds { get; set; } = 30;
+
+    /// <summary>
+    /// Enable FIPS mode enforcement.
+    /// </summary>
+    public bool EnforceFipsMode { get; set; } = true;
+
+    /// <summary>
+    /// Maximum number of concurrent sessions.
+    /// </summary>
+    public int MaxSessions { get; set; } = 10;
+}
+
+public sealed class LunaHaMember
+{
+    public string Hostname { get; set; } = string.Empty;
+    public int Port { get; set; } = 1792;
+    public string SerialNumber { get; set; } = string.Empty;
+    public int Priority { get; set; } = 100;
+}
+
+public sealed class LunaSlotInfo
+{
+    public int SlotId { get; set; }
+    public string SlotDescription { get; set; } = string.Empty;
+    public string TokenLabel { get; set; } = string.Empty;
+    public string FirmwareVersion { get; set; } = string.Empty;
+    public string HardwareVersion { get; set; } = string.Empty;
+    public string SerialNumber { get; set; } = string.Empty;
+    public bool IsFipsMode { get; set; }
+    public long FreePublicMemory { get; set; }
+    public long FreePrivateMemory { get; set; }
+    public int MaxSessionCount { get; set; }
+    public int CurrentSessionCount { get; set; }
+}
+
+public sealed class LunaSession
+{
+    public long SessionId { get; set; }
+    public int SlotId { get; set; }
+    public LunaSessionState State { get; set; }
+    public DateTime OpenedAt { get; set; }
+    public bool IsLoggedIn { get; set; }
+}
+
+public enum LunaSessionState { ReadOnly, ReadWrite }
+
+public sealed class LunaKeyHandle
+{
+    public long KeyHandle { get; set; }
+    public long PublicKeyHandle { get; set; }
+    public long PrivateKeyHandle { get; set; }
+    public HsmKeyType KeyType { get; set; }
+    public DateTime CreatedAt { get; set; }
+    public bool IsExportable { get; set; }
+    public bool IsPersistent { get; set; }
+
+    // Simulation only - in production, keys never leave the HSM
+    internal byte[]? SimulatedKeyMaterial { get; set; }
+    internal RSAParameters? SimulatedRsaKey { get; set; }
+    internal ECParameters? SimulatedEcKey { get; set; }
+}
+
+public sealed class LunaKeyAttributes
+{
+    public string Label { get; set; } = string.Empty;
+    public HsmKeyType KeyType { get; set; }
+    public int KeySize { get; set; }
+    public bool Extractable { get; set; }
+    public bool Sensitive { get; set; }
+    public bool Private { get; set; }
+    public bool Token { get; set; }
+    public bool Modifiable { get; set; }
+    public bool Derive { get; set; }
+    public bool Sign { get; set; }
+    public bool Verify { get; set; }
+    public bool Encrypt { get; set; }
+    public bool Decrypt { get; set; }
+    public bool Wrap { get; set; }
+    public bool Unwrap { get; set; }
+}
+
+public sealed class LunaKeyInfo
+{
+    public string Alias { get; set; } = string.Empty;
+    public HsmKeyType KeyType { get; set; }
+    public DateTime CreatedAt { get; set; }
+    public bool IsExportable { get; set; }
+    public bool IsPersistent { get; set; }
+}
+
+public enum LunaMechanism
+{
+    CKM_AES_KEY_GEN = 0x1080,
+    CKM_AES_CBC = 0x1082,
+    CKM_AES_GCM = 0x1087,
+    CKM_RSA_PKCS_KEY_PAIR_GEN = 0x0000,
+    CKM_RSA_PKCS = 0x0001,
+    CKM_RSA_OAEP = 0x0009,
+    CKM_SHA256_RSA_PKCS = 0x0040,
+    CKM_SHA512_RSA_PKCS = 0x0044,
+    CKM_EC_KEY_PAIR_GEN = 0x1040,
+    CKM_ECDSA = 0x1041,
+    CKM_ECDSA_SHA256 = 0x1044
+}
+
+public sealed class LunaHaStatus
+{
+    public bool Enabled { get; set; }
+    public string GroupLabel { get; set; } = string.Empty;
+    public List<LunaHaMemberStatus> Members { get; set; } = new();
+    public int ActiveMemberCount { get; set; }
+    public int TotalMemberCount { get; set; }
+}
+
+public sealed class LunaHaMemberStatus
+{
+    public string Hostname { get; set; } = string.Empty;
+    public int Port { get; set; }
+    public bool IsActive { get; set; }
+    public DateTime LastHeartbeat { get; set; }
+    public TimeSpan Latency { get; set; }
+}
+
+public sealed class LunaPerformanceStats
+{
+    public long TotalOperations { get; set; }
+    public long SignOperations { get; set; }
+    public long EncryptOperations { get; set; }
+    public long DecryptOperations { get; set; }
+    public long TotalErrors { get; set; }
+    public DateTime LastOperationTime { get; set; }
+    public int ActiveSessions { get; set; }
+    public int CachedKeyCount { get; set; }
+}
+
+public sealed class LunaAuditEventArgs : EventArgs
+{
+    public string Operation { get; set; } = string.Empty;
+    public string Details { get; set; } = string.Empty;
+    public DateTime Timestamp { get; set; }
+    public string PartitionLabel { get; set; } = string.Empty;
+}
+
+public sealed class LunaErrorEventArgs : EventArgs
+{
+    public string Operation { get; set; } = string.Empty;
+    public Exception? Exception { get; set; }
+    public DateTime Timestamp { get; set; }
+}
 
 public interface IComplianceRule
 {

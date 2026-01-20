@@ -779,6 +779,905 @@ public sealed class DormantNodeWatcher : IDisposable
 [JsonSerializable(typeof(DormantObjectEntry))]
 [JsonSerializable(typeof(List<DormantObjectEntry>))]
 [JsonSerializable(typeof(List<CapabilityToken>))]
+[JsonSerializable(typeof(IncrementalSyncState))]
+[JsonSerializable(typeof(SneakernetConflict))]
+[JsonSerializable(typeof(List<SneakernetConflict>))]
+[JsonSerializable(typeof(OfflineChangeRecord))]
+[JsonSerializable(typeof(List<OfflineChangeRecord>))]
 internal partial class DormantNodeJsonContext : JsonSerializerContext
 {
 }
+
+// ============================================================================
+// SCENARIO 2: SNEAKERNET SUPPORT (U1 → USB → U2)
+// Extends existing DormantNode infrastructure with incremental sync,
+// conflict resolution, and auto-resync capabilities.
+// ============================================================================
+
+#region Incremental Sync
+
+/// <summary>
+/// State for incremental synchronization.
+/// </summary>
+public sealed class IncrementalSyncState
+{
+    /// <summary>Last successful sync timestamp.</summary>
+    public DateTimeOffset LastSyncAt { get; set; }
+
+    /// <summary>Object checksums at last sync.</summary>
+    public Dictionary<string, string> ObjectChecksums { get; set; } = new();
+
+    /// <summary>Objects pending sync.</summary>
+    public List<string> PendingObjectIds { get; set; } = new();
+
+    /// <summary>Sync sequence number.</summary>
+    public long SyncSequence { get; set; }
+
+    /// <summary>Source node ID.</summary>
+    public string SourceNodeId { get; set; } = string.Empty;
+
+    /// <summary>Target node ID.</summary>
+    public string TargetNodeId { get; set; } = string.Empty;
+
+    /// <summary>Sync state filename.</summary>
+    public const string SyncStateFileName = ".dw-sync-state.json";
+
+    public string ToJson() => JsonSerializer.Serialize(this, DormantNodeJsonContext.Default.IncrementalSyncState);
+
+    public static IncrementalSyncState? FromJson(string json) =>
+        JsonSerializer.Deserialize(json, DormantNodeJsonContext.Default.IncrementalSyncState);
+}
+
+/// <summary>
+/// Manages incremental synchronization between active and dormant nodes.
+/// Uses checksums to identify changed objects for delta transfers.
+/// </summary>
+public sealed class IncrementalSyncManager
+{
+    private readonly ContentAddressableObjectStore _objectStore;
+    private readonly NodeIdentityManager _identityManager;
+
+    /// <summary>Gets the underlying object store for conflict detection.</summary>
+    internal ContentAddressableObjectStore ObjectStore => _objectStore;
+
+    public IncrementalSyncManager(
+        ContentAddressableObjectStore objectStore,
+        NodeIdentityManager identityManager)
+    {
+        _objectStore = objectStore;
+        _identityManager = identityManager;
+    }
+
+    /// <summary>
+    /// Calculates delta between local state and dormant node.
+    /// Returns objects that need to be transferred.
+    /// </summary>
+    public async Task<SyncDelta> CalculateDeltaAsync(
+        string dormantPath,
+        CancellationToken ct = default)
+    {
+        var delta = new SyncDelta();
+        var syncStatePath = Path.Combine(dormantPath, IncrementalSyncState.SyncStateFileName);
+        var manifestPath = Path.Combine(dormantPath, DormantNodeManifest.ManifestFileName);
+
+        // Load existing sync state
+        IncrementalSyncState? syncState = null;
+        if (File.Exists(syncStatePath))
+        {
+            var json = await File.ReadAllTextAsync(syncStatePath, ct);
+            syncState = IncrementalSyncState.FromJson(json);
+        }
+
+        // Load dormant manifest
+        DormantNodeManifest? manifest = null;
+        if (File.Exists(manifestPath))
+        {
+            var json = await File.ReadAllTextAsync(manifestPath, ct);
+            manifest = DormantNodeManifest.FromJson(json);
+        }
+
+        var dormantObjects = manifest?.Objects.ToDictionary(o => o.ObjectId) ?? new();
+        var dormantChecksums = syncState?.ObjectChecksums ?? new();
+
+        // Get local objects
+        var localObjectIds = await _objectStore.ListAllObjectIdsAsync(ct).ToListAsync(ct);
+
+        foreach (var objectId in localObjectIds)
+        {
+            var objectIdHex = objectId.ToHex();
+            var localChecksum = await ComputeChecksumAsync(objectId, ct);
+
+            if (!dormantObjects.ContainsKey(objectIdHex))
+            {
+                // New object - needs to be copied to dormant
+                delta.NewObjects.Add(objectIdHex);
+            }
+            else if (dormantChecksums.TryGetValue(objectIdHex, out var oldChecksum) &&
+                     oldChecksum != localChecksum)
+            {
+                // Modified object
+                delta.ModifiedObjects.Add(objectIdHex);
+            }
+        }
+
+        // Find objects deleted locally but present on dormant
+        foreach (var dormantObj in dormantObjects.Keys)
+        {
+            var found = localObjectIds.Any(id => id.ToHex() == dormantObj);
+            if (!found)
+            {
+                delta.DeletedObjects.Add(dormantObj);
+            }
+        }
+
+        delta.TotalChanges = delta.NewObjects.Count + delta.ModifiedObjects.Count + delta.DeletedObjects.Count;
+        return delta;
+    }
+
+    /// <summary>
+    /// Performs incremental sync, only transferring changed objects.
+    /// </summary>
+    public async Task<IncrementalSyncResult> SyncAsync(
+        string dormantPath,
+        NodeDehydrator dehydrator,
+        DehydrateOptions options,
+        CancellationToken ct = default)
+    {
+        var result = new IncrementalSyncResult { TargetPath = dormantPath };
+
+        try
+        {
+            var delta = await CalculateDeltaAsync(dormantPath, ct);
+            result.Delta = delta;
+
+            if (delta.TotalChanges == 0)
+            {
+                result.Success = true;
+                result.Message = "No changes to sync";
+                return result;
+            }
+
+            // Sync new and modified objects
+            var objectsToSync = delta.NewObjects.Concat(delta.ModifiedObjects)
+                .Select(hex => ObjectId.FromHex(hex))
+                .ToList();
+
+            if (objectsToSync.Count > 0)
+            {
+                var dehydrateResult = await dehydrator.DehydrateAsync(
+                    dormantPath, objectsToSync, options, ct);
+
+                result.ObjectsSynced = dehydrateResult.CopiedObjects.Count;
+                result.ObjectsFailed = dehydrateResult.FailedObjects.Count;
+            }
+
+            // Handle deletions by marking in manifest
+            if (delta.DeletedObjects.Count > 0)
+            {
+                await MarkObjectsDeletedAsync(dormantPath, delta.DeletedObjects, ct);
+                result.ObjectsDeleted = delta.DeletedObjects.Count;
+            }
+
+            // Update sync state
+            await UpdateSyncStateAsync(dormantPath, ct);
+
+            result.Success = true;
+        }
+        catch (Exception ex)
+        {
+            result.Success = false;
+            result.Message = ex.Message;
+        }
+
+        return result;
+    }
+
+    private async Task<string> ComputeChecksumAsync(ObjectId objectId, CancellationToken ct)
+    {
+        var result = await _objectStore.RetrieveAsync(objectId, ct);
+        if (result.Data == null) return string.Empty;
+
+        var hash = SHA256.HashData(result.Data);
+        return Convert.ToHexString(hash).ToLowerInvariant();
+    }
+
+    private async Task MarkObjectsDeletedAsync(string dormantPath, List<string> deletedIds, CancellationToken ct)
+    {
+        var manifestPath = Path.Combine(dormantPath, DormantNodeManifest.ManifestFileName);
+        if (!File.Exists(manifestPath)) return;
+
+        var json = await File.ReadAllTextAsync(manifestPath, ct);
+        var manifest = DormantNodeManifest.FromJson(json);
+        if (manifest == null) return;
+
+        manifest.Objects.RemoveAll(o => deletedIds.Contains(o.ObjectId));
+        manifest.UpdatedAt = DateTimeOffset.UtcNow;
+
+        await File.WriteAllTextAsync(manifestPath, manifest.ToJson(), ct);
+    }
+
+    private async Task UpdateSyncStateAsync(string dormantPath, CancellationToken ct)
+    {
+        var syncStatePath = Path.Combine(dormantPath, IncrementalSyncState.SyncStateFileName);
+        var manifestPath = Path.Combine(dormantPath, DormantNodeManifest.ManifestFileName);
+
+        var manifest = DormantNodeManifest.FromJson(
+            await File.ReadAllTextAsync(manifestPath, ct));
+
+        var checksums = new Dictionary<string, string>();
+        foreach (var obj in manifest?.Objects ?? new())
+        {
+            var objPath = Path.Combine(dormantPath, DormantNodeManifest.ObjectsDirectory, obj.RelativePath);
+            if (File.Exists(objPath))
+            {
+                var data = await File.ReadAllBytesAsync(objPath, ct);
+                checksums[obj.ObjectId] = Convert.ToHexString(SHA256.HashData(data)).ToLowerInvariant();
+            }
+        }
+
+        var state = new IncrementalSyncState
+        {
+            LastSyncAt = DateTimeOffset.UtcNow,
+            ObjectChecksums = checksums,
+            SyncSequence = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
+            SourceNodeId = _identityManager.LocalIdentity.Id.ToHex(),
+            TargetNodeId = manifest?.Identity.Id.ToHex() ?? string.Empty
+        };
+
+        await File.WriteAllTextAsync(syncStatePath, state.ToJson(), ct);
+    }
+}
+
+/// <summary>
+/// Delta between local and dormant storage.
+/// </summary>
+public sealed class SyncDelta
+{
+    public List<string> NewObjects { get; } = new();
+    public List<string> ModifiedObjects { get; } = new();
+    public List<string> DeletedObjects { get; } = new();
+    public int TotalChanges { get; set; }
+}
+
+/// <summary>
+/// Result of incremental sync operation.
+/// </summary>
+public sealed class IncrementalSyncResult
+{
+    public bool Success { get; set; }
+    public string TargetPath { get; set; } = string.Empty;
+    public SyncDelta? Delta { get; set; }
+    public int ObjectsSynced { get; set; }
+    public int ObjectsFailed { get; set; }
+    public int ObjectsDeleted { get; set; }
+    public string? Message { get; set; }
+}
+
+#endregion
+
+#region Conflict Queue
+
+/// <summary>
+/// Represents a conflict between local and dormant changes.
+/// </summary>
+public sealed class SneakernetConflict
+{
+    /// <summary>Object that has conflicts.</summary>
+    public string ObjectId { get; set; } = string.Empty;
+
+    /// <summary>Object name.</summary>
+    public string ObjectName { get; set; } = string.Empty;
+
+    /// <summary>When conflict was detected.</summary>
+    public DateTimeOffset DetectedAt { get; set; } = DateTimeOffset.UtcNow;
+
+    /// <summary>Local version info.</summary>
+    public ConflictVersion LocalVersion { get; set; } = new();
+
+    /// <summary>Dormant (remote) version info.</summary>
+    public ConflictVersion DormantVersion { get; set; } = new();
+
+    /// <summary>Base version (common ancestor) if available.</summary>
+    public ConflictVersion? BaseVersion { get; set; }
+
+    /// <summary>Resolution status.</summary>
+    public ConflictResolution Resolution { get; set; } = ConflictResolution.Unresolved;
+
+    /// <summary>Resolved version (if resolved).</summary>
+    public ConflictVersion? ResolvedVersion { get; set; }
+
+    /// <summary>Resolution timestamp.</summary>
+    public DateTimeOffset? ResolvedAt { get; set; }
+}
+
+/// <summary>
+/// Version information for conflict resolution.
+/// </summary>
+public sealed class ConflictVersion
+{
+    public string Checksum { get; set; } = string.Empty;
+    public long SizeBytes { get; set; }
+    public DateTimeOffset ModifiedAt { get; set; }
+    public string ModifiedBy { get; set; } = string.Empty;
+    public byte[]? Data { get; set; }
+}
+
+/// <summary>
+/// Conflict resolution strategy.
+/// </summary>
+public enum ConflictResolution
+{
+    Unresolved,
+    KeepLocal,
+    KeepDormant,
+    Merged,
+    ManuallyResolved
+}
+
+/// <summary>
+/// Manages conflicts during sneakernet sync operations.
+/// Supports three-way merge when base version is available.
+/// </summary>
+public sealed class SneakernetConflictQueue
+{
+    private readonly List<SneakernetConflict> _conflicts = new();
+    private readonly string _queuePath;
+    private readonly object _lock = new();
+
+    public const string ConflictQueueFileName = ".dw-conflicts.json";
+
+    public int ConflictCount => _conflicts.Count;
+    public int UnresolvedCount => _conflicts.Count(c => c.Resolution == ConflictResolution.Unresolved);
+
+    public SneakernetConflictQueue(string basePath)
+    {
+        _queuePath = Path.Combine(basePath, ConflictQueueFileName);
+        LoadQueue();
+    }
+
+    /// <summary>
+    /// Detects and queues conflicts between local and dormant versions.
+    /// </summary>
+    public async Task<List<SneakernetConflict>> DetectConflictsAsync(
+        ContentAddressableObjectStore localStore,
+        string dormantPath,
+        CancellationToken ct = default)
+    {
+        var newConflicts = new List<SneakernetConflict>();
+        var manifestPath = Path.Combine(dormantPath, DormantNodeManifest.ManifestFileName);
+
+        if (!File.Exists(manifestPath)) return newConflicts;
+
+        var manifest = DormantNodeManifest.FromJson(
+            await File.ReadAllTextAsync(manifestPath, ct));
+        if (manifest == null) return newConflicts;
+
+        var objectsPath = Path.Combine(dormantPath, DormantNodeManifest.ObjectsDirectory);
+
+        foreach (var dormantObj in manifest.Objects)
+        {
+            var objectId = ObjectId.FromHex(dormantObj.ObjectId);
+
+            // Check if local has this object
+            var localResult = await localStore.RetrieveAsync(objectId, ct);
+            if (!localResult.Success || localResult.Data == null) continue;
+
+            // Read dormant version
+            var dormantObjPath = Path.Combine(objectsPath, dormantObj.RelativePath);
+            if (!File.Exists(dormantObjPath)) continue;
+
+            var dormantData = await File.ReadAllBytesAsync(dormantObjPath, ct);
+
+            // Compare checksums
+            var localChecksum = Convert.ToHexString(SHA256.HashData(localResult.Data)).ToLowerInvariant();
+            var dormantChecksum = Convert.ToHexString(SHA256.HashData(dormantData)).ToLowerInvariant();
+
+            if (localChecksum != dormantChecksum)
+            {
+                var conflict = new SneakernetConflict
+                {
+                    ObjectId = dormantObj.ObjectId,
+                    ObjectName = dormantObj.Name,
+                    LocalVersion = new ConflictVersion
+                    {
+                        Checksum = localChecksum,
+                        SizeBytes = localResult.Data.Length,
+                        ModifiedAt = DateTimeOffset.UtcNow
+                    },
+                    DormantVersion = new ConflictVersion
+                    {
+                        Checksum = dormantChecksum,
+                        SizeBytes = dormantData.Length,
+                        ModifiedAt = dormantObj.AddedAt
+                    }
+                };
+
+                newConflicts.Add(conflict);
+                AddConflict(conflict);
+            }
+        }
+
+        return newConflicts;
+    }
+
+    /// <summary>
+    /// Adds a conflict to the queue.
+    /// </summary>
+    public void AddConflict(SneakernetConflict conflict)
+    {
+        lock (_lock)
+        {
+            // Check if already exists
+            var existing = _conflicts.FirstOrDefault(c => c.ObjectId == conflict.ObjectId);
+            if (existing != null)
+            {
+                _conflicts.Remove(existing);
+            }
+            _conflicts.Add(conflict);
+            SaveQueue();
+        }
+    }
+
+    /// <summary>
+    /// Gets all unresolved conflicts.
+    /// </summary>
+    public IReadOnlyList<SneakernetConflict> GetUnresolved()
+    {
+        lock (_lock)
+        {
+            return _conflicts.Where(c => c.Resolution == ConflictResolution.Unresolved).ToList();
+        }
+    }
+
+    /// <summary>
+    /// Resolves a conflict with specified strategy.
+    /// </summary>
+    public void ResolveConflict(string objectId, ConflictResolution resolution, ConflictVersion? resolvedVersion = null)
+    {
+        lock (_lock)
+        {
+            var conflict = _conflicts.FirstOrDefault(c => c.ObjectId == objectId);
+            if (conflict != null)
+            {
+                conflict.Resolution = resolution;
+                conflict.ResolvedVersion = resolvedVersion;
+                conflict.ResolvedAt = DateTimeOffset.UtcNow;
+                SaveQueue();
+            }
+        }
+    }
+
+    /// <summary>
+    /// Attempts automatic three-way merge for text-based objects.
+    /// </summary>
+    public async Task<bool> TryAutoMergeAsync(
+        string objectId,
+        ContentAddressableObjectStore localStore,
+        string dormantPath,
+        CancellationToken ct = default)
+    {
+        var conflict = _conflicts.FirstOrDefault(c => c.ObjectId == objectId);
+        if (conflict == null || conflict.BaseVersion == null) return false;
+
+        // Load all three versions
+        var localResult = await localStore.RetrieveAsync(ObjectId.FromHex(objectId), ct);
+        if (!localResult.Success || localResult.Data == null) return false;
+
+        var dormantObjPath = Path.Combine(dormantPath, DormantNodeManifest.ObjectsDirectory,
+            $"{objectId[..2]}/{objectId}");
+        if (!File.Exists(dormantObjPath)) return false;
+
+        var dormantData = await File.ReadAllBytesAsync(dormantObjPath, ct);
+        var baseData = conflict.BaseVersion.Data;
+
+        if (baseData == null) return false;
+
+        // Attempt line-based merge for text files
+        try
+        {
+            var baseText = System.Text.Encoding.UTF8.GetString(baseData);
+            var localText = System.Text.Encoding.UTF8.GetString(localResult.Data);
+            var dormantText = System.Text.Encoding.UTF8.GetString(dormantData);
+
+            var merged = ThreeWayMerge(baseText, localText, dormantText);
+            if (merged != null)
+            {
+                conflict.Resolution = ConflictResolution.Merged;
+                conflict.ResolvedVersion = new ConflictVersion
+                {
+                    Data = System.Text.Encoding.UTF8.GetBytes(merged),
+                    SizeBytes = merged.Length,
+                    ModifiedAt = DateTimeOffset.UtcNow,
+                    Checksum = Convert.ToHexString(SHA256.HashData(
+                        System.Text.Encoding.UTF8.GetBytes(merged))).ToLowerInvariant()
+                };
+                conflict.ResolvedAt = DateTimeOffset.UtcNow;
+                SaveQueue();
+                return true;
+            }
+        }
+        catch
+        {
+            // Not text or merge failed
+        }
+
+        return false;
+    }
+
+    private static string? ThreeWayMerge(string baseText, string local, string remote)
+    {
+        var baseLines = baseText.Split('\n');
+        var localLines = local.Split('\n');
+        var remoteLines = remote.Split('\n');
+
+        var result = new List<string>();
+        var maxLen = Math.Max(Math.Max(baseLines.Length, localLines.Length), remoteLines.Length);
+
+        for (int i = 0; i < maxLen; i++)
+        {
+            var baseLine = i < baseLines.Length ? baseLines[i] : "";
+            var localLine = i < localLines.Length ? localLines[i] : "";
+            var remoteLine = i < remoteLines.Length ? remoteLines[i] : "";
+
+            if (localLine == remoteLine)
+            {
+                // Both same - use either
+                result.Add(localLine);
+            }
+            else if (localLine == baseLine)
+            {
+                // Only remote changed
+                result.Add(remoteLine);
+            }
+            else if (remoteLine == baseLine)
+            {
+                // Only local changed
+                result.Add(localLine);
+            }
+            else
+            {
+                // Conflict - cannot auto-merge
+                return null;
+            }
+        }
+
+        return string.Join('\n', result);
+    }
+
+    private void LoadQueue()
+    {
+        if (File.Exists(_queuePath))
+        {
+            try
+            {
+                var json = File.ReadAllText(_queuePath);
+                var conflicts = JsonSerializer.Deserialize(json,
+                    DormantNodeJsonContext.Default.ListSneakernetConflict);
+                if (conflicts != null)
+                {
+                    _conflicts.AddRange(conflicts);
+                }
+            }
+            catch { }
+        }
+    }
+
+    private void SaveQueue()
+    {
+        var json = JsonSerializer.Serialize(_conflicts,
+            DormantNodeJsonContext.Default.ListSneakernetConflict);
+        File.WriteAllText(_queuePath, json);
+    }
+}
+
+#endregion
+
+#region Offline Change Tracking
+
+/// <summary>
+/// Record of a change made while offline.
+/// </summary>
+public sealed class OfflineChangeRecord
+{
+    public string ObjectId { get; set; } = string.Empty;
+    public ChangeType Type { get; set; }
+    public DateTimeOffset Timestamp { get; set; } = DateTimeOffset.UtcNow;
+    public string NodeId { get; set; } = string.Empty;
+    public string Checksum { get; set; } = string.Empty;
+    public long SizeBytes { get; set; }
+    public Dictionary<string, string> Metadata { get; set; } = new();
+}
+
+public enum ChangeType
+{
+    Created,
+    Modified,
+    Deleted
+}
+
+/// <summary>
+/// Tracks changes made during offline/disconnected periods.
+/// Used for sync reconciliation when reconnecting.
+/// </summary>
+public sealed class OfflineChangeTracker : IDisposable
+{
+    private readonly ContentAddressableObjectStore _objectStore;
+    private readonly string _trackingPath;
+    private readonly List<OfflineChangeRecord> _changes = new();
+    private readonly FileSystemWatcher? _watcher;
+    private readonly string _nodeId;
+    private bool _disposed;
+
+    public const string ChangeLogFileName = ".dw-offline-changes.json";
+
+    public OfflineChangeTracker(
+        ContentAddressableObjectStore objectStore,
+        string trackingPath,
+        string nodeId)
+    {
+        _objectStore = objectStore;
+        _trackingPath = trackingPath;
+        _nodeId = nodeId;
+
+        Directory.CreateDirectory(trackingPath);
+        LoadChanges();
+    }
+
+    /// <summary>
+    /// Records a new change.
+    /// </summary>
+    public void RecordChange(string objectId, ChangeType type, string checksum, long sizeBytes)
+    {
+        var record = new OfflineChangeRecord
+        {
+            ObjectId = objectId,
+            Type = type,
+            Timestamp = DateTimeOffset.UtcNow,
+            NodeId = _nodeId,
+            Checksum = checksum,
+            SizeBytes = sizeBytes
+        };
+
+        _changes.Add(record);
+        SaveChanges();
+    }
+
+    /// <summary>
+    /// Gets all changes since a timestamp.
+    /// </summary>
+    public IReadOnlyList<OfflineChangeRecord> GetChangesSince(DateTimeOffset since)
+    {
+        return _changes.Where(c => c.Timestamp > since).OrderBy(c => c.Timestamp).ToList();
+    }
+
+    /// <summary>
+    /// Gets all tracked changes.
+    /// </summary>
+    public IReadOnlyList<OfflineChangeRecord> GetAllChanges()
+    {
+        return _changes.ToList();
+    }
+
+    /// <summary>
+    /// Clears changes that have been successfully synced.
+    /// </summary>
+    public void ClearSyncedChanges(IEnumerable<string> syncedObjectIds)
+    {
+        var syncedSet = syncedObjectIds.ToHashSet();
+        _changes.RemoveAll(c => syncedSet.Contains(c.ObjectId));
+        SaveChanges();
+    }
+
+    /// <summary>
+    /// Merges changes from a dormant node.
+    /// </summary>
+    public void MergeChangesFrom(string dormantPath)
+    {
+        var changeLogPath = Path.Combine(dormantPath, ChangeLogFileName);
+        if (!File.Exists(changeLogPath)) return;
+
+        try
+        {
+            var json = File.ReadAllText(changeLogPath);
+            var changes = JsonSerializer.Deserialize(json,
+                DormantNodeJsonContext.Default.ListOfflineChangeRecord);
+
+            if (changes != null)
+            {
+                foreach (var change in changes)
+                {
+                    if (!_changes.Any(c => c.ObjectId == change.ObjectId &&
+                                           c.Timestamp == change.Timestamp))
+                    {
+                        _changes.Add(change);
+                    }
+                }
+                _changes.Sort((a, b) => a.Timestamp.CompareTo(b.Timestamp));
+                SaveChanges();
+            }
+        }
+        catch { }
+    }
+
+    private void LoadChanges()
+    {
+        var path = Path.Combine(_trackingPath, ChangeLogFileName);
+        if (File.Exists(path))
+        {
+            try
+            {
+                var json = File.ReadAllText(path);
+                var changes = JsonSerializer.Deserialize(json,
+                    DormantNodeJsonContext.Default.ListOfflineChangeRecord);
+                if (changes != null)
+                {
+                    _changes.AddRange(changes);
+                }
+            }
+            catch { }
+        }
+    }
+
+    private void SaveChanges()
+    {
+        var path = Path.Combine(_trackingPath, ChangeLogFileName);
+        var json = JsonSerializer.Serialize(_changes,
+            DormantNodeJsonContext.Default.ListOfflineChangeRecord);
+        File.WriteAllText(path, json);
+    }
+
+    public void Dispose()
+    {
+        if (!_disposed)
+        {
+            _watcher?.Dispose();
+            _disposed = true;
+        }
+    }
+}
+
+#endregion
+
+#region Auto-Resync Trigger
+
+/// <summary>
+/// Automatically triggers resync when dormant nodes are detected.
+/// Integrates with DormantNodeWatcher for USB mount detection.
+/// </summary>
+public sealed class AutoResyncTrigger : IDisposable
+{
+    private readonly DormantNodeWatcher _watcher;
+    private readonly IncrementalSyncManager _syncManager;
+    private readonly SneakernetConflictQueue _conflictQueue;
+    private readonly NodeDehydrator _dehydrator;
+    private readonly DehydrateOptions _defaultOptions;
+    private readonly ConcurrentDictionary<string, DateTimeOffset> _recentSyncs = new();
+    private readonly TimeSpan _minSyncInterval;
+    private bool _disposed;
+
+    public event EventHandler<AutoResyncEventArgs>? SyncStarted;
+    public event EventHandler<AutoResyncEventArgs>? SyncCompleted;
+    public event EventHandler<AutoResyncEventArgs>? ConflictsDetected;
+
+    public AutoResyncTrigger(
+        IncrementalSyncManager syncManager,
+        SneakernetConflictQueue conflictQueue,
+        NodeDehydrator dehydrator,
+        DehydrateOptions? defaultOptions = null,
+        TimeSpan? minSyncInterval = null)
+    {
+        _syncManager = syncManager;
+        _conflictQueue = conflictQueue;
+        _dehydrator = dehydrator;
+        _defaultOptions = defaultOptions ?? new DehydrateOptions { Encrypt = true };
+        _minSyncInterval = minSyncInterval ?? TimeSpan.FromMinutes(1);
+
+        _watcher = new DormantNodeWatcher(OnDormantNodeDetected);
+    }
+
+    /// <summary>
+    /// Starts watching for dormant nodes at specified paths.
+    /// </summary>
+    public void StartWatching(IEnumerable<string> watchPaths)
+    {
+        _watcher.Watch(watchPaths);
+    }
+
+    /// <summary>
+    /// Starts watching common USB mount points.
+    /// </summary>
+    public void StartWatchingUsbPaths()
+    {
+        var paths = new List<string>();
+
+        if (OperatingSystem.IsWindows())
+        {
+            // Watch removable drives
+            foreach (var drive in DriveInfo.GetDrives())
+            {
+                if (drive.DriveType == DriveType.Removable && drive.IsReady)
+                {
+                    paths.Add(drive.RootDirectory.FullName);
+                }
+            }
+        }
+        else if (OperatingSystem.IsLinux())
+        {
+            paths.Add("/media");
+            paths.Add("/mnt");
+            var userName = Environment.UserName;
+            paths.Add($"/media/{userName}");
+            paths.Add($"/run/media/{userName}");
+        }
+        else if (OperatingSystem.IsMacOS())
+        {
+            paths.Add("/Volumes");
+        }
+
+        _watcher.Watch(paths.Where(Directory.Exists));
+    }
+
+    private async void OnDormantNodeDetected(string dormantPath)
+    {
+        // Check if we recently synced this path
+        if (_recentSyncs.TryGetValue(dormantPath, out var lastSync) &&
+            DateTimeOffset.UtcNow - lastSync < _minSyncInterval)
+        {
+            return;
+        }
+
+        _recentSyncs[dormantPath] = DateTimeOffset.UtcNow;
+
+        var args = new AutoResyncEventArgs { DormantPath = dormantPath };
+
+        try
+        {
+            SyncStarted?.Invoke(this, args);
+
+            // Detect conflicts first
+            var conflicts = await _conflictQueue.DetectConflictsAsync(
+                _syncManager.ObjectStore, dormantPath);
+
+            if (conflicts.Count > 0)
+            {
+                args.Conflicts = conflicts;
+                ConflictsDetected?.Invoke(this, args);
+                return; // Don't auto-sync if there are conflicts
+            }
+
+            // Perform incremental sync
+            var result = await _syncManager.SyncAsync(
+                dormantPath, _dehydrator, _defaultOptions);
+
+            args.SyncResult = result;
+            SyncCompleted?.Invoke(this, args);
+        }
+        catch (Exception ex)
+        {
+            args.Error = ex;
+            SyncCompleted?.Invoke(this, args);
+        }
+    }
+
+    public void Dispose()
+    {
+        if (!_disposed)
+        {
+            _watcher.Dispose();
+            _disposed = true;
+        }
+    }
+}
+
+/// <summary>
+/// Event args for auto-resync events.
+/// </summary>
+public sealed class AutoResyncEventArgs : EventArgs
+{
+    public string DormantPath { get; set; } = string.Empty;
+    public IncrementalSyncResult? SyncResult { get; set; }
+    public List<SneakernetConflict>? Conflicts { get; set; }
+    public Exception? Error { get; set; }
+}
+
+#endregion
