@@ -1,0 +1,282 @@
+@page "/plugins"
+@inject IPluginDiscoveryService PluginService
+
+<PageTitle>Plugins - DataWarehouse</PageTitle>
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h4 class="mb-0">Plugin Management</h4>
+        <small class="text-muted">Manage and configure storage and database plugins</small>
+    </div>
+    <button class="btn btn-primary" @onclick="RefreshPlugins">
+        <i class="bi bi-arrow-clockwise me-1"></i> Refresh
+    </button>
+</div>
+
+<!-- Filter Tabs -->
+<ul class="nav nav-tabs mb-4">
+    <li class="nav-item">
+        <button class="nav-link @(_filter == "all" ? "active" : "")" @onclick='() => SetFilter("all")'>
+            All Plugins <span class="badge bg-secondary ms-1">@_plugins.Count</span>
+        </button>
+    </li>
+    <li class="nav-item">
+        <button class="nav-link @(_filter == "active" ? "active" : "")" @onclick='() => SetFilter("active")'>
+            Active <span class="badge bg-success ms-1">@_plugins.Count(p => p.IsEnabled)</span>
+        </button>
+    </li>
+    <li class="nav-item">
+        <button class="nav-link @(_filter == "storage" ? "active" : "")" @onclick='() => SetFilter("storage")'>
+            Storage <span class="badge bg-info ms-1">@_plugins.Count(p => p.Category == "Storage")</span>
+        </button>
+    </li>
+    <li class="nav-item">
+        <button class="nav-link @(_filter == "database" ? "active" : "")" @onclick='() => SetFilter("database")'>
+            Database <span class="badge bg-info ms-1">@_plugins.Count(p => p.Category == "Database")</span>
+        </button>
+    </li>
+    <li class="nav-item">
+        <button class="nav-link @(_filter == "interface" ? "active" : "")" @onclick='() => SetFilter("interface")'>
+            Interface <span class="badge bg-info ms-1">@_plugins.Count(p => p.Category == "Interface")</span>
+        </button>
+    </li>
+</ul>
+
+<!-- Plugin Cards -->
+<div class="row g-4">
+    @foreach (var plugin in FilteredPlugins)
+    {
+        <div class="col-xl-4 col-md-6">
+            <div class="card h-100 border-0 shadow-sm @(plugin.IsEnabled ? "" : "opacity-75")">
+                <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                    <div>
+                        <h6 class="mb-0">
+                            <i class="bi @GetPluginIcon(plugin.Category) me-2 text-primary"></i>
+                            @plugin.Name
+                        </h6>
+                        <small class="text-muted">v@(plugin.Version)</small>
+                    </div>
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" checked="@plugin.IsEnabled"
+                               @onchange="e => TogglePlugin(plugin.Id, (bool)e.Value!)" />
+                    </div>
+                </div>
+                <div class="card-body">
+                    <p class="card-text small text-muted">@plugin.Description</p>
+
+                    <div class="mb-3">
+                        <span class="badge @GetCategoryBadgeClass(plugin.Category) me-1">@plugin.Category</span>
+                        @if (plugin.IsEnabled)
+                        {
+                            <span class="badge bg-success">Active</span>
+                        }
+                        else
+                        {
+                            <span class="badge bg-secondary">Inactive</span>
+                        }
+                    </div>
+
+                    @if (plugin.Capabilities != null)
+                    {
+                        <div class="mb-3">
+                            <small class="text-muted d-block mb-1">Capabilities:</small>
+                            <div class="d-flex flex-wrap gap-1">
+                                @if (plugin.Capabilities.SupportsStreaming)
+                                {
+                                    <span class="badge bg-light text-dark border">Streaming</span>
+                                }
+                                @if (plugin.Capabilities.SupportsMultiInstance)
+                                {
+                                    <span class="badge bg-light text-dark border">Multi-Instance</span>
+                                }
+                                @if (plugin.Capabilities.SupportsTransactions)
+                                {
+                                    <span class="badge bg-light text-dark border">Transactions</span>
+                                }
+                                @if (plugin.Capabilities.SupportsCaching)
+                                {
+                                    <span class="badge bg-light text-dark border">Caching</span>
+                                }
+                                @if (plugin.Capabilities.SupportsIndexing)
+                                {
+                                    <span class="badge bg-light text-dark border">Indexing</span>
+                                }
+                            </div>
+                        </div>
+                    }
+
+                    @if (plugin.InstanceCount > 0)
+                    {
+                        <div class="mb-3">
+                            <small class="text-muted">Instances: @plugin.InstanceCount</small>
+                        </div>
+                    }
+                </div>
+                <div class="card-footer bg-white border-0">
+                    <button class="btn btn-sm btn-outline-primary me-1" @onclick="() => ShowDetails(plugin)">
+                        <i class="bi bi-info-circle me-1"></i> Details
+                    </button>
+                    <button class="btn btn-sm btn-outline-secondary" @onclick="() => ShowConfiguration(plugin)">
+                        <i class="bi bi-gear me-1"></i> Configure
+                    </button>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+@if (!FilteredPlugins.Any())
+{
+    <div class="text-center py-5">
+        <i class="bi bi-plug text-muted" style="font-size: 4rem;"></i>
+        <h5 class="mt-3 text-muted">No plugins found</h5>
+        <p class="text-muted">Try changing the filter or refreshing the plugin list.</p>
+    </div>
+}
+
+<!-- Plugin Details Modal -->
+@if (_selectedPlugin != null)
+{
+    <div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">
+                        <i class="bi @GetPluginIcon(_selectedPlugin.Category) me-2"></i>
+                        @_selectedPlugin.Name
+                    </h5>
+                    <button type="button" class="btn-close" @onclick="CloseModal"></button>
+                </div>
+                <div class="modal-body">
+                    <dl class="row">
+                        <dt class="col-sm-3">Plugin ID</dt>
+                        <dd class="col-sm-9"><code>@_selectedPlugin.Id</code></dd>
+
+                        <dt class="col-sm-3">Version</dt>
+                        <dd class="col-sm-9">@_selectedPlugin.Version</dd>
+
+                        <dt class="col-sm-3">Category</dt>
+                        <dd class="col-sm-9">@_selectedPlugin.Category</dd>
+
+                        <dt class="col-sm-3">Status</dt>
+                        <dd class="col-sm-9">
+                            @if (_selectedPlugin.IsEnabled)
+                            {
+                                <span class="badge bg-success">Active</span>
+                            }
+                            else
+                            {
+                                <span class="badge bg-secondary">Inactive</span>
+                            }
+                        </dd>
+
+                        <dt class="col-sm-3">Author</dt>
+                        <dd class="col-sm-9">@(_selectedPlugin.Author ?? "Unknown")</dd>
+
+                        <dt class="col-sm-3">Description</dt>
+                        <dd class="col-sm-9">@_selectedPlugin.Description</dd>
+
+                        <dt class="col-sm-3">Instances</dt>
+                        <dd class="col-sm-9">@_selectedPlugin.InstanceCount</dd>
+
+                        @if (_selectedPlugin.Capabilities != null)
+                        {
+                            <dt class="col-sm-3">Capabilities</dt>
+                            <dd class="col-sm-9">
+                                <ul class="list-unstyled mb-0">
+                                    <li><i class="bi @(_selectedPlugin.Capabilities.SupportsStreaming ? "bi-check-circle text-success" : "bi-x-circle text-muted") me-1"></i> Streaming</li>
+                                    <li><i class="bi @(_selectedPlugin.Capabilities.SupportsMultiInstance ? "bi-check-circle text-success" : "bi-x-circle text-muted") me-1"></i> Multi-Instance</li>
+                                    <li><i class="bi @(_selectedPlugin.Capabilities.SupportsTransactions ? "bi-check-circle text-success" : "bi-x-circle text-muted") me-1"></i> Transactions</li>
+                                    <li><i class="bi @(_selectedPlugin.Capabilities.SupportsCaching ? "bi-check-circle text-success" : "bi-x-circle text-muted") me-1"></i> Caching</li>
+                                    <li><i class="bi @(_selectedPlugin.Capabilities.SupportsIndexing ? "bi-check-circle text-success" : "bi-x-circle text-muted") me-1"></i> Indexing</li>
+                                    <li><i class="bi @(_selectedPlugin.Capabilities.SupportsEncryption ? "bi-check-circle text-success" : "bi-x-circle text-muted") me-1"></i> Encryption</li>
+                                    <li><i class="bi @(_selectedPlugin.Capabilities.SupportsCompression ? "bi-check-circle text-success" : "bi-x-circle text-muted") me-1"></i> Compression</li>
+                                </ul>
+                            </dd>
+                        }
+                    </dl>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" @onclick="CloseModal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private List<PluginInfo> _plugins = new();
+    private string _filter = "all";
+    private PluginInfo? _selectedPlugin;
+
+    protected override void OnInitialized()
+    {
+        LoadPlugins();
+    }
+
+    private void LoadPlugins()
+    {
+        _plugins = PluginService.GetDiscoveredPlugins().ToList();
+    }
+
+    private async Task RefreshPlugins()
+    {
+        await PluginService.RefreshPluginsAsync();
+        LoadPlugins();
+    }
+
+    private void SetFilter(string filter)
+    {
+        _filter = filter;
+    }
+
+    private IEnumerable<PluginInfo> FilteredPlugins => _filter switch
+    {
+        "active" => _plugins.Where(p => p.IsEnabled),
+        "storage" => _plugins.Where(p => p.Category == "Storage"),
+        "database" => _plugins.Where(p => p.Category == "Database"),
+        "interface" => _plugins.Where(p => p.Category == "Interface"),
+        _ => _plugins
+    };
+
+    private async Task TogglePlugin(string pluginId, bool enable)
+    {
+        if (enable)
+            await PluginService.EnablePluginAsync(pluginId);
+        else
+            await PluginService.DisablePluginAsync(pluginId);
+        LoadPlugins();
+    }
+
+    private void ShowDetails(PluginInfo plugin)
+    {
+        _selectedPlugin = plugin;
+    }
+
+    private void ShowConfiguration(PluginInfo plugin)
+    {
+        // TODO: Show configuration modal
+        _selectedPlugin = plugin;
+    }
+
+    private void CloseModal()
+    {
+        _selectedPlugin = null;
+    }
+
+    private string GetPluginIcon(string category) => category switch
+    {
+        "Storage" => "bi-hdd-stack",
+        "Database" => "bi-database",
+        "Interface" => "bi-diagram-3",
+        _ => "bi-plug"
+    };
+
+    private string GetCategoryBadgeClass(string category) => category switch
+    {
+        "Storage" => "bg-primary",
+        "Database" => "bg-info",
+        "Interface" => "bg-warning text-dark",
+        _ => "bg-secondary"
+    };
+}

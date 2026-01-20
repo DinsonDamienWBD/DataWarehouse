@@ -1,0 +1,333 @@
+@page "/audit"
+@inject IAuditLogService AuditService
+
+<PageTitle>Audit Logs - DataWarehouse</PageTitle>
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h4 class="mb-0">Audit Logs</h4>
+        <small class="text-muted">View and search audit trail for all system operations</small>
+    </div>
+    <button class="btn btn-outline-primary" @onclick="ExportLogs">
+        <i class="bi bi-download me-1"></i> Export
+    </button>
+</div>
+
+<!-- Stats Cards -->
+<div class="row g-4 mb-4">
+    <div class="col-xl-3 col-md-6">
+        <div class="card border-0 shadow-sm">
+            <div class="card-body">
+                <h6 class="text-muted">Total Entries (24h)</h6>
+                <h3>@_stats.TotalEntries</h3>
+            </div>
+        </div>
+    </div>
+    <div class="col-xl-3 col-md-6">
+        <div class="card border-0 shadow-sm">
+            <div class="card-body">
+                <h6 class="text-muted">Successful</h6>
+                <h3 class="text-success">@_stats.SuccessfulOperations</h3>
+            </div>
+        </div>
+    </div>
+    <div class="col-xl-3 col-md-6">
+        <div class="card border-0 shadow-sm">
+            <div class="card-body">
+                <h6 class="text-muted">Failed</h6>
+                <h3 class="text-danger">@_stats.FailedOperations</h3>
+            </div>
+        </div>
+    </div>
+    <div class="col-xl-3 col-md-6">
+        <div class="card border-0 shadow-sm">
+            <div class="card-body">
+                <h6 class="text-muted">Security Events</h6>
+                <h3 class="text-warning">@_stats.SecurityEvents</h3>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Filters -->
+<div class="card border-0 shadow-sm mb-4">
+    <div class="card-body">
+        <div class="row g-3">
+            <div class="col-md-3">
+                <label class="form-label small">Category</label>
+                <select class="form-select form-select-sm" @bind="_query.Category">
+                    <option value="">All Categories</option>
+                    <option value="Storage">Storage</option>
+                    <option value="Plugin">Plugin</option>
+                    <option value="Security">Security</option>
+                    <option value="Config">Config</option>
+                    <option value="User">User</option>
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label small">Severity</label>
+                <select class="form-select form-select-sm" @bind="_minSeverity">
+                    <option value="">All Severities</option>
+                    <option value="Debug">Debug+</option>
+                    <option value="Info">Info+</option>
+                    <option value="Warning">Warning+</option>
+                    <option value="Error">Error+</option>
+                    <option value="Critical">Critical+</option>
+                    <option value="Security">Security</option>
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label small">Status</label>
+                <select class="form-select form-select-sm" @bind="_statusFilter">
+                    <option value="">All</option>
+                    <option value="success">Success Only</option>
+                    <option value="failed">Failed Only</option>
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label small">Search</label>
+                <input type="text" class="form-control form-control-sm" placeholder="Search..." @bind="_query.SearchText" />
+            </div>
+        </div>
+        <div class="mt-3">
+            <button class="btn btn-primary btn-sm" @onclick="ApplyFilters">
+                <i class="bi bi-search me-1"></i> Search
+            </button>
+            <button class="btn btn-outline-secondary btn-sm ms-2" @onclick="ClearFilters">
+                <i class="bi bi-x-circle me-1"></i> Clear
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Log Entries -->
+<div class="card border-0 shadow-sm">
+    <div class="card-header bg-white d-flex justify-content-between align-items-center">
+        <h5 class="mb-0">Log Entries</h5>
+        <span class="badge bg-secondary">@_logs.Count entries</span>
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th style="width: 150px;">Timestamp</th>
+                        <th style="width: 80px;">Severity</th>
+                        <th style="width: 100px;">Category</th>
+                        <th style="width: 100px;">Action</th>
+                        <th>Message</th>
+                        <th style="width: 100px;">User</th>
+                        <th style="width: 80px;">Status</th>
+                        <th style="width: 50px;"></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var log in _logs)
+                    {
+                        <tr class="@(log.Success ? "" : "table-danger")">
+                            <td class="small text-muted">@log.Timestamp.ToString("yyyy-MM-dd HH:mm:ss")</td>
+                            <td><span class="badge @GetSeverityBadgeClass(log.Severity)">@log.Severity</span></td>
+                            <td><span class="badge bg-secondary">@log.Category</span></td>
+                            <td>@log.Action</td>
+                            <td class="small">@TruncateMessage(log.Message, 60)</td>
+                            <td class="small">@(log.UserName ?? "-")</td>
+                            <td>
+                                @if (log.Success)
+                                {
+                                    <span class="badge bg-success">OK</span>
+                                }
+                                else
+                                {
+                                    <span class="badge bg-danger">Fail</span>
+                                }
+                            </td>
+                            <td>
+                                <button class="btn btn-sm btn-link p-0" @onclick="() => ShowDetails(log)">
+                                    <i class="bi bi-eye"></i>
+                                </button>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+    <div class="card-footer bg-white">
+        <div class="d-flex justify-content-between align-items-center">
+            <span class="text-muted small">Showing @_logs.Count entries</span>
+            <div>
+                <button class="btn btn-sm btn-outline-secondary me-1" disabled="@(_query.Skip == 0)" @onclick="PreviousPage">
+                    Previous
+                </button>
+                <button class="btn btn-sm btn-outline-secondary" disabled="@(_logs.Count < _query.Take)" @onclick="NextPage">
+                    Next
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Details Modal -->
+@if (_selectedLog != null)
+{
+    <div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Log Entry Details</h5>
+                    <button type="button" class="btn-close" @onclick="CloseModal"></button>
+                </div>
+                <div class="modal-body">
+                    <dl class="row">
+                        <dt class="col-sm-3">ID</dt>
+                        <dd class="col-sm-9"><code>@_selectedLog.Id</code></dd>
+
+                        <dt class="col-sm-3">Timestamp</dt>
+                        <dd class="col-sm-9">@_selectedLog.Timestamp.ToString("yyyy-MM-dd HH:mm:ss.fff")</dd>
+
+                        <dt class="col-sm-3">Category</dt>
+                        <dd class="col-sm-9">@_selectedLog.Category</dd>
+
+                        <dt class="col-sm-3">Action</dt>
+                        <dd class="col-sm-9">@_selectedLog.Action</dd>
+
+                        <dt class="col-sm-3">Severity</dt>
+                        <dd class="col-sm-9"><span class="badge @GetSeverityBadgeClass(_selectedLog.Severity)">@_selectedLog.Severity</span></dd>
+
+                        <dt class="col-sm-3">Status</dt>
+                        <dd class="col-sm-9">
+                            @if (_selectedLog.Success)
+                            {
+                                <span class="badge bg-success">Success</span>
+                            }
+                            else
+                            {
+                                <span class="badge bg-danger">Failed</span>
+                            }
+                        </dd>
+
+                        <dt class="col-sm-3">User</dt>
+                        <dd class="col-sm-9">@(_selectedLog.UserName ?? "-") (@(_selectedLog.UserId ?? "-"))</dd>
+
+                        <dt class="col-sm-3">Tenant</dt>
+                        <dd class="col-sm-9">@(_selectedLog.TenantId ?? "-")</dd>
+
+                        <dt class="col-sm-3">Resource</dt>
+                        <dd class="col-sm-9">@(_selectedLog.ResourceType ?? "-") / @(_selectedLog.ResourceId ?? "-")</dd>
+
+                        <dt class="col-sm-3">IP Address</dt>
+                        <dd class="col-sm-9">@(_selectedLog.IpAddress ?? "-")</dd>
+
+                        <dt class="col-sm-3">Duration</dt>
+                        <dd class="col-sm-9">@(_selectedLog.Duration?.TotalMilliseconds.ToString("F2") ?? "-") ms</dd>
+
+                        <dt class="col-sm-3">Message</dt>
+                        <dd class="col-sm-9">@_selectedLog.Message</dd>
+
+                        @if (!string.IsNullOrEmpty(_selectedLog.ErrorMessage))
+                        {
+                            <dt class="col-sm-3">Error</dt>
+                            <dd class="col-sm-9 text-danger">@_selectedLog.ErrorMessage</dd>
+                        }
+
+                        @if (_selectedLog.Details != null && _selectedLog.Details.Any())
+                        {
+                            <dt class="col-sm-3">Details</dt>
+                            <dd class="col-sm-9">
+                                <pre class="bg-light p-2 rounded small">@System.Text.Json.JsonSerializer.Serialize(_selectedLog.Details, new System.Text.Json.JsonSerializerOptions { WriteIndented = true })</pre>
+                            </dd>
+                        }
+                    </dl>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" @onclick="CloseModal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private List<AuditLogEntry> _logs = new();
+    private AuditLogStats _stats = new();
+    private AuditLogQuery _query = new() { Take = 50 };
+    private AuditLogEntry? _selectedLog;
+    private string _minSeverity = "";
+    private string _statusFilter = "";
+
+    protected override void OnInitialized()
+    {
+        LoadData();
+    }
+
+    private void LoadData()
+    {
+        _stats = AuditService.GetStats(TimeSpan.FromHours(24));
+        ApplyFilters();
+    }
+
+    private void ApplyFilters()
+    {
+        _query.MinSeverity = string.IsNullOrEmpty(_minSeverity) ? null : Enum.Parse<AuditSeverity>(_minSeverity);
+        _query.SuccessOnly = _statusFilter switch
+        {
+            "success" => true,
+            "failed" => false,
+            _ => null
+        };
+
+        _logs = AuditService.QueryLogs(_query).ToList();
+    }
+
+    private void ClearFilters()
+    {
+        _query = new AuditLogQuery { Take = 50 };
+        _minSeverity = "";
+        _statusFilter = "";
+        ApplyFilters();
+    }
+
+    private void PreviousPage()
+    {
+        _query.Skip = Math.Max(0, _query.Skip - _query.Take);
+        ApplyFilters();
+    }
+
+    private void NextPage()
+    {
+        _query.Skip += _query.Take;
+        ApplyFilters();
+    }
+
+    private void ShowDetails(AuditLogEntry log)
+    {
+        _selectedLog = log;
+    }
+
+    private void CloseModal()
+    {
+        _selectedLog = null;
+    }
+
+    private void ExportLogs()
+    {
+        // TODO: Implement export
+    }
+
+    private string GetSeverityBadgeClass(AuditSeverity severity) => severity switch
+    {
+        AuditSeverity.Debug => "bg-secondary",
+        AuditSeverity.Info => "bg-info",
+        AuditSeverity.Warning => "bg-warning text-dark",
+        AuditSeverity.Error => "bg-danger",
+        AuditSeverity.Critical => "bg-danger",
+        AuditSeverity.Security => "bg-dark",
+        _ => "bg-secondary"
+    };
+
+    private string TruncateMessage(string message, int maxLength)
+    {
+        if (string.IsNullOrEmpty(message)) return "-";
+        return message.Length <= maxLength ? message : message[..maxLength] + "...";
+    }
+}

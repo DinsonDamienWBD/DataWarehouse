@@ -172,44 +172,70 @@ namespace DataWarehouse.SDK.Utilities
         {
             if (_opCount >= CompactionThreshold)
             {
-                Compact();
+                // Call internal compaction method that doesn't acquire lock
+                // since caller (Set/Remove) already holds it
+                CompactInternal();
                 _opCount = 0;
+            }
+        }
+
+        /// <summary>
+        /// Internal compaction method. Caller must hold _lock.
+        /// </summary>
+        private void CompactInternal()
+        {
+            string tempPath = _filePath + ".compact";
+            try
+            {
+                using (var fs = new FileStream(tempPath, FileMode.Create))
+                using (var writer = new BinaryWriter(fs))
+                {
+                    foreach (var kvp in _cache)
+                    {
+                        writer.Write((byte)1); // Set
+                        writer.Write(kvp.Key);
+                        var json = JsonSerializer.Serialize(kvp.Value);
+                        var bytes = Encoding.UTF8.GetBytes(json);
+                        writer.Write(bytes.Length);
+                        writer.Write(bytes);
+                    }
+                    fs.Flush(flushToDisk: true);
+                }
+
+                if (_writer != null)
+                {
+                    _writer.Close();
+                    _journalStream?.Close();
+                }
+
+                File.Move(tempPath, _filePath, overwrite: true);
+                InitializeJournal();
+            }
+            catch
+            {
+                if (File.Exists(tempPath))
+                {
+                    try { File.Delete(tempPath); } catch { }
+                }
+                if (_journalStream == null || !_journalStream.CanWrite)
+                {
+                    InitializeJournal();
+                }
+                throw;
             }
         }
 
         /// <summary>
         /// Rewrites the log to contain only the current state (Snapshot).
         /// Reduces file size and replay time.
+        /// Thread-safe: acquires the lock to prevent concurrent modifications during compaction.
         /// </summary>
         public void Compact()
         {
-            string tempPath = _filePath + ".compact";
-            using (var fs = new FileStream(tempPath, FileMode.Create))
-            using (var writer = new BinaryWriter(fs))
+            lock (_lock)
             {
-                foreach (var kvp in _cache)
-                {
-                    writer.Write((byte)1); // Set
-                    writer.Write(kvp.Key);
-                    var json = JsonSerializer.Serialize(kvp.Value);
-                    var bytes = Encoding.UTF8.GetBytes(json);
-                    writer.Write(bytes.Length);
-                    writer.Write(bytes);
-                }
-                fs.Flush();
+                CompactInternal();
             }
-
-            // Atomic Swap
-            if (_writer != null)
-            {
-                _writer.Close();
-                _journalStream?.Close();
-            }
-
-            File.Move(tempPath, _filePath, overwrite: true);
-
-            // Re-open
-            InitializeJournal();
         }
 
         /// <summary>

@@ -7,14 +7,18 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Folder Include="AI\Graph\" />
-    <Folder Include="AI\Math\" />
-    <Folder Include="AI\Vectors\" />
+    <Compile Remove="AI\Graph\**" />
+    <Compile Remove="AI\Math\**" />
+    <EmbeddedResource Remove="AI\Graph\**" />
+    <EmbeddedResource Remove="AI\Math\**" />
+    <None Remove="AI\Graph\**" />
+    <None Remove="AI\Math\**" />
   </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="Microsoft.Json.Schema" Version="2.3.0" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
+    <PackageReference Include="System.IO.Hashing" Version="10.0.2" />
   </ItemGroup>
 
 </Project>

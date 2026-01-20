@@ -11,19 +11,78 @@
         public string Id { get; set; } = Guid.NewGuid().ToString("N");
 
         /// <summary>
+        /// Human-readable name for the manifest
+        /// </summary>
+        public string Name { get; set; } = string.Empty;
+
+        /// <summary>
+        /// MIME content type
+        /// </summary>
+        public string ContentType { get; set; } = "application/octet-stream";
+
+        /// <summary>
         /// Container ID
         /// </summary>
         public string ContainerId { get; set; } = "default";
 
         /// <summary>
-        /// BLOB URI
+        /// BLOB URI - The primary storage location for the blob content.
         /// </summary>
         public string BlobUri { get; set; } = string.Empty;
+
+        /// <summary>
+        /// Storage URI - Alias for BlobUri for tiered storage operations.
+        /// Returns BlobUri if set, otherwise constructs from Id and ContainerId.
+        /// </summary>
+        public Uri StorageUri
+        {
+            get
+            {
+                if (!string.IsNullOrEmpty(BlobUri))
+                {
+                    return new Uri(BlobUri);
+                }
+                return new Uri($"blob://{ContainerId}/{Id}");
+            }
+            set => BlobUri = value?.ToString() ?? string.Empty;
+        }
 
         /// <summary>
         /// BLOB size in bytes
         /// </summary>
         public long SizeBytes { get; set; }
+
+        /// <summary>
+        /// Total size in bytes (alias for SizeBytes for compatibility)
+        /// </summary>
+        public long TotalSize
+        {
+            get => SizeBytes;
+            set => SizeBytes = value;
+        }
+
+        /// <summary>
+        /// OriginalSize alias for backward compatibility.
+        /// </summary>
+        public long OriginalSize
+        {
+            get => SizeBytes;
+            set => SizeBytes = value;
+        }
+
+        /// <summary>
+        /// Size alias for backward compatibility.
+        /// </summary>
+        public long Size
+        {
+            get => SizeBytes;
+            set => SizeBytes = value;
+        }
+
+        /// <summary>
+        /// Custom metadata key-value pairs
+        /// </summary>
+        public Dictionary<string, string> Metadata { get; set; } = new();
 
         /// <summary>
         /// Created datetime in offset
@@ -76,6 +135,24 @@
         /// Integrity Checksum (SHA256/CRC32).
         /// </summary>
         public string Checksum { get; set; } = string.Empty;
+
+        /// <summary>
+        /// ContentHash alias for Checksum (backward compatibility).
+        /// </summary>
+        public string ContentHash
+        {
+            get => Checksum;
+            set => Checksum = value;
+        }
+
+        /// <summary>
+        /// Hash alias for Checksum (backward compatibility).
+        /// </summary>
+        public string Hash
+        {
+            get => Checksum;
+            set => Checksum = value;
+        }
 
         /// <summary>
         /// [NEW] System-managed tags for Governance and Sentinel state.

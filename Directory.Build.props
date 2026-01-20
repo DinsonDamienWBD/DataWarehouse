@@ -1,0 +1,22 @@
+<Project>
+  <PropertyGroup>
+    <!-- Enable nullable reference types across all projects -->
+    <Nullable>enable</Nullable>
+
+    <!-- Treat nullable warnings as errors for production readiness -->
+    <WarningsAsErrors>nullable</WarningsAsErrors>
+
+    <!-- Enable latest C# language features -->
+    <LangVersion>latest</LangVersion>
+
+    <!-- Enable implicit usings for cleaner code -->
+    <ImplicitUsings>enable</ImplicitUsings>
+
+    <!-- Enable analyzers for code quality -->
+    <EnableNETAnalyzers>true</EnableNETAnalyzers>
+    <AnalysisLevel>latest</AnalysisLevel>
+
+    <!-- Enforce code analysis -->
+    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+  </PropertyGroup>
+</Project>

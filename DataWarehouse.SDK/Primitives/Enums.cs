@@ -14,41 +14,64 @@ namespace DataWarehouse.SDK.Primitives
     public enum PluginCategory
     {
         /// <summary>
-        /// Anything that mutates data
-        /// Includes compression, encryption, data format changes, etc.
+        /// Anything that mutates data (compression, encryption, format changes).
         /// </summary>
         DataTransformationProvider,
 
         /// <summary>
-        /// Represents an abstraction for a storage provider that manages data persistence and retrieval.
+        /// Storage providers for data persistence (Local, S3, Azure, IPFS).
         /// </summary>
-        /// <remarks>Implementations of this interface or class provide mechanisms to store and access
-        /// data from various storage backends, such as file systems, databases, or cloud storage services. Use this
-        /// type to decouple application logic from specific storage implementations.</remarks>
         StorageProvider,
 
         /// <summary>
-        /// Provides an interface for indexing and retrieving metadata for content items.  
+        /// Metadata indexing and search (SQLite, Postgres, Elasticsearch).
         /// </summary>
-        /// <remarks>Implementations of this provider enable efficient searching and filtering of content
-        /// based on associated metadata. This type is typically used in scenarios where content needs to be
-        /// discoverable or categorized by metadata attributes.</remarks>
         MetadataIndexingProvider,
 
         /// <summary>
-        /// Provides methods and properties for managing security operations such as authentication, authorization, 
-        /// ACL, credential management etc.
+        /// Security operations (authentication, authorization, ACL, encryption keys).
         /// </summary>
-        /// <remarks>Use this class to implement or access security-related functionality within an
-        /// application. The specific capabilities and usage patterns depend on the implementation of the security
-        /// provider. This class may be used to abstract different security mechanisms, allowing for flexible
-        /// integration with various authentication or authorization systems.</remarks>
         SecurityProvider,
 
         /// <summary>
-        /// Represents a provider that manages orchestration operations or services.
+        /// Orchestration services (consensus, workflow, pipelines).
         /// </summary>
-        OrchestrationProvider
+        OrchestrationProvider,
+
+        /// <summary>
+        /// Active features with lifecycle management (SQL Listener, gRPC, WebSocket).
+        /// </summary>
+        FeatureProvider,
+
+        /// <summary>
+        /// AI/ML providers (OpenAI, Claude, Ollama, Copilot, embeddings).
+        /// </summary>
+        AIProvider,
+
+        /// <summary>
+        /// Federation and replication for distributed deployments.
+        /// </summary>
+        FederationProvider,
+
+        /// <summary>
+        /// Governance, compliance, and policy enforcement (Neural Sentinel).
+        /// </summary>
+        GovernanceProvider,
+
+        /// <summary>
+        /// Metrics, telemetry, and observability.
+        /// </summary>
+        MetricsProvider,
+
+        /// <summary>
+        /// Serialization providers (JSON, MessagePack, Protobuf).
+        /// </summary>
+        SerializationProvider,
+
+        /// <summary>
+        /// Interface providers for external access (REST, gRPC, SQL, WebSocket).
+        /// </summary>
+        InterfaceProvider
     }
 
     /// <summary>
@@ -254,23 +277,41 @@ namespace DataWarehouse.SDK.Primitives
 
     /// <summary>
     /// Represents the performance characteristic of a storage node.
+    /// Supports a wide range of storage tiers from hot (frequently accessed)
+    /// to deep archive (rarely accessed, long-term retention).
     /// </summary>
     public enum StorageTier
     {
         /// <summary>
-        /// Hot
+        /// Hot - Frequently accessed data with lowest latency.
         /// </summary>
         Hot,
 
         /// <summary>
-        /// Warm
+        /// Warm - Less frequently accessed data with moderate latency.
         /// </summary>
         Warm,
 
         /// <summary>
-        /// Cold
+        /// Cool - Infrequently accessed data (similar to AWS S3 Standard-IA or Azure Cool).
         /// </summary>
-        Cold
+        Cool,
+
+        /// <summary>
+        /// Cold - Rarely accessed data with higher access latency.
+        /// </summary>
+        Cold,
+
+        /// <summary>
+        /// Archive - Long-term storage with retrieval delays (similar to AWS Glacier or Azure Archive).
+        /// </summary>
+        Archive,
+
+        /// <summary>
+        /// DeepArchive - Lowest-cost storage for data that is rarely accessed
+        /// (similar to AWS Glacier Deep Archive).
+        /// </summary>
+        DeepArchive
     }
 
     /// <summary>

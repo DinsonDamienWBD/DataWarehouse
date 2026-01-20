@@ -1,91 +1,121 @@
-﻿using DataWarehouse.SDK.Primitives;
-using DataWarehouse.SDK.Security;
+using DataWarehouse.SDK.Primitives;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.SDK.Contracts
 {
+    /// <summary>
+    /// Core interface for the DataWarehouse orchestrator (Kernel).
+    ///
+    /// The Kernel is the central orchestrator - it does NOT perform storage operations directly.
+    /// Storage operations are handled by IStorageProvider plugins.
+    /// Container/partition management is handled by IContainerManager.
+    ///
+    /// Responsibilities:
+    /// - Plugin registration and lifecycle management
+    /// - Message routing between plugins
+    /// - Pipeline orchestration
+    /// - Background job management
+    /// </summary>
     public interface IDataWarehouse
     {
-        // --- Storage Operations (Secured) ---
+        /// <summary>
+        /// Unique identifier for this kernel instance.
+        /// </summary>
+        string KernelId { get; }
 
         /// <summary>
-        /// Stores a blob in a specific container with security checks.
+        /// Current operating mode.
         /// </summary>
-        Task<string> StoreBlobAsync(
-            ISecurityContext context,
-            string containerId,
-            string blobName,
-            Stream data);
+        OperatingMode OperatingMode { get; }
 
         /// <summary>
-        /// Retrieves a blob if the context has Read access.
+        /// Whether the kernel is initialized and ready.
         /// </summary>
-        Task<Stream> GetBlobAsync(
-            ISecurityContext context,
-            string containerId,
-            string blobName);
-
-        // --- Management Operations ---
+        bool IsReady { get; }
 
         /// <summary>
-        /// Creates a new container (Room/Partition) and assigns ownership to the caller.
+        /// The message bus for inter-plugin communication.
         /// </summary>
-        Task CreateContainerAsync(
-            ISecurityContext context,
-            string containerId,
-            bool encrypt = false,
-            bool compress = false);
+        IMessageBus MessageBus { get; }
 
         /// <summary>
-        /// Updates the ACL for a container.
+        /// The pipeline orchestrator for transformation chains.
         /// </summary>
-        Task GrantAccessAsync(
-            ISecurityContext ownerContext,
-            string containerId,
-            string targetUserId,
-            AccessLevel level);
+        IPipelineOrchestrator PipelineOrchestrator { get; }
 
-        // --- Search Operations ---
-
-        Task<string[]> SearchAsync(
-            ISecurityContext context,
-            string query,
-            float[]? vector,
-            int limit = 10);
-
-        // Original IDataWarehouse Contract from Core.Contracts
-        /*
-        /// <summary>
-        /// Configure the data warehouse with settings from configuration.
-        /// </summary>
-        /// <param name="config"></param>
-        void Configure(IConfiguration config);
+        // --- Lifecycle ---
 
         /// <summary>
-        /// Mount the data warehouse.
+        /// Initialize the kernel and load plugins.
         /// </summary>
-        /// <returns></returns>
-        Task MountAsync();
+        Task InitializeAsync(CancellationToken ct = default);
 
         /// <summary>
-        /// Unmount the data warehouse.
+        /// Register a plugin with the kernel.
         /// </summary>
-        /// <returns></returns>
-        Task DismountAsync();
+        Task<HandshakeResponse> RegisterPluginAsync(IPlugin plugin, CancellationToken ct = default);
+
+        // --- Storage Providers (not storage operations) ---
 
         /// <summary>
-        /// Saves a binary blob.
+        /// Set the primary storage provider.
         /// </summary>
-        Task StoreObjectAsync(string bucket, string key, Stream data, StorageIntent intent);
+        void SetPrimaryStorage(IStorageProvider storage);
 
         /// <summary>
-        /// Retrieves a binary blob.
+        /// Set the cache storage provider.
         /// </summary>
-        Task<Stream> RetrieveObjectAsync(string bucket, string key);
+        void SetCacheStorage(IStorageProvider storage);
 
         /// <summary>
-        /// Checks system health (Storage, Keys, Plugins).
+        /// Get the primary storage provider.
         /// </summary>
-        void CheckHealth();
-        */
+        IStorageProvider? GetPrimaryStorage();
+
+        /// <summary>
+        /// Get the cache storage provider.
+        /// </summary>
+        IStorageProvider? GetCacheStorage();
+
+        // --- Pipeline ---
+
+        /// <summary>
+        /// Execute the write pipeline (compress, encrypt, etc.).
+        /// </summary>
+        Task<Stream> ExecuteWritePipelineAsync(Stream input, PipelineContext context, CancellationToken ct = default);
+
+        /// <summary>
+        /// Execute the read pipeline (decrypt, decompress, etc.).
+        /// </summary>
+        Task<Stream> ExecuteReadPipelineAsync(Stream input, PipelineContext context, CancellationToken ct = default);
+
+        /// <summary>
+        /// Override pipeline configuration at runtime.
+        /// </summary>
+        void SetPipelineConfiguration(PipelineConfiguration config, bool persistent = true);
+
+        // --- Plugins ---
+
+        /// <summary>
+        /// Get a plugin by type.
+        /// </summary>
+        T? GetPlugin<T>() where T : class, IPlugin;
+
+        /// <summary>
+        /// Get a plugin by type and ID.
+        /// </summary>
+        T? GetPlugin<T>(string id) where T : class, IPlugin;
+
+        /// <summary>
+        /// Get all plugins of a type.
+        /// </summary>
+        IEnumerable<T> GetPlugins<T>() where T : class, IPlugin;
+
+        // --- Background Jobs ---
+
+        /// <summary>
+        /// Run a background job.
+        /// </summary>
+        string RunInBackground(Func<CancellationToken, Task> job, string? jobId = null);
     }
 }

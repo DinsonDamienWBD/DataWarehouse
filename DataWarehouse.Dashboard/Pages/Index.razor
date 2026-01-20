@@ -1,0 +1,357 @@
+@page "/"
+@inject ISystemHealthService HealthService
+@inject IPluginDiscoveryService PluginService
+@inject IStorageManagementService StorageService
+@inject IAuditLogService AuditService
+@implements IDisposable
+
+<PageTitle>Dashboard - DataWarehouse</PageTitle>
+
+<div class="row g-4 mb-4">
+    <!-- System Health Card -->
+    <div class="col-xl-3 col-md-6">
+        <div class="card h-100 border-0 shadow-sm">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h6 class="text-muted mb-1">System Health</h6>
+                        <h3 class="mb-0">
+                            @if (_health != null)
+                            {
+                                <span class="@GetHealthBadgeClass(_health.OverallStatus)">
+                                    @_health.OverallStatus
+                                </span>
+                            }
+                            else
+                            {
+                                <span class="text-muted">Loading...</span>
+                            }
+                        </h3>
+                    </div>
+                    <div class="bg-primary bg-opacity-10 p-3 rounded">
+                        <i class="bi bi-heart-pulse text-primary" style="font-size: 1.5rem;"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Active Plugins Card -->
+    <div class="col-xl-3 col-md-6">
+        <div class="card h-100 border-0 shadow-sm">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h6 class="text-muted mb-1">Active Plugins</h6>
+                        <h3 class="mb-0">@_activePlugins / @_totalPlugins</h3>
+                    </div>
+                    <div class="bg-success bg-opacity-10 p-3 rounded">
+                        <i class="bi bi-plug text-success" style="font-size: 1.5rem;"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Storage Usage Card -->
+    <div class="col-xl-3 col-md-6">
+        <div class="card h-100 border-0 shadow-sm">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h6 class="text-muted mb-1">Storage Used</h6>
+                        <h3 class="mb-0">@FormatBytes(_usedStorage)</h3>
+                        <small class="text-muted">of @FormatBytes(_totalStorage)</small>
+                    </div>
+                    <div class="bg-info bg-opacity-10 p-3 rounded">
+                        <i class="bi bi-hdd text-info" style="font-size: 1.5rem;"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Recent Operations Card -->
+    <div class="col-xl-3 col-md-6">
+        <div class="card h-100 border-0 shadow-sm">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h6 class="text-muted mb-1">Operations (24h)</h6>
+                        <h3 class="mb-0">@_operationsCount</h3>
+                        <small class="@(_failedOperations > 0 ? "text-danger" : "text-muted")">
+                            @_failedOperations failed
+                        </small>
+                    </div>
+                    <div class="bg-warning bg-opacity-10 p-3 rounded">
+                        <i class="bi bi-activity text-warning" style="font-size: 1.5rem;"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-4">
+    <!-- System Metrics -->
+    <div class="col-xl-8">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-white">
+                <h5 class="mb-0"><i class="bi bi-graph-up me-2"></i>System Metrics</h5>
+            </div>
+            <div class="card-body">
+                @if (_metrics != null)
+                {
+                    <div class="row">
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label small text-muted">CPU Usage</label>
+                            <div class="progress" style="height: 20px;">
+                                <div class="progress-bar @GetProgressBarClass(_metrics.CpuUsagePercent)"
+                                     role="progressbar"
+                                     style="width: @_metrics.CpuUsagePercent%">
+                                    @_metrics.CpuUsagePercent.ToString("F1")%
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label small text-muted">Memory Usage</label>
+                            @{
+                                var memPercent = _metrics.MemoryTotalBytes > 0
+                                    ? (double)_metrics.MemoryUsedBytes / _metrics.MemoryTotalBytes * 100
+                                    : 0;
+                            }
+                            <div class="progress" style="height: 20px;">
+                                <div class="progress-bar @GetProgressBarClass(memPercent)"
+                                     role="progressbar"
+                                     style="width: @memPercent%">
+                                    @memPercent.ToString("F1")%
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label small text-muted">Disk Usage</label>
+                            @{
+                                var diskPercent = _metrics.DiskTotalBytes > 0
+                                    ? (double)_metrics.DiskUsedBytes / _metrics.DiskTotalBytes * 100
+                                    : 0;
+                            }
+                            <div class="progress" style="height: 20px;">
+                                <div class="progress-bar @GetProgressBarClass(diskPercent)"
+                                     role="progressbar"
+                                     style="width: @diskPercent%">
+                                    @diskPercent.ToString("F1")%
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <hr />
+                    <div class="row text-center">
+                        <div class="col">
+                            <h4 class="mb-0">@_metrics.ActiveConnections</h4>
+                            <small class="text-muted">Active Connections</small>
+                        </div>
+                        <div class="col">
+                            <h4 class="mb-0">@_metrics.RequestsPerSecond.ToString("F1")</h4>
+                            <small class="text-muted">Requests/sec</small>
+                        </div>
+                        <div class="col">
+                            <h4 class="mb-0">@_metrics.ThreadCount</h4>
+                            <small class="text-muted">Threads</small>
+                        </div>
+                        <div class="col">
+                            <h4 class="mb-0">@FormatUptime(_metrics.UptimeSeconds)</h4>
+                            <small class="text-muted">Uptime</small>
+                        </div>
+                    </div>
+                }
+                else
+                {
+                    <div class="text-center text-muted py-4">
+                        <div class="spinner-border spinner-border-sm me-2"></div>
+                        Loading metrics...
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+
+    <!-- Alerts -->
+    <div class="col-xl-4">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                <h5 class="mb-0"><i class="bi bi-bell me-2"></i>Active Alerts</h5>
+                <span class="badge bg-danger">@_alerts.Count(a => !a.IsAcknowledged)</span>
+            </div>
+            <div class="card-body overflow-auto" style="max-height: 300px;">
+                @if (_alerts.Any())
+                {
+                    @foreach (var alert in _alerts.Take(5))
+                    {
+                        <div class="alert @GetAlertClass(alert.Severity) py-2 mb-2" role="alert">
+                            <strong>@alert.Title</strong>
+                            <br />
+                            <small>@alert.Message</small>
+                            <br />
+                            <small class="text-muted">@alert.Timestamp.ToString("HH:mm:ss")</small>
+                        </div>
+                    }
+                }
+                else
+                {
+                    <div class="text-center text-muted py-4">
+                        <i class="bi bi-check-circle text-success" style="font-size: 2rem;"></i>
+                        <p class="mb-0 mt-2">No active alerts</p>
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-4 mt-2">
+    <!-- Recent Activity -->
+    <div class="col-12">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                <h5 class="mb-0"><i class="bi bi-clock-history me-2"></i>Recent Activity</h5>
+                <a href="audit" class="btn btn-sm btn-outline-primary">View All</a>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Time</th>
+                                <th>Category</th>
+                                <th>Action</th>
+                                <th>User</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var log in _recentLogs)
+                            {
+                                <tr>
+                                    <td class="text-muted small">@log.Timestamp.ToString("HH:mm:ss")</td>
+                                    <td><span class="badge bg-secondary">@log.Category</span></td>
+                                    <td>@log.Action</td>
+                                    <td>@(log.UserName ?? "System")</td>
+                                    <td>
+                                        @if (log.Success)
+                                        {
+                                            <span class="badge bg-success">Success</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="badge bg-danger">Failed</span>
+                                        }
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private SystemHealthStatus? _health;
+    private SystemMetrics? _metrics;
+    private int _activePlugins;
+    private int _totalPlugins;
+    private long _usedStorage;
+    private long _totalStorage;
+    private int _operationsCount;
+    private int _failedOperations;
+    private List<SystemAlert> _alerts = new();
+    private List<AuditLogEntry> _recentLogs = new();
+    private Timer? _refreshTimer;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await RefreshData();
+        _refreshTimer = new Timer(async _ => await RefreshData(), null, TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(5));
+    }
+
+    private async Task RefreshData()
+    {
+        try
+        {
+            _health = await HealthService.GetSystemHealthAsync();
+            _metrics = HealthService.GetCurrentMetrics();
+            _alerts = HealthService.GetAlerts(true).ToList();
+
+            var plugins = PluginService.GetDiscoveredPlugins().ToList();
+            _totalPlugins = plugins.Count;
+            _activePlugins = plugins.Count(p => p.IsEnabled);
+
+            var pools = StorageService.GetStoragePools().ToList();
+            _totalStorage = pools.Sum(p => p.CapacityBytes);
+            _usedStorage = pools.Sum(p => p.UsedBytes);
+
+            var stats = AuditService.GetStats(TimeSpan.FromHours(24));
+            _operationsCount = stats.TotalEntries;
+            _failedOperations = stats.FailedOperations;
+
+            _recentLogs = AuditService.GetRecentLogs(10).ToList();
+
+            await InvokeAsync(StateHasChanged);
+        }
+        catch
+        {
+            // Ignore refresh errors
+        }
+    }
+
+    private string GetHealthBadgeClass(HealthStatus status) => status switch
+    {
+        HealthStatus.Healthy => "badge bg-success",
+        HealthStatus.Degraded => "badge bg-warning",
+        HealthStatus.Critical => "badge bg-danger",
+        _ => "badge bg-secondary"
+    };
+
+    private string GetProgressBarClass(double percent)
+    {
+        if (percent < 60) return "bg-success";
+        if (percent < 80) return "bg-warning";
+        return "bg-danger";
+    }
+
+    private string GetAlertClass(AlertSeverity severity) => severity switch
+    {
+        AlertSeverity.Info => "alert-info",
+        AlertSeverity.Warning => "alert-warning",
+        AlertSeverity.Error => "alert-danger",
+        AlertSeverity.Critical => "alert-danger",
+        _ => "alert-secondary"
+    };
+
+    private string FormatBytes(long bytes)
+    {
+        string[] sizes = { "B", "KB", "MB", "GB", "TB" };
+        int order = 0;
+        double size = bytes;
+        while (size >= 1024 && order < sizes.Length - 1)
+        {
+            order++;
+            size /= 1024;
+        }
+        return $"{size:F1} {sizes[order]}";
+    }
+
+    private string FormatUptime(long seconds)
+    {
+        var ts = TimeSpan.FromSeconds(seconds);
+        if (ts.TotalDays >= 1) return $"{(int)ts.TotalDays}d {ts.Hours}h";
+        if (ts.TotalHours >= 1) return $"{(int)ts.TotalHours}h {ts.Minutes}m";
+        return $"{ts.Minutes}m";
+    }
+
+    public void Dispose()
+    {
+        _refreshTimer?.Dispose();
+    }
+}

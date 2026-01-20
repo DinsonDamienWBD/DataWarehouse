@@ -1,0 +1,374 @@
+@page "/storage"
+@inject IStorageManagementService StorageService
+
+<PageTitle>Storage - DataWarehouse</PageTitle>
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h4 class="mb-0">Storage Management</h4>
+        <small class="text-muted">Manage storage pools, RAID configurations, and instances</small>
+    </div>
+    <button class="btn btn-primary" @onclick="ShowCreatePoolModal">
+        <i class="bi bi-plus-lg me-1"></i> Create Pool
+    </button>
+</div>
+
+<!-- Storage Summary -->
+<div class="row g-4 mb-4">
+    <div class="col-xl-3 col-md-6">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-body">
+                <h6 class="text-muted">Total Pools</h6>
+                <h3>@_pools.Count</h3>
+            </div>
+        </div>
+    </div>
+    <div class="col-xl-3 col-md-6">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-body">
+                <h6 class="text-muted">Total Capacity</h6>
+                <h3>@FormatBytes(_pools.Sum(p => p.CapacityBytes))</h3>
+            </div>
+        </div>
+    </div>
+    <div class="col-xl-3 col-md-6">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-body">
+                <h6 class="text-muted">Used Storage</h6>
+                <h3>@FormatBytes(_pools.Sum(p => p.UsedBytes))</h3>
+            </div>
+        </div>
+    </div>
+    <div class="col-xl-3 col-md-6">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-body">
+                <h6 class="text-muted">Pool Health</h6>
+                <h3>
+                    <span class="text-success">@_pools.Count(p => p.Health == PoolHealth.Healthy)</span> /
+                    <span class="text-warning">@_pools.Count(p => p.Health == PoolHealth.Degraded)</span> /
+                    <span class="text-danger">@_pools.Count(p => p.Health == PoolHealth.Offline)</span>
+                </h3>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Storage Pools -->
+<div class="card border-0 shadow-sm mb-4">
+    <div class="card-header bg-white">
+        <h5 class="mb-0"><i class="bi bi-hdd-stack me-2"></i>Storage Pools</h5>
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Name</th>
+                        <th>Type</th>
+                        <th>Status</th>
+                        <th>Capacity</th>
+                        <th>Used</th>
+                        <th>Usage</th>
+                        <th>Instances</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var pool in _pools)
+                    {
+                        var usagePercent = pool.CapacityBytes > 0 ? (double)pool.UsedBytes / pool.CapacityBytes * 100 : 0;
+                        <tr>
+                            <td>
+                                <strong>@pool.Name</strong>
+                                <br />
+                                <small class="text-muted">@pool.Id</small>
+                            </td>
+                            <td><span class="badge bg-secondary">@pool.PoolType</span></td>
+                            <td>
+                                <span class="badge @GetHealthBadgeClass(pool.Health)">
+                                    @pool.Health
+                                </span>
+                            </td>
+                            <td>@FormatBytes(pool.CapacityBytes)</td>
+                            <td>@FormatBytes(pool.UsedBytes)</td>
+                            <td style="min-width: 150px;">
+                                <div class="progress" style="height: 20px;">
+                                    <div class="progress-bar @GetUsageBarClass(usagePercent)"
+                                         role="progressbar"
+                                         style="width: @usagePercent%">
+                                        @usagePercent.ToString("F1")%
+                                    </div>
+                                </div>
+                            </td>
+                            <td>@pool.Instances.Count</td>
+                            <td>
+                                <button class="btn btn-sm btn-outline-primary me-1" @onclick="() => ShowPoolDetails(pool)">
+                                    <i class="bi bi-info-circle"></i>
+                                </button>
+                                <button class="btn btn-sm btn-outline-danger" @onclick="() => DeletePool(pool.Id)">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- RAID Configurations -->
+<div class="card border-0 shadow-sm">
+    <div class="card-header bg-white">
+        <h5 class="mb-0"><i class="bi bi-layers me-2"></i>RAID Configurations</h5>
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Name</th>
+                        <th>Level</th>
+                        <th>Status</th>
+                        <th>Disks</th>
+                        <th>Capacity</th>
+                        <th>Stripe Size</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var raid in _raidConfigs)
+                    {
+                        <tr>
+                            <td><strong>@raid.Name</strong></td>
+                            <td><span class="badge bg-info">@raid.Level</span></td>
+                            <td>
+                                <span class="badge @GetRaidStatusBadgeClass(raid.Status)">
+                                    @raid.Status
+                                </span>
+                            </td>
+                            <td>@raid.DiskCount (@raid.ActiveDisks active)</td>
+                            <td>@FormatBytes(raid.TotalCapacityBytes)</td>
+                            <td>@(raid.StripeSizeKB)KB</td>
+                            <td>
+                                <button class="btn btn-sm btn-outline-primary">
+                                    <i class="bi bi-info-circle"></i>
+                                </button>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Create Pool Modal -->
+@if (_showCreateModal)
+{
+    <div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Create Storage Pool</h5>
+                    <button type="button" class="btn-close" @onclick="CloseModal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Pool Name</label>
+                        <input type="text" class="form-control" @bind="_newPoolName" placeholder="Enter pool name" />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Pool Type</label>
+                        <select class="form-select" @bind="_newPoolType">
+                            <option value="Standard">Standard</option>
+                            <option value="SSD">SSD</option>
+                            <option value="Archive">Archive</option>
+                            <option value="Cache">Cache</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Capacity (GB)</label>
+                        <input type="number" class="form-control" @bind="_newPoolCapacityGb" min="1" />
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" @onclick="CloseModal">Cancel</button>
+                    <button type="button" class="btn btn-primary" @onclick="CreatePool">Create</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+<!-- Pool Details Modal -->
+@if (_selectedPool != null)
+{
+    <div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">@_selectedPool.Name</h5>
+                    <button type="button" class="btn-close" @onclick="CloseModal"></button>
+                </div>
+                <div class="modal-body">
+                    <h6>Pool Information</h6>
+                    <dl class="row">
+                        <dt class="col-sm-4">ID</dt>
+                        <dd class="col-sm-8"><code>@_selectedPool.Id</code></dd>
+                        <dt class="col-sm-4">Type</dt>
+                        <dd class="col-sm-8">@_selectedPool.PoolType</dd>
+                        <dt class="col-sm-4">Health</dt>
+                        <dd class="col-sm-8"><span class="badge @GetHealthBadgeClass(_selectedPool.Health)">@_selectedPool.Health</span></dd>
+                        <dt class="col-sm-4">Created</dt>
+                        <dd class="col-sm-8">@_selectedPool.CreatedAt.ToString("yyyy-MM-dd HH:mm")</dd>
+                    </dl>
+
+                    <hr />
+                    <h6>Instances (@_selectedPool.Instances.Count)</h6>
+                    @if (_selectedPool.Instances.Any())
+                    {
+                        <div class="table-responsive">
+                            <table class="table table-sm">
+                                <thead>
+                                    <tr>
+                                        <th>Name</th>
+                                        <th>Plugin</th>
+                                        <th>Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var instance in _selectedPool.Instances)
+                                    {
+                                        <tr>
+                                            <td>@instance.Name</td>
+                                            <td>@instance.PluginId</td>
+                                            <td><span class="badge bg-success">@instance.Status</span></td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    }
+                    else
+                    {
+                        <p class="text-muted">No instances in this pool.</p>
+                    }
+
+                    @if (_selectedPool.Stats != null)
+                    {
+                        <hr />
+                        <h6>Statistics</h6>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <small class="text-muted">Read Operations</small>
+                                <h5>@_selectedPool.Stats.ReadOperations</h5>
+                            </div>
+                            <div class="col-md-6">
+                                <small class="text-muted">Write Operations</small>
+                                <h5>@_selectedPool.Stats.WriteOperations</h5>
+                            </div>
+                        </div>
+                    }
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" @onclick="CloseModal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private List<StoragePoolInfo> _pools = new();
+    private List<RaidConfiguration> _raidConfigs = new();
+    private bool _showCreateModal;
+    private StoragePoolInfo? _selectedPool;
+
+    private string _newPoolName = "";
+    private string _newPoolType = "Standard";
+    private int _newPoolCapacityGb = 100;
+
+    protected override void OnInitialized()
+    {
+        LoadData();
+    }
+
+    private void LoadData()
+    {
+        _pools = StorageService.GetStoragePools().ToList();
+        _raidConfigs = StorageService.GetRaidConfigurations().ToList();
+    }
+
+    private void ShowCreatePoolModal()
+    {
+        _newPoolName = "";
+        _newPoolType = "Standard";
+        _newPoolCapacityGb = 100;
+        _showCreateModal = true;
+    }
+
+    private async Task CreatePool()
+    {
+        if (!string.IsNullOrWhiteSpace(_newPoolName))
+        {
+            await StorageService.CreatePoolAsync(_newPoolName, _newPoolType, (long)_newPoolCapacityGb * 1024 * 1024 * 1024);
+            LoadData();
+            CloseModal();
+        }
+    }
+
+    private async Task DeletePool(string poolId)
+    {
+        await StorageService.DeletePoolAsync(poolId);
+        LoadData();
+    }
+
+    private void ShowPoolDetails(StoragePoolInfo pool)
+    {
+        _selectedPool = pool;
+    }
+
+    private void CloseModal()
+    {
+        _showCreateModal = false;
+        _selectedPool = null;
+    }
+
+    private string GetHealthBadgeClass(PoolHealth health) => health switch
+    {
+        PoolHealth.Healthy => "bg-success",
+        PoolHealth.Degraded => "bg-warning text-dark",
+        PoolHealth.Offline => "bg-danger",
+        _ => "bg-secondary"
+    };
+
+    private string GetRaidStatusBadgeClass(RaidStatus status) => status switch
+    {
+        RaidStatus.Optimal => "bg-success",
+        RaidStatus.Degraded => "bg-warning text-dark",
+        RaidStatus.Rebuilding => "bg-info",
+        RaidStatus.Failed => "bg-danger",
+        _ => "bg-secondary"
+    };
+
+    private string GetUsageBarClass(double percent)
+    {
+        if (percent < 60) return "bg-success";
+        if (percent < 80) return "bg-warning";
+        return "bg-danger";
+    }
+
+    private string FormatBytes(long bytes)
+    {
+        string[] sizes = { "B", "KB", "MB", "GB", "TB" };
+        int order = 0;
+        double size = bytes;
+        while (size >= 1024 && order < sizes.Length - 1)
+        {
+            order++;
+            size /= 1024;
+        }
+        return $"{size:F1} {sizes[order]}";
+    }
+}
