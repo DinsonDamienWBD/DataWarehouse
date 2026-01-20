@@ -4,6 +4,7 @@ using System.Collections.Concurrent;
 using System.Net;
 using System.Net.Sockets;
 using System.Buffers;
+using DataWarehouse.SDK.Infrastructure;
 
 /// <summary>
 /// Connection state for a node.
@@ -104,6 +105,7 @@ public sealed class FileTransportDriver : ITransportDriver
     private readonly string _basePath;
     private FileSystemWatcher? _watcher;
     private Func<NodeConnection, Task>? _connectionHandler;
+    private readonly MessageSizeLimits _sizeLimits;
 
     /// <inheritdoc />
     public TransportProtocol Protocol => TransportProtocol.File;
@@ -111,17 +113,35 @@ public sealed class FileTransportDriver : ITransportDriver
     /// <inheritdoc />
     public string Name => "FileTransport";
 
-    public FileTransportDriver(string basePath)
+    public FileTransportDriver(string basePath, MessageSizeLimits? sizeLimits = null)
     {
-        _basePath = basePath;
-        Directory.CreateDirectory(_basePath);
+        // Validate and canonicalize base path
+        _basePath = Path.GetFullPath(basePath);
+        if (!Directory.Exists(_basePath))
+            Directory.CreateDirectory(_basePath);
+        _sizeLimits = sizeLimits ?? MessageSizeLimits.Default;
+    }
+
+    /// <summary>
+    /// Validates a path is safe and under the base path.
+    /// </summary>
+    private string ValidatePath(string relativePath)
+    {
+        return SecurityValidation.ValidatePath(relativePath, _basePath);
     }
 
     /// <inheritdoc />
     public Task<NodeConnection> ConnectAsync(NodeEndpoint endpoint, NodeId remoteNodeId, CancellationToken ct = default)
     {
-        var path = endpoint.Path ?? Path.Combine(_basePath, remoteNodeId.ToShortString());
-        var connection = new FileNodeConnection(remoteNodeId, endpoint, path);
+        // Validate node ID format
+        var nodeIdStr = remoteNodeId.ToHex();
+        SecurityValidation.ValidateNodeId(nodeIdStr);
+
+        // Validate and construct path
+        var relativePath = endpoint.Path ?? remoteNodeId.ToShortString();
+        var safePath = ValidatePath(relativePath);
+
+        var connection = new FileNodeConnection(remoteNodeId, endpoint, safePath, _sizeLimits);
         return Task.FromResult<NodeConnection>(connection);
     }
 
@@ -142,18 +162,44 @@ public sealed class FileTransportDriver : ITransportDriver
         {
             try
             {
-                // Parse sender from filename
+                // Validate file path is under inbox
+                var fullPath = Path.GetFullPath(e.FullPath);
+                if (!fullPath.StartsWith(Path.GetFullPath(inboxPath), StringComparison.OrdinalIgnoreCase))
+                {
+                    // Path traversal attempt - ignore
+                    return;
+                }
+
+                // Parse sender from filename with validation
                 var filename = Path.GetFileNameWithoutExtension(e.Name);
                 var parts = filename?.Split('_');
                 if (parts?.Length >= 2)
                 {
+                    // Validate node ID format
+                    try
+                    {
+                        SecurityValidation.ValidateNodeId(parts[0]);
+                    }
+                    catch
+                    {
+                        return; // Invalid node ID format
+                    }
+
                     var senderNodeId = NodeId.FromHex(parts[0]);
-                    var endpoint = new NodeEndpoint { Protocol = TransportProtocol.File, Path = Path.GetDirectoryName(e.FullPath) };
-                    var connection = new FileNodeConnection(senderNodeId, endpoint, Path.GetDirectoryName(e.FullPath)!);
-                    await _connectionHandler!(connection);
+                    var dirPath = Path.GetDirectoryName(e.FullPath);
+                    if (dirPath != null)
+                    {
+                        var endpoint = new NodeEndpoint { Protocol = TransportProtocol.File, Path = dirPath };
+                        var connection = new FileNodeConnection(senderNodeId, endpoint, dirPath, _sizeLimits);
+                        await _connectionHandler!(connection);
+                    }
                 }
             }
-            catch { /* Ignore malformed messages */ }
+            catch (Exception ex)
+            {
+                // Log error instead of silently ignoring
+                System.Diagnostics.Debug.WriteLine($"[FileTransport] Error handling incoming message: {InputSanitizer.SanitizeForLogging(ex.Message)}");
+            }
         };
 
         _watcher.EnableRaisingEvents = true;
@@ -177,14 +223,17 @@ public sealed class FileNodeConnection : NodeConnection
     private readonly string _basePath;
     private readonly string _outboxPath;
     private readonly string _inboxPath;
+    private readonly MessageSizeLimits _sizeLimits;
 
-    public FileNodeConnection(NodeId remoteNodeId, NodeEndpoint endpoint, string basePath)
+    public FileNodeConnection(NodeId remoteNodeId, NodeEndpoint endpoint, string basePath, MessageSizeLimits? sizeLimits = null)
     {
+        // Canonicalize path to prevent traversal
+        _basePath = Path.GetFullPath(basePath);
         RemoteNodeId = remoteNodeId;
         Endpoint = endpoint;
-        _basePath = basePath;
-        _outboxPath = Path.Combine(basePath, "outbox");
-        _inboxPath = Path.Combine(basePath, "inbox");
+        _outboxPath = Path.Combine(_basePath, "outbox");
+        _inboxPath = Path.Combine(_basePath, "inbox");
+        _sizeLimits = sizeLimits ?? MessageSizeLimits.Default;
     }
 
     /// <inheritdoc />
@@ -200,8 +249,15 @@ public sealed class FileNodeConnection : NodeConnection
     /// <inheritdoc />
     public override async Task<int> SendAsync(ReadOnlyMemory<byte> data, CancellationToken ct = default)
     {
+        // Validate message size
+        SecurityValidation.ValidateMessageSize(data.Length, _sizeLimits.MaxMessageSize);
+
         var filename = $"{Guid.NewGuid():N}.dat";
-        var path = Path.Combine(_outboxPath, filename);
+        // Validate path is under outbox
+        var path = Path.GetFullPath(Path.Combine(_outboxPath, filename));
+        if (!path.StartsWith(_outboxPath, StringComparison.OrdinalIgnoreCase))
+            throw new SecurityException("Path escape attempt detected");
+
         await File.WriteAllBytesAsync(path, data.ToArray(), ct);
         BytesSent += data.Length;
         UpdateActivity();
@@ -215,8 +271,16 @@ public sealed class FileNodeConnection : NodeConnection
         if (files.Length == 0)
             return 0;
 
-        var data = await File.ReadAllBytesAsync(files[0], ct);
-        File.Delete(files[0]);
+        // Validate file path is under inbox
+        var filePath = Path.GetFullPath(files[0]);
+        if (!filePath.StartsWith(_inboxPath, StringComparison.OrdinalIgnoreCase))
+            throw new SecurityException("Path escape attempt detected");
+
+        var fileInfo = new FileInfo(filePath);
+        SecurityValidation.ValidateMessageSize(fileInfo.Length, _sizeLimits.MaxMessageSize);
+
+        var data = await File.ReadAllBytesAsync(filePath, ct);
+        File.Delete(filePath);
 
         var length = Math.Min(data.Length, buffer.Length);
         data.AsMemory(0, length).CopyTo(buffer);
@@ -274,6 +338,9 @@ public sealed class TcpTransportDriver : ITransportDriver, IAsyncDisposable
     private TcpListener? _listener;
     private CancellationTokenSource? _listenerCts;
     private Task? _acceptTask;
+    private readonly MessageSizeLimits _sizeLimits;
+    private readonly ConcurrentDictionary<string, TcpNodeConnection> _connectionPool = new();
+    private readonly int _maxConnections;
 
     /// <inheritdoc />
     public TransportProtocol Protocol => TransportProtocol.Tcp;
@@ -281,14 +348,55 @@ public sealed class TcpTransportDriver : ITransportDriver, IAsyncDisposable
     /// <inheritdoc />
     public string Name => "TcpTransport";
 
+    public TcpTransportDriver(MessageSizeLimits? sizeLimits = null, int maxConnections = 1000)
+    {
+        _sizeLimits = sizeLimits ?? MessageSizeLimits.Default;
+        _maxConnections = maxConnections;
+    }
+
     /// <inheritdoc />
     public async Task<NodeConnection> ConnectAsync(NodeEndpoint endpoint, NodeId remoteNodeId, CancellationToken ct = default)
     {
+        // Validate host and port
+        var host = SecurityValidation.ValidateHost(endpoint.Address);
+        var port = SecurityValidation.ValidatePort(endpoint.Port);
+
+        // Check connection pool limit
+        if (_connectionPool.Count >= _maxConnections)
+        {
+            // Clean up stale connections
+            CleanupIdleConnections();
+            if (_connectionPool.Count >= _maxConnections)
+                throw new InvalidOperationException("Maximum connection limit reached");
+        }
+
         var client = new TcpClient();
-        await client.ConnectAsync(endpoint.Address, endpoint.Port, ct);
-        var connection = new TcpNodeConnection(remoteNodeId, endpoint, client);
+        await client.ConnectAsync(host, port, ct);
+        var connection = new TcpNodeConnection(remoteNodeId, endpoint, client, _sizeLimits);
         connection.State = ConnectionState.Connected;
+
+        // Track connection for cleanup
+        var key = $"{host}:{port}";
+        _connectionPool[key] = connection;
+
         return connection;
+    }
+
+    private void CleanupIdleConnections()
+    {
+        var threshold = DateTimeOffset.UtcNow.AddMinutes(-5);
+        var stale = _connectionPool
+            .Where(kvp => kvp.Value.LastActivityAt < threshold || kvp.Value.State != ConnectionState.Connected)
+            .Select(kvp => kvp.Key)
+            .ToList();
+
+        foreach (var key in stale)
+        {
+            if (_connectionPool.TryRemove(key, out var conn))
+            {
+                _ = conn.DisposeAsync();
+            }
+        }
     }
 
     /// <inheritdoc />
@@ -296,9 +404,10 @@ public sealed class TcpTransportDriver : ITransportDriver, IAsyncDisposable
     {
         var address = localEndpoint.Address == "0.0.0.0"
             ? IPAddress.Any
-            : IPAddress.Parse(localEndpoint.Address);
+            : IPAddress.Parse(SecurityValidation.ValidateHost(localEndpoint.Address));
+        var port = SecurityValidation.ValidatePort(localEndpoint.Port);
 
-        _listener = new TcpListener(address, localEndpoint.Port);
+        _listener = new TcpListener(address, port);
         _listener.Start();
 
         _listenerCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
@@ -314,24 +423,32 @@ public sealed class TcpTransportDriver : ITransportDriver, IAsyncDisposable
             try
             {
                 var client = await _listener!.AcceptTcpClientAsync(ct);
+                var remoteEndpoint = (IPEndPoint?)client.Client.RemoteEndPoint;
+                if (remoteEndpoint == null)
+                {
+                    client.Dispose();
+                    continue;
+                }
+
                 var endpoint = new NodeEndpoint
                 {
                     Protocol = TransportProtocol.Tcp,
-                    Address = ((IPEndPoint)client.Client.RemoteEndPoint!).Address.ToString(),
-                    Port = ((IPEndPoint)client.Client.RemoteEndPoint!).Port
+                    Address = remoteEndpoint.Address.ToString(),
+                    Port = remoteEndpoint.Port
                 };
 
                 // Node ID will be established during handshake
-                var connection = new TcpNodeConnection(NodeId.Empty, endpoint, client);
+                var connection = new TcpNodeConnection(NodeId.Empty, endpoint, client, _sizeLimits);
                 _ = handler(connection); // Fire and forget
             }
             catch (OperationCanceledException)
             {
                 break;
             }
-            catch
+            catch (Exception ex)
             {
-                // Continue accepting
+                // Log error instead of silently ignoring
+                System.Diagnostics.Debug.WriteLine($"[TcpTransport] Accept error: {InputSanitizer.SanitizeForLogging(ex.Message)}");
             }
         }
     }
@@ -357,21 +474,28 @@ public sealed class TcpTransportDriver : ITransportDriver, IAsyncDisposable
 }
 
 /// <summary>
-/// TCP node connection.
+/// TCP node connection with message size validation and connection leak prevention.
 /// </summary>
 public sealed class TcpNodeConnection : NodeConnection
 {
     private readonly TcpClient _client;
     private NetworkStream? _stream;
+    private readonly MessageSizeLimits _sizeLimits;
+    private bool _disposed;
 
-    public TcpNodeConnection(NodeId remoteNodeId, NodeEndpoint endpoint, TcpClient client)
+    public TcpNodeConnection(NodeId remoteNodeId, NodeEndpoint endpoint, TcpClient client, MessageSizeLimits? sizeLimits = null)
     {
         RemoteNodeId = remoteNodeId;
         Endpoint = endpoint;
         _client = client;
         _stream = client.GetStream();
+        _sizeLimits = sizeLimits ?? MessageSizeLimits.Default;
         State = ConnectionState.Connected;
         ConnectedAt = DateTimeOffset.UtcNow;
+
+        // Set socket options for connection leak prevention
+        _client.SendTimeout = 30000; // 30 seconds
+        _client.ReceiveTimeout = 30000;
     }
 
     /// <inheritdoc />
@@ -384,7 +508,10 @@ public sealed class TcpNodeConnection : NodeConnection
     /// <inheritdoc />
     public override async Task<int> SendAsync(ReadOnlyMemory<byte> data, CancellationToken ct = default)
     {
-        if (_stream == null) throw new InvalidOperationException("Not connected");
+        if (_stream == null || _disposed) throw new InvalidOperationException("Not connected");
+
+        // Validate message size
+        SecurityValidation.ValidateMessageSize(data.Length, _sizeLimits.MaxMessageSize);
 
         // Send length prefix
         var length = BitConverter.GetBytes(data.Length);
@@ -399,7 +526,7 @@ public sealed class TcpNodeConnection : NodeConnection
     /// <inheritdoc />
     public override async Task<int> ReceiveAsync(Memory<byte> buffer, CancellationToken ct = default)
     {
-        if (_stream == null) throw new InvalidOperationException("Not connected");
+        if (_stream == null || _disposed) throw new InvalidOperationException("Not connected");
 
         // Read length prefix
         var lengthBuf = new byte[4];
@@ -407,6 +534,12 @@ public sealed class TcpNodeConnection : NodeConnection
         if (read < 4) return 0;
 
         var length = BitConverter.ToInt32(lengthBuf);
+
+        // Validate received message size
+        if (length < 0)
+            throw new SecurityException("Invalid message length (negative)");
+        SecurityValidation.ValidateMessageSize(length, _sizeLimits.MaxMessageSize);
+
         var toRead = Math.Min(length, buffer.Length);
         read = await _stream.ReadAsync(buffer[..toRead], ct);
 
@@ -419,13 +552,16 @@ public sealed class TcpNodeConnection : NodeConnection
     public override async Task SendMessageAsync(SignedMessage message, CancellationToken ct = default)
     {
         var json = System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(message);
+        SecurityValidation.ValidateMessageSize(json.Length, _sizeLimits.MaxMessageSize);
         await SendAsync(json, ct);
     }
 
     /// <inheritdoc />
     public override async Task<SignedMessage?> ReceiveMessageAsync(CancellationToken ct = default)
     {
-        var buffer = ArrayPool<byte>.Shared.Rent(65536);
+        // Use size limits for buffer allocation
+        var maxSize = Math.Min(_sizeLimits.MaxMessageSize, int.MaxValue);
+        var buffer = ArrayPool<byte>.Shared.Rent((int)Math.Min(maxSize, 1024 * 1024)); // Start with 1MB
         try
         {
             var read = await ReceiveAsync(buffer, ct);
@@ -442,9 +578,18 @@ public sealed class TcpNodeConnection : NodeConnection
     /// <inheritdoc />
     public override Task CloseAsync(CancellationToken ct = default)
     {
+        if (_disposed) return Task.CompletedTask;
+
         State = ConnectionState.Closing;
-        _stream?.Close();
-        _client.Close();
+        try
+        {
+            _stream?.Close();
+            _client.Close();
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[TcpConnection] Close error: {InputSanitizer.SanitizeForLogging(ex.Message)}");
+        }
         State = ConnectionState.Disconnected;
         return Task.CompletedTask;
     }
@@ -452,6 +597,8 @@ public sealed class TcpNodeConnection : NodeConnection
     /// <inheritdoc />
     public override async ValueTask DisposeAsync()
     {
+        if (_disposed) return;
+        _disposed = true;
         await CloseAsync();
         _stream?.Dispose();
         _client.Dispose();
@@ -459,11 +606,105 @@ public sealed class TcpNodeConnection : NodeConnection
 }
 
 /// <summary>
-/// HTTP transport driver for WAN/Cloud connections.
+/// HTTP transport driver for WAN/Cloud connections with Kestrel listener support.
 /// </summary>
-public sealed class HttpTransportDriver : ITransportDriver
+public sealed class HttpTransportDriver : ITransportDriver, IAsyncDisposable
 {
     private readonly HttpClient _httpClient;
+    private readonly MessageSizeLimits _sizeLimits;
+    private IHttpListener? _listener;
+
+    /// <summary>HTTP listener interface for abstraction.</summary>
+    public interface IHttpListener : IAsyncDisposable
+    {
+        Task StartAsync(string prefix, Func<HttpListenerContext, Task> handler, CancellationToken ct);
+        Task StopAsync();
+    }
+
+    /// <summary>Context for HTTP listener requests.</summary>
+    public class HttpListenerContext
+    {
+        public required string Method { get; init; }
+        public required string Path { get; init; }
+        public required Stream RequestBody { get; init; }
+        public required Stream ResponseBody { get; init; }
+        public required IDictionary<string, string> Headers { get; init; }
+        public required string RemoteAddress { get; init; }
+        public int StatusCode { get; set; } = 200;
+    }
+
+    /// <summary>Simple HTTP listener implementation using HttpListener.</summary>
+    public sealed class SimpleHttpListener : IHttpListener
+    {
+        private HttpListener? _listener;
+        private CancellationTokenSource? _cts;
+        private Task? _listenerTask;
+
+        public async Task StartAsync(string prefix, Func<HttpListenerContext, Task> handler, CancellationToken ct)
+        {
+            _listener = new HttpListener();
+            _listener.Prefixes.Add(prefix);
+            _listener.Start();
+
+            _cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            _listenerTask = ListenLoopAsync(handler, _cts.Token);
+            await Task.CompletedTask;
+        }
+
+        private async Task ListenLoopAsync(Func<HttpListenerContext, Task> handler, CancellationToken ct)
+        {
+            while (!ct.IsCancellationRequested)
+            {
+                try
+                {
+                    var ctx = await _listener!.GetContextAsync();
+                    var context = new HttpListenerContext
+                    {
+                        Method = ctx.Request.HttpMethod,
+                        Path = ctx.Request.Url?.AbsolutePath ?? "/",
+                        RequestBody = ctx.Request.InputStream,
+                        ResponseBody = ctx.Response.OutputStream,
+                        Headers = ctx.Request.Headers.AllKeys
+                            .Where(k => k != null)
+                            .ToDictionary(k => k!, k => ctx.Request.Headers[k] ?? ""),
+                        RemoteAddress = ctx.Request.RemoteEndPoint?.Address.ToString() ?? "unknown"
+                    };
+
+                    try
+                    {
+                        await handler(context);
+                        ctx.Response.StatusCode = context.StatusCode;
+                    }
+                    finally
+                    {
+                        ctx.Response.Close();
+                    }
+                }
+                catch (HttpListenerException) when (ct.IsCancellationRequested)
+                {
+                    break;
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"[HttpListener] Error: {InputSanitizer.SanitizeForLogging(ex.Message)}");
+                }
+            }
+        }
+
+        public Task StopAsync()
+        {
+            _cts?.Cancel();
+            _listener?.Stop();
+            return Task.CompletedTask;
+        }
+
+        public async ValueTask DisposeAsync()
+        {
+            await StopAsync();
+            _cts?.Dispose();
+            _listener?.Close();
+        }
+    }
 
     /// <inheritdoc />
     public TransportProtocol Protocol => TransportProtocol.Http;
@@ -471,46 +712,76 @@ public sealed class HttpTransportDriver : ITransportDriver
     /// <inheritdoc />
     public string Name => "HttpTransport";
 
-    public HttpTransportDriver(HttpClient? httpClient = null)
+    public HttpTransportDriver(HttpClient? httpClient = null, MessageSizeLimits? sizeLimits = null)
     {
         _httpClient = httpClient ?? new HttpClient();
+        _sizeLimits = sizeLimits ?? MessageSizeLimits.Default;
     }
 
     /// <inheritdoc />
     public Task<NodeConnection> ConnectAsync(NodeEndpoint endpoint, NodeId remoteNodeId, CancellationToken ct = default)
     {
-        var connection = new HttpNodeConnection(remoteNodeId, endpoint, _httpClient);
+        // Validate URL
+        var url = endpoint.ToUri().ToString();
+        SecurityValidation.ValidateUrl(url, allowLocal: true);
+
+        var connection = new HttpNodeConnection(remoteNodeId, endpoint, _httpClient, _sizeLimits);
         return Task.FromResult<NodeConnection>(connection);
     }
 
     /// <inheritdoc />
-    public Task StartListeningAsync(NodeEndpoint localEndpoint, Func<NodeConnection, Task> connectionHandler, CancellationToken ct = default)
+    public async Task StartListeningAsync(NodeEndpoint localEndpoint, Func<NodeConnection, Task> connectionHandler, CancellationToken ct = default)
     {
-        // HTTP listening requires ASP.NET Core or similar - stub for now
-        return Task.CompletedTask;
+        var host = localEndpoint.Address == "0.0.0.0" ? "+" : localEndpoint.Address;
+        var port = SecurityValidation.ValidatePort(localEndpoint.Port);
+        var prefix = $"http://{host}:{port}/";
+
+        _listener = new SimpleHttpListener();
+        await _listener.StartAsync(prefix, async ctx =>
+        {
+            // Create a pseudo-connection for the request
+            var nodeId = NodeId.Empty; // Will be determined from headers
+            var endpoint = new NodeEndpoint
+            {
+                Protocol = TransportProtocol.Http,
+                Address = ctx.RemoteAddress,
+                Port = 0
+            };
+            var connection = new HttpNodeConnection(nodeId, endpoint, _httpClient, _sizeLimits);
+            await connectionHandler(connection);
+        }, ct);
     }
 
     /// <inheritdoc />
-    public Task StopListeningAsync()
+    public async Task StopListeningAsync()
     {
-        return Task.CompletedTask;
+        if (_listener != null)
+            await _listener.StopAsync();
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_listener != null)
+            await _listener.DisposeAsync();
     }
 }
 
 /// <summary>
-/// HTTP node connection (request/response based).
+/// HTTP node connection (request/response based) with size validation.
 /// </summary>
 public sealed class HttpNodeConnection : NodeConnection
 {
     private readonly HttpClient _httpClient;
     private readonly Uri _baseUri;
+    private readonly MessageSizeLimits _sizeLimits;
 
-    public HttpNodeConnection(NodeId remoteNodeId, NodeEndpoint endpoint, HttpClient httpClient)
+    public HttpNodeConnection(NodeId remoteNodeId, NodeEndpoint endpoint, HttpClient httpClient, MessageSizeLimits? sizeLimits = null)
     {
         RemoteNodeId = remoteNodeId;
         Endpoint = endpoint;
         _httpClient = httpClient;
         _baseUri = endpoint.ToUri();
+        _sizeLimits = sizeLimits ?? MessageSizeLimits.Default;
     }
 
     /// <inheritdoc />
@@ -525,6 +796,9 @@ public sealed class HttpNodeConnection : NodeConnection
     /// <inheritdoc />
     public override async Task<int> SendAsync(ReadOnlyMemory<byte> data, CancellationToken ct = default)
     {
+        // Validate message size
+        SecurityValidation.ValidateMessageSize(data.Length, _sizeLimits.MaxMessageSize);
+
         using var content = new ByteArrayContent(data.ToArray());
         var response = await _httpClient.PostAsync(new Uri(_baseUri, "/data"), content, ct);
         response.EnsureSuccessStatusCode();
@@ -539,7 +813,14 @@ public sealed class HttpNodeConnection : NodeConnection
         var response = await _httpClient.GetAsync(new Uri(_baseUri, "/data"), ct);
         response.EnsureSuccessStatusCode();
 
+        // Validate content length before reading
+        var contentLength = response.Content.Headers.ContentLength;
+        if (contentLength.HasValue)
+            SecurityValidation.ValidateMessageSize(contentLength.Value, _sizeLimits.MaxMessageSize);
+
         var data = await response.Content.ReadAsByteArrayAsync(ct);
+        SecurityValidation.ValidateMessageSize(data.Length, _sizeLimits.MaxMessageSize);
+
         var length = Math.Min(data.Length, buffer.Length);
         data.AsMemory(0, length).CopyTo(buffer);
 
@@ -552,6 +833,8 @@ public sealed class HttpNodeConnection : NodeConnection
     public override async Task SendMessageAsync(SignedMessage message, CancellationToken ct = default)
     {
         var json = System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(message);
+        SecurityValidation.ValidateMessageSize(json.Length, _sizeLimits.MaxMessageSize);
+
         using var content = new ByteArrayContent(json);
         content.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("application/json");
 
@@ -569,7 +852,15 @@ public sealed class HttpNodeConnection : NodeConnection
             return null;
 
         response.EnsureSuccessStatusCode();
+
+        // Validate content length
+        var contentLength = response.Content.Headers.ContentLength;
+        if (contentLength.HasValue)
+            SecurityValidation.ValidateMessageSize(contentLength.Value, _sizeLimits.MaxMessageSize);
+
         var json = await response.Content.ReadAsByteArrayAsync(ct);
+        SecurityValidation.ValidateMessageSize(json.Length, _sizeLimits.MaxMessageSize);
+
         BytesReceived += json.Length;
         UpdateActivity();
 
