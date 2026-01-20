@@ -1276,25 +1276,25 @@ Transform DataWarehouse from a single-instance storage engine to a **Federated D
 
 ### Phase 1: Core Primitives
 
-**Status:** 🔄 PENDING
+**Status:** 🔄 IN PROGRESS (2/3 complete)
 
-#### 1.1 Content-Addressable Object Store
+#### 1.1 Content-Addressable Object Store ✅ COMPLETE
 | # | Task | File | Status |
 |---|------|------|--------|
-| 1.1.1 | Create `IContentAddressableObject` interface | SDK/Federation/ObjectStore.cs | 🔄 |
-| 1.1.2 | Create `ObjectId` value type (SHA256 content hash) | SDK/Federation/ObjectStore.cs | 🔄 |
-| 1.1.3 | Create `ObjectChunk` for large object chunking | SDK/Federation/ObjectStore.cs | 🔄 |
-| 1.1.4 | Create `ObjectManifest` (extends Manifest with federation) | SDK/Federation/ObjectStore.cs | 🔄 |
-| 1.1.5 | Implement `ContentAddressableObjectStore` | SDK/Federation/ObjectStore.cs | 🔄 |
+| 1.1.1 | Create `IContentAddressableObject` interface | SDK/Federation/ObjectStore.cs | ✅ |
+| 1.1.2 | Create `ObjectId` value type (SHA256 content hash) | SDK/Federation/ObjectStore.cs | ✅ |
+| 1.1.3 | Create `ObjectChunk` for large object chunking | SDK/Federation/ObjectStore.cs | ✅ |
+| 1.1.4 | Create `ObjectManifest` (extends Manifest with federation) | SDK/Federation/ObjectStore.cs | ✅ |
+| 1.1.5 | Implement `ContentAddressableObjectStore` | SDK/Federation/ObjectStore.cs | ✅ |
 
-#### 1.2 Node Identity System
+#### 1.2 Node Identity System ✅ COMPLETE
 | # | Task | File | Status |
 |---|------|------|--------|
-| 1.2.1 | Create `NodeIdentity` (NodeId, KeyPair, Capabilities) | SDK/Federation/NodeIdentity.cs | 🔄 |
-| 1.2.2 | Create `NodeEndpoint` (Protocol, Address, Port) | SDK/Federation/NodeIdentity.cs | 🔄 |
-| 1.2.3 | Create `NodeState` enum (Active, Dormant, Offline) | SDK/Federation/NodeIdentity.cs | 🔄 |
-| 1.2.4 | Create `NodeCapabilities` flags (Storage, Compute, Gateway) | SDK/Federation/NodeIdentity.cs | 🔄 |
-| 1.2.5 | Implement `NodeIdentityManager` with key generation | SDK/Federation/NodeIdentity.cs | 🔄 |
+| 1.2.1 | Create `NodeIdentity` (NodeId, KeyPair, Capabilities) | SDK/Federation/NodeIdentity.cs | ✅ |
+| 1.2.2 | Create `NodeEndpoint` (Protocol, Address, Port) | SDK/Federation/NodeIdentity.cs | ✅ |
+| 1.2.3 | Create `NodeState` enum (Active, Dormant, Offline) | SDK/Federation/NodeIdentity.cs | ✅ |
+| 1.2.4 | Create `NodeCapabilities` flags (Storage, Compute, Gateway) | SDK/Federation/NodeIdentity.cs | ✅ |
+| 1.2.5 | Implement `NodeIdentityManager` with key generation | SDK/Federation/NodeIdentity.cs | ✅ |
 
 #### 1.3 Capability Token System
 | # | Task | File | Status |
