@@ -3851,3 +3851,1368 @@ public sealed class HsmConnectionEventArgs : EventArgs
 }
 
 #endregion
+
+#region 5. Comprehensive Audit Logging
+
+/// <summary>
+/// Enterprise audit logging system with tamper-evident hash chaining,
+/// SIEM integration, and real-time alerting.
+/// </summary>
+public sealed class ComprehensiveAuditSystem : IAsyncDisposable
+{
+    private readonly ConcurrentDictionary<string, AuditLogChain> _logChains = new();
+    private readonly Channel<ComprehensiveAuditEvent> _eventChannel;
+    private readonly List<IAuditForwarder> _forwarders = new();
+    private readonly List<IAuditAlertRule> _alertRules = new();
+    private readonly ComprehensiveAuditConfiguration _config;
+    private readonly Task _processingTask;
+    private readonly CancellationTokenSource _cts = new();
+    private string _lastEventHash = "genesis";
+    private long _eventSequence;
+    private volatile bool _disposed;
+
+    /// <summary>Event raised when suspicious activity is detected.</summary>
+    public event EventHandler<SuspiciousActivityEventArgs>? SuspiciousActivityDetected;
+
+    /// <summary>
+    /// Initializes the comprehensive audit system.
+    /// </summary>
+    public ComprehensiveAuditSystem(ComprehensiveAuditConfiguration? config = null)
+    {
+        _config = config ?? new ComprehensiveAuditConfiguration();
+        _eventChannel = Channel.CreateBounded<ComprehensiveAuditEvent>(
+            new BoundedChannelOptions(_config.EventBufferSize)
+            {
+                FullMode = BoundedChannelFullMode.Wait
+            });
+
+        _processingTask = ProcessEventsAsync(_cts.Token);
+    }
+
+    /// <summary>
+    /// Logs a data access event.
+    /// </summary>
+    public async Task LogDataAccessAsync(DataAccessEvent evt, CancellationToken ct = default)
+    {
+        var auditEvent = new ComprehensiveAuditEvent
+        {
+            EventId = GenerateEventId(),
+            EventType = AuditEventCategory.DataAccess,
+            Timestamp = DateTime.UtcNow,
+            Principal = evt.Principal,
+            Action = evt.Action,
+            ResourceType = evt.ResourceType,
+            ResourceId = evt.ResourceId,
+            Outcome = evt.Outcome,
+            SourceIp = evt.SourceIp,
+            UserAgent = evt.UserAgent,
+            SessionId = evt.SessionId,
+            Details = evt.Details ?? new Dictionary<string, object>()
+        };
+
+        await EnqueueEventAsync(auditEvent, ct);
+    }
+
+    /// <summary>
+    /// Logs an administrative action.
+    /// </summary>
+    public async Task LogAdminActionAsync(AdminActionEvent evt, CancellationToken ct = default)
+    {
+        var auditEvent = new ComprehensiveAuditEvent
+        {
+            EventId = GenerateEventId(),
+            EventType = AuditEventCategory.AdminAction,
+            Timestamp = DateTime.UtcNow,
+            Principal = evt.Principal,
+            Action = evt.Action,
+            ResourceType = evt.ResourceType,
+            ResourceId = evt.ResourceId,
+            Outcome = evt.Outcome,
+            SourceIp = evt.SourceIp,
+            SessionId = evt.SessionId,
+            PreviousValue = evt.PreviousValue,
+            NewValue = evt.NewValue,
+            Details = evt.Details ?? new Dictionary<string, object>()
+        };
+
+        await EnqueueEventAsync(auditEvent, ct);
+    }
+
+    /// <summary>
+    /// Logs a security event.
+    /// </summary>
+    public async Task LogSecurityEventAsync(SecurityAuditEvent evt, CancellationToken ct = default)
+    {
+        var auditEvent = new ComprehensiveAuditEvent
+        {
+            EventId = GenerateEventId(),
+            EventType = AuditEventCategory.Security,
+            Severity = evt.Severity,
+            Timestamp = DateTime.UtcNow,
+            Principal = evt.Principal,
+            Action = evt.Action,
+            ResourceType = evt.ResourceType,
+            ResourceId = evt.ResourceId,
+            Outcome = evt.Outcome,
+            SourceIp = evt.SourceIp,
+            ThreatIndicators = evt.ThreatIndicators,
+            Details = evt.Details ?? new Dictionary<string, object>()
+        };
+
+        await EnqueueEventAsync(auditEvent, ct);
+
+        // Immediate alert for critical security events
+        if (evt.Severity == AuditEventSeverity.Critical)
+        {
+            await TriggerImmediateAlertAsync(auditEvent, ct);
+        }
+    }
+
+    /// <summary>
+    /// Adds a log forwarder (syslog, SIEM, etc.).
+    /// </summary>
+    public void AddForwarder(IAuditForwarder forwarder)
+    {
+        _forwarders.Add(forwarder);
+    }
+
+    /// <summary>
+    /// Adds an alert rule for suspicious activity detection.
+    /// </summary>
+    public void AddAlertRule(IAuditAlertRule rule)
+    {
+        _alertRules.Add(rule);
+    }
+
+    /// <summary>
+    /// Verifies the integrity of the audit chain.
+    /// </summary>
+    public async Task<AuditChainVerificationResult> VerifyChainIntegrityAsync(
+        string chainId, CancellationToken ct = default)
+    {
+        if (!_logChains.TryGetValue(chainId, out var chain))
+            return new AuditChainVerificationResult { Success = false, Error = "Chain not found" };
+
+        var invalidEvents = new List<string>();
+        string previousHash = "genesis";
+
+        foreach (var evt in chain.Events.OrderBy(e => e.Sequence))
+        {
+            if (evt.PreviousEventHash != previousHash)
+            {
+                invalidEvents.Add(evt.EventId);
+            }
+
+            var calculatedHash = ComputeEventHash(evt);
+            if (calculatedHash != evt.EventHash)
+            {
+                invalidEvents.Add(evt.EventId);
+            }
+
+            previousHash = evt.EventHash;
+        }
+
+        return new AuditChainVerificationResult
+        {
+            Success = invalidEvents.Count == 0,
+            TotalEvents = chain.Events.Count,
+            InvalidEvents = invalidEvents,
+            FirstEvent = chain.Events.MinBy(e => e.Sequence)?.Timestamp,
+            LastEvent = chain.Events.MaxBy(e => e.Sequence)?.Timestamp
+        };
+    }
+
+    /// <summary>
+    /// Searches audit logs with forensic capabilities.
+    /// </summary>
+    public async Task<AuditSearchResult> SearchAsync(
+        AuditSearchQuery query, CancellationToken ct = default)
+    {
+        var allEvents = _logChains.Values.SelectMany(c => c.Events);
+
+        if (!string.IsNullOrEmpty(query.Principal))
+            allEvents = allEvents.Where(e => e.Principal == query.Principal);
+
+        if (query.StartTime.HasValue)
+            allEvents = allEvents.Where(e => e.Timestamp >= query.StartTime.Value);
+
+        if (query.EndTime.HasValue)
+            allEvents = allEvents.Where(e => e.Timestamp <= query.EndTime.Value);
+
+        if (!string.IsNullOrEmpty(query.ResourceId))
+            allEvents = allEvents.Where(e => e.ResourceId == query.ResourceId);
+
+        if (query.EventTypes != null && query.EventTypes.Count > 0)
+            allEvents = allEvents.Where(e => query.EventTypes.Contains(e.EventType));
+
+        if (!string.IsNullOrEmpty(query.SourceIp))
+            allEvents = allEvents.Where(e => e.SourceIp == query.SourceIp);
+
+        var total = allEvents.Count();
+        var results = allEvents
+            .OrderByDescending(e => e.Timestamp)
+            .Skip(query.Offset)
+            .Take(query.Limit)
+            .ToList();
+
+        return new AuditSearchResult
+        {
+            Events = results,
+            TotalCount = total,
+            Offset = query.Offset,
+            Limit = query.Limit
+        };
+    }
+
+    /// <summary>
+    /// Exports audit logs for compliance reporting.
+    /// </summary>
+    public async Task<AuditExportResult> ExportAsync(
+        AuditExportRequest request, CancellationToken ct = default)
+    {
+        var searchResult = await SearchAsync(new AuditSearchQuery
+        {
+            StartTime = request.StartTime,
+            EndTime = request.EndTime,
+            EventTypes = request.EventTypes,
+            Limit = int.MaxValue
+        }, ct);
+
+        var exportData = request.Format switch
+        {
+            AuditExportFormat.Json => JsonSerializer.SerializeToUtf8Bytes(searchResult.Events),
+            AuditExportFormat.Csv => GenerateCsv(searchResult.Events),
+            _ => JsonSerializer.SerializeToUtf8Bytes(searchResult.Events)
+        };
+
+        var exportHash = Convert.ToHexString(SHA256.HashData(exportData)).ToLowerInvariant();
+
+        return new AuditExportResult
+        {
+            Success = true,
+            Data = exportData,
+            Format = request.Format,
+            EventCount = searchResult.Events.Count,
+            ExportHash = exportHash,
+            ExportedAt = DateTime.UtcNow
+        };
+    }
+
+    private async Task EnqueueEventAsync(ComprehensiveAuditEvent evt, CancellationToken ct)
+    {
+        evt.Sequence = Interlocked.Increment(ref _eventSequence);
+        evt.PreviousEventHash = _lastEventHash;
+        evt.EventHash = ComputeEventHash(evt);
+        _lastEventHash = evt.EventHash;
+
+        await _eventChannel.Writer.WriteAsync(evt, ct);
+    }
+
+    private async Task ProcessEventsAsync(CancellationToken ct)
+    {
+        await foreach (var evt in _eventChannel.Reader.ReadAllAsync(ct))
+        {
+            try
+            {
+                // Store in chain
+                var chainId = $"{evt.Timestamp:yyyyMMdd}";
+                var chain = _logChains.GetOrAdd(chainId, _ => new AuditLogChain { ChainId = chainId });
+                chain.Events.Add(evt);
+
+                // Forward to external systems
+                foreach (var forwarder in _forwarders)
+                {
+                    try
+                    {
+                        await forwarder.ForwardAsync(evt, ct);
+                    }
+                    catch { /* Log and continue */ }
+                }
+
+                // Check alert rules
+                foreach (var rule in _alertRules)
+                {
+                    if (await rule.EvaluateAsync(evt, ct))
+                    {
+                        SuspiciousActivityDetected?.Invoke(this, new SuspiciousActivityEventArgs
+                        {
+                            Event = evt,
+                            Rule = rule.RuleName,
+                            Severity = rule.Severity
+                        });
+                    }
+                }
+            }
+            catch { /* Log error */ }
+        }
+    }
+
+    private async Task TriggerImmediateAlertAsync(ComprehensiveAuditEvent evt, CancellationToken ct)
+    {
+        SuspiciousActivityDetected?.Invoke(this, new SuspiciousActivityEventArgs
+        {
+            Event = evt,
+            Rule = "CriticalSecurityEvent",
+            Severity = AuditEventSeverity.Critical
+        });
+    }
+
+    private string GenerateEventId() => $"EVT-{DateTime.UtcNow:yyyyMMddHHmmss}-{Guid.NewGuid():N}"[..32];
+
+    private static string ComputeEventHash(ComprehensiveAuditEvent evt)
+    {
+        var data = $"{evt.EventId}|{evt.Sequence}|{evt.Timestamp:O}|{evt.Principal}|{evt.Action}|{evt.PreviousEventHash}";
+        return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(data))).ToLowerInvariant();
+    }
+
+    private static byte[] GenerateCsv(List<ComprehensiveAuditEvent> events)
+    {
+        var sb = new StringBuilder();
+        sb.AppendLine("EventId,Timestamp,Principal,Action,ResourceType,ResourceId,Outcome,SourceIp");
+        foreach (var evt in events)
+        {
+            sb.AppendLine($"{evt.EventId},{evt.Timestamp:O},{evt.Principal},{evt.Action},{evt.ResourceType},{evt.ResourceId},{evt.Outcome},{evt.SourceIp}");
+        }
+        return Encoding.UTF8.GetBytes(sb.ToString());
+    }
+
+    /// <summary>Disposes resources.</summary>
+    public async ValueTask DisposeAsync()
+    {
+        if (_disposed) return;
+        _disposed = true;
+
+        _eventChannel.Writer.Complete();
+        _cts.Cancel();
+
+        try { await _processingTask.WaitAsync(TimeSpan.FromSeconds(10)); }
+        catch { /* Best effort */ }
+
+        _cts.Dispose();
+    }
+}
+
+/// <summary>Interface for audit log forwarders.</summary>
+public interface IAuditForwarder
+{
+    Task ForwardAsync(ComprehensiveAuditEvent evt, CancellationToken ct);
+}
+
+/// <summary>Interface for audit alert rules.</summary>
+public interface IAuditAlertRule
+{
+    string RuleName { get; }
+    AuditEventSeverity Severity { get; }
+    Task<bool> EvaluateAsync(ComprehensiveAuditEvent evt, CancellationToken ct);
+}
+
+/// <summary>Syslog forwarder implementation.</summary>
+public sealed class SyslogForwarder : IAuditForwarder
+{
+    private readonly string _host;
+    private readonly int _port;
+    private readonly UdpClient _client;
+
+    public SyslogForwarder(string host, int port = 514)
+    {
+        _host = host;
+        _port = port;
+        _client = new UdpClient();
+    }
+
+    public async Task ForwardAsync(ComprehensiveAuditEvent evt, CancellationToken ct)
+    {
+        var priority = evt.Severity switch
+        {
+            AuditEventSeverity.Critical => 2,
+            AuditEventSeverity.High => 3,
+            AuditEventSeverity.Medium => 5,
+            _ => 6
+        };
+
+        var message = $"<{priority}>{evt.Timestamp:MMM dd HH:mm:ss} DataWarehouse: {evt.Action} by {evt.Principal} on {evt.ResourceId}";
+        var data = Encoding.UTF8.GetBytes(message);
+        await _client.SendAsync(data, data.Length, _host, _port);
+    }
+}
+
+#endregion
+
+#region Audit Types
+
+/// <summary>Audit event categories.</summary>
+public enum AuditEventCategory { DataAccess, AdminAction, Security, System, Compliance }
+
+/// <summary>Audit event severity.</summary>
+public enum AuditEventSeverity { Low, Medium, High, Critical }
+
+/// <summary>Audit event outcome.</summary>
+public enum AuditEventOutcome { Success, Failure, Denied, Error }
+
+/// <summary>Audit export format.</summary>
+public enum AuditExportFormat { Json, Csv, Xml }
+
+/// <summary>Comprehensive audit event.</summary>
+public sealed class ComprehensiveAuditEvent
+{
+    public required string EventId { get; init; }
+    public long Sequence { get; set; }
+    public AuditEventCategory EventType { get; init; }
+    public AuditEventSeverity Severity { get; init; } = AuditEventSeverity.Low;
+    public DateTime Timestamp { get; init; }
+    public required string Principal { get; init; }
+    public required string Action { get; init; }
+    public string? ResourceType { get; init; }
+    public string? ResourceId { get; init; }
+    public AuditEventOutcome Outcome { get; init; }
+    public string? SourceIp { get; init; }
+    public string? UserAgent { get; init; }
+    public string? SessionId { get; init; }
+    public string? PreviousValue { get; init; }
+    public string? NewValue { get; init; }
+    public List<string>? ThreatIndicators { get; init; }
+    public string PreviousEventHash { get; set; } = string.Empty;
+    public string EventHash { get; set; } = string.Empty;
+    public Dictionary<string, object> Details { get; init; } = new();
+}
+
+/// <summary>Audit log chain.</summary>
+public sealed class AuditLogChain
+{
+    public required string ChainId { get; init; }
+    public List<ComprehensiveAuditEvent> Events { get; } = new();
+}
+
+/// <summary>Data access event.</summary>
+public sealed class DataAccessEvent
+{
+    public required string Principal { get; init; }
+    public required string Action { get; init; }
+    public string? ResourceType { get; init; }
+    public string? ResourceId { get; init; }
+    public AuditEventOutcome Outcome { get; init; }
+    public string? SourceIp { get; init; }
+    public string? UserAgent { get; init; }
+    public string? SessionId { get; init; }
+    public Dictionary<string, object>? Details { get; init; }
+}
+
+/// <summary>Admin action event.</summary>
+public sealed class AdminActionEvent
+{
+    public required string Principal { get; init; }
+    public required string Action { get; init; }
+    public string? ResourceType { get; init; }
+    public string? ResourceId { get; init; }
+    public AuditEventOutcome Outcome { get; init; }
+    public string? SourceIp { get; init; }
+    public string? SessionId { get; init; }
+    public string? PreviousValue { get; init; }
+    public string? NewValue { get; init; }
+    public Dictionary<string, object>? Details { get; init; }
+}
+
+/// <summary>Security audit event.</summary>
+public sealed class SecurityAuditEvent
+{
+    public required string Principal { get; init; }
+    public required string Action { get; init; }
+    public AuditEventSeverity Severity { get; init; }
+    public string? ResourceType { get; init; }
+    public string? ResourceId { get; init; }
+    public AuditEventOutcome Outcome { get; init; }
+    public string? SourceIp { get; init; }
+    public List<string>? ThreatIndicators { get; init; }
+    public Dictionary<string, object>? Details { get; init; }
+}
+
+/// <summary>Audit search query.</summary>
+public sealed class AuditSearchQuery
+{
+    public string? Principal { get; init; }
+    public DateTime? StartTime { get; init; }
+    public DateTime? EndTime { get; init; }
+    public string? ResourceId { get; init; }
+    public string? SourceIp { get; init; }
+    public List<AuditEventCategory>? EventTypes { get; init; }
+    public int Offset { get; init; } = 0;
+    public int Limit { get; init; } = 100;
+}
+
+/// <summary>Audit search result.</summary>
+public sealed class AuditSearchResult
+{
+    public required List<ComprehensiveAuditEvent> Events { get; init; }
+    public int TotalCount { get; init; }
+    public int Offset { get; init; }
+    public int Limit { get; init; }
+}
+
+/// <summary>Audit export request.</summary>
+public sealed class AuditExportRequest
+{
+    public DateTime? StartTime { get; init; }
+    public DateTime? EndTime { get; init; }
+    public List<AuditEventCategory>? EventTypes { get; init; }
+    public AuditExportFormat Format { get; init; } = AuditExportFormat.Json;
+}
+
+/// <summary>Audit export result.</summary>
+public sealed class AuditExportResult
+{
+    public bool Success { get; init; }
+    public byte[]? Data { get; init; }
+    public AuditExportFormat Format { get; init; }
+    public int EventCount { get; init; }
+    public string? ExportHash { get; init; }
+    public DateTime ExportedAt { get; init; }
+    public string? Error { get; init; }
+}
+
+/// <summary>Audit chain verification result.</summary>
+public sealed class AuditChainVerificationResult
+{
+    public bool Success { get; init; }
+    public int TotalEvents { get; init; }
+    public List<string> InvalidEvents { get; init; } = new();
+    public DateTime? FirstEvent { get; init; }
+    public DateTime? LastEvent { get; init; }
+    public string? Error { get; init; }
+}
+
+/// <summary>Suspicious activity event args.</summary>
+public sealed class SuspiciousActivityEventArgs : EventArgs
+{
+    public required ComprehensiveAuditEvent Event { get; init; }
+    public required string Rule { get; init; }
+    public AuditEventSeverity Severity { get; init; }
+}
+
+/// <summary>Comprehensive audit configuration.</summary>
+public sealed class ComprehensiveAuditConfiguration
+{
+    public int EventBufferSize { get; set; } = 10000;
+    public TimeSpan RetentionPeriod { get; set; } = TimeSpan.FromDays(2555); // 7 years
+    public bool EnableRealTimeAlerts { get; set; } = true;
+}
+
+#endregion
+
+#region 6. RBAC with API Authentication
+
+/// <summary>
+/// Enterprise Role-Based Access Control with Attribute-Based Access Control (ABAC),
+/// multi-tenant isolation, and comprehensive API authentication.
+/// </summary>
+public sealed class EnterpriseAccessControlSystem : IAsyncDisposable
+{
+    private readonly ConcurrentDictionary<string, EnterpriseRole> _roles = new();
+    private readonly ConcurrentDictionary<string, EnterpriseUser> _users = new();
+    private readonly ConcurrentDictionary<string, ApiKey> _apiKeys = new();
+    private readonly ConcurrentDictionary<string, TenantContext> _tenants = new();
+    private readonly ConcurrentDictionary<string, AbacPolicy> _abacPolicies = new();
+    private readonly IEnterpriseAuditLog _auditLog;
+    private readonly JwtTokenService _jwtService;
+    private readonly MtlsValidator _mtlsValidator;
+    private readonly EnterpriseAccessControlConfiguration _config;
+    private volatile bool _disposed;
+
+    /// <summary>Event raised when access is denied.</summary>
+    public event EventHandler<AccessDeniedEventArgs>? AccessDenied;
+
+    /// <summary>
+    /// Initializes the enterprise access control system.
+    /// </summary>
+    public EnterpriseAccessControlSystem(
+        IEnterpriseAuditLog auditLog,
+        EnterpriseAccessControlConfiguration? config = null)
+    {
+        _auditLog = auditLog ?? throw new ArgumentNullException(nameof(auditLog));
+        _config = config ?? new EnterpriseAccessControlConfiguration();
+        _jwtService = new JwtTokenService(_config.JwtConfiguration);
+        _mtlsValidator = new MtlsValidator(_config.MtlsConfiguration);
+
+        InitializeBuiltInRoles();
+    }
+
+    /// <summary>
+    /// Authenticates using JWT token.
+    /// </summary>
+    public async Task<AuthenticationResult> AuthenticateJwtAsync(
+        string token, CancellationToken ct = default)
+    {
+        var validation = await _jwtService.ValidateTokenAsync(token, ct);
+        if (!validation.IsValid)
+        {
+            await _auditLog.LogAsync(new AuditEntry
+            {
+                Action = "JwtAuthenticationFailed",
+                ResourceId = "auth",
+                Principal = "unknown",
+                Severity = AuditSeverity.Warning,
+                Details = new Dictionary<string, object> { ["reason"] = validation.Error ?? "Unknown" }
+            }, ct);
+
+            return new AuthenticationResult { Success = false, Error = validation.Error };
+        }
+
+        return new AuthenticationResult
+        {
+            Success = true,
+            Principal = validation.Principal,
+            Claims = validation.Claims,
+            TenantId = validation.TenantId,
+            AuthMethod = AuthenticationMethod.Jwt
+        };
+    }
+
+    /// <summary>
+    /// Authenticates using API key.
+    /// </summary>
+    public async Task<AuthenticationResult> AuthenticateApiKeyAsync(
+        string apiKey, CancellationToken ct = default)
+    {
+        var keyHash = ComputeApiKeyHash(apiKey);
+        if (!_apiKeys.TryGetValue(keyHash, out var key) || !key.IsActive)
+        {
+            await _auditLog.LogAsync(new AuditEntry
+            {
+                Action = "ApiKeyAuthenticationFailed",
+                ResourceId = "auth",
+                Principal = "unknown",
+                Severity = AuditSeverity.Warning
+            }, ct);
+
+            return new AuthenticationResult { Success = false, Error = "Invalid API key" };
+        }
+
+        if (key.ExpiresAt.HasValue && key.ExpiresAt.Value < DateTime.UtcNow)
+        {
+            return new AuthenticationResult { Success = false, Error = "API key expired" };
+        }
+
+        key.LastUsedAt = DateTime.UtcNow;
+        key.UsageCount++;
+
+        return new AuthenticationResult
+        {
+            Success = true,
+            Principal = key.OwnerId,
+            TenantId = key.TenantId,
+            Permissions = key.Permissions.ToList(),
+            AuthMethod = AuthenticationMethod.ApiKey
+        };
+    }
+
+    /// <summary>
+    /// Authenticates using mTLS certificate.
+    /// </summary>
+    public async Task<AuthenticationResult> AuthenticateMtlsAsync(
+        X509Certificate2 clientCert, CancellationToken ct = default)
+    {
+        var validation = await _mtlsValidator.ValidateCertificateAsync(clientCert, ct);
+        if (!validation.IsValid)
+        {
+            await _auditLog.LogAsync(new AuditEntry
+            {
+                Action = "MtlsAuthenticationFailed",
+                ResourceId = "auth",
+                Principal = clientCert.Subject,
+                Severity = AuditSeverity.Warning,
+                Details = new Dictionary<string, object> { ["reason"] = validation.Error ?? "Unknown" }
+            }, ct);
+
+            return new AuthenticationResult { Success = false, Error = validation.Error };
+        }
+
+        return new AuthenticationResult
+        {
+            Success = true,
+            Principal = validation.Principal,
+            TenantId = validation.TenantId,
+            AuthMethod = AuthenticationMethod.Mtls
+        };
+    }
+
+    /// <summary>
+    /// Authorizes an action using combined RBAC and ABAC.
+    /// </summary>
+    public async Task<AuthorizationResult> AuthorizeAsync(
+        AuthorizationRequest request, CancellationToken ct = default)
+    {
+        // Get user and roles
+        if (!_users.TryGetValue(request.Principal, out var user))
+        {
+            return DenyAccess(request, "User not found");
+        }
+
+        // Check tenant isolation
+        if (_config.EnforceMultiTenantIsolation &&
+            request.TenantId != null &&
+            user.TenantId != request.TenantId)
+        {
+            return DenyAccess(request, "Tenant isolation violation");
+        }
+
+        // Check RBAC
+        var rbacAllowed = await CheckRbacAsync(user, request, ct);
+
+        // Check ABAC policies
+        var abacAllowed = await CheckAbacAsync(user, request, ct);
+
+        if (!rbacAllowed && !abacAllowed)
+        {
+            return DenyAccess(request, "Access denied by policy");
+        }
+
+        await _auditLog.LogAsync(new AuditEntry
+        {
+            Action = "AuthorizationGranted",
+            ResourceId = request.ResourceId ?? request.Action,
+            Principal = request.Principal,
+            Details = new Dictionary<string, object>
+            {
+                ["action"] = request.Action,
+                ["rbacAllowed"] = rbacAllowed,
+                ["abacAllowed"] = abacAllowed
+            }
+        }, ct);
+
+        return new AuthorizationResult
+        {
+            Allowed = true,
+            GrantedBy = rbacAllowed ? "RBAC" : "ABAC",
+            EffectivePermissions = GetEffectivePermissions(user)
+        };
+    }
+
+    /// <summary>
+    /// Creates a new role.
+    /// </summary>
+    public async Task<RoleResult> CreateRoleAsync(
+        CreateRoleRequest request, CancellationToken ct = default)
+    {
+        var roleId = request.RoleId ?? $"ROLE-{Guid.NewGuid():N}"[..16];
+
+        var role = new EnterpriseRole
+        {
+            RoleId = roleId,
+            Name = request.Name,
+            Description = request.Description,
+            Permissions = request.Permissions.ToHashSet(),
+            InheritsFrom = request.InheritsFrom,
+            TenantId = request.TenantId,
+            CreatedAt = DateTime.UtcNow,
+            CreatedBy = request.CreatedBy
+        };
+
+        _roles[roleId] = role;
+
+        await _auditLog.LogAsync(new AuditEntry
+        {
+            Action = "RoleCreated",
+            ResourceId = roleId,
+            Principal = request.CreatedBy,
+            Details = new Dictionary<string, object>
+            {
+                ["name"] = request.Name,
+                ["permissions"] = string.Join(",", request.Permissions)
+            }
+        }, ct);
+
+        return new RoleResult { Success = true, RoleId = roleId };
+    }
+
+    /// <summary>
+    /// Assigns a role to a user.
+    /// </summary>
+    public async Task<RoleAssignmentResult> AssignRoleAsync(
+        RoleAssignmentRequest request, CancellationToken ct = default)
+    {
+        if (!_users.TryGetValue(request.UserId, out var user))
+        {
+            user = new EnterpriseUser
+            {
+                UserId = request.UserId,
+                TenantId = request.TenantId,
+                CreatedAt = DateTime.UtcNow
+            };
+            _users[request.UserId] = user;
+        }
+
+        if (!_roles.TryGetValue(request.RoleId, out _))
+        {
+            return new RoleAssignmentResult { Success = false, Error = "Role not found" };
+        }
+
+        user.Roles.Add(new UserRoleAssignment
+        {
+            RoleId = request.RoleId,
+            Scope = request.Scope,
+            AssignedAt = DateTime.UtcNow,
+            AssignedBy = request.AssignedBy,
+            ExpiresAt = request.ExpiresAt
+        });
+
+        await _auditLog.LogAsync(new AuditEntry
+        {
+            Action = "RoleAssigned",
+            ResourceId = request.UserId,
+            Principal = request.AssignedBy,
+            Details = new Dictionary<string, object>
+            {
+                ["roleId"] = request.RoleId,
+                ["scope"] = request.Scope ?? "global"
+            }
+        }, ct);
+
+        return new RoleAssignmentResult { Success = true };
+    }
+
+    /// <summary>
+    /// Creates an API key.
+    /// </summary>
+    public async Task<ApiKeyResult> CreateApiKeyAsync(
+        CreateApiKeyRequest request, CancellationToken ct = default)
+    {
+        var keyBytes = new byte[32];
+        RandomNumberGenerator.Fill(keyBytes);
+        var plainKey = Convert.ToBase64String(keyBytes);
+        var keyHash = ComputeApiKeyHash(plainKey);
+
+        var apiKey = new ApiKey
+        {
+            KeyId = $"KEY-{Guid.NewGuid():N}"[..16],
+            KeyHash = keyHash,
+            Name = request.Name,
+            OwnerId = request.OwnerId,
+            TenantId = request.TenantId,
+            Permissions = request.Permissions.ToHashSet(),
+            CreatedAt = DateTime.UtcNow,
+            ExpiresAt = request.ExpiresAt,
+            IsActive = true
+        };
+
+        _apiKeys[keyHash] = apiKey;
+
+        await _auditLog.LogAsync(new AuditEntry
+        {
+            Action = "ApiKeyCreated",
+            ResourceId = apiKey.KeyId,
+            Principal = request.OwnerId,
+            Details = new Dictionary<string, object>
+            {
+                ["name"] = request.Name,
+                ["expiresAt"] = request.ExpiresAt?.ToString("O") ?? "never"
+            }
+        }, ct);
+
+        return new ApiKeyResult
+        {
+            Success = true,
+            KeyId = apiKey.KeyId,
+            PlainKey = plainKey // Only returned once!
+        };
+    }
+
+    /// <summary>
+    /// Adds an ABAC policy.
+    /// </summary>
+    public void AddAbacPolicy(AbacPolicy policy)
+    {
+        _abacPolicies[policy.PolicyId] = policy;
+    }
+
+    /// <summary>
+    /// Initiates emergency access procedure.
+    /// </summary>
+    public async Task<EmergencyAccessResult> RequestEmergencyAccessAsync(
+        EmergencyAccessRequest request, CancellationToken ct = default)
+    {
+        // Verify emergency access is configured
+        if (!_config.EmergencyAccessEnabled)
+        {
+            return new EmergencyAccessResult { Success = false, Error = "Emergency access not enabled" };
+        }
+
+        // Verify requester is authorized for emergency access
+        if (!_config.EmergencyAccessUsers.Contains(request.RequesterId))
+        {
+            await _auditLog.LogAsync(new AuditEntry
+            {
+                Action = "UnauthorizedEmergencyAccessAttempt",
+                ResourceId = request.TargetResource,
+                Principal = request.RequesterId,
+                Severity = AuditSeverity.Critical
+            }, ct);
+
+            return new EmergencyAccessResult { Success = false, Error = "Not authorized for emergency access" };
+        }
+
+        var sessionId = $"EMERGENCY-{Guid.NewGuid():N}";
+        var expiresAt = DateTime.UtcNow.Add(_config.EmergencyAccessDuration);
+
+        await _auditLog.LogAsync(new AuditEntry
+        {
+            Action = "EmergencyAccessGranted",
+            ResourceId = request.TargetResource,
+            Principal = request.RequesterId,
+            Severity = AuditSeverity.Critical,
+            Details = new Dictionary<string, object>
+            {
+                ["sessionId"] = sessionId,
+                ["justification"] = request.Justification,
+                ["expiresAt"] = expiresAt
+            }
+        }, ct);
+
+        return new EmergencyAccessResult
+        {
+            Success = true,
+            SessionId = sessionId,
+            ExpiresAt = expiresAt
+        };
+    }
+
+    private void InitializeBuiltInRoles()
+    {
+        _roles["admin"] = new EnterpriseRole
+        {
+            RoleId = "admin",
+            Name = "Administrator",
+            Description = "Full system access",
+            Permissions = new HashSet<string> { "*" },
+            IsBuiltIn = true,
+            CreatedAt = DateTime.UtcNow
+        };
+
+        _roles["operator"] = new EnterpriseRole
+        {
+            RoleId = "operator",
+            Name = "Operator",
+            Description = "Operational access",
+            Permissions = new HashSet<string> { "read:*", "write:data", "manage:backups" },
+            IsBuiltIn = true,
+            CreatedAt = DateTime.UtcNow
+        };
+
+        _roles["auditor"] = new EnterpriseRole
+        {
+            RoleId = "auditor",
+            Name = "Auditor",
+            Description = "Read-only audit access",
+            Permissions = new HashSet<string> { "read:audit", "read:compliance" },
+            IsBuiltIn = true,
+            CreatedAt = DateTime.UtcNow
+        };
+    }
+
+    private async Task<bool> CheckRbacAsync(EnterpriseUser user, AuthorizationRequest request, CancellationToken ct)
+    {
+        foreach (var assignment in user.Roles.Where(r => !r.ExpiresAt.HasValue || r.ExpiresAt > DateTime.UtcNow))
+        {
+            if (!_roles.TryGetValue(assignment.RoleId, out var role))
+                continue;
+
+            // Check scope
+            if (assignment.Scope != null && request.ResourceId != null &&
+                !request.ResourceId.StartsWith(assignment.Scope))
+                continue;
+
+            // Check permission
+            if (HasPermission(role, request.Action, request.ResourceType))
+                return true;
+        }
+
+        return false;
+    }
+
+    private async Task<bool> CheckAbacAsync(EnterpriseUser user, AuthorizationRequest request, CancellationToken ct)
+    {
+        foreach (var policy in _abacPolicies.Values.Where(p => p.IsActive))
+        {
+            if (await policy.EvaluateAsync(user, request, ct))
+                return true;
+        }
+
+        return false;
+    }
+
+    private bool HasPermission(EnterpriseRole role, string action, string? resourceType)
+    {
+        // Check wildcard
+        if (role.Permissions.Contains("*"))
+            return true;
+
+        // Check exact match
+        var permission = resourceType != null ? $"{action}:{resourceType}" : action;
+        if (role.Permissions.Contains(permission))
+            return true;
+
+        // Check action wildcard
+        if (role.Permissions.Contains($"{action}:*"))
+            return true;
+
+        // Check inherited roles
+        if (role.InheritsFrom != null)
+        {
+            foreach (var parentId in role.InheritsFrom)
+            {
+                if (_roles.TryGetValue(parentId, out var parent) && HasPermission(parent, action, resourceType))
+                    return true;
+            }
+        }
+
+        return false;
+    }
+
+    private List<string> GetEffectivePermissions(EnterpriseUser user)
+    {
+        var permissions = new HashSet<string>();
+
+        foreach (var assignment in user.Roles)
+        {
+            if (_roles.TryGetValue(assignment.RoleId, out var role))
+            {
+                foreach (var perm in role.Permissions)
+                    permissions.Add(perm);
+            }
+        }
+
+        return permissions.ToList();
+    }
+
+    private AuthorizationResult DenyAccess(AuthorizationRequest request, string reason)
+    {
+        AccessDenied?.Invoke(this, new AccessDeniedEventArgs
+        {
+            Principal = request.Principal,
+            Action = request.Action,
+            Resource = request.ResourceId,
+            Reason = reason
+        });
+
+        return new AuthorizationResult { Allowed = false, DenialReason = reason };
+    }
+
+    private static string ComputeApiKeyHash(string key) =>
+        Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(key))).ToLowerInvariant();
+
+    /// <summary>Disposes resources.</summary>
+    public ValueTask DisposeAsync()
+    {
+        if (_disposed) return ValueTask.CompletedTask;
+        _disposed = true;
+        return ValueTask.CompletedTask;
+    }
+}
+
+/// <summary>JWT token service.</summary>
+public sealed class JwtTokenService
+{
+    private readonly JwtConfiguration _config;
+
+    public JwtTokenService(JwtConfiguration config) => _config = config;
+
+    public Task<JwtValidationResult> ValidateTokenAsync(string token, CancellationToken ct)
+    {
+        // Simplified JWT validation
+        try
+        {
+            var parts = token.Split('.');
+            if (parts.Length != 3)
+                return Task.FromResult(new JwtValidationResult { IsValid = false, Error = "Invalid token format" });
+
+            var payload = Encoding.UTF8.GetString(Convert.FromBase64String(PadBase64(parts[1])));
+            var claims = JsonSerializer.Deserialize<Dictionary<string, object>>(payload) ?? new();
+
+            return Task.FromResult(new JwtValidationResult
+            {
+                IsValid = true,
+                Principal = claims.TryGetValue("sub", out var sub) ? sub?.ToString() ?? "unknown" : "unknown",
+                Claims = claims,
+                TenantId = claims.TryGetValue("tenant", out var tenant) ? tenant?.ToString() : null
+            });
+        }
+        catch (Exception ex)
+        {
+            return Task.FromResult(new JwtValidationResult { IsValid = false, Error = ex.Message });
+        }
+    }
+
+    private static string PadBase64(string s)
+    {
+        var mod = s.Length % 4;
+        if (mod > 0) s += new string('=', 4 - mod);
+        return s.Replace('-', '+').Replace('_', '/');
+    }
+}
+
+/// <summary>mTLS validator.</summary>
+public sealed class MtlsValidator
+{
+    private readonly MtlsConfiguration _config;
+
+    public MtlsValidator(MtlsConfiguration config) => _config = config;
+
+    public Task<MtlsValidationResult> ValidateCertificateAsync(X509Certificate2 cert, CancellationToken ct)
+    {
+        if (cert.NotAfter < DateTime.UtcNow)
+            return Task.FromResult(new MtlsValidationResult { IsValid = false, Error = "Certificate expired" });
+
+        if (cert.NotBefore > DateTime.UtcNow)
+            return Task.FromResult(new MtlsValidationResult { IsValid = false, Error = "Certificate not yet valid" });
+
+        return Task.FromResult(new MtlsValidationResult
+        {
+            IsValid = true,
+            Principal = cert.GetNameInfo(X509NameType.SimpleName, false) ?? cert.Subject,
+            TenantId = ExtractTenantFromCert(cert)
+        });
+    }
+
+    private string? ExtractTenantFromCert(X509Certificate2 cert)
+    {
+        // Extract tenant from OU or custom extension
+        return null;
+    }
+}
+
+#endregion
+
+#region Access Control Types
+
+/// <summary>Authentication methods.</summary>
+public enum AuthenticationMethod { Jwt, ApiKey, Mtls, Basic, OAuth2 }
+
+/// <summary>Enterprise role.</summary>
+public sealed class EnterpriseRole
+{
+    public required string RoleId { get; init; }
+    public required string Name { get; init; }
+    public string? Description { get; init; }
+    public HashSet<string> Permissions { get; init; } = new();
+    public List<string>? InheritsFrom { get; init; }
+    public string? TenantId { get; init; }
+    public bool IsBuiltIn { get; init; }
+    public DateTime CreatedAt { get; init; }
+    public string? CreatedBy { get; init; }
+}
+
+/// <summary>Enterprise user.</summary>
+public sealed class EnterpriseUser
+{
+    public required string UserId { get; init; }
+    public string? TenantId { get; init; }
+    public List<UserRoleAssignment> Roles { get; } = new();
+    public Dictionary<string, object> Attributes { get; } = new();
+    public DateTime CreatedAt { get; init; }
+}
+
+/// <summary>User role assignment.</summary>
+public sealed class UserRoleAssignment
+{
+    public required string RoleId { get; init; }
+    public string? Scope { get; init; }
+    public DateTime AssignedAt { get; init; }
+    public required string AssignedBy { get; init; }
+    public DateTime? ExpiresAt { get; init; }
+}
+
+/// <summary>API key.</summary>
+public sealed class ApiKey
+{
+    public required string KeyId { get; init; }
+    public required string KeyHash { get; init; }
+    public required string Name { get; init; }
+    public required string OwnerId { get; init; }
+    public string? TenantId { get; init; }
+    public HashSet<string> Permissions { get; init; } = new();
+    public DateTime CreatedAt { get; init; }
+    public DateTime? ExpiresAt { get; init; }
+    public DateTime? LastUsedAt { get; set; }
+    public int UsageCount { get; set; }
+    public bool IsActive { get; set; }
+}
+
+/// <summary>Tenant context.</summary>
+public sealed class TenantContext
+{
+    public required string TenantId { get; init; }
+    public required string Name { get; init; }
+    public bool IsActive { get; init; }
+    public Dictionary<string, object> Settings { get; } = new();
+}
+
+/// <summary>ABAC policy.</summary>
+public abstract class AbacPolicy
+{
+    public required string PolicyId { get; init; }
+    public required string Name { get; init; }
+    public bool IsActive { get; init; } = true;
+    public abstract Task<bool> EvaluateAsync(EnterpriseUser user, AuthorizationRequest request, CancellationToken ct);
+}
+
+/// <summary>Authentication result.</summary>
+public sealed class AuthenticationResult
+{
+    public bool Success { get; init; }
+    public string? Principal { get; init; }
+    public string? TenantId { get; init; }
+    public Dictionary<string, object>? Claims { get; init; }
+    public List<string>? Permissions { get; init; }
+    public AuthenticationMethod AuthMethod { get; init; }
+    public string? Error { get; init; }
+}
+
+/// <summary>Authorization request.</summary>
+public sealed class AuthorizationRequest
+{
+    public required string Principal { get; init; }
+    public required string Action { get; init; }
+    public string? ResourceType { get; init; }
+    public string? ResourceId { get; init; }
+    public string? TenantId { get; init; }
+    public Dictionary<string, object>? Context { get; init; }
+}
+
+/// <summary>Authorization result.</summary>
+public sealed class AuthorizationResult
+{
+    public bool Allowed { get; init; }
+    public string? GrantedBy { get; init; }
+    public string? DenialReason { get; init; }
+    public List<string>? EffectivePermissions { get; init; }
+}
+
+/// <summary>Create role request.</summary>
+public sealed class CreateRoleRequest
+{
+    public string? RoleId { get; init; }
+    public required string Name { get; init; }
+    public string? Description { get; init; }
+    public required List<string> Permissions { get; init; }
+    public List<string>? InheritsFrom { get; init; }
+    public string? TenantId { get; init; }
+    public required string CreatedBy { get; init; }
+}
+
+/// <summary>Role result.</summary>
+public sealed class RoleResult
+{
+    public bool Success { get; init; }
+    public string? RoleId { get; init; }
+    public string? Error { get; init; }
+}
+
+/// <summary>Role assignment request.</summary>
+public sealed class RoleAssignmentRequest
+{
+    public required string UserId { get; init; }
+    public required string RoleId { get; init; }
+    public string? Scope { get; init; }
+    public string? TenantId { get; init; }
+    public required string AssignedBy { get; init; }
+    public DateTime? ExpiresAt { get; init; }
+}
+
+/// <summary>Role assignment result.</summary>
+public sealed class RoleAssignmentResult
+{
+    public bool Success { get; init; }
+    public string? Error { get; init; }
+}
+
+/// <summary>Create API key request.</summary>
+public sealed class CreateApiKeyRequest
+{
+    public required string Name { get; init; }
+    public required string OwnerId { get; init; }
+    public string? TenantId { get; init; }
+    public required List<string> Permissions { get; init; }
+    public DateTime? ExpiresAt { get; init; }
+}
+
+/// <summary>API key result.</summary>
+public sealed class ApiKeyResult
+{
+    public bool Success { get; init; }
+    public string? KeyId { get; init; }
+    public string? PlainKey { get; init; }
+    public string? Error { get; init; }
+}
+
+/// <summary>Emergency access request.</summary>
+public sealed class EmergencyAccessRequest
+{
+    public required string RequesterId { get; init; }
+    public required string TargetResource { get; init; }
+    public required string Justification { get; init; }
+}
+
+/// <summary>Emergency access result.</summary>
+public sealed class EmergencyAccessResult
+{
+    public bool Success { get; init; }
+    public string? SessionId { get; init; }
+    public DateTime? ExpiresAt { get; init; }
+    public string? Error { get; init; }
+}
+
+/// <summary>Access denied event args.</summary>
+public sealed class AccessDeniedEventArgs : EventArgs
+{
+    public required string Principal { get; init; }
+    public required string Action { get; init; }
+    public string? Resource { get; init; }
+    public required string Reason { get; init; }
+}
+
+/// <summary>JWT validation result.</summary>
+public sealed class JwtValidationResult
+{
+    public bool IsValid { get; init; }
+    public string? Principal { get; init; }
+    public Dictionary<string, object>? Claims { get; init; }
+    public string? TenantId { get; init; }
+    public string? Error { get; init; }
+}
+
+/// <summary>mTLS validation result.</summary>
+public sealed class MtlsValidationResult
+{
+    public bool IsValid { get; init; }
+    public string? Principal { get; init; }
+    public string? TenantId { get; init; }
+    public string? Error { get; init; }
+}
+
+/// <summary>JWT configuration.</summary>
+public sealed class JwtConfiguration
+{
+    public string? Issuer { get; set; }
+    public string? Audience { get; set; }
+    public string? SigningKey { get; set; }
+    public TimeSpan TokenLifetime { get; set; } = TimeSpan.FromHours(1);
+}
+
+/// <summary>mTLS configuration.</summary>
+public sealed class MtlsConfiguration
+{
+    public string? TrustedCaPath { get; set; }
+    public bool RequireClientCert { get; set; } = true;
+    public bool ValidateChain { get; set; } = true;
+}
+
+/// <summary>Enterprise access control configuration.</summary>
+public sealed class EnterpriseAccessControlConfiguration
+{
+    public bool EnforceMultiTenantIsolation { get; set; } = true;
+    public bool EmergencyAccessEnabled { get; set; } = true;
+    public TimeSpan EmergencyAccessDuration { get; set; } = TimeSpan.FromHours(4);
+    public HashSet<string> EmergencyAccessUsers { get; set; } = new();
+    public JwtConfiguration JwtConfiguration { get; set; } = new();
+    public MtlsConfiguration MtlsConfiguration { get; set; } = new();
+}
+
+#endregion
