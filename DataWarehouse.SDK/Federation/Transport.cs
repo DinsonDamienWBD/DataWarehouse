@@ -761,3 +761,318 @@ public sealed class TransportBus : ITransportBus, IAsyncDisposable
         await StopAsync();
     }
 }
+
+/// <summary>
+/// Interface for stream relay (zero-copy piping between nodes).
+/// </summary>
+public interface IStreamRelay
+{
+    /// <summary>
+    /// Relays data from source to destination without storing locally.
+    /// Acts as a pure conduit/pipe.
+    /// </summary>
+    Task<RelayResult> RelayAsync(
+        NodeId source,
+        NodeId destination,
+        ObjectId objectId,
+        CancellationToken ct = default);
+
+    /// <summary>
+    /// Relays a stream to multiple destinations (broadcast relay).
+    /// </summary>
+    Task<RelayResult> RelayToManyAsync(
+        NodeId source,
+        IEnumerable<NodeId> destinations,
+        ObjectId objectId,
+        CancellationToken ct = default);
+}
+
+/// <summary>
+/// Result of a relay operation.
+/// </summary>
+public sealed class RelayResult
+{
+    public bool Success { get; init; }
+    public ObjectId ObjectId { get; init; }
+    public long BytesRelayed { get; init; }
+    public TimeSpan Duration { get; init; }
+    public NodeId SourceNode { get; init; }
+    public List<NodeId> SuccessfulDestinations { get; init; } = new();
+    public List<NodeId> FailedDestinations { get; init; } = new();
+    public string? ErrorMessage { get; init; }
+
+    /// <summary>Effective throughput in bytes/second.</summary>
+    public double ThroughputBps => Duration.TotalSeconds > 0 ? BytesRelayed / Duration.TotalSeconds : 0;
+}
+
+/// <summary>
+/// Stream relay implementation for zero-copy node-to-node transfers.
+/// </summary>
+public sealed class StreamRelay : IStreamRelay
+{
+    private readonly ITransportBus _transportBus;
+    private readonly int _bufferSize;
+
+    public StreamRelay(ITransportBus transportBus, int bufferSize = 65536)
+    {
+        _transportBus = transportBus;
+        _bufferSize = bufferSize;
+    }
+
+    /// <inheritdoc />
+    public async Task<RelayResult> RelayAsync(
+        NodeId source,
+        NodeId destination,
+        ObjectId objectId,
+        CancellationToken ct = default)
+    {
+        var sw = System.Diagnostics.Stopwatch.StartNew();
+        long bytesRelayed = 0;
+
+        try
+        {
+            // Get connections
+            var sourceConn = await _transportBus.GetConnectionAsync(source, ct);
+            var destConn = await _transportBus.GetConnectionAsync(destination, ct);
+
+            // Request object from source
+            var fetchRequest = new RelayFetchRequest { ObjectId = objectId.ToHex() };
+            var requestBytes = System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(fetchRequest);
+            await sourceConn.SendAsync(requestBytes, ct);
+
+            // Stream from source to destination
+            var buffer = new byte[_bufferSize];
+            int bytesRead;
+
+            while ((bytesRead = await sourceConn.ReceiveAsync(buffer, ct)) > 0)
+            {
+                if (ct.IsCancellationRequested)
+                    break;
+
+                // Pipe directly to destination without local storage
+                await destConn.SendAsync(buffer.AsMemory(0, bytesRead), ct);
+                bytesRelayed += bytesRead;
+            }
+
+            sw.Stop();
+
+            return new RelayResult
+            {
+                Success = true,
+                ObjectId = objectId,
+                BytesRelayed = bytesRelayed,
+                Duration = sw.Elapsed,
+                SourceNode = source,
+                SuccessfulDestinations = new List<NodeId> { destination }
+            };
+        }
+        catch (Exception ex)
+        {
+            sw.Stop();
+
+            return new RelayResult
+            {
+                Success = false,
+                ObjectId = objectId,
+                BytesRelayed = bytesRelayed,
+                Duration = sw.Elapsed,
+                SourceNode = source,
+                FailedDestinations = new List<NodeId> { destination },
+                ErrorMessage = ex.Message
+            };
+        }
+    }
+
+    /// <inheritdoc />
+    public async Task<RelayResult> RelayToManyAsync(
+        NodeId source,
+        IEnumerable<NodeId> destinations,
+        ObjectId objectId,
+        CancellationToken ct = default)
+    {
+        var destList = destinations.ToList();
+        var sw = System.Diagnostics.Stopwatch.StartNew();
+        long bytesRelayed = 0;
+        var successful = new List<NodeId>();
+        var failed = new List<NodeId>();
+
+        try
+        {
+            // Get source connection
+            var sourceConn = await _transportBus.GetConnectionAsync(source, ct);
+
+            // Get destination connections
+            var destConnections = new Dictionary<NodeId, NodeConnection>();
+            foreach (var dest in destList)
+            {
+                try
+                {
+                    destConnections[dest] = await _transportBus.GetConnectionAsync(dest, ct);
+                }
+                catch
+                {
+                    failed.Add(dest);
+                }
+            }
+
+            if (destConnections.Count == 0)
+            {
+                return new RelayResult
+                {
+                    Success = false,
+                    ObjectId = objectId,
+                    SourceNode = source,
+                    FailedDestinations = destList,
+                    ErrorMessage = "No destinations reachable"
+                };
+            }
+
+            // Request object from source
+            var fetchRequest = new RelayFetchRequest { ObjectId = objectId.ToHex() };
+            var requestBytes = System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(fetchRequest);
+            await sourceConn.SendAsync(requestBytes, ct);
+
+            // Stream to all destinations (fan-out)
+            var buffer = new byte[_bufferSize];
+            int bytesRead;
+
+            while ((bytesRead = await sourceConn.ReceiveAsync(buffer, ct)) > 0)
+            {
+                if (ct.IsCancellationRequested)
+                    break;
+
+                var data = buffer.AsMemory(0, bytesRead);
+
+                // Send to all destinations in parallel
+                var sendTasks = destConnections.Select(async kvp =>
+                {
+                    try
+                    {
+                        await kvp.Value.SendAsync(data, ct);
+                        return (kvp.Key, Success: true);
+                    }
+                    catch
+                    {
+                        return (kvp.Key, Success: false);
+                    }
+                });
+
+                var results = await Task.WhenAll(sendTasks);
+
+                // Track failures (remove from active destinations)
+                foreach (var (nodeId, success) in results)
+                {
+                    if (!success)
+                    {
+                        destConnections.Remove(nodeId);
+                        if (!failed.Contains(nodeId))
+                            failed.Add(nodeId);
+                    }
+                }
+
+                bytesRelayed += bytesRead;
+            }
+
+            // Mark remaining as successful
+            successful.AddRange(destConnections.Keys);
+
+            sw.Stop();
+
+            return new RelayResult
+            {
+                Success = successful.Count > 0,
+                ObjectId = objectId,
+                BytesRelayed = bytesRelayed,
+                Duration = sw.Elapsed,
+                SourceNode = source,
+                SuccessfulDestinations = successful,
+                FailedDestinations = failed
+            };
+        }
+        catch (Exception ex)
+        {
+            sw.Stop();
+
+            return new RelayResult
+            {
+                Success = false,
+                ObjectId = objectId,
+                BytesRelayed = bytesRelayed,
+                Duration = sw.Elapsed,
+                SourceNode = source,
+                SuccessfulDestinations = successful,
+                FailedDestinations = failed.Concat(destList.Except(successful).Except(failed)).ToList(),
+                ErrorMessage = ex.Message
+            };
+        }
+    }
+}
+
+/// <summary>
+/// Request for relay fetch operation.
+/// </summary>
+internal sealed class RelayFetchRequest
+{
+    public string ObjectId { get; set; } = string.Empty;
+}
+
+/// <summary>
+/// Extended transport bus with relay support.
+/// </summary>
+public sealed class RelayCapableTransportBus : ITransportBus, IStreamRelay, IAsyncDisposable
+{
+    private readonly TransportBus _inner;
+    private readonly StreamRelay _relay;
+
+    public RelayCapableTransportBus(NodeRegistry nodeRegistry, NodeIdentityManager identityManager)
+    {
+        _inner = new TransportBus(nodeRegistry, identityManager);
+        _relay = new StreamRelay(_inner);
+    }
+
+    /// <inheritdoc />
+    public NodeId LocalNodeId => _inner.LocalNodeId;
+
+    /// <summary>
+    /// Registers a transport driver.
+    /// </summary>
+    public void RegisterDriver(ITransportDriver driver) => _inner.RegisterDriver(driver);
+
+    /// <inheritdoc />
+    public Task<NodeConnection> GetConnectionAsync(NodeId nodeId, CancellationToken ct = default)
+        => _inner.GetConnectionAsync(nodeId, ct);
+
+    /// <inheritdoc />
+    public Task SendAsync(NodeId nodeId, SignedMessage message, CancellationToken ct = default)
+        => _inner.SendAsync(nodeId, message, ct);
+
+    /// <inheritdoc />
+    public Task BroadcastAsync(IEnumerable<NodeId> nodeIds, SignedMessage message, CancellationToken ct = default)
+        => _inner.BroadcastAsync(nodeIds, message, ct);
+
+    /// <inheritdoc />
+    public void OnMessage(string messageType, Func<SignedMessage, NodeConnection, Task> handler)
+        => _inner.OnMessage(messageType, handler);
+
+    /// <inheritdoc />
+    public Task StartAsync(CancellationToken ct = default)
+        => _inner.StartAsync(ct);
+
+    /// <inheritdoc />
+    public Task StopAsync(CancellationToken ct = default)
+        => _inner.StopAsync(ct);
+
+    /// <inheritdoc />
+    public Task<RelayResult> RelayAsync(NodeId source, NodeId destination, ObjectId objectId, CancellationToken ct = default)
+        => _relay.RelayAsync(source, destination, objectId, ct);
+
+    /// <inheritdoc />
+    public Task<RelayResult> RelayToManyAsync(NodeId source, IEnumerable<NodeId> destinations, ObjectId objectId, CancellationToken ct = default)
+        => _relay.RelayToManyAsync(source, destinations, objectId, ct);
+
+    /// <inheritdoc />
+    public async ValueTask DisposeAsync()
+    {
+        await _inner.DisposeAsync();
+    }
+}
