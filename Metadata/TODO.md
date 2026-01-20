@@ -1430,7 +1430,7 @@ Transform DataWarehouse from a single-instance storage engine to a **Federated D
 
 ### Phase 5: Advanced Federation (Hyperscale Fluidity)
 
-**Status:** 🔄 IN PROGRESS (1/6 complete)
+**Status:** 🔄 IN PROGRESS (2/6 complete)
 
 **Goal:** Enable true multi-node fluidity for scenarios:
 - U1 → DWH → U2 (cloud share with per-user views)
@@ -1457,13 +1457,13 @@ Transform DataWarehouse from a single-instance storage engine to a **Federated D
 | 5.1.4 | Implement `StoragePool` with dynamic membership | SDK/Federation/StoragePool.cs | ✅ |
 | 5.1.5 | Implement `UnionPool` for combined namespace (scenario 3/4) | SDK/Federation/StoragePool.cs | ✅ |
 
-#### 5.2 Identity-Filtered Namespaces
+#### 5.2 Identity-Filtered Namespaces ✅ COMPLETE
 | # | Task | File | Status |
 |---|------|------|--------|
-| 5.2.1 | Add `AllowedPools` to `CapabilityConstraints` | SDK/Federation/Capabilities.cs | 🔄 |
-| 5.2.2 | Create `INamespaceProjection` interface | SDK/Federation/VFS.cs | 🔄 |
-| 5.2.3 | Implement `CapabilityFilteredVfs` (wraps VFS with filtering) | SDK/Federation/VFS.cs | 🔄 |
-| 5.2.4 | Add `GetProjectedNamespaceAsync` to FederationHub | Kernel/Federation/FederationHub.cs | 🔄 |
+| 5.2.1 | Add `AllowedPools` to `CapabilityConstraints` | SDK/Federation/Capabilities.cs | ✅ |
+| 5.2.2 | Create `INamespaceProjection` interface | SDK/Federation/VFS.cs | ✅ |
+| 5.2.3 | Implement `CapabilityFilteredVfs` (wraps VFS with filtering) | SDK/Federation/VFS.cs | ✅ |
+| 5.2.4 | Add `GetProjectedNamespaceAsync` to FederationHub | SDK/Federation/VFS.cs | ✅ |
 
 #### 5.3 Dormant Node Support (USB/Offline)
 | # | Task | File | Status |

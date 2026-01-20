@@ -89,6 +89,12 @@ public sealed class CapabilityConstraints
     /// <summary>Device/client identifiers that can use this token (empty = any).</summary>
     public HashSet<string> AllowedDevices { get; set; } = new();
 
+    /// <summary>Allowed storage pool IDs (empty = any).</summary>
+    public HashSet<string> AllowedPools { get; set; } = new();
+
+    /// <summary>Allowed group IDs (empty = any).</summary>
+    public HashSet<string> AllowedGroups { get; set; } = new();
+
     /// <summary>Minimum required encryption level.</summary>
     public string? RequiredEncryption { get; set; }
 
@@ -126,6 +132,14 @@ public sealed class CapabilityConstraints
             !AllowedDevices.Contains(context.DeviceId))
             return ConstraintValidation.Failed("Device not allowed");
 
+        if (AllowedPools.Count > 0 && !string.IsNullOrEmpty(context.PoolId) &&
+            !AllowedPools.Contains(context.PoolId))
+            return ConstraintValidation.Failed("Pool not allowed");
+
+        if (AllowedGroups.Count > 0 && context.GroupMemberships.Count > 0 &&
+            !AllowedGroups.Overlaps(context.GroupMemberships))
+            return ConstraintValidation.Failed("Group not allowed");
+
         return ConstraintValidation.Success();
     }
 }
@@ -146,6 +160,12 @@ public sealed class CapabilityContext
 
     /// <summary>Device identifier.</summary>
     public string? DeviceId { get; set; }
+
+    /// <summary>Storage pool ID being accessed.</summary>
+    public string? PoolId { get; set; }
+
+    /// <summary>Groups the requester is a member of.</summary>
+    public HashSet<string> GroupMemberships { get; set; } = new();
 
     /// <summary>Current timestamp.</summary>
     public DateTimeOffset Timestamp { get; set; } = DateTimeOffset.UtcNow;

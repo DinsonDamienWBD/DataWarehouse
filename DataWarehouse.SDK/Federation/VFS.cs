@@ -620,3 +620,248 @@ public sealed class VirtualFilesystem : IVirtualFilesystem
         return name == pattern;
     }
 }
+
+/// <summary>
+/// Interface for namespace projection based on viewer identity.
+/// </summary>
+public interface INamespaceProjection
+{
+    /// <summary>
+    /// Gets a filtered view of the VFS based on viewer's capabilities.
+    /// U2 sees U1's shared data; U3 sees nothing from U1.
+    /// </summary>
+    Task<IVirtualFilesystem> GetProjectedNamespaceAsync(
+        NodeIdentity viewer,
+        IEnumerable<CapabilityToken> viewerCapabilities,
+        CancellationToken ct = default);
+}
+
+/// <summary>
+/// A VFS wrapper that filters based on capability tokens.
+/// Implements per-identity namespace views.
+/// </summary>
+public sealed class CapabilityFilteredVfs : IVirtualFilesystem
+{
+    private readonly IVirtualFilesystem _inner;
+    private readonly NodeIdentity _viewer;
+    private readonly HashSet<string> _allowedObjectIds;
+    private readonly HashSet<string> _allowedPaths;
+    private readonly CapabilityPermissions _effectivePermissions;
+
+    /// <inheritdoc />
+    public string LocalNodeId => _inner.LocalNodeId;
+
+    /// <summary>
+    /// Creates a filtered VFS view for a specific viewer.
+    /// </summary>
+    public CapabilityFilteredVfs(
+        IVirtualFilesystem inner,
+        NodeIdentity viewer,
+        IEnumerable<CapabilityToken> capabilities)
+    {
+        _inner = inner;
+        _viewer = viewer;
+        _allowedObjectIds = new HashSet<string>();
+        _allowedPaths = new HashSet<string>();
+        _effectivePermissions = CapabilityPermissions.None;
+
+        // Build allowed set from capabilities
+        foreach (var cap in capabilities.Where(c => !c.IsRevoked))
+        {
+            _effectivePermissions |= cap.Permissions;
+
+            switch (cap.Type)
+            {
+                case CapabilityType.Object:
+                    _allowedObjectIds.Add(cap.TargetId);
+                    break;
+                case CapabilityType.Container:
+                    _allowedPaths.Add(cap.TargetId);
+                    break;
+                case CapabilityType.Wildcard:
+                    // Pattern-based - add as path prefix
+                    _allowedPaths.Add(cap.TargetId.TrimEnd('*'));
+                    break;
+                case CapabilityType.Node:
+                case CapabilityType.Federation:
+                    // Full access to all paths
+                    _allowedPaths.Add("/");
+                    break;
+            }
+        }
+    }
+
+    private bool IsAllowed(VfsNode node)
+    {
+        // Check object ID
+        if (node.ObjectId.HasValue && _allowedObjectIds.Contains(node.ObjectId.Value.ToHex()))
+            return true;
+
+        // Check path prefixes
+        var pathStr = node.Path.ToString();
+        foreach (var prefix in _allowedPaths)
+        {
+            if (pathStr.StartsWith(prefix) || prefix == "/")
+                return true;
+        }
+
+        return false;
+    }
+
+    private bool HasPermission(CapabilityPermissions required)
+    {
+        return (_effectivePermissions & required) == required;
+    }
+
+    /// <inheritdoc />
+    public async Task<VfsNode?> GetNodeAsync(VfsPath path, CancellationToken ct = default)
+    {
+        var node = await _inner.GetNodeAsync(path, ct);
+        if (node == null || !IsAllowed(node))
+            return null;
+        return node;
+    }
+
+    /// <inheritdoc />
+    public async Task<VfsNode> CreateDirectoryAsync(VfsPath path, CancellationToken ct = default)
+    {
+        if (!HasPermission(CapabilityPermissions.Create))
+            throw new UnauthorizedAccessException("No create permission");
+
+        // Check parent is allowed
+        var parent = await _inner.GetNodeAsync(path.Parent, ct);
+        if (parent == null || !IsAllowed(parent))
+            throw new UnauthorizedAccessException("Parent path not accessible");
+
+        return await _inner.CreateDirectoryAsync(path, ct);
+    }
+
+    /// <inheritdoc />
+    public async Task<VfsNode> CreateFileAsync(VfsPath path, ObjectId objectId, long size, string contentType, CancellationToken ct = default)
+    {
+        if (!HasPermission(CapabilityPermissions.Create))
+            throw new UnauthorizedAccessException("No create permission");
+
+        var parent = await _inner.GetNodeAsync(path.Parent, ct);
+        if (parent == null || !IsAllowed(parent))
+            throw new UnauthorizedAccessException("Parent path not accessible");
+
+        return await _inner.CreateFileAsync(path, objectId, size, contentType, ct);
+    }
+
+    /// <inheritdoc />
+    public async Task<bool> DeleteAsync(VfsPath path, bool recursive = false, CancellationToken ct = default)
+    {
+        if (!HasPermission(CapabilityPermissions.Delete))
+            return false;
+
+        var node = await _inner.GetNodeAsync(path, ct);
+        if (node == null || !IsAllowed(node))
+            return false;
+
+        return await _inner.DeleteAsync(path, recursive, ct);
+    }
+
+    /// <inheritdoc />
+    public async Task<bool> MoveAsync(VfsPath source, VfsPath destination, CancellationToken ct = default)
+    {
+        if (!HasPermission(CapabilityPermissions.Write))
+            return false;
+
+        var srcNode = await _inner.GetNodeAsync(source, ct);
+        var dstParent = await _inner.GetNodeAsync(destination.Parent, ct);
+
+        if (srcNode == null || !IsAllowed(srcNode))
+            return false;
+        if (dstParent == null || !IsAllowed(dstParent))
+            return false;
+
+        return await _inner.MoveAsync(source, destination, ct);
+    }
+
+    /// <inheritdoc />
+    public async Task<VfsNode> CreateLinkAsync(VfsPath linkPath, VfsPath targetPath, CancellationToken ct = default)
+    {
+        if (!HasPermission(CapabilityPermissions.Create))
+            throw new UnauthorizedAccessException("No create permission");
+
+        var target = await _inner.GetNodeAsync(targetPath, ct);
+        if (target == null || !IsAllowed(target))
+            throw new UnauthorizedAccessException("Target not accessible");
+
+        return await _inner.CreateLinkAsync(linkPath, targetPath, ct);
+    }
+
+    /// <inheritdoc />
+    public async Task<IReadOnlyList<VfsNode>> ListAsync(VfsPath path, CancellationToken ct = default)
+    {
+        var parent = await _inner.GetNodeAsync(path, ct);
+        if (parent == null || !IsAllowed(parent))
+            return Array.Empty<VfsNode>();
+
+        var children = await _inner.ListAsync(path, ct);
+        return children.Where(IsAllowed).ToList();
+    }
+
+    /// <inheritdoc />
+    public async Task<bool> ExistsAsync(VfsPath path, CancellationToken ct = default)
+    {
+        var node = await _inner.GetNodeAsync(path, ct);
+        return node != null && IsAllowed(node);
+    }
+
+    /// <inheritdoc />
+    public Task<VfsPath> ResolveAsync(VfsPath path, int maxDepth = 10, CancellationToken ct = default)
+    {
+        return _inner.ResolveAsync(path, maxDepth, ct);
+    }
+}
+
+/// <summary>
+/// Namespace projection service.
+/// </summary>
+public sealed class NamespaceProjectionService : INamespaceProjection
+{
+    private readonly IVirtualFilesystem _vfs;
+    private readonly CapabilityStore _capabilityStore;
+
+    public NamespaceProjectionService(IVirtualFilesystem vfs, CapabilityStore capabilityStore)
+    {
+        _vfs = vfs;
+        _capabilityStore = capabilityStore;
+    }
+
+    /// <inheritdoc />
+    public async Task<IVirtualFilesystem> GetProjectedNamespaceAsync(
+        NodeIdentity viewer,
+        IEnumerable<CapabilityToken> viewerCapabilities,
+        CancellationToken ct = default)
+    {
+        // Get all capabilities for this viewer from store
+        var storedCaps = await _capabilityStore.GetTokensForHolderAsync(viewer.Id.ToHex(), ct);
+
+        // Combine provided and stored capabilities
+        var allCaps = viewerCapabilities.Concat(storedCaps).Distinct().ToList();
+
+        // Create filtered VFS
+        return new CapabilityFilteredVfs(_vfs, viewer, allCaps);
+    }
+
+    /// <summary>
+    /// Creates a projected namespace for a specific pool.
+    /// </summary>
+    public async Task<IVirtualFilesystem> GetPoolProjectedNamespaceAsync(
+        NodeIdentity viewer,
+        IStoragePool pool,
+        IEnumerable<CapabilityToken> viewerCapabilities,
+        CancellationToken ct = default)
+    {
+        // Filter capabilities to those valid for this pool
+        var poolCaps = viewerCapabilities
+            .Where(c => c.Constraints.AllowedPools.Count == 0 ||
+                        c.Constraints.AllowedPools.Contains(pool.PoolId))
+            .ToList();
+
+        return await GetProjectedNamespaceAsync(viewer, poolCaps, ct);
+    }
+}
