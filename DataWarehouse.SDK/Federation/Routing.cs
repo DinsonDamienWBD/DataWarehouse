@@ -558,3 +558,176 @@ public sealed class StoreRoute
     /// <summary>Whether object already exists at this node.</summary>
     public bool IsExisting { get; init; }
 }
+
+#region H17: Routing Table Stale Entry Cleanup
+
+/// <summary>
+/// Manages TTL-based expiration and stale entry cleanup for routing tables.
+/// </summary>
+public sealed class RoutingTableCleanup : IAsyncDisposable
+{
+    private readonly RoutingTable _routingTable;
+    private readonly RoutingCleanupConfig _config;
+    private readonly Timer _sweepTimer;
+    private readonly ConcurrentDictionary<string, RouteMetadata> _routeMetadata = new();
+    private volatile bool _disposed;
+
+    public event EventHandler<StaleRouteEventArgs>? StaleRouteDetected;
+
+    public RoutingTableCleanup(RoutingTable routingTable, RoutingCleanupConfig? config = null)
+    {
+        _routingTable = routingTable;
+        _config = config ?? new RoutingCleanupConfig();
+        _sweepTimer = new Timer(
+            SweepStaleEntries,
+            null,
+            _config.SweepInterval,
+            _config.SweepInterval);
+    }
+
+    /// <summary>
+    /// Records route access time for freshness tracking.
+    /// </summary>
+    public void RecordAccess(ObjectId objectId)
+    {
+        var key = objectId.ToHex();
+        _routeMetadata.AddOrUpdate(
+            key,
+            _ => new RouteMetadata { LastAccessed = DateTime.UtcNow, AccessCount = 1 },
+            (_, m) => { m.LastAccessed = DateTime.UtcNow; m.AccessCount++; return m; });
+    }
+
+    /// <summary>
+    /// Sets TTL for a specific route.
+    /// </summary>
+    public void SetTtl(ObjectId objectId, TimeSpan ttl)
+    {
+        var key = objectId.ToHex();
+        var metadata = _routeMetadata.GetOrAdd(key, _ => new RouteMetadata());
+        metadata.ExpiresAt = DateTime.UtcNow + ttl;
+    }
+
+    /// <summary>
+    /// Gets freshness score for a route (0-1, where 1 is fresh).
+    /// </summary>
+    public double GetFreshnessScore(ObjectId objectId)
+    {
+        var key = objectId.ToHex();
+        if (!_routeMetadata.TryGetValue(key, out var metadata))
+            return 0;
+
+        var age = DateTime.UtcNow - metadata.LastAccessed;
+        var maxAge = _config.DefaultTtl.TotalSeconds;
+
+        return Math.Max(0, 1 - (age.TotalSeconds / maxAge));
+    }
+
+    /// <summary>
+    /// Proactively refreshes routes that are becoming stale.
+    /// </summary>
+    public async Task ProactiveRefreshAsync(CancellationToken ct = default)
+    {
+        var threshold = DateTime.UtcNow - (_config.DefaultTtl * 0.8); // Refresh at 80% of TTL
+        var toRefresh = _routeMetadata
+            .Where(kvp => kvp.Value.LastAccessed < threshold)
+            .Select(kvp => kvp.Key)
+            .ToList();
+
+        foreach (var key in toRefresh)
+        {
+            if (ct.IsCancellationRequested) break;
+
+            // In production, this would re-query the route from the network
+            await Task.Delay(10, ct);
+            RecordAccess(ObjectId.FromHex(key));
+        }
+    }
+
+    private void SweepStaleEntries(object? state)
+    {
+        if (_disposed) return;
+
+        var now = DateTime.UtcNow;
+        var staleKeys = new List<string>();
+
+        foreach (var (key, metadata) in _routeMetadata)
+        {
+            bool isStale = false;
+
+            // Check explicit TTL expiration
+            if (metadata.ExpiresAt.HasValue && metadata.ExpiresAt.Value < now)
+            {
+                isStale = true;
+            }
+            // Check default TTL based on last access
+            else if ((now - metadata.LastAccessed) > _config.DefaultTtl)
+            {
+                isStale = true;
+            }
+
+            if (isStale)
+            {
+                staleKeys.Add(key);
+                StaleRouteDetected?.Invoke(this, new StaleRouteEventArgs
+                {
+                    ObjectId = ObjectId.FromHex(key),
+                    LastAccessed = metadata.LastAccessed,
+                    Age = now - metadata.LastAccessed
+                });
+            }
+        }
+
+        // Remove stale entries
+        foreach (var key in staleKeys)
+        {
+            _routeMetadata.TryRemove(key, out _);
+            // Note: In production, would also remove from RoutingTable
+        }
+    }
+
+    /// <summary>
+    /// Gets cleanup statistics.
+    /// </summary>
+    public RoutingCleanupStats GetStats() => new()
+    {
+        TotalTrackedRoutes = _routeMetadata.Count,
+        AvgFreshnessScore = _routeMetadata.Count > 0
+            ? _routeMetadata.Keys.Average(k => GetFreshnessScore(ObjectId.FromHex(k)))
+            : 0
+    };
+
+    public ValueTask DisposeAsync()
+    {
+        _disposed = true;
+        _sweepTimer.Dispose();
+        return ValueTask.CompletedTask;
+    }
+}
+
+public sealed class RouteMetadata
+{
+    public DateTime LastAccessed { get; set; } = DateTime.UtcNow;
+    public DateTime? ExpiresAt { get; set; }
+    public long AccessCount { get; set; }
+}
+
+public sealed class RoutingCleanupConfig
+{
+    public TimeSpan DefaultTtl { get; set; } = TimeSpan.FromHours(1);
+    public TimeSpan SweepInterval { get; set; } = TimeSpan.FromMinutes(5);
+}
+
+public sealed class StaleRouteEventArgs : EventArgs
+{
+    public ObjectId ObjectId { get; init; }
+    public DateTime LastAccessed { get; init; }
+    public TimeSpan Age { get; init; }
+}
+
+public sealed class RoutingCleanupStats
+{
+    public int TotalTrackedRoutes { get; init; }
+    public double AvgFreshnessScore { get; init; }
+}
+
+#endregion

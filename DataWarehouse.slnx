@@ -39,7 +39,11 @@
     <Project Path="Plugins/DataWarehouse.Plugins.Tiering/DataWarehouse.Plugins.Tiering.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.VaultKeyStore/DataWarehouse.Plugins.VaultKeyStore.csproj" />
   </Folder>
+  <Project Path="DataWarehouse.Benchmarks/DataWarehouse.Benchmarks.csproj" />
+  <Project Path="DataWarehouse.CLI/DataWarehouse.CLI.csproj" />
   <Project Path="DataWarehouse.Dashboard/DataWarehouse.Dashboard.csproj" />
   <Project Path="DataWarehouse.Kernel/DataWarehouse.Kernel.csproj" />
+  <Project Path="DataWarehouse.Launcher/DataWarehouse.Launcher.csproj" />
   <Project Path="DataWarehouse.SDK/DataWarehouse.SDK.csproj" />
+  <Project Path="DataWarehouse.Tests/DataWarehouse.Tests.csproj" />
 </Solution>
