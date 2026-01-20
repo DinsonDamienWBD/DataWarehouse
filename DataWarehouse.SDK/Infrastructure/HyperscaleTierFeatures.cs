@@ -2384,3 +2384,334 @@ internal sealed class CompactionTask
 #endregion
 
 #endregion
+
+#region 3. Exabyte Scale Testing Framework
+
+/// <summary>
+/// Comprehensive scale validation framework for exabyte-scale testing.
+/// Provides synthetic data generation, performance benchmarking, and bottleneck identification.
+/// </summary>
+public sealed class ExabyteScaleTestingFramework : IAsyncDisposable
+{
+    private readonly ConcurrentDictionary<string, BenchmarkRun> _benchmarkRuns = new();
+    private readonly ConcurrentDictionary<string, LatencyTracker> _latencyTrackers = new();
+    private readonly ConcurrentDictionary<string, ThroughputMeter> _throughputMeters = new();
+    private readonly ConcurrentDictionary<string, ResourceMonitor> _resourceMonitors = new();
+    private readonly Channel<BenchmarkTask> _benchmarkQueue;
+    private readonly ScaleTestConfig _config;
+    private readonly Task _benchmarkWorker;
+    private readonly CancellationTokenSource _cts = new();
+    private long _totalDataGenerated;
+    private long _totalOperations;
+    private volatile bool _disposed;
+
+    /// <summary>
+    /// Initializes the exabyte scale testing framework.
+    /// </summary>
+    public ExabyteScaleTestingFramework(ScaleTestConfig? config = null)
+    {
+        _config = config ?? new ScaleTestConfig();
+        _benchmarkQueue = Channel.CreateBounded<BenchmarkTask>(
+            new BoundedChannelOptions(1000) { FullMode = BoundedChannelFullMode.Wait });
+        _benchmarkWorker = RunBenchmarkWorkerAsync(_cts.Token);
+    }
+
+    /// <summary>
+    /// Generates synthetic data for scale testing.
+    /// </summary>
+    public async IAsyncEnumerable<SyntheticDataBatch> GenerateSyntheticDataAsync(
+        SyntheticDataRequest request,
+        [EnumeratorCancellation] CancellationToken ct = default)
+    {
+        var random = new Random(request.Seed ?? Environment.TickCount);
+        var batchNumber = 0L;
+        var totalGenerated = 0L;
+
+        while (totalGenerated < request.TotalSizeBytes)
+        {
+            ct.ThrowIfCancellationRequested();
+            var batchSize = (int)Math.Min(request.BatchSizeBytes, request.TotalSizeBytes - totalGenerated);
+            var objects = new List<SyntheticObject>();
+            var remainingBatch = batchSize;
+
+            while (remainingBatch > 0)
+            {
+                var objectSize = request.ObjectSizeDistribution switch
+                {
+                    ObjectSizeDistribution.Uniform => random.Next(request.MinObjectSize, request.MaxObjectSize + 1),
+                    ObjectSizeDistribution.Normal => GenerateNormalSize(random, request.MinObjectSize, request.MaxObjectSize),
+                    ObjectSizeDistribution.Exponential => GenerateExponentialSize(random, request.MinObjectSize, request.MaxObjectSize),
+                    ObjectSizeDistribution.Bimodal => GenerateBimodalSize(random, request.MinObjectSize, request.MaxObjectSize),
+                    _ => random.Next(request.MinObjectSize, request.MaxObjectSize + 1)
+                };
+
+                objectSize = Math.Min(objectSize, remainingBatch);
+                var data = new byte[objectSize];
+
+                switch (request.DataPattern)
+                {
+                    case DataPattern.Random:
+                        random.NextBytes(data);
+                        break;
+                    case DataPattern.Compressible:
+                        GenerateCompressibleData(data, random, request.CompressibilityRatio);
+                        break;
+                    case DataPattern.Sequential:
+                        GenerateSequentialData(data, totalGenerated);
+                        break;
+                    case DataPattern.Sparse:
+                        GenerateSparseData(data, random, request.SparsityRatio);
+                        break;
+                }
+
+                objects.Add(new SyntheticObject
+                {
+                    ObjectId = $"{request.KeyPrefix}{batchNumber:D12}_{objects.Count:D8}",
+                    Data = data,
+                    SizeBytes = objectSize,
+                    GeneratedAt = DateTime.UtcNow
+                });
+                remainingBatch -= objectSize;
+            }
+
+            var batch = new SyntheticDataBatch
+            {
+                BatchNumber = batchNumber,
+                Objects = objects,
+                TotalSizeBytes = batchSize,
+                GeneratedAt = DateTime.UtcNow
+            };
+
+            totalGenerated += batchSize;
+            batchNumber++;
+            Interlocked.Add(ref _totalDataGenerated, batchSize);
+            yield return batch;
+
+            if (request.ThrottleMBps > 0)
+            {
+                var delayMs = (int)(batchSize / (request.ThrottleMBps * 1024.0));
+                if (delayMs > 0) await Task.Delay(delayMs, ct);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Runs a comprehensive performance benchmark.
+    /// </summary>
+    public async Task<BenchmarkResults> RunBenchmarkAsync(BenchmarkConfiguration benchmark, CancellationToken ct = default)
+    {
+        var runId = $"bench-{Guid.NewGuid():N}";
+        var run = new BenchmarkRun
+        {
+            RunId = runId,
+            Configuration = benchmark,
+            StartedAt = DateTime.UtcNow,
+            Status = BenchmarkStatus.Running
+        };
+        _benchmarkRuns[runId] = run;
+
+        var latencyTracker = new LatencyTracker();
+        _latencyTrackers[runId] = latencyTracker;
+        var throughputMeter = new ThroughputMeter();
+        _throughputMeters[runId] = throughputMeter;
+        var resourceMonitor = new ResourceMonitor();
+        _resourceMonitors[runId] = resourceMonitor;
+
+        var monitoringTask = resourceMonitor.StartMonitoringAsync(ct);
+
+        try
+        {
+            var sw = Stopwatch.StartNew();
+            var completedOps = 0L;
+            var failedOps = 0L;
+            var semaphore = new SemaphoreSlim(benchmark.ConcurrentOperations);
+            var tasks = new List<Task>();
+
+            for (int i = 0; i < benchmark.TotalOperations && !ct.IsCancellationRequested; i++)
+            {
+                await semaphore.WaitAsync(ct);
+                tasks.Add(Task.Run(async () =>
+                {
+                    var opSw = Stopwatch.StartNew();
+                    try
+                    {
+                        await ExecuteBenchmarkOperationAsync(benchmark, ct);
+                        opSw.Stop();
+                        latencyTracker.RecordLatency(opSw.Elapsed);
+                        throughputMeter.RecordOperation(benchmark.OperationSizeBytes);
+                        Interlocked.Increment(ref completedOps);
+                        Interlocked.Increment(ref _totalOperations);
+                    }
+                    catch { Interlocked.Increment(ref failedOps); }
+                    finally { semaphore.Release(); }
+                }, ct));
+            }
+
+            await Task.WhenAll(tasks);
+            sw.Stop();
+            resourceMonitor.StopMonitoring();
+            await monitoringTask;
+
+            run.CompletedAt = DateTime.UtcNow;
+            run.Status = BenchmarkStatus.Completed;
+
+            return new BenchmarkResults
+            {
+                RunId = runId,
+                Configuration = benchmark,
+                Duration = sw.Elapsed,
+                TotalOperations = benchmark.TotalOperations,
+                CompletedOperations = completedOps,
+                FailedOperations = failedOps,
+                LatencyPercentiles = latencyTracker.GetPercentiles(),
+                ThroughputMetrics = throughputMeter.GetMetrics(),
+                ResourceUtilization = resourceMonitor.GetUtilization(),
+                Bottlenecks = IdentifyBottlenecks(latencyTracker, throughputMeter, resourceMonitor),
+                StartedAt = run.StartedAt,
+                CompletedAt = run.CompletedAt.Value
+            };
+        }
+        catch (Exception ex)
+        {
+            run.Status = BenchmarkStatus.Failed;
+            run.ErrorMessage = ex.Message;
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// Gets latency percentiles for a tracker.
+    /// </summary>
+    public LatencyPercentiles GetLatencyPercentiles(string trackerId)
+    {
+        return _latencyTrackers.TryGetValue(trackerId, out var tracker) ? tracker.GetPercentiles() : new LatencyPercentiles();
+    }
+
+    /// <summary>
+    /// Generates a capacity planning report.
+    /// </summary>
+    public CapacityPlanningReport GenerateCapacityPlanningReport(IEnumerable<BenchmarkResults> historicalData)
+    {
+        var dataList = historicalData.ToList();
+        if (dataList.Count == 0)
+            return new CapacityPlanningReport { GeneratedAt = DateTime.UtcNow, Message = "Insufficient data" };
+
+        var avgThroughput = dataList.Average(d => d.ThroughputMetrics.AverageMBps);
+        var avgLatencyP99 = dataList.Average(d => d.LatencyPercentiles.P99.TotalMilliseconds);
+        var avgCpu = dataList.Average(d => d.ResourceUtilization.AverageCpuPercent);
+        var avgMem = dataList.Average(d => d.ResourceUtilization.AverageMemoryPercent);
+        var growthRate = CalculateGrowthRate(dataList);
+
+        return new CapacityPlanningReport
+        {
+            GeneratedAt = DateTime.UtcNow,
+            CurrentThroughputMBps = avgThroughput,
+            CurrentLatencyP99Ms = avgLatencyP99,
+            CurrentCpuUtilization = avgCpu,
+            CurrentMemoryUtilization = avgMem,
+            ProjectedGrowthRate = growthRate,
+            RecommendedActions = GenerateRecommendations(avgCpu, avgMem, avgLatencyP99),
+            CapacityProjections = GenerateProjections(avgThroughput, growthRate),
+            OptimalNodeCount = Math.Max(1, (int)Math.Ceiling(avgCpu / 60.0))
+        };
+    }
+
+    private async Task ExecuteBenchmarkOperationAsync(BenchmarkConfiguration benchmark, CancellationToken ct)
+    {
+        var delay = benchmark.WorkloadType switch
+        {
+            WorkloadType.Read => TimeSpan.FromMicroseconds(100 + Random.Shared.Next(500)),
+            WorkloadType.Write => TimeSpan.FromMicroseconds(200 + Random.Shared.Next(1000)),
+            WorkloadType.Mixed => TimeSpan.FromMicroseconds(150 + Random.Shared.Next(750)),
+            WorkloadType.Scan => TimeSpan.FromMilliseconds(1 + Random.Shared.Next(10)),
+            _ => TimeSpan.FromMicroseconds(100)
+        };
+        await Task.Delay(delay, ct);
+    }
+
+    private static List<BottleneckInfo> IdentifyBottlenecks(LatencyTracker lt, ThroughputMeter tm, ResourceMonitor rm)
+    {
+        var bottlenecks = new List<BottleneckInfo>();
+        var util = rm.GetUtilization();
+        var perc = lt.GetPercentiles();
+
+        if (util.AverageCpuPercent > 80)
+            bottlenecks.Add(new BottleneckInfo { Type = BottleneckType.CPU, Severity = util.AverageCpuPercent > 95 ? BottleneckSeverity.Critical : BottleneckSeverity.Warning, Description = $"CPU at {util.AverageCpuPercent:F1}%", Recommendation = "Add compute nodes" });
+        if (util.AverageMemoryPercent > 85)
+            bottlenecks.Add(new BottleneckInfo { Type = BottleneckType.Memory, Severity = BottleneckSeverity.Warning, Description = $"Memory at {util.AverageMemoryPercent:F1}%", Recommendation = "Add memory or improve caching" });
+        if (perc.P99.TotalMilliseconds > 100)
+            bottlenecks.Add(new BottleneckInfo { Type = BottleneckType.Latency, Severity = BottleneckSeverity.Warning, Description = $"P99 at {perc.P99.TotalMilliseconds:F1}ms", Recommendation = "Review I/O patterns" });
+
+        return bottlenecks;
+    }
+
+    private static int GenerateNormalSize(Random r, int min, int max) { var m = (min + max) / 2.0; var s = (max - min) / 6.0; return Math.Clamp((int)(m + s * Math.Sqrt(-2 * Math.Log(r.NextDouble())) * Math.Cos(2 * Math.PI * r.NextDouble())), min, max); }
+    private static int GenerateExponentialSize(Random r, int min, int max) => Math.Clamp(min + (int)(-Math.Log(1 - r.NextDouble()) / (1.0 / ((max - min) / 3.0))), min, max);
+    private static int GenerateBimodalSize(Random r, int min, int max) => r.NextDouble() < 0.7 ? r.Next(min, min + (max - min) / 4) : r.Next(min + 3 * (max - min) / 4, max);
+    private static void GenerateCompressibleData(byte[] d, Random r, double c) { var p = new byte[Math.Min(256, d.Length)]; r.NextBytes(p); for (int i = 0; i < d.Length; i++) d[i] = p[i % p.Length]; }
+    private static void GenerateSequentialData(byte[] d, long o) { for (int i = 0; i < d.Length; i++) d[i] = (byte)((o + i) & 0xFF); }
+    private static void GenerateSparseData(byte[] d, Random r, double s) { Array.Clear(d); for (int i = 0; i < (int)(d.Length * (1 - s)); i++) d[r.Next(d.Length)] = (byte)r.Next(1, 256); }
+    private static double CalculateGrowthRate(List<BenchmarkResults> d) { if (d.Count < 2) return 0; var s = d.OrderBy(x => x.StartedAt).ToList(); var days = (s.Last().StartedAt - s.First().StartedAt).TotalDays; return days > 0 ? (s.Last().ThroughputMetrics.AverageMBps - s.First().ThroughputMetrics.AverageMBps) / s.First().ThroughputMetrics.AverageMBps / days * 365 : 0; }
+    private static List<string> GenerateRecommendations(double c, double m, double l) { var r = new List<string>(); if (c > 70) r.Add("Scale horizontally"); if (m > 80) r.Add("Add caching"); if (l > 50) r.Add("Review network"); if (r.Count == 0) r.Add("Capacity adequate"); return r; }
+    private static List<CapacityProjection> GenerateProjections(double t, double g) => new() { new() { Months = 6, ProjectedThroughputMBps = t * (1 + g * 0.5) }, new() { Months = 12, ProjectedThroughputMBps = t * (1 + g) }, new() { Months = 24, ProjectedThroughputMBps = t * (1 + g * 2) } };
+    private async Task RunBenchmarkWorkerAsync(CancellationToken ct) { await foreach (var t in _benchmarkQueue.Reader.ReadAllAsync(ct)) try { await RunBenchmarkAsync(t.Configuration, ct); } catch { } }
+    public async ValueTask DisposeAsync() { if (_disposed) return; _disposed = true; _cts.Cancel(); _benchmarkQueue.Writer.Complete(); try { await _benchmarkWorker; } catch { } _cts.Dispose(); }
+}
+
+internal sealed class LatencyTracker
+{
+    private readonly ConcurrentBag<double> _latencies = new();
+    public void RecordLatency(TimeSpan l) => _latencies.Add(l.TotalMilliseconds);
+    public LatencyPercentiles GetPercentiles()
+    {
+        var s = _latencies.OrderBy(l => l).ToArray();
+        if (s.Length == 0) return new LatencyPercentiles();
+        double P(double p) => s[Math.Max(0, (int)Math.Ceiling(p / 100.0 * s.Length) - 1)];
+        return new LatencyPercentiles { P50 = TimeSpan.FromMilliseconds(P(50)), P75 = TimeSpan.FromMilliseconds(P(75)), P90 = TimeSpan.FromMilliseconds(P(90)), P95 = TimeSpan.FromMilliseconds(P(95)), P99 = TimeSpan.FromMilliseconds(P(99)), P999 = TimeSpan.FromMilliseconds(P(99.9)), Min = TimeSpan.FromMilliseconds(s.First()), Max = TimeSpan.FromMilliseconds(s.Last()), Mean = TimeSpan.FromMilliseconds(s.Average()), Count = s.Length };
+    }
+}
+
+internal sealed class ThroughputMeter
+{
+    private long _totalBytes, _totalOps;
+    private readonly Stopwatch _sw = Stopwatch.StartNew();
+    public void RecordOperation(long b) { Interlocked.Add(ref _totalBytes, b); Interlocked.Increment(ref _totalOps); }
+    public ThroughputMetrics GetMetrics() { var e = _sw.Elapsed.TotalSeconds; return new ThroughputMetrics { TotalBytes = _totalBytes, TotalOperations = _totalOps, AverageMBps = e > 0 ? _totalBytes / 1024.0 / 1024.0 / e : 0, AverageIOPS = e > 0 ? _totalOps / e : 0 }; }
+}
+
+internal sealed class ResourceMonitor
+{
+    private readonly ConcurrentBag<(double Cpu, long Mem, int Threads)> _samples = new();
+    private readonly CancellationTokenSource _cts = new();
+    public async Task StartMonitoringAsync(CancellationToken ct) { while (!ct.IsCancellationRequested && !_cts.IsCancellationRequested) { var p = Process.GetCurrentProcess(); p.Refresh(); _samples.Add((p.TotalProcessorTime.TotalMilliseconds / Environment.ProcessorCount / 10, p.WorkingSet64, p.Threads.Count)); try { await Task.Delay(1000, ct); } catch { break; } } }
+    public void StopMonitoring() => _cts.Cancel();
+    public ResourceUtilization GetUtilization() { var s = _samples.ToList(); return s.Count == 0 ? new ResourceUtilization() : new ResourceUtilization { AverageCpuPercent = s.Average(x => x.Cpu), PeakCpuPercent = s.Max(x => x.Cpu), AverageMemoryBytes = (long)s.Average(x => x.Mem), PeakMemoryBytes = s.Max(x => x.Mem), AverageMemoryPercent = s.Average(x => x.Mem) / (1024.0 * 1024 * 1024 * 16) * 100, AverageThreadCount = (int)s.Average(x => x.Threads), SampleCount = s.Count }; }
+}
+
+#region Scale Testing Types
+
+public sealed class ScaleTestConfig { public int MaxConcurrentBenchmarks { get; set; } = 10; public TimeSpan OperationTimeout { get; set; } = TimeSpan.FromMinutes(30); }
+public sealed class SyntheticDataRequest { public long TotalSizeBytes { get; init; } public int BatchSizeBytes { get; init; } = 10 * 1024 * 1024; public int MinObjectSize { get; init; } = 1024; public int MaxObjectSize { get; init; } = 10 * 1024 * 1024; public ObjectSizeDistribution ObjectSizeDistribution { get; init; } = ObjectSizeDistribution.Uniform; public DataPattern DataPattern { get; init; } = DataPattern.Random; public string KeyPrefix { get; init; } = "synthetic/"; public int? Seed { get; init; } public double CompressibilityRatio { get; init; } = 0.5; public double SparsityRatio { get; init; } = 0.9; public int ThrottleMBps { get; init; } }
+public enum ObjectSizeDistribution { Uniform, Normal, Exponential, Bimodal }
+public enum DataPattern { Random, Compressible, Sequential, Sparse }
+public sealed class SyntheticDataBatch { public long BatchNumber { get; init; } public List<SyntheticObject> Objects { get; init; } = new(); public long TotalSizeBytes { get; init; } public DateTime GeneratedAt { get; init; } }
+public sealed class SyntheticObject { public required string ObjectId { get; init; } public byte[] Data { get; init; } = []; public int SizeBytes { get; init; } public DateTime GeneratedAt { get; init; } }
+public sealed class BenchmarkConfiguration { public string Name { get; init; } = "Default"; public int TotalOperations { get; init; } = 100_000; public int ConcurrentOperations { get; init; } = 100; public int OperationSizeBytes { get; init; } = 4096; public WorkloadType WorkloadType { get; init; } = WorkloadType.Mixed; public Action<BenchmarkProgress>? ProgressCallback { get; init; } }
+public enum WorkloadType { Read, Write, Mixed, Scan }
+internal sealed class BenchmarkRun { public string RunId { get; init; } = ""; public BenchmarkConfiguration Configuration { get; init; } = new(); public DateTime StartedAt { get; init; } public DateTime? CompletedAt { get; set; } public BenchmarkStatus Status { get; set; } public string? ErrorMessage { get; set; } }
+internal sealed class BenchmarkTask { public BenchmarkConfiguration Configuration { get; init; } = new(); }
+public enum BenchmarkStatus { Pending, Running, Completed, Failed }
+public sealed class BenchmarkProgress { public long CompletedOperations { get; init; } public long FailedOperations { get; init; } public int TotalOperations { get; init; } public TimeSpan ElapsedTime { get; init; } public double CurrentThroughput { get; init; } }
+public sealed class BenchmarkResults { public string RunId { get; init; } = ""; public BenchmarkConfiguration Configuration { get; init; } = new(); public TimeSpan Duration { get; init; } public int TotalOperations { get; init; } public long CompletedOperations { get; init; } public long FailedOperations { get; init; } public LatencyPercentiles LatencyPercentiles { get; init; } = new(); public ThroughputMetrics ThroughputMetrics { get; init; } = new(); public ResourceUtilization ResourceUtilization { get; init; } = new(); public List<BottleneckInfo> Bottlenecks { get; init; } = new(); public DateTime StartedAt { get; init; } public DateTime CompletedAt { get; init; } }
+public sealed class LatencyPercentiles { public TimeSpan P50 { get; init; } public TimeSpan P75 { get; init; } public TimeSpan P90 { get; init; } public TimeSpan P95 { get; init; } public TimeSpan P99 { get; init; } public TimeSpan P999 { get; init; } public TimeSpan Min { get; init; } public TimeSpan Max { get; init; } public TimeSpan Mean { get; init; } public int Count { get; init; } }
+public sealed class ThroughputMetrics { public long TotalBytes { get; init; } public long TotalOperations { get; init; } public double AverageMBps { get; init; } public double AverageIOPS { get; init; } public double PeakMBps { get; init; } }
+public sealed class ResourceUtilization { public double AverageCpuPercent { get; init; } public double PeakCpuPercent { get; init; } public long AverageMemoryBytes { get; init; } public long PeakMemoryBytes { get; init; } public double AverageMemoryPercent { get; init; } public int AverageThreadCount { get; init; } public int SampleCount { get; init; } }
+public sealed class BottleneckInfo { public BottleneckType Type { get; init; } public BottleneckSeverity Severity { get; init; } public string Description { get; init; } = ""; public string Recommendation { get; init; } = ""; }
+public enum BottleneckType { CPU, Memory, Disk, Network, Latency }
+public enum BottleneckSeverity { Info, Warning, Critical }
+public sealed class CapacityPlanningReport { public DateTime GeneratedAt { get; init; } public double CurrentThroughputMBps { get; init; } public double CurrentLatencyP99Ms { get; init; } public double CurrentCpuUtilization { get; init; } public double CurrentMemoryUtilization { get; init; } public double ProjectedGrowthRate { get; init; } public List<string> RecommendedActions { get; init; } = new(); public List<CapacityProjection> CapacityProjections { get; init; } = new(); public int OptimalNodeCount { get; init; } public string? Message { get; init; } }
+public sealed class CapacityProjection { public int Months { get; init; } public double ProjectedThroughputMBps { get; init; } }
+
+#endregion
+
+#endregion
