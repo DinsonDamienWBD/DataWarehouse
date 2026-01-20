@@ -483,7 +483,7 @@
 - [x] Add `Pkcs11HsmProvider` for generic HSM
 - [x] Add `AwsCloudHsmProvider` for AWS
 - [x] Add `AzureDedicatedHsmProvider` for Azure
-- [ ] Add `ThalesLunaProvider` for on-premise (future)
+- [x] Add `ThalesLunaProvider` for on-premise HSM
 
 ### CS3. Regulatory Compliance Framework
 **File:** `DataWarehouse.SDK/Infrastructure/CompliancePhase7.cs` (NEW)
