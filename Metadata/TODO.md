@@ -1276,7 +1276,7 @@ Transform DataWarehouse from a single-instance storage engine to a **Federated D
 
 ### Phase 1: Core Primitives
 
-**Status:** 🔄 IN PROGRESS (2/3 complete)
+**Status:** ✅ COMPLETE (3/3)
 
 #### 1.1 Content-Addressable Object Store ✅ COMPLETE
 | # | Task | File | Status |
@@ -1296,14 +1296,14 @@ Transform DataWarehouse from a single-instance storage engine to a **Federated D
 | 1.2.4 | Create `NodeCapabilities` flags (Storage, Compute, Gateway) | SDK/Federation/NodeIdentity.cs | ✅ |
 | 1.2.5 | Implement `NodeIdentityManager` with key generation | SDK/Federation/NodeIdentity.cs | ✅ |
 
-#### 1.3 Capability Token System
+#### 1.3 Capability Token System ✅ COMPLETE
 | # | Task | File | Status |
 |---|------|------|--------|
-| 1.3.1 | Create `CapabilityToken` (OID, Permissions, Holder, Signature) | SDK/Federation/Capabilities.cs | 🔄 |
-| 1.3.2 | Create `CapabilityPermissions` flags | SDK/Federation/Capabilities.cs | 🔄 |
-| 1.3.3 | Create `CapabilityConstraints` (geo, time, device) | SDK/Federation/Capabilities.cs | 🔄 |
-| 1.3.4 | Implement `CapabilityIssuer` (create/sign tokens) | SDK/Federation/Capabilities.cs | 🔄 |
-| 1.3.5 | Implement `CapabilityVerifier` (verify signature chain) | SDK/Federation/Capabilities.cs | 🔄 |
+| 1.3.1 | Create `CapabilityToken` (OID, Permissions, Holder, Signature) | SDK/Federation/Capabilities.cs | ✅ |
+| 1.3.2 | Create `CapabilityPermissions` flags | SDK/Federation/Capabilities.cs | ✅ |
+| 1.3.3 | Create `CapabilityConstraints` (geo, time, device) | SDK/Federation/Capabilities.cs | ✅ |
+| 1.3.4 | Implement `CapabilityIssuer` (create/sign tokens) | SDK/Federation/Capabilities.cs | ✅ |
+| 1.3.5 | Implement `CapabilityVerifier` (verify signature chain) | SDK/Federation/Capabilities.cs | ✅ |
 
 ---
 
