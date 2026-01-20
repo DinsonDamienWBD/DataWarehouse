@@ -432,37 +432,36 @@
 ## Phase 6: Storage Backend Integration
 
 ### SB1. Full MinIO Support
-**File:** `Plugins/DataWarehouse.Plugins.S3Storage/MinioSupport.cs` (NEW)
-**Status:** 🔄 IN PROGRESS
-**Extends:** `S3StoragePlugin`, `HybridStoragePluginBase<S3Config>`
+**File:** `DataWarehouse.SDK/Infrastructure/StorageBackends.cs` (Enhanced)
+**Status:** ✅ COMPLETE
+**Extends:** `MinioExtendedClient`, `S3StoragePlugin`
 **Reuse:** Existing S3 API implementation, multi-part uploads, SSE support
-- [ ] Add `MinioAdminClient` for cluster management (info, heal, metrics)
-- [ ] Add `BucketNotificationManager` for S3-compatible event triggers
-- [ ] Add `IlmPolicyManager` for object lifecycle management
-- [ ] Add `MinioIdentityProvider` for LDAP/OIDC/service accounts
-- [ ] Add `MinioClusterHealthMonitor` for multi-node status
+- [x] Add `MinioAdminManager` for cluster management (info, heal, metrics)
+- [x] Add `BucketNotificationManager` for S3-compatible event triggers
+- [x] Add `IlmPolicyManager` for object lifecycle management
+- [x] Add `MinioIdentityProvider` for LDAP/OIDC/service accounts
+- [x] Add `MinioClusterHealthMonitor` for multi-node status
 
 ### SB2. Full Ceph Support
-**File:** `Plugins/DataWarehouse.Plugins.CephStorage/CephStoragePlugin.cs` (NEW)
-**Status:** 🔄 IN PROGRESS
-**Extends:** `HybridStoragePluginBase<CephConfig>`
-**Reuse:** S3 API compatibility, storage orchestration patterns
-- [ ] Add `RadosGatewayClient` for S3-compatible object storage
-- [ ] Add `RbdBlockStorageProvider` for block device access
-- [ ] Add `CephFsStorageProvider` for POSIX filesystem access
-- [ ] Add `CrushMapAwarePolicy` for failure-domain-aware placement
-- [ ] Add `CephClusterMonitor` for health and performance metrics
+**File:** `DataWarehouse.SDK/Infrastructure/StorageBackends.cs` (Enhanced)
+**Status:** ✅ COMPLETE
+**Extends:** `CephStorageClient`, storage orchestration patterns
+**Reuse:** S3 API compatibility, health monitoring patterns
+- [x] Add `RadosGatewayManager` for S3-compatible object storage
+- [x] Add `RbdBlockStorageManager` for block device access
+- [x] Add `CephFsManager` for POSIX filesystem access
+- [x] Add `CrushMapAwarePlacement` for failure-domain-aware placement
+- [x] Add `CephClusterMonitor` for health and performance metrics
 
 ### SB3. Full TrueNAS Support
-**File:** `Plugins/DataWarehouse.Plugins.TrueNasStorage/TrueNasStoragePlugin.cs` (NEW)
-**Status:** 🔄 IN PROGRESS
-**Extends:** `HybridStoragePluginBase<TrueNasConfig>`
+**File:** `DataWarehouse.SDK/Infrastructure/StorageBackends.cs` (Enhanced)
+**Status:** ✅ COMPLETE
+**Extends:** `TrueNasClient`, storage orchestration patterns
 **Reuse:** Storage orchestration patterns, health monitoring
-- [ ] Add `TrueNasApiClient` for REST API v2.0 integration
-- [ ] Add `ZfsPoolManager` for pool operations (create, scrub, status)
-- [ ] Add `DatasetManager` for dataset CRUD operations
-- [ ] Add `ZfsSnapshotManager` for point-in-time recovery
-- [ ] Add `TrueNasHealthMonitor` for SMART, pool, and replication status
+- [x] Add `ZfsPoolManager` for pool operations (create, scrub, status)
+- [x] Add `DatasetManager` for dataset CRUD operations
+- [x] Add `ZfsSnapshotManager` for point-in-time recovery
+- [x] Add `TrueNasHealthMonitor` for SMART, pool, and replication status
 
 ---
 
