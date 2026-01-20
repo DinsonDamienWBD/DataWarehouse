@@ -1428,6 +1428,77 @@ Transform DataWarehouse from a single-instance storage engine to a **Federated D
 
 ---
 
+### Phase 5: Advanced Federation (Hyperscale Fluidity)
+
+**Status:** 🔄 PENDING
+
+**Goal:** Enable true multi-node fluidity for scenarios:
+- U1 → DWH → U2 (cloud share with per-user views)
+- U1 → USB → U2 (sneakernet with dormant nodes)
+- U1 creates DWH+DW1 pool, U2 accesses transparently (storage pools)
+- P2P direct linking (NAT traversal)
+
+**Reusable Components (from audit):**
+| Component | Source | Extension Strategy |
+|-----------|--------|-------------------|
+| ConsistentHashRing | Plugins/Sharding | Pool member distribution |
+| CapabilityConstraints | SDK/Federation/Capabilities.cs | Add AllowedPools, AllowedGroups |
+| NodeState.Dormant | SDK/Federation/NodeIdentity.cs | Hydration protocol |
+| VfsNamespace.RequiredCapabilityId | SDK/Federation/VFS.cs | Per-identity filtering |
+| TransportBus.BroadcastAsync | SDK/Federation/Transport.cs | Relay streaming |
+| AccessControlPlugin roles | Plugins/AccessControl | Group membership |
+
+#### 5.1 Storage Pools
+| # | Task | File | Status |
+|---|------|------|--------|
+| 5.1.1 | Create `IStoragePool` interface and `PoolTopology` enum | SDK/Federation/StoragePool.cs | 🔄 |
+| 5.1.2 | Create `StoragePoolMember` (NodeId, Role, Weight, State) | SDK/Federation/StoragePool.cs | 🔄 |
+| 5.1.3 | Create `PoolPlacementPolicy` (extend ConsistentHashRing) | SDK/Federation/StoragePool.cs | 🔄 |
+| 5.1.4 | Implement `StoragePool` with dynamic membership | SDK/Federation/StoragePool.cs | 🔄 |
+| 5.1.5 | Implement `UnionPool` for combined namespace (scenario 3/4) | SDK/Federation/StoragePool.cs | 🔄 |
+
+#### 5.2 Identity-Filtered Namespaces
+| # | Task | File | Status |
+|---|------|------|--------|
+| 5.2.1 | Add `AllowedPools` to `CapabilityConstraints` | SDK/Federation/Capabilities.cs | 🔄 |
+| 5.2.2 | Create `INamespaceProjection` interface | SDK/Federation/VFS.cs | 🔄 |
+| 5.2.3 | Implement `CapabilityFilteredVfs` (wraps VFS with filtering) | SDK/Federation/VFS.cs | 🔄 |
+| 5.2.4 | Add `GetProjectedNamespaceAsync` to FederationHub | Kernel/Federation/FederationHub.cs | 🔄 |
+
+#### 5.3 Dormant Node Support (USB/Offline)
+| # | Task | File | Status |
+|---|------|------|--------|
+| 5.3.1 | Create `DormantNodeManifest` (portable identity + object list) | SDK/Federation/DormantNode.cs | 🔄 |
+| 5.3.2 | Implement `DehydrateAsync` (export active → dormant) | SDK/Federation/DormantNode.cs | 🔄 |
+| 5.3.3 | Implement `HydrateAsync` (import dormant → active) | SDK/Federation/DormantNode.cs | 🔄 |
+| 5.3.4 | Add dormant node detection to FileTransportDriver | SDK/Federation/Transport.cs | 🔄 |
+
+#### 5.4 Advanced ACL (Groups)
+| # | Task | File | Status |
+|---|------|------|--------|
+| 5.4.1 | Create `FederationGroup` (GroupId, Members, NestedGroups) | SDK/Federation/Groups.cs | 🔄 |
+| 5.4.2 | Create `GroupCapabilityToken` (issued to groups) | SDK/Federation/Groups.cs | 🔄 |
+| 5.4.3 | Implement `GroupRegistry` with membership resolution | SDK/Federation/Groups.cs | 🔄 |
+| 5.4.4 | Extend `CapabilityVerifier` with group expansion | SDK/Federation/Capabilities.cs | 🔄 |
+
+#### 5.5 Stream Relay (Pipe Mode)
+| # | Task | File | Status |
+|---|------|------|--------|
+| 5.5.1 | Create `IStreamRelay` interface | SDK/Federation/Transport.cs | 🔄 |
+| 5.5.2 | Implement `StreamRelay` (zero-copy node-to-node) | SDK/Federation/Transport.cs | 🔄 |
+| 5.5.3 | Add `RelayAsync` to TransportBus | SDK/Federation/Transport.cs | 🔄 |
+| 5.5.4 | Implement bandwidth-aware relay routing | SDK/Federation/Routing.cs | 🔄 |
+
+#### 5.6 NAT Traversal (P2P Direct)
+| # | Task | File | Status |
+|---|------|------|--------|
+| 5.6.1 | Create `INatTraversal` interface | SDK/Federation/NatTraversal.cs | 🔄 |
+| 5.6.2 | Implement `StunClient` for public endpoint discovery | SDK/Federation/NatTraversal.cs | 🔄 |
+| 5.6.3 | Implement `HolePunchingDriver` (UDP hole punch) | SDK/Federation/NatTraversal.cs | 🔄 |
+| 5.6.4 | Add relay fallback through gateway nodes | SDK/Federation/NatTraversal.cs | 🔄 |
+
+---
+
 ### Implementation Order
 
 **Commit Strategy:** Each numbered task (e.g., 1.1.1) should be a single commit.
@@ -1447,6 +1518,12 @@ Transform DataWarehouse from a single-instance storage engine to a **Federated D
 13. **Phase 4.2** → Storage Adapter (bridge old to new)
 14. **Phase 4.3** → Plugin Updates (enable existing plugins)
 15. **Phase 4.4** → Backward Compatibility (migration support)
+16. **Phase 5.1** → Storage Pools (multi-node aggregation)
+17. **Phase 5.2** → Identity-Filtered Namespaces (per-user views)
+18. **Phase 5.3** → Dormant Node Support (USB/offline)
+19. **Phase 5.4** → Advanced ACL Groups (enterprise scale)
+20. **Phase 5.5** → Stream Relay (pipe mode)
+21. **Phase 5.6** → NAT Traversal (P2P direct)
 
 ---
 
