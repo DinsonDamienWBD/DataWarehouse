@@ -356,15 +356,15 @@
 - [x] Add `OfflineChangeTracker` for tracking modifications during disconnect
 
 ### Scenario 3: Unified Pool (DWH + DW1)
-**File:** `DataWarehouse.SDK/Federation/StoragePool.cs` (Enhance)
-**Status:** 🔄 IN PROGRESS
+**File:** `DataWarehouse.SDK/Federation/StoragePool.cs` (Enhanced)
+**Status:** ✅ COMPLETE
 **Extends:** `StoragePool`, `UnionPool`, `PoolPlacementPolicy`, `StoragePoolRegistry`
 **Reuse:** Existing pool member management, consistent hashing, role-based selection
-- [ ] Add `PoolDiscoveryProtocol` with mDNS and gossip-based discovery
-- [ ] Add `PoolAutoJoinManager` for seamless node integration
-- [ ] Add `FederatedPoolRouter` for transparent object routing
-- [ ] Add `PoolDeduplicationService` with cross-pool content hashing
-- [ ] Add `PoolCapacityMonitor` for aggregated stats and alerts
+- [x] Add `PoolDiscoveryProtocol` with mDNS and gossip-based discovery
+- [x] Add `PoolAutoJoinManager` for seamless node integration
+- [x] Add `FederatedPoolRouter` for transparent object routing
+- [x] Add `PoolDeduplicationService` with cross-pool content hashing
+- [x] Add `PoolCapacityMonitor` for aggregated stats and alerts
 
 ### Scenario 4: P2P Direct Link
 **File:** `DataWarehouse.SDK/Federation/NatTraversal.cs` (Enhance)
