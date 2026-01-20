@@ -408,15 +408,15 @@
 - [x] Add `Savepoint` support for partial rollback
 
 ### E3. Full Encryption at Rest
-**File:** `DataWarehouse.SDK/Infrastructure/EncryptionAtRest.cs` (Enhance)
-**Status:** 🔄 IN PROGRESS
+**File:** `DataWarehouse.SDK/Infrastructure/EncryptionAtRest.cs` (Enhanced)
+**Status:** ✅ COMPLETE
 **Extends:** `IKeyEncryptionProvider`, `EncryptionAtRestManager`, `DpapiKeyEncryptionProvider`, `KeyVaultEncryptionProvider`
 **Reuse:** Existing DPAPI, KeyVault, Local providers, envelope encryption
-- [ ] Add `FullDiskEncryptionProvider` abstraction for whole-volume encryption
-- [ ] Add `PerFileEncryptionMode` with automatic per-file key generation
-- [ ] Add `KeyHierarchy` implementing master → tenant → data key structure
-- [ ] Add `SecureKeyStorage` with hardware (TPM), file, and cloud backends
-- [ ] Add `KeyRotationScheduler` for automated key rotation
+- [x] Add `FullDiskEncryptionProvider` abstraction for whole-volume encryption
+- [x] Add `PerFileEncryptionMode` with automatic per-file key generation
+- [x] Add `KeyHierarchy` implementing master → tenant → data key structure
+- [x] Add `SecureKeyStorage` with hardware (TPM), file, and cloud backends
+- [x] Add `KeyRotationScheduler` for automated key rotation
 
 ### E4. Distributed Services Tier 2
 **File:** `DataWarehouse.SDK/Infrastructure/DistributedServicesPhase5.cs` (NEW)
