@@ -1430,7 +1430,7 @@ Transform DataWarehouse from a single-instance storage engine to a **Federated D
 
 ### Phase 5: Advanced Federation (Hyperscale Fluidity)
 
-**Status:** 🔄 IN PROGRESS (2/6 complete)
+**Status:** 🔄 IN PROGRESS (3/6 complete)
 
 **Goal:** Enable true multi-node fluidity for scenarios:
 - U1 → DWH → U2 (cloud share with per-user views)
@@ -1465,13 +1465,13 @@ Transform DataWarehouse from a single-instance storage engine to a **Federated D
 | 5.2.3 | Implement `CapabilityFilteredVfs` (wraps VFS with filtering) | SDK/Federation/VFS.cs | ✅ |
 | 5.2.4 | Add `GetProjectedNamespaceAsync` to FederationHub | SDK/Federation/VFS.cs | ✅ |
 
-#### 5.3 Dormant Node Support (USB/Offline)
+#### 5.3 Dormant Node Support (USB/Offline) ✅ COMPLETE
 | # | Task | File | Status |
 |---|------|------|--------|
-| 5.3.1 | Create `DormantNodeManifest` (portable identity + object list) | SDK/Federation/DormantNode.cs | 🔄 |
-| 5.3.2 | Implement `DehydrateAsync` (export active → dormant) | SDK/Federation/DormantNode.cs | 🔄 |
-| 5.3.3 | Implement `HydrateAsync` (import dormant → active) | SDK/Federation/DormantNode.cs | 🔄 |
-| 5.3.4 | Add dormant node detection to FileTransportDriver | SDK/Federation/Transport.cs | 🔄 |
+| 5.3.1 | Create `DormantNodeManifest` (portable identity + object list) | SDK/Federation/DormantNode.cs | ✅ |
+| 5.3.2 | Implement `DehydrateAsync` (export active → dormant) | SDK/Federation/DormantNode.cs | ✅ |
+| 5.3.3 | Implement `HydrateAsync` (import dormant → active) | SDK/Federation/DormantNode.cs | ✅ |
+| 5.3.4 | Add dormant node detection to FileTransportDriver | SDK/Federation/DormantNode.cs | ✅ |
 
 #### 5.4 Advanced ACL (Groups)
 | # | Task | File | Status |
