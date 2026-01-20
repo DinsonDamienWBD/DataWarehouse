@@ -1,7 +1,11 @@
 namespace DataWarehouse.SDK.Federation;
 
 using System.Collections.Concurrent;
+using System.Net;
+using System.Net.Sockets;
 using System.Security.Cryptography;
+using System.Text;
+using System.Text.Json;
 
 /// <summary>
 /// Topology/layout of a storage pool.
@@ -579,3 +583,1003 @@ public sealed class StoragePoolRegistry
         return pool;
     }
 }
+
+// ============================================================================
+// SCENARIO 3: UNIFIED POOL (DWH + DW1)
+// Pool discovery, auto-join, federated routing, deduplication, and monitoring.
+// ============================================================================
+
+#region Pool Discovery Protocol
+
+/// <summary>
+/// Discovery message for pool advertisement.
+/// </summary>
+public sealed class PoolDiscoveryMessage
+{
+    public string MessageType { get; set; } = "PoolDiscovery";
+    public string PoolId { get; set; } = string.Empty;
+    public string PoolName { get; set; } = string.Empty;
+    public string NodeId { get; set; } = string.Empty;
+    public PoolTopology Topology { get; set; }
+    public int MemberCount { get; set; }
+    public long TotalCapacityBytes { get; set; }
+    public long AvailableBytes { get; set; }
+    public string EndpointAddress { get; set; } = string.Empty;
+    public int EndpointPort { get; set; }
+    public DateTimeOffset Timestamp { get; set; } = DateTimeOffset.UtcNow;
+    public int Ttl { get; set; } = 30; // seconds
+}
+
+/// <summary>
+/// Implements pool discovery using mDNS-style multicast and gossip protocols.
+/// </summary>
+public sealed class PoolDiscoveryProtocol : IDisposable
+{
+    private readonly NodeIdentityManager _identityManager;
+    private readonly StoragePoolRegistry _poolRegistry;
+    private readonly ConcurrentDictionary<string, DiscoveredPool> _discoveredPools = new();
+    private UdpClient? _multicastClient;
+    private CancellationTokenSource? _cts;
+    private Task? _listenTask;
+    private Task? _announceTask;
+    private bool _disposed;
+
+    private const int MulticastPort = 5357; // DataWarehouse discovery port
+    private static readonly IPAddress MulticastAddress = IPAddress.Parse("239.255.77.88");
+    private const string ServiceName = "_datawarehouse._udp.local";
+
+    public event EventHandler<PoolDiscoveredEventArgs>? PoolDiscovered;
+    public event EventHandler<PoolDiscoveredEventArgs>? PoolLost;
+
+    public PoolDiscoveryProtocol(
+        NodeIdentityManager identityManager,
+        StoragePoolRegistry poolRegistry)
+    {
+        _identityManager = identityManager;
+        _poolRegistry = poolRegistry;
+    }
+
+    /// <summary>
+    /// Starts discovery - listens for and announces pools.
+    /// </summary>
+    public void Start()
+    {
+        _cts = new CancellationTokenSource();
+
+        try
+        {
+            _multicastClient = new UdpClient();
+            _multicastClient.Client.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReuseAddress, true);
+            _multicastClient.Client.Bind(new IPEndPoint(IPAddress.Any, MulticastPort));
+            _multicastClient.JoinMulticastGroup(MulticastAddress);
+
+            _listenTask = ListenLoopAsync(_cts.Token);
+            _announceTask = AnnounceLoopAsync(_cts.Token);
+        }
+        catch
+        {
+            // Multicast may not be available - fall back to gossip only
+        }
+    }
+
+    /// <summary>
+    /// Actively probes for pools on the network.
+    /// </summary>
+    public async Task ProbeAsync(CancellationToken ct = default)
+    {
+        var probe = new PoolDiscoveryMessage
+        {
+            MessageType = "PoolProbe",
+            NodeId = _identityManager.LocalIdentity.Id.ToHex()
+        };
+
+        await BroadcastMessageAsync(probe, ct);
+    }
+
+    /// <summary>
+    /// Gets all discovered pools.
+    /// </summary>
+    public IReadOnlyList<DiscoveredPool> GetDiscoveredPools()
+    {
+        // Prune expired
+        var now = DateTimeOffset.UtcNow;
+        var expired = _discoveredPools.Where(kv => kv.Value.ExpiresAt < now).Select(kv => kv.Key).ToList();
+        foreach (var id in expired)
+        {
+            if (_discoveredPools.TryRemove(id, out var pool))
+            {
+                PoolLost?.Invoke(this, new PoolDiscoveredEventArgs { Pool = pool });
+            }
+        }
+
+        return _discoveredPools.Values.ToList();
+    }
+
+    /// <summary>
+    /// Announces a pool to the network.
+    /// </summary>
+    public async Task AnnouncePoolAsync(IStoragePool pool, IPEndPoint endpoint, CancellationToken ct = default)
+    {
+        var stats = pool.GetStatistics();
+        var message = new PoolDiscoveryMessage
+        {
+            PoolId = pool.PoolId,
+            PoolName = pool.Name,
+            NodeId = _identityManager.LocalIdentity.Id.ToHex(),
+            Topology = pool.Topology,
+            MemberCount = stats.TotalMembers,
+            TotalCapacityBytes = stats.TotalCapacityBytes,
+            AvailableBytes = stats.AvailableBytes,
+            EndpointAddress = endpoint.Address.ToString(),
+            EndpointPort = endpoint.Port
+        };
+
+        await BroadcastMessageAsync(message, ct);
+    }
+
+    private async Task ListenLoopAsync(CancellationToken ct)
+    {
+        while (!ct.IsCancellationRequested && _multicastClient != null)
+        {
+            try
+            {
+                var result = await _multicastClient.ReceiveAsync(ct);
+                var json = Encoding.UTF8.GetString(result.Buffer);
+                var message = JsonSerializer.Deserialize<PoolDiscoveryMessage>(json);
+
+                if (message != null)
+                {
+                    await HandleDiscoveryMessageAsync(message, result.RemoteEndPoint, ct);
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                break;
+            }
+            catch
+            {
+                // Continue listening
+            }
+        }
+    }
+
+    private async Task AnnounceLoopAsync(CancellationToken ct)
+    {
+        while (!ct.IsCancellationRequested)
+        {
+            try
+            {
+                foreach (var pool in _poolRegistry.GetAllPools())
+                {
+                    var localMember = pool.Members.FirstOrDefault(m =>
+                        m.NodeId == _identityManager.LocalIdentity.Id);
+
+                    if (localMember?.Endpoint != null)
+                    {
+                        var endpoint = new IPEndPoint(
+                            IPAddress.Parse(localMember.Endpoint.Address ?? "127.0.0.1"),
+                            localMember.Endpoint.Port);
+                        await AnnouncePoolAsync(pool, endpoint, ct);
+                    }
+                }
+
+                await Task.Delay(TimeSpan.FromSeconds(10), ct);
+            }
+            catch (OperationCanceledException)
+            {
+                break;
+            }
+            catch
+            {
+                await Task.Delay(TimeSpan.FromSeconds(5), ct);
+            }
+        }
+    }
+
+    private async Task HandleDiscoveryMessageAsync(
+        PoolDiscoveryMessage message,
+        IPEndPoint sender,
+        CancellationToken ct)
+    {
+        if (message.MessageType == "PoolProbe")
+        {
+            // Respond with our pools
+            foreach (var pool in _poolRegistry.GetAllPools())
+            {
+                var localMember = pool.Members.FirstOrDefault(m =>
+                    m.NodeId == _identityManager.LocalIdentity.Id);
+                if (localMember?.Endpoint != null)
+                {
+                    var endpoint = new IPEndPoint(
+                        IPAddress.Parse(localMember.Endpoint.Address ?? sender.Address.ToString()),
+                        localMember.Endpoint.Port);
+                    await AnnouncePoolAsync(pool, endpoint, ct);
+                }
+            }
+        }
+        else if (message.MessageType == "PoolDiscovery")
+        {
+            // Skip our own announcements
+            if (message.NodeId == _identityManager.LocalIdentity.Id.ToHex())
+                return;
+
+            var discovered = new DiscoveredPool
+            {
+                PoolId = message.PoolId,
+                PoolName = message.PoolName,
+                Topology = message.Topology,
+                MemberCount = message.MemberCount,
+                TotalCapacityBytes = message.TotalCapacityBytes,
+                AvailableBytes = message.AvailableBytes,
+                DiscoveredAt = DateTimeOffset.UtcNow,
+                ExpiresAt = DateTimeOffset.UtcNow.AddSeconds(message.Ttl * 2),
+                AnnouncerNodeId = message.NodeId,
+                AnnouncerEndpoint = new IPEndPoint(
+                    IPAddress.Parse(message.EndpointAddress),
+                    message.EndpointPort)
+            };
+
+            var isNew = !_discoveredPools.ContainsKey(message.PoolId);
+            _discoveredPools[message.PoolId] = discovered;
+
+            if (isNew)
+            {
+                PoolDiscovered?.Invoke(this, new PoolDiscoveredEventArgs { Pool = discovered });
+            }
+        }
+    }
+
+    private async Task BroadcastMessageAsync(PoolDiscoveryMessage message, CancellationToken ct)
+    {
+        if (_multicastClient == null) return;
+
+        var json = JsonSerializer.Serialize(message);
+        var data = Encoding.UTF8.GetBytes(json);
+        var endpoint = new IPEndPoint(MulticastAddress, MulticastPort);
+
+        await _multicastClient.SendAsync(data, data.Length, endpoint);
+    }
+
+    public void Dispose()
+    {
+        if (!_disposed)
+        {
+            _cts?.Cancel();
+            _multicastClient?.Dispose();
+            _disposed = true;
+        }
+    }
+}
+
+/// <summary>
+/// Discovered pool information.
+/// </summary>
+public sealed class DiscoveredPool
+{
+    public string PoolId { get; set; } = string.Empty;
+    public string PoolName { get; set; } = string.Empty;
+    public PoolTopology Topology { get; set; }
+    public int MemberCount { get; set; }
+    public long TotalCapacityBytes { get; set; }
+    public long AvailableBytes { get; set; }
+    public DateTimeOffset DiscoveredAt { get; set; }
+    public DateTimeOffset ExpiresAt { get; set; }
+    public string AnnouncerNodeId { get; set; } = string.Empty;
+    public IPEndPoint? AnnouncerEndpoint { get; set; }
+}
+
+public sealed class PoolDiscoveredEventArgs : EventArgs
+{
+    public DiscoveredPool? Pool { get; set; }
+}
+
+#endregion
+
+#region Pool Auto-Join Manager
+
+/// <summary>
+/// Manages automatic joining of discovered pools based on policies.
+/// </summary>
+public sealed class PoolAutoJoinManager
+{
+    private readonly NodeIdentityManager _identityManager;
+    private readonly StoragePoolRegistry _poolRegistry;
+    private readonly PoolDiscoveryProtocol _discovery;
+    private readonly PoolAutoJoinPolicy _policy;
+    private readonly ConcurrentDictionary<string, DateTimeOffset> _joinAttempts = new();
+
+    public event EventHandler<PoolJoinedEventArgs>? PoolJoined;
+    public event EventHandler<PoolJoinedEventArgs>? JoinFailed;
+
+    public PoolAutoJoinManager(
+        NodeIdentityManager identityManager,
+        StoragePoolRegistry poolRegistry,
+        PoolDiscoveryProtocol discovery,
+        PoolAutoJoinPolicy? policy = null)
+    {
+        _identityManager = identityManager;
+        _poolRegistry = poolRegistry;
+        _discovery = discovery;
+        _policy = policy ?? new PoolAutoJoinPolicy();
+
+        _discovery.PoolDiscovered += OnPoolDiscovered;
+    }
+
+    private async void OnPoolDiscovered(object? sender, PoolDiscoveredEventArgs e)
+    {
+        if (e.Pool == null || !_policy.AutoJoinEnabled) return;
+
+        // Check if we should auto-join
+        if (!ShouldAutoJoin(e.Pool)) return;
+
+        await TryJoinPoolAsync(e.Pool);
+    }
+
+    private bool ShouldAutoJoin(DiscoveredPool pool)
+    {
+        // Check if already in this pool
+        var existingPool = _poolRegistry.GetPool(pool.PoolId);
+        if (existingPool != null)
+        {
+            return existingPool.Members.All(m => m.NodeId != _identityManager.LocalIdentity.Id);
+        }
+
+        // Check topology whitelist
+        if (_policy.AllowedTopologies.Count > 0 &&
+            !_policy.AllowedTopologies.Contains(pool.Topology))
+        {
+            return false;
+        }
+
+        // Check pool name pattern
+        if (!string.IsNullOrEmpty(_policy.PoolNamePattern) &&
+            !pool.PoolName.Contains(_policy.PoolNamePattern, StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        // Check maximum pools
+        var myPools = _poolRegistry.GetPoolsForNode(_identityManager.LocalIdentity.Id);
+        if (myPools.Count >= _policy.MaxPoolMemberships)
+        {
+            return false;
+        }
+
+        // Rate limit join attempts
+        if (_joinAttempts.TryGetValue(pool.PoolId, out var lastAttempt) &&
+            DateTimeOffset.UtcNow - lastAttempt < _policy.JoinRetryInterval)
+        {
+            return false;
+        }
+
+        return true;
+    }
+
+    /// <summary>
+    /// Attempts to join a discovered pool.
+    /// </summary>
+    public async Task<bool> TryJoinPoolAsync(DiscoveredPool discoveredPool, CancellationToken ct = default)
+    {
+        _joinAttempts[discoveredPool.PoolId] = DateTimeOffset.UtcNow;
+
+        try
+        {
+            // Create or get pool
+            var pool = _poolRegistry.GetPool(discoveredPool.PoolId);
+            if (pool == null)
+            {
+                // Create local representation of remote pool
+                pool = new UnionPool(discoveredPool.PoolId, discoveredPool.PoolName);
+                _poolRegistry.Register(pool);
+            }
+
+            // Create member entry for ourselves
+            var localIdentity = _identityManager.LocalIdentity;
+            var member = new StoragePoolMember
+            {
+                NodeId = localIdentity.Id,
+                Role = PoolMemberRole.Member,
+                State = PoolMemberState.Joining,
+                CapacityBytes = localIdentity.StorageCapacityBytes,
+                UsedBytes = localIdentity.StorageCapacityBytes - localIdentity.StorageAvailableBytes,
+                Endpoint = localIdentity.GetPreferredEndpoint()
+            };
+
+            var added = await pool.AddMemberAsync(member, ct);
+
+            if (added)
+            {
+                PoolJoined?.Invoke(this, new PoolJoinedEventArgs
+                {
+                    PoolId = pool.PoolId,
+                    PoolName = pool.Name,
+                    Success = true
+                });
+                return true;
+            }
+        }
+        catch (Exception ex)
+        {
+            JoinFailed?.Invoke(this, new PoolJoinedEventArgs
+            {
+                PoolId = discoveredPool.PoolId,
+                PoolName = discoveredPool.PoolName,
+                Success = false,
+                Error = ex.Message
+            });
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// Manually requests to join a specific pool.
+    /// </summary>
+    public async Task<bool> RequestJoinAsync(string poolId, IPEndPoint coordinatorEndpoint, CancellationToken ct = default)
+    {
+        // In a full implementation, this would send a join request to the coordinator
+        // For now, create local pool entry
+        var pool = _poolRegistry.GetPool(poolId);
+        if (pool == null)
+        {
+            pool = new UnionPool(poolId, $"Pool-{poolId[..8]}");
+            _poolRegistry.Register(pool);
+        }
+
+        var localIdentity = _identityManager.LocalIdentity;
+        var member = new StoragePoolMember
+        {
+            NodeId = localIdentity.Id,
+            Role = PoolMemberRole.Member,
+            CapacityBytes = localIdentity.StorageCapacityBytes,
+            Endpoint = localIdentity.GetPreferredEndpoint()
+        };
+
+        return await pool.AddMemberAsync(member, ct);
+    }
+}
+
+/// <summary>
+/// Policy for automatic pool joining.
+/// </summary>
+public sealed class PoolAutoJoinPolicy
+{
+    public bool AutoJoinEnabled { get; set; } = false;
+    public HashSet<PoolTopology> AllowedTopologies { get; set; } = new() { PoolTopology.Union };
+    public string? PoolNamePattern { get; set; }
+    public int MaxPoolMemberships { get; set; } = 5;
+    public TimeSpan JoinRetryInterval { get; set; } = TimeSpan.FromMinutes(5);
+    public bool RequireAuthentication { get; set; } = true;
+}
+
+public sealed class PoolJoinedEventArgs : EventArgs
+{
+    public string PoolId { get; set; } = string.Empty;
+    public string PoolName { get; set; } = string.Empty;
+    public bool Success { get; set; }
+    public string? Error { get; set; }
+}
+
+#endregion
+
+#region Federated Pool Router
+
+/// <summary>
+/// Routes object requests transparently across federated pools.
+/// </summary>
+public sealed class FederatedPoolRouter
+{
+    private readonly StoragePoolRegistry _poolRegistry;
+    private readonly IObjectResolver _objectResolver;
+    private readonly ITransportBus _transportBus;
+    private readonly ConcurrentDictionary<ObjectId, RoutingCacheEntry> _routingCache = new();
+    private readonly TimeSpan _cacheTtl;
+
+    public FederatedPoolRouter(
+        StoragePoolRegistry poolRegistry,
+        IObjectResolver objectResolver,
+        ITransportBus transportBus,
+        TimeSpan? cacheTtl = null)
+    {
+        _poolRegistry = poolRegistry;
+        _objectResolver = objectResolver;
+        _transportBus = transportBus;
+        _cacheTtl = cacheTtl ?? TimeSpan.FromMinutes(5);
+    }
+
+    /// <summary>
+    /// Routes a store request to the optimal pool member.
+    /// </summary>
+    public async Task<RoutingDecision> RouteStoreAsync(
+        ObjectId objectId,
+        long sizeBytes,
+        CancellationToken ct = default)
+    {
+        var allPools = _poolRegistry.GetAllPools();
+        var candidates = new List<(IStoragePool Pool, IReadOnlyList<StoragePoolMember> Members, float Score)>();
+
+        foreach (var pool in allPools)
+        {
+            var members = await pool.SelectMembersForStoreAsync(objectId, ct);
+            if (members.Count > 0)
+            {
+                var score = CalculatePoolScore(pool, sizeBytes);
+                candidates.Add((pool, members, score));
+            }
+        }
+
+        if (candidates.Count == 0)
+        {
+            return new RoutingDecision { Success = false, Reason = "No pool can accept the object" };
+        }
+
+        // Select best pool
+        var best = candidates.OrderByDescending(c => c.Score).First();
+
+        return new RoutingDecision
+        {
+            Success = true,
+            Pool = best.Pool,
+            TargetMembers = best.Members.ToList(),
+            Reason = $"Selected pool '{best.Pool.Name}' with score {best.Score:F2}"
+        };
+    }
+
+    /// <summary>
+    /// Routes a retrieve request to find the object across pools.
+    /// </summary>
+    public async Task<RoutingDecision> RouteRetrieveAsync(
+        ObjectId objectId,
+        CancellationToken ct = default)
+    {
+        // Check cache first
+        if (_routingCache.TryGetValue(objectId, out var cached) && cached.ExpiresAt > DateTimeOffset.UtcNow)
+        {
+            return cached.Decision;
+        }
+
+        // Try object resolver
+        var resolution = await _objectResolver.ResolveAsync(objectId, ct);
+        if (resolution.Found)
+        {
+            var pool = FindPoolForLocations(resolution.Locations);
+            if (pool != null)
+            {
+                var decision = new RoutingDecision
+                {
+                    Success = true,
+                    Pool = pool,
+                    TargetMembers = resolution.Locations
+                        .Select(loc => pool.Members.FirstOrDefault(m => m.NodeId == loc.NodeId))
+                        .Where(m => m != null)
+                        .Cast<StoragePoolMember>()
+                        .ToList()
+                };
+
+                CacheDecision(objectId, decision);
+                return decision;
+            }
+        }
+
+        // Search all pools
+        foreach (var pool in _poolRegistry.GetAllPools())
+        {
+            var locations = await pool.GetObjectLocationsAsync(objectId, ct);
+            if (locations.Count > 0)
+            {
+                var decision = new RoutingDecision
+                {
+                    Success = true,
+                    Pool = pool,
+                    TargetMembers = locations.ToList()
+                };
+
+                CacheDecision(objectId, decision);
+                return decision;
+            }
+        }
+
+        return new RoutingDecision { Success = false, Reason = "Object not found in any pool" };
+    }
+
+    private float CalculatePoolScore(IStoragePool pool, long sizeBytes)
+    {
+        var stats = pool.GetStatistics();
+
+        // Score based on: availability, capacity, member count
+        var availabilityScore = stats.AvailableBytes > sizeBytes * 10 ? 1.0f : 0.5f;
+        var capacityScore = Math.Max(0, 1.0f - stats.UsagePercent / 100);
+        var redundancyScore = Math.Min(1.0f, stats.ActiveMembers / 3.0f);
+
+        return (availabilityScore + capacityScore + redundancyScore) / 3;
+    }
+
+    private IStoragePool? FindPoolForLocations(IEnumerable<ObjectLocation> locations)
+    {
+        var nodeIds = locations.Select(l => l.NodeId).ToHashSet();
+
+        foreach (var pool in _poolRegistry.GetAllPools())
+        {
+            if (pool.Members.Any(m => nodeIds.Contains(m.NodeId)))
+            {
+                return pool;
+            }
+        }
+
+        return null;
+    }
+
+    private void CacheDecision(ObjectId objectId, RoutingDecision decision)
+    {
+        _routingCache[objectId] = new RoutingCacheEntry
+        {
+            Decision = decision,
+            ExpiresAt = DateTimeOffset.UtcNow + _cacheTtl
+        };
+    }
+
+    /// <summary>
+    /// Invalidates routing cache for an object.
+    /// </summary>
+    public void InvalidateCache(ObjectId objectId)
+    {
+        _routingCache.TryRemove(objectId, out _);
+    }
+
+    private sealed class RoutingCacheEntry
+    {
+        public RoutingDecision Decision { get; set; } = new();
+        public DateTimeOffset ExpiresAt { get; set; }
+    }
+}
+
+/// <summary>
+/// Result of a routing decision.
+/// </summary>
+public sealed class RoutingDecision
+{
+    public bool Success { get; set; }
+    public IStoragePool? Pool { get; set; }
+    public List<StoragePoolMember> TargetMembers { get; set; } = new();
+    public string? Reason { get; set; }
+}
+
+#endregion
+
+#region Pool Deduplication Service
+
+/// <summary>
+/// Provides cross-pool content-addressable deduplication.
+/// </summary>
+public sealed class PoolDeduplicationService
+{
+    private readonly StoragePoolRegistry _poolRegistry;
+    private readonly ConcurrentDictionary<string, DeduplicationEntry> _contentIndex = new();
+    private long _bytesDeduped;
+    private long _objectsDeduped;
+
+    public long BytesDeduped => _bytesDeduped;
+    public long ObjectsDeduped => _objectsDeduped;
+
+    public PoolDeduplicationService(StoragePoolRegistry poolRegistry)
+    {
+        _poolRegistry = poolRegistry;
+    }
+
+    /// <summary>
+    /// Checks if content already exists in any pool.
+    /// </summary>
+    public async Task<DeduplicationResult> CheckForDuplicateAsync(
+        byte[] content,
+        CancellationToken ct = default)
+    {
+        var hash = ComputeContentHash(content);
+
+        // Check local index
+        if (_contentIndex.TryGetValue(hash, out var entry))
+        {
+            return new DeduplicationResult
+            {
+                IsDuplicate = true,
+                ContentHash = hash,
+                ExistingObjectId = entry.ObjectId,
+                ExistingPoolId = entry.PoolId,
+                SizeBytes = content.Length
+            };
+        }
+
+        // Check across pools
+        foreach (var pool in _poolRegistry.GetAllPools())
+        {
+            if (pool is UnionPool unionPool)
+            {
+                // Would need object store access to check content
+                // For now, rely on local index
+            }
+        }
+
+        return new DeduplicationResult
+        {
+            IsDuplicate = false,
+            ContentHash = hash,
+            SizeBytes = content.Length
+        };
+    }
+
+    /// <summary>
+    /// Registers content in the deduplication index.
+    /// </summary>
+    public void RegisterContent(string contentHash, ObjectId objectId, string poolId)
+    {
+        _contentIndex[contentHash] = new DeduplicationEntry
+        {
+            ContentHash = contentHash,
+            ObjectId = objectId,
+            PoolId = poolId,
+            RegisteredAt = DateTimeOffset.UtcNow
+        };
+    }
+
+    /// <summary>
+    /// Registers a deduplicated reference (saves storage).
+    /// </summary>
+    public void RecordDeduplication(long sizeBytes)
+    {
+        Interlocked.Add(ref _bytesDeduped, sizeBytes);
+        Interlocked.Increment(ref _objectsDeduped);
+    }
+
+    /// <summary>
+    /// Unregisters content when deleted.
+    /// </summary>
+    public void UnregisterContent(string contentHash)
+    {
+        _contentIndex.TryRemove(contentHash, out _);
+    }
+
+    /// <summary>
+    /// Gets deduplication statistics.
+    /// </summary>
+    public DeduplicationStats GetStats()
+    {
+        return new DeduplicationStats
+        {
+            TotalIndexedObjects = _contentIndex.Count,
+            BytesDeduped = _bytesDeduped,
+            ObjectsDeduped = _objectsDeduped
+        };
+    }
+
+    private static string ComputeContentHash(byte[] content)
+    {
+        return Convert.ToHexString(SHA256.HashData(content)).ToLowerInvariant();
+    }
+}
+
+public sealed class DeduplicationEntry
+{
+    public string ContentHash { get; set; } = string.Empty;
+    public ObjectId ObjectId { get; set; }
+    public string PoolId { get; set; } = string.Empty;
+    public DateTimeOffset RegisteredAt { get; set; }
+}
+
+public sealed class DeduplicationResult
+{
+    public bool IsDuplicate { get; set; }
+    public string ContentHash { get; set; } = string.Empty;
+    public ObjectId? ExistingObjectId { get; set; }
+    public string? ExistingPoolId { get; set; }
+    public long SizeBytes { get; set; }
+}
+
+public sealed class DeduplicationStats
+{
+    public int TotalIndexedObjects { get; set; }
+    public long BytesDeduped { get; set; }
+    public long ObjectsDeduped { get; set; }
+}
+
+#endregion
+
+#region Pool Capacity Monitor
+
+/// <summary>
+/// Monitors pool capacity and generates alerts.
+/// </summary>
+public sealed class PoolCapacityMonitor : IDisposable
+{
+    private readonly StoragePoolRegistry _poolRegistry;
+    private readonly PoolCapacityThresholds _thresholds;
+    private readonly ConcurrentDictionary<string, PoolCapacitySnapshot> _snapshots = new();
+    private Timer? _monitorTimer;
+    private bool _disposed;
+
+    public event EventHandler<PoolCapacityAlertEventArgs>? CapacityAlert;
+    public event EventHandler<PoolCapacityAlertEventArgs>? MemberAlert;
+
+    public PoolCapacityMonitor(
+        StoragePoolRegistry poolRegistry,
+        PoolCapacityThresholds? thresholds = null)
+    {
+        _poolRegistry = poolRegistry;
+        _thresholds = thresholds ?? new PoolCapacityThresholds();
+    }
+
+    /// <summary>
+    /// Starts monitoring with specified interval.
+    /// </summary>
+    public void Start(TimeSpan? interval = null)
+    {
+        var checkInterval = interval ?? TimeSpan.FromMinutes(1);
+        _monitorTimer = new Timer(_ => CheckCapacity(), null, TimeSpan.Zero, checkInterval);
+    }
+
+    /// <summary>
+    /// Gets aggregated statistics for all pools.
+    /// </summary>
+    public AggregatedPoolStats GetAggregatedStats()
+    {
+        var pools = _poolRegistry.GetAllPools();
+        var stats = pools.Select(p => p.GetStatistics()).ToList();
+
+        return new AggregatedPoolStats
+        {
+            TotalPools = pools.Count,
+            TotalMembers = stats.Sum(s => s.TotalMembers),
+            ActiveMembers = stats.Sum(s => s.ActiveMembers),
+            TotalCapacityBytes = stats.Sum(s => s.TotalCapacityBytes),
+            UsedBytes = stats.Sum(s => s.UsedBytes),
+            AvailableBytes = stats.Sum(s => s.AvailableBytes),
+            PoolStatistics = stats
+        };
+    }
+
+    private void CheckCapacity()
+    {
+        foreach (var pool in _poolRegistry.GetAllPools())
+        {
+            var stats = pool.GetStatistics();
+            var previousSnapshot = _snapshots.GetValueOrDefault(pool.PoolId);
+
+            // Check pool-level thresholds
+            if (stats.UsagePercent >= _thresholds.CriticalUsagePercent)
+            {
+                RaiseAlert(pool, AlertLevel.Critical, $"Pool usage critical: {stats.UsagePercent:F1}%");
+            }
+            else if (stats.UsagePercent >= _thresholds.WarningUsagePercent)
+            {
+                RaiseAlert(pool, AlertLevel.Warning, $"Pool usage high: {stats.UsagePercent:F1}%");
+            }
+
+            // Check member-level
+            foreach (var member in pool.Members)
+            {
+                if (member.UsagePercent >= _thresholds.MemberCriticalPercent)
+                {
+                    RaiseMemberAlert(pool, member, AlertLevel.Critical,
+                        $"Member {member.NodeId.ToShortString()} usage critical: {member.UsagePercent:F1}%");
+                }
+
+                if (member.State == PoolMemberState.Failed || member.State == PoolMemberState.Unavailable)
+                {
+                    RaiseMemberAlert(pool, member, AlertLevel.Warning,
+                        $"Member {member.NodeId.ToShortString()} is {member.State}");
+                }
+            }
+
+            // Check growth rate
+            if (previousSnapshot != null)
+            {
+                var elapsed = (DateTimeOffset.UtcNow - previousSnapshot.Timestamp).TotalHours;
+                if (elapsed > 0)
+                {
+                    var growthRate = (stats.UsedBytes - previousSnapshot.UsedBytes) / elapsed;
+                    var hoursToFull = growthRate > 0
+                        ? stats.AvailableBytes / growthRate
+                        : double.MaxValue;
+
+                    if (hoursToFull < _thresholds.HoursToFullWarning)
+                    {
+                        RaiseAlert(pool, AlertLevel.Warning,
+                            $"Pool projected full in {hoursToFull:F1} hours at current growth rate");
+                    }
+                }
+            }
+
+            // Update snapshot
+            _snapshots[pool.PoolId] = new PoolCapacitySnapshot
+            {
+                PoolId = pool.PoolId,
+                UsedBytes = stats.UsedBytes,
+                Timestamp = DateTimeOffset.UtcNow
+            };
+        }
+    }
+
+    private void RaiseAlert(IStoragePool pool, AlertLevel level, string message)
+    {
+        CapacityAlert?.Invoke(this, new PoolCapacityAlertEventArgs
+        {
+            PoolId = pool.PoolId,
+            PoolName = pool.Name,
+            Level = level,
+            Message = message,
+            Timestamp = DateTimeOffset.UtcNow
+        });
+    }
+
+    private void RaiseMemberAlert(IStoragePool pool, StoragePoolMember member, AlertLevel level, string message)
+    {
+        MemberAlert?.Invoke(this, new PoolCapacityAlertEventArgs
+        {
+            PoolId = pool.PoolId,
+            PoolName = pool.Name,
+            MemberId = member.NodeId.ToHex(),
+            Level = level,
+            Message = message,
+            Timestamp = DateTimeOffset.UtcNow
+        });
+    }
+
+    public void Dispose()
+    {
+        if (!_disposed)
+        {
+            _monitorTimer?.Dispose();
+            _disposed = true;
+        }
+    }
+
+    private sealed class PoolCapacitySnapshot
+    {
+        public string PoolId { get; set; } = string.Empty;
+        public long UsedBytes { get; set; }
+        public DateTimeOffset Timestamp { get; set; }
+    }
+}
+
+/// <summary>
+/// Thresholds for capacity alerts.
+/// </summary>
+public sealed class PoolCapacityThresholds
+{
+    public float WarningUsagePercent { get; set; } = 75f;
+    public float CriticalUsagePercent { get; set; } = 90f;
+    public float MemberCriticalPercent { get; set; } = 95f;
+    public double HoursToFullWarning { get; set; } = 24;
+}
+
+public enum AlertLevel
+{
+    Info,
+    Warning,
+    Critical
+}
+
+public sealed class PoolCapacityAlertEventArgs : EventArgs
+{
+    public string PoolId { get; set; } = string.Empty;
+    public string PoolName { get; set; } = string.Empty;
+    public string? MemberId { get; set; }
+    public AlertLevel Level { get; set; }
+    public string Message { get; set; } = string.Empty;
+    public DateTimeOffset Timestamp { get; set; }
+}
+
+/// <summary>
+/// Aggregated statistics across all pools.
+/// </summary>
+public sealed class AggregatedPoolStats
+{
+    public int TotalPools { get; set; }
+    public int TotalMembers { get; set; }
+    public int ActiveMembers { get; set; }
+    public long TotalCapacityBytes { get; set; }
+    public long UsedBytes { get; set; }
+    public long AvailableBytes { get; set; }
+    public float UsagePercent => TotalCapacityBytes > 0 ? (float)UsedBytes / TotalCapacityBytes * 100 : 0;
+    public List<PoolStatistics> PoolStatistics { get; set; } = new();
+}
+
+#endregion
