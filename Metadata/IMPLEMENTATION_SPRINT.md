@@ -528,15 +528,16 @@
 
 ### EM3. Full IAM Integration
 **File:** `DataWarehouse.SDK/Infrastructure/IamIntegration.cs` (NEW)
-**Status:** 🔄 IN PROGRESS
+**Status:** ✅ COMPLETE
 **Extends:** `CapabilityIssuer`, `GroupRegistry`, `AccessControlPluginBase`
 **Reuse:** Existing capability tokens, group membership, ACL infrastructure
-- [ ] Add `IIdentityProvider` interface for pluggable identity backends
-- [ ] Add `AwsIamProvider` (STS AssumeRole, IAM policies)
-- [ ] Add `AzureAdProvider` (OAuth2/OIDC, Graph API integration)
-- [ ] Add `GoogleCloudIamProvider` (service accounts, workload identity)
-- [ ] Add `OidcSamlBridge` for enterprise SSO with claim mapping
-- [ ] Add `IamSessionManager` for session lifecycle and token refresh
+- [x] Add `IIdentityProvider` interface for pluggable identity backends
+- [x] Add `AwsIamProvider` (STS AssumeRole, Cognito, Web Identity, IAM policies)
+- [x] Add `AzureAdProvider` (OAuth2/OIDC, Graph API, managed identity)
+- [x] Add `GoogleCloudIamProvider` (service accounts, workload identity, metadata)
+- [x] Add `OidcSamlBridge` for enterprise SSO with claim mapping
+- [x] Add `IamSessionManager` for session lifecycle and token refresh
+- [x] Add `IamIntegrationRegistry` for central provider management
 
 ### EM4. Storage Type Detection & AI Processing
 **File:** `DataWarehouse.SDK/Infrastructure/StorageIntelligence.cs` (NEW)
