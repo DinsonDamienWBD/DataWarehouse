@@ -1,740 +1,668 @@
-# DataWarehouse SDK & Kernel - Production Readiness Assessment
+# DataWarehouse Production Readiness - Implementation Plan
 
 ## Executive Summary
 
-**Overall Status: 💎 DIAMOND LEVEL - 100% Production Ready**
+This document outlines the implementation plan for achieving full production readiness across all deployment tiers (Individual, SMB, Enterprise, High-Stakes, Hyperscale). Tasks are ordered by priority and organized into phases.
 
-The DataWarehouse Kernel is now ready for multi-level customer production deployment, supporting:
-- **Individual Users**: Laptops, desktops
-- **SMB Servers**: Small/medium business deployments
-- **Network Storage**: Enterprise NAS/SAN
-- **High-Stakes**: Hospitals, banks, government (HIPAA, SOX, GDPR, PCI-DSS compliance)
-- **Hyperscale**: Google/Microsoft/Amazon scale deployments
-
-All core Kernel features are complete and ready for customer testing while plugins are developed.
-
-**Last Updated:** 2026-01-20
+**Current Status**: Code review complete. Foundation is strong but requires 17 critical enhancements.
 
 ---
 
-## Table of Contents
+## PRIORITY 1: GEO-REPLICATION (Multi-Region)
 
-1. [Implementation Status Summary](#implementation-status-summary)
-2. [Production Hardening Sprint](#production-hardening-sprint)
-3. [Kernel Infrastructure](#kernel-infrastructure)
-4. [Hyperscale Features](#hyperscale-features)
-5. [Federation Implementation](#federation-implementation)
-6. [Plugin Development Status](#plugin-development-status)
-7. [God-Tier Improvements](#god-tier-improvements)
-8. [Competitive Analysis](#competitive-analysis)
-9. [Architecture Verification](#architecture-verification)
-10. [Future Development Roadmap](#future-development-roadmap)
+### Status: ✅ COMPLETE
 
----
+### What Already Exists:
+✅ **SDK/Infrastructure/ResiliencePatterns.cs** (lines 1628-2147)
+- `MultiRegionReplicator` with CRDT-based conflict resolution
+- Vector clocks for multi-region synchronization
+- `IRegionTransport` interface abstraction
+- Last-Write-Wins conflict resolution with region tiebreaker
+- Tombstone-based deletion replication
 
-## Implementation Status Summary
+✅ **SDK/Infrastructure/HyperscaleFeatures.cs** (lines 541-998)
+- `GeoDistributedConsensus` - Multi-region Raft implementation
+- Hierarchical consensus with local and global quorums
+- Locality-aware leader election
+- Witness region support
+- Network partition detection and healing
+- Multiple consistency levels: Eventual, Local, Quorum, Strong
 
-### All Phases Complete ✅
+✅ **SDK/Contracts/IFederationNode.cs**
+- Federation node interface for cross-region communication
 
-| Phase | Description | Status |
-|-------|-------------|--------|
-| **Phase 1** | Security Critical (C1-C12) | ✅ COMPLETE |
-| **Phase 2** | HIGH Priority Issues (H1-H18) | ✅ COMPLETE |
-| **Phase 3** | Hyperscale Features (HS1-HS8) | ✅ COMPLETE |
-| **Phase 4** | Scenario Implementation (1-5) | ✅ COMPLETE |
-| **Phase 5** | Enterprise Features (E1-E4) | ✅ COMPLETE |
-| **Phase 6** | Storage Backend Integration (SB1-SB3) | ✅ COMPLETE |
-| **Phase 7** | Compliance & Security (CS1-CS4) | ✅ COMPLETE |
-| **Phase 8** | Edge & Managed Services (EM1-EM4) | ✅ COMPLETE |
+### What Needs Implementation:
 
----
+#### Task 1.1: GeoReplicationPlugin
+**File**: `Plugins/DataWarehouse.Plugins.GeoReplication/GeoReplicationPlugin.cs`
+- [x] Extend `ReplicationPluginBase`
+- [x] Integrate `MultiRegionReplicator` from SDK
+- [x] Integrate `GeoDistributedConsensus` from SDK
+- [x] Configuration for regions, endpoints, consistency levels
+- [x] Message handlers for replication commands
+- [x] Region health monitoring and failover
+- [x] Cross-region bandwidth throttling
+- [x] Replication lag monitoring
+- [x] Conflict resolution UI/API
 
-## Production Hardening Sprint
+#### Task 1.2: SDK Enhancement - IMultiRegionReplication Interface
+**File**: `DataWarehouse.SDK/Contracts/IMultiRegionReplication.cs`
+- [x] Define formal interface for multi-region replication
+- [x] Methods: `AddRegionAsync`, `RemoveRegionAsync`, `GetReplicationStatusAsync`
+- [x] `ForceSync`, `ResolveConflict`, `SetConsistencyLevel`
 
-### Phase 1: Security Critical (C1-C12) ✅ COMPLETE
+#### Task 1.3: Kernel Integration
+**File**: `DataWarehouse.Kernel/Replication/GeoReplicationManager.cs`
+- [x] Kernel-level geo-replication orchestrator
+- [x] Coordinates between `MultiRegionReplicator` and storage providers
+- [x] Region topology management
+- [x] Cross-region data transfer optimization
 
-#### C1. Key Encryption at Rest (DPAPI/KeyVault) ✅
-**File:** `DataWarehouse.SDK/Infrastructure/EncryptionAtRest.cs`
-- [x] Implement DPAPI wrapper for Windows
-- [x] Implement KeyVault integration for cloud
-- [x] Implement key derivation function (PBKDF2/Argon2)
-- [x] Add master key rotation support
-- [x] Integrate with VaultKeyStorePlugin
-
-#### C2. Dormant Node Data Encryption (AES-256-GCM) ✅
-**File:** `DataWarehouse.SDK/Federation/DormantNode.cs`
-- [x] Encrypt node manifest during dehydration
-- [x] Encrypt object data in dormant storage
-- [x] Add key escrow for recovery
-- [x] Implement secure key exchange on hydration
-
-#### C3. Path Traversal Vulnerability Fix ✅
-**Files:** `Transport.cs`, `ObjectStore.cs`, `VFS.cs`
-- [x] Sanitize all file paths in FileTransportDriver
-- [x] Validate VFS paths prevent escape
-- [x] Add path canonicalization
-- [x] Add security tests
-
-#### C4. Message Size Limits ✅
-**Files:** `Transport.cs`, `Protocol.cs`
-- [x] Add configurable max message size (default 64MB)
-- [x] Implement chunked transfer for large messages
-- [x] Add streaming support for large payloads
-- [x] Reject oversized messages early
-
-#### C5. Proper NAT Authentication ✅
-**File:** `DataWarehouse.SDK/Federation/NatTraversal.cs`
-- [x] Add STUN/TURN server authentication
-- [x] Implement peer verification during hole punch
-- [x] Add challenge-response for relay authentication
-- [x] Integrate with capability tokens
-
-#### C6. HTTP Listening Implementation (Kestrel) ✅
-**File:** `DataWarehouse.SDK/Federation/Transport.cs`
-- [x] Replace HTTP stub with Kestrel listener
-- [x] Add TLS/mTLS support
-- [x] Implement WebSocket for bidirectional comm
-- [x] Add HTTP/2 and HTTP/3 support
-
-#### C7. Distributed Lock Handlers ✅
-**File:** `DataWarehouse.SDK/Federation/Protocol.cs`
-- [x] Complete DistributedLock message handlers
-- [x] Add lock acquisition timeout
-- [x] Add lock holder tracking
-- [x] Add lock inheritance on node failure
-
-#### C8. Chunk Reference Counting ✅
-**File:** `DataWarehouse.SDK/Federation/ObjectStore.cs`
-- [x] Add reference counter to chunks
-- [x] Implement garbage collection for zero-ref chunks
-- [x] Add cross-object chunk deduplication
-- [x] Add atomic ref count operations
-
-#### C9. Capability Verification Handlers ✅
-**File:** `DataWarehouse.SDK/Federation/Capabilities.cs`
-- [x] Complete verify message handlers
-- [x] Add capability refresh protocol
-- [x] Add revocation list checking
-- [x] Add capability chain validation
-
-#### C10. Lock TTL and Expiration ✅
-**File:** `DataWarehouse.SDK/Federation/Protocol.cs`
-- [x] Add TTL to all distributed locks
-- [x] Implement automatic lock expiration
-- [x] Add lock renewal heartbeat
-- [x] Add configurable timeout policies
-
-#### C11. Bounded Caches with LRU Eviction ✅
-**Files:** Multiple caches in SDK/Kernel
-- [x] Add LRU eviction to ObjectStore cache
-- [x] Add LRU eviction to routing cache
-- [x] Add LRU eviction to resolution cache
-- [x] Add memory pressure integration
-
-#### C12. Race Conditions in Pool Operations ✅
-**File:** `DataWarehouse.SDK/Federation/StoragePool.cs`
-- [x] Add locking to pool member add/remove
-- [x] Fix concurrent placement policy updates
-- [x] Add atomic rebalance operations
-- [x] Add concurrent iteration safety
+**Estimated Effort**: 3-4 days
 
 ---
 
-### Phase 2: HIGH Priority Issues (H1-H18) ✅ COMPLETE
+## PRIORITY 2: REST API - KERNEL INTEGRATION
 
-#### H1-H8: Core Infrastructure ✅
+### Status: ❌ CRITICAL BLOCKER - USES MOCK STORAGE
 
-| # | Issue | File | Status |
-|---|-------|------|--------|
-| H1 | Connection Leak in TCP Transport | Transport.cs | ✅ Connection pooling, idle cleanup |
-| H2 | Relay Session Timeouts | Transport.cs | ✅ Session timeout tracking, keepalive |
-| H3 | Comprehensive Audit Logging | All federation ops | ✅ ImmutableAuditTrail integration |
-| H4 | Capability Audit Trail | Capabilities.cs | ✅ Full usage metrics |
-| H5 | Heartbeat Timestamp Validation | Protocol.cs | ✅ NTP drift tolerance |
-| H6 | Group Query Performance | Groups.cs | ✅ Membership caching |
-| H7 | Rate Limiting for Relay Gateway | Transport.cs | ✅ Per-node/operation limits |
-| H8 | Proper Error Logging | Multiple files | ✅ Structured logging |
+### Current Issue:
+**Location**: `Plugins/DataWarehouse.Plugins.RestInterface/RestInterfacePlugin.cs:50`
+```csharp
+private readonly ConcurrentDictionary<string, object> _mockStorage = new();
+```
 
-#### H9-H18: Advanced Infrastructure ✅
+### What Needs Implementation:
 
-| # | Issue | File | Status |
-|---|-------|------|--------|
-| H9 | VFS Concurrent Access | VFS.cs | ✅ VfsAsyncLockManager, VfsVersionVector |
-| H10 | Object Versioning Conflicts | ObjectStore.cs | ✅ ThreeWayMergeResolver |
-| H11 | Proper Consensus Handoff | Protocol.cs | ✅ ConsensusHandoff, state transfer |
-| H12 | Node Graceful Shutdown | Protocol.cs | ✅ GracefulShutdownProtocol |
-| H13 | Metadata Sync Race Conditions | Protocol.cs | ✅ SyncBarrier, OrderedMetadataSync |
-| H14 | Replication Lag Monitoring | Protocol.cs | ✅ ReplicationLagMonitor |
-| H15 | Proper Quorum Validation | Protocol.cs | ✅ QuorumValidator |
-| H16 | Object Repair Verification | ObjectStore.cs | ✅ ObjectRepairVerifier |
-| H17 | Routing Table Stale Cleanup | Routing.cs | ✅ RoutingTableCleanup |
-| H18 | Federation Health Dashboard | FederationHealth.cs | ✅ FederationHealthAggregator |
+#### Task 2.1: Replace Mock Storage with Kernel Integration
+**File**: `Plugins/DataWarehouse.Plugins.RestInterface/RestInterfacePlugin.cs`
+- [ ] Remove `_mockStorage` dictionary
+- [ ] Add `IDataWarehouse _kernel` field
+- [ ] Inject kernel via constructor or handshake
+- [ ] Replace all `_mockStorage` operations with `_kernel.SaveAsync`, `_kernel.LoadAsync`, etc.
+- [ ] Handle streaming properly (no buffering entire content)
+- [ ] Add proper error handling for kernel operations
+- [ ] Update message handlers to use kernel operations
+- [ ] Test with actual storage providers
+
+**Estimated Effort**: 4-6 hours
 
 ---
 
-### Phase 3: Hyperscale Features (HS1-HS8) ✅ COMPLETE
+## PRIORITY 3: S3 XML PARSING
 
-**File:** `DataWarehouse.SDK/Infrastructure/HyperscaleFeatures.cs`
+### Status: ❌ BLOCKER - BRITTLE STRING SPLITTING
 
-| # | Feature | Class | Status |
-|---|---------|-------|--------|
-| HS1 | Full Erasure Coding | RabinFingerprinting, StreamingErasureCoder, ParallelErasureCoder | ✅ |
-| HS2 | Geo-Distributed Consensus | RegionAwareLeaderElection, HierarchicalConsensus, PartitionHealer | ✅ |
-| HS3 | Petabyte-Scale Index Sharding | DynamicShardManager | ✅ |
-| HS4 | Predictive Tiering ML Model | PredictiveTiering (6-feature ML) | ✅ |
-| HS5 | Chaos Engineering Scheduling | ChaosExperimentScheduler | ✅ |
-| HS6 | Hyperscale Observability | PrometheusExporter, GrafanaDashboardGenerator, DistributedTracer | ✅ |
-| HS7 | Kubernetes Operator CRD | CrdSchemaGenerator, AdmissionWebhookValidator, FinalizerManager | ✅ |
-| HS8 | S3 API 100% Compatibility | Full S3 ops, Select, Lifecycle, Replication | ✅ |
+### Current Issue:
+**Location**: `Plugins/DataWarehouse.Plugins.S3Storage/S3StoragePlugin.cs:324`
+```csharp
+// Parse XML response (simplified - in production use XML parser)
+var lines = xml.Split('\n');
+```
 
----
+### What Needs Implementation:
 
-### Phase 4: Scenario Implementation (1-5) ✅ COMPLETE
+#### Task 3.1: Use Proper XML Parser
+**File**: `Plugins/DataWarehouse.Plugins.S3Storage/S3StoragePlugin.cs`
+- [ ] Add `System.Xml.Linq` namespace reference
+- [ ] Replace string splitting with `XDocument.Parse(xml)`
+- [ ] Handle XML namespaces properly
+- [ ] Parse `ListBucketResult` with XElement queries
+- [ ] Parse continuation tokens correctly
+- [ ] Handle error responses with proper XML parsing
+- [ ] Add unit tests for XML parsing edge cases
 
-#### Scenario 1: Cloud Share (U1 → DWH → U2) ✅
-**File:** `DataWarehouse.SDK/Federation/CloudShare.cs`
-- [x] CloudShareManager for share lifecycle
-- [x] ShareLink with expiry and access limits
-- [x] User-specific VfsProjection per share
-- [x] Share access audit logging
-
-#### Scenario 2: Sneakernet (U1 → USB → U2) ✅
-**File:** `DataWarehouse.SDK/Federation/DormantNode.cs`
-- [x] IncrementalSyncManager for partial transfers (delta sync)
-- [x] SneakernetConflictQueue with three-way merge
-- [x] AutoResyncTrigger integration with DormantNodeWatcher
-- [x] OfflineChangeTracker for modifications during disconnect
-
-#### Scenario 3: Unified Pool (DWH + DW1) ✅
-**File:** `DataWarehouse.SDK/Federation/StoragePool.cs`
-- [x] PoolDiscoveryProtocol with mDNS and gossip
-- [x] PoolAutoJoinManager for seamless node integration
-- [x] FederatedPoolRouter for transparent object routing
-- [x] PoolDeduplicationService with cross-pool content hashing
-- [x] PoolCapacityMonitor for aggregated stats
-
-#### Scenario 4: P2P Direct Link ✅
-**File:** `DataWarehouse.SDK/Federation/NatTraversal.cs`
-- [x] IceLiteCandidateGatherer for RFC 8445 candidate collection
-- [x] ConnectivityChecker with priority-ordered candidate pairs
-- [x] RelayFallbackChain with latency-based selection
-- [x] LinkQualityMonitor tracking jitter, packet loss, RTT, bandwidth
-
-#### Scenario 5: Multi-Region Federation ✅
-**File:** `DataWarehouse.SDK/Federation/MultiRegion.cs`
-- [x] Region entity with latency matrix
-- [x] Region-aware data placement policy
-- [x] Cross-region async replication
-- [x] Regional failover orchestration
+**Estimated Effort**: 2-3 hours
 
 ---
 
-### Phase 5: Enterprise Features (E1-E4) ✅ COMPLETE
+## PRIORITY 4: RAFT LOG COMPACTION
 
-#### E1. Single File Deploy ✅
-**File:** `DataWarehouse.SDK/Infrastructure/SingleFileDeploy.cs`
-- [x] EmbeddedResourceManager for bundled plugins
-- [x] ConfigurationEmbedder for default config
-- [x] PluginExtractor for runtime extraction
-- [x] AutoUpdateManager with version check
+### Status: ❌ TODO IN CODE
 
-#### E2. ACID Transactions ✅
-**File:** `DataWarehouse.SDK/Infrastructure/AcidTransactions.cs`
-- [x] WriteAheadLog with append-only storage
-- [x] IsolationLevel enum (ReadUncommitted to Serializable)
-- [x] DistributedTransactionCoordinator (2PC protocol)
-- [x] Savepoint support for partial rollback
+### Current Issue:
+**Location**: `Plugins/DataWarehouse.Plugins.Raft/RaftConsensusPlugin.cs:1331`
+```csharp
+// TODO: Implement snapshot creation for log compaction
+```
 
-#### E3. Full Encryption at Rest ✅
-**File:** `DataWarehouse.SDK/Infrastructure/EncryptionAtRest.cs`
-- [x] FullDiskEncryptionProvider abstraction
-- [x] PerFileEncryptionMode with automatic per-file key generation
-- [x] KeyHierarchy implementing master → tenant → data key structure
-- [x] SecureKeyStorage with hardware (TPM), file, and cloud backends
-- [x] KeyRotationScheduler for automated key rotation
+### What Needs Implementation:
 
-#### E4. Distributed Services Tier 2 ✅
-**File:** `DataWarehouse.SDK/Infrastructure/DistributedServicesPhase5.cs`
-- [x] DistributedLockService with fencing tokens
-- [x] DistributedCounterService (CRDT G-Counter)
-- [x] DistributedQueueService for work distribution
-- [x] DistributedConfigService for cluster-wide config
+#### Task 4.1: Implement Log Compaction
+**File**: `Plugins/DataWarehouse.Plugins.Raft/RaftConsensusPlugin.cs`
+- [ ] Implement `CreateSnapshotAsync()` method (line 1329)
+- [ ] Snapshot state machine at commit index
+- [ ] Serialize snapshot to disk/storage
+- [ ] Truncate log entries before snapshot index
+- [ ] Load snapshot on startup/recovery
+- [ ] Install snapshot RPC for follower recovery
+- [ ] Configurable snapshot interval (e.g., every 10,000 entries)
+- [ ] Incremental snapshots for large state machines
+
+**Estimated Effort**: 1 week
 
 ---
 
-### Phase 6: Storage Backend Integration (SB1-SB3) ✅ COMPLETE
+## PRIORITY 5: RAFT SNAPSHOTS
 
-**File:** `DataWarehouse.SDK/Infrastructure/StorageBackends.cs`
+### Status: ❌ PART OF LOG COMPACTION (See Priority 4)
 
-#### SB1. Full MinIO Support ✅
-- [x] MinioAdminManager for cluster management
-- [x] BucketNotificationManager for S3-compatible events
-- [x] IlmPolicyManager for object lifecycle
-- [x] MinioIdentityProvider for LDAP/OIDC/service accounts
-- [x] MinioClusterHealthMonitor for multi-node status
-
-#### SB2. Full Ceph Support ✅
-- [x] RadosGatewayManager for S3-compatible object storage
-- [x] RbdBlockStorageManager for block device access
-- [x] CephFsManager for POSIX filesystem access
-- [x] CrushMapAwarePlacement for failure-domain-aware placement
-- [x] CephClusterMonitor for health and performance
-
-#### SB3. Full TrueNAS Support ✅
-- [x] ZfsPoolManager for pool operations
-- [x] DatasetManager for dataset CRUD
-- [x] ZfsSnapshotManager for point-in-time recovery
-- [x] TrueNasHealthMonitor for SMART, pool, and replication status
+This is covered by Priority 4 implementation.
 
 ---
 
-### Phase 7: Compliance & Security (CS1-CS4) ✅ COMPLETE
+## PRIORITY 6: FAULT TOLERANCE OPTIONS
 
-**File:** `DataWarehouse.SDK/Infrastructure/CompliancePhase7.cs`
+### Status: 🟢 MOSTLY IMPLEMENTED - NEEDS UNIFIED CONFIGURATION
 
-#### CS1. Full Audit Trails ✅
-- [x] AuditSyncManager for cross-node replication
-- [x] AuditExporter (CSV, JSON, SIEM/Splunk format)
-- [x] AuditRetentionPolicy with auto-purge
-- [x] AuditQueryEngine with filter/search
+### What Already Exists:
+✅ **RAID 1 with configurable MirrorCount** (supports 2, 3, 4+ replicas)
+✅ **RAID 6** (dual parity Reed-Solomon)
+✅ **RAID Z3** (triple parity)
+✅ **AdaptiveErasureCoding** with 4 profiles (6+3, 8+4, 10+2, 16+4)
+✅ **AvailabilityLevel enum** (Single, Redundant, GeoRedundant, Global)
 
-#### CS2. Full HSM Integration ✅
-- [x] Pkcs11HsmProvider for generic HSM
-- [x] AwsCloudHsmProvider for AWS
-- [x] AzureDedicatedHsmProvider for Azure
-- [x] ThalesLunaProvider for on-premise HSM
+### What Needs Implementation:
 
-#### CS3. Regulatory Compliance Framework ✅
-- [x] ComplianceChecker with pluggable rules
-- [x] Soc2ComplianceRules validation
-- [x] HipaaComplianceRules validation
-- [x] GdprComplianceRules (data residency, right to delete)
-- [x] PciDssComplianceRules validation
+#### Task 6.1: Unified FaultToleranceConfig
+**File**: `DataWarehouse.SDK/Configuration/FaultToleranceConfig.cs`
+- [ ] Create unified configuration class
+- [ ] Enum: `FaultToleranceMode` (None, Replica2, Replica3, ReedSolomon, RAID6, RAIDZ3)
+- [ ] Auto-select mode based on customer tier
+- [ ] User override capability
+- [ ] Validation rules (e.g., min 3 providers for RAID6)
 
-#### CS4. Durability Guarantees (11 9s) ✅
-- [x] DurabilityCalculator (Markov model)
-- [x] ReplicationAdvisor for factor recommendations
-- [x] GeoDistributionChecker for failure domain analysis
-- [x] DurabilityMonitor for continuous verification
+#### Task 6.2: Kernel Enhancement - Apply Fault Tolerance
+**File**: `DataWarehouse.Kernel/DataWarehouseKernel.cs`
+- [ ] Apply fault tolerance config during `SaveAsync`
+- [ ] Route to appropriate RAID level or erasure coding
+- [ ] Fallback to simpler mode if insufficient providers
 
----
-
-### Phase 8: Edge & Managed Services (EM1-EM4) ✅ COMPLETE
-
-**File:** `DataWarehouse.SDK/Infrastructure/EdgeManagedPhase8.cs`
-
-#### EM1. Edge Locations ✅
-- [x] EdgeNodeDetector (latency-based classification)
-- [x] EdgeOriginSync for cache population
-- [x] CacheInvalidationProtocol (pub/sub based)
-- [x] EdgeHealthMonitor with failover
-
-#### EM2. Managed Services Platform ✅
-- [x] ServiceProvisioner for tenant onboarding
-- [x] TenantLifecycleManager (create, suspend, delete)
-- [x] UsageMeteringService for resource tracking
-- [x] BillingIntegration hooks (Stripe, AWS Marketplace)
-
-#### EM3. Full IAM Integration ✅
-**File:** `DataWarehouse.SDK/Infrastructure/IamIntegration.cs`
-- [x] IIdentityProvider interface for pluggable backends
-- [x] AwsIamProvider (STS AssumeRole, Cognito, Web Identity)
-- [x] AzureAdProvider (OAuth2/OIDC, Graph API, managed identity)
-- [x] GoogleCloudIamProvider (service accounts, workload identity)
-- [x] OidcSamlBridge for enterprise SSO
-- [x] IamSessionManager for session lifecycle
-
-#### EM4. Storage Type Detection & AI Processing ✅
-**File:** `DataWarehouse.SDK/Infrastructure/StorageIntelligence.cs`
-- [x] StorageTypeDetector with magic bytes, MIME type, content analysis
-- [x] IntelligentContentClassifier using AI for semantic classification
-- [x] AutoTieringRecommender based on access patterns
-- [x] ContentExtractionPipeline for text/metadata extraction
-- [x] SmartSearchIndexer for automatic full-text and vector indexing
+**Estimated Effort**: 1-2 days
 
 ---
 
-## Kernel Infrastructure ✅ COMPLETE
+## PRIORITY 7: LOAD BALANCING - AUTOMATIC SHARDING
 
-### Core Kernel Components
+### Status: 🟢 MOSTLY IMPLEMENTED - NEEDS INTELLIGENT SWITCHING
 
-| # | Component | File | Status |
-|---|-----------|------|--------|
-| K1 | Hot Plugin Reload | IKernelInfrastructure.cs | ✅ State preservation, rollback |
-| K2 | Circuit Breaker Framework | CircuitBreakerPolicy.cs | ✅ Closed → Open → Half-Open |
-| K3 | Memory Pressure Management | MemoryPressureMonitor.cs | ✅ GC notification, throttling |
-| K4 | Security Context Flow | ISecurityContext | ✅ Passed through all operations |
-| K5 | Health Check Aggregation | HealthCheck.cs | ✅ Liveness vs Readiness, TTL |
-| K6 | Configuration Hot Reload | File watcher | ✅ Validation, rollback |
-| K7 | Metrics Collection | Observability.cs | ✅ ops/sec, latency, errors |
-| K8 | AI Provider Registry | AIProviderRegistry.cs | ✅ Capability-based selection |
-| K9 | Transaction Coordination | ITransactionScope | ✅ Best-effort rollback |
-| K10 | Rate Limiting Framework | TokenBucketRateLimiter.cs | ✅ Per-operation limits |
+### What Already Exists:
+✅ **ShardingPlugin** with `AutoRebalance` flag
+✅ **AdaptiveLoadBalancer** with 4 strategies (RoundRobin, LeastConnections, WeightedRandom, LatencyBased)
+✅ **ConsistentHashRing** implementation
+✅ **Hot shard detection** and auto-splitting
 
-### Kernel Storage Implementations
+### What Needs Implementation:
 
-| Task | File | Status |
-|------|------|--------|
-| RAID Engine (41 levels) | RaidEngine.cs | ✅ Full GF(2^8) Reed-Solomon |
-| HybridStorageManager | HybridStorageManager.cs | ✅ 6-stage indexing pipeline |
-| RealTimeStorageManager | RealTimeStorageManager.cs | ✅ Point-in-time recovery |
-| SearchOrchestratorManager | SearchOrchestratorManager.cs | ✅ Multi-provider search fusion |
-| AdvancedMessageBus | AdvancedMessageBus.cs | ✅ At-least-once delivery |
-| ContainerManager | ContainerManager.cs | ✅ Quotas, access control |
-| KernelLogger | KernelLogger.cs | ✅ Structured logging |
-| HealthCheckManager | HealthCheck.cs | ✅ Kubernetes-ready probes |
+#### Task 7.1: Intelligent Mode Selection
+**File**: `Plugins/DataWarehouse.Plugins.Sharding/ShardingPlugin.cs`
+- [ ] Add `ShardingMode` enum (Manual, Automatic, Intelligent)
+- [ ] Implement intelligent mode selection logic:
+  - Single user/laptop → Manual
+  - SMB (2-10 nodes) → Automatic with conservative rebalancing
+  - High-stakes (10+ nodes) → Automatic with aggressive rebalancing
+  - Hyperscale (100+ nodes) → Automatic with predictive rebalancing
+- [ ] User override capability via configuration
+- [ ] Document mode selection criteria
 
----
+#### Task 7.2: Predictive Rebalancing
+**File**: `Plugins/DataWarehouse.Plugins.Sharding/ShardingPlugin.cs`
+- [ ] Analyze access patterns over time windows
+- [ ] Predict hot shards before they become bottlenecks
+- [ ] Pre-emptive shard splitting
+- [ ] Load prediction based on historical data
 
-## Hyperscale Features ✅ COMPLETE
-
-**File:** `DataWarehouse.SDK/Infrastructure/HyperscaleFeatures.cs` (~3,500 lines)
-
-### Feature Summary
-
-| Feature | Class | Description |
-|---------|-------|-------------|
-| Adaptive Erasure Coding | AdaptiveErasureCoding | Dynamic m,k parameters, streaming encoder |
-| Geo-Distributed Consensus | GeoDistributedConsensus | Multi-datacenter Raft, hierarchical quorums |
-| Petabyte-Scale Indexing | DistributedBPlusTree | Sharded B+ tree, consistent hashing, bloom filters |
-| Predictive Tiering | PredictiveTiering | ML-based access pattern prediction |
-| Chaos Engineering | ChaosEngineeringFramework | Network/node/disk failure injection |
-| Observability Platform | HyperscaleObservability | OpenTelemetry, anomaly detection |
-| Kubernetes Operator | KubernetesOperator | CRDs, HPA, StatefulSet management |
-| S3-Compatible API | S3CompatibleApi | Full S3 API, multipart, versioning |
+**Estimated Effort**: 2-3 days
 
 ---
 
-## Federation Implementation ✅ COMPLETE
+## PRIORITY 8: SQL INJECTION PROTECTION
 
-### Vision
-Transform DataWarehouse from a single-instance storage engine to a **Federated Distributed Object Store** where:
-- Every DW instance is a **Node** (laptop, server, USB, cloud - all equal peers)
-- Objects are **Content-Addressed** (GUID/hash, not file paths)
-- **Split Metadata** separates "The Map" from "The Territory"
-- **VFS Layer** provides unified namespace across all nodes
-- **Capability-based Security** with cryptographic proof of access
+### Status: 🟢 IMPLEMENTED - NEEDS VERIFICATION
 
-### Phase 1: Core Primitives ✅
+### What Already Exists:
+✅ **Parameterized queries** in `SqlInterfacePlugin.cs`
+✅ **Prepared statements** with Npgsql
+✅ **Pattern-based malware detection** in GovernancePlugin
 
-| Component | File | Status |
-|-----------|------|--------|
-| Content-Addressable Object Store | SDK/Federation/ObjectStore.cs | ✅ |
-| Node Identity System | SDK/Federation/NodeIdentity.cs | ✅ |
-| Capability Token System | SDK/Federation/Capabilities.cs | ✅ |
+### What Needs Implementation:
 
-### Phase 2: Translation Layer ✅
+#### Task 8.1: Security Audit of SQL Interface
+**File**: `Plugins/DataWarehouse.Plugins.SqlInterface/SqlInterfacePlugin.cs`
+- [ ] Audit all SQL query construction
+- [ ] Verify no string concatenation of user input
+- [ ] Add input validation for all parameters
+- [ ] Test with SQL injection payloads (OWASP Top 10)
+- [ ] Document secure query patterns
 
-| Component | File | Status |
-|-----------|------|--------|
-| Virtual Filesystem (VFS) | SDK/Federation/VFS.cs | ✅ |
-| Object Resolution Service | SDK/Federation/Resolution.cs | ✅ |
-| Transport Bus | SDK/Federation/Transport.cs | ✅ |
-| Routing Layer | SDK/Federation/Routing.cs | ✅ |
+#### Task 8.2: Add SQL Injection Detection
+**File**: `Plugins/DataWarehouse.Plugins.Governance/GovernancePlugin.cs`
+- [ ] Enhance malware detection with SQL injection patterns
+- [ ] Add alerts for suspicious query patterns
+- [ ] Rate limiting on failed query attempts
 
-### Phase 3: Federation Protocol ✅
-
-| Component | File | Status |
-|-----------|------|--------|
-| Node Discovery (Gossip) | SDK/Federation/Protocol.cs | ✅ |
-| Metadata Synchronization (CRDT) | SDK/Federation/Protocol.cs | ✅ |
-| Object Replication (Quorum) | SDK/Federation/Protocol.cs | ✅ |
-| Cluster Coordination (Bully) | SDK/Federation/Protocol.cs | ✅ |
-
-### Phase 4: Integration ✅
-
-| Component | File | Status |
-|-----------|------|--------|
-| Federation Hub | Kernel/Federation/FederationHub.cs | ✅ |
-| Federated Storage Provider | Kernel/Federation/FederatedStorage.cs | ✅ |
-| Federation Migrator | Kernel/Federation/FederatedStorage.cs | ✅ |
-
-### Phase 5: Advanced Federation ✅
-
-| Feature | File | Status |
-|---------|------|--------|
-| Storage Pools | SDK/Federation/StoragePool.cs | ✅ |
-| Identity-Filtered Namespaces | SDK/Federation/VFS.cs | ✅ |
-| Dormant Node Support | SDK/Federation/DormantNode.cs | ✅ |
-| Advanced ACL (Groups) | SDK/Federation/Groups.cs | ✅ |
-| Stream Relay | SDK/Federation/Transport.cs | ✅ |
-| NAT Traversal | SDK/Federation/NatTraversal.cs | ✅ |
+**Estimated Effort**: 1 day
 
 ---
 
-## Plugin Development Status
+## PRIORITY 9: INPUT VALIDATION FRAMEWORK
 
-### Core Plugins ✅ ALL COMPLETE
+### Status: 🟢 IMPLEMENTED - NEEDS EXPANSION
 
-#### Storage Providers
-| Plugin | File | Status |
-|--------|------|--------|
-| LocalStoragePlugin | Plugins.LocalStorage | ✅ |
-| EmbeddedDatabasePlugin (SQLite) | Plugins.EmbeddedDatabaseStorage | ✅ |
-| S3StoragePlugin | Plugins.S3Storage | ✅ |
-| AzureBlobStoragePlugin | Plugins.AzureBlobStorage | ✅ |
+### What Already Exists:
+✅ **ConfigurationValidator** with rules engine
+✅ **RequiredSettingRule, RangeValidationRule**
+✅ **IConfigurationRule** interface
 
-#### Data Transformation
-| Plugin | File | Status |
-|--------|------|--------|
-| GZipCompressionPlugin | Plugins.Compression | ✅ |
-| LZ4CompressionPlugin | Plugins.Compression | ✅ |
-| AesEncryptionPlugin | Plugins.Encryption | ✅ |
-| ChaCha20EncryptionPlugin | Plugins.Encryption | ✅ |
+### What Needs Implementation:
 
-#### Enterprise Features
-| Plugin | File | Status |
-|--------|------|--------|
-| RaftConsensusPlugin | Plugins.Raft | ✅ |
-| GovernancePlugin | Plugins.Governance | ✅ |
-| GrpcInterfacePlugin | Plugins.GrpcInterface | ✅ |
-| RestInterfacePlugin | Plugins.RestInterface | ✅ |
-| SqlInterfacePlugin | Plugins.SqlInterface | ✅ |
-| OpenTelemetryPlugin | Plugins.OpenTelemetry | ✅ |
+#### Task 9.1: Expand Validation Rules
+**File**: `DataWarehouse.SDK/Infrastructure/ProductionHardening.cs`
+- [ ] `PathTraversalValidationRule` - Prevent ../../../ attacks
+- [ ] `FileSizeValidationRule` - Enforce max file sizes
+- [ ] `ContentTypeValidationRule` - Whitelist allowed MIME types
+- [ ] `RegexValidationRule` - Pattern-based validation
+- [ ] `JsonSchemaValidationRule` - Validate JSON payloads
 
-### Future Development Plugins
+#### Task 9.2: Apply Validation to All External Inputs
+**File**: `Plugins/DataWarehouse.Plugins.RestInterface/RestInterfacePlugin.cs`
+- [ ] Validate all REST API inputs
+- [ ] Reject invalid requests with clear error messages
+- [ ] Log validation failures for monitoring
 
-#### Advanced AI (Planned)
-- [ ] OpenAIEmbeddingsPlugin - Vector embeddings
-- [ ] PineconeVectorPlugin - Vector database
-- [ ] LangChainIntegrationPlugin - AI orchestration
+**File**: `Plugins/DataWarehouse.Plugins.SqlInterface/SqlInterfacePlugin.cs`
+- [ ] Validate SQL query inputs
+- [ ] Sanitize identifiers (table names, column names)
 
-#### Enterprise Authentication (Planned)
-- [ ] LdapAuthPlugin - Enterprise authentication
-- [ ] RbacPlugin - Role-based access control
-- [ ] SamlAuthPlugin - SAML SSO support
+**Estimated Effort**: 2-3 days
 
 ---
 
-## God-Tier Improvements ✅ ALL COMPLETE
+## PRIORITY 10: SECURITY AUDIT AUTOMATION
 
-### Tier 1: Individual/Laptop
+### Status: ❌ NOT IMPLEMENTED
 
-| # | Improvement | Class | Status |
-|---|-------------|-------|--------|
-| 1 | Zero-Config Deployment | ZeroConfigurationStartup | ✅ |
-| 2 | Battery-Aware Storage | BatteryAwareStorageManager | ✅ |
-| 3 | Incremental Backup Agent | IncrementalBackupAgent | ✅ |
+### What Needs Implementation:
 
-### Tier 2: SMB/Server
+#### Task 10.1: Security Scanning Integration
+**File**: `DataWarehouse.SDK/Infrastructure/SecurityEnhancements.cs`
+- [ ] Integrate static analysis (e.g., Roslyn analyzers)
+- [ ] Add security-focused code analysis rules
+- [ ] CI/CD pipeline integration for automated scanning
+- [ ] Security test suite with OWASP test cases
 
-| # | Improvement | Class | Status |
-|---|-------------|-------|--------|
-| 4 | One-Click HA Setup | ZeroDowntimeUpgradeManager | ✅ |
-| 5 | S3 API 100% Compatibility | S3CompatibleApi | ✅ |
-| 6 | Built-in Deduplication | ContentAddressableDeduplication | ✅ |
-| 7 | Ransomware Detection | RansomwareDetectionEngine | ✅ |
+#### Task 10.2: Runtime Security Monitoring
+**File**: `DataWarehouse.SDK/Infrastructure/SecurityEnhancements.cs`
+- [ ] Add `SecurityMonitor` class
+- [ ] Track failed authentication attempts
+- [ ] Detect brute force attacks
+- [ ] Alert on suspicious patterns
+- [ ] Integration with SIEM systems (Splunk, ELK)
 
-### Tier 3: High-Stakes/Compliance
-
-| # | Improvement | Class | Status |
-|---|-------------|-------|--------|
-| 8 | WORM Compliance Mode | WormComplianceManager | ✅ |
-| 9 | Air-Gap Support | AirGappedBackupManager | ✅ |
-| 10 | Audit Immutability | ImmutableAuditTrail | ✅ |
-| 11 | HSM Integration | ThalesLunaProvider, Pkcs11HsmProvider | ✅ |
-| 12 | Zero-Trust Data Access | ZeroTrustDataAccess | ✅ |
-
-### Tier 4: Hyperscale
-
-| # | Improvement | Class | Status |
-|---|-------------|-------|--------|
-| 13 | Global Namespace | GeoDistributedConsensus | ✅ |
-| 14 | Erasure Coding Auto-Tune | AdaptiveErasureCoding | ✅ |
-| 15 | Petabyte Index | DistributedBPlusTree | ✅ |
-| 16 | Chaos Engineering Built-in | ChaosEngineeringFramework | ✅ |
-| 17 | Carbon-Aware Tiering | CarbonAwareTiering | ✅ |
-
-### Cross-Tier Universal
-
-| # | Improvement | Class | Status |
-|---|-------------|-------|--------|
-| 18 | Real Interface Persistence | KernelStorageService | ✅ |
-| 19 | Production Crypto Libraries | SecurityEnhancements | ✅ |
-| 20 | Comprehensive Error Handling | All infrastructure files | ✅ |
+**Estimated Effort**: 1 week
 
 ---
 
-## Competitive Analysis
+## PRIORITY 11: CVE MONITORING
 
-### Individual/Laptop Tier
+### Status: ❌ NOT IMPLEMENTED
 
-| Feature | DataWarehouse | SQLite | LiteDB | RocksDB |
-|---------|--------------|--------|--------|---------|
-| Single File Deploy | ✅ | ✅ | ✅ | ❌ |
-| ACID Transactions | ✅ | ✅ | ✅ | ✅ |
-| Encryption At Rest | ✅ Built-in | ❌ Extension | ✅ | ❌ |
-| RAID Support | ✅ 41 levels | ❌ | ❌ | ❌ |
-| AI Integration | ✅ | ❌ | ❌ | ❌ |
-| Plugin System | ✅ | ❌ | ❌ | ❌ |
+### What Needs Implementation:
 
-### SMB/Server Tier
+#### Task 11.1: Dependency Vulnerability Scanning
+**File**: `DataWarehouse.SDK/Infrastructure/SecurityEnhancements.cs`
+- [ ] Create `CVEScanner` class
+- [ ] Integrate with vulnerability databases (NVD, GitHub Advisory)
+- [ ] Scan NuGet dependencies for known CVEs
+- [ ] Generate vulnerability reports
+- [ ] Configurable severity thresholds
+- [ ] Automated PR creation for dependency updates
 
-| Feature | DataWarehouse | MinIO | TrueNAS | Ceph |
-|---------|--------------|-------|---------|------|
-| S3 Compatible | ✅ | ✅ | ✅ | ✅ |
-| gRPC Interface | ✅ | ❌ | ❌ | ❌ |
-| SQL Interface | ✅ | ❌ | ❌ | ❌ |
-| GUI Dashboard | ✅ Blazor | ✅ | ✅ | ✅ |
-| Multi-Protocol | ✅ | ❌ | ✅ | ✅ |
-| Kubernetes Native | ✅ | ✅ | ❌ | ✅ |
+#### Task 11.2: CI/CD Integration
+**File**: `.github/workflows/security-scan.yml` (new)
+- [ ] GitHub Actions workflow for dependency scanning
+- [ ] Use tools: `dotnet list package --vulnerable`
+- [ ] Fail builds on high/critical vulnerabilities
+- [ ] Weekly scheduled scans
 
-### High-Stakes Tier
-
-| Feature | DataWarehouse | NetApp ONTAP | Dell EMC | Pure Storage |
-|---------|--------------|--------------|----------|--------------|
-| WORM Compliance | ✅ | ✅ SnapLock | ✅ | ✅ |
-| HIPAA Ready | ✅ | ✅ | ✅ | ✅ |
-| SOX Compliant | ✅ | ✅ | ✅ | ✅ |
-| Air-Gap Backup | ✅ | ✅ | ✅ | ✅ |
-| Hardware Cost | Low (software) | Very High | Very High | Very High |
-
-### Hyperscale Tier
-
-| Feature | DataWarehouse | AWS S3 | Azure Blob | Ceph |
-|---------|--------------|--------|------------|------|
-| Erasure Coding | ✅ Adaptive | ✅ | ✅ | ✅ |
-| Geo-Replication | ✅ | ✅ | ✅ | ✅ |
-| Kubernetes Operator | ✅ | ✅ | ✅ | ✅ Rook |
-| Chaos Engineering | ✅ Built-in | ❌ External | ❌ External | ❌ |
-| AI-Native | ✅ | ✅ Bedrock | ✅ OpenAI | ❌ |
-| Carbon Awareness | ✅ | ❌ | ✅ | ❌ |
+**Estimated Effort**: 3-4 days
 
 ---
 
-## Architecture Verification
+## PRIORITY 12: MONITORING DASHBOARDS
 
-### Plugin Category Coverage
+### Status: 🟡 PARTIALLY IMPLEMENTED - NEEDS EXPORTERS
 
-| Category | SDK Interface | SDK Base Class | Kernel Plugin |
-|----------|--------------|----------------|---------------|
-| DataTransformation | IDataTransformation | DataTransformationPluginBase | - |
-| Storage | IStorageProvider | StorageProviderPluginBase | InMemoryStoragePlugin |
-| MetadataIndexing | IMetadataIndex | MetadataIndexPluginBase | - |
-| Security | IAccessControl | SecurityProviderPluginBase | - |
-| Orchestration | IConsensusEngine | OrchestrationProviderPluginBase | - |
-| Feature | IFeaturePlugin | FeaturePluginBase | - |
-| AI | IAIProvider | IntelligencePluginBase | - |
-| Federation | IReplicationService | ReplicationPluginBase | - |
-| Governance | INeuralSentinel | GovernancePluginBase | GovernancePlugin ✅ |
-| Metrics | IMetricsProvider | MetricsPluginBase | - |
-| Serialization | ISerializer | SerializerPluginBase | - |
-| Interface | IInterfacePlugin | InterfacePluginBase | REST, gRPC, SQL ✅ |
-| Consensus | IConsensusEngine | ConsensusPluginBase | RaftConsensusPlugin ✅ |
+### What Already Exists:
+✅ **MonitoringDashboard** with metrics collection
+✅ **IMetricsCollector** with counters, gauges, histograms
+✅ **OpenTelemetryIntegration** framework
+✅ **DistributedTracingExporter** (Jaeger, Zipkin, X-Ray, OTLP)
 
-### Code Quality Metrics
+### What Needs Implementation:
 
-| Metric | SDK | Kernel |
-|--------|-----|--------|
-| Files | ~25 | ~18 |
-| Interfaces | ~30 | ~5 |
-| Base Classes | 22 | 0 |
-| Production Implementations | - | 8 new managers |
-| Total Lines Added | - | ~3,500+ |
-| NotImplementedException | 0 ✅ | 0 ✅ |
-| Simplified/Placeholder | 0 ✅ | 0 ✅ |
-| Empty Catch Blocks | 0 ✅ | 0 ✅ |
+#### Task 12.1: Prometheus Exporter
+**File**: `Plugins/DataWarehouse.Plugins.PrometheusExporter/PrometheusExporterPlugin.cs`
+- [ ] Extend `MetricsPluginBase`
+- [ ] Expose `/metrics` endpoint in Prometheus format
+- [ ] Convert internal metrics to Prometheus format
+- [ ] Support labels and dimensions
+- [ ] Configurable scrape interval
+
+#### Task 12.2: Grafana Dashboard Definitions
+**File**: `Metadata/Dashboards/Grafana/datawarehouse-overview.json`
+- [ ] Create Grafana dashboard JSON
+- [ ] Panels for: throughput, latency, error rate, CPU, memory
+- [ ] RAID rebuild progress panel
+- [ ] Storage capacity panel
+- [ ] Replication lag panel (for geo-replication)
+
+**Estimated Effort**: 2-3 days
 
 ---
 
-## RAID Engine Implementation ✅ COMPLETE
+## PRIORITY 13: ALERTING INTEGRATION
 
-**File:** `DataWarehouse.Kernel/Storage/RaidEngine.cs`
-**Total RAID Levels:** 41 (All Implemented)
+### Status: 🟡 PARTIALLY IMPLEMENTED - NEEDS INTEGRATIONS
 
-### RAID Levels by Category
+### What Already Exists:
+✅ **Alert rules engine** in MonitoringDashboard
+✅ **AnomalyDetector** with ML-based detection
+✅ **Alert severity levels** (Info, Warning, Critical)
 
-| Category | Levels | Count |
-|----------|--------|-------|
-| Standard | RAID 0, 1, 2, 3, 4, 5, 6 | 7 |
-| Nested | RAID 01, 10, 03, 50, 60, 100 | 6 |
-| Enhanced | RAID 1E, 5E, 5EE, 6E | 4 |
-| ZFS | RAID Z1, Z2, Z3 | 3 |
-| Vendor-Specific | RAID DP, S, 7, FR, MD10 | 5 |
-| Advanced/Proprietary | Adaptive, Beyond, Unraid, Declustered, 7.1, 7.2 | 6 |
-| Extended | N+M, Matrix, JBOD, Crypto, DUP, DDP, SPAN, BIG, MAID, Linear | 10 |
+### What Needs Implementation:
 
-### Key Technical Implementations
+#### Task 13.1: PagerDuty Integration
+**File**: `Plugins/DataWarehouse.Plugins.PagerDuty/PagerDutyPlugin.cs`
+- [ ] Extend `FeaturePluginBase`
+- [ ] PagerDuty Events API v2 integration
+- [ ] Create incidents for Critical alerts
+- [ ] Auto-resolve incidents when alert clears
+- [ ] Configurable routing keys and severity mapping
 
-| Feature | Implementation |
-|---------|----------------|
-| GF(2^8) Arithmetic | Pre-computed exp/log lookup tables |
-| Hamming Code ECC | True bit-level error correction |
-| Reed-Solomon P/Q/R | P=XOR, Q=g^i, R=g^(2i) coefficients |
-| Dual Parity Rebuild | Cramer's rule in GF(2^8) |
-| Triple Parity Rebuild | 3x3 matrix inversion in GF(2^8) |
-| Variable Stripe Width | ZFS-style dynamic sizing |
-| Diagonal Parity | NetApp anti-diagonal XOR pattern |
-| Distributed Hot Spare | Space reservation within array |
+#### Task 13.2: OpsGenie Integration
+**File**: `Plugins/DataWarehouse.Plugins.OpsGenie/OpsGeniePlugin.cs`
+- [ ] Extend `FeaturePluginBase`
+- [ ] OpsGenie Alert API integration
+- [ ] Create alerts with tags and priority
+- [ ] On-call schedule integration
+- [ ] Heartbeat monitoring
 
----
+#### Task 13.3: Generic Webhook Alerting
+**File**: `Plugins/DataWarehouse.Plugins.WebhookAlerting/WebhookAlertingPlugin.cs`
+- [ ] Extend `FeaturePluginBase`
+- [ ] HTTP POST to configurable webhook URL
+- [ ] JSON payload with alert details
+- [ ] Retry with exponential backoff
+- [ ] Support for Slack, Teams, Discord webhooks
 
-## New Projects Added
-
-### DataWarehouse.CLI
-Production-ready command-line interface:
-- Storage management (pools, instances)
-- Plugin management (list, enable, disable, reload)
-- RAID configuration (create, status, rebuild, levels)
-- Backup/restore operations
-- Health monitoring
-- Configuration management
-- Audit log viewing
-- Performance benchmarking
-- Server management
-
-### DataWarehouse.Launcher
-Standalone executable for production deployments:
-- Self-contained deployment support
-- Configuration from file, environment, or CLI
-- Structured logging with Serilog
-- Graceful shutdown handling (SIGINT, SIGTERM)
-- Multi-platform support
+**Estimated Effort**: 3-4 days
 
 ---
 
-## Future Development Roadmap
+## PRIORITY 14: BACKUP/RESTORE TESTING (DR Procedures)
 
-### Planned Enhancements
+### Status: 🟡 PARTIALLY IMPLEMENTED - NEEDS DR FRAMEWORK
 
-1. **Advanced AI Plugins**
-   - OpenAI embeddings integration
-   - Vector database support (Pinecone, Weaviate)
-   - LangChain orchestration
+### What Already Exists:
+✅ **SmartAutoBackup** with AI-powered scheduling
+✅ **AirGappedBackupManager** for tape archives
+✅ **VersionHistoryManager** with Git-like versioning
+✅ **ZeroDowntimeUpgradeManager** with rollback
+✅ **SelfHealingStorage** with corruption detection
 
-2. **Enterprise Authentication**
-   - LDAP integration
-   - Advanced RBAC
-   - SAML SSO support
+### What Needs Implementation:
 
-3. **Performance Optimizations**
-   - Improved storage type detection
-   - Enhanced AI processing pipelines
-   - Optimized erasure coding paths
+#### Task 14.1: DR Testing Framework
+**File**: `DataWarehouse.SDK/Infrastructure/DisasterRecovery.cs`
+- [ ] Create `DisasterRecoveryTester` class
+- [ ] Automated DR drill scheduling
+- [ ] Test scenarios:
+  - Full restore from backup
+  - Point-in-time recovery
+  - Region failover (for geo-replication)
+  - Node failure and rebuild
+  - Corruption detection and repair
+- [ ] DR test reports with RTO/RPO metrics
+- [ ] Validation that recovered data matches original
+
+#### Task 14.2: Backup Verification
+**File**: `DataWarehouse.SDK/Infrastructure/HighStakesFeatures.cs`
+- [ ] Enhance `AirGappedBackupManager.VerifyBackupAsync`
+- [ ] Automated backup verification scheduling (daily/weekly)
+- [ ] Cryptographic verification (Merkle root, signatures)
+- [ ] Test restore to temporary location
+- [ ] Alert on backup verification failures
+
+#### Task 14.3: DR Runbook Automation
+**File**: `DataWarehouse.SDK/Infrastructure/ObservabilityEnhancements.cs`
+- [ ] Enhance `RunbookEngine` with DR procedures
+- [ ] Runbooks for:
+  - Database restore
+  - Region failover
+  - Storage array rebuild
+  - Configuration rollback
+- [ ] Dry-run mode for testing
+- [ ] Execution history and audit trail
+
+**Estimated Effort**: 1 week
 
 ---
 
-## Conclusion
+## PRIORITY 15: UPGRADE PATH (Blue/Green Deployment)
 
-### 💎 DIAMOND LEVEL PRODUCTION READY
+### Status: 🟢 IMPLEMENTED - NEEDS FORMALIZATION
 
-The DataWarehouse Kernel is complete and ready for customer deployment across all tiers:
+### What Already Exists:
+✅ **ZeroDowntimeDeployment** (ProductionHardening.cs)
+✅ **BlueGreenDeploymentConfig**
+✅ **Rolling upgrades** with connection draining
+✅ **Automatic rollback** on failure
 
-- **Individual users** (laptops, desktops)
-- **SMB servers**
-- **Network storage**
-- **High-stakes** (hospitals, banks, governments) with compliance
-- **Hyperscale deployments**
+### What Needs Implementation:
 
-All critical components have been implemented:
-- ✅ 41 RAID levels with full Reed-Solomon
-- ✅ Complete Federation system
-- ✅ Full compliance framework (HIPAA, SOX, GDPR, PCI-DSS)
-- ✅ HSM integration (Thales Luna, AWS CloudHSM, Azure)
-- ✅ Hyperscale features (erasure coding, geo-consensus, chaos engineering)
-- ✅ All core plugins operational
+#### Task 15.1: Formalize Upgrade Procedures
+**File**: `DataWarehouse.SDK/Infrastructure/ProductionHardening.cs`
+- [ ] Add `IUpgradeOrchestrator` interface
+- [ ] Document upgrade steps in code comments
+- [ ] Pre-flight checks before upgrade
+- [ ] Schema migration support
+- [ ] Backwards compatibility validation
+
+#### Task 15.2: Version Migration Framework
+**File**: `DataWarehouse.SDK/Infrastructure/VersionMigration.cs`
+- [ ] Create `MigrationEngine` class
+- [ ] Migration scripts with version numbers
+- [ ] Automatic migration execution during upgrade
+- [ ] Migration rollback support
+- [ ] Migration testing framework
+
+#### Task 15.3: Upgrade Testing
+**File**: `DataWarehouse.Tests/Upgrade/UpgradeTests.cs`
+- [ ] Test upgrade from v1.0 → v2.0
+- [ ] Test rollback procedures
+- [ ] Test schema migrations
+- [ ] Test data preservation during upgrade
+
+**Estimated Effort**: 3-4 days
 
 ---
 
-*This document is automatically updated as features are implemented.*
-*Last Updated: 2026-01-20*
+## PRIORITY 16: PERFORMANCE BASELINES (SLO/SLA)
+
+### Status: ❌ NOT IMPLEMENTED
+
+### What Needs Implementation:
+
+#### Task 16.1: Define SLOs
+**File**: `DataWarehouse.SDK/Infrastructure/ServiceLevelObjectives.cs`
+- [ ] Create `SLO` class
+- [ ] Define SLOs for each customer tier:
+  - **Individual**: 99% availability, <500ms p95 latency
+  - **SMB**: 99.5% availability, <200ms p95 latency
+  - **Enterprise**: 99.9% availability, <100ms p95 latency
+  - **High-Stakes**: 99.95% availability, <50ms p95 latency
+  - **Hyperscale**: 99.99% availability, <20ms p95 latency
+- [ ] Define error budgets (allowed downtime per month)
+
+#### Task 16.2: SLO Monitoring
+**File**: `DataWarehouse.SDK/Infrastructure/ServiceLevelObjectives.cs`
+- [ ] Create `SLOMonitor` class
+- [ ] Track SLO compliance in real-time
+- [ ] Alert when approaching error budget exhaustion
+- [ ] Monthly SLO reports
+
+#### Task 16.3: Performance Benchmarking
+**File**: `DataWarehouse.Tests/Performance/BenchmarkTests.cs`
+- [ ] Benchmark throughput (MB/s) for each RAID level
+- [ ] Benchmark latency (p50, p95, p99) for read/write
+- [ ] Benchmark scalability (1, 10, 100, 1000 nodes)
+- [ ] Benchmark compression ratios and speeds
+- [ ] Benchmark encryption overhead
+- [ ] CI/CD integration for regression detection
+
+**Estimated Effort**: 1 week
+
+---
+
+## PRIORITY 17: HIPAA/SOC2/ISO27001 COMPLIANCE
+
+### Status: 🟡 PARTIALLY IMPLEMENTED - NEEDS RUNTIME ENFORCEMENT
+
+### What Already Exists:
+✅ **ComplianceTestSuites.cs** with comprehensive test coverage
+✅ **ComplianceManager** (ProductionHardening.cs)
+✅ **FipsCompliantCryptoModule** (HighStakesFeatures.cs)
+✅ **ImmutableAuditTrail** (HighStakesFeatures.cs)
+✅ **CryptographicAuditLog** (SecurityEnhancements.cs)
+
+### What Needs Implementation:
+
+#### Task 17.1: HIPAA Runtime Enforcement
+**File**: `DataWarehouse.SDK/Compliance/HipaaEnforcer.cs`
+- [ ] Create `HipaaEnforcer` class
+- [ ] Enforce unique user IDs (AU-2)
+- [ ] Enforce automatic logoff after inactivity (AC-11)
+- [ ] Enforce encryption at rest and in transit (SC-8, SC-13)
+- [ ] Enforce audit log retention (6 years minimum) (AU-11)
+- [ ] Enforce access controls on PHI (AC-3, AC-4)
+- [ ] Generate HIPAA compliance reports
+
+#### Task 17.2: SOC 2 Runtime Enforcement
+**File**: `DataWarehouse.SDK/Compliance/Soc2Enforcer.cs`
+- [ ] Create `Soc2Enforcer` class
+- [ ] Enforce logical access controls (CC6.1)
+- [ ] Track availability SLAs (99.9%+) (A1.2)
+- [ ] Enforce data validation rules (PI1.4)
+- [ ] Enforce data classification (C1.2)
+- [ ] Enforce retention policies (PI1.5)
+- [ ] Generate SOC 2 compliance reports
+
+#### Task 17.3: ISO 27001 Runtime Enforcement
+**File**: `DataWarehouse.SDK/Compliance/Iso27001Enforcer.cs`
+- [ ] Create `Iso27001Enforcer` class
+- [ ] Enforce access control policy (A.9)
+- [ ] Enforce cryptography policy (A.10)
+- [ ] Enforce operations security (A.12)
+- [ ] Enforce incident management (A.16)
+- [ ] Enforce business continuity (A.17)
+- [ ] Generate ISO 27001 compliance reports
+
+#### Task 17.4: Compliance Audit Reports
+**File**: `DataWarehouse.SDK/Compliance/ComplianceAuditor.cs`
+- [ ] Create `ComplianceAuditor` class
+- [ ] Generate audit-ready reports for:
+  - HIPAA (PDF with all required controls)
+  - PCI-DSS (Attestation of Compliance format)
+  - SOC 2 (Type II report format)
+  - ISO 27001 (Statement of Applicability)
+- [ ] Evidence collection (logs, configs, test results)
+- [ ] Automated evidence packaging for auditors
+
+**Estimated Effort**: 2 weeks
+
+---
+
+## IMPLEMENTATION PHASES
+
+### Phase 1: Critical Blockers (Week 1)
+- [ ] Priority 2: REST API Kernel Integration (6 hours)
+- [ ] Priority 3: S3 XML Parsing (3 hours)
+- [ ] Priority 4: Raft Log Compaction (1 week)
+Total: 1 week
+
+### Phase 2: Core Features (Week 2-3)
+- [ ] Priority 1: Geo-Replication Plugin (4 days)
+- [ ] Priority 6: Fault Tolerance Unified Config (2 days)
+- [ ] Priority 7: Intelligent Load Balancing (3 days)
+- [ ] Priority 8: SQL Injection Audit (1 day)
+Total: 2 weeks
+
+### Phase 3: Security & Validation (Week 4)
+- [ ] Priority 9: Input Validation Expansion (3 days)
+- [ ] Priority 10: Security Audit Automation (1 week)
+Total: 1.5 weeks
+
+### Phase 4: Observability (Week 5-6)
+- [ ] Priority 11: CVE Monitoring (4 days)
+- [ ] Priority 12: Grafana/Prometheus Integration (3 days)
+- [ ] Priority 13: PagerDuty/OpsGenie/Webhook Alerting (4 days)
+Total: 2 weeks
+
+### Phase 5: Operations (Week 7-8)
+- [ ] Priority 14: DR Testing Framework (1 week)
+- [ ] Priority 15: Upgrade Path Formalization (4 days)
+- [ ] Priority 16: SLO/SLA Baselines (1 week)
+Total: 2.5 weeks
+
+### Phase 6: Compliance (Week 9-10)
+- [ ] Priority 17: HIPAA/SOC2/ISO27001 Runtime Enforcement (2 weeks)
+Total: 2 weeks
+
+**Total Estimated Time: 11 weeks**
+
+---
+
+## COMMIT STRATEGY
+
+After completing each major task:
+1. Update this TODO.md with ✅ completion status
+2. Commit changes with descriptive message
+3. Move to next task
+
+Do NOT wait for an entire phase to complete before committing.
+
+---
+
+## SUCCESS CRITERIA
+
+### All Blockers Resolved ✅
+- REST API uses real kernel storage
+- S3 XML parsing is robust
+- Raft log compaction prevents unbounded growth
+
+### Production Features Complete ✅
+- Multi-region geo-replication with conflict resolution
+- Intelligent automatic sharding
+- Comprehensive security scanning
+
+### Operational Excellence ✅
+- Grafana dashboards for all metrics
+- PagerDuty/OpsGenie alerting
+- DR testing framework with automated drills
+- SLO monitoring and compliance
+
+### Compliance Ready ✅
+- HIPAA/SOC2/ISO27001 runtime enforcement
+- Audit reports for all frameworks
+- Evidence collection for auditors
+
+---
+
+## NOTES
+
+- Follow the philosophy of code reuse: Leverage existing abstractions before creating new ones
+- Upgrade SDK first, then Kernel, then Plugins
+- Commit frequently to avoid losing work
+- Test each feature thoroughly before moving to the next
+- Document all security-related changes
