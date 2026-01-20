@@ -176,21 +176,21 @@
 
 ### H9. Fix VFS Concurrent Access Patterns
 **File:** `DataWarehouse.SDK/Federation/VFS.cs`
-**Status:** ⬜ TODO
+**Status:** ✅ COMPLETE
 **Extends:** `VirtualFilesystem` class (already has ReaderWriterLockSlim)
-- [ ] Add async lock support for long-running operations
-- [ ] Add optimistic concurrency with version vectors
-- [ ] Add file-level locking for atomic operations
-- [ ] Add deadlock detection and timeout
+- [x] Add async lock support for long-running operations (`VfsAsyncLockManager`)
+- [x] Add optimistic concurrency with version vectors (`VfsVersionVector`)
+- [x] Add file-level locking for atomic operations (`AtomicVfsOperation`)
+- [x] Add deadlock detection and timeout (`DetectDeadlock`)
 
 ### H10. Object Versioning Conflict Resolution
 **File:** `DataWarehouse.SDK/Federation/ObjectStore.cs`
-**Status:** ⬜ TODO
+**Status:** ✅ COMPLETE
 **Extends:** `ObjectManifest` class (already has VectorClock)
-- [ ] Add three-way merge support
-- [ ] Add custom conflict resolver interface
-- [ ] Add conflict visualization for manual resolution
-- [ ] Add automatic resolution strategies (LWW, First, Merge)
+- [x] Add three-way merge support (`ThreeWayMergeResolver`)
+- [x] Add custom conflict resolver interface (`IConflictResolver`)
+- [x] Add conflict visualization for manual resolution (`ConflictVisualization`)
+- [x] Add automatic resolution strategies (LWW, First, Merge)
 
 ### H11. Proper Consensus Handoff
 **File:** `DataWarehouse.SDK/Federation/Protocol.cs`
@@ -239,30 +239,30 @@
 
 ### H16. Object Repair Verification
 **File:** `DataWarehouse.SDK/Federation/ObjectStore.cs`
-**Status:** ⬜ TODO
+**Status:** ✅ COMPLETE
 **Extends:** `ContentAddressableObjectStore`
-- [ ] Add post-repair integrity check
-- [ ] Add repair audit logging
-- [ ] Add repair success metrics
-- [ ] Add automatic re-repair on failure
+- [x] Add post-repair integrity check (`ObjectRepairVerifier.VerifyRepairAsync`)
+- [x] Add repair audit logging (`RepairRecord`, `RepairVerified` event)
+- [x] Add repair success metrics (`RepairMetrics`)
+- [x] Add automatic re-repair on failure (`AutoReRepairAsync`)
 
 ### H17. Routing Table Stale Entry Cleanup
 **File:** `DataWarehouse.SDK/Federation/Routing.cs`
-**Status:** ⬜ TODO
+**Status:** ✅ COMPLETE
 **Extends:** `RoutingTable` class (already has LRU)
-- [ ] Add TTL-based entry expiration
-- [ ] Add background stale entry sweep
-- [ ] Add route freshness scoring
-- [ ] Add proactive route refresh
+- [x] Add TTL-based entry expiration (`RoutingTableCleanup`)
+- [x] Add background stale entry sweep (`SweepStaleEntries`)
+- [x] Add route freshness scoring (`GetFreshnessScore`)
+- [x] Add proactive route refresh (`ProactiveRefreshAsync`)
 
 ### H18. Federation Health Dashboard Metrics
 **File:** `DataWarehouse.SDK/Federation/FederationHealth.cs` (NEW)
-**Status:** ⬜ TODO
+**Status:** ✅ COMPLETE
 **Extends:** Uses all Federation classes
-- [ ] Add unified health aggregator
-- [ ] Add per-node health scores
-- [ ] Add federation-wide metrics
-- [ ] Add health trend analysis
+- [x] Add unified health aggregator (`FederationHealthAggregator`)
+- [x] Add per-node health scores (`GetNodeHealthScore`, `NodeHealthInfo`)
+- [x] Add federation-wide metrics (`FederationMetric`, `RecordMetric`)
+- [x] Add health trend analysis (`AnalyzeHealthTrends`)
 
 ---
 

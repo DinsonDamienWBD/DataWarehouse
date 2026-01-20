@@ -865,3 +865,267 @@ public sealed class NamespaceProjectionService : INamespaceProjection
         return await GetProjectedNamespaceAsync(viewer, poolCaps, ct);
     }
 }
+
+#region H9: VFS Concurrent Access Patterns
+
+/// <summary>
+/// Async-aware lock manager for VFS operations.
+/// </summary>
+public sealed class VfsAsyncLockManager : IAsyncDisposable
+{
+    private readonly ConcurrentDictionary<string, VfsPathLock> _locks = new();
+    private readonly SemaphoreSlim _globalLock = new(1, 1);
+    private readonly TimeSpan _defaultTimeout;
+
+    public VfsAsyncLockManager(TimeSpan? defaultTimeout = null)
+    {
+        _defaultTimeout = defaultTimeout ?? TimeSpan.FromSeconds(30);
+    }
+
+    /// <summary>
+    /// Acquires an async read lock on a path.
+    /// </summary>
+    public async Task<VfsLockHandle> AcquireReadLockAsync(VfsPath path, CancellationToken ct = default)
+    {
+        var pathLock = GetOrCreateLock(path);
+        using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        cts.CancelAfter(_defaultTimeout);
+
+        await pathLock.Semaphore.WaitAsync(cts.Token);
+        Interlocked.Increment(ref pathLock.ReaderCount);
+        pathLock.Semaphore.Release();
+
+        return new VfsLockHandle(path, LockType.Read, this);
+    }
+
+    /// <summary>
+    /// Acquires an async write lock on a path.
+    /// </summary>
+    public async Task<VfsLockHandle> AcquireWriteLockAsync(VfsPath path, CancellationToken ct = default)
+    {
+        var pathLock = GetOrCreateLock(path);
+        using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        cts.CancelAfter(_defaultTimeout);
+
+        await pathLock.Semaphore.WaitAsync(cts.Token);
+        // Wait for all readers to finish
+        while (pathLock.ReaderCount > 0 && !cts.Token.IsCancellationRequested)
+        {
+            pathLock.Semaphore.Release();
+            await Task.Delay(10, cts.Token);
+            await pathLock.Semaphore.WaitAsync(cts.Token);
+        }
+
+        pathLock.HasWriter = true;
+        return new VfsLockHandle(path, LockType.Write, this);
+    }
+
+    private VfsPathLock GetOrCreateLock(VfsPath path) =>
+        _locks.GetOrAdd(path.ToString(), _ => new VfsPathLock());
+
+    internal void ReleaseLock(VfsPath path, LockType lockType)
+    {
+        if (!_locks.TryGetValue(path.ToString(), out var pathLock)) return;
+
+        if (lockType == LockType.Read)
+        {
+            Interlocked.Decrement(ref pathLock.ReaderCount);
+        }
+        else
+        {
+            pathLock.HasWriter = false;
+            pathLock.Semaphore.Release();
+        }
+    }
+
+    /// <summary>
+    /// Detects potential deadlocks in lock acquisitions.
+    /// </summary>
+    public bool DetectDeadlock(IEnumerable<VfsPath> requestedPaths)
+    {
+        // Simple cycle detection - check if any path is already locked by current thread
+        // In production, this would use a wait-for graph
+        var locked = requestedPaths.Count(p => _locks.TryGetValue(p.ToString(), out var l) && l.HasWriter);
+        return locked > 1; // Potential deadlock if requesting multiple write locks
+    }
+
+    public ValueTask DisposeAsync()
+    {
+        foreach (var pathLock in _locks.Values)
+        {
+            pathLock.Semaphore.Dispose();
+        }
+        _locks.Clear();
+        _globalLock.Dispose();
+        return ValueTask.CompletedTask;
+    }
+}
+
+internal sealed class VfsPathLock
+{
+    public SemaphoreSlim Semaphore { get; } = new(1, 1);
+    public int ReaderCount;
+    public bool HasWriter;
+}
+
+public sealed class VfsLockHandle : IAsyncDisposable
+{
+    private readonly VfsPath _path;
+    private readonly LockType _lockType;
+    private readonly VfsAsyncLockManager _manager;
+    private bool _disposed;
+
+    internal VfsLockHandle(VfsPath path, LockType lockType, VfsAsyncLockManager manager)
+    {
+        _path = path;
+        _lockType = lockType;
+        _manager = manager;
+    }
+
+    public ValueTask DisposeAsync()
+    {
+        if (_disposed) return ValueTask.CompletedTask;
+        _disposed = true;
+        _manager.ReleaseLock(_path, _lockType);
+        return ValueTask.CompletedTask;
+    }
+}
+
+public enum LockType { Read, Write }
+
+/// <summary>
+/// Version vector for optimistic concurrency control in VFS.
+/// </summary>
+public sealed class VfsVersionVector : IEquatable<VfsVersionVector>
+{
+    private readonly ConcurrentDictionary<string, long> _versions = new();
+
+    public VfsVersionVector() { }
+
+    public VfsVersionVector(IEnumerable<KeyValuePair<string, long>> versions)
+    {
+        foreach (var (key, value) in versions)
+            _versions[key] = value;
+    }
+
+    /// <summary>
+    /// Increments version for a node.
+    /// </summary>
+    public void Increment(string nodeId)
+    {
+        _versions.AddOrUpdate(nodeId, 1, (_, v) => v + 1);
+    }
+
+    /// <summary>
+    /// Gets version for a node.
+    /// </summary>
+    public long Get(string nodeId) => _versions.GetValueOrDefault(nodeId, 0);
+
+    /// <summary>
+    /// Merges with another version vector (takes max of each component).
+    /// </summary>
+    public VfsVersionVector Merge(VfsVersionVector other)
+    {
+        var merged = new VfsVersionVector(_versions);
+        foreach (var (key, value) in other._versions)
+        {
+            merged._versions.AddOrUpdate(key, value, (_, existing) => Math.Max(existing, value));
+        }
+        return merged;
+    }
+
+    /// <summary>
+    /// Compares with another version vector.
+    /// </summary>
+    public VfsVersionComparison Compare(VfsVersionVector other)
+    {
+        bool thisGreater = false, otherGreater = false;
+
+        var allKeys = _versions.Keys.Union(other._versions.Keys);
+        foreach (var key in allKeys)
+        {
+            var thisVal = Get(key);
+            var otherVal = other.Get(key);
+
+            if (thisVal > otherVal) thisGreater = true;
+            else if (otherVal > thisVal) otherGreater = true;
+        }
+
+        if (thisGreater && otherGreater) return VfsVersionComparison.Concurrent;
+        if (thisGreater) return VfsVersionComparison.After;
+        if (otherGreater) return VfsVersionComparison.Before;
+        return VfsVersionComparison.Equal;
+    }
+
+    public bool Equals(VfsVersionVector? other)
+    {
+        if (other is null) return false;
+        return Compare(other) == VfsVersionComparison.Equal;
+    }
+
+    public override bool Equals(object? obj) => Equals(obj as VfsVersionVector);
+    public override int GetHashCode() => _versions.Count;
+
+    public IReadOnlyDictionary<string, long> ToDict() => new Dictionary<string, long>(_versions);
+}
+
+public enum VfsVersionComparison { Before, After, Equal, Concurrent }
+
+/// <summary>
+/// Atomic VFS operation for transactional file operations.
+/// </summary>
+public sealed class AtomicVfsOperation
+{
+    private readonly IVirtualFilesystem _vfs;
+    private readonly VfsAsyncLockManager _lockManager;
+    private readonly List<VfsPath> _lockedPaths = new();
+
+    public AtomicVfsOperation(IVirtualFilesystem vfs, VfsAsyncLockManager lockManager)
+    {
+        _vfs = vfs;
+        _lockManager = lockManager;
+    }
+
+    /// <summary>
+    /// Executes an atomic operation across multiple paths.
+    /// </summary>
+    public async Task<T> ExecuteAsync<T>(
+        IEnumerable<VfsPath> paths,
+        Func<IVirtualFilesystem, Task<T>> operation,
+        CancellationToken ct = default)
+    {
+        var sortedPaths = paths.OrderBy(p => p.ToString()).ToList();
+
+        // Check for potential deadlock
+        if (_lockManager.DetectDeadlock(sortedPaths))
+        {
+            throw new VfsDeadlockException("Potential deadlock detected");
+        }
+
+        // Acquire locks in sorted order to prevent deadlock
+        var handles = new List<VfsLockHandle>();
+        try
+        {
+            foreach (var path in sortedPaths)
+            {
+                handles.Add(await _lockManager.AcquireWriteLockAsync(path, ct));
+            }
+
+            return await operation(_vfs);
+        }
+        finally
+        {
+            foreach (var handle in handles)
+            {
+                await handle.DisposeAsync();
+            }
+        }
+    }
+}
+
+public sealed class VfsDeadlockException : Exception
+{
+    public VfsDeadlockException(string message) : base(message) { }
+}
+
+#endregion

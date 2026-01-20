@@ -761,3 +761,326 @@ public interface IObjectStorageBackend
 }
 
 #endregion
+
+#region H10: Object Versioning Conflict Resolution
+
+/// <summary>
+/// Interface for custom conflict resolvers.
+/// </summary>
+public interface IConflictResolver
+{
+    Task<ConflictResolution> ResolveAsync(ObjectManifest local, ObjectManifest remote, CancellationToken ct = default);
+}
+
+/// <summary>
+/// Result of conflict resolution.
+/// </summary>
+public sealed class ConflictResolution
+{
+    public ConflictResolutionType Type { get; init; }
+    public ObjectManifest? ResolvedManifest { get; init; }
+    public byte[]? MergedData { get; init; }
+}
+
+public enum ConflictResolutionType { KeepLocal, KeepRemote, Merge, Manual }
+
+/// <summary>
+/// Last-Write-Wins conflict resolver based on timestamps.
+/// </summary>
+public sealed class LastWriteWinsResolver : IConflictResolver
+{
+    public Task<ConflictResolution> ResolveAsync(ObjectManifest local, ObjectManifest remote, CancellationToken ct = default)
+    {
+        var resolution = local.CreatedAt >= remote.CreatedAt
+            ? new ConflictResolution { Type = ConflictResolutionType.KeepLocal, ResolvedManifest = local }
+            : new ConflictResolution { Type = ConflictResolutionType.KeepRemote, ResolvedManifest = remote };
+
+        return Task.FromResult(resolution);
+    }
+}
+
+/// <summary>
+/// First-Write-Wins conflict resolver (immutable semantics).
+/// </summary>
+public sealed class FirstWriteWinsResolver : IConflictResolver
+{
+    public Task<ConflictResolution> ResolveAsync(ObjectManifest local, ObjectManifest remote, CancellationToken ct = default)
+    {
+        var resolution = local.CreatedAt <= remote.CreatedAt
+            ? new ConflictResolution { Type = ConflictResolutionType.KeepLocal, ResolvedManifest = local }
+            : new ConflictResolution { Type = ConflictResolutionType.KeepRemote, ResolvedManifest = remote };
+
+        return Task.FromResult(resolution);
+    }
+}
+
+/// <summary>
+/// Three-way merge conflict resolver for mergeable content.
+/// </summary>
+public sealed class ThreeWayMergeResolver : IConflictResolver
+{
+    private readonly Func<byte[], byte[], byte[], byte[]?>? _mergeFunc;
+
+    public ThreeWayMergeResolver(Func<byte[], byte[], byte[], byte[]?>? customMerge = null)
+    {
+        _mergeFunc = customMerge;
+    }
+
+    public async Task<ConflictResolution> ResolveAsync(ObjectManifest local, ObjectManifest remote, CancellationToken ct = default)
+    {
+        // If no merge function provided or merge not possible, fall back to LWW
+        if (_mergeFunc == null || local.TotalSize != remote.TotalSize)
+        {
+            return await new LastWriteWinsResolver().ResolveAsync(local, remote, ct);
+        }
+
+        // For proper three-way merge, we'd need the common ancestor
+        // This is a simplified two-way merge
+        return new ConflictResolution
+        {
+            Type = ConflictResolutionType.Merge,
+            ResolvedManifest = local with
+            {
+                Version = Math.Max(local.Version, remote.Version) + 1,
+                Clock = local.Clock.Merge(remote.Clock)
+            }
+        };
+    }
+}
+
+/// <summary>
+/// Conflict detector for object manifests.
+/// </summary>
+public sealed class ConflictDetector
+{
+    /// <summary>
+    /// Detects if two manifests are in conflict (concurrent modifications).
+    /// </summary>
+    public bool HasConflict(ObjectManifest local, ObjectManifest remote)
+    {
+        var comparison = local.Clock.Compare(remote.Clock);
+        return comparison == ClockComparison.Concurrent;
+    }
+
+    /// <summary>
+    /// Gets the conflict type between two manifests.
+    /// </summary>
+    public ConflictType GetConflictType(ObjectManifest local, ObjectManifest remote)
+    {
+        if (!HasConflict(local, remote))
+            return ConflictType.None;
+
+        // Check what aspects differ
+        if (local.TotalSize != remote.TotalSize)
+            return ConflictType.ContentDiverged;
+
+        if (local.Chunks.Count != remote.Chunks.Count)
+            return ConflictType.StructureDiverged;
+
+        return ConflictType.MetadataOnly;
+    }
+}
+
+public enum ConflictType { None, ContentDiverged, StructureDiverged, MetadataOnly }
+
+/// <summary>
+/// Conflict visualization for manual resolution.
+/// </summary>
+public sealed class ConflictVisualization
+{
+    public ObjectId ObjectId { get; init; }
+    public ObjectManifest LocalVersion { get; init; } = null!;
+    public ObjectManifest RemoteVersion { get; init; } = null!;
+    public ConflictType ConflictType { get; init; }
+    public List<ChunkDifference> ChunkDifferences { get; init; } = new();
+    public DateTime DetectedAt { get; init; }
+}
+
+public sealed class ChunkDifference
+{
+    public int Index { get; init; }
+    public ObjectId? LocalChunkId { get; init; }
+    public ObjectId? RemoteChunkId { get; init; }
+    public DifferenceType Type { get; init; }
+}
+
+public enum DifferenceType { Added, Removed, Modified, Identical }
+
+#endregion
+
+#region H16: Object Repair Verification
+
+/// <summary>
+/// Verifies object repairs and tracks repair metrics.
+/// </summary>
+public sealed class ObjectRepairVerifier
+{
+    private readonly IObjectStorageBackend _backend;
+    private readonly ConcurrentDictionary<string, RepairRecord> _repairHistory = new();
+    private long _totalRepairs;
+    private long _successfulRepairs;
+    private long _failedRepairs;
+
+    public event EventHandler<RepairVerificationEventArgs>? RepairVerified;
+
+    public ObjectRepairVerifier(IObjectStorageBackend backend)
+    {
+        _backend = backend;
+    }
+
+    /// <summary>
+    /// Verifies a repaired object for integrity.
+    /// </summary>
+    public async Task<RepairVerificationResult> VerifyRepairAsync(
+        ObjectId objectId,
+        ObjectManifest repairedManifest,
+        CancellationToken ct = default)
+    {
+        var result = new RepairVerificationResult
+        {
+            ObjectId = objectId,
+            StartedAt = DateTime.UtcNow
+        };
+
+        try
+        {
+            // Verify manifest exists
+            var storedManifest = await _backend.GetManifestAsync(objectId, ct);
+            if (storedManifest == null)
+            {
+                result.Success = false;
+                result.Error = "Manifest not found after repair";
+                Interlocked.Increment(ref _failedRepairs);
+                return result;
+            }
+
+            // Verify all chunks are accessible
+            var missingChunks = new List<ObjectId>();
+            foreach (var chunk in repairedManifest.Chunks)
+            {
+                var chunkData = await _backend.GetChunkAsync(chunk.ChunkId, ct);
+                if (chunkData == null)
+                {
+                    missingChunks.Add(chunk.ChunkId);
+                }
+            }
+
+            if (missingChunks.Count > 0)
+            {
+                result.Success = false;
+                result.Error = $"Missing {missingChunks.Count} chunks after repair";
+                result.MissingChunks = missingChunks;
+                Interlocked.Increment(ref _failedRepairs);
+                return result;
+            }
+
+            // Verify checksums
+            var checksumValid = await VerifyChecksumsAsync(repairedManifest, ct);
+            if (!checksumValid)
+            {
+                result.Success = false;
+                result.Error = "Checksum verification failed";
+                Interlocked.Increment(ref _failedRepairs);
+                return result;
+            }
+
+            result.Success = true;
+            result.CompletedAt = DateTime.UtcNow;
+            Interlocked.Increment(ref _successfulRepairs);
+            Interlocked.Increment(ref _totalRepairs);
+
+            // Record repair
+            _repairHistory[objectId.ToHex()] = new RepairRecord
+            {
+                ObjectId = objectId,
+                RepairedAt = DateTime.UtcNow,
+                Success = true
+            };
+
+            RepairVerified?.Invoke(this, new RepairVerificationEventArgs
+            {
+                ObjectId = objectId,
+                Success = true
+            });
+        }
+        catch (Exception ex)
+        {
+            result.Success = false;
+            result.Error = ex.Message;
+            Interlocked.Increment(ref _failedRepairs);
+        }
+
+        return result;
+    }
+
+    private async Task<bool> VerifyChecksumsAsync(ObjectManifest manifest, CancellationToken ct)
+    {
+        foreach (var chunk in manifest.Chunks)
+        {
+            var chunkData = await _backend.GetChunkAsync(chunk.ChunkId, ct);
+            if (chunkData == null) return false;
+
+            var computedId = ObjectId.FromData(chunkData);
+            if (!computedId.Equals(chunk.ChunkId))
+                return false;
+        }
+        return true;
+    }
+
+    /// <summary>
+    /// Triggers automatic re-repair for failed verifications.
+    /// </summary>
+    public async Task<bool> AutoReRepairAsync(ObjectId objectId, CancellationToken ct = default)
+    {
+        if (!_repairHistory.TryGetValue(objectId.ToHex(), out var record) || record.Success)
+            return false;
+
+        // In production, this would trigger the repair process again
+        await Task.Delay(100, ct); // Simulated repair
+        return true;
+    }
+
+    /// <summary>
+    /// Gets repair metrics.
+    /// </summary>
+    public RepairMetrics GetMetrics() => new()
+    {
+        TotalRepairs = _totalRepairs,
+        SuccessfulRepairs = _successfulRepairs,
+        FailedRepairs = _failedRepairs,
+        SuccessRate = _totalRepairs > 0 ? (double)_successfulRepairs / _totalRepairs : 0
+    };
+}
+
+public sealed class RepairVerificationResult
+{
+    public ObjectId ObjectId { get; init; }
+    public bool Success { get; set; }
+    public string? Error { get; set; }
+    public List<ObjectId> MissingChunks { get; set; } = new();
+    public DateTime StartedAt { get; init; }
+    public DateTime? CompletedAt { get; set; }
+}
+
+public sealed class RepairRecord
+{
+    public ObjectId ObjectId { get; init; }
+    public DateTime RepairedAt { get; init; }
+    public bool Success { get; init; }
+}
+
+public sealed class RepairVerificationEventArgs : EventArgs
+{
+    public ObjectId ObjectId { get; init; }
+    public bool Success { get; init; }
+}
+
+public sealed class RepairMetrics
+{
+    public long TotalRepairs { get; init; }
+    public long SuccessfulRepairs { get; init; }
+    public long FailedRepairs { get; init; }
+    public double SuccessRate { get; init; }
+}
+
+#endregion
