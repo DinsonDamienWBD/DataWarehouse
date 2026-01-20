@@ -1247,5 +1247,208 @@ Standalone executable for production deployments:
 
 ---
 
-*Last Updated: 2026-01-19*
+## FEDERATION IMPLEMENTATION: True Distributed Object Store
+
+### Vision
+Transform DataWarehouse from a single-instance storage engine to a **Federated Distributed Object Store** where:
+- Every DW instance is a **Node** (laptop, server, USB, cloud - all equal peers)
+- Objects are **Content-Addressed** (GUID/hash, not file paths)
+- **Split Metadata** separates "The Map" (what exists) from "The Territory" (where bytes live)
+- **VFS Layer** provides unified namespace across all nodes
+- **Capability-based Security** with cryptographic proof of access
+
+### Reusable Components Inventory
+
+| Component | Existing Class | Location | Reuse Level |
+|-----------|---------------|----------|-------------|
+| Content Hashing | `Manifest.Checksum` | SDK/Primitives/Manifest.cs | Extend |
+| Erasure Coding | `RaidEngine` | Kernel/Storage/RaidEngine.cs | Reuse |
+| Consistent Hashing | `ConsistentHashRing` | Plugins/Sharding | Extend |
+| Distributed Consensus | `RaftConsensusPlugin` | Plugins/Raft | Reuse |
+| Tiered Storage | `TieringPlugin` | Plugins/Tiering | Reuse |
+| Message Bus | `IMessageBus` | Kernel/Messaging | Extend |
+| Federation Node | `IFederationNode` | SDK/Contracts | Extend |
+| Access Control | `AdvancedAclPlugin` | Plugins/AccessControl | Extend |
+| Metadata Index | `IMetadataIndex` | SDK/Contracts | Extend |
+| Node/Peer Model | `ShardNode`, `RaftPeer` | Plugins | Extend |
+
+---
+
+### Phase 1: Core Primitives
+
+**Status:** 🔄 PENDING
+
+#### 1.1 Content-Addressable Object Store
+| # | Task | File | Status |
+|---|------|------|--------|
+| 1.1.1 | Create `IContentAddressableObject` interface | SDK/Federation/ObjectStore.cs | 🔄 |
+| 1.1.2 | Create `ObjectId` value type (SHA256 content hash) | SDK/Federation/ObjectStore.cs | 🔄 |
+| 1.1.3 | Create `ObjectChunk` for large object chunking | SDK/Federation/ObjectStore.cs | 🔄 |
+| 1.1.4 | Create `ObjectManifest` (extends Manifest with federation) | SDK/Federation/ObjectStore.cs | 🔄 |
+| 1.1.5 | Implement `ContentAddressableObjectStore` | SDK/Federation/ObjectStore.cs | 🔄 |
+
+#### 1.2 Node Identity System
+| # | Task | File | Status |
+|---|------|------|--------|
+| 1.2.1 | Create `NodeIdentity` (NodeId, KeyPair, Capabilities) | SDK/Federation/NodeIdentity.cs | 🔄 |
+| 1.2.2 | Create `NodeEndpoint` (Protocol, Address, Port) | SDK/Federation/NodeIdentity.cs | 🔄 |
+| 1.2.3 | Create `NodeState` enum (Active, Dormant, Offline) | SDK/Federation/NodeIdentity.cs | 🔄 |
+| 1.2.4 | Create `NodeCapabilities` flags (Storage, Compute, Gateway) | SDK/Federation/NodeIdentity.cs | 🔄 |
+| 1.2.5 | Implement `NodeIdentityManager` with key generation | SDK/Federation/NodeIdentity.cs | 🔄 |
+
+#### 1.3 Capability Token System
+| # | Task | File | Status |
+|---|------|------|--------|
+| 1.3.1 | Create `CapabilityToken` (OID, Permissions, Holder, Signature) | SDK/Federation/Capabilities.cs | 🔄 |
+| 1.3.2 | Create `CapabilityPermissions` flags | SDK/Federation/Capabilities.cs | 🔄 |
+| 1.3.3 | Create `CapabilityConstraints` (geo, time, device) | SDK/Federation/Capabilities.cs | 🔄 |
+| 1.3.4 | Implement `CapabilityIssuer` (create/sign tokens) | SDK/Federation/Capabilities.cs | 🔄 |
+| 1.3.5 | Implement `CapabilityVerifier` (verify signature chain) | SDK/Federation/Capabilities.cs | 🔄 |
+
+---
+
+### Phase 2: Translation Layer
+
+**Status:** 🔄 PENDING
+
+#### 2.1 Virtual Filesystem (VFS)
+| # | Task | File | Status |
+|---|------|------|--------|
+| 2.1.1 | Create `IVirtualFilesystem` interface | SDK/Federation/VFS.cs | 🔄 |
+| 2.1.2 | Create `VfsNode` (directory/file abstraction) | SDK/Federation/VFS.cs | 🔄 |
+| 2.1.3 | Create `VfsPath` (virtual path parsing) | SDK/Federation/VFS.cs | 🔄 |
+| 2.1.4 | Create `VfsNamespace` (virtual folder tree) | SDK/Federation/VFS.cs | 🔄 |
+| 2.1.5 | Implement `VirtualFilesystem` with namespace management | SDK/Federation/VFS.cs | 🔄 |
+
+#### 2.2 Object Resolution Service
+| # | Task | File | Status |
+|---|------|------|--------|
+| 2.2.1 | Create `IObjectResolver` interface | SDK/Federation/Resolution.cs | 🔄 |
+| 2.2.2 | Create `ObjectLocation` (NodeId, ObjectId, Confidence) | SDK/Federation/Resolution.cs | 🔄 |
+| 2.2.3 | Create `IResolutionProvider` for pluggable resolvers | SDK/Federation/Resolution.cs | 🔄 |
+| 2.2.4 | Implement `LocalResolutionProvider` (local cache) | SDK/Federation/Resolution.cs | 🔄 |
+| 2.2.5 | Implement `ObjectResolver` with provider chain | SDK/Federation/Resolution.cs | 🔄 |
+
+#### 2.3 Transport Bus
+| # | Task | File | Status |
+|---|------|------|--------|
+| 2.3.1 | Create `ITransportBus` interface | SDK/Federation/Transport.cs | 🔄 |
+| 2.3.2 | Create `ITransportDriver` interface (file, tcp, http) | SDK/Federation/Transport.cs | 🔄 |
+| 2.3.3 | Create `NodeConnection` abstraction | SDK/Federation/Transport.cs | 🔄 |
+| 2.3.4 | Implement `FileTransportDriver` (local/USB) | SDK/Federation/Transport.cs | 🔄 |
+| 2.3.5 | Implement `TcpTransportDriver` (LAN/P2P) | SDK/Federation/Transport.cs | 🔄 |
+| 2.3.6 | Implement `HttpTransportDriver` (WAN/Cloud) | SDK/Federation/Transport.cs | 🔄 |
+| 2.3.7 | Implement `TransportBus` with driver registry | SDK/Federation/Transport.cs | 🔄 |
+
+#### 2.4 Routing Layer
+| # | Task | File | Status |
+|---|------|------|--------|
+| 2.4.1 | Create `IRoutingTable` interface | SDK/Federation/Routing.cs | 🔄 |
+| 2.4.2 | Create `RouteEntry` (ObjectId → NodeId[]) | SDK/Federation/Routing.cs | 🔄 |
+| 2.4.3 | Create `RoutingMetrics` (latency, bandwidth, cost) | SDK/Federation/Routing.cs | 🔄 |
+| 2.4.4 | Implement `RoutingTable` with best-path selection | SDK/Federation/Routing.cs | 🔄 |
+| 2.4.5 | Integrate ConsistentHashRing for object placement | SDK/Federation/Routing.cs | 🔄 |
+
+---
+
+### Phase 3: Federation Protocol
+
+**Status:** 🔄 PENDING
+
+#### 3.1 Node Discovery
+| # | Task | File | Status |
+|---|------|------|--------|
+| 3.1.1 | Create `INodeDiscovery` interface | SDK/Federation/Discovery.cs | 🔄 |
+| 3.1.2 | Implement `MdnsDiscovery` (LAN discovery) | SDK/Federation/Discovery.cs | 🔄 |
+| 3.1.3 | Implement `ManualDiscovery` (config-based) | SDK/Federation/Discovery.cs | 🔄 |
+| 3.1.4 | Implement `DhtDiscovery` (Kademlia-style) | SDK/Federation/Discovery.cs | 🔄 |
+| 3.1.5 | Create `NodeRegistry` (known nodes cache) | SDK/Federation/Discovery.cs | 🔄 |
+
+#### 3.2 Metadata Synchronization
+| # | Task | File | Status |
+|---|------|------|--------|
+| 3.2.1 | Create `IMetadataStore` interface (The Map) | SDK/Federation/Metadata.cs | 🔄 |
+| 3.2.2 | Create `ObjectMetadata` (name, owner, ACL, replicas) | SDK/Federation/Metadata.cs | 🔄 |
+| 3.2.3 | Implement `VectorClock` for causality (reuse existing) | SDK/Federation/Metadata.cs | 🔄 |
+| 3.2.4 | Implement `CrdtMetadataStore` (conflict-free sync) | SDK/Federation/Metadata.cs | 🔄 |
+| 3.2.5 | Implement `MetadataSyncProtocol` (gossip-based) | SDK/Federation/Metadata.cs | 🔄 |
+
+#### 3.3 Object Replication
+| # | Task | File | Status |
+|---|------|------|--------|
+| 3.3.1 | Create `IReplicationPolicy` interface | SDK/Federation/Replication.cs | 🔄 |
+| 3.3.2 | Create `ReplicationFactor` config (N copies, zones) | SDK/Federation/Replication.cs | 🔄 |
+| 3.3.3 | Implement `QuorumPolicy` (W+R > N) | SDK/Federation/Replication.cs | 🔄 |
+| 3.3.4 | Implement `ReplicationManager` | SDK/Federation/Replication.cs | 🔄 |
+| 3.3.5 | Integrate with RaidEngine for erasure coding | SDK/Federation/Replication.cs | 🔄 |
+
+#### 3.4 Cluster Coordination
+| # | Task | File | Status |
+|---|------|------|--------|
+| 3.4.1 | Create `IFederationCoordinator` interface | SDK/Federation/Coordinator.cs | 🔄 |
+| 3.4.2 | Integrate RaftConsensusPlugin for leader election | SDK/Federation/Coordinator.cs | 🔄 |
+| 3.4.3 | Implement `ClusterMembership` (join/leave) | SDK/Federation/Coordinator.cs | 🔄 |
+| 3.4.4 | Implement `FederationCoordinator` | SDK/Federation/Coordinator.cs | 🔄 |
+
+---
+
+### Phase 4: Integration
+
+**Status:** 🔄 PENDING
+
+#### 4.1 Federation Hub (Kernel Extension)
+| # | Task | File | Status |
+|---|------|------|--------|
+| 4.1.1 | Create `IFederationHub` interface | Kernel/Federation/FederationHub.cs | 🔄 |
+| 4.1.2 | Implement `FederationHub` (orchestrates all components) | Kernel/Federation/FederationHub.cs | 🔄 |
+| 4.1.3 | Add `FederationHub` to KernelBuilder | Kernel/KernelBuilder.cs | 🔄 |
+| 4.1.4 | Create federation message handlers | Kernel/Federation/FederationHub.cs | 🔄 |
+
+#### 4.2 Storage Provider Adapter
+| # | Task | File | Status |
+|---|------|------|--------|
+| 4.2.1 | Create `FederatedStorageProvider` adapter | Kernel/Federation/FederatedStorage.cs | 🔄 |
+| 4.2.2 | Bridge existing IStorageProvider to federation | Kernel/Federation/FederatedStorage.cs | 🔄 |
+| 4.2.3 | Implement transparent object routing | Kernel/Federation/FederatedStorage.cs | 🔄 |
+
+#### 4.3 Plugin Updates
+| # | Task | File | Status |
+|---|------|------|--------|
+| 4.3.1 | Update LocalStorage plugin with federation support | Plugins/LocalStorage | 🔄 |
+| 4.3.2 | Update S3Storage plugin with federation support | Plugins/S3Storage | 🔄 |
+| 4.3.3 | Update NetworkStorage plugin with P2P federation | Plugins/NetworkStorage | 🔄 |
+| 4.3.4 | Create new FederationPlugin (hub plugin) | Plugins/Federation | 🔄 |
+
+#### 4.4 Backward Compatibility
+| # | Task | File | Status |
+|---|------|------|--------|
+| 4.4.1 | Create path-to-ObjectId migration utility | SDK/Federation/Migration.cs | 🔄 |
+| 4.4.2 | Implement legacy path resolution layer | SDK/Federation/Migration.cs | 🔄 |
+| 4.4.3 | Create data migration tools | SDK/Federation/Migration.cs | 🔄 |
+
+---
+
+### Implementation Order
+
+**Commit Strategy:** Each numbered task (e.g., 1.1.1) should be a single commit.
+
+1. **Phase 1.1** → Content-Addressable Object Store (foundation)
+2. **Phase 1.2** → Node Identity (required for 1.3)
+3. **Phase 1.3** → Capability Tokens (security foundation)
+4. **Phase 2.1** → VFS (user-facing abstraction)
+5. **Phase 2.2** → Object Resolution (connects VFS to objects)
+6. **Phase 2.3** → Transport Bus (network abstraction)
+7. **Phase 2.4** → Routing (connects resolution to transport)
+8. **Phase 3.1** → Node Discovery (find peers)
+9. **Phase 3.2** → Metadata Sync (distribute The Map)
+10. **Phase 3.3** → Object Replication (distribute The Territory)
+11. **Phase 3.4** → Cluster Coordination (orchestrate federation)
+12. **Phase 4.1** → Federation Hub (kernel integration)
+13. **Phase 4.2** → Storage Adapter (bridge old to new)
+14. **Phase 4.3** → Plugin Updates (enable existing plugins)
+15. **Phase 4.4** → Backward Compatibility (migration support)
+
+---
+
+*Last Updated: 2026-01-20*
 *This document should be updated as issues are resolved and new requirements are identified.*
