@@ -347,30 +347,34 @@
 
 ### Scenario 2: Sneakernet (U1 → USB → U2)
 **File:** `DataWarehouse.SDK/Federation/DormantNode.cs` (Enhance)
-**Status:** ⬜ TODO
-**Extends:** `DormantNodeManager`, `FileTransportDriver`
-- [ ] Add encrypted manifest export with password
-- [ ] Add incremental sync for partial transfers
-- [ ] Add conflict queue for offline changes
-- [ ] Add auto-resync trigger on USB mount detection
+**Status:** 🔄 IN PROGRESS
+**Extends:** `NodeDehydrator`, `NodeHydrator`, `DormantNodeWatcher`
+**Reuse:** Existing encryption support (AES-256-GCM), DormantNodeManifest
+- [ ] Add `IncrementalSyncManager` for partial transfers (delta sync using checksums)
+- [ ] Add `SneakernetConflictQueue` for offline changes with three-way merge
+- [ ] Add `AutoResyncTrigger` integration with DormantNodeWatcher
+- [ ] Add `OfflineChangeTracker` for tracking modifications during disconnect
 
 ### Scenario 3: Unified Pool (DWH + DW1)
 **File:** `DataWarehouse.SDK/Federation/StoragePool.cs` (Enhance)
-**Status:** ⬜ TODO
-**Extends:** `StoragePool`, `UnionPool`, `PoolPlacementPolicy`
-- [ ] Add pool discovery and auto-join protocol
-- [ ] Add transparent `FederationRouter` integration
-- [ ] Add pool-wide `ContentAddressableDeduplication`
-- [ ] Add pool capacity aggregation and alerts
+**Status:** 🔄 IN PROGRESS
+**Extends:** `StoragePool`, `UnionPool`, `PoolPlacementPolicy`, `StoragePoolRegistry`
+**Reuse:** Existing pool member management, consistent hashing, role-based selection
+- [ ] Add `PoolDiscoveryProtocol` with mDNS and gossip-based discovery
+- [ ] Add `PoolAutoJoinManager` for seamless node integration
+- [ ] Add `FederatedPoolRouter` for transparent object routing
+- [ ] Add `PoolDeduplicationService` with cross-pool content hashing
+- [ ] Add `PoolCapacityMonitor` for aggregated stats and alerts
 
 ### Scenario 4: P2P Direct Link
 **File:** `DataWarehouse.SDK/Federation/NatTraversal.cs` (Enhance)
-**Status:** ⬜ TODO
-**Extends:** `StunClient`, `HolePunchingDriver`, `RelayGateway`
-- [ ] Add ICE-lite candidate gathering
-- [ ] Add connectivity check with priority ordering
-- [ ] Add relay fallback chain with latency preference
-- [ ] Add link quality metrics (jitter, packet loss, RTT)
+**Status:** 🔄 IN PROGRESS
+**Extends:** `StunClient`, `HolePunchingDriver`, `RelayGateway`, `NatTraversalService`, `P2PConnectionManager`
+**Reuse:** Existing STUN/TURN, UDP hole punching, relay gateway infrastructure
+- [ ] Add `IceLiteCandidateGatherer` for RFC 8445 candidate collection
+- [ ] Add `ConnectivityChecker` with priority-ordered candidate pairs
+- [ ] Add `RelayFallbackChain` with latency-based selection
+- [ ] Add `LinkQualityMonitor` tracking jitter, packet loss, RTT, bandwidth
 
 ### Scenario 5: Multi-Region Federation
 **File:** `DataWarehouse.SDK/Federation/MultiRegion.cs` (NEW)
@@ -405,12 +409,14 @@
 
 ### E3. Full Encryption at Rest
 **File:** `DataWarehouse.SDK/Infrastructure/EncryptionAtRest.cs` (Enhance)
-**Status:** ⬜ TODO
-**Extends:** Uses `FipsCompliantCryptoModule`, `IKeyStore`
-- [ ] Add `FullDiskEncryptionProvider` abstraction
-- [ ] Add `PerFileEncryptionMode` with per-file keys
-- [ ] Add `KeyHierarchy` (master → tenant → data keys)
-- [ ] Add `SecureKeyStorage` with multiple backends
+**Status:** 🔄 IN PROGRESS
+**Extends:** `IKeyEncryptionProvider`, `EncryptionAtRestManager`, `DpapiKeyEncryptionProvider`, `KeyVaultEncryptionProvider`
+**Reuse:** Existing DPAPI, KeyVault, Local providers, envelope encryption
+- [ ] Add `FullDiskEncryptionProvider` abstraction for whole-volume encryption
+- [ ] Add `PerFileEncryptionMode` with automatic per-file key generation
+- [ ] Add `KeyHierarchy` implementing master → tenant → data key structure
+- [ ] Add `SecureKeyStorage` with hardware (TPM), file, and cloud backends
+- [ ] Add `KeyRotationScheduler` for automated key rotation
 
 ### E4. Distributed Services Tier 2
 **File:** `DataWarehouse.SDK/Infrastructure/DistributedServicesPhase5.cs` (NEW)
@@ -427,30 +433,36 @@
 
 ### SB1. Full MinIO Support
 **File:** `Plugins/DataWarehouse.Plugins.S3Storage/MinioSupport.cs` (NEW)
-**Status:** ⬜ TODO
-**Extends:** `S3StoragePlugin`
-- [ ] Add `MinioAdminClient` for cluster management
-- [ ] Add `BucketNotificationManager` for event triggers
-- [ ] Add `IlmPolicyManager` for lifecycle rules
-- [ ] Add `MinioIdentityProvider` for IAM integration
+**Status:** 🔄 IN PROGRESS
+**Extends:** `S3StoragePlugin`, `HybridStoragePluginBase<S3Config>`
+**Reuse:** Existing S3 API implementation, multi-part uploads, SSE support
+- [ ] Add `MinioAdminClient` for cluster management (info, heal, metrics)
+- [ ] Add `BucketNotificationManager` for S3-compatible event triggers
+- [ ] Add `IlmPolicyManager` for object lifecycle management
+- [ ] Add `MinioIdentityProvider` for LDAP/OIDC/service accounts
+- [ ] Add `MinioClusterHealthMonitor` for multi-node status
 
 ### SB2. Full Ceph Support
 **File:** `Plugins/DataWarehouse.Plugins.CephStorage/CephStoragePlugin.cs` (NEW)
-**Status:** ⬜ TODO
-**Extends:** `StorageProviderPluginBase`
-- [ ] Add `RadosGatewayClient` for object storage
-- [ ] Add `RbdBlockStorage` for block devices
-- [ ] Add `CephFsMount` for filesystem access
-- [ ] Add `CrushMapAwareness` for placement optimization
+**Status:** 🔄 IN PROGRESS
+**Extends:** `HybridStoragePluginBase<CephConfig>`
+**Reuse:** S3 API compatibility, storage orchestration patterns
+- [ ] Add `RadosGatewayClient` for S3-compatible object storage
+- [ ] Add `RbdBlockStorageProvider` for block device access
+- [ ] Add `CephFsStorageProvider` for POSIX filesystem access
+- [ ] Add `CrushMapAwarePolicy` for failure-domain-aware placement
+- [ ] Add `CephClusterMonitor` for health and performance metrics
 
 ### SB3. Full TrueNAS Support
 **File:** `Plugins/DataWarehouse.Plugins.TrueNasStorage/TrueNasStoragePlugin.cs` (NEW)
-**Status:** ⬜ TODO
-**Extends:** `StorageProviderPluginBase`
-- [ ] Add `TrueNasApiClient` for REST API
-- [ ] Add `ZfsPoolManager` for pool operations
-- [ ] Add `DatasetManager` for dataset CRUD
-- [ ] Add `SnapshotManager` for point-in-time recovery
+**Status:** 🔄 IN PROGRESS
+**Extends:** `HybridStoragePluginBase<TrueNasConfig>`
+**Reuse:** Storage orchestration patterns, health monitoring
+- [ ] Add `TrueNasApiClient` for REST API v2.0 integration
+- [ ] Add `ZfsPoolManager` for pool operations (create, scrub, status)
+- [ ] Add `DatasetManager` for dataset CRUD operations
+- [ ] Add `ZfsSnapshotManager` for point-in-time recovery
+- [ ] Add `TrueNasHealthMonitor` for SMART, pool, and replication status
 
 ---
 
@@ -517,12 +529,26 @@
 
 ### EM3. Full IAM Integration
 **File:** `DataWarehouse.SDK/Infrastructure/IamIntegration.cs` (NEW)
-**Status:** ⬜ TODO
-**Extends:** Uses `CapabilityIssuer`, `GroupRegistry`
-- [ ] Add `AwsIamProvider` (STS AssumeRole)
-- [ ] Add `AzureAdProvider` (OAuth2/OIDC)
-- [ ] Add `GoogleCloudIamProvider` (service accounts)
-- [ ] Add `OidcSamlBridge` for enterprise SSO
+**Status:** 🔄 IN PROGRESS
+**Extends:** `CapabilityIssuer`, `GroupRegistry`, `AccessControlPluginBase`
+**Reuse:** Existing capability tokens, group membership, ACL infrastructure
+- [ ] Add `IIdentityProvider` interface for pluggable identity backends
+- [ ] Add `AwsIamProvider` (STS AssumeRole, IAM policies)
+- [ ] Add `AzureAdProvider` (OAuth2/OIDC, Graph API integration)
+- [ ] Add `GoogleCloudIamProvider` (service accounts, workload identity)
+- [ ] Add `OidcSamlBridge` for enterprise SSO with claim mapping
+- [ ] Add `IamSessionManager` for session lifecycle and token refresh
+
+### EM4. Storage Type Detection & AI Processing
+**File:** `DataWarehouse.SDK/Infrastructure/StorageIntelligence.cs` (NEW)
+**Status:** 🔄 IN PROGRESS
+**Extends:** `AIProviderRegistry`, `SearchOrchestratorBase`, `Manifest`
+**Reuse:** Existing AI provider infrastructure, metadata indexing
+- [ ] Add `StorageTypeDetector` with magic bytes, MIME type, and content analysis
+- [ ] Add `IntelligentContentClassifier` using AI for semantic classification
+- [ ] Add `AutoTieringRecommender` based on access patterns and content type
+- [ ] Add `ContentExtractionPipeline` for text/metadata extraction
+- [ ] Add `SmartSearchIndexer` for automatic full-text and vector indexing
 
 ---
 
