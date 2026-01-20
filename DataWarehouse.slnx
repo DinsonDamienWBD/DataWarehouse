@@ -2,7 +2,6 @@
   <Folder Name="/Metadata/">
     <File Path="Metadata/CLAUDE.md" />
     <File Path="Metadata/CODE-REVIEW-PRODUCTION-READINESS.md" />
-    <File Path="Metadata/IMPLEMENTATION_SPRINT.md" />
     <File Path="Metadata/README.md" />
     <File Path="Metadata/RULES.md" />
     <File Path="Metadata/TODO.md" />
