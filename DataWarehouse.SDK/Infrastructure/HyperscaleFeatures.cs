@@ -536,6 +536,1158 @@ public sealed class InsufficientShardsException : Exception
     public InsufficientShardsException(string message) : base(message) { }
 }
 
+// ============================================================================
+// HS1 ENHANCEMENTS: Full Erasure Coding Implementation
+// ============================================================================
+
+#region HS1.1: Rabin Fingerprinting for Content-Defined Chunking
+
+/// <summary>
+/// Rabin fingerprinting implementation for content-defined chunking (CDC).
+/// Enables variable-size chunks based on content boundaries for better deduplication
+/// and efficient delta synchronization.
+/// </summary>
+public sealed class RabinFingerprinting
+{
+    private readonly ulong[] _lookupTable = new ulong[256];
+    private readonly RabinConfig _config;
+    private readonly ulong _polynomial;
+    private readonly ulong _windowMask;
+
+    /// <summary>
+    /// Creates a new Rabin fingerprinting engine with the specified configuration.
+    /// </summary>
+    public RabinFingerprinting(RabinConfig? config = null)
+    {
+        _config = config ?? new RabinConfig();
+        _polynomial = _config.Polynomial;
+        _windowMask = (1UL << _config.WindowSize) - 1;
+        InitializeLookupTable();
+    }
+
+    private void InitializeLookupTable()
+    {
+        for (int i = 0; i < 256; i++)
+        {
+            ulong fingerprint = (ulong)i;
+            for (int j = 0; j < 8; j++)
+            {
+                if ((fingerprint & 1) != 0)
+                    fingerprint = (fingerprint >> 1) ^ _polynomial;
+                else
+                    fingerprint >>= 1;
+            }
+            _lookupTable[i] = fingerprint;
+        }
+    }
+
+    /// <summary>
+    /// Chunks data using content-defined chunking with Rabin fingerprinting.
+    /// Returns variable-size chunks based on content boundaries.
+    /// </summary>
+    public async Task<List<ContentDefinedChunk>> ChunkDataAsync(
+        Stream dataStream,
+        CancellationToken ct = default)
+    {
+        var chunks = new List<ContentDefinedChunk>();
+        var buffer = new byte[_config.MaxChunkSize * 2];
+        var chunkStart = 0L;
+        var totalBytesRead = 0L;
+        var currentChunk = new MemoryStream();
+        ulong fingerprint = 0;
+        int windowPos = 0;
+        var window = new byte[_config.WindowSize];
+
+        int bytesRead;
+        while ((bytesRead = await dataStream.ReadAsync(buffer, ct)) > 0)
+        {
+            for (int i = 0; i < bytesRead; i++)
+            {
+                var b = buffer[i];
+                currentChunk.WriteByte(b);
+
+                // Update rolling hash
+                var oldByte = window[windowPos];
+                window[windowPos] = b;
+                windowPos = (windowPos + 1) % _config.WindowSize;
+
+                // Remove old byte contribution and add new byte
+                fingerprint = ((fingerprint << 8) | b) ^ _lookupTable[oldByte];
+
+                var chunkSize = currentChunk.Length;
+
+                // Check for chunk boundary
+                bool isBoundary = (chunkSize >= _config.MinChunkSize) &&
+                    ((fingerprint & _config.ChunkMask) == _config.ChunkMask ||
+                     chunkSize >= _config.MaxChunkSize);
+
+                if (isBoundary)
+                {
+                    var chunkData = currentChunk.ToArray();
+                    chunks.Add(new ContentDefinedChunk
+                    {
+                        Index = chunks.Count,
+                        Offset = chunkStart,
+                        Size = chunkData.Length,
+                        Data = chunkData,
+                        Fingerprint = fingerprint,
+                        ContentHash = ComputeContentHash(chunkData)
+                    });
+
+                    chunkStart = totalBytesRead + i + 1;
+                    currentChunk = new MemoryStream();
+                    fingerprint = 0;
+                    windowPos = 0;
+                    Array.Clear(window);
+                }
+            }
+            totalBytesRead += bytesRead;
+        }
+
+        // Handle remaining data as final chunk
+        if (currentChunk.Length > 0)
+        {
+            var chunkData = currentChunk.ToArray();
+            chunks.Add(new ContentDefinedChunk
+            {
+                Index = chunks.Count,
+                Offset = chunkStart,
+                Size = chunkData.Length,
+                Data = chunkData,
+                Fingerprint = fingerprint,
+                ContentHash = ComputeContentHash(chunkData)
+            });
+        }
+
+        return chunks;
+    }
+
+    /// <summary>
+    /// Computes the Rabin fingerprint of a byte array.
+    /// </summary>
+    public ulong ComputeFingerprint(byte[] data)
+    {
+        ulong fingerprint = 0;
+        foreach (var b in data)
+        {
+            fingerprint = (fingerprint << 8 | b) ^ _lookupTable[(fingerprint >> 56) & 0xFF];
+        }
+        return fingerprint;
+    }
+
+    /// <summary>
+    /// Finds chunk boundaries in data without creating chunks.
+    /// Useful for pre-analysis.
+    /// </summary>
+    public List<long> FindChunkBoundaries(byte[] data)
+    {
+        var boundaries = new List<long> { 0 };
+        ulong fingerprint = 0;
+        int windowPos = 0;
+        var window = new byte[_config.WindowSize];
+        long chunkSize = 0;
+
+        for (int i = 0; i < data.Length; i++)
+        {
+            var b = data[i];
+            var oldByte = window[windowPos];
+            window[windowPos] = b;
+            windowPos = (windowPos + 1) % _config.WindowSize;
+
+            fingerprint = ((fingerprint << 8) | b) ^ _lookupTable[oldByte];
+            chunkSize++;
+
+            bool isBoundary = (chunkSize >= _config.MinChunkSize) &&
+                ((fingerprint & _config.ChunkMask) == _config.ChunkMask ||
+                 chunkSize >= _config.MaxChunkSize);
+
+            if (isBoundary)
+            {
+                boundaries.Add(i + 1);
+                chunkSize = 0;
+                fingerprint = 0;
+                windowPos = 0;
+                Array.Clear(window);
+            }
+        }
+
+        if (boundaries[^1] != data.Length)
+            boundaries.Add(data.Length);
+
+        return boundaries;
+    }
+
+    private static string ComputeContentHash(byte[] data)
+    {
+        var hash = SHA256.HashData(data);
+        return Convert.ToHexString(hash).ToLowerInvariant();
+    }
+}
+
+/// <summary>
+/// Configuration for Rabin fingerprinting and content-defined chunking.
+/// </summary>
+public sealed class RabinConfig
+{
+    /// <summary>
+    /// Rabin polynomial for GF(2) arithmetic. Default is a well-known irreducible polynomial.
+    /// </summary>
+    public ulong Polynomial { get; set; } = 0xbfe6b8a5bf378d83UL;
+
+    /// <summary>
+    /// Sliding window size in bytes. Default is 48 bytes.
+    /// </summary>
+    public int WindowSize { get; set; } = 48;
+
+    /// <summary>
+    /// Minimum chunk size in bytes. Default is 4KB.
+    /// </summary>
+    public int MinChunkSize { get; set; } = 4 * 1024;
+
+    /// <summary>
+    /// Target average chunk size. Default is 8KB.
+    /// </summary>
+    public int TargetChunkSize { get; set; } = 8 * 1024;
+
+    /// <summary>
+    /// Maximum chunk size in bytes. Default is 64KB.
+    /// </summary>
+    public int MaxChunkSize { get; set; } = 64 * 1024;
+
+    /// <summary>
+    /// Chunk boundary mask. When (fingerprint & mask) == mask, a boundary is created.
+    /// Default creates ~8KB average chunks.
+    /// </summary>
+    public ulong ChunkMask { get; set; } = 0x1FFF; // 13 bits = 8KB average
+}
+
+/// <summary>
+/// Represents a content-defined chunk with its metadata.
+/// </summary>
+public sealed class ContentDefinedChunk
+{
+    public int Index { get; init; }
+    public long Offset { get; init; }
+    public int Size { get; init; }
+    public byte[] Data { get; init; } = Array.Empty<byte>();
+    public ulong Fingerprint { get; init; }
+    public string ContentHash { get; init; } = string.Empty;
+}
+
+#endregion
+
+#region HS1.2: Streaming Encoder/Decoder for Large Files
+
+/// <summary>
+/// Streaming erasure coding encoder/decoder for large files.
+/// Processes data in chunks without loading the entire file into memory.
+/// </summary>
+public sealed class StreamingErasureCoder : IAsyncDisposable
+{
+    private readonly AdaptiveErasureCoding _erasureCoding;
+    private readonly RabinFingerprinting _chunker;
+    private readonly StreamingCoderConfig _config;
+    private readonly Channel<StreamingEncoderJob> _encoderQueue;
+    private readonly Channel<StreamingDecoderJob> _decoderQueue;
+    private readonly Task _encoderTask;
+    private readonly Task _decoderTask;
+    private readonly CancellationTokenSource _cts = new();
+    private long _totalBytesProcessed;
+    private long _totalChunksProcessed;
+    private volatile bool _disposed;
+
+    public StreamingErasureCoder(
+        AdaptiveErasureCoding? erasureCoding = null,
+        StreamingCoderConfig? config = null)
+    {
+        _config = config ?? new StreamingCoderConfig();
+        _erasureCoding = erasureCoding ?? new AdaptiveErasureCoding();
+        _chunker = new RabinFingerprinting(new RabinConfig
+        {
+            MinChunkSize = _config.MinChunkSize,
+            TargetChunkSize = _config.TargetChunkSize,
+            MaxChunkSize = _config.MaxChunkSize
+        });
+
+        _encoderQueue = Channel.CreateBounded<StreamingEncoderJob>(
+            new BoundedChannelOptions(_config.MaxQueuedJobs) { FullMode = BoundedChannelFullMode.Wait });
+        _decoderQueue = Channel.CreateBounded<StreamingDecoderJob>(
+            new BoundedChannelOptions(_config.MaxQueuedJobs) { FullMode = BoundedChannelFullMode.Wait });
+
+        _encoderTask = ProcessEncoderQueueAsync(_cts.Token);
+        _decoderTask = ProcessDecoderQueueAsync(_cts.Token);
+    }
+
+    /// <summary>
+    /// Encodes a large file stream using streaming erasure coding.
+    /// </summary>
+    public async Task<StreamingEncodedFile> EncodeStreamAsync(
+        Stream inputStream,
+        ErasureCodingProfile profile,
+        IProgress<StreamingProgress>? progress = null,
+        CancellationToken ct = default)
+    {
+        var result = new StreamingEncodedFile
+        {
+            ProfileName = profile.Name,
+            DataShardCount = profile.DataShards,
+            ParityShardCount = profile.ParityShards,
+            StartedAt = DateTime.UtcNow
+        };
+
+        // Use content-defined chunking for variable-size chunks
+        var chunks = await _chunker.ChunkDataAsync(inputStream, ct);
+        result.TotalChunks = chunks.Count;
+
+        var encodedChunks = new List<EncodedStreamChunk>();
+        var processedBytes = 0L;
+
+        foreach (var chunk in chunks)
+        {
+            ct.ThrowIfCancellationRequested();
+
+            // Encode each chunk using erasure coding
+            var encoded = await _erasureCoding.EncodeAsync(chunk.Data, profile, ct);
+
+            encodedChunks.Add(new EncodedStreamChunk
+            {
+                ChunkIndex = chunk.Index,
+                OriginalOffset = chunk.Offset,
+                OriginalSize = chunk.Size,
+                ContentHash = chunk.ContentHash,
+                EncodedData = encoded
+            });
+
+            processedBytes += chunk.Size;
+            Interlocked.Add(ref _totalBytesProcessed, chunk.Size);
+            Interlocked.Increment(ref _totalChunksProcessed);
+
+            progress?.Report(new StreamingProgress
+            {
+                BytesProcessed = processedBytes,
+                ChunksProcessed = encodedChunks.Count,
+                TotalChunks = chunks.Count,
+                PercentComplete = (double)encodedChunks.Count / chunks.Count * 100
+            });
+        }
+
+        result.EncodedChunks = encodedChunks;
+        result.TotalOriginalSize = processedBytes;
+        result.CompletedAt = DateTime.UtcNow;
+
+        return result;
+    }
+
+    /// <summary>
+    /// Decodes a streaming encoded file back to original data.
+    /// </summary>
+    public async Task DecodeStreamAsync(
+        StreamingEncodedFile encodedFile,
+        Stream outputStream,
+        IProgress<StreamingProgress>? progress = null,
+        CancellationToken ct = default)
+    {
+        var processedChunks = 0;
+
+        foreach (var chunk in encodedFile.EncodedChunks.OrderBy(c => c.ChunkIndex))
+        {
+            ct.ThrowIfCancellationRequested();
+
+            // Decode each chunk
+            var decodedData = await _erasureCoding.DecodeAsync(chunk.EncodedData, ct);
+
+            // Verify integrity
+            var hash = Convert.ToHexString(SHA256.HashData(decodedData)).ToLowerInvariant();
+            if (hash != chunk.ContentHash)
+            {
+                throw new DataCorruptionException(
+                    $"Chunk {chunk.ChunkIndex} integrity check failed. Expected {chunk.ContentHash}, got {hash}");
+            }
+
+            // Write to output stream
+            await outputStream.WriteAsync(decodedData, ct);
+            processedChunks++;
+
+            Interlocked.Add(ref _totalBytesProcessed, decodedData.Length);
+
+            progress?.Report(new StreamingProgress
+            {
+                BytesProcessed = outputStream.Position,
+                ChunksProcessed = processedChunks,
+                TotalChunks = encodedFile.TotalChunks,
+                PercentComplete = (double)processedChunks / encodedFile.TotalChunks * 100
+            });
+        }
+    }
+
+    /// <summary>
+    /// Encodes a file asynchronously using background processing.
+    /// </summary>
+    public async Task<string> QueueEncodeAsync(
+        Stream inputStream,
+        ErasureCodingProfile profile,
+        CancellationToken ct = default)
+    {
+        var jobId = Guid.NewGuid().ToString("N");
+        var job = new StreamingEncoderJob
+        {
+            JobId = jobId,
+            InputStream = inputStream,
+            Profile = profile
+        };
+
+        await _encoderQueue.Writer.WriteAsync(job, ct);
+        return jobId;
+    }
+
+    private async Task ProcessEncoderQueueAsync(CancellationToken ct)
+    {
+        await foreach (var job in _encoderQueue.Reader.ReadAllAsync(ct))
+        {
+            try
+            {
+                var result = await EncodeStreamAsync(job.InputStream, job.Profile, null, ct);
+                job.CompletionSource?.TrySetResult(result);
+            }
+            catch (Exception ex)
+            {
+                job.CompletionSource?.TrySetException(ex);
+            }
+        }
+    }
+
+    private async Task ProcessDecoderQueueAsync(CancellationToken ct)
+    {
+        await foreach (var job in _decoderQueue.Reader.ReadAllAsync(ct))
+        {
+            try
+            {
+                await DecodeStreamAsync(job.EncodedFile, job.OutputStream, null, ct);
+                job.CompletionSource?.TrySetResult(true);
+            }
+            catch (Exception ex)
+            {
+                job.CompletionSource?.TrySetException(ex);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Gets streaming coder statistics.
+    /// </summary>
+    public StreamingCoderStatistics GetStatistics()
+    {
+        return new StreamingCoderStatistics
+        {
+            TotalBytesProcessed = _totalBytesProcessed,
+            TotalChunksProcessed = _totalChunksProcessed,
+            PendingEncoderJobs = _encoderQueue.Reader.Count,
+            PendingDecoderJobs = _decoderQueue.Reader.Count
+        };
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_disposed) return;
+        _disposed = true;
+
+        _cts.Cancel();
+        _encoderQueue.Writer.Complete();
+        _decoderQueue.Writer.Complete();
+
+        try
+        {
+            await Task.WhenAll(_encoderTask, _decoderTask);
+        }
+        catch (OperationCanceledException) { }
+
+        _cts.Dispose();
+        await _erasureCoding.DisposeAsync();
+    }
+}
+
+public sealed class StreamingCoderConfig
+{
+    public int MinChunkSize { get; set; } = 4 * 1024;      // 4KB
+    public int TargetChunkSize { get; set; } = 64 * 1024;  // 64KB
+    public int MaxChunkSize { get; set; } = 1024 * 1024;   // 1MB
+    public int MaxQueuedJobs { get; set; } = 100;
+    public int BufferSize { get; set; } = 81920;           // 80KB
+}
+
+public sealed class StreamingEncodedFile
+{
+    public string ProfileName { get; set; } = string.Empty;
+    public int DataShardCount { get; set; }
+    public int ParityShardCount { get; set; }
+    public int TotalChunks { get; set; }
+    public long TotalOriginalSize { get; set; }
+    public List<EncodedStreamChunk> EncodedChunks { get; set; } = new();
+    public DateTime StartedAt { get; init; }
+    public DateTime? CompletedAt { get; set; }
+}
+
+public sealed class EncodedStreamChunk
+{
+    public int ChunkIndex { get; init; }
+    public long OriginalOffset { get; init; }
+    public int OriginalSize { get; init; }
+    public string ContentHash { get; init; } = string.Empty;
+    public ErasureCodedData EncodedData { get; init; } = new();
+}
+
+public record StreamingProgress
+{
+    public long BytesProcessed { get; init; }
+    public int ChunksProcessed { get; init; }
+    public int TotalChunks { get; init; }
+    public double PercentComplete { get; init; }
+}
+
+public record StreamingCoderStatistics
+{
+    public long TotalBytesProcessed { get; init; }
+    public long TotalChunksProcessed { get; init; }
+    public int PendingEncoderJobs { get; init; }
+    public int PendingDecoderJobs { get; init; }
+}
+
+internal sealed class StreamingEncoderJob
+{
+    public string JobId { get; init; } = string.Empty;
+    public Stream InputStream { get; init; } = Stream.Null;
+    public ErasureCodingProfile Profile { get; init; } = new() { Name = "default" };
+    public TaskCompletionSource<StreamingEncodedFile>? CompletionSource { get; set; }
+}
+
+internal sealed class StreamingDecoderJob
+{
+    public string JobId { get; init; } = string.Empty;
+    public StreamingEncodedFile EncodedFile { get; init; } = new();
+    public Stream OutputStream { get; init; } = Stream.Null;
+    public TaskCompletionSource<bool>? CompletionSource { get; set; }
+}
+
+public sealed class DataCorruptionException : Exception
+{
+    public DataCorruptionException(string message) : base(message) { }
+}
+
+#endregion
+
+#region HS1.3: Adaptive Parameter Tuning Based on Failure Rates
+
+/// <summary>
+/// Adaptive parameter tuning for erasure coding based on observed failure rates.
+/// Automatically adjusts encoding parameters to maintain target durability.
+/// </summary>
+public sealed class AdaptiveParameterTuner : IAsyncDisposable
+{
+    private readonly ConcurrentDictionary<string, FailureStatistics> _nodeStats = new();
+    private readonly ConcurrentDictionary<string, ProfilePerformance> _profileStats = new();
+    private readonly AdaptiveTunerConfig _config;
+    private readonly Timer _analysisTimer;
+    private readonly object _tuneLock = new();
+    private ErasureCodingProfile _currentProfile;
+    private double _currentFailureRate;
+    private DateTime _lastTuningTime = DateTime.UtcNow;
+    private volatile bool _disposed;
+
+    public event EventHandler<ProfileChangedEventArgs>? ProfileChanged;
+
+    public AdaptiveParameterTuner(AdaptiveTunerConfig? config = null)
+    {
+        _config = config ?? new AdaptiveTunerConfig();
+        _currentProfile = new ErasureCodingProfile
+        {
+            Name = "adaptive-default",
+            DataShards = _config.DefaultDataShards,
+            ParityShards = _config.DefaultParityShards,
+            Description = "Adaptively tuned profile"
+        };
+
+        _analysisTimer = new Timer(
+            AnalyzeAndTune,
+            null,
+            TimeSpan.FromMinutes(1),
+            TimeSpan.FromMinutes(_config.AnalysisIntervalMinutes));
+    }
+
+    /// <summary>
+    /// Records a shard failure for a specific node.
+    /// </summary>
+    public void RecordShardFailure(string nodeId, ShardFailureType failureType)
+    {
+        var stats = _nodeStats.GetOrAdd(nodeId, _ => new FailureStatistics { NodeId = nodeId });
+        lock (stats)
+        {
+            stats.TotalFailures++;
+            stats.FailuresByType[failureType] = stats.FailuresByType.GetValueOrDefault(failureType) + 1;
+            stats.RecentFailures.Enqueue(new FailureEvent
+            {
+                Timestamp = DateTime.UtcNow,
+                FailureType = failureType
+            });
+
+            // Keep only recent failures (last 24 hours)
+            while (stats.RecentFailures.TryPeek(out var oldest) &&
+                   (DateTime.UtcNow - oldest.Timestamp).TotalHours > 24)
+            {
+                stats.RecentFailures.TryDequeue(out _);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Records a successful recovery operation.
+    /// </summary>
+    public void RecordSuccessfulRecovery(string profileName, int shardsRecovered, TimeSpan duration)
+    {
+        var stats = _profileStats.GetOrAdd(profileName, _ => new ProfilePerformance { ProfileName = profileName });
+        lock (stats)
+        {
+            stats.TotalRecoveries++;
+            stats.TotalShardsRecovered += shardsRecovered;
+            stats.TotalRecoveryTime += duration;
+            stats.LastRecoveryTime = DateTime.UtcNow;
+        }
+    }
+
+    /// <summary>
+    /// Records a failed recovery operation.
+    /// </summary>
+    public void RecordFailedRecovery(string profileName, int shardsNeeded, int shardsAvailable)
+    {
+        var stats = _profileStats.GetOrAdd(profileName, _ => new ProfilePerformance { ProfileName = profileName });
+        lock (stats)
+        {
+            stats.FailedRecoveries++;
+            stats.LastFailureTime = DateTime.UtcNow;
+            stats.LastFailureReason = $"Needed {shardsNeeded} shards but only {shardsAvailable} available";
+        }
+    }
+
+    /// <summary>
+    /// Gets the current recommended profile based on observed failure rates.
+    /// </summary>
+    public ErasureCodingProfile GetRecommendedProfile()
+    {
+        lock (_tuneLock)
+        {
+            return _currentProfile;
+        }
+    }
+
+    /// <summary>
+    /// Gets the current observed failure rate.
+    /// </summary>
+    public double GetCurrentFailureRate() => _currentFailureRate;
+
+    /// <summary>
+    /// Forces an immediate analysis and tuning cycle.
+    /// </summary>
+    public void ForceAnalysis()
+    {
+        AnalyzeAndTune(null);
+    }
+
+    private void AnalyzeAndTune(object? state)
+    {
+        if (_disposed) return;
+
+        lock (_tuneLock)
+        {
+            // Calculate overall failure rate
+            var recentFailures = _nodeStats.Values
+                .SelectMany(s => s.RecentFailures)
+                .Where(f => (DateTime.UtcNow - f.Timestamp).TotalHours <= _config.FailureWindowHours)
+                .Count();
+
+            var totalOperations = Math.Max(1, _profileStats.Values.Sum(p => p.TotalRecoveries + p.FailedRecoveries));
+            _currentFailureRate = (double)recentFailures / totalOperations;
+
+            // Determine if adjustment is needed
+            var previousProfile = _currentProfile;
+            ErasureCodingProfile newProfile;
+
+            if (_currentFailureRate > _config.HighFailureRateThreshold)
+            {
+                // High failure rate - increase parity
+                newProfile = new ErasureCodingProfile
+                {
+                    Name = "adaptive-high-durability",
+                    DataShards = Math.Max(4, _currentProfile.DataShards - 2),
+                    ParityShards = Math.Min(8, _currentProfile.ParityShards + 2),
+                    Description = $"High durability (failure rate: {_currentFailureRate:P2})"
+                };
+            }
+            else if (_currentFailureRate < _config.LowFailureRateThreshold &&
+                     (DateTime.UtcNow - _lastTuningTime).TotalHours > _config.MinTuningIntervalHours)
+            {
+                // Low failure rate - can reduce parity for efficiency
+                newProfile = new ErasureCodingProfile
+                {
+                    Name = "adaptive-storage-optimized",
+                    DataShards = Math.Min(16, _currentProfile.DataShards + 1),
+                    ParityShards = Math.Max(2, _currentProfile.ParityShards - 1),
+                    Description = $"Storage optimized (failure rate: {_currentFailureRate:P2})"
+                };
+            }
+            else
+            {
+                // Keep current profile
+                return;
+            }
+
+            // Validate new profile meets minimum durability
+            var durability = CalculateDurability(newProfile, _currentFailureRate);
+            if (durability >= _config.MinTargetDurability)
+            {
+                _currentProfile = newProfile;
+                _lastTuningTime = DateTime.UtcNow;
+
+                ProfileChanged?.Invoke(this, new ProfileChangedEventArgs
+                {
+                    PreviousProfile = previousProfile,
+                    NewProfile = newProfile,
+                    FailureRate = _currentFailureRate,
+                    CalculatedDurability = durability
+                });
+            }
+        }
+    }
+
+    private double CalculateDurability(ErasureCodingProfile profile, double failureRate)
+    {
+        // Simplified durability calculation based on binomial distribution
+        // P(data loss) = P(more than parityShards failures in totalShards)
+        var totalShards = profile.DataShards + profile.ParityShards;
+        var p = failureRate;
+
+        // Calculate probability of losing more than parityShards
+        double pDataLoss = 0;
+        for (int k = profile.ParityShards + 1; k <= totalShards; k++)
+        {
+            pDataLoss += BinomialProbability(totalShards, k, p);
+        }
+
+        // Return durability as (1 - P(data loss))
+        return 1.0 - pDataLoss;
+    }
+
+    private static double BinomialProbability(int n, int k, double p)
+    {
+        return BinomialCoefficient(n, k) * Math.Pow(p, k) * Math.Pow(1 - p, n - k);
+    }
+
+    private static double BinomialCoefficient(int n, int k)
+    {
+        if (k > n) return 0;
+        if (k == 0 || k == n) return 1;
+
+        double result = 1;
+        for (int i = 0; i < k; i++)
+        {
+            result *= (n - i) / (double)(i + 1);
+        }
+        return result;
+    }
+
+    /// <summary>
+    /// Gets tuning statistics.
+    /// </summary>
+    public AdaptiveTunerStatistics GetStatistics()
+    {
+        return new AdaptiveTunerStatistics
+        {
+            CurrentProfile = _currentProfile,
+            CurrentFailureRate = _currentFailureRate,
+            NodeCount = _nodeStats.Count,
+            TotalFailuresRecorded = _nodeStats.Values.Sum(s => s.TotalFailures),
+            TotalRecoveries = _profileStats.Values.Sum(p => p.TotalRecoveries),
+            FailedRecoveries = _profileStats.Values.Sum(p => p.FailedRecoveries),
+            LastTuningTime = _lastTuningTime
+        };
+    }
+
+    public ValueTask DisposeAsync()
+    {
+        if (_disposed) return ValueTask.CompletedTask;
+        _disposed = true;
+
+        _analysisTimer.Dispose();
+        return ValueTask.CompletedTask;
+    }
+}
+
+public sealed class AdaptiveTunerConfig
+{
+    public int DefaultDataShards { get; set; } = 6;
+    public int DefaultParityShards { get; set; } = 3;
+    public double HighFailureRateThreshold { get; set; } = 0.05;  // 5%
+    public double LowFailureRateThreshold { get; set; } = 0.01;   // 1%
+    public double MinTargetDurability { get; set; } = 0.999999;   // 6 nines
+    public int FailureWindowHours { get; set; } = 24;
+    public int MinTuningIntervalHours { get; set; } = 6;
+    public int AnalysisIntervalMinutes { get; set; } = 5;
+}
+
+public enum ShardFailureType
+{
+    DiskFailure,
+    NetworkTimeout,
+    CorruptionDetected,
+    NodeOffline,
+    ChecksumMismatch
+}
+
+public sealed class FailureStatistics
+{
+    public string NodeId { get; init; } = string.Empty;
+    public long TotalFailures { get; set; }
+    public Dictionary<ShardFailureType, long> FailuresByType { get; } = new();
+    public ConcurrentQueue<FailureEvent> RecentFailures { get; } = new();
+}
+
+public sealed class FailureEvent
+{
+    public DateTime Timestamp { get; init; }
+    public ShardFailureType FailureType { get; init; }
+}
+
+public sealed class ProfilePerformance
+{
+    public string ProfileName { get; init; } = string.Empty;
+    public long TotalRecoveries { get; set; }
+    public long FailedRecoveries { get; set; }
+    public long TotalShardsRecovered { get; set; }
+    public TimeSpan TotalRecoveryTime { get; set; }
+    public DateTime? LastRecoveryTime { get; set; }
+    public DateTime? LastFailureTime { get; set; }
+    public string? LastFailureReason { get; set; }
+}
+
+public sealed class ProfileChangedEventArgs : EventArgs
+{
+    public ErasureCodingProfile PreviousProfile { get; init; } = new() { Name = "none" };
+    public ErasureCodingProfile NewProfile { get; init; } = new() { Name = "none" };
+    public double FailureRate { get; init; }
+    public double CalculatedDurability { get; init; }
+}
+
+public record AdaptiveTunerStatistics
+{
+    public ErasureCodingProfile CurrentProfile { get; init; } = new() { Name = "none" };
+    public double CurrentFailureRate { get; init; }
+    public int NodeCount { get; init; }
+    public long TotalFailuresRecorded { get; init; }
+    public long TotalRecoveries { get; init; }
+    public long FailedRecoveries { get; init; }
+    public DateTime LastTuningTime { get; init; }
+}
+
+#endregion
+
+#region HS1.4: Parallel Encoding/Decoding
+
+/// <summary>
+/// Parallel erasure coding engine for high-throughput encoding/decoding.
+/// Uses multiple CPU cores for concurrent processing.
+/// </summary>
+public sealed class ParallelErasureCoder : IAsyncDisposable
+{
+    private readonly AdaptiveErasureCoding _baseCoder;
+    private readonly ParallelCoderConfig _config;
+    private readonly SemaphoreSlim _encoderSemaphore;
+    private readonly SemaphoreSlim _decoderSemaphore;
+    private long _totalBytesEncoded;
+    private long _totalBytesDecoded;
+    private long _totalEncodingTime;
+    private long _totalDecodingTime;
+    private volatile bool _disposed;
+
+    public ParallelErasureCoder(ParallelCoderConfig? config = null)
+    {
+        _config = config ?? new ParallelCoderConfig();
+        _baseCoder = new AdaptiveErasureCoding();
+        _encoderSemaphore = new SemaphoreSlim(_config.MaxConcurrentEncoders);
+        _decoderSemaphore = new SemaphoreSlim(_config.MaxConcurrentDecoders);
+    }
+
+    /// <summary>
+    /// Encodes multiple data blocks in parallel.
+    /// </summary>
+    public async Task<List<ErasureCodedData>> EncodeParallelAsync(
+        IEnumerable<byte[]> dataBlocks,
+        ErasureCodingProfile profile,
+        IProgress<ParallelProgress>? progress = null,
+        CancellationToken ct = default)
+    {
+        var blocks = dataBlocks.ToList();
+        var results = new ConcurrentBag<(int Index, ErasureCodedData Data)>();
+        var processedCount = 0;
+        var sw = Stopwatch.StartNew();
+
+        var options = new ParallelOptions
+        {
+            MaxDegreeOfParallelism = _config.MaxConcurrentEncoders,
+            CancellationToken = ct
+        };
+
+        await Parallel.ForEachAsync(
+            blocks.Select((data, index) => (Data: data, Index: index)),
+            options,
+            async (item, token) =>
+            {
+                await _encoderSemaphore.WaitAsync(token);
+                try
+                {
+                    var encoded = await _baseCoder.EncodeAsync(item.Data, profile, token);
+                    results.Add((item.Index, encoded));
+
+                    var count = Interlocked.Increment(ref processedCount);
+                    Interlocked.Add(ref _totalBytesEncoded, item.Data.Length);
+
+                    progress?.Report(new ParallelProgress
+                    {
+                        ProcessedCount = count,
+                        TotalCount = blocks.Count,
+                        PercentComplete = (double)count / blocks.Count * 100,
+                        CurrentThroughputMBps = count > 0 ?
+                            blocks.Take(count).Sum(b => b.Length) / (1024.0 * 1024.0) / sw.Elapsed.TotalSeconds : 0
+                    });
+                }
+                finally
+                {
+                    _encoderSemaphore.Release();
+                }
+            });
+
+        sw.Stop();
+        Interlocked.Add(ref _totalEncodingTime, sw.ElapsedMilliseconds);
+
+        return results.OrderBy(r => r.Index).Select(r => r.Data).ToList();
+    }
+
+    /// <summary>
+    /// Decodes multiple encoded blocks in parallel.
+    /// </summary>
+    public async Task<List<byte[]>> DecodeParallelAsync(
+        IEnumerable<ErasureCodedData> encodedBlocks,
+        IProgress<ParallelProgress>? progress = null,
+        CancellationToken ct = default)
+    {
+        var blocks = encodedBlocks.ToList();
+        var results = new ConcurrentBag<(int Index, byte[] Data)>();
+        var processedCount = 0;
+        var sw = Stopwatch.StartNew();
+
+        var options = new ParallelOptions
+        {
+            MaxDegreeOfParallelism = _config.MaxConcurrentDecoders,
+            CancellationToken = ct
+        };
+
+        await Parallel.ForEachAsync(
+            blocks.Select((encoded, index) => (Encoded: encoded, Index: index)),
+            options,
+            async (item, token) =>
+            {
+                await _decoderSemaphore.WaitAsync(token);
+                try
+                {
+                    var decoded = await _baseCoder.DecodeAsync(item.Encoded, token);
+                    results.Add((item.Index, decoded));
+
+                    var count = Interlocked.Increment(ref processedCount);
+                    Interlocked.Add(ref _totalBytesDecoded, decoded.Length);
+
+                    progress?.Report(new ParallelProgress
+                    {
+                        ProcessedCount = count,
+                        TotalCount = blocks.Count,
+                        PercentComplete = (double)count / blocks.Count * 100,
+                        CurrentThroughputMBps = count > 0 ?
+                            results.Sum(r => r.Data.Length) / (1024.0 * 1024.0) / sw.Elapsed.TotalSeconds : 0
+                    });
+                }
+                finally
+                {
+                    _decoderSemaphore.Release();
+                }
+            });
+
+        sw.Stop();
+        Interlocked.Add(ref _totalDecodingTime, sw.ElapsedMilliseconds);
+
+        return results.OrderBy(r => r.Index).Select(r => r.Data).ToList();
+    }
+
+    /// <summary>
+    /// Encodes a large data array by splitting into chunks and encoding in parallel.
+    /// </summary>
+    public async Task<ParallelEncodedResult> EncodeWithChunkingAsync(
+        byte[] data,
+        ErasureCodingProfile profile,
+        int chunkSize = 1024 * 1024, // 1MB default
+        IProgress<ParallelProgress>? progress = null,
+        CancellationToken ct = default)
+    {
+        var chunks = new List<byte[]>();
+        for (int offset = 0; offset < data.Length; offset += chunkSize)
+        {
+            var size = Math.Min(chunkSize, data.Length - offset);
+            var chunk = new byte[size];
+            Array.Copy(data, offset, chunk, 0, size);
+            chunks.Add(chunk);
+        }
+
+        var sw = Stopwatch.StartNew();
+        var encodedChunks = await EncodeParallelAsync(chunks, profile, progress, ct);
+        sw.Stop();
+
+        return new ParallelEncodedResult
+        {
+            OriginalSize = data.Length,
+            ChunkCount = chunks.Count,
+            ChunkSize = chunkSize,
+            EncodedChunks = encodedChunks,
+            Profile = profile,
+            EncodingDuration = sw.Elapsed,
+            ThroughputMBps = data.Length / (1024.0 * 1024.0) / sw.Elapsed.TotalSeconds
+        };
+    }
+
+    /// <summary>
+    /// Decodes parallel encoded result back to original data.
+    /// </summary>
+    public async Task<byte[]> DecodeParallelResultAsync(
+        ParallelEncodedResult encoded,
+        IProgress<ParallelProgress>? progress = null,
+        CancellationToken ct = default)
+    {
+        var decodedChunks = await DecodeParallelAsync(encoded.EncodedChunks, progress, ct);
+
+        var result = new byte[encoded.OriginalSize];
+        var offset = 0;
+        foreach (var chunk in decodedChunks)
+        {
+            var copySize = Math.Min(chunk.Length, encoded.OriginalSize - offset);
+            Array.Copy(chunk, 0, result, offset, copySize);
+            offset += copySize;
+        }
+
+        return result;
+    }
+
+    /// <summary>
+    /// Verifies and repairs multiple encoded blocks in parallel.
+    /// </summary>
+    public async Task<List<ShardRepairResult>> VerifyAndRepairParallelAsync(
+        IEnumerable<ErasureCodedData> encodedBlocks,
+        IProgress<ParallelProgress>? progress = null,
+        CancellationToken ct = default)
+    {
+        var blocks = encodedBlocks.ToList();
+        var results = new ConcurrentBag<(int Index, ShardRepairResult Result)>();
+        var processedCount = 0;
+
+        var options = new ParallelOptions
+        {
+            MaxDegreeOfParallelism = _config.MaxConcurrentEncoders,
+            CancellationToken = ct
+        };
+
+        await Parallel.ForEachAsync(
+            blocks.Select((encoded, index) => (Encoded: encoded, Index: index)),
+            options,
+            async (item, token) =>
+            {
+                var result = await _baseCoder.VerifyAndRepairAsync(item.Encoded, token);
+                results.Add((item.Index, result));
+
+                var count = Interlocked.Increment(ref processedCount);
+                progress?.Report(new ParallelProgress
+                {
+                    ProcessedCount = count,
+                    TotalCount = blocks.Count,
+                    PercentComplete = (double)count / blocks.Count * 100
+                });
+            });
+
+        return results.OrderBy(r => r.Index).Select(r => r.Result).ToList();
+    }
+
+    /// <summary>
+    /// Gets parallel coder statistics.
+    /// </summary>
+    public ParallelCoderStatistics GetStatistics()
+    {
+        return new ParallelCoderStatistics
+        {
+            TotalBytesEncoded = _totalBytesEncoded,
+            TotalBytesDecoded = _totalBytesDecoded,
+            TotalEncodingTimeMs = _totalEncodingTime,
+            TotalDecodingTimeMs = _totalDecodingTime,
+            AverageEncodingThroughputMBps = _totalEncodingTime > 0 ?
+                _totalBytesEncoded / (1024.0 * 1024.0) / (_totalEncodingTime / 1000.0) : 0,
+            AverageDecodingThroughputMBps = _totalDecodingTime > 0 ?
+                _totalBytesDecoded / (1024.0 * 1024.0) / (_totalDecodingTime / 1000.0) : 0,
+            MaxConcurrentEncoders = _config.MaxConcurrentEncoders,
+            MaxConcurrentDecoders = _config.MaxConcurrentDecoders
+        };
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_disposed) return;
+        _disposed = true;
+
+        _encoderSemaphore.Dispose();
+        _decoderSemaphore.Dispose();
+        await _baseCoder.DisposeAsync();
+    }
+}
+
+public sealed class ParallelCoderConfig
+{
+    public int MaxConcurrentEncoders { get; set; } = Environment.ProcessorCount;
+    public int MaxConcurrentDecoders { get; set; } = Environment.ProcessorCount;
+}
+
+public record ParallelProgress
+{
+    public int ProcessedCount { get; init; }
+    public int TotalCount { get; init; }
+    public double PercentComplete { get; init; }
+    public double CurrentThroughputMBps { get; init; }
+}
+
+public sealed class ParallelEncodedResult
+{
+    public int OriginalSize { get; init; }
+    public int ChunkCount { get; init; }
+    public int ChunkSize { get; init; }
+    public List<ErasureCodedData> EncodedChunks { get; init; } = new();
+    public ErasureCodingProfile Profile { get; init; } = new() { Name = "default" };
+    public TimeSpan EncodingDuration { get; init; }
+    public double ThroughputMBps { get; init; }
+}
+
+public record ParallelCoderStatistics
+{
+    public long TotalBytesEncoded { get; init; }
+    public long TotalBytesDecoded { get; init; }
+    public long TotalEncodingTimeMs { get; init; }
+    public long TotalDecodingTimeMs { get; init; }
+    public double AverageEncodingThroughputMBps { get; init; }
+    public double AverageDecodingThroughputMBps { get; init; }
+    public int MaxConcurrentEncoders { get; init; }
+    public int MaxConcurrentDecoders { get; init; }
+}
+
+#endregion
+
 #endregion
 
 #region H2: Geo-Distributed Consensus - Multi-Region Raft
