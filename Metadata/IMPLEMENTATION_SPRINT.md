@@ -173,17 +173,96 @@
 - [x] Add error aggregation for monitoring
 
 ### H9-H18. Additional HIGH Items
+
+### H9. Fix VFS Concurrent Access Patterns
+**File:** `DataWarehouse.SDK/Federation/VFS.cs`
 **Status:** ⬜ TODO
-- [ ] H9: Fix VFS concurrent access patterns
-- [ ] H10: Add object versioning conflict resolution
-- [ ] H11: Implement proper consensus handoff
-- [ ] H12: Add node graceful shutdown protocol
-- [ ] H13: Fix metadata sync race conditions
-- [ ] H14: Add replication lag monitoring
-- [ ] H15: Implement proper quorum validation
-- [ ] H16: Add object repair verification
-- [ ] H17: Fix routing table stale entries
-- [ ] H18: Add federation health dashboard metrics
+**Extends:** `VirtualFilesystem` class (already has ReaderWriterLockSlim)
+- [ ] Add async lock support for long-running operations
+- [ ] Add optimistic concurrency with version vectors
+- [ ] Add file-level locking for atomic operations
+- [ ] Add deadlock detection and timeout
+
+### H10. Object Versioning Conflict Resolution
+**File:** `DataWarehouse.SDK/Federation/ObjectStore.cs`
+**Status:** ⬜ TODO
+**Extends:** `ObjectManifest` class (already has VectorClock)
+- [ ] Add three-way merge support
+- [ ] Add custom conflict resolver interface
+- [ ] Add conflict visualization for manual resolution
+- [ ] Add automatic resolution strategies (LWW, First, Merge)
+
+### H11. Proper Consensus Handoff
+**File:** `DataWarehouse.SDK/Federation/Protocol.cs`
+**Status:** ⬜ TODO
+**Extends:** `BullyCoordinator` class
+- [ ] Add graceful leader resignation
+- [ ] Add follower promotion protocol
+- [ ] Add state transfer during handoff
+- [ ] Add handoff verification
+
+### H12. Node Graceful Shutdown Protocol
+**File:** `DataWarehouse.SDK/Federation/Protocol.cs`
+**Status:** ⬜ TODO
+**Extends:** `GossipDiscovery`, `QuorumReplicator`
+- [ ] Add shutdown announcement broadcast
+- [ ] Add data migration before shutdown
+- [ ] Add connection draining
+- [ ] Add shutdown acknowledgment protocol
+
+### H13. Metadata Sync Race Conditions
+**File:** `DataWarehouse.SDK/Federation/Protocol.cs`
+**Status:** ⬜ TODO
+**Extends:** `CrdtMetadataSync` class
+- [ ] Add versioned sync barriers
+- [ ] Add sync operation ordering
+- [ ] Add conflict-free merge verification
+- [ ] Add sync progress checkpoints
+
+### H14. Replication Lag Monitoring
+**File:** `DataWarehouse.SDK/Federation/Protocol.cs`
+**Status:** ⬜ TODO
+**Extends:** `QuorumReplicator` class
+- [ ] Add lag tracking per replica
+- [ ] Add lag threshold alerts
+- [ ] Add catch-up replication mode
+- [ ] Add lag metrics export
+
+### H15. Proper Quorum Validation
+**File:** `DataWarehouse.SDK/Federation/Protocol.cs`
+**Status:** ⬜ TODO
+**Extends:** `QuorumReplicator` class
+- [ ] Add dynamic quorum recalculation
+- [ ] Add quorum loss detection
+- [ ] Add read-your-writes consistency
+- [ ] Add quorum witness support
+
+### H16. Object Repair Verification
+**File:** `DataWarehouse.SDK/Federation/ObjectStore.cs`
+**Status:** ⬜ TODO
+**Extends:** `ContentAddressableObjectStore`
+- [ ] Add post-repair integrity check
+- [ ] Add repair audit logging
+- [ ] Add repair success metrics
+- [ ] Add automatic re-repair on failure
+
+### H17. Routing Table Stale Entry Cleanup
+**File:** `DataWarehouse.SDK/Federation/Routing.cs`
+**Status:** ⬜ TODO
+**Extends:** `RoutingTable` class (already has LRU)
+- [ ] Add TTL-based entry expiration
+- [ ] Add background stale entry sweep
+- [ ] Add route freshness scoring
+- [ ] Add proactive route refresh
+
+### H18. Federation Health Dashboard Metrics
+**File:** `DataWarehouse.SDK/Federation/FederationHealth.cs` (NEW)
+**Status:** ⬜ TODO
+**Extends:** Uses all Federation classes
+- [ ] Add unified health aggregator
+- [ ] Add per-node health scores
+- [ ] Add federation-wide metrics
+- [ ] Add health trend analysis
 
 ---
 
@@ -199,187 +278,251 @@
 
 ### HS2. Geo-Distributed Consensus Enhancement
 **File:** `DataWarehouse.SDK/Infrastructure/HyperscaleFeatures.cs`
-**Status:** ⬜ TODO (Enhance existing)
-- [ ] Add region-aware leader election
-- [ ] Implement hierarchical consensus
-- [ ] Add cross-region lease management
-- [ ] Add partition healing automation
+**Status:** ⬜ TODO (Enhance existing `GeoDistributedConsensus`)
+- [ ] Add region-aware leader election (prefer local leaders)
+- [ ] Implement hierarchical consensus (local + global quorums)
+- [ ] Add cross-region lease management with latency awareness
+- [ ] Add partition healing automation with split-brain prevention
 
-### HS3-HS8. Additional Hyperscale Items
-**Status:** ⬜ TODO
-- [ ] HS3: Petabyte-scale index sharding
-- [ ] HS4: Predictive tiering ML model
-- [ ] HS5: Chaos engineering scheduling
-- [ ] HS6: Hyperscale observability dashboards
-- [ ] HS7: Kubernetes operator CRD finalization
-- [ ] HS8: S3 API 100% compatibility tests
+### HS3. Petabyte-Scale Index Sharding
+**File:** `DataWarehouse.SDK/Infrastructure/HyperscaleFeatures.cs`
+**Status:** ⬜ TODO (Enhance existing `DistributedBPlusTree`)
+- [ ] Add dynamic shard splitting on threshold
+- [ ] Add shard rebalancing with minimal data movement
+- [ ] Add cross-shard range query optimization
+- [ ] Add shard compaction scheduling
+
+### HS4. Predictive Tiering ML Model
+**File:** `DataWarehouse.SDK/Infrastructure/HyperscaleFeatures.cs`
+**Status:** ⬜ TODO (Enhance existing `PredictiveTiering`)
+- [ ] Add access pattern feature extraction
+- [ ] Add simple ML model (linear regression for access prediction)
+- [ ] Add temperature scoring for hot/warm/cold classification
+- [ ] Add pre-warming based on predicted patterns
+
+### HS5. Chaos Engineering Scheduling
+**File:** `DataWarehouse.SDK/Infrastructure/HyperscaleFeatures.cs`
+**Status:** ⬜ TODO (Enhance existing `ChaosEngineeringFramework`)
+- [ ] Add experiment scheduler with cron support
+- [ ] Add experiment result aggregation
+- [ ] Add blast radius controls
+- [ ] Add automatic rollback triggers
+
+### HS6. Hyperscale Observability Dashboards
+**File:** `DataWarehouse.SDK/Infrastructure/HyperscaleFeatures.cs`
+**Status:** ⬜ TODO (Enhance existing `HyperscaleObservability`)
+- [ ] Add Prometheus metrics export format
+- [ ] Add Grafana dashboard JSON generation
+- [ ] Add distributed tracing span export
+- [ ] Add log aggregation hooks
+
+### HS7. Kubernetes Operator CRD Finalization
+**File:** `DataWarehouse.SDK/Infrastructure/HyperscaleFeatures.cs`
+**Status:** ⬜ TODO (Enhance existing `KubernetesOperator`)
+- [ ] Add complete CRD schema definitions
+- [ ] Add admission webhook validation
+- [ ] Add status subresource updates
+- [ ] Add finalizer cleanup logic
+
+### HS8. S3 API 100% Compatibility
+**File:** `DataWarehouse.SDK/Infrastructure/HyperscaleFeatures.cs`
+**Status:** ⬜ TODO (Enhance existing `S3CompatibleApi`)
+- [ ] Add all S3 operations (copy, batch delete, tagging)
+- [ ] Add S3 Select query support
+- [ ] Add lifecycle configuration API
+- [ ] Add replication configuration API
 
 ---
 
 ## Phase 4: Scenario Implementation (1-5)
 
 ### Scenario 1: Cloud Share (U1 → DWH → U2)
+**File:** `DataWarehouse.SDK/Federation/CloudShare.cs` (NEW)
 **Status:** ⬜ TODO
-- [ ] Implement cloud storage node
-- [ ] Add user-specific view projection
-- [ ] Add sharing link generation
-- [ ] Add access control per share
+**Extends:** `VirtualFilesystem`, `CapabilityIssuer`, `NamespaceProjectionService`
+- [ ] Add `CloudShareManager` for share lifecycle
+- [ ] Add `ShareLink` with expiry and access limits
+- [ ] Add user-specific `VfsProjection` per share
+- [ ] Add share access audit logging
 
 ### Scenario 2: Sneakernet (U1 → USB → U2)
+**File:** `DataWarehouse.SDK/Federation/DormantNode.cs` (Enhance)
 **Status:** ⬜ TODO
-- [ ] Complete dormant node manifest
-- [ ] Add encrypted USB transfer
-- [ ] Add offline conflict resolution
-- [ ] Add resync on reconnection
+**Extends:** `DormantNodeManager`, `FileTransportDriver`
+- [ ] Add encrypted manifest export with password
+- [ ] Add incremental sync for partial transfers
+- [ ] Add conflict queue for offline changes
+- [ ] Add auto-resync trigger on USB mount detection
 
 ### Scenario 3: Unified Pool (DWH + DW1)
+**File:** `DataWarehouse.SDK/Federation/StoragePool.cs` (Enhance)
 **Status:** ⬜ TODO
-- [ ] Implement pool joining protocol
-- [ ] Add transparent routing
-- [ ] Add pool-wide deduplication
-- [ ] Add pool capacity management
+**Extends:** `StoragePool`, `UnionPool`, `PoolPlacementPolicy`
+- [ ] Add pool discovery and auto-join protocol
+- [ ] Add transparent `FederationRouter` integration
+- [ ] Add pool-wide `ContentAddressableDeduplication`
+- [ ] Add pool capacity aggregation and alerts
 
 ### Scenario 4: P2P Direct Link
+**File:** `DataWarehouse.SDK/Federation/NatTraversal.cs` (Enhance)
 **Status:** ⬜ TODO
-- [ ] Complete STUN/TURN integration
-- [ ] Add ICE-style connectivity check
-- [ ] Add fallback relay chain
-- [ ] Add direct link quality monitoring
+**Extends:** `StunClient`, `HolePunchingDriver`, `RelayGateway`
+- [ ] Add ICE-lite candidate gathering
+- [ ] Add connectivity check with priority ordering
+- [ ] Add relay fallback chain with latency preference
+- [ ] Add link quality metrics (jitter, packet loss, RTT)
 
 ### Scenario 5: Multi-Region Federation
+**File:** `DataWarehouse.SDK/Federation/MultiRegion.cs` (NEW)
 **Status:** ⬜ TODO
-- [ ] Add region definitions
-- [ ] Implement region-aware placement
-- [ ] Add cross-region replication
-- [ ] Add regional failover
+**Extends:** `GeoDistributedConsensus`, `QuorumReplicator`, `RoutingTable`
+- [ ] Add `Region` entity with latency matrix
+- [ ] Add region-aware data placement policy
+- [ ] Add cross-region async replication
+- [ ] Add regional failover orchestration
 
 ---
 
 ## Phase 5: Enterprise Features
 
 ### E1. Single File Deploy
-**File:** `DataWarehouse.Launcher/SingleFileDeploy.cs`
+**File:** `DataWarehouse.SDK/Infrastructure/SingleFileDeploy.cs` (NEW)
 **Status:** ⬜ TODO
-- [ ] Implement self-contained executable packaging
-- [ ] Add embedded configuration
-- [ ] Add embedded plugins
-- [ ] Add auto-update mechanism
+**Extends:** Uses `ZeroConfigurationStartup`
+- [ ] Add `EmbeddedResourceManager` for bundled plugins
+- [ ] Add `ConfigurationEmbedder` for default config
+- [ ] Add `PluginExtractor` for runtime extraction
+- [ ] Add `AutoUpdateManager` with version check
 
 ### E2. ACID Transactions
-**File:** `DataWarehouse.SDK/Infrastructure/AcidTransactions.cs`
+**File:** `DataWarehouse.SDK/Infrastructure/AcidTransactions.cs` (NEW)
 **Status:** ⬜ TODO
-- [ ] Implement full WAL (Write-Ahead Log)
-- [ ] Add transaction isolation levels
-- [ ] Add distributed transaction coordinator
-- [ ] Add savepoint support
+**Extends:** Uses `ITransactionScope` from Kernel
+- [ ] Add `WriteAheadLog` with append-only storage
+- [ ] Add `IsolationLevel` enum (ReadUncommitted to Serializable)
+- [ ] Add `DistributedTransactionCoordinator` (2PC protocol)
+- [ ] Add `Savepoint` support for partial rollback
 
 ### E3. Full Encryption at Rest
-**File:** `DataWarehouse.SDK/Infrastructure/EncryptionAtRest.cs`
+**File:** `DataWarehouse.SDK/Infrastructure/EncryptionAtRest.cs` (Enhance)
 **Status:** ⬜ TODO
-- [ ] Add full disk encryption abstraction
-- [ ] Add per-file encryption mode
-- [ ] Add key hierarchy management
-- [ ] Add secure key storage
+**Extends:** Uses `FipsCompliantCryptoModule`, `IKeyStore`
+- [ ] Add `FullDiskEncryptionProvider` abstraction
+- [ ] Add `PerFileEncryptionMode` with per-file keys
+- [ ] Add `KeyHierarchy` (master → tenant → data keys)
+- [ ] Add `SecureKeyStorage` with multiple backends
 
-### E4. Distributed Stubs Tier 2
-**Files:** Various stub implementations
+### E4. Distributed Services Tier 2
+**File:** `DataWarehouse.SDK/Infrastructure/DistributedServices.cs` (NEW)
 **Status:** ⬜ TODO
-- [ ] Complete S3 API compatibility
-- [ ] Complete distributed lock service
-- [ ] Complete distributed metadata sync
-- [ ] Complete distributed transaction manager
+**Extends:** Uses `QuorumReplicator`, `CrdtMetadataSync`
+- [ ] Add `DistributedLockService` with fencing tokens
+- [ ] Add `DistributedCounterService` (CRDT G-Counter)
+- [ ] Add `DistributedQueueService` for work distribution
+- [ ] Add `DistributedConfigService` for cluster-wide config
 
 ---
 
 ## Phase 6: Storage Backend Integration
 
 ### SB1. Full MinIO Support
-**File:** `Plugins/DataWarehouse.Plugins.S3Storage/MinioSupport.cs`
+**File:** `Plugins/DataWarehouse.Plugins.S3Storage/MinioSupport.cs` (NEW)
 **Status:** ⬜ TODO
-- [ ] Add MinIO-specific admin API support
-- [ ] Add bucket notification support
-- [ ] Add ILM policy support
-- [ ] Add MinIO identity integration
+**Extends:** `S3StoragePlugin`
+- [ ] Add `MinioAdminClient` for cluster management
+- [ ] Add `BucketNotificationManager` for event triggers
+- [ ] Add `IlmPolicyManager` for lifecycle rules
+- [ ] Add `MinioIdentityProvider` for IAM integration
 
 ### SB2. Full Ceph Support
-**File:** `Plugins/DataWarehouse.Plugins.CephStorage/CephStoragePlugin.cs`
+**File:** `Plugins/DataWarehouse.Plugins.CephStorage/CephStoragePlugin.cs` (NEW)
 **Status:** ⬜ TODO
-- [ ] Implement RADOS gateway integration
-- [ ] Add RBD block storage support
-- [ ] Add CephFS integration
-- [ ] Add CRUSH map awareness
+**Extends:** `StorageProviderPluginBase`
+- [ ] Add `RadosGatewayClient` for object storage
+- [ ] Add `RbdBlockStorage` for block devices
+- [ ] Add `CephFsMount` for filesystem access
+- [ ] Add `CrushMapAwareness` for placement optimization
 
 ### SB3. Full TrueNAS Support
-**File:** `Plugins/DataWarehouse.Plugins.TrueNasStorage/TrueNasStoragePlugin.cs`
+**File:** `Plugins/DataWarehouse.Plugins.TrueNasStorage/TrueNasStoragePlugin.cs` (NEW)
 **Status:** ⬜ TODO
-- [ ] Implement TrueNAS API client
-- [ ] Add ZFS pool management
-- [ ] Add dataset operations
-- [ ] Add snapshot integration
+**Extends:** `StorageProviderPluginBase`
+- [ ] Add `TrueNasApiClient` for REST API
+- [ ] Add `ZfsPoolManager` for pool operations
+- [ ] Add `DatasetManager` for dataset CRUD
+- [ ] Add `SnapshotManager` for point-in-time recovery
 
 ---
 
 ## Phase 7: Compliance & Security
 
 ### CS1. Full Audit Trails
-**File:** `Plugins/DataWarehouse.Plugins.AuditLogging/AuditLoggingPlugin.cs`
-**Status:** ⬜ TODO (Enhance existing)
-- [ ] Add cross-node audit synchronization
-- [ ] Add audit log export formats (CSV, JSON, SIEM)
-- [ ] Add audit retention policies
-- [ ] Add audit search/filter API
+**File:** `DataWarehouse.SDK/Infrastructure/AuditTrails.cs` (NEW)
+**Status:** ⬜ TODO
+**Extends:** Uses `ImmutableAuditTrail` from HighStakesFeatures
+- [ ] Add `AuditSyncManager` for cross-node replication
+- [ ] Add `AuditExporter` (CSV, JSON, SIEM/Splunk format)
+- [ ] Add `AuditRetentionPolicy` with auto-purge
+- [ ] Add `AuditQueryEngine` with filter/search
 
 ### CS2. Full HSM Integration
-**File:** `DataWarehouse.SDK/Infrastructure/HighStakesFeatures.cs`
-**Status:** ⬜ TODO (Enhance existing)
-- [ ] Add PKCS#11 provider
-- [ ] Add AWS CloudHSM support
-- [ ] Add Azure Dedicated HSM support
-- [ ] Add on-premise HSM support
-
-### CS3. Regulatory Certifications
-**File:** `DataWarehouse.SDK/Infrastructure/RegulatoryCompliance.cs`
+**File:** `DataWarehouse.SDK/Infrastructure/HsmProviders.cs` (NEW)
 **Status:** ⬜ TODO
-- [ ] Add SOC 2 compliance checklist
-- [ ] Add HIPAA compliance checklist
-- [ ] Add GDPR compliance checklist
-- [ ] Add PCI-DSS compliance checklist
+**Extends:** Implements `IHsmProvider` from HighStakesFeatures
+- [ ] Add `Pkcs11Provider` for generic HSM
+- [ ] Add `AwsCloudHsmProvider` for AWS
+- [ ] Add `AzureDedicatedHsmProvider` for Azure
+- [ ] Add `ThalesLunaProvider` for on-premise
 
-### CS4. 11 9s Durability
-**File:** `DataWarehouse.SDK/Infrastructure/DurabilityGuarantees.cs`
+### CS3. Regulatory Compliance Framework
+**File:** `DataWarehouse.SDK/Infrastructure/RegulatoryCompliance.cs` (NEW)
 **Status:** ⬜ TODO
-- [ ] Implement durability calculator
-- [ ] Add replication factor recommendations
-- [ ] Add geographic distribution requirements
-- [ ] Add continuous durability monitoring
+**Extends:** Uses `WormComplianceManager`, `ImmutableAuditTrail`
+- [ ] Add `ComplianceChecker` with pluggable rules
+- [ ] Add `Soc2ComplianceRules` validation
+- [ ] Add `HipaaComplianceRules` validation
+- [ ] Add `GdprComplianceRules` (data residency, right to delete)
+- [ ] Add `PciDssComplianceRules` validation
+
+### CS4. Durability Guarantees (11 9s)
+**File:** `DataWarehouse.SDK/Infrastructure/DurabilityGuarantees.cs` (NEW)
+**Status:** ⬜ TODO
+**Extends:** Uses `AdaptiveErasureCoding`, `QuorumReplicator`
+- [ ] Add `DurabilityCalculator` (Markov model)
+- [ ] Add `ReplicationAdvisor` for factor recommendations
+- [ ] Add `GeoDistributionChecker` for failure domain analysis
+- [ ] Add `DurabilityMonitor` for continuous verification
 
 ---
 
 ## Phase 8: Edge & Managed Services
 
 ### EM1. Edge Locations
-**File:** `DataWarehouse.SDK/Infrastructure/EdgeLocations.cs`
+**File:** `DataWarehouse.SDK/Infrastructure/EdgeComputing.cs` (NEW)
 **Status:** ⬜ TODO
-- [ ] Implement edge node detection
-- [ ] Add edge-to-origin sync
-- [ ] Add cache invalidation protocol
-- [ ] Add edge health monitoring
+**Extends:** Uses `RoutingTable`, `QuorumReplicator`
+- [ ] Add `EdgeNodeDetector` (latency-based classification)
+- [ ] Add `EdgeOriginSync` for cache population
+- [ ] Add `CacheInvalidationProtocol` (pub/sub based)
+- [ ] Add `EdgeHealthMonitor` with failover
 
-### EM2. Managed Services
-**File:** `DataWarehouse.SDK/Infrastructure/ManagedServices.cs`
+### EM2. Managed Services Platform
+**File:** `DataWarehouse.SDK/Infrastructure/ManagedServices.cs` (NEW)
 **Status:** ⬜ TODO
-- [ ] Implement service provisioning API
-- [ ] Add tenant management
-- [ ] Add usage metering
-- [ ] Add billing integration hooks
+**Extends:** Uses `CryptographicTenantIsolation`, `RoleBasedAccessControl`
+- [ ] Add `ServiceProvisioner` for tenant onboarding
+- [ ] Add `TenantLifecycleManager` (create, suspend, delete)
+- [ ] Add `UsageMeteringService` for resource tracking
+- [ ] Add `BillingIntegration` hooks (Stripe, AWS Marketplace)
 
 ### EM3. Full IAM Integration
-**File:** `DataWarehouse.SDK/Infrastructure/IamIntegration.cs`
+**File:** `DataWarehouse.SDK/Infrastructure/IamIntegration.cs` (NEW)
 **Status:** ⬜ TODO
-- [ ] Add AWS IAM integration
-- [ ] Add Azure AD integration
-- [ ] Add Google Cloud IAM integration
-- [ ] Add OIDC/SAML support
+**Extends:** Uses `CapabilityIssuer`, `GroupRegistry`
+- [ ] Add `AwsIamProvider` (STS AssumeRole)
+- [ ] Add `AzureAdProvider` (OAuth2/OIDC)
+- [ ] Add `GoogleCloudIamProvider` (service accounts)
+- [ ] Add `OidcSamlBridge` for enterprise SSO
 
 ---
 
