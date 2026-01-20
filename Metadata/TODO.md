@@ -1430,7 +1430,7 @@ Transform DataWarehouse from a single-instance storage engine to a **Federated D
 
 ### Phase 5: Advanced Federation (Hyperscale Fluidity)
 
-**Status:** 🔄 PENDING
+**Status:** 🔄 IN PROGRESS (1/6 complete)
 
 **Goal:** Enable true multi-node fluidity for scenarios:
 - U1 → DWH → U2 (cloud share with per-user views)
@@ -1448,14 +1448,14 @@ Transform DataWarehouse from a single-instance storage engine to a **Federated D
 | TransportBus.BroadcastAsync | SDK/Federation/Transport.cs | Relay streaming |
 | AccessControlPlugin roles | Plugins/AccessControl | Group membership |
 
-#### 5.1 Storage Pools
+#### 5.1 Storage Pools ✅ COMPLETE
 | # | Task | File | Status |
 |---|------|------|--------|
-| 5.1.1 | Create `IStoragePool` interface and `PoolTopology` enum | SDK/Federation/StoragePool.cs | 🔄 |
-| 5.1.2 | Create `StoragePoolMember` (NodeId, Role, Weight, State) | SDK/Federation/StoragePool.cs | 🔄 |
-| 5.1.3 | Create `PoolPlacementPolicy` (extend ConsistentHashRing) | SDK/Federation/StoragePool.cs | 🔄 |
-| 5.1.4 | Implement `StoragePool` with dynamic membership | SDK/Federation/StoragePool.cs | 🔄 |
-| 5.1.5 | Implement `UnionPool` for combined namespace (scenario 3/4) | SDK/Federation/StoragePool.cs | 🔄 |
+| 5.1.1 | Create `IStoragePool` interface and `PoolTopology` enum | SDK/Federation/StoragePool.cs | ✅ |
+| 5.1.2 | Create `StoragePoolMember` (NodeId, Role, Weight, State) | SDK/Federation/StoragePool.cs | ✅ |
+| 5.1.3 | Create `PoolPlacementPolicy` (extend ConsistentHashRing) | SDK/Federation/StoragePool.cs | ✅ |
+| 5.1.4 | Implement `StoragePool` with dynamic membership | SDK/Federation/StoragePool.cs | ✅ |
+| 5.1.5 | Implement `UnionPool` for combined namespace (scenario 3/4) | SDK/Federation/StoragePool.cs | ✅ |
 
 #### 5.2 Identity-Filtered Namespaces
 | # | Task | File | Status |
