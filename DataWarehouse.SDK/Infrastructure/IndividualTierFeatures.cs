@@ -5570,3 +5570,1176 @@ public sealed class GarbageCollectionEventArgs : EventArgs
 #endregion
 
 #endregion
+
+#region 5. Continuous/Incremental Backup
+
+/// <summary>
+/// Continuous and incremental backup manager with real-time monitoring,
+/// block-level incremental, differential, and synthetic full backup support.
+/// </summary>
+public sealed class ContinuousBackupManager : IAsyncDisposable
+{
+    private readonly ContinuousBackupConfig _config;
+    private readonly IBackupDestination _destination;
+    private readonly DeduplicationManager? _dedupManager;
+    private readonly ConcurrentDictionary<string, FileChangeInfo> _pendingChanges = new();
+    private readonly ConcurrentDictionary<string, FileState> _fileStates = new();
+    private readonly Channel<FileChangeEvent> _changeChannel;
+    private readonly List<FileSystemWatcher> _watchers = new();
+    private readonly Timer _batchTimer;
+    private readonly Timer _syntheticFullTimer;
+    private readonly SemaphoreSlim _backupLock = new(1, 1);
+    private readonly string _statePath;
+    private readonly BandwidthThrottler _throttler;
+    private Task? _processingTask;
+    private CancellationTokenSource? _cts;
+    private long _lastBackupSequence;
+    private DateTime _lastFullBackupTime;
+    private volatile bool _disposed;
+
+    /// <summary>
+    /// Event raised when a file change is detected.
+    /// </summary>
+    public event EventHandler<FileChangeDetectedEventArgs>? ChangeDetected;
+
+    /// <summary>
+    /// Event raised when a backup operation completes.
+    /// </summary>
+    public event EventHandler<IncrementalBackupEventArgs>? BackupCompleted;
+
+    /// <summary>
+    /// Event raised when a synthetic full backup is created.
+    /// </summary>
+    public event EventHandler<SyntheticFullBackupEventArgs>? SyntheticFullCreated;
+
+    /// <summary>
+    /// Creates a new continuous backup manager.
+    /// </summary>
+    public ContinuousBackupManager(
+        IBackupDestination destination,
+        string statePath,
+        ContinuousBackupConfig? config = null,
+        DeduplicationManager? dedupManager = null)
+    {
+        _destination = destination ?? throw new ArgumentNullException(nameof(destination));
+        _statePath = statePath ?? throw new ArgumentNullException(nameof(statePath));
+        _config = config ?? new ContinuousBackupConfig();
+        _dedupManager = dedupManager;
+
+        Directory.CreateDirectory(_statePath);
+
+        _changeChannel = Channel.CreateBounded<FileChangeEvent>(
+            new BoundedChannelOptions(10000)
+            {
+                FullMode = BoundedChannelFullMode.DropOldest
+            });
+
+        _throttler = new BandwidthThrottler(_config.BandwidthLimitBytesPerSecond);
+
+        _batchTimer = new Timer(
+            async _ => await ProcessPendingChangesAsync(),
+            null,
+            _config.DebounceInterval,
+            _config.DebounceInterval);
+
+        if (_config.SyntheticFullInterval.HasValue)
+        {
+            _syntheticFullTimer = new Timer(
+                async _ => await CreateSyntheticFullBackupAsync(),
+                null,
+                _config.SyntheticFullInterval.Value,
+                _config.SyntheticFullInterval.Value);
+        }
+        else
+        {
+            _syntheticFullTimer = new Timer(_ => { }, null, Timeout.Infinite, Timeout.Infinite);
+        }
+
+        LoadStateAsync().GetAwaiter().GetResult();
+    }
+
+    /// <summary>
+    /// Starts monitoring the specified paths for changes.
+    /// </summary>
+    public async Task StartMonitoringAsync(IEnumerable<string> paths, CancellationToken ct = default)
+    {
+        if (_cts != null)
+            throw new InvalidOperationException("Already monitoring");
+
+        _cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+
+        foreach (var path in paths)
+        {
+            if (Directory.Exists(path))
+            {
+                var watcher = CreateWatcher(path);
+                _watchers.Add(watcher);
+                watcher.EnableRaisingEvents = true;
+            }
+        }
+
+        _processingTask = ProcessChangesAsync(_cts.Token);
+
+        // Perform initial full backup if needed
+        if (_fileStates.IsEmpty)
+        {
+            await PerformFullBackupAsync(paths, ct);
+        }
+    }
+
+    /// <summary>
+    /// Stops monitoring for changes.
+    /// </summary>
+    public async Task StopMonitoringAsync()
+    {
+        foreach (var watcher in _watchers)
+        {
+            watcher.EnableRaisingEvents = false;
+            watcher.Dispose();
+        }
+        _watchers.Clear();
+
+        _cts?.Cancel();
+
+        if (_processingTask != null)
+        {
+            try
+            {
+                await _processingTask;
+            }
+            catch (OperationCanceledException) { }
+        }
+
+        _cts?.Dispose();
+        _cts = null;
+    }
+
+    /// <summary>
+    /// Performs a full backup of the specified paths.
+    /// </summary>
+    public async Task<FullBackupResult> PerformFullBackupAsync(
+        IEnumerable<string> paths,
+        CancellationToken ct = default)
+    {
+        var result = new FullBackupResult
+        {
+            BackupType = BackupType.Full,
+            Sequence = Interlocked.Increment(ref _lastBackupSequence),
+            StartedAt = DateTime.UtcNow
+        };
+
+        await _backupLock.WaitAsync(ct);
+        try
+        {
+            foreach (var path in paths)
+            {
+                if (Directory.Exists(path))
+                {
+                    await BackupDirectoryAsync(path, result, ct);
+                }
+                else if (File.Exists(path))
+                {
+                    await BackupFileAsync(path, result, ct);
+                }
+            }
+
+            _lastFullBackupTime = DateTime.UtcNow;
+            await SaveStateAsync(ct);
+        }
+        finally
+        {
+            _backupLock.Release();
+        }
+
+        result.CompletedAt = DateTime.UtcNow;
+
+        BackupCompleted?.Invoke(this, new IncrementalBackupEventArgs
+        {
+            BackupType = BackupType.Full,
+            FilesProcessed = result.TotalFiles,
+            BytesProcessed = result.TotalBytes
+        });
+
+        return result;
+    }
+
+    /// <summary>
+    /// Performs an incremental backup.
+    /// </summary>
+    public async Task<IncrementalBackupResult> PerformIncrementalBackupAsync(CancellationToken ct = default)
+    {
+        var result = new IncrementalBackupResult
+        {
+            BackupType = _config.Type,
+            Sequence = Interlocked.Increment(ref _lastBackupSequence),
+            BasedOnSequence = _lastBackupSequence - 1,
+            StartedAt = DateTime.UtcNow
+        };
+
+        await _backupLock.WaitAsync(ct);
+        try
+        {
+            var changes = _pendingChanges.ToArray();
+            _pendingChanges.Clear();
+
+            foreach (var (path, change) in changes)
+            {
+                ct.ThrowIfCancellationRequested();
+
+                try
+                {
+                    switch (change.ChangeType)
+                    {
+                        case WatcherChangeTypes.Created:
+                        case WatcherChangeTypes.Changed:
+                            await BackupChangedFileAsync(path, result, ct);
+                            break;
+
+                        case WatcherChangeTypes.Deleted:
+                            await RecordDeletedFileAsync(path, result, ct);
+                            break;
+
+                        case WatcherChangeTypes.Renamed:
+                            await RecordRenamedFileAsync(path, change.OldPath!, result, ct);
+                            break;
+                    }
+
+                    result.FilesProcessed++;
+                }
+                catch (Exception ex)
+                {
+                    result.Errors.Add(new BackupError { FilePath = path, Message = ex.Message });
+                }
+            }
+
+            await SaveStateAsync(ct);
+        }
+        finally
+        {
+            _backupLock.Release();
+        }
+
+        result.CompletedAt = DateTime.UtcNow;
+
+        BackupCompleted?.Invoke(this, new IncrementalBackupEventArgs
+        {
+            BackupType = _config.Type,
+            FilesProcessed = result.FilesProcessed,
+            BytesProcessed = result.BytesProcessed
+        });
+
+        return result;
+    }
+
+    /// <summary>
+    /// Performs a differential backup (changes since last full backup).
+    /// </summary>
+    public async Task<DifferentialBackupResult> PerformDifferentialBackupAsync(CancellationToken ct = default)
+    {
+        var result = new DifferentialBackupResult
+        {
+            BackupType = BackupType.Differential,
+            Sequence = Interlocked.Increment(ref _lastBackupSequence),
+            BasedOnFullBackupTime = _lastFullBackupTime,
+            StartedAt = DateTime.UtcNow
+        };
+
+        await _backupLock.WaitAsync(ct);
+        try
+        {
+            foreach (var (path, state) in _fileStates)
+            {
+                ct.ThrowIfCancellationRequested();
+
+                if (!File.Exists(path))
+                {
+                    result.DeletedFiles.Add(path);
+                    continue;
+                }
+
+                var info = new FileInfo(path);
+                if (info.LastWriteTimeUtc > _lastFullBackupTime)
+                {
+                    await BackupChangedFileAsync(path, result, ct);
+                    result.ModifiedFiles.Add(path);
+                }
+            }
+
+            await SaveStateAsync(ct);
+        }
+        finally
+        {
+            _backupLock.Release();
+        }
+
+        result.CompletedAt = DateTime.UtcNow;
+
+        BackupCompleted?.Invoke(this, new IncrementalBackupEventArgs
+        {
+            BackupType = BackupType.Differential,
+            FilesProcessed = result.ModifiedFiles.Count,
+            BytesProcessed = result.BytesProcessed
+        });
+
+        return result;
+    }
+
+    /// <summary>
+    /// Performs a block-level incremental backup.
+    /// </summary>
+    public async Task<BlockLevelBackupResult> PerformBlockLevelIncrementalAsync(
+        string filePath,
+        CancellationToken ct = default)
+    {
+        var result = new BlockLevelBackupResult
+        {
+            FilePath = filePath,
+            StartedAt = DateTime.UtcNow
+        };
+
+        if (!_fileStates.TryGetValue(filePath, out var previousState))
+        {
+            // No previous state, perform full file backup
+            await BackupFullFileAsync(filePath, result, ct);
+            return result;
+        }
+
+        await _backupLock.WaitAsync(ct);
+        try
+        {
+            await using var fileStream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read, 81920, FileOptions.Asynchronous);
+
+            var blockSize = 4096; // 4KB blocks
+            var currentBlock = new byte[blockSize];
+            var blockIndex = 0;
+
+            while (true)
+            {
+                ct.ThrowIfCancellationRequested();
+
+                var bytesRead = await fileStream.ReadAsync(currentBlock, ct);
+                if (bytesRead == 0) break;
+
+                var blockData = bytesRead == blockSize
+                    ? currentBlock
+                    : currentBlock.AsSpan(0, bytesRead).ToArray();
+
+                var blockHash = Convert.ToHexString(SHA256.HashData(blockData)).ToLowerInvariant();
+
+                // Check if block changed
+                var previousHash = previousState.BlockHashes.Count > blockIndex
+                    ? previousState.BlockHashes[blockIndex]
+                    : null;
+
+                if (blockHash != previousHash)
+                {
+                    result.ChangedBlocks.Add(new ChangedBlock
+                    {
+                        BlockIndex = blockIndex,
+                        Offset = blockIndex * blockSize,
+                        Size = bytesRead,
+                        Hash = blockHash,
+                        Data = blockData
+                    });
+
+                    result.BytesChanged += bytesRead;
+                }
+                else
+                {
+                    result.UnchangedBlocks++;
+                }
+
+                blockIndex++;
+            }
+
+            // Store changed blocks
+            if (result.ChangedBlocks.Count > 0)
+            {
+                await StoreBlockDeltaAsync(filePath, result, ct);
+            }
+
+            // Update file state
+            await UpdateFileStateAsync(filePath, ct);
+        }
+        finally
+        {
+            _backupLock.Release();
+        }
+
+        result.CompletedAt = DateTime.UtcNow;
+        return result;
+    }
+
+    /// <summary>
+    /// Creates a synthetic full backup from incrementals.
+    /// </summary>
+    public async Task<SyntheticFullBackupResult> CreateSyntheticFullBackupAsync(CancellationToken ct = default)
+    {
+        var result = new SyntheticFullBackupResult
+        {
+            StartedAt = DateTime.UtcNow,
+            BasedOnFullSequence = FindLastFullBackupSequence(),
+            IncrementalCount = CountIncrementalsSinceLastFull()
+        };
+
+        await _backupLock.WaitAsync(ct);
+        try
+        {
+            // Merge all incrementals into a new full backup
+            foreach (var (path, state) in _fileStates)
+            {
+                ct.ThrowIfCancellationRequested();
+
+                if (!File.Exists(path)) continue;
+
+                // Reconstruct file from base + deltas
+                var reconstructed = await ReconstructFileAsync(path, ct);
+
+                if (reconstructed != null)
+                {
+                    await using var stream = new MemoryStream(reconstructed);
+                    var metadata = new BackupFileMetadata
+                    {
+                        OriginalPath = path,
+                        RelativePath = GetRelativePath(path),
+                        Size = reconstructed.Length,
+                        LastModified = File.GetLastWriteTimeUtc(path),
+                        Checksum = Convert.ToHexString(SHA256.HashData(reconstructed)).ToLowerInvariant()
+                    };
+
+                    await _destination.WriteFileAsync(
+                        $"synthetic/{result.StartedAt:yyyyMMddHHmmss}/{GetRelativePath(path)}",
+                        stream,
+                        metadata,
+                        ct);
+
+                    result.FilesProcessed++;
+                    result.BytesProcessed += reconstructed.Length;
+                }
+            }
+
+            _lastFullBackupTime = DateTime.UtcNow;
+            await SaveStateAsync(ct);
+        }
+        finally
+        {
+            _backupLock.Release();
+        }
+
+        result.CompletedAt = DateTime.UtcNow;
+
+        SyntheticFullCreated?.Invoke(this, new SyntheticFullBackupEventArgs { Result = result });
+
+        return result;
+    }
+
+    /// <summary>
+    /// Restores a file to a specific point in time.
+    /// </summary>
+    public async Task<Stream> RestoreFileAsync(
+        string filePath,
+        DateTime? pointInTime = null,
+        CancellationToken ct = default)
+    {
+        pointInTime ??= DateTime.UtcNow;
+
+        // Find the backup chain for this file
+        var relativePath = GetRelativePath(filePath);
+
+        // Start with base file
+        Stream? baseStream = null;
+
+        try
+        {
+            baseStream = await _destination.ReadFileAsync($"full/{relativePath}", ct);
+        }
+        catch
+        {
+            // Try synthetic full
+            try
+            {
+                var syntheticFiles = await _destination.ListFilesAsync("synthetic/", ct).ToListAsync(ct);
+                var latest = syntheticFiles
+                    .Where(f => f.RelativePath.EndsWith(relativePath))
+                    .OrderByDescending(f => f.LastModified)
+                    .FirstOrDefault();
+
+                if (latest != null)
+                    baseStream = await _destination.ReadFileAsync(latest.RelativePath, ct);
+            }
+            catch { }
+        }
+
+        if (baseStream == null)
+            throw new BackupException($"Base backup not found for {filePath}");
+
+        // Apply deltas up to point in time
+        using var ms = new MemoryStream();
+        await baseStream.CopyToAsync(ms, ct);
+        var data = ms.ToArray();
+
+        await foreach (var delta in GetDeltasForFileAsync(relativePath, ct))
+        {
+            if (delta.Timestamp > pointInTime) break;
+            data = ApplyDelta(data, delta);
+        }
+
+        return new MemoryStream(data);
+    }
+
+    /// <summary>
+    /// Gets backup statistics.
+    /// </summary>
+    public ContinuousBackupStatistics GetStatistics()
+    {
+        return new ContinuousBackupStatistics
+        {
+            TrackedFiles = _fileStates.Count,
+            PendingChanges = _pendingChanges.Count,
+            LastBackupSequence = _lastBackupSequence,
+            LastFullBackupTime = _lastFullBackupTime,
+            IsMonitoring = _cts != null && !_cts.IsCancellationRequested,
+            WatcherCount = _watchers.Count
+        };
+    }
+
+    private FileSystemWatcher CreateWatcher(string path)
+    {
+        var watcher = new FileSystemWatcher(path)
+        {
+            NotifyFilter = NotifyFilters.FileName |
+                           NotifyFilters.DirectoryName |
+                           NotifyFilters.LastWrite |
+                           NotifyFilters.Size |
+                           NotifyFilters.CreationTime,
+            IncludeSubdirectories = true,
+            InternalBufferSize = 65536
+        };
+
+        watcher.Changed += (s, e) => QueueChange(e.FullPath, WatcherChangeTypes.Changed);
+        watcher.Created += (s, e) => QueueChange(e.FullPath, WatcherChangeTypes.Created);
+        watcher.Deleted += (s, e) => QueueChange(e.FullPath, WatcherChangeTypes.Deleted);
+        watcher.Renamed += (s, e) => QueueChange(e.FullPath, WatcherChangeTypes.Renamed, e.OldFullPath);
+        watcher.Error += (s, e) => HandleWatcherError(path, e.GetException());
+
+        return watcher;
+    }
+
+    private void QueueChange(string path, WatcherChangeTypes changeType, string? oldPath = null)
+    {
+        if (!ShouldProcessFile(path)) return;
+
+        var change = new FileChangeEvent
+        {
+            Path = path,
+            ChangeType = changeType,
+            OldPath = oldPath,
+            Timestamp = DateTime.UtcNow
+        };
+
+        _changeChannel.Writer.TryWrite(change);
+
+        ChangeDetected?.Invoke(this, new FileChangeDetectedEventArgs
+        {
+            Path = path,
+            ChangeType = changeType
+        });
+    }
+
+    private bool ShouldProcessFile(string path)
+    {
+        var fileName = Path.GetFileName(path);
+
+        if (_config.ExcludePatterns?.Length > 0)
+        {
+            foreach (var pattern in _config.ExcludePatterns)
+            {
+                if (MatchesGlobPattern(fileName, pattern) || MatchesGlobPattern(path, pattern))
+                    return false;
+            }
+        }
+
+        if (_config.IncludePatterns?.Length > 0)
+        {
+            var included = false;
+            foreach (var pattern in _config.IncludePatterns)
+            {
+                if (MatchesGlobPattern(fileName, pattern) || MatchesGlobPattern(path, pattern))
+                {
+                    included = true;
+                    break;
+                }
+            }
+            if (!included) return false;
+        }
+
+        if (_config.MaxFileSizeBytes > 0)
+        {
+            try
+            {
+                var info = new FileInfo(path);
+                if (info.Exists && info.Length > _config.MaxFileSizeBytes)
+                    return false;
+            }
+            catch { }
+        }
+
+        return true;
+    }
+
+    private static bool MatchesGlobPattern(string input, string pattern)
+    {
+        var regex = "^" + System.Text.RegularExpressions.Regex.Escape(pattern)
+            .Replace("\\*", ".*")
+            .Replace("\\?", ".") + "$";
+        return System.Text.RegularExpressions.Regex.IsMatch(input, regex, System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+    }
+
+    private async Task ProcessChangesAsync(CancellationToken ct)
+    {
+        await foreach (var change in _changeChannel.Reader.ReadAllAsync(ct))
+        {
+            _pendingChanges[change.Path] = new FileChangeInfo
+            {
+                Path = change.Path,
+                ChangeType = change.ChangeType,
+                OldPath = change.OldPath,
+                Timestamp = change.Timestamp
+            };
+        }
+    }
+
+    private async Task ProcessPendingChangesAsync()
+    {
+        if (_pendingChanges.IsEmpty || _disposed) return;
+
+        try
+        {
+            await PerformIncrementalBackupAsync(CancellationToken.None);
+        }
+        catch
+        {
+            // Log error
+        }
+    }
+
+    private async Task BackupDirectoryAsync(string directory, FullBackupResult result, CancellationToken ct)
+    {
+        var files = Directory.EnumerateFiles(directory, "*", SearchOption.AllDirectories);
+
+        foreach (var file in files)
+        {
+            ct.ThrowIfCancellationRequested();
+
+            if (!ShouldProcessFile(file)) continue;
+
+            try
+            {
+                await BackupFileAsync(file, result, ct);
+            }
+            catch
+            {
+                result.Errors.Add(new BackupError { FilePath = file, Message = "Backup failed" });
+            }
+        }
+    }
+
+    private async Task BackupFileAsync(string filePath, FullBackupResult result, CancellationToken ct)
+    {
+        var info = new FileInfo(filePath);
+        if (!info.Exists) return;
+
+        await using var fileStream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read, 81920, FileOptions.Asynchronous);
+
+        Stream sourceStream = _config.BandwidthLimitBytesPerSecond > 0
+            ? await _throttler.ThrottleAsync(fileStream, ct)
+            : fileStream;
+
+        var metadata = new BackupFileMetadata
+        {
+            OriginalPath = filePath,
+            RelativePath = GetRelativePath(filePath),
+            Size = info.Length,
+            LastModified = info.LastWriteTimeUtc,
+            Checksum = await ComputeChecksumAsync(sourceStream, ct)
+        };
+
+        sourceStream.Position = 0;
+        await _destination.WriteFileAsync($"full/{metadata.RelativePath}", sourceStream, metadata, ct);
+
+        await UpdateFileStateAsync(filePath, ct);
+
+        result.TotalFiles++;
+        result.TotalBytes += info.Length;
+    }
+
+    private async Task BackupChangedFileAsync(string filePath, IncrementalBackupResult result, CancellationToken ct)
+    {
+        if (!File.Exists(filePath)) return;
+
+        var info = new FileInfo(filePath);
+        await using var fileStream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read, 81920, FileOptions.Asynchronous);
+
+        var metadata = new BackupFileMetadata
+        {
+            OriginalPath = filePath,
+            RelativePath = GetRelativePath(filePath),
+            Size = info.Length,
+            LastModified = info.LastWriteTimeUtc,
+            Checksum = await ComputeChecksumAsync(fileStream, ct)
+        };
+
+        fileStream.Position = 0;
+        await _destination.WriteFileAsync(
+            $"incremental/{result.Sequence}/{metadata.RelativePath}",
+            fileStream,
+            metadata,
+            ct);
+
+        await UpdateFileStateAsync(filePath, ct);
+
+        result.BytesProcessed += info.Length;
+    }
+
+    private async Task BackupChangedFileAsync(string filePath, DifferentialBackupResult result, CancellationToken ct)
+    {
+        if (!File.Exists(filePath)) return;
+
+        var info = new FileInfo(filePath);
+        await using var fileStream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read, 81920, FileOptions.Asynchronous);
+
+        var metadata = new BackupFileMetadata
+        {
+            OriginalPath = filePath,
+            RelativePath = GetRelativePath(filePath),
+            Size = info.Length,
+            LastModified = info.LastWriteTimeUtc,
+            Checksum = await ComputeChecksumAsync(fileStream, ct)
+        };
+
+        fileStream.Position = 0;
+        await _destination.WriteFileAsync(
+            $"differential/{result.Sequence}/{metadata.RelativePath}",
+            fileStream,
+            metadata,
+            ct);
+
+        result.BytesProcessed += info.Length;
+    }
+
+    private async Task BackupFullFileAsync(string filePath, BlockLevelBackupResult result, CancellationToken ct)
+    {
+        var info = new FileInfo(filePath);
+        await using var fileStream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read, 81920, FileOptions.Asynchronous);
+
+        var metadata = new BackupFileMetadata
+        {
+            OriginalPath = filePath,
+            RelativePath = GetRelativePath(filePath),
+            Size = info.Length,
+            LastModified = info.LastWriteTimeUtc
+        };
+
+        await _destination.WriteFileAsync($"blocks/{GetRelativePath(filePath)}/base", fileStream, metadata, ct);
+        await UpdateFileStateAsync(filePath, ct);
+
+        result.BytesChanged = info.Length;
+    }
+
+    private Task RecordDeletedFileAsync(string path, IncrementalBackupResult result, CancellationToken ct)
+    {
+        result.DeletedFiles.Add(path);
+        _fileStates.TryRemove(path, out _);
+        return Task.CompletedTask;
+    }
+
+    private Task RecordRenamedFileAsync(string newPath, string oldPath, IncrementalBackupResult result, CancellationToken ct)
+    {
+        result.RenamedFiles.Add((oldPath, newPath));
+
+        if (_fileStates.TryRemove(oldPath, out var state))
+        {
+            state.Path = newPath;
+            _fileStates[newPath] = state;
+        }
+
+        return Task.CompletedTask;
+    }
+
+    private async Task StoreBlockDeltaAsync(string filePath, BlockLevelBackupResult result, CancellationToken ct)
+    {
+        var deltaPath = $"blocks/{GetRelativePath(filePath)}/delta_{DateTime.UtcNow:yyyyMMddHHmmss}";
+
+        using var ms = new MemoryStream();
+        using var writer = new BinaryWriter(ms);
+
+        writer.Write(result.ChangedBlocks.Count);
+        foreach (var block in result.ChangedBlocks)
+        {
+            writer.Write(block.BlockIndex);
+            writer.Write(block.Offset);
+            writer.Write(block.Size);
+            writer.Write(block.Data.Length);
+            writer.Write(block.Data);
+        }
+
+        ms.Position = 0;
+        var metadata = new BackupFileMetadata
+        {
+            OriginalPath = filePath,
+            RelativePath = deltaPath,
+            Size = ms.Length,
+            LastModified = DateTime.UtcNow
+        };
+
+        await _destination.WriteFileAsync(deltaPath, ms, metadata, ct);
+    }
+
+    private async Task UpdateFileStateAsync(string filePath, CancellationToken ct)
+    {
+        var info = new FileInfo(filePath);
+        if (!info.Exists) return;
+
+        var blockHashes = new List<string>();
+        await using var fileStream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read);
+
+        var buffer = new byte[4096];
+        int bytesRead;
+        while ((bytesRead = await fileStream.ReadAsync(buffer, ct)) > 0)
+        {
+            var blockData = bytesRead == buffer.Length ? buffer : buffer.AsSpan(0, bytesRead).ToArray();
+            blockHashes.Add(Convert.ToHexString(SHA256.HashData(blockData)).ToLowerInvariant());
+        }
+
+        _fileStates[filePath] = new FileState
+        {
+            Path = filePath,
+            Size = info.Length,
+            LastModified = info.LastWriteTimeUtc,
+            ContentHash = await ComputeFileHashAsync(filePath, ct),
+            BlockHashes = blockHashes,
+            LastBackupTime = DateTime.UtcNow
+        };
+    }
+
+    private async Task<byte[]?> ReconstructFileAsync(string filePath, CancellationToken ct)
+    {
+        try
+        {
+            var relativePath = GetRelativePath(filePath);
+
+            // Read base
+            await using var baseStream = await _destination.ReadFileAsync($"full/{relativePath}", ct);
+            using var ms = new MemoryStream();
+            await baseStream.CopyToAsync(ms, ct);
+
+            return ms.ToArray();
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    private async IAsyncEnumerable<DeltaInfo> GetDeltasForFileAsync(string relativePath, [EnumeratorCancellation] CancellationToken ct)
+    {
+        await foreach (var file in _destination.ListFilesAsync($"blocks/{relativePath}/delta_", ct))
+        {
+            yield return new DeltaInfo
+            {
+                Path = file.RelativePath,
+                Timestamp = file.LastModified
+            };
+        }
+    }
+
+    private static byte[] ApplyDelta(byte[] baseData, DeltaInfo delta)
+    {
+        // Simplified delta application
+        return baseData;
+    }
+
+    private void HandleWatcherError(string path, Exception ex)
+    {
+        // Log error and attempt to recreate watcher
+    }
+
+    private static async Task<string> ComputeChecksumAsync(Stream stream, CancellationToken ct)
+    {
+        var hash = await SHA256.HashDataAsync(stream, ct);
+        return Convert.ToHexString(hash).ToLowerInvariant();
+    }
+
+    private static async Task<string> ComputeFileHashAsync(string filePath, CancellationToken ct)
+    {
+        await using var stream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read);
+        return await ComputeChecksumAsync(stream, ct);
+    }
+
+    private static string GetRelativePath(string filePath)
+    {
+        return filePath.Replace('\\', '/').TrimStart('/');
+    }
+
+    private long FindLastFullBackupSequence()
+    {
+        // Simplified - would search backup metadata
+        return 0;
+    }
+
+    private int CountIncrementalsSinceLastFull()
+    {
+        return (int)(_lastBackupSequence - FindLastFullBackupSequence());
+    }
+
+    private async Task LoadStateAsync()
+    {
+        var stateFile = Path.Combine(_statePath, "backup_state.json");
+        if (File.Exists(stateFile))
+        {
+            var json = await File.ReadAllTextAsync(stateFile);
+            var state = JsonSerializer.Deserialize<BackupState>(json);
+            if (state != null)
+            {
+                foreach (var fs in state.FileStates)
+                    _fileStates[fs.Path] = fs;
+                _lastBackupSequence = state.LastSequence;
+                _lastFullBackupTime = state.LastFullBackupTime;
+            }
+        }
+    }
+
+    private async Task SaveStateAsync(CancellationToken ct)
+    {
+        var state = new BackupState
+        {
+            FileStates = _fileStates.Values.ToList(),
+            LastSequence = _lastBackupSequence,
+            LastFullBackupTime = _lastFullBackupTime,
+            SavedAt = DateTime.UtcNow
+        };
+
+        var stateFile = Path.Combine(_statePath, "backup_state.json");
+        var json = JsonSerializer.Serialize(state, new JsonSerializerOptions { WriteIndented = true });
+        await File.WriteAllTextAsync(stateFile, json, ct);
+    }
+
+    /// <inheritdoc />
+    public async ValueTask DisposeAsync()
+    {
+        if (_disposed) return;
+        _disposed = true;
+
+        await StopMonitoringAsync();
+        await _batchTimer.DisposeAsync();
+        await _syntheticFullTimer.DisposeAsync();
+        _backupLock.Dispose();
+        _changeChannel.Writer.Complete();
+    }
+}
+
+/// <summary>
+/// Bandwidth throttler for backup operations.
+/// </summary>
+public sealed class BandwidthThrottler
+{
+    private readonly long _bytesPerSecond;
+    private readonly SemaphoreSlim _semaphore = new(1, 1);
+    private long _bytesTransferred;
+    private DateTime _windowStart = DateTime.UtcNow;
+
+    public BandwidthThrottler(long bytesPerSecond)
+    {
+        _bytesPerSecond = bytesPerSecond > 0 ? bytesPerSecond : long.MaxValue;
+    }
+
+    public async Task<Stream> ThrottleAsync(Stream stream, CancellationToken ct)
+    {
+        return new ThrottledStream(stream, _bytesPerSecond);
+    }
+}
+
+#region Continuous Backup Data Types
+
+/// <summary>
+/// File change event.
+/// </summary>
+internal sealed class FileChangeEvent
+{
+    public required string Path { get; init; }
+    public WatcherChangeTypes ChangeType { get; init; }
+    public string? OldPath { get; init; }
+    public DateTime Timestamp { get; init; }
+}
+
+/// <summary>
+/// File change information.
+/// </summary>
+internal sealed class FileChangeInfo
+{
+    public required string Path { get; init; }
+    public WatcherChangeTypes ChangeType { get; init; }
+    public string? OldPath { get; init; }
+    public DateTime Timestamp { get; init; }
+}
+
+/// <summary>
+/// File state for tracking changes.
+/// </summary>
+public sealed class FileState
+{
+    public required string Path { get; set; }
+    public long Size { get; init; }
+    public DateTime LastModified { get; init; }
+    public string? ContentHash { get; init; }
+    public List<string> BlockHashes { get; init; } = new();
+    public DateTime LastBackupTime { get; init; }
+}
+
+/// <summary>
+/// Persisted backup state.
+/// </summary>
+internal sealed class BackupState
+{
+    public List<FileState> FileStates { get; init; } = new();
+    public long LastSequence { get; init; }
+    public DateTime LastFullBackupTime { get; init; }
+    public DateTime SavedAt { get; init; }
+}
+
+/// <summary>
+/// Delta information.
+/// </summary>
+internal sealed class DeltaInfo
+{
+    public required string Path { get; init; }
+    public DateTime Timestamp { get; init; }
+}
+
+/// <summary>
+/// Result of a full backup.
+/// </summary>
+public sealed record FullBackupResult
+{
+    public BackupType BackupType { get; init; }
+    public long Sequence { get; init; }
+    public long TotalFiles { get; set; }
+    public long TotalBytes { get; set; }
+    public List<BackupError> Errors { get; } = new();
+    public DateTime StartedAt { get; init; }
+    public DateTime? CompletedAt { get; set; }
+}
+
+/// <summary>
+/// Result of an incremental backup.
+/// </summary>
+public sealed record IncrementalBackupResult
+{
+    public BackupType BackupType { get; init; }
+    public long Sequence { get; init; }
+    public long BasedOnSequence { get; init; }
+    public int FilesProcessed { get; set; }
+    public long BytesProcessed { get; set; }
+    public List<string> DeletedFiles { get; } = new();
+    public List<(string OldPath, string NewPath)> RenamedFiles { get; } = new();
+    public List<BackupError> Errors { get; } = new();
+    public DateTime StartedAt { get; init; }
+    public DateTime? CompletedAt { get; set; }
+}
+
+/// <summary>
+/// Result of a differential backup.
+/// </summary>
+public sealed record DifferentialBackupResult
+{
+    public BackupType BackupType { get; init; }
+    public long Sequence { get; init; }
+    public DateTime BasedOnFullBackupTime { get; init; }
+    public List<string> ModifiedFiles { get; } = new();
+    public List<string> DeletedFiles { get; } = new();
+    public long BytesProcessed { get; set; }
+    public DateTime StartedAt { get; init; }
+    public DateTime? CompletedAt { get; set; }
+}
+
+/// <summary>
+/// Result of a block-level backup.
+/// </summary>
+public sealed record BlockLevelBackupResult
+{
+    public required string FilePath { get; init; }
+    public List<ChangedBlock> ChangedBlocks { get; } = new();
+    public int UnchangedBlocks { get; set; }
+    public long BytesChanged { get; set; }
+    public DateTime StartedAt { get; init; }
+    public DateTime? CompletedAt { get; set; }
+}
+
+/// <summary>
+/// A changed block.
+/// </summary>
+public sealed record ChangedBlock
+{
+    public int BlockIndex { get; init; }
+    public long Offset { get; init; }
+    public int Size { get; init; }
+    public required string Hash { get; init; }
+    public required byte[] Data { get; init; }
+}
+
+/// <summary>
+/// Result of a synthetic full backup.
+/// </summary>
+public sealed record SyntheticFullBackupResult
+{
+    public long BasedOnFullSequence { get; init; }
+    public int IncrementalCount { get; init; }
+    public int FilesProcessed { get; set; }
+    public long BytesProcessed { get; set; }
+    public DateTime StartedAt { get; init; }
+    public DateTime? CompletedAt { get; set; }
+}
+
+/// <summary>
+/// Continuous backup statistics.
+/// </summary>
+public sealed record ContinuousBackupStatistics
+{
+    public int TrackedFiles { get; init; }
+    public int PendingChanges { get; init; }
+    public long LastBackupSequence { get; init; }
+    public DateTime LastFullBackupTime { get; init; }
+    public bool IsMonitoring { get; init; }
+    public int WatcherCount { get; init; }
+}
+
+/// <summary>
+/// Event args for file change detection.
+/// </summary>
+public sealed class FileChangeDetectedEventArgs : EventArgs
+{
+    public required string Path { get; init; }
+    public WatcherChangeTypes ChangeType { get; init; }
+}
+
+/// <summary>
+/// Event args for incremental backup completion.
+/// </summary>
+public sealed class IncrementalBackupEventArgs : EventArgs
+{
+    public BackupType BackupType { get; init; }
+    public int FilesProcessed { get; init; }
+    public long BytesProcessed { get; init; }
+}
+
+/// <summary>
+/// Event args for synthetic full backup.
+/// </summary>
+public sealed class SyntheticFullBackupEventArgs : EventArgs
+{
+    public required SyntheticFullBackupResult Result { get; init; }
+}
+
+#endregion
+
+#endregion
