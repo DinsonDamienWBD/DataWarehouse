@@ -1430,7 +1430,7 @@ Transform DataWarehouse from a single-instance storage engine to a **Federated D
 
 ### Phase 5: Advanced Federation (Hyperscale Fluidity)
 
-**Status:** 🔄 IN PROGRESS (3/6 complete)
+**Status:** 🔄 IN PROGRESS (4/6 complete)
 
 **Goal:** Enable true multi-node fluidity for scenarios:
 - U1 → DWH → U2 (cloud share with per-user views)
@@ -1473,13 +1473,13 @@ Transform DataWarehouse from a single-instance storage engine to a **Federated D
 | 5.3.3 | Implement `HydrateAsync` (import dormant → active) | SDK/Federation/DormantNode.cs | ✅ |
 | 5.3.4 | Add dormant node detection to FileTransportDriver | SDK/Federation/DormantNode.cs | ✅ |
 
-#### 5.4 Advanced ACL (Groups)
+#### 5.4 Advanced ACL (Groups) ✅ COMPLETE
 | # | Task | File | Status |
 |---|------|------|--------|
-| 5.4.1 | Create `FederationGroup` (GroupId, Members, NestedGroups) | SDK/Federation/Groups.cs | 🔄 |
-| 5.4.2 | Create `GroupCapabilityToken` (issued to groups) | SDK/Federation/Groups.cs | 🔄 |
-| 5.4.3 | Implement `GroupRegistry` with membership resolution | SDK/Federation/Groups.cs | 🔄 |
-| 5.4.4 | Extend `CapabilityVerifier` with group expansion | SDK/Federation/Capabilities.cs | 🔄 |
+| 5.4.1 | Create `FederationGroup` (GroupId, Members, NestedGroups) | SDK/Federation/Groups.cs | ✅ |
+| 5.4.2 | Create `GroupCapabilityToken` (issued to groups) | SDK/Federation/Groups.cs | ✅ |
+| 5.4.3 | Implement `GroupRegistry` with membership resolution | SDK/Federation/Groups.cs | ✅ |
+| 5.4.4 | Extend `CapabilityVerifier` with group expansion | SDK/Federation/Groups.cs | ✅ |
 
 #### 5.5 Stream Relay (Pipe Mode)
 | # | Task | File | Status |
