@@ -1,7 +1,9 @@
 namespace DataWarehouse.SDK.Federation;
 
+using System.Security.Cryptography;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using DataWarehouse.SDK.Infrastructure;
 
 /// <summary>
 /// Manifest for a dormant (offline/USB) node.
@@ -32,6 +34,21 @@ public sealed class DormantNodeManifest
 
     /// <summary>Custom metadata.</summary>
     public Dictionary<string, string> Metadata { get; set; } = new();
+
+    /// <summary>Whether data is encrypted.</summary>
+    public bool IsEncrypted { get; set; }
+
+    /// <summary>Encryption key ID (for key escrow).</summary>
+    public string? EncryptionKeyId { get; set; }
+
+    /// <summary>Encrypted data key (wrapped with password/KEK).</summary>
+    public byte[]? WrappedDataKey { get; set; }
+
+    /// <summary>Salt for password-based key derivation.</summary>
+    public byte[]? KeyDerivationSalt { get; set; }
+
+    /// <summary>Key derivation algorithm used.</summary>
+    public string KeyDerivationAlgorithm { get; set; } = "Argon2id";
 
     /// <summary>Manifest filename on dormant storage.</summary>
     public const string ManifestFileName = ".dw-dormant.json";
@@ -84,6 +101,36 @@ public sealed class DormantObjectEntry
 
     /// <summary>When this object was added.</summary>
     public DateTimeOffset AddedAt { get; set; } = DateTimeOffset.UtcNow;
+
+    /// <summary>Whether this object is encrypted.</summary>
+    public bool IsEncrypted { get; set; }
+
+    /// <summary>IV/Nonce for this object's encryption.</summary>
+    public byte[]? EncryptionIV { get; set; }
+
+    /// <summary>Authentication tag for AES-GCM.</summary>
+    public byte[]? AuthTag { get; set; }
+}
+
+/// <summary>
+/// Options for dehydration with encryption.
+/// </summary>
+public sealed class DehydrateOptions
+{
+    /// <summary>Whether to encrypt the dormant node data.</summary>
+    public bool Encrypt { get; set; } = true;
+
+    /// <summary>Password for encryption (if not using key store).</summary>
+    public string? Password { get; set; }
+
+    /// <summary>Key store for enterprise key management.</summary>
+    public IKeyEncryptionProvider? KeyProvider { get; set; }
+
+    /// <summary>Custom node name.</summary>
+    public string? NodeName { get; set; }
+
+    /// <summary>Key derivation method.</summary>
+    public KeyDerivationMethod KeyDerivation { get; set; } = KeyDerivationMethod.Argon2id;
 }
 
 /// <summary>
@@ -109,10 +156,23 @@ public sealed class NodeDehydrator
     /// Dehydrates (exports) selected objects to a dormant node location.
     /// Creates a new portable instance on USB/external storage.
     /// </summary>
-    public async Task<DehydrateResult> DehydrateAsync(
+    public Task<DehydrateResult> DehydrateAsync(
         string targetPath,
         IEnumerable<ObjectId> objectIds,
         string? nodeName = null,
+        CancellationToken ct = default)
+    {
+        return DehydrateAsync(targetPath, objectIds, new DehydrateOptions { NodeName = nodeName, Encrypt = false }, ct);
+    }
+
+    /// <summary>
+    /// Dehydrates (exports) selected objects to a dormant node location with encryption.
+    /// Creates a new portable instance on USB/external storage with AES-256-GCM encryption.
+    /// </summary>
+    public async Task<DehydrateResult> DehydrateAsync(
+        string targetPath,
+        IEnumerable<ObjectId> objectIds,
+        DehydrateOptions options,
         CancellationToken ct = default)
     {
         var result = new DehydrateResult { TargetPath = targetPath };
@@ -129,7 +189,7 @@ public sealed class NodeDehydrator
             var identity = new NodeIdentity
             {
                 Id = dormantId,
-                Name = nodeName ?? $"Dormant-{dormantId.ToShortString()}",
+                Name = options.NodeName ?? $"Dormant-{dormantId.ToShortString()}",
                 State = NodeState.Dormant,
                 Capabilities = NodeCapabilities.Storage,
                 CreatedAt = DateTimeOffset.UtcNow,
@@ -143,6 +203,40 @@ public sealed class NodeDehydrator
                 CreatedAt = DateTimeOffset.UtcNow,
                 UpdatedAt = DateTimeOffset.UtcNow
             };
+
+            // Setup encryption if enabled
+            byte[]? dataKey = null;
+            if (options.Encrypt)
+            {
+                // Generate random data encryption key (DEK)
+                dataKey = new byte[32];
+                RandomNumberGenerator.Fill(dataKey);
+                manifest.IsEncrypted = true;
+                manifest.EncryptionKeyId = Guid.NewGuid().ToString("N");
+
+                if (!string.IsNullOrEmpty(options.Password))
+                {
+                    // Derive key from password and wrap DEK
+                    manifest.KeyDerivationSalt = new byte[32];
+                    RandomNumberGenerator.Fill(manifest.KeyDerivationSalt);
+                    manifest.KeyDerivationAlgorithm = options.KeyDerivation.ToString();
+
+                    var kek = DeriveKeyFromPassword(options.Password, manifest.KeyDerivationSalt, options.KeyDerivation);
+                    manifest.WrappedDataKey = WrapKey(dataKey, kek);
+                    CryptographicOperations.ZeroMemory(kek);
+                }
+                else if (options.KeyProvider != null)
+                {
+                    // Use key provider to wrap DEK
+                    var wrapped = await options.KeyProvider.EncryptKeyAsync(dataKey, manifest.EncryptionKeyId, ct);
+                    manifest.WrappedDataKey = wrapped.EncryptedData;
+                    manifest.KeyDerivationAlgorithm = "KeyVault";
+                }
+                else
+                {
+                    throw new ArgumentException("Encryption enabled but no password or key provider specified");
+                }
+            }
 
             // Copy objects
             foreach (var objectId in objectIds)
@@ -161,9 +255,7 @@ public sealed class NodeDehydrator
                 var objectPath = Path.Combine(objectsPath, relativePath);
                 Directory.CreateDirectory(Path.GetDirectoryName(objectPath)!);
 
-                await File.WriteAllBytesAsync(objectPath, retrieveResult.Data, ct);
-
-                manifest.Objects.Add(new DormantObjectEntry
+                var entry = new DormantObjectEntry
                 {
                     ObjectId = objectId.ToHex(),
                     Name = retrieveResult.Manifest?.Name ?? objectId.ToShortString(),
@@ -171,8 +263,23 @@ public sealed class NodeDehydrator
                     ContentType = retrieveResult.Manifest?.ContentType ?? "application/octet-stream",
                     RelativePath = relativePath,
                     AddedAt = DateTimeOffset.UtcNow
-                });
+                };
 
+                if (options.Encrypt && dataKey != null)
+                {
+                    // Encrypt object data with AES-256-GCM
+                    var (encryptedData, iv, tag) = EncryptData(retrieveResult.Data, dataKey);
+                    await File.WriteAllBytesAsync(objectPath, encryptedData, ct);
+                    entry.IsEncrypted = true;
+                    entry.EncryptionIV = iv;
+                    entry.AuthTag = tag;
+                }
+                else
+                {
+                    await File.WriteAllBytesAsync(objectPath, retrieveResult.Data, ct);
+                }
+
+                manifest.Objects.Add(entry);
                 result.CopiedObjects.Add(objectId.ToHex());
             }
 
@@ -194,6 +301,10 @@ public sealed class NodeDehydrator
             var manifestPath = Path.Combine(targetPath, DormantNodeManifest.ManifestFileName);
             await File.WriteAllTextAsync(manifestPath, manifest.ToJson(), ct);
 
+            // Clear sensitive data
+            if (dataKey != null)
+                CryptographicOperations.ZeroMemory(dataKey);
+
             result.Success = true;
             result.Manifest = manifest;
         }
@@ -204,6 +315,67 @@ public sealed class NodeDehydrator
         }
 
         return result;
+    }
+
+    private static byte[] DeriveKeyFromPassword(string password, byte[] salt, KeyDerivationMethod method)
+    {
+        return Rfc2898DeriveBytes.Pbkdf2(
+            System.Text.Encoding.UTF8.GetBytes(password),
+            salt,
+            iterations: method == KeyDerivationMethod.Argon2id ? 600_000 : 310_000,
+            HashAlgorithmName.SHA256,
+            outputLength: 32);
+    }
+
+    private static byte[] WrapKey(byte[] key, byte[] kek)
+    {
+        var iv = new byte[12];
+        RandomNumberGenerator.Fill(iv);
+
+        using var aes = new AesGcm(kek, 16);
+        var ciphertext = new byte[key.Length];
+        var tag = new byte[16];
+        aes.Encrypt(iv, key, ciphertext, tag);
+
+        // Return [iv:12][tag:16][ciphertext:32]
+        var result = new byte[12 + 16 + ciphertext.Length];
+        Buffer.BlockCopy(iv, 0, result, 0, 12);
+        Buffer.BlockCopy(tag, 0, result, 12, 16);
+        Buffer.BlockCopy(ciphertext, 0, result, 28, ciphertext.Length);
+        return result;
+    }
+
+    private static byte[] UnwrapKey(byte[] wrapped, byte[] kek)
+    {
+        var iv = wrapped.AsSpan(0, 12).ToArray();
+        var tag = wrapped.AsSpan(12, 16).ToArray();
+        var ciphertext = wrapped.AsSpan(28).ToArray();
+
+        using var aes = new AesGcm(kek, 16);
+        var key = new byte[ciphertext.Length];
+        aes.Decrypt(iv, ciphertext, tag, key);
+        return key;
+    }
+
+    private static (byte[] ciphertext, byte[] iv, byte[] tag) EncryptData(byte[] data, byte[] key)
+    {
+        var iv = new byte[12];
+        RandomNumberGenerator.Fill(iv);
+
+        using var aes = new AesGcm(key, 16);
+        var ciphertext = new byte[data.Length];
+        var tag = new byte[16];
+        aes.Encrypt(iv, data, ciphertext, tag);
+
+        return (ciphertext, iv, tag);
+    }
+
+    private static byte[] DecryptData(byte[] ciphertext, byte[] iv, byte[] tag, byte[] key)
+    {
+        using var aes = new AesGcm(key, 16);
+        var plaintext = new byte[ciphertext.Length];
+        aes.Decrypt(iv, ciphertext, tag, plaintext);
+        return plaintext;
     }
 }
 
@@ -218,6 +390,21 @@ public sealed class DehydrateResult
     public List<string> CopiedObjects { get; } = new();
     public List<string> FailedObjects { get; } = new();
     public string? ErrorMessage { get; set; }
+}
+
+/// <summary>
+/// Options for hydration with decryption.
+/// </summary>
+public sealed class HydrateOptions
+{
+    /// <summary>Mode for hydration.</summary>
+    public HydrateMode Mode { get; set; } = HydrateMode.Reference;
+
+    /// <summary>Password for decryption (if encrypted with password).</summary>
+    public string? Password { get; set; }
+
+    /// <summary>Key provider for decryption (if encrypted with key vault).</summary>
+    public IKeyEncryptionProvider? KeyProvider { get; set; }
 }
 
 /// <summary>
@@ -246,9 +433,20 @@ public sealed class NodeHydrator
     /// Hydrates (imports) a dormant node into the active instance.
     /// Makes USB/external storage objects available locally.
     /// </summary>
-    public async Task<HydrateResult> HydrateAsync(
+    public Task<HydrateResult> HydrateAsync(
         string sourcePath,
         HydrateMode mode = HydrateMode.Reference,
+        CancellationToken ct = default)
+    {
+        return HydrateAsync(sourcePath, new HydrateOptions { Mode = mode }, ct);
+    }
+
+    /// <summary>
+    /// Hydrates (imports) a dormant node with decryption support.
+    /// </summary>
+    public async Task<HydrateResult> HydrateAsync(
+        string sourcePath,
+        HydrateOptions options,
         CancellationToken ct = default)
     {
         var result = new HydrateResult { SourcePath = sourcePath };
@@ -276,6 +474,48 @@ public sealed class NodeHydrator
 
             result.Manifest = manifest;
 
+            // Derive data key if encrypted
+            byte[]? dataKey = null;
+            if (manifest.IsEncrypted)
+            {
+                if (manifest.WrappedDataKey == null)
+                {
+                    result.Success = false;
+                    result.ErrorMessage = "Encrypted manifest missing wrapped data key";
+                    return result;
+                }
+
+                if (!string.IsNullOrEmpty(options.Password) && manifest.KeyDerivationSalt != null)
+                {
+                    // Derive KEK from password and unwrap DEK
+                    var method = Enum.TryParse<KeyDerivationMethod>(manifest.KeyDerivationAlgorithm, out var m)
+                        ? m : KeyDerivationMethod.Argon2id;
+                    var kek = DeriveKeyFromPassword(options.Password, manifest.KeyDerivationSalt, method);
+                    dataKey = UnwrapKey(manifest.WrappedDataKey, kek);
+                    CryptographicOperations.ZeroMemory(kek);
+                }
+                else if (options.KeyProvider != null)
+                {
+                    // Use key provider to unwrap DEK
+                    var wrapped = new EncryptedKey
+                    {
+                        KeyId = manifest.EncryptionKeyId ?? "",
+                        ProviderId = manifest.KeyDerivationAlgorithm,
+                        EncryptedData = manifest.WrappedDataKey,
+                        IV = Array.Empty<byte>(),
+                        KeyVersion = 1,
+                        EncryptedAt = manifest.CreatedAt.DateTime
+                    };
+                    dataKey = await options.KeyProvider.DecryptKeyAsync(wrapped, ct);
+                }
+                else
+                {
+                    result.Success = false;
+                    result.ErrorMessage = "Encrypted dormant node requires password or key provider";
+                    return result;
+                }
+            }
+
             // Register dormant node in registry
             manifest.Identity.State = NodeState.Dormant;
             manifest.Identity.Endpoints.Add(new NodeEndpoint
@@ -299,35 +539,41 @@ public sealed class NodeHydrator
                     continue;
                 }
 
-                var objectId = ObjectId.FromHex(entry.ObjectId);
-
-                switch (mode)
+                try
                 {
-                    case HydrateMode.Copy:
-                        // Copy object data to local store
-                        var data = await File.ReadAllBytesAsync(objectPath, ct);
-                        using (var ms = new MemoryStream(data))
-                        {
-                            await _objectStore.StoreAsync(ms, entry.Name, entry.ContentType, ct);
-                        }
-                        result.ImportedObjects.Add(entry.ObjectId);
-                        break;
+                    byte[] data;
+                    if (entry.IsEncrypted && dataKey != null && entry.EncryptionIV != null && entry.AuthTag != null)
+                    {
+                        // Decrypt object data
+                        var encryptedData = await File.ReadAllBytesAsync(objectPath, ct);
+                        data = DecryptData(encryptedData, entry.EncryptionIV, entry.AuthTag, dataKey);
+                    }
+                    else
+                    {
+                        data = await File.ReadAllBytesAsync(objectPath, ct);
+                    }
 
-                    case HydrateMode.Reference:
-                        // Just register the location, don't copy
-                        result.ReferencedObjects.Add(entry.ObjectId);
-                        break;
+                    switch (options.Mode)
+                    {
+                        case HydrateMode.Copy:
+                        case HydrateMode.Move:
+                            using (var ms = new MemoryStream(data))
+                            {
+                                await _objectStore.StoreAsync(ms, entry.Name, entry.ContentType, ct);
+                            }
+                            result.ImportedObjects.Add(entry.ObjectId);
+                            if (options.Mode == HydrateMode.Move)
+                                result.ObjectsToDelete.Add(objectPath);
+                            break;
 
-                    case HydrateMode.Move:
-                        // Copy then mark for deletion
-                        var moveData = await File.ReadAllBytesAsync(objectPath, ct);
-                        using (var moveMs = new MemoryStream(moveData))
-                        {
-                            await _objectStore.StoreAsync(moveMs, entry.Name, entry.ContentType, ct);
-                        }
-                        result.ImportedObjects.Add(entry.ObjectId);
-                        result.ObjectsToDelete.Add(objectPath);
-                        break;
+                        case HydrateMode.Reference:
+                            result.ReferencedObjects.Add(entry.ObjectId);
+                            break;
+                    }
+                }
+                catch (CryptographicException)
+                {
+                    result.FailedObjects.Add(entry.ObjectId);
                 }
             }
 
@@ -345,6 +591,10 @@ public sealed class NodeHydrator
 
             await File.WriteAllTextAsync(manifestPath, manifest.ToJson(), ct);
 
+            // Clear sensitive data
+            if (dataKey != null)
+                CryptographicOperations.ZeroMemory(dataKey);
+
             result.Success = true;
         }
         catch (Exception ex)
@@ -354,6 +604,36 @@ public sealed class NodeHydrator
         }
 
         return result;
+    }
+
+    private static byte[] DeriveKeyFromPassword(string password, byte[] salt, KeyDerivationMethod method)
+    {
+        return Rfc2898DeriveBytes.Pbkdf2(
+            System.Text.Encoding.UTF8.GetBytes(password),
+            salt,
+            iterations: method == KeyDerivationMethod.Argon2id ? 600_000 : 310_000,
+            HashAlgorithmName.SHA256,
+            outputLength: 32);
+    }
+
+    private static byte[] UnwrapKey(byte[] wrapped, byte[] kek)
+    {
+        var iv = wrapped.AsSpan(0, 12).ToArray();
+        var tag = wrapped.AsSpan(12, 16).ToArray();
+        var ciphertext = wrapped.AsSpan(28).ToArray();
+
+        using var aes = new AesGcm(kek, 16);
+        var key = new byte[ciphertext.Length];
+        aes.Decrypt(iv, ciphertext, tag, key);
+        return key;
+    }
+
+    private static byte[] DecryptData(byte[] ciphertext, byte[] iv, byte[] tag, byte[] key)
+    {
+        using var aes = new AesGcm(key, 16);
+        var plaintext = new byte[ciphertext.Length];
+        aes.Decrypt(iv, ciphertext, tag, plaintext);
+        return plaintext;
     }
 
     /// <summary>
