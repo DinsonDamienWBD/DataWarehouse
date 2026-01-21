@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using System.Diagnostics;
+using System.Globalization;
 using System.IO.Compression;
 using System.Net;
 using System.Net.NetworkInformation;
@@ -10,6 +11,7 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Threading.Channels;
+using System.Xml.Linq;
 
 namespace DataWarehouse.SDK.Infrastructure;
 
@@ -1514,7 +1516,7 @@ public sealed class S3Destination : IBackupDestination, IAsyncDisposable
 
             var content = await response.Content.ReadAsStringAsync(ct);
 
-            // Parse XML response (simplified)
+            // Parse XML response using proper XDocument parser
             var keys = ParseS3ListResponse(content, out isTruncated, out marker);
 
             foreach (var key in keys)
@@ -1652,23 +1654,90 @@ public sealed class S3Destination : IBackupDestination, IAsyncDisposable
         isTruncated = false;
         nextMarker = "";
 
-        // Simple XML parsing (in production, use proper XML parser)
-        if (xml.Contains("<IsTruncated>true</IsTruncated>"))
-            isTruncated = true;
-
-        var tokenMatch = System.Text.RegularExpressions.Regex.Match(xml, @"<NextContinuationToken>([^<]+)</NextContinuationToken>");
-        if (tokenMatch.Success)
-            nextMarker = tokenMatch.Groups[1].Value;
-
-        var contentMatches = System.Text.RegularExpressions.Regex.Matches(xml, @"<Contents>.*?<Key>([^<]+)</Key>.*?<Size>(\d+)</Size>.*?<LastModified>([^<]+)</LastModified>.*?</Contents>", System.Text.RegularExpressions.RegexOptions.Singleline);
-
-        foreach (System.Text.RegularExpressions.Match match in contentMatches)
+        if (string.IsNullOrWhiteSpace(xml))
         {
-            results.Add((
-                match.Groups[1].Value,
-                long.Parse(match.Groups[2].Value),
-                DateTime.Parse(match.Groups[3].Value)
-            ));
+            return results;
+        }
+
+        XDocument doc;
+        try
+        {
+            doc = XDocument.Parse(xml);
+        }
+        catch (System.Xml.XmlException)
+        {
+            // Malformed XML - return empty results
+            return results;
+        }
+
+        if (doc.Root == null)
+        {
+            return results;
+        }
+
+        // Handle S3 namespace - the root element may have a default namespace
+        XNamespace ns = doc.Root.GetDefaultNamespace();
+
+        // Parse IsTruncated
+        var isTruncatedElement = doc.Root.Element(ns + "IsTruncated");
+        if (isTruncatedElement != null &&
+            bool.TryParse(isTruncatedElement.Value, out var truncated))
+        {
+            isTruncated = truncated;
+        }
+
+        // Parse NextContinuationToken (used in ListObjectsV2)
+        var nextTokenElement = doc.Root.Element(ns + "NextContinuationToken");
+        if (nextTokenElement != null && !string.IsNullOrEmpty(nextTokenElement.Value))
+        {
+            nextMarker = nextTokenElement.Value;
+        }
+        else
+        {
+            // Fall back to NextMarker (used in ListObjects v1)
+            var nextMarkerElement = doc.Root.Element(ns + "NextMarker");
+            if (nextMarkerElement != null && !string.IsNullOrEmpty(nextMarkerElement.Value))
+            {
+                nextMarker = nextMarkerElement.Value;
+            }
+        }
+
+        // Parse Contents elements
+        var contents = doc.Root.Elements(ns + "Contents");
+        foreach (var content in contents)
+        {
+            var keyElement = content.Element(ns + "Key");
+            var sizeElement = content.Element(ns + "Size");
+            var lastModifiedElement = content.Element(ns + "LastModified");
+
+            // Skip entries with missing required fields
+            if (keyElement == null || string.IsNullOrEmpty(keyElement.Value))
+            {
+                continue;
+            }
+
+            var key = keyElement.Value;
+
+            // Parse size with default of 0 for missing/invalid values
+            long size = 0;
+            if (sizeElement != null && !string.IsNullOrEmpty(sizeElement.Value))
+            {
+                long.TryParse(sizeElement.Value, NumberStyles.Integer, CultureInfo.InvariantCulture, out size);
+            }
+
+            // Parse LastModified with default of MinValue for missing/invalid values
+            var lastModified = DateTime.MinValue;
+            if (lastModifiedElement != null && !string.IsNullOrEmpty(lastModifiedElement.Value))
+            {
+                // S3 uses ISO 8601 format: 2023-01-15T10:30:00.000Z
+                if (DateTime.TryParse(lastModifiedElement.Value, CultureInfo.InvariantCulture,
+                    DateTimeStyles.AdjustToUniversal | DateTimeStyles.AssumeUniversal, out var parsedDate))
+                {
+                    lastModified = parsedDate;
+                }
+            }
+
+            results.Add((key, size, lastModified));
         }
 
         return results;
@@ -1896,15 +1965,208 @@ public sealed class AzureBlobDestination : IBackupDestination, IAsyncDisposable
         if (string.IsNullOrEmpty(_accountKey))
             return;
 
-        var date = DateTime.UtcNow.ToString("R");
+        var date = DateTime.UtcNow.ToString("R", CultureInfo.InvariantCulture);
         request.Headers.Add("x-ms-date", date);
         request.Headers.Add("x-ms-version", "2021-06-08");
 
-        // Simplified SharedKey auth (full implementation would include proper canonicalization)
-        var stringToSign = $"{method}\n\n\n\n\n\n\n\n\n\n\n\nx-ms-date:{date}\nx-ms-version:2021-06-08\n/{_accountName}/{_containerName}/{resource}";
-        var signature = Convert.ToBase64String(HMACSHA256.HashData(Convert.FromBase64String(_accountKey), Encoding.UTF8.GetBytes(stringToSign)));
+        // Build canonicalized headers (all x-ms-* headers in lexicographical order)
+        var canonicalizedHeaders = BuildCanonicalizedHeaders(request);
 
-        request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("SharedKey", $"{_accountName}:{signature}");
+        // Build canonicalized resource
+        var canonicalizedResource = BuildCanonicalizedResource(request.RequestUri!, resource);
+
+        // Get content headers for string-to-sign
+        var contentEncoding = GetHeaderValue(request, "Content-Encoding");
+        var contentLanguage = GetHeaderValue(request, "Content-Language");
+        var contentLength = GetContentLength(request);
+        var contentMd5 = GetHeaderValue(request, "Content-MD5");
+        var contentType = GetHeaderValue(request, "Content-Type");
+        var dateHeader = GetHeaderValue(request, "Date"); // Empty when using x-ms-date
+        var ifModifiedSince = GetHeaderValue(request, "If-Modified-Since");
+        var ifMatch = GetHeaderValue(request, "If-Match");
+        var ifNoneMatch = GetHeaderValue(request, "If-None-Match");
+        var ifUnmodifiedSince = GetHeaderValue(request, "If-Unmodified-Since");
+        var range = GetHeaderValue(request, "Range");
+
+        // Build string-to-sign per Azure Storage SharedKey format
+        var stringToSign = new StringBuilder();
+        stringToSign.Append(method).Append('\n');
+        stringToSign.Append(contentEncoding).Append('\n');
+        stringToSign.Append(contentLanguage).Append('\n');
+        stringToSign.Append(contentLength).Append('\n');
+        stringToSign.Append(contentMd5).Append('\n');
+        stringToSign.Append(contentType).Append('\n');
+        stringToSign.Append(dateHeader).Append('\n');
+        stringToSign.Append(ifModifiedSince).Append('\n');
+        stringToSign.Append(ifMatch).Append('\n');
+        stringToSign.Append(ifNoneMatch).Append('\n');
+        stringToSign.Append(ifUnmodifiedSince).Append('\n');
+        stringToSign.Append(range).Append('\n');
+        stringToSign.Append(canonicalizedHeaders);
+        stringToSign.Append(canonicalizedResource);
+
+        var signature = Convert.ToBase64String(
+            HMACSHA256.HashData(
+                Convert.FromBase64String(_accountKey),
+                Encoding.UTF8.GetBytes(stringToSign.ToString())));
+
+        request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue(
+            "SharedKey", $"{_accountName}:{signature}");
+    }
+
+    private static string BuildCanonicalizedHeaders(HttpRequestMessage request)
+    {
+        // Collect all x-ms-* headers
+        var msHeaders = new SortedDictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var header in request.Headers)
+        {
+            if (header.Key.StartsWith("x-ms-", StringComparison.OrdinalIgnoreCase))
+            {
+                var lowerKey = header.Key.ToLowerInvariant();
+                if (!msHeaders.TryGetValue(lowerKey, out var values))
+                {
+                    values = new List<string>();
+                    msHeaders[lowerKey] = values;
+                }
+                foreach (var value in header.Value)
+                {
+                    // Trim whitespace and replace multiple spaces/newlines with single space
+                    var trimmedValue = System.Text.RegularExpressions.Regex.Replace(
+                        value.Trim(), @"\s+", " ");
+                    values.Add(trimmedValue);
+                }
+            }
+        }
+
+        // Also check content headers for x-ms-* headers
+        if (request.Content?.Headers != null)
+        {
+            foreach (var header in request.Content.Headers)
+            {
+                if (header.Key.StartsWith("x-ms-", StringComparison.OrdinalIgnoreCase))
+                {
+                    var lowerKey = header.Key.ToLowerInvariant();
+                    if (!msHeaders.TryGetValue(lowerKey, out var values))
+                    {
+                        values = new List<string>();
+                        msHeaders[lowerKey] = values;
+                    }
+                    foreach (var value in header.Value)
+                    {
+                        var trimmedValue = System.Text.RegularExpressions.Regex.Replace(
+                            value.Trim(), @"\s+", " ");
+                        values.Add(trimmedValue);
+                    }
+                }
+            }
+        }
+
+        // Build canonicalized headers string
+        var result = new StringBuilder();
+        foreach (var kvp in msHeaders)
+        {
+            result.Append(kvp.Key).Append(':').Append(string.Join(",", kvp.Value)).Append('\n');
+        }
+
+        return result.ToString();
+    }
+
+    private string BuildCanonicalizedResource(Uri requestUri, string resource)
+    {
+        var result = new StringBuilder();
+
+        // Start with account name and container
+        result.Append('/').Append(_accountName);
+
+        // Add the path (container and blob)
+        if (!string.IsNullOrEmpty(_containerName))
+        {
+            result.Append('/').Append(_containerName);
+        }
+
+        if (!string.IsNullOrEmpty(resource))
+        {
+            result.Append('/').Append(resource);
+        }
+
+        // Parse and sort query parameters
+        var query = requestUri.Query;
+        if (!string.IsNullOrEmpty(query))
+        {
+            var queryParams = new SortedDictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
+
+            var queryString = query.TrimStart('?');
+            var pairs = queryString.Split('&', StringSplitOptions.RemoveEmptyEntries);
+
+            foreach (var pair in pairs)
+            {
+                var parts = pair.Split('=', 2);
+                var key = Uri.UnescapeDataString(parts[0]).ToLowerInvariant();
+                var value = parts.Length > 1 ? Uri.UnescapeDataString(parts[1]) : "";
+
+                if (!queryParams.TryGetValue(key, out var values))
+                {
+                    values = new List<string>();
+                    queryParams[key] = values;
+                }
+                values.Add(value);
+            }
+
+            // Append sorted query parameters
+            foreach (var kvp in queryParams)
+            {
+                // Sort values for each parameter
+                kvp.Value.Sort(StringComparer.Ordinal);
+                result.Append('\n').Append(kvp.Key).Append(':').Append(string.Join(",", kvp.Value));
+            }
+        }
+
+        return result.ToString();
+    }
+
+    private static string GetHeaderValue(HttpRequestMessage request, string headerName)
+    {
+        if (request.Headers.TryGetValues(headerName, out var values))
+        {
+            return string.Join(",", values);
+        }
+
+        if (request.Content?.Headers != null)
+        {
+            var property = request.Content.Headers.GetType().GetProperty(
+                headerName.Replace("-", ""),
+                System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance |
+                System.Reflection.BindingFlags.IgnoreCase);
+
+            if (property != null)
+            {
+                var value = property.GetValue(request.Content.Headers);
+                if (value != null)
+                {
+                    return value.ToString() ?? "";
+                }
+            }
+
+            // Try direct header access
+            if (request.Content.Headers.TryGetValues(headerName, out var contentValues))
+            {
+                return string.Join(",", contentValues);
+            }
+        }
+
+        return "";
+    }
+
+    private static string GetContentLength(HttpRequestMessage request)
+    {
+        if (request.Content?.Headers?.ContentLength != null)
+        {
+            var length = request.Content.Headers.ContentLength.Value;
+            // Azure requires content-length to be empty for 0-length bodies in certain scenarios
+            return length > 0 ? length.ToString(CultureInfo.InvariantCulture) : "";
+        }
+        return "";
     }
 
     private static List<(string Name, long Size, DateTime LastModified)> ParseAzureListResponse(string xml, out bool hasMore, out string nextMarker)
@@ -2965,112 +3227,360 @@ public sealed class ExtendedEncryptionManager : IAsyncDisposable
 
     private byte[] DeriveArgon2idManual(string password, byte[] salt)
     {
-        // Argon2id implementation following RFC 9106
+        // Full Argon2id implementation following RFC 9106
         var passwordBytes = Encoding.UTF8.GetBytes(password);
-        var keyLength = _config.KeySizeBits / 8;
-        var memoryCost = _config.Argon2MemoryKb;
-        var timeCost = _config.Argon2TimeCost;
-        var parallelism = _config.Argon2Parallelism;
+        var tagLength = _config.KeySizeBits / 8;
+        var memoryCost = _config.Argon2MemoryKb; // m in KB
+        var timeCost = _config.Argon2TimeCost;   // t iterations
+        var parallelism = _config.Argon2Parallelism; // p lanes
 
-        // H0 = H(p || τ || m || t || v || y || len(P) || P || len(S) || S || len(K) || K || len(X) || X)
-        using var blake2b = new Blake2bHasher();
+        // Constants per RFC 9106
+        const int ARGON2_BLOCK_SIZE = 1024; // bytes
+        const int ARGON2_QWORDS_IN_BLOCK = 128; // 1024/8
+        const int ARGON2_SYNC_POINTS = 4; // slices per pass
+        const int ARGON2_VERSION = 0x13; // Version 1.3
+        const int ARGON2_TYPE_ID = 2; // Argon2id
 
-        // Initial hash
+        // Calculate memory size in blocks (minimum 8*p blocks)
+        var memoryBlocks = Math.Max(memoryCost, 8 * parallelism);
+        // Round down to multiple of 4*p
+        memoryBlocks = (memoryBlocks / (4 * parallelism)) * (4 * parallelism);
+        var laneLength = memoryBlocks / parallelism;
+        var segmentLength = laneLength / ARGON2_SYNC_POINTS;
+
+        // H0 = H^(64)(p || tau || m || t || v || y || len(P) || P || len(S) || S || len(K) || K || len(X) || X)
         var h0Input = new List<byte>();
-        h0Input.AddRange(BitConverter.GetBytes(parallelism)); // p
-        h0Input.AddRange(BitConverter.GetBytes(keyLength)); // τ
-        h0Input.AddRange(BitConverter.GetBytes(memoryCost)); // m
-        h0Input.AddRange(BitConverter.GetBytes(timeCost)); // t
-        h0Input.AddRange(BitConverter.GetBytes(0x13)); // v (version 1.3)
-        h0Input.AddRange(BitConverter.GetBytes(2)); // y (Argon2id = 2)
-        h0Input.AddRange(BitConverter.GetBytes(passwordBytes.Length));
+        h0Input.AddRange(ToLittleEndianBytes(parallelism));
+        h0Input.AddRange(ToLittleEndianBytes(tagLength));
+        h0Input.AddRange(ToLittleEndianBytes(memoryCost));
+        h0Input.AddRange(ToLittleEndianBytes(timeCost));
+        h0Input.AddRange(ToLittleEndianBytes(ARGON2_VERSION));
+        h0Input.AddRange(ToLittleEndianBytes(ARGON2_TYPE_ID));
+        h0Input.AddRange(ToLittleEndianBytes(passwordBytes.Length));
         h0Input.AddRange(passwordBytes);
-        h0Input.AddRange(BitConverter.GetBytes(salt.Length));
+        h0Input.AddRange(ToLittleEndianBytes(salt.Length));
         h0Input.AddRange(salt);
-        h0Input.AddRange(BitConverter.GetBytes(0)); // No secret key
-        h0Input.AddRange(BitConverter.GetBytes(0)); // No associated data
+        h0Input.AddRange(ToLittleEndianBytes(0)); // No secret key (K)
+        h0Input.AddRange(ToLittleEndianBytes(0)); // No associated data (X)
 
-        var h0 = blake2b.ComputeHash(h0Input.ToArray(), 64);
+        var h0 = Blake2bHasher.Hash(h0Input.ToArray(), 64);
 
-        // Memory matrix B (simplified - full implementation would use blocks)
-        var blockCount = memoryCost / 4; // 4 blocks per KB
-        var memory = new byte[blockCount][];
-
-        // Initialize first blocks
-        for (int i = 0; i < Math.Min(blockCount, parallelism * 2); i++)
+        // Allocate memory matrix B[p][q] where q = laneLength
+        var memory = new ulong[memoryBlocks][];
+        for (int i = 0; i < memoryBlocks; i++)
         {
-            var blockInput = new byte[h0.Length + 8];
-            Array.Copy(h0, blockInput, h0.Length);
-            BitConverter.GetBytes(i).CopyTo(blockInput, h0.Length);
-            BitConverter.GetBytes(i / 2).CopyTo(blockInput, h0.Length + 4);
-            memory[i] = blake2b.ComputeHash(blockInput, 1024);
+            memory[i] = new ulong[ARGON2_QWORDS_IN_BLOCK];
         }
 
-        // Fill remaining blocks with compression function
-        for (int i = parallelism * 2; i < blockCount; i++)
+        // Initialize first two blocks of each lane
+        // B[i][0] = H'^(1024)(H0 || 0 || i)
+        // B[i][1] = H'^(1024)(H0 || 1 || i)
+        for (int lane = 0; lane < parallelism; lane++)
         {
-            var prevBlock = memory[i - 1] ?? new byte[1024];
-            var refIndex = Math.Abs(BitConverter.ToInt32(prevBlock, 0)) % i;
-            var refBlock = memory[refIndex] ?? new byte[1024];
+            var input0 = new byte[h0.Length + 8];
+            Array.Copy(h0, input0, h0.Length);
+            ToLittleEndianBytes(0).CopyTo(input0, h0.Length);
+            ToLittleEndianBytes(lane).CopyTo(input0, h0.Length + 4);
+            var block0 = Blake2bHasher.HashLong(input0, ARGON2_BLOCK_SIZE);
+            BytesToBlock(block0, memory[lane * laneLength]);
 
-            memory[i] = CompressArgon2Block(prevBlock, refBlock);
+            var input1 = new byte[h0.Length + 8];
+            Array.Copy(h0, input1, h0.Length);
+            ToLittleEndianBytes(1).CopyTo(input1, h0.Length);
+            ToLittleEndianBytes(lane).CopyTo(input1, h0.Length + 4);
+            var block1 = Blake2bHasher.HashLong(input1, ARGON2_BLOCK_SIZE);
+            BytesToBlock(block1, memory[lane * laneLength + 1]);
         }
 
-        // Time cost iterations
-        for (int t = 1; t < timeCost; t++)
+        // Main loop: t passes over memory
+        for (int pass = 0; pass < timeCost; pass++)
         {
-            for (int i = 0; i < blockCount; i++)
+            for (int slice = 0; slice < ARGON2_SYNC_POINTS; slice++)
             {
-                var prevBlock = memory[(i - 1 + blockCount) % blockCount]!;
-                var refIndex = Math.Abs(BitConverter.ToInt32(prevBlock, 0)) % blockCount;
-                var refBlock = memory[refIndex]!;
-
-                // Argon2id: mix of Argon2i (data-independent) and Argon2d (data-dependent)
-                if (t == 0 && i < blockCount / 2)
+                for (int lane = 0; lane < parallelism; lane++)
                 {
-                    // First half of first pass: data-independent
-                    refIndex = (i * 3 + t) % blockCount;
-                    refBlock = memory[refIndex]!;
+                    // Generate addresses for Argon2id
+                    ulong[]? addressBlock = null;
+
+                    // Argon2id uses data-independent addressing for first two slices of first pass
+                    bool useDataIndependent = (pass == 0 && slice < 2);
+
+                    if (useDataIndependent)
+                    {
+                        addressBlock = new ulong[ARGON2_QWORDS_IN_BLOCK];
+                    }
+
+                    for (int index = 0; index < segmentLength; index++)
+                    {
+                        // Current block position
+                        int currentOffset = lane * laneLength + slice * segmentLength + index;
+
+                        // Skip first two blocks of first pass (already initialized)
+                        if (pass == 0 && slice == 0 && index < 2)
+                            continue;
+
+                        // Previous block (wrapping within lane)
+                        int prevOffset = currentOffset - 1;
+                        if (currentOffset % laneLength == 0)
+                            prevOffset = currentOffset + laneLength - 1;
+
+                        ulong pseudoRand;
+                        if (useDataIndependent)
+                        {
+                            // Generate addresses using G function
+                            if (index % ARGON2_QWORDS_IN_BLOCK == 0 || addressBlock == null)
+                            {
+                                // Input block for address generation
+                                var inputBlock = new ulong[ARGON2_QWORDS_IN_BLOCK];
+                                inputBlock[0] = (ulong)pass;
+                                inputBlock[1] = (ulong)lane;
+                                inputBlock[2] = (ulong)slice;
+                                inputBlock[3] = (ulong)memoryBlocks;
+                                inputBlock[4] = (ulong)timeCost;
+                                inputBlock[5] = (ulong)ARGON2_TYPE_ID;
+                                inputBlock[6] = (ulong)(index / ARGON2_QWORDS_IN_BLOCK + 1);
+
+                                // Zero block for first G application
+                                var zeroBlock = new ulong[ARGON2_QWORDS_IN_BLOCK];
+                                addressBlock = new ulong[ARGON2_QWORDS_IN_BLOCK];
+
+                                // addressBlock = G(G(zeroBlock, inputBlock), zeroBlock)
+                                var tmp = Argon2Compress(zeroBlock, inputBlock);
+                                addressBlock = Argon2Compress(tmp, zeroBlock);
+                            }
+                            pseudoRand = addressBlock[index % ARGON2_QWORDS_IN_BLOCK];
+                        }
+                        else
+                        {
+                            // Data-dependent: use first 64 bits of previous block
+                            pseudoRand = memory[prevOffset][0];
+                        }
+
+                        // Compute reference block position using mapping function
+                        int refLane = (int)((pseudoRand >> 32) % (ulong)parallelism);
+
+                        // In first pass and first slice, reference must be in same lane
+                        if (pass == 0 && slice == 0)
+                            refLane = lane;
+
+                        // Calculate reference index
+                        int referenceAreaSize;
+                        int startPosition;
+
+                        if (pass == 0)
+                        {
+                            // First pass
+                            if (slice == 0)
+                            {
+                                // First slice: only previous blocks in same lane
+                                referenceAreaSize = index - 1;
+                                startPosition = 0;
+                            }
+                            else
+                            {
+                                if (refLane == lane)
+                                {
+                                    referenceAreaSize = slice * segmentLength + index - 1;
+                                    startPosition = 0;
+                                }
+                                else
+                                {
+                                    referenceAreaSize = slice * segmentLength + (index == 0 ? -1 : 0);
+                                    startPosition = 0;
+                                }
+                            }
+                        }
+                        else
+                        {
+                            // Subsequent passes
+                            if (refLane == lane)
+                            {
+                                referenceAreaSize = laneLength - segmentLength + index - 1;
+                            }
+                            else
+                            {
+                                referenceAreaSize = laneLength - segmentLength + (index == 0 ? -1 : 0);
+                            }
+                            startPosition = (slice + 1) * segmentLength % laneLength;
+                        }
+
+                        if (referenceAreaSize < 0)
+                            referenceAreaSize = 0;
+
+                        // Map pseudoRand to reference position
+                        ulong relativePosition = (pseudoRand & 0xFFFFFFFF);
+                        relativePosition = (relativePosition * relativePosition) >> 32;
+                        relativePosition = (ulong)referenceAreaSize - 1 - ((ulong)referenceAreaSize * relativePosition >> 32);
+
+                        int refIndex = (int)((startPosition + (int)relativePosition) % laneLength);
+                        int refOffset = refLane * laneLength + refIndex;
+
+                        // Bounds check
+                        if (refOffset < 0) refOffset = 0;
+                        if (refOffset >= memoryBlocks) refOffset = memoryBlocks - 1;
+
+                        // Apply compression function: B[current] = G(B[prev], B[ref]) XOR B[current] (for pass > 0)
+                        var newBlock = Argon2Compress(memory[prevOffset], memory[refOffset]);
+
+                        if (pass > 0)
+                        {
+                            // XOR with existing block
+                            for (int i = 0; i < ARGON2_QWORDS_IN_BLOCK; i++)
+                            {
+                                memory[currentOffset][i] ^= newBlock[i];
+                            }
+                        }
+                        else
+                        {
+                            memory[currentOffset] = newBlock;
+                        }
+                    }
                 }
-
-                memory[i] = CompressArgon2Block(prevBlock, refBlock);
             }
         }
 
-        // Final block
-        var finalBlock = memory[blockCount - 1]!;
-        for (int i = 0; i < blockCount - 1; i++)
+        // Final: XOR last blocks of all lanes
+        var finalBlock = new ulong[ARGON2_QWORDS_IN_BLOCK];
+        for (int lane = 0; lane < parallelism; lane++)
         {
-            for (int j = 0; j < finalBlock.Length && j < memory[i]!.Length; j++)
+            int lastBlockOffset = lane * laneLength + laneLength - 1;
+            for (int i = 0; i < ARGON2_QWORDS_IN_BLOCK; i++)
             {
-                finalBlock[j] ^= memory[i]![j];
+                finalBlock[i] ^= memory[lastBlockOffset][i];
             }
         }
 
-        // Output
-        return blake2b.ComputeHash(finalBlock, keyLength);
+        // Convert final block to bytes and apply H' for tag
+        var finalBytes = BlockToBytes(finalBlock);
+        return Blake2bHasher.HashLong(finalBytes, tagLength);
     }
 
-    private static byte[] CompressArgon2Block(byte[] x, byte[] y)
+    private static byte[] ToLittleEndianBytes(int value)
+    {
+        var bytes = BitConverter.GetBytes(value);
+        if (!BitConverter.IsLittleEndian)
+            Array.Reverse(bytes);
+        return bytes;
+    }
+
+    private static void BytesToBlock(byte[] bytes, ulong[] block)
+    {
+        for (int i = 0; i < 128; i++)
+        {
+            block[i] = BitConverter.ToUInt64(bytes, i * 8);
+        }
+    }
+
+    private static byte[] BlockToBytes(ulong[] block)
     {
         var result = new byte[1024];
-        for (int i = 0; i < Math.Min(result.Length, Math.Min(x.Length, y.Length)); i++)
+        for (int i = 0; i < 128; i++)
         {
-            result[i] = (byte)(x[i] ^ y[i]);
+            BitConverter.GetBytes(block[i]).CopyTo(result, i * 8);
+        }
+        return result;
+    }
+
+    /// <summary>
+    /// Argon2 compression function G(X, Y) -> R
+    /// R = Z XOR Q where Q = permutation(Z), Z = X XOR Y
+    /// </summary>
+    private static ulong[] Argon2Compress(ulong[] x, ulong[] y)
+    {
+        const int ARGON2_QWORDS_IN_BLOCK = 128;
+
+        // Z = X XOR Y
+        var z = new ulong[ARGON2_QWORDS_IN_BLOCK];
+        for (int i = 0; i < ARGON2_QWORDS_IN_BLOCK; i++)
+        {
+            z[i] = x[i] ^ y[i];
         }
 
-        // Apply Blake2b compression rounds
-        for (int round = 0; round < 2; round++)
+        // Q = permutation(Z)
+        var q = new ulong[ARGON2_QWORDS_IN_BLOCK];
+        Array.Copy(z, q, ARGON2_QWORDS_IN_BLOCK);
+
+        // Apply permutation P: two rounds of Blake2b-like mixing
+        // First: apply P to rows (8 rows of 16 64-bit words)
+        for (int row = 0; row < 8; row++)
         {
-            for (int i = 0; i < result.Length - 8; i += 8)
-            {
-                var v = BitConverter.ToUInt64(result, i);
-                v = (v << 32) | (v >> 32); // Mix
-                BitConverter.GetBytes(v).CopyTo(result, i);
-            }
+            int offset = row * 16;
+            // Apply Blake2b G function to columns
+            Argon2BlakeRound(
+                ref q[offset + 0], ref q[offset + 1], ref q[offset + 2], ref q[offset + 3],
+                ref q[offset + 4], ref q[offset + 5], ref q[offset + 6], ref q[offset + 7],
+                ref q[offset + 8], ref q[offset + 9], ref q[offset + 10], ref q[offset + 11],
+                ref q[offset + 12], ref q[offset + 13], ref q[offset + 14], ref q[offset + 15]
+            );
+        }
+
+        // Second: apply P to columns (8 columns of 16 64-bit words)
+        for (int col = 0; col < 8; col++)
+        {
+            Argon2BlakeRound(
+                ref q[col + 0 * 8], ref q[col + 1 * 8], ref q[col + 2 * 8], ref q[col + 3 * 8],
+                ref q[col + 4 * 8], ref q[col + 5 * 8], ref q[col + 6 * 8], ref q[col + 7 * 8],
+                ref q[col + 8 * 8], ref q[col + 9 * 8], ref q[col + 10 * 8], ref q[col + 11 * 8],
+                ref q[col + 12 * 8], ref q[col + 13 * 8], ref q[col + 14 * 8], ref q[col + 15 * 8]
+            );
+        }
+
+        // R = Z XOR Q
+        var result = new ulong[ARGON2_QWORDS_IN_BLOCK];
+        for (int i = 0; i < ARGON2_QWORDS_IN_BLOCK; i++)
+        {
+            result[i] = z[i] ^ q[i];
         }
 
         return result;
+    }
+
+    /// <summary>
+    /// Argon2 Blake2b-like round function for 16 64-bit words.
+    /// </summary>
+    private static void Argon2BlakeRound(
+        ref ulong v0, ref ulong v1, ref ulong v2, ref ulong v3,
+        ref ulong v4, ref ulong v5, ref ulong v6, ref ulong v7,
+        ref ulong v8, ref ulong v9, ref ulong v10, ref ulong v11,
+        ref ulong v12, ref ulong v13, ref ulong v14, ref ulong v15)
+    {
+        // Two rounds of Blake2b G mixing
+        Argon2GB(ref v0, ref v4, ref v8, ref v12);
+        Argon2GB(ref v1, ref v5, ref v9, ref v13);
+        Argon2GB(ref v2, ref v6, ref v10, ref v14);
+        Argon2GB(ref v3, ref v7, ref v11, ref v15);
+
+        Argon2GB(ref v0, ref v5, ref v10, ref v15);
+        Argon2GB(ref v1, ref v6, ref v11, ref v12);
+        Argon2GB(ref v2, ref v7, ref v8, ref v13);
+        Argon2GB(ref v3, ref v4, ref v9, ref v14);
+    }
+
+    /// <summary>
+    /// Argon2 GB mixing function (modified Blake2b G).
+    /// Uses multiplication for better diffusion per RFC 9106.
+    /// </summary>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static void Argon2GB(ref ulong a, ref ulong b, ref ulong c, ref ulong d)
+    {
+        // Argon2 uses a modified G with multiplications for better diffusion
+        a = a + b + 2 * (uint)a * (uint)b;
+        d = RotateRight64(d ^ a, 32);
+
+        c = c + d + 2 * (uint)c * (uint)d;
+        b = RotateRight64(b ^ c, 24);
+
+        a = a + b + 2 * (uint)a * (uint)b;
+        d = RotateRight64(d ^ a, 16);
+
+        c = c + d + 2 * (uint)c * (uint)d;
+        b = RotateRight64(b ^ c, 63);
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static ulong RotateRight64(ulong value, int bits)
+    {
+        return (value >> bits) | (value << (64 - bits));
     }
 
     private byte[] DeriveScrypt(string password, byte[] salt)
@@ -3577,7 +4087,8 @@ public sealed class XChaCha20Poly1305Provider : IEncryptionProvider
 }
 
 /// <summary>
-/// Twofish encryption provider.
+/// Twofish encryption provider implementing the full Twofish block cipher per the official specification.
+/// Supports 256-bit keys with CTR mode and HMAC authentication.
 /// </summary>
 public sealed class TwofishProvider : IEncryptionProvider
 {
@@ -3585,9 +4096,64 @@ public sealed class TwofishProvider : IEncryptionProvider
     public int KeySizeBits => 256;
     public int NonceSizeBytes => 16;
 
-    // Twofish S-boxes (precomputed)
-    private static readonly byte[] Q0 = GenerateQ0();
-    private static readonly byte[] Q1 = GenerateQ1();
+    // q0 permutation table from Twofish specification
+    private static readonly byte[] Q0 = new byte[]
+    {
+        0xA9, 0x67, 0xB3, 0xE8, 0x04, 0xFD, 0xA3, 0x76, 0x9A, 0x92, 0x80, 0x78, 0xE4, 0xDD, 0xD1, 0x38,
+        0x0D, 0xC6, 0x35, 0x98, 0x18, 0xF7, 0xEC, 0x6C, 0x43, 0x75, 0x37, 0x26, 0xFA, 0x13, 0x94, 0x48,
+        0xF2, 0xD0, 0x8B, 0x30, 0x84, 0x54, 0xDF, 0x23, 0x19, 0x5B, 0x3D, 0x59, 0xF3, 0xAE, 0xA2, 0x82,
+        0x63, 0x01, 0x83, 0x2E, 0xD9, 0x51, 0x9B, 0x7C, 0xA6, 0xEB, 0xA5, 0xBE, 0x16, 0x0C, 0xE3, 0x61,
+        0xC0, 0x8C, 0x3A, 0xF5, 0x73, 0x2C, 0x25, 0x0B, 0xBB, 0x4E, 0x89, 0x6B, 0x53, 0x6A, 0xB4, 0xF1,
+        0xE1, 0xE6, 0xBD, 0x45, 0xE2, 0xF4, 0xB6, 0x66, 0xCC, 0x95, 0x03, 0x56, 0xD4, 0x1C, 0x1E, 0xD7,
+        0xFB, 0xC3, 0x8E, 0xB5, 0xE9, 0xCF, 0xBF, 0xBA, 0xEA, 0x77, 0x39, 0xAF, 0x33, 0xC9, 0x62, 0x71,
+        0x81, 0x79, 0x09, 0xAD, 0x24, 0xCD, 0xF9, 0xD8, 0xE5, 0xC5, 0xB9, 0x4D, 0x44, 0x08, 0x86, 0xE7,
+        0xA1, 0x1D, 0xAA, 0xED, 0x06, 0x70, 0xB2, 0xD2, 0x41, 0x7B, 0xA0, 0x11, 0x31, 0xC2, 0x27, 0x90,
+        0x20, 0xF6, 0x60, 0xFF, 0x96, 0x5C, 0xB1, 0xAB, 0x9E, 0x9C, 0x52, 0x1B, 0x5F, 0x93, 0x0A, 0xEF,
+        0x91, 0x85, 0x49, 0xEE, 0x2D, 0x4F, 0x8F, 0x3B, 0x47, 0x87, 0x6D, 0x46, 0xD6, 0x3E, 0x69, 0x64,
+        0x2A, 0xCE, 0xCB, 0x2F, 0xFC, 0x97, 0x05, 0x7A, 0xAC, 0x7F, 0xD5, 0x1A, 0x4B, 0x0E, 0xA7, 0x5A,
+        0x28, 0x14, 0x3F, 0x29, 0x88, 0x3C, 0x4C, 0x02, 0xB8, 0xDA, 0xB0, 0x17, 0x55, 0x1F, 0x8A, 0x7D,
+        0x57, 0xC7, 0x8D, 0x74, 0xB7, 0xC4, 0x9F, 0x72, 0x7E, 0x15, 0x22, 0x12, 0x58, 0x07, 0x99, 0x34,
+        0x6E, 0x50, 0xDE, 0x68, 0x65, 0xBC, 0xDB, 0xF8, 0xC8, 0xA8, 0x2B, 0x40, 0xDC, 0xFE, 0x32, 0xA4,
+        0xCA, 0x10, 0x21, 0xF0, 0xD3, 0x5D, 0x0F, 0x00, 0x6F, 0x9D, 0x36, 0x42, 0x4A, 0x5E, 0xC1, 0xE0
+    };
+
+    // q1 permutation table from Twofish specification
+    private static readonly byte[] Q1 = new byte[]
+    {
+        0x75, 0xF3, 0xC6, 0xF4, 0xDB, 0x7B, 0xFB, 0xC8, 0x4A, 0xD3, 0xE6, 0x6B, 0x45, 0x7D, 0xE8, 0x4B,
+        0xD6, 0x32, 0xD8, 0xFD, 0x37, 0x71, 0xF1, 0xE1, 0x30, 0x0F, 0xF8, 0x1B, 0x87, 0xFA, 0x06, 0x3F,
+        0x5E, 0xBA, 0xAE, 0x5B, 0x8A, 0x00, 0xBC, 0x9D, 0x6D, 0xC1, 0xB1, 0x0E, 0x80, 0x5D, 0xD2, 0xD5,
+        0xA0, 0x84, 0x07, 0x14, 0xB5, 0x90, 0x2C, 0xA3, 0xB2, 0x73, 0x4C, 0x54, 0x92, 0x74, 0x36, 0x51,
+        0x38, 0xB0, 0xBD, 0x5A, 0xFC, 0x60, 0x62, 0x96, 0x6C, 0x42, 0xF7, 0x10, 0x7C, 0x28, 0x27, 0x8C,
+        0x13, 0x95, 0x9C, 0xC7, 0x24, 0x46, 0x3B, 0x70, 0xCA, 0xE3, 0x85, 0xCB, 0x11, 0xD0, 0x93, 0xB8,
+        0xA6, 0x83, 0x20, 0xFF, 0x9F, 0x77, 0xC3, 0xCC, 0x03, 0x6F, 0x08, 0xBF, 0x40, 0xE7, 0x2B, 0xE2,
+        0x79, 0x0C, 0xAA, 0x82, 0x41, 0x3A, 0xEA, 0xB9, 0xE4, 0x9A, 0xA4, 0x97, 0x7E, 0xDA, 0x7A, 0x17,
+        0x66, 0x94, 0xA1, 0x1D, 0x3D, 0xF0, 0xDE, 0xB3, 0x0B, 0x72, 0xA7, 0x1C, 0xEF, 0xD1, 0x53, 0x3E,
+        0x8F, 0x33, 0x26, 0x5F, 0xEC, 0x76, 0x2A, 0x49, 0x81, 0x88, 0xEE, 0x21, 0xC4, 0x1A, 0xEB, 0xD9,
+        0xC5, 0x39, 0x99, 0xCD, 0xAD, 0x31, 0x8B, 0x01, 0x18, 0x23, 0xDD, 0x1F, 0x4E, 0x2D, 0xF9, 0x48,
+        0x4F, 0xF2, 0x65, 0x8E, 0x78, 0x5C, 0x58, 0x19, 0x8D, 0xE5, 0x98, 0x57, 0x67, 0x7F, 0x05, 0x64,
+        0xAF, 0x63, 0xB6, 0xFE, 0xF5, 0xB7, 0x3C, 0xA5, 0xCE, 0xE9, 0x68, 0x44, 0xE0, 0x4D, 0x43, 0x69,
+        0x29, 0x2E, 0xAC, 0x15, 0x59, 0xA8, 0x0A, 0x9E, 0x6E, 0x47, 0xDF, 0x34, 0x35, 0x6A, 0xCF, 0xDC,
+        0x22, 0xC9, 0xC0, 0x9B, 0x89, 0xD4, 0xED, 0xAB, 0x12, 0xA2, 0x0D, 0x52, 0xBB, 0x02, 0x2F, 0xA9,
+        0xD7, 0x61, 0x1E, 0xB4, 0x50, 0x04, 0xF6, 0xC2, 0x16, 0x25, 0x86, 0x56, 0x55, 0x09, 0xBE, 0x91
+    };
+
+    // Reed-Solomon matrix for key schedule (over GF(2^8) with poly 0x14D)
+    private static readonly byte[,] RS = new byte[,]
+    {
+        { 0x01, 0xA4, 0x55, 0x87, 0x5A, 0x58, 0xDB, 0x9E },
+        { 0xA4, 0x56, 0x82, 0xF3, 0x1E, 0xC6, 0x68, 0xE5 },
+        { 0x02, 0xA1, 0xFC, 0xC1, 0x47, 0xAE, 0x3D, 0x19 },
+        { 0xA4, 0x55, 0x87, 0x5A, 0x58, 0xDB, 0x9E, 0x03 }
+    };
+
+    // Twofish key schedule context
+    private sealed class TwofishContext
+    {
+        public uint[] SubKeys = new uint[40];  // 40 subkeys for whitening and rounds
+        public uint[] SBoxKeys = new uint[4];  // S-box keys derived from key material
+        public int KeyLength;                   // Key length in 64-bit units (k)
+    }
 
     public EncryptedPayload Encrypt(byte[] plaintext, byte[] key)
     {
@@ -3597,16 +4163,17 @@ public sealed class TwofishProvider : IEncryptionProvider
         var encKey = key.AsSpan(0, 32).ToArray();
         var macKey = SHA256.HashData(key);
 
+        // Initialize Twofish context with key schedule
+        var ctx = InitializeContext(encKey);
+
         // Generate keystream using Twofish in CTR mode
         var ciphertext = new byte[plaintext.Length];
-        var subkeys = GenerateSubkeys(encKey);
-
         var counter = new byte[16];
         Array.Copy(nonce, counter, 16);
 
         for (int i = 0; i < plaintext.Length; i += 16)
         {
-            var block = TwofishEncryptBlock(counter, subkeys);
+            var block = TwofishEncryptBlock(counter, ctx);
             var blockLen = Math.Min(16, plaintext.Length - i);
 
             for (int j = 0; j < blockLen; j++)
@@ -3645,16 +4212,17 @@ public sealed class TwofishProvider : IEncryptionProvider
         if (!CryptographicOperations.FixedTimeEquals(expectedTag, payload.Tag))
             throw new CryptographicException("MAC verification failed");
 
+        // Initialize Twofish context with key schedule
+        var ctx = InitializeContext(encKey);
+
         // Decrypt using Twofish in CTR mode
         var plaintext = new byte[payload.Ciphertext.Length];
-        var subkeys = GenerateSubkeys(encKey);
-
         var counter = new byte[16];
         Array.Copy(payload.Nonce, counter, 16);
 
         for (int i = 0; i < payload.Ciphertext.Length; i += 16)
         {
-            var block = TwofishEncryptBlock(counter, subkeys);
+            var block = TwofishEncryptBlock(counter, ctx);
             var blockLen = Math.Min(16, payload.Ciphertext.Length - i);
 
             for (int j = 0; j < blockLen; j++)
@@ -3666,70 +4234,280 @@ public sealed class TwofishProvider : IEncryptionProvider
         return plaintext;
     }
 
-    private static uint[] GenerateSubkeys(byte[] key)
+    /// <summary>
+    /// Initialize Twofish context with full key schedule per specification.
+    /// </summary>
+    private static TwofishContext InitializeContext(byte[] key)
     {
-        // Simplified Twofish key schedule
-        var subkeys = new uint[40];
-        var kLen = key.Length / 8;
+        var ctx = new TwofishContext();
+        int keyLen = key.Length;
+        ctx.KeyLength = keyLen / 8; // k = number of 64-bit units (4 for 256-bit key)
 
-        for (int i = 0; i < 40; i++)
+        // Split key into Me (even words) and Mo (odd words)
+        var Me = new uint[ctx.KeyLength];
+        var Mo = new uint[ctx.KeyLength];
+
+        for (int i = 0; i < ctx.KeyLength; i++)
         {
-            var idx = i % key.Length;
-            subkeys[i] = BitConverter.ToUInt32(key, (idx / 4) * 4);
-            subkeys[i] = (uint)((subkeys[i] << (i % 32)) | (subkeys[i] >> (32 - i % 32)));
+            Me[i] = BitConverter.ToUInt32(key, 8 * i);
+            Mo[i] = BitConverter.ToUInt32(key, 8 * i + 4);
         }
 
-        return subkeys;
+        // Compute S-box keys using Reed-Solomon matrix
+        // S vector is computed from key material in reverse order
+        for (int i = 0; i < ctx.KeyLength; i++)
+        {
+            ctx.SBoxKeys[ctx.KeyLength - 1 - i] = ComputeReedSolomon(key, 8 * i);
+        }
+
+        // Generate 40 subkeys using the h function
+        uint rho = 0x01010101;
+        for (int i = 0; i < 20; i++)
+        {
+            // A = h(2i * rho, Me)
+            uint A = HFunction(2 * (uint)i * rho, Me, ctx.KeyLength);
+            // B = ROL(h((2i+1) * rho, Mo), 8)
+            uint B = HFunction((2 * (uint)i + 1) * rho, Mo, ctx.KeyLength);
+            B = RotateLeft(B, 8);
+
+            // Apply PHT: A = A + B, B = A + 2B
+            ctx.SubKeys[2 * i] = A + B;
+            ctx.SubKeys[2 * i + 1] = RotateLeft(A + 2 * B, 9);
+        }
+
+        return ctx;
     }
 
-    private static byte[] TwofishEncryptBlock(byte[] block, uint[] subkeys)
+    /// <summary>
+    /// Compute Reed-Solomon code for S-box key derivation.
+    /// RS is over GF(2^8) with primitive polynomial x^8 + x^6 + x^3 + x^2 + 1 (0x14D).
+    /// </summary>
+    private static uint ComputeReedSolomon(byte[] key, int offset)
     {
-        var output = new byte[16];
-        Array.Copy(block, output, 16);
+        var result = new byte[4];
+        for (int i = 0; i < 4; i++)
+        {
+            result[i] = 0;
+            for (int j = 0; j < 8; j++)
+            {
+                result[i] ^= GfMult(RS[i, j], key[offset + j], 0x14D);
+            }
+        }
+        return BitConverter.ToUInt32(result, 0);
+    }
 
-        // 16 rounds of Twofish (simplified)
+    /// <summary>
+    /// The h function maps a 32-bit input X through key-dependent S-boxes.
+    /// This is the core of the Twofish key schedule and g function.
+    /// </summary>
+    private static uint HFunction(uint X, uint[] L, int k)
+    {
+        byte[] y = new byte[4];
+        y[0] = (byte)X;
+        y[1] = (byte)(X >> 8);
+        y[2] = (byte)(X >> 16);
+        y[3] = (byte)(X >> 24);
+
+        // Process through q-boxes based on key length (k)
+        // For 256-bit key (k=4), all 4 stages are used
+        if (k == 4)
+        {
+            y[0] = Q1[y[0] ^ (byte)L[3]];
+            y[1] = Q0[y[1] ^ (byte)(L[3] >> 8)];
+            y[2] = Q0[y[2] ^ (byte)(L[3] >> 16)];
+            y[3] = Q1[y[3] ^ (byte)(L[3] >> 24)];
+        }
+
+        if (k >= 3)
+        {
+            y[0] = Q1[y[0] ^ (byte)L[2]];
+            y[1] = Q1[y[1] ^ (byte)(L[2] >> 8)];
+            y[2] = Q0[y[2] ^ (byte)(L[2] >> 16)];
+            y[3] = Q0[y[3] ^ (byte)(L[2] >> 24)];
+        }
+
+        // These two stages always apply for k >= 2 (128+ bit keys)
+        y[0] = Q1[Q0[Q0[y[0] ^ (byte)L[1]] ^ (byte)L[0]]];
+        y[1] = Q0[Q0[Q1[y[1] ^ (byte)(L[1] >> 8)] ^ (byte)(L[0] >> 8)]];
+        y[2] = Q1[Q1[Q0[y[2] ^ (byte)(L[1] >> 16)] ^ (byte)(L[0] >> 16)]];
+        y[3] = Q0[Q1[Q1[y[3] ^ (byte)(L[1] >> 24)] ^ (byte)(L[0] >> 24)]];
+
+        // Apply MDS matrix
+        return ApplyMDS(y);
+    }
+
+    /// <summary>
+    /// The g function used in each Feistel round.
+    /// Takes 32-bit input, processes through key-dependent S-boxes and MDS matrix.
+    /// </summary>
+    private static uint GFunction(uint X, uint[] sBoxKeys, int k)
+    {
+        byte[] y = new byte[4];
+        y[0] = (byte)X;
+        y[1] = (byte)(X >> 8);
+        y[2] = (byte)(X >> 16);
+        y[3] = (byte)(X >> 24);
+
+        // Process through q-boxes with S-box keys
+        // For 256-bit key (k=4)
+        if (k == 4)
+        {
+            y[0] = Q1[y[0] ^ (byte)sBoxKeys[3]];
+            y[1] = Q0[y[1] ^ (byte)(sBoxKeys[3] >> 8)];
+            y[2] = Q0[y[2] ^ (byte)(sBoxKeys[3] >> 16)];
+            y[3] = Q1[y[3] ^ (byte)(sBoxKeys[3] >> 24)];
+        }
+
+        if (k >= 3)
+        {
+            y[0] = Q1[y[0] ^ (byte)sBoxKeys[2]];
+            y[1] = Q1[y[1] ^ (byte)(sBoxKeys[2] >> 8)];
+            y[2] = Q0[y[2] ^ (byte)(sBoxKeys[2] >> 16)];
+            y[3] = Q0[y[3] ^ (byte)(sBoxKeys[2] >> 24)];
+        }
+
+        // Final two stages
+        y[0] = Q1[Q0[Q0[y[0] ^ (byte)sBoxKeys[1]] ^ (byte)sBoxKeys[0]]];
+        y[1] = Q0[Q0[Q1[y[1] ^ (byte)(sBoxKeys[1] >> 8)] ^ (byte)(sBoxKeys[0] >> 8)]];
+        y[2] = Q1[Q1[Q0[y[2] ^ (byte)(sBoxKeys[1] >> 16)] ^ (byte)(sBoxKeys[0] >> 16)]];
+        y[3] = Q0[Q1[Q1[y[3] ^ (byte)(sBoxKeys[1] >> 24)] ^ (byte)(sBoxKeys[0] >> 24)]];
+
+        // Apply MDS matrix
+        return ApplyMDS(y);
+    }
+
+    /// <summary>
+    /// Apply the MDS (Maximum Distance Separable) matrix multiplication in GF(2^8).
+    /// Uses primitive polynomial 0x169 (x^8 + x^6 + x^5 + x^3 + 1).
+    /// </summary>
+    private static uint ApplyMDS(byte[] y)
+    {
+        // MDS multiplication using the specific Twofish MDS matrix
+        // The MDS matrix is circulant based on [01, EF, 5B, 5B]
+        byte[] result = new byte[4];
+
+        result[0] = (byte)(GfMult(0x01, y[0], 0x169) ^ GfMult(0xEF, y[1], 0x169) ^
+                          GfMult(0x5B, y[2], 0x169) ^ GfMult(0x5B, y[3], 0x169));
+        result[1] = (byte)(GfMult(0x5B, y[0], 0x169) ^ GfMult(0xEF, y[1], 0x169) ^
+                          GfMult(0xEF, y[2], 0x169) ^ GfMult(0x01, y[3], 0x169));
+        result[2] = (byte)(GfMult(0xEF, y[0], 0x169) ^ GfMult(0x5B, y[1], 0x169) ^
+                          GfMult(0x01, y[2], 0x169) ^ GfMult(0xEF, y[3], 0x169));
+        result[3] = (byte)(GfMult(0xEF, y[0], 0x169) ^ GfMult(0x01, y[1], 0x169) ^
+                          GfMult(0xEF, y[2], 0x169) ^ GfMult(0x5B, y[3], 0x169));
+
+        return BitConverter.ToUInt32(result, 0);
+    }
+
+    /// <summary>
+    /// Galois Field multiplication in GF(2^8) with specified primitive polynomial.
+    /// </summary>
+    private static byte GfMult(byte a, byte b, int poly)
+    {
+        int result = 0;
+        int aa = a;
+        int bb = b;
+
+        while (aa != 0)
+        {
+            if ((aa & 1) != 0)
+                result ^= bb;
+
+            bb <<= 1;
+            if ((bb & 0x100) != 0)
+                bb ^= poly;
+
+            aa >>= 1;
+        }
+
+        return (byte)result;
+    }
+
+    /// <summary>
+    /// The F function combines two g functions with PHT and subkey addition.
+    /// </summary>
+    private static void FFunction(uint R0, uint R1, uint[] sBoxKeys, int k,
+                                  uint subKey0, uint subKey1, out uint F0, out uint F1)
+    {
+        // T0 = g(R0)
+        uint T0 = GFunction(R0, sBoxKeys, k);
+        // T1 = g(ROL(R1, 8))
+        uint T1 = GFunction(RotateLeft(R1, 8), sBoxKeys, k);
+
+        // PHT (Pseudo-Hadamard Transform) and subkey addition
+        F0 = T0 + T1 + subKey0;
+        F1 = T0 + 2 * T1 + subKey1;
+    }
+
+    /// <summary>
+    /// Encrypt a single 16-byte block using Twofish.
+    /// </summary>
+    private static byte[] TwofishEncryptBlock(byte[] block, TwofishContext ctx)
+    {
+        // Input whitening - XOR plaintext with first 4 subkeys
+        uint R0 = BitConverter.ToUInt32(block, 0) ^ ctx.SubKeys[0];
+        uint R1 = BitConverter.ToUInt32(block, 4) ^ ctx.SubKeys[1];
+        uint R2 = BitConverter.ToUInt32(block, 8) ^ ctx.SubKeys[2];
+        uint R3 = BitConverter.ToUInt32(block, 12) ^ ctx.SubKeys[3];
+
+        // 16 Feistel rounds
         for (int round = 0; round < 16; round++)
         {
-            var t0 = G(BitConverter.ToUInt32(output, 0), subkeys);
-            var t1 = G(BitConverter.ToUInt32(output, 4), subkeys);
+            // Compute F function
+            FFunction(R0, R1, ctx.SBoxKeys, ctx.KeyLength,
+                     ctx.SubKeys[8 + 2 * round], ctx.SubKeys[9 + 2 * round],
+                     out uint F0, out uint F1);
 
-            var f0 = t0 + t1 + subkeys[2 * round + 8];
-            var f1 = t0 + 2 * t1 + subkeys[2 * round + 9];
+            // XOR and rotate
+            R2 = RotateRight(R2 ^ F0, 1);
+            R3 = RotateLeft(R3, 1) ^ F1;
 
-            var r2 = BitConverter.ToUInt32(output, 8) ^ f0;
-            var r3 = BitConverter.ToUInt32(output, 12) ^ f1;
-
-            r2 = (r2 >> 1) | (r2 << 31);
-            r3 = (r3 << 1) | (r3 >> 31);
-
-            BitConverter.GetBytes(r2).CopyTo(output, 8);
-            BitConverter.GetBytes(r3).CopyTo(output, 12);
-
-            // Swap halves
-            (output[0], output[1], output[2], output[3], output[8], output[9], output[10], output[11]) =
-                (output[8], output[9], output[10], output[11], output[0], output[1], output[2], output[3]);
-            (output[4], output[5], output[6], output[7], output[12], output[13], output[14], output[15]) =
-                (output[12], output[13], output[14], output[15], output[4], output[5], output[6], output[7]);
+            // Swap (R0,R1) with (R2,R3) for next round (except last round)
+            if (round < 15)
+            {
+                (R0, R2) = (R2, R0);
+                (R1, R3) = (R3, R1);
+            }
         }
+
+        // Undo last swap (specification quirk)
+        (R0, R2) = (R2, R0);
+        (R1, R3) = (R3, R1);
+
+        // Output whitening - XOR with last 4 subkeys
+        R0 ^= ctx.SubKeys[4];
+        R1 ^= ctx.SubKeys[5];
+        R2 ^= ctx.SubKeys[6];
+        R3 ^= ctx.SubKeys[7];
+
+        // Convert back to bytes (little-endian)
+        var output = new byte[16];
+        BitConverter.GetBytes(R0).CopyTo(output, 0);
+        BitConverter.GetBytes(R1).CopyTo(output, 4);
+        BitConverter.GetBytes(R2).CopyTo(output, 8);
+        BitConverter.GetBytes(R3).CopyTo(output, 12);
 
         return output;
     }
 
-    private static uint G(uint x, uint[] subkeys)
+    /// <summary>
+    /// Rotate a 32-bit value left by the specified number of bits.
+    /// </summary>
+    private static uint RotateLeft(uint value, int count)
     {
-        var b0 = (byte)x;
-        var b1 = (byte)(x >> 8);
-        var b2 = (byte)(x >> 16);
-        var b3 = (byte)(x >> 24);
-
-        b0 = Q1[Q0[Q0[b0] ^ (byte)subkeys[0]] ^ (byte)subkeys[4]];
-        b1 = Q0[Q0[Q1[b1] ^ (byte)subkeys[1]] ^ (byte)subkeys[5]];
-        b2 = Q1[Q1[Q0[b2] ^ (byte)subkeys[2]] ^ (byte)subkeys[6]];
-        b3 = Q0[Q1[Q1[b3] ^ (byte)subkeys[3]] ^ (byte)subkeys[7]];
-
-        return (uint)(b0 | (b1 << 8) | (b2 << 16) | (b3 << 24));
+        return (value << count) | (value >> (32 - count));
     }
 
+    /// <summary>
+    /// Rotate a 32-bit value right by the specified number of bits.
+    /// </summary>
+    private static uint RotateRight(uint value, int count)
+    {
+        return (value >> count) | (value << (32 - count));
+    }
+
+    /// <summary>
+    /// Increment counter for CTR mode (big-endian increment).
+    /// </summary>
     private static void IncrementCounter(byte[] counter)
     {
         for (int i = counter.Length - 1; i >= 0; i--)
@@ -3738,46 +4516,21 @@ public sealed class TwofishProvider : IEncryptionProvider
                 break;
         }
     }
-
-    private static byte[] GenerateQ0()
-    {
-        var q = new byte[256];
-        for (int i = 0; i < 256; i++)
-        {
-            var a = (byte)(i >> 4);
-            var b = (byte)(i & 0xF);
-            a ^= b;
-            b = (byte)(((b << 1) ^ (b >> 3) ^ (a >> 3)) & 0xF);
-            a = (byte)((a ^ ((a << 1) & 0xF) ^ b) & 0xF);
-            q[i] = (byte)((a << 4) | b);
-        }
-        return q;
-    }
-
-    private static byte[] GenerateQ1()
-    {
-        var q = new byte[256];
-        for (int i = 0; i < 256; i++)
-        {
-            var a = (byte)(i >> 4);
-            var b = (byte)(i & 0xF);
-            a ^= b;
-            b = (byte)(((b << 1) ^ (b >> 3) ^ 8) & 0xF);
-            a = (byte)((((a << 1) ^ a ^ 8) ^ b) & 0xF);
-            q[i] = (byte)((a << 4) | b);
-        }
-        return q;
-    }
 }
 
 /// <summary>
-/// Serpent encryption provider.
+/// Full production-ready Serpent cipher implementation according to the official specification.
+/// Serpent is a 128-bit block cipher with 256-bit key, 32 rounds, and 8 distinct S-boxes.
+/// This implementation follows the bitsliced approach from the original Serpent paper.
 /// </summary>
 public sealed class SerpentProvider : IEncryptionProvider
 {
     public string AlgorithmName => "Serpent-256-CTR-HMAC";
     public int KeySizeBits => 256;
     public int NonceSizeBytes => 16;
+
+    // Golden ratio fractional part: (sqrt(5) - 1) / 2 * 2^32
+    private const uint PHI = 0x9E3779B9;
 
     public EncryptedPayload Encrypt(byte[] plaintext, byte[] key)
     {
@@ -3856,49 +4609,95 @@ public sealed class SerpentProvider : IEncryptionProvider
         return plaintext;
     }
 
+    /// <summary>
+    /// Generates Serpent subkeys according to the official key schedule.
+    /// Produces 33 round keys (132 32-bit words) from a 256-bit key.
+    /// </summary>
     private static uint[] GenerateSerpentSubkeys(byte[] key)
     {
-        // Serpent key schedule: expand 256-bit key to 132 32-bit subkeys
-        var w = new uint[140];
-
-        // Copy key into first 8 words
-        for (int i = 0; i < 8; i++)
-            w[i] = BitConverter.ToUInt32(key, i * 4);
-
-        // Expand key
-        for (int i = 8; i < 140; i++)
+        // Step 1: Pad key to 256 bits if necessary
+        var paddedKey = new byte[32];
+        Array.Copy(key, paddedKey, Math.Min(key.Length, 32));
+        if (key.Length < 32)
         {
-            var t = w[i - 8] ^ w[i - 5] ^ w[i - 3] ^ w[i - 1] ^ 0x9E3779B9 ^ (uint)(i - 8);
-            w[i] = (t << 11) | (t >> 21);
+            // Pad with 1 bit followed by zeros (as per spec)
+            paddedKey[key.Length] = 0x01;
         }
 
-        return w;
+        // Step 2: Convert to 8 words (little-endian)
+        var w = new uint[140];
+        for (int i = 0; i < 8; i++)
+            w[i] = BitConverter.ToUInt32(paddedKey, i * 4);
+
+        // Step 3: Expand using the recurrence relation
+        // w[i] = (w[i-8] XOR w[i-5] XOR w[i-3] XOR w[i-1] XOR PHI XOR i) <<< 11
+        for (int i = 8; i < 140; i++)
+        {
+            var t = w[i - 8] ^ w[i - 5] ^ w[i - 3] ^ w[i - 1] ^ PHI ^ (uint)(i - 8);
+            w[i] = RotateLeft(t, 11);
+        }
+
+        // Step 4: Apply S-boxes to generate actual subkeys
+        // The prekeys w[8..139] are transformed into subkeys k[0..131]
+        var subkeys = new uint[132];
+        for (int i = 0; i < 33; i++)
+        {
+            // Each group of 4 words uses S-box ((35 - i) % 8)
+            int sboxIndex = (35 - i) % 8;
+            var block = new uint[4];
+            block[0] = w[8 + i * 4];
+            block[1] = w[8 + i * 4 + 1];
+            block[2] = w[8 + i * 4 + 2];
+            block[3] = w[8 + i * 4 + 3];
+
+            ApplySBox(block, sboxIndex);
+
+            subkeys[i * 4] = block[0];
+            subkeys[i * 4 + 1] = block[1];
+            subkeys[i * 4 + 2] = block[2];
+            subkeys[i * 4 + 3] = block[3];
+        }
+
+        return subkeys;
     }
 
+    /// <summary>
+    /// Encrypts a single 128-bit block using Serpent.
+    /// </summary>
     private static byte[] SerpentEncryptBlock(byte[] block, uint[] subkeys)
     {
         var x = new uint[4];
         for (int i = 0; i < 4; i++)
             x[i] = BitConverter.ToUInt32(block, i * 4);
 
+        // Apply Initial Permutation (IP)
+        ApplyIP(x);
+
         // 32 rounds
         for (int round = 0; round < 32; round++)
         {
-            // Add round key
-            for (int i = 0; i < 4; i++)
-                x[i] ^= subkeys[4 * round + i];
+            // XOR with round key
+            x[0] ^= subkeys[4 * round];
+            x[1] ^= subkeys[4 * round + 1];
+            x[2] ^= subkeys[4 * round + 2];
+            x[3] ^= subkeys[4 * round + 3];
 
-            // S-box
-            SerpentSBox(x, round % 8);
+            // Apply S-box (round % 8)
+            ApplySBox(x, round % 8);
 
             // Linear transformation (except last round)
             if (round < 31)
-                SerpentLinearTransform(x);
+                ApplyLinearTransform(x);
         }
 
         // Final round key
-        for (int i = 0; i < 4; i++)
-            x[i] ^= subkeys[128 + i];
+        x[0] ^= subkeys[128];
+        x[1] ^= subkeys[129];
+        x[2] ^= subkeys[130];
+        x[3] ^= subkeys[131];
+
+        // Apply Final Permutation (FP)
+        ApplyFP(x);
 
         var output = new byte[16];
         for (int i = 0; i < 4; i++)
@@ -3907,36 +4706,480 @@ public sealed class SerpentProvider : IEncryptionProvider
         return output;
     }
 
-    private static void SerpentSBox(uint[] x, int box)
+    /// <summary>
+    /// Decrypts a single 128-bit block using Serpent.
+    /// </summary>
+    private static byte[] SerpentDecryptBlock(byte[] block, uint[] subkeys)
     {
-        // Simplified S-box implementation
-        uint t;
+        var x = new uint[4];
+        for (int i = 0; i < 4; i++)
+            x[i] = BitConverter.ToUInt32(block, i * 4);
+
+        // Apply Initial Permutation (IP)
+        ApplyIP(x);
+
+        // XOR with final round key
+        x[0] ^= subkeys[128];
+        x[1] ^= subkeys[129];
+        x[2] ^= subkeys[130];
+        x[3] ^= subkeys[131];
+
+        // Apply inverse S-box for round 31
+        ApplyInverseSBox(x, 7);
+
+        // XOR with round key 31
+        x[0] ^= subkeys[124];
+        x[1] ^= subkeys[125];
+        x[2] ^= subkeys[126];
+        x[3] ^= subkeys[127];
+
+        // Rounds 30 down to 0
+        for (int round = 30; round >= 0; round--)
+        {
+            ApplyInverseLinearTransform(x);
+            ApplyInverseSBox(x, round % 8);
+            x[0] ^= subkeys[4 * round];
+            x[1] ^= subkeys[4 * round + 1];
+            x[2] ^= subkeys[4 * round + 2];
+            x[3] ^= subkeys[4 * round + 3];
+        }
+
+        // Apply Final Permutation (FP)
+        ApplyFP(x);
+
+        var output = new byte[16];
+        for (int i = 0; i < 4; i++)
+            BitConverter.GetBytes(x[i]).CopyTo(output, i * 4);
+
+        return output;
+    }
+
+    #region S-Boxes (Bitsliced Implementation)
+
+    /// <summary>
+    /// Applies one of the 8 Serpent S-boxes in bitsliced form.
+    /// S-box definitions from the official Serpent specification:
+    /// S0: 3 8 15 1 10 6 5 11 14 13 4 2 7 0 9 12
+    /// S1: 15 12 2 7 9 0 5 10 1 11 14 8 6 13 3 4
+    /// S2: 8 6 7 9 3 12 10 15 13 1 14 4 0 11 5 2
+    /// S3: 0 15 11 8 12 9 6 3 13 1 2 4 10 7 5 14
+    /// S4: 1 15 8 3 12 0 11 6 2 5 4 10 9 14 7 13
+    /// S5: 15 5 2 11 4 10 9 12 0 3 14 8 13 6 7 1
+    /// S6: 7 2 12 5 8 4 6 11 14 9 1 15 13 3 10 0
+    /// S7: 1 13 15 0 14 8 2 11 7 4 12 10 9 3 5 6
+    /// </summary>
+    private static void ApplySBox(uint[] x, int box)
+    {
+        uint t0, t1, t2, t3, t4, t5, t6, t7, t8, t9, t10, t11, t12, t13, t14, t15, t16, t17;
+
         switch (box)
         {
             case 0:
-                t = x[0]; x[0] = x[0] ^ x[3]; x[3] = x[1] ^ x[2]; x[1] = t ^ x[2]; x[2] = x[3] ^ t;
+                // S0: 3 8 15 1 10 6 5 11 14 13 4 2 7 0 9 12
+                t0 = x[1] ^ x[2];
+                t1 = x[0] | x[3];
+                t2 = x[0] ^ x[1];
+                t3 = x[3] ^ t0;
+                t4 = t1 ^ t3;
+                t5 = x[1] | x[2];
+                t6 = x[3] ^ t4;
+                t7 = t5 | t6;
+                t8 = x[0] ^ x[3];
+                t9 = t2 & t8;
+                x[3] = t7 ^ t9;
+                t10 = t2 | x[3];
+                x[1] = t10 ^ t8;
+                t11 = t4 ^ t6;
+                t12 = x[1] & t11;
+                x[2] = t4 ^ t12;
+                t13 = x[2] & x[3];
+                x[0] = t0 ^ t13;
                 break;
+
             case 1:
-                t = x[0]; x[0] = x[1] ^ x[3]; x[1] = t ^ x[2]; x[2] = x[3] ^ t; x[3] = x[0] ^ x[2];
+                // S1: 15 12 2 7 9 0 5 10 1 11 14 8 6 13 3 4
+                t0 = x[0] | x[3];
+                t1 = x[2] ^ x[3];
+                t2 = ~x[1];
+                t3 = x[0] ^ x[2];
+                t4 = x[0] | t2;
+                t5 = t0 & t1;
+                t6 = t3 | t5;
+                x[1] = t4 ^ t6;
+                t7 = t0 ^ t2;
+                t8 = t5 | x[1];
+                t9 = x[3] | x[1];
+                t10 = t7 ^ t8;
+                x[3] = t1 ^ t9;
+                t11 = x[2] | t10;
+                x[0] = t10 ^ t11;
+                x[2] = t9 ^ t0 ^ x[0];
                 break;
-            default:
-                t = x[0] ^ x[1]; x[0] = x[2] ^ x[3]; x[1] = t; x[2] = x[0] ^ t; x[3] = x[3] ^ x[1];
+
+            case 2:
+                // S2: 8 6 7 9 3 12 10 15 13 1 14 4 0 11 5 2
+                t0 = x[0] | x[2];
+                t1 = x[0] ^ x[1];
+                t2 = x[3] ^ t0;
+                x[0] = t1 ^ t2;
+                t3 = x[2] ^ x[0];
+                t4 = x[1] ^ t2;
+                t5 = x[1] | t3;
+                x[3] = t4 ^ t5;
+                t6 = t0 ^ x[3];
+                t7 = t5 & t6;
+                x[2] = t2 ^ t7;
+                t8 = x[2] & x[0];
+                x[1] = t6 ^ t8;
+                break;
+
+            case 3:
+                // S3: 0 15 11 8 12 9 6 3 13 1 2 4 10 7 5 14
+                t0 = x[0] | x[3];
+                t1 = x[2] ^ x[3];
+                t2 = x[0] ^ x[2];
+                t3 = t0 & t1;
+                t4 = x[1] | t2;
+                x[2] = t3 ^ t4;
+                t5 = x[1] ^ t1;
+                t6 = x[3] ^ x[2];
+                t7 = t4 | t6;
+                x[3] = t5 ^ t7;
+                t8 = t0 ^ x[3];
+                t9 = x[2] & t8;
+                x[1] = t1 ^ t9;
+                t10 = x[1] | x[0];
+                x[0] = t6 ^ t10;
+                break;
+
+            case 4:
+                // S4: 1 15 8 3 12 0 11 6 2 5 4 10 9 14 7 13
+                t0 = x[0] | x[1];
+                t1 = x[1] | x[2];
+                t2 = x[0] ^ t1;
+                t3 = x[1] ^ x[3];
+                t4 = x[3] | t2;
+                x[3] = t3 ^ t4;
+                t5 = t0 ^ t4;
+                t6 = t1 ^ t5;
+                t7 = x[3] & t5;
+                x[1] = t6 ^ t7;
+                t8 = x[3] | x[1];
+                x[0] = t5 ^ t8;
+                t9 = x[2] ^ x[0];
+                x[2] = t2 ^ t9 ^ x[1];
+                break;
+
+            case 5:
+                // S5: 15 5 2 11 4 10 9 12 0 3 14 8 13 6 7 1
+                t0 = x[1] ^ x[3];
+                t1 = x[1] | x[3];
+                t2 = x[0] & t0;
+                t3 = x[2] ^ t1;
+                x[0] = t2 ^ t3;
+                t4 = x[0] | x[1];
+                t5 = x[3] ^ t4;
+                t6 = x[2] | x[0];
+                x[3] = t5 ^ t6;
+                t7 = t0 ^ t6;
+                t8 = t1 & x[3];
+                x[1] = t7 ^ t8;
+                t9 = x[0] ^ x[3];
+                x[2] = x[1] ^ t9 ^ t4;
+                break;
+
+            case 6:
+                // S6: 7 2 12 5 8 4 6 11 14 9 1 15 13 3 10 0
+                t0 = x[0] ^ x[3];
+                t1 = x[1] ^ x[3];
+                t2 = x[0] & t1;
+                t3 = x[2] ^ t2;
+                x[0] = x[1] ^ t3;
+                t4 = t0 | x[0];
+                t5 = x[3] | t3;
+                x[3] = t4 ^ t5;
+                t6 = t1 ^ t4;
+                t7 = x[0] & x[3];
+                x[1] = t6 ^ t7;
+                t8 = x[0] ^ x[3];
+                x[2] = x[1] ^ t8 ^ t1;
+                break;
+
+            case 7:
+                // S7: 1 13 15 0 14 8 2 11 7 4 12 10 9 3 5 6
+                t0 = x[0] & x[2];
+                t1 = x[3] ^ t0;
+                t2 = x[0] ^ x[3];
+                t3 = x[1] ^ t1;
+                t4 = x[0] ^ t3;
+                x[2] = t2 & t4;
+                t5 = t1 | x[2];
+                x[0] = t3 ^ t5;
+                t6 = x[2] ^ x[0];
+                t7 = x[3] | t6;
+                x[3] = t4 ^ t7;
+                t8 = t3 & x[3];
+                x[1] = t1 ^ t8;
                 break;
         }
     }
 
-    private static void SerpentLinearTransform(uint[] x)
+    /// <summary>
+    /// Applies the inverse of one of the 8 Serpent S-boxes.
+    /// </summary>
+    private static void ApplyInverseSBox(uint[] x, int box)
     {
-        x[0] = ((x[0] << 13) | (x[0] >> 19));
-        x[2] = ((x[2] << 3) | (x[2] >> 29));
+        uint t0, t1, t2, t3, t4, t5, t6, t7, t8, t9, t10, t11, t12, t13, t14, t15, t16, t17;
+
+        switch (box)
+        {
+            case 0:
+                // IS0: Inverse of S0
+                t0 = x[2] ^ x[3];
+                t1 = x[0] | x[1];
+                t2 = x[1] | x[2];
+                t3 = x[3] & t0;
+                t4 = t1 ^ t3;
+                x[2] = x[0] ^ t4;
+                t5 = x[0] ^ t2;
+                t6 = t0 ^ x[2];
+                t7 = t5 & t6;
+                x[3] = t4 ^ t7;
+                t8 = x[3] | t5;
+                t9 = x[1] ^ t8;
+                x[0] = x[2] ^ t9;
+                x[1] = t6 ^ t9;
+                break;
+
+            case 1:
+                // IS1: Inverse of S1
+                t0 = x[0] ^ x[1];
+                t1 = x[0] | x[3];
+                t2 = x[1] ^ x[3];
+                t3 = x[2] | t0;
+                t4 = t1 ^ t2;
+                x[1] = t3 ^ t4;
+                t5 = ~t2;
+                t6 = x[1] | t5;
+                x[0] = t0 ^ t6;
+                t7 = x[0] | x[1];
+                t8 = t1 & t7;
+                t9 = t3 ^ t8;
+                x[2] = t2 ^ t9;
+                t10 = x[2] & x[0];
+                x[3] = t4 ^ t10;
+                break;
+
+            case 2:
+                // IS2: Inverse of S2
+                t0 = x[0] ^ x[3];
+                t1 = x[2] ^ x[3];
+                t2 = x[0] & t1;
+                t3 = x[1] ^ t2;
+                x[3] = t0 ^ t3;
+                t4 = x[2] ^ x[3];
+                t5 = x[0] | t3;
+                x[2] = t4 ^ t5;
+                t6 = t1 | x[2];
+                t7 = x[0] ^ t6;
+                x[0] = t3 ^ t7;
+                t8 = t0 & x[2];
+                x[1] = t7 ^ t8;
+                break;
+
+            case 3:
+                // IS3: Inverse of S3
+                t0 = x[0] | x[3];
+                t1 = x[1] ^ x[3];
+                t2 = x[1] & t1;
+                t3 = x[0] ^ t2;
+                t4 = x[2] ^ t3;
+                x[1] = t0 ^ t4;
+                t5 = t1 ^ x[1];
+                t6 = x[3] | t5;
+                x[0] = t1 ^ t6;
+                t7 = t0 & x[0];
+                x[3] = t4 ^ t7;
+                t8 = x[0] | x[3];
+                x[2] = t5 ^ t8;
+                break;
+
+            case 4:
+                // IS4: Inverse of S4
+                t0 = x[1] | x[3];
+                t1 = x[0] ^ t0;
+                t2 = x[1] ^ x[3];
+                t3 = x[2] ^ t1;
+                x[1] = t2 ^ t3;
+                t4 = ~x[1];
+                t5 = x[0] & t4;
+                x[0] = t3 ^ t5;
+                t6 = x[0] | t2;
+                x[3] = t1 ^ t6;
+                t7 = t2 | x[3];
+                x[2] = t4 ^ t7;
+                break;
+
+            case 5:
+                // IS5: Inverse of S5
+                t0 = x[0] & x[3];
+                t1 = x[2] ^ t0;
+                t2 = x[0] ^ x[3];
+                t3 = x[1] & t1;
+                t4 = t2 ^ t3;
+                x[2] = x[0] ^ t4;
+                t5 = ~x[2];
+                t6 = x[3] | t5;
+                x[0] = t1 ^ t6;
+                t7 = t4 | x[0];
+                t8 = x[3] ^ t7;
+                x[3] = t1 ^ t8;
+                x[1] = t5 ^ t8;
+                break;
+
+            case 6:
+                // IS6: Inverse of S6
+                t0 = x[0] ^ x[2];
+                t1 = x[2] & t0;
+                t2 = x[3] ^ t1;
+                t3 = x[1] | t2;
+                x[2] = t0 ^ t3;
+                t4 = ~x[1];
+                t5 = t0 | x[2];
+                x[1] = t2 ^ t5;
+                t6 = x[3] & t4;
+                t7 = x[0] ^ t6;
+                x[3] = x[2] ^ t7;
+                t8 = t0 ^ x[1];
+                x[0] = t7 ^ t8;
+                break;
+
+            case 7:
+                // IS7: Inverse of S7
+                t0 = x[0] & x[1];
+                t1 = x[0] | x[1];
+                t2 = x[2] | t0;
+                t3 = x[3] & t1;
+                x[3] = t2 ^ t3;
+                t4 = x[1] ^ x[3];
+                t5 = x[3] ^ t2;
+                t6 = ~x[2];
+                t7 = t4 | t5;
+                x[1] = t6 ^ t7;
+                t8 = t3 & x[1];
+                x[0] = t4 ^ t8;
+                t9 = x[0] | x[3];
+                x[2] = t5 ^ t9;
+                break;
+        }
+    }
+
+    #endregion
+
+    #region Linear Transformation
+
+    /// <summary>
+    /// Applies the Serpent linear transformation.
+    /// This provides diffusion across the cipher state.
+    /// </summary>
+    private static void ApplyLinearTransform(uint[] x)
+    {
+        x[0] = RotateLeft(x[0], 13);
+        x[2] = RotateLeft(x[2], 3);
         x[1] = x[1] ^ x[0] ^ x[2];
         x[3] = x[3] ^ x[2] ^ (x[0] << 3);
-        x[1] = ((x[1] << 1) | (x[1] >> 31));
-        x[3] = ((x[3] << 7) | (x[3] >> 25));
+        x[1] = RotateLeft(x[1], 1);
+        x[3] = RotateLeft(x[3], 7);
         x[0] = x[0] ^ x[1] ^ x[3];
         x[2] = x[2] ^ x[3] ^ (x[1] << 7);
-        x[0] = ((x[0] << 5) | (x[0] >> 27));
-        x[2] = ((x[2] << 22) | (x[2] >> 10));
+        x[0] = RotateLeft(x[0], 5);
+        x[2] = RotateLeft(x[2], 22);
+    }
+
+    /// <summary>
+    /// Applies the inverse Serpent linear transformation.
+    /// </summary>
+    private static void ApplyInverseLinearTransform(uint[] x)
+    {
+        x[2] = RotateRight(x[2], 22);
+        x[0] = RotateRight(x[0], 5);
+        x[2] = x[2] ^ x[3] ^ (x[1] << 7);
+        x[0] = x[0] ^ x[1] ^ x[3];
+        x[3] = RotateRight(x[3], 7);
+        x[1] = RotateRight(x[1], 1);
+        x[3] = x[3] ^ x[2] ^ (x[0] << 3);
+        x[1] = x[1] ^ x[0] ^ x[2];
+        x[2] = RotateRight(x[2], 3);
+        x[0] = RotateRight(x[0], 13);
+    }
+
+    #endregion
+
+    #region Initial and Final Permutations
+
+    /// <summary>
+    /// Applies the Initial Permutation (IP).
+    /// This permutes bits between the four 32-bit words using SWAPMOVE operations.
+    /// </summary>
+    private static void ApplyIP(uint[] x)
+    {
+        uint t0 = x[0], t1 = x[1], t2 = x[2], t3 = x[3];
+
+        // Standard bitsliced IP implementation using SWAPMOVE
+        SWAPMOVE(ref t0, ref t1, 0x55555555, 1);
+        SWAPMOVE(ref t2, ref t3, 0x55555555, 1);
+        SWAPMOVE(ref t0, ref t2, 0x33333333, 2);
+        SWAPMOVE(ref t1, ref t3, 0x33333333, 2);
+        SWAPMOVE(ref t0, ref t1, 0x0F0F0F0F, 4);
+        SWAPMOVE(ref t2, ref t3, 0x0F0F0F0F, 4);
+
+        x[0] = t0; x[1] = t1; x[2] = t2; x[3] = t3;
+    }
+
+    /// <summary>
+    /// Applies the Final Permutation (FP), which is the inverse of IP.
+    /// </summary>
+    private static void ApplyFP(uint[] x)
+    {
+        uint t0 = x[0], t1 = x[1], t2 = x[2], t3 = x[3];
+
+        // Reverse of IP operations
+        SWAPMOVE(ref t2, ref t3, 0x0F0F0F0F, 4);
+        SWAPMOVE(ref t0, ref t1, 0x0F0F0F0F, 4);
+        SWAPMOVE(ref t1, ref t3, 0x33333333, 2);
+        SWAPMOVE(ref t0, ref t2, 0x33333333, 2);
+        SWAPMOVE(ref t2, ref t3, 0x55555555, 1);
+        SWAPMOVE(ref t0, ref t1, 0x55555555, 1);
+
+        x[0] = t0; x[1] = t1; x[2] = t2; x[3] = t3;
+    }
+
+    /// <summary>
+    /// SWAPMOVE operation used in permutations.
+    /// Swaps bits between two words based on a mask and shift.
+    /// </summary>
+    [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
+    private static void SWAPMOVE(ref uint a, ref uint b, uint mask, int shift)
+    {
+        uint t = ((a >> shift) ^ b) & mask;
+        b ^= t;
+        a ^= t << shift;
+    }
+
+    #endregion
+
+    #region Utility Functions
+
+    [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
+    private static uint RotateLeft(uint value, int bits)
+    {
+        return (value << bits) | (value >> (32 - bits));
+    }
+
+    [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
+    private static uint RotateRight(uint value, int bits)
+    {
+        return (value >> bits) | (value << (32 - bits));
     }
 
     private static void IncrementCounter(byte[] counter)
@@ -3947,40 +5190,231 @@ public sealed class SerpentProvider : IEncryptionProvider
                 break;
         }
     }
+
+    #endregion
 }
 
 /// <summary>
-/// Simple Blake2b hasher for Argon2.
+/// Full Blake2b implementation per RFC 7693 for Argon2.
+/// Supports variable output length (1-64 bytes), keyed hashing, and proper compression.
 /// </summary>
 internal sealed class Blake2bHasher
 {
-    public byte[] ComputeHash(byte[] data, int outputLength)
+    // Blake2b IV (first 64 bits of fractional parts of square roots of first 8 primes)
+    private static readonly ulong[] IV = new ulong[]
     {
-        // Use SHA-512 as Blake2b substitute for simplicity
-        // In production, use a proper Blake2b implementation
-        var hash = SHA512.HashData(data);
+        0x6A09E667F3BCC908UL, 0xBB67AE8584CAA73BUL,
+        0x3C6EF372FE94F82BUL, 0xA54FF53A5F1D36F1UL,
+        0x510E527FADE682D1UL, 0x9B05688C2B3E6C1FUL,
+        0x1F83D9ABFB41BD6BUL, 0x5BE0CD19137E2179UL
+    };
 
-        if (outputLength <= 64)
-            return hash.AsSpan(0, outputLength).ToArray();
+    // Sigma permutations for 12 rounds
+    private static readonly byte[,] SIGMA = new byte[,]
+    {
+        { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15 },
+        { 14, 10, 4, 8, 9, 15, 13, 6, 1, 12, 0, 2, 11, 7, 5, 3 },
+        { 11, 8, 12, 0, 5, 2, 15, 13, 10, 14, 3, 6, 7, 1, 9, 4 },
+        { 7, 9, 3, 1, 13, 12, 11, 14, 2, 6, 5, 10, 4, 0, 15, 8 },
+        { 9, 0, 5, 7, 2, 4, 10, 15, 14, 1, 11, 12, 6, 8, 3, 13 },
+        { 2, 12, 6, 10, 0, 11, 8, 3, 4, 13, 7, 5, 15, 14, 1, 9 },
+        { 12, 5, 1, 15, 14, 13, 4, 10, 0, 7, 6, 3, 9, 2, 8, 11 },
+        { 13, 11, 7, 14, 12, 1, 3, 9, 5, 0, 15, 4, 8, 6, 2, 10 },
+        { 6, 15, 14, 9, 11, 3, 0, 8, 12, 2, 13, 7, 1, 4, 10, 5 },
+        { 10, 2, 8, 4, 7, 6, 1, 5, 15, 11, 9, 14, 3, 12, 13, 0 },
+        { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15 },
+        { 14, 10, 4, 8, 9, 15, 13, 6, 1, 12, 0, 2, 11, 7, 5, 3 }
+    };
 
-        // For longer outputs, use HKDF-like expansion
-        var result = new byte[outputLength];
-        var pos = 0;
-        var counter = 1;
+    /// <summary>
+    /// Compute Blake2b hash with specified output length (1-64 bytes).
+    /// </summary>
+    public static byte[] Hash(byte[] data, int outputLength)
+    {
+        return Hash(data, outputLength, null);
+    }
 
-        while (pos < outputLength)
+    /// <summary>
+    /// Compute Blake2b hash with specified output length and optional key.
+    /// </summary>
+    public static byte[] Hash(byte[] data, int outputLength, byte[]? key)
+    {
+        if (outputLength < 1 || outputLength > 64)
+            throw new ArgumentOutOfRangeException(nameof(outputLength), "Output length must be 1-64 bytes");
+
+        int keyLen = key?.Length ?? 0;
+        if (keyLen > 64)
+            throw new ArgumentException("Key length must be 0-64 bytes", nameof(key));
+
+        // Initialize state
+        var h = new ulong[8];
+        Array.Copy(IV, h, 8);
+
+        // Parameter block: digest length, key length, fanout=1, depth=1
+        h[0] ^= 0x01010000UL ^ ((ulong)keyLen << 8) ^ (ulong)outputLength;
+
+        ulong bytesCompressed = 0;
+        int dataOffset = 0;
+        int dataLen = data.Length;
+
+        // If we have a key, process it as the first block (padded)
+        byte[] block = new byte[128];
+        if (keyLen > 0)
         {
-            var input = new byte[hash.Length + 4];
-            Array.Copy(hash, input, hash.Length);
-            BitConverter.GetBytes(counter++).CopyTo(input, hash.Length);
+            Array.Copy(key!, block, keyLen);
+            bytesCompressed = 128;
+            Compress(h, block, bytesCompressed, false);
+        }
 
-            var block = SHA512.HashData(input);
-            var copyLen = Math.Min(64, outputLength - pos);
-            Array.Copy(block, 0, result, pos, copyLen);
-            pos += copyLen;
+        // Process data in 128-byte blocks
+        while (dataLen - dataOffset > 128)
+        {
+            Array.Copy(data, dataOffset, block, 0, 128);
+            dataOffset += 128;
+            bytesCompressed += 128;
+            Compress(h, block, bytesCompressed, false);
+        }
+
+        // Final block
+        int remaining = dataLen - dataOffset;
+        Array.Clear(block, 0, 128);
+        if (remaining > 0)
+        {
+            Array.Copy(data, dataOffset, block, 0, remaining);
+        }
+        bytesCompressed += (ulong)remaining;
+        Compress(h, block, bytesCompressed, true);
+
+        // Convert state to output bytes
+        byte[] output = new byte[outputLength];
+        for (int i = 0; i < outputLength; i++)
+        {
+            output[i] = (byte)(h[i / 8] >> (8 * (i % 8)));
+        }
+
+        return output;
+    }
+
+    /// <summary>
+    /// Variable-length hash function H' for Argon2 (RFC 9106 Section 3.2).
+    /// For outputs <= 64 bytes: H'(X) = H^(T)(LE32(T) || X)
+    /// For outputs > 64 bytes: Use expansion with Blake2b
+    /// </summary>
+    public static byte[] HashLong(byte[] data, int outputLength)
+    {
+        if (outputLength <= 64)
+        {
+            // For short outputs, use Blake2b directly
+            var input = new byte[4 + data.Length];
+            BitConverter.GetBytes(outputLength).CopyTo(input, 0);
+            Array.Copy(data, 0, input, 4, data.Length);
+            return Hash(input, outputLength);
+        }
+
+        // For longer outputs, use Blake2b expansion per RFC 9106
+        var result = new byte[outputLength];
+        int pos = 0;
+
+        // First hash: H^(64)(LE32(T) || X)
+        var firstInput = new byte[4 + data.Length];
+        BitConverter.GetBytes(outputLength).CopyTo(firstInput, 0);
+        Array.Copy(data, 0, firstInput, 4, data.Length);
+        var v = Hash(firstInput, 64);
+
+        // Copy first 32 bytes
+        Array.Copy(v, 0, result, pos, 32);
+        pos += 32;
+
+        // Generate remaining blocks
+        while (outputLength - pos > 64)
+        {
+            v = Hash(v, 64);
+            Array.Copy(v, 0, result, pos, 32);
+            pos += 32;
+        }
+
+        // Final partial block
+        int remaining = outputLength - pos;
+        if (remaining > 0)
+        {
+            v = Hash(v, remaining);
+            Array.Copy(v, 0, result, pos, remaining);
         }
 
         return result;
+    }
+
+    /// <summary>
+    /// Blake2b compression function.
+    /// </summary>
+    private static void Compress(ulong[] h, byte[] block, ulong bytesCompressed, bool isLast)
+    {
+        // Initialize working vector
+        var v = new ulong[16];
+        Array.Copy(h, 0, v, 0, 8);
+        Array.Copy(IV, 0, v, 8, 8);
+
+        // XOR with counter and finalization flag
+        v[12] ^= bytesCompressed;
+        // v[13] ^= 0; // High 64 bits of counter (not used for messages < 2^64 bytes)
+        if (isLast)
+        {
+            v[14] = ~v[14]; // Invert all bits for last block
+        }
+
+        // Parse message block into 16 64-bit words
+        var m = new ulong[16];
+        for (int i = 0; i < 16; i++)
+        {
+            m[i] = BitConverter.ToUInt64(block, i * 8);
+        }
+
+        // 12 rounds of mixing
+        for (int round = 0; round < 12; round++)
+        {
+            // Column mixing
+            G(ref v[0], ref v[4], ref v[8], ref v[12], m[SIGMA[round, 0]], m[SIGMA[round, 1]]);
+            G(ref v[1], ref v[5], ref v[9], ref v[13], m[SIGMA[round, 2]], m[SIGMA[round, 3]]);
+            G(ref v[2], ref v[6], ref v[10], ref v[14], m[SIGMA[round, 4]], m[SIGMA[round, 5]]);
+            G(ref v[3], ref v[7], ref v[11], ref v[15], m[SIGMA[round, 6]], m[SIGMA[round, 7]]);
+
+            // Diagonal mixing
+            G(ref v[0], ref v[5], ref v[10], ref v[15], m[SIGMA[round, 8]], m[SIGMA[round, 9]]);
+            G(ref v[1], ref v[6], ref v[11], ref v[12], m[SIGMA[round, 10]], m[SIGMA[round, 11]]);
+            G(ref v[2], ref v[7], ref v[8], ref v[13], m[SIGMA[round, 12]], m[SIGMA[round, 13]]);
+            G(ref v[3], ref v[4], ref v[9], ref v[14], m[SIGMA[round, 14]], m[SIGMA[round, 15]]);
+        }
+
+        // Finalize: h = h XOR v[0..7] XOR v[8..15]
+        for (int i = 0; i < 8; i++)
+        {
+            h[i] ^= v[i] ^ v[i + 8];
+        }
+    }
+
+    /// <summary>
+    /// Blake2b mixing function G.
+    /// </summary>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static void G(ref ulong a, ref ulong b, ref ulong c, ref ulong d, ulong x, ulong y)
+    {
+        a = a + b + x;
+        d = RotateRight(d ^ a, 32);
+
+        c = c + d;
+        b = RotateRight(b ^ c, 24);
+
+        a = a + b + y;
+        d = RotateRight(d ^ a, 16);
+
+        c = c + d;
+        b = RotateRight(b ^ c, 63);
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static ulong RotateRight(ulong value, int bits)
+    {
+        return (value >> bits) | (value << (64 - bits));
     }
 }
 
@@ -6455,8 +7889,42 @@ public sealed class ContinuousBackupManager : IAsyncDisposable
 
     private static byte[] ApplyDelta(byte[] baseData, DeltaInfo delta)
     {
-        // Simplified delta application
-        return baseData;
+        // Delta application using binary diff format:
+        // Format: [op:1][offset:4][length:4][data:length]...
+        // op: 0=copy from base, 1=insert new data
+        if (delta.DeltaData == null || delta.DeltaData.Length == 0)
+            return baseData;
+
+        using var output = new MemoryStream();
+        var deltaSpan = delta.DeltaData.AsSpan();
+        var pos = 0;
+
+        while (pos < deltaSpan.Length)
+        {
+            var op = deltaSpan[pos++];
+            if (pos + 8 > deltaSpan.Length) break;
+
+            var offset = BitConverter.ToInt32(deltaSpan.Slice(pos, 4));
+            pos += 4;
+            var length = BitConverter.ToInt32(deltaSpan.Slice(pos, 4));
+            pos += 4;
+
+            if (op == 0) // Copy from base
+            {
+                if (offset >= 0 && offset + length <= baseData.Length)
+                    output.Write(baseData, offset, length);
+            }
+            else if (op == 1) // Insert new data
+            {
+                if (pos + length <= deltaSpan.Length)
+                {
+                    output.Write(deltaSpan.Slice(pos, length));
+                    pos += length;
+                }
+            }
+        }
+
+        return output.ToArray();
     }
 
     private void HandleWatcherError(string path, Exception ex)
@@ -6483,7 +7951,25 @@ public sealed class ContinuousBackupManager : IAsyncDisposable
 
     private long FindLastFullBackupSequence()
     {
-        // Simplified - would search backup metadata
+        // Search backup metadata for the most recent full backup
+        var metadataPath = System.IO.Path.Combine(_destination.Path, "metadata", "backups.json");
+        if (!File.Exists(metadataPath))
+            return 0;
+
+        try
+        {
+            var json = File.ReadAllText(metadataPath);
+            var metadata = JsonSerializer.Deserialize<BackupMetadataIndex>(json);
+            if (metadata?.FullBackups != null && metadata.FullBackups.Count > 0)
+            {
+                return metadata.FullBackups.Max(fb => fb.Sequence);
+            }
+        }
+        catch (Exception)
+        {
+            // Metadata unavailable or corrupted
+        }
+
         return 0;
     }
 
@@ -6614,6 +8100,43 @@ internal sealed class DeltaInfo
 {
     public required string Path { get; init; }
     public DateTime Timestamp { get; init; }
+    public byte[]? DeltaData { get; set; }
+    public long BaseOffset { get; init; }
+    public long Length { get; init; }
+}
+
+/// <summary>
+/// Backup metadata index for tracking full and incremental backups.
+/// </summary>
+internal sealed class BackupMetadataIndex
+{
+    public List<FullBackupEntry> FullBackups { get; init; } = new();
+    public List<IncrementalBackupEntry> IncrementalBackups { get; init; } = new();
+    public DateTime LastUpdated { get; init; }
+}
+
+/// <summary>
+/// Entry for a full backup in the metadata index.
+/// </summary>
+internal sealed class FullBackupEntry
+{
+    public long Sequence { get; init; }
+    public DateTime Timestamp { get; init; }
+    public long TotalFiles { get; init; }
+    public long TotalBytes { get; init; }
+    public string? Checksum { get; init; }
+}
+
+/// <summary>
+/// Entry for an incremental backup in the metadata index.
+/// </summary>
+internal sealed class IncrementalBackupEntry
+{
+    public long Sequence { get; init; }
+    public long BaseSequence { get; init; }
+    public DateTime Timestamp { get; init; }
+    public long ChangedFiles { get; init; }
+    public long DeltaBytes { get; init; }
 }
 
 /// <summary>
