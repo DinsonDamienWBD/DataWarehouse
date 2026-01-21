@@ -12,6 +12,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Threading.Channels;
 using System.Xml.Linq;
+using DataWarehouse.SDK.Contracts;
 
 namespace DataWarehouse.SDK.Infrastructure;
 
@@ -491,6 +492,27 @@ public sealed record ContinuousBackupConfig
 #endregion
 
 #region 1. Local Backup Options
+
+// ============================================================================
+// MIGRATION NOTICE: Backup implementations are being migrated to the plugin:
+// DataWarehouse.Plugins.Backup
+//
+// The plugin provides enhanced backup capabilities including:
+// - ContinuousBackupProvider: Real-time file monitoring and backup
+// - IncrementalBackupProvider: Content-defined chunking with deduplication
+// - DeltaBackupProvider: Block-level change tracking
+// - SyntheticFullBackupProvider: Merge incrementals into synthetic fulls
+//
+// New implementations should use the plugin directly. These SDK implementations
+// are maintained for backward compatibility.
+//
+// To use the plugin, add a reference to DataWarehouse.Plugins.Backup and use:
+// - BackupPlugin: Main plugin class for registration
+// - IBackupProvider: Unified backup interface
+// - IContinuousBackupProvider: For real-time monitoring
+// - IDeltaBackupProvider: For block-level backups
+// - ISyntheticFullBackupProvider: For synthetic full creation
+// ============================================================================
 
 /// <summary>
 /// Comprehensive backup destination manager supporting local filesystem, external drives,
@@ -3096,723 +3118,31 @@ internal sealed class ScheduledBackup
 
 #region 2. Encryption at Rest Options
 
-/// <summary>
-/// Extended encryption manager with configurable algorithms and key derivation functions.
-/// Supports AES-256-GCM, AES-256-CBC-HMAC, ChaCha20-Poly1305, XChaCha20-Poly1305, Twofish, and Serpent.
-/// </summary>
-public sealed class ExtendedEncryptionManager : IAsyncDisposable
-{
-    private readonly EncryptionConfig _config;
-    private readonly ConcurrentDictionary<string, byte[]> _keyCache = new();
-    private readonly IEncryptionProvider _provider;
-    private readonly bool _hardwareAccelerationAvailable;
-    private volatile bool _disposed;
-
-    /// <summary>
-    /// Gets whether hardware acceleration (AES-NI) is available.
-    /// </summary>
-    public bool HardwareAccelerationAvailable => _hardwareAccelerationAvailable;
-
-    /// <summary>
-    /// Gets the active encryption algorithm.
-    /// </summary>
-    public EncryptionAlgorithm ActiveAlgorithm => _config.Algorithm;
-
-    /// <summary>
-    /// Creates a new extended encryption manager.
-    /// </summary>
-    public ExtendedEncryptionManager(EncryptionConfig? config = null)
-    {
-        _config = config ?? new EncryptionConfig();
-        _hardwareAccelerationAvailable = DetectHardwareAcceleration();
-
-        _provider = CreateProvider(_config.Algorithm);
-    }
-
-    private static bool DetectHardwareAcceleration()
-    {
-        try
-        {
-            // Check for AES-NI support
-            if (System.Runtime.Intrinsics.X86.Aes.IsSupported)
-                return true;
-
-            // Check for ARM AES support
-            if (System.Runtime.Intrinsics.Arm.Aes.IsSupported)
-                return true;
-
-            return false;
-        }
-        catch
-        {
-            return false;
-        }
-    }
-
-    private IEncryptionProvider CreateProvider(EncryptionAlgorithm algorithm)
-    {
-        return algorithm switch
-        {
-            EncryptionAlgorithm.Aes256Gcm => new Aes256GcmProvider(),
-            EncryptionAlgorithm.Aes256CbcHmac => new Aes256CbcHmacProvider(),
-            EncryptionAlgorithm.ChaCha20Poly1305 => new ChaCha20Poly1305Provider(),
-            EncryptionAlgorithm.XChaCha20Poly1305 => new XChaCha20Poly1305Provider(),
-            EncryptionAlgorithm.Twofish => new TwofishProvider(),
-            EncryptionAlgorithm.Serpent => new SerpentProvider(),
-            _ => new Aes256GcmProvider()
-        };
-    }
-
-    /// <summary>
-    /// Derives an encryption key from a password using the configured KDF.
-    /// </summary>
-    public byte[] DeriveKey(string password, byte[] salt)
-    {
-        ArgumentException.ThrowIfNullOrEmpty(password);
-        ArgumentNullException.ThrowIfNull(salt);
-
-        return _config.KeyDerivation switch
-        {
-            KeyDerivationFunction.Pbkdf2Sha256 => DerivePbkdf2(password, salt, HashAlgorithmName.SHA256),
-            KeyDerivationFunction.Pbkdf2Sha512 => DerivePbkdf2(password, salt, HashAlgorithmName.SHA512),
-            KeyDerivationFunction.Argon2id => DeriveArgon2id(password, salt),
-            KeyDerivationFunction.Scrypt => DeriveScrypt(password, salt),
-            _ => DerivePbkdf2(password, salt, HashAlgorithmName.SHA256)
-        };
-    }
-
-    private byte[] DerivePbkdf2(string password, byte[] salt, HashAlgorithmName hashAlgorithm)
-    {
-        return Rfc2898DeriveBytes.Pbkdf2(
-            Encoding.UTF8.GetBytes(password),
-            salt,
-            _config.Pbkdf2Iterations,
-            hashAlgorithm,
-            _config.KeySizeBits / 8);
-    }
-
-    private byte[] DeriveArgon2id(string password, byte[] salt)
-    {
-        // Check for native Argon2id support in .NET 9+
-        try
-        {
-            var argon2Type = Type.GetType("System.Security.Cryptography.Argon2id, System.Security.Cryptography");
-            if (argon2Type != null)
-            {
-                var deriveMethod = argon2Type.GetMethod("DeriveKey",
-                    new[] { typeof(byte[]), typeof(byte[]), typeof(int), typeof(int), typeof(int), typeof(int) });
-
-                if (deriveMethod != null)
-                {
-                    var result = deriveMethod.Invoke(null, new object[]
-                    {
-                        Encoding.UTF8.GetBytes(password),
-                        salt,
-                        _config.Argon2MemoryKb,
-                        _config.Argon2TimeCost,
-                        _config.Argon2Parallelism,
-                        _config.KeySizeBits / 8
-                    });
-
-                    if (result is byte[] derivedKey)
-                        return derivedKey;
-                }
-            }
-        }
-        catch { }
-
-        // Fallback: Implement Argon2id manually
-        return DeriveArgon2idManual(password, salt);
-    }
-
-    private byte[] DeriveArgon2idManual(string password, byte[] salt)
-    {
-        // Full Argon2id implementation following RFC 9106
-        var passwordBytes = Encoding.UTF8.GetBytes(password);
-        var tagLength = _config.KeySizeBits / 8;
-        var memoryCost = _config.Argon2MemoryKb; // m in KB
-        var timeCost = _config.Argon2TimeCost;   // t iterations
-        var parallelism = _config.Argon2Parallelism; // p lanes
-
-        // Constants per RFC 9106
-        const int ARGON2_BLOCK_SIZE = 1024; // bytes
-        const int ARGON2_QWORDS_IN_BLOCK = 128; // 1024/8
-        const int ARGON2_SYNC_POINTS = 4; // slices per pass
-        const int ARGON2_VERSION = 0x13; // Version 1.3
-        const int ARGON2_TYPE_ID = 2; // Argon2id
-
-        // Calculate memory size in blocks (minimum 8*p blocks)
-        var memoryBlocks = Math.Max(memoryCost, 8 * parallelism);
-        // Round down to multiple of 4*p
-        memoryBlocks = (memoryBlocks / (4 * parallelism)) * (4 * parallelism);
-        var laneLength = memoryBlocks / parallelism;
-        var segmentLength = laneLength / ARGON2_SYNC_POINTS;
-
-        // H0 = H^(64)(p || tau || m || t || v || y || len(P) || P || len(S) || S || len(K) || K || len(X) || X)
-        var h0Input = new List<byte>();
-        h0Input.AddRange(ToLittleEndianBytes(parallelism));
-        h0Input.AddRange(ToLittleEndianBytes(tagLength));
-        h0Input.AddRange(ToLittleEndianBytes(memoryCost));
-        h0Input.AddRange(ToLittleEndianBytes(timeCost));
-        h0Input.AddRange(ToLittleEndianBytes(ARGON2_VERSION));
-        h0Input.AddRange(ToLittleEndianBytes(ARGON2_TYPE_ID));
-        h0Input.AddRange(ToLittleEndianBytes(passwordBytes.Length));
-        h0Input.AddRange(passwordBytes);
-        h0Input.AddRange(ToLittleEndianBytes(salt.Length));
-        h0Input.AddRange(salt);
-        h0Input.AddRange(ToLittleEndianBytes(0)); // No secret key (K)
-        h0Input.AddRange(ToLittleEndianBytes(0)); // No associated data (X)
-
-        var h0 = Blake2bHasher.Hash(h0Input.ToArray(), 64);
-
-        // Allocate memory matrix B[p][q] where q = laneLength
-        var memory = new ulong[memoryBlocks][];
-        for (int i = 0; i < memoryBlocks; i++)
-        {
-            memory[i] = new ulong[ARGON2_QWORDS_IN_BLOCK];
-        }
-
-        // Initialize first two blocks of each lane
-        // B[i][0] = H'^(1024)(H0 || 0 || i)
-        // B[i][1] = H'^(1024)(H0 || 1 || i)
-        for (int lane = 0; lane < parallelism; lane++)
-        {
-            var input0 = new byte[h0.Length + 8];
-            Array.Copy(h0, input0, h0.Length);
-            ToLittleEndianBytes(0).CopyTo(input0, h0.Length);
-            ToLittleEndianBytes(lane).CopyTo(input0, h0.Length + 4);
-            var block0 = Blake2bHasher.HashLong(input0, ARGON2_BLOCK_SIZE);
-            BytesToBlock(block0, memory[lane * laneLength]);
-
-            var input1 = new byte[h0.Length + 8];
-            Array.Copy(h0, input1, h0.Length);
-            ToLittleEndianBytes(1).CopyTo(input1, h0.Length);
-            ToLittleEndianBytes(lane).CopyTo(input1, h0.Length + 4);
-            var block1 = Blake2bHasher.HashLong(input1, ARGON2_BLOCK_SIZE);
-            BytesToBlock(block1, memory[lane * laneLength + 1]);
-        }
-
-        // Main loop: t passes over memory
-        for (int pass = 0; pass < timeCost; pass++)
-        {
-            for (int slice = 0; slice < ARGON2_SYNC_POINTS; slice++)
-            {
-                for (int lane = 0; lane < parallelism; lane++)
-                {
-                    // Generate addresses for Argon2id
-                    ulong[]? addressBlock = null;
-
-                    // Argon2id uses data-independent addressing for first two slices of first pass
-                    bool useDataIndependent = (pass == 0 && slice < 2);
-
-                    if (useDataIndependent)
-                    {
-                        addressBlock = new ulong[ARGON2_QWORDS_IN_BLOCK];
-                    }
-
-                    for (int index = 0; index < segmentLength; index++)
-                    {
-                        // Current block position
-                        int currentOffset = lane * laneLength + slice * segmentLength + index;
-
-                        // Skip first two blocks of first pass (already initialized)
-                        if (pass == 0 && slice == 0 && index < 2)
-                            continue;
-
-                        // Previous block (wrapping within lane)
-                        int prevOffset = currentOffset - 1;
-                        if (currentOffset % laneLength == 0)
-                            prevOffset = currentOffset + laneLength - 1;
-
-                        ulong pseudoRand;
-                        if (useDataIndependent)
-                        {
-                            // Generate addresses using G function
-                            if (index % ARGON2_QWORDS_IN_BLOCK == 0 || addressBlock == null)
-                            {
-                                // Input block for address generation
-                                var inputBlock = new ulong[ARGON2_QWORDS_IN_BLOCK];
-                                inputBlock[0] = (ulong)pass;
-                                inputBlock[1] = (ulong)lane;
-                                inputBlock[2] = (ulong)slice;
-                                inputBlock[3] = (ulong)memoryBlocks;
-                                inputBlock[4] = (ulong)timeCost;
-                                inputBlock[5] = (ulong)ARGON2_TYPE_ID;
-                                inputBlock[6] = (ulong)(index / ARGON2_QWORDS_IN_BLOCK + 1);
-
-                                // Zero block for first G application
-                                var zeroBlock = new ulong[ARGON2_QWORDS_IN_BLOCK];
-                                addressBlock = new ulong[ARGON2_QWORDS_IN_BLOCK];
-
-                                // addressBlock = G(G(zeroBlock, inputBlock), zeroBlock)
-                                var tmp = Argon2Compress(zeroBlock, inputBlock);
-                                addressBlock = Argon2Compress(tmp, zeroBlock);
-                            }
-                            pseudoRand = addressBlock[index % ARGON2_QWORDS_IN_BLOCK];
-                        }
-                        else
-                        {
-                            // Data-dependent: use first 64 bits of previous block
-                            pseudoRand = memory[prevOffset][0];
-                        }
-
-                        // Compute reference block position using mapping function
-                        int refLane = (int)((pseudoRand >> 32) % (ulong)parallelism);
-
-                        // In first pass and first slice, reference must be in same lane
-                        if (pass == 0 && slice == 0)
-                            refLane = lane;
-
-                        // Calculate reference index
-                        int referenceAreaSize;
-                        int startPosition;
-
-                        if (pass == 0)
-                        {
-                            // First pass
-                            if (slice == 0)
-                            {
-                                // First slice: only previous blocks in same lane
-                                referenceAreaSize = index - 1;
-                                startPosition = 0;
-                            }
-                            else
-                            {
-                                if (refLane == lane)
-                                {
-                                    referenceAreaSize = slice * segmentLength + index - 1;
-                                    startPosition = 0;
-                                }
-                                else
-                                {
-                                    referenceAreaSize = slice * segmentLength + (index == 0 ? -1 : 0);
-                                    startPosition = 0;
-                                }
-                            }
-                        }
-                        else
-                        {
-                            // Subsequent passes
-                            if (refLane == lane)
-                            {
-                                referenceAreaSize = laneLength - segmentLength + index - 1;
-                            }
-                            else
-                            {
-                                referenceAreaSize = laneLength - segmentLength + (index == 0 ? -1 : 0);
-                            }
-                            startPosition = (slice + 1) * segmentLength % laneLength;
-                        }
-
-                        if (referenceAreaSize < 0)
-                            referenceAreaSize = 0;
-
-                        // Map pseudoRand to reference position
-                        ulong relativePosition = (pseudoRand & 0xFFFFFFFF);
-                        relativePosition = (relativePosition * relativePosition) >> 32;
-                        relativePosition = (ulong)referenceAreaSize - 1 - ((ulong)referenceAreaSize * relativePosition >> 32);
-
-                        int refIndex = (int)((startPosition + (int)relativePosition) % laneLength);
-                        int refOffset = refLane * laneLength + refIndex;
-
-                        // Bounds check
-                        if (refOffset < 0) refOffset = 0;
-                        if (refOffset >= memoryBlocks) refOffset = memoryBlocks - 1;
-
-                        // Apply compression function: B[current] = G(B[prev], B[ref]) XOR B[current] (for pass > 0)
-                        var newBlock = Argon2Compress(memory[prevOffset], memory[refOffset]);
-
-                        if (pass > 0)
-                        {
-                            // XOR with existing block
-                            for (int i = 0; i < ARGON2_QWORDS_IN_BLOCK; i++)
-                            {
-                                memory[currentOffset][i] ^= newBlock[i];
-                            }
-                        }
-                        else
-                        {
-                            memory[currentOffset] = newBlock;
-                        }
-                    }
-                }
-            }
-        }
-
-        // Final: XOR last blocks of all lanes
-        var finalBlock = new ulong[ARGON2_QWORDS_IN_BLOCK];
-        for (int lane = 0; lane < parallelism; lane++)
-        {
-            int lastBlockOffset = lane * laneLength + laneLength - 1;
-            for (int i = 0; i < ARGON2_QWORDS_IN_BLOCK; i++)
-            {
-                finalBlock[i] ^= memory[lastBlockOffset][i];
-            }
-        }
-
-        // Convert final block to bytes and apply H' for tag
-        var finalBytes = BlockToBytes(finalBlock);
-        return Blake2bHasher.HashLong(finalBytes, tagLength);
-    }
-
-    private static byte[] ToLittleEndianBytes(int value)
-    {
-        var bytes = BitConverter.GetBytes(value);
-        if (!BitConverter.IsLittleEndian)
-            Array.Reverse(bytes);
-        return bytes;
-    }
-
-    private static void BytesToBlock(byte[] bytes, ulong[] block)
-    {
-        for (int i = 0; i < 128; i++)
-        {
-            block[i] = BitConverter.ToUInt64(bytes, i * 8);
-        }
-    }
-
-    private static byte[] BlockToBytes(ulong[] block)
-    {
-        var result = new byte[1024];
-        for (int i = 0; i < 128; i++)
-        {
-            BitConverter.GetBytes(block[i]).CopyTo(result, i * 8);
-        }
-        return result;
-    }
-
-    /// <summary>
-    /// Argon2 compression function G(X, Y) -> R
-    /// R = Z XOR Q where Q = permutation(Z), Z = X XOR Y
-    /// </summary>
-    private static ulong[] Argon2Compress(ulong[] x, ulong[] y)
-    {
-        const int ARGON2_QWORDS_IN_BLOCK = 128;
-
-        // Z = X XOR Y
-        var z = new ulong[ARGON2_QWORDS_IN_BLOCK];
-        for (int i = 0; i < ARGON2_QWORDS_IN_BLOCK; i++)
-        {
-            z[i] = x[i] ^ y[i];
-        }
-
-        // Q = permutation(Z)
-        var q = new ulong[ARGON2_QWORDS_IN_BLOCK];
-        Array.Copy(z, q, ARGON2_QWORDS_IN_BLOCK);
-
-        // Apply permutation P: two rounds of Blake2b-like mixing
-        // First: apply P to rows (8 rows of 16 64-bit words)
-        for (int row = 0; row < 8; row++)
-        {
-            int offset = row * 16;
-            // Apply Blake2b G function to columns
-            Argon2BlakeRound(
-                ref q[offset + 0], ref q[offset + 1], ref q[offset + 2], ref q[offset + 3],
-                ref q[offset + 4], ref q[offset + 5], ref q[offset + 6], ref q[offset + 7],
-                ref q[offset + 8], ref q[offset + 9], ref q[offset + 10], ref q[offset + 11],
-                ref q[offset + 12], ref q[offset + 13], ref q[offset + 14], ref q[offset + 15]
-            );
-        }
-
-        // Second: apply P to columns (8 columns of 16 64-bit words)
-        for (int col = 0; col < 8; col++)
-        {
-            Argon2BlakeRound(
-                ref q[col + 0 * 8], ref q[col + 1 * 8], ref q[col + 2 * 8], ref q[col + 3 * 8],
-                ref q[col + 4 * 8], ref q[col + 5 * 8], ref q[col + 6 * 8], ref q[col + 7 * 8],
-                ref q[col + 8 * 8], ref q[col + 9 * 8], ref q[col + 10 * 8], ref q[col + 11 * 8],
-                ref q[col + 12 * 8], ref q[col + 13 * 8], ref q[col + 14 * 8], ref q[col + 15 * 8]
-            );
-        }
-
-        // R = Z XOR Q
-        var result = new ulong[ARGON2_QWORDS_IN_BLOCK];
-        for (int i = 0; i < ARGON2_QWORDS_IN_BLOCK; i++)
-        {
-            result[i] = z[i] ^ q[i];
-        }
-
-        return result;
-    }
-
-    /// <summary>
-    /// Argon2 Blake2b-like round function for 16 64-bit words.
-    /// </summary>
-    private static void Argon2BlakeRound(
-        ref ulong v0, ref ulong v1, ref ulong v2, ref ulong v3,
-        ref ulong v4, ref ulong v5, ref ulong v6, ref ulong v7,
-        ref ulong v8, ref ulong v9, ref ulong v10, ref ulong v11,
-        ref ulong v12, ref ulong v13, ref ulong v14, ref ulong v15)
-    {
-        // Two rounds of Blake2b G mixing
-        Argon2GB(ref v0, ref v4, ref v8, ref v12);
-        Argon2GB(ref v1, ref v5, ref v9, ref v13);
-        Argon2GB(ref v2, ref v6, ref v10, ref v14);
-        Argon2GB(ref v3, ref v7, ref v11, ref v15);
-
-        Argon2GB(ref v0, ref v5, ref v10, ref v15);
-        Argon2GB(ref v1, ref v6, ref v11, ref v12);
-        Argon2GB(ref v2, ref v7, ref v8, ref v13);
-        Argon2GB(ref v3, ref v4, ref v9, ref v14);
-    }
-
-    /// <summary>
-    /// Argon2 GB mixing function (modified Blake2b G).
-    /// Uses multiplication for better diffusion per RFC 9106.
-    /// </summary>
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static void Argon2GB(ref ulong a, ref ulong b, ref ulong c, ref ulong d)
-    {
-        // Argon2 uses a modified G with multiplications for better diffusion
-        a = a + b + 2 * (uint)a * (uint)b;
-        d = RotateRight64(d ^ a, 32);
-
-        c = c + d + 2 * (uint)c * (uint)d;
-        b = RotateRight64(b ^ c, 24);
-
-        a = a + b + 2 * (uint)a * (uint)b;
-        d = RotateRight64(d ^ a, 16);
-
-        c = c + d + 2 * (uint)c * (uint)d;
-        b = RotateRight64(b ^ c, 63);
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static ulong RotateRight64(ulong value, int bits)
-    {
-        return (value >> bits) | (value << (64 - bits));
-    }
-
-    private byte[] DeriveScrypt(string password, byte[] salt)
-    {
-        // scrypt implementation following RFC 7914
-        var passwordBytes = Encoding.UTF8.GetBytes(password);
-        var N = _config.ScryptN;
-        var r = _config.ScryptR;
-        var p = _config.ScryptP;
-        var dkLen = _config.KeySizeBits / 8;
-
-        // 1. B = PBKDF2-HMAC-SHA256(P, S, 1, p * MFLen)
-        var mfLen = 128 * r;
-        var b = Rfc2898DeriveBytes.Pbkdf2(passwordBytes, salt, 1, HashAlgorithmName.SHA256, p * mfLen);
-
-        // 2. For each block in B, apply ROMix
-        for (int i = 0; i < p; i++)
-        {
-            var block = new byte[mfLen];
-            Array.Copy(b, i * mfLen, block, 0, mfLen);
-
-            var mixedBlock = ScryptROMix(block, N, r);
-            Array.Copy(mixedBlock, 0, b, i * mfLen, mfLen);
-        }
-
-        // 3. DK = PBKDF2-HMAC-SHA256(P, B, 1, dkLen)
-        return Rfc2898DeriveBytes.Pbkdf2(passwordBytes, b, 1, HashAlgorithmName.SHA256, dkLen);
-    }
-
-    private static byte[] ScryptROMix(byte[] block, int n, int r)
-    {
-        var blockSize = 128 * r;
-        var v = new byte[n][];
-        var x = new byte[blockSize];
-        Array.Copy(block, x, blockSize);
-
-        // Build V
-        for (int i = 0; i < n; i++)
-        {
-            v[i] = new byte[blockSize];
-            Array.Copy(x, v[i], blockSize);
-            x = ScryptBlockMix(x, r);
-        }
-
-        // Mix with V
-        for (int i = 0; i < n; i++)
-        {
-            var j = (int)(BitConverter.ToUInt64(x, (2 * r - 1) * 64) % (ulong)n);
-            for (int k = 0; k < blockSize; k++)
-                x[k] ^= v[j][k];
-            x = ScryptBlockMix(x, r);
-        }
-
-        return x;
-    }
-
-    private static byte[] ScryptBlockMix(byte[] b, int r)
-    {
-        var blockSize = 64;
-        var result = new byte[128 * r];
-        var x = new byte[blockSize];
-        Array.Copy(b, (2 * r - 1) * blockSize, x, 0, blockSize);
-
-        for (int i = 0; i < 2 * r; i++)
-        {
-            for (int j = 0; j < blockSize; j++)
-                x[j] ^= b[i * blockSize + j];
-
-            x = SalsaCore(x, 8);
-
-            var destOffset = (i % 2 == 0 ? i / 2 : r + i / 2) * blockSize;
-            Array.Copy(x, 0, result, destOffset, blockSize);
-        }
-
-        return result;
-    }
-
-    private static byte[] SalsaCore(byte[] input, int rounds)
-    {
-        var x = new uint[16];
-        for (int i = 0; i < 16; i++)
-            x[i] = BitConverter.ToUInt32(input, i * 4);
-
-        var original = (uint[])x.Clone();
-
-        for (int i = 0; i < rounds; i += 2)
-        {
-            // Column rounds
-            x[4] ^= RotateLeft(x[0] + x[12], 7);
-            x[8] ^= RotateLeft(x[4] + x[0], 9);
-            x[12] ^= RotateLeft(x[8] + x[4], 13);
-            x[0] ^= RotateLeft(x[12] + x[8], 18);
-
-            x[9] ^= RotateLeft(x[5] + x[1], 7);
-            x[13] ^= RotateLeft(x[9] + x[5], 9);
-            x[1] ^= RotateLeft(x[13] + x[9], 13);
-            x[5] ^= RotateLeft(x[1] + x[13], 18);
-
-            x[14] ^= RotateLeft(x[10] + x[6], 7);
-            x[2] ^= RotateLeft(x[14] + x[10], 9);
-            x[6] ^= RotateLeft(x[2] + x[14], 13);
-            x[10] ^= RotateLeft(x[6] + x[2], 18);
-
-            x[3] ^= RotateLeft(x[15] + x[11], 7);
-            x[7] ^= RotateLeft(x[3] + x[15], 9);
-            x[11] ^= RotateLeft(x[7] + x[3], 13);
-            x[15] ^= RotateLeft(x[11] + x[7], 18);
-
-            // Row rounds
-            x[1] ^= RotateLeft(x[0] + x[3], 7);
-            x[2] ^= RotateLeft(x[1] + x[0], 9);
-            x[3] ^= RotateLeft(x[2] + x[1], 13);
-            x[0] ^= RotateLeft(x[3] + x[2], 18);
-
-            x[6] ^= RotateLeft(x[5] + x[4], 7);
-            x[7] ^= RotateLeft(x[6] + x[5], 9);
-            x[4] ^= RotateLeft(x[7] + x[6], 13);
-            x[5] ^= RotateLeft(x[4] + x[7], 18);
-
-            x[11] ^= RotateLeft(x[10] + x[9], 7);
-            x[8] ^= RotateLeft(x[11] + x[10], 9);
-            x[9] ^= RotateLeft(x[8] + x[11], 13);
-            x[10] ^= RotateLeft(x[9] + x[8], 18);
-
-            x[12] ^= RotateLeft(x[15] + x[14], 7);
-            x[13] ^= RotateLeft(x[12] + x[15], 9);
-            x[14] ^= RotateLeft(x[13] + x[12], 13);
-            x[15] ^= RotateLeft(x[14] + x[13], 18);
-        }
-
-        var output = new byte[64];
-        for (int i = 0; i < 16; i++)
-            BitConverter.GetBytes(x[i] + original[i]).CopyTo(output, i * 4);
-
-        return output;
-    }
-
-    private static uint RotateLeft(uint value, int bits) => (value << bits) | (value >> (32 - bits));
-
-    /// <summary>
-    /// Encrypts data using the configured algorithm.
-    /// </summary>
-    public async Task<EncryptedPayload> EncryptAsync(byte[] plaintext, byte[] key, CancellationToken ct = default)
-    {
-        ArgumentNullException.ThrowIfNull(plaintext);
-        ArgumentNullException.ThrowIfNull(key);
-
-        return await Task.Run(() => _provider.Encrypt(plaintext, key), ct);
-    }
-
-    /// <summary>
-    /// Decrypts data using the configured algorithm.
-    /// </summary>
-    public async Task<byte[]> DecryptAsync(EncryptedPayload payload, byte[] key, CancellationToken ct = default)
-    {
-        ArgumentNullException.ThrowIfNull(payload);
-        ArgumentNullException.ThrowIfNull(key);
-
-        return await Task.Run(() => _provider.Decrypt(payload, key), ct);
-    }
-
-    /// <summary>
-    /// Encrypts a stream using the configured algorithm.
-    /// </summary>
-    public async Task<Stream> EncryptStreamAsync(Stream plaintext, byte[] key, CancellationToken ct = default)
-    {
-        using var ms = new MemoryStream();
-        await plaintext.CopyToAsync(ms, ct);
-        var encrypted = await EncryptAsync(ms.ToArray(), key, ct);
-
-        var result = new MemoryStream();
-        var json = JsonSerializer.SerializeToUtf8Bytes(encrypted);
-        await result.WriteAsync(json, ct);
-        result.Position = 0;
-        return result;
-    }
-
-    /// <summary>
-    /// Decrypts a stream using the configured algorithm.
-    /// </summary>
-    public async Task<Stream> DecryptStreamAsync(Stream ciphertext, byte[] key, CancellationToken ct = default)
-    {
-        using var ms = new MemoryStream();
-        await ciphertext.CopyToAsync(ms, ct);
-        var payload = JsonSerializer.Deserialize<EncryptedPayload>(ms.ToArray())
-            ?? throw new EncryptionException("Invalid encrypted payload");
-
-        var decrypted = await DecryptAsync(payload, key, ct);
-        return new MemoryStream(decrypted);
-    }
-
-    /// <summary>
-    /// Generates a random salt for key derivation.
-    /// </summary>
-    public static byte[] GenerateSalt(int length = 32)
-    {
-        var salt = new byte[length];
-        RandomNumberGenerator.Fill(salt);
-        return salt;
-    }
-
-    /// <summary>
-    /// Gets information about the current encryption configuration.
-    /// </summary>
-    public EncryptionInfo GetInfo()
-    {
-        return new EncryptionInfo
-        {
-            Algorithm = _config.Algorithm,
-            KeyDerivation = _config.KeyDerivation,
-            KeySizeBits = _config.KeySizeBits,
-            HardwareAccelerationEnabled = _config.UseHardwareAcceleration && _hardwareAccelerationAvailable,
-            HardwareAccelerationAvailable = _hardwareAccelerationAvailable
-        };
-    }
-
-    /// <inheritdoc />
-    public ValueTask DisposeAsync()
-    {
-        if (_disposed) return ValueTask.CompletedTask;
-        _disposed = true;
-
-        foreach (var key in _keyCache.Values)
-            CryptographicOperations.ZeroMemory(key);
-        _keyCache.Clear();
-
-        return ValueTask.CompletedTask;
-    }
-}
+// =============================================================================
+// ENCRYPTION IMPLEMENTATIONS MOVED TO: DataWarehouse.Plugins.Encryption
+// =============================================================================
+// All encryption algorithm implementations (AES, ChaCha20, Twofish, Serpent, etc.)
+// have been consolidated into the DataWarehouse.Plugins.Encryption plugin.
+//
+// Use DataWarehouse.Plugins.Encryption.EncryptionProviderRegistry to:
+// - Create encryption providers
+// - Access available algorithms
+// - Create password hashers and KDFs
+//
+// The following types are available in the plugin:
+// - IEncryptionProvider interface and implementations
+// - Aes256GcmProvider, Aes256CbcHmacProvider
+// - ChaCha20Poly1305Provider, XChaCha20Poly1305Provider
+// - TwofishProvider, SerpentProvider
+// - Blake2bHasher
+// - Argon2KeyDerivation, Argon2PasswordHasher
+// - ZeroKnowledgeEncryption
+// - EncryptedPayload, EncryptionInfo
+// =============================================================================
 
 /// <summary>
 /// Interface for encryption providers.
+/// Implementations are in DataWarehouse.Plugins.Encryption.
 /// </summary>
 public interface IEncryptionProvider
 {
@@ -3833,248 +3163,31 @@ public interface IEncryptionProvider
 }
 
 /// <summary>
-/// AES-256-GCM encryption provider (default).
+/// Encrypted payload with metadata.
 /// </summary>
-public sealed class Aes256GcmProvider : IEncryptionProvider
+public sealed record EncryptedPayload
 {
-    public string AlgorithmName => "AES-256-GCM";
-    public int KeySizeBits => 256;
-    public int NonceSizeBytes => 12;
-
-    public EncryptedPayload Encrypt(byte[] plaintext, byte[] key)
-    {
-        var nonce = new byte[NonceSizeBytes];
-        RandomNumberGenerator.Fill(nonce);
-
-        var ciphertext = new byte[plaintext.Length];
-        var tag = new byte[16];
-
-        using var aes = new AesGcm(key, 16);
-        aes.Encrypt(nonce, plaintext, ciphertext, tag);
-
-        return new EncryptedPayload
-        {
-            Algorithm = AlgorithmName,
-            Nonce = nonce,
-            Ciphertext = ciphertext,
-            Tag = tag,
-            EncryptedAt = DateTime.UtcNow
-        };
-    }
-
-    public byte[] Decrypt(EncryptedPayload payload, byte[] key)
-    {
-        var plaintext = new byte[payload.Ciphertext.Length];
-
-        using var aes = new AesGcm(key, 16);
-        aes.Decrypt(payload.Nonce, payload.Ciphertext, payload.Tag, plaintext);
-
-        return plaintext;
-    }
+    public required string Algorithm { get; init; }
+    public required byte[] Nonce { get; init; }
+    public required byte[] Ciphertext { get; init; }
+    public required byte[] Tag { get; init; }
+    public DateTime EncryptedAt { get; init; }
+    public Dictionary<string, string> Metadata { get; init; } = new();
 }
 
 /// <summary>
-/// AES-256-CBC with HMAC-SHA256 encryption provider.
+/// Information about encryption configuration.
 /// </summary>
-public sealed class Aes256CbcHmacProvider : IEncryptionProvider
+public sealed record EncryptionInfo
 {
-    public string AlgorithmName => "AES-256-CBC-HMAC-SHA256";
-    public int KeySizeBits => 256;
-    public int NonceSizeBytes => 16;
-
-    public EncryptedPayload Encrypt(byte[] plaintext, byte[] key)
-    {
-        // Split key: first half for encryption, second half for HMAC
-        var encKey = key.AsSpan(0, 32).ToArray();
-        var macKey = key.Length > 32 ? key.AsSpan(32).ToArray() : SHA256.HashData(key);
-
-        var iv = new byte[NonceSizeBytes];
-        RandomNumberGenerator.Fill(iv);
-
-        byte[] ciphertext;
-        using (var aes = Aes.Create())
-        {
-            aes.Key = encKey;
-            aes.IV = iv;
-            aes.Mode = CipherMode.CBC;
-            aes.Padding = PaddingMode.PKCS7;
-
-            using var encryptor = aes.CreateEncryptor();
-            ciphertext = encryptor.TransformFinalBlock(plaintext, 0, plaintext.Length);
-        }
-
-        // Compute HMAC over IV + ciphertext
-        var dataToMac = new byte[iv.Length + ciphertext.Length];
-        Array.Copy(iv, dataToMac, iv.Length);
-        Array.Copy(ciphertext, 0, dataToMac, iv.Length, ciphertext.Length);
-
-        var tag = HMACSHA256.HashData(macKey, dataToMac);
-
-        return new EncryptedPayload
-        {
-            Algorithm = AlgorithmName,
-            Nonce = iv,
-            Ciphertext = ciphertext,
-            Tag = tag,
-            EncryptedAt = DateTime.UtcNow
-        };
-    }
-
-    public byte[] Decrypt(EncryptedPayload payload, byte[] key)
-    {
-        var encKey = key.AsSpan(0, 32).ToArray();
-        var macKey = key.Length > 32 ? key.AsSpan(32).ToArray() : SHA256.HashData(key);
-
-        // Verify HMAC
-        var dataToMac = new byte[payload.Nonce.Length + payload.Ciphertext.Length];
-        Array.Copy(payload.Nonce, dataToMac, payload.Nonce.Length);
-        Array.Copy(payload.Ciphertext, 0, dataToMac, payload.Nonce.Length, payload.Ciphertext.Length);
-
-        var expectedTag = HMACSHA256.HashData(macKey, dataToMac);
-        if (!CryptographicOperations.FixedTimeEquals(expectedTag, payload.Tag))
-            throw new CryptographicException("MAC verification failed");
-
-        using var aes = Aes.Create();
-        aes.Key = encKey;
-        aes.IV = payload.Nonce;
-        aes.Mode = CipherMode.CBC;
-        aes.Padding = PaddingMode.PKCS7;
-
-        using var decryptor = aes.CreateDecryptor();
-        return decryptor.TransformFinalBlock(payload.Ciphertext, 0, payload.Ciphertext.Length);
-    }
+    public EncryptionAlgorithm Algorithm { get; init; }
+    public KeyDerivationFunction KeyDerivation { get; init; }
+    public int KeySizeBits { get; init; }
+    public bool HardwareAccelerationEnabled { get; init; }
+    public bool HardwareAccelerationAvailable { get; init; }
 }
 
-/// <summary>
-/// ChaCha20-Poly1305 encryption provider.
-/// </summary>
-public sealed class ChaCha20Poly1305Provider : IEncryptionProvider
-{
-    public string AlgorithmName => "ChaCha20-Poly1305";
-    public int KeySizeBits => 256;
-    public int NonceSizeBytes => 12;
-
-    public EncryptedPayload Encrypt(byte[] plaintext, byte[] key)
-    {
-        var nonce = new byte[NonceSizeBytes];
-        RandomNumberGenerator.Fill(nonce);
-
-        var ciphertext = new byte[plaintext.Length];
-        var tag = new byte[16];
-
-        using var chacha = new ChaCha20Poly1305(key);
-        chacha.Encrypt(nonce, plaintext, ciphertext, tag);
-
-        return new EncryptedPayload
-        {
-            Algorithm = AlgorithmName,
-            Nonce = nonce,
-            Ciphertext = ciphertext,
-            Tag = tag,
-            EncryptedAt = DateTime.UtcNow
-        };
-    }
-
-    public byte[] Decrypt(EncryptedPayload payload, byte[] key)
-    {
-        var plaintext = new byte[payload.Ciphertext.Length];
-
-        using var chacha = new ChaCha20Poly1305(key);
-        chacha.Decrypt(payload.Nonce, payload.Ciphertext, payload.Tag, plaintext);
-
-        return plaintext;
-    }
-}
-
-/// <summary>
-/// XChaCha20-Poly1305 encryption provider with extended nonce.
-/// </summary>
-public sealed class XChaCha20Poly1305Provider : IEncryptionProvider
-{
-    public string AlgorithmName => "XChaCha20-Poly1305";
-    public int KeySizeBits => 256;
-    public int NonceSizeBytes => 24;
-
-    public EncryptedPayload Encrypt(byte[] plaintext, byte[] key)
-    {
-        var nonce = new byte[NonceSizeBytes];
-        RandomNumberGenerator.Fill(nonce);
-
-        // XChaCha20 uses HChaCha20 to derive a subkey from the first 16 bytes of the nonce
-        var subkey = HChaCha20(key, nonce.AsSpan(0, 16).ToArray());
-        var shortNonce = new byte[12];
-        Array.Copy(nonce, 16, shortNonce, 4, 8);
-
-        var ciphertext = new byte[plaintext.Length];
-        var tag = new byte[16];
-
-        using var chacha = new ChaCha20Poly1305(subkey);
-        chacha.Encrypt(shortNonce, plaintext, ciphertext, tag);
-
-        CryptographicOperations.ZeroMemory(subkey);
-
-        return new EncryptedPayload
-        {
-            Algorithm = AlgorithmName,
-            Nonce = nonce,
-            Ciphertext = ciphertext,
-            Tag = tag,
-            EncryptedAt = DateTime.UtcNow
-        };
-    }
-
-    public byte[] Decrypt(EncryptedPayload payload, byte[] key)
-    {
-        var subkey = HChaCha20(key, payload.Nonce.AsSpan(0, 16).ToArray());
-        var shortNonce = new byte[12];
-        Array.Copy(payload.Nonce, 16, shortNonce, 4, 8);
-
-        var plaintext = new byte[payload.Ciphertext.Length];
-
-        using var chacha = new ChaCha20Poly1305(subkey);
-        chacha.Decrypt(shortNonce, payload.Ciphertext, payload.Tag, plaintext);
-
-        CryptographicOperations.ZeroMemory(subkey);
-
-        return plaintext;
-    }
-
-    private static byte[] HChaCha20(byte[] key, byte[] nonce)
-    {
-        // HChaCha20 initialization
-        var state = new uint[16];
-        state[0] = 0x61707865;
-        state[1] = 0x3320646e;
-        state[2] = 0x79622d32;
-        state[3] = 0x6b206574;
-
-        for (int i = 0; i < 8; i++)
-            state[4 + i] = BitConverter.ToUInt32(key, i * 4);
-
-        for (int i = 0; i < 4; i++)
-            state[12 + i] = BitConverter.ToUInt32(nonce, i * 4);
-
-        // 20 rounds
-        for (int i = 0; i < 10; i++)
-        {
-            QuarterRound(ref state[0], ref state[4], ref state[8], ref state[12]);
-            QuarterRound(ref state[1], ref state[5], ref state[9], ref state[13]);
-            QuarterRound(ref state[2], ref state[6], ref state[10], ref state[14]);
-            QuarterRound(ref state[3], ref state[7], ref state[11], ref state[15]);
-            QuarterRound(ref state[0], ref state[5], ref state[10], ref state[15]);
-            QuarterRound(ref state[1], ref state[6], ref state[11], ref state[12]);
-            QuarterRound(ref state[2], ref state[7], ref state[8], ref state[13]);
-            QuarterRound(ref state[3], ref state[4], ref state[9], ref state[14]);
-        }
-
-        // Output first and last 4 words
-        var output = new byte[32];
-        for (int i = 0; i < 4; i++)
-            BitConverter.GetBytes(state[i]).CopyTo(output, i * 4);
-        for (int i = 0; i < 4; i++)
-            BitConverter.GetBytes(state[12 + i]).CopyTo(output, 16 + i * 4);
-
-        return output;
+#endregion
     }
 
     private static void QuarterRound(ref uint a, ref uint b, ref uint c, ref uint d)
@@ -5194,35 +4307,6 @@ public sealed class SerpentProvider : IEncryptionProvider
     #endregion
 }
 
-/// <summary>
-/// Full Blake2b implementation per RFC 7693 for Argon2.
-/// Supports variable output length (1-64 bytes), keyed hashing, and proper compression.
-/// </summary>
-internal sealed class Blake2bHasher
-{
-    // Blake2b IV (first 64 bits of fractional parts of square roots of first 8 primes)
-    private static readonly ulong[] IV = new ulong[]
-    {
-        0x6A09E667F3BCC908UL, 0xBB67AE8584CAA73BUL,
-        0x3C6EF372FE94F82BUL, 0xA54FF53A5F1D36F1UL,
-        0x510E527FADE682D1UL, 0x9B05688C2B3E6C1FUL,
-        0x1F83D9ABFB41BD6BUL, 0x5BE0CD19137E2179UL
-    };
-
-    // Sigma permutations for 12 rounds
-    private static readonly byte[,] SIGMA = new byte[,]
-    {
-        { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15 },
-        { 14, 10, 4, 8, 9, 15, 13, 6, 1, 12, 0, 2, 11, 7, 5, 3 },
-        { 11, 8, 12, 0, 5, 2, 15, 13, 10, 14, 3, 6, 7, 1, 9, 4 },
-        { 7, 9, 3, 1, 13, 12, 11, 14, 2, 6, 5, 10, 4, 0, 15, 8 },
-        { 9, 0, 5, 7, 2, 4, 10, 15, 14, 1, 11, 12, 6, 8, 3, 13 },
-        { 2, 12, 6, 10, 0, 11, 8, 3, 4, 13, 7, 5, 15, 14, 1, 9 },
-        { 12, 5, 1, 15, 14, 13, 4, 10, 0, 7, 6, 3, 9, 2, 8, 11 },
-        { 13, 11, 7, 14, 12, 1, 3, 9, 5, 0, 15, 4, 8, 6, 2, 10 },
-        { 6, 15, 14, 9, 11, 3, 0, 8, 12, 2, 13, 7, 1, 4, 10, 5 },
-        { 10, 2, 8, 4, 7, 6, 1, 5, 15, 11, 9, 14, 3, 12, 13, 0 },
-        { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15 },
         { 14, 10, 4, 8, 9, 15, 13, 6, 1, 12, 0, 2, 11, 7, 5, 3 }
     };
 
@@ -5383,68 +4467,6 @@ internal sealed class Blake2bHasher
             G(ref v[1], ref v[6], ref v[11], ref v[12], m[SIGMA[round, 10]], m[SIGMA[round, 11]]);
             G(ref v[2], ref v[7], ref v[8], ref v[13], m[SIGMA[round, 12]], m[SIGMA[round, 13]]);
             G(ref v[3], ref v[4], ref v[9], ref v[14], m[SIGMA[round, 14]], m[SIGMA[round, 15]]);
-        }
-
-        // Finalize: h = h XOR v[0..7] XOR v[8..15]
-        for (int i = 0; i < 8; i++)
-        {
-            h[i] ^= v[i] ^ v[i + 8];
-        }
-    }
-
-    /// <summary>
-    /// Blake2b mixing function G.
-    /// </summary>
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static void G(ref ulong a, ref ulong b, ref ulong c, ref ulong d, ulong x, ulong y)
-    {
-        a = a + b + x;
-        d = RotateRight(d ^ a, 32);
-
-        c = c + d;
-        b = RotateRight(b ^ c, 24);
-
-        a = a + b + y;
-        d = RotateRight(d ^ a, 16);
-
-        c = c + d;
-        b = RotateRight(b ^ c, 63);
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static ulong RotateRight(ulong value, int bits)
-    {
-        return (value >> bits) | (value << (64 - bits));
-    }
-}
-
-/// <summary>
-/// Encrypted payload with metadata.
-/// </summary>
-public sealed record EncryptedPayload
-{
-    public required string Algorithm { get; init; }
-    public required byte[] Nonce { get; init; }
-    public required byte[] Ciphertext { get; init; }
-    public required byte[] Tag { get; init; }
-    public DateTime EncryptedAt { get; init; }
-    public Dictionary<string, string> Metadata { get; init; } = new();
-}
-
-/// <summary>
-/// Information about encryption configuration.
-/// </summary>
-public sealed record EncryptionInfo
-{
-    public EncryptionAlgorithm Algorithm { get; init; }
-    public KeyDerivationFunction KeyDerivation { get; init; }
-    public int KeySizeBits { get; init; }
-    public bool HardwareAccelerationEnabled { get; init; }
-    public bool HardwareAccelerationAvailable { get; init; }
-}
-
-#endregion
-
 #region 3. File Versioning Options
 
 /// <summary>
@@ -6014,6 +5036,8 @@ public sealed class FileVersioningManager : IAsyncDisposable
 
     private static async Task<byte[]> CompressAsync(byte[] data, CancellationToken ct)
     {
+        // Use Brotli compression - implementation moved to DataWarehouse.Plugins.Compression
+        // This inline version is kept for SDK self-containment when plugin is not available
         using var output = new MemoryStream();
         await using (var compressor = new BrotliStream(output, CompressionLevel.Optimal, true))
         {
@@ -6024,6 +5048,8 @@ public sealed class FileVersioningManager : IAsyncDisposable
 
     private static async Task<byte[]> DecompressAsync(byte[] data, CancellationToken ct)
     {
+        // Use Brotli decompression - implementation moved to DataWarehouse.Plugins.Compression
+        // This inline version is kept for SDK self-containment when plugin is not available
         using var input = new MemoryStream(data);
         using var output = new MemoryStream();
         await using (var decompressor = new BrotliStream(input, CompressionMode.Decompress))
@@ -6709,6 +5735,8 @@ public sealed class DeduplicationManager : IAsyncDisposable
 
     private static async Task<byte[]> CompressChunkAsync(byte[] data, CancellationToken ct)
     {
+        // Use Brotli compression with fast setting - implementation moved to DataWarehouse.Plugins.Compression
+        // This inline version is kept for SDK self-containment when plugin is not available
         using var output = new MemoryStream();
         await using (var compressor = new BrotliStream(output, CompressionLevel.Fastest, true))
         {
@@ -6719,6 +5747,8 @@ public sealed class DeduplicationManager : IAsyncDisposable
 
     private static async Task<byte[]> DecompressChunkAsync(byte[] data, CancellationToken ct)
     {
+        // Use Brotli decompression - implementation moved to DataWarehouse.Plugins.Compression
+        // This inline version is kept for SDK self-containment when plugin is not available
         using var input = new MemoryStream(data);
         using var output = new MemoryStream();
         await using (var decompressor = new BrotliStream(input, CompressionMode.Decompress))

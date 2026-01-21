@@ -2171,7 +2171,13 @@ public record BatteryAwareStats
 /// <summary>
 /// Background delta-sync backup agent with bandwidth limiting.
 /// Provides continuous incremental backups to cloud or local targets.
+///
+/// MIGRATION NOTICE: This class is being migrated to DataWarehouse.Plugins.Backup.
+/// New implementations should use the IncrementalBackupProvider from the plugin,
+/// which provides enhanced features including content-defined chunking with
+/// Rabin fingerprinting, global deduplication, and synthetic full support.
 /// </summary>
+[Obsolete("Use DataWarehouse.Plugins.Backup.Providers.IncrementalBackupProvider for new implementations")]
 public sealed class IncrementalBackupAgent : IAsyncDisposable
 {
     private readonly ConcurrentDictionary<string, FileTrackingInfo> _trackedFiles = new();

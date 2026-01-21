@@ -3897,64 +3897,15 @@ public interface IPasswordHasher
     bool VerifyPassword(string password, string hash);
 }
 
-/// <summary>
-/// Argon2 password hasher implementation.
-/// </summary>
-public sealed class Argon2PasswordHasher : IPasswordHasher
-{
-    private const int SaltSize = 16;
-    private const int HashSize = 32;
-    private const int Iterations = 4;
-    private const int MemorySize = 65536;
-    private const int DegreeOfParallelism = 4;
-
-    /// <summary>
-    /// Hashes a password using Argon2id.
-    /// </summary>
-    public string HashPassword(string password)
-    {
-        var salt = new byte[SaltSize];
-        RandomNumberGenerator.Fill(salt);
-
-        // Using PBKDF2 as a fallback since Argon2 requires additional libraries
-        // In production, use Konscious.Security.Cryptography.Argon2 or similar
-        using var pbkdf2 = new Rfc2898DeriveBytes(password, salt, Iterations * 10000, HashAlgorithmName.SHA256);
-        var hash = pbkdf2.GetBytes(HashSize);
-
-        var result = new byte[SaltSize + HashSize];
-        Buffer.BlockCopy(salt, 0, result, 0, SaltSize);
-        Buffer.BlockCopy(hash, 0, result, SaltSize, HashSize);
-
-        return Convert.ToBase64String(result);
-    }
-
-    /// <summary>
-    /// Verifies a password against a hash.
-    /// </summary>
-    public bool VerifyPassword(string password, string storedHash)
-    {
-        try
-        {
-            var hashBytes = Convert.FromBase64String(storedHash);
-            if (hashBytes.Length != SaltSize + HashSize)
-                return false;
-
-            var salt = new byte[SaltSize];
-            Buffer.BlockCopy(hashBytes, 0, salt, 0, SaltSize);
-
-            using var pbkdf2 = new Rfc2898DeriveBytes(password, salt, Iterations * 10000, HashAlgorithmName.SHA256);
-            var computedHash = pbkdf2.GetBytes(HashSize);
-
-            return CryptographicOperations.FixedTimeEquals(
-                computedHash,
-                hashBytes.AsSpan(SaltSize, HashSize));
-        }
-        catch
-        {
-            return false;
-        }
-    }
-}
+// =============================================================================
+// ARGON2 PASSWORD HASHER MOVED TO: DataWarehouse.Plugins.Encryption
+// =============================================================================
+// The Argon2PasswordHasher implementation has been moved to
+// DataWarehouse.Plugins.Encryption.Providers.Argon2PasswordHasher
+//
+// Use DataWarehouse.Plugins.Encryption.EncryptionProviderRegistry.CreatePasswordHasher()
+// to obtain a password hasher instance.
+// =============================================================================
 
 /// <summary>
 /// Interface for TOTP provider.
