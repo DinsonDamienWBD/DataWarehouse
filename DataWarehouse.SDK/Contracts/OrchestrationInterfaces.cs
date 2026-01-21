@@ -1112,4 +1112,488 @@ namespace DataWarehouse.SDK.Contracts
     }
 
     #endregion
+
+    #region Search Provider Base Class
+
+    /// <summary>
+    /// Abstract base class for search providers.
+    /// Provides common functionality for search indexing and querying.
+    /// </summary>
+    public abstract class SearchProviderPluginBase : FeaturePluginBase, ISearchProvider
+    {
+        public override PluginCategory Category => PluginCategory.MetadataIndexingProvider;
+
+        /// <summary>
+        /// Type of search this provider handles. Must be overridden.
+        /// </summary>
+        public abstract SearchType SearchType { get; }
+
+        /// <summary>
+        /// Priority for result ranking (higher = more important). Override to customize.
+        /// </summary>
+        public virtual int Priority => SearchType switch
+        {
+            SearchType.Agent => 100,
+            SearchType.Semantic => 80,
+            SearchType.Keyword => 60,
+            SearchType.Filename => 40,
+            SearchType.Metadata => 30,
+            _ => 50
+        };
+
+        /// <summary>
+        /// Whether this provider is available. Override to implement availability check.
+        /// </summary>
+        public virtual bool IsAvailable => IsRunning;
+
+        /// <summary>
+        /// Performs the search. Must be implemented by derived classes.
+        /// </summary>
+        public abstract Task<SearchProviderResult> SearchAsync(
+            SearchRequest request,
+            CancellationToken ct = default);
+
+        /// <summary>
+        /// Indexes content for later search. Must be implemented by derived classes.
+        /// </summary>
+        public abstract Task IndexAsync(
+            string objectId,
+            IndexableContent content,
+            CancellationToken ct = default);
+
+        /// <summary>
+        /// Removes content from the index. Must be implemented by derived classes.
+        /// </summary>
+        public abstract Task RemoveFromIndexAsync(string objectId, CancellationToken ct = default);
+
+        public override Task StartAsync(CancellationToken ct) => Task.CompletedTask;
+        public override Task StopAsync() => Task.CompletedTask;
+
+        protected override Dictionary<string, object> GetMetadata()
+        {
+            var metadata = base.GetMetadata();
+            metadata["SearchType"] = SearchType.ToString();
+            metadata["Priority"] = Priority;
+            metadata["IsAvailable"] = IsAvailable;
+            return metadata;
+        }
+    }
+
+    #endregion
+
+    #region Content Processor Base Class
+
+    /// <summary>
+    /// Abstract base class for content processors.
+    /// Provides common functionality for text extraction, embedding generation, etc.
+    /// </summary>
+    public abstract class ContentProcessorPluginBase : FeaturePluginBase, IContentProcessor
+    {
+        public override PluginCategory Category => PluginCategory.DataTransformationProvider;
+
+        /// <summary>
+        /// Type of processing this processor does. Must be overridden.
+        /// </summary>
+        public abstract ContentProcessingType ProcessingType { get; }
+
+        /// <summary>
+        /// Content types this processor can handle.
+        /// Override to restrict to specific types. Empty = all types.
+        /// </summary>
+        public virtual string[] SupportedContentTypes => Array.Empty<string>();
+
+        /// <summary>
+        /// Processes content. Must be implemented by derived classes.
+        /// </summary>
+        public abstract Task<ContentProcessingResult> ProcessAsync(
+            Stream content,
+            string contentType,
+            Dictionary<string, object>? context = null,
+            CancellationToken ct = default);
+
+        /// <summary>
+        /// Checks if this processor supports the given content type.
+        /// </summary>
+        protected virtual bool SupportsContentType(string contentType)
+        {
+            if (SupportedContentTypes.Length == 0)
+                return true;
+
+            foreach (var supported in SupportedContentTypes)
+            {
+                if (supported == "*/*")
+                    return true;
+
+                if (supported.EndsWith("/*"))
+                {
+                    var category = supported[..^2];
+                    if (contentType.StartsWith(category + "/", StringComparison.OrdinalIgnoreCase))
+                        return true;
+                }
+                else if (string.Equals(supported, contentType, StringComparison.OrdinalIgnoreCase))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        /// <summary>
+        /// Creates a successful result with the specified data.
+        /// </summary>
+        protected ContentProcessingResult SuccessResult(
+            string? extractedText = null,
+            float[]? embeddings = null,
+            string? summary = null,
+            Dictionary<string, object>? metadata = null,
+            byte[]? thumbnail = null,
+            ContentClassification? classification = null,
+            IReadOnlyList<ExtractedEntity>? entities = null,
+            TimeSpan? duration = null)
+        {
+            return new ContentProcessingResult
+            {
+                Success = true,
+                ProcessingType = ProcessingType,
+                ExtractedText = extractedText,
+                Embeddings = embeddings,
+                Summary = summary,
+                Metadata = metadata,
+                Thumbnail = thumbnail,
+                Classification = classification,
+                Entities = entities,
+                Duration = duration ?? TimeSpan.Zero
+            };
+        }
+
+        /// <summary>
+        /// Creates a failure result with the specified error.
+        /// </summary>
+        protected ContentProcessingResult FailureResult(string errorMessage, TimeSpan? duration = null)
+        {
+            return new ContentProcessingResult
+            {
+                Success = false,
+                ProcessingType = ProcessingType,
+                ErrorMessage = errorMessage,
+                Duration = duration ?? TimeSpan.Zero
+            };
+        }
+
+        public override Task StartAsync(CancellationToken ct) => Task.CompletedTask;
+        public override Task StopAsync() => Task.CompletedTask;
+
+        protected override Dictionary<string, object> GetMetadata()
+        {
+            var metadata = base.GetMetadata();
+            metadata["ProcessingType"] = ProcessingType.ToString();
+            metadata["SupportedContentTypes"] = SupportedContentTypes.Length > 0
+                ? string.Join(", ", SupportedContentTypes)
+                : "All";
+            return metadata;
+        }
+    }
+
+    #endregion
+
+    #region Write Fan-Out Orchestrator Base Class
+
+    /// <summary>
+    /// Abstract base class for write fan-out orchestrators.
+    /// Provides parallel write coordination to multiple destinations.
+    /// </summary>
+    public abstract class WriteFanOutOrchestratorPluginBase : FeaturePluginBase, IWriteFanOutOrchestrator
+    {
+        private readonly List<IWriteDestination> _destinations = new();
+        private readonly object _lock = new();
+
+        public override PluginCategory Category => PluginCategory.OrchestrationProvider;
+
+        /// <summary>
+        /// Registers a write destination.
+        /// </summary>
+        public void RegisterDestination(IWriteDestination destination)
+        {
+            lock (_lock)
+            {
+                _destinations.Add(destination);
+            }
+        }
+
+        /// <summary>
+        /// Gets all registered destinations.
+        /// </summary>
+        public IReadOnlyList<IWriteDestination> GetDestinations()
+        {
+            lock (_lock)
+            {
+                return _destinations.ToList();
+            }
+        }
+
+        /// <summary>
+        /// Performs a fan-out write to all registered destinations.
+        /// </summary>
+        public virtual async Task<FanOutWriteResult> WriteAsync(
+            string objectId,
+            Stream data,
+            Manifest manifest,
+            FanOutWriteOptions? options = null,
+            CancellationToken ct = default)
+        {
+            var sw = System.Diagnostics.Stopwatch.StartNew();
+            options ??= new FanOutWriteOptions();
+
+            var destinations = GetDestinations();
+            var requiredDestinations = destinations.Where(d => d.IsRequired).ToList();
+            var optionalDestinations = destinations.Where(d => !d.IsRequired).ToList();
+
+            // Process content in parallel to get indexable content
+            var processingResults = await ProcessContentAsync(data, manifest, options, ct);
+
+            // Create indexable content from processing results
+            var indexableContent = CreateIndexableContent(objectId, manifest, processingResults);
+
+            // Reset stream position for primary storage
+            if (data.CanSeek)
+                data.Position = 0;
+
+            // Write to all destinations in parallel
+            var destinationResults = new ConcurrentDictionary<WriteDestinationType, WriteDestinationResult>();
+
+            // Required destinations - must all succeed
+            var requiredTasks = requiredDestinations.Select(async d =>
+            {
+                var result = await WriteToDestinationAsync(d, objectId, indexableContent, ct);
+                destinationResults[d.DestinationType] = result;
+                return result;
+            });
+
+            var requiredResults = await Task.WhenAll(requiredTasks);
+            var requiredSuccess = requiredResults.All(r => r.Success);
+
+            // Optional destinations - fire and forget with timeout
+            if (optionalDestinations.Count > 0)
+            {
+                using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+                timeoutCts.CancelAfter(options.NonRequiredTimeout);
+
+                var optionalTasks = optionalDestinations.Select(async d =>
+                {
+                    try
+                    {
+                        var result = await WriteToDestinationAsync(d, objectId, indexableContent, timeoutCts.Token);
+                        destinationResults[d.DestinationType] = result;
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        destinationResults[d.DestinationType] = new WriteDestinationResult
+                        {
+                            Success = false,
+                            DestinationType = d.DestinationType,
+                            ErrorMessage = "Timeout"
+                        };
+                    }
+                });
+
+                if (options.WaitForAll)
+                {
+                    await Task.WhenAll(optionalTasks);
+                }
+                else
+                {
+                    // Fire and forget
+                    _ = Task.WhenAll(optionalTasks);
+                }
+            }
+
+            sw.Stop();
+
+            return new FanOutWriteResult
+            {
+                Success = requiredSuccess,
+                ObjectId = objectId,
+                DestinationResults = destinationResults.ToDictionary(kvp => kvp.Key, kvp => kvp.Value),
+                ProcessingResults = processingResults.ToDictionary(kvp => kvp.Key, kvp => kvp.Value),
+                Duration = sw.Elapsed
+            };
+        }
+
+        /// <summary>
+        /// Processes content through available content processors.
+        /// Override to customize processing behavior.
+        /// </summary>
+        protected virtual async Task<Dictionary<ContentProcessingType, ContentProcessingResult>> ProcessContentAsync(
+            Stream data,
+            Manifest manifest,
+            FanOutWriteOptions options,
+            CancellationToken ct)
+        {
+            var results = new Dictionary<ContentProcessingType, ContentProcessingResult>();
+            // Default: no processing. Override to add content processors.
+            return results;
+        }
+
+        /// <summary>
+        /// Creates indexable content from manifest and processing results.
+        /// Override to customize content creation.
+        /// </summary>
+        protected virtual IndexableContent CreateIndexableContent(
+            string objectId,
+            Manifest manifest,
+            Dictionary<ContentProcessingType, ContentProcessingResult> processingResults)
+        {
+            return new IndexableContent
+            {
+                ObjectId = objectId,
+                Filename = manifest.FileName,
+                ContentType = manifest.ContentType,
+                Size = manifest.OriginalSize,
+                Metadata = manifest.CustomMetadata,
+                TextContent = processingResults.TryGetValue(ContentProcessingType.TextExtraction, out var textResult)
+                    ? textResult.ExtractedText
+                    : null,
+                Embeddings = processingResults.TryGetValue(ContentProcessingType.EmbeddingGeneration, out var embResult)
+                    ? embResult.Embeddings
+                    : null,
+                Summary = processingResults.TryGetValue(ContentProcessingType.Summarization, out var sumResult)
+                    ? sumResult.Summary
+                    : null
+            };
+        }
+
+        /// <summary>
+        /// Writes to a single destination with error handling.
+        /// </summary>
+        private async Task<WriteDestinationResult> WriteToDestinationAsync(
+            IWriteDestination destination,
+            string objectId,
+            IndexableContent content,
+            CancellationToken ct)
+        {
+            var sw = System.Diagnostics.Stopwatch.StartNew();
+            try
+            {
+                var result = await destination.WriteAsync(objectId, content, ct);
+                sw.Stop();
+                return new WriteDestinationResult
+                {
+                    Success = result.Success,
+                    DestinationType = destination.DestinationType,
+                    Duration = sw.Elapsed,
+                    ErrorMessage = result.ErrorMessage
+                };
+            }
+            catch (Exception ex)
+            {
+                sw.Stop();
+                return new WriteDestinationResult
+                {
+                    Success = false,
+                    DestinationType = destination.DestinationType,
+                    Duration = sw.Elapsed,
+                    ErrorMessage = ex.Message
+                };
+            }
+        }
+
+        public override Task StartAsync(CancellationToken ct) => Task.CompletedTask;
+        public override Task StopAsync() => Task.CompletedTask;
+
+        protected override Dictionary<string, object> GetMetadata()
+        {
+            var metadata = base.GetMetadata();
+            metadata["FeatureType"] = "WriteFanOutOrchestrator";
+            metadata["DestinationCount"] = _destinations.Count;
+            return metadata;
+        }
+    }
+
+    #endregion
+
+    #region Write Destination Base Class
+
+    /// <summary>
+    /// Abstract base class for write destinations.
+    /// Provides common functionality for destination-specific writes.
+    /// </summary>
+    public abstract class WriteDestinationPluginBase : FeaturePluginBase, IWriteDestination
+    {
+        public override PluginCategory Category => PluginCategory.StorageProvider;
+
+        /// <summary>
+        /// Type of destination. Must be overridden.
+        /// </summary>
+        public abstract WriteDestinationType DestinationType { get; }
+
+        /// <summary>
+        /// Whether this destination is required for a successful write.
+        /// Override to customize. Default is false for non-primary storage.
+        /// </summary>
+        public virtual bool IsRequired => DestinationType == WriteDestinationType.PrimaryStorage;
+
+        /// <summary>
+        /// Priority for write ordering (higher = writes first). Override to customize.
+        /// </summary>
+        public virtual int Priority => DestinationType switch
+        {
+            WriteDestinationType.PrimaryStorage => 100,
+            WriteDestinationType.MetadataStorage => 90,
+            WriteDestinationType.TextIndex => 50,
+            WriteDestinationType.VectorStore => 50,
+            WriteDestinationType.DocumentStore => 40,
+            WriteDestinationType.Cache => 30,
+            _ => 50
+        };
+
+        /// <summary>
+        /// Writes to this destination. Must be implemented by derived classes.
+        /// </summary>
+        public abstract Task<WriteDestinationResult> WriteAsync(
+            string objectId,
+            IndexableContent content,
+            CancellationToken ct = default);
+
+        /// <summary>
+        /// Creates a successful write result.
+        /// </summary>
+        protected WriteDestinationResult SuccessResult(TimeSpan? duration = null)
+        {
+            return new WriteDestinationResult
+            {
+                Success = true,
+                DestinationType = DestinationType,
+                Duration = duration ?? TimeSpan.Zero
+            };
+        }
+
+        /// <summary>
+        /// Creates a failure write result.
+        /// </summary>
+        protected WriteDestinationResult FailureResult(string errorMessage, TimeSpan? duration = null)
+        {
+            return new WriteDestinationResult
+            {
+                Success = false,
+                DestinationType = DestinationType,
+                ErrorMessage = errorMessage,
+                Duration = duration ?? TimeSpan.Zero
+            };
+        }
+
+        public override Task StartAsync(CancellationToken ct) => Task.CompletedTask;
+        public override Task StopAsync() => Task.CompletedTask;
+
+        protected override Dictionary<string, object> GetMetadata()
+        {
+            var metadata = base.GetMetadata();
+            metadata["DestinationType"] = DestinationType.ToString();
+            metadata["IsRequired"] = IsRequired;
+            metadata["Priority"] = Priority;
+            return metadata;
+        }
+    }
+
+    #endregion
 }

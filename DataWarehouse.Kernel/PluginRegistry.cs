@@ -12,8 +12,9 @@ namespace DataWarehouse.Kernel
     /// - Category-based querying
     /// - Plugin selection based on operating mode (Intelligent Defaults)
     /// - Thread-safe operations
+    /// - Implements IPluginRegistry for inter-plugin discovery
     /// </summary>
-    public sealed class PluginRegistry
+    public sealed class PluginRegistry : IPluginRegistry
     {
         private readonly ConcurrentDictionary<string, IPlugin> _plugins = new();
         private readonly ConcurrentDictionary<PluginCategory, List<IPlugin>> _byCategory = new();
@@ -89,6 +90,11 @@ namespace DataWarehouse.Kernel
         }
 
         /// <summary>
+        /// Get a plugin by ID (IPluginRegistry interface implementation).
+        /// </summary>
+        IPlugin? IPluginRegistry.GetById(string pluginId) => GetPluginById(pluginId);
+
+        /// <summary>
         /// Get a plugin by type.
         /// Returns the best available plugin based on operating mode.
         /// </summary>
@@ -101,6 +107,11 @@ namespace DataWarehouse.Kernel
             // Select based on operating mode and quality level
             return SelectBestPlugin(candidates);
         }
+
+        /// <summary>
+        /// Get a plugin by type (IPluginRegistry interface implementation).
+        /// </summary>
+        T? IPluginRegistry.Get<T>() where T : class => GetPlugin<T>();
 
         /// <summary>
         /// Get a plugin by type and ID.
@@ -116,6 +127,19 @@ namespace DataWarehouse.Kernel
         public IEnumerable<T> GetPlugins<T>() where T : class, IPlugin
         {
             return _plugins.Values.OfType<T>();
+        }
+
+        /// <summary>
+        /// Get all plugins of a specific type (IPluginRegistry interface implementation).
+        /// </summary>
+        IEnumerable<T> IPluginRegistry.GetAll<T>() => GetPlugins<T>();
+
+        /// <summary>
+        /// Check if a plugin of the specified type is registered (IPluginRegistry interface).
+        /// </summary>
+        public bool Has<T>() where T : class, IPlugin
+        {
+            return _plugins.Values.OfType<T>().Any();
         }
 
         /// <summary>
