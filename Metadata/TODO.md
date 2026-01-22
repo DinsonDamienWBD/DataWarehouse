@@ -129,3 +129,229 @@ Do NOT wait for an entire phase to complete before committing.
 - ⏳ GUI Installer for Individual Users tier
 - ⏳ Cross-platform migration (.NET 10)
 - ⏳ Support SLA documentation per deployment
+
+---
+
+## MICROKERNEL ARCHITECTURE REFACTOR
+
+### Overview
+Refactoring the DataWarehouse architecture to a true microkernel + plugins model. All features are implemented as plugins extending SDK base classes. Target: 103+ plugins.
+
+**Current Progress:** 40 plugins implemented | ~63 remaining
+
+---
+
+### Phase 1: Infrastructure Base Classes ✅ COMPLETE
+
+SDK base classes for infrastructure plugins (InfrastructurePluginBases.cs):
+
+| Base Class | Purpose | Status |
+|------------|---------|--------|
+| HealthProviderPluginBase | Health checks, component monitoring | ✅ |
+| RateLimiterPluginBase | Token bucket rate limiting | ✅ |
+| CircuitBreakerPluginBase | Failure detection, retry with backoff | ✅ |
+| TransactionManagerPluginBase | Distributed transaction coordination | ✅ |
+| RaidProviderPluginBase | RAID 0-Z3 support, parity calculation | ✅ |
+| ErasureCodingPluginBase | Reed-Solomon encoding | ✅ |
+| ComplianceProviderPluginBase | GDPR/HIPAA/SOC2 compliance | ✅ |
+| IAMProviderPluginBase | Authentication, authorization, roles | ✅ |
+
+---
+
+### Phase 2: Feature Plugin Interfaces ✅ COMPLETE
+
+SDK interfaces and base classes for feature plugins (FeaturePluginInterfaces.cs):
+
+| Base Class | Purpose | Status |
+|------------|---------|--------|
+| DeduplicationPluginBase | Content-defined chunking, fingerprinting | ✅ |
+| VersioningPluginBase | Git-like versioning, branches, deltas | ✅ |
+| SnapshotPluginBase | Point-in-time snapshots, legal holds | ✅ |
+| TelemetryPluginBase | Metrics, tracing, logging | ✅ |
+| ThreatDetectionPluginBase | Ransomware, anomaly detection | ✅ |
+| BackupPluginBase | Full/incremental/differential backups | ✅ |
+| OperationsPluginBase | Zero-downtime upgrades, rollback | ✅ |
+
+---
+
+### Phase 3: Orchestration Interfaces ✅ COMPLETE
+
+SDK interfaces for orchestration patterns (OrchestrationInterfaces.cs):
+
+| Base Class | Purpose | Status |
+|------------|---------|--------|
+| SearchProviderPluginBase | Search provider plugins | ✅ |
+| ContentProcessorPluginBase | Text extraction, embeddings | ✅ |
+| WriteFanOutOrchestratorPluginBase | Parallel writes to destinations | ✅ |
+| WriteDestinationPluginBase | Individual write destinations | ✅ |
+| PreOperationInterceptorBase | Pre-operation hooks | ✅ |
+| PostOperationInterceptorBase | Post-operation hooks | ✅ |
+
+---
+
+### Phase 4: Infrastructure Plugins ⏳ NEXT
+
+Implement concrete plugins using infrastructure base classes:
+
+| Plugin | Base Class | Status |
+|--------|------------|--------|
+| HealthCheckPlugin | HealthProviderPluginBase | ⏳ |
+| RateLimiterPlugin | RateLimiterPluginBase | ⏳ |
+| CircuitBreakerPlugin | CircuitBreakerPluginBase | ⏳ |
+| TransactionManagerPlugin | TransactionManagerPluginBase | ⏳ |
+| GdprCompliancePlugin | ComplianceProviderPluginBase | ⏳ |
+| HipaaCompliancePlugin | ComplianceProviderPluginBase | ⏳ |
+| Soc2CompliancePlugin | ComplianceProviderPluginBase | ⏳ |
+| PciDssCompliancePlugin | ComplianceProviderPluginBase | ⏳ |
+| LdapIamPlugin | IAMProviderPluginBase | ⏳ |
+| OAuth2IamPlugin | IAMProviderPluginBase | ⏳ |
+| SamlIamPlugin | IAMProviderPluginBase | ⏳ |
+
+---
+
+### Phase 5: Additional Storage Plugins ⏳
+
+Extend storage capabilities with additional providers:
+
+| Plugin | Base Class | Status |
+|--------|------------|--------|
+| FtpStoragePlugin | StorageProviderPluginBase | ⏳ |
+| SftpStoragePlugin | StorageProviderPluginBase | ⏳ |
+| WebDavStoragePlugin | StorageProviderPluginBase | ⏳ |
+| SmbStoragePlugin | StorageProviderPluginBase | ⏳ |
+| NfsStoragePlugin | StorageProviderPluginBase | ⏳ |
+| TapeLibraryPlugin | StorageProviderPluginBase | ⏳ |
+| MinioStoragePlugin | StorageProviderPluginBase | ⏳ |
+| CephStoragePlugin | StorageProviderPluginBase | ⏳ |
+
+---
+
+### Phase 6: AI Provider Plugins ⏳
+
+Implement AI providers using IntelligencePluginBase:
+
+| Plugin | Base Class | Status |
+|--------|------------|--------|
+| OpenAIPlugin | IntelligencePluginBase | ⏳ |
+| AnthropicPlugin | IntelligencePluginBase | ⏳ |
+| AzureOpenAIPlugin | IntelligencePluginBase | ⏳ |
+| OllamaPlugin | IntelligencePluginBase | ⏳ |
+| HuggingFacePlugin | IntelligencePluginBase | ⏳ |
+| CoherePlugin | IntelligencePluginBase | ⏳ |
+
+---
+
+### Phase 7: Observability Plugins ⏳
+
+Implement telemetry exporters using TelemetryPluginBase:
+
+| Plugin | Base Class | Status |
+|--------|------------|--------|
+| PrometheusPlugin | TelemetryPluginBase | ⏳ |
+| JaegerPlugin | TelemetryPluginBase | ⏳ |
+| DataDogPlugin | TelemetryPluginBase | ⏳ |
+| NewRelicPlugin | TelemetryPluginBase | ⏳ |
+| SplunkPlugin | TelemetryPluginBase | ⏳ |
+
+---
+
+### Phase 8: Database/Metadata Plugins ⏳
+
+Implement metadata storage providers using MetadataIndexPluginBase:
+
+| Plugin | Base Class | Status |
+|--------|------------|--------|
+| RedisMetadataPlugin | MetadataIndexPluginBase | ⏳ |
+| ElasticsearchMetadataPlugin | MetadataIndexPluginBase | ⏳ |
+| MongoDbMetadataPlugin | MetadataIndexPluginBase | ⏳ |
+| CassandraMetadataPlugin | MetadataIndexPluginBase | ⏳ |
+| InfluxDbMetadataPlugin | MetadataIndexPluginBase | ⏳ |
+| CockroachDbPlugin | MetadataIndexPluginBase | ⏳ |
+
+---
+
+### Phase 9: Consensus Plugins ⏳
+
+Implement distributed consensus using ConsensusPluginBase:
+
+| Plugin | Base Class | Status |
+|--------|------------|--------|
+| PaxosPlugin | ConsensusPluginBase | ⏳ |
+| PbftPlugin | ConsensusPluginBase | ⏳ |
+| ZabPlugin | ConsensusPluginBase | ⏳ |
+
+---
+
+### Phase 10: Cloud Environment Plugins ⏳
+
+Implement cloud detection using CloudEnvironmentPluginBase:
+
+| Plugin | Base Class | Status |
+|--------|------------|--------|
+| AwsCloudPlugin | CloudEnvironmentPluginBase | ⏳ |
+| AzureCloudPlugin | CloudEnvironmentPluginBase | ⏳ |
+| GcpCloudPlugin | CloudEnvironmentPluginBase | ⏳ |
+| OpenStackPlugin | CloudEnvironmentPluginBase | ⏳ |
+
+---
+
+### Phase 11: Integration Plugins ⏳
+
+Implement message queue integrations using RealTimePluginBase:
+
+| Plugin | Base Class | Status |
+|--------|------------|--------|
+| KafkaPlugin | RealTimePluginBase | ⏳ |
+| RabbitMqPlugin | RealTimePluginBase | ⏳ |
+| NatsPlugin | RealTimePluginBase | ⏳ |
+| PulsarPlugin | RealTimePluginBase | ⏳ |
+
+---
+
+### Phase 12: Search Provider Plugins ⏳
+
+Implement search providers using SearchProviderPluginBase:
+
+| Plugin | Base Class | Status |
+|--------|------------|--------|
+| ElasticsearchSearchPlugin | SearchProviderPluginBase | ⏳ |
+| SolrSearchPlugin | SearchProviderPluginBase | ⏳ |
+| MeilisearchPlugin | SearchProviderPluginBase | ⏳ |
+| TypesensePlugin | SearchProviderPluginBase | ⏳ |
+
+---
+
+### Phase 13: Interface Plugins ⏳
+
+Implement API interfaces using InterfacePluginBase:
+
+| Plugin | Base Class | Status |
+|--------|------------|--------|
+| GraphQlInterfacePlugin | InterfacePluginBase | ⏳ |
+| WebSocketInterfacePlugin | InterfacePluginBase | ⏳ |
+| S3ApiInterfacePlugin | InterfacePluginBase | ⏳ |
+| AzureBlobApiInterfacePlugin | InterfacePluginBase | ⏳ |
+
+---
+
+### Phase 14: Operations Plugins ⏳
+
+Implement deployment operations using OperationsPluginBase:
+
+| Plugin | Base Class | Status |
+|--------|------------|--------|
+| BlueGreenDeploymentPlugin | OperationsPluginBase | ⏳ |
+| CanaryDeploymentPlugin | OperationsPluginBase | ⏳ |
+| AutoScalerPlugin | OperationsPluginBase | ⏳ |
+
+---
+
+## Plugin Implementation Checklist
+
+For each plugin:
+1. [ ] Create plugin project in Plugins/DataWarehouse.Plugins.{Name}/
+2. [ ] Implement plugin class extending appropriate base class
+3. [ ] Add XML documentation for all public members
+4. [ ] Register plugin in solution file
+5. [ ] Add unit tests
+6. [ ] Update this TODO.md with ✅ status
