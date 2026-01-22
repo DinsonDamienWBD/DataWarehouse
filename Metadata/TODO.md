@@ -516,6 +516,6 @@ For each plugin:
 1. [ ] Create plugin project in `Plugins/DataWarehouse.Plugins.{Name}/`
 2. [ ] Implement plugin class extending appropriate base class
 3. [ ] Add XML documentation for all public members
-4. [ ] Register plugin in solution file
+4. [ ] Register plugin in solution file DataWarehouse.slnx
 5. [ ] Add unit tests
 6. [ ] Update this TODO.md with ✅ status
