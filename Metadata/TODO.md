@@ -244,13 +244,17 @@ Track code to be removed from SDK/Kernel after plugins are verified working:
 | IpfsStoragePlugin | StorageProviderPluginBase | ✅ | IPFS distributed |
 | TapeLibraryPlugin | StorageProviderPluginBase | ⏳ | LTO tape support |
 
-### Category 5: RAID Plugins (4 total)
+### Category 5: RAID Plugins (8 total)
 
 | Plugin | Base Class | Status | Notes |
 |--------|------------|--------|-------|
-| StandardRaidPlugin | RaidProviderPluginBase | ✅ | RAID 0,1,5,6,10 |
+| StandardRaidPlugin | RaidProviderPluginBase | ⏳ | RAID 0,1,2,3,4,5,6 |
+| NestedRaidPlugin | RaidProviderPluginBase | ⏳ | RAID 10,01,03,50,60,100 |
+| EnhancedRaidPlugin | RaidProviderPluginBase | ⏳ | RAID 1E,5E,5EE,6E |
 | ZfsRaidPlugin | RaidProviderPluginBase | ⏳ | ZFS RAID-Z1/Z2/Z3 |
-| AdvancedRaidPlugin | RaidProviderPluginBase | ⏳ | RAID 50,60,1E,5E |
+| VendorSpecificRaidPlugin | RaidProviderPluginBase | ⏳ | RAID DP,S,7,FR,Unraid |
+| AdvancedSpecificRaidPlugin | RaidProviderPluginBase | ⏳ | RAID MD10,Adaptive,Beyond,Declustered |
+| ExtendedRaidPlugin | RaidProviderPluginBase | ⏳ | RAID 71,72,NM,Matrix,JBOD,Crypto,DUP,DDP,SPAN,BIG,MAID,Linear |
 | SelfHealingRaidPlugin | RaidProviderPluginBase | ⏳ | Auto-rebuild, scrubbing |
 
 ### Category 6: Erasure Coding Plugins (3 total)
