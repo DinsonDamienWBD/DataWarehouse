@@ -311,8 +311,8 @@ Track code to be removed from SDK/Kernel after plugins are verified working:
 | Plugin | Base Class | Status | Notes |
 |--------|------------|--------|-------|
 | RbacIamPlugin | IAMProviderPluginBase | ✅ | Role-based access |
-| SamlIamPlugin | IAMProviderPluginBase | ⏳ | SAML 2.0 SSO |
-| OAuthIamPlugin | IAMProviderPluginBase | ⏳ | OAuth 2.0/OIDC |
+| SamlIamPlugin | IAMProviderPluginBase | ✅ | SAML 2.0 SSO |
+| OAuthIamPlugin | IAMProviderPluginBase | ✅ | OAuth 2.0/OIDC |
 | SigV4IamPlugin | IAMProviderPluginBase | ⏳ | AWS Signature V4 |
 | TenantIsolationPlugin | IAMProviderPluginBase | ⏳ | Multi-tenant isolation |
 
@@ -320,8 +320,8 @@ Track code to be removed from SDK/Kernel after plugins are verified working:
 
 | Plugin | Base Class | Status | Notes |
 |--------|------------|--------|-------|
-| GdprCompliancePlugin | ComplianceProviderPluginBase | ⏳ | GDPR data protection |
-| HipaaCompliancePlugin | ComplianceProviderPluginBase | ⏳ | HIPAA healthcare |
+| GdprCompliancePlugin | ComplianceProviderPluginBase | ✅ | GDPR data protection |
+| HipaaCompliancePlugin | ComplianceProviderPluginBase | ✅ | HIPAA healthcare |
 | Soc2CompliancePlugin | ComplianceProviderPluginBase | ⏳ | SOC 2 Type II |
 | PciDssCompliancePlugin | ComplianceProviderPluginBase | ⏳ | PCI-DSS payment |
 | FedRampCompliancePlugin | ComplianceProviderPluginBase | ⏳ | FedRAMP government |
@@ -359,9 +359,9 @@ Track code to be removed from SDK/Kernel after plugins are verified working:
 
 | Plugin | Base Class | Status | Notes |
 |--------|------------|--------|-------|
-| CircuitBreakerPlugin | CircuitBreakerPluginBase | ⏳ | Bulkhead pattern |
-| RateLimiterPlugin | RateLimiterPluginBase | ⏳ | Token bucket |
-| HealthMonitorPlugin | HealthProviderPluginBase | ⏳ | Health aggregation |
+| CircuitBreakerPlugin | CircuitBreakerPluginBase | ✅ | Bulkhead pattern |
+| RateLimiterPlugin | RateLimiterPluginBase | ✅ | Token bucket |
+| HealthMonitorPlugin | HealthProviderPluginBase | ✅ | Health aggregation |
 | ChaosEngineeringPlugin | FeaturePluginBase | ✅ | Fault injection |
 | RetryPolicyPlugin | FeaturePluginBase | ⏳ | Exponential backoff |
 | LoadBalancerPlugin | FeaturePluginBase | ⏳ | Request distribution |
@@ -442,12 +442,12 @@ Track code to be removed from SDK/Kernel after plugins are verified working:
 | Versioning | 3 | 2 | 1 |
 | Transactions | 4 | 4 | 0 |
 | Security/HSM | 6 | 6 | 0 |
-| IAM | 5 | 1 | 4 |
-| Compliance | 7 | 1 | 6 |
+| IAM | 5 | 3 | 2 |
+| Compliance | 7 | 3 | 4 |
 | Snapshots/Recovery | 4 | 2 | 2 |
 | Replication | 5 | 1 | 4 |
 | Consensus | 3 | 1 | 2 |
-| Resilience | 6 | 1 | 5 |
+| Resilience | 6 | 4 | 2 |
 | Telemetry | 5 | 1 | 4 |
 | Threat Detection | 3 | 2 | 1 |
 | API/Integration | 4 | 2 | 2 |
@@ -455,7 +455,7 @@ Track code to be removed from SDK/Kernel after plugins are verified working:
 | Power/Environment | 2 | 0 | 2 |
 | ML/Intelligence | 3 | 0 | 3 |
 | Auto-Config | 2 | 0 | 2 |
-| **TOTAL** | **108** | **49** | **59** |
+| **TOTAL** | **108** | **56** | **52** |
 
 ---
 
