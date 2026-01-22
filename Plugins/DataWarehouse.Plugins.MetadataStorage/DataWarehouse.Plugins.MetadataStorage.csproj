@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RootNamespace>DataWarehouse.Plugins.MetadataStorage</RootNamespace>
+    <AssemblyName>DataWarehouse.Plugins.MetadataStorage</AssemblyName>
+    <Description>DataWarehouse Metadata Storage Plugin - Production-ready metadata storage for the write fan-out pattern with SQLite (ACID-compliant) and file-based backends, full-text search, tag filtering, pagination, and efficient indexing</Description>
+    <Version>1.0.0</Version>
+    <Authors>DataWarehouse Team</Authors>
+    <PackageTags>datawarehouse;metadata;storage;sqlite;fanout</PackageTags>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- SQLite for ACID-compliant embedded database storage -->
+    <PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.2" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\DataWarehouse.SDK\DataWarehouse.SDK.csproj" />
+  </ItemGroup>
+
+</Project>

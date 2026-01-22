@@ -5,7 +5,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <RootNamespace>DataWarehouse.Plugins.Compression</RootNamespace>
-    <Description>GZip and LZ4 compression plugins for DataWarehouse pipeline</Description>
+    <Description>Compression plugins for DataWarehouse pipeline - GZip, Deflate, Brotli, LZ4, and Zstd algorithms with unified ICompressionProvider interface</Description>
   </PropertyGroup>
 
   <ItemGroup>

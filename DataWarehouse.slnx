@@ -10,6 +10,7 @@
     <Project Path="Plugins/DataWarehouse.Plugins.AIAgents/DataWarehouse.Plugins.AIAgents.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.AuditLogging/DataWarehouse.Plugins.AuditLogging.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.AzureBlobStorage/DataWarehouse.Plugins.AzureBlobStorage.csproj" />
+    <Project Path="Plugins/DataWarehouse.Plugins.Backup/DataWarehouse.Plugins.Backup.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.CloudStorage/DataWarehouse.Plugins.CloudStorage.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.Compression/DataWarehouse.Plugins.Compression.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.DistributedTransactions/DataWarehouse.Plugins.DistributedTransactions.csproj" />

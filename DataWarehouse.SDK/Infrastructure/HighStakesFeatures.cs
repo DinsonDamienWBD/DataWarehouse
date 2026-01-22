@@ -5,6 +5,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.Threading.Channels;
+using DataWarehouse.SDK.Contracts;
 
 namespace DataWarehouse.SDK.Infrastructure;
 
@@ -1188,211 +1189,16 @@ public sealed class BreakGlassConfig
 
 #region Tier 3.5: Zero-Knowledge Encryption
 
-/// <summary>
-/// Client-side encryption where server never sees plaintext data.
-/// Provides privacy-preserving storage with server-blind operations.
-/// </summary>
-public sealed class ZeroKnowledgeEncryption
-{
-    private readonly IKeyDerivationFunction _kdf;
-    private readonly ZeroKnowledgeConfig _config;
-
-    public ZeroKnowledgeEncryption(IKeyDerivationFunction? kdf = null, ZeroKnowledgeConfig? config = null)
-    {
-        _kdf = kdf ?? new Argon2KeyDerivation();
-        _config = config ?? new ZeroKnowledgeConfig();
-    }
-
-    /// <summary>
-    /// Derives a client-side encryption key from user credentials.
-    /// Server never learns the key.
-    /// </summary>
-    public async Task<ClientKey> DeriveClientKeyAsync(
-        string userId,
-        string password,
-        CancellationToken ct = default)
-    {
-        // Generate salt deterministically from userId (so server doesn't need to store it)
-        var userIdBytes = Encoding.UTF8.GetBytes(userId);
-        var salt = SHA256.HashData(userIdBytes);
-
-        // Derive encryption key using strong KDF
-        var keyMaterial = await _kdf.DeriveKeyAsync(password, salt, _config.KeyLength, ct);
-
-        // Derive separate keys for encryption and authentication
-        var encryptionKey = HKDF.DeriveKey(
-            HashAlgorithmName.SHA256,
-            keyMaterial,
-            _config.KeyLength,
-            info: Encoding.UTF8.GetBytes("encryption"));
-
-        var authKey = HKDF.DeriveKey(
-            HashAlgorithmName.SHA256,
-            keyMaterial,
-            _config.KeyLength,
-            info: Encoding.UTF8.GetBytes("authentication"));
-
-        // Create verification token (server can verify user without knowing key)
-        var verificationToken = HKDF.DeriveKey(
-            HashAlgorithmName.SHA256,
-            keyMaterial,
-            32,
-            info: Encoding.UTF8.GetBytes("verification"));
-
-        return new ClientKey
-        {
-            UserId = userId,
-            EncryptionKey = encryptionKey,
-            AuthenticationKey = authKey,
-            VerificationToken = Convert.ToHexString(verificationToken).ToLowerInvariant()
-        };
-    }
-
-    /// <summary>
-    /// Encrypts data client-side. Server only stores ciphertext.
-    /// </summary>
-    public EncryptedClientData EncryptClientSide(ClientKey clientKey, byte[] plaintext)
-    {
-        var nonce = new byte[12];
-        RandomNumberGenerator.Fill(nonce);
-
-        var ciphertext = new byte[plaintext.Length];
-        var tag = new byte[16];
-
-        using var aes = new AesGcm(clientKey.EncryptionKey, 16);
-        aes.Encrypt(nonce, plaintext, ciphertext, tag);
-
-        // Create HMAC for additional integrity verification
-        var hmac = HMACSHA256.HashData(clientKey.AuthenticationKey, ciphertext);
-
-        return new EncryptedClientData
-        {
-            Nonce = nonce,
-            Ciphertext = ciphertext,
-            Tag = tag,
-            Hmac = hmac,
-            EncryptedAt = DateTime.UtcNow
-        };
-    }
-
-    /// <summary>
-    /// Decrypts data client-side.
-    /// </summary>
-    public byte[] DecryptClientSide(ClientKey clientKey, EncryptedClientData encrypted)
-    {
-        // Verify HMAC first
-        var expectedHmac = HMACSHA256.HashData(clientKey.AuthenticationKey, encrypted.Ciphertext);
-        if (!CryptographicOperations.FixedTimeEquals(expectedHmac, encrypted.Hmac))
-            throw new CryptographicException("Data integrity check failed");
-
-        var plaintext = new byte[encrypted.Ciphertext.Length];
-
-        using var aes = new AesGcm(clientKey.EncryptionKey, 16);
-        aes.Decrypt(encrypted.Nonce, encrypted.Ciphertext, encrypted.Tag, plaintext);
-
-        return plaintext;
-    }
-
-    /// <summary>
-    /// Generates a searchable token for encrypted data.
-    /// Enables server-side search without decryption.
-    /// </summary>
-    public string GenerateSearchToken(ClientKey clientKey, string searchTerm)
-    {
-        // Create deterministic token from search term
-        var termBytes = Encoding.UTF8.GetBytes(searchTerm.ToLowerInvariant());
-        var token = HMACSHA256.HashData(clientKey.AuthenticationKey, termBytes);
-        return Convert.ToHexString(token).ToLowerInvariant();
-    }
-
-    /// <summary>
-    /// Enables secure key sharing using public key cryptography.
-    /// </summary>
-    public KeyShareResult ShareKey(ClientKey ownerKey, byte[] recipientPublicKey)
-    {
-        // Generate ephemeral key pair
-        using var ecdh = ECDiffieHellman.Create(ECCurve.NamedCurves.nistP384);
-        var ephemeralPublic = ecdh.ExportSubjectPublicKeyInfo();
-
-        // Derive shared secret
-        using var recipientEcdh = ECDiffieHellman.Create();
-        recipientEcdh.ImportSubjectPublicKeyInfo(recipientPublicKey, out _);
-
-        var sharedSecret = ecdh.DeriveKeyMaterial(recipientEcdh.PublicKey);
-
-        // Encrypt the owner's key with shared secret
-        var wrappingKey = HKDF.DeriveKey(HashAlgorithmName.SHA256, sharedSecret, 32);
-
-        var nonce = new byte[12];
-        RandomNumberGenerator.Fill(nonce);
-
-        var encryptedKey = new byte[ownerKey.EncryptionKey.Length];
-        var tag = new byte[16];
-
-        using var aes = new AesGcm(wrappingKey, 16);
-        aes.Encrypt(nonce, ownerKey.EncryptionKey, encryptedKey, tag);
-
-        return new KeyShareResult
-        {
-            EphemeralPublicKey = ephemeralPublic,
-            EncryptedKey = encryptedKey,
-            Nonce = nonce,
-            Tag = tag
-        };
-    }
-}
-
-public interface IKeyDerivationFunction
-{
-    Task<byte[]> DeriveKeyAsync(string password, byte[] salt, int keyLength, CancellationToken ct);
-}
-
-public sealed class Argon2KeyDerivation : IKeyDerivationFunction
-{
-    public Task<byte[]> DeriveKeyAsync(string password, byte[] salt, int keyLength, CancellationToken ct)
-    {
-        // Using PBKDF2 as fallback (Argon2 would require external library)
-        var key = Rfc2898DeriveBytes.Pbkdf2(
-            Encoding.UTF8.GetBytes(password),
-            salt,
-            100_000, // iterations
-            HashAlgorithmName.SHA256,
-            keyLength);
-
-        return Task.FromResult(key);
-    }
-}
-
-public sealed class ClientKey
-{
-    public required string UserId { get; init; }
-    public required byte[] EncryptionKey { get; init; }
-    public required byte[] AuthenticationKey { get; init; }
-    public required string VerificationToken { get; init; }
-}
-
-public record EncryptedClientData
-{
-    public required byte[] Nonce { get; init; }
-    public required byte[] Ciphertext { get; init; }
-    public required byte[] Tag { get; init; }
-    public required byte[] Hmac { get; init; }
-    public DateTime EncryptedAt { get; init; }
-}
-
-public record KeyShareResult
-{
-    public required byte[] EphemeralPublicKey { get; init; }
-    public required byte[] EncryptedKey { get; init; }
-    public required byte[] Nonce { get; init; }
-    public required byte[] Tag { get; init; }
-}
-
-public sealed class ZeroKnowledgeConfig
-{
-    public int KeyLength { get; set; } = 32;
-    public int Iterations { get; set; } = 100_000;
-}
+// =============================================================================
+// ZERO-KNOWLEDGE ENCRYPTION MOVED TO: DataWarehouse.Plugins.Encryption
+// =============================================================================
+// The ZeroKnowledgeEncryption class and related types have been moved to
+// DataWarehouse.Plugins.Encryption for consolidation of all encryption code.
+//
+// Use DataWarehouse.Plugins.Encryption.Providers.ZeroKnowledgeEncryption
+// and DataWarehouse.Plugins.Encryption.EncryptionProviderRegistry to access
+// zero-knowledge encryption features.
+// =============================================================================
 
 #endregion
 
@@ -1840,6 +1646,8 @@ public sealed class AirGappedBackupManager : IAsyncDisposable
 
     private static Task<byte[]> CompressAsync(byte[] data, CancellationToken ct)
     {
+        // Use Brotli compression - implementation moved to DataWarehouse.Plugins.Compression
+        // This inline version is kept for SDK self-containment when plugin is not available
         using var output = new MemoryStream();
         using (var compressor = new System.IO.Compression.BrotliStream(
             output, System.IO.Compression.CompressionLevel.Optimal))
@@ -1851,6 +1659,8 @@ public sealed class AirGappedBackupManager : IAsyncDisposable
 
     private static Task<byte[]> DecompressAsync(byte[] data, CancellationToken ct)
     {
+        // Use Brotli decompression - implementation moved to DataWarehouse.Plugins.Compression
+        // This inline version is kept for SDK self-containment when plugin is not available
         using var input = new MemoryStream(data);
         using var decompressor = new System.IO.Compression.BrotliStream(
             input, System.IO.Compression.CompressionMode.Decompress);
@@ -1942,7 +1752,22 @@ public interface ITapeLibrary
 public enum TapeStatus { Available, InUse, Full, Error, Retired }
 public enum TapeArchiveStatus { Creating, Complete, Verified, Error }
 public enum TapeJobType { Backup, Verification, Restore }
-public enum CompressionType { None, Brotli, Zstd }
+/// <summary>
+/// Compression type for tape archives. Maps to CompressionAlgorithm from the Compression plugin.
+/// </summary>
+/// <remarks>
+/// This type alias is provided for backward compatibility.
+/// New code should use CompressionAlgorithm from DataWarehouse.Plugins.Compression directly.
+/// </remarks>
+public enum CompressionType
+{
+    /// <summary>No compression.</summary>
+    None = CompressionAlgorithm.None,
+    /// <summary>Brotli compression.</summary>
+    Brotli = CompressionAlgorithm.Brotli,
+    /// <summary>Zstandard compression.</summary>
+    Zstd = CompressionAlgorithm.Zstd
+}
 
 public sealed class TapeHandle
 {

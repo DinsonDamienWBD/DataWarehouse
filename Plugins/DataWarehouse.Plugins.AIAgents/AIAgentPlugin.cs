@@ -1,5 +1,4 @@
 using DataWarehouse.SDK.Contracts;
-using DataWarehouse.SDK.Licensing;
 using DataWarehouse.SDK.Primitives;
 using DataWarehouse.SDK.Utilities;
 using System.Collections.Concurrent;
@@ -1311,118 +1310,8 @@ namespace DataWarehouse.Plugins.AIAgents
 
     #endregion
 
-    #region Customer Tier Integration
-
-    /// <summary>
-    /// Provides integration between the SDK CustomerTier system and the AI plugin's QuotaTier system.
-    /// </summary>
-    public static class TierIntegration
-    {
-        /// <summary>
-        /// Maps a CustomerTier to the corresponding AI QuotaTier.
-        /// </summary>
-        public static QuotaTier ToQuotaTier(CustomerTier customerTier) => customerTier switch
-        {
-            CustomerTier.Individual => QuotaTier.Free,
-            CustomerTier.SMB => QuotaTier.Basic,
-            CustomerTier.HighStakes => QuotaTier.Pro,
-            CustomerTier.Hyperscale => QuotaTier.Enterprise,
-            _ => QuotaTier.Free
-        };
-
-        /// <summary>
-        /// Maps a QuotaTier to the corresponding CustomerTier.
-        /// </summary>
-        public static CustomerTier ToCustomerTier(QuotaTier quotaTier) => quotaTier switch
-        {
-            QuotaTier.Free => CustomerTier.Individual,
-            QuotaTier.Basic => CustomerTier.SMB,
-            QuotaTier.Pro => CustomerTier.HighStakes,
-            QuotaTier.Enterprise => CustomerTier.Hyperscale,
-            QuotaTier.BringYourOwnKey => CustomerTier.SMB, // BYOK users at least need SMB for API access
-            _ => CustomerTier.Individual
-        };
-
-        /// <summary>
-        /// Gets the AI features available for a customer tier.
-        /// </summary>
-        public static (bool Streaming, bool FunctionCalling, bool Vision, bool Embeddings) GetAIFeatures(CustomerTier tier)
-        {
-            return (
-                Streaming: TierManager.HasFeature(tier, Feature.AIStreaming),
-                FunctionCalling: TierManager.HasFeature(tier, Feature.AIFunctionCalling),
-                Vision: TierManager.HasFeature(tier, Feature.AIVision),
-                Embeddings: TierManager.HasFeature(tier, Feature.AIEmbeddings)
-            );
-        }
-
-        /// <summary>
-        /// Creates UsageLimits from a CustomerTier.
-        /// </summary>
-        public static UsageLimits CreateLimitsFromCustomerTier(CustomerTier tier)
-        {
-            var limits = TierManager.GetLimits(tier);
-            var features = GetAIFeatures(tier);
-
-            return new UsageLimits
-            {
-                DailyRequestLimit = limits.MaxDailyApiRequests,
-                DailyTokenLimit = (int)Math.Min(limits.MaxDailyAITokens, int.MaxValue),
-                MaxTokensPerRequest = tier switch
-                {
-                    CustomerTier.Individual => 1024,
-                    CustomerTier.SMB => 4096,
-                    CustomerTier.HighStakes => 16384,
-                    CustomerTier.Hyperscale => 128000,
-                    _ => 1024
-                },
-                MaxConcurrentRequests = limits.MaxConcurrentOperations,
-                AllowedModels = tier >= CustomerTier.HighStakes ? new[] { "*" } : GetTierModels(tier),
-                AllowedProviders = tier >= CustomerTier.HighStakes ? new[] { "*" } : GetTierProviders(tier),
-                StreamingEnabled = features.Streaming,
-                FunctionCallingEnabled = features.FunctionCalling,
-                VisionEnabled = features.Vision,
-                EmbeddingsEnabled = features.Embeddings,
-                MonthlyBudgetUsd = limits.MonthlyPriceUsd.HasValue ? (double)limits.MonthlyPriceUsd.Value : null
-            };
-        }
-
-        private static string[] GetTierModels(CustomerTier tier) => tier switch
-        {
-            CustomerTier.Individual => new[] { "gpt-4o-mini", "claude-3-haiku-20240307", "gemini-1.5-flash" },
-            CustomerTier.SMB => new[] { "gpt-4o-mini", "gpt-4o", "claude-3-haiku-20240307", "claude-3-sonnet-20240229", "gemini-1.5-flash", "gemini-1.5-pro" },
-            _ => new[] { "*" }
-        };
-
-        private static string[] GetTierProviders(CustomerTier tier) => tier switch
-        {
-            CustomerTier.Individual => new[] { "openai", "anthropic", "google" },
-            CustomerTier.SMB => new[] { "openai", "anthropic", "google", "mistral", "cohere" },
-            _ => new[] { "*" }
-        };
-
-        /// <summary>
-        /// Validates that a customer can use a specific AI feature.
-        /// Throws FeatureNotAvailableException if not allowed.
-        /// </summary>
-        public static void ValidateAIFeature(CustomerTier tier, string featureName)
-        {
-            var feature = featureName.ToLowerInvariant() switch
-            {
-                "chat" or "basic" => Feature.AIBasicChat,
-                "streaming" or "stream" => Feature.AIStreaming,
-                "function" or "functioncalling" or "tools" => Feature.AIFunctionCalling,
-                "vision" or "image" => Feature.AIVision,
-                "embedding" or "embeddings" or "embed" => Feature.AIEmbeddings,
-                _ => Feature.AIBasicChat
-            };
-
-            if (!TierManager.HasFeature(tier, feature))
-            {
-                throw new FeatureNotAvailableException(feature, tier);
-            }
-        }
-    }
-
-    #endregion
+    // Customer Tier Integration has been removed.
+    // The microkernel architecture is tier-agnostic - any customer can purchase and use ANY plugin.
+    // AI quota management is now handled internally by the QuotaTier system within this plugin,
+    // independent of any external customer tier concepts.
 }
