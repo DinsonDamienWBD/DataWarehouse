@@ -132,3 +132,54 @@ Standardized parameter schemas (JSON Schema)
 - Mark tasks with status: NOT STARTED, IN PROGRESS, COMPLETED
 - Update TODO.md immediately when task status changes
 - Include file paths and commit references when completed
+
+---
+
+* Microkernel Architecture Rules (Refactor in Progress)
+
+** Rule 13: Plugin Base Class Selection
+When creating a new plugin, ALWAYS extend the appropriate base class from SDK/Contracts/:
+- Check TODO.md for the correct base class for each plugin
+- Never implement interfaces directly (IPlugin, IStorageProvider, etc.)
+- Base classes provide: metadata, AI integration, message handling, common functionality
+
+** Rule 14: Plugin Project Structure
+Each plugin MUST follow this structure:
+```
+Plugins/DataWarehouse.Plugins.{Name}/
+├── DataWarehouse.Plugins.{Name}.csproj  ← References SDK
+└── {Name}Plugin.cs                       ← Extends appropriate base
+```
+
+Optional additional files if plugin is complex:
+```
+├── Engine/{Name}Engine.cs     ← Core stateless logic
+├── Service/{Name}Service.cs   ← Stateful services
+└── Models/{Name}Models.cs     ← Data models
+```
+
+** Rule 15: Plugin Implementation Checklist
+For each new plugin:
+1. Identify correct base class from TODO.md
+2. Create plugin project with proper structure
+3. Implement all abstract methods from base class
+4. Add XML documentation for all public members
+5. Add to solution file
+6. Write unit tests
+7. Update TODO.md with ✅ status
+8. Commit with descriptive message
+
+** Rule 16: Session Continuity
+Before starting work in a new session:
+1. Read REFACTOR_STATUS.md for current snapshot
+2. Read TODO.md for full task list
+3. Check git log for recent commits
+4. Continue from the next pending task in priority order
+
+** Rule 17: Cleanup Strategy
+When removing code from SDK/Kernel that has been moved to plugins:
+1. First mark with [Obsolete("Use {PluginName} plugin instead")]
+2. Verify plugin is working correctly
+3. Update any references to use plugin
+4. Only then delete the deprecated code
+5. Document deletion in commit message
