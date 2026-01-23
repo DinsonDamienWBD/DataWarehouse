@@ -80,6 +80,7 @@
     <Project Path="Plugins/DataWarehouse.Plugins.DeflateCompression/DataWarehouse.Plugins.DeflateCompression.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.DeltaSyncVersioning/DataWarehouse.Plugins.DeltaSyncVersioning.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.DifferentialBackup/DataWarehouse.Plugins.DifferentialBackup.csproj" />
+    <Project Path="Plugins/DataWarehouse.Plugins.FedRampCompliance/DataWarehouse.Plugins.FedRampCompliance.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.Federation/DataWarehouse.Plugins.Federation.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.FipsEncryption/DataWarehouse.Plugins.FipsEncryption.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.GraphQlApi/DataWarehouse.Plugins.GraphQlApi.csproj" />
