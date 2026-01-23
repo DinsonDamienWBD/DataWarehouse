@@ -268,17 +268,130 @@ The following SDK base classes provide the foundation for all plugins:
 
 ---
 
-## CLEANUP TASKS (Before Phase 4)
+## CLEANUP TASKS
 
-Track code to be removed from SDK/Kernel after plugins are verified working:
-
-| Location | Code to Remove | Depends On | Status |
-|----------|----------------|------------|--------|
-| SDK/Licensing/ | Tier feature implementations | All tier plugins working | ⏳ |
-| Kernel/ | Direct feature implementations | Plugins registered | ⏳ |
-| SDK/Contracts/ | Legacy interfaces (if duplicated) | New interfaces tested | ⏳ |
+Track code to be removed from SDK/Kernel now that plugins handle these features.
 
 **Strategy:** Mark deprecated with `[Obsolete]` first, delete after plugin verification.
+
+---
+
+### SDK/Infrastructure - Tier Feature Implementations (2.4 MB total)
+
+These files contain direct feature implementations now replaced by plugins:
+
+| File | Size | Replaced By | Status |
+|------|------|-------------|--------|
+| HighStakesEnterpriseTierFeatures.cs | 328 KB | Compliance, Encryption, HSM plugins | ⏳ |
+| IndividualTierFeatures.cs | 243 KB | Backup, Encryption, Versioning plugins | ⏳ |
+| HyperscaleFeatures.cs | 239 KB | Erasure Coding, Consensus, Sharding plugins | ⏳ |
+| SmbTierFeatures.cs | 144 KB | RAID, Replication, Storage plugins | ⏳ |
+| HighStakesFeatures.cs | 132 KB | Enterprise security plugins | ⏳ |
+| HyperscaleTierFeatures.cs | 98 KB | Hyperscale plugins | ⏳ |
+| IamIntegration.cs | 96 KB | IAM plugins (RBAC, SAML, OAuth, SigV4) | ⏳ |
+| OpenTelemetryIntegration.cs | 91 KB | Telemetry plugins (OpenTelemetry, Prometheus, Jaeger) | ⏳ |
+| GodTierFeatures.cs | 89 KB | Various advanced plugins | ⏳ |
+| EnterpriseTierFeatures.cs | 85 KB | Enterprise plugins | ⏳ |
+| StorageIntelligence.cs | 84 KB | ML/Intelligence plugins (PredictiveTiering, AccessPrediction) | ⏳ |
+| ObservabilityEnhancements.cs | 75 KB | Telemetry plugins | ⏳ |
+| EncryptionAtRest.cs | 70 KB | Encryption plugins (AES, ChaCha20, Twofish, Serpent, FIPS) | ⏳ |
+| SecurityEnhancements.cs | 69 KB | Security/HSM plugins | ⏳ |
+| ResiliencePatterns.cs | 69 KB | Resilience plugins (CircuitBreaker, RateLimiter, Retry) | ⏳ |
+| ProductionHardening.cs | 67 KB | Operations plugins | ⏳ |
+| Observability.cs | 67 KB | Telemetry plugins | ⏳ |
+| CompliancePhase7.cs | 67 KB | Compliance plugins (GDPR, HIPAA, SOC2, PCI-DSS, FedRAMP) | ⏳ |
+| PerformanceOptimizations.cs | 62 KB | Evaluate - may contain core optimizations | ⏳ |
+| StorageBackends.cs | 60 KB | Storage plugins (Local, S3, Azure, GCS, Network) | ⏳ |
+| EnterpriseOperations.cs | 46 KB | Operations plugins | ⏳ |
+| EnterpriseSecurityOps.cs | 45 KB | Security plugins | ⏳ |
+| DeveloperExperience.cs | 46 KB | Evaluate - may contain SDK utilities | ⏳ |
+| SelfHealing.cs | 45 KB | SelfHealingRaid, AutoRaid plugins | ⏳ |
+| EnterpriseFeatures.cs | 38 KB | Enterprise plugins | ⏳ |
+| Resilience.cs | 35 KB | Resilience plugins | ⏳ |
+| ErrorHandling.cs | 32 KB | Evaluate - may contain core error handling | ⏳ |
+| DistributedFeatures.cs | 26 KB | Distributed transaction plugins | ⏳ |
+| HttpClientFactory.cs | 26 KB | Keep - core HTTP infrastructure | ✅ KEEP |
+| StorageConnectionRegistry.cs | 26 KB | Evaluate - may be needed by storage plugins | ⏳ |
+| StandardizedExceptionHandling.cs | 20 KB | Evaluate - may contain core exceptions | ⏳ |
+| DistributedServicesPhase5.cs | 19 KB | Distributed plugins | ⏳ |
+| CapabilityAudit.cs | 19 KB | AuditTrail plugin | ⏳ |
+| SingleFileDeploy.cs | 17 KB | Evaluate - deployment infrastructure | ⏳ |
+| AcidTransactions.cs | 16 KB | Transaction plugins | ⏳ |
+| SecurityValidation.cs | 14 KB | Security plugins | ⏳ |
+| BackupPluginAdapter.cs | 8 KB | Keep - adapter for backup plugins | ✅ KEEP |
+| KernelInfrastructure.cs | 73 KB | Keep - core kernel infrastructure | ✅ KEEP |
+
+---
+
+### SDK/Licensing (27 lines total)
+
+| File | Lines | Status |
+|------|-------|--------|
+| CustomerTiers.cs | 14 | ⏳ Evaluate - tier definitions |
+| FeatureEnforcement.cs | 13 | ⏳ Evaluate - enforcement logic |
+
+---
+
+### Kernel - Direct Feature Implementations (20,358 lines total)
+
+| File | Lines | Replaced By | Status |
+|------|-------|-------------|--------|
+| RaidEngine.cs | 7,280 | RAID plugins (Standard, Nested, Enhanced, ZFS, etc.) | ⏳ |
+| AdvancedMessageBus.cs | 1,037 | Keep - core messaging infrastructure | ✅ KEEP |
+| HealthCheckManager.cs | 893 | HealthMonitorPlugin | ⏳ |
+| PluginLoader.cs | 722 | Keep - core plugin infrastructure | ✅ KEEP |
+| GeoReplicationManager.cs | 705 | Replication plugins (Geo, RealTime, CRDT, Federation) | ⏳ |
+| FederationHub.cs | 687 | FederationPlugin | ⏳ |
+| ContainerManager.cs | 671 | Keep - core container management | ✅ KEEP |
+| HybridStorageManager.cs | 664 | Storage plugins | ⏳ |
+| SearchOrchestratorManager.cs | 616 | SearchPlugin | ⏳ |
+| InMemoryStoragePlugin.cs | 586 | Keep - built-in fallback storage | ✅ KEEP |
+| KernelLogger.cs | 559 | Keep - core logging | ✅ KEEP |
+| PipelineOrchestrator.cs | 541 | Keep - core pipeline | ✅ KEEP |
+| RealTimeStorageManager.cs | 529 | RealTimeSyncPlugin | ⏳ |
+| AIProviderRegistry.cs | 522 | AIAgentsPlugin | ⏳ |
+| HealthCheck.cs | 506 | HealthMonitorPlugin | ⏳ |
+| CircuitBreakerPolicy.cs | 429 | CircuitBreakerPlugin | ⏳ |
+| FederatedStorage.cs | 409 | FederationPlugin | ⏳ |
+| ConfigurationHotReload.cs | 397 | HotReloadPlugin | ⏳ |
+| DistributedTracing.cs | 352 | DistributedTracingPlugin | ⏳ |
+| MessageBus.cs | 346 | Keep - core messaging | ✅ KEEP |
+| MetricsCollector.cs | 320 | Telemetry plugins | ⏳ |
+| HealthCheckAggregator.cs | 317 | HealthMonitorPlugin | ⏳ |
+| TransactionManager.cs | 297 | Transaction plugins | ⏳ |
+| KernelStorageService.cs | 280 | Keep - core storage service | ✅ KEEP |
+| MemoryPressureMonitor.cs | 213 | Keep - core memory management | ✅ KEEP |
+| SecurityContextProvider.cs | 181 | IAM plugins | ⏳ |
+| TokenBucketRateLimiter.cs | 168 | RateLimiterPlugin | ⏳ |
+| KernelConfiguration.cs | 66 | Keep - core configuration | ✅ KEEP |
+| KernelContext.cs | 65 | Keep - core context | ✅ KEEP |
+
+---
+
+### Legacy Plugin Folders (Not in Solution)
+
+These 4 folders exist on disk but are not in DataWarehouse.slnx:
+
+| Folder | Created | Action |
+|--------|---------|--------|
+| DataWarehouse.Plugins.DatabaseIndexing | 01/19/2026 | ⏳ Delete or integrate into Metadata plugins |
+| DataWarehouse.Plugins.Metadata.Postgres | 01/19/2026 | ⏳ Delete or integrate into MetadataStorage |
+| DataWarehouse.Plugins.Metadata.SQLite | 01/19/2026 | ⏳ Delete or integrate into MetadataStorage |
+| DataWarehouse.Plugins.SqliteIndexing | 01/19/2026 | ⏳ Delete or integrate into Metadata plugins |
+
+---
+
+### Cleanup Summary
+
+| Category | Total Files | To Remove | To Keep | To Evaluate |
+|----------|-------------|-----------|---------|-------------|
+| SDK/Infrastructure | 40 | 30 | 3 | 7 |
+| SDK/Licensing | 2 | 0 | 0 | 2 |
+| Kernel | 28 | 17 | 11 | 0 |
+| Legacy Plugins | 4 | 4 | 0 | 0 |
+| **TOTAL** | **74** | **51** | **14** | **9** |
+
+**Estimated Code Reduction:** ~2.5 MB of duplicate implementations
 
 ---
 
