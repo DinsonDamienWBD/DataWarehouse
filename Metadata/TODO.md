@@ -360,3 +360,258 @@ After implementing fixes:
 | GeoReplicationPlugin compiles with StartAsync/StopAsync | [x] |
 | All 10 RAID plugins use SharedRaidUtilities | [ ] |
 | RAID parity calculations verified with test vectors | [ ] |
+
+---
+
+## TO DO - Microkernel Architecture Compliance (2026-01-24)
+
+### Architecture Principle
+
+**Microkernel Philosophy:** SDK and Kernel should ONLY provide:
+- Core features (plugin loading, hot-reload)
+- In-memory volatile storage (no persistence)
+- Task management & background job scheduling
+- Message routing (IMessageBus)
+- Pipeline orchestration (WITHOUT implementation details)
+
+**Features that MUST be plugins (NOT in SDK/Kernel):**
+- Persistence (durability, backups, journaling)
+- Safety/Integrity (checksums, replication, recovery)
+- Encryption/Security (key management, credential storage)
+- Compression (all algorithms)
+- Deduplication
+- Consensus
+- Governance (AI-based or otherwise)
+- Federation/Multi-region
+- Any advanced features beyond basic orchestration
+
+---
+
+### CRITICAL - Files to Delete or Refactor
+
+#### 13. Delete DurableState.cs - Persistence in Kernel Violation
+**File:** `DataWarehouse.SDK/Utilities/DurableState.cs` (266 lines)
+**Issue:** Full persistence implementation with journaling, file I/O, and log compaction in the kernel
+
+**Violation Details:**
+- Line 27: `_filePath` - File persistence in kernel
+- Line 44-76: `Load()` - Replay journal log from disk
+- Line 81-83: `InitializeJournal()` - Opens FileStream for persistent journaling
+- Line 147-169: `AppendLog()` - Writes to persistent journal
+- Line 185-226: `CompactInternal()` - Log compaction (persistence feature)
+
+**Remediation:**
+| Task | Status |
+|------|--------|
+| Create `Plugins/DataWarehouse.Plugins.PersistentState/` project | [ ] |
+| Move `DurableState<T>` to PersistentStatePlugin | [ ] |
+| Create `IStateStore` interface in SDK (for plugin contracts) | [ ] |
+| Replace SDK usage with in-memory `ConcurrentDictionary<string, T>` | [ ] |
+| Delete `DataWarehouse.SDK/Utilities/DurableState.cs` | [ ] |
+| Update any code that imports DurableState to use plugin | [ ] |
+
+---
+
+#### 14. Refactor SecretManager.cs - Security Implementation in Kernel
+**File:** `DataWarehouse.SDK/Security/SecretManager.cs` (669 lines)
+**Issue:** Full secret management implementation should be a plugin, not kernel
+
+**Violation Details:**
+- Lines 230-584: `SecretManager` class - Full implementation with caching, rotation, validation
+- Lines 241-250: `PlainTextSecretPatterns` - Regex-based secret detection
+- Lines 252-275: Timer-based cache cleanup and rotation (background tasks)
+- Lines 338-392: `RotateSecretAsync()` - Secret rotation with versioning
+- Lines 618-666: `EnvironmentSecretProvider` - Concrete provider in kernel
+
+**What to KEEP in SDK:**
+- `ISecretManager` interface (lines 16-63)
+- `SecretReference` class (lines 69-173) - Data transfer object
+- `SecretProvider` enum (lines 178-196)
+- `SecretMetadata` class (lines 201-209)
+- `ISecretProvider` interface (lines 604-613)
+
+**What to MOVE to Plugin:**
+- `SecretManager` class implementation
+- `SecretManagerConfig` class
+- `EnvironmentSecretProvider` class
+- All concrete provider implementations
+
+**Remediation:**
+| Task | Status |
+|------|--------|
+| Keep only interfaces in `DataWarehouse.SDK/Security/SecretManager.cs` | [ ] |
+| Create `Plugins/DataWarehouse.Plugins.SecretManagement/` project | [ ] |
+| Move `SecretManager` implementation to SecretManagementPlugin | [ ] |
+| Move `EnvironmentSecretProvider` to plugin | [ ] |
+| Update SDK to only define contracts (interfaces) | [ ] |
+| Remove implementation code from SDK | [ ] |
+
+---
+
+#### 15. Delete/Move Federation Module - Advanced Feature in Kernel
+**Directory:** `DataWarehouse.SDK/Federation/` (13 files, ~6,000+ lines)
+**Issue:** Entire federation subsystem is an advanced feature that should be a plugin
+
+**Files to Move:**
+| File | Lines | Description |
+|------|-------|-------------|
+| `MultiRegion.cs` | 517 | Multi-region federation with failover |
+| `Protocol.cs` | 1,600+ | Replication protocol with sync |
+| `Transport.cs` | 400+ | Network transport layer |
+| `DormantNode.cs` | 1,600+ | Node hibernation with encryption |
+| `ObjectStore.cs` | 800+ | Distributed object storage |
+| `StoragePool.cs` | 1,500+ | Pool management with alerts |
+| `NatTraversal.cs` | 1,100+ | NAT traversal/hole punching |
+| `VFS.cs` | 500+ | Virtual filesystem |
+| `Resolution.cs` | 500+ | Path resolution |
+| `Routing.cs` | 400+ | Routing tables |
+| `Groups.cs` | 300+ | Replica groups |
+| `CloudShare.cs` | 200+ | Cloud sharing |
+| `NodeIdentity.cs` | 200+ | Node identification |
+| `FederationHealth.cs` | 200+ | Health monitoring |
+| `Capabilities.cs` | 100+ | Capability negotiation |
+
+**Remediation:**
+| Task | Status |
+|------|--------|
+| Create `Plugins/DataWarehouse.Plugins.Federation/` project | [ ] |
+| Move all 13 files from `DataWarehouse.SDK/Federation/` to plugin | [ ] |
+| Keep only `IFederationNode` interface in SDK | [ ] |
+| Update imports in any SDK code that references Federation | [ ] |
+| Delete `DataWarehouse.SDK/Federation/` directory | [ ] |
+
+---
+
+#### 16. Refactor GovernanceContracts.cs - AI Governance in Kernel
+**File:** `DataWarehouse.SDK/Governance/GovernanceContracts.cs` (200+ lines)
+**Issue:** AI-based governance (INeuralSentinel) is an advanced feature
+
+**What to KEEP in SDK (Contracts Only):**
+- `INeuralSentinel` interface
+- `ISentinelModule` interface
+- `SentinelContext` class (input DTO)
+- `GovernanceJudgment` class (output DTO)
+- `GovernanceResult` class
+- `GovernanceAlert` class
+- `IntegrityResult` class
+- Attributes (`SentinelSkillAttribute`, etc.)
+
+**What to MOVE to Plugin:**
+- Any concrete implementations
+- Background tasks for governance checks
+
+**Remediation:**
+| Task | Status |
+|------|--------|
+| Verify no concrete implementations exist in GovernanceContracts.cs | [ ] |
+| If any exist, move to `Plugins/DataWarehouse.Plugins.AIGovernance/` | [ ] |
+| Ensure file contains only interfaces and DTOs | [ ] |
+
+---
+
+#### 17. Refactor StorageOrchestratorBase.cs - Advanced Features in Base Class
+**File:** `DataWarehouse.SDK/Contracts/StorageOrchestratorBase.cs` (1,278+ lines)
+**Issue:** Base class contains implementations of advanced features
+
+**Violations Found:**
+- `RealTimeStorageOrchestratorBase`: Audit trails, locks, hash computation
+- `IndexingStorageOrchestratorBase`: OCR, vector embeddings, AI summaries
+- Replication logic embedded in base classes
+- Integrity verification in base classes
+
+**Remediation:**
+| Task | Status |
+|------|--------|
+| Remove audit trail implementation from base class | [ ] |
+| Remove hash computation from base class | [ ] |
+| Remove lock management from base class | [ ] |
+| Keep only abstract method declarations | [ ] |
+| Move implementations to appropriate plugins | [ ] |
+
+---
+
+#### 18. Refactor BackupPluginAdapter.cs - Backup Logic in Kernel
+**File:** `DataWarehouse.SDK/Infrastructure/BackupPluginAdapter.cs` (~200 lines)
+**Issue:** Backup adapter contains backup-specific logic that should be in plugin
+
+**Remediation:**
+| Task | Status |
+|------|--------|
+| Keep only adapter interface in SDK | [ ] |
+| Move backup scheduling logic to BackupPlugin | [ ] |
+| Move backup destination management to BackupPlugin | [ ] |
+| Remove concrete backup types from SDK | [ ] |
+
+---
+
+### MEDIUM - Interface-Only Violations (Keep Interface, Remove Implementation)
+
+#### 19. Clean Up ICompressionProvider.cs
+**File:** `DataWarehouse.SDK/Contracts/ICompressionProvider.cs`
+**Issue:** Should be interface-only, no implementation
+
+| Task | Status |
+|------|--------|
+| Verify file contains only interface definition | [ ] |
+| Remove any concrete compression implementations | [ ] |
+| Remove compression algorithm registry if present | [ ] |
+
+---
+
+#### 20. Clean Up IConsensusEngine.cs
+**File:** `DataWarehouse.SDK/Contracts/IConsensusEngine.cs`
+**Issue:** Consensus is an advanced feature - SDK should only define interface
+
+| Task | Status |
+|------|--------|
+| Verify file contains only interface definition | [ ] |
+| Remove any Raft/Paxos implementations | [ ] |
+| Remove any quorum logic from SDK | [ ] |
+
+---
+
+#### 21. Clean Up IReplicationService.cs
+**File:** `DataWarehouse.SDK/Contracts/IReplicationService.cs`
+**Issue:** Replication is an advanced feature - SDK should only define interface
+
+| Task | Status |
+|------|--------|
+| Verify file contains only interface definition | [ ] |
+| Remove corrupted blob restoration logic | [ ] |
+| Remove any concrete replication implementations | [ ] |
+
+---
+
+#### 22. Clean Up IMultiRegionReplication.cs
+**File:** `DataWarehouse.SDK/Contracts/IMultiRegionReplication.cs`
+**Issue:** Multi-region is an advanced feature - SDK should only define interface
+
+| Task | Status |
+|------|--------|
+| Verify file contains only interface definition | [ ] |
+| Remove conflict resolution implementations | [ ] |
+| Remove consistency level implementations | [ ] |
+
+---
+
+### Microkernel Compliance Verification Checklist
+
+After refactoring:
+
+| Check | Status |
+|-------|--------|
+| `DurableState.cs` deleted from SDK | [ ] |
+| `SecretManager.cs` contains only interfaces | [ ] |
+| `Federation/` directory deleted from SDK | [ ] |
+| `GovernanceContracts.cs` contains only interfaces/DTOs | [ ] |
+| `StorageOrchestratorBase.cs` contains no concrete implementations | [ ] |
+| `BackupPluginAdapter.cs` contains only adapter interface | [ ] |
+| All compression implementations in plugins only | [ ] |
+| All consensus implementations in plugins only | [ ] |
+| All replication implementations in plugins only | [ ] |
+| SDK provides only: interfaces, DTOs, base classes (abstract) | [ ] |
+| SDK has NO file I/O for persistence | [ ] |
+| SDK has NO encryption/decryption implementations | [ ] |
+| SDK has NO network I/O for federation | [ ] |
+| Solution compiles after refactoring | [ ] |
+| All existing plugins still work | [ ] |
