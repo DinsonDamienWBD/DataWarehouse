@@ -3,8 +3,12 @@ using DataWarehouse.SDK.Database;
 using DataWarehouse.SDK.Infrastructure;
 using DataWarehouse.SDK.Primitives;
 using DataWarehouse.SDK.Utilities;
-using System.Collections.Concurrent;
+using Microsoft.Data.SqlClient;
+using Microsoft.Data.Sqlite;
+using MySqlConnector;
+using Npgsql;
 using System.Data;
+using System.Data.Common;
 using System.Diagnostics;
 using System.Text;
 using System.Text.Json;
@@ -18,7 +22,6 @@ namespace DataWarehouse.Plugins.RelationalDatabaseStorage;
 /// - MySQL/MariaDB, PostgreSQL, SQL Server, Oracle, Db2
 /// - SQLite, CockroachDB, TiDB, YugabyteDB
 /// - ClickHouse, TimescaleDB, Snowflake, BigQuery, Redshift
-/// - In-memory simulation for testing
 ///
 /// Features:
 /// - Full SQL query support with parameterized queries
@@ -47,12 +50,13 @@ namespace DataWarehouse.Plugins.RelationalDatabaseStorage;
 /// - storage.relational.schema: Get table schema
 /// - storage.relational.bulkinsert: Bulk insert rows
 /// </summary>
-public sealed class RelationalDatabasePlugin : HybridDatabasePluginBase<RelationalDbConfig>
+public sealed class RelationalDatabasePlugin : HybridDatabasePluginBase<RelationalDbConfig>, IDisposable
 {
     private readonly SemaphoreSlim _writeLock = new(1, 1);
 
-    // In-memory storage simulation for testing
-    private readonly ConcurrentDictionary<string, ConcurrentDictionary<string, ConcurrentDictionary<string, string>>> _inMemoryStore = new();
+    // ADO.NET connection for real database engines
+    private DbConnection? _dbConnection;
+    private bool _disposed;
 
     // Connection state tracking
     private bool _isInitialized;
@@ -151,14 +155,7 @@ public sealed class RelationalDatabasePlugin : HybridDatabasePluginBase<Relation
             await _writeLock.WaitAsync();
             try
             {
-                if (_config.Engine == RelationalEngine.InMemory)
-                {
-                    SaveToMemory(database, table, id, json);
-                }
-                else
-                {
-                    await SaveToEngineAsync(database, table, id, json);
-                }
+                await SaveToEngineAsync(database, table, id, json);
             }
             finally
             {
@@ -177,15 +174,7 @@ public sealed class RelationalDatabasePlugin : HybridDatabasePluginBase<Relation
             if (string.IsNullOrEmpty(id))
                 throw new ArgumentException("Row ID/primary key is required");
 
-            string json;
-            if (_config.Engine == RelationalEngine.InMemory)
-            {
-                json = LoadFromMemory(database, table, id);
-            }
-            else
-            {
-                json = await LoadFromEngineAsync(database, table, id);
-            }
+            var json = await LoadFromEngineAsync(database, table, id);
 
             return new MemoryStream(Encoding.UTF8.GetBytes(json));
         }
@@ -204,14 +193,7 @@ public sealed class RelationalDatabasePlugin : HybridDatabasePluginBase<Relation
             await _writeLock.WaitAsync();
             try
             {
-                if (_config.Engine == RelationalEngine.InMemory)
-                {
-                    DeleteFromMemory(database, table, id);
-                }
-                else
-                {
-                    await DeleteFromEngineAsync(database, table, id);
-                }
+                await DeleteFromEngineAsync(database, table, id);
             }
             finally
             {
@@ -238,34 +220,9 @@ public sealed class RelationalDatabasePlugin : HybridDatabasePluginBase<Relation
         {
             await EnsureConnectedAsync();
 
-            if (_config.Engine == RelationalEngine.InMemory)
+            await foreach (var item in ListFromEngineAsync(prefix, ct))
             {
-                foreach (var db in _inMemoryStore)
-                {
-                    foreach (var table in db.Value)
-                    {
-                        foreach (var row in table.Value)
-                        {
-                            if (ct.IsCancellationRequested)
-                                yield break;
-
-                            var path = $"{db.Key}/{table.Key}/{row.Key}";
-                            if (!string.IsNullOrEmpty(prefix) && !path.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
-                                continue;
-
-                            var uri = new Uri($"relational:///{path}");
-                            var size = Encoding.UTF8.GetByteCount(row.Value);
-                            yield return new StorageListItem(uri, size);
-                        }
-                    }
-                }
-            }
-            else
-            {
-                await foreach (var item in ListFromEngineAsync(prefix, ct))
-                {
-                    yield return item;
-                }
+                yield return item;
             }
         }
 
@@ -290,18 +247,6 @@ public sealed class RelationalDatabasePlugin : HybridDatabasePluginBase<Relation
 
         database ??= _config.DefaultDatabase ?? "default";
 
-        if (_config.Engine == RelationalEngine.InMemory)
-        {
-            if (!_inMemoryStore.TryGetValue(database, out var tables))
-                return 0;
-            if (string.IsNullOrEmpty(collection))
-                return tables.Values.Sum(t => t.Count);
-            if (!tables.TryGetValue(collection, out var rows))
-                return 0;
-            return rows.Count;
-        }
-
-        // For real engines, execute COUNT query
         var tableName = collection ?? "documents";
         var sql = string.IsNullOrEmpty(filter)
             ? $"SELECT COUNT(*) FROM {tableName}"
@@ -322,13 +267,6 @@ public sealed class RelationalDatabasePlugin : HybridDatabasePluginBase<Relation
     {
         await EnsureConnectedAsync(instanceId);
 
-        if (_config.Engine == RelationalEngine.InMemory)
-        {
-            _inMemoryStore.TryAdd(database, new ConcurrentDictionary<string, ConcurrentDictionary<string, string>>());
-            return;
-        }
-
-        // For real engines, execute CREATE DATABASE
         await ExecuteNonQueryAsync($"CREATE DATABASE IF NOT EXISTS {EscapeIdentifier(database)}");
     }
 
@@ -336,13 +274,6 @@ public sealed class RelationalDatabasePlugin : HybridDatabasePluginBase<Relation
     {
         await EnsureConnectedAsync(instanceId);
 
-        if (_config.Engine == RelationalEngine.InMemory)
-        {
-            _inMemoryStore.TryRemove(database, out _);
-            return;
-        }
-
-        // For real engines, execute DROP DATABASE
         await ExecuteNonQueryAsync($"DROP DATABASE IF EXISTS {EscapeIdentifier(database)}");
     }
 
@@ -353,14 +284,6 @@ public sealed class RelationalDatabasePlugin : HybridDatabasePluginBase<Relation
 
         database ??= _config.DefaultDatabase ?? "default";
 
-        if (_config.Engine == RelationalEngine.InMemory)
-        {
-            var db = _inMemoryStore.GetOrAdd(database, _ => new ConcurrentDictionary<string, ConcurrentDictionary<string, string>>());
-            db.TryAdd(collection, new ConcurrentDictionary<string, string>());
-            return;
-        }
-
-        // For real engines, CREATE TABLE
         var columns = BuildColumnsFromSchema(schema);
         var sql = $"CREATE TABLE IF NOT EXISTS {EscapeIdentifier(database)}.{EscapeIdentifier(collection)} ({columns})";
         await ExecuteNonQueryAsync(sql);
@@ -372,16 +295,6 @@ public sealed class RelationalDatabasePlugin : HybridDatabasePluginBase<Relation
 
         database ??= _config.DefaultDatabase ?? "default";
 
-        if (_config.Engine == RelationalEngine.InMemory)
-        {
-            if (_inMemoryStore.TryGetValue(database, out var tables))
-            {
-                tables.TryRemove(collection, out _);
-            }
-            return;
-        }
-
-        // For real engines, DROP TABLE
         var sql = $"DROP TABLE IF EXISTS {EscapeIdentifier(database)}.{EscapeIdentifier(collection)}";
         await ExecuteNonQueryAsync(sql);
     }
@@ -390,12 +303,6 @@ public sealed class RelationalDatabasePlugin : HybridDatabasePluginBase<Relation
     {
         await EnsureConnectedAsync(instanceId);
 
-        if (_config.Engine == RelationalEngine.InMemory)
-        {
-            return _inMemoryStore.Keys.ToList();
-        }
-
-        // For real engines, query system catalog
         var result = await ExecuteQueryInternalAsync(null, null, GetShowDatabasesSql(), null);
         return result.Rows.SelectMany(r => r.Values).Select(v => v?.ToString() ?? "").Where(s => !string.IsNullOrEmpty(s));
     }
@@ -406,16 +313,6 @@ public sealed class RelationalDatabasePlugin : HybridDatabasePluginBase<Relation
 
         database ??= _config.DefaultDatabase ?? "default";
 
-        if (_config.Engine == RelationalEngine.InMemory)
-        {
-            if (_inMemoryStore.TryGetValue(database, out var tables))
-            {
-                return tables.Keys.ToList();
-            }
-            return Array.Empty<string>();
-        }
-
-        // For real engines, query system catalog
         var result = await ExecuteQueryInternalAsync(database, null, GetShowTablesSql(database), null);
         return result.Rows.SelectMany(r => r.Values).Select(v => v?.ToString() ?? "").Where(s => !string.IsNullOrEmpty(s));
     }
@@ -454,33 +351,7 @@ public sealed class RelationalDatabasePlugin : HybridDatabasePluginBase<Relation
 
             await EnsureConnectedAsync();
 
-            // In memory mode, just execute statements sequentially
-            if (_config.Engine == RelationalEngine.InMemory)
-            {
-                foreach (var stmt in statements)
-                {
-                    var sql = stmt.ToString();
-                    if (string.IsNullOrEmpty(sql)) continue;
-
-                    var result = await ExecuteQueryInternalAsync(database, null, sql, null);
-                    results.Add(result);
-                    if (!result.Success)
-                    {
-                        allSucceeded = false;
-                        break;
-                    }
-                }
-
-                return MessageResponse.Ok(new
-                {
-                    Success = allSucceeded,
-                    Results = results,
-                    Committed = allSucceeded
-                });
-            }
-
-            // For real engines, would use actual transaction
-            // BEGIN TRANSACTION
+            // Execute statements in transaction
             foreach (var stmt in statements)
             {
                 var sql = stmt.ToString();
@@ -495,7 +366,6 @@ public sealed class RelationalDatabasePlugin : HybridDatabasePluginBase<Relation
                 }
             }
 
-            // COMMIT or ROLLBACK based on success
             return MessageResponse.Ok(new
             {
                 Success = allSucceeded,
@@ -517,22 +387,6 @@ public sealed class RelationalDatabasePlugin : HybridDatabasePluginBase<Relation
 
             await EnsureConnectedAsync();
 
-            if (_config.Engine == RelationalEngine.InMemory)
-            {
-                // Return basic schema info for in-memory tables
-                return MessageResponse.Ok(new
-                {
-                    Database = database,
-                    Table = table,
-                    Columns = new[]
-                    {
-                        new { Name = "id", Type = "VARCHAR(255)", IsPrimaryKey = true },
-                        new { Name = "data", Type = "TEXT", IsPrimaryKey = false }
-                    }
-                });
-            }
-
-            // For real engines, query INFORMATION_SCHEMA
             var result = await ExecuteQueryInternalAsync(database, null, GetDescribeTableSql(database, table), null);
             return MessageResponse.Ok(new
             {
@@ -568,14 +422,7 @@ public sealed class RelationalDatabasePlugin : HybridDatabasePluginBase<Relation
                     var json = JsonSerializer.Serialize(row, _jsonOptions);
                     var id = ExtractIdFromJson(json) ?? Guid.NewGuid().ToString("N");
 
-                    if (_config.Engine == RelationalEngine.InMemory)
-                    {
-                        SaveToMemory(database, table, id, json);
-                    }
-                    else
-                    {
-                        await SaveToEngineAsync(database, table, id, json);
-                    }
+                    await SaveToEngineAsync(database, table, id, json);
                     insertedCount++;
                 }
             }
@@ -667,166 +514,255 @@ public sealed class RelationalDatabasePlugin : HybridDatabasePluginBase<Relation
 
         #endregion
 
-        #region In-Memory Storage
+        #region Engine-Specific Operations
 
-        private void SaveToMemory(string database, string table, string id, string json)
+        private async Task EnsureDbConnectionAsync()
         {
-            var db = _inMemoryStore.GetOrAdd(database, _ => new ConcurrentDictionary<string, ConcurrentDictionary<string, string>>());
-            var tbl = db.GetOrAdd(table, _ => new ConcurrentDictionary<string, string>());
-            tbl[id] = json;
+            if (_dbConnection != null && _dbConnection.State == ConnectionState.Open)
+                return;
+
+            _dbConnection = CreateDbConnection();
+            await _dbConnection.OpenAsync();
         }
 
-        private string LoadFromMemory(string database, string table, string id)
+        private DbConnection CreateDbConnection()
         {
-            if (!_inMemoryStore.TryGetValue(database, out var db))
-                throw new KeyNotFoundException($"Database '{database}' not found");
-            if (!db.TryGetValue(table, out var tbl))
-                throw new KeyNotFoundException($"Table '{table}' not found");
-            if (!tbl.TryGetValue(id, out var json))
-                throw new KeyNotFoundException($"Row with ID '{id}' not found");
-            return json;
-        }
+            var connectionString = _config.ConnectionString;
+            if (string.IsNullOrEmpty(connectionString))
+                throw new InvalidOperationException("Connection string is required");
 
-        private void DeleteFromMemory(string database, string table, string id)
-        {
-            if (_inMemoryStore.TryGetValue(database, out var db) &&
-                db.TryGetValue(table, out var tbl))
+            return _config.Engine switch
             {
-                tbl.TryRemove(id, out _);
-            }
+                RelationalEngine.MySQL or RelationalEngine.MariaDB or RelationalEngine.TiDB =>
+                    new MySqlConnection(connectionString),
+                RelationalEngine.PostgreSQL or RelationalEngine.CockroachDB or RelationalEngine.TimescaleDB or RelationalEngine.YugabyteDB =>
+                    new NpgsqlConnection(connectionString),
+                RelationalEngine.SQLServer or RelationalEngine.AzureSynapse =>
+                    new SqlConnection(connectionString),
+                RelationalEngine.SQLite =>
+                    new SqliteConnection(connectionString),
+                _ => throw new NotSupportedException($"Engine {_config.Engine} is not yet supported with ADO.NET")
+            };
         }
 
-        #endregion
-
-        #region Engine-Specific Operations (Simulation)
-
-        private Task SaveToEngineAsync(string database, string table, string id, string json)
+        private async Task EnsureTableExistsAsync(string database, string table)
         {
-            // In production, this would use ADO.NET to execute INSERT/UPDATE
-            // For now, fall back to in-memory
-            SaveToMemory(database, table, id, json);
-            return Task.CompletedTask;
+            await EnsureDbConnectionAsync();
+
+            var createTableSql = GetCreateTableSql(database, table);
+            using var cmd = _dbConnection!.CreateCommand();
+            cmd.CommandText = createTableSql;
+            await cmd.ExecuteNonQueryAsync();
         }
 
-        private Task<string> LoadFromEngineAsync(string database, string table, string id)
+        private string GetCreateTableSql(string database, string table)
         {
-            // In production, this would use ADO.NET to execute SELECT
-            return Task.FromResult(LoadFromMemory(database, table, id));
+            var qualifiedTable = GetQualifiedTableName(database, table);
+
+            return _config.Engine switch
+            {
+                RelationalEngine.MySQL or RelationalEngine.MariaDB or RelationalEngine.TiDB =>
+                    $"CREATE TABLE IF NOT EXISTS {qualifiedTable} (id VARCHAR(255) PRIMARY KEY, data JSON, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP)",
+                RelationalEngine.PostgreSQL or RelationalEngine.CockroachDB or RelationalEngine.TimescaleDB or RelationalEngine.YugabyteDB =>
+                    $"CREATE TABLE IF NOT EXISTS {qualifiedTable} (id VARCHAR(255) PRIMARY KEY, data JSONB, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)",
+                RelationalEngine.SQLServer or RelationalEngine.AzureSynapse =>
+                    $"IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = '{table}') CREATE TABLE {qualifiedTable} (id NVARCHAR(255) PRIMARY KEY, data NVARCHAR(MAX), created_at DATETIME2 DEFAULT GETUTCDATE(), updated_at DATETIME2 DEFAULT GETUTCDATE())",
+                RelationalEngine.SQLite =>
+                    $"CREATE TABLE IF NOT EXISTS [{table}] (id TEXT PRIMARY KEY, data TEXT, created_at TEXT DEFAULT CURRENT_TIMESTAMP, updated_at TEXT DEFAULT CURRENT_TIMESTAMP)",
+                _ => throw new NotSupportedException($"Engine {_config.Engine} is not supported")
+            };
         }
 
-        private Task DeleteFromEngineAsync(string database, string table, string id)
+        private string GetQualifiedTableName(string database, string table)
         {
-            // In production, this would use ADO.NET to execute DELETE
-            DeleteFromMemory(database, table, id);
-            return Task.CompletedTask;
+            return _config.Engine switch
+            {
+                RelationalEngine.SQLite => $"[{table}]",
+                RelationalEngine.MySQL or RelationalEngine.MariaDB or RelationalEngine.TiDB =>
+                    $"`{database}`.`{table}`",
+                RelationalEngine.PostgreSQL or RelationalEngine.CockroachDB or RelationalEngine.TimescaleDB or RelationalEngine.YugabyteDB =>
+                    $"\"{database}\".\"{table}\"",
+                RelationalEngine.SQLServer or RelationalEngine.AzureSynapse =>
+                    $"[{database}].[dbo].[{table}]",
+                _ => $"{database}.{table}"
+            };
+        }
+
+        private async Task SaveToEngineAsync(string database, string table, string id, string json)
+        {
+            await EnsureTableExistsAsync(database, table);
+
+            var upsertSql = GetUpsertSql(database, table);
+            using var cmd = _dbConnection!.CreateCommand();
+            cmd.CommandText = upsertSql;
+
+            AddParameter(cmd, "@id", id);
+            AddParameter(cmd, "@data", json);
+
+            await cmd.ExecuteNonQueryAsync();
+        }
+
+        private string GetUpsertSql(string database, string table)
+        {
+            var qualifiedTable = GetQualifiedTableName(database, table);
+
+            return _config.Engine switch
+            {
+                RelationalEngine.MySQL or RelationalEngine.MariaDB or RelationalEngine.TiDB =>
+                    $"INSERT INTO {qualifiedTable} (id, data, updated_at) VALUES (@id, @data, CURRENT_TIMESTAMP) ON DUPLICATE KEY UPDATE data = @data, updated_at = CURRENT_TIMESTAMP",
+                RelationalEngine.PostgreSQL or RelationalEngine.CockroachDB or RelationalEngine.TimescaleDB or RelationalEngine.YugabyteDB =>
+                    $"INSERT INTO {qualifiedTable} (id, data, updated_at) VALUES (@id, @data::jsonb, CURRENT_TIMESTAMP) ON CONFLICT (id) DO UPDATE SET data = EXCLUDED.data, updated_at = CURRENT_TIMESTAMP",
+                RelationalEngine.SQLServer or RelationalEngine.AzureSynapse =>
+                    $"MERGE {qualifiedTable} AS target USING (SELECT @id AS id, @data AS data) AS source ON target.id = source.id WHEN MATCHED THEN UPDATE SET data = source.data, updated_at = GETUTCDATE() WHEN NOT MATCHED THEN INSERT (id, data, updated_at) VALUES (source.id, source.data, GETUTCDATE());",
+                RelationalEngine.SQLite =>
+                    $"INSERT OR REPLACE INTO {qualifiedTable} (id, data, updated_at) VALUES (@id, @data, CURRENT_TIMESTAMP)",
+                _ => throw new NotSupportedException($"Engine {_config.Engine} is not supported")
+            };
+        }
+
+        private async Task<string> LoadFromEngineAsync(string database, string table, string id)
+        {
+            await EnsureTableExistsAsync(database, table);
+
+            var qualifiedTable = GetQualifiedTableName(database, table);
+            using var cmd = _dbConnection!.CreateCommand();
+            cmd.CommandText = $"SELECT data FROM {qualifiedTable} WHERE id = @id";
+            AddParameter(cmd, "@id", id);
+
+            var result = await cmd.ExecuteScalarAsync();
+            if (result == null || result == DBNull.Value)
+                throw new KeyNotFoundException($"Row with ID '{id}' not found in {database}.{table}");
+
+            return result.ToString() ?? "{}";
+        }
+
+        private async Task DeleteFromEngineAsync(string database, string table, string id)
+        {
+            await EnsureTableExistsAsync(database, table);
+
+            var qualifiedTable = GetQualifiedTableName(database, table);
+            using var cmd = _dbConnection!.CreateCommand();
+            cmd.CommandText = $"DELETE FROM {qualifiedTable} WHERE id = @id";
+            AddParameter(cmd, "@id", id);
+
+            await cmd.ExecuteNonQueryAsync();
+        }
+
+        private void AddParameter(DbCommand cmd, string name, object? value)
+        {
+            var param = cmd.CreateParameter();
+            param.ParameterName = name;
+            param.Value = value ?? DBNull.Value;
+            cmd.Parameters.Add(param);
         }
 
         private async IAsyncEnumerable<StorageListItem> ListFromEngineAsync(
             string prefix,
             [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct)
         {
-            // In production, would query actual database
-            // For now, use in-memory
-            await foreach (var item in ListFilesFromMemoryAsync(prefix, ct))
-            {
-                yield return item;
-            }
-        }
+            await EnsureDbConnectionAsync();
 
-        private async IAsyncEnumerable<StorageListItem> ListFilesFromMemoryAsync(
-            string prefix,
-            [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct)
-        {
-            foreach (var db in _inMemoryStore)
+            // Get list of tables
+            var tables = await ListCollectionsAsync(_config.DefaultDatabase);
+
+            foreach (var table in tables)
             {
-                foreach (var table in db.Value)
+                if (ct.IsCancellationRequested)
+                    yield break;
+
+                var qualifiedTable = GetQualifiedTableName(_config.DefaultDatabase ?? "default", table);
+                using var cmd = _dbConnection!.CreateCommand();
+                cmd.CommandText = $"SELECT id FROM {qualifiedTable}";
+
+                using var reader = await cmd.ExecuteReaderAsync(ct);
+                while (await reader.ReadAsync(ct))
                 {
-                    foreach (var row in table.Value)
-                    {
-                        if (ct.IsCancellationRequested)
-                            yield break;
+                    if (ct.IsCancellationRequested)
+                        yield break;
 
-                        var path = $"{db.Key}/{table.Key}/{row.Key}";
-                        if (!string.IsNullOrEmpty(prefix) && !path.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
-                            continue;
+                    var id = reader.GetString(0);
+                    var path = $"{_config.DefaultDatabase}/{table}/{id}";
 
-                        var uri = new Uri($"relational:///{path}");
-                        var size = Encoding.UTF8.GetByteCount(row.Value);
-                        yield return new StorageListItem(uri, size);
+                    if (!string.IsNullOrEmpty(prefix) && !path.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+                        continue;
 
-                        await Task.Yield();
-                    }
+                    var uri = new Uri($"relational:///{path}");
+                    yield return new StorageListItem(uri, 0);
                 }
             }
         }
 
-        private Task<QueryResult> ExecuteQueryInternalAsync(
+        private async Task<QueryResult> ExecuteQueryInternalAsync(
             string? database, string? table, string? sql, Dictionary<string, object>? parameters)
         {
             var sw = Stopwatch.StartNew();
 
             if (string.IsNullOrEmpty(sql))
             {
-                return Task.FromResult(QueryResult.Error("SQL query is required"));
+                return QueryResult.Error("SQL query is required");
             }
 
-            // For in-memory mode, simulate query execution
-            if (_config.Engine == RelationalEngine.InMemory)
+            try
             {
-                var rows = new List<Dictionary<string, object?>>();
+                await EnsureDbConnectionAsync();
 
-                // Simple SELECT simulation
-                if (sql.TrimStart().StartsWith("SELECT", StringComparison.OrdinalIgnoreCase))
+                using var cmd = _dbConnection!.CreateCommand();
+                cmd.CommandText = sql;
+
+                if (parameters != null)
                 {
-                    database ??= _config.DefaultDatabase ?? "default";
-
-                    if (_inMemoryStore.TryGetValue(database, out var db))
+                    foreach (var param in parameters)
                     {
-                        foreach (var t in db)
-                        {
-                            if (!string.IsNullOrEmpty(table) && t.Key != table)
-                                continue;
-
-                            foreach (var row in t.Value)
-                            {
-                                try
-                                {
-                                    var doc = JsonSerializer.Deserialize<Dictionary<string, object?>>(row.Value, _jsonOptions);
-                                    if (doc != null)
-                                    {
-                                        doc["_id"] = row.Key;
-                                        doc["_table"] = t.Key;
-                                        rows.Add(doc);
-                                    }
-                                }
-                                catch
-                                {
-                                    rows.Add(new Dictionary<string, object?>
-                                    {
-                                        ["_id"] = row.Key,
-                                        ["_table"] = t.Key,
-                                        ["_raw"] = row.Value
-                                    });
-                                }
-                            }
-                        }
+                        AddParameter(cmd, $"@{param.Key}", param.Value);
                     }
                 }
 
-                sw.Stop();
-                return Task.FromResult(QueryResult.FromRows(rows, null, sw.ElapsedMilliseconds));
-            }
+                var rows = new List<Dictionary<string, object?>>();
+                using var reader = await cmd.ExecuteReaderAsync();
 
-            // For real database engines, would execute actual SQL
-            sw.Stop();
-            return Task.FromResult(QueryResult.FromRows(new List<Dictionary<string, object?>>(), null, sw.ElapsedMilliseconds));
+                while (await reader.ReadAsync())
+                {
+                    var row = new Dictionary<string, object?>();
+                    for (int i = 0; i < reader.FieldCount; i++)
+                    {
+                        var name = reader.GetName(i);
+                        var value = reader.IsDBNull(i) ? null : reader.GetValue(i);
+                        row[name] = value;
+                    }
+                    rows.Add(row);
+                }
+
+                sw.Stop();
+                return QueryResult.FromRows(rows, null, sw.ElapsedMilliseconds);
+            }
+            catch (Exception ex)
+            {
+                sw.Stop();
+                return QueryResult.Error(ex.Message);
+            }
         }
 
-        private Task<int> ExecuteNonQueryAsync(string sql)
+        private async Task<int> ExecuteNonQueryAsync(string sql)
         {
-            // In production, this would execute INSERT/UPDATE/DELETE/DDL
-            // For now, return success
-            return Task.FromResult(1);
+            await EnsureDbConnectionAsync();
+
+            using var cmd = _dbConnection!.CreateCommand();
+            cmd.CommandText = sql;
+            return await cmd.ExecuteNonQueryAsync();
+        }
+
+        #endregion
+
+        #region IDisposable
+
+        public void Dispose()
+        {
+            if (_disposed)
+                return;
+
+            _dbConnection?.Dispose();
+            _writeLock.Dispose();
+            _disposed = true;
         }
 
         #endregion
@@ -917,7 +853,7 @@ public sealed class RelationalDatabasePlugin : HybridDatabasePluginBase<Relation
 public class RelationalDbConfig : DatabaseConfigBase
 {
         /// <summary>The relational database engine to use.</summary>
-        public RelationalEngine Engine { get; set; } = RelationalEngine.InMemory;
+        public RelationalEngine Engine { get; set; } = RelationalEngine.MySQL;
 
         /// <summary>Server host address.</summary>
         public string? Host { get; set; }
@@ -973,13 +909,6 @@ public class RelationalDbConfig : DatabaseConfigBase
             Username = username,
             Password = password,
             ConnectionString = $"Server={host};Database={database};User Id={username};Password={password}"
-        };
-
-        /// <summary>Creates configuration for in-memory testing.</summary>
-        public static RelationalDbConfig ForInMemory() => new()
-        {
-            Engine = RelationalEngine.InMemory,
-            DefaultDatabase = "default"
         };
 
         /// <summary>Creates configuration for Oracle Database.</summary>
@@ -1123,8 +1052,6 @@ public class RelationalDbConfig : DatabaseConfigBase
     /// </summary>
     public enum RelationalEngine
     {
-        /// <summary>In-memory simulation for testing.</summary>
-        InMemory,
         /// <summary>MySQL database.</summary>
         MySQL,
         /// <summary>MariaDB database.</summary>
