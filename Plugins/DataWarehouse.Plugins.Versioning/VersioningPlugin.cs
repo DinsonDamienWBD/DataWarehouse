@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using System.Security.Cryptography;
 using System.Text.Json;
 using DataWarehouse.SDK.Contracts;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.Versioning;
 

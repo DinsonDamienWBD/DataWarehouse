@@ -1,5 +1,6 @@
 using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Primitives;
+using DataWarehouse.SDK.Utilities;
 using System.Collections.Concurrent;
 using System.Net.Http;
 using System.Net.Http.Headers;

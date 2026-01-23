@@ -1,5 +1,6 @@
 using DataWarehouse.Plugins.Backup.Providers;
 using DataWarehouse.SDK.Contracts;
+using DataWarehouse.SDK.Utilities;
 using System.Collections.Concurrent;
 
 namespace DataWarehouse.Plugins.Backup;

@@ -3,6 +3,7 @@ using System.Security.Cryptography;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using DataWarehouse.SDK.Contracts;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.Snapshot;
 

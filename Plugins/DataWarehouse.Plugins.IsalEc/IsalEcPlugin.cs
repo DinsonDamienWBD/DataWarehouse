@@ -4,6 +4,7 @@ using System.Runtime.CompilerServices;
 using System.Security.Cryptography;
 using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Primitives;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.IsalEc
 {

@@ -1,6 +1,4 @@
 using DataWarehouse.Kernel.Messaging;
-using DataWarehouse.Kernel.Security;
-using DataWarehouse.Kernel.Telemetry;
 using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Primitives;
 using DataWarehouse.SDK.Security;
@@ -238,8 +236,8 @@ namespace DataWarehouse.Kernel.Pipeline
                 .OrderBy(s => s.Order)
                 .ToList();
 
-            // Get security context from PipelineContext or ambient context
-            var securityContext = context.SecurityContext ?? SecurityContextProvider.Current;
+            // Get security context from PipelineContext or use anonymous fallback
+            var securityContext = context.SecurityContext ?? AnonymousSecurityContext.Instance;
 
             // Add trace context
             traceScope?.SetTag("stage_count", orderedStages.Count);
@@ -378,8 +376,8 @@ namespace DataWarehouse.Kernel.Pipeline
                 .OrderByDescending(s => s.Order) // Reverse order for read
                 .ToList();
 
-            // Get security context from PipelineContext or ambient context
-            var securityContext = context.SecurityContext ?? SecurityContextProvider.Current;
+            // Get security context from PipelineContext or use anonymous fallback
+            var securityContext = context.SecurityContext ?? AnonymousSecurityContext.Instance;
 
             // Add trace context
             traceScope?.SetTag("stage_count", orderedStages.Count);
@@ -525,9 +523,11 @@ namespace DataWarehouse.Kernel.Pipeline
         private sealed class DefaultKernelContext(PluginRegistry registry) : IKernelContext
         {
             private readonly PluginRegistry _registry = registry;
+            private readonly IKernelStorageService _storage = new NullKernelStorageService();
 
             public OperatingMode Mode => _registry.OperatingMode;
             public string RootPath => Environment.CurrentDirectory;
+            public IKernelStorageService Storage => _storage;
 
             public void LogInfo(string message) { /* Default: no-op */ }
             public void LogError(string message, Exception? ex = null) { /* Default: no-op */ }
@@ -536,6 +536,41 @@ namespace DataWarehouse.Kernel.Pipeline
 
             public T? GetPlugin<T>() where T : class, IPlugin => _registry.GetPlugin<T>();
             public IEnumerable<T> GetPlugins<T>() where T : class, IPlugin => _registry.GetPlugins<T>();
+        }
+
+        /// <summary>
+        /// Anonymous security context for pipeline operations when no user context is available.
+        /// </summary>
+        private sealed class AnonymousSecurityContext : ISecurityContext
+        {
+            public static readonly AnonymousSecurityContext Instance = new();
+            public string UserId => "anonymous";
+            public string? TenantId => null;
+            public IEnumerable<string> Roles => Array.Empty<string>();
+            public bool IsSystemAdmin => false;
+        }
+
+        /// <summary>
+        /// Null implementation of IKernelStorageService for contexts where storage is not available.
+        /// </summary>
+        private sealed class NullKernelStorageService : IKernelStorageService
+        {
+            public Task SaveAsync(string path, Stream data, IDictionary<string, string>? metadata = null, CancellationToken ct = default)
+                => Task.CompletedTask;
+            public Task SaveAsync(string path, byte[] data, IDictionary<string, string>? metadata = null, CancellationToken ct = default)
+                => Task.CompletedTask;
+            public Task<Stream?> LoadAsync(string path, CancellationToken ct = default)
+                => Task.FromResult<Stream?>(null);
+            public Task<byte[]?> LoadBytesAsync(string path, CancellationToken ct = default)
+                => Task.FromResult<byte[]?>(null);
+            public Task<IDictionary<string, string>?> GetMetadataAsync(string path, CancellationToken ct = default)
+                => Task.FromResult<IDictionary<string, string>?>(null);
+            public Task<bool> DeleteAsync(string path, CancellationToken ct = default)
+                => Task.FromResult(false);
+            public Task<bool> ExistsAsync(string path, CancellationToken ct = default)
+                => Task.FromResult(false);
+            public Task<IReadOnlyList<StorageItemInfo>> ListAsync(string prefix, int limit = 100, int offset = 0, CancellationToken ct = default)
+                => Task.FromResult<IReadOnlyList<StorageItemInfo>>(Array.Empty<StorageItemInfo>());
         }
     }
 }

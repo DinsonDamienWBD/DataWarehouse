@@ -115,6 +115,7 @@
     <Project Path="Plugins/DataWarehouse.Plugins.RetryPolicy/DataWarehouse.Plugins.RetryPolicy.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.S3Storage/DataWarehouse.Plugins.S3Storage.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.Search/DataWarehouse.Plugins.Search.csproj" />
+    <Project Path="Plugins/DataWarehouse.Plugins.SecretManagement/DataWarehouse.Plugins.SecretManagement.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.SelfHealingRaid/DataWarehouse.Plugins.SelfHealingRaid.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.SerpentEncryption/DataWarehouse.Plugins.SerpentEncryption.csproj">
       <Build Solution="Debug|*" Project="false" />

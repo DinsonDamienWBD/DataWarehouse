@@ -1,5 +1,6 @@
 using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Primitives;
+using DataWarehouse.SDK.Utilities;
 using System;
 using System.Collections.Generic;
 using System.Linq;
