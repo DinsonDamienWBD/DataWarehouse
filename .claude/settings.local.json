@@ -1,0 +1,19 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(curl:*)",
+      "Skill(hud)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "Bash(where bun:*)",
+      "Bash(where npx:*)",
+      "Bash(npx oh-my-opencode install --no-tui --claude=yes --openai=no --gemini=yes --copilot=no)",
+      "Bash(npm install:*)",
+      "Bash(bunx oh-my-opencode install:*)",
+      "WebFetch(domain:opencode.ai)",
+      "Bash(opencode --version:*)",
+      "Bash(opencode auth login:*)",
+      "Bash(opencode auth status:*)",
+      "Bash(opencode auth list:*)"
+    ]
+  }
+}
