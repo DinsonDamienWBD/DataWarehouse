@@ -30,6 +30,9 @@
     <ProjectReference Include="..\Plugins\DataWarehouse.Plugins.LocalStorage\DataWarehouse.Plugins.LocalStorage.csproj" />
     <ProjectReference Include="..\Plugins\DataWarehouse.Plugins.AIAgents\DataWarehouse.Plugins.AIAgents.csproj" />
     <ProjectReference Include="..\Plugins\DataWarehouse.Plugins.Compression\DataWarehouse.Plugins.Compression.csproj" />
+    <ProjectReference Include="..\Plugins\DataWarehouse.Plugins.EmbeddedDatabaseStorage\DataWarehouse.Plugins.EmbeddedDatabaseStorage.csproj" />
+    <ProjectReference Include="..\Plugins\DataWarehouse.Plugins.RelationalDatabaseStorage\DataWarehouse.Plugins.RelationalDatabaseStorage.csproj" />
+    <ProjectReference Include="..\Plugins\DataWarehouse.Plugins.GeoReplication\DataWarehouse.Plugins.GeoReplication.csproj" />
   </ItemGroup>
 
 </Project>

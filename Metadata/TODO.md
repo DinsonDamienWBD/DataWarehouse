@@ -92,6 +92,7 @@ All three database plugins (Relational, NoSQL, Embedded) already extend `HybridD
 | Delete `DataWarehouse.SDK/Database/DatabaseInfrastructure.cs` | [x] |
 | Run full solution build to confirm no breakage | [x] |
 | Update any imports/usings if needed | [x] |
+| Add unit tests verifying deletion | [x] |
 
 ---
 
@@ -107,7 +108,7 @@ All three database plugins (Relational, NoSQL, Embedded) already extend `HybridD
 | Replace `_inMemoryTables` with actual database operations | [x] |
 | Fix `CreateConnectionAsync` to return real connections | [x] |
 | Add connection pooling and proper disposal | [x] |
-| Add unit tests with actual database files | [ ] |
+| Add unit tests with actual database files | [x] |
 
 ---
 
@@ -123,7 +124,7 @@ All three database plugins (Relational, NoSQL, Embedded) already extend `HybridD
 | Replace `_inMemoryStore` with actual ADO.NET operations | [x] |
 | Fix `CreateConnectionAsync` to return real `DbConnection` | [x] |
 | Add connection string validation and pooling | [x] |
-| Add unit tests with actual database connections | [ ] |
+| Add unit tests with actual database connections | [x] |
 
 ---
 
@@ -133,10 +134,10 @@ All three database plugins (Relational, NoSQL, Embedded) already extend `HybridD
 
 | Task | Status |
 |------|--------|
-| Change `LoadAsync` to abstract method OR provide default implementation | [ ] |
-| Review all storage plugins to ensure they override `LoadAsync` | [ ] |
-| Fix fire-and-forget `TouchAsync` bug (line 841) | [ ] |
-| Add compile-time enforcement for required overrides | [ ] |
+| Change `LoadAsync` to abstract method OR provide default implementation | [x] |
+| Review all storage plugins to ensure they override `LoadAsync` | [x] |
+| Fix fire-and-forget `TouchAsync` bug (line 841) | [x] |
+| Add compile-time enforcement for required overrides | [x] |
 
 ---
 
@@ -160,7 +161,7 @@ All three database plugins (Relational, NoSQL, Embedded) already extend `HybridD
 | Implement replication lag tracking with real metrics (not zeros) | [x] |
 | Implement cross-region data sync | [x] |
 | Add conflict resolution logic | [x] |
-| Add unit tests for geo-replication scenarios | [ ] |
+| Add unit tests for geo-replication scenarios | [x] |
 
 ---
 

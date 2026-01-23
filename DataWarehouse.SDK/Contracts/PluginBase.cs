@@ -834,14 +834,9 @@ namespace DataWarehouse.SDK.Contracts
 
         /// <summary>
         /// Load with cache hit tracking. Derived classes must implement actual loading.
+        /// Implementations should call TouchAsync(uri) to track cache access before loading.
         /// </summary>
-        public override Task<Stream> LoadAsync(Uri uri)
-        {
-            // Touch to track access - derived classes should call this via base then do actual load
-            TouchAsync(uri).ConfigureAwait(false);
-            // Abstract - derived classes must override to provide actual implementation
-            throw new NotImplementedException("Derived class must override LoadAsync to provide storage implementation");
-        }
+        public abstract override Task<Stream> LoadAsync(Uri uri);
 
         protected override Dictionary<string, object> GetMetadata()
         {
