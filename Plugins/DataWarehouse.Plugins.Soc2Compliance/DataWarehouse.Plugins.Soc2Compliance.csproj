@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <Description>SOC 2 Type II compliance provider plugin for DataWarehouse supporting all Trust Services Criteria (Security, Availability, Processing Integrity, Confidentiality, Privacy), continuous monitoring, evidence collection, control effectiveness testing, and audit report generation.</Description>
+    <Authors>DataWarehouse Team</Authors>
+    <Company>DataWarehouse</Company>
+    <Product>DataWarehouse SOC 2 Compliance Plugin</Product>
+    <Version>1.0.0</Version>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\DataWarehouse.SDK\DataWarehouse.SDK.csproj" />
+  </ItemGroup>
+</Project>

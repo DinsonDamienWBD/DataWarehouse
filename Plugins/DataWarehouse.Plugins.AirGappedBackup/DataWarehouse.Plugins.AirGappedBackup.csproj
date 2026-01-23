@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <Description>Air-gapped backup plugin for DataWarehouse supporting offline tape libraries, removable media, secure transfer protocols, and chain of custody tracking.</Description>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\DataWarehouse.SDK\DataWarehouse.SDK.csproj" />
+    <ProjectReference Include="..\DataWarehouse.Plugins.Backup\DataWarehouse.Plugins.Backup.csproj" />
+  </ItemGroup>
+</Project>

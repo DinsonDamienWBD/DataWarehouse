@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <Description>HIPAA compliance provider plugin for DataWarehouse supporting PHI protection, access controls, audit trails, encryption validation, minimum necessary standard, BAA tracking, and breach notification.</Description>
+    <Authors>DataWarehouse Team</Authors>
+    <Company>DataWarehouse</Company>
+    <Product>DataWarehouse HIPAA Compliance Plugin</Product>
+    <Version>1.0.0</Version>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\DataWarehouse.SDK\DataWarehouse.SDK.csproj" />
+  </ItemGroup>
+</Project>

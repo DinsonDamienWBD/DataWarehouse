@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RootNamespace>DataWarehouse.Plugins.SelfHealingRaid</RootNamespace>
+    <Description>Production-ready Self-Healing RAID plugin for DataWarehouse with automatic rebuild, proactive scrubbing, predictive failure detection via SMART data analysis, bad block remapping, progressive rebuild, multi-path I/O, online expansion, hot-swap drive replacement, bit-rot detection, recovery logging, health scoring, and quarantine mode</Description>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\DataWarehouse.SDK\DataWarehouse.SDK.csproj" />
+  </ItemGroup>
+
+</Project>

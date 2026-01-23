@@ -200,3 +200,98 @@ class MyStorage : IStorageProvider { ... }
 // DO this
 class MyStorage : StorageProviderPluginBase { ... }
 ```
+
+---
+
+## MICROKERNEL ARCHITECTURE REFACTOR (IN PROGRESS)
+
+### Current Status
+We are in the middle of a major architectural refactor to fully implement the microkernel + plugins pattern. This involves:
+1. Creating SDK base classes for all plugin categories (✅ COMPLETE)
+2. Implementing 108 individual plugins that extend these base classes (IN PROGRESS)
+3. Removing duplicate code from SDK/Kernel after plugins are verified
+
+### Key Files for Refactor
+- `Metadata/TODO.md` - Master task list with all 108 plugins by category
+- `Metadata/REFACTOR_STATUS.md` - Quick status snapshot for session continuity
+- `DataWarehouse.SDK/Contracts/InfrastructurePluginBases.cs` - Infrastructure base classes
+- `DataWarehouse.SDK/Contracts/FeaturePluginInterfaces.cs` - Feature plugin base classes
+- `DataWarehouse.SDK/Contracts/OrchestrationInterfaces.cs` - Orchestration base classes
+- `DataWarehouse.SDK/Contracts/PluginBase.cs` - Core plugin base classes
+
+### Plugin Base Class Hierarchy (Extended)
+
+```
+PluginBase (IPlugin)
+├── DataTransformationPluginBase (IDataTransformation)
+│   └── PipelinePluginBase (runtime ordering)
+├── StorageProviderPluginBase (IStorageProvider)
+│   └── ListableStoragePluginBase → TieredStoragePluginBase → CacheableStoragePluginBase → IndexableStoragePluginBase
+├── MetadataIndexPluginBase (IMetadataIndex)
+├── FeaturePluginBase (IFeaturePlugin)
+│   ├── InterfacePluginBase (REST, gRPC, SQL)
+│   ├── ConsensusPluginBase (IConsensusEngine)
+│   ├── RealTimePluginBase (IRealTimeProvider)
+│   ├── DeduplicationPluginBase (IDeduplicationProvider)
+│   ├── VersioningPluginBase (IVersioningProvider)
+│   ├── SnapshotPluginBase (ISnapshotProvider)
+│   ├── TelemetryPluginBase (ITelemetryProvider)
+│   ├── ThreatDetectionPluginBase (IThreatDetectionProvider)
+│   ├── BackupPluginBase (IBackupProvider)
+│   ├── OperationsPluginBase (IOperationsProvider)
+│   ├── HealthProviderPluginBase (IHealthCheck)
+│   ├── RateLimiterPluginBase (IRateLimiter)
+│   ├── CircuitBreakerPluginBase (IResiliencePolicy)
+│   ├── TransactionManagerPluginBase (ITransactionManager)
+│   ├── RaidProviderPluginBase (IRaidProvider)
+│   ├── ErasureCodingPluginBase (IErasureCodingProvider)
+│   ├── ComplianceProviderPluginBase (IComplianceProvider)
+│   ├── IAMProviderPluginBase (IIAMProvider)
+│   ├── SearchProviderPluginBase (ISearchProvider)
+│   ├── ContentProcessorPluginBase (IContentProcessor)
+│   ├── WriteFanOutOrchestratorPluginBase (IWriteFanOutOrchestrator)
+│   └── WriteDestinationPluginBase (IWriteDestination)
+├── SecurityProviderPluginBase
+│   └── AccessControlPluginBase
+├── OrchestrationProviderPluginBase
+├── IntelligencePluginBase (AI providers)
+├── CloudEnvironmentPluginBase (ICloudEnvironment)
+├── ReplicationPluginBase (IReplicationService)
+├── SerializerPluginBase (ISerializer)
+├── SemanticMemoryPluginBase (ISemanticMemory)
+├── MetricsPluginBase (IMetricsProvider)
+├── GovernancePluginBase (INeuralSentinel)
+└── ContainerManagerPluginBase (IContainerManager)
+```
+
+### Next Steps (When Resuming)
+1. Read `Metadata/REFACTOR_STATUS.md` for current state
+2. Read `Metadata/TODO.md` for full task list
+3. Continue with **Priority 1: Core Infrastructure** plugins:
+   - CircuitBreakerPlugin, RateLimiterPlugin, HealthMonitorPlugin
+   - SamlIamPlugin, OAuthIamPlugin
+   - GdprCompliancePlugin, HipaaCompliancePlugin
+
+### Plugin Implementation Pattern
+```csharp
+// Example: Creating a new compliance plugin
+namespace DataWarehouse.Plugins.Compliance.Gdpr;
+
+public class GdprCompliancePlugin : ComplianceProviderPluginBase
+{
+    public override string Id => "com.datawarehouse.compliance.gdpr";
+    public override string Name => "GDPR Compliance";
+    protected override string SemanticDescription => "GDPR data protection compliance validation";
+    protected override string[] SemanticTags => new[] { "compliance", "gdpr", "privacy", "eu" };
+
+    // Implement abstract methods from base class...
+}
+```
+
+### Directory Structure for New Plugins
+```
+Plugins/
+└── DataWarehouse.Plugins.{Category}/
+    ├── DataWarehouse.Plugins.{Category}.csproj
+    └── {PluginName}Plugin.cs
+```
