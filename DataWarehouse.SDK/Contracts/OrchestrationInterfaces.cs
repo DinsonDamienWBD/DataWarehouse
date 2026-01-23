@@ -1144,7 +1144,7 @@ namespace DataWarehouse.SDK.Contracts
         /// <summary>
         /// Whether this provider is available. Override to implement availability check.
         /// </summary>
-        public virtual bool IsAvailable => IsRunning;
+        public virtual bool IsAvailable => true;
 
         /// <summary>
         /// Performs the search. Must be implemented by derived classes.
@@ -1447,10 +1447,10 @@ namespace DataWarehouse.SDK.Contracts
             return new IndexableContent
             {
                 ObjectId = objectId,
-                Filename = manifest.FileName,
+                Filename = manifest.Name,
                 ContentType = manifest.ContentType,
                 Size = manifest.OriginalSize,
-                Metadata = manifest.CustomMetadata,
+                Metadata = manifest.Metadata?.ToDictionary(kvp => kvp.Key, kvp => (object)kvp.Value),
                 TextContent = processingResults.TryGetValue(ContentProcessingType.TextExtraction, out var textResult)
                     ? textResult.ExtractedText
                     : null,

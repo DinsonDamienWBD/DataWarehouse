@@ -21,7 +21,7 @@ namespace DataWarehouse.SDK.Contracts
         /// <summary>
         /// Name of this health check provider.
         /// </summary>
-        public abstract string Name { get; }
+        public override abstract string Name { get; }
 
         /// <summary>
         /// Tags for categorizing this health check (e.g., "liveness", "readiness", "storage").

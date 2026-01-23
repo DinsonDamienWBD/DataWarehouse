@@ -136,7 +136,7 @@ namespace DataWarehouse.SDK.Governance
         /// <summary>
         /// The severity of the alert.
         /// </summary>
-        public AlertSeverity Severity { get; set; }
+        public Primitives.AlertSeverity Severity { get; set; }
 
         /// <summary>
         /// A code identifying the issue type (e.g., "PII_DETECTED", "INTEGRITY_FAIL").
