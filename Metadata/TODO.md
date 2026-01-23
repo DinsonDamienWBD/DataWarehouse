@@ -62,21 +62,36 @@ Based on comprehensive code review (see `Metadata/CODE_REVIEW_REPORT.md`), the f
 
 ### CRITICAL Severity (Must Fix Before ANY Deployment)
 
-#### 1. Fix SDK Database Infrastructure - NotImplementedException
-**File:** `DataWarehouse.SDK/Database/DatabaseInfrastructure.cs:782-935`
-**Issue:** All 21 CRUD methods throw `NotImplementedException`
+#### 1. Delete Obsolete DatabaseInfrastructure.cs
+**File:** `DataWarehouse.SDK/Database/DatabaseInfrastructure.cs`
+**Issue:** This entire file (~1,000 lines) is obsolete and superseded by existing infrastructure
+
+**Analysis:** All functionality is already provided by:
+- `StorageConnectionRegistry.cs` - Connection pooling and instance management
+- `HybridDatabasePluginBase.cs` - Message-based command handling for all database operations
+
+All three database plugins (Relational, NoSQL, Embedded) already extend `HybridDatabasePluginBase<TConfig>`.
+
+**Redundant classes to be removed:**
+| Class | Replacement |
+|-------|-------------|
+| `ConnectionRegistry` | `StorageConnectionRegistry<TConfig>` |
+| `ConnectionInstance` | `StorageConnectionInstance<TConfig>` |
+| `PooledConnection` | `PooledStorageConnection<TConfig>` |
+| `DatabaseFunctionAdapter` | Message handlers in HybridDatabasePluginBase |
+| `StorageFunctionAdapter` | `SaveAsync`, `LoadAsync`, `DeleteAsync` in base |
+| `IndexFunctionAdapter` | Index message handlers in base |
+| `CacheFunctionAdapter` | Cache message handlers in base |
+| `MetadataFunctionAdapter` | Metadata message handlers in base |
+| `ConnectionRole` enum | `StorageRole` enum in IStorageOrchestration.cs |
+| `InstanceHealth` enum | `InstanceHealthStatus` enum |
 
 | Task | Status |
 |------|--------|
-| Implement `SaveAsync` with real storage backend | [ ] |
-| Implement `LoadAsync` with real storage backend | [ ] |
-| Implement `DeleteAsync` with real storage backend | [ ] |
-| Implement `ExistsAsync` with real storage backend | [ ] |
-| Implement `ListAsync` with real storage backend | [ ] |
-| Implement metadata operations (Store/Get/Update/Delete/QueryByMetadata) | [ ] |
-| Implement cache operations (Get/Set/Remove) | [ ] |
-| Implement index operations (Index/RemoveFromIndex/Search/Query) | [ ] |
-| Add unit tests for all CRUD operations | [ ] |
+| Verify no code references DatabaseInfrastructure.cs | [ ] |
+| Delete `DataWarehouse.SDK/Database/DatabaseInfrastructure.cs` | [ ] |
+| Run full solution build to confirm no breakage | [ ] |
+| Update any imports/usings if needed | [ ] |
 
 ---
 
@@ -125,12 +140,22 @@ Based on comprehensive code review (see `Metadata/CODE_REVIEW_REPORT.md`), the f
 
 ---
 
-#### 5. Fix GeoReplicationPlugin - Missing Manager Class
-**File:** `Plugins/DataWarehouse.Plugins.GeoReplication/GeoReplicationPlugin.cs:36,55`
-**Issue:** References non-existent `GeoReplicationManager` class - COMPILATION ERROR
+#### 5. Fix GeoReplicationPlugin - Compilation Errors
+**File:** `Plugins/DataWarehouse.Plugins.GeoReplication/GeoReplicationPlugin.cs`
+**Issues:**
+1. References non-existent `GeoReplicationManager` class (lines 36, 55)
+2. Missing required `StartAsync`/`StopAsync` abstract method implementations
+
+**Architecture Context:**
+- `GeoReplicationPlugin` extends `ReplicationPluginBase` → `FeaturePluginBase`
+- `FeaturePluginBase` requires `StartAsync(CancellationToken ct)` and `StopAsync()` implementations
+- Reference implementations: `CrdtReplicationPlugin.cs:195-208`, `FederationPlugin.cs:124-176`
 
 | Task | Status |
 |------|--------|
+| Add `StartAsync(CancellationToken ct)` override (follow CrdtReplication pattern) | [ ] |
+| Add `StopAsync()` override with proper cleanup | [ ] |
+| Add `CancellationTokenSource` field for lifecycle management | [ ] |
 | Create `GeoReplicationManager` class with full implementation | [ ] |
 | Implement replication lag tracking with real metrics (not zeros) | [ ] |
 | Implement cross-region data sync | [ ] |
@@ -216,6 +241,106 @@ Based on comprehensive code review (see `Metadata/CODE_REVIEW_REPORT.md`), the f
 
 ---
 
+#### 11. Clean Up RAID Plugin Code Duplications
+**Issue:** 10 RAID plugins contain ~1,450 lines of duplicated code
+
+**Affected Plugins:**
+| Plugin | Location |
+|--------|----------|
+| AutoRaid | `Plugins/DataWarehouse.Plugins.AutoRaid/` |
+| Raid | `Plugins/DataWarehouse.Plugins.Raid/` |
+| SelfHealingRaid | `Plugins/DataWarehouse.Plugins.SelfHealingRaid/` |
+| StandardRaid | `Plugins/DataWarehouse.Plugins.StandardRaid/` |
+| AdvancedRaid | `Plugins/DataWarehouse.Plugins.AdvancedRaid/` |
+| EnhancedRaid | `Plugins/DataWarehouse.Plugins.EnhancedRaid/` |
+| NestedRaid | `Plugins/DataWarehouse.Plugins.NestedRaid/` |
+| ExtendedRaid | `Plugins/DataWarehouse.Plugins.ExtendedRaid/` |
+| VendorSpecificRaid | `Plugins/DataWarehouse.Plugins.VendorSpecificRaid/` |
+| ZfsRaid | `Plugins/DataWarehouse.Plugins.ZfsRaid/` |
+
+**Duplications Identified:**
+
+1. **GaloisField Implementations (7 independent copies, ~600 lines)**
+   - `ZfsRaid/GaloisField.cs` - Standalone 640 lines (most comprehensive)
+   - `Raid/RaidPlugin.cs:2416` - Embedded
+   - `StandardRaid/StandardRaidPlugin.cs:1825` - Embedded
+   - `AdvancedRaid/AdvancedRaidPlugin.cs:1788` - Embedded
+   - `EnhancedRaid/EnhancedRaidPlugin.cs:2090` - Embedded (identical to AdvancedRaid)
+   - `NestedRaid/NestedRaidPlugin.cs:2052` - Embedded (identical to AdvancedRaid)
+   - `VendorSpecificRaid/VendorSpecificRaidPlugin.cs:2269` - Embedded as `VendorGaloisField`
+
+2. **Reed-Solomon Z1/Z2/Z3 Parity Calculations (~300 lines)**
+   - `Raid/RaidPlugin.cs:1942-2120` - `CalculateReedSolomonZ1/Z2/Z3Parity()`, `ReconstructRaidZ3Failures()`
+   - `ZfsRaid/ZfsRaidPlugin.cs:766-791, 1023-1043` - `CalculateZ3Parity()`, `ReconstructZ3()`
+   - Similar implementations in AutoRaid, StandardRaid
+
+3. **Z3 References in 7 Files** (RAID-Z3 with 3 parity devices)
+   - `AutoRaidPlugin.cs:202, 510-511, 705, 723`
+   - `RaidPlugin.cs:102-104, 290-291, 368-376, 420, 1564, 1995-2015, 2101-2120`
+   - `SelfHealingRaidPlugin.cs:200-202`
+   - `ZfsRaidPlugin.cs:24, 107-113, 216-221, 766-791, 1023-1043`
+
+4. **Duplicated RAID Constants**
+   - Minimum device requirements (RAID_Z1=3, RAID_Z2=4, RAID_Z3=5) in 3+ plugins
+   - Capacity calculation formulas duplicated
+
+**Solution: Create SharedRaidUtilities Project**
+
+Create `Plugins/DataWarehouse.Plugins.SharedRaidUtilities/` with:
+
+| Task | Status |
+|------|--------|
+| Create `SharedRaidUtilities` project | [ ] |
+| Implement shared `GaloisField.cs` (consolidate from ZfsRaid) | [ ] |
+| Implement shared `ReedSolomonHelper.cs` with P/Q/R parity methods | [ ] |
+| Implement shared `RaidConstants.cs` (MinimumDevices, CapacityFactors) | [ ] |
+| Update `AutoRaidPlugin.cs` to use shared utilities | [ ] |
+| Update `RaidPlugin.cs` to use shared utilities | [ ] |
+| Update `SelfHealingRaidPlugin.cs` to use shared utilities | [ ] |
+| Update `StandardRaidPlugin.cs` to use shared utilities | [ ] |
+| Update `AdvancedRaidPlugin.cs` to use shared utilities | [ ] |
+| Update `EnhancedRaidPlugin.cs` to use shared utilities | [ ] |
+| Update `NestedRaidPlugin.cs` to use shared utilities | [ ] |
+| Update `ExtendedRaidPlugin.cs` to use shared utilities | [ ] |
+| Update `VendorSpecificRaidPlugin.cs` to use shared utilities | [ ] |
+| Update `ZfsRaidPlugin.cs` to use shared utilities | [ ] |
+| Delete embedded GaloisField classes from all plugins | [ ] |
+| Run all RAID tests to verify correctness | [ ] |
+
+**Expected Reduction:** ~1,450 lines of duplicated code
+
+---
+
+#### 12. HSM/VaultKeyStore Architecture (Verified Correct)
+**Status:** ✓ No changes needed
+
+**Analysis:** HSM is correctly implemented as a capability within VaultKeyStorePlugin, not a separate plugin.
+
+**Current Architecture (Correct):**
+```
+SecurityProviderPluginBase
+├── FileKeyStorePlugin (local/edge deployments)
+│   └── 4-tier protection: DPAPI, Credential Manager, Database, Password
+├── VaultKeyStorePlugin (enterprise/cloud with HSM)
+│   └── Backends: HashiCorp Vault, Azure Key Vault, AWS KMS, Google Cloud KMS
+│   └── Features: SupportsHSM=true, SupportsEnvelopeEncryption=true
+└── KeyRotationPlugin (wrapper for any IKeyStore)
+```
+
+**Rationale for keeping separate:**
+- Different deployment scenarios (edge vs enterprise)
+- Different dependencies (zero external deps vs cloud SDKs)
+- Different failure modes and SLAs
+- Different compliance/audit requirements
+- Different cost models
+
+| Task | Status |
+|------|--------|
+| Document HSM/VaultKeyStore architecture decision | [x] |
+| No implementation changes required | [x] |
+
+---
+
 ## Verification Checklist
 
 After implementing fixes:
@@ -230,3 +355,7 @@ After implementing fixes:
 | Geo-replication syncs data across regions | [ ] |
 | No empty catch blocks remain | [ ] |
 | All IDisposable resources properly disposed | [ ] |
+| DatabaseInfrastructure.cs deleted with no breakage | [ ] |
+| GeoReplicationPlugin compiles with StartAsync/StopAsync | [ ] |
+| All 10 RAID plugins use SharedRaidUtilities | [ ] |
+| RAID parity calculations verified with test vectors | [ ] |
