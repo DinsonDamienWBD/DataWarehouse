@@ -94,6 +94,22 @@
     <Project Path="Plugins/DataWarehouse.Plugins.ZeroConfig/DataWarehouse.Plugins.ZeroConfig.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.ZeroDowntimeUpgrade/DataWarehouse.Plugins.ZeroDowntimeUpgrade.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.ZeroKnowledgeEncryption/DataWarehouse.Plugins.ZeroKnowledgeEncryption.csproj" />
+    <Project Path="Plugins/DataWarehouse.Plugins.AesEncryption/DataWarehouse.Plugins.AesEncryption.csproj" />
+    <Project Path="Plugins/DataWarehouse.Plugins.BlueGreenDeployment/DataWarehouse.Plugins.BlueGreenDeployment.csproj" />
+    <Project Path="Plugins/DataWarehouse.Plugins.BrotliCompression/DataWarehouse.Plugins.BrotliCompression.csproj" />
+    <Project Path="Plugins/DataWarehouse.Plugins.CanaryDeployment/DataWarehouse.Plugins.CanaryDeployment.csproj" />
+    <Project Path="Plugins/DataWarehouse.Plugins.ChaCha20Encryption/DataWarehouse.Plugins.ChaCha20Encryption.csproj" />
+    <Project Path="Plugins/DataWarehouse.Plugins.EnhancedRaid/DataWarehouse.Plugins.EnhancedRaid.csproj" />
+    <Project Path="Plugins/DataWarehouse.Plugins.ExtendedRaid/DataWarehouse.Plugins.ExtendedRaid.csproj" />
+    <Project Path="Plugins/DataWarehouse.Plugins.GlobalDedup/DataWarehouse.Plugins.GlobalDedup.csproj" />
+    <Project Path="Plugins/DataWarehouse.Plugins.GZipCompression/DataWarehouse.Plugins.GZipCompression.csproj" />
+    <Project Path="Plugins/DataWarehouse.Plugins.Lz4Compression/DataWarehouse.Plugins.Lz4Compression.csproj" />
+    <Project Path="Plugins/DataWarehouse.Plugins.NestedRaid/DataWarehouse.Plugins.NestedRaid.csproj" />
+    <Project Path="Plugins/DataWarehouse.Plugins.SerpentEncryption/DataWarehouse.Plugins.SerpentEncryption.csproj" />
+    <Project Path="Plugins/DataWarehouse.Plugins.StandardRaid/DataWarehouse.Plugins.StandardRaid.csproj" />
+    <Project Path="Plugins/DataWarehouse.Plugins.TwofishEncryption/DataWarehouse.Plugins.TwofishEncryption.csproj" />
+    <Project Path="Plugins/DataWarehouse.Plugins.VendorSpecificRaid/DataWarehouse.Plugins.VendorSpecificRaid.csproj" />
+    <Project Path="Plugins/DataWarehouse.Plugins.ZstdCompression/DataWarehouse.Plugins.ZstdCompression.csproj" />
   </Folder>
   <Project Path="DataWarehouse.Benchmarks/DataWarehouse.Benchmarks.csproj" />
   <Project Path="DataWarehouse.CLI/DataWarehouse.CLI.csproj" />

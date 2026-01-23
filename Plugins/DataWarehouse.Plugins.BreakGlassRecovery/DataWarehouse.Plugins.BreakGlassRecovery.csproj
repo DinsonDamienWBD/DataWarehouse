@@ -3,7 +3,7 @@
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
-    <Description>Production-ready break-glass emergency recovery plugin for DataWarehouse. Provides multi-party authorization, Shamir secret sharing for key escrow, time-limited emergency access, dual-control requirements, offline recovery capabilities, WORM compliance override with full audit trail, and comprehensive post-incident reporting for enterprise disaster recovery scenarios.</Description>
+    <Description>Enterprise break-glass recovery plugin for DataWarehouse providing emergency access procedures, multi-party authorization, Shamir secret sharing, hardware security key support, and comprehensive audit trails for compliance.</Description>
     <Authors>DataWarehouse Team</Authors>
     <Version>1.0.0</Version>
   </PropertyGroup>

@@ -1,11 +1,15 @@
 <Project Sdk="Microsoft.NET.Sdk">
+
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
-    <Description>AutoRaid plugin for DataWarehouse providing automatic RAID configuration, disk analysis, RAID level recommendations, capacity planning, migration support, and configuration wizards.</Description>
+    <RootNamespace>DataWarehouse.Plugins.TwofishEncryption</RootNamespace>
+    <Description>Production-ready Twofish-256-CTR-HMAC encryption plugin for DataWarehouse implementing the full Twofish block cipher per official specification</Description>
   </PropertyGroup>
+
   <ItemGroup>
     <ProjectReference Include="..\..\DataWarehouse.SDK\DataWarehouse.SDK.csproj" />
   </ItemGroup>
+
 </Project>

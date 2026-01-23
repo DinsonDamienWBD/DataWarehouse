@@ -3,7 +3,7 @@
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
-    <Description>AutoRaid plugin for DataWarehouse providing automatic RAID configuration, disk analysis, RAID level recommendations, capacity planning, migration support, and configuration wizards.</Description>
+    <Description>Enhanced RAID plugin for DataWarehouse supporting RAID 1E, 5E, 5EE, and 6E with Galois Field mathematics, distributed hot spare allocation, and interleaved data/parity/spare placement.</Description>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\DataWarehouse.SDK\DataWarehouse.SDK.csproj" />

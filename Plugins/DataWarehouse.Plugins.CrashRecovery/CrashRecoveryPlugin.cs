@@ -32,6 +32,10 @@ public sealed class CrashRecoveryPlugin : SnapshotPluginBase, IAsyncDisposable
     private readonly Timer _checkpointTimer;
     private readonly Timer _walFlushTimer;
     private readonly WalManager _walManager;
+    private readonly DirtyPageTable _dirtyPageTable;
+    private readonly TransactionTable _transactionTable;
+    private readonly DoubleWriteBuffer _doubleWriteBuffer;
+    private readonly PageChecksumManager _checksumManager;
     private CancellationTokenSource? _cts;
     private volatile bool _disposed;
     private volatile bool _isRecovering;
@@ -138,6 +142,20 @@ public sealed class CrashRecoveryPlugin : SnapshotPluginBase, IAsyncDisposable
         Directory.CreateDirectory(Path.Combine(_storagePath, "snapshots"));
 
         _walManager = new WalManager(_walPath, _config.WalConfig ?? new WalConfig());
+
+        // Initialize dirty page table for tracking modified pages
+        _dirtyPageTable = new DirtyPageTable();
+
+        // Initialize transaction table for tracking active transactions
+        _transactionTable = new TransactionTable();
+
+        // Initialize double-write buffer for atomic page writes
+        var doubleWriteBufferPath = Path.Combine(_storagePath, "double_write_buffer");
+        Directory.CreateDirectory(doubleWriteBufferPath);
+        _doubleWriteBuffer = new DoubleWriteBuffer(doubleWriteBufferPath, _config.DoubleWriteBufferConfig ?? new DoubleWriteBufferConfig());
+
+        // Initialize page checksum manager for data integrity
+        _checksumManager = new PageChecksumManager(_config.ChecksumConfig ?? new PageChecksumConfig());
 
         // Initialize checkpoint timer
         _checkpointTimer = new Timer(
@@ -531,7 +549,8 @@ public sealed class CrashRecoveryPlugin : SnapshotPluginBase, IAsyncDisposable
     }
 
     /// <summary>
-    /// Applies a page image from WAL.
+    /// Applies a page image from WAL using double-write buffer for atomicity.
+    /// Uses page-level checksums for data integrity verification.
     /// </summary>
     private async Task ApplyPageImageAsync(string pageId, byte[] image, CancellationToken ct)
     {
@@ -542,7 +561,59 @@ public sealed class CrashRecoveryPlugin : SnapshotPluginBase, IAsyncDisposable
             Directory.CreateDirectory(pageDir);
         }
 
-        await File.WriteAllBytesAsync(pagePath, image, ct);
+        // Add page checksum for integrity verification
+        var pageWithChecksum = _checksumManager.AddChecksum(image);
+
+        // Use double-write buffer for atomic page writes (prevents torn writes)
+        await _doubleWriteBuffer.WritePageAtomicallyAsync(pagePath, pageWithChecksum, ct);
+
+        // Update dirty page table
+        _dirtyPageTable.MarkClean(pageId, CurrentLsn);
+    }
+
+    /// <summary>
+    /// Reads and verifies a page, detecting torn writes via checksum validation.
+    /// </summary>
+    public async Task<PageReadResult> ReadAndVerifyPageAsync(string pageId, CancellationToken ct = default)
+    {
+        var pagePath = GetPagePath(pageId);
+        if (!File.Exists(pagePath))
+        {
+            return new PageReadResult { Success = false, ErrorType = PageErrorType.NotFound };
+        }
+
+        var data = await File.ReadAllBytesAsync(pagePath, ct);
+
+        // Verify checksum to detect torn writes or corruption
+        var verifyResult = _checksumManager.VerifyAndExtract(data);
+        if (!verifyResult.IsValid)
+        {
+            // Attempt recovery from double-write buffer
+            var recovered = await _doubleWriteBuffer.RecoverPageAsync(pagePath, ct);
+            if (recovered != null)
+            {
+                verifyResult = _checksumManager.VerifyAndExtract(recovered);
+                if (verifyResult.IsValid)
+                {
+                    return new PageReadResult
+                    {
+                        Success = true,
+                        Data = verifyResult.Data,
+                        RecoveredFromDoubleWrite = true
+                    };
+                }
+            }
+
+            return new PageReadResult
+            {
+                Success = false,
+                ErrorType = verifyResult.IsTornWrite ? PageErrorType.TornWrite : PageErrorType.Corruption,
+                ExpectedChecksum = verifyResult.ExpectedChecksum,
+                ActualChecksum = verifyResult.ActualChecksum
+            };
+        }
+
+        return new PageReadResult { Success = true, Data = verifyResult.Data };
     }
 
     /// <summary>
@@ -555,6 +626,7 @@ public sealed class CrashRecoveryPlugin : SnapshotPluginBase, IAsyncDisposable
         {
             File.Delete(pagePath);
         }
+        _dirtyPageTable.Remove(pageId);
         return Task.CompletedTask;
     }
 

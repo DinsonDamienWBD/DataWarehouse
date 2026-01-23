@@ -1,11 +1,16 @@
 <Project Sdk="Microsoft.NET.Sdk">
+
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
-    <Description>AutoRaid plugin for DataWarehouse providing automatic RAID configuration, disk analysis, RAID level recommendations, capacity planning, migration support, and configuration wizards.</Description>
+    <RootNamespace>DataWarehouse.Plugins.StandardRaid</RootNamespace>
+    <Description>Standard RAID storage plugin implementing RAID 0/1/5/6/10 with real parity calculations using Galois Field mathematics</Description>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
+
   <ItemGroup>
     <ProjectReference Include="..\..\DataWarehouse.SDK\DataWarehouse.SDK.csproj" />
   </ItemGroup>
+
 </Project>
