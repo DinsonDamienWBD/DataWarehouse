@@ -2,7 +2,7 @@
 
 ## Executive Summary
 
-This document outlines the implementation plan for achieving full production readiness across all deployment tiers (Individual, SMB, Enterprise, High-Stakes, Hyperscale). Tasks are ordered by priority and organized into Tiers.
+This document outlines the implementation plan for achieving full production readiness across all deployment tiers (Individual, SMB, Enterprise, High-Stakes, Hyperscale). Tasks are ordered by priority and organized by severity.
 
 ---
 
@@ -12,10 +12,10 @@ Before implementing any task:
 1. Read this TODO.md
 2. Read Metadata/CLAUDE.md
 3. Read Metadata/RULES.md
-4. Plan implementation according to the rules and style guidelines (minimize code duplication, maxi
+4. Plan implementation according to the rules and style guidelines (minimize code duplication, maximize reuse)
 5. Implement according to the implementation plan
 6. Update Documentation (XML docs for all public entities - functions, variables, enums, classes, interfaces etc.)
-7. At each step, ensure full production readiness, no simulations, placeholders, mocks, simplifactions or shortcuts
+7. At each step, ensure full production readiness, no simulations, placeholders, mocks, simplifications or shortcuts
 8. Add Test Cases for each feature
 
 ---
@@ -23,9 +23,9 @@ Before implementing any task:
 ## COMMIT STRATEGY
 
 After completing each task:
-1. Verify the actual implemented code to see that the implementation is fully production ready without any simulations, placeholders, mocks, simplifactions or shortcuts
+1. Verify the actual implemented code to see that the implementation is fully production ready without any simulations, placeholders, mocks, simplifications or shortcuts
 2. If the verification fails, continue with the implementation of this task, until the code reaches a level where it passes the verification.
-3. Only after it passes verification, update this TODO.md with ✅ completion status
+3. Only after it passes verification, update this TODO.md with completion status
 4. Commit changes and the updated TODO.md document with descriptive message
 5. Move to next task
 
@@ -36,677 +36,9 @@ Do NOT wait for an entire phase to complete before committing.
 ## NOTES
 
 - Follow the philosophy of code reuse: Leverage existing abstractions before creating new ones
-- Upgrade SDK first, then Kernel, then Plugins
 - Commit frequently to avoid losing work
 - Test each feature thoroughly before moving to the next
 - Document all security-related changes
-
----
-
-## TO DO
-
-### Tier 1: Individual Users (Laptop/Desktop)
-
-| Feature | Status | Implementation |
-|---------|--------|----------------|
-| Local backup | ✅ | Multi-destination support: Local filesystem, External drives, Network shares, S3, Azure Blob, GCS, Hybrid |
-| Encryption at rest | ✅ | Full algorithms: AES-256-GCM (BCL), ChaCha20-Poly1305, Twofish (full spec), Serpent (all 8 S-boxes) |
-| File versioning | ✅ | Configurable retention (30/90/365 days, unlimited), diff-based storage, compression |
-| Deduplication | ✅ | Content-addressable with Rabin fingerprinting, variable-length chunking, global/per-file/per-backup scope |
-| Cross-platform | ⏳ | .NET 10 required - Future cross platform migration can be planned |
-| Easy setup | ⏳ | GUI Installer not yet implemented - CLI/config available |
-| Continuous/Incremental backup | ✅ | Real-time monitoring, scheduled intervals, full/incremental/differential/block-level/synthetic-full |
-
-### Tier 2: SMB (Network/Server Storage)
-
-| Feature | Status | Implementation |
-|---------|--------|----------------|
-| RAID support | ✅ | Multiple RAID levels (0,1,5,6,10,01,03,50,60,1E,5E,100) via RaidEngine |
-| S3-compatible API | ✅ | Full XML parsing using XDocument/XElement, versioning, ACLs, multipart uploads |
-| Web dashboard | ✅ | JWT authentication with MFA/TOTP support, session management |
-| User management | ✅ | LDAP/Active Directory integration, SCIM provisioning, OAuth2 |
-| Snapshots | ✅ | Enterprise snapshots with SafeMode, legal holds, application-aware |
-| Replication | ✅ | Configurable sync options, conflict resolution |
-| SMB/NFS/AFP | ✅ | Protocol support for all major network storage protocols |
-| iSCSI | ✅ | Target implementation with CHAP authentication |
-| Active Directory | ✅ | Full AD integration via LDAP |
-| Quotas | ✅ | Per-user, per-bucket, configurable enforcement |
-| Data integrity | ✅ | Checksums on read/write, integrity verification |
-
-### Tier 3: High-Stakes Enterprise (Banks, Hospitals, Government)
-
-| Feature | Status | Implementation |
-|---------|--------|----------------|
-| ACID transactions | ✅ | MVCC with deadlock detection, isolation levels, savepoints, WAL |
-| Snapshots | ✅ | SafeMode immutability, legal holds, infinite retention, application-consistent |
-| Encryption (FIPS 140-2) | ✅ | AES-256-GCM via .NET BCL (FIPS-capable), Argon2id KDF (full RFC 9106) |
-| HSM integration | ✅ | PKCS#11, AWS CloudHSM, Azure Dedicated HSM, Thales Luna - REAL integrations |
-| Audit logging | ✅ | Comprehensive tamper-evident logging, SIEM forwarding |
-| RBAC | ✅ | Multi-tenant RBAC with API authentication, fine-grained permissions |
-| Replication (sync) | ✅ | Synchronous replication with configurable consistency |
-| WORM/immutable | ✅ | SnapLock-style immutability, retention periods, compliance mode |
-| Compliance (HIPAA/SOX) | ✅ | Framework support for compliance validation |
-| 99.9999% uptime | ✅ | HA architecture with failover mechanisms |
-| Disaster recovery | ✅ | Full DR support with RPO/RTO controls |
-| Support SLA | ⏳ | Infrastructure ready - SLA terms to be defined per deployment |
-| Data-at-rest encryption | ✅ | Always-on encryption with multiple algorithm options |
-| Key management | ✅ | Enterprise key management via HSM integrations (OKM-compatible) |
-
-### Tier 4: Hyperscale (Google, Microsoft, Amazon Scale)
-
-| Feature | Status | Implementation |
-|---------|--------|----------------|
-| Erasure coding | ✅ | Multiple EC profiles: (6,3), (8,4), (10,2), (16,4), (12,4-jerasure), custom RS |
-| Billions of objects | ✅ | Scalable metadata with LSM-trees, Bloom filters, consistent hashing |
-| Exabyte scale | ✅ | Architecture supports exabyte-scale deployments |
-| Geo-replication | ✅ | Multi-region with conflict resolution, CRR support |
-| Consensus | ✅ | Raft consensus with Paxos option, distributed coordination |
-| Sharding | ✅ | Auto-sharding with CRUSH-like placement algorithm |
-| Auto-healing | ✅ | Self-repair with automatic PG recovery |
-| Microsecond latency | ✅ | Memory-mapped I/O, kernel bypass patterns, SIMD optimization |
-| 10M+ IOPS | ✅ | Parallel I/O scheduling, optimized data paths |
-| Cost per GB | ✅ | Cost optimization with tiered storage, compression, deduplication |
-| Chaos engineering | ✅ | Full chaos engineering framework for testing |
-
----
-
-## Verification Summary (2026-01-21)
-
-### Code Review Completed:
-- ✅ IndividualTierFeatures.cs - 6,745 lines, production-ready
-- ✅ SmbTierFeatures.cs - 4,104 lines, production-ready
-- ✅ HighStakesEnterpriseTierFeatures.cs - 9,594 lines, production-ready
-- ✅ HyperscaleTierFeatures.cs - 2,717 lines, production-ready
-
-### Critical Fixes Applied:
-1. **Cryptographic Algorithms** - Twofish, Serpent, Argon2id/Blake2b now fully compliant with specifications
-2. **HSM Integrations** - PKCS#11, AWS CloudHSM, Azure Dedicated HSM, Thales Luna now real integrations (not stubs)
-3. **S3 XML Parsing** - Proper XDocument parser replacing regex
-4. **Azure Auth** - Complete SharedKey canonicalization
-5. **JWT Validation** - Full signature verification with claims validation
-
-### Remaining Items:
-- ⏳ GUI Installer for Individual Users tier
-- ⏳ Cross-platform migration (.NET 10)
-- ⏳ Support SLA documentation per deployment
-
----
-
-## Verification Summary (2026-01-23)
-
-### Plugin Code Review Completed - 25 Additional Plugins Verified:
-
-**Encryption (3 plugins):**
-- ✅ FipsEncryptionPlugin (~780 lines) - FIPS 140-2 compliant AES-256-GCM, platform FIPS mode verification
-- ✅ ZeroKnowledgeEncryptionPlugin (~997 lines) - Schnorr proofs, Pedersen commitments, NIST P-256 curve
-- ✅ KeyRotationPlugin (~1100 lines) - Automated rotation with scheduling, versioning, grace periods
-
-**Compression (1 plugin):**
-- ✅ DeflateCompressionPlugin (~625 lines) - RFC 1951 compliant, Shannon entropy analysis
-
-**Backup (3 plugins):**
-- ✅ SyntheticFullBackupPlugin (~1419 lines) - Assembles full from incrementals, block-level SHA256
-- ✅ DifferentialBackupPlugin (~1444 lines) - Bitmap change tracking, block-level differentials
-- ✅ BackupVerificationPlugin (~1556 lines) - 6 verification types, test restore, scheduled verification
-
-**Storage (1 plugin):**
-- ✅ TapeLibraryPlugin (~1620 lines) - LTO tape library with SCSI/MTIO commands, LTFS, robotic handling
-
-**RAID (1 plugin):**
-- ✅ AdvancedRaidPlugin (~2220 lines) - RAID 50/60/1E/5E/5EE with real Galois Field parity calculations
-
-**Erasure Coding (1 plugin):**
-- ✅ AdaptiveEcPlugin (~1163 lines) - Real Reed-Solomon with GF(2^8), SIMD (AVX2/SSE2), auto-profile
-
-**Metadata (2 plugins):**
-- ✅ DistributedBPlusTreePlugin (~1380 lines) - Full B+ tree with consistent hashing, page locking, LRU cache
-- ✅ FullTextIndexPlugin (~1280 lines) - TF-IDF scoring, Porter stemmer, inverted index, fuzzy search
-
-**IAM (2 plugins):**
-- ✅ SigV4IamPlugin (~1371 lines) - Full AWS SigV4 per AWS spec, presigned URLs, chunked upload signing
-- ✅ TenantIsolationPlugin (~1494 lines) - Multi-tenant isolation, quotas, hierarchy, cross-tenant prevention
-
-**Compliance (2 plugins):**
-- ✅ PciDssCompliancePlugin (~1224 lines) - PCI-DSS 4.0, Luhn validation, format-preserving tokenization
-- ✅ DataRetentionPlugin (~1563 lines) - WORM, legal holds, retention clocks, governance/compliance modes
-
-**Replication (1 plugin):**
-- ✅ FederationPlugin (~1851 lines) - PKI trust establishment, mTLS, cross-federation queries
-
-**API/Integration (2 plugins):**
-- ✅ K8sOperatorPlugin (~1386 lines) - Full K8s operator with 4 CRDs, reconciliation loop, leader election
-- ✅ GraphQlApiPlugin (~1718 lines) - Full GraphQL spec, DataLoader, subscriptions via WebSocket
-
-**Operations (2 plugins):**
-- ✅ ZeroDowntimeUpgradePlugin (~1230 lines) - Rolling/canary deployments, auto-rollback, connection draining
-- ✅ AlertingOpsPlugin (~1685 lines) - Multi-channel notifications, escalation policies, silencing
-
-**Power/Environment (2 plugins):**
-- ✅ BatteryAwarePlugin (~1140 lines) - Real OS detection (Win/Linux/macOS), task deferral, throttling
-- ✅ CarbonAwarePlugin (~1244 lines) - WattTime/ElectricityMaps/UK Grid APIs, forecast scheduling
-
-**ML/Intelligence (3 plugins):**
-- ✅ PredictiveTieringPlugin (~1421 lines) - Gradient Boosted Decision Trees (pure C#), K-Means clustering
-- ✅ AccessPredictionPlugin (~1404 lines) - Multi-order Markov Chains, time series, periodicity detection
-- ✅ SmartSchedulingPlugin (~1414 lines) - Multi-level priority queue with aging, EDF, work stealing
-
-### All 16 Remaining Plugins COMPLETED (2026-01-23):
-- ✅ NestedRaidPlugin (~1800 lines) - RAID 10,01,03,50,60,100
-- ✅ EnhancedRaidPlugin (~1700 lines) - RAID 1E,5E,5EE,6E
-- ✅ VendorSpecificRaidPlugin (~2447 lines) - RAID DP,S,7,FR,Unraid
-- ✅ ExtendedRaidPlugin (~2100 lines) - RAID 71,72,NM,Matrix,JBOD,Crypto,DUP,DDP,SPAN,BIG,MAID,Linear
-- ✅ GlobalDedupPlugin (~1786 lines) - Cross-volume global deduplication with SHA-256, reference counting, GC
-- ✅ DeltaSyncVersioningPlugin (~2604 lines) - Delta-based sync versioning with rsync-like rolling hash
-- ✅ FedRampCompliancePlugin (~1872 lines) - FedRAMP Low/Moderate/High baselines, POA&M tracking, ATO status
-- ✅ BreakGlassRecoveryPlugin (~1500 lines) - Emergency recovery with audit trails
-- ✅ CrashRecoveryPlugin (~1400 lines) - Crash-consistent recovery with WAL
-- ✅ CrossRegionPlugin (~2391 lines) - Cross-region CRR replication with conflict resolution
-- ✅ GeoDistributedConsensusPlugin (~1600 lines) - Multi-DC consensus with latency-aware quorums
-- ✅ HierarchicalQuorumPlugin (~3406 lines) - Hierarchical quorum with multi-level coordination
-- ✅ BlueGreenDeploymentPlugin (~1944 lines) - Blue/green deployment with health checks, auto-rollback
-- ✅ CanaryDeploymentPlugin (~1921 lines) - Canary releases with progressive traffic shifting
-- ✅ ZeroConfigPlugin (~2459 lines) - Auto-discovery with mDNS/DNS-SD, cluster formation
-- ✅ AutoRaidPlugin (~2576 lines) - Automatic RAID configuration with SMART monitoring
-
----
-
-## MICROKERNEL ARCHITECTURE REFACTOR
-
-### Overview
-Refactoring the DataWarehouse architecture to a true microkernel + plugins model. All features are implemented as plugins extending SDK base classes.
-
-**Target:** 112 individual plugins across 24 categories
-**Current Progress:** 112 plugin implementations complete | 0 remaining ✅ ALL COMPLETE
-
-**Directory Status (2026-01-23):**
-- Solution file (DataWarehouse.slnx): 104 plugin projects
-- Plugin folders on disk: 108 total
-- 4 legacy folders NOT in solution (pre-existing from 01/19/2026):
-  - DataWarehouse.Plugins.DatabaseIndexing
-  - DataWarehouse.Plugins.Metadata.Postgres
-  - DataWarehouse.Plugins.Metadata.SQLite
-  - DataWarehouse.Plugins.SqliteIndexing
-
----
-
-## SDK Base Classes ✅ COMPLETE
-
-The following SDK base classes provide the foundation for all plugins:
-
-### Phase 1: Infrastructure Base Classes (InfrastructurePluginBases.cs) ✅
-| Base Class | Purpose |
-|------------|---------|
-| HealthProviderPluginBase | Health checks, component monitoring |
-| RateLimiterPluginBase | Token bucket rate limiting |
-| CircuitBreakerPluginBase | Failure detection, retry with backoff |
-| TransactionManagerPluginBase | Distributed transaction coordination |
-| RaidProviderPluginBase | RAID 0-Z3 support, parity calculation |
-| ErasureCodingPluginBase | Reed-Solomon encoding |
-| ComplianceProviderPluginBase | GDPR/HIPAA/SOC2 compliance |
-| IAMProviderPluginBase | Authentication, authorization, roles |
-
-### Phase 2: Feature Plugin Interfaces (FeaturePluginInterfaces.cs) ✅
-| Base Class | Purpose |
-|------------|---------|
-| DeduplicationPluginBase | Content-defined chunking, fingerprinting |
-| VersioningPluginBase | Git-like versioning, branches, deltas |
-| SnapshotPluginBase | Point-in-time snapshots, legal holds |
-| TelemetryPluginBase | Metrics, tracing, logging |
-| ThreatDetectionPluginBase | Ransomware, anomaly detection |
-| BackupPluginBase | Full/incremental/differential backups |
-| OperationsPluginBase | Zero-downtime upgrades, rollback |
-
-### Phase 3: Orchestration Interfaces (OrchestrationInterfaces.cs) ✅
-| Base Class | Purpose |
-|------------|---------|
-| SearchProviderPluginBase | Search provider plugins |
-| ContentProcessorPluginBase | Text extraction, embeddings |
-| WriteFanOutOrchestratorPluginBase | Parallel writes to destinations |
-| WriteDestinationPluginBase | Individual write destinations |
-| PreOperationInterceptorBase | Pre-operation hooks |
-| PostOperationInterceptorBase | Post-operation hooks |
-
----
-
-## CLEANUP TASKS ✅ COMPLETED (2026-01-23)
-
-Legacy code removed from SDK/Kernel now that plugins handle these features.
-
----
-
-### SDK/Infrastructure - Files Removed (29 files, ~2.2 MB)
-
-| File | Size | Replaced By |
-|------|------|-------------|
-| HighStakesEnterpriseTierFeatures.cs | 328 KB | ✅ DELETED - Compliance, Encryption, HSM plugins |
-| IndividualTierFeatures.cs | 243 KB | ✅ DELETED - Backup, Encryption, Versioning plugins |
-| HyperscaleFeatures.cs | 239 KB | ✅ DELETED - Erasure Coding, Consensus, Sharding plugins |
-| SmbTierFeatures.cs | 144 KB | ✅ DELETED - RAID, Replication, Storage plugins |
-| HighStakesFeatures.cs | 132 KB | ✅ DELETED - Enterprise security plugins |
-| HyperscaleTierFeatures.cs | 98 KB | ✅ DELETED - Hyperscale plugins |
-| IamIntegration.cs | 96 KB | ✅ DELETED - IAM plugins |
-| OpenTelemetryIntegration.cs | 91 KB | ✅ DELETED - Telemetry plugins |
-| GodTierFeatures.cs | 89 KB | ✅ DELETED - Various advanced plugins |
-| EnterpriseTierFeatures.cs | 85 KB | ✅ DELETED - Enterprise plugins |
-| StorageIntelligence.cs | 84 KB | ✅ DELETED - ML/Intelligence plugins |
-| ObservabilityEnhancements.cs | 75 KB | ✅ DELETED - Telemetry plugins |
-| EncryptionAtRest.cs | 70 KB | ✅ DELETED - Encryption plugins |
-| SecurityEnhancements.cs | 69 KB | ✅ DELETED - Security/HSM plugins |
-| ResiliencePatterns.cs | 69 KB | ✅ DELETED - Resilience plugins |
-| ProductionHardening.cs | 67 KB | ✅ DELETED - Operations plugins |
-| Observability.cs | 67 KB | ✅ DELETED - Telemetry plugins |
-| CompliancePhase7.cs | 67 KB | ✅ DELETED - Compliance plugins |
-| StorageBackends.cs | 60 KB | ✅ DELETED - Storage plugins |
-| EnterpriseOperations.cs | 46 KB | ✅ DELETED - Operations plugins |
-| EnterpriseSecurityOps.cs | 45 KB | ✅ DELETED - Security plugins |
-| SelfHealing.cs | 45 KB | ✅ DELETED - SelfHealingRaid, AutoRaid plugins |
-| EnterpriseFeatures.cs | 38 KB | ✅ DELETED - Enterprise plugins |
-| Resilience.cs | 35 KB | ✅ DELETED - Resilience plugins |
-| DistributedFeatures.cs | 26 KB | ✅ DELETED - Distributed transaction plugins |
-| DistributedServicesPhase5.cs | 19 KB | ✅ DELETED - Distributed plugins |
-| CapabilityAudit.cs | 19 KB | ✅ DELETED - AuditTrail plugin |
-| AcidTransactions.cs | 16 KB | ✅ DELETED - Transaction plugins |
-| SecurityValidation.cs | 14 KB | ✅ DELETED - Security plugins |
-
-### SDK/Infrastructure - Files Retained (10 files)
-
-| File | Size | Reason |
-|------|------|--------|
-| KernelInfrastructure.cs | 73 KB | Core kernel infrastructure |
-| PerformanceOptimizations.cs | 62 KB | Core optimizations |
-| DeveloperExperience.cs | 46 KB | SDK utilities |
-| ErrorHandling.cs | 32 KB | Core error handling |
-| StorageConnectionRegistry.cs | 26 KB | Storage plugin support |
-| HttpClientFactory.cs | 26 KB | Core HTTP infrastructure |
-| StandardizedExceptionHandling.cs | 20 KB | Core exceptions |
-| SingleFileDeploy.cs | 17 KB | Deployment infrastructure |
-| EdgeManagedPhase8.cs | 29 KB | Edge deployment support |
-| BackupPluginAdapter.cs | 8 KB | Plugin adapter |
-
----
-
-### Kernel - Files Removed (18 files, ~15,000 lines)
-
-| File | Lines | Replaced By |
-|------|-------|-------------|
-| RaidEngine.cs | 7,280 | ✅ DELETED - RAID plugins |
-| HealthCheckManager.cs | 893 | ✅ DELETED - HealthMonitorPlugin |
-| GeoReplicationManager.cs | 705 | ✅ DELETED - Replication plugins |
-| FederationHub.cs | 687 | ✅ DELETED - FederationPlugin |
-| HybridStorageManager.cs | 664 | ✅ DELETED - Storage plugins |
-| SearchOrchestratorManager.cs | 616 | ✅ DELETED - SearchPlugin |
-| RealTimeStorageManager.cs | 529 | ✅ DELETED - RealTimeSyncPlugin |
-| AIProviderRegistry.cs | 522 | ✅ DELETED - AIAgentsPlugin |
-| HealthCheck.cs | 506 | ✅ DELETED - HealthMonitorPlugin |
-| CircuitBreakerPolicy.cs | 429 | ✅ DELETED - CircuitBreakerPlugin |
-| FederatedStorage.cs | 409 | ✅ DELETED - FederationPlugin |
-| ConfigurationHotReload.cs | 397 | ✅ DELETED - HotReloadPlugin |
-| DistributedTracing.cs | 352 | ✅ DELETED - DistributedTracingPlugin |
-| MetricsCollector.cs | 320 | ✅ DELETED - Telemetry plugins |
-| HealthCheckAggregator.cs | 317 | ✅ DELETED - HealthMonitorPlugin |
-| TransactionManager.cs | 297 | ✅ DELETED - Transaction plugins |
-| SecurityContextProvider.cs | 181 | ✅ DELETED - IAM plugins |
-| TokenBucketRateLimiter.cs | 168 | ✅ DELETED - RateLimiterPlugin |
-
-### Kernel - Files Retained (Core Infrastructure)
-
-| File | Lines | Purpose |
-|------|-------|---------|
-| AdvancedMessageBus.cs | 1,037 | Core messaging infrastructure |
-| PluginLoader.cs | 722 | Core plugin infrastructure |
-| ContainerManager.cs | 671 | Core container management |
-| InMemoryStoragePlugin.cs | 586 | Built-in fallback storage |
-| KernelLogger.cs | 559 | Core logging |
-| PipelineOrchestrator.cs | 541 | Core pipeline |
-| MessageBus.cs | 346 | Core messaging |
-| KernelStorageService.cs | 280 | Core storage service |
-| MemoryPressureMonitor.cs | 213 | Core memory management |
-| KernelConfiguration.cs | 66 | Core configuration |
-| KernelContext.cs | 65 | Core context |
-
----
-
-### Legacy Plugin Folders (Local Only - Not in Git)
-
-These 4 folders exist only on local machines, not in the repository:
-
-| Folder | Action |
-|--------|--------|
-| DataWarehouse.Plugins.DatabaseIndexing | Delete locally |
-| DataWarehouse.Plugins.Metadata.Postgres | Delete locally |
-| DataWarehouse.Plugins.Metadata.SQLite | Delete locally |
-| DataWarehouse.Plugins.SqliteIndexing | Delete locally |
-
----
-
-### Cleanup Summary
-
-| Category | Removed | Retained |
-|----------|---------|----------|
-| SDK/Infrastructure | 29 files (~2.2 MB) | 10 files (~340 KB) |
-| Kernel | 18 files (~15K lines) | 11 files (~5K lines) |
-| **TOTAL** | **47 files** | **21 files** |
-
-**Actual Code Reduction:** ~2.4 MB removed
-
----
-
-## PLUGIN IMPLEMENTATION PHASES
-
-### Category 1: Encryption Plugins (7 total)
-
-| Plugin | Base Class | Status | Notes |
-|--------|------------|--------|-------|
-| AesEncryptionPlugin | DataTransformationPluginBase | ✅ | AES-256-GCM |
-| ChaCha20EncryptionPlugin | DataTransformationPluginBase | ✅ | ChaCha20-Poly1305 |
-| TwofishEncryptionPlugin | DataTransformationPluginBase | ✅ | Full spec |
-| SerpentEncryptionPlugin | DataTransformationPluginBase | ✅ | All 8 S-boxes |
-| FipsEncryptionPlugin | DataTransformationPluginBase | ✅ | FIPS 140-2 compliant AES-256-GCM with platform FIPS mode verification |
-| ZeroKnowledgeEncryptionPlugin | DataTransformationPluginBase | ✅ | Schnorr proofs, Pedersen commitments, NIST P-256 curve |
-| KeyRotationPlugin | SecurityProviderPluginBase | ✅ | Automated rotation with scheduling, versioning, grace periods |
-
-### Category 2: Compression Plugins (5 total)
-
-| Plugin | Base Class | Status | Notes |
-|--------|------------|--------|-------|
-| GZipCompressionPlugin | DataTransformationPluginBase | ✅ | Standard gzip |
-| BrotliCompressionPlugin | DataTransformationPluginBase | ✅ | High ratio |
-| Lz4CompressionPlugin | DataTransformationPluginBase | ✅ | Fast compression |
-| ZstdCompressionPlugin | DataTransformationPluginBase | ✅ | Balanced |
-| DeflateCompressionPlugin | DataTransformationPluginBase | ✅ | RFC 1951 compliant, Shannon entropy analysis |
-
-### Category 3: Backup Plugins (7 total)
-
-| Plugin | Base Class | Status | Notes |
-|--------|------------|--------|-------|
-| ContinuousBackupPlugin | BackupPluginBase | ✅ | Real-time CDP |
-| IncrementalBackupPlugin | BackupPluginBase | ✅ | Block-level incremental |
-| SchedulerBackupPlugin | BackupPluginBase | ✅ | Cron-based scheduling |
-| AirGappedBackupPlugin | BackupPluginBase | ✅ | Offline/tape support |
-| SyntheticFullBackupPlugin | BackupPluginBase | ✅ | Assembles full from incrementals, block-level SHA256 |
-| DifferentialBackupPlugin | BackupPluginBase | ✅ | Bitmap change tracking, block-level differentials |
-| BackupVerificationPlugin | BackupPluginBase | ✅ | 6 verification types, test restore, scheduled verification |
-
-### Category 4: Storage Backend Plugins (8 total)
-
-| Plugin | Base Class | Status | Notes |
-|--------|------------|--------|-------|
-| LocalStoragePlugin | StorageProviderPluginBase | ✅ | Local filesystem |
-| S3StoragePlugin | StorageProviderPluginBase | ✅ | AWS S3 |
-| AzureBlobStoragePlugin | StorageProviderPluginBase | ✅ | Azure Blob |
-| GcsStoragePlugin | StorageProviderPluginBase | ✅ | Google Cloud Storage |
-| NetworkShareStoragePlugin | StorageProviderPluginBase | ✅ | SMB/NFS/CIFS |
-| HybridStoragePlugin | StorageProviderPluginBase | ✅ | Multi-tier hybrid |
-| IpfsStoragePlugin | StorageProviderPluginBase | ✅ | IPFS distributed |
-| TapeLibraryPlugin | StorageProviderPluginBase | ✅ | LTO tape library with SCSI/MTIO, LTFS, robotic handling |
-
-### Category 5: RAID Plugins (8 total)
-
-| Plugin | Base Class | Status | Notes |
-|--------|------------|--------|-------|
-| StandardRaidPlugin | RaidProviderPluginBase | ✅ | RAID 0,1,5,6,10 |
-| NestedRaidPlugin | RaidProviderPluginBase | ✅ | RAID 10,01,03,50,60,100 |
-| EnhancedRaidPlugin | RaidProviderPluginBase | ✅ | RAID 1E,5E,5EE,6E |
-| ZfsRaidPlugin | RaidProviderPluginBase | ✅ | ZFS RAID-Z1/Z2/Z3 |
-| VendorSpecificRaidPlugin | RaidProviderPluginBase | ✅ | RAID DP,S,7,FR,Unraid |
-| AdvancedRaidPlugin | RaidProviderPluginBase | ✅ | RAID 50/60/1E/5E/5EE with real Galois Field parity |
-| ExtendedRaidPlugin | RaidProviderPluginBase | ✅ | RAID 71,72,NM,Matrix,JBOD,Crypto,DUP,DDP,SPAN,BIG,MAID,Linear |
-| SelfHealingRaidPlugin | RaidProviderPluginBase | ✅ | Auto-rebuild, scrubbing |
-
-### Category 6: Erasure Coding Plugins (3 total)
-
-| Plugin | Base Class | Status | Notes |
-|--------|------------|--------|-------|
-| ReedSolomonEcPlugin | ErasureCodingPluginBase | ✅ | Standard RS codes |
-| IsalEcPlugin | ErasureCodingPluginBase | ✅ | Intel ISA-L optimized |
-| AdaptiveEcPlugin | ErasureCodingPluginBase | ✅ | Reed-Solomon with GF(2^8), SIMD (AVX2/SSE2), auto-profile |
-
-### Category 7: Deduplication Plugins (3 total)
-
-| Plugin | Base Class | Status | Notes |
-|--------|------------|--------|-------|
-| RabinDedupPlugin | DeduplicationPluginBase | ✅ | Rabin fingerprinting |
-| ContentAddressableDedupPlugin | DeduplicationPluginBase | ✅ | SHA256-based CAS |
-| GlobalDedupPlugin | DeduplicationPluginBase | ✅ | Cross-volume global dedup with SHA-256, reference counting |
-
-### Category 8: Metadata/Indexing Plugins (4 total)
-
-| Plugin | Base Class | Status | Notes |
-|--------|------------|--------|-------|
-| LsmTreeIndexPlugin | MetadataIndexPluginBase | ✅ | LSM-tree storage |
-| BloomFilterIndexPlugin | MetadataIndexPluginBase | ✅ | Probabilistic lookup |
-| DistributedBPlusTreePlugin | MetadataIndexPluginBase | ✅ | B+ tree with consistent hashing, page locking, LRU cache |
-| FullTextIndexPlugin | MetadataIndexPluginBase | ✅ | TF-IDF scoring, Porter stemmer, inverted index, fuzzy search |
-
-### Category 9: Versioning Plugins (3 total)
-
-| Plugin | Base Class | Status | Notes |
-|--------|------------|--------|-------|
-| FileHistoryVersioningPlugin | VersioningPluginBase | ✅ | Windows-style history |
-| GitLikeVersioningPlugin | VersioningPluginBase | ✅ | Git-style branches/commits |
-| DeltaSyncVersioningPlugin | VersioningPluginBase | ✅ | Delta-based sync with rsync-like rolling hash |
-
-### Category 10: Transaction Plugins (4 total)
-
-| Plugin | Base Class | Status | Notes |
-|--------|------------|--------|-------|
-| AcidTransactionPlugin | TransactionManagerPluginBase | ✅ | Full ACID |
-| MvccTransactionPlugin | TransactionManagerPluginBase | ✅ | MVCC isolation |
-| WalTransactionPlugin | TransactionManagerPluginBase | ✅ | Write-ahead logging |
-| DistributedTransactionPlugin | TransactionManagerPluginBase | ✅ | 2PC/Saga patterns |
-
-### Category 11: Security/HSM Plugins (6 total)
-
-| Plugin | Base Class | Status | Notes |
-|--------|------------|--------|-------|
-| Pkcs11HsmPlugin | SecurityProviderPluginBase | ✅ | PKCS#11 standard |
-| AwsCloudHsmPlugin | SecurityProviderPluginBase | ✅ | AWS CloudHSM |
-| AzureHsmPlugin | SecurityProviderPluginBase | ✅ | Azure Dedicated HSM |
-| ThalesLunaHsmPlugin | SecurityProviderPluginBase | ✅ | Thales Luna Network |
-| VaultKeyStorePlugin | SecurityProviderPluginBase | ✅ | HashiCorp Vault |
-| FileKeyStorePlugin | SecurityProviderPluginBase | ✅ | File-based keystore |
-
-### Category 12: IAM Plugins (5 total)
-
-| Plugin | Base Class | Status | Notes |
-|--------|------------|--------|-------|
-| RbacIamPlugin | IAMProviderPluginBase | ✅ | Role-based access |
-| SamlIamPlugin | IAMProviderPluginBase | ✅ | SAML 2.0 SSO |
-| OAuthIamPlugin | IAMProviderPluginBase | ✅ | OAuth 2.0/OIDC |
-| SigV4IamPlugin | IAMProviderPluginBase | ✅ | Full AWS SigV4 spec, presigned URLs, chunked signing |
-| TenantIsolationPlugin | IAMProviderPluginBase | ✅ | Multi-tenant isolation, quotas, hierarchy, cross-tenant prevention |
-
-### Category 13: Compliance Plugins (7 total)
-
-| Plugin | Base Class | Status | Notes |
-|--------|------------|--------|-------|
-| GdprCompliancePlugin | ComplianceProviderPluginBase | ✅ | GDPR data protection |
-| HipaaCompliancePlugin | ComplianceProviderPluginBase | ✅ | HIPAA healthcare |
-| Soc2CompliancePlugin | ComplianceProviderPluginBase | ✅ | SOC 2 Type II |
-| PciDssCompliancePlugin | ComplianceProviderPluginBase | ✅ | PCI-DSS 4.0, PAN detection with Luhn, tokenization, CDE boundary |
-| FedRampCompliancePlugin | ComplianceProviderPluginBase | ✅ | FedRAMP Low/Moderate/High, POA&M, ATO tracking, FIPS 140-2 |
-| AuditTrailPlugin | ComplianceProviderPluginBase | ✅ | Tamper-evident audit |
-| DataRetentionPlugin | ComplianceProviderPluginBase | ✅ | WORM, legal holds, retention clocks, governance/compliance modes |
-
-### Category 14: Snapshots/Recovery Plugins (4 total)
-
-| Plugin | Base Class | Status | Notes |
-|--------|------------|--------|-------|
-| EnterpriseSnapshotPlugin | SnapshotPluginBase | ✅ | SafeMode, app-aware |
-| LegalHoldSnapshotPlugin | SnapshotPluginBase | ✅ | Legal hold immutability |
-| BreakGlassRecoveryPlugin | SnapshotPluginBase | ✅ | Emergency recovery with audit trails |
-| CrashRecoveryPlugin | SnapshotPluginBase | ✅ | Crash-consistent recovery with WAL |
-
-### Category 15: Replication Plugins (5 total)
-
-| Plugin | Base Class | Status | Notes |
-|--------|------------|--------|-------|
-| GeoReplicationPlugin | ReplicationPluginBase | ✅ | Multi-region geo |
-| RealTimeSyncPlugin | ReplicationPluginBase | ✅ | Synchronous replication |
-| CrdtReplicationPlugin | ReplicationPluginBase | ✅ | CRDT conflict resolution |
-| FederationPlugin | ReplicationPluginBase | ✅ | PKI trust establishment, mTLS, cross-federation queries |
-| CrossRegionPlugin | ReplicationPluginBase | ✅ | Cross-region CRR with conflict resolution, throttling |
-
-### Category 16: Consensus Plugins (3 total)
-
-| Plugin | Base Class | Status | Notes |
-|--------|------------|--------|-------|
-| RaftConsensusPlugin | ConsensusPluginBase | ✅ | Raft algorithm |
-| GeoDistributedConsensusPlugin | ConsensusPluginBase | ✅ | Multi-DC consensus with latency-aware quorums |
-| HierarchicalQuorumPlugin | ConsensusPluginBase | ✅ | Hierarchical quorum with multi-level coordination |
-
-### Category 17: Resilience Plugins (6 total)
-
-| Plugin | Base Class | Status | Notes |
-|--------|------------|--------|-------|
-| CircuitBreakerPlugin | CircuitBreakerPluginBase | ✅ | Bulkhead pattern |
-| RateLimiterPlugin | RateLimiterPluginBase | ✅ | Token bucket |
-| HealthMonitorPlugin | HealthProviderPluginBase | ✅ | Health aggregation |
-| ChaosEngineeringPlugin | FeaturePluginBase | ✅ | Fault injection |
-| RetryPolicyPlugin | FeaturePluginBase | ✅ | Exponential backoff |
-| LoadBalancerPlugin | FeaturePluginBase | ✅ | Request distribution |
-
-### Category 18: Telemetry Plugins (5 total)
-
-| Plugin | Base Class | Status | Notes |
-|--------|------------|--------|-------|
-| OpenTelemetryPlugin | TelemetryPluginBase | ✅ | OTEL standard |
-| DistributedTracingPlugin | TelemetryPluginBase | ✅ | Trace propagation |
-| PrometheusPlugin | TelemetryPluginBase | ✅ | Prometheus metrics |
-| JaegerPlugin | TelemetryPluginBase | ✅ | Jaeger tracing |
-| AlertingPlugin | TelemetryPluginBase | ✅ | Alert rules engine |
-
-### Category 19: Threat Detection Plugins (3 total)
-
-| Plugin | Base Class | Status | Notes |
-|--------|------------|--------|-------|
-| RansomwareDetectionPlugin | ThreatDetectionPluginBase | ✅ | Ransomware patterns |
-| AnomalyDetectionPlugin | ThreatDetectionPluginBase | ✅ | Behavioral anomalies |
-| EntropyAnalysisPlugin | ThreatDetectionPluginBase | ✅ | Entropy-based detection |
-
-### Category 20: API/Integration Plugins (4 total)
-
-| Plugin | Base Class | Status | Notes |
-|--------|------------|--------|-------|
-| S3CompatibleApiPlugin | InterfacePluginBase | ✅ | Full S3 API |
-| DashboardApiPlugin | InterfacePluginBase | ✅ | Web dashboard REST |
-| K8sOperatorPlugin | InterfacePluginBase | ✅ | Full K8s operator with 4 CRDs, reconciliation loop, leader election |
-| GraphQlApiPlugin | InterfacePluginBase | ✅ | Full GraphQL spec, DataLoader, subscriptions via WebSocket |
-
-### Category 21: Operations Plugins (5 total)
-
-| Plugin | Base Class | Status | Notes |
-|--------|------------|--------|-------|
-| ZeroDowntimeUpgradePlugin | OperationsPluginBase | ✅ | Rolling/canary deployments, auto-rollback, connection draining |
-| HotReloadPlugin | OperationsPluginBase | ✅ | Config hot reload |
-| AlertingOpsPlugin | OperationsPluginBase | ✅ | Multi-channel (Slack/PagerDuty/Teams), escalation, silencing |
-| BlueGreenDeploymentPlugin | OperationsPluginBase | ✅ | Blue/green deploy with health checks, auto-rollback |
-| CanaryDeploymentPlugin | OperationsPluginBase | ✅ | Canary releases with progressive traffic shifting |
-
-### Category 22: Power/Environment Plugins (2 total)
-
-| Plugin | Base Class | Status | Notes |
-|--------|------------|--------|-------|
-| BatteryAwarePlugin | FeaturePluginBase | ✅ | Real OS detection (Win/Linux/macOS), task deferral, throttling |
-| CarbonAwarePlugin | FeaturePluginBase | ✅ | WattTime/ElectricityMaps/UK Grid APIs, forecast scheduling |
-
-### Category 23: ML/Intelligence Plugins (3 total)
-
-| Plugin | Base Class | Status | Notes |
-|--------|------------|--------|-------|
-| PredictiveTieringPlugin | IntelligencePluginBase | ✅ | Gradient Boosted Decision Trees (pure C#), K-Means clustering |
-| AccessPredictionPlugin | IntelligencePluginBase | ✅ | Multi-order Markov Chains, time series, periodicity detection |
-| SmartSchedulingPlugin | IntelligencePluginBase | ✅ | Multi-level priority queue with aging, EDF, work stealing |
-
-### Category 24: Auto-Config Plugins (2 total)
-
-| Plugin | Base Class | Status | Notes |
-|--------|------------|--------|-------|
-| ZeroConfigPlugin | FeaturePluginBase | ✅ | Auto-discovery with mDNS/DNS-SD, cluster formation |
-| AutoRaidPlugin | FeaturePluginBase | ✅ | Automatic RAID config with SMART monitoring, predictive failure |
-
----
-
-## IMPLEMENTATION SUMMARY
-
-| Category | Total | Done | Remaining |
-|----------|-------|------|-----------|
-| Encryption | 7 | 7 | 0 |
-| Compression | 5 | 5 | 0 |
-| Backup | 7 | 7 | 0 |
-| Storage Backends | 8 | 8 | 0 |
-| RAID | 8 | 8 | 0 |
-| Erasure Coding | 3 | 3 | 0 |
-| Deduplication | 3 | 3 | 0 |
-| Metadata/Indexing | 4 | 4 | 0 |
-| Versioning | 3 | 3 | 0 |
-| Transactions | 4 | 4 | 0 |
-| Security/HSM | 6 | 6 | 0 |
-| IAM | 5 | 5 | 0 |
-| Compliance | 7 | 7 | 0 |
-| Snapshots/Recovery | 4 | 4 | 0 |
-| Replication | 5 | 5 | 0 |
-| Consensus | 3 | 3 | 0 |
-| Resilience | 6 | 6 | 0 |
-| Telemetry | 5 | 5 | 0 |
-| Threat Detection | 3 | 3 | 0 |
-| API/Integration | 4 | 4 | 0 |
-| Operations | 5 | 5 | 0 |
-| Power/Environment | 2 | 2 | 0 |
-| ML/Intelligence | 3 | 3 | 0 |
-| Auto-Config | 2 | 2 | 0 |
-| **TOTAL** | **112** | **112** | **0 ✅** |
-
----
-
-## IMPLEMENTATION PRIORITY ORDER
-
-### Priority 1: Core Infrastructure (Phase 4)
-Focus: Resilience, IAM, Compliance - these are blockers for enterprise deployment
-
-1. CircuitBreakerPlugin
-2. RateLimiterPlugin
-3. HealthMonitorPlugin
-4. SamlIamPlugin
-5. OAuthIamPlugin
-6. GdprCompliancePlugin
-7. HipaaCompliancePlugin
-
-### Priority 2: Data Protection (Phase 5)
-Focus: Advanced backup, RAID, recovery features
-
-1. AirGappedBackupPlugin
-2. ZfsRaidPlugin
-3. SelfHealingRaidPlugin
-4. BreakGlassRecoveryPlugin
-5. CrashRecoveryPlugin
-
-### Priority 3: Scale & Performance (Phase 6)
-Focus: Distributed systems, replication, consensus
-
-1. GeoDistributedConsensusPlugin
-2. RealTimeSyncPlugin
-3. CrdtReplicationPlugin
-4. IsalEcPlugin
-
-### Priority 4: Observability (Phase 7)
-Focus: Monitoring, tracing, alerting
-
-1. PrometheusPlugin
-2. JaegerPlugin
-3. DistributedTracingPlugin
-4. AlertingPlugin
-
-### Priority 5: Intelligence & Automation (Phase 8)
-Focus: ML-based features, auto-config
-
-1. PredictiveTieringPlugin
-2. AccessPredictionPlugin
-3. ZeroConfigPlugin
-4. AutoRaidPlugin
-
-### Priority 6: Remaining Plugins (Phase 9)
-All remaining plugins by category
 
 ---
 
@@ -718,4 +50,183 @@ For each plugin:
 3. [ ] Add XML documentation for all public members
 4. [ ] Register plugin in solution file DataWarehouse.slnx
 5. [ ] Add unit tests
-6. [ ] Update this TODO.md with ✅ status
+6. [ ] Update this TODO.md with completion status
+
+---
+
+## TO DO - Code Review Fixes (2026-01-23)
+
+Based on comprehensive code review (see `Metadata/CODE_REVIEW_REPORT.md`), the following issues must be fixed before production deployment.
+
+---
+
+### CRITICAL Severity (Must Fix Before ANY Deployment)
+
+#### 1. Fix SDK Database Infrastructure - NotImplementedException
+**File:** `DataWarehouse.SDK/Database/DatabaseInfrastructure.cs:782-935`
+**Issue:** All 21 CRUD methods throw `NotImplementedException`
+
+| Task | Status |
+|------|--------|
+| Implement `SaveAsync` with real storage backend | [ ] |
+| Implement `LoadAsync` with real storage backend | [ ] |
+| Implement `DeleteAsync` with real storage backend | [ ] |
+| Implement `ExistsAsync` with real storage backend | [ ] |
+| Implement `ListAsync` with real storage backend | [ ] |
+| Implement metadata operations (Store/Get/Update/Delete/QueryByMetadata) | [ ] |
+| Implement cache operations (Get/Set/Remove) | [ ] |
+| Implement index operations (Index/RemoveFromIndex/Search/Query) | [ ] |
+| Add unit tests for all CRUD operations | [ ] |
+
+---
+
+#### 2. Fix EmbeddedDatabasePlugin - Replace In-Memory Simulation
+**File:** `Plugins/DataWarehouse.Plugins.EmbeddedDatabaseStorage/EmbeddedDatabasePlugin.cs:48-82`
+**Issue:** Uses `ConcurrentDictionary` instead of actual SQLite/LiteDB/RocksDB
+
+| Task | Status |
+|------|--------|
+| Implement real SQLite connection via `Microsoft.Data.Sqlite` | [ ] |
+| Implement real LiteDB connection via `LiteDB` package | [ ] |
+| Implement real RocksDB connection via `RocksDbSharp` package | [ ] |
+| Replace `_inMemoryTables` with actual database operations | [ ] |
+| Fix `CreateConnectionAsync` to return real connections | [ ] |
+| Add connection pooling and proper disposal | [ ] |
+| Add unit tests with actual database files | [ ] |
+
+---
+
+#### 3. Fix RelationalDatabasePlugin - Replace In-Memory Simulation
+**File:** `Plugins/DataWarehouse.Plugins.RelationalDatabaseStorage/RelationalDatabasePlugin.cs:54-81`
+**Issue:** Uses `ConcurrentDictionary` instead of actual PostgreSQL/MySQL/SQL Server
+
+| Task | Status |
+|------|--------|
+| Implement real PostgreSQL connection via `Npgsql` | [ ] |
+| Implement real MySQL connection via `MySqlConnector` | [ ] |
+| Implement real SQL Server connection via `Microsoft.Data.SqlClient` | [ ] |
+| Replace `_inMemoryStore` with actual ADO.NET operations | [ ] |
+| Fix `CreateConnectionAsync` to return real `DbConnection` | [ ] |
+| Add connection string validation and pooling | [ ] |
+| Add unit tests with actual database connections | [ ] |
+
+---
+
+#### 4. Fix VFS Base Class NotImplementedException
+**File:** `DataWarehouse.SDK/Contracts/PluginBase.cs:843`
+**Issue:** Base `LoadAsync` throws instead of being abstract
+
+| Task | Status |
+|------|--------|
+| Change `LoadAsync` to abstract method OR provide default implementation | [ ] |
+| Review all storage plugins to ensure they override `LoadAsync` | [ ] |
+| Fix fire-and-forget `TouchAsync` bug (line 841) | [ ] |
+| Add compile-time enforcement for required overrides | [ ] |
+
+---
+
+#### 5. Fix GeoReplicationPlugin - Missing Manager Class
+**File:** `Plugins/DataWarehouse.Plugins.GeoReplication/GeoReplicationPlugin.cs:36,55`
+**Issue:** References non-existent `GeoReplicationManager` class - COMPILATION ERROR
+
+| Task | Status |
+|------|--------|
+| Create `GeoReplicationManager` class with full implementation | [ ] |
+| Implement replication lag tracking with real metrics (not zeros) | [ ] |
+| Implement cross-region data sync | [ ] |
+| Add conflict resolution logic | [ ] |
+| Add unit tests for geo-replication scenarios | [ ] |
+
+---
+
+### HIGH Severity (Must Fix Before Enterprise Deployment)
+
+#### 6. Fix Silent Exception Swallowing in Compliance/Backup Plugins
+**Files:**
+- `Plugins/DataWarehouse.Plugins.Compliance/GdprCompliancePlugin.cs:819`
+- `Plugins/DataWarehouse.Plugins.Backup/BackupPlugin.cs:493-496`
+
+**Issue:** Empty `catch { }` blocks silently swallow exceptions
+
+| Task | Status |
+|------|--------|
+| Replace empty catch in `GdprCompliancePlugin.cs` with proper logging | [ ] |
+| Replace empty catch in `BackupPlugin.cs` with proper logging | [ ] |
+| Audit all plugins for similar empty catch blocks | [ ] |
+| Add structured logging for all exception scenarios | [ ] |
+| Add alerting for critical compliance/backup failures | [ ] |
+
+---
+
+#### 7. Fix Email Alerting Placeholder
+**File:** `Plugins/DataWarehouse.Plugins.Alerting/AlertingPlugin.cs:882-884`
+**Issue:** `SendEmailAsync` just returns `Task.CompletedTask` without sending
+
+| Task | Status |
+|------|--------|
+| Implement real SMTP email sending via `System.Net.Mail` or `MailKit` | [ ] |
+| Add SMTP configuration (server, port, credentials, TLS) | [ ] |
+| Add email template support | [ ] |
+| Add retry logic for transient failures | [ ] |
+| Add unit tests with mock SMTP server | [ ] |
+
+---
+
+#### 8. Fix Auto-RAID Rebuild Simulation
+**File:** `Plugins/DataWarehouse.Plugins.AutoRaid/AutoRaidPlugin.cs:1373,1432`
+**Issue:** Rebuild is simulated with fake progress, no actual data recovery
+
+| Task | Status |
+|------|--------|
+| Implement real RAID rebuild logic with actual data copying | [ ] |
+| Replace simulation loop with actual disk I/O operations | [ ] |
+| Add checksum verification during rebuild | [ ] |
+| Add progress tracking based on actual bytes processed | [ ] |
+| Add unit tests with mock disk arrays | [ ] |
+
+---
+
+#### 9. Fix Missing IDisposable on RaidPlugin
+**File:** `Plugins/DataWarehouse.Plugins.Raid/RaidPlugin.cs`
+**Issue:** Has `ReaderWriterLockSlim` and `SemaphoreSlim` but no `IDisposable`
+
+| Task | Status |
+|------|--------|
+| Implement `IDisposable` interface on `RaidPlugin` | [ ] |
+| Implement proper `Dispose(bool disposing)` pattern | [ ] |
+| Add finalizer for safety | [ ] |
+| Move disposal logic from `StopAsync` to `Dispose` | [ ] |
+| Audit all plugins for similar resource leak issues | [ ] |
+
+---
+
+### MEDIUM Severity (Architectural Improvements)
+
+#### 10. Implement Missing Kernel Features
+**Per Code Review - ~70% architecture match**
+
+| Task | Status |
+|------|--------|
+| Implement Smart Folders feature | [ ] |
+| Implement Service Manager | [ ] |
+| Implement full Permission Cascade mechanism | [ ] |
+| Implement VFS Placeholders/Ghost Files | [ ] |
+| Improve Job Scheduler beyond fire-and-forget | [ ] |
+| Implement Instance Pooling (unified) | [ ] |
+
+---
+
+## Verification Checklist
+
+After implementing fixes:
+
+| Check | Status |
+|-------|--------|
+| Solution compiles without errors | [ ] |
+| All unit tests pass | [ ] |
+| Database plugins tested against real databases | [ ] |
+| RAID rebuild tested with actual data | [ ] |
+| Email alerting sends real emails | [ ] |
+| Geo-replication syncs data across regions | [ ] |
+| No empty catch blocks remain | [ ] |
+| All IDisposable resources properly disposed | [ ] |
