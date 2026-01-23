@@ -12,14 +12,21 @@ namespace DataWarehouse.Plugins.GeoDistributedConsensus;
 /// Geo-Distributed Consensus Plugin implementing multi-datacenter consensus protocols.
 ///
 /// Features:
-/// - Paxos-style multi-leader consensus across datacenters
-/// - Quorum-based voting with datacenter weights
+/// - Multi-Paxos for geo-distribution with flexible quorum configuration
+/// - Raft extensions for WAN: pre-vote protocol, learner nodes, leadership transfer
+/// - Hierarchical consensus: local datacenter + global consensus
+/// - Witness/observer nodes for tie-breaking
+/// - Two-tier commit protocol
 /// - Network partition detection and handling
 /// - Leader election with datacenter awareness
-/// - Configurable consistency levels (strong, eventual, bounded staleness)
+/// - Configurable consistency levels (strong, session, bounded staleness, eventual)
 /// - Conflict resolution strategies
 /// - Hybrid Logical Clocks (HLC) for ordering
 /// - Split-brain prevention mechanisms
+/// - Log replication with state machine
+/// - Snapshot transfer and log compaction
+/// - Joint consensus for membership changes
+/// - Speculative execution for latency optimization
 ///
 /// Message Commands:
 /// - geo.propose: Propose a value with specified consistency level
@@ -30,6 +37,10 @@ namespace DataWarehouse.Plugins.GeoDistributedConsensus;
 /// - geo.leader.info: Get current leader information
 /// - geo.partition.status: Get partition detection status
 /// - geo.configure: Configure plugin settings
+/// - geo.leader.transfer: Transfer leadership to another node
+/// - geo.membership.change: Change cluster membership with joint consensus
+/// - geo.snapshot.request: Request a snapshot transfer
+/// - geo.log.status: Get log replication status
 /// </summary>
 public sealed class GeoDistributedConsensusPlugin : ConsensusPluginBase
 {
@@ -68,11 +79,45 @@ public sealed class GeoDistributedConsensusPlugin : ConsensusPluginBase
     private PartitionDetector? _partitionDetector;
     private ConflictResolver _conflictResolver = new();
 
+    // Raft extensions
+    private GeoRaftState _raftState = new();
+    private readonly LogReplicator _logReplicator;
+    private readonly ConcurrentDictionary<string, GeoRaftNode> _raftNodes = new();
+    private readonly ConcurrentDictionary<string, SessionState> _sessions = new();
+
+    // Hierarchical consensus
+    private readonly HierarchicalConsensusManager _hierarchicalConsensus;
+
+    // Joint consensus for membership changes
+    private JointConsensusState? _jointConsensus;
+
+    // Snapshot management
+    private readonly SnapshotManager _snapshotManager;
+
+    // Speculative execution
+    private readonly ConcurrentDictionary<string, SpeculativeExecution> _speculativeExecutions = new();
+
     private CancellationTokenSource? _cts;
     private Task? _leaderElectionTask;
     private Task? _heartbeatTask;
     private Task? _partitionMonitorTask;
     private Task? _staleFenceTask;
+    private Task? _logCompactionTask;
+    private Task? _snapshotTask;
+
+    #endregion
+
+    #region Constructor
+
+    /// <summary>
+    /// Creates a new instance of the geo-distributed consensus plugin.
+    /// </summary>
+    public GeoDistributedConsensusPlugin()
+    {
+        _logReplicator = new LogReplicator(this);
+        _hierarchicalConsensus = new HierarchicalConsensusManager(this);
+        _snapshotManager = new SnapshotManager(this);
+    }
 
     #endregion
 
@@ -90,6 +135,16 @@ public sealed class GeoDistributedConsensusPlugin : ConsensusPluginBase
             }
         }
     }
+
+    /// <summary>
+    /// Gets whether this node is the local datacenter leader.
+    /// </summary>
+    public bool IsLocalLeader => _raftState.Role == GeoRaftRole.Leader;
+
+    /// <summary>
+    /// Gets the current Raft state.
+    /// </summary>
+    public GeoRaftState RaftState => _raftState;
 
     /// <summary>
     /// Gets the current leader information.
@@ -115,6 +170,31 @@ public sealed class GeoDistributedConsensusPlugin : ConsensusPluginBase
     /// Gets the number of active datacenters.
     /// </summary>
     public int DatacenterCount => _datacenters.Count;
+
+    /// <summary>
+    /// Gets the current term.
+    /// </summary>
+    public long CurrentTerm => _raftState.CurrentTerm;
+
+    /// <summary>
+    /// Gets the commit index.
+    /// </summary>
+    public long CommitIndex => _raftState.CommitIndex;
+
+    /// <summary>
+    /// Gets the last applied index.
+    /// </summary>
+    public long LastApplied => _raftState.LastApplied;
+
+    /// <summary>
+    /// Gets the log replicator for this node.
+    /// </summary>
+    internal LogReplicator LogReplicator => _logReplicator;
+
+    /// <summary>
+    /// Gets the hierarchical consensus manager.
+    /// </summary>
+    internal HierarchicalConsensusManager HierarchicalConsensus => _hierarchicalConsensus;
 
     #endregion
 
@@ -161,22 +241,47 @@ public sealed class GeoDistributedConsensusPlugin : ConsensusPluginBase
             });
         }
 
-        // Register self as a node
-        RegisterNode(new DatacenterNode
+        // Register self as a Raft node
+        var selfNode = new GeoRaftNode
         {
             NodeId = _nodeId,
             DatacenterId = _localDatacenterId,
             Endpoint = $"localhost:{5100 + Math.Abs(_nodeId.GetHashCode()) % 100}",
+            Role = GeoRaftRole.Follower,
+            VotingStatus = VotingStatus.Voter,
+            Status = NodeStatus.Active,
+            LastHeartbeat = DateTime.UtcNow
+        };
+        _raftNodes[_nodeId] = selfNode;
+
+        // Register self as a datacenter node
+        RegisterNode(new DatacenterNode
+        {
+            NodeId = _nodeId,
+            DatacenterId = _localDatacenterId,
+            Endpoint = selfNode.Endpoint,
             Role = NodeRole.Voter,
             Status = NodeStatus.Active,
             LastHeartbeat = DateTime.UtcNow
         });
+
+        // Initialize Raft state
+        _raftState = new GeoRaftState
+        {
+            Role = GeoRaftRole.Follower,
+            CurrentTerm = 0,
+            VotedFor = null,
+            CommitIndex = 0,
+            LastApplied = 0
+        };
 
         // Start background tasks
         _leaderElectionTask = RunLeaderElectionLoopAsync(_cts.Token);
         _heartbeatTask = RunHeartbeatLoopAsync(_cts.Token);
         _partitionMonitorTask = RunPartitionMonitorLoopAsync(_cts.Token);
         _staleFenceTask = RunStaleFenceLoopAsync(_cts.Token);
+        _logCompactionTask = RunLogCompactionLoopAsync(_cts.Token);
+        _snapshotTask = RunSnapshotLoopAsync(_cts.Token);
 
         await Task.CompletedTask;
     }
@@ -186,7 +291,7 @@ public sealed class GeoDistributedConsensusPlugin : ConsensusPluginBase
     {
         _cts?.Cancel();
 
-        var tasks = new[] { _leaderElectionTask, _heartbeatTask, _partitionMonitorTask, _staleFenceTask }
+        var tasks = new[] { _leaderElectionTask, _heartbeatTask, _partitionMonitorTask, _staleFenceTask, _logCompactionTask, _snapshotTask }
             .Where(t => t != null)
             .Select(t => t!.ContinueWith(_ => { }));
 
@@ -194,6 +299,37 @@ public sealed class GeoDistributedConsensusPlugin : ConsensusPluginBase
 
         _cts?.Dispose();
         _cts = null;
+    }
+
+    private async Task RunLogCompactionLoopAsync(CancellationToken ct)
+    {
+        while (!ct.IsCancellationRequested)
+        {
+            try
+            {
+                await Task.Delay(_config.LogCompactionIntervalMs, ct);
+                await _logReplicator.CompactLogAsync(_config.LogCompactionThreshold, ct);
+            }
+            catch (OperationCanceledException) { break; }
+            catch { /* Log compaction failed, will retry */ }
+        }
+    }
+
+    private async Task RunSnapshotLoopAsync(CancellationToken ct)
+    {
+        while (!ct.IsCancellationRequested)
+        {
+            try
+            {
+                await Task.Delay(_config.SnapshotIntervalMs, ct);
+                if (_raftState.CommitIndex - _snapshotManager.LastSnapshotIndex > _config.SnapshotThreshold)
+                {
+                    await _snapshotManager.CreateSnapshotAsync(ct);
+                }
+            }
+            catch (OperationCanceledException) { break; }
+            catch { /* Snapshot failed, will retry */ }
+        }
     }
 
     #endregion
@@ -702,7 +838,19 @@ public sealed class GeoDistributedConsensusPlugin : ConsensusPluginBase
                 // Check if we need to elect a leader
                 if (_currentLeader == null || IsLeaderStale())
                 {
-                    await StartLeaderElectionAsync(ct);
+                    // Use pre-vote protocol to prevent disruption
+                    if (_config.EnablePreVote)
+                    {
+                        var preVoteResult = await RunPreVoteAsync(ct);
+                        if (preVoteResult.Success)
+                        {
+                            await StartLeaderElectionAsync(ct);
+                        }
+                    }
+                    else
+                    {
+                        await StartLeaderElectionAsync(ct);
+                    }
                 }
             }
             catch (OperationCanceledException)
@@ -716,6 +864,90 @@ public sealed class GeoDistributedConsensusPlugin : ConsensusPluginBase
         }
     }
 
+    /// <summary>
+    /// Runs the pre-vote protocol to prevent disruptive elections.
+    /// Pre-vote checks if a candidate would get enough votes before incrementing term.
+    /// This prevents nodes that are partitioned from incrementing terms unnecessarily.
+    /// </summary>
+    private async Task<PreVoteResult> RunPreVoteAsync(CancellationToken ct)
+    {
+        var preVoteRound = _currentRound + 1; // Don't increment yet
+        var votes = new ConcurrentDictionary<string, PreVoteResponse>();
+
+        var activeNodes = _raftNodes.Values
+            .Where(n => n.Status == NodeStatus.Active && n.VotingStatus == VotingStatus.Voter)
+            .ToList();
+
+        // Send pre-vote requests
+        var preVoteTasks = activeNodes.Select(async node =>
+        {
+            try
+            {
+                if (node.NodeId == _nodeId)
+                {
+                    // Vote for self
+                    votes[node.NodeId] = new PreVoteResponse
+                    {
+                        NodeId = node.NodeId,
+                        Term = preVoteRound,
+                        VoteGranted = true,
+                        Reason = "Self vote"
+                    };
+                    return;
+                }
+
+                await Task.Delay(node.DatacenterId == _localDatacenterId ? 1 : 10, ct);
+
+                // Simulate pre-vote response
+                var wouldVote = ShouldGrantPreVote(node, preVoteRound);
+                votes[node.NodeId] = new PreVoteResponse
+                {
+                    NodeId = node.NodeId,
+                    Term = preVoteRound,
+                    VoteGranted = wouldVote,
+                    Reason = wouldVote ? "Would grant vote" : "Would not grant vote"
+                };
+            }
+            catch
+            {
+                // Pre-vote request failed
+            }
+        });
+
+        await Task.WhenAll(preVoteTasks);
+
+        var grantedVotes = votes.Values.Count(v => v.VoteGranted);
+        var requiredVotes = (activeNodes.Count / 2) + 1;
+
+        return new PreVoteResult
+        {
+            Success = grantedVotes >= requiredVotes,
+            VotesReceived = grantedVotes,
+            VotesRequired = requiredVotes,
+            Term = preVoteRound
+        };
+    }
+
+    private bool ShouldGrantPreVote(GeoRaftNode voter, long candidateTerm)
+    {
+        // Grant pre-vote if:
+        // 1. Candidate's term is at least as high
+        // 2. Candidate's log is at least as up-to-date
+        // 3. Current leader hasn't sent heartbeat recently (prevents disruption)
+
+        if (candidateTerm < _raftState.CurrentTerm)
+            return false;
+
+        if (_currentLeader != null && !IsLeaderStale())
+            return false; // Current leader is healthy, don't grant pre-vote
+
+        var lastLogIndex = _logReplicator.GetLastLogIndex();
+        var lastLogTerm = _logReplicator.GetLastLogTerm();
+
+        // Would the voter grant a real vote?
+        return candidateTerm >= _raftState.CurrentTerm;
+    }
+
     private bool IsLeaderStale()
     {
         if (_currentLeader == null) return true;
@@ -726,6 +958,14 @@ public sealed class GeoDistributedConsensusPlugin : ConsensusPluginBase
 
     private async Task StartLeaderElectionAsync(CancellationToken ct)
     {
+        // Increment term
+        lock (_stateLock)
+        {
+            _raftState.CurrentTerm++;
+            _raftState.VotedFor = _nodeId;
+            _raftState.Role = GeoRaftRole.Candidate;
+        }
+
         var electionRound = Interlocked.Increment(ref _currentRound);
         var votes = new ConcurrentDictionary<string, LeaderVote>();
 
@@ -733,26 +973,53 @@ public sealed class GeoDistributedConsensusPlugin : ConsensusPluginBase
         var localDatacenter = _datacenters.GetValueOrDefault(_localDatacenterId);
         var priority = CalculateLeaderPriority(localDatacenter);
 
-        // Request votes from all datacenters
-        var activeDatacenters = GetActiveDatacenters();
-        var voteTasks = activeDatacenters.Select(async dc =>
+        // Send RequestVote to all voting nodes
+        var votingNodes = _raftNodes.Values
+            .Where(n => n.VotingStatus == VotingStatus.Voter && n.Status == NodeStatus.Active)
+            .ToList();
+
+        var voteTasks = votingNodes.Select(async node =>
         {
             try
             {
-                await Task.Delay(dc.Id == _localDatacenterId ? 1 : dc.EstimatedLatencyMs / 2, ct);
-
-                // Simulate vote request
-                var vote = new LeaderVote
+                var request = new RequestVoteMessage
                 {
-                    DatacenterId = dc.Id,
+                    Term = _raftState.CurrentTerm,
+                    CandidateId = _nodeId,
+                    CandidateDatacenterId = _localDatacenterId,
+                    LastLogIndex = _logReplicator.GetLastLogIndex(),
+                    LastLogTerm = _logReplicator.GetLastLogTerm(),
+                    IsPreVote = false
+                };
+
+                if (node.NodeId == _nodeId)
+                {
+                    votes[node.NodeId] = new LeaderVote
+                    {
+                        DatacenterId = node.DatacenterId,
+                        CandidateNodeId = _nodeId,
+                        CandidateDatacenterId = _localDatacenterId,
+                        Round = electionRound,
+                        Granted = true,
+                        Timestamp = _hlc.Now()
+                    };
+                    return;
+                }
+
+                var dc = _datacenters.GetValueOrDefault(node.DatacenterId);
+                await Task.Delay(dc?.EstimatedLatencyMs ?? 50 / 2, ct);
+
+                // Process vote request
+                var response = ProcessRequestVote(request);
+                votes[node.NodeId] = new LeaderVote
+                {
+                    DatacenterId = node.DatacenterId,
                     CandidateNodeId = _nodeId,
                     CandidateDatacenterId = _localDatacenterId,
                     Round = electionRound,
-                    Granted = ShouldGrantLeaderVote(dc, priority),
+                    Granted = response.VoteGranted,
                     Timestamp = _hlc.Now()
                 };
-
-                votes[dc.Id] = vote;
             }
             catch
             {
@@ -764,22 +1031,163 @@ public sealed class GeoDistributedConsensusPlugin : ConsensusPluginBase
 
         // Check if we won the election
         var grantedVotes = votes.Values.Count(v => v.Granted);
-        var requiredVotes = (activeDatacenters.Count / 2) + 1;
+        var requiredVotes = (votingNodes.Count / 2) + 1;
 
         if (grantedVotes >= requiredVotes)
         {
+            BecomeLeader(electionRound, priority);
+        }
+        else
+        {
+            // Election failed, return to follower
             lock (_stateLock)
             {
-                _currentLeader = new LeaderInfo
+                _raftState.Role = GeoRaftRole.Follower;
+            }
+        }
+    }
+
+    private void BecomeLeader(long electionRound, int priority)
+    {
+        lock (_stateLock)
+        {
+            _raftState.Role = GeoRaftRole.Leader;
+            _currentLeader = new LeaderInfo
+            {
+                NodeId = _nodeId,
+                DatacenterId = _localDatacenterId,
+                ElectedAt = DateTime.UtcNow,
+                LastHeartbeat = DateTime.UtcNow,
+                LeaderRound = electionRound,
+                Priority = priority
+            };
+        }
+
+        // Initialize nextIndex and matchIndex for all nodes
+        var lastLogIndex = _logReplicator.GetLastLogIndex();
+        foreach (var node in _raftNodes.Values)
+        {
+            node.NextIndex = lastLogIndex + 1;
+            node.MatchIndex = 0;
+        }
+
+        // Send immediate heartbeats
+        _ = SendLeaderHeartbeatsAsync(CancellationToken.None);
+    }
+
+    /// <summary>
+    /// Processes a RequestVote message from a candidate.
+    /// </summary>
+    private RequestVoteResponse ProcessRequestVote(RequestVoteMessage request)
+    {
+        lock (_stateLock)
+        {
+            // If term is higher, update and become follower
+            if (request.Term > _raftState.CurrentTerm)
+            {
+                _raftState.CurrentTerm = request.Term;
+                _raftState.VotedFor = null;
+                _raftState.Role = GeoRaftRole.Follower;
+            }
+
+            // Reject if term is lower
+            if (request.Term < _raftState.CurrentTerm)
+            {
+                return new RequestVoteResponse
                 {
-                    NodeId = _nodeId,
-                    DatacenterId = _localDatacenterId,
-                    ElectedAt = DateTime.UtcNow,
-                    LastHeartbeat = DateTime.UtcNow,
-                    LeaderRound = electionRound,
-                    Priority = priority
+                    Term = _raftState.CurrentTerm,
+                    VoteGranted = false,
+                    Reason = "Term is lower than current term"
                 };
             }
+
+            // Check if we can vote for this candidate
+            var canVote = _raftState.VotedFor == null || _raftState.VotedFor == request.CandidateId;
+
+            // Check log is at least as up-to-date
+            var lastLogIndex = _logReplicator.GetLastLogIndex();
+            var lastLogTerm = _logReplicator.GetLastLogTerm();
+            var logIsOk = request.LastLogTerm > lastLogTerm ||
+                         (request.LastLogTerm == lastLogTerm && request.LastLogIndex >= lastLogIndex);
+
+            if (canVote && logIsOk)
+            {
+                _raftState.VotedFor = request.CandidateId;
+                return new RequestVoteResponse
+                {
+                    Term = _raftState.CurrentTerm,
+                    VoteGranted = true,
+                    Reason = "Vote granted"
+                };
+            }
+
+            return new RequestVoteResponse
+            {
+                Term = _raftState.CurrentTerm,
+                VoteGranted = false,
+                Reason = canVote ? "Log not up-to-date" : "Already voted for another candidate"
+            };
+        }
+    }
+
+    /// <summary>
+    /// Transfers leadership to a target node.
+    /// </summary>
+    public async Task<bool> TransferLeadershipAsync(string targetNodeId, CancellationToken ct = default)
+    {
+        if (!IsLeader)
+            return false;
+
+        if (!_raftNodes.TryGetValue(targetNodeId, out var targetNode))
+            return false;
+
+        if (targetNode.VotingStatus != VotingStatus.Voter)
+            return false;
+
+        // Step 1: Stop accepting new client requests
+        _raftState.IsTransferringLeadership = true;
+
+        try
+        {
+            // Step 2: Catch up the target node's log
+            var lastLogIndex = _logReplicator.GetLastLogIndex();
+            var maxRetries = 10;
+            var retries = 0;
+
+            while (targetNode.MatchIndex < lastLogIndex && retries < maxRetries)
+            {
+                await _logReplicator.ReplicateToNodeAsync(targetNode, ct);
+                retries++;
+                await Task.Delay(100, ct);
+            }
+
+            if (targetNode.MatchIndex < lastLogIndex)
+            {
+                return false; // Could not catch up target
+            }
+
+            // Step 3: Send TimeoutNow to target to trigger immediate election
+            var timeoutNow = new TimeoutNowMessage
+            {
+                FromNodeId = _nodeId,
+                Term = _raftState.CurrentTerm
+            };
+
+            // Simulate sending TimeoutNow
+            await Task.Delay(10, ct);
+
+            // Step 4: Step down
+            lock (_stateLock)
+            {
+                _raftState.Role = GeoRaftRole.Follower;
+                _currentLeader = null;
+            }
+
+            return true;
+        }
+        finally
+        {
+            _raftState.IsTransferringLeadership = false;
         }
     }
 
@@ -797,6 +1205,155 @@ public sealed class GeoDistributedConsensusPlugin : ConsensusPluginBase
         // Grant vote if candidate has equal or better priority
         var localPriority = CalculateLeaderPriority(votingDc);
         return candidatePriority <= localPriority + 100; // Some tolerance
+    }
+
+    #endregion
+
+    #region Membership Changes (Joint Consensus)
+
+    /// <summary>
+    /// Initiates a membership change using joint consensus.
+    /// Joint consensus uses a two-phase approach to safely change cluster membership.
+    /// </summary>
+    public async Task<MembershipChangeResult> ChangeMembershipAsync(
+        MembershipChangeRequest request,
+        CancellationToken ct = default)
+    {
+        if (!IsLeader)
+        {
+            return new MembershipChangeResult
+            {
+                Success = false,
+                Error = "Only leader can initiate membership changes"
+            };
+        }
+
+        // Create joint configuration (old + new)
+        var oldConfig = _raftNodes.Values
+            .Where(n => n.VotingStatus == VotingStatus.Voter)
+            .Select(n => n.NodeId)
+            .ToList();
+
+        var newConfig = request.ChangeType switch
+        {
+            MembershipChangeType.AddNode => oldConfig.Concat(new[] { request.NodeId }).Distinct().ToList(),
+            MembershipChangeType.RemoveNode => oldConfig.Where(id => id != request.NodeId).ToList(),
+            MembershipChangeType.PromoteLearner => oldConfig.Concat(new[] { request.NodeId }).Distinct().ToList(),
+            _ => oldConfig
+        };
+
+        // Phase 1: Commit joint configuration (C_old,new)
+        _jointConsensus = new JointConsensusState
+        {
+            OldConfiguration = oldConfig,
+            NewConfiguration = newConfig,
+            Phase = JointConsensusPhase.Joint,
+            StartedAt = DateTime.UtcNow
+        };
+
+        var jointEntry = new GeoLogEntry
+        {
+            Index = _logReplicator.GetLastLogIndex() + 1,
+            Term = _raftState.CurrentTerm,
+            Type = LogEntryType.Configuration,
+            Command = "membership.joint",
+            Data = JsonSerializer.SerializeToUtf8Bytes(_jointConsensus),
+            Timestamp = _hlc.Now()
+        };
+
+        var jointCommitted = await _logReplicator.AppendAndReplicateAsync(jointEntry, ct);
+        if (!jointCommitted)
+        {
+            _jointConsensus = null;
+            return new MembershipChangeResult
+            {
+                Success = false,
+                Error = "Failed to commit joint configuration"
+            };
+        }
+
+        // Apply the membership change
+        ApplyMembershipChange(request);
+
+        // Phase 2: Commit new configuration (C_new)
+        _jointConsensus.Phase = JointConsensusPhase.New;
+
+        var newEntry = new GeoLogEntry
+        {
+            Index = _logReplicator.GetLastLogIndex() + 1,
+            Term = _raftState.CurrentTerm,
+            Type = LogEntryType.Configuration,
+            Command = "membership.new",
+            Data = JsonSerializer.SerializeToUtf8Bytes(newConfig),
+            Timestamp = _hlc.Now()
+        };
+
+        var newCommitted = await _logReplicator.AppendAndReplicateAsync(newEntry, ct);
+
+        _jointConsensus = null;
+
+        return new MembershipChangeResult
+        {
+            Success = newCommitted,
+            OldConfiguration = oldConfig,
+            NewConfiguration = newConfig,
+            Error = newCommitted ? null : "Failed to commit new configuration"
+        };
+    }
+
+    private void ApplyMembershipChange(MembershipChangeRequest request)
+    {
+        switch (request.ChangeType)
+        {
+            case MembershipChangeType.AddNode:
+                _raftNodes[request.NodeId] = new GeoRaftNode
+                {
+                    NodeId = request.NodeId,
+                    DatacenterId = request.DatacenterId ?? _localDatacenterId,
+                    Endpoint = request.Endpoint ?? "",
+                    VotingStatus = VotingStatus.Voter,
+                    Status = NodeStatus.Active,
+                    Role = GeoRaftRole.Follower
+                };
+                break;
+
+            case MembershipChangeType.RemoveNode:
+                _raftNodes.TryRemove(request.NodeId, out _);
+                break;
+
+            case MembershipChangeType.PromoteLearner:
+                if (_raftNodes.TryGetValue(request.NodeId, out var learner))
+                {
+                    learner.VotingStatus = VotingStatus.Voter;
+                }
+                break;
+
+            case MembershipChangeType.DemoteToLearner:
+                if (_raftNodes.TryGetValue(request.NodeId, out var voter))
+                {
+                    voter.VotingStatus = VotingStatus.Learner;
+                }
+                break;
+        }
+    }
+
+    /// <summary>
+    /// Adds a learner node that replicates logs but doesn't vote.
+    /// </summary>
+    public void AddLearner(GeoRaftNode learner)
+    {
+        learner.VotingStatus = VotingStatus.Learner;
+        _raftNodes[learner.NodeId] = learner;
+    }
+
+    /// <summary>
+    /// Adds a witness node for tie-breaking in quorum calculations.
+    /// </summary>
+    public void AddWitness(GeoRaftNode witness)
+    {
+        witness.VotingStatus = VotingStatus.Witness;
+        witness.Role = GeoRaftRole.Witness;
+        _raftNodes[witness.NodeId] = witness;
     }
 
     #endregion

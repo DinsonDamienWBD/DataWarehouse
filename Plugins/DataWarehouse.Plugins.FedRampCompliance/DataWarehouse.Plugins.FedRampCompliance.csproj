@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <Description>FedRAMP (Federal Risk and Authorization Management Program) compliance provider plugin for DataWarehouse supporting Low, Moderate, and High baselines. Implements all FedRAMP control families (AC, AU, CM, CP, IA, IR, MA, MP, PE, PL, PS, RA, SA, SC, SI), continuous monitoring, POA&amp;M tracking, ATO status management, FIPS 140-2 cryptography verification, boundary protection controls, and comprehensive audit logging.</Description>
+    <Authors>DataWarehouse Team</Authors>
+    <Company>DataWarehouse</Company>
+    <Product>DataWarehouse FedRAMP Compliance Plugin</Product>
+    <Version>1.0.0</Version>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\DataWarehouse.SDK\DataWarehouse.SDK.csproj" />
+  </ItemGroup>
+</Project>

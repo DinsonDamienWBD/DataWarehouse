@@ -3,11 +3,10 @@
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
-    <RootNamespace>DataWarehouse.Plugins.CrossRegion</RootNamespace>
-    <Description>Enterprise-grade cross-region replication (CRR) plugin for DataWarehouse providing multi-region topology management, synchronous/asynchronous/semi-synchronous replication modes, vector clock-based conflict resolution, bandwidth management with WAN compression, automatic failover with split-brain prevention, and comprehensive consistency guarantees.</Description>
+    <Description>Enterprise-grade blue/green deployment plugin for DataWarehouse providing zero-downtime deployments with atomic traffic switching, health checking, automatic rollback, connection draining, and comprehensive deployment state management.</Description>
     <Authors>DataWarehouse Team</Authors>
     <Company>DataWarehouse</Company>
-    <Product>DataWarehouse Cross-Region Replication Plugin</Product>
+    <Product>DataWarehouse Blue/Green Deployment Plugin</Product>
     <Copyright>Copyright (c) DataWarehouse. All rights reserved.</Copyright>
     <Version>1.0.0</Version>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
