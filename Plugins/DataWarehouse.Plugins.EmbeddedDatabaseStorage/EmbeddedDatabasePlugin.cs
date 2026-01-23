@@ -3,7 +3,9 @@ using DataWarehouse.SDK.Database;
 using DataWarehouse.SDK.Infrastructure;
 using DataWarehouse.SDK.Primitives;
 using DataWarehouse.SDK.Utilities;
+using LiteDB;
 using Microsoft.Data.Sqlite;
+using RocksDbSharp;
 using System.Data;
 using System.Text;
 using System.Text.Json;
@@ -49,6 +51,14 @@ public sealed class EmbeddedDatabasePlugin : HybridDatabasePluginBase<EmbeddedDb
 
     // SQLite connection
     private SqliteConnection? _sqliteConnection;
+
+    // LiteDB connection
+    private LiteDatabase? _liteDb;
+
+    // RocksDB connection
+    private RocksDb? _rocksDb;
+    private readonly object _rocksDbLock = new();
+
     private bool _disposed;
 
     public override string Id => "datawarehouse.plugins.database.embedded";
@@ -139,6 +149,9 @@ public sealed class EmbeddedDatabasePlugin : HybridDatabasePluginBase<EmbeddedDb
                     case EmbeddedEngine.LiteDB:
                         await SaveToLiteDBAsync(table, id, json);
                         break;
+                    case EmbeddedEngine.RocksDB:
+                        await SaveToRocksDBAsync(table, id, json);
+                        break;
                     default:
                         throw new NotSupportedException($"Engine {_config.Engine} not supported");
                 }
@@ -163,6 +176,7 @@ public sealed class EmbeddedDatabasePlugin : HybridDatabasePluginBase<EmbeddedDb
             {
                 EmbeddedEngine.SQLite => await LoadFromSQLiteAsync(table, id),
                 EmbeddedEngine.LiteDB => await LoadFromLiteDBAsync(table, id),
+                EmbeddedEngine.RocksDB => await LoadFromRocksDBAsync(table, id),
                 _ => throw new NotSupportedException($"Engine {_config.Engine} not supported")
             };
 
@@ -189,6 +203,9 @@ public sealed class EmbeddedDatabasePlugin : HybridDatabasePluginBase<EmbeddedDb
                         break;
                     case EmbeddedEngine.LiteDB:
                         await DeleteFromLiteDBAsync(table, id);
+                        break;
+                    case EmbeddedEngine.RocksDB:
+                        await DeleteFromRocksDBAsync(table, id);
                         break;
                     default:
                         throw new NotSupportedException($"Engine {_config.Engine} not supported");
@@ -252,6 +269,7 @@ public sealed class EmbeddedDatabasePlugin : HybridDatabasePluginBase<EmbeddedDb
             {
                 case EmbeddedEngine.SQLite:
                 case EmbeddedEngine.LiteDB:
+                case EmbeddedEngine.RocksDB:
                     _isConnected = true;
                     break;
             }
@@ -603,11 +621,154 @@ public sealed class EmbeddedDatabasePlugin : HybridDatabasePluginBase<EmbeddedDb
 
         #endregion
 
-        #region LiteDB Implementation (Stub - requires LiteDB-specific implementation)
+        #region LiteDB Implementation
 
-        private Task SaveToLiteDBAsync(string table, string id, string json) => Task.CompletedTask;
-        private Task<string> LoadFromLiteDBAsync(string table, string id) => Task.FromResult("{}");
-        private Task DeleteFromLiteDBAsync(string table, string id) => Task.CompletedTask;
+        private void EnsureLiteDbConnection()
+        {
+            if (_liteDb != null)
+                return;
+
+            var connectionString = _config.FilePath ?? "memory";
+
+            // Build connection string with options
+            var builder = new ConnectionString(connectionString);
+
+            if (!string.IsNullOrEmpty(_config.Password))
+            {
+                builder.Password = _config.Password;
+            }
+
+            // Configure connection mode
+            builder.Connection = ConnectionType.Shared; // Allow concurrent access
+
+            _liteDb = new LiteDatabase(builder);
+        }
+
+        private Task SaveToLiteDBAsync(string collection, string id, string json)
+        {
+            EnsureLiteDbConnection();
+
+            var col = _liteDb!.GetCollection<BsonDocument>(collection);
+
+            // Parse JSON to BsonDocument
+            var doc = LiteDB.JsonSerializer.Deserialize(json).AsDocument;
+
+            // Ensure _id is set
+            doc["_id"] = new BsonValue(id);
+
+            // Upsert the document
+            col.Upsert(doc);
+
+            return Task.CompletedTask;
+        }
+
+        private Task<string> LoadFromLiteDBAsync(string collection, string id)
+        {
+            EnsureLiteDbConnection();
+
+            var col = _liteDb!.GetCollection<BsonDocument>(collection);
+
+            var doc = col.FindById(new BsonValue(id));
+            if (doc == null)
+                throw new FileNotFoundException($"Record not found: {collection}/{id}");
+
+            // Convert BsonDocument to JSON
+            var json = LiteDB.JsonSerializer.Serialize(doc);
+            return Task.FromResult(json);
+        }
+
+        private Task DeleteFromLiteDBAsync(string collection, string id)
+        {
+            EnsureLiteDbConnection();
+
+            var col = _liteDb!.GetCollection<BsonDocument>(collection);
+            col.Delete(new BsonValue(id));
+
+            return Task.CompletedTask;
+        }
+
+        #endregion
+
+        #region RocksDB Implementation
+
+        private void EnsureRocksDbConnection()
+        {
+            if (_rocksDb != null)
+                return;
+
+            lock (_rocksDbLock)
+            {
+                if (_rocksDb != null)
+                    return;
+
+                var dbPath = _config.FilePath ?? Path.Combine(Path.GetTempPath(), "rocksdb_" + Guid.NewGuid().ToString("N"));
+
+                // Ensure directory exists
+                Directory.CreateDirectory(dbPath);
+
+                var options = new DbOptions()
+                    .SetCreateIfMissing(true)
+                    .SetCreateMissingColumnFamilies(true);
+
+                // Configure for performance
+                options.SetMaxBackgroundCompactions(4);
+                options.SetMaxBackgroundFlushes(2);
+                options.IncreaseParallelism(Environment.ProcessorCount);
+
+                _rocksDb = RocksDb.Open(options, dbPath);
+            }
+        }
+
+        private Task SaveToRocksDBAsync(string table, string id, string json)
+        {
+            EnsureRocksDbConnection();
+
+            // Use composite key: table:id
+            var key = $"{table}:{id}";
+            var keyBytes = Encoding.UTF8.GetBytes(key);
+            var valueBytes = Encoding.UTF8.GetBytes(json);
+
+            lock (_rocksDbLock)
+            {
+                _rocksDb!.Put(keyBytes, valueBytes);
+            }
+
+            return Task.CompletedTask;
+        }
+
+        private Task<string> LoadFromRocksDBAsync(string table, string id)
+        {
+            EnsureRocksDbConnection();
+
+            var key = $"{table}:{id}";
+            var keyBytes = Encoding.UTF8.GetBytes(key);
+
+            byte[]? valueBytes;
+            lock (_rocksDbLock)
+            {
+                valueBytes = _rocksDb!.Get(keyBytes);
+            }
+
+            if (valueBytes == null)
+                throw new FileNotFoundException($"Record not found: {table}/{id}");
+
+            return Task.FromResult(Encoding.UTF8.GetString(valueBytes));
+        }
+
+        private Task DeleteFromRocksDBAsync(string table, string id)
+        {
+            EnsureRocksDbConnection();
+
+            var key = $"{table}:{id}";
+            var keyBytes = Encoding.UTF8.GetBytes(key);
+
+            lock (_rocksDbLock)
+            {
+                _rocksDb!.Remove(keyBytes);
+            }
+
+            return Task.CompletedTask;
+        }
 
         #endregion
 
@@ -619,6 +780,13 @@ public sealed class EmbeddedDatabasePlugin : HybridDatabasePluginBase<EmbeddedDb
                 return;
 
             _sqliteConnection?.Dispose();
+            _liteDb?.Dispose();
+
+            lock (_rocksDbLock)
+            {
+                _rocksDb?.Dispose();
+            }
+
             _writeLock.Dispose();
             _disposed = true;
         }
@@ -674,6 +842,12 @@ public class EmbeddedDbConfig : DatabaseConfigBase
             Engine = EmbeddedEngine.LiteDB,
             FilePath = filePath,
             Password = password
+        };
+
+        public static EmbeddedDbConfig RocksDB(string directoryPath) => new()
+        {
+            Engine = EmbeddedEngine.RocksDB,
+            FilePath = directoryPath
         };
     }
 
