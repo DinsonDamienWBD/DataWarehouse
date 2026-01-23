@@ -581,7 +581,27 @@ public sealed class ContinuousBackupProvider :
                 if (info.Exists && info.Length > _config.MaxFileSizeBytes)
                     return false;
             }
-            catch { }
+            catch (UnauthorizedAccessException ex)
+            {
+                // Cannot access file - log warning but include in backup attempt
+                System.Diagnostics.Trace.TraceWarning(
+                    "[ContinuousBackupProvider] Cannot access file {0} to check size (access denied): {1}",
+                    path, ex.Message);
+            }
+            catch (IOException ex)
+            {
+                // I/O error - log warning but include in backup attempt
+                System.Diagnostics.Trace.TraceWarning(
+                    "[ContinuousBackupProvider] I/O error checking file size for {0}: {1}",
+                    path, ex.Message);
+            }
+            catch (Exception ex)
+            {
+                // Unexpected error - log and continue
+                System.Diagnostics.Trace.TraceWarning(
+                    "[ContinuousBackupProvider] Unexpected error checking file size for {0}: {1}",
+                    path, ex.Message);
+            }
         }
 
         return true;

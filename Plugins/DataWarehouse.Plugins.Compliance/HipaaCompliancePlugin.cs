@@ -931,7 +931,27 @@ namespace DataWarehouse.Plugins.Compliance
                         _baas[baa.BaaId] = baa;
                 }
             }
-            catch { }
+            catch (JsonException ex)
+            {
+                // Log JSON deserialization errors - may indicate corrupted data file
+                System.Diagnostics.Trace.TraceError(
+                    "[HipaaCompliancePlugin] Failed to deserialize HIPAA data from {0}: {1}",
+                    path, ex.Message);
+            }
+            catch (IOException ex)
+            {
+                // Log I/O errors - may indicate permission or disk issues
+                System.Diagnostics.Trace.TraceError(
+                    "[HipaaCompliancePlugin] Failed to read HIPAA data file {0}: {1}",
+                    path, ex.Message);
+            }
+            catch (Exception ex)
+            {
+                // Log unexpected errors for debugging
+                System.Diagnostics.Trace.TraceError(
+                    "[HipaaCompliancePlugin] Unexpected error loading HIPAA data from {0}: {1}\n{2}",
+                    path, ex.Message, ex.StackTrace);
+            }
         }
 
         private async Task SaveDataAsync()

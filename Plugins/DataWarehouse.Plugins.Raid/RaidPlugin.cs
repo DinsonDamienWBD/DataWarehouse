@@ -12,7 +12,7 @@ namespace DataWarehouse.Plugins.Raid
     /// degraded mode operation, rebuild capability, and scrubbing.
     /// Thread-safe and designed for hyperscale deployment.
     /// </summary>
-    public sealed class RaidPlugin : RaidProviderPluginBase
+    public sealed class RaidPlugin : RaidProviderPluginBase, IDisposable
     {
         private readonly RaidConfiguration _config;
         private readonly IStorageProvider[] _providers;
@@ -30,6 +30,7 @@ namespace DataWarehouse.Plugins.Raid
         private long _totalOperations;
         private long _totalBytesProcessed;
         private DateTime _lastScrubTime = DateTime.MinValue;
+        private bool _disposed;
 
         public override string Id => "datawarehouse.plugins.raid";
         public override string Name => "RAID Storage Provider";
@@ -2267,14 +2268,50 @@ namespace DataWarehouse.Plugins.Raid
 
         public override Task StartAsync(CancellationToken ct)
         {
+            ObjectDisposedException.ThrowIf(_disposed, this);
             return CreateArrayAsync(ct).ContinueWith(_ => { }, ct);
         }
 
         public override Task StopAsync()
         {
-            _arrayLock.Dispose();
-            _rebuildSemaphore.Dispose();
+            Dispose();
             return Task.CompletedTask;
+        }
+
+        /// <summary>
+        /// Releases all resources used by the RAID plugin.
+        /// </summary>
+        public void Dispose()
+        {
+            Dispose(disposing: true);
+            GC.SuppressFinalize(this);
+        }
+
+        /// <summary>
+        /// Releases the unmanaged resources and optionally releases the managed resources.
+        /// </summary>
+        /// <param name="disposing">true to release both managed and unmanaged resources; false to release only unmanaged resources.</param>
+        private void Dispose(bool disposing)
+        {
+            if (_disposed)
+                return;
+
+            if (disposing)
+            {
+                // Dispose managed resources
+                _arrayLock.Dispose();
+                _rebuildSemaphore.Dispose();
+            }
+
+            _disposed = true;
+        }
+
+        /// <summary>
+        /// Finalizer for safety - ensures resources are released if Dispose is not called.
+        /// </summary>
+        ~RaidPlugin()
+        {
+            Dispose(disposing: false);
         }
 
         protected override List<PluginCapabilityDescriptor> GetCapabilities()
