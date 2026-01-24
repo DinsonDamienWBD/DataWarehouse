@@ -148,5 +148,10 @@ namespace DataWarehouse.SDK.Services
         /// Returns all registered IDs.
         /// </summary>
         public IEnumerable<string> GetAllPluginIds() => _plugins.Keys;
+
+        /// <summary>
+        /// Returns all registered plugins.
+        /// </summary>
+        public IEnumerable<IPlugin> GetAllPlugins() => _plugins.Values;
     }
 }

@@ -1,4 +1,5 @@
-﻿using DataWarehouse.SDK.Utilities;
+﻿using DataWarehouse.SDK.Contracts;
+using DataWarehouse.SDK.Utilities;
 using System;
 using System.Collections.Generic;
 using System.Text;
@@ -30,6 +31,11 @@ namespace DataWarehouse.SDK.Primitives
         /// Optional configuration dictionary for plugin initialization
         /// </summary>
         public Dictionary<string, object>? Config { get; init; }
+
+        /// <summary>
+        /// Optional kernel context for handshake operations
+        /// </summary>
+        public IKernelContext? Context { get; init; }
     }
 
     // SDK/Messaging/HandshakeResponse.cs
@@ -46,29 +52,29 @@ namespace DataWarehouse.SDK.Primitives
     public class HandshakeResponse
     {
         // Identity
-        public string PluginId { get; init; } = string.Empty;
-        public string Name { get; init; } = string.Empty;
-        public Version Version { get; init; } = new Version(1, 0, 0);
-        public PluginCategory Category { get; init; }
+        public string PluginId { get; set; } = string.Empty;
+        public string Name { get; set; } = string.Empty;
+        public Version Version { get; set; } = new Version(1, 0, 0);
+        public PluginCategory Category { get; set; }
 
         // Readiness
-        public bool Success { get; init; }
-        public PluginReadyState ReadyState { get; init; }
-        public string? ErrorMessage { get; init; }
+        public bool Success { get; set; }
+        public PluginReadyState ReadyState { get; set; }
+        public string? ErrorMessage { get; set; }
 
         // Capabilities
-        public List<PluginCapabilityDescriptor> Capabilities { get; init; } = [];
+        public List<PluginCapabilityDescriptor> Capabilities { get; set; } = [];
 
         // Dependencies
-        public List<PluginDependency> Dependencies { get; init; } = [];
+        public List<PluginDependency> Dependencies { get; set; } = [];
 
         // Metadata
-        public Dictionary<string, object> Metadata { get; init; } = [];
+        public Dictionary<string, object> Metadata { get; set; } = [];
 
         // Initialization time (for performance tracking)
-        public TimeSpan InitializationDuration { get; init; }
+        public TimeSpan InitializationDuration { get; set; }
 
         // Health check endpoint (optional)
-        public TimeSpan? HealthCheckInterval { get; init; }
+        public TimeSpan? HealthCheckInterval { get; set; }
     }
 }

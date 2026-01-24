@@ -54,7 +54,7 @@ namespace DataWarehouse.Plugins.Search
         /// </summary>
         public int EmbeddingDimension { get; private set; }
 
-        public override bool IsAvailable => _isAvailable && IsRunning;
+        public override bool IsAvailable => _isAvailable;
 
         public SemanticSearchPlugin() : this(0, null) { }
 

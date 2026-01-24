@@ -1385,9 +1385,9 @@ namespace DataWarehouse.Plugins.Raft
                 ["locks"] = _locks.ToDictionary(kv => kv.Key, kv => new
                 {
                     kv.Value.LockId,
-                    kv.Value.OwnerId,
+                    OwnerId = kv.Value.Owner,
                     kv.Value.AcquiredAt,
-                    kv.Value.LeaseExpires
+                    LeaseExpires = kv.Value.ExpiresAt
                 }),
                 ["nodeId"] = _nodeId,
                 ["votedFor"] = _votedFor ?? ""

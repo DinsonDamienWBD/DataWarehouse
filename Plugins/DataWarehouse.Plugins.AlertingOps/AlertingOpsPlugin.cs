@@ -257,7 +257,7 @@ public sealed class AlertingOpsPlugin : OperationsPluginBase
             Condition = config.Condition,
             Threshold = config.Threshold,
             EvaluationWindow = config.EvaluationWindow,
-            Severity = config.Severity,
+            Severity = (SDK.Primitives.AlertSeverity)(int)config.Severity,
             NotificationChannels = config.NotificationChannels?.ToList() ?? new List<string>(),
             Enabled = config.Enabled,
             CreatedAt = DateTime.UtcNow
@@ -282,7 +282,7 @@ public sealed class AlertingOpsPlugin : OperationsPluginBase
             AlertId = a.AlertId,
             RuleId = a.RuleId,
             RuleName = a.RuleName,
-            Severity = MapSeverity(a.Severity),
+            Severity = (SDK.Contracts.AlertSeverity)(int)MapSeverity(a.Severity),
             Message = a.Message,
             CurrentValue = a.CurrentValue,
             Threshold = a.Threshold,
@@ -1408,35 +1408,35 @@ public sealed class AlertingOpsPlugin : OperationsPluginBase
         }
     }
 
-    private AlertSeverity MapSeverity(AlertSeverityLevel level)
+    private SDK.Primitives.AlertSeverity MapSeverity(AlertSeverityLevel level)
     {
         return level switch
         {
-            AlertSeverityLevel.Critical => AlertSeverity.Critical,
-            AlertSeverityLevel.Error => AlertSeverity.Error,
-            AlertSeverityLevel.Warning => AlertSeverity.Warning,
-            _ => AlertSeverity.Info
+            AlertSeverityLevel.Critical => SDK.Primitives.AlertSeverity.Critical,
+            AlertSeverityLevel.Error => SDK.Primitives.AlertSeverity.Error,
+            AlertSeverityLevel.Warning => SDK.Primitives.AlertSeverity.Warning,
+            _ => SDK.Primitives.AlertSeverity.Info
         };
     }
 
-    private AlertSeverity MapToSdkSeverity(AlertSeverityLevel level)
+    private SDK.Primitives.AlertSeverity MapToSdkSeverity(AlertSeverityLevel level)
     {
         return level switch
         {
-            AlertSeverityLevel.Critical => AlertSeverity.Critical,
-            AlertSeverityLevel.Error => AlertSeverity.Error,
-            AlertSeverityLevel.Warning => AlertSeverity.Warning,
-            _ => AlertSeverity.Info
+            AlertSeverityLevel.Critical => SDK.Primitives.AlertSeverity.Critical,
+            AlertSeverityLevel.Error => SDK.Primitives.AlertSeverity.Error,
+            AlertSeverityLevel.Warning => SDK.Primitives.AlertSeverity.Warning,
+            _ => SDK.Primitives.AlertSeverity.Info
         };
     }
 
-    private AlertSeverityLevel MapFromSdkSeverity(AlertSeverity severity)
+    private AlertSeverityLevel MapFromSdkSeverity(SDK.Primitives.AlertSeverity severity)
     {
         return severity switch
         {
-            AlertSeverity.Critical => AlertSeverityLevel.Critical,
-            AlertSeverity.Error => AlertSeverityLevel.Error,
-            AlertSeverity.Warning => AlertSeverityLevel.Warning,
+            SDK.Primitives.AlertSeverity.Critical => AlertSeverityLevel.Critical,
+            SDK.Primitives.AlertSeverity.Error => AlertSeverityLevel.Error,
+            SDK.Primitives.AlertSeverity.Warning => AlertSeverityLevel.Warning,
             _ => AlertSeverityLevel.Info
         };
     }
@@ -1517,7 +1517,7 @@ public sealed class AlertingOpsPlugin : OperationsPluginBase
         public AlertCondition Condition { get; init; }
         public double Threshold { get; set; }
         public TimeSpan EvaluationWindow { get; init; }
-        public AlertSeverity Severity { get; set; }
+        public SDK.Primitives.AlertSeverity Severity { get; set; }
         public List<string> NotificationChannels { get; init; } = new();
         public bool Enabled { get; set; }
         public DateTime CreatedAt { get; init; }

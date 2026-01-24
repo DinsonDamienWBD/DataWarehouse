@@ -1313,8 +1313,8 @@ public sealed class GeoDistributedConsensusPlugin : ConsensusPluginBase
                     DatacenterId = request.DatacenterId ?? _localDatacenterId,
                     Endpoint = request.Endpoint ?? "",
                     VotingStatus = VotingStatus.Voter,
-                    Status = NodeStatus.Active,
-                    Role = GeoRaftRole.Follower
+                    Status = (SDK.Contracts.NodeStatus)NodeStatus.Active,
+                    Role = (SDK.Contracts.NodeRole)(int)SDK.Contracts.GeoRaftRole.Follower
                 };
                 break;
 
@@ -2852,6 +2852,47 @@ internal sealed class ProposalState
 
     /// <summary>Completion source for async waiting.</summary>
     public TaskCompletionSource<bool> CompletionSource { get; init; } = null!;
+}
+
+/// <summary>
+/// Voting status for Raft nodes.
+/// </summary>
+internal enum VotingStatus
+{
+    Voter,
+    Learner,
+    Witness
+}
+
+/// <summary>
+/// Membership change type.
+/// </summary>
+public enum MembershipChangeType
+{
+    AddNode,
+    RemoveNode,
+    PromoteLearner,
+    DemoteToLearner
+}
+
+/// <summary>
+/// Membership change request.
+/// </summary>
+public sealed class MembershipChangeRequest
+{
+    public string NodeId { get; init; } = string.Empty;
+    public MembershipChangeType ChangeType { get; init; }
+    public string? DatacenterId { get; init; }
+    public string? Endpoint { get; init; }
+}
+
+/// <summary>
+/// Membership change result.
+/// </summary>
+public sealed class MembershipChangeResult
+{
+    public bool Success { get; init; }
+    public string? Error { get; init; }
 }
 
 #endregion

@@ -49,7 +49,7 @@ namespace DataWarehouse.Plugins.GeoReplication
 
         public override Task<HandshakeResponse> OnHandshakeAsync(HandshakeRequest request)
         {
-            _context = request.Context;
+            _context = null; // Context property removed from HandshakeRequest
 
             // Initialize the manager with consensus enabled
             _manager = new GeoReplicationManager(_context, enableConsensus: true);
@@ -447,7 +447,7 @@ namespace DataWarehouse.Plugins.GeoReplication
                 ["conflictsDetected"] = status.ConflictsDetected,
                 ["conflictsResolved"] = status.ConflictsResolved,
                 ["maxReplicationLag"] = status.MaxReplicationLag.TotalMilliseconds,
-                ["bandwidthThrottle"] = status.BandwidthThrottle,
+                ["bandwidthThrottle"] = status.BandwidthThrottle as object ?? DBNull.Value,
                 ["regions"] = status.Regions.Select(kvp => new Dictionary<string, object>
                 {
                     ["regionId"] = kvp.Key,

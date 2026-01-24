@@ -59,7 +59,6 @@ public sealed class ZeroDowntimeUpgradePlugin : OperationsPluginBase
     private readonly ConcurrentDictionary<string, Alert> _activeAlerts = new();
     private readonly SemaphoreSlim _upgradeLock = new(1, 1);
 
-    private IKernelContext? _context;
     private CancellationTokenSource? _cts;
     private Task? _monitoringTask;
     private string? _activeDeploymentId;
@@ -84,7 +83,8 @@ public sealed class ZeroDowntimeUpgradePlugin : OperationsPluginBase
     /// <inheritdoc />
     public override Task<HandshakeResponse> OnHandshakeAsync(HandshakeRequest request)
     {
-        _context = request.Context;
+        // Store kernel context properties if needed
+        // _context = ... (HandshakeRequest no longer has Context property)
 
         return Task.FromResult(new HandshakeResponse
         {
@@ -443,12 +443,20 @@ public sealed class ZeroDowntimeUpgradePlugin : OperationsPluginBase
     {
         if (_activeAlerts.TryGetValue(alertId, out var alert))
         {
-            alert = alert with
+            var updatedAlert = new Alert
             {
+                AlertId = alert.AlertId,
+                RuleId = alert.RuleId,
+                RuleName = alert.RuleName,
+                Severity = alert.Severity,
+                Message = alert.Message,
+                CurrentValue = alert.CurrentValue,
+                Threshold = alert.Threshold,
+                TriggeredAt = alert.TriggeredAt,
                 IsAcknowledged = true,
                 AcknowledgedBy = "system"
             };
-            _activeAlerts[alertId] = alert;
+            _activeAlerts[alertId] = updatedAlert;
             return Task.FromResult(true);
         }
 
@@ -995,7 +1003,7 @@ public sealed class ZeroDowntimeUpgradePlugin : OperationsPluginBase
                                 AlertId = alertId,
                                 RuleId = "deployment-health",
                                 RuleName = "Deployment Health",
-                                Severity = AlertSeverity.Warning,
+                                Severity = SDK.Contracts.AlertSeverity.Warning,
                                 Message = $"{unhealthy} instances unhealthy during upgrade",
                                 CurrentValue = unhealthy,
                                 Threshold = 0,

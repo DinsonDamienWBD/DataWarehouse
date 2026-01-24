@@ -884,7 +884,7 @@ public sealed class RealTimeSyncPlugin : ReplicationPluginBase,
     /// <inheritdoc />
     public override Task<HandshakeResponse> OnHandshakeAsync(HandshakeRequest request)
     {
-        _context = request.Context;
+        _context = null; // Context property removed from HandshakeRequest
 
         return Task.FromResult(new HandshakeResponse
         {

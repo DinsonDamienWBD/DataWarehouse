@@ -19,7 +19,7 @@ namespace DataWarehouse.Plugins.CrdtReplication.Crdts
     /// - No data is lost during concurrent writes
     /// - Eventually converges to the same set of values on all replicas
     /// </remarks>
-    public sealed class MVRegister<T> : ICrdt<MVRegister<T>>
+    public class MVRegister<T> : ICrdt<MVRegister<T>>
     {
         private readonly List<ValueVersion<T>> _versions;
         private readonly string _nodeId;

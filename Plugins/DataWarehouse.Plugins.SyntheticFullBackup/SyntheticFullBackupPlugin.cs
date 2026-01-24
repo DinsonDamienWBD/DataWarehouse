@@ -135,11 +135,20 @@ public sealed class SyntheticFullBackupPlugin : BackupPluginBase, IAsyncDisposab
             }
             catch (Exception ex)
             {
-                syntheticJob.Job = syntheticJob.Job with
+                syntheticJob.Job = new BackupJob
                 {
+                    JobId = syntheticJob.Job.JobId,
+                    Name = syntheticJob.Job.Name,
+                    Type = syntheticJob.Job.Type,
                     State = BackupJobState.Failed,
+                    StartedAt = syntheticJob.Job.StartedAt,
                     CompletedAt = DateTime.UtcNow,
-                    ErrorMessage = ex.Message
+                    BytesProcessed = syntheticJob.Job.BytesProcessed,
+                    BytesTransferred = syntheticJob.Job.BytesTransferred,
+                    FilesProcessed = syntheticJob.Job.FilesProcessed,
+                    Progress = syntheticJob.Job.Progress,
+                    ErrorMessage = ex.Message,
+                    Tags = syntheticJob.Job.Tags
                 };
             }
             finally
@@ -155,7 +164,21 @@ public sealed class SyntheticFullBackupPlugin : BackupPluginBase, IAsyncDisposab
     private async Task ExecuteBackupAsync(SyntheticJob syntheticJob)
     {
         var ct = syntheticJob.CancellationSource.Token;
-        syntheticJob.Job = syntheticJob.Job with { State = BackupJobState.Running };
+        syntheticJob.Job = new BackupJob
+        {
+            JobId = syntheticJob.Job.JobId,
+            Name = syntheticJob.Job.Name,
+            Type = syntheticJob.Job.Type,
+            State = BackupJobState.Running,
+            StartedAt = syntheticJob.Job.StartedAt,
+            CompletedAt = syntheticJob.Job.CompletedAt,
+            BytesProcessed = syntheticJob.Job.BytesProcessed,
+            BytesTransferred = syntheticJob.Job.BytesTransferred,
+            FilesProcessed = syntheticJob.Job.FilesProcessed,
+            Progress = syntheticJob.Job.Progress,
+            ErrorMessage = syntheticJob.Job.ErrorMessage,
+            Tags = syntheticJob.Job.Tags
+        };
 
         if (syntheticJob.Request.Type == BackupType.Synthetic)
         {
@@ -235,7 +258,21 @@ public sealed class SyntheticFullBackupPlugin : BackupPluginBase, IAsyncDisposab
 
             if (_config.VerifyAfterSynthesis)
             {
-                job.Job = job.Job with { State = BackupJobState.Verifying };
+                job.Job = new BackupJob
+                {
+                    JobId = job.Job.JobId,
+                    Name = job.Job.Name,
+                    Type = job.Job.Type,
+                    State = BackupJobState.Verifying,
+                    StartedAt = job.Job.StartedAt,
+                    CompletedAt = job.Job.CompletedAt,
+                    BytesProcessed = job.Job.BytesProcessed,
+                    BytesTransferred = job.Job.BytesTransferred,
+                    FilesProcessed = job.Job.FilesProcessed,
+                    Progress = job.Job.Progress,
+                    ErrorMessage = job.Job.ErrorMessage,
+                    Tags = job.Job.Tags
+                };
                 await VerifySyntheticBackupAsync(syntheticBackupId, synthesizedManifest, ct);
             }
 
@@ -245,13 +282,20 @@ public sealed class SyntheticFullBackupPlugin : BackupPluginBase, IAsyncDisposab
             Interlocked.Add(ref _totalBytesProcessed, bytesProcessed);
             Interlocked.Add(ref _totalBlocksAssembled, blocksAssembled);
 
-            job.Job = job.Job with
+            job.Job = new BackupJob
             {
+                JobId = job.Job.JobId,
+                Name = job.Job.Name,
+                Type = job.Job.Type,
                 State = errors.Count > 0 ? BackupJobState.Failed : BackupJobState.Completed,
+                StartedAt = job.Job.StartedAt,
                 CompletedAt = DateTime.UtcNow,
                 BytesProcessed = bytesProcessed,
+                BytesTransferred = job.Job.BytesTransferred,
                 FilesProcessed = synthesizedManifest.ObjectBlocks.Count,
-                ErrorMessage = errors.Count > 0 ? string.Join("; ", errors) : null
+                Progress = job.Job.Progress,
+                ErrorMessage = errors.Count > 0 ? string.Join("; ", errors) : null,
+                Tags = job.Job.Tags
             };
         }
         finally
@@ -442,11 +486,20 @@ public sealed class SyntheticFullBackupPlugin : BackupPluginBase, IAsyncDisposab
                 bytesProcessed += blocks.Sum(b => b.Size);
                 filesProcessed++;
 
-                job.Job = job.Job with
+                job.Job = new BackupJob
                 {
+                    JobId = job.Job.JobId,
+                    Name = job.Job.Name,
+                    Type = job.Job.Type,
+                    State = job.Job.State,
+                    StartedAt = job.Job.StartedAt,
+                    CompletedAt = job.Job.CompletedAt,
                     BytesProcessed = bytesProcessed,
+                    BytesTransferred = job.Job.BytesTransferred,
                     FilesProcessed = filesProcessed,
-                    Progress = (double)filesProcessed / files.Count
+                    Progress = (double)filesProcessed / files.Count,
+                    ErrorMessage = job.Job.ErrorMessage,
+                    Tags = job.Job.Tags
                 };
             }
         }
@@ -471,12 +524,20 @@ public sealed class SyntheticFullBackupPlugin : BackupPluginBase, IAsyncDisposab
             _chainLock.ExitWriteLock();
         }
 
-        job.Job = job.Job with
+        job.Job = new BackupJob
         {
+            JobId = job.Job.JobId,
+            Name = job.Job.Name,
+            Type = job.Job.Type,
             State = BackupJobState.Completed,
+            StartedAt = job.Job.StartedAt,
             CompletedAt = DateTime.UtcNow,
             BytesProcessed = bytesProcessed,
-            FilesProcessed = filesProcessed
+            BytesTransferred = job.Job.BytesTransferred,
+            FilesProcessed = filesProcessed,
+            Progress = job.Job.Progress,
+            ErrorMessage = job.Job.ErrorMessage,
+            Tags = job.Job.Tags
         };
     }
 
@@ -529,10 +590,20 @@ public sealed class SyntheticFullBackupPlugin : BackupPluginBase, IAsyncDisposab
                 }
 
                 filesProcessed++;
-                job.Job = job.Job with
+                job.Job = new BackupJob
                 {
+                    JobId = job.Job.JobId,
+                    Name = job.Job.Name,
+                    Type = job.Job.Type,
+                    State = job.Job.State,
+                    StartedAt = job.Job.StartedAt,
+                    CompletedAt = job.Job.CompletedAt,
                     BytesProcessed = bytesProcessed,
-                    FilesProcessed = filesProcessed
+                    BytesTransferred = job.Job.BytesTransferred,
+                    FilesProcessed = filesProcessed,
+                    Progress = job.Job.Progress,
+                    ErrorMessage = job.Job.ErrorMessage,
+                    Tags = job.Job.Tags
                 };
             }
 
@@ -573,12 +644,20 @@ public sealed class SyntheticFullBackupPlugin : BackupPluginBase, IAsyncDisposab
             _chainLock.ExitWriteLock();
         }
 
-        job.Job = job.Job with
+        job.Job = new BackupJob
         {
+            JobId = job.Job.JobId,
+            Name = job.Job.Name,
+            Type = job.Job.Type,
             State = BackupJobState.Completed,
+            StartedAt = job.Job.StartedAt,
             CompletedAt = DateTime.UtcNow,
             BytesProcessed = bytesProcessed,
-            FilesProcessed = filesProcessed
+            BytesTransferred = job.Job.BytesTransferred,
+            FilesProcessed = filesProcessed,
+            Progress = job.Job.Progress,
+            ErrorMessage = job.Job.ErrorMessage,
+            Tags = job.Job.Tags
         };
     }
 

@@ -664,9 +664,13 @@ namespace DataWarehouse.Plugins.Deduplication
                     _shardLocks[shard].EnterWriteLock();
                     try
                     {
-                        Interlocked.Increment(ref metadata.ReferenceCount);
+                        long refCount = metadata.ReferenceCount;
+                        Interlocked.Increment(ref refCount);
+                        metadata.ReferenceCount = refCount;
                         metadata.LastAccessedAt = DateTime.UtcNow;
-                        Interlocked.Add(ref _totalLogicalBytes, metadata.OriginalSize);
+                        long totalLogical = _totalLogicalBytes;
+                        Interlocked.Add(ref totalLogical, metadata.OriginalSize);
+                        _totalLogicalBytes = totalLogical;
                     }
                     finally
                     {
@@ -694,9 +698,13 @@ namespace DataWarehouse.Plugins.Deduplication
             {
                 if (_shards[shard].TryGetValue(hashHex, out var existing))
                 {
-                    Interlocked.Increment(ref existing.ReferenceCount);
+                    long refCount = existing.ReferenceCount;
+                    Interlocked.Increment(ref refCount);
+                    existing.ReferenceCount = refCount;
                     existing.LastAccessedAt = DateTime.UtcNow;
-                    Interlocked.Add(ref _totalLogicalBytes, existing.OriginalSize);
+                    long totalLogical = _totalLogicalBytes;
+                    Interlocked.Add(ref totalLogical, existing.OriginalSize);
+                    _totalLogicalBytes = totalLogical;
                     isNew = false;
                     return true;
                 }
@@ -731,14 +739,22 @@ namespace DataWarehouse.Plugins.Deduplication
             {
                 if (_shards[shard].TryGetValue(hashHex, out metadata))
                 {
-                    var newCount = Interlocked.Decrement(ref metadata.ReferenceCount);
-                    Interlocked.Add(ref _totalLogicalBytes, -metadata.OriginalSize);
+                    long refCount = metadata.ReferenceCount;
+                    var newCount = Interlocked.Decrement(ref refCount);
+                    metadata.ReferenceCount = refCount;
+                    long totalLogical = _totalLogicalBytes;
+                    Interlocked.Add(ref totalLogical, -metadata.OriginalSize);
+                    _totalLogicalBytes = totalLogical;
 
                     if (newCount <= 0)
                     {
                         _shards[shard].TryRemove(hashHex, out _);
-                        Interlocked.Decrement(ref _totalChunks);
-                        Interlocked.Add(ref _totalPhysicalBytes, -metadata.StoredSize);
+                        long totalChunks = _totalChunks;
+                        Interlocked.Decrement(ref totalChunks);
+                        _totalChunks = totalChunks;
+                        long totalPhysical = _totalPhysicalBytes;
+                        Interlocked.Add(ref totalPhysical, -metadata.StoredSize);
+                        _totalPhysicalBytes = totalPhysical;
                         return true;
                     }
                 }
@@ -794,7 +810,8 @@ namespace DataWarehouse.Plugins.Deduplication
             {
                 foreach (var kvp in _shards[i])
                 {
-                    if (Interlocked.Read(ref kvp.Value.ReferenceCount) <= 0)
+                    long refCount = kvp.Value.ReferenceCount;
+                    if (Interlocked.Read(ref refCount) <= 0)
                     {
                         result.Add((kvp.Key, kvp.Value));
                     }
@@ -826,7 +843,7 @@ namespace DataWarehouse.Plugins.Deduplication
     /// Supports Rabin fingerprinting, FastCDC, fixed-size chunking, SHA-256 hashing,
     /// reference counting, and delta encoding for TB-scale data deduplication.
     /// </summary>
-    public sealed class DeduplicationPlugin : DeduplicationPluginBase, IDisposable
+    public class DeduplicationPlugin : DeduplicationPluginBase, IDisposable
     {
         private readonly DeduplicationConfig _config;
         private readonly ShardedChunkIndex _chunkIndex;
@@ -1490,8 +1507,8 @@ namespace DataWarehouse.Plugins.Deduplication
     /// </summary>
     public sealed class FixedChunkingPlugin : DeduplicationPlugin
     {
-        public override string Id => "datawarehouse.plugins.deduplication.fixed";
-        public override string Name => "Fixed-Size Deduplication";
+        public new string Id => "datawarehouse.plugins.deduplication.fixed";
+        public new string Name => "Fixed-Size Deduplication";
 
         public FixedChunkingPlugin() : base(new DeduplicationConfig
         {
@@ -1520,8 +1537,8 @@ namespace DataWarehouse.Plugins.Deduplication
     /// </summary>
     public sealed class RabinCDCPlugin : DeduplicationPlugin
     {
-        public override string Id => "datawarehouse.plugins.deduplication.rabin";
-        public override string Name => "Rabin CDC Deduplication";
+        public new string Id => "datawarehouse.plugins.deduplication.rabin";
+        public new string Name => "Rabin CDC Deduplication";
 
         public RabinCDCPlugin() : base(new DeduplicationConfig
         {

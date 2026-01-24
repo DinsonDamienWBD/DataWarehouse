@@ -367,6 +367,7 @@ public sealed class BreakGlassRecoveryPlugin : SnapshotPluginBase, IAsyncDisposa
         var assignedCustodians = custodianAssignments != null
             ? custodianAssignments.Select(id => _custodians.GetValueOrDefault(id))
                 .Where(c => c != null && c.Status == CustodianStatus.Active)
+                .Select(c => c!)
                 .Take(totalShares)
                 .ToList()
             : activeCustodians.Take(totalShares).ToList();
@@ -1582,7 +1583,7 @@ public sealed class BreakGlassRecoveryPlugin : SnapshotPluginBase, IAsyncDisposa
 
             if (state == null) return;
 
-            foreach (var custodian in state.Custodians)
+            foreach (var custodian in state.Custodians.Where(c => c != null))
                 _custodians[custodian.CustodianId] = custodian;
 
             foreach (var escrow in state.EscrowedKeys)

@@ -643,7 +643,13 @@ public sealed class SnapshotPlugin : SnapshotPluginBase, IAsyncDisposable
         // Calculate RetainUntil from RetainFor if not set
         if (!policy.RetainUntil.HasValue && policy.RetainFor.HasValue)
         {
-            policy = policy with { RetainUntil = DateTime.UtcNow.Add(policy.RetainFor.Value) };
+            policy = new SnapshotRetentionPolicy
+            {
+                RetainFor = policy.RetainFor,
+                RetainUntil = DateTime.UtcNow.Add(policy.RetainFor.Value),
+                DeleteAfterExpiry = policy.DeleteAfterExpiry,
+                AllowEarlyDeletion = policy.AllowEarlyDeletion
+            };
         }
 
         metadata.RetentionPolicy = policy;
@@ -1128,9 +1134,16 @@ public sealed class SnapshotPlugin : SnapshotPluginBase, IAsyncDisposable
             try
             {
                 // Create the snapshot
-                var request = schedule.SnapshotTemplate with
+                var request = new SnapshotRequest
                 {
-                    Name = $"{schedule.SnapshotTemplate.Name}_{now:yyyyMMdd_HHmmss}"
+                    Name = $"{schedule.SnapshotTemplate.Name}_{now:yyyyMMdd_HHmmss}",
+                    Description = schedule.SnapshotTemplate.Description,
+                    IncludePaths = schedule.SnapshotTemplate.IncludePaths,
+                    ExcludePaths = schedule.SnapshotTemplate.ExcludePaths,
+                    Incremental = schedule.SnapshotTemplate.Incremental,
+                    BaseSnapshotId = schedule.SnapshotTemplate.BaseSnapshotId,
+                    Tags = schedule.SnapshotTemplate.Tags,
+                    RetentionPolicy = schedule.SnapshotTemplate.RetentionPolicy
                 };
 
                 await CreateSnapshotAsync(request, CancellationToken.None);
@@ -1334,82 +1347,82 @@ public sealed class SnapshotPlugin : SnapshotPluginBase, IAsyncDisposable
             {
                 Name = "CreateSnapshot",
                 Description = "Creates an instant COW snapshot with O(1) metadata operation",
-                Parameters = new List<PluginParameterDescriptor>
+                Parameters = new Dictionary<string, object>
                 {
-                    new() { Name = "name", Type = "string", Required = true, Description = "Snapshot name" },
-                    new() { Name = "incremental", Type = "bool", Required = false, Description = "Create incremental snapshot" },
-                    new() { Name = "baseSnapshotId", Type = "string", Required = false, Description = "Base snapshot for incremental" }
+                    ["name"] = "Snapshot name (required)",
+                    ["incremental"] = "Create incremental snapshot (optional bool)",
+                    ["baseSnapshotId"] = "Base snapshot for incremental (optional)"
                 }
             },
             new()
             {
                 Name = "DeleteSnapshot",
                 Description = "Deletes a snapshot (blocked by legal hold/WORM)",
-                Parameters = new List<PluginParameterDescriptor>
+                Parameters = new Dictionary<string, object>
                 {
-                    new() { Name = "snapshotId", Type = "string", Required = true, Description = "Snapshot ID to delete" }
+                    ["snapshotId"] = "Snapshot ID to delete (required)"
                 }
             },
             new()
             {
                 Name = "RestoreFromSnapshot",
                 Description = "Restores data from a snapshot to target path",
-                Parameters = new List<PluginParameterDescriptor>
+                Parameters = new Dictionary<string, object>
                 {
-                    new() { Name = "snapshotId", Type = "string", Required = true, Description = "Snapshot ID to restore" },
-                    new() { Name = "targetPath", Type = "string", Required = false, Description = "Target restore path" }
+                    ["snapshotId"] = "Snapshot ID to restore (required)",
+                    ["targetPath"] = "Target restore path (optional)"
                 }
             },
             new()
             {
                 Name = "PlaceLegalHold",
                 Description = "Places litigation hold on a snapshot",
-                Parameters = new List<PluginParameterDescriptor>
+                Parameters = new Dictionary<string, object>
                 {
-                    new() { Name = "snapshotId", Type = "string", Required = true, Description = "Snapshot ID" },
-                    new() { Name = "reason", Type = "string", Required = true, Description = "Legal hold reason" },
-                    new() { Name = "caseNumber", Type = "string", Required = false, Description = "Case reference number" }
+                    ["snapshotId"] = "Snapshot ID (required)",
+                    ["reason"] = "Legal hold reason (required)",
+                    ["caseNumber"] = "Case reference number (optional)"
                 }
             },
             new()
             {
                 Name = "EnableWorm",
                 Description = "Enables WORM protection for compliance",
-                Parameters = new List<PluginParameterDescriptor>
+                Parameters = new Dictionary<string, object>
                 {
-                    new() { Name = "snapshotId", Type = "string", Required = true, Description = "Snapshot ID" },
-                    new() { Name = "retentionDays", Type = "int", Required = true, Description = "WORM retention period in days" }
+                    ["snapshotId"] = "Snapshot ID (required)",
+                    ["retentionDays"] = "WORM retention period in days (required int)"
                 }
             },
             new()
             {
                 Name = "CloneFromSnapshot",
                 Description = "Creates writable clone using COW semantics",
-                Parameters = new List<PluginParameterDescriptor>
+                Parameters = new Dictionary<string, object>
                 {
-                    new() { Name = "snapshotId", Type = "string", Required = true, Description = "Source snapshot ID" },
-                    new() { Name = "cloneName", Type = "string", Required = true, Description = "Name for the clone" }
+                    ["snapshotId"] = "Source snapshot ID (required)",
+                    ["cloneName"] = "Name for the clone (required)"
                 }
             },
             new()
             {
                 Name = "GetSnapshotDiff",
                 Description = "Calculates block-level differences between snapshots",
-                Parameters = new List<PluginParameterDescriptor>
+                Parameters = new Dictionary<string, object>
                 {
-                    new() { Name = "fromSnapshotId", Type = "string", Required = true, Description = "Base snapshot ID" },
-                    new() { Name = "toSnapshotId", Type = "string", Required = true, Description = "Target snapshot ID" }
+                    ["fromSnapshotId"] = "Base snapshot ID (required)",
+                    ["toSnapshotId"] = "Target snapshot ID (required)"
                 }
             },
             new()
             {
                 Name = "ScheduleSnapshot",
                 Description = "Creates scheduled recurring snapshots",
-                Parameters = new List<PluginParameterDescriptor>
+                Parameters = new Dictionary<string, object>
                 {
-                    new() { Name = "name", Type = "string", Required = true, Description = "Schedule name" },
-                    new() { Name = "cronExpression", Type = "string", Required = true, Description = "Cron schedule expression" },
-                    new() { Name = "retentionCount", Type = "int", Required = false, Description = "Number of snapshots to retain" }
+                    ["name"] = "Schedule name (required)",
+                    ["cronExpression"] = "Cron schedule expression (required)",
+                    ["retentionCount"] = "Number of snapshots to retain (optional int)"
                 }
             }
         };

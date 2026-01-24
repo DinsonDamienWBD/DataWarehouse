@@ -41,7 +41,15 @@ public sealed class DataRetentionPlugin : ComplianceProviderPluginBase, IAsyncDi
     public override string Version => "1.0.0";
 
     /// <inheritdoc />
-    public override ComplianceCapabilities Capabilities =>
+    public override PluginCategory Category => PluginCategory.Compliance;
+
+    /// <inheritdoc />
+    public override IReadOnlyList<string> SupportedFrameworks => new[] { "GDPR", "HIPAA", "SOX", "FINRA" };
+
+    /// <summary>
+    /// Gets the compliance capabilities supported by this plugin.
+    /// </summary>
+    public ComplianceCapabilities Capabilities =>
         ComplianceCapabilities.RetentionPolicy |
         ComplianceCapabilities.LegalHold |
         ComplianceCapabilities.WORM |
@@ -862,7 +870,110 @@ public sealed class DataRetentionPlugin : ComplianceProviderPluginBase, IAsyncDi
     }
 
     /// <inheritdoc />
-    public override async Task<ComplianceCheckResult> CheckComplianceAsync(
+    public override async Task<ComplianceValidationResult> ValidateAsync(
+        string framework,
+        object data,
+        Dictionary<string, object>? context = null,
+        CancellationToken ct = default)
+    {
+        var violations = new List<ComplianceViolation>();
+        var warnings = new List<ComplianceWarning>();
+
+        if (!SupportedFrameworks.Contains(framework))
+        {
+            violations.Add(new ComplianceViolation
+            {
+                RuleId = "FRAMEWORK_NOT_SUPPORTED",
+                Severity = ViolationSeverity.Error,
+                Message = $"Framework {framework} is not supported",
+                DetectedAt = DateTime.UtcNow
+            });
+        }
+
+        return await Task.FromResult(new ComplianceValidationResult
+        {
+            IsCompliant = violations.Count == 0,
+            Framework = framework,
+            Violations = violations,
+            Warnings = warnings,
+            ValidatedAt = DateTime.UtcNow
+        });
+    }
+
+    /// <inheritdoc />
+    public override Task<ComplianceStatus> GetStatusAsync(string framework, CancellationToken ct = default)
+    {
+        var status = new ComplianceStatus
+        {
+            Framework = framework,
+            IsCompliant = SupportedFrameworks.Contains(framework),
+            LastChecked = DateTime.UtcNow,
+            TotalPolicies = _policies.Count,
+            ActivePolicies = _policies.Count(p => p.Value.IsActive)
+        };
+        return Task.FromResult(status);
+    }
+
+    /// <inheritdoc />
+    public override Task<ComplianceReport> GenerateReportAsync(
+        string framework,
+        DateTime? startDate = null,
+        DateTime? endDate = null,
+        CancellationToken ct = default)
+    {
+        var report = new ComplianceReport
+        {
+            Framework = framework,
+            GeneratedAt = DateTime.UtcNow,
+            StartDate = startDate ?? DateTime.UtcNow.AddMonths(-1),
+            EndDate = endDate ?? DateTime.UtcNow,
+            Summary = $"Retention report for {framework}",
+            Details = new Dictionary<string, object>
+            {
+                ["TotalPolicies"] = _policies.Count,
+                ["TotalRetainedObjects"] = Interlocked.Read(ref _totalRetainedObjects),
+                ["TotalLegalHolds"] = Interlocked.Read(ref _totalLegalHolds)
+            }
+        };
+        return Task.FromResult(report);
+    }
+
+    /// <inheritdoc />
+    public override Task<string> RegisterDataSubjectRequestAsync(
+        DataSubjectRequest request,
+        CancellationToken ct = default)
+    {
+        var requestId = Guid.NewGuid().ToString();
+        LogInformation($"Registered data subject request {requestId} for subject {request.SubjectId}");
+        return Task.FromResult(requestId);
+    }
+
+    /// <inheritdoc />
+    public override async Task<SDK.Contracts.RetentionPolicy> GetRetentionPolicyAsync(
+        string dataType,
+        string? framework = null,
+        CancellationToken ct = default)
+    {
+        var policy = _policies.Values.FirstOrDefault(p => p.DataType == dataType && (framework == null || p.Framework == framework));
+        if (policy == null)
+        {
+            throw new RetentionPolicyException($"No retention policy found for data type {dataType}");
+        }
+
+        // Map local RetentionPolicy to SDK.Contracts.RetentionPolicy
+        return await Task.FromResult(new SDK.Contracts.RetentionPolicy
+        {
+            DataType = dataType,
+            RetentionPeriod = policy.RetentionPeriod,
+            LegalBasis = framework,
+            RequiresSecureDeletion = policy.WormEnabled || policy.ImmutabilityMode == ImmutabilityMode.Locked
+        });
+    }
+
+    /// <summary>
+    /// Checks compliance for a specific object.
+    /// </summary>
+    public async Task<ComplianceCheckResult> CheckComplianceAsync(
         string objectId,
         CancellationToken ct = default)
     {

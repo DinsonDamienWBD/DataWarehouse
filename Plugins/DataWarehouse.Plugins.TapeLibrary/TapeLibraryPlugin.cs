@@ -75,16 +75,7 @@ namespace DataWarehouse.Plugins.TapeLibrary
         public override string Version => "1.0.0";
 
         /// <inheritdoc/>
-        protected override string SemanticDescription =>
-            "Enterprise LTO tape library storage with SCSI commands, LTFS filesystem support, " +
-            "bar code scanning, and robotic media handling for archival and cold storage workloads.";
-
-        /// <inheritdoc/>
-        protected override string[] SemanticTags => new[]
-        {
-            "storage", "tape", "lto", "archive", "cold-storage", "backup",
-            "scsi", "ltfs", "barcode", "library", "enterprise"
-        };
+        public override string Scheme => "tape";
 
         /// <summary>
         /// Initializes a new instance of the tape library plugin.
@@ -208,31 +199,33 @@ namespace DataWarehouse.Plugins.TapeLibrary
         #region IStorageProvider Implementation
 
         /// <inheritdoc/>
-        public override async Task SaveAsync(string key, Stream data, CancellationToken ct = default)
+        public override async Task SaveAsync(Uri uri, Stream data)
         {
             ObjectDisposedException.ThrowIf(_disposed, this);
 
-            if (string.IsNullOrEmpty(key))
+            if (uri == null)
             {
-                throw new ArgumentNullException(nameof(key));
+                throw new ArgumentNullException(nameof(uri));
             }
 
+            var key = uri.ToString();
+
             // Find available drive with loaded tape
-            var drive = await GetAvailableDriveAsync(ct);
+            var drive = await GetAvailableDriveAsync(CancellationToken.None);
             if (drive == null)
             {
                 throw new InvalidOperationException("No tape drive available with loaded media");
             }
 
-            await drive.Lock.WaitAsync(ct);
+            await drive.Lock.WaitAsync(CancellationToken.None);
             try
             {
                 // Position to end of data (append mode)
-                await PositionToEndAsync(drive, ct);
+                await PositionToEndAsync(drive, CancellationToken.None);
 
                 // Read data into buffer
                 using var ms = new MemoryStream();
-                await data.CopyToAsync(ms, ct);
+                await data.CopyToAsync(ms, CancellationToken.None);
                 var dataBytes = ms.ToArray();
 
                 // Create file header
@@ -246,7 +239,7 @@ namespace DataWarehouse.Plugins.TapeLibrary
 
                 // Write header
                 var headerBytes = SerializeHeader(header);
-                await WriteTapeBlockAsync(drive, headerBytes, ct);
+                await WriteTapeBlockAsync(drive, headerBytes, CancellationToken.None);
 
                 // Write data in blocks
                 var offset = 0;
@@ -259,12 +252,12 @@ namespace DataWarehouse.Plugins.TapeLibrary
                     var block = new byte[currentBlockSize];
                     Array.Copy(dataBytes, offset, block, 0, currentBlockSize);
 
-                    await WriteTapeBlockAsync(drive, block, ct);
+                    await WriteTapeBlockAsync(drive, block, CancellationToken.None);
                     offset += currentBlockSize;
                 }
 
                 // Write file mark
-                await WriteFileMarkAsync(drive, ct);
+                await WriteFileMarkAsync(drive, CancellationToken.None);
 
                 // Update index
                 _fileIndex[key] = new FileMetadata
@@ -287,14 +280,16 @@ namespace DataWarehouse.Plugins.TapeLibrary
         }
 
         /// <inheritdoc/>
-        public override async Task<Stream> LoadAsync(string key, CancellationToken ct = default)
+        public override async Task<Stream> LoadAsync(Uri uri)
         {
             ObjectDisposedException.ThrowIf(_disposed, this);
 
-            if (string.IsNullOrEmpty(key))
+            if (uri == null)
             {
-                throw new ArgumentNullException(nameof(key));
+                throw new ArgumentNullException(nameof(uri));
             }
+
+            var key = uri.ToString();
 
             // Find file in index
             if (!_fileIndex.TryGetValue(key, out var metadata))
@@ -303,21 +298,21 @@ namespace DataWarehouse.Plugins.TapeLibrary
             }
 
             // Find drive with the right cartridge loaded
-            var drive = await GetDriveWithCartridgeAsync(metadata.CartridgeId, ct);
+            var drive = await GetDriveWithCartridgeAsync(metadata.CartridgeId, CancellationToken.None);
             if (drive == null)
             {
                 // Need to load the cartridge
-                drive = await LoadCartridgeAsync(metadata.CartridgeId, ct);
+                drive = await LoadCartridgeAsync(metadata.CartridgeId, null, CancellationToken.None);
             }
 
-            await drive.Lock.WaitAsync(ct);
+            await drive.Lock.WaitAsync(CancellationToken.None);
             try
             {
                 // Position to file start
-                await PositionToBlockAsync(drive, metadata.StartBlock, ct);
+                await PositionToBlockAsync(drive, metadata.StartBlock, CancellationToken.None);
 
                 // Read header
-                var headerBytes = await ReadTapeBlockAsync(drive, ct);
+                var headerBytes = await ReadTapeBlockAsync(drive, CancellationToken.None);
                 var header = DeserializeHeader(headerBytes);
 
                 if (header.FileName != key)
@@ -327,16 +322,16 @@ namespace DataWarehouse.Plugins.TapeLibrary
 
                 // Read file data
                 var fileData = new byte[header.FileSize];
-                var offset = 0;
+                var offset = 0L;
                 var blockSize = _config.BlockSize;
 
                 while (offset < header.FileSize)
                 {
-                    var block = await ReadTapeBlockAsync(drive, ct);
+                    var block = await ReadTapeBlockAsync(drive, CancellationToken.None);
                     var remaining = header.FileSize - offset;
-                    var copySize = Math.Min(block.Length, remaining);
+                    var copySize = (int)Math.Min(block.Length, remaining);
 
-                    Array.Copy(block, 0, fileData, offset, copySize);
+                    Array.Copy(block, 0, fileData, (int)offset, copySize);
                     offset += copySize;
                 }
 
@@ -352,40 +347,63 @@ namespace DataWarehouse.Plugins.TapeLibrary
         }
 
         /// <inheritdoc/>
-        public override async Task<bool> DeleteAsync(string key, CancellationToken ct = default)
+        public override Task DeleteAsync(Uri uri)
         {
             ObjectDisposedException.ThrowIf(_disposed, this);
+
+            if (uri == null)
+            {
+                throw new ArgumentNullException(nameof(uri));
+            }
+
+            var key = uri.ToString();
 
             // Tape doesn't support in-place deletion
             // Mark as deleted in index only
-            if (_fileIndex.TryRemove(key, out _))
-            {
-                return true;
-            }
+            _fileIndex.TryRemove(key, out _);
 
-            return false;
+            return Task.CompletedTask;
         }
 
         /// <inheritdoc/>
-        public override Task<bool> ExistsAsync(string key, CancellationToken ct = default)
+        public override Task<bool> ExistsAsync(Uri uri)
         {
             ObjectDisposedException.ThrowIf(_disposed, this);
+
+            if (uri == null)
+            {
+                throw new ArgumentNullException(nameof(uri));
+            }
+
+            var key = uri.ToString();
             return Task.FromResult(_fileIndex.ContainsKey(key));
         }
 
         /// <inheritdoc/>
-        public override Task<IReadOnlyList<string>> ListAsync(string? prefix = null, CancellationToken ct = default)
+        public override IAsyncEnumerable<StorageListItem> ListFilesAsync(string prefix = "", CancellationToken ct = default)
         {
             ObjectDisposedException.ThrowIf(_disposed, this);
 
-            IEnumerable<string> keys = _fileIndex.Keys;
+            return ListFilesAsyncImpl(prefix, ct);
+        }
 
-            if (!string.IsNullOrEmpty(prefix))
+        private async IAsyncEnumerable<StorageListItem> ListFilesAsyncImpl(string prefix, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct = default)
+        {
+            foreach (var kv in _fileIndex)
             {
-                keys = keys.Where(k => k.StartsWith(prefix, StringComparison.Ordinal));
-            }
+                if (ct.IsCancellationRequested)
+                    yield break;
 
-            return Task.FromResult<IReadOnlyList<string>>(keys.ToList());
+                if (!string.IsNullOrEmpty(prefix) && !kv.Key.StartsWith(prefix, StringComparison.Ordinal))
+                    continue;
+
+                yield return new StorageListItem(
+                    new Uri(kv.Key, UriKind.RelativeOrAbsolute),
+                    kv.Value.Size
+                );
+
+                await Task.Yield();
+            }
         }
 
         #endregion
@@ -395,7 +413,7 @@ namespace DataWarehouse.Plugins.TapeLibrary
         /// <summary>
         /// Performs a full library inventory scan.
         /// </summary>
-        public async Task<LibraryInventory> PerformInventoryAsync(CancellationToken ct = default)
+        internal async Task<LibraryInventory> PerformInventoryAsync(CancellationToken ct = default)
         {
             await _libraryLock.WaitAsync(ct);
             try
@@ -447,7 +465,7 @@ namespace DataWarehouse.Plugins.TapeLibrary
         /// <param name="cartridgeId">Bar code or slot number of cartridge.</param>
         /// <param name="driveId">Optional specific drive. If null, first available is used.</param>
         /// <param name="ct">Cancellation token.</param>
-        public async Task<TapeDrive> LoadCartridgeAsync(string cartridgeId, string? driveId = null, CancellationToken ct = default)
+        internal async Task<TapeDrive> LoadCartridgeAsync(string cartridgeId, string? driveId = null, CancellationToken ct = default)
         {
             TapeDrive? targetDrive;
 
@@ -1356,7 +1374,7 @@ namespace DataWarehouse.Plugins.TapeLibrary
     /// <summary>
     /// Library inventory result.
     /// </summary>
-    public sealed class LibraryInventory
+    internal sealed class LibraryInventory
     {
         public DateTime ScanStartTime { get; set; }
         public DateTime ScanEndTime { get; set; }

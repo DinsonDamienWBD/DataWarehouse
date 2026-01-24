@@ -631,7 +631,6 @@ public sealed class ZeroConfigPlugin : FeaturePluginBase, IDisposable
     private readonly SemaphoreSlim _discoveryLock = new(1, 1);
     private readonly object _stateLock = new();
 
-    private IKernelContext? _context;
     private CancellationTokenSource? _cts;
     private Task? _announcementTask;
     private Task? _discoveryTask;
@@ -672,7 +671,6 @@ public sealed class ZeroConfigPlugin : FeaturePluginBase, IDisposable
     /// <inheritdoc />
     public override Task<HandshakeResponse> OnHandshakeAsync(HandshakeRequest request)
     {
-        _context = request.Context;
         _localNodeId = GenerateNodeId();
         _localNodeName = $"node-{Environment.MachineName}-{_localNodeId[..8]}";
 
@@ -1053,7 +1051,11 @@ public sealed class ZeroConfigPlugin : FeaturePluginBase, IDisposable
             node.Capabilities = announcement.Capabilities;
             node.ConfigVersion = announcement.ConfigVersion;
             node.LastHeartbeat = DateTime.UtcNow;
-            node.Metadata = new Dictionary<string, string>(announcement.Metadata);
+            node.Metadata.Clear();
+            foreach (var kvp in announcement.Metadata)
+            {
+                node.Metadata[kvp.Key] = kvp.Value;
+            }
 
             // Add remote address if not already present
             if (!node.Addresses.Contains(remoteEndPoint.Address))
@@ -1668,10 +1670,19 @@ public sealed class ZeroConfigPlugin : FeaturePluginBase, IDisposable
             try
             {
                 var gcInfo = GC.GetGCMemoryInfo();
-                capabilities = capabilities with
+                capabilities = new NodeCapabilities
                 {
+                    CpuCores = capabilities.CpuCores,
+                    CpuFrequencyMhz = capabilities.CpuFrequencyMhz,
                     TotalMemoryBytes = gcInfo.TotalAvailableMemoryBytes,
-                    AvailableMemoryBytes = gcInfo.TotalAvailableMemoryBytes - GC.GetTotalMemory(false)
+                    AvailableMemoryBytes = gcInfo.TotalAvailableMemoryBytes - GC.GetTotalMemory(false),
+                    TotalDiskBytes = capabilities.TotalDiskBytes,
+                    AvailableDiskBytes = capabilities.AvailableDiskBytes,
+                    NetworkBandwidthMbps = capabilities.NetworkBandwidthMbps,
+                    OperatingSystem = capabilities.OperatingSystem,
+                    RuntimeVersion = capabilities.RuntimeVersion,
+                    HasSsdStorage = capabilities.HasSsdStorage,
+                    SupportsHardwareAcceleration = capabilities.SupportsHardwareAcceleration
                 };
             }
             catch
@@ -1688,10 +1699,19 @@ public sealed class ZeroConfigPlugin : FeaturePluginBase, IDisposable
 
                 if (drives.Count > 0)
                 {
-                    capabilities = capabilities with
+                    capabilities = new NodeCapabilities
                     {
+                        CpuCores = capabilities.CpuCores,
+                        CpuFrequencyMhz = capabilities.CpuFrequencyMhz,
+                        TotalMemoryBytes = capabilities.TotalMemoryBytes,
+                        AvailableMemoryBytes = capabilities.AvailableMemoryBytes,
                         TotalDiskBytes = drives.Sum(d => d.TotalSize),
-                        AvailableDiskBytes = drives.Sum(d => d.AvailableFreeSpace)
+                        AvailableDiskBytes = drives.Sum(d => d.AvailableFreeSpace),
+                        NetworkBandwidthMbps = capabilities.NetworkBandwidthMbps,
+                        OperatingSystem = capabilities.OperatingSystem,
+                        RuntimeVersion = capabilities.RuntimeVersion,
+                        HasSsdStorage = capabilities.HasSsdStorage,
+                        SupportsHardwareAcceleration = capabilities.SupportsHardwareAcceleration
                     };
                 }
             }
@@ -1710,9 +1730,19 @@ public sealed class ZeroConfigPlugin : FeaturePluginBase, IDisposable
                     .DefaultIfEmpty(0L)
                     .Max();
 
-                capabilities = capabilities with
+                capabilities = new NodeCapabilities
                 {
-                    NetworkBandwidthMbps = maxSpeed / 1_000_000
+                    CpuCores = capabilities.CpuCores,
+                    CpuFrequencyMhz = capabilities.CpuFrequencyMhz,
+                    TotalMemoryBytes = capabilities.TotalMemoryBytes,
+                    AvailableMemoryBytes = capabilities.AvailableMemoryBytes,
+                    TotalDiskBytes = capabilities.TotalDiskBytes,
+                    AvailableDiskBytes = capabilities.AvailableDiskBytes,
+                    NetworkBandwidthMbps = maxSpeed / 1_000_000,
+                    OperatingSystem = capabilities.OperatingSystem,
+                    RuntimeVersion = capabilities.RuntimeVersion,
+                    HasSsdStorage = capabilities.HasSsdStorage,
+                    SupportsHardwareAcceleration = capabilities.SupportsHardwareAcceleration
                 };
             }
             catch
@@ -1725,9 +1755,19 @@ public sealed class ZeroConfigPlugin : FeaturePluginBase, IDisposable
             {
                 // On Linux, check /sys/block/*/queue/rotational
                 // On Windows, use WMI (simplified here)
-                capabilities = capabilities with
+                capabilities = new NodeCapabilities
                 {
-                    HasSsdStorage = DetectSsdStorage()
+                    CpuCores = capabilities.CpuCores,
+                    CpuFrequencyMhz = capabilities.CpuFrequencyMhz,
+                    TotalMemoryBytes = capabilities.TotalMemoryBytes,
+                    AvailableMemoryBytes = capabilities.AvailableMemoryBytes,
+                    TotalDiskBytes = capabilities.TotalDiskBytes,
+                    AvailableDiskBytes = capabilities.AvailableDiskBytes,
+                    NetworkBandwidthMbps = capabilities.NetworkBandwidthMbps,
+                    OperatingSystem = capabilities.OperatingSystem,
+                    RuntimeVersion = capabilities.RuntimeVersion,
+                    HasSsdStorage = DetectSsdStorage(),
+                    SupportsHardwareAcceleration = capabilities.SupportsHardwareAcceleration
                 };
             }
             catch
@@ -1778,10 +1818,7 @@ public sealed class ZeroConfigPlugin : FeaturePluginBase, IDisposable
                 if (_localCapabilities != null)
                 {
                     var gcInfo = GC.GetGCMemoryInfo();
-                    _localCapabilities = _localCapabilities with
-                    {
-                        AvailableMemoryBytes = gcInfo.TotalAvailableMemoryBytes - GC.GetTotalMemory(false)
-                    };
+                    _localCapabilities.AvailableMemoryBytes = gcInfo.TotalAvailableMemoryBytes - GC.GetTotalMemory(false);
 
                     var drives = DriveInfo.GetDrives()
                         .Where(d => d.IsReady && d.DriveType == DriveType.Fixed)
@@ -1789,10 +1826,7 @@ public sealed class ZeroConfigPlugin : FeaturePluginBase, IDisposable
 
                     if (drives.Count > 0)
                     {
-                        _localCapabilities = _localCapabilities with
-                        {
-                            AvailableDiskBytes = drives.Sum(d => d.AvailableFreeSpace)
-                        };
+                        _localCapabilities.AvailableDiskBytes = drives.Sum(d => d.AvailableFreeSpace);
                     }
 
                     if (_localNode != null)

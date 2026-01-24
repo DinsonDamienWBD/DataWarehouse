@@ -22,7 +22,7 @@ namespace DataWarehouse.Plugins.CrdtReplication.Crdts
     /// - Eventually converges to the same set on all replicas
     /// - Delta-state capable for efficient synchronization
     /// </remarks>
-    public sealed class ORSet<T> : ICrdt<ORSet<T>>, IDeltaCrdt<ORSet<T>>, IEnumerable<T> where T : notnull
+    public class ORSet<T> : ICrdt<ORSet<T>>, IDeltaCrdt<ORSet<T>>, IEnumerable<T> where T : notnull
     {
         private readonly ConcurrentDictionary<T, HashSet<UniqueTag>> _elements;
         private readonly ConcurrentDictionary<UniqueTag, byte> _tombstones;

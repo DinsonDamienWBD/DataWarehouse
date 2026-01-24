@@ -590,7 +590,7 @@ public sealed class EmbeddedDatabasePlugin : HybridDatabasePluginBase<EmbeddedDb
                     var value = reader.IsDBNull(i) ? null : reader.GetValue(i);
                     row[name] = value!;
                 }
-                results.Add(JsonSerializer.SerializeToElement(row, _jsonOptions));
+                results.Add(System.Text.Json.JsonSerializer.SerializeToElement(row, _jsonOptions));
             }
 
             return results;

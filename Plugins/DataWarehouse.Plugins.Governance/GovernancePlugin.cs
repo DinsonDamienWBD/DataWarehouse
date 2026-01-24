@@ -61,16 +61,16 @@ public sealed class GovernancePlugin : GovernancePluginBase
         // PII patterns
         _piiPatterns.AddRange(new[]
         {
-            new PiiPattern { Name = "SSN", Pattern = @"\b\d{3}-\d{2}-\d{4}\b", Severity = AlertSeverity.Critical, Category = "PII" },
-            new PiiPattern { Name = "CreditCard", Pattern = @"\b(?:\d{4}[-\s]?){3}\d{4}\b", Severity = AlertSeverity.Critical, Category = "PCI" },
-            new PiiPattern { Name = "Email", Pattern = @"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b", Severity = AlertSeverity.Warning, Category = "PII" },
-            new PiiPattern { Name = "Phone", Pattern = @"\b(?:\+1[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}\b", Severity = AlertSeverity.Warning, Category = "PII" },
-            new PiiPattern { Name = "IPAddress", Pattern = @"\b(?:\d{1,3}\.){3}\d{1,3}\b", Severity = AlertSeverity.Info, Category = "Network" },
-            new PiiPattern { Name = "DateOfBirth", Pattern = @"\b(?:DOB|Date of Birth|Born)[:\s]*\d{1,2}[-/]\d{1,2}[-/]\d{2,4}\b", Severity = AlertSeverity.Warning, Category = "PII" },
-            new PiiPattern { Name = "DriversLicense", Pattern = @"\b[A-Z]{1,2}\d{6,8}\b", Severity = AlertSeverity.Critical, Category = "PII" },
-            new PiiPattern { Name = "Passport", Pattern = @"\b[A-Z]{1,2}\d{7,9}\b", Severity = AlertSeverity.Critical, Category = "PII" },
-            new PiiPattern { Name = "MedicalRecordNumber", Pattern = @"\b(?:MRN|Medical Record)[:\s]*\d{6,12}\b", Severity = AlertSeverity.Critical, Category = "HIPAA" },
-            new PiiPattern { Name = "BankAccount", Pattern = @"\b\d{8,17}\b", Severity = AlertSeverity.Warning, Category = "Financial" }
+            new PiiPattern { Name = "SSN", Pattern = @"\b\d{3}-\d{2}-\d{4}\b", Severity = SDK.Primitives.AlertSeverity.Critical, Category = "PII" },
+            new PiiPattern { Name = "CreditCard", Pattern = @"\b(?:\d{4}[-\s]?){3}\d{4}\b", Severity = SDK.Primitives.AlertSeverity.Critical, Category = "PCI" },
+            new PiiPattern { Name = "Email", Pattern = @"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b", Severity = SDK.Primitives.AlertSeverity.Warning, Category = "PII" },
+            new PiiPattern { Name = "Phone", Pattern = @"\b(?:\+1[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}\b", Severity = SDK.Primitives.AlertSeverity.Warning, Category = "PII" },
+            new PiiPattern { Name = "IPAddress", Pattern = @"\b(?:\d{1,3}\.){3}\d{1,3}\b", Severity = SDK.Primitives.AlertSeverity.Info, Category = "Network" },
+            new PiiPattern { Name = "DateOfBirth", Pattern = @"\b(?:DOB|Date of Birth|Born)[:\s]*\d{1,2}[-/]\d{1,2}[-/]\d{2,4}\b", Severity = SDK.Primitives.AlertSeverity.Warning, Category = "PII" },
+            new PiiPattern { Name = "DriversLicense", Pattern = @"\b[A-Z]{1,2}\d{6,8}\b", Severity = SDK.Primitives.AlertSeverity.Critical, Category = "PII" },
+            new PiiPattern { Name = "Passport", Pattern = @"\b[A-Z]{1,2}\d{7,9}\b", Severity = SDK.Primitives.AlertSeverity.Critical, Category = "PII" },
+            new PiiPattern { Name = "MedicalRecordNumber", Pattern = @"\b(?:MRN|Medical Record)[:\s]*\d{6,12}\b", Severity = SDK.Primitives.AlertSeverity.Critical, Category = "HIPAA" },
+            new PiiPattern { Name = "BankAccount", Pattern = @"\b\d{8,17}\b", Severity = SDK.Primitives.AlertSeverity.Warning, Category = "Financial" }
         });
 
         // Malware signatures (simplified examples)
@@ -285,7 +285,7 @@ public sealed class GovernancePlugin : GovernancePluginBase
                         Type = FindingType.Malware,
                         Name = signature.Name,
                         Category = signature.Type,
-                        Severity = AlertSeverity.Critical,
+                        Severity = SDK.Primitives.AlertSeverity.Critical,
                         MatchCount = 1,
                         Description = $"Detected malware signature: {signature.Name} ({signature.Type})"
                     });
@@ -334,7 +334,7 @@ public sealed class GovernancePlugin : GovernancePluginBase
                             Type = FindingType.Retention,
                             Name = "RetentionExceeded",
                             Category = policy.Name,
-                            Severity = AlertSeverity.Warning,
+                            Severity = SDK.Primitives.AlertSeverity.Warning,
                             Description = $"Data exceeds retention period of {rule.MaxRetentionDays} days"
                         });
                     }
@@ -362,7 +362,7 @@ public sealed class GovernancePlugin : GovernancePluginBase
             }
         }
 
-        if (findings.Any(f => f.Severity == AlertSeverity.Critical))
+        if (findings.Any(f => f.Severity == SDK.Primitives.AlertSeverity.Critical))
         {
             judgment.InterventionRequired = true;
         }
@@ -389,7 +389,7 @@ public sealed class GovernancePlugin : GovernancePluginBase
                 judgment.BlockOperation = true;
                 judgment.Alert = new GovernanceAlert
                 {
-                    Severity = AlertSeverity.Critical,
+                    Severity = SDK.Primitives.AlertSeverity.Critical,
                     Code = $"{finding.Type}_BLOCKED",
                     Message = finding.Description,
                     Recommendation = "Operation blocked due to policy violation"
@@ -454,7 +454,7 @@ public sealed class GovernancePlugin : GovernancePluginBase
             Timestamp = DateTime.UtcNow,
             Findings = findings,
             FindingCount = findings.Count,
-            CriticalCount = findings.Count(f => f.Severity == AlertSeverity.Critical)
+            CriticalCount = findings.Count(f => f.Severity == SDK.Primitives.AlertSeverity.Critical)
         };
     }
 
@@ -577,7 +577,7 @@ public sealed class GovernancePlugin : GovernancePluginBase
     {
         public required string Name { get; init; }
         public required string Pattern { get; init; }
-        public AlertSeverity Severity { get; init; }
+        public SDK.Primitives.AlertSeverity Severity { get; init; }
         public required string Category { get; init; }
     }
 
@@ -593,7 +593,7 @@ public sealed class GovernancePlugin : GovernancePluginBase
         public FindingType Type { get; init; }
         public required string Name { get; init; }
         public required string Category { get; init; }
-        public AlertSeverity Severity { get; init; }
+        public SDK.Primitives.AlertSeverity Severity { get; init; }
         public int MatchCount { get; init; }
         public required string Description { get; init; }
     }

@@ -255,11 +255,20 @@ public sealed class AirGappedBackupPlugin : BackupPluginBase, IAsyncDisposable
             }
             catch (Exception ex)
             {
-                job = job with
+                job = new BackupJob
                 {
+                    JobId = job.JobId,
+                    Name = job.Name,
+                    Type = job.Type,
                     State = BackupJobState.Failed,
+                    StartedAt = job.StartedAt,
+                    CompletedAt = DateTime.UtcNow,
+                    BytesProcessed = job.BytesProcessed,
+                    BytesTransferred = job.BytesTransferred,
+                    FilesProcessed = job.FilesProcessed,
+                    Progress = job.Progress,
                     ErrorMessage = ex.Message,
-                    CompletedAt = DateTime.UtcNow
+                    Tags = job.Tags
                 };
                 _backupJobs[job.JobId] = job;
             }
@@ -315,7 +324,21 @@ public sealed class AirGappedBackupPlugin : BackupPluginBase, IAsyncDisposable
         if (job.State != BackupJobState.Running && job.State != BackupJobState.Pending)
             return false;
 
-        var updatedJob = job with { State = BackupJobState.Cancelled, CompletedAt = DateTime.UtcNow };
+        var updatedJob = new BackupJob
+        {
+            JobId = job.JobId,
+            Name = job.Name,
+            Type = job.Type,
+            State = BackupJobState.Cancelled,
+            StartedAt = job.StartedAt,
+            CompletedAt = DateTime.UtcNow,
+            BytesProcessed = job.BytesProcessed,
+            BytesTransferred = job.BytesTransferred,
+            FilesProcessed = job.FilesProcessed,
+            Progress = job.Progress,
+            ErrorMessage = job.ErrorMessage,
+            Tags = job.Tags
+        };
         _backupJobs[jobId] = updatedJob;
 
         return true;
@@ -1155,12 +1178,10 @@ public sealed class AirGappedBackupPlugin : BackupPluginBase, IAsyncDisposable
         }
 
         // Update drive status
-        _driveStatuses[driveKey] = driveStatus with
-        {
-            HasMedia = false,
-            LoadedMediaId = null,
-            CurrentOperation = "Idle"
-        };
+        driveStatus.HasMedia = false;
+        driveStatus.LoadedMediaId = null;
+        driveStatus.CurrentOperation = "Idle";
+        _driveStatuses[driveKey] = driveStatus;
 
         // Update media
         media.CurrentLocation = $"{libraryId}:slot:{targetSlot}";
@@ -2072,7 +2093,21 @@ public sealed class AirGappedBackupPlugin : BackupPluginBase, IAsyncDisposable
         BackupRequest request,
         CancellationToken ct)
     {
-        var updatedJob = job with { State = BackupJobState.Running };
+        var updatedJob = new BackupJob
+        {
+            JobId = job.JobId,
+            Name = job.Name,
+            Type = job.Type,
+            State = BackupJobState.Running,
+            StartedAt = job.StartedAt,
+            CompletedAt = job.CompletedAt,
+            BytesProcessed = job.BytesProcessed,
+            BytesTransferred = job.BytesTransferred,
+            FilesProcessed = job.FilesProcessed,
+            Progress = job.Progress,
+            ErrorMessage = job.ErrorMessage,
+            Tags = job.Tags
+        };
         _backupJobs[job.JobId] = updatedJob;
 
         try
@@ -2089,24 +2124,38 @@ public sealed class AirGappedBackupPlugin : BackupPluginBase, IAsyncDisposable
                 options,
                 ct);
 
-            updatedJob = updatedJob with
+            updatedJob = new BackupJob
             {
+                JobId = updatedJob.JobId,
+                Name = updatedJob.Name,
+                Type = updatedJob.Type,
                 State = result.Success ? BackupJobState.Completed : BackupJobState.Failed,
+                StartedAt = updatedJob.StartedAt,
                 CompletedAt = DateTime.UtcNow,
                 BytesProcessed = result.TotalBytesWritten,
                 BytesTransferred = result.TotalBytesWritten,
                 FilesProcessed = (int)result.TotalFilesWritten,
                 Progress = 100,
-                ErrorMessage = result.Success ? null : string.Join("; ", result.Errors)
+                ErrorMessage = result.Success ? null : string.Join("; ", result.Errors),
+                Tags = updatedJob.Tags
             };
         }
         catch (Exception ex)
         {
-            updatedJob = updatedJob with
+            updatedJob = new BackupJob
             {
+                JobId = updatedJob.JobId,
+                Name = updatedJob.Name,
+                Type = updatedJob.Type,
                 State = BackupJobState.Failed,
+                StartedAt = updatedJob.StartedAt,
                 CompletedAt = DateTime.UtcNow,
-                ErrorMessage = ex.Message
+                BytesProcessed = updatedJob.BytesProcessed,
+                BytesTransferred = updatedJob.BytesTransferred,
+                FilesProcessed = updatedJob.FilesProcessed,
+                Progress = updatedJob.Progress,
+                ErrorMessage = ex.Message,
+                Tags = updatedJob.Tags
             };
 
             Interlocked.Increment(ref _failedBackups);
@@ -2318,66 +2367,66 @@ public sealed class AirGappedBackupPlugin : BackupPluginBase, IAsyncDisposable
             {
                 Name = "AirGappedBackup",
                 Description = "Performs an air-gapped backup to offline media",
-                Parameters = new List<PluginParameterDescriptor>
+                Parameters = new Dictionary<string, object>
                 {
-                    new() { Name = "sourcePaths", Type = "string[]", Required = true, Description = "Paths to back up" },
-                    new() { Name = "targetMediaId", Type = "string", Required = false, Description = "Target media ID" },
-                    new() { Name = "verifyAfterWrite", Type = "bool", Required = false, Description = "Verify after write" }
+                    ["sourcePaths"] = new PluginParameterDescriptor { Name = "sourcePaths", Type = "string[]", Required = true, Description = "Paths to back up" },
+                    ["targetMediaId"] = new PluginParameterDescriptor { Name = "targetMediaId", Type = "string", Required = false, Description = "Target media ID" },
+                    ["verifyAfterWrite"] = new PluginParameterDescriptor { Name = "verifyAfterWrite", Type = "bool", Required = false, Description = "Verify after write" }
                 }
             },
             new()
             {
                 Name = "VerifyAirGap",
                 Description = "Verifies system is properly air-gapped",
-                Parameters = new List<PluginParameterDescriptor>()
+                Parameters = new Dictionary<string, object>()
             },
             new()
             {
                 Name = "RegisterMedia",
                 Description = "Registers new media in inventory",
-                Parameters = new List<PluginParameterDescriptor>
+                Parameters = new Dictionary<string, object>
                 {
-                    new() { Name = "mediaInfo", Type = "MediaInfo", Required = true, Description = "Media information" },
-                    new() { Name = "custodian", Type = "string", Required = true, Description = "Initial custodian" },
-                    new() { Name = "location", Type = "string", Required = true, Description = "Initial location" }
+                    ["mediaInfo"] = new PluginParameterDescriptor { Name = "mediaInfo", Type = "MediaInfo", Required = true, Description = "Media information" },
+                    ["custodian"] = new PluginParameterDescriptor { Name = "custodian", Type = "string", Required = true, Description = "Initial custodian" },
+                    ["location"] = new PluginParameterDescriptor { Name = "location", Type = "string", Required = true, Description = "Initial location" }
                 }
             },
             new()
             {
                 Name = "RecordCustodyEvent",
                 Description = "Records a chain of custody event",
-                Parameters = new List<PluginParameterDescriptor>
+                Parameters = new Dictionary<string, object>
                 {
-                    new() { Name = "entry", Type = "ChainOfCustodyEntry", Required = true, Description = "Custody entry" }
+                    ["entry"] = new PluginParameterDescriptor { Name = "entry", Type = "ChainOfCustodyEntry", Required = true, Description = "Custody entry" }
                 }
             },
             new()
             {
                 Name = "VerifyMediaIntegrity",
                 Description = "Verifies integrity of data on media",
-                Parameters = new List<PluginParameterDescriptor>
+                Parameters = new Dictionary<string, object>
                 {
-                    new() { Name = "mediaId", Type = "string", Required = true, Description = "Media identifier" }
+                    ["mediaId"] = new PluginParameterDescriptor { Name = "mediaId", Type = "string", Required = true, Description = "Media identifier" }
                 }
             },
             new()
             {
                 Name = "LoadTape",
                 Description = "Loads a tape from slot to drive",
-                Parameters = new List<PluginParameterDescriptor>
+                Parameters = new Dictionary<string, object>
                 {
-                    new() { Name = "libraryId", Type = "string", Required = true, Description = "Library identifier" },
-                    new() { Name = "slotNumber", Type = "int", Required = true, Description = "Source slot" },
-                    new() { Name = "driveIndex", Type = "int", Required = true, Description = "Target drive" }
+                    ["libraryId"] = new PluginParameterDescriptor { Name = "libraryId", Type = "string", Required = true, Description = "Library identifier" },
+                    ["slotNumber"] = new PluginParameterDescriptor { Name = "slotNumber", Type = "int", Required = true, Description = "Source slot" },
+                    ["driveIndex"] = new PluginParameterDescriptor { Name = "driveIndex", Type = "int", Required = true, Description = "Target drive" }
                 }
             },
             new()
             {
                 Name = "ScheduleRotation",
                 Description = "Schedules a media rotation",
-                Parameters = new List<PluginParameterDescriptor>
+                Parameters = new Dictionary<string, object>
                 {
-                    new() { Name = "entry", Type = "MediaRotationEntry", Required = true, Description = "Rotation entry" }
+                    ["entry"] = new PluginParameterDescriptor { Name = "entry", Type = "MediaRotationEntry", Required = true, Description = "Rotation entry" }
                 }
             }
         };

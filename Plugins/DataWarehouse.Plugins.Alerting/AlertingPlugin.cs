@@ -1687,8 +1687,8 @@ namespace DataWarehouse.Plugins.Alerting
                 ["thresholdValue"] = a.ThresholdValue,
                 ["message"] = a.Message,
                 ["firedAt"] = a.FiredAt,
-                ["acknowledgedAt"] = a.AcknowledgedAt,
-                ["acknowledgedBy"] = a.AcknowledgedBy,
+                ["acknowledgedAt"] = (object?)a.AcknowledgedAt ?? DBNull.Value,
+                ["acknowledgedBy"] = (object?)a.AcknowledgedBy ?? DBNull.Value,
                 ["escalationLevel"] = a.EscalationLevel
             }).ToList();
 
@@ -1892,7 +1892,7 @@ namespace DataWarehouse.Plugins.Alerting
                 ["totalAlertsEscalated"] = historyInRange.Count(h => h.EventType == AlertHistoryEventType.Escalated),
                 ["alertsByRule"] = alertsByRule,
                 ["alertsBySeverity"] = alertsBySeverity,
-                ["meanTimeToResolve"] = mttr?.TotalMinutes,
+                ["meanTimeToResolve"] = (object?)mttr?.TotalMinutes ?? DBNull.Value,
                 ["currentActiveAlerts"] = _activeAlerts.Count,
                 ["totalRules"] = _rules.Count,
                 ["enabledRules"] = _rules.Values.Count(r => r.Enabled),
@@ -2207,8 +2207,8 @@ namespace DataWarehouse.Plugins.Alerting
                 ["labels"] = rule.Labels ?? new Dictionary<string, string>(),
                 ["notificationChannels"] = rule.NotificationChannels ?? new List<string>(),
                 ["evaluationWindowMinutes"] = rule.EvaluationWindow.TotalMinutes,
-                ["pendingDurationMinutes"] = rule.PendingDuration?.TotalMinutes,
-                ["repeatIntervalMinutes"] = rule.RepeatInterval?.TotalMinutes,
+                ["pendingDurationMinutes"] = (object?)rule.PendingDuration?.TotalMinutes ?? DBNull.Value,
+                ["repeatIntervalMinutes"] = (object?)rule.RepeatInterval?.TotalMinutes ?? DBNull.Value,
                 ["enabled"] = rule.Enabled,
                 ["createdAt"] = rule.CreatedAt,
                 ["updatedAt"] = rule.UpdatedAt,

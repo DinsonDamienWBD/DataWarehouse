@@ -20,7 +20,7 @@ namespace DataWarehouse.Plugins.CrdtReplication.Crdts
     /// - Visible elements = added set - removed set
     /// - Eventually converges to the same set on all replicas
     /// </remarks>
-    public sealed class TwoPhaseSet<T> : ICrdt<TwoPhaseSet<T>>, IDeltaCrdt<TwoPhaseSet<T>>, IEnumerable<T> where T : notnull
+    public class TwoPhaseSet<T> : ICrdt<TwoPhaseSet<T>>, IDeltaCrdt<TwoPhaseSet<T>>, IEnumerable<T> where T : notnull
     {
         private readonly GSet<T> _added;
         private readonly GSet<T> _removed;

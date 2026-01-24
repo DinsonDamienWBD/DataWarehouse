@@ -1287,7 +1287,8 @@ namespace DataWarehouse.SDK.Contracts
         Encryption = 128,
         Scheduling = 256,
         Verification = 512,
-        All = Full | Incremental | Differential | Continuous | Synthetic | Dedup | Compression | Encryption | Scheduling | Verification
+        TestRestore = 1024,
+        All = Full | Incremental | Differential | Continuous | Synthetic | Dedup | Compression | Encryption | Scheduling | Verification | TestRestore
     }
 
     /// <summary>

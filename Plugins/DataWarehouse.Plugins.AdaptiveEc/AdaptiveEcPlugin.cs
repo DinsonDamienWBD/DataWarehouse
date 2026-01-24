@@ -72,6 +72,9 @@ namespace DataWarehouse.Plugins.AdaptiveEc
         /// <inheritdoc/>
         public override int ParityShardCount => _currentProfile.ParityShards;
 
+        /// <inheritdoc/>
+        public override PluginCategory Category => PluginCategory.StorageProvider;
+
         /// <summary>
         /// Initializes a new instance of the adaptive erasure coding plugin.
         /// </summary>

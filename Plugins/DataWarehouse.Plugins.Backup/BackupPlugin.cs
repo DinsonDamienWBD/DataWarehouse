@@ -1,5 +1,6 @@
 using DataWarehouse.Plugins.Backup.Providers;
 using DataWarehouse.SDK.Contracts;
+using DataWarehouse.SDK.Primitives;
 using DataWarehouse.SDK.Utilities;
 using System.Collections.Concurrent;
 
@@ -411,49 +412,49 @@ public sealed class BackupPlugin : FeaturePluginBase, IAsyncDisposable
             {
                 Name = "FullBackup",
                 Description = "Performs a full backup of specified paths",
-                Parameters = new List<PluginParameterDescriptor>
+                Parameters = new Dictionary<string, object>
                 {
-                    new() { Name = "paths", Type = "string[]", Required = true, Description = "Paths to backup" },
-                    new() { Name = "provider", Type = "string", Required = true, Description = "Provider name" }
+                    ["paths"] = new PluginParameterDescriptor { Name = "paths", Type = "string[]", Required = true, Description = "Paths to backup" },
+                    ["provider"] = new PluginParameterDescriptor { Name = "provider", Type = "string", Required = true, Description = "Provider name" }
                 }
             },
             new()
             {
                 Name = "IncrementalBackup",
                 Description = "Performs an incremental backup",
-                Parameters = new List<PluginParameterDescriptor>
+                Parameters = new Dictionary<string, object>
                 {
-                    new() { Name = "provider", Type = "string", Required = true, Description = "Provider name" }
+                    ["provider"] = new PluginParameterDescriptor { Name = "provider", Type = "string", Required = true, Description = "Provider name" }
                 }
             },
             new()
             {
                 Name = "Restore",
                 Description = "Restores from a backup",
-                Parameters = new List<PluginParameterDescriptor>
+                Parameters = new Dictionary<string, object>
                 {
-                    new() { Name = "provider", Type = "string", Required = true, Description = "Provider name" },
-                    new() { Name = "backupId", Type = "string", Required = true, Description = "Backup ID to restore" },
-                    new() { Name = "targetPath", Type = "string", Required = false, Description = "Target restore path" }
+                    ["provider"] = new PluginParameterDescriptor { Name = "provider", Type = "string", Required = true, Description = "Provider name" },
+                    ["backupId"] = new PluginParameterDescriptor { Name = "backupId", Type = "string", Required = true, Description = "Backup ID to restore" },
+                    ["targetPath"] = new PluginParameterDescriptor { Name = "targetPath", Type = "string", Required = false, Description = "Target restore path" }
                 }
             },
             new()
             {
                 Name = "SyntheticFull",
                 Description = "Creates a synthetic full backup from incrementals",
-                Parameters = new List<PluginParameterDescriptor>
+                Parameters = new Dictionary<string, object>
                 {
-                    new() { Name = "provider", Type = "string", Required = true, Description = "Provider name" }
+                    ["provider"] = new PluginParameterDescriptor { Name = "provider", Type = "string", Required = true, Description = "Provider name" }
                 }
             },
             new()
             {
                 Name = "StartContinuous",
                 Description = "Starts continuous backup monitoring",
-                Parameters = new List<PluginParameterDescriptor>
+                Parameters = new Dictionary<string, object>
                 {
-                    new() { Name = "provider", Type = "string", Required = true, Description = "Provider name" },
-                    new() { Name = "paths", Type = "string[]", Required = true, Description = "Paths to monitor" }
+                    ["provider"] = new PluginParameterDescriptor { Name = "provider", Type = "string", Required = true, Description = "Provider name" },
+                    ["paths"] = new PluginParameterDescriptor { Name = "paths", Type = "string[]", Required = true, Description = "Paths to monitor" }
                 }
             }
         };

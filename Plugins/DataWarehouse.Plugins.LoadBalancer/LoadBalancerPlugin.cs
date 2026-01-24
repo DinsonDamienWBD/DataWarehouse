@@ -1676,7 +1676,7 @@ namespace DataWarehouse.Plugins.LoadBalancer
                             Interlocked.Increment(ref _successfulRoutes);
                             RecordBackendRequest(stickyBackend.Id);
 
-                            var connection = _connectionPool != null
+                            var stickyConnection = _connectionPool != null
                                 ? await _connectionPool.AcquireAsync(stickyBackend, ct)
                                 : null;
 
@@ -1688,7 +1688,7 @@ namespace DataWarehouse.Plugins.LoadBalancer
                                 _config.Algorithm,
                                 sw.Elapsed,
                                 session.SessionId,
-                                connection);
+                                stickyConnection);
                         }
 
                         // Backend unhealthy, failover if configured

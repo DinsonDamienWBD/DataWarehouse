@@ -250,8 +250,8 @@ namespace DataWarehouse.Plugins.ContentProcessing
 
             // Check for BOM
             var bomResult = DetectByBom(data);
-            if (bomResult.HasValue)
-                return (bomResult.Value, 1.0);
+            if (bomResult != null)
+                return (bomResult, 1.0);
 
             // Statistical analysis
             return DetectByStatistics(data);

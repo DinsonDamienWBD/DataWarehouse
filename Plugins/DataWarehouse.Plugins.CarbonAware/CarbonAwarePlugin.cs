@@ -408,7 +408,7 @@ public sealed class CarbonAwarePlugin : FeaturePluginBase
             ["minIntensity"] = forecast.DataPoints.Count > 0 ? forecast.DataPoints.Min(p => p.Intensity) : -1,
             ["maxIntensity"] = forecast.DataPoints.Count > 0 ? forecast.DataPoints.Max(p => p.Intensity) : -1,
             ["avgIntensity"] = forecast.DataPoints.Count > 0 ? forecast.DataPoints.Average(p => p.Intensity) : -1,
-            ["optimalTime"] = optimalWindow?.Timestamp
+            ["optimalTime"] = optimalWindow?.Timestamp as object ?? DBNull.Value
         };
         message.Payload["success"] = true;
     }

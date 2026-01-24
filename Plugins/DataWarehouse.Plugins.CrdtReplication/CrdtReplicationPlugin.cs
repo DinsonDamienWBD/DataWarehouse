@@ -299,7 +299,7 @@ namespace DataWarehouse.Plugins.CrdtReplication
                     ["success"] = true,
                     ["key"] = key,
                     ["type"] = crdt.GetCrdtType(),
-                    ["value"] = crdt.GetValue(),
+                    ["value"] = crdt.GetValue() ?? DBNull.Value,
                     ["metadata"] = crdt.GetMetadata()
                 };
             }
@@ -337,7 +337,7 @@ namespace DataWarehouse.Plugins.CrdtReplication
                     ["success"] = true,
                     ["key"] = key,
                     ["operation"] = operation,
-                    ["newValue"] = crdt.GetValue()
+                    ["newValue"] = crdt.GetValue() ?? DBNull.Value
                 };
             }
             catch (Exception ex)
@@ -369,7 +369,7 @@ namespace DataWarehouse.Plugins.CrdtReplication
                 {
                     ["success"] = true,
                     ["key"] = key,
-                    ["newValue"] = crdt.GetValue()
+                    ["newValue"] = crdt.GetValue() ?? DBNull.Value
                 };
             }
             catch (Exception ex)
@@ -409,7 +409,7 @@ namespace DataWarehouse.Plugins.CrdtReplication
                 {
                     ["key"] = kv.Key,
                     ["type"] = kv.Value.GetCrdtType(),
-                    ["value"] = kv.Value.GetValue()
+                    ["value"] = kv.Value.GetValue() ?? DBNull.Value
                 }).ToList();
 
                 return new Dictionary<string, object>

@@ -22,7 +22,8 @@ public static class ConfigCommands
                     if (config.TryGetValue(section, out var sectionConfig))
                     {
                         AnsiConsole.MarkupLine($"[bold]{section}[/]\n");
-                        AnsiConsole.Write(new JsonText(JsonSerializer.Serialize(sectionConfig, new JsonSerializerOptions { WriteIndented = true })));
+                        var json = JsonSerializer.Serialize(sectionConfig, new JsonSerializerOptions { WriteIndented = true });
+                        AnsiConsole.WriteLine(json);
                     }
                     else
                     {

@@ -62,7 +62,6 @@ public sealed class FederationPlugin : ReplicationPluginBase
     private readonly SemaphoreSlim _trustLock = new(1, 1);
     private readonly object _auditLock = new();
 
-    private IKernelContext? _context;
     private CancellationTokenSource? _cts;
     private Task? _healthCheckTask;
     private Task? _tokenRefreshTask;
@@ -93,7 +92,6 @@ public sealed class FederationPlugin : ReplicationPluginBase
     /// <inheritdoc />
     public override Task<HandshakeResponse> OnHandshakeAsync(HandshakeRequest request)
     {
-        _context = request.Context;
         _instanceId = $"federation-{request.KernelId}-{Guid.NewGuid():N}"[..32];
 
         if (request.Config?.TryGetValue("endpoint", out var endpoint) == true && endpoint is string ep)
@@ -1103,6 +1101,12 @@ public sealed class FederationPlugin : ReplicationPluginBase
         var maxAccessLevelStr = payload.GetValueOrDefault("maxAccessLevel")?.ToString();
         var isEnabled = payload.GetValueOrDefault("enabled") as bool? ?? true;
 
+        var maxLevel = AccessLevel.Read;
+        if (!string.IsNullOrEmpty(maxAccessLevelStr) && Enum.TryParse<AccessLevel>(maxAccessLevelStr, out var parsedLevel))
+        {
+            maxLevel = parsedLevel;
+        }
+
         var policy = new FederationPolicy
         {
             PolicyId = policyId,
@@ -1111,13 +1115,9 @@ public sealed class FederationPlugin : ReplicationPluginBase
             IsEnabled = isEnabled,
             CreatedAt = DateTime.UtcNow,
             AllowedDataTypes = ParseJsonStringArray(allowedTypesJson) ?? new List<string> { "*" },
-            DeniedDataTypes = ParseJsonStringArray(deniedTypesJson) ?? new List<string>()
+            DeniedDataTypes = ParseJsonStringArray(deniedTypesJson) ?? new List<string>(),
+            MaxAccessLevel = maxLevel
         };
-
-        if (!string.IsNullOrEmpty(maxAccessLevelStr) && Enum.TryParse<AccessLevel>(maxAccessLevelStr, out var maxLevel))
-        {
-            policy.MaxAccessLevel = maxLevel;
-        }
 
         _policies[policyId] = policy;
 
@@ -1450,7 +1450,7 @@ public sealed class FederationPlugin : ReplicationPluginBase
                     ? pwd?.ToString()
                     : null;
 
-                _localCertificate = new X509Certificate2(path, password);
+                _localCertificate = X509CertificateLoader.LoadPkcs12FromFile(path, password);
                 _localPrivateKey = _localCertificate.GetRSAPrivateKey();
             }
             else

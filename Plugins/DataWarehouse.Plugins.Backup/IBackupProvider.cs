@@ -216,7 +216,7 @@ public sealed record BackupResult
     public required string BackupId { get; init; }
 
     /// <summary>Gets whether the backup succeeded.</summary>
-    public bool Success { get; init; }
+    public bool Success { get; set; }
 
     /// <summary>Gets the backup type.</summary>
     public BackupProviderType BackupType { get; init; }

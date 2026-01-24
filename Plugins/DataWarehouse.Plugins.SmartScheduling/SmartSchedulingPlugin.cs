@@ -68,9 +68,6 @@ public sealed class SmartSchedulingPlugin : IntelligencePluginBase
     /// <inheritdoc/>
     public override string Version => "1.0.0";
 
-    /// <inheritdoc/>
-    public override PluginCategory Category => PluginCategory.IntelligenceProvider;
-
     /// <summary>
     /// Initializes a new instance of the SmartSchedulingPlugin.
     /// </summary>
@@ -89,8 +86,15 @@ public sealed class SmartSchedulingPlugin : IntelligencePluginBase
         _sessionStart = DateTime.UtcNow;
     }
 
-    /// <inheritdoc/>
-    public override async Task StartAsync(CancellationToken ct)
+    /// <summary>
+    /// Gets the AI provider type.
+    /// </summary>
+    public override string ProviderType => "scheduler";
+
+    /// <summary>
+    /// Starts the scheduler plugin.
+    /// </summary>
+    public Task StartAsync(CancellationToken ct)
     {
         _sessionStart = DateTime.UtcNow;
 
@@ -110,11 +114,13 @@ public sealed class SmartSchedulingPlugin : IntelligencePluginBase
         _monitorTask = RunMonitorAsync(_cts.Token);
         _loadBalancerTask = RunLoadBalancerAsync(_cts.Token);
 
-        await Task.CompletedTask;
+        return Task.CompletedTask;
     }
 
-    /// <inheritdoc/>
-    public override async Task StopAsync()
+    /// <summary>
+    /// Stops the scheduler plugin.
+    /// </summary>
+    public async Task StopAsync()
     {
         _cts.Cancel();
 
@@ -579,7 +585,7 @@ public sealed class SmartSchedulingPlugin : IntelligencePluginBase
                     continue;
 
                 // Dequeue highest priority task
-                if (!_priorityQueue.TryDequeue(out var task))
+                if (!_priorityQueue.TryDequeue(out var task) || task == null)
                     continue;
 
                 // Execute task

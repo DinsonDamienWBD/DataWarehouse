@@ -24,6 +24,15 @@ namespace DataWarehouse.SDK.Utilities
         public string Reason { get; init; } = string.Empty;  // "Needed for manifest lookups"
     }
 
+    public class PluginParameterDescriptor
+    {
+        public string Name { get; init; } = string.Empty;
+        public string Type { get; init; } = string.Empty;
+        public bool Required { get; init; }
+        public string Description { get; init; } = string.Empty;
+        public object? DefaultValue { get; init; }
+    }
+
     public class PluginCapabilityDescriptor
     {
         private string _capabilityId = string.Empty;

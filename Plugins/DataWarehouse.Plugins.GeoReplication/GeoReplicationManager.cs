@@ -25,7 +25,7 @@ internal sealed class GeoReplicationManager : IDisposable
 
     private ConsistencyLevel _consistencyLevel = ConsistencyLevel.Eventual;
     private long? _bandwidthThrottle;
-    private long _conflictsDetected;
+    private long _conflictsDetected = 0;
     private long _conflictsResolved;
 
     private CancellationTokenSource? _cts;

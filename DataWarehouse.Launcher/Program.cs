@@ -113,8 +113,8 @@ public static class Program
             .MinimumLevel.Override("Microsoft", LogEventLevel.Warning)
             .MinimumLevel.Override("System", LogEventLevel.Warning)
             .Enrich.FromLogContext()
-            .Enrich.WithMachineName()
-            .Enrich.WithEnvironmentName()
+            .Enrich.WithProperty("MachineName", Environment.MachineName)
+            .Enrich.WithProperty("EnvironmentName", Environment.GetEnvironmentVariable("DOTNET_ENVIRONMENT") ?? "Production")
             .Enrich.WithProperty("KernelId", options.KernelId)
             .WriteTo.Console(
                 outputTemplate: "[{Timestamp:HH:mm:ss} {Level:u3}] {Message:lj}{NewLine}{Exception}",

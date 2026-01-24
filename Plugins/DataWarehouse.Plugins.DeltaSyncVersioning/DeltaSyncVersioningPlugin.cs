@@ -1380,7 +1380,7 @@ public sealed class DeltaSyncVersioningPlugin : VersioningPluginBase, IAsyncDisp
                     conflicts.Add(new MergeConflict
                     {
                         Offset = position,
-                        Length = Math.Max(sourceChange.Length, targetChange.Length),
+                        Length = Math.Max(sourceChange!.Length, targetChange!.Length),
                         BaseData = position < baseData.Length
                             ? baseData.Skip((int)position).Take(Math.Max(sourceChange.Length, targetChange.Length)).ToArray()
                             : null,
@@ -1389,14 +1389,14 @@ public sealed class DeltaSyncVersioningPlugin : VersioningPluginBase, IAsyncDisp
                     });
 
                     // Default to target (ours)
-                    result.AddRange(targetChange);
+                    result.AddRange(targetChange!);
                     position += targetChange.Length;
                 }
                 else
                 {
                     // Same change
-                    result.AddRange(sourceChange);
-                    position += sourceChange.Length;
+                    result.AddRange(sourceChange!);
+                    position += sourceChange!.Length;
                 }
             }
             else if (hasSourceChange)

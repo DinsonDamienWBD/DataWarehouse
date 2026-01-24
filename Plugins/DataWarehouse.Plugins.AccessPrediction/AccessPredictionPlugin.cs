@@ -66,7 +66,7 @@ public sealed class AccessPredictionPlugin : IntelligencePluginBase
     public override string Version => "1.0.0";
 
     /// <inheritdoc/>
-    public override PluginCategory Category => PluginCategory.IntelligenceProvider;
+    public override string ProviderType => "access-prediction";
 
     /// <summary>
     /// Initializes a new instance of the AccessPredictionPlugin.
@@ -85,8 +85,10 @@ public sealed class AccessPredictionPlugin : IntelligencePluginBase
         _sessionStart = DateTime.UtcNow;
     }
 
-    /// <inheritdoc/>
-    public override async Task StartAsync(CancellationToken ct)
+    /// <summary>
+    /// Starts the access prediction plugin.
+    /// </summary>
+    public Task StartAsync(CancellationToken ct)
     {
         _sessionStart = DateTime.UtcNow;
         _globalModel = new GlobalPatternModel();
@@ -94,11 +96,13 @@ public sealed class AccessPredictionPlugin : IntelligencePluginBase
         _learnerTask = RunLearnerAsync(_cts.Token);
         _prewarmTask = RunPrewarmGeneratorAsync(_cts.Token);
 
-        await Task.CompletedTask;
+        return Task.CompletedTask;
     }
 
-    /// <inheritdoc/>
-    public override async Task StopAsync()
+    /// <summary>
+    /// Stops the access prediction plugin.
+    /// </summary>
+    public async Task StopAsync(CancellationToken ct)
     {
         _cts.Cancel();
 
@@ -707,8 +711,8 @@ public sealed class AccessPredictionPlugin : IntelligencePluginBase
             {
                 patterns["totalAccesses"] = sequence.Entries.Count;
                 patterns["uniqueItems"] = sequence.Entries.Select(e => e.ItemId).Distinct().Count();
-                patterns["firstAccess"] = sequence.Entries.FirstOrDefault()?.Timestamp;
-                patterns["lastAccess"] = sequence.Entries.LastOrDefault()?.Timestamp;
+                patterns["firstAccess"] = (object?)sequence.Entries.FirstOrDefault()?.Timestamp ?? DBNull.Value;
+                patterns["lastAccess"] = (object?)sequence.Entries.LastOrDefault()?.Timestamp ?? DBNull.Value;
             }
         }
 

@@ -607,7 +607,11 @@ public sealed class SyntheticFullBackupProvider : IBackupProvider, ISyntheticFul
                 var info = new FileInfo(path);
                 if (info.Length > options.MaxFileSizeBytes) return false;
             }
-            catch { return false; }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Filter evaluation failed for {path}: {ex.Message}");
+                return false;
+            }
         }
 
         return true;

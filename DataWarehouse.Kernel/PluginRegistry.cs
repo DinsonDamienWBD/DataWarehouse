@@ -166,6 +166,14 @@ namespace DataWarehouse.Kernel
         }
 
         /// <summary>
+        /// Get all registered plugins (alias for GetAll).
+        /// </summary>
+        public IEnumerable<IPlugin> GetAllPlugins()
+        {
+            return GetAll();
+        }
+
+        /// <summary>
         /// Check if a plugin is registered.
         /// </summary>
         public bool Contains(string pluginId)

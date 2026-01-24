@@ -58,6 +58,9 @@ public sealed class GraphQlApiPlugin : InterfacePluginBase
     public override int? Port => _port;
 
     /// <inheritdoc />
+    public override PluginCategory Category => PluginCategory.Interface;
+
+    /// <inheritdoc />
     public override string? BasePath => "/graphql";
 
     #region Private Fields
@@ -1377,11 +1380,12 @@ public sealed class GraphQlApiPlugin : InterfacePluginBase
 
         try
         {
-            return (T)Convert.ChangeType(value, typeof(T));
+            var converted = Convert.ChangeType(value, typeof(T));
+            return converted != null ? (T)converted : default!;
         }
         catch
         {
-            return default;
+            return default!;
         }
     }
 
