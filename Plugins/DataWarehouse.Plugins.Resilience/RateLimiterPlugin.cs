@@ -512,7 +512,11 @@ namespace DataWarehouse.Plugins.Resilience
         private void HandleGetQuota(PluginMessage message)
         {
             var key = GetString(message.Payload, "key") ?? throw new ArgumentException("key required");
-            message.Payload["result"] = GetQuota(key);
+            var quota = GetQuota(key);
+            if (quota != null)
+            {
+                message.Payload["result"] = quota;
+            }
         }
 
         private async Task LoadPoliciesAsync()

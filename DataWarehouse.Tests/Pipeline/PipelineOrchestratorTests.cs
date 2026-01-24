@@ -1,6 +1,6 @@
 using DataWarehouse.Kernel.Messaging;
 using DataWarehouse.Kernel.Pipeline;
-using DataWarehouse.Kernel.Telemetry;
+using DataWarehouse.SDK.Infrastructure;
 using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Primitives;
 using FluentAssertions;
@@ -229,7 +229,7 @@ public class PipelineOrchestratorTests
         });
 
         var input = new MemoryStream("test data"u8.ToArray());
-        var context = new PipelineContext();
+        var context = new DataWarehouse.SDK.Contracts.PipelineContext();
 
         // Act
         var result = await orchestrator.ExecuteWritePipelineAsync(input, context);
@@ -259,7 +259,7 @@ public class PipelineOrchestratorTests
         });
 
         var input = new MemoryStream("original"u8.ToArray());
-        var context = new PipelineContext();
+        var context = new DataWarehouse.SDK.Contracts.PipelineContext();
 
         // Act
         var result = await orchestrator.ExecuteWritePipelineAsync(input, context);
@@ -287,7 +287,7 @@ public class PipelineOrchestratorTests
         });
 
         var input = new MemoryStream("data"u8.ToArray());
-        var context = new PipelineContext();
+        var context = new DataWarehouse.SDK.Contracts.PipelineContext();
 
         // Act
         await orchestrator.ExecuteWritePipelineAsync(input, context);
@@ -318,7 +318,7 @@ public class PipelineOrchestratorTests
         });
 
         var input = new MemoryStream("data"u8.ToArray());
-        var context = new PipelineContext();
+        var context = new DataWarehouse.SDK.Contracts.PipelineContext();
 
         // Act
         await orchestrator.ExecuteWritePipelineAsync(input, context);
@@ -349,7 +349,7 @@ public class PipelineOrchestratorTests
         cts.CancelAfter(100);
 
         var input = new MemoryStream("data"u8.ToArray());
-        var context = new PipelineContext();
+        var context = new DataWarehouse.SDK.Contracts.PipelineContext();
 
         // Act & Assert
         var act = async () => await orchestrator.ExecuteWritePipelineAsync(input, context, cts.Token);
@@ -378,7 +378,7 @@ public class PipelineOrchestratorTests
         });
 
         var input = new MemoryStream("data"u8.ToArray());
-        var context = new PipelineContext();
+        var context = new DataWarehouse.SDK.Contracts.PipelineContext();
 
         // Act
         await orchestrator.ExecuteReadPipelineAsync(input, context);
@@ -407,7 +407,7 @@ public class PipelineOrchestratorTests
 
         using var traceScope = tracing.StartTrace("test-operation");
         var input = new MemoryStream("data"u8.ToArray());
-        var context = new PipelineContext();
+        var context = new DataWarehouse.SDK.Contracts.PipelineContext();
 
         // Act
         await orchestrator.ExecuteWritePipelineAsync(input, context);
@@ -444,12 +444,12 @@ public class PipelineOrchestratorTests
         public override string SubCategory => _subCategory;
         public override int DefaultOrder => 100;
 
-        public override Stream OnWrite(Stream input, IKernelContext ctx, IReadOnlyDictionary<string, object>? parameters)
+        public override Stream OnWrite(Stream input, IKernelContext ctx, Dictionary<string, object> parameters)
         {
             return input; // Pass through
         }
 
-        public override Stream OnRead(Stream input, IKernelContext ctx, IReadOnlyDictionary<string, object>? parameters)
+        public override Stream OnRead(Stream input, IKernelContext ctx, Dictionary<string, object> parameters)
         {
             return input; // Pass through
         }
@@ -470,13 +470,13 @@ public class PipelineOrchestratorTests
         public override string Version => "1.0.0";
         public override string SubCategory => "slow";
 
-        public override Stream OnWrite(Stream input, IKernelContext ctx, IReadOnlyDictionary<string, object>? parameters)
+        public override Stream OnWrite(Stream input, IKernelContext ctx, Dictionary<string, object> parameters)
         {
             Thread.Sleep(_delay);
             return input;
         }
 
-        public override Stream OnRead(Stream input, IKernelContext ctx, IReadOnlyDictionary<string, object>? parameters)
+        public override Stream OnRead(Stream input, IKernelContext ctx, Dictionary<string, object> parameters)
         {
             Thread.Sleep(_delay);
             return input;
@@ -485,14 +485,15 @@ public class PipelineOrchestratorTests
 
     private class TestKernelContext : IKernelContext
     {
-        public OperatingMode Mode => OperatingMode.OnPrem;
+        public OperatingMode Mode => OperatingMode.Server;
         public string RootPath => Environment.CurrentDirectory;
+        public IKernelStorageService Storage => throw new NotImplementedException();
         public void LogInfo(string message) { }
         public void LogError(string message, Exception? ex = null) { }
         public void LogWarning(string message) { }
         public void LogDebug(string message) { }
         public T? GetPlugin<T>() where T : class, IPlugin => null;
-        public IEnumerable<T> GetPlugins<T>() where T : class, IPlugin => [];
+        public IEnumerable<T> GetPlugins<T>() where T : class, IPlugin => Enumerable.Empty<T>();
     }
 
     #endregion

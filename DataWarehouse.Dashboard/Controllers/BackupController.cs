@@ -72,7 +72,7 @@ public class BackupController : ControllerBase
 
         var status = _backupService.GetJobStatus(jobId);
 
-        return Accepted(new { jobId }, status);
+        return Accepted($"api/backup/jobs/{jobId}", status);
     }
 
     /// <summary>
@@ -94,7 +94,7 @@ public class BackupController : ControllerBase
 
         var status = _backupService.GetJobStatus(jobId);
 
-        return Accepted(new { jobId }, status);
+        return Accepted($"api/backup/jobs/{jobId}", status);
     }
 
     /// <summary>
@@ -263,7 +263,7 @@ public sealed class RestoreRequest
 /// <summary>
 /// Status of a backup/restore job.
 /// </summary>
-public sealed class BackupJobStatus
+public sealed record BackupJobStatus
 {
     public string JobId { get; init; } = string.Empty;
     public JobType Type { get; init; }

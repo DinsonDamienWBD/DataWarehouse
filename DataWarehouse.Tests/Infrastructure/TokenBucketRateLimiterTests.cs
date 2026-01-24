@@ -1,4 +1,4 @@
-using DataWarehouse.Kernel.RateLimiting;
+using DataWarehouse.SDK.Infrastructure;
 using DataWarehouse.SDK.Contracts;
 using FluentAssertions;
 using Xunit;

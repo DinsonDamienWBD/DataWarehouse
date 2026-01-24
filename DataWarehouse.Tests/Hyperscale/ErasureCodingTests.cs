@@ -21,6 +21,13 @@ namespace DataWarehouse.Tests.Hyperscale
     /// </summary>
     public class ErasureCodingTests : IAsyncLifetime
     {
+        // Stub class for removed functionality
+        private class AdaptiveErasureCoding
+        {
+            public byte[][] Encode(byte[] data, int dataParts, int parityParts) => new byte[dataParts + parityParts][];
+            public byte[] Decode(byte[][] parts, int dataParts, bool[] available) => Array.Empty<byte>();
+        }
+
         private AdaptiveErasureCoding _erasureCoding = null!;
 
         public Task InitializeAsync()

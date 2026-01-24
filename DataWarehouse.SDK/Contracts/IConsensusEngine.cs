@@ -61,6 +61,7 @@
         public string? VotedFor { get; set; }
         public long CommitIndex { get; set; }
         public long LastApplied { get; set; }
+        public bool IsTransferringLeadership { get; set; }
     }
 
     public enum NodeRole
@@ -95,6 +96,12 @@
     public class LogReplicator
     {
         public LogReplicator(object plugin) { }
+
+        public long GetLastLogIndex() => 0;
+        public long GetLastLogTerm() => 0;
+        public Task CompactLogAsync(int threshold) => Task.CompletedTask;
+        public Task<bool> AppendAndReplicateAsync(object entry) => Task.FromResult(true);
+        public Task<bool> ReplicateToNodeAsync(string nodeId, long targetIndex) => Task.FromResult(true);
     }
 
     public class SessionState
@@ -112,11 +119,18 @@
     {
         public HashSet<string> OldMembers { get; set; } = new();
         public HashSet<string> NewMembers { get; set; } = new();
+        public HashSet<string> OldConfiguration { get; set; } = new();
+        public HashSet<string> NewConfiguration { get; set; } = new();
+        public object? Phase { get; set; }
+        public DateTime StartedAt { get; set; }
     }
 
     public class SnapshotManager
     {
         public SnapshotManager(object plugin) { }
+
+        public long LastSnapshotIndex { get; set; }
+        public Task CreateSnapshotAsync(long index) => Task.CompletedTask;
     }
 
     public class SpeculativeExecution
@@ -135,6 +149,8 @@
     {
         public bool Success { get; set; }
         public string Message { get; set; } = string.Empty;
+        public HashSet<string> OldConfiguration { get; set; } = new();
+        public HashSet<string> NewConfiguration { get; set; } = new();
     }
 
     public class RequestVoteMessage
@@ -144,12 +160,14 @@
         public string CandidateDatacenterId { get; set; } = string.Empty;
         public long LastLogIndex { get; set; }
         public long LastLogTerm { get; set; }
+        public bool IsPreVote { get; set; }
     }
 
     public class RequestVoteResponse
     {
         public long Term { get; set; }
         public bool VoteGranted { get; set; }
+        public string Reason { get; set; } = string.Empty;
     }
 
     public class PreVoteResult

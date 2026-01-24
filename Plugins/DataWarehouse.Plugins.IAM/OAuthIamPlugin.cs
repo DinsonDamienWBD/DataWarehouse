@@ -956,7 +956,7 @@ namespace DataWarehouse.Plugins.IAM
             }
 
             var userInfo = await GetUserInfoAsync(session.AccessToken, provider, CancellationToken.None);
-            message.Payload["result"] = userInfo;
+            message.Payload["result"] = userInfo ?? new Dictionary<string, object>();
         }
 
         private async Task LoadConfigurationAsync()

@@ -325,7 +325,18 @@ public class StoragePoolBaseTests
     /// </summary>
     private class TestStoragePool : StoragePoolBase
     {
+        public override string Id => "test-storage-pool";
         public override string PoolId => "test-pool";
+
+        public override Task StartAsync(CancellationToken ct)
+        {
+            return Task.CompletedTask;
+        }
+
+        public override Task StopAsync()
+        {
+            return Task.CompletedTask;
+        }
     }
 
     #endregion

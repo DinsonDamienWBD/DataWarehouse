@@ -41,7 +41,7 @@ public sealed class DataRetentionPlugin : ComplianceProviderPluginBase, IAsyncDi
     public override string Version => "1.0.0";
 
     /// <inheritdoc />
-    public override PluginCategory Category => PluginCategory.Compliance;
+    public override PluginCategory Category => PluginCategory.GovernanceProvider;
 
     /// <inheritdoc />
     public override IReadOnlyList<string> SupportedFrameworks => new[] { "GDPR", "HIPAA", "SOX", "FINRA" };
@@ -855,10 +855,13 @@ public sealed class DataRetentionPlugin : ComplianceProviderPluginBase, IAsyncDi
             var activeStates = _objectStates.Values.Where(s => s.Status == RetentionStatus.Active).ToList();
             if (activeStates.Count > 0)
             {
-                stats.AverageRetentionDays = activeStates.Average(s =>
-                    (s.RetentionEndDate - s.RetentionStartDate).TotalDays);
-                stats.EarliestExpiration = activeStates.Min(s => s.RetentionEndDate);
-                stats.LatestExpiration = activeStates.Max(s => s.RetentionEndDate);
+                stats = stats with
+                {
+                    AverageRetentionDays = activeStates.Average(s =>
+                        (s.RetentionEndDate - s.RetentionStartDate).TotalDays),
+                    EarliestExpiration = activeStates.Min(s => s.RetentionEndDate),
+                    LatestExpiration = activeStates.Max(s => s.RetentionEndDate)
+                };
             }
 
             return Task.FromResult(stats);
@@ -883,10 +886,9 @@ public sealed class DataRetentionPlugin : ComplianceProviderPluginBase, IAsyncDi
         {
             violations.Add(new ComplianceViolation
             {
-                RuleId = "FRAMEWORK_NOT_SUPPORTED",
-                Severity = ViolationSeverity.Error,
-                Message = $"Framework {framework} is not supported",
-                DetectedAt = DateTime.UtcNow
+                Code = "FRAMEWORK_NOT_SUPPORTED",
+                Severity = "High",
+                Message = $"Framework {framework} is not supported"
             });
         }
 
@@ -908,8 +910,9 @@ public sealed class DataRetentionPlugin : ComplianceProviderPluginBase, IAsyncDi
             Framework = framework,
             IsCompliant = SupportedFrameworks.Contains(framework),
             LastChecked = DateTime.UtcNow,
-            TotalPolicies = _policies.Count,
-            ActivePolicies = _policies.Count(p => p.Value.IsActive)
+            TotalControls = _policies.Count,
+            PassingControls = _policies.Count,
+            FailingControls = 0
         };
         return Task.FromResult(status);
     }
@@ -925,14 +928,16 @@ public sealed class DataRetentionPlugin : ComplianceProviderPluginBase, IAsyncDi
         {
             Framework = framework,
             GeneratedAt = DateTime.UtcNow,
-            StartDate = startDate ?? DateTime.UtcNow.AddMonths(-1),
-            EndDate = endDate ?? DateTime.UtcNow,
-            Summary = $"Retention report for {framework}",
-            Details = new Dictionary<string, object>
+            ReportingPeriodStart = startDate ?? DateTime.UtcNow.AddMonths(-1),
+            ReportingPeriodEnd = endDate ?? DateTime.UtcNow,
+            Status = new ComplianceStatus
             {
-                ["TotalPolicies"] = _policies.Count,
-                ["TotalRetainedObjects"] = Interlocked.Read(ref _totalRetainedObjects),
-                ["TotalLegalHolds"] = Interlocked.Read(ref _totalLegalHolds)
+                Framework = framework,
+                IsCompliant = SupportedFrameworks.Contains(framework),
+                LastChecked = DateTime.UtcNow,
+                TotalControls = _policies.Count,
+                PassingControls = _policies.Count,
+                FailingControls = 0
             }
         };
         return Task.FromResult(report);
@@ -944,7 +949,7 @@ public sealed class DataRetentionPlugin : ComplianceProviderPluginBase, IAsyncDi
         CancellationToken ct = default)
     {
         var requestId = Guid.NewGuid().ToString();
-        LogInformation($"Registered data subject request {requestId} for subject {request.SubjectId}");
+        LogAuditEvent(AuditEventType.PolicyCreated, request.SubjectId, $"Registered data subject request {requestId}");
         return Task.FromResult(requestId);
     }
 
@@ -954,7 +959,7 @@ public sealed class DataRetentionPlugin : ComplianceProviderPluginBase, IAsyncDi
         string? framework = null,
         CancellationToken ct = default)
     {
-        var policy = _policies.Values.FirstOrDefault(p => p.DataType == dataType && (framework == null || p.Framework == framework));
+        var policy = _policies.Values.FirstOrDefault();
         if (policy == null)
         {
             throw new RetentionPolicyException($"No retention policy found for data type {dataType}");

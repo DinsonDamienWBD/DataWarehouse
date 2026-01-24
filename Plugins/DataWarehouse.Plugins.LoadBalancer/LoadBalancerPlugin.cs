@@ -2362,8 +2362,8 @@ namespace DataWarehouse.Plugins.LoadBalancer
     internal sealed class BackendRuntimeStats
     {
         public long TotalRequests;
-        public int ActiveConnections;
-        public double AverageResponseTimeMs;
+        public int ActiveConnections = 0;
+        public double AverageResponseTimeMs = 0.0;
         public double SuccessRate = 1.0;
     }
 

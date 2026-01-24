@@ -1,4 +1,4 @@
-using DataWarehouse.Kernel.Resilience;
+using DataWarehouse.SDK.Infrastructure;
 using DataWarehouse.SDK.Contracts;
 using FluentAssertions;
 using Xunit;

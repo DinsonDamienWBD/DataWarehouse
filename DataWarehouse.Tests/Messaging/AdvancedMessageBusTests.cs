@@ -173,7 +173,7 @@ public class AdvancedMessageBusTests : IDisposable
         _bus.Subscribe("reliable.topic", _ => Task.CompletedTask);
 
         // Act
-        var result = await _bus.PublishReliableAsync("reliable.topic", new PluginMessage { Type = "reliable" });
+        var result = await _bus.PublishReliableAsync("reliable.topic", new PluginMessage { Type = "reliable" }, CancellationToken.None);
 
         // Assert
         result.Success.Should().BeTrue();
@@ -188,7 +188,7 @@ public class AdvancedMessageBusTests : IDisposable
         _bus.Subscribe("track.topic", _ => Task.CompletedTask);
 
         // Act
-        var result = await _bus.PublishReliableAsync("track.topic", new PluginMessage { Type = "track" });
+        var result = await _bus.PublishReliableAsync("track.topic", new PluginMessage { Type = "track" }, CancellationToken.None);
 
         // Assert
         result.DeliveredAt.Should().NotBeNull();
@@ -422,7 +422,7 @@ public class AdvancedMessageBusTests : IDisposable
     {
         // Arrange
         _bus.Subscribe("reset.topic", _ => Task.CompletedTask);
-        _bus.PublishReliableAsync("reset.topic", new PluginMessage()).Wait();
+        _bus.PublishReliableAsync("reset.topic", new PluginMessage(), CancellationToken.None).Wait();
 
         var before = _bus.GetStatistics();
         before.TotalPublished.Should().BeGreaterThan(0);
@@ -499,8 +499,9 @@ public class AdvancedMessageBusTests : IDisposable
 
     private class TestKernelContext : IKernelContext
     {
-        public OperatingMode Mode => OperatingMode.OnPrem;
+        public OperatingMode Mode => OperatingMode.Server;
         public string RootPath => Environment.CurrentDirectory;
+        public IKernelStorageService Storage => throw new NotImplementedException();
         public void LogInfo(string message) { }
         public void LogError(string message, Exception? ex = null) { }
         public void LogWarning(string message) { }
