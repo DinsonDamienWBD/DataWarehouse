@@ -24,7 +24,23 @@
       "Bash(git commit -m \"$\\(cat <<''EOF''\nAdd LiteDB and RocksDB implementations to EmbeddedDatabasePlugin\n\n- Add RocksDb NuGet package reference\n- Implement real LiteDB storage with BsonDocument serialization,\n  shared connection mode, and password support\n- Implement real RocksDB key-value storage with composite keys,\n  parallel compaction, and proper locking\n- Add factory method EmbeddedDbConfig.RocksDB\\(\\)\n- Update Dispose to clean up LiteDB and RocksDB resources\n- Update TODO.md to mark LiteDB and RocksDB tasks complete\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
       "Bash(git commit:*)",
       "Bash(git push:*)",
-      "Bash(git status:*)"
+      "Bash(git status:*)",
+      "Bash(Select-String -Pattern \"error CS\")",
+      "Bash(findstr:*)",
+      "Bash(powershell -Command \"Get-Content errors.txt | Measure-Object -Line | Select-Object -ExpandProperty Lines\")",
+      "Bash(powershell -Command:*)",
+      "Bash(Select-String \"error CS\")",
+      "Bash(Measure-Object -Line)",
+      "Bash(Select-String \"error CS1061|error CS0117\")",
+      "Bash(Select-Object -First 20)",
+      "Bash(dir /s /b \"C:\\\\Temp\\\\DataWarehouse\\\\DataWarehouse\\\\Plugins\\\\DataWarehouse.Plugins.KeyRotation\\\\*.cs\")",
+      "Bash(Select-String -Pattern \"error CS|warning CS|Build succeeded|Build FAILED\")",
+      "Bash(dotnet clean:*)",
+      "Bash(dir:*)",
+      "Bash(find:*)",
+      "Bash(npx tsc:*)",
+      "Bash(Select-String -Pattern \"Error\\\\\\(s\\\\\\)|Build succeeded|Build FAILED\")",
+      "Bash(ls:*)"
     ]
   }
 }

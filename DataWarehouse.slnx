@@ -2,6 +2,7 @@
   <Folder Name="/Metadata/">
     <File Path="Metadata/CLAUDE.md" />
     <File Path="Metadata/CODE_REVIEW_REPORT.md" />
+    <File Path="Metadata/IMPROVEMENT_ROADMAP.md" />
     <File Path="Metadata/REFACTOR_STATUS.md" />
     <File Path="Metadata/RULES.md" />
     <File Path="Metadata/TODO.md" />
