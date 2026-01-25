@@ -126,7 +126,10 @@ public class SecretManagementPlugin : SecurityProviderPluginBase, ISecretManager
             {
                 oldVersion = await provider.GetCurrentVersionAsync(reference.Path, ct);
             }
-            catch { }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[SecretManagementPlugin] Operation failed: {ex.Message}");
+            }
 
             var newVersion = $"v{DateTime.UtcNow:yyyyMMddHHmmss}";
             var metadata = new SecretMetadata
@@ -263,7 +266,10 @@ public class SecretManagementPlugin : SecurityProviderPluginBase, ISecretManager
                     _cache.TryRemove(cacheKey, out _);
                 }
             }
-            catch { }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[SecretManagementPlugin] Operation failed: {ex.Message}");
+            }
         }
     }
 

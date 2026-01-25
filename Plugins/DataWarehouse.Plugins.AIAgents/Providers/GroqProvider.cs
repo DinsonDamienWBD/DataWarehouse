@@ -179,7 +179,10 @@ namespace DataWarehouse.Plugins.AIAgents
                         }
                     }
                 }
-                catch { }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"[GroqProvider] Failed to parse streaming response: {ex.Message}");
+                }
 
                 if (textToYield != null)
                     yield return textToYield;

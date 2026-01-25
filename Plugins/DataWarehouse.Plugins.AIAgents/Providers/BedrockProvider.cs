@@ -355,7 +355,10 @@ namespace DataWarehouse.Plugins.AIAgents
                         textToYield = text.GetString();
                     }
                 }
-                catch { }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"[BedrockProvider] Failed to parse streaming response: {ex.Message}");
+                }
 
                 if (!string.IsNullOrEmpty(textToYield))
                     yield return textToYield;

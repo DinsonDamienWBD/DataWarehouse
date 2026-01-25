@@ -11,48 +11,41 @@ namespace DataWarehouse.Plugins.Backup.Providers;
 /// a base full backup with subsequent incremental backups, without
 /// requiring a full re-scan of source data.
 /// </summary>
-public sealed class SyntheticFullBackupProvider : IBackupProvider, ISyntheticFullBackupProvider
+public sealed class SyntheticFullBackupProvider : BackupProviderBase, ISyntheticFullBackupProvider
 {
     private readonly IBackupDestination _destination;
     private readonly SyntheticFullBackupConfig _config;
     private readonly ConcurrentDictionary<string, SyntheticFileEntry> _catalog = new();
     private readonly ConcurrentDictionary<long, BackupChainEntry> _backupChain = new();
-    private readonly SemaphoreSlim _backupLock = new(1, 1);
     private readonly string _statePath;
-    private readonly ILogger<SyntheticFullBackupProvider>? _logger;
     private long _sequence;
     private long _lastFullSequence;
-    private volatile bool _disposed;
 
-    public string ProviderId => "synthetic-full-backup-provider";
-    public string Name => "Synthetic Full Backup Provider";
-    public BackupProviderType ProviderType => BackupProviderType.SyntheticFull;
-    public bool IsMonitoring => false;
-
-    public event EventHandler<BackupProgressEventArgs>? ProgressChanged;
-    public event EventHandler<BackupCompletedEventArgs>? BackupCompleted;
+    public override string ProviderId => "synthetic-full-backup-provider";
+    public override string Name => "Synthetic Full Backup Provider";
+    public override BackupProviderType ProviderType => BackupProviderType.SyntheticFull;
 
     public SyntheticFullBackupProvider(
         IBackupDestination destination,
         string statePath,
         SyntheticFullBackupConfig? config = null,
         ILogger<SyntheticFullBackupProvider>? logger = null)
+        : base(logger)
     {
         _destination = destination ?? throw new ArgumentNullException(nameof(destination));
         _statePath = statePath ?? throw new ArgumentNullException(nameof(statePath));
         _config = config ?? new SyntheticFullBackupConfig();
-        _logger = logger;
 
         Directory.CreateDirectory(_statePath);
     }
 
-    public async Task InitializeAsync(CancellationToken ct = default)
+    public override async Task InitializeAsync(CancellationToken ct = default)
     {
         await _destination.InitializeAsync(ct);
         await LoadStateAsync();
     }
 
-    public async Task<BackupResult> PerformFullBackupAsync(
+    public override async Task<BackupResult> PerformFullBackupAsync(
         IEnumerable<string> paths,
         BackupOptions? options = null,
         CancellationToken ct = default)
@@ -126,7 +119,7 @@ public sealed class SyntheticFullBackupProvider : IBackupProvider, ISyntheticFul
         return result;
     }
 
-    public async Task<BackupResult> PerformIncrementalBackupAsync(
+    public override async Task<BackupResult> PerformIncrementalBackupAsync(
         BackupOptions? options = null,
         CancellationToken ct = default)
     {
@@ -314,7 +307,7 @@ public sealed class SyntheticFullBackupProvider : IBackupProvider, ISyntheticFul
             kv.Key > _lastFullSequence && kv.Value.Type == BackupProviderType.Incremental);
     }
 
-    public async Task<RestoreResult> RestoreAsync(
+    public override async Task<RestoreResult> RestoreAsync(
         string backupId,
         string? targetPath = null,
         DateTime? pointInTime = null,
@@ -393,7 +386,7 @@ public sealed class SyntheticFullBackupProvider : IBackupProvider, ISyntheticFul
         }
     }
 
-    public BackupStatistics GetStatistics()
+    public override BackupStatistics GetStatistics()
     {
         var lastFull = _backupChain.Values
             .Where(e => e.Type == BackupProviderType.Full || e.Type == BackupProviderType.SyntheticFull)
@@ -415,7 +408,7 @@ public sealed class SyntheticFullBackupProvider : IBackupProvider, ISyntheticFul
         };
     }
 
-    public Task<BackupMetadata?> GetBackupMetadataAsync(string backupId, CancellationToken ct = default)
+    public override Task<BackupMetadata?> GetBackupMetadataAsync(string backupId, CancellationToken ct = default)
     {
         var entry = _backupChain.Values.FirstOrDefault(e => e.BackupId == backupId);
         if (entry == null) return Task.FromResult<BackupMetadata?>(null);
@@ -431,7 +424,7 @@ public sealed class SyntheticFullBackupProvider : IBackupProvider, ISyntheticFul
         });
     }
 
-    public async IAsyncEnumerable<BackupMetadata> ListBackupsAsync(
+    public override async IAsyncEnumerable<BackupMetadata> ListBackupsAsync(
         [EnumeratorCancellation] CancellationToken ct = default)
     {
         foreach (var entry in _backupChain.Values.OrderByDescending(e => e.Sequence))
@@ -589,54 +582,6 @@ public sealed class SyntheticFullBackupProvider : IBackupProvider, ISyntheticFul
         }
     }
 
-    private static async Task<string> ComputeChecksumAsync(Stream stream, CancellationToken ct)
-    {
-        var hash = await SHA256.HashDataAsync(stream, ct);
-        return Convert.ToHexString(hash).ToLowerInvariant();
-    }
-
-    private static string GetRelativePath(string filePath)
-    {
-        return filePath.Replace('\\', '/').TrimStart('/');
-    }
-
-    private bool ShouldBackupFile(string path, BackupOptions? options)
-    {
-        if (options == null) return true;
-
-        if (options.MaxFileSizeBytes > 0)
-        {
-            try
-            {
-                var info = new FileInfo(path);
-                if (info.Length > options.MaxFileSizeBytes) return false;
-            }
-            catch (Exception ex)
-            {
-                _logger?.LogWarning(ex, "Filter evaluation failed for path: {Path}", path);
-                return false;
-            }
-        }
-
-        return true;
-    }
-
-    private void RaiseProgressChanged(string backupId, long files, long totalFiles, long bytes, long totalBytes)
-    {
-        ProgressChanged?.Invoke(this, new BackupProgressEventArgs
-        {
-            BackupId = backupId,
-            ProcessedFiles = files,
-            TotalFiles = totalFiles,
-            ProcessedBytes = bytes,
-            TotalBytes = totalBytes
-        });
-    }
-
-    private void RaiseBackupCompleted(BackupResult result)
-    {
-        BackupCompleted?.Invoke(this, new BackupCompletedEventArgs { Result = result });
-    }
 
     private async Task LoadStateAsync()
     {
@@ -674,13 +619,9 @@ public sealed class SyntheticFullBackupProvider : IBackupProvider, ISyntheticFul
         await File.WriteAllTextAsync(stateFile, json, ct);
     }
 
-    public async ValueTask DisposeAsync()
+    protected override async ValueTask DisposeAsyncCore()
     {
-        if (_disposed) return;
-        _disposed = true;
-
         await SaveStateAsync(CancellationToken.None);
-        _backupLock.Dispose();
     }
 }
 

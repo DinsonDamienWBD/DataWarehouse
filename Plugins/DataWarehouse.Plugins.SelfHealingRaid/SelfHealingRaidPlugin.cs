@@ -1790,7 +1790,10 @@ namespace DataWarehouse.Plugins.SelfHealingRaid
                             await stream.CopyToAsync(ms, ct);
                             pParity = ms.ToArray();
                         }
-                        catch { }
+                        catch (Exception ex)
+                        {
+                            Console.WriteLine($"[SelfHealingRaidPlugin] Parity read operation failed: {ex.Message}");
+                        }
                     }
                     else if (p == qParityIdx)
                     {
@@ -1802,7 +1805,10 @@ namespace DataWarehouse.Plugins.SelfHealingRaid
                             await stream.CopyToAsync(ms, ct);
                             qParity = ms.ToArray();
                         }
-                        catch { }
+                        catch (Exception ex)
+                        {
+                            Console.WriteLine($"[SelfHealingRaidPlugin] Parity read operation failed: {ex.Message}");
+                        }
                     }
                     else if (dataIdx < dataProviders)
                     {

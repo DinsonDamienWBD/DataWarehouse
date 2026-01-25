@@ -308,7 +308,7 @@ namespace DataWarehouse.Plugins.LocalStorage
                     }
                     catch
                     {
-                        try { File.Delete(tempPath); } catch { }
+                        try { File.Delete(tempPath); } catch (Exception ex) { Console.WriteLine($"[LocalStoragePlugin] Failed to delete temp file {tempPath}: {ex.Message}"); }
                         throw;
                     }
                 }

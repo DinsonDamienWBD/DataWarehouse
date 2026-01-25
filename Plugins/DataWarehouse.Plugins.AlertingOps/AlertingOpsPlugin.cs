@@ -388,7 +388,10 @@ public sealed class AlertingOpsPlugin : OperationsPluginBase
             {
                 channels = JsonSerializer.Deserialize<List<string>>(channelsJson, _jsonOptions) ?? new List<string>();
             }
-            catch { }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[AlertingOpsPlugin] Deserialization failed: {ex.Message}");
+            }
         }
 
         var ruleId = Guid.NewGuid().ToString("N");
@@ -535,7 +538,10 @@ public sealed class AlertingOpsPlugin : OperationsPluginBase
                 config = JsonSerializer.Deserialize<Dictionary<string, string>>(configJson, _jsonOptions)
                     ?? new Dictionary<string, string>();
             }
-            catch { }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[AlertingOpsPlugin] Deserialization failed: {ex.Message}");
+            }
         }
 
         var channel = new NotificationChannelConfig
@@ -643,7 +649,10 @@ public sealed class AlertingOpsPlugin : OperationsPluginBase
                 matchers = JsonSerializer.Deserialize<Dictionary<string, string>>(matchersJson, _jsonOptions)
                     ?? new Dictionary<string, string>();
             }
-            catch { }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[AlertingOpsPlugin] Deserialization failed: {ex.Message}");
+            }
         }
 
         var silenceId = Guid.NewGuid().ToString("N");
@@ -828,7 +837,10 @@ public sealed class AlertingOpsPlugin : OperationsPluginBase
                 tags = JsonSerializer.Deserialize<Dictionary<string, string>>(tagsJson, _jsonOptions)
                     ?? new Dictionary<string, string>();
             }
-            catch { }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[AlertingOpsPlugin] Deserialization failed: {ex.Message}");
+            }
         }
 
         var key = GetMetricKey(name, tags);
@@ -905,7 +917,10 @@ public sealed class AlertingOpsPlugin : OperationsPluginBase
                 steps = JsonSerializer.Deserialize<List<EscalationStep>>(stepsJson, _jsonOptions)
                     ?? new List<EscalationStep>();
             }
-            catch { }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[AlertingOpsPlugin] Deserialization failed: {ex.Message}");
+            }
         }
 
         var policy = new EscalationPolicyDef

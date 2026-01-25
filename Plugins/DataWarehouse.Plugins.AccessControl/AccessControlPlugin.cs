@@ -216,7 +216,10 @@ namespace DataWarehouse.Plugins.AccessControl
                         roles.Add($"ldap:{group}");
                     }
                 }
-                catch { }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"[AccessControlPlugin] Operation failed: {ex.Message}");
+                }
             }
 
             return roles.ToArray();
@@ -428,7 +431,10 @@ namespace DataWarehouse.Plugins.AccessControl
                     }
                 }
             }
-            catch { }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[AccessControlPlugin] Failed to load ACL data: {ex.Message}");
+            }
         }
 
         private async Task PersistAclsAsync()

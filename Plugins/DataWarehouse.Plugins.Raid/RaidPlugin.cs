@@ -960,7 +960,10 @@ namespace DataWarehouse.Plugins.Raid
                         };
                     }
                 }
-                catch { }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"[RaidPlugin] Operation failed: {ex.Message}");
+                }
             }
 
             return null;
@@ -1060,7 +1063,10 @@ namespace DataWarehouse.Plugins.Raid
                             parityData = ms.ToArray();
                             _providerStates[p].BytesRead += ms.Length;
                         }
-                        catch { }
+                        catch (Exception ex)
+                {
+                    Console.WriteLine($"[RaidPlugin] Operation failed: {ex.Message}");
+                }
                     }
                     else
                     {
@@ -1134,7 +1140,10 @@ namespace DataWarehouse.Plugins.Raid
                             pParity = ms.ToArray();
                             _providerStates[p].BytesRead += ms.Length;
                         }
-                        catch { }
+                        catch (Exception ex)
+                {
+                    Console.WriteLine($"[RaidPlugin] Operation failed: {ex.Message}");
+                }
                     }
                     else if (p == qParityIdx)
                     {
@@ -1147,7 +1156,10 @@ namespace DataWarehouse.Plugins.Raid
                             qParity = ms.ToArray();
                             _providerStates[p].BytesRead += ms.Length;
                         }
-                        catch { }
+                        catch (Exception ex)
+                {
+                    Console.WriteLine($"[RaidPlugin] Operation failed: {ex.Message}");
+                }
                     }
                     else
                     {
@@ -1220,7 +1232,10 @@ namespace DataWarehouse.Plugins.Raid
                             chunk = ms.ToArray();
                             _providerStates[primary].BytesRead += ms.Length;
                         }
-                        catch { }
+                        catch (Exception ex)
+                {
+                    Console.WriteLine($"[RaidPlugin] Operation failed: {ex.Message}");
+                }
                     }
 
                     if (chunk == null && _providerStates[secondary].IsHealthy)
@@ -1234,7 +1249,10 @@ namespace DataWarehouse.Plugins.Raid
                             chunk = ms.ToArray();
                             _providerStates[secondary].BytesRead += ms.Length;
                         }
-                        catch { }
+                        catch (Exception ex)
+                {
+                    Console.WriteLine($"[RaidPlugin] Operation failed: {ex.Message}");
+                }
                     }
 
                     if (chunk != null)
@@ -1274,7 +1292,10 @@ namespace DataWarehouse.Plugins.Raid
                             parityData = ms.ToArray();
                             _providerStates[providerIdx].BytesRead += ms.Length;
                         }
-                        catch { }
+                        catch (Exception ex)
+                {
+                    Console.WriteLine($"[RaidPlugin] Operation failed: {ex.Message}");
+                }
                     }
                     else
                     {
@@ -1346,7 +1367,10 @@ namespace DataWarehouse.Plugins.Raid
                             await stream.CopyToAsync(ms, ct);
                             p1Parity = ms.ToArray();
                         }
-                        catch { }
+                        catch (Exception ex)
+                {
+                    Console.WriteLine($"[RaidPlugin] Operation failed: {ex.Message}");
+                }
                     }
                     else if (i == 1)
                     {
@@ -1358,7 +1382,10 @@ namespace DataWarehouse.Plugins.Raid
                             await stream.CopyToAsync(ms, ct);
                             p2Parity = ms.ToArray();
                         }
-                        catch { }
+                        catch (Exception ex)
+                {
+                    Console.WriteLine($"[RaidPlugin] Operation failed: {ex.Message}");
+                }
                     }
                     else
                     {
@@ -1430,7 +1457,10 @@ namespace DataWarehouse.Plugins.Raid
                             await stream.CopyToAsync(ms, ct);
                             p1Parity = ms.ToArray();
                         }
-                        catch { }
+                        catch (Exception ex)
+                {
+                    Console.WriteLine($"[RaidPlugin] Operation failed: {ex.Message}");
+                }
                     }
                     else if (i == 1)
                     {
@@ -1442,7 +1472,10 @@ namespace DataWarehouse.Plugins.Raid
                             await stream.CopyToAsync(ms, ct);
                             p2Parity = ms.ToArray();
                         }
-                        catch { }
+                        catch (Exception ex)
+                {
+                    Console.WriteLine($"[RaidPlugin] Operation failed: {ex.Message}");
+                }
                     }
                     else if (i == 2)
                     {
@@ -1454,7 +1487,10 @@ namespace DataWarehouse.Plugins.Raid
                             await stream.CopyToAsync(ms, ct);
                             p3Parity = ms.ToArray();
                         }
-                        catch { }
+                        catch (Exception ex)
+                {
+                    Console.WriteLine($"[RaidPlugin] Operation failed: {ex.Message}");
+                }
                     }
                     else
                     {
@@ -1517,7 +1553,10 @@ namespace DataWarehouse.Plugins.Raid
                         result.AddRange(ms.ToArray());
                     }
                 }
-                catch { }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"[RaidPlugin] Operation failed: {ex.Message}");
+                }
             }
 
             return result.ToArray();
@@ -1573,7 +1612,10 @@ namespace DataWarehouse.Plugins.Raid
                                 }
                             }
                         }
-                        catch { }
+                        catch (Exception ex)
+                {
+                    Console.WriteLine($"[RaidPlugin] Operation failed: {ex.Message}");
+                }
                     }, ct));
                 }
 
@@ -1611,7 +1653,10 @@ namespace DataWarehouse.Plugins.Raid
                         if (await _providers[i].ExistsAsync(stripeUri))
                             return true;
                     }
-                    catch { }
+                    catch (Exception ex)
+                {
+                    Console.WriteLine($"[RaidPlugin] Operation failed: {ex.Message}");
+                }
                 }
 
                 return false;
@@ -1872,7 +1917,10 @@ namespace DataWarehouse.Plugins.Raid
                                 }
                             }
                         }
-                        catch { }
+                        catch (Exception ex)
+                {
+                    Console.WriteLine($"[RaidPlugin] Operation failed: {ex.Message}");
+                }
                     }
                 }
 

@@ -840,7 +840,10 @@ public sealed class RelationalDatabasePlugin : HybridDatabasePluginBase<Relation
                 if (doc.RootElement.TryGetProperty("_id", out var _idProp))
                     return _idProp.GetString();
             }
-            catch { }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[RelationalDatabasePlugin] Failed to extract ID from JSON: {ex.Message}");
+            }
             return null;
         }
 

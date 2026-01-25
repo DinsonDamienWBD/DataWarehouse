@@ -960,7 +960,10 @@ namespace DataWarehouse.Plugins.VendorSpecificRaid
                         };
                     }
                 }
-                catch { }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"[VendorSpecificRaidPlugin] Failed to read stripe metadata for key '{key}': {ex.Message}");
+                }
             }
 
             return null;
@@ -1015,7 +1018,10 @@ namespace DataWarehouse.Plugins.VendorSpecificRaid
                     await pStream.CopyToAsync(pMs, ct);
                     pParity = pMs.ToArray();
                 }
-                catch { }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"[VendorSpecificRaidPlugin] RAID DP: Failed to read P parity for key '{key}' stripe {s}: {ex.Message}");
+                }
 
                 try
                 {
@@ -1025,7 +1031,10 @@ namespace DataWarehouse.Plugins.VendorSpecificRaid
                     await dpStream.CopyToAsync(dpMs, ct);
                     dpParity = dpMs.ToArray();
                 }
-                catch { }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"[VendorSpecificRaidPlugin] RAID DP: Failed to read DP parity for key '{key}' stripe {s}: {ex.Message}");
+                }
 
                 if (failedIndices.Count == 1 && pParity.Length > 0)
                 {
@@ -1074,7 +1083,10 @@ namespace DataWarehouse.Plugins.VendorSpecificRaid
                             parityData = ms.ToArray();
                             _providerStates[p].BytesRead += ms.Length;
                         }
-                        catch { }
+                        catch (Exception ex)
+                        {
+                            Console.WriteLine($"[VendorSpecificRaidPlugin] RAID S: Failed to read parity from provider {p} for key '{key}' stripe {s}: {ex.Message}");
+                        }
                     }
                     else
                     {
@@ -1167,7 +1179,10 @@ namespace DataWarehouse.Plugins.VendorSpecificRaid
                     parityData = ms.ToArray();
                     _providerStates[parityProviderIdx].BytesRead += ms.Length;
                 }
-                catch { }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"[VendorSpecificRaidPlugin] RAID 7: Failed to read parity from provider {parityProviderIdx} for key '{key}' stripe {s}: {ex.Message}");
+                }
 
                 if (failedChunkIdx.HasValue && parityData.Length > 0)
                 {
@@ -1215,7 +1230,10 @@ namespace DataWarehouse.Plugins.VendorSpecificRaid
                             pParity = ms.ToArray();
                             _providerStates[p].BytesRead += ms.Length;
                         }
-                        catch { }
+                        catch (Exception ex)
+                        {
+                            Console.WriteLine($"[VendorSpecificRaidPlugin] FlexRAID: Failed to read P parity from provider {p} for key '{key}' stripe {s}: {ex.Message}");
+                        }
                     }
                     else if (p == qParityIdx)
                     {
@@ -1228,7 +1246,10 @@ namespace DataWarehouse.Plugins.VendorSpecificRaid
                             qParity = ms.ToArray();
                             _providerStates[p].BytesRead += ms.Length;
                         }
-                        catch { }
+                        catch (Exception ex)
+                        {
+                            Console.WriteLine($"[VendorSpecificRaidPlugin] FlexRAID: Failed to read Q parity from provider {p} for key '{key}' stripe {s}: {ex.Message}");
+                        }
                     }
                     else
                     {
@@ -1326,7 +1347,10 @@ namespace DataWarehouse.Plugins.VendorSpecificRaid
                     await pStream.CopyToAsync(pMs, ct);
                     pParity = pMs.ToArray();
                 }
-                catch { }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"[VendorSpecificRaidPlugin] Unraid: Failed to read P parity for key '{key}' stripe {s}: {ex.Message}");
+                }
 
                 if (qParityIdx >= 0)
                 {
@@ -1338,7 +1362,10 @@ namespace DataWarehouse.Plugins.VendorSpecificRaid
                         await qStream.CopyToAsync(qMs, ct);
                         qParity = qMs.ToArray();
                     }
-                    catch { }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"[VendorSpecificRaidPlugin] Unraid: Failed to read Q parity for key '{key}' stripe {s}: {ex.Message}");
+                    }
                 }
 
                 if (failedIndices.Count == 1 && pParity.Length > 0)
@@ -1415,7 +1442,10 @@ namespace DataWarehouse.Plugins.VendorSpecificRaid
                                 if (!foundAny && s > 0) break;
                             }
                         }
-                        catch { }
+                        catch (Exception ex)
+                        {
+                            Console.WriteLine($"[VendorSpecificRaidPlugin] Scrub verification failed for provider {providerIdx}: {ex.Message}");
+                        }
                     }, ct));
                 }
 
@@ -1455,7 +1485,10 @@ namespace DataWarehouse.Plugins.VendorSpecificRaid
                         if (await _providers[i].ExistsAsync(stripeUri))
                             return true;
                     }
-                    catch { }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"[VendorSpecificRaidPlugin] Hot spare activation failed for provider {i}: {ex.Message}");
+                    }
                 }
 
                 return false;
@@ -1725,7 +1758,10 @@ namespace DataWarehouse.Plugins.VendorSpecificRaid
                             chunks.Add(ms.ToArray());
                         }
                     }
-                    catch { }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"[VendorSpecificRaidPlugin] Rebuild failed reading data chunk {d} for key '{key}' stripe {s}: {ex.Message}");
+                    }
                 }
 
                 if (chunks.Count > 0)

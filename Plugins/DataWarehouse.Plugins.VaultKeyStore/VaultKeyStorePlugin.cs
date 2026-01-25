@@ -193,7 +193,10 @@ namespace DataWarehouse.Plugins.VaultKeyStore
                             break;
                         }
                     }
-                    catch { }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"[VaultKeyStorePlugin] Backend health check failed: {ex.Message}");
+                    }
                 }
 
                 if (_activeBackend == null && _backends.Length > 0)
@@ -322,7 +325,11 @@ namespace DataWarehouse.Plugins.VaultKeyStore
                 var response = await _httpClient.SendAsync(request);
                 return response.IsSuccessStatusCode;
             }
-            catch { return false; }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[VaultKeyStorePlugin] Vault operation failed: {ex.Message}");
+                return false;
+            }
         }
 
         public Task<string?> GetCurrentKeyIdAsync()
@@ -425,7 +432,11 @@ namespace DataWarehouse.Plugins.VaultKeyStore
                 var response = await _httpClient.SendAsync(request);
                 return response.IsSuccessStatusCode;
             }
-            catch { return false; }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[VaultKeyStorePlugin] Vault operation failed: {ex.Message}");
+                return false;
+            }
         }
 
         public Task<string?> GetCurrentKeyIdAsync() => Task.FromResult<string?>(_config.DefaultKeyName);
@@ -546,7 +557,11 @@ namespace DataWarehouse.Plugins.VaultKeyStore
                 var response = await _httpClient.SendAsync(request);
                 return response.IsSuccessStatusCode;
             }
-            catch { return false; }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[VaultKeyStorePlugin] Vault operation failed: {ex.Message}");
+                return false;
+            }
         }
 
         public Task<string?> GetCurrentKeyIdAsync() => Task.FromResult<string?>(_config.DefaultKeyId);

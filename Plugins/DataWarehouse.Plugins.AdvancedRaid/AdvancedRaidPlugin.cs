@@ -1119,7 +1119,10 @@ public sealed class AdvancedRaidPlugin : RaidProviderPluginBase, IAsyncDisposabl
                     {
                         data = await ReadBlockFromDriveAsync(primary, key, s, $"chunk-{c}-primary", ct);
                     }
-                    catch { }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"[AdvancedRaidPlugin] Read operation failed: {ex.Message}");
+                    }
                 }
 
                 if (data == null && mirror.Status == DriveStatus.Online)

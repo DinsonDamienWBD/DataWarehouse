@@ -724,7 +724,10 @@ namespace DataWarehouse.Plugins.StandardRaid
                         };
                     }
                 }
-                catch { }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"[StandardRaidPlugin] Failed to read stripe metadata for key '{key}': {ex.Message}");
+                }
             }
 
             return null;
@@ -836,7 +839,10 @@ namespace DataWarehouse.Plugins.StandardRaid
                             parityData = ms.ToArray();
                             _providerStates[p].BytesRead += ms.Length;
                         }
-                        catch { }
+                        catch (Exception ex)
+                        {
+                            Console.WriteLine($"[StandardRaidPlugin] RAID 5: Failed to read parity from provider {p} for key '{key}' stripe {s}: {ex.Message}");
+                        }
                     }
                     else
                     {
@@ -915,7 +921,10 @@ namespace DataWarehouse.Plugins.StandardRaid
                             pParity = ms.ToArray();
                             _providerStates[p].BytesRead += ms.Length;
                         }
-                        catch { }
+                        catch (Exception ex)
+                        {
+                            Console.WriteLine($"[StandardRaidPlugin] RAID 6: Failed to read P parity from provider {p} for key '{key}' stripe {s}: {ex.Message}");
+                        }
                     }
                     else if (p == qParityIdx)
                     {
@@ -928,7 +937,10 @@ namespace DataWarehouse.Plugins.StandardRaid
                             qParity = ms.ToArray();
                             _providerStates[p].BytesRead += ms.Length;
                         }
-                        catch { }
+                        catch (Exception ex)
+                        {
+                            Console.WriteLine($"[StandardRaidPlugin] RAID 6: Failed to read Q parity from provider {p} for key '{key}' stripe {s}: {ex.Message}");
+                        }
                     }
                     else
                     {
@@ -1008,7 +1020,10 @@ namespace DataWarehouse.Plugins.StandardRaid
                             chunk = ms.ToArray();
                             _providerStates[primary].BytesRead += ms.Length;
                         }
-                        catch { }
+                        catch (Exception ex)
+                        {
+                            Console.WriteLine($"[StandardRaidPlugin] RAID 10: Failed to read from primary provider {primary} for key '{key}' stripe {s}: {ex.Message}");
+                        }
                     }
 
                     // Fall back to secondary mirror if primary failed
@@ -1023,7 +1038,10 @@ namespace DataWarehouse.Plugins.StandardRaid
                             chunk = ms.ToArray();
                             _providerStates[secondary].BytesRead += ms.Length;
                         }
-                        catch { }
+                        catch (Exception ex)
+                        {
+                            Console.WriteLine($"[StandardRaidPlugin] RAID 10: Failed to read from secondary provider {secondary} for key '{key}' stripe {s}: {ex.Message}");
+                        }
                     }
 
                     if (chunk != null)
@@ -1095,7 +1113,10 @@ namespace DataWarehouse.Plugins.StandardRaid
                                 if (!foundAny && s > 0) break;
                             }
                         }
-                        catch { }
+                        catch (Exception ex)
+                        {
+                            Console.WriteLine($"[StandardRaidPlugin] Scrub verification failed for provider {providerIdx}: {ex.Message}");
+                        }
                     }, ct));
                 }
 
@@ -1133,7 +1154,10 @@ namespace DataWarehouse.Plugins.StandardRaid
                         if (await _providers[i].ExistsAsync(stripeUri))
                             return true;
                     }
-                    catch { }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"[StandardRaidPlugin] Key existence check failed for provider {i}: {ex.Message}");
+                    }
                 }
 
                 return false;
@@ -1400,7 +1424,10 @@ namespace DataWarehouse.Plugins.StandardRaid
                                 }
                             }
                         }
-                        catch { }
+                        catch (Exception ex)
+                        {
+                            Console.WriteLine($"[StandardRaidPlugin] Parity verification failed for provider {p} key '{key}' stripe {s}: {ex.Message}");
+                        }
                     }
                 }
 

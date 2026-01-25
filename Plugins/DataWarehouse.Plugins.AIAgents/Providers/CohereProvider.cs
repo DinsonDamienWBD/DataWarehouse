@@ -259,7 +259,10 @@ namespace DataWarehouse.Plugins.AIAgents
                         textStr = text.GetString();
                     }
                 }
-                catch { }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"[CohereProvider] Failed to parse streaming response: {ex.Message}");
+                }
 
                 if (!string.IsNullOrEmpty(textStr))
                     yield return textStr;

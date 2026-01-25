@@ -205,7 +205,10 @@ namespace DataWarehouse.Plugins.AIAgents
                         }
                     }
                 }
-                catch { }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"[AzureOpenAIProvider] Failed to parse streaming response chunk: {ex.Message}");
+                }
 
                 if (textToYield != null)
                     yield return textToYield;

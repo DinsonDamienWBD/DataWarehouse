@@ -242,7 +242,10 @@ namespace DataWarehouse.Plugins.AIAgents
                     if (root.TryGetProperty("done", out var done) && done.GetBoolean())
                         shouldBreak = true;
                 }
-                catch { }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"[OllamaProvider] Failed to parse streaming response: {ex.Message}");
+                }
 
                 if (textToYield != null)
                     yield return textToYield;
@@ -404,7 +407,10 @@ namespace DataWarehouse.Plugins.AIAgents
                         progress?.Report(pct);
                     }
                 }
-                catch { }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"[OllamaProvider] Failed to parse streaming response: {ex.Message}");
+                }
             }
         }
     }

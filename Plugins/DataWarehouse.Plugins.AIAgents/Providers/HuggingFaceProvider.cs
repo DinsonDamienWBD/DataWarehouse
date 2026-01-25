@@ -243,7 +243,10 @@ namespace DataWarehouse.Plugins.AIAgents
                                 valueToYield = textStr;
                         }
                     }
-                    catch { }
+                    catch (Exception ex)
+                {
+                    Console.WriteLine($"[HuggingFaceProvider] Failed to parse streaming response: {ex.Message}");
+                }
 
                     if (valueToYield != null)
                         yield return valueToYield;

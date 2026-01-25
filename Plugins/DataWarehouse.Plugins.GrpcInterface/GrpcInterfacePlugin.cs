@@ -195,7 +195,7 @@ public sealed class GrpcInterfacePlugin : InterfacePluginBase
         // Close all connections
         foreach (var conn in _connections.Values)
         {
-            try { conn.Client.Close(); } catch { }
+            try { conn.Client.Close(); } catch (Exception ex) { Console.WriteLine($"[GrpcInterfacePlugin] Failed to close connection: {ex.Message}"); }
         }
         _connections.Clear();
 
@@ -274,7 +274,7 @@ public sealed class GrpcInterfacePlugin : InterfacePluginBase
         finally
         {
             _connections.TryRemove(connection.Id, out _);
-            try { connection.Client.Close(); } catch { }
+            try { connection.Client.Close(); } catch (Exception ex) { Console.WriteLine($"[GrpcInterfacePlugin] Failed to close connection: {ex.Message}"); }
         }
     }
 
