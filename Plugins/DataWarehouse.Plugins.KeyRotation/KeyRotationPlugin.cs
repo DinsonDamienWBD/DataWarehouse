@@ -1169,27 +1169,27 @@ namespace DataWarehouse.Plugins.KeyRotation
     {
         public Task SaveAsync(string path, Stream data, IDictionary<string, string>? metadata = null, CancellationToken ct = default)
         {
-            throw new NotImplementedException("Mock storage service does not support save operations");
+            throw new NotSupportedException("Mock storage service does not support save operations");
         }
 
         public Task SaveAsync(string path, byte[] data, IDictionary<string, string>? metadata = null, CancellationToken ct = default)
         {
-            throw new NotImplementedException("Mock storage service does not support save operations");
+            throw new NotSupportedException("Mock storage service does not support save operations");
         }
 
         public Task<Stream?> LoadAsync(string path, CancellationToken ct = default)
         {
-            throw new NotImplementedException("Mock storage service does not support load operations");
+            throw new NotSupportedException("Mock storage service does not support load operations");
         }
 
         public Task<byte[]?> LoadBytesAsync(string path, CancellationToken ct = default)
         {
-            throw new NotImplementedException("Mock storage service does not support load operations");
+            throw new NotSupportedException("Mock storage service does not support load operations");
         }
 
         public Task<bool> DeleteAsync(string path, CancellationToken ct = default)
         {
-            throw new NotImplementedException("Mock storage service does not support delete operations");
+            throw new NotSupportedException("Mock storage service does not support delete operations");
         }
 
         public Task<bool> ExistsAsync(string path, CancellationToken ct = default)

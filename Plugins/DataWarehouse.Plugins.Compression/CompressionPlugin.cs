@@ -1683,7 +1683,10 @@ namespace DataWarehouse.Plugins.Compression
         public void LogDebug(string message) { }
         public T? GetPlugin<T>() where T : class, IPlugin => null;
         public IEnumerable<T> GetPlugins<T>() where T : class, IPlugin => [];
-        public IKernelStorageService Storage => throw new NotImplementedException();
+        /// <summary>
+        /// Storage service is not supported in test context.
+        /// </summary>
+        public IKernelStorageService Storage => throw new NotSupportedException("Storage service is not supported in test context");
     }
 
     #endregion

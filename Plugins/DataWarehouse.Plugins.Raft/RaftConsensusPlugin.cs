@@ -83,7 +83,7 @@ namespace DataWarehouse.Plugins.Raft
 
         // Network
         private TcpListener? _listener;
-        private int _listenPort = 5000;
+        private RaftConfiguration _config = new();
 
         public override bool IsLeader
         {
@@ -99,6 +99,22 @@ namespace DataWarehouse.Plugins.Raft
         public string NodeId => _nodeId;
         public long CurrentTerm => Interlocked.Read(ref _currentTerm);
         public string? LeaderId => _leaderId;
+
+        /// <summary>
+        /// Initializes a new instance of the RaftConsensusPlugin with default configuration.
+        /// </summary>
+        public RaftConsensusPlugin() : this(new RaftConfiguration())
+        {
+        }
+
+        /// <summary>
+        /// Initializes a new instance of the RaftConsensusPlugin with the specified configuration.
+        /// </summary>
+        /// <param name="config">The Raft configuration settings.</param>
+        public RaftConsensusPlugin(RaftConfiguration config)
+        {
+            _config = config ?? new RaftConfiguration();
+        }
 
         public override Task<HandshakeResponse> OnHandshakeAsync(HandshakeRequest request)
         {
@@ -388,9 +404,10 @@ namespace DataWarehouse.Plugins.Raft
                 {
                     break;
                 }
-                catch
+                catch (Exception ex)
                 {
                     // Election failed, will retry
+                    Console.WriteLine($"[Raft] Election attempt failed - Node: {_nodeId}, State: {_state}, Term: {_currentTerm}, Error: {ex.Message}");
                 }
             }
         }
@@ -504,9 +521,10 @@ namespace DataWarehouse.Plugins.Raft
                 {
                     break;
                 }
-                catch
+                catch (Exception ex)
                 {
-                    // Heartbeat failed, will retry
+                    // Heartbeat failed, will retry - expected during network partitions
+                    Console.WriteLine($"[Raft] Heartbeat failed - Node: {_nodeId}, State: {_state}, Term: {_currentTerm}, PeerCount: {_peers.Count}, Error: {ex.Message}");
                 }
             }
         }
@@ -597,9 +615,10 @@ namespace DataWarehouse.Plugins.Raft
                 {
                     break;
                 }
-                catch
+                catch (Exception ex)
                 {
                     // Commit loop error, will retry
+                    Console.WriteLine($"[Raft] Commit loop error - Node: {_nodeId}, LastApplied: {_lastApplied}, CommitIndex: {_commitIndex}, Error: {ex.Message}");
                 }
             }
         }
@@ -644,9 +663,10 @@ namespace DataWarehouse.Plugins.Raft
                 {
                     handler(proposal);
                 }
-                catch
+                catch (Exception ex)
                 {
-                    // Handler error, continue
+                    // Handler error, continue - individual handler failures should not block commit processing
+                    Console.WriteLine($"[Raft] Commit handler failed - Node: {_nodeId}, ProposalId: {proposal.Id}, Command: {proposal.Command}, Error: {ex.Message}");
                 }
             }
         }
@@ -787,7 +807,11 @@ namespace DataWarehouse.Plugins.Raft
 
                 _locks[lockId] = @lock;
             }
-            catch { }
+            catch (Exception ex)
+            {
+                // Failed to parse lock acquire payload
+                Console.WriteLine($"[Raft] Lock acquire parse failed - Node: {_nodeId}, PayloadLength: {payload.Length}, Error: {ex.Message}");
+            }
         }
 
         private void ApplyLockRelease(byte[] payload)
@@ -805,7 +829,11 @@ namespace DataWarehouse.Plugins.Raft
                     _locks.TryRemove(lockId, out _);
                 }
             }
-            catch { }
+            catch (Exception ex)
+            {
+                // Failed to parse lock release payload
+                Console.WriteLine($"[Raft] Lock release parse failed - Node: {_nodeId}, PayloadLength: {payload.Length}, Error: {ex.Message}");
+            }
         }
 
         #endregion
@@ -907,7 +935,11 @@ namespace DataWarehouse.Plugins.Raft
                     };
                 }
             }
-            catch { }
+            catch (Exception ex)
+            {
+                // Failed to parse cluster join payload
+                Console.WriteLine($"[Raft] Cluster join parse failed - Node: {_nodeId}, PayloadLength: {payload.Length}, Error: {ex.Message}");
+            }
         }
 
         private void ApplyClusterLeave(byte[] payload)
@@ -919,7 +951,11 @@ namespace DataWarehouse.Plugins.Raft
 
                 _peers.TryRemove(nodeId, out _);
             }
-            catch { }
+            catch (Exception ex)
+            {
+                // Failed to parse cluster leave payload
+                Console.WriteLine($"[Raft] Cluster leave parse failed - Node: {_nodeId}, PayloadLength: {payload.Length}, Error: {ex.Message}");
+            }
         }
 
         #endregion
@@ -1077,19 +1113,39 @@ namespace DataWarehouse.Plugins.Raft
         {
             try
             {
-                _listener = new TcpListener(IPAddress.Any, _listenPort);
+                // Use configured base port (0 = OS-assigned)
+                _listener = new TcpListener(IPAddress.Any, _config.BasePort);
                 _listener.Start();
-                _nodeEndpoint = $"127.0.0.1:{_listenPort}";
+
+                // Get the actual port assigned by OS if BasePort was 0
+                var actualPort = ((IPEndPoint)_listener.LocalEndpoint).Port;
+                _nodeEndpoint = $"127.0.0.1:{actualPort}";
 
                 _ = AcceptConnectionsAsync(_cts!.Token);
             }
-            catch
+            catch (Exception ex)
             {
-                // Listener failed, try next port
-                _listenPort++;
-                if (_listenPort < 5100)
+                // Listener failed, try next port in range if configured
+                Console.WriteLine($"[Raft] TCP listener failed on port {_config.BasePort} - Node: {_nodeId}, Error: {ex.Message}");
+
+                if (_config.BasePort > 0 && _config.PortRange > 0)
                 {
-                    await StartListenerAsync();
+                    // Try incrementing within the port range
+                    var nextPort = _config.BasePort + 1;
+                    if (nextPort < _config.BasePort + _config.PortRange)
+                    {
+                        _config = _config with { BasePort = nextPort };
+                        await StartListenerAsync();
+                    }
+                    else
+                    {
+                        Console.WriteLine($"[Raft] Exhausted port range - Node: {_nodeId}, Range: [{_config.BasePort - _config.PortRange + 1}, {_config.BasePort}]");
+                        throw;
+                    }
+                }
+                else
+                {
+                    throw; // Re-throw if OS assignment failed or no range configured
                 }
             }
         }
@@ -1107,9 +1163,10 @@ namespace DataWarehouse.Plugins.Raft
                 {
                     break;
                 }
-                catch
+                catch (Exception ex)
                 {
-                    // Accept failed, continue
+                    // Accept failed, continue - expected during shutdown or temporary network issues
+                    Console.WriteLine($"[Raft] TCP accept failed - Node: {_nodeId}, State: {_state}, Error: {ex.Message}");
                 }
             }
         }
@@ -1149,9 +1206,10 @@ namespace DataWarehouse.Plugins.Raft
                     await writer.WriteLineAsync(JsonSerializer.Serialize(response));
                 }
             }
-            catch
+            catch (Exception ex)
             {
-                // Client handling failed
+                // Client handling failed - expected during network issues or malformed requests
+                Console.WriteLine($"[Raft] Client request handling failed - Node: {_nodeId}, State: {_state}, Error: {ex.Message}");
             }
         }
 
@@ -1189,8 +1247,10 @@ namespace DataWarehouse.Plugins.Raft
 
                 return response;
             }
-            catch
+            catch (Exception ex)
             {
+                // Failed to send vote request - expected during network partitions
+                Console.WriteLine($"[Raft] RequestVote RPC failed - Node: {_nodeId}, Peer: {peer.NodeId}, Endpoint: {peer.Endpoint}, Term: {request.Term}, Error: {ex.Message}");
                 return null;
             }
         }
@@ -1246,8 +1306,10 @@ namespace DataWarehouse.Plugins.Raft
 
                 return response;
             }
-            catch
+            catch (Exception ex)
             {
+                // Failed to send AppendEntries - expected during network partitions
+                Console.WriteLine($"[Raft] AppendEntries RPC failed - Node: {_nodeId}, Peer: {peer.NodeId}, Endpoint: {peer.Endpoint}, EntryCount: {entries.Length}, Term: {_currentTerm}, Error: {ex.Message}");
                 return null;
             }
         }
@@ -1282,8 +1344,10 @@ namespace DataWarehouse.Plugins.Raft
                 using var doc = JsonDocument.Parse(responseLine);
                 return doc.RootElement.TryGetProperty("success", out var success) && success.GetBoolean();
             }
-            catch
+            catch (Exception ex)
             {
+                // Failed to forward proposal to leader
+                Console.WriteLine($"[Raft] Proposal forwarding failed - Node: {_nodeId}, Leader: {leader.NodeId}, Endpoint: {leader.Endpoint}, ProposalId: {proposal.Id}, Error: {ex.Message}");
                 return false;
             }
         }
@@ -1417,8 +1481,15 @@ namespace DataWarehouse.Plugins.Raft
 
             foreach (var oldSnapshot in snapshots)
             {
-                try { File.Delete(oldSnapshot); }
-                catch { /* Ignore cleanup errors */ }
+                try
+                {
+                    File.Delete(oldSnapshot);
+                }
+                catch (Exception ex)
+                {
+                    // Ignore cleanup errors - non-critical, will retry on next snapshot
+                    Console.WriteLine($"[Raft] Snapshot cleanup failed - Node: {_nodeId}, File: {Path.GetFileName(oldSnapshot)}, Error: {ex.Message}");
+                }
             }
         }
 
@@ -1443,8 +1514,10 @@ namespace DataWarehouse.Plugins.Raft
                 var json = await File.ReadAllTextAsync(latestFile);
                 return JsonSerializer.Deserialize<Snapshot>(json);
             }
-            catch
+            catch (Exception ex)
             {
+                // Failed to load snapshot - will start from empty state
+                Console.WriteLine($"[Raft] Snapshot load failed - Node: {_nodeId}, File: {Path.GetFileName(latestFile)}, Error: {ex.Message}");
                 return null;
             }
         }
@@ -1500,13 +1573,27 @@ namespace DataWarehouse.Plugins.Raft
                 _lockLeaseTime = TimeSpan.FromSeconds(Convert.ToDouble(leaseS));
             }
 
+            if (payload.TryGetValue("basePort", out var basePort))
+            {
+                var port = Convert.ToInt32(basePort);
+                _config = _config with { BasePort = port };
+            }
+
+            if (payload.TryGetValue("portRange", out var portRange))
+            {
+                var range = Convert.ToInt32(portRange);
+                _config = _config with { PortRange = range };
+            }
+
             return new Dictionary<string, object>
             {
                 ["success"] = true,
                 ["electionTimeoutMinMs"] = _electionTimeoutMin.TotalMilliseconds,
                 ["electionTimeoutMaxMs"] = _electionTimeoutMax.TotalMilliseconds,
                 ["heartbeatIntervalMs"] = _heartbeatInterval.TotalMilliseconds,
-                ["lockLeaseSeconds"] = _lockLeaseTime.TotalSeconds
+                ["lockLeaseSeconds"] = _lockLeaseTime.TotalSeconds,
+                ["basePort"] = _config.BasePort,
+                ["portRange"] = _config.PortRange
             };
         }
 
@@ -1569,6 +1656,31 @@ namespace DataWarehouse.Plugins.Raft
         public bool Success { get; set; }
         public long MatchIndex { get; set; }
         public long ConflictIndex { get; set; }
+    }
+
+    /// <summary>
+    /// Configuration for Raft consensus plugin.
+    /// </summary>
+    public record RaftConfiguration
+    {
+        /// <summary>
+        /// Base port for Raft communication. Default 0 = OS-assigned port (recommended for safety).
+        /// Set to a specific port number for production deployments where fixed ports are required.
+        /// </summary>
+        public int BasePort { get; init; } = 0;
+
+        /// <summary>
+        /// Port range size for multi-node clusters.
+        /// If BasePort is specified and port binding fails, the plugin will try ports in the range [BasePort, BasePort+PortRange).
+        /// Default 100. Ignored when BasePort is 0 (OS-assigned).
+        /// </summary>
+        public int PortRange { get; init; } = 100;
+
+        /// <summary>
+        /// Node endpoints for cluster membership. Format: "host:port".
+        /// Example: ["node1.example.com:5000", "node2.example.com:5000"]
+        /// </summary>
+        public List<string> ClusterEndpoints { get; init; } = new();
     }
 
     #endregion

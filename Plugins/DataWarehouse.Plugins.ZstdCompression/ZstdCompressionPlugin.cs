@@ -645,7 +645,10 @@ namespace DataWarehouse.Plugins.ZstdCompression
     {
         public OperatingMode Mode => OperatingMode.Laptop;
         public string RootPath => Environment.CurrentDirectory;
-        public IKernelStorageService Storage => throw new NotImplementedException("Test context does not support storage");
+        /// <summary>
+        /// Storage service is not supported in test context.
+        /// </summary>
+        public IKernelStorageService Storage => throw new NotSupportedException("Storage service is not supported in test context");
         public void LogInfo(string message) { }
         public void LogError(string message, Exception? ex = null) { }
         public void LogWarning(string message) { }

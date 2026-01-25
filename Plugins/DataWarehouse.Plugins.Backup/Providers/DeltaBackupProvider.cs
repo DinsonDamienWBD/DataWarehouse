@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using System.Runtime.CompilerServices;
 using System.Security.Cryptography;
 using System.Text.Json;
+using Microsoft.Extensions.Logging;
 
 namespace DataWarehouse.Plugins.Backup.Providers;
 
@@ -17,6 +18,7 @@ public sealed class DeltaBackupProvider : IBackupProvider, IDeltaBackupProvider
     private readonly ConcurrentDictionary<string, DeltaFileState> _fileStates = new();
     private readonly SemaphoreSlim _backupLock = new(1, 1);
     private readonly string _statePath;
+    private readonly ILogger<DeltaBackupProvider>? _logger;
     private long _sequence;
     private volatile bool _disposed;
 
@@ -31,11 +33,13 @@ public sealed class DeltaBackupProvider : IBackupProvider, IDeltaBackupProvider
     public DeltaBackupProvider(
         IBackupDestination destination,
         string statePath,
-        DeltaBackupConfig? config = null)
+        DeltaBackupConfig? config = null,
+        ILogger<DeltaBackupProvider>? logger = null)
     {
         _destination = destination ?? throw new ArgumentNullException(nameof(destination));
         _statePath = statePath ?? throw new ArgumentNullException(nameof(statePath));
         _config = config ?? new DeltaBackupConfig();
+        _logger = logger;
 
         Directory.CreateDirectory(_statePath);
     }
@@ -551,7 +555,7 @@ public sealed class DeltaBackupProvider : IBackupProvider, IDeltaBackupProvider
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"Filter evaluation failed for {path}: {ex.Message}");
+                _logger?.LogWarning(ex, "Filter evaluation failed for path: {Path}", path);
                 return false;
             }
         }

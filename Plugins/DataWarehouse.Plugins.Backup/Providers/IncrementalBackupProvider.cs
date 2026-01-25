@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using System.Runtime.CompilerServices;
 using System.Security.Cryptography;
 using System.Text.Json;
+using Microsoft.Extensions.Logging;
 
 namespace DataWarehouse.Plugins.Backup.Providers;
 
@@ -19,6 +20,7 @@ public sealed class IncrementalBackupProvider : IBackupProvider, IDifferentialBa
     private readonly ConcurrentDictionary<string, IncrementalBackupEntry> _entries = new();
     private readonly SemaphoreSlim _backupLock = new(1, 1);
     private readonly string _statePath;
+    private readonly ILogger<IncrementalBackupProvider>? _logger;
     private long _sequence;
     private DateTime _lastFullBackupTime;
     private volatile bool _disposed;
@@ -34,11 +36,13 @@ public sealed class IncrementalBackupProvider : IBackupProvider, IDifferentialBa
     public IncrementalBackupProvider(
         IBackupDestination destination,
         string statePath,
-        IncrementalBackupConfig? config = null)
+        IncrementalBackupConfig? config = null,
+        ILogger<IncrementalBackupProvider>? logger = null)
     {
         _destination = destination ?? throw new ArgumentNullException(nameof(destination));
         _statePath = statePath ?? throw new ArgumentNullException(nameof(statePath));
         _config = config ?? new IncrementalBackupConfig();
+        _logger = logger;
         _chunker = new RabinChunker(_config.MinChunkSize, _config.TargetChunkSize, _config.MaxChunkSize);
 
         Directory.CreateDirectory(_statePath);
@@ -488,7 +492,7 @@ public sealed class IncrementalBackupProvider : IBackupProvider, IDifferentialBa
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"Filter evaluation failed for {path}: {ex.Message}");
+                _logger?.LogWarning(ex, "Filter evaluation failed for path: {Path}", path);
                 return false;
             }
         }

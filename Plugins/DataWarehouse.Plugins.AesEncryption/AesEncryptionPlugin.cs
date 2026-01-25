@@ -178,6 +178,7 @@ namespace DataWarehouse.Plugins.AesEncryption
 
         /// <summary>
         /// Encrypts data from the input stream using AES-256-GCM authenticated encryption.
+        /// LEGACY: Use OnWriteAsync for proper async support. This method calls OnWriteAsync synchronously.
         /// </summary>
         /// <param name="input">The plaintext input stream.</param>
         /// <param name="context">The kernel context for logging and plugin access.</param>
@@ -191,14 +192,34 @@ namespace DataWarehouse.Plugins.AesEncryption
         /// <exception cref="InvalidOperationException">Thrown when no key store is configured.</exception>
         /// <exception cref="CryptographicException">Thrown on encryption failure.</exception>
         /// <remarks>
-        /// IMPORTANT: This method is synchronous due to the PipelinePluginBase interface constraint.
-        /// The OnWrite method signature is defined as returning Stream (not Task&lt;Stream&gt;),
-        /// which means we cannot use async/await here. We use RunSyncWithErrorHandling to safely
-        /// execute async key store operations with proper error handling and context preservation.
-        ///
         /// Output format: [KeyIdLength:4][KeyId:32][IV:12][Tag:16][Ciphertext:...]
         /// </remarks>
         public override Stream OnWrite(Stream input, IKernelContext context, Dictionary<string, object> args)
+        {
+            // LEGACY SYNC WRAPPER: Calls async version
+            // This is maintained for backward compatibility with sync-only callers
+            return OnWriteAsync(input, context, args).GetAwaiter().GetResult();
+        }
+
+        /// <summary>
+        /// Async version: Encrypts data from the input stream using AES-256-GCM authenticated encryption.
+        /// This is the preferred method for proper async/await support without blocking.
+        /// </summary>
+        /// <param name="input">The plaintext input stream.</param>
+        /// <param name="context">The kernel context for logging and plugin access.</param>
+        /// <param name="args">
+        /// Optional arguments:
+        /// - keyStore: IKeyStore instance
+        /// - securityContext: ISecurityContext for key access
+        /// - keyId: Specific key ID to use (otherwise current key is used)
+        /// </param>
+        /// <returns>A task that completes with a stream containing the encrypted data with header.</returns>
+        /// <exception cref="InvalidOperationException">Thrown when no key store is configured.</exception>
+        /// <exception cref="CryptographicException">Thrown on encryption failure.</exception>
+        /// <remarks>
+        /// Output format: [KeyIdLength:4][KeyId:32][IV:12][Tag:16][Ciphertext:...]
+        /// </remarks>
+        protected override async Task<Stream> OnWriteAsync(Stream input, IKernelContext context, Dictionary<string, object> args)
         {
             ObjectDisposedException.ThrowIf(_disposed, this);
 
@@ -213,16 +234,12 @@ namespace DataWarehouse.Plugins.AesEncryption
             }
             else
             {
-                // Interface constraint: OnWrite must be synchronous, but IKeyStore methods are async.
-                // Using helper method with proper error handling for sync-over-async calls.
-                keyId = RunSyncWithErrorHandling(
-                    () => keyStore.GetCurrentKeyIdAsync(),
-                    "Failed to retrieve current key ID from key store");
+                // PROPER ASYNC: Use await instead of blocking
+                keyId = await keyStore.GetCurrentKeyIdAsync().ConfigureAwait(false);
             }
 
-            var key = RunSyncWithErrorHandling(
-                () => keyStore.GetKeyAsync(keyId, securityContext),
-                $"Failed to retrieve key from key store for encryption");
+            // PROPER ASYNC: Use await instead of blocking
+            var key = await keyStore.GetKeyAsync(keyId, securityContext).ConfigureAwait(false);
 
             if (key.Length != 32)
             {
@@ -308,6 +325,7 @@ namespace DataWarehouse.Plugins.AesEncryption
 
         /// <summary>
         /// Decrypts data from the stored stream using AES-256-GCM authenticated encryption.
+        /// LEGACY: Use OnReadAsync for proper async support. This method calls OnReadAsync synchronously.
         /// </summary>
         /// <param name="stored">The encrypted input stream with header.</param>
         /// <param name="context">The kernel context for logging and plugin access.</param>
@@ -321,13 +339,30 @@ namespace DataWarehouse.Plugins.AesEncryption
         /// <exception cref="CryptographicException">
         /// Thrown on decryption failure or authentication tag verification failure.
         /// </exception>
-        /// <remarks>
-        /// IMPORTANT: This method is synchronous due to the PipelinePluginBase interface constraint.
-        /// The OnRead method signature is defined as returning Stream (not Task&lt;Stream&gt;),
-        /// which means we cannot use async/await here. We use RunSyncWithErrorHandling to safely
-        /// execute async key store operations with proper error handling and context preservation.
-        /// </remarks>
         public override Stream OnRead(Stream stored, IKernelContext context, Dictionary<string, object> args)
+        {
+            // LEGACY SYNC WRAPPER: Calls async version
+            // This is maintained for backward compatibility with sync-only callers
+            return OnReadAsync(stored, context, args).GetAwaiter().GetResult();
+        }
+
+        /// <summary>
+        /// Async version: Decrypts data from the stored stream using AES-256-GCM authenticated encryption.
+        /// This is the preferred method for proper async/await support without blocking.
+        /// </summary>
+        /// <param name="stored">The encrypted input stream with header.</param>
+        /// <param name="context">The kernel context for logging and plugin access.</param>
+        /// <param name="args">
+        /// Optional arguments:
+        /// - keyStore: IKeyStore instance
+        /// - securityContext: ISecurityContext for key access
+        /// </param>
+        /// <returns>A task that completes with a stream containing the decrypted plaintext.</returns>
+        /// <exception cref="InvalidOperationException">Thrown when no key store is configured.</exception>
+        /// <exception cref="CryptographicException">
+        /// Thrown on decryption failure or authentication tag verification failure.
+        /// </exception>
+        protected override async Task<Stream> OnReadAsync(Stream stored, IKernelContext context, Dictionary<string, object> args)
         {
             ObjectDisposedException.ThrowIf(_disposed, this);
 
@@ -389,12 +424,8 @@ namespace DataWarehouse.Plugins.AesEncryption
                     Array.Copy(encryptedData, pos, ciphertext, 0, ciphertextLength);
                 }
 
-                // Retrieve decryption key
-                // Interface constraint: OnRead must be synchronous, but IKeyStore methods are async.
-                // Using helper method with proper error handling for sync-over-async calls.
-                key = RunSyncWithErrorHandling(
-                    () => keyStore.GetKeyAsync(keyId, securityContext),
-                    $"Failed to retrieve key from key store for decryption");
+                // PROPER ASYNC: Use await instead of blocking
+                key = await keyStore.GetKeyAsync(keyId, securityContext).ConfigureAwait(false);
 
                 if (key.Length != 32)
                 {
@@ -503,58 +534,6 @@ namespace DataWarehouse.Plugins.AesEncryption
             return _securityContext ?? new DefaultSecurityContext();
         }
 
-        /// <summary>
-        /// Safely executes an async operation synchronously with proper error handling.
-        /// </summary>
-        /// <remarks>
-        /// This helper is necessary because the PipelinePluginBase interface defines OnWrite/OnRead
-        /// as synchronous methods (returning Stream), but key store operations are async.
-        ///
-        /// We use Task.Run to avoid potential deadlocks that can occur when calling
-        /// .GetAwaiter().GetResult() directly on a task that may use the current synchronization context.
-        /// This approach schedules the async work on the thread pool, avoiding context capture issues.
-        ///
-        /// Error handling preserves the original exception type when possible, wrapping in
-        /// CryptographicException for consistent error handling in encryption operations.
-        /// </remarks>
-        /// <typeparam name="T">The return type of the async operation.</typeparam>
-        /// <param name="asyncOperation">The async operation to execute.</param>
-        /// <param name="errorContext">Context message for error reporting.</param>
-        /// <returns>The result of the async operation.</returns>
-        /// <exception cref="CryptographicException">Thrown when the async operation fails.</exception>
-        private static T RunSyncWithErrorHandling<T>(Func<Task<T>> asyncOperation, string errorContext)
-        {
-            try
-            {
-                // Use Task.Run to avoid synchronization context deadlocks
-                // This schedules the async work on the thread pool
-                return Task.Run(asyncOperation).GetAwaiter().GetResult();
-            }
-            catch (AggregateException ae) when (ae.InnerException != null)
-            {
-                // Unwrap AggregateException to get the actual exception
-                var innerException = ae.InnerException;
-
-                // Preserve CryptographicException as-is for consistent error handling
-                if (innerException is CryptographicException)
-                {
-                    throw innerException;
-                }
-
-                // Wrap other exceptions with context
-                throw new CryptographicException($"{errorContext}: {innerException.Message}", innerException);
-            }
-            catch (CryptographicException)
-            {
-                // Re-throw CryptographicExceptions without wrapping
-                throw;
-            }
-            catch (Exception ex)
-            {
-                // Wrap unexpected exceptions with context
-                throw new CryptographicException($"{errorContext}: {ex.Message}", ex);
-            }
-        }
 
         /// <summary>
         /// Logs key access for auditing purposes.
