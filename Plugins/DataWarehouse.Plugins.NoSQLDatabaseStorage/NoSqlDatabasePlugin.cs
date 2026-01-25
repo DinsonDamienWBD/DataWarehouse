@@ -7,6 +7,9 @@ using System.Collections.Concurrent;
 using System.Net.Http.Json;
 using System.Text;
 using System.Text.Json;
+using MongoDB.Bson;
+using MongoDB.Driver;
+using StackExchange.Redis;
 
 namespace DataWarehouse.Plugins.NoSQLDatabaseStorage;
 
@@ -45,9 +48,12 @@ namespace DataWarehouse.Plugins.NoSQLDatabaseStorage;
 /// </summary>
 public sealed class NoSqlDatabasePlugin : HybridDatabasePluginBase<NoSqlConfig>
 {
-    private readonly HttpClient? _httpClient;
+    private HttpClient? _httpClient;
+    private IMongoClient? _mongoClient;
+    private IConnectionMultiplexer? _redisConnection;
 
     // In-memory storage for testing or embedded mode
+    // NOTE: This is ONLY for testing/embedded mode. Real deployments should use actual database engines.
     private readonly ConcurrentDictionary<string, ConcurrentDictionary<string, ConcurrentDictionary<string, string>>> _inMemoryStore = new();
 
     public override string Id => "datawarehouse.plugins.database.nosql";
@@ -59,20 +65,74 @@ public sealed class NoSqlDatabasePlugin : HybridDatabasePluginBase<NoSqlConfig>
 
     public NoSqlDatabasePlugin(NoSqlConfig? config = null) : base(config)
     {
+        // Initialize clients based on engine type
         if (_config.Engine != NoSqlEngine.InMemory)
         {
-            _httpClient = new HttpClient
-            {
-                BaseAddress = new Uri(_config.Endpoint),
-                Timeout = TimeSpan.FromSeconds(_config.CommandTimeoutSeconds)
-            };
+            InitializeClient();
+        }
+    }
 
-            // Add authentication headers if configured
-            if (!string.IsNullOrEmpty(_config.Username) && !string.IsNullOrEmpty(_config.Password))
-            {
-                var credentials = Convert.ToBase64String(Encoding.UTF8.GetBytes($"{_config.Username}:{_config.Password}"));
-                _httpClient.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Basic", credentials);
-            }
+    private void InitializeClient()
+    {
+        switch (_config.Engine)
+        {
+            case NoSqlEngine.MongoDB:
+            case NoSqlEngine.DocumentDB:
+            case NoSqlEngine.CosmosDB when _config.ConnectionString?.Contains("mongodb://") == true:
+                // Use MongoDB driver for MongoDB, DocumentDB, and CosmosDB (MongoDB API)
+                if (!string.IsNullOrEmpty(_config.ConnectionString))
+                {
+                    var settings = MongoClientSettings.FromConnectionString(_config.ConnectionString);
+                    settings.ServerSelectionTimeout = TimeSpan.FromSeconds(_config.CommandTimeoutSeconds);
+                    _mongoClient = new MongoClient(settings);
+                }
+                else
+                {
+                    throw new InvalidOperationException($"ConnectionString is required for {_config.Engine}");
+                }
+                break;
+
+            case NoSqlEngine.Redis:
+            case NoSqlEngine.Memcached:
+                // Use StackExchange.Redis for Redis/Memcached
+                if (!string.IsNullOrEmpty(_config.ConnectionString))
+                {
+                    _redisConnection = ConnectionMultiplexer.Connect(_config.ConnectionString);
+                }
+                else if (!string.IsNullOrEmpty(_config.Endpoint))
+                {
+                    _redisConnection = ConnectionMultiplexer.Connect(_config.Endpoint);
+                }
+                else
+                {
+                    throw new InvalidOperationException($"ConnectionString or Endpoint is required for {_config.Engine}");
+                }
+                break;
+
+            case NoSqlEngine.CouchDB:
+            case NoSqlEngine.Elasticsearch:
+            case NoSqlEngine.OpenSearch:
+            case NoSqlEngine.Solr:
+                // Use HTTP client for REST-based databases
+                if (string.IsNullOrEmpty(_config.Endpoint))
+                    throw new InvalidOperationException($"Endpoint is required for {_config.Engine}");
+
+                _httpClient = new HttpClient
+                {
+                    BaseAddress = new Uri(_config.Endpoint),
+                    Timeout = TimeSpan.FromSeconds(_config.CommandTimeoutSeconds)
+                };
+
+                // Add authentication headers if configured
+                if (!string.IsNullOrEmpty(_config.Username) && !string.IsNullOrEmpty(_config.Password))
+                {
+                    var credentials = Convert.ToBase64String(Encoding.UTF8.GetBytes($"{_config.Username}:{_config.Password}"));
+                    _httpClient.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Basic", credentials);
+                }
+                break;
+
+            default:
+                throw new NotSupportedException($"Engine {_config.Engine} is not yet implemented. Use InMemory mode for testing or implement the specific driver.");
         }
     }
 
@@ -81,8 +141,29 @@ public sealed class NoSqlDatabasePlugin : HybridDatabasePluginBase<NoSqlConfig>
     /// </summary>
     protected override Task<object> CreateConnectionAsync(NoSqlConfig config)
     {
-        // In production, would create real NoSQL client based on engine
-        return Task.FromResult<object>(new { Engine = config.Engine, Endpoint = config.Endpoint });
+        // Create actual database client based on engine type
+        return Task.FromResult<object>(config.Engine switch
+        {
+            NoSqlEngine.MongoDB or NoSqlEngine.DocumentDB =>
+                _mongoClient ?? throw new InvalidOperationException("MongoDB client not initialized"),
+            NoSqlEngine.Redis or NoSqlEngine.Memcached =>
+                _redisConnection ?? throw new InvalidOperationException("Redis connection not initialized"),
+            NoSqlEngine.CouchDB or NoSqlEngine.Elasticsearch or NoSqlEngine.OpenSearch =>
+                _httpClient ?? throw new InvalidOperationException("HTTP client not initialized"),
+            NoSqlEngine.InMemory =>
+                _inMemoryStore,
+            _ => throw new NotSupportedException($"Engine {config.Engine} connection creation not implemented")
+        });
+    }
+
+    protected override void Dispose(bool disposing)
+    {
+        if (disposing)
+        {
+            _httpClient?.Dispose();
+            _redisConnection?.Dispose();
+        }
+        base.Dispose(disposing);
     }
 
         protected override List<PluginCapabilityDescriptor> GetCapabilities()
@@ -548,14 +629,37 @@ public sealed class NoSqlDatabasePlugin : HybridDatabasePluginBase<NoSqlConfig>
         {
             try
             {
-                var response = _config.Engine switch
+                switch (_config.Engine)
                 {
-                    NoSqlEngine.MongoDB => await _httpClient!.GetAsync("/"),
-                    NoSqlEngine.CouchDB => await _httpClient!.GetAsync("/"),
-                    _ => null
-                };
+                    case NoSqlEngine.MongoDB:
+                    case NoSqlEngine.DocumentDB:
+                    case NoSqlEngine.CosmosDB when _mongoClient != null:
+                        // Test MongoDB connection by listing databases
+                        await _mongoClient!.ListDatabaseNamesAsync();
+                        _isConnected = true;
+                        break;
 
-                _isConnected = response?.IsSuccessStatusCode ?? false;
+                    case NoSqlEngine.Redis:
+                    case NoSqlEngine.Memcached:
+                        // Test Redis connection
+                        var db = _redisConnection!.GetDatabase();
+                        await db.PingAsync();
+                        _isConnected = true;
+                        break;
+
+                    case NoSqlEngine.CouchDB:
+                    case NoSqlEngine.Elasticsearch:
+                    case NoSqlEngine.OpenSearch:
+                    case NoSqlEngine.Solr:
+                        // Test HTTP-based connection
+                        var response = await _httpClient!.GetAsync("/");
+                        _isConnected = response.IsSuccessStatusCode;
+                        break;
+
+                    default:
+                        _isConnected = false;
+                        break;
+                }
             }
             catch
             {
@@ -569,13 +673,40 @@ public sealed class NoSqlDatabasePlugin : HybridDatabasePluginBase<NoSqlConfig>
             switch (_config.Engine)
             {
                 case NoSqlEngine.MongoDB:
-                    var content = new StringContent(json, Encoding.UTF8, "application/json");
-                    await _httpClient!.PutAsync($"/{database}/{collection}/{id}", content);
+                case NoSqlEngine.DocumentDB:
+                case NoSqlEngine.CosmosDB when _mongoClient != null:
+                    // Use MongoDB Driver
+                    var mongoDb = _mongoClient!.GetDatabase(database);
+                    var mongoCollection = mongoDb.GetCollection<BsonDocument>(collection);
+                    var doc = BsonDocument.Parse(json);
+                    doc["_id"] = id;
+                    await mongoCollection.ReplaceOneAsync(
+                        Builders<BsonDocument>.Filter.Eq("_id", id),
+                        doc,
+                        new ReplaceOptions { IsUpsert = true });
                     break;
+
+                case NoSqlEngine.Redis:
+                case NoSqlEngine.Memcached:
+                    // Use Redis
+                    var redisDb = _redisConnection!.GetDatabase();
+                    var key = $"{database}:{collection}:{id}";
+                    await redisDb.StringSetAsync(key, json);
+                    break;
+
                 case NoSqlEngine.CouchDB:
-                    content = new StringContent(json, Encoding.UTF8, "application/json");
+                    // CouchDB HTTP API
+                    var content = new StringContent(json, Encoding.UTF8, "application/json");
                     await _httpClient!.PutAsync($"/{database}/{id}", content);
                     break;
+
+                case NoSqlEngine.Elasticsearch:
+                case NoSqlEngine.OpenSearch:
+                    // Elasticsearch/OpenSearch HTTP API
+                    content = new StringContent(json, Encoding.UTF8, "application/json");
+                    await _httpClient!.PutAsync($"/{collection}/_doc/{id}", content);
+                    break;
+
                 default:
                     throw new NotSupportedException($"Engine {_config.Engine} not supported for external storage");
             }
@@ -583,21 +714,46 @@ public sealed class NoSqlDatabasePlugin : HybridDatabasePluginBase<NoSqlConfig>
 
         private async Task<string> LoadFromEngineAsync(string database, string collection, string id)
         {
-            HttpResponseMessage response;
             switch (_config.Engine)
             {
                 case NoSqlEngine.MongoDB:
-                    response = await _httpClient!.GetAsync($"/{database}/{collection}/{id}");
-                    break;
+                case NoSqlEngine.DocumentDB:
+                case NoSqlEngine.CosmosDB when _mongoClient != null:
+                    // Use MongoDB Driver
+                    var mongoDb = _mongoClient!.GetDatabase(database);
+                    var mongoCollection = mongoDb.GetCollection<BsonDocument>(collection);
+                    var filter = Builders<BsonDocument>.Filter.Eq("_id", id);
+                    var doc = await mongoCollection.Find(filter).FirstOrDefaultAsync();
+                    if (doc == null)
+                        throw new FileNotFoundException($"Document not found: {database}/{collection}/{id}");
+                    return doc.ToJson();
+
+                case NoSqlEngine.Redis:
+                case NoSqlEngine.Memcached:
+                    // Use Redis
+                    var redisDb = _redisConnection!.GetDatabase();
+                    var key = $"{database}:{collection}:{id}";
+                    var value = await redisDb.StringGetAsync(key);
+                    if (!value.HasValue)
+                        throw new FileNotFoundException($"Document not found: {database}/{collection}/{id}");
+                    return value.ToString();
+
                 case NoSqlEngine.CouchDB:
-                    response = await _httpClient!.GetAsync($"/{database}/{id}");
-                    break;
+                    // CouchDB HTTP API
+                    var response = await _httpClient!.GetAsync($"/{database}/{id}");
+                    response.EnsureSuccessStatusCode();
+                    return await response.Content.ReadAsStringAsync();
+
+                case NoSqlEngine.Elasticsearch:
+                case NoSqlEngine.OpenSearch:
+                    // Elasticsearch/OpenSearch HTTP API
+                    response = await _httpClient!.GetAsync($"/{collection}/_doc/{id}");
+                    response.EnsureSuccessStatusCode();
+                    return await response.Content.ReadAsStringAsync();
+
                 default:
                     throw new NotSupportedException($"Engine {_config.Engine} not supported");
             }
-
-            response.EnsureSuccessStatusCode();
-            return await response.Content.ReadAsStringAsync();
         }
 
         private async Task DeleteFromEngineAsync(string database, string collection, string id)
@@ -605,55 +761,248 @@ public sealed class NoSqlDatabasePlugin : HybridDatabasePluginBase<NoSqlConfig>
             switch (_config.Engine)
             {
                 case NoSqlEngine.MongoDB:
-                    await _httpClient!.DeleteAsync($"/{database}/{collection}/{id}");
+                case NoSqlEngine.DocumentDB:
+                case NoSqlEngine.CosmosDB when _mongoClient != null:
+                    // Use MongoDB Driver
+                    var mongoDb = _mongoClient!.GetDatabase(database);
+                    var mongoCollection = mongoDb.GetCollection<BsonDocument>(collection);
+                    var filter = Builders<BsonDocument>.Filter.Eq("_id", id);
+                    await mongoCollection.DeleteOneAsync(filter);
                     break;
+
+                case NoSqlEngine.Redis:
+                case NoSqlEngine.Memcached:
+                    // Use Redis
+                    var redisDb = _redisConnection!.GetDatabase();
+                    var key = $"{database}:{collection}:{id}";
+                    await redisDb.KeyDeleteAsync(key);
+                    break;
+
                 case NoSqlEngine.CouchDB:
+                    // CouchDB HTTP API (requires revision)
                     await _httpClient!.DeleteAsync($"/{database}/{id}");
+                    break;
+
+                case NoSqlEngine.Elasticsearch:
+                case NoSqlEngine.OpenSearch:
+                    // Elasticsearch/OpenSearch HTTP API
+                    await _httpClient!.DeleteAsync($"/{collection}/_doc/{id}");
                     break;
             }
         }
 
         private async Task<IEnumerable<object>> QueryEngineAsync(string database, string collection, string? query, Dictionary<string, object>? parameters)
         {
-            var response = await _httpClient!.GetAsync($"/{database}/{collection}?query={Uri.EscapeDataString(query ?? "{}")}");
-            if (response.IsSuccessStatusCode)
+            switch (_config.Engine)
             {
-                var json = await response.Content.ReadAsStringAsync();
-                return JsonSerializer.Deserialize<List<object>>(json, _jsonOptions) ?? new List<object>();
+                case NoSqlEngine.MongoDB:
+                case NoSqlEngine.DocumentDB:
+                case NoSqlEngine.CosmosDB when _mongoClient != null:
+                    // Use MongoDB Driver
+                    var mongoDb = _mongoClient!.GetDatabase(database);
+                    var mongoCollection = mongoDb.GetCollection<BsonDocument>(collection);
+                    var filter = string.IsNullOrEmpty(query) || query == "{}"
+                        ? Builders<BsonDocument>.Filter.Empty
+                        : BsonDocument.Parse(query);
+                    var cursor = await mongoCollection.FindAsync(filter);
+                    var docs = await cursor.ToListAsync();
+                    return docs.Select(d => JsonSerializer.Deserialize<object>(d.ToJson(), _jsonOptions)!).ToList();
+
+                case NoSqlEngine.Redis:
+                case NoSqlEngine.Memcached:
+                    // Redis doesn't support queries - scan keys instead
+                    var redisDb = _redisConnection!.GetDatabase();
+                    var server = _redisConnection.GetServer(_redisConnection.GetEndPoints().First());
+                    var pattern = $"{database}:{collection}:*";
+                    var keys = server.Keys(pattern: pattern);
+                    var results = new List<object>();
+                    foreach (var key in keys)
+                    {
+                        var value = await redisDb.StringGetAsync(key);
+                        if (value.HasValue)
+                        {
+                            var obj = JsonSerializer.Deserialize<object>(value.ToString(), _jsonOptions);
+                            if (obj != null) results.Add(obj);
+                        }
+                    }
+                    return results;
+
+                case NoSqlEngine.CouchDB:
+                    // CouchDB HTTP API
+                    var response = await _httpClient!.GetAsync($"/{database}/_all_docs?include_docs=true");
+                    if (response.IsSuccessStatusCode)
+                    {
+                        var json = await response.Content.ReadAsStringAsync();
+                        var result = JsonSerializer.Deserialize<Dictionary<string, object>>(json, _jsonOptions);
+                        if (result?.TryGetValue("rows", out var rows) == true && rows is JsonElement rowsEl)
+                        {
+                            return rowsEl.EnumerateArray().Select(r => r.GetProperty("doc")).Cast<object>().ToList();
+                        }
+                    }
+                    return Enumerable.Empty<object>();
+
+                case NoSqlEngine.Elasticsearch:
+                case NoSqlEngine.OpenSearch:
+                    // Elasticsearch/OpenSearch HTTP API
+                    var searchQuery = string.IsNullOrEmpty(query) ? "{\"query\":{\"match_all\":{}}}" : query;
+                    var content = new StringContent(searchQuery, Encoding.UTF8, "application/json");
+                    response = await _httpClient!.PostAsync($"/{collection}/_search", content);
+                    if (response.IsSuccessStatusCode)
+                    {
+                        var json = await response.Content.ReadAsStringAsync();
+                        var result = JsonSerializer.Deserialize<Dictionary<string, object>>(json, _jsonOptions);
+                        if (result?.TryGetValue("hits", out var hits) == true && hits is JsonElement hitsEl)
+                        {
+                            if (hitsEl.TryGetProperty("hits", out var innerHits))
+                            {
+                                return innerHits.EnumerateArray().Select(h => h.GetProperty("_source")).Cast<object>().ToList();
+                            }
+                        }
+                    }
+                    return Enumerable.Empty<object>();
+
+                default:
+                    throw new NotSupportedException($"Query not supported for engine {_config.Engine}");
             }
-            return Enumerable.Empty<object>();
         }
 
         private async Task<long> CountEngineAsync(string database, string collection, string? filter)
         {
-            var response = await _httpClient!.GetAsync($"/{database}/{collection}/_count?filter={Uri.EscapeDataString(filter ?? "{}")}");
-            if (response.IsSuccessStatusCode)
+            switch (_config.Engine)
             {
-                var json = await response.Content.ReadAsStringAsync();
-                var result = JsonSerializer.Deserialize<Dictionary<string, long>>(json);
-                return result?.GetValueOrDefault("count", 0) ?? 0;
+                case NoSqlEngine.MongoDB:
+                case NoSqlEngine.DocumentDB:
+                case NoSqlEngine.CosmosDB when _mongoClient != null:
+                    // Use MongoDB Driver
+                    var mongoDb = _mongoClient!.GetDatabase(database);
+                    var mongoCollection = mongoDb.GetCollection<BsonDocument>(collection);
+                    var mongoFilter = string.IsNullOrEmpty(filter) || filter == "{}"
+                        ? Builders<BsonDocument>.Filter.Empty
+                        : BsonDocument.Parse(filter);
+                    return await mongoCollection.CountDocumentsAsync(mongoFilter);
+
+                case NoSqlEngine.Redis:
+                case NoSqlEngine.Memcached:
+                    // Redis - count keys
+                    var server = _redisConnection!.GetServer(_redisConnection.GetEndPoints().First());
+                    var pattern = $"{database}:{collection}:*";
+                    return server.Keys(pattern: pattern).Count();
+
+                case NoSqlEngine.CouchDB:
+                    // CouchDB HTTP API
+                    var response = await _httpClient!.GetAsync($"/{database}/_all_docs");
+                    if (response.IsSuccessStatusCode)
+                    {
+                        var json = await response.Content.ReadAsStringAsync();
+                        var result = JsonSerializer.Deserialize<Dictionary<string, object>>(json, _jsonOptions);
+                        if (result?.TryGetValue("total_rows", out var count) == true)
+                        {
+                            return Convert.ToInt64(count);
+                        }
+                    }
+                    return 0;
+
+                case NoSqlEngine.Elasticsearch:
+                case NoSqlEngine.OpenSearch:
+                    // Elasticsearch/OpenSearch count API
+                    response = await _httpClient!.GetAsync($"/{collection}/_count");
+                    if (response.IsSuccessStatusCode)
+                    {
+                        var json = await response.Content.ReadAsStringAsync();
+                        var result = JsonSerializer.Deserialize<Dictionary<string, long>>(json, _jsonOptions);
+                        return result?.GetValueOrDefault("count", 0) ?? 0;
+                    }
+                    return 0;
+
+                default:
+                    throw new NotSupportedException($"Count not supported for engine {_config.Engine}");
             }
-            return 0;
         }
 
         private async Task<IEnumerable<string>> ListDatabasesFromEngineAsync()
         {
-            var response = await _httpClient!.GetAsync("/_all_dbs");
-            if (response.IsSuccessStatusCode)
+            switch (_config.Engine)
             {
-                return await response.Content.ReadFromJsonAsync<List<string>>() ?? new List<string>();
+                case NoSqlEngine.MongoDB:
+                case NoSqlEngine.DocumentDB:
+                case NoSqlEngine.CosmosDB when _mongoClient != null:
+                    // Use MongoDB Driver
+                    var cursor = await _mongoClient!.ListDatabaseNamesAsync();
+                    return await cursor.ToListAsync();
+
+                case NoSqlEngine.Redis:
+                case NoSqlEngine.Memcached:
+                    // Redis doesn't have databases in traditional sense - return default
+                    return new[] { "default" };
+
+                case NoSqlEngine.CouchDB:
+                    // CouchDB HTTP API
+                    var response = await _httpClient!.GetAsync("/_all_dbs");
+                    if (response.IsSuccessStatusCode)
+                    {
+                        return await response.Content.ReadFromJsonAsync<List<string>>() ?? new List<string>();
+                    }
+                    return Enumerable.Empty<string>();
+
+                case NoSqlEngine.Elasticsearch:
+                case NoSqlEngine.OpenSearch:
+                    // Elasticsearch uses indices, not databases
+                    return new[] { "default" };
+
+                default:
+                    throw new NotSupportedException($"List databases not supported for engine {_config.Engine}");
             }
-            return Enumerable.Empty<string>();
         }
 
         private async Task<IEnumerable<string>> ListCollectionsFromEngineAsync(string database)
         {
-            var response = await _httpClient!.GetAsync($"/{database}/_collections");
-            if (response.IsSuccessStatusCode)
+            switch (_config.Engine)
             {
-                return await response.Content.ReadFromJsonAsync<List<string>>() ?? new List<string>();
+                case NoSqlEngine.MongoDB:
+                case NoSqlEngine.DocumentDB:
+                case NoSqlEngine.CosmosDB when _mongoClient != null:
+                    // Use MongoDB Driver
+                    var mongoDb = _mongoClient!.GetDatabase(database);
+                    var cursor = await mongoDb.ListCollectionNamesAsync();
+                    return await cursor.ToListAsync();
+
+                case NoSqlEngine.Redis:
+                case NoSqlEngine.Memcached:
+                    // Redis - extract collection names from keys
+                    var server = _redisConnection!.GetServer(_redisConnection.GetEndPoints().First());
+                    var pattern = $"{database}:*";
+                    var collections = new HashSet<string>();
+                    foreach (var key in server.Keys(pattern: pattern))
+                    {
+                        var parts = key.ToString().Split(':');
+                        if (parts.Length >= 2)
+                        {
+                            collections.Add(parts[1]);
+                        }
+                    }
+                    return collections;
+
+                case NoSqlEngine.CouchDB:
+                    // CouchDB doesn't have collections, only documents
+                    return Enumerable.Empty<string>();
+
+                case NoSqlEngine.Elasticsearch:
+                case NoSqlEngine.OpenSearch:
+                    // Elasticsearch - list indices
+                    var response = await _httpClient!.GetAsync("/_cat/indices?format=json");
+                    if (response.IsSuccessStatusCode)
+                    {
+                        var json = await response.Content.ReadAsStringAsync();
+                        var indices = JsonSerializer.Deserialize<List<Dictionary<string, object>>>(json, _jsonOptions);
+                        return indices?.Select(i => i.GetValueOrDefault("index", "").ToString() ?? "")
+                            .Where(s => !string.IsNullOrEmpty(s))
+                            .ToList() ?? Enumerable.Empty<string>();
+                    }
+                    return Enumerable.Empty<string>();
+
+                default:
+                    throw new NotSupportedException($"List collections not supported for engine {_config.Engine}");
             }
-            return Enumerable.Empty<string>();
         }
 
         #endregion
@@ -682,18 +1031,89 @@ public class NoSqlConfig : DatabaseConfigBase
         public string? Password { get; set; }
         public string? ReplicaSet { get; set; }
 
+        /// <summary>
+        /// Create an in-memory configuration for testing.
+        /// NOTE: In-memory mode is ONLY for testing/development. Use real database engines in production.
+        /// </summary>
         public static NoSqlConfig InMemory => new() { Engine = NoSqlEngine.InMemory };
 
-        public static NoSqlConfig MongoDB(string connectionString) => new()
+        /// <summary>
+        /// Create MongoDB configuration from connection string.
+        /// Connection string format: mongodb://[username:password@]host[:port][/database][?options]
+        /// Example: mongodb://localhost:27017/mydb
+        /// Example with auth: mongodb://user:pass@localhost:27017/mydb?authSource=admin
+        /// </summary>
+        public static NoSqlConfig MongoDB(string connectionString, string? defaultDatabase = null) => new()
         {
             Engine = NoSqlEngine.MongoDB,
             ConnectionString = connectionString,
+            DefaultDatabase = defaultDatabase ?? ExtractDatabase(connectionString),
             Endpoint = ExtractEndpoint(connectionString)
         };
 
-        public static NoSqlConfig CouchDB(string endpoint, string? username = null, string? password = null) => new()
+        /// <summary>
+        /// Create AWS DocumentDB configuration (MongoDB-compatible).
+        /// Connection string format same as MongoDB.
+        /// </summary>
+        public static NoSqlConfig DocumentDB(string connectionString, string? defaultDatabase = null) => new()
+        {
+            Engine = NoSqlEngine.DocumentDB,
+            ConnectionString = connectionString,
+            DefaultDatabase = defaultDatabase ?? ExtractDatabase(connectionString),
+            Endpoint = ExtractEndpoint(connectionString)
+        };
+
+        /// <summary>
+        /// Create Azure Cosmos DB configuration (MongoDB API).
+        /// Connection string format: mongodb://[account]:[key]@[account].mongo.cosmos.azure.com:10255/[database]?ssl=true
+        /// </summary>
+        public static NoSqlConfig CosmosDB(string connectionString, string? defaultDatabase = null) => new()
+        {
+            Engine = NoSqlEngine.CosmosDB,
+            ConnectionString = connectionString,
+            DefaultDatabase = defaultDatabase ?? ExtractDatabase(connectionString),
+            Endpoint = ExtractEndpoint(connectionString)
+        };
+
+        /// <summary>
+        /// Create Redis configuration.
+        /// Connection string format: localhost:6379,password=secret,ssl=true
+        /// </summary>
+        public static NoSqlConfig Redis(string connectionString) => new()
+        {
+            Engine = NoSqlEngine.Redis,
+            ConnectionString = connectionString
+        };
+
+        /// <summary>
+        /// Create CouchDB configuration.
+        /// </summary>
+        public static NoSqlConfig CouchDB(string endpoint, string? username = null, string? password = null, string? defaultDatabase = null) => new()
         {
             Engine = NoSqlEngine.CouchDB,
+            Endpoint = endpoint,
+            Username = username,
+            Password = password,
+            DefaultDatabase = defaultDatabase
+        };
+
+        /// <summary>
+        /// Create Elasticsearch configuration.
+        /// </summary>
+        public static NoSqlConfig Elasticsearch(string endpoint, string? username = null, string? password = null) => new()
+        {
+            Engine = NoSqlEngine.Elasticsearch,
+            Endpoint = endpoint,
+            Username = username,
+            Password = password
+        };
+
+        /// <summary>
+        /// Create OpenSearch configuration.
+        /// </summary>
+        public static NoSqlConfig OpenSearch(string endpoint, string? username = null, string? password = null) => new()
+        {
+            Engine = NoSqlEngine.OpenSearch,
             Endpoint = endpoint,
             Username = username,
             Password = password
@@ -703,6 +1123,13 @@ public class NoSqlConfig : DatabaseConfigBase
         {
             var match = System.Text.RegularExpressions.Regex.Match(connectionString, @"mongodb://([^/]+)");
             return match.Success ? $"http://{match.Groups[1].Value}" : "http://localhost:27017";
+        }
+
+        private static string? ExtractDatabase(string connectionString)
+        {
+            // Extract database from mongodb://host:port/database format
+            var match = System.Text.RegularExpressions.Regex.Match(connectionString, @"mongodb://[^/]+/([^?]+)");
+            return match.Success ? match.Groups[1].Value : null;
         }
     }
 

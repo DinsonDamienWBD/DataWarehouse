@@ -1,5 +1,6 @@
 using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Primitives;
+using DataWarehouse.Plugins.SharedRaidUtilities;
 using System.Collections.Concurrent;
 using System.Runtime.CompilerServices;
 using System.Security.Cryptography;
@@ -36,7 +37,7 @@ namespace DataWarehouse.Plugins.ZfsRaid
 
         private readonly ZfsRaidConfiguration _config;
         private readonly IStorageProvider[] _devices;
-        private readonly ZfsGaloisField _galoisField;
+        private readonly GaloisField _galoisField;
         private readonly ConcurrentDictionary<int, DeviceState> _deviceStates;
         private readonly ConcurrentDictionary<string, BlockMetadata> _blockIndex;
         private readonly ConcurrentDictionary<string, TransactionGroup> _openTxgs;
@@ -161,7 +162,7 @@ namespace DataWarehouse.Plugins.ZfsRaid
             ValidateConfiguration();
 
             _configuredLevel = config.Level;
-            _galoisField = new ZfsGaloisField();
+            _galoisField = new GaloisField();
             _deviceStates = new ConcurrentDictionary<int, DeviceState>();
             _blockIndex = new ConcurrentDictionary<string, BlockMetadata>();
             _openTxgs = new ConcurrentDictionary<string, TransactionGroup>();

@@ -1,17 +1,18 @@
 using System.Runtime.CompilerServices;
 
-namespace DataWarehouse.Plugins.ZfsRaid
+namespace DataWarehouse.Plugins.SharedRaidUtilities
 {
     /// <summary>
-    /// GF(2^8) Galois Field implementation for Reed-Solomon error correction in ZFS RAID-Z.
+    /// GF(2^8) Galois Field implementation for Reed-Solomon error correction in RAID systems.
     /// Uses the standard irreducible polynomial x^8 + x^4 + x^3 + x^2 + 1 (0x11D) as used in ZFS.
     /// Provides complete arithmetic operations for multi-parity RAID calculations.
     /// </summary>
     /// <remarks>
     /// This implementation uses precomputed logarithm and exponential tables for O(1)
     /// multiplication and division operations. The field generator is 2 (primitive element).
+    /// This is a shared utility used across all RAID plugins to eliminate code duplication.
     /// </remarks>
-    public sealed class ZfsGaloisField
+    public sealed class GaloisField
     {
         /// <summary>
         /// Size of the Galois field (2^8 = 256 elements).
@@ -49,7 +50,7 @@ namespace DataWarehouse.Plugins.ZfsRaid
         /// <summary>
         /// Creates a new Galois Field instance with precomputed tables.
         /// </summary>
-        public ZfsGaloisField()
+        public GaloisField()
         {
             _expTable = new byte[FieldSize * 2];
             _logTable = new byte[FieldSize];

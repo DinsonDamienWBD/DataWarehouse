@@ -147,6 +147,7 @@
     <Project Path="Plugins/DataWarehouse.Plugins.ZstdCompression/DataWarehouse.Plugins.ZstdCompression.csproj">
       <Build Solution="Debug|*" Project="false" />
     </Project>
+    <Project Path="Plugins/DataWarehouse.Plugins.SharedRaidUtilities/DataWarehouse.Plugins.SharedRaidUtilities.csproj" />
   </Folder>
   <Project Path="DataWarehouse.Benchmarks/DataWarehouse.Benchmarks.csproj" />
   <Project Path="DataWarehouse.CLI/DataWarehouse.CLI.csproj" />
