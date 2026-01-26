@@ -625,8 +625,9 @@ allowVolumeExpansion: true
 | Slack Bot | Query data from Slack | [ ] |
 | Teams Bot | Microsoft Teams integration | [ ] |
 | Discord Bot | For developer communities | [ ] |
-| ChatGPT Plugin | OpenAI plugin marketplace | [ ] |
-| Claude Integration | Anthropic MCP protocol | [ ] |
+| ChatGPT Plugin | OpenAI plugin marketplace  * SDK is AI native. make use of it *| [ ] |
+| Claude Integration | Anthropic MCP protocol  * SDK is AI native. make use of it *| [ ] |
+| Integrate with other providers like Copilot, Bard, Llama 3, Gemini etc. * SDK is AI native. make use of it *| [ ] |
 
 ---
 
