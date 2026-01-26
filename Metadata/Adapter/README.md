@@ -1,8 +1,16 @@
-# DataWarehouse Kernel Adapter Pattern
+# DataWarehouse Integration Adapter
 
 **Namespace:** `DataWarehouse.Integration`
 
-A lightweight, copyable adapter pattern for integrating kernel-based applications into any .NET project.
+A comprehensive, copyable integration pattern for building DataWarehouse host applications and connecting to instances.
+
+## Overview
+
+This adapter package provides everything needed to:
+
+1. **Host DataWarehouse** - Run local, embedded, or full instances
+2. **Connect to Instances** - Local, remote, or clustered connections
+3. **Build Applications** - CLI, GUI, or embedded integrations
 
 ## What Is This?
 
@@ -21,7 +29,185 @@ The Adapter pattern provides a standardized interface for running, managing, and
 | `IKernelAdapter.cs` | Core interface, enums, and data classes |
 | `AdapterFactory.cs` | Factory for registering and creating adapters |
 | `AdapterRunner.cs` | Runner for executing adapters with lifecycle management |
+| `DataWarehouseHost.cs` | **Host class** - 3-mode support (Install, Connect, Embedded) |
+| `OperatingMode.cs` | Operating modes and configuration types |
+| `InstanceConnection.cs` | Connection interfaces for local/remote/cluster |
 | `README.md` | This integration guide |
+
+## DataWarehouseHost - The Base Piece
+
+The `DataWarehouseHost` class is the foundation for all DataWarehouse applications (CLI, GUI, embedded). It supports three operating modes:
+
+### Mode 1: Install
+
+```csharp
+var host = new DataWarehouseHost(loggerFactory);
+
+var result = await host.InstallAsync(new InstallConfiguration
+{
+    InstallPath = "C:/DataWarehouse",
+    DataPath = "D:/DataWarehouse/data",
+    CreateDefaultAdmin = true,
+    AdminUsername = "admin",
+    AdminPassword = "securepassword",
+    CreateService = true,
+    AutoStart = true,
+    IncludedPlugins = new() { "S3Storage", "Encryption", "Prometheus" }
+}, progress: new Progress<InstallProgress>(p =>
+{
+    Console.WriteLine($"[{p.PercentComplete}%] {p.Message}");
+}));
+
+if (result.Success)
+    Console.WriteLine($"Installed to: {result.InstallPath}");
+```
+
+### Mode 2: Connect
+
+```csharp
+var host = new DataWarehouseHost(loggerFactory);
+
+// Connect to remote instance
+var result = await host.ConnectAsync(ConnectionTarget.Remote("192.168.1.100", 8080));
+
+// Or local instance
+var result = await host.ConnectAsync(ConnectionTarget.Local("C:/DataWarehouse"));
+
+if (result.Success)
+{
+    // Discover capabilities
+    var capabilities = host.Capabilities;
+    Console.WriteLine($"Connected to {result.InstanceId}");
+    Console.WriteLine($"Plugins: {capabilities.AvailablePlugins.Count}");
+    Console.WriteLine($"Features: {string.Join(", ", capabilities.SupportedFeatures)}");
+
+    // Get/update configuration
+    var config = await host.GetConfigurationAsync();
+    config["maxConnections"] = 100;
+    await host.UpdateConfigurationAsync(config);
+
+    // Save profile for later
+    await host.SaveConfigurationAsync("production-server-1");
+}
+```
+
+### Mode 3: Embedded
+
+```csharp
+var host = new DataWarehouseHost(loggerFactory);
+
+// Handle shutdown
+Console.CancelKeyPress += (_, e) => { e.Cancel = true; host.RequestShutdown(); };
+
+// Run embedded instance
+var exitCode = await host.RunEmbeddedAsync(new EmbeddedConfiguration
+{
+    PersistData = true,
+    DataPath = "./data",
+    MaxMemoryMb = 256,
+    ExposeHttp = true,
+    HttpPort = 8080,
+    Plugins = new() { "LocalStorage", "Search" }
+});
+```
+
+## Capability-Aware Applications
+
+The `InstanceCapabilities` class allows CLI/GUI to adapt to what the connected instance supports:
+
+```csharp
+var host = new DataWarehouseHost(loggerFactory);
+await host.ConnectAsync(target);
+
+// Check if feature is available before using
+if (host.Capabilities.HasFeature("encryption"))
+{
+    // Show encryption options in UI
+}
+
+if (host.Capabilities.HasPlugin("com.datawarehouse.storage.s3"))
+{
+    // Enable S3 storage commands
+}
+
+// Dynamically build menu based on capabilities
+foreach (var plugin in host.Capabilities.AvailablePlugins.Where(p => p.IsEnabled))
+{
+    menu.AddItem(plugin.Name, plugin.Capabilities);
+}
+```
+
+## Building CLI Applications
+
+Use the host as the foundation for CLI:
+
+```csharp
+// dw.exe CLI example
+var host = new DataWarehouseHost(loggerFactory);
+
+switch (args[0])
+{
+    case "install":
+        await host.InstallAsync(ParseInstallConfig(args));
+        break;
+
+    case "connect":
+        await host.ConnectAsync(ParseConnectionTarget(args));
+        // Interactive mode or execute command
+        break;
+
+    case "run":
+        await host.RunEmbeddedAsync(ParseEmbeddedConfig(args));
+        break;
+
+    case "config":
+        await host.ConnectAsync(target);
+        if (args[1] == "get")
+            Console.WriteLine(await host.GetConfigurationAsync());
+        else if (args[1] == "set")
+            await host.UpdateConfigurationAsync(ParseConfig(args));
+        break;
+}
+```
+
+## Building GUI Applications
+
+Use the host as the foundation for GUI:
+
+```csharp
+// MainWindow.xaml.cs
+public partial class MainWindow : Window
+{
+    private readonly DataWarehouseHost _host;
+
+    public MainWindow()
+    {
+        _host = new DataWarehouseHost(loggerFactory);
+        InitializeComponent();
+    }
+
+    private async void OnConnectClick(object sender, EventArgs e)
+    {
+        var result = await _host.ConnectAsync(
+            ConnectionTarget.Remote(HostTextBox.Text, int.Parse(PortTextBox.Text)));
+
+        if (result.Success)
+        {
+            // Update UI based on capabilities
+            EnableFeaturesForCapabilities(_host.Capabilities);
+            StatusLabel.Text = $"Connected: {result.InstanceId}";
+        }
+    }
+
+    private void EnableFeaturesForCapabilities(InstanceCapabilities caps)
+    {
+        // Show/hide UI elements based on what's available
+        S3MenuItem.IsEnabled = caps.HasPlugin("com.datawarehouse.storage.s3");
+        EncryptionPanel.Visibility = caps.HasFeature("encryption")
+            ? Visibility.Visible : Visibility.Collapsed;
+        ClusterView.IsEnabled = caps.IsClustered;
+    }
+}
 
 ## Quick Start
 

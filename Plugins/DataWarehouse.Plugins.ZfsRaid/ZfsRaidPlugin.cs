@@ -1159,7 +1159,7 @@ namespace DataWarehouse.Plugins.ZfsRaid
                     }
                     catch (Exception ex)
                     {
-                        System.Diagnostics.Trace.TraceWarning($"Failed to read block from device {deviceIndex} for reconstruction: {ex.Message}");
+                        System.Diagnostics.Trace.TraceWarning($"Failed to read block from device {deviceIdx} for reconstruction: {ex.Message}");
                     }
                 }
 
