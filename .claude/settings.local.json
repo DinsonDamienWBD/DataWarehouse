@@ -42,7 +42,13 @@
       "Bash(Select-String -Pattern \"Error\\\\\\(s\\\\\\)|Build succeeded|Build FAILED\")",
       "Bash(ls:*)",
       "Bash(fi)",
-      "Bash(done)"
+      "Bash(done)",
+      "Bash(Select-String -Pattern \"error|warning CS\")",
+      "Bash(Select-Object -First 30)",
+      "Bash(dotnet restore:*)",
+      "Bash(dotnet list:*)",
+      "Bash(dotnet nuget:*)",
+      "Bash(dotnet add:*)"
     ]
   }
 }

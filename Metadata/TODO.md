@@ -54,133 +54,6 @@ For each plugin:
 
 ---
 
-### HIGH Severity (Must Fix Before Enterprise Deployment)
-
-#### 6. Fix Silent Exception Swallowing in Compliance/Backup Plugins
-**Files:**
-- `Plugins/DataWarehouse.Plugins.Compliance/GdprCompliancePlugin.cs:819`
-- `Plugins/DataWarehouse.Plugins.Backup/BackupPlugin.cs:493-496`
-
-**Status:** ✅ **COMPLETED** (2026-01-26)
-
-**Verification (2026-01-26):**
-- ✅ DeltaBackupProvider.cs - No empty catches found (already compliant)
-- ✅ SyntheticFullBackupProvider.cs:577-580 - Fixed with proper `_logger?.LogWarning()` logging
-- ✅ IncrementalBackupProvider.cs - No empty catches found (already compliant)
-- ✅ ContinuousBackupProvider.cs:641-646, 788-793 - Fixed with `System.Diagnostics.Trace` logging
-
-| Task | Status |
-|------|--------|
-| Replace empty catch in `BackupPlugin.cs` with proper logging | [x] Completed |
-| Add structured logging for all exception scenarios | [x] Completed |
-| Add alerting for critical compliance/backup failures | [x] Via existing logging infrastructure |
-
----
-
-#### 11. Clean Up RAID Plugin Code Duplications
-**Issue:** 10 RAID plugins contain ~1,450 lines of duplicated code
-
-**Affected Plugins:**
-| Plugin | Location |
-|--------|----------|
-| AutoRaid | `Plugins/DataWarehouse.Plugins.AutoRaid/` |
-| Raid | `Plugins/DataWarehouse.Plugins.Raid/` |
-| SelfHealingRaid | `Plugins/DataWarehouse.Plugins.SelfHealingRaid/` |
-| StandardRaid | `Plugins/DataWarehouse.Plugins.StandardRaid/` |
-| AdvancedRaid | `Plugins/DataWarehouse.Plugins.AdvancedRaid/` |
-| EnhancedRaid | `Plugins/DataWarehouse.Plugins.EnhancedRaid/` |
-| NestedRaid | `Plugins/DataWarehouse.Plugins.NestedRaid/` |
-| ExtendedRaid | `Plugins/DataWarehouse.Plugins.ExtendedRaid/` |
-| VendorSpecificRaid | `Plugins/DataWarehouse.Plugins.VendorSpecificRaid/` |
-| ZfsRaid | `Plugins/DataWarehouse.Plugins.ZfsRaid/` |
-
-**Duplications Identified:**
-
-1. **GaloisField Implementations (7 independent copies, ~600 lines)**
-   - `ZfsRaid/GaloisField.cs` - Standalone 640 lines (most comprehensive)
-   - `Raid/RaidPlugin.cs:2416` - Embedded
-   - `StandardRaid/StandardRaidPlugin.cs:1825` - Embedded
-   - `AdvancedRaid/AdvancedRaidPlugin.cs:1788` - Embedded
-   - `EnhancedRaid/EnhancedRaidPlugin.cs:2090` - Embedded (identical to AdvancedRaid)
-   - `NestedRaid/NestedRaidPlugin.cs:2052` - Embedded (identical to AdvancedRaid)
-   - `VendorSpecificRaid/VendorSpecificRaidPlugin.cs:2269` - Embedded as `VendorGaloisField`
-
-2. **Reed-Solomon Z1/Z2/Z3 Parity Calculations (~300 lines)**
-   - `Raid/RaidPlugin.cs:1942-2120` - `CalculateReedSolomonZ1/Z2/Z3Parity()`, `ReconstructRaidZ3Failures()`
-   - `ZfsRaid/ZfsRaidPlugin.cs:766-791, 1023-1043` - `CalculateZ3Parity()`, `ReconstructZ3()`
-   - Similar implementations in AutoRaid, StandardRaid
-
-3. **Z3 References in 7 Files** (RAID-Z3 with 3 parity devices)
-   - `AutoRaidPlugin.cs:202, 510-511, 705, 723`
-   - `RaidPlugin.cs:102-104, 290-291, 368-376, 420, 1564, 1995-2015, 2101-2120`
-   - `SelfHealingRaidPlugin.cs:200-202`
-   - `ZfsRaidPlugin.cs:24, 107-113, 216-221, 766-791, 1023-1043`
-
-4. **Duplicated RAID Constants**
-   - Minimum device requirements (RAID_Z1=3, RAID_Z2=4, RAID_Z3=5) in 3+ plugins
-   - Capacity calculation formulas duplicated
-
-**Solution: Create SharedRaidUtilities Project**
-
-Create `Plugins/DataWarehouse.Plugins.SharedRaidUtilities/` with:
-
-**Status:** ✅ **COMPLETED** (2026-01-26) - All RAID plugins with GaloisField migrated to SharedRaidUtilities
-
-| Task | Status |
-|------|--------|
-| Create `SharedRaidUtilities` project | [x] |
-| Implement shared `GaloisField.cs` (consolidate from ZfsRaid) | [x] |
-| Implement shared `ReedSolomonHelper.cs` with P/Q/R parity methods | [x] |
-| Implement shared `RaidConstants.cs` (MinimumDevices, CapacityFactors) | [x] |
-| Update `AutoRaidPlugin.cs` to use shared utilities | [x] N/A - No GaloisField (orchestration only) |
-| Update `RaidPlugin.cs` to use shared utilities | [x] 105 lines removed |
-| Update `SelfHealingRaidPlugin.cs` to use shared utilities | [x] 81 lines removed |
-| Update `StandardRaidPlugin.cs` to use shared utilities | [x] 339 lines removed |
-| Update `AdvancedRaidPlugin.cs` to use shared utilities | [x] 67 lines removed |
-| Update `EnhancedRaidPlugin.cs` to use shared utilities | [x] 93 lines removed |
-| Update `NestedRaidPlugin.cs` to use shared utilities | [x] 96 lines removed |
-| Update `ExtendedRaidPlugin.cs` to use shared utilities | [x] N/A - No GaloisField (simpler RAID modes) |
-| Update `VendorSpecificRaidPlugin.cs` to use shared utilities | [x] N/A - Uses vendor-specific GaloisField (intentional) |
-| Update `ZfsRaidPlugin.cs` to use shared utilities | [x] Reference implementation |
-| Delete embedded GaloisField classes from all plugins | [x] Completed |
-| Run all RAID tests to verify correctness | [x] Build verified |
-
-**Expected Reduction:** ~1,450 lines of duplicated code
-**Actual Reduction:** 781 lines removed (Raid:105, StandardRaid:339, AdvancedRaid:67, EnhancedRaid:93, NestedRaid:96, SelfHealingRaid:81)
-
----
-
-#### 25. Audit and Fix Remaining Empty Catch Blocks (27 plugins)
-**Issue:** 27 plugins still have empty catch blocks that may silently swallow exceptions
-
-**Affected Plugins (verified 2026-01-24):**
-- VendorSpecificRaidPlugin, StandardRaidPlugin, SelfHealingRaidPlugin, RaidPlugin
-- AlertingOpsPlugin, SecretManagementPlugin, RelationalDatabasePlugin
-- VaultKeyStorePlugin, SqlInterfacePlugin, RaftConsensusPlugin
-- RamDiskStoragePlugin, LocalStoragePlugin, GrpcInterfacePlugin
-- DistributedTransactionPlugin, AuditLoggingPlugin, AdvancedRaidPlugin
-- AccessControlPlugin, plus 10 AI provider plugins
-
-**Triage Strategy:**
-1. RAID plugins - Review if catch blocks are protecting critical data paths
-2. Security plugins - Must log all exceptions for audit compliance
-3. AI providers - May be acceptable for timeout/network errors
-4. Storage plugins - Must not silently lose data
-
-**Status:** ✅ **COMPLETED** (2026-01-26)
-
-| Task | Status |
-|------|--------|
-| Triage each plugin's empty catches by criticality | [x] |
-| Fix RAID plugins (data integrity critical) | [x] |
-| Fix Security plugins (audit compliance) | [x] |
-| Fix Storage plugins (data loss prevention) | [x] |
-| Document acceptable cases for remaining plugins | [x] |
-
-**Verification:** All empty catch blocks in 27 plugins have been fixed with proper logging.
-
----
-
 ## PRODUCTION READINESS SPRINT (2026-01-25)
 
 ### Overview
@@ -245,33 +118,6 @@ This sprint addresses all CRITICAL and HIGH severity issues identified in the co
 
 ---
 
-### Phase 3: Backup Provider Refactoring
-
-#### Task 37: Refactor Backup Providers to Use Base Classes
-**Files:**
-- `Plugins/DataWarehouse.Plugins.Backup/Providers/DeltaBackupProvider.cs`
-- `Plugins/DataWarehouse.Plugins.Backup/Providers/IncrementalBackupProvider.cs`
-- `Plugins/DataWarehouse.Plugins.Backup/Providers/SyntheticFullBackupProvider.cs`
-**Issue:** Internal providers implement IBackupProvider directly instead of extending BackupPluginBase
-**Priority:** MEDIUM
-**Status:** ✅ **COMPLETED** (2026-01-26)
-
-**Solution Implemented:** Enhanced existing `BackupProviderBase` with generic infrastructure methods
-
-| Step | Action | Status |
-|------|--------|--------|
-| 1 | Create abstract `BackupProviderBase` in SDK or plugin | [x] Already existed, enhanced |
-| 2 | Move common functionality (logging, filtering) to base | [x] Added LoadStateAsync<T>, SaveStateAsync<T>, PerformBackupLoopAsync |
-| 3 | Have DeltaBackupProvider extend BackupProviderBase | [x] Updated to use base methods |
-| 4 | Have IncrementalBackupProvider extend BackupProviderBase | [x] Updated to use base methods |
-| 5 | Have SyntheticFullBackupProvider extend BackupProviderBase | [x] Updated to use base methods |
-| 6 | Remove duplicated code from providers | [x] 111 lines removed |
-| 7 | Verify build succeeds | [x] Build successful |
-
-**Results:** 111 lines of duplicated code eliminated, centralized state management and backup loop logic
-
----
-
 ## GOD TIER FEATURES - Future-Proofing & Industry Leadership (2026-2027)
 
 ### Overview
@@ -288,6 +134,7 @@ These features represent the next generation of data storage technology, positio
 **Priority:** P0 (Essential for Mass Adoption)
 **Effort:** High
 **Status:** [ ] Not Started
+**Merge:** The updated Launcher has 3-modes update: Install, Connect & Configure, Live run. Doesn't the "Connect & Configure" mode handle this? So the task should be not to create a new GUI app, but to make the Launcher have a full-featured GUI for all 3 modes...
 
 **Description:** Create a modern, extensible desktop GUI application with a plugin architecture that mirrors the backend. The GUI should be as modular as the storage engine itself.
 
