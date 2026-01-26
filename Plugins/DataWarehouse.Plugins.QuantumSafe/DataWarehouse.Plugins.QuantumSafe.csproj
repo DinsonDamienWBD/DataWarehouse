@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RootNamespace>DataWarehouse.Plugins.QuantumSafe</RootNamespace>
+    <Description>Industry-first quantum-safe storage plugin implementing NIST FIPS 203/204/205 post-quantum cryptography (CRYSTALS-Kyber, CRYSTALS-Dilithium, SPHINCS+) with hybrid classical+PQC mode, cryptographic agility, and harvest-now-decrypt-later protection</Description>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <!-- Temporarily excluded until BouncyCastle version with ML-KEM/ML-DSA support is available -->
+    <!-- The NIST standardized names (ML-KEM, ML-DSA) were finalized in August 2024 -->
+    <!-- BouncyCastle may need version 3.x or later for FIPS 203/204/205 support -->
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\DataWarehouse.SDK\DataWarehouse.SDK.csproj" />
+  </ItemGroup>
+
+  <!-- BouncyCastle provides production-ready PQC implementations -->
+  <ItemGroup>
+    <PackageReference Include="BouncyCastle.Cryptography" Version="2.5.1" />
+  </ItemGroup>
+
+</Project>

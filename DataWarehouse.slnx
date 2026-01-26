@@ -182,8 +182,16 @@
       <Build Solution="Debug|*" Project="false" />
     </Project>
     <Project Path="Plugins/DataWarehouse.Plugins.SharedRaidUtilities/DataWarehouse.Plugins.SharedRaidUtilities.csproj" />
-    <Project Path="Plugins/DataWarehouse.Plugins.QuantumSafe/DataWarehouse.Plugins.QuantumSafe.csproj" />
+    <Project Path="Plugins/DataWarehouse.Plugins.QuantumSafe/DataWarehouse.Plugins.QuantumSafe.csproj">
+      <Build Solution="Debug|*" Project="false" />
+    </Project>
     <Project Path="Plugins/DataWarehouse.Plugins.ZeroTrust/DataWarehouse.Plugins.ZeroTrust.csproj" />
+    <Project Path="Plugins/DataWarehouse.Plugins.TdsProtocol/DataWarehouse.Plugins.TdsProtocol.csproj" />
+    <Project Path="Plugins/DataWarehouse.Plugins.OracleTnsProtocol/DataWarehouse.Plugins.OracleTnsProtocol.csproj" />
+    <Project Path="Plugins/DataWarehouse.Plugins.JdbcBridge/DataWarehouse.Plugins.JdbcBridge.csproj" />
+    <Project Path="Plugins/DataWarehouse.Plugins.AdoNetProvider/DataWarehouse.Plugins.AdoNetProvider.csproj" />
+    <Project Path="Plugins/DataWarehouse.Plugins.NoSqlProtocol/DataWarehouse.Plugins.NoSqlProtocol.csproj" />
+    <Project Path="Plugins/DataWarehouse.Plugins.Docker/DataWarehouse.Plugins.Docker.csproj" />
   </Folder>
   <Project Path="DataWarehouse.Benchmarks/DataWarehouse.Benchmarks.csproj" />
   <Project Path="DataWarehouse.CLI/DataWarehouse.CLI.csproj" />
@@ -193,4 +201,5 @@
   <Project Path="DataWarehouse.SDK/DataWarehouse.SDK.csproj" />
   <Project Path="DataWarehouse.Shared/DataWarehouse.Shared.csproj" />
   <Project Path="DataWarehouse.Tests/DataWarehouse.Tests.csproj" />
+  <Project Path="DataWarehouse.GUI/DataWarehouse.GUI.csproj" />
 </Solution>

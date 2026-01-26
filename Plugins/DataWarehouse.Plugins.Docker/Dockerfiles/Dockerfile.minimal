@@ -1,0 +1,78 @@
+# DataWarehouse Minimal Alpine Image
+# datawarehouse/core:minimal
+#
+# Lightweight Alpine-based image optimized for size and security.
+# Target size: <100MB
+# Suitable for resource-constrained environments and edge deployments.
+#
+# Features:
+# - Alpine Linux base (smaller footprint)
+# - Minimal dependencies
+# - musl libc (compatible with .NET)
+# - Health check endpoint
+# - Graceful shutdown handling
+# - Non-root user support
+
+ARG DOTNET_VERSION=10.0
+FROM mcr.microsoft.com/dotnet/runtime:${DOTNET_VERSION}-alpine AS base
+
+# Labels for OCI compliance
+LABEL org.opencontainers.image.title="DataWarehouse Minimal"
+LABEL org.opencontainers.image.description="Lightweight DataWarehouse image based on Alpine Linux"
+LABEL org.opencontainers.image.vendor="DataWarehouse"
+LABEL org.opencontainers.image.source="https://github.com/datawarehouse/datawarehouse"
+LABEL org.opencontainers.image.licenses="MIT"
+
+# Install minimal required dependencies
+RUN apk add --no-cache \
+    curl \
+    ca-certificates \
+    tzdata \
+    icu-libs \
+    && rm -rf /var/cache/apk/*
+
+# Create non-root user for security
+RUN addgroup -g 1000 datawarehouse \
+    && adduser -u 1000 -G datawarehouse -h /home/datawarehouse -s /bin/sh -D datawarehouse
+
+# Set up application directories with proper permissions
+RUN mkdir -p /app /data /logs /config \
+    && chown -R datawarehouse:datawarehouse /app /data /logs /config
+
+# Set working directory
+WORKDIR /app
+
+# Copy application files (minimal set)
+COPY --chown=datawarehouse:datawarehouse ./publish-minimal/ ./
+
+# Environment configuration
+ENV DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=false \
+    DOTNET_RUNNING_IN_CONTAINER=true \
+    ASPNETCORE_URLS=http://+:8080 \
+    DATAWAREHOUSE_DATA_PATH=/data \
+    DATAWAREHOUSE_LOG_PATH=/logs \
+    DATAWAREHOUSE_CONFIG_PATH=/config \
+    DATAWAREHOUSE_MINIMAL=true \
+    TZ=UTC
+
+# Health check using wget (lighter than curl on Alpine)
+HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
+    CMD wget -q -O /dev/null http://localhost:8080/health || exit 1
+
+# Volume mounts for persistent data
+VOLUME ["/data", "/logs", "/config"]
+
+# Expose default port
+EXPOSE 8080
+
+# Switch to non-root user
+USER datawarehouse
+
+# Graceful shutdown handling
+STOPSIGNAL SIGTERM
+
+# Entry point
+ENTRYPOINT ["dotnet", "DataWarehouse.Kernel.dll"]
+
+# Default command
+CMD ["--minimal"]
