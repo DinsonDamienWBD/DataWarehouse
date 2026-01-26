@@ -153,26 +153,27 @@ Create `Plugins/DataWarehouse.Plugins.SharedRaidUtilities/` with:
 #### 25. Audit and Fix Remaining Empty Catch Blocks (27 plugins)
 **Issue:** 27 plugins still have empty catch blocks that may silently swallow exceptions
 
-**Status:** ✅ **COMPLETED** (2026-01-26)
+**Affected Plugins (verified 2026-01-24):**
+- VendorSpecificRaidPlugin, StandardRaidPlugin, SelfHealingRaidPlugin, RaidPlugin
+- AlertingOpsPlugin, SecretManagementPlugin, RelationalDatabasePlugin
+- VaultKeyStorePlugin, SqlInterfacePlugin, RaftConsensusPlugin
+- RamDiskStoragePlugin, LocalStoragePlugin, GrpcInterfacePlugin
+- DistributedTransactionPlugin, AuditLoggingPlugin, AdvancedRaidPlugin
+- AccessControlPlugin, plus 10 AI provider plugins
 
-**Verification (2026-01-26):**
-Most empty catch blocks were already fixed in earlier refactoring. The remaining 11 were fixed:
-- CrdtReplicationPlugin.cs - Added trace logging
-- EnhancedRaidPlugin.cs - Added trace logging for fallback paths
-- FileKeyStorePlugin.cs - Added trace logging
-- GeoDistributedConsensusPlugin.cs - Added trace logging for retry paths
-- HotReloadPlugin.cs - Added trace logging
-- ZfsRaidPlugin.cs - Added trace logging for recovery paths
-
-Note: `catch (OperationCanceledException) { }` patterns are intentionally empty as they're expected during cancellation/shutdown.
+**Triage Strategy:**
+1. RAID plugins - Review if catch blocks are protecting critical data paths
+2. Security plugins - Must log all exceptions for audit compliance
+3. AI providers - May be acceptable for timeout/network errors
+4. Storage plugins - Must not silently lose data
 
 | Task | Status |
 |------|--------|
-| Triage each plugin's empty catches by criticality | [x] |
-| Fix RAID plugins (data integrity critical) | [x] |
-| Fix Security plugins (audit compliance) | [x] |
-| Fix Storage plugins (data loss prevention) | [x] |
-| Document acceptable cases for remaining plugins | [x] OperationCanceledException catches are acceptable |
+| Triage each plugin's empty catches by criticality | [ ] |
+| Fix RAID plugins (data integrity critical) | [ ] |
+| Fix Security plugins (audit compliance) | [ ] |
+| Fix Storage plugins (data loss prevention) | [ ] |
+| Document acceptable cases for remaining plugins | [ ] |
 
 ---
 
@@ -1085,24 +1086,22 @@ Tasks carried over from previous sprints that need to be completed before starti
 
 ## Include UI/UX improvements, bug fixes, performance optimizations, and minor features from previous sprints that are prerequisites for GOD TIER features.
 Task A1: Dashboard Plugin - Add support for:
-  **Status:** ✅ **COMPLETED** (2026-01-26) - All 21 dashboard platforms implemented
-
   |#.| Task                               | Status |
   |--|------------------------------------|--------|
   |a.| Grafana Loki                       | [x]    |
   |b.| Prometheus                         | [x]    |
   |c.| Kibana                             | [x]    |
   |d.| SigNoz                             | [x]    |
-  |e.| Zabbix                             | [x]    |
-  |f.| VictoriaMetrics                    | [x]    |
+  |e.| Zabbix                             | [ ]    |
+  |f.| VictoriaMetrics                    | [ ]    |
   |g.| Netdata                            | [x]    |
   |h.| Perses                             | [x]    |
   |i.| Chronograf                         | [x]    |
   |j.| Datadog                            | [x]    |
-  |k.| New Relic                          | [x]    |
+  |k.| New Relic                          | [ ]    |
   |l.| Dynatrace                          | [x]    |
-  |m.| Splunk/Splunk Observability Cloud  | [x]    |
-  |n.| Logz.io                            | [x]    |
+  |m.| Splunk/Splunk Observvability Cloud | [ ]    |
+  |n.| Logx.io                            | [x]    |
   |o.| LogicMonitor                       | [x]    |
   |p.| Tableau                            | [x]    |
   |q.| Microsoft Power BI                 | [x]    |
@@ -1111,18 +1110,16 @@ Task A1: Dashboard Plugin - Add support for:
   |t.| Geckoboard                         | [x]    |
   |u.| Redash                             | [x]    |
 
-  All plugins verified and committed to branch `claude/implement-metadata-tasks-7gI6Q`.
+  Verify the existing implementation first for already supported dashboard plugins (partial or full),
+  then, implement the above missing pieces one by one.
 
   Task A2: Improve UI/UX
-  **Status:** IN PROGRESS (Parts 1-2 complete)
-
   Concept: A modular live media/installer, sinilar to a Linux Live CD/USB distro where users can pick and choose which components to include in their build or run a live version directly from the media without installation.
-    1. ✅ **COMPLETED** (2026-01-26) - Create a full fledged Adapter class in 'DataWarehouse/Metadata/' that can be copy/pasted into any other project.
+    1. Create a full fledged Adapter class in 'DataWarehouse/Metadata/' that can be copy/pasted into any other project.
        This Adapter allows the host project to communicate with DataWarehouse, without needing any direct project reference.
        This is one of the ways how our customers will be integrating/using DataWarehouse with their own applications.
-       **Files created:** IKernelAdapter.cs, AdapterFactory.cs, AdapterRunner.cs, README.md
 
-    2. ✅ **COMPLETED** (2026-01-26) - Create a base piece that supports 3 modes:
+    2. Create a base piece that supports 3 modes:
          i. Install and initialize an instance of DataWarehouse
         ii. Connect to an existing DataWarehouse instance - allows configuration of remote instances without having to login to the remote server/machine.
             It can also be used to configure the local or standalone instances also).
@@ -1138,9 +1135,8 @@ Task A1: Dashboard Plugin - Add support for:
        the configuration can be saved to the live media itself, so that next time the user boots from the live media, their configuration is already present).
        And when they proceed to 'Install' from 'i' mode, the configuration used in 'ii' mode can be used as the default configuration for the installed instance also
        if the user wnats it that way.
-       **Files created:** DataWarehouseHost.cs, OperatingMode.cs, InstanceConnection.cs
-
-    3. [ ] Upgrade the CLI to use the base piece, and support all 3 modes above.
+    
+    3. Upgrade the CLI to use the base piece, and support all 3 modes above.
        This will allow users to use the CLI to manage both local embedded instances, as well as any local and remote instances.
 
     4. Rename the Launcher project to a more appropriate name.
@@ -1167,7 +1163,7 @@ Task A3: Implement support for full SQL toolset compatibility
   i. Implement Database Import plugin (import SQL/Server/MySQL/PostgreSQL/Oracle/SQLite/NoSQL etc. databses and tables into DataWarehouse)
  ii. Implement Federated Query plugin (allow querying accross heterogenious data, databases and tables from DataWarehouse in one go)
 iii. Implement Schema Registry (Track imported database and table structures, versions and changes over time)
- iv. Implement SQL Toolset Compatibility plugin (allow connecting to DataWarehouse from various SQL tools and IDEs):
+ iv. Implement SQL Toolset Compatibility plugin (allow connecting to DataWarehouse from various SQL tools and IDEs to be able to qork with the imported databases and tables and records.):
 |1. |SSMS (TDS protocol)                                                            | [ ]    |
 |2. |Azure Data Studio                                                              | [ ]    |
 |3. |DBeaver                                                                        | [ ]    |
