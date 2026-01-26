@@ -40,7 +40,9 @@
       "Bash(find:*)",
       "Bash(npx tsc:*)",
       "Bash(Select-String -Pattern \"Error\\\\\\(s\\\\\\)|Build succeeded|Build FAILED\")",
-      "Bash(ls:*)"
+      "Bash(ls:*)",
+      "Bash(fi)",
+      "Bash(done)"
     ]
   }
 }
