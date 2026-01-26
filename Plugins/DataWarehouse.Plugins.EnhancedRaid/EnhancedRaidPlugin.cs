@@ -1,5 +1,6 @@
 using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Primitives;
+using DataWarehouse.Plugins.SharedRaidUtilities;
 using System.Collections.Concurrent;
 using System.Runtime.CompilerServices;
 using System.Security.Cryptography;
@@ -33,6 +34,9 @@ public sealed class EnhancedRaidPlugin : RaidProviderPluginBase, IAsyncDisposabl
 
     /// <inheritdoc />
     public override string Id => "com.datawarehouse.plugins.raid.enhanced";
+
+    /// <inheritdoc />
+    public override PluginCategory Category => PluginCategory.StorageProvider;
 
     /// <inheritdoc />
     public override string Name => "Enhanced RAID Plugin";
@@ -83,7 +87,7 @@ public sealed class EnhancedRaidPlugin : RaidProviderPluginBase, IAsyncDisposabl
         Directory.CreateDirectory(_statePath);
 
         // Initialize Galois Field with primitive polynomial x^8 + x^4 + x^3 + x^2 + 1 (0x11D)
-        _galoisField = new GaloisField(0x11D);
+        _galoisField = new GaloisField();
         _rebuildSemaphore = new SemaphoreSlim(_config.MaxConcurrentRebuilds, _config.MaxConcurrentRebuilds);
 
         _healthCheckTimer = new Timer(
@@ -2080,101 +2084,6 @@ public sealed class EnhancedRaidPlugin : RaidProviderPluginBase, IAsyncDisposabl
         _arrayLock.Dispose();
     }
 }
-
-#region Galois Field Implementation
-
-/// <summary>
-/// GF(2^8) Galois Field implementation for Reed-Solomon parity calculations.
-/// Uses primitive polynomial x^8 + x^4 + x^3 + x^2 + 1 (0x11D).
-/// </summary>
-internal sealed class GaloisField
-{
-    private readonly byte[] _expTable;
-    private readonly byte[] _logTable;
-    private readonly int _primitive;
-
-    /// <summary>
-    /// Creates a new Galois Field with the specified primitive polynomial.
-    /// </summary>
-    /// <param name="primitive">The primitive polynomial (e.g., 0x11D for x^8+x^4+x^3+x^2+1)</param>
-    public GaloisField(int primitive)
-    {
-        _primitive = primitive;
-        _expTable = new byte[512];
-        _logTable = new byte[256];
-
-        // Generate exp and log tables
-        int x = 1;
-        for (int i = 0; i < 255; i++)
-        {
-            _expTable[i] = (byte)x;
-            _logTable[x] = (byte)i;
-            x <<= 1;
-            if (x >= 256)
-            {
-                x ^= _primitive;
-            }
-        }
-
-        // Extend exp table for easier modular arithmetic
-        for (int i = 255; i < 512; i++)
-        {
-            _expTable[i] = _expTable[i - 255];
-        }
-    }
-
-    /// <summary>
-    /// Adds two elements in GF(2^8). Addition in GF(2^8) is XOR.
-    /// </summary>
-    public byte Add(byte a, byte b) => (byte)(a ^ b);
-
-    /// <summary>
-    /// Subtracts two elements in GF(2^8). Same as addition.
-    /// </summary>
-    public byte Subtract(byte a, byte b) => (byte)(a ^ b);
-
-    /// <summary>
-    /// Multiplies two elements in GF(2^8) using log/antilog tables.
-    /// </summary>
-    public byte Multiply(byte a, byte b)
-    {
-        if (a == 0 || b == 0) return 0;
-        return _expTable[_logTable[a] + _logTable[b]];
-    }
-
-    /// <summary>
-    /// Divides two elements in GF(2^8).
-    /// </summary>
-    public byte Divide(byte a, byte b)
-    {
-        if (b == 0) throw new DivideByZeroException("Cannot divide by zero in Galois Field");
-        if (a == 0) return 0;
-        return _expTable[_logTable[a] + 255 - _logTable[b]];
-    }
-
-    /// <summary>
-    /// Raises base to exponent in GF(2^8).
-    /// </summary>
-    public int Power(int baseVal, int exponent)
-    {
-        if (exponent == 0) return 1;
-        if (baseVal == 0) return 0;
-        var logBase = _logTable[baseVal];
-        var result = (logBase * exponent) % 255;
-        return _expTable[result];
-    }
-
-    /// <summary>
-    /// Calculates the multiplicative inverse in GF(2^8).
-    /// </summary>
-    public byte Inverse(byte a)
-    {
-        if (a == 0) throw new DivideByZeroException("Zero has no inverse in Galois Field");
-        return _expTable[255 - _logTable[a]];
-    }
-}
-
-#endregion
 
 #region Configuration and Models
 

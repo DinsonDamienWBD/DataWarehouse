@@ -1,6 +1,7 @@
 using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Primitives;
 using DataWarehouse.SDK.Utilities;
+using DataWarehouse.Plugins.SharedRaidUtilities;
 using System.Collections.Concurrent;
 using System.Runtime.CompilerServices;
 using System.Security.Cryptography;
@@ -466,7 +467,7 @@ namespace DataWarehouse.Plugins.StandardRaid
                 var parityProviderIdx = s % _providers.Length;
 
                 // Calculate real XOR parity
-                var parity = CalculateXorParity(paddedChunks);
+                var parity = _galoisField.CalculatePParity(paddedChunks);
 
                 int dataIdx = 0;
                 for (int p = 0; p < _providers.Length; p++)
@@ -536,10 +537,10 @@ namespace DataWarehouse.Plugins.StandardRaid
                 var qParityIdx = (s + 1) % _providers.Length;
 
                 // Calculate real P parity (XOR)
-                var pParity = CalculateXorParity(paddedChunks);
+                var pParity = _galoisField.CalculatePParity(paddedChunks);
 
                 // Calculate real Q parity using Reed-Solomon in GF(2^8)
-                var qParity = CalculateReedSolomonQParity(paddedChunks, _galoisField);
+                var qParity = _galoisField.CalculateQParity(paddedChunks);
 
                 int dataIdx = 0;
                 for (int p = 0; p < _providers.Length; p++)
@@ -877,7 +878,7 @@ namespace DataWarehouse.Plugins.StandardRaid
                 // Reconstruct missing chunk using XOR parity
                 if (failedChunkIdx.HasValue && parityData.Length > 0)
                 {
-                    chunks[failedChunkIdx.Value] = ReconstructFromXorParity(chunks, parityData, failedChunkIdx.Value);
+                    chunks[failedChunkIdx.Value] = _galoisField.ReconstructFromP(chunks, parityData, failedChunkIdx.Value);
                 }
 
                 foreach (var chunk in chunks.Where(c => c != null))
@@ -975,12 +976,12 @@ namespace DataWarehouse.Plugins.StandardRaid
                 if (failedIndices.Count == 1 && pParity.Length > 0)
                 {
                     // Single failure - use P parity (XOR)
-                    chunks[failedIndices[0]] = ReconstructFromXorParity(chunks, pParity, failedIndices[0]);
+                    chunks[failedIndices[0]] = _galoisField.ReconstructFromP(chunks, pParity, failedIndices[0]);
                 }
                 else if (failedIndices.Count == 2 && pParity.Length > 0 && qParity.Length > 0)
                 {
                     // Double failure - use both P and Q parity with Galois Field math
-                    ReconstructTwoFailuresWithDualParity(chunks, pParity, qParity, failedIndices[0], failedIndices[1], _galoisField);
+                    _galoisField.ReconstructFromPQ(chunks, pParity, qParity, failedIndices[0], failedIndices[1]);
                 }
 
                 foreach (var chunk in chunks.Where(c => c != null))
@@ -1434,7 +1435,7 @@ namespace DataWarehouse.Plugins.StandardRaid
                 // Recalculate and verify parity
                 if (chunks.Count > 0)
                 {
-                    var calculatedParity = CalculateXorParity(chunks.ToArray());
+                    var calculatedParity = _galoisField.CalculatePParity(chunks.ToArray());
                     // In a full implementation, we would compare with stored parity
                 }
             }
@@ -1474,140 +1475,6 @@ namespace DataWarehouse.Plugins.StandardRaid
 
         #region Parity Calculations
 
-        /// <summary>
-        /// Calculates XOR parity across all data blocks.
-        /// P = D0 XOR D1 XOR D2 XOR ... XOR Dn
-        /// </summary>
-        private static byte[] CalculateXorParity(byte[][] dataBlocks)
-        {
-            if (dataBlocks.Length == 0) return Array.Empty<byte>();
-
-            var parityLength = dataBlocks.Max(b => b?.Length ?? 0);
-            var parity = new byte[parityLength];
-
-            foreach (var block in dataBlocks)
-            {
-                if (block != null)
-                {
-                    for (int i = 0; i < block.Length; i++)
-                    {
-                        parity[i] ^= block[i];
-                    }
-                }
-            }
-
-            return parity;
-        }
-
-        /// <summary>
-        /// Calculates Reed-Solomon Q parity using Galois Field GF(2^8) mathematics.
-        /// Q[i] = sum of (D[j][i] * g^j) for all j, where g is the generator (2)
-        /// This allows reconstruction of any two failed disks when combined with P parity.
-        /// </summary>
-        private static byte[] CalculateReedSolomonQParity(byte[][] dataBlocks, GaloisField gf)
-        {
-            if (dataBlocks.Length == 0) return Array.Empty<byte>();
-
-            var parityLength = dataBlocks.Max(b => b?.Length ?? 0);
-            var parity = new byte[parityLength];
-
-            for (int i = 0; i < parityLength; i++)
-            {
-                byte result = 0;
-                for (int j = 0; j < dataBlocks.Length; j++)
-                {
-                    if (dataBlocks[j] != null && i < dataBlocks[j].Length)
-                    {
-                        // Coefficient is g^j where g=2 is the generator
-                        var coefficient = gf.Power(2, j);
-                        result = gf.Add(result, gf.Multiply(dataBlocks[j][i], coefficient));
-                    }
-                }
-                parity[i] = result;
-            }
-
-            return parity;
-        }
-
-        /// <summary>
-        /// Reconstructs a single missing block using XOR parity.
-        /// Missing = P XOR D0 XOR D1 XOR ... (excluding missing)
-        /// </summary>
-        private static byte[] ReconstructFromXorParity(byte[][] chunks, byte[] parity, int failedIdx)
-        {
-            var length = parity.Length;
-            var result = new byte[length];
-            Array.Copy(parity, result, length);
-
-            for (int i = 0; i < chunks.Length; i++)
-            {
-                if (i != failedIdx && chunks[i] != null)
-                {
-                    for (int j = 0; j < chunks[i].Length && j < result.Length; j++)
-                    {
-                        result[j] ^= chunks[i][j];
-                    }
-                }
-            }
-
-            return result;
-        }
-
-        /// <summary>
-        /// Reconstructs two missing blocks using both P (XOR) and Q (Reed-Solomon) parity.
-        /// Uses Galois Field arithmetic to solve the system of equations:
-        /// P = D_fail1 + D_fail2 + sum(other data)
-        /// Q = g^fail1 * D_fail1 + g^fail2 * D_fail2 + sum(g^j * other data)
-        /// </summary>
-        private static void ReconstructTwoFailuresWithDualParity(
-            byte[][] chunks, byte[] pParity, byte[] qParity, int fail1, int fail2, GaloisField gf)
-        {
-            var length = pParity.Length;
-            chunks[fail1] = new byte[length];
-            chunks[fail2] = new byte[length];
-
-            // Coefficients for the failed disks
-            var coef1 = gf.Power(2, fail1);  // g^fail1
-            var coef2 = gf.Power(2, fail2);  // g^fail2
-
-            // The coefficient difference determines if we can solve
-            var coefDiff = gf.Add(coef1, coef2);
-            if (coefDiff == 0)
-            {
-                throw new StandardRaidException("Cannot reconstruct: coefficient difference is zero");
-            }
-            var coefDiffInv = gf.Inverse(coefDiff);
-
-            for (int i = 0; i < length; i++)
-            {
-                // Calculate syndromes (P and Q after removing known data contributions)
-                byte pSyndrome = pParity[i];
-                byte qSyndrome = qParity[i];
-
-                for (int j = 0; j < chunks.Length; j++)
-                {
-                    if (j != fail1 && j != fail2 && chunks[j] != null && i < chunks[j].Length)
-                    {
-                        pSyndrome ^= chunks[j][i];
-                        qSyndrome = gf.Add(qSyndrome, gf.Multiply(chunks[j][i], gf.Power(2, j)));
-                    }
-                }
-
-                // Solve the system of equations:
-                // pSyndrome = D_fail1 + D_fail2
-                // qSyndrome = coef1 * D_fail1 + coef2 * D_fail2
-                //
-                // Solution:
-                // D_fail1 = (pSyndrome * coef2 + qSyndrome) / (coef1 + coef2)
-                // D_fail2 = pSyndrome + D_fail1
-
-                var a = gf.Multiply(gf.Add(gf.Multiply(pSyndrome, coef2), qSyndrome), coefDiffInv);
-                var b = gf.Add(pSyndrome, a);
-
-                chunks[fail1][i] = a;
-                chunks[fail2][i] = b;
-            }
-        }
 
         #endregion
 
@@ -1836,212 +1703,6 @@ namespace DataWarehouse.Plugins.StandardRaid
     {
         public StandardRaidException(string message) : base(message) { }
         public StandardRaidException(string message, Exception inner) : base(message, inner) { }
-    }
-
-    /// <summary>
-    /// GF(2^8) Galois Field implementation for Reed-Solomon error correction in RAID 6.
-    /// Uses the standard irreducible polynomial x^8 + x^4 + x^3 + x^2 + 1 (0x11D).
-    /// Provides O(1) multiplication and division through precomputed log/exp tables.
-    /// </summary>
-    /// <remarks>
-    /// The Galois Field GF(2^8) contains 256 elements (0-255).
-    /// All arithmetic operations wrap within this field:
-    /// - Addition and subtraction are XOR operations
-    /// - Multiplication uses log/antilog tables for O(1) performance
-    /// - Division is multiplication by the multiplicative inverse
-    /// </remarks>
-    internal sealed class GaloisField
-    {
-        /// <summary>
-        /// Size of the Galois field (2^8 = 256 elements).
-        /// </summary>
-        public const int FieldSize = 256;
-
-        /// <summary>
-        /// The irreducible polynomial used for field reduction: x^8 + x^4 + x^3 + x^2 + 1.
-        /// This polynomial is used in ZFS RAID-Z and is standard for Reed-Solomon codes.
-        /// </summary>
-        private const int IrreduciblePolynomial = 0x11D;
-
-        /// <summary>
-        /// Primitive element (generator) of the field. g=2 generates all non-zero elements.
-        /// </summary>
-        private const byte Generator = 2;
-
-        private readonly byte[] _expTable;
-        private readonly byte[] _logTable;
-        private readonly byte[] _inverseTable;
-
-        /// <summary>
-        /// Creates a new Galois Field instance with precomputed lookup tables.
-        /// </summary>
-        public GaloisField()
-        {
-            _expTable = new byte[FieldSize * 2];
-            _logTable = new byte[FieldSize];
-            _inverseTable = new byte[FieldSize];
-
-            InitializeLogExpTables();
-            InitializeInverseTable();
-        }
-
-        private void InitializeLogExpTables()
-        {
-            int x = 1;
-            for (int i = 0; i < FieldSize - 1; i++)
-            {
-                _expTable[i] = (byte)x;
-                _logTable[x] = (byte)i;
-
-                // Multiply by generator (2)
-                x <<= 1;
-                if (x >= FieldSize)
-                {
-                    x ^= IrreduciblePolynomial;
-                }
-            }
-
-            // Handle the wrap-around for exp table
-            _expTable[FieldSize - 1] = _expTable[0];
-            _logTable[0] = 0; // log(0) is undefined, but we use 0 as a sentinel
-
-            // Extend exp table to avoid modulo operations
-            for (int i = FieldSize - 1; i < FieldSize * 2; i++)
-            {
-                _expTable[i] = _expTable[i - (FieldSize - 1)];
-            }
-        }
-
-        private void InitializeInverseTable()
-        {
-            _inverseTable[0] = 0; // 0 has no inverse
-            for (int i = 1; i < FieldSize; i++)
-            {
-                // Multiplicative inverse: a^(-1) = g^(255 - log(a))
-                _inverseTable[i] = _expTable[255 - _logTable[i]];
-            }
-        }
-
-        /// <summary>
-        /// Adds two elements in GF(2^8). Addition is XOR in binary fields.
-        /// </summary>
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public byte Add(byte a, byte b) => (byte)(a ^ b);
-
-        /// <summary>
-        /// Subtracts two elements in GF(2^8). Subtraction equals addition in binary fields.
-        /// </summary>
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public byte Subtract(byte a, byte b) => (byte)(a ^ b);
-
-        /// <summary>
-        /// Multiplies two elements in GF(2^8) using precomputed log/exp tables.
-        /// a * b = exp(log(a) + log(b))
-        /// </summary>
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public byte Multiply(byte a, byte b)
-        {
-            if (a == 0 || b == 0) return 0;
-            return _expTable[_logTable[a] + _logTable[b]];
-        }
-
-        /// <summary>
-        /// Divides two elements in GF(2^8).
-        /// a / b = a * b^(-1) = exp(log(a) - log(b))
-        /// </summary>
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public byte Divide(byte a, byte b)
-        {
-            if (b == 0) throw new DivideByZeroException("Division by zero in Galois Field");
-            if (a == 0) return 0;
-            // Add 255 to ensure positive result before modulo
-            return _expTable[(_logTable[a] + 255 - _logTable[b]) % 255];
-        }
-
-        /// <summary>
-        /// Computes base^exp in GF(2^8).
-        /// Used to calculate generator coefficients g^j for Reed-Solomon.
-        /// </summary>
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public byte Power(int @base, int exp)
-        {
-            if (@base == 0) return 0;
-            if (exp == 0) return 1;
-
-            @base = @base & 0xFF;
-            exp = ((exp % 255) + 255) % 255;
-
-            if (@base == 0) return 0;
-
-            var logBase = _logTable[@base];
-            var result = (logBase * exp) % 255;
-            return _expTable[result];
-        }
-
-        /// <summary>
-        /// Computes the multiplicative inverse of an element in GF(2^8).
-        /// a^(-1) such that a * a^(-1) = 1
-        /// </summary>
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public byte Inverse(byte a)
-        {
-            if (a == 0) throw new ArgumentException("Zero has no multiplicative inverse", nameof(a));
-            return _inverseTable[a];
-        }
-
-        /// <summary>
-        /// Computes the exponential (antilog) of a value.
-        /// </summary>
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public byte Exp(int i)
-        {
-            return _expTable[(i % 255 + 255) % 255];
-        }
-
-        /// <summary>
-        /// Computes the logarithm of a value.
-        /// </summary>
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public byte Log(byte a)
-        {
-            if (a == 0) throw new ArgumentException("Logarithm of zero is undefined", nameof(a));
-            return _logTable[a];
-        }
-
-        /// <summary>
-        /// Multiplies two polynomials in GF(2^8)[x].
-        /// Useful for generator polynomial construction in Reed-Solomon.
-        /// </summary>
-        public byte[] MultiplyPolynomial(byte[] p1, byte[] p2)
-        {
-            var result = new byte[p1.Length + p2.Length - 1];
-
-            for (int i = 0; i < p1.Length; i++)
-            {
-                for (int j = 0; j < p2.Length; j++)
-                {
-                    result[i + j] = Add(result[i + j], Multiply(p1[i], p2[j]));
-                }
-            }
-
-            return result;
-        }
-
-        /// <summary>
-        /// Evaluates a polynomial at a given point in GF(2^8).
-        /// Uses Horner's method for efficiency.
-        /// </summary>
-        public byte EvaluatePolynomial(byte[] poly, byte x)
-        {
-            if (poly.Length == 0) return 0;
-
-            byte result = poly[poly.Length - 1];
-            for (int i = poly.Length - 2; i >= 0; i--)
-            {
-                result = Add(Multiply(result, x), poly[i]);
-            }
-            return result;
-        }
     }
 
     #endregion

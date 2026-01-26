@@ -574,9 +574,9 @@ public sealed class SyntheticFullBackupProvider : BackupProviderBase, ISynthetic
                     }
                     _backupChain.TryRemove(seq, out _);
                 }
-                catch
+                catch (Exception ex)
                 {
-                    // Log error but continue
+                    _logger?.LogWarning(ex, "Failed to delete incremental backup files for sequence {Sequence} (BackupId: {BackupId}). Continuing with next sequence.", seq, entry.BackupId);
                 }
             }
         }

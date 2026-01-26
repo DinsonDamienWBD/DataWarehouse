@@ -638,9 +638,11 @@ public sealed class ContinuousBackupProvider :
         {
             await PerformIncrementalBackupAsync();
         }
-        catch
+        catch (Exception ex)
         {
-            // Log error
+            System.Diagnostics.Trace.TraceError(
+                "[ContinuousBackupProvider] Failed to process pending changes during batch backup: {0}",
+                ex.Message);
         }
     }
 
@@ -783,8 +785,11 @@ public sealed class ContinuousBackupProvider :
             await baseStream.CopyToAsync(ms, ct);
             return ms.ToArray();
         }
-        catch
+        catch (Exception ex)
         {
+            System.Diagnostics.Trace.TraceWarning(
+                "[ContinuousBackupProvider] Failed to reconstruct file {0} from backup: {1}",
+                filePath, ex.Message);
             return null;
         }
     }

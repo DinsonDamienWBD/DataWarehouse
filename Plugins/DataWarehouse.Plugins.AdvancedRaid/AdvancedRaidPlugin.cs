@@ -1,5 +1,6 @@
 using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Primitives;
+using DataWarehouse.Plugins.SharedRaidUtilities;
 using System.Collections.Concurrent;
 using System.Runtime.CompilerServices;
 using System.Security.Cryptography;
@@ -78,7 +79,7 @@ public sealed class AdvancedRaidPlugin : RaidProviderPluginBase, IAsyncDisposabl
 
         Directory.CreateDirectory(_statePath);
 
-        _galoisField = new GaloisField(0x11D);
+        _galoisField = new GaloisField();
         _rebuildSemaphore = new SemaphoreSlim(_config.MaxConcurrentRebuilds, _config.MaxConcurrentRebuilds);
 
         _healthCheckTimer = new Timer(
@@ -1312,26 +1313,7 @@ public sealed class AdvancedRaidPlugin : RaidProviderPluginBase, IAsyncDisposabl
     /// </summary>
     private byte[] CalculateReedSolomonParity(byte[][] chunks)
     {
-        if (chunks.Length == 0) return Array.Empty<byte>();
-
-        var maxLen = chunks.Max(c => c?.Length ?? 0);
-        var qParity = new byte[maxLen];
-
-        for (int i = 0; i < maxLen; i++)
-        {
-            byte result = 0;
-            for (int c = 0; c < chunks.Length; c++)
-            {
-                if (chunks[c] == null || i >= chunks[c].Length) continue;
-
-                var coefficient = _galoisField.Power(2, c);
-                var product = _galoisField.Multiply(coefficient, chunks[c][i]);
-                result = _galoisField.Add(result, product);
-            }
-            qParity[i] = result;
-        }
-
-        return qParity;
+        return _galoisField.CalculateQParity(chunks);
     }
 
     /// <summary>
@@ -1366,40 +1348,7 @@ public sealed class AdvancedRaidPlugin : RaidProviderPluginBase, IAsyncDisposabl
         int failedIndex1,
         int failedIndex2)
     {
-        var size = pParity.Length;
-        chunks[failedIndex1] = new byte[size];
-        chunks[failedIndex2] = new byte[size];
-
-        var g1 = (byte)_galoisField.Power(2, failedIndex1);
-        var g2 = (byte)_galoisField.Power(2, failedIndex2);
-
-        for (int i = 0; i < size; i++)
-        {
-            byte pXor = pParity[i];
-            byte qXor = qParity[i];
-
-            for (int c = 0; c < chunks.Length; c++)
-            {
-                if (c == failedIndex1 || c == failedIndex2 || chunks[c] == null) continue;
-
-                pXor ^= chunks[c][i];
-                var coef = (byte)_galoisField.Power(2, c);
-                qXor = _galoisField.Add(qXor, _galoisField.Multiply(coef, chunks[c][i]));
-            }
-
-            var gDiff = _galoisField.Add(g1, g2);
-            var gDiffInv = _galoisField.Inverse(gDiff);
-
-            var d1Temp = _galoisField.Add(
-                _galoisField.Multiply(g2, pXor),
-                qXor);
-            var d1 = _galoisField.Multiply(gDiffInv, d1Temp);
-
-            var d2 = _galoisField.Add(pXor, d1);
-
-            chunks[failedIndex1][i] = d1;
-            chunks[failedIndex2][i] = d2;
-        }
+        _galoisField.ReconstructFromPQ(chunks, pParity, qParity, failedIndex1, failedIndex2);
     }
 
     private async Task<byte[]> ReadParityAsync(
@@ -1979,74 +1928,6 @@ public sealed class AdvancedRaidPlugin : RaidProviderPluginBase, IAsyncDisposabl
         _arrayLock.Dispose();
     }
 }
-
-#region Galois Field Implementation
-
-/// <summary>
-/// GF(2^8) Galois Field implementation for Reed-Solomon parity calculations.
-/// </summary>
-internal sealed class GaloisField
-{
-    private readonly byte[] _expTable;
-    private readonly byte[] _logTable;
-    private readonly int _primitive;
-
-    public GaloisField(int primitive)
-    {
-        _primitive = primitive;
-        _expTable = new byte[512];
-        _logTable = new byte[256];
-
-        int x = 1;
-        for (int i = 0; i < 255; i++)
-        {
-            _expTable[i] = (byte)x;
-            _logTable[x] = (byte)i;
-            x <<= 1;
-            if (x >= 256)
-            {
-                x ^= _primitive;
-            }
-        }
-
-        for (int i = 255; i < 512; i++)
-        {
-            _expTable[i] = _expTable[i - 255];
-        }
-    }
-
-    public byte Add(byte a, byte b) => (byte)(a ^ b);
-
-    public byte Subtract(byte a, byte b) => (byte)(a ^ b);
-
-    public byte Multiply(byte a, byte b)
-    {
-        if (a == 0 || b == 0) return 0;
-        return _expTable[_logTable[a] + _logTable[b]];
-    }
-
-    public byte Divide(byte a, byte b)
-    {
-        if (b == 0) throw new DivideByZeroException();
-        if (a == 0) return 0;
-        return _expTable[_logTable[a] + 255 - _logTable[b]];
-    }
-
-    public byte Power(int b, int e)
-    {
-        if (e == 0) return 1;
-        if (b == 0) return 0;
-        return _expTable[(e * _logTable[b]) % 255];
-    }
-
-    public byte Inverse(byte a)
-    {
-        if (a == 0) throw new DivideByZeroException();
-        return _expTable[255 - _logTable[a]];
-    }
-}
-
-#endregion
 
 #region Configuration and Models
 

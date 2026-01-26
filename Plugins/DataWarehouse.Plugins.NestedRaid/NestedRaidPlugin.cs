@@ -1,5 +1,6 @@
 using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Primitives;
+using DataWarehouse.Plugins.SharedRaidUtilities;
 using System.Collections.Concurrent;
 using System.Runtime.CompilerServices;
 using System.Security.Cryptography;
@@ -94,8 +95,8 @@ public sealed class NestedRaidPlugin : RaidProviderPluginBase, IAsyncDisposable
 
         Directory.CreateDirectory(_statePath);
 
-        // GF(2^8) with primitive polynomial x^8 + x^4 + x^3 + x^2 + 1 = 0x11D
-        _galoisField = new GaloisField(0x11D);
+        // GF(2^8) with primitive polynomial x^8 + x^4 + x^3 + x^2 + 1 = 0x11D (using shared implementation)
+        _galoisField = new GaloisField();
         _rebuildSemaphore = new SemaphoreSlim(_config.MaxConcurrentRebuilds, _config.MaxConcurrentRebuilds);
 
         _healthCheckTimer = new Timer(
@@ -2042,103 +2043,6 @@ public sealed class NestedRaidPlugin : RaidProviderPluginBase, IAsyncDisposable
 
     #endregion
 }
-
-#region Galois Field Implementation
-
-/// <summary>
-/// GF(2^8) Galois Field implementation for Reed-Solomon parity calculations.
-/// Used for RAID 6/60 dual parity.
-/// </summary>
-internal sealed class GaloisField
-{
-    private readonly byte[] _expTable;
-    private readonly byte[] _logTable;
-    private readonly int _primitive;
-
-    /// <summary>
-    /// Creates a new Galois Field with the specified primitive polynomial.
-    /// Default: 0x11D (x^8 + x^4 + x^3 + x^2 + 1)
-    /// </summary>
-    public GaloisField(int primitive = 0x11D)
-    {
-        _primitive = primitive;
-        _expTable = new byte[512];
-        _logTable = new byte[256];
-
-        // Generate exp and log tables
-        int x = 1;
-        for (int i = 0; i < 255; i++)
-        {
-            _expTable[i] = (byte)x;
-            _logTable[x] = (byte)i;
-            x <<= 1;
-            if (x >= 256)
-            {
-                x ^= _primitive;
-            }
-        }
-
-        // Extend exp table for easier modular arithmetic
-        for (int i = 255; i < 512; i++)
-        {
-            _expTable[i] = _expTable[i - 255];
-        }
-    }
-
-    /// <summary>
-    /// Addition in GF(2^8) is XOR.
-    /// </summary>
-    public byte Add(byte a, byte b) => (byte)(a ^ b);
-
-    /// <summary>
-    /// Subtraction in GF(2^8) is also XOR.
-    /// </summary>
-    public byte Subtract(byte a, byte b) => (byte)(a ^ b);
-
-    /// <summary>
-    /// Multiplication using log/exp tables.
-    /// </summary>
-    public byte Multiply(byte a, byte b)
-    {
-        if (a == 0 || b == 0) return 0;
-        return _expTable[_logTable[a] + _logTable[b]];
-    }
-
-    /// <summary>
-    /// Division using log/exp tables.
-    /// </summary>
-    public byte Divide(byte a, byte b)
-    {
-        if (b == 0) throw new DivideByZeroException("Division by zero in Galois Field");
-        if (a == 0) return 0;
-        return _expTable[_logTable[a] + 255 - _logTable[b]];
-    }
-
-    /// <summary>
-    /// Power using log/exp tables.
-    /// </summary>
-    public byte Power(int b, int e)
-    {
-        if (e == 0) return 1;
-        if (b == 0) return 0;
-        if (b >= 256) b %= 256;
-        if (b == 0) return 0;
-        var log = _logTable[b];
-        var result = (e * log) % 255;
-        return _expTable[result];
-    }
-
-    /// <summary>
-    /// Multiplicative inverse.
-    /// </summary>
-    public byte Inverse(byte a)
-    {
-        if (a == 0) throw new DivideByZeroException("Cannot invert zero in Galois Field");
-        return _expTable[255 - _logTable[a]];
-    }
-}
-
-#endregion
 
 #region Configuration and Models
 
