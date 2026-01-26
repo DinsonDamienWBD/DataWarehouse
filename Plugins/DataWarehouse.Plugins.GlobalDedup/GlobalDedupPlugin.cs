@@ -854,7 +854,7 @@ namespace DataWarehouse.Plugins.GlobalDedup
     /// - O(log n) reference counting operations
     /// - Linear scaling with shard count for concurrent operations
     /// </remarks>
-    public sealed class GlobalDedupPlugin : DeduplicationPluginBase, IDisposable
+    public class GlobalDedupPlugin : DeduplicationPluginBase, IDisposable
     {
         private readonly GlobalDedupConfig _config;
         private readonly ShardedGlobalIndex _globalIndex;
@@ -1042,6 +1042,9 @@ namespace DataWarehouse.Plugins.GlobalDedup
                 }
                 else
                 {
+                    // Convert Span to array before await
+                    byte[] chunkDataArray = chunkData.ToArray();
+
                     // New chunk - store it
                     await _storageLock.WaitAsync(ct);
                     try
@@ -1049,7 +1052,7 @@ namespace DataWarehouse.Plugins.GlobalDedup
                         _globalIndex.AddOrReference(hashHex, hash, length, length, volumeId, out isNew);
                         if (isNew)
                         {
-                            _chunkStorage[hashHex] = chunkData.ToArray();
+                            _chunkStorage[hashHex] = chunkDataArray;
                             deduplicatedSize += length;
                             uniqueCount++;
                         }
@@ -1198,7 +1201,7 @@ namespace DataWarehouse.Plugins.GlobalDedup
                 // Check if already exists
                 if (_globalIndex.TryGet(hashHex, out var existing))
                 {
-                    _globalIndex.AddOrReference(hashHex, hash, existing.OriginalSize, existing.StoredSize, volumeId, out _);
+                    _globalIndex.AddOrReference(hashHex, hash, existing!.OriginalSize, existing.StoredSize, volumeId, out _);
                     return false;
                 }
 
@@ -1262,7 +1265,7 @@ namespace DataWarehouse.Plugins.GlobalDedup
                 }
             }
 
-            metadata.LastAccessedAt = DateTime.UtcNow;
+            metadata!.LastAccessedAt = DateTime.UtcNow;
             return Task.FromResult<Stream?>(new MemoryStream(storedData));
         }
 

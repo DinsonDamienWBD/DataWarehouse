@@ -1,5 +1,4 @@
 using System.CommandLine;
-using System.CommandLine.Builder;
 using System.CommandLine.Parsing;
 using DataWarehouse.CLI.Commands;
 using Spectre.Console;
@@ -34,11 +33,21 @@ public static class Program
             getDefaultValue: () => OutputFormat.Table,
             description: "Output format (table, json, yaml)");
 
+        var instanceOption = new Option<string?>(
+            aliases: new[] { "--instance", "-i" },
+            description: "Saved instance profile to use");
+
         rootCommand.AddGlobalOption(verboseOption);
         rootCommand.AddGlobalOption(configOption);
         rootCommand.AddGlobalOption(formatOption);
+        rootCommand.AddGlobalOption(instanceOption);
 
-        // Add command groups
+        // Add mode commands (install, connect, run/embedded)
+        rootCommand.AddCommand(CreateInstallCommand());
+        rootCommand.AddCommand(CreateConnectCommand());
+        rootCommand.AddCommand(CreateRunCommand());
+
+        // Add management command groups
         rootCommand.AddCommand(CreateStorageCommand());
         rootCommand.AddCommand(CreatePluginCommand());
         rootCommand.AddCommand(CreateRaidCommand());
@@ -49,20 +58,39 @@ public static class Program
         rootCommand.AddCommand(CreateBenchmarkCommand());
         rootCommand.AddCommand(CreateServerCommand());
 
-        var parser = new CommandLineBuilder(rootCommand)
-            .UseDefaults()
-            .UseExceptionHandler((ex, context) =>
+        rootCommand.SetHandler((context) =>
+        {
+            try
+            {
+                // Show help if no command specified
+                if (args.Length == 0)
+                {
+                    AnsiConsole.MarkupLine("[bold]DataWarehouse CLI - Command-line interface for DataWarehouse management[/]\n");
+                    AnsiConsole.MarkupLine("Usage: [cyan]dw [command] [options][/]\n");
+                    AnsiConsole.MarkupLine("Commands:");
+                    AnsiConsole.MarkupLine("  [cyan]install[/]    - Install and initialize a new instance");
+                    AnsiConsole.MarkupLine("  [cyan]connect[/]    - Connect to an existing instance");
+                    AnsiConsole.MarkupLine("  [cyan]run/embedded[/] - Run an embedded instance");
+                    AnsiConsole.MarkupLine("  [cyan]storage[/]    - Manage storage pools");
+                    AnsiConsole.MarkupLine("  [cyan]plugin[/]     - Manage plugins");
+                    AnsiConsole.MarkupLine("  [cyan]backup[/]     - Backup and restore operations");
+                    AnsiConsole.MarkupLine("  [cyan]health[/]     - System health monitoring");
+                    AnsiConsole.MarkupLine("\nUse [cyan]dw [command] --help[/] for more information about a command.");
+                }
+            }
+            catch (Exception ex)
             {
                 AnsiConsole.MarkupLine($"[red]Error:[/] {ex.Message}");
-                if (context.ParseResult.GetValueForOption(verboseOption))
+                var verbose = context.ParseResult.GetValueForOption(verboseOption);
+                if (verbose)
                 {
                     AnsiConsole.WriteException(ex);
                 }
                 context.ExitCode = 1;
-            })
-            .Build();
+            }
+        });
 
-        return await parser.InvokeAsync(args);
+        return await rootCommand.InvokeAsync(args);
     }
 
     private static Command CreateStorageCommand()
@@ -423,6 +451,82 @@ public static class Program
         var infoCommand = new Command("info", "Show server information");
         infoCommand.SetHandler(ServerCommands.ShowInfoAsync);
         command.AddCommand(infoCommand);
+
+        return command;
+    }
+
+    private static Command CreateInstallCommand()
+    {
+        var command = new Command("install", "Install and initialize a new DataWarehouse instance");
+
+        var pathArg = new Argument<string>("path", "Installation directory path");
+        var dataPathOption = new Option<string?>("--data-path", "Data storage directory (if different from install path)");
+        var adminPasswordOption = new Option<string?>("--admin-password", "Admin password for default account");
+        var createServiceOption = new Option<bool>("--create-service", "Create system service (Windows/Linux)");
+        var autoStartOption = new Option<bool>("--auto-start", "Enable auto-start on system boot");
+
+        command.AddArgument(pathArg);
+        command.AddOption(dataPathOption);
+        command.AddOption(adminPasswordOption);
+        command.AddOption(createServiceOption);
+        command.AddOption(autoStartOption);
+
+        command.SetHandler(InstallCommand.ExecuteAsync,
+            pathArg, dataPathOption, adminPasswordOption, createServiceOption, autoStartOption);
+
+        return command;
+    }
+
+    private static Command CreateConnectCommand()
+    {
+        var command = new Command("connect", "Connect to an existing DataWarehouse instance");
+
+        var hostOption = new Option<string?>("--host", "Remote host address");
+        var portOption = new Option<int>("--port", () => 8080, "Remote port");
+        var localPathOption = new Option<string?>("--local-path", "Path to local instance");
+        var authTokenOption = new Option<string?>("--auth-token", "Authentication token");
+        var useTlsOption = new Option<bool>("--use-tls", () => true, "Use TLS/SSL for connection");
+        var profileOption = new Option<string?>("--save-profile", "Save connection as profile");
+
+        command.AddOption(hostOption);
+        command.AddOption(portOption);
+        command.AddOption(localPathOption);
+        command.AddOption(authTokenOption);
+        command.AddOption(useTlsOption);
+        command.AddOption(profileOption);
+
+        command.SetHandler(ConnectCommand.ExecuteAsync,
+            hostOption, portOption, localPathOption, authTokenOption, useTlsOption, profileOption);
+
+        // connect profiles - list saved profiles
+        var profilesCommand = new Command("profiles", "List saved connection profiles");
+        profilesCommand.SetHandler(ConnectCommand.ListProfilesAsync);
+        command.AddCommand(profilesCommand);
+
+        return command;
+    }
+
+    private static Command CreateRunCommand()
+    {
+        var command = new Command("run", "Run an embedded DataWarehouse instance");
+        command.AddAlias("embedded");
+
+        var dataPathOption = new Option<string?>("--data-path", "Path for persistent data (null for memory-only)");
+        var maxMemoryOption = new Option<int>("--max-memory", () => 256, "Maximum memory usage in MB");
+        var exposeHttpOption = new Option<bool>("--expose-http", "Expose HTTP interface");
+        var httpPortOption = new Option<int>("--http-port", () => 8080, "HTTP port if expose-http is enabled");
+        var pluginsOption = new Option<string[]?>("--plugins", "Plugins to load (comma-separated)");
+
+        command.AddOption(dataPathOption);
+        command.AddOption(maxMemoryOption);
+        command.AddOption(exposeHttpOption);
+        command.AddOption(httpPortOption);
+        command.AddOption(pluginsOption);
+
+        command.SetHandler(async (dataPath, maxMemory, exposeHttp, httpPort, plugins) =>
+        {
+            await EmbeddedCommand.ExecuteAsync(dataPath, maxMemory, exposeHttp, httpPort, plugins);
+        }, dataPathOption, maxMemoryOption, exposeHttpOption, httpPortOption, pluginsOption);
 
         return command;
     }

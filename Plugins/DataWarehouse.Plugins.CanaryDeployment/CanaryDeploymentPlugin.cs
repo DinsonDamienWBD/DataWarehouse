@@ -464,8 +464,16 @@ public sealed class CanaryDeploymentPlugin : OperationsPluginBase
     {
         if (_activeAlerts.TryGetValue(alertId, out var alert))
         {
-            alert = alert with
+            alert = new Alert
             {
+                AlertId = alert.AlertId,
+                RuleId = alert.RuleId,
+                RuleName = alert.RuleName,
+                Severity = alert.Severity,
+                Message = alert.Message,
+                CurrentValue = alert.CurrentValue,
+                Threshold = alert.Threshold,
+                TriggeredAt = alert.TriggeredAt,
                 IsAcknowledged = true,
                 AcknowledgedBy = message ?? "system"
             };
@@ -1550,7 +1558,7 @@ public sealed class CanaryDeploymentPlugin : OperationsPluginBase
                     AlertId = alertId,
                     RuleId = "canary-error-rate",
                     RuleName = "Canary Error Rate",
-                    Severity = AlertSeverity.Critical,
+                    Severity = DataWarehouse.SDK.Contracts.AlertSeverity.Critical,
                     Message = $"Canary error rate ({deployment.Metrics.ErrorRate:F2}%) exceeds threshold ({_config.ErrorRateThreshold}%)",
                     CurrentValue = deployment.Metrics.ErrorRate,
                     Threshold = _config.ErrorRateThreshold,
@@ -1569,7 +1577,7 @@ public sealed class CanaryDeploymentPlugin : OperationsPluginBase
                     AlertId = alertId,
                     RuleId = "canary-latency",
                     RuleName = "Canary Latency",
-                    Severity = AlertSeverity.Warning,
+                    Severity = DataWarehouse.SDK.Contracts.AlertSeverity.Warning,
                     Message = $"Canary latency ({deployment.Metrics.AverageLatencyMs:F2}ms) exceeds threshold ({_config.LatencyThresholdMs}ms)",
                     CurrentValue = deployment.Metrics.AverageLatencyMs,
                     Threshold = _config.LatencyThresholdMs,

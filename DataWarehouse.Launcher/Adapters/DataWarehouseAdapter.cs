@@ -2,6 +2,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using DataWarehouse.Kernel;
 using DataWarehouse.SDK.Primitives;
+using DataWarehouse.Launcher.Integration;
 
 namespace DataWarehouse.Launcher.Adapters;
 
@@ -159,15 +160,15 @@ public sealed class DataWarehouseAdapter : IKernelAdapter
         }
     }
 
-    private static OperatingMode ParseOperatingMode(string mode)
+    private static SDK.Primitives.OperatingMode ParseOperatingMode(string mode)
     {
         return mode.ToLowerInvariant() switch
         {
-            "laptop" => OperatingMode.Laptop,
-            "workstation" => OperatingMode.Workstation,
-            "server" => OperatingMode.Server,
-            "hyperscale" => OperatingMode.Hyperscale,
-            _ => OperatingMode.Workstation
+            "laptop" => SDK.Primitives.OperatingMode.Laptop,
+            "workstation" => SDK.Primitives.OperatingMode.Workstation,
+            "server" => SDK.Primitives.OperatingMode.Server,
+            "hyperscale" => SDK.Primitives.OperatingMode.Hyperscale,
+            _ => SDK.Primitives.OperatingMode.Workstation
         };
     }
 }

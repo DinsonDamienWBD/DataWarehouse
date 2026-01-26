@@ -1604,7 +1604,7 @@ public sealed class BlueGreenDeploymentPlugin : OperationsPluginBase
                             AlertId = alertId,
                             RuleId = "environment-health",
                             RuleName = "Environment Health",
-                            Severity = environment.HealthStatus == HealthStatus.Unhealthy ? AlertSeverity.Critical : AlertSeverity.Warning,
+                            Severity = environment.HealthStatus == HealthStatus.Unhealthy ? DataWarehouse.SDK.Contracts.AlertSeverity.Critical : DataWarehouse.SDK.Contracts.AlertSeverity.Warning,
                             Message = $"Active environment {environment.Color} health degraded: {healthyCount}/{totalCount} instances healthy",
                             CurrentValue = healthyCount,
                             Threshold = totalCount * _config.MinHealthyInstancesPercent / 100,
@@ -1627,7 +1627,7 @@ public sealed class BlueGreenDeploymentPlugin : OperationsPluginBase
                                 AlertId = alertId,
                                 RuleId = "deployment-duration",
                                 RuleName = "Deployment Duration",
-                                Severity = AlertSeverity.Warning,
+                                Severity = DataWarehouse.SDK.Contracts.AlertSeverity.Warning,
                                 Message = $"Deployment {deployment.DeploymentId} running for {duration.TotalMinutes:F0} minutes",
                                 CurrentValue = duration.TotalMinutes,
                                 Threshold = 30,
@@ -1841,7 +1841,7 @@ public sealed class BlueGreenDeploymentPlugin : OperationsPluginBase
         public TimeSpan HealthCheckTimeout { get; set; } = TimeSpan.FromMinutes(5);
         public TimeSpan HealthCheckInterval { get; set; } = TimeSpan.FromMilliseconds(DefaultHealthCheckIntervalMs);
         public int HealthCheckRetries { get; set; } = DefaultHealthCheckRetries;
-        public int MinHealthyInstancesPercent { get; set; } = MinHealthyInstancesPercent;
+        public int MinHealthyInstancesPercent { get; set; } = BlueGreenDeploymentPlugin.MinHealthyInstancesPercent;
         public bool EnableDatabaseMigration { get; set; } = true;
         public List<string> LoadBalancerHooks { get; init; } = new();
         public List<string> DnsUpdateHooks { get; init; } = new();

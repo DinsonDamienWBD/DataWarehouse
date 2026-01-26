@@ -42,7 +42,7 @@ public class SystemHealthServiceTests
         result.MemoryUsedBytes.Should().BeGreaterThan(0);
         result.MemoryTotalBytes.Should().BeGreaterThan(0);
         result.ThreadCount.Should().BeGreaterThan(0);
-        result.UptimeSeconds.Should().BeGreaterOrEqualTo(0);
+        result.UptimeSeconds.Should().BeGreaterThanOrEqualTo(0);
     }
 
     [Fact]
