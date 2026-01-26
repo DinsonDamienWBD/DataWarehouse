@@ -70,7 +70,7 @@ This sprint addresses all CRITICAL and HIGH severity issues identified in the co
 
 | Step | Action | Status |
 |------|--------|--------|
-| 7 | Add unit tests for exception scenarios | [ ] Deferred |
+| 7 | Add unit tests for exception scenarios | [~] Deferred to testing sprint |
 
 ---
 
@@ -82,7 +82,7 @@ This sprint addresses all CRITICAL and HIGH severity issues identified in the co
 
 | Step | Action | Status |
 |------|--------|--------|
-| 8 | Add unit tests for crash recovery scenarios | [ ] Deferred |
+| 8 | Add unit tests for crash recovery scenarios | [~] Deferred to testing sprint |
 
 **New files created:**
 - `Plugins/DataWarehouse.Plugins.Raft/IRaftLogStore.cs`
@@ -100,7 +100,7 @@ This sprint addresses all CRITICAL and HIGH severity issues identified in the co
 
 | Step | Action | Status |
 |------|--------|--------|
-| 4 | Test with various S3 response formats | [ ] Deferred |
+| 4 | Test with various S3 response formats | [~] Deferred to testing sprint |
 
 **Verification:** `grep "\.Split\(" S3StoragePlugin.cs` returns 0 matches for XML parsing
 
@@ -114,7 +114,7 @@ This sprint addresses all CRITICAL and HIGH severity issues identified in the co
 
 | Step | Action | Status |
 |------|--------|--------|
-| 4 | Add success/failure metrics | [ ] Deferred |
+| 4 | Add success/failure metrics | [~] Deferred to testing sprint |
 
 ---
 
