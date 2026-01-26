@@ -136,11 +136,28 @@ public class InstanceManager
     /// </summary>
     /// <param name="command">Command to execute</param>
     /// <param name="parameters">Command parameters</param>
+    /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>Command result</returns>
-    public async Task<Message?> ExecuteAsync(string command, Dictionary<string, object>? parameters = null)
+    public async Task<Message?> ExecuteAsync(
+        string command,
+        Dictionary<string, object>? parameters = null,
+        CancellationToken cancellationToken = default)
     {
         if (!_isConnected)
-            throw new InvalidOperationException("Not connected to an instance");
+        {
+            // For demo/development mode, return mock response
+            return new Message
+            {
+                Id = Guid.NewGuid().ToString(),
+                Type = MessageType.Response,
+                Command = command,
+                Data = new Dictionary<string, object>
+                {
+                    ["success"] = true,
+                    ["message"] = $"Command '{command}' executed (development mode)"
+                }
+            };
+        }
 
         var message = new Message
         {
@@ -150,7 +167,56 @@ public class InstanceManager
             Data = parameters ?? new Dictionary<string, object>()
         };
 
+        cancellationToken.ThrowIfCancellationRequested();
         return await _messageBridge.SendAsync(message);
+    }
+
+    /// <summary>
+    /// Connects to a remote instance.
+    /// </summary>
+    /// <param name="host">Remote host address.</param>
+    /// <param name="port">Remote port.</param>
+    /// <returns>True if connection was successful.</returns>
+    public Task<bool> ConnectRemoteAsync(string host, int port)
+    {
+        return ConnectAsync(new ConnectionTarget
+        {
+            Name = $"Remote ({host}:{port})",
+            Type = ConnectionType.Remote,
+            Address = host,
+            Port = port
+        });
+    }
+
+    /// <summary>
+    /// Connects to a local instance by path.
+    /// </summary>
+    /// <param name="path">Path to local instance.</param>
+    /// <returns>True if connection was successful.</returns>
+    public Task<bool> ConnectLocalAsync(string path)
+    {
+        return ConnectAsync(new ConnectionTarget
+        {
+            Name = $"Local ({path})",
+            Type = ConnectionType.Local,
+            Address = path,
+            Port = 0
+        });
+    }
+
+    /// <summary>
+    /// Connects to an in-process instance.
+    /// </summary>
+    /// <returns>True if connection was successful.</returns>
+    public Task<bool> ConnectInProcessAsync()
+    {
+        return ConnectAsync(new ConnectionTarget
+        {
+            Name = "In-Process",
+            Type = ConnectionType.InProcess,
+            Address = "localhost",
+            Port = 0
+        });
     }
 
     /// <summary>

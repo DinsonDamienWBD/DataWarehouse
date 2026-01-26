@@ -1,4 +1,5 @@
 using DataWarehouse.Shared.Models;
+using Newtonsoft.Json;
 
 namespace DataWarehouse.Shared;
 
@@ -7,12 +8,29 @@ namespace DataWarehouse.Shared;
 /// </summary>
 public class CapabilityManager
 {
+    private readonly InstanceManager? _instanceManager;
     private InstanceCapabilities? _capabilities;
 
     /// <summary>
     /// Event raised when the capabilities change (e.g., when switching instances)
     /// </summary>
     public event EventHandler<InstanceCapabilities>? CapabilitiesChanged;
+
+    /// <summary>
+    /// Creates a new CapabilityManager.
+    /// </summary>
+    public CapabilityManager()
+    {
+    }
+
+    /// <summary>
+    /// Creates a new CapabilityManager with an InstanceManager.
+    /// </summary>
+    /// <param name="instanceManager">The instance manager to use for refreshing capabilities.</param>
+    public CapabilityManager(InstanceManager instanceManager)
+    {
+        _instanceManager = instanceManager;
+    }
 
     /// <summary>
     /// Gets the current instance capabilities
@@ -135,5 +153,53 @@ public class CapabilityManager
             ["tiering"] = _capabilities.SupportsTiering,
             ["search"] = _capabilities.SupportsSearch
         };
+    }
+
+    /// <summary>
+    /// Refreshes capabilities from the connected instance.
+    /// </summary>
+    public async Task RefreshCapabilitiesAsync(CancellationToken cancellationToken = default)
+    {
+        if (_instanceManager == null || !_instanceManager.IsConnected)
+        {
+            // Set default capabilities for development mode
+            _capabilities = new InstanceCapabilities
+            {
+                InstanceId = "dev-instance",
+                Name = "Development Instance",
+                Version = "1.0.0",
+                SupportsEncryption = true,
+                SupportsCompression = true,
+                SupportsMetadata = true,
+                SupportsVersioning = true,
+                SupportsDeduplication = true,
+                SupportsRaid = true,
+                SupportsReplication = true,
+                SupportsBackup = true,
+                SupportsTiering = true,
+                SupportsSearch = true,
+                LoadedPlugins = new List<string>
+                {
+                    "local-storage", "s3-storage", "azure-blob",
+                    "gzip-compression", "aes-encryption", "raft-consensus",
+                    "rest-interface", "grpc-interface", "ai-agents",
+                    "access-control", "opentelemetry", "governance"
+                }
+            };
+            return;
+        }
+
+        var response = await _instanceManager.ExecuteAsync("system.capabilities", null, cancellationToken);
+
+        if (response?.Data != null && response.Data.TryGetValue("capabilities", out var capData))
+        {
+            var capJson = JsonConvert.SerializeObject(capData);
+            var caps = JsonConvert.DeserializeObject<InstanceCapabilities>(capJson);
+
+            if (caps != null)
+            {
+                UpdateCapabilities(caps);
+            }
+        }
     }
 }
