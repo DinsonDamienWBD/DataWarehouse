@@ -1159,6 +1159,53 @@ Implementing this 'Live Media/Installer' concept will greatly enhance the usabil
 by both being able to run a local instance easily for testing purposes without having to modify their system by installing anything, as well as allow user 
 to remotly configure and manage any instance of DataWarehouse, embed DataWarehouse into their own applications with minimal effort etc., offering a great deal of versatility.
 
+Task A3: Implement support for full SQL toolset compatibility
+|1. |SSMS (TDS protocol)                                                            | [ ]    |
+|2. |Azure Data Studio                                                              | [ ]    |
+|3. |DBeaver                                                                        | [ ]    |
+|4. |HeidiSQL                                                                       | [ ]    |
+|5. |DataGrip                                                                       | [ ]    |
+|6. |Squirrel SQL                                                                   | [ ]    |
+|7. |Navicat                                                                        | [ ]    |
+|8. |TablePlus                                                                      | [ ]    |
+|9. |Valentina Studio                                                               | [ ]    |
+|10.|Beekeeper Studio                                                               | [ ]    |
+|11.|OmniDB                                                                         | [ ]    |
+|12.|DbVisualizer                                                                   | [ ]    |
+|13.|SQL Workbench/J                                                                | [ ]    |
+|14.|Aqua Data Studio                                                               | [ ]    |
+|15.|RazorSQL                                                                       | [ ]    |
+|16.|DbSchema                                                                       | [ ]    |
+|17.|FlySpeed SQL Query                                                             | [ ]    |
+|18.|MySQL Workbench (for MySQL compatibility mode)                                 | [ ]    |
+|19.|Posticope (for PostgreSQL compatibility mode)                                  | [ ]    |
+|20.|PostgreSQL Wire Protocol                                                       | [ ]    |
+|21.|ODBC/JDBC/ADO.NET/ADO drivers for various programming languages and frameworks | [ ]    |
+|22.|SQL Alchemy                                                                    | [ ]    |
+|23.|Entity Framework                                                               | [ ]    |
+|24.|Hibernate                                                                      | [ ]    |
+|25.|Django ORM                                                                     | [ ]    |
+|26.|Sequelize                                                                      | [ ]    |
+|27.|Knex.js/Node.js/Python libraries                                               | [ ]    |
+|28.|LINQ to SQL                                                                    | [ ]    |
+|29.|PHP PDO                                                                        | [ ]    |
+|30.|Power BI                                                                       | [ ]    |
+|31.|pgAdmin (for PostgreSQL compatibility mode)                                    | [ ]    |
+|32.|Adminer                                                                        | [ ]    |
+|33.|SQLyog (for MySQL compatibility mode)                                          | [ ]    |
+|34.|SQL Maestro                                                                    | [ ]    |
+|35.|Toad for SQL Server/MySQL/PostgreSQL                                           | [ ]    |
+|36.|SQL Developer (for Oracle compatibility mode)                                  | [ ]    |
+|37.|PL/SQL Developer (for Oracle compatibility mode)                               | [ ]    |
+|38.|SQL*Plus (for Oracle compatibility mode)                                       | [ ]    |
+|39.|SQLite tools (for SQLite compatibility mode)                                   | [ ]    |
+|40.|NoSQL tools (for NoSQL compatibility modes)                                    | [ ]    |
+|41.|REST API/GraphQL clients (for REST/GraphQL compatibility modes)                | [ ]    |
+
+* Many of these tools can connect via standard protocols (TDS, PostgreSQL Wire Protocol, MySQL protocol etc.).
+  Instead of implementing each tool individually, we can focus on supporting the underlying protocols and standards,
+  so implementing support for those protocols in DataWarehouse will enable compatibility with multiple tools at once.
+
 ---
 
 #### Phase 1: Foundation (Q1-Q2 2026)
