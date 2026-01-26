@@ -101,6 +101,7 @@
     <Project Path="Plugins/DataWarehouse.Plugins.IsalEc/DataWarehouse.Plugins.IsalEc.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.Jaeger/DataWarehouse.Plugins.Jaeger.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.K8sOperator/DataWarehouse.Plugins.K8sOperator.csproj" />
+    <Project Path="Plugins/DataWarehouse.Plugins.KubernetesCsi/DataWarehouse.Plugins.KubernetesCsi.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.KeyRotation/DataWarehouse.Plugins.KeyRotation.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.LoadBalancer/DataWarehouse.Plugins.LoadBalancer.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.LocalStorage/DataWarehouse.Plugins.LocalStorage.csproj" />
@@ -124,6 +125,8 @@
     <Project Path="Plugins/DataWarehouse.Plugins.Chronograf/DataWarehouse.Plugins.Chronograf.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.Perses/DataWarehouse.Plugins.Perses.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.PostgresWireProtocol/DataWarehouse.Plugins.PostgresWireProtocol.csproj" />
+    <Project Path="Plugins/DataWarehouse.Plugins.MySqlProtocol/DataWarehouse.Plugins.MySqlProtocol.csproj" />
+    <Project Path="Plugins/DataWarehouse.Plugins.OdbcDriver/DataWarehouse.Plugins.OdbcDriver.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.ApacheSuperset/DataWarehouse.Plugins.ApacheSuperset.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.Redash/DataWarehouse.Plugins.Redash.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.Logzio/DataWarehouse.Plugins.Logzio.csproj" />
@@ -179,6 +182,8 @@
       <Build Solution="Debug|*" Project="false" />
     </Project>
     <Project Path="Plugins/DataWarehouse.Plugins.SharedRaidUtilities/DataWarehouse.Plugins.SharedRaidUtilities.csproj" />
+    <Project Path="Plugins/DataWarehouse.Plugins.QuantumSafe/DataWarehouse.Plugins.QuantumSafe.csproj" />
+    <Project Path="Plugins/DataWarehouse.Plugins.ZeroTrust/DataWarehouse.Plugins.ZeroTrust.csproj" />
   </Folder>
   <Project Path="DataWarehouse.Benchmarks/DataWarehouse.Benchmarks.csproj" />
   <Project Path="DataWarehouse.CLI/DataWarehouse.CLI.csproj" />
