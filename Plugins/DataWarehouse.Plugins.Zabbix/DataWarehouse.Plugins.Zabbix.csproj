@@ -5,7 +5,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <LangVersion>latest</LangVersion>
-    <Description>Tableau BI integration plugin with Hyper API data extracts, REST API publishing, and Web Data Connector support</Description>
+    <Description>Zabbix monitoring plugin with Zabbix Sender protocol and JSON-RPC 2.0 API support</Description>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
   </PropertyGroup>
 

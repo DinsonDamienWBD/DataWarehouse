@@ -353,7 +353,7 @@ namespace DataWarehouse.Plugins.Tableau
     /// <summary>
     /// Metadata for a Tableau extract.
     /// </summary>
-    internal sealed class ExtractMetadata
+    public sealed class ExtractMetadata
     {
         public string Id { get; set; } = string.Empty;
         public string Name { get; set; } = string.Empty;
@@ -371,7 +371,7 @@ namespace DataWarehouse.Plugins.Tableau
     /// <summary>
     /// Extract status enumeration.
     /// </summary>
-    internal enum ExtractStatus
+    public enum ExtractStatus
     {
         Creating,
         Ready,

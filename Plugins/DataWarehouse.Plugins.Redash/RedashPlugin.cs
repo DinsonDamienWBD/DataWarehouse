@@ -1,8 +1,10 @@
 using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Primitives;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.Redash
 {
@@ -464,7 +466,7 @@ namespace DataWarehouse.Plugins.Redash
                 }
 
                 var result = await ExecuteQueryAsync(queryId.Value, CancellationToken.None);
-                message.Payload["result"] = result;
+                message.Payload["result"] = result ?? (object)"null";
                 message.Payload["success"] = true;
             }
             catch (Exception ex)
@@ -486,7 +488,7 @@ namespace DataWarehouse.Plugins.Redash
                 }
 
                 var query = await GetQueryAsync(queryId.Value, CancellationToken.None);
-                message.Payload["result"] = query;
+                message.Payload["result"] = query ?? (object)"null";
                 message.Payload["success"] = true;
             }
             catch (Exception ex)
@@ -501,7 +503,7 @@ namespace DataWarehouse.Plugins.Redash
             try
             {
                 var queries = await GetQueriesAsync(CancellationToken.None);
-                message.Payload["result"] = queries;
+                message.Payload["result"] = queries ?? (object)"null";
                 message.Payload["success"] = true;
             }
             catch (Exception ex)
@@ -523,7 +525,7 @@ namespace DataWarehouse.Plugins.Redash
                 }
 
                 var result = await GetQueryResultAsync(resultId.Value, CancellationToken.None);
-                message.Payload["result"] = result;
+                message.Payload["result"] = result ?? (object)"null";
                 message.Payload["success"] = true;
             }
             catch (Exception ex)
@@ -545,7 +547,7 @@ namespace DataWarehouse.Plugins.Redash
                 }
 
                 var visualization = await GetVisualizationAsync(vizId.Value, CancellationToken.None);
-                message.Payload["result"] = visualization;
+                message.Payload["result"] = visualization ?? (object)"null";
                 message.Payload["success"] = true;
             }
             catch (Exception ex)
@@ -567,7 +569,7 @@ namespace DataWarehouse.Plugins.Redash
                 }
 
                 var dashboard = await GetDashboardAsync(slug, CancellationToken.None);
-                message.Payload["result"] = dashboard;
+                message.Payload["result"] = dashboard ?? (object)"null";
                 message.Payload["success"] = true;
             }
             catch (Exception ex)
@@ -582,7 +584,7 @@ namespace DataWarehouse.Plugins.Redash
             try
             {
                 var dataSources = await GetDataSourcesAsync(CancellationToken.None);
-                message.Payload["result"] = dataSources;
+                message.Payload["result"] = dataSources ?? (object)"null";
                 message.Payload["success"] = true;
             }
             catch (Exception ex)
@@ -751,20 +753,6 @@ namespace DataWarehouse.Plugins.Redash
         {
             [JsonPropertyName("query_result")]
             public QueryResult? QueryResult { get; set; }
-        }
-
-        #endregion
-
-        #region IDisposable
-
-        /// <summary>
-        /// Disposes resources used by the plugin.
-        /// </summary>
-        public override void Dispose()
-        {
-            _httpClient?.Dispose();
-            _rateLimiter?.Dispose();
-            base.Dispose();
         }
 
         #endregion

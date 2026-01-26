@@ -180,12 +180,21 @@ namespace DataWarehouse.Plugins.Metabase
     /// </summary>
     public sealed class QueryParameter
     {
+        /// <summary>
+        /// Gets or sets the parameter type.
+        /// </summary>
         [JsonPropertyName("type")]
         public string Type { get; set; } = "category";
 
+        /// <summary>
+        /// Gets or sets the parameter target.
+        /// </summary>
         [JsonPropertyName("target")]
         public object? Target { get; set; }
 
+        /// <summary>
+        /// Gets or sets the parameter value.
+        /// </summary>
         [JsonPropertyName("value")]
         public object? Value { get; set; }
     }

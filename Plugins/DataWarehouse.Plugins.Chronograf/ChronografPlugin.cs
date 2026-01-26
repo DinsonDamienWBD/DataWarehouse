@@ -194,6 +194,9 @@ namespace DataWarehouse.Plugins.Chronograf
             _cts?.Dispose();
             _cts = null;
             _flushTask = null;
+
+            // Dispose HttpClient
+            _httpClient?.Dispose();
         }
 
         #endregion
@@ -837,20 +840,6 @@ namespace DataWarehouse.Plugins.Chronograf
                 _stopwatch.Stop();
                 _plugin.ObserveHistogram(_metric, _stopwatch.Elapsed.TotalSeconds, _tags);
             }
-        }
-
-        #endregion
-
-        #region IDisposable
-
-        /// <inheritdoc/>
-        protected override void Dispose(bool disposing)
-        {
-            if (disposing)
-            {
-                _httpClient?.Dispose();
-            }
-            base.Dispose(disposing);
         }
 
         #endregion

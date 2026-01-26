@@ -687,24 +687,5 @@ namespace DataWarehouse.Plugins.Dynatrace
         }
 
         #endregion
-
-        #region IDisposable
-
-        /// <summary>
-        /// Disposes resources used by the plugin.
-        /// </summary>
-        /// <param name="disposing">Whether to dispose managed resources.</param>
-        protected override void Dispose(bool disposing)
-        {
-            if (disposing)
-            {
-                _httpClient?.Dispose();
-                _cts?.Dispose();
-            }
-
-            base.Dispose(disposing);
-        }
-
-        #endregion
     }
 }

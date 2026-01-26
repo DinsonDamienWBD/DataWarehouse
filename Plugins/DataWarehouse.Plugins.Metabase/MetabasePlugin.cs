@@ -6,6 +6,7 @@ using System.Text;
 using System.Text.Json;
 using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Primitives;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.Metabase
 {
@@ -82,7 +83,9 @@ namespace DataWarehouse.Plugins.Metabase
         private readonly object _stateLock = new();
         private long _requestCount;
         private long _errorCount;
+#pragma warning disable CS0649 // Field is never assigned to (reserved for future caching implementation)
         private long _cacheHits;
+#pragma warning restore CS0649
 
         /// <inheritdoc/>
         public override string Id => "com.datawarehouse.telemetry.metabase";
@@ -191,7 +194,7 @@ namespace DataWarehouse.Plugins.Metabase
             }
 
             // Stop refresh timer
-            await _sessionRefreshTimer.ChangeAsync(Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
+            _sessionRefreshTimer.Change(Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
 
             // Clear session token
             _sessionToken = null;
@@ -270,7 +273,8 @@ namespace DataWarehouse.Plugins.Metabase
         /// <inheritdoc/>
         public override async Task<object> ExecuteQueryAsync(string queryId, Dictionary<string, object>? parameters = null)
         {
-            return await ExecuteQuestionAsync(int.Parse(queryId), parameters);
+            var result = await ExecuteQuestionAsync(int.Parse(queryId), parameters);
+            return result ?? new object();
         }
 
         /// <inheritdoc/>
@@ -512,7 +516,7 @@ namespace DataWarehouse.Plugins.Metabase
                 var parameters = GetDictionary(message.Payload, "parameters");
                 var result = await ExecuteQuestionAsync(questionId.Value, parameters);
 
-                message.Payload["result"] = result;
+                message.Payload["result"] = result ?? new QueryResult();
                 message.Payload["success"] = true;
             }
             catch (Exception ex)
@@ -550,7 +554,7 @@ namespace DataWarehouse.Plugins.Metabase
                 }
 
                 var question = await GetQuestionAsync(questionId.Value);
-                message.Payload["result"] = question;
+                message.Payload["result"] = question ?? new MetabaseQuestion();
                 message.Payload["success"] = true;
             }
             catch (Exception ex)
@@ -588,7 +592,7 @@ namespace DataWarehouse.Plugins.Metabase
                 }
 
                 var dashboard = await GetDashboardAsync(dashboardId.Value);
-                message.Payload["result"] = dashboard;
+                message.Payload["result"] = dashboard ?? new MetabaseDashboard();
                 message.Payload["success"] = true;
             }
             catch (Exception ex)
@@ -775,24 +779,6 @@ namespace DataWarehouse.Plugins.Metabase
             metadata["SupportsParameters"] = true;
             metadata["SessionRefreshMinutes"] = _config.SessionRefreshIntervalMinutes;
             return metadata;
-        }
-
-        #endregion
-
-        #region Disposal
-
-        /// <summary>
-        /// Disposes resources used by the plugin.
-        /// </summary>
-        protected override void Dispose(bool disposing)
-        {
-            if (disposing)
-            {
-                _sessionRefreshTimer?.Dispose();
-                _httpClient?.Dispose();
-                _authLock?.Dispose();
-            }
-            base.Dispose(disposing);
         }
 
         #endregion

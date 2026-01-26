@@ -1088,27 +1088,27 @@ Tasks carried over from previous sprints that need to be completed before starti
 Task A1: Dashboard Plugin - Add support for:
   |#.| Task                               | Status |
   |--|------------------------------------|--------|
-  |a.| Grafana Loki                       | [ ]    |
-  |b.| Prometheus                         | [ ]    |
-  |c.| Kibana                             | [ ]    |
-  |d.| SigNoz                             | [ ]    |
+  |a.| Grafana Loki                       | [x]    |
+  |b.| Prometheus                         | [x]    |
+  |c.| Kibana                             | [x]    |
+  |d.| SigNoz                             | [x]    |
   |e.| Zabbix                             | [ ]    |
   |f.| VictoriaMetrics                    | [ ]    |
-  |g.| Netdata                            | [ ]    |
-  |h.| Perses                             | [ ]    |
-  |i.| Chronograf                         | [ ]    |
-  |j.| Datadog                            | [ ]    |
+  |g.| Netdata                            | [x]    |
+  |h.| Perses                             | [x]    |
+  |i.| Chronograf                         | [x]    |
+  |j.| Datadog                            | [x]    |
   |k.| New Relic                          | [ ]    |
-  |l.| Dynatrace                          | [ ]    |
+  |l.| Dynatrace                          | [x]    |
   |m.| Splunk/Splunk Observvability Cloud | [ ]    |
-  |n.| Logx.io                            | [ ]    |
-  |o.| LogicMonitor                       | [ ]    |
-  |p.| Tableau                            | [ ]    |
-  |q.| Microsoft Power BI                 | [ ]    |
-  |r.| Apache Superset                    | [ ]    |
-  |s.| Metabase                           | [ ]    |
-  |t.| Geckoboard                         | [ ]    |
-  |u.| Redash                             | [ ]    |
+  |n.| Logx.io                            | [x]    |
+  |o.| LogicMonitor                       | [x]    |
+  |p.| Tableau                            | [x]    |
+  |q.| Microsoft Power BI                 | [x]    |
+  |r.| Apache Superset                    | [x]    |
+  |s.| Metabase                           | [x]    |
+  |t.| Geckoboard                         | [x]    |
+  |u.| Redash                             | [x]    |
 
   Verify the existing implementation first for already supported dashboard plugins (partial or full),
   then, implement the above missing pieces one by one.

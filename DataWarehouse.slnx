@@ -47,6 +47,7 @@
     <Project Path="Plugins/DataWarehouse.Plugins.CrashRecovery/DataWarehouse.Plugins.CrashRecovery.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.CrdtReplication/DataWarehouse.Plugins.CrdtReplication.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.CrossRegion/DataWarehouse.Plugins.CrossRegion.csproj" />
+    <Project Path="Plugins/DataWarehouse.Plugins.Datadog/DataWarehouse.Plugins.Datadog.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.DataRetention/DataWarehouse.Plugins.DataRetention.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.Deduplication/DataWarehouse.Plugins.Deduplication.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.DeflateCompression/DataWarehouse.Plugins.DeflateCompression.csproj" />
@@ -107,6 +108,17 @@
     <Project Path="Plugins/DataWarehouse.Plugins.OpenTelemetry/DataWarehouse.Plugins.OpenTelemetry.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.PredictiveTiering/DataWarehouse.Plugins.PredictiveTiering.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.Prometheus/DataWarehouse.Plugins.Prometheus.csproj" />
+    <Project Path="Plugins/DataWarehouse.Plugins.NewRelic/DataWarehouse.Plugins.NewRelic.csproj" />
+    <Project Path="Plugins/DataWarehouse.Plugins.Splunk/DataWarehouse.Plugins.Splunk.csproj" />
+    <Project Path="Plugins/DataWarehouse.Plugins.Zabbix/DataWarehouse.Plugins.Zabbix.csproj" />
+    <Project Path="Plugins/DataWarehouse.Plugins.VictoriaMetrics/DataWarehouse.Plugins.VictoriaMetrics.csproj" />
+    <Project Path="Plugins/DataWarehouse.Plugins.Chronograf/DataWarehouse.Plugins.Chronograf.csproj" />
+    <Project Path="Plugins/DataWarehouse.Plugins.Perses/DataWarehouse.Plugins.Perses.csproj" />
+    <Project Path="Plugins/DataWarehouse.Plugins.ApacheSuperset/DataWarehouse.Plugins.ApacheSuperset.csproj" />
+    <Project Path="Plugins/DataWarehouse.Plugins.Redash/DataWarehouse.Plugins.Redash.csproj" />
+    <Project Path="Plugins/DataWarehouse.Plugins.Logzio/DataWarehouse.Plugins.Logzio.csproj" />
+    <Project Path="Plugins/DataWarehouse.Plugins.Tableau/DataWarehouse.Plugins.Tableau.csproj" />
+    <Project Path="Plugins/DataWarehouse.Plugins.Geckoboard/DataWarehouse.Plugins.Geckoboard.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.Metabase/DataWarehouse.Plugins.Metabase.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.Dynatrace/DataWarehouse.Plugins.Dynatrace.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.LogicMonitor/DataWarehouse.Plugins.LogicMonitor.csproj" />

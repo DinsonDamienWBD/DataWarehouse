@@ -5,6 +5,7 @@ using System.Text;
 using System.Text.Json;
 using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Primitives;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.PowerBI
 {
@@ -735,23 +736,6 @@ namespace DataWarehouse.Plugins.PowerBI
                 var duration = (DateTime.UtcNow - _startTime).TotalMilliseconds;
                 _plugin.RecordMetric($"{_metric}_duration_ms", duration);
             }
-        }
-
-        #endregion
-
-        #region IDisposable
-
-        /// <summary>
-        /// Disposes resources used by the plugin.
-        /// </summary>
-        public override void Dispose()
-        {
-            _cts?.Cancel();
-            _cts?.Dispose();
-            _httpClient?.Dispose();
-            _flushTimer?.Dispose();
-            _tokenRefreshTimer?.Dispose();
-            base.Dispose();
         }
 
         #endregion

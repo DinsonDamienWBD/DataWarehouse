@@ -202,15 +202,11 @@ namespace DataWarehouse.Plugins.LogicMonitor
                 // Ignore errors during shutdown
             }
 
-            await Task.CompletedTask;
-        }
-
-        /// <inheritdoc/>
-        public override void Dispose()
-        {
+            // Dispose resources
             _pushTimer?.Dispose();
             _httpClient.Dispose();
-            base.Dispose();
+
+            await Task.CompletedTask;
         }
 
         #endregion

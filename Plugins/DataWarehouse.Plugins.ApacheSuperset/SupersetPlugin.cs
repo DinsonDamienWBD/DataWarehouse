@@ -5,6 +5,7 @@ using System.Text;
 using System.Text.Json;
 using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Primitives;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.ApacheSuperset
 {
@@ -810,15 +811,5 @@ namespace DataWarehouse.Plugins.ApacheSuperset
         }
 
         #endregion
-
-        /// <summary>
-        /// Disposes resources used by the plugin.
-        /// </summary>
-        public override void Dispose()
-        {
-            _refreshTimer?.Dispose();
-            _httpClient?.Dispose();
-            base.Dispose();
-        }
     }
 }

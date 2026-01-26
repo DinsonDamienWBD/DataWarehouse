@@ -3,6 +3,7 @@ using System.Text;
 using System.Text.Json;
 using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Primitives;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.Perses
 {
