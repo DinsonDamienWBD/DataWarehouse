@@ -200,15 +200,59 @@ namespace DataWarehouse.SDK.Contracts
 
         /// <summary>
         /// Transform data during write operations (e.g., encrypt, compress).
-        /// Must be implemented by derived classes.
+        /// LEGACY: Prefer OnWriteAsync for new implementations. This method calls OnWriteAsync synchronously.
+        /// Must be implemented by derived classes OR override OnWriteAsync instead.
         /// </summary>
-        public abstract Stream OnWrite(Stream input, IKernelContext context, Dictionary<string, object> args);
+        public virtual Stream OnWrite(Stream input, IKernelContext context, Dictionary<string, object> args)
+        {
+            // Default implementation calls async version synchronously
+            // Derived classes should override OnWriteAsync for proper async support
+            return OnWriteAsync(input, context, args).GetAwaiter().GetResult();
+        }
 
         /// <summary>
         /// Transform data during read operations (e.g., decrypt, decompress).
-        /// Must be implemented by derived classes.
+        /// LEGACY: Prefer OnReadAsync for new implementations. This method calls OnReadAsync synchronously.
+        /// Must be implemented by derived classes OR override OnReadAsync instead.
         /// </summary>
-        public abstract Stream OnRead(Stream stored, IKernelContext context, Dictionary<string, object> args);
+        public virtual Stream OnRead(Stream stored, IKernelContext context, Dictionary<string, object> args)
+        {
+            // Default implementation calls async version synchronously
+            // Derived classes should override OnReadAsync for proper async support
+            return OnReadAsync(stored, context, args).GetAwaiter().GetResult();
+        }
+
+        /// <summary>
+        /// Async version of OnWrite. Transform data during write operations (e.g., encrypt, compress).
+        /// RECOMMENDED: Override this method instead of OnWrite for proper async support.
+        /// This is the preferred approach for plugins that need to call async APIs (e.g., IKeyStore).
+        /// </summary>
+        /// <param name="input">The input stream to transform.</param>
+        /// <param name="context">The kernel context for logging and plugin access.</param>
+        /// <param name="args">Operation-specific arguments.</param>
+        /// <returns>A task that completes with the transformed stream.</returns>
+        protected virtual Task<Stream> OnWriteAsync(Stream input, IKernelContext context, Dictionary<string, object> args)
+        {
+            // Default implementation calls sync version
+            // Derived classes override this for true async support
+            return Task.FromResult(OnWrite(input, context, args));
+        }
+
+        /// <summary>
+        /// Async version of OnRead. Transform data during read operations (e.g., decrypt, decompress).
+        /// RECOMMENDED: Override this method instead of OnRead for proper async support.
+        /// This is the preferred approach for plugins that need to call async APIs (e.g., IKeyStore).
+        /// </summary>
+        /// <param name="stored">The stored stream to transform.</param>
+        /// <param name="context">The kernel context for logging and plugin access.</param>
+        /// <param name="args">Operation-specific arguments.</param>
+        /// <returns>A task that completes with the transformed stream.</returns>
+        protected virtual Task<Stream> OnReadAsync(Stream stored, IKernelContext context, Dictionary<string, object> args)
+        {
+            // Default implementation calls sync version
+            // Derived classes override this for true async support
+            return Task.FromResult(OnRead(stored, context, args));
+        }
 
         protected override Dictionary<string, object> GetMetadata()
         {
@@ -217,6 +261,7 @@ namespace DataWarehouse.SDK.Contracts
             metadata["QualityLevel"] = QualityLevel;
             metadata["SupportsStreaming"] = true;
             metadata["TransformationType"] = "Bidirectional";
+            metadata["SupportsAsyncTransform"] = true;
             return metadata;
         }
     }
@@ -834,14 +879,9 @@ namespace DataWarehouse.SDK.Contracts
 
         /// <summary>
         /// Load with cache hit tracking. Derived classes must implement actual loading.
+        /// Implementations should call TouchAsync(uri) to track cache access before loading.
         /// </summary>
-        public override Task<Stream> LoadAsync(Uri uri)
-        {
-            // Touch to track access - derived classes should call this via base then do actual load
-            TouchAsync(uri).ConfigureAwait(false);
-            // Abstract - derived classes must override to provide actual implementation
-            throw new NotImplementedException("Derived class must override LoadAsync to provide storage implementation");
-        }
+        public abstract override Task<Stream> LoadAsync(Uri uri);
 
         protected override Dictionary<string, object> GetMetadata()
         {

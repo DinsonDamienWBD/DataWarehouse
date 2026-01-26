@@ -7,5 +7,6 @@
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\DataWarehouse.SDK\DataWarehouse.SDK.csproj" />
+    <ProjectReference Include="..\DataWarehouse.Plugins.SharedRaidUtilities\DataWarehouse.Plugins.SharedRaidUtilities.csproj" />
   </ItemGroup>
 </Project>

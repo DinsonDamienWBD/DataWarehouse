@@ -20,7 +20,7 @@ namespace DataWarehouse.Plugins.CrdtReplication.Crdts
     /// - Eventually converges to the same set on all replicas
     /// - Delta-state capable for efficient synchronization
     /// </remarks>
-    public sealed class GSet<T> : ICrdt<GSet<T>>, IDeltaCrdt<GSet<T>>, IEnumerable<T> where T : notnull
+    public class GSet<T> : ICrdt<GSet<T>>, IDeltaCrdt<GSet<T>>, IEnumerable<T> where T : notnull
     {
         private readonly ConcurrentDictionary<T, byte> _elements;
         private readonly string _nodeId;

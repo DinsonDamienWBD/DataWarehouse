@@ -1,5 +1,6 @@
 using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Primitives;
+using DataWarehouse.SDK.Utilities;
 using System.Collections.Concurrent;
 using System.Security.Cryptography;
 using System.Text;
@@ -1675,7 +1676,7 @@ namespace DataWarehouse.Plugins.LoadBalancer
                             Interlocked.Increment(ref _successfulRoutes);
                             RecordBackendRequest(stickyBackend.Id);
 
-                            var connection = _connectionPool != null
+                            var stickyConnection = _connectionPool != null
                                 ? await _connectionPool.AcquireAsync(stickyBackend, ct)
                                 : null;
 
@@ -1687,7 +1688,7 @@ namespace DataWarehouse.Plugins.LoadBalancer
                                 _config.Algorithm,
                                 sw.Elapsed,
                                 session.SessionId,
-                                connection);
+                                stickyConnection);
                         }
 
                         // Backend unhealthy, failover if configured
@@ -2361,8 +2362,8 @@ namespace DataWarehouse.Plugins.LoadBalancer
     internal sealed class BackendRuntimeStats
     {
         public long TotalRequests;
-        public int ActiveConnections;
-        public double AverageResponseTimeMs;
+        public int ActiveConnections = 0;
+        public double AverageResponseTimeMs = 0.0;
         public double SuccessRate = 1.0;
     }
 

@@ -1,5 +1,6 @@
 using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Primitives;
+using DataWarehouse.SDK.Utilities;
 using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Text.Json;
@@ -691,10 +692,17 @@ namespace DataWarehouse.Plugins.Resilience
         }
 
         /// <inheritdoc/>
+        public override Task StartAsync(CancellationToken ct)
+        {
+            // Initialization logic here if needed
+            return Task.CompletedTask;
+        }
+
+        /// <inheritdoc/>
         public override Task StopAsync()
         {
             _scheduledCheckTimer.Dispose();
-            return base.StopAsync();
+            return Task.CompletedTask;
         }
 
         private static string? GetString(Dictionary<string, object> payload, string key)

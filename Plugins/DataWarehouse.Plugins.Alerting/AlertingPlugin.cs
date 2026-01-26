@@ -1,8 +1,11 @@
 using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Primitives;
+using DataWarehouse.SDK.Utilities;
 using System.Collections.Concurrent;
+using System.Net;
 using System.Net.Http;
 using System.Net.Http.Headers;
+using System.Net.Mail;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -878,9 +881,207 @@ namespace DataWarehouse.Plugins.Alerting
 
         private async Task SendEmailAsync(NotificationChannel channel, AlertInstance alert, string message)
         {
-            // Email would require SMTP configuration
-            // This is a placeholder for email sending logic
-            await Task.CompletedTask;
+            // Validate required SMTP configuration
+            if (string.IsNullOrEmpty(channel.SmtpHost))
+            {
+                LogEvent(LogLevel.Warning, "Cannot send email alert: SMTP host not configured",
+                    new Dictionary<string, object> { ["channelId"] = channel.Id, ["alertId"] = alert.Id });
+                return;
+            }
+
+            if (string.IsNullOrEmpty(channel.EmailTo))
+            {
+                LogEvent(LogLevel.Warning, "Cannot send email alert: recipient email not configured",
+                    new Dictionary<string, object> { ["channelId"] = channel.Id, ["alertId"] = alert.Id });
+                return;
+            }
+
+            if (string.IsNullOrEmpty(channel.EmailFrom))
+            {
+                LogEvent(LogLevel.Warning, "Cannot send email alert: sender email not configured",
+                    new Dictionary<string, object> { ["channelId"] = channel.Id, ["alertId"] = alert.Id });
+                return;
+            }
+
+            // Build email subject
+            var subjectPrefix = channel.EmailSubjectPrefix ?? "[Alert]";
+            var severityText = alert.Severity.ToString().ToUpperInvariant();
+            var subject = $"{subjectPrefix} [{severityText}] {alert.RuleName}";
+
+            // Build email body with HTML template
+            var body = BuildEmailBody(alert, message);
+
+            // Retry logic for transient failures
+            var lastException = (Exception?)null;
+            for (int attempt = 1; attempt <= channel.MaxRetryAttempts; attempt++)
+            {
+                try
+                {
+                    using var smtpClient = new SmtpClient(channel.SmtpHost, channel.SmtpPort)
+                    {
+                        EnableSsl = channel.SmtpEnableSsl,
+                        DeliveryMethod = SmtpDeliveryMethod.Network,
+                        Timeout = 30000 // 30 second timeout
+                    };
+
+                    // Configure authentication if credentials provided
+                    if (!string.IsNullOrEmpty(channel.SmtpUsername))
+                    {
+                        smtpClient.Credentials = new NetworkCredential(
+                            channel.SmtpUsername,
+                            channel.SmtpPassword ?? string.Empty);
+                    }
+
+                    using var mailMessage = new MailMessage
+                    {
+                        From = new MailAddress(channel.EmailFrom),
+                        Subject = subject,
+                        Body = body,
+                        IsBodyHtml = true,
+                        Priority = alert.Severity == AlertSeverity.Critical ? MailPriority.High :
+                                   alert.Severity == AlertSeverity.Error ? MailPriority.High :
+                                   MailPriority.Normal
+                    };
+
+                    // Add recipients (supports comma-separated list)
+                    foreach (var recipient in channel.EmailTo.Split(',', ';'))
+                    {
+                        var email = recipient.Trim();
+                        if (!string.IsNullOrEmpty(email))
+                        {
+                            mailMessage.To.Add(email);
+                        }
+                    }
+
+                    await smtpClient.SendMailAsync(mailMessage);
+
+                    LogEvent(LogLevel.Information, "Email alert sent successfully",
+                        new Dictionary<string, object>
+                        {
+                            ["channelId"] = channel.Id,
+                            ["alertId"] = alert.Id,
+                            ["recipients"] = channel.EmailTo,
+                            ["attempt"] = attempt
+                        });
+
+                    return; // Success - exit retry loop
+                }
+                catch (SmtpException ex)
+                {
+                    lastException = ex;
+                    LogEvent(LogLevel.Warning, $"SMTP error sending email alert (attempt {attempt}/{channel.MaxRetryAttempts})",
+                        new Dictionary<string, object>
+                        {
+                            ["channelId"] = channel.Id,
+                            ["alertId"] = alert.Id,
+                            ["smtpStatusCode"] = ex.StatusCode.ToString(),
+                            ["error"] = ex.Message
+                        });
+                }
+                catch (Exception ex)
+                {
+                    lastException = ex;
+                    LogEvent(LogLevel.Warning, $"Error sending email alert (attempt {attempt}/{channel.MaxRetryAttempts})",
+                        new Dictionary<string, object>
+                        {
+                            ["channelId"] = channel.Id,
+                            ["alertId"] = alert.Id,
+                            ["error"] = ex.Message
+                        });
+                }
+
+                // Wait before retry (except on last attempt)
+                if (attempt < channel.MaxRetryAttempts)
+                {
+                    await Task.Delay(channel.RetryDelayMs * attempt); // Exponential backoff
+                }
+            }
+
+            // All retries exhausted
+            LogEvent(LogLevel.Error, "Failed to send email alert after all retry attempts",
+                new Dictionary<string, object>
+                {
+                    ["channelId"] = channel.Id,
+                    ["alertId"] = alert.Id,
+                    ["recipients"] = channel.EmailTo,
+                    ["lastError"] = lastException?.Message ?? "Unknown error"
+                }, lastException);
+        }
+
+        private static string BuildEmailBody(AlertInstance alert, string message)
+        {
+            var severityColor = alert.Severity switch
+            {
+                AlertSeverity.Critical => "#dc3545",
+                AlertSeverity.Error => "#fd7e14",
+                AlertSeverity.Warning => "#ffc107",
+                AlertSeverity.Info => "#17a2b8",
+                _ => "#6c757d"
+            };
+
+            var labelsHtml = string.Empty;
+            if (alert.Labels != null && alert.Labels.Count > 0)
+            {
+                var labelItems = string.Join("", alert.Labels.Select(kv =>
+                    $"<li><strong>{WebUtility.HtmlEncode(kv.Key)}:</strong> {WebUtility.HtmlEncode(kv.Value)}</li>"));
+                labelsHtml = $"<h3>Labels</h3><ul>{labelItems}</ul>";
+            }
+
+            return $@"
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset=""utf-8"">
+    <style>
+        body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; margin: 0; padding: 20px; background: #f5f5f5; }}
+        .container {{ max-width: 600px; margin: 0 auto; background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }}
+        .header {{ background: {severityColor}; color: white; padding: 20px; }}
+        .header h1 {{ margin: 0; font-size: 24px; }}
+        .header .severity {{ opacity: 0.9; font-size: 14px; text-transform: uppercase; }}
+        .content {{ padding: 20px; }}
+        .metric-box {{ background: #f8f9fa; border-radius: 4px; padding: 15px; margin: 15px 0; }}
+        .metric-label {{ color: #6c757d; font-size: 12px; text-transform: uppercase; }}
+        .metric-value {{ font-size: 24px; font-weight: bold; color: #212529; }}
+        .threshold {{ color: #6c757d; font-size: 14px; }}
+        .message {{ background: #e9ecef; padding: 15px; border-radius: 4px; margin: 15px 0; }}
+        .footer {{ padding: 20px; border-top: 1px solid #dee2e6; color: #6c757d; font-size: 12px; }}
+        ul {{ padding-left: 20px; }}
+        li {{ margin: 5px 0; }}
+    </style>
+</head>
+<body>
+    <div class=""container"">
+        <div class=""header"">
+            <div class=""severity"">{alert.Severity} Alert</div>
+            <h1>{WebUtility.HtmlEncode(alert.RuleName)}</h1>
+        </div>
+        <div class=""content"">
+            <div class=""message"">{WebUtility.HtmlEncode(message)}</div>
+
+            <div class=""metric-box"">
+                <div class=""metric-label"">Metric: {WebUtility.HtmlEncode(alert.Metric)}</div>
+                <div class=""metric-value"">{alert.CurrentValue:F2}</div>
+                <div class=""threshold"">Threshold: {alert.ThresholdValue:F2}</div>
+            </div>
+
+            {labelsHtml}
+
+            <h3>Alert Details</h3>
+            <ul>
+                <li><strong>Alert ID:</strong> {alert.Id}</li>
+                <li><strong>Rule ID:</strong> {alert.RuleId}</li>
+                <li><strong>State:</strong> {alert.State}</li>
+                <li><strong>Fired At:</strong> {alert.FiredAt:yyyy-MM-dd HH:mm:ss} UTC</li>
+                {(alert.ResolvedAt.HasValue ? $"<li><strong>Resolved At:</strong> {alert.ResolvedAt:yyyy-MM-dd HH:mm:ss} UTC</li>" : "")}
+            </ul>
+        </div>
+        <div class=""footer"">
+            This alert was generated by DataWarehouse Alerting Plugin.<br>
+            Generated at {DateTime.UtcNow:yyyy-MM-dd HH:mm:ss} UTC
+        </div>
+    </div>
+</body>
+</html>";
         }
 
         private async Task SendWebhookAsync(NotificationChannel channel, AlertInstance alert, NotificationEventType eventType)
@@ -1486,8 +1687,8 @@ namespace DataWarehouse.Plugins.Alerting
                 ["thresholdValue"] = a.ThresholdValue,
                 ["message"] = a.Message,
                 ["firedAt"] = a.FiredAt,
-                ["acknowledgedAt"] = a.AcknowledgedAt,
-                ["acknowledgedBy"] = a.AcknowledgedBy,
+                ["acknowledgedAt"] = (object?)a.AcknowledgedAt ?? DBNull.Value,
+                ["acknowledgedBy"] = (object?)a.AcknowledgedBy ?? DBNull.Value,
                 ["escalationLevel"] = a.EscalationLevel
             }).ToList();
 
@@ -1691,7 +1892,7 @@ namespace DataWarehouse.Plugins.Alerting
                 ["totalAlertsEscalated"] = historyInRange.Count(h => h.EventType == AlertHistoryEventType.Escalated),
                 ["alertsByRule"] = alertsByRule,
                 ["alertsBySeverity"] = alertsBySeverity,
-                ["meanTimeToResolve"] = mttr?.TotalMinutes,
+                ["meanTimeToResolve"] = (object?)mttr?.TotalMinutes ?? DBNull.Value,
                 ["currentActiveAlerts"] = _activeAlerts.Count,
                 ["totalRules"] = _rules.Count,
                 ["enabledRules"] = _rules.Values.Count(r => r.Enabled),
@@ -2006,8 +2207,8 @@ namespace DataWarehouse.Plugins.Alerting
                 ["labels"] = rule.Labels ?? new Dictionary<string, string>(),
                 ["notificationChannels"] = rule.NotificationChannels ?? new List<string>(),
                 ["evaluationWindowMinutes"] = rule.EvaluationWindow.TotalMinutes,
-                ["pendingDurationMinutes"] = rule.PendingDuration?.TotalMinutes,
-                ["repeatIntervalMinutes"] = rule.RepeatInterval?.TotalMinutes,
+                ["pendingDurationMinutes"] = (object?)rule.PendingDuration?.TotalMinutes ?? DBNull.Value,
+                ["repeatIntervalMinutes"] = (object?)rule.RepeatInterval?.TotalMinutes ?? DBNull.Value,
                 ["enabled"] = rule.Enabled,
                 ["createdAt"] = rule.CreatedAt,
                 ["updatedAt"] = rule.UpdatedAt,
@@ -2406,6 +2607,46 @@ namespace DataWarehouse.Plugins.Alerting
         /// When the channel was created.
         /// </summary>
         public DateTime CreatedAt { get; set; }
+
+        /// <summary>
+        /// SMTP server hostname for email notifications.
+        /// </summary>
+        public string? SmtpHost { get; set; }
+
+        /// <summary>
+        /// SMTP server port (default: 587 for TLS, 465 for SSL, 25 for plain).
+        /// </summary>
+        public int SmtpPort { get; set; } = 587;
+
+        /// <summary>
+        /// SMTP username for authentication.
+        /// </summary>
+        public string? SmtpUsername { get; set; }
+
+        /// <summary>
+        /// SMTP password for authentication.
+        /// </summary>
+        public string? SmtpPassword { get; set; }
+
+        /// <summary>
+        /// Enable TLS/SSL for SMTP connection.
+        /// </summary>
+        public bool SmtpEnableSsl { get; set; } = true;
+
+        /// <summary>
+        /// Sender email address (From field).
+        /// </summary>
+        public string? EmailFrom { get; set; }
+
+        /// <summary>
+        /// Maximum retry attempts for failed email sends.
+        /// </summary>
+        public int MaxRetryAttempts { get; set; } = 3;
+
+        /// <summary>
+        /// Delay between retry attempts in milliseconds.
+        /// </summary>
+        public int RetryDelayMs { get; set; } = 1000;
     }
 
     /// <summary>

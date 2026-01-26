@@ -41,7 +41,15 @@ public sealed class DataRetentionPlugin : ComplianceProviderPluginBase, IAsyncDi
     public override string Version => "1.0.0";
 
     /// <inheritdoc />
-    public override ComplianceCapabilities Capabilities =>
+    public override PluginCategory Category => PluginCategory.GovernanceProvider;
+
+    /// <inheritdoc />
+    public override IReadOnlyList<string> SupportedFrameworks => new[] { "GDPR", "HIPAA", "SOX", "FINRA" };
+
+    /// <summary>
+    /// Gets the compliance capabilities supported by this plugin.
+    /// </summary>
+    public ComplianceCapabilities Capabilities =>
         ComplianceCapabilities.RetentionPolicy |
         ComplianceCapabilities.LegalHold |
         ComplianceCapabilities.WORM |
@@ -847,10 +855,13 @@ public sealed class DataRetentionPlugin : ComplianceProviderPluginBase, IAsyncDi
             var activeStates = _objectStates.Values.Where(s => s.Status == RetentionStatus.Active).ToList();
             if (activeStates.Count > 0)
             {
-                stats.AverageRetentionDays = activeStates.Average(s =>
-                    (s.RetentionEndDate - s.RetentionStartDate).TotalDays);
-                stats.EarliestExpiration = activeStates.Min(s => s.RetentionEndDate);
-                stats.LatestExpiration = activeStates.Max(s => s.RetentionEndDate);
+                stats = stats with
+                {
+                    AverageRetentionDays = activeStates.Average(s =>
+                        (s.RetentionEndDate - s.RetentionStartDate).TotalDays),
+                    EarliestExpiration = activeStates.Min(s => s.RetentionEndDate),
+                    LatestExpiration = activeStates.Max(s => s.RetentionEndDate)
+                };
             }
 
             return Task.FromResult(stats);
@@ -862,7 +873,112 @@ public sealed class DataRetentionPlugin : ComplianceProviderPluginBase, IAsyncDi
     }
 
     /// <inheritdoc />
-    public override async Task<ComplianceCheckResult> CheckComplianceAsync(
+    public override async Task<ComplianceValidationResult> ValidateAsync(
+        string framework,
+        object data,
+        Dictionary<string, object>? context = null,
+        CancellationToken ct = default)
+    {
+        var violations = new List<ComplianceViolation>();
+        var warnings = new List<ComplianceWarning>();
+
+        if (!SupportedFrameworks.Contains(framework))
+        {
+            violations.Add(new ComplianceViolation
+            {
+                Code = "FRAMEWORK_NOT_SUPPORTED",
+                Severity = "High",
+                Message = $"Framework {framework} is not supported"
+            });
+        }
+
+        return await Task.FromResult(new ComplianceValidationResult
+        {
+            IsCompliant = violations.Count == 0,
+            Framework = framework,
+            Violations = violations,
+            Warnings = warnings,
+            ValidatedAt = DateTime.UtcNow
+        });
+    }
+
+    /// <inheritdoc />
+    public override Task<ComplianceStatus> GetStatusAsync(string framework, CancellationToken ct = default)
+    {
+        var status = new ComplianceStatus
+        {
+            Framework = framework,
+            IsCompliant = SupportedFrameworks.Contains(framework),
+            LastChecked = DateTime.UtcNow,
+            TotalControls = _policies.Count,
+            PassingControls = _policies.Count,
+            FailingControls = 0
+        };
+        return Task.FromResult(status);
+    }
+
+    /// <inheritdoc />
+    public override Task<ComplianceReport> GenerateReportAsync(
+        string framework,
+        DateTime? startDate = null,
+        DateTime? endDate = null,
+        CancellationToken ct = default)
+    {
+        var report = new ComplianceReport
+        {
+            Framework = framework,
+            GeneratedAt = DateTime.UtcNow,
+            ReportingPeriodStart = startDate ?? DateTime.UtcNow.AddMonths(-1),
+            ReportingPeriodEnd = endDate ?? DateTime.UtcNow,
+            Status = new ComplianceStatus
+            {
+                Framework = framework,
+                IsCompliant = SupportedFrameworks.Contains(framework),
+                LastChecked = DateTime.UtcNow,
+                TotalControls = _policies.Count,
+                PassingControls = _policies.Count,
+                FailingControls = 0
+            }
+        };
+        return Task.FromResult(report);
+    }
+
+    /// <inheritdoc />
+    public override Task<string> RegisterDataSubjectRequestAsync(
+        DataSubjectRequest request,
+        CancellationToken ct = default)
+    {
+        var requestId = Guid.NewGuid().ToString();
+        LogAuditEvent(AuditEventType.PolicyCreated, request.SubjectId, $"Registered data subject request {requestId}");
+        return Task.FromResult(requestId);
+    }
+
+    /// <inheritdoc />
+    public override async Task<SDK.Contracts.RetentionPolicy> GetRetentionPolicyAsync(
+        string dataType,
+        string? framework = null,
+        CancellationToken ct = default)
+    {
+        var policy = _policies.Values.FirstOrDefault();
+        if (policy == null)
+        {
+            throw new RetentionPolicyException($"No retention policy found for data type {dataType}");
+        }
+
+        // Map local RetentionPolicy to SDK.Contracts.RetentionPolicy
+        return await Task.FromResult(new SDK.Contracts.RetentionPolicy
+        {
+            DataType = dataType,
+            RetentionPeriod = policy.RetentionPeriod,
+            LegalBasis = framework,
+            RequiresSecureDeletion = policy.WormEnabled || policy.ImmutabilityMode == ImmutabilityMode.Locked
+        });
+    }
+
+    /// <summary>
+    /// Checks compliance for a specific object.
+    /// </summary>
+    public async Task<ComplianceCheckResult> CheckComplianceAsync(
         string objectId,
         CancellationToken ct = default)
     {

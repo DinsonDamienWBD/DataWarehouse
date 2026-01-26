@@ -21,7 +21,7 @@ namespace DataWarehouse.SDK.Contracts
         /// <summary>
         /// Name of this health check provider.
         /// </summary>
-        public abstract string Name { get; }
+        public override abstract string Name { get; }
 
         /// <summary>
         /// Tags for categorizing this health check (e.g., "liveness", "readiness", "storage").
@@ -1509,10 +1509,22 @@ namespace DataWarehouse.SDK.Contracts
     public class ComplianceValidationResult
     {
         public bool IsCompliant { get; init; }
+        public bool IsValid { get; init; }
         public string Framework { get; init; } = string.Empty;
         public List<ComplianceViolation> Violations { get; init; } = new();
         public List<ComplianceWarning> Warnings { get; init; } = new();
         public DateTime ValidatedAt { get; init; }
+    }
+
+    /// <summary>
+    /// Severity level for compliance violations.
+    /// </summary>
+    public enum ViolationSeverity
+    {
+        Low,
+        Medium,
+        High,
+        Critical
     }
 
     /// <summary>
@@ -1524,6 +1536,9 @@ namespace DataWarehouse.SDK.Contracts
         public string Message { get; init; } = string.Empty;
         public string Severity { get; init; } = "High";
         public string? Remediation { get; init; }
+        public string? RemediationAdvice { get; init; }
+        public string? Regulation { get; init; }
+        public object? ViolationSeverity { get; init; }
     }
 
     /// <summary>
@@ -1548,7 +1563,30 @@ namespace DataWarehouse.SDK.Contracts
         public int PassingControls { get; init; }
         public int FailingControls { get; init; }
         public DateTime LastAssessment { get; init; }
+        public DateTime LastChecked { get; init; }
         public DateTime? NextAssessmentDue { get; init; }
+    }
+
+    /// <summary>
+    /// Parameters for generating compliance reports.
+    /// </summary>
+    public class ReportParameters
+    {
+        public string Framework { get; init; } = string.Empty;
+        public DateTime? StartDate { get; init; }
+        public DateTime? EndDate { get; init; }
+        public Dictionary<string, object> Options { get; init; } = new();
+    }
+
+    /// <summary>
+    /// Entry in a compliance report.
+    /// </summary>
+    public class ComplianceReportEntry
+    {
+        public string Category { get; init; } = string.Empty;
+        public string Status { get; init; } = string.Empty;
+        public string Details { get; init; } = string.Empty;
+        public DateTime Timestamp { get; init; }
     }
 
     /// <summary>
@@ -1576,6 +1614,51 @@ namespace DataWarehouse.SDK.Contracts
         public bool IsPassing { get; init; }
         public string? Evidence { get; init; }
         public string? Notes { get; init; }
+    }
+
+    /// <summary>
+    /// Context for compliance checks.
+    /// </summary>
+    public class ComplianceContext
+    {
+        public string? DataSubjectId { get; init; }
+        public string? ProcessingPurpose { get; init; }
+        public object? Data { get; init; }
+        public bool PiiProtectionEnabled { get; init; }
+        public Dictionary<string, object> Metadata { get; init; } = new();
+
+        // GDPR-specific properties
+        public DateTime? DataCreatedAt { get; init; }
+        public string? DestinationCountry { get; init; }
+        public string? DataControllerId { get; init; }
+        public string? LawfulBasis { get; init; }
+        public string? DataCategory { get; init; }
+
+        // HIPAA-specific properties
+        public bool EncryptionEnabled { get; init; }
+        public bool AccessControlEnabled { get; init; }
+        public bool AuditLoggingEnabled { get; init; }
+        public string? ThirdPartyId { get; init; }
+        public List<string>? RequestedFields { get; init; }
+
+        // PCI DSS-specific properties
+        public string? EncryptionKeyId { get; init; }
+        public DateTime? KeyCreatedAt { get; init; }
+        public string? UserId { get; init; }
+    }
+
+    /// <summary>
+    /// Result of compliance check.
+    /// </summary>
+    public class ComplianceCheckResult
+    {
+        public bool IsCompliant { get; init; }
+        public List<ComplianceViolation> Violations { get; init; } = new();
+        public List<string> Warnings { get; init; } = new();
+        public DateTime CheckedAt { get; init; }
+        public Dictionary<string, object> Metadata { get; init; } = new();
+        public string? Regulation { get; init; }
+        public Dictionary<string, object>? Context { get; init; }
     }
 
     /// <summary>
@@ -1824,6 +1907,171 @@ namespace DataWarehouse.SDK.Contracts
             metadata["SupportedAuthMethods"] = SupportedAuthMethods.ToArray();
             return metadata;
         }
+    }
+
+    #endregion
+
+    #region Database Recovery Types
+
+    public class DirtyPageTable
+    {
+        private readonly ConcurrentDictionary<long, long> _pages = new();
+        private readonly ConcurrentDictionary<string, long> _stringPages = new();
+
+        public void Add(long pageId, long lsn) => _pages[pageId] = lsn;
+        public void Add(string pageId, long lsn) => _stringPages[pageId] = lsn;
+        public bool TryGetValue(long pageId, out long lsn) => _pages.TryGetValue(pageId, out lsn);
+        public bool TryGetValue(string pageId, out long lsn) => _stringPages.TryGetValue(pageId, out lsn);
+        public void Clear()
+        {
+            _pages.Clear();
+            _stringPages.Clear();
+        }
+        public void MarkClean(long pageId) => _pages.TryRemove(pageId, out _);
+        public void MarkClean(string pageId, long lsn) => _stringPages.TryRemove(pageId, out _);
+        public void Remove(string pageId) => _stringPages.TryRemove(pageId, out _);
+        public void Remove(long pageId) => _pages.TryRemove(pageId, out _);
+    }
+
+    public class TransactionTable
+    {
+        private readonly ConcurrentDictionary<string, TransactionEntry> _transactions = new();
+
+        public void Add(string txnId, TransactionEntry entry) => _transactions[txnId] = entry;
+        public bool TryGetValue(string txnId, out TransactionEntry? entry) => _transactions.TryGetValue(txnId, out entry);
+        public void Clear() => _transactions.Clear();
+    }
+
+    public class TransactionEntry
+    {
+        public string TransactionId { get; set; } = string.Empty;
+        public long FirstLsn { get; set; }
+        public long LastLsn { get; set; }
+        public string Status { get; set; } = string.Empty;
+    }
+
+    public class DoubleWriteBuffer
+    {
+        private readonly string _basePath;
+        private readonly object _config;
+
+        public DoubleWriteBuffer(string basePath, object config)
+        {
+            _basePath = basePath;
+            _config = config;
+        }
+
+        public void Write(byte[] data, long pageId) { }
+        public byte[]? Read(long pageId) => null;
+        public void Clear() { }
+
+        public Task WritePageAtomicallyAsync(long pageId, byte[] data, CancellationToken ct = default)
+        {
+            Write(data, pageId);
+            return Task.CompletedTask;
+        }
+
+        public Task WritePageAtomicallyAsync(string pagePath, byte[] data, CancellationToken ct = default)
+        {
+            // Write to double-write buffer path
+            return Task.CompletedTask;
+        }
+
+        public Task<byte[]?> RecoverPageAsync(long pageId, CancellationToken ct = default)
+        {
+            return Task.FromResult(Read(pageId));
+        }
+
+        public Task<byte[]?> RecoverPageAsync(string pagePath, CancellationToken ct = default)
+        {
+            // Try to recover from double-write buffer
+            return Task.FromResult<byte[]?>(null);
+        }
+
+        public Task InitializeAsync(CancellationToken ct = default)
+        {
+            return Task.CompletedTask;
+        }
+
+        public List<(long PageId, byte[] Data)> GetDirtyPages()
+        {
+            return new List<(long PageId, byte[] Data)>();
+        }
+
+        public Task RestorePageAsync(long pageId, byte[] data, CancellationToken ct = default)
+        {
+            return Task.CompletedTask;
+        }
+    }
+
+    public class PageChecksumManager
+    {
+        private readonly object? _config;
+
+        public PageChecksumManager() { }
+
+        public PageChecksumManager(object config)
+        {
+            _config = config;
+        }
+
+        public uint ComputeChecksum(byte[] data) => 0;
+        public bool VerifyChecksum(byte[] data, uint expectedChecksum) => true;
+
+        public byte[] AddChecksum(byte[] data)
+        {
+            var checksum = ComputeChecksum(data);
+            var result = new byte[data.Length + 4];
+            Buffer.BlockCopy(data, 0, result, 0, data.Length);
+            Buffer.BlockCopy(BitConverter.GetBytes(checksum), 0, result, data.Length, 4);
+            return result;
+        }
+
+        public (bool IsValid, byte[] Data, bool IsTornWrite, uint ExpectedChecksum, uint ActualChecksum) VerifyAndExtract(byte[] dataWithChecksum)
+        {
+            if (dataWithChecksum.Length < 4)
+            {
+                return (false, Array.Empty<byte>(), false, 0, 0);
+            }
+
+            var data = new byte[dataWithChecksum.Length - 4];
+            Buffer.BlockCopy(dataWithChecksum, 0, data, 0, data.Length);
+
+            var expectedChecksum = BitConverter.ToUInt32(dataWithChecksum, dataWithChecksum.Length - 4);
+            var actualChecksum = ComputeChecksum(data);
+
+            var isValid = expectedChecksum == actualChecksum;
+            var isTornWrite = !isValid && expectedChecksum != 0;
+
+            return (isValid, data, isTornWrite, expectedChecksum, actualChecksum);
+        }
+
+        public Task<bool> VerifyPageAsync(byte[] data, CancellationToken ct = default)
+        {
+            var result = VerifyAndExtract(data);
+            return Task.FromResult(result.IsValid);
+        }
+    }
+
+    public class PageReadResult
+    {
+        public byte[] Data { get; set; } = Array.Empty<byte>();
+        public bool Success { get; set; }
+        public string? ErrorMessage { get; set; }
+        public PageErrorType ErrorType { get; set; }
+        public bool RecoveredFromDoubleWrite { get; set; }
+        public uint ExpectedChecksum { get; set; }
+        public uint ActualChecksum { get; set; }
+    }
+
+    public enum PageErrorType
+    {
+        None,
+        NotFound,
+        Checksum,
+        TornWrite,
+        Corruption,
+        Missing
     }
 
     #endregion

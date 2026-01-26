@@ -1,5 +1,6 @@
 using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Primitives;
+using DataWarehouse.SDK.Utilities;
 using System.Collections.Concurrent;
 using System.Net;
 using System.Text;
@@ -55,6 +56,9 @@ public sealed class GraphQlApiPlugin : InterfacePluginBase
 
     /// <inheritdoc />
     public override int? Port => _port;
+
+    /// <inheritdoc />
+    public override PluginCategory Category => PluginCategory.Interface;
 
     /// <inheritdoc />
     public override string? BasePath => "/graphql";
@@ -1376,11 +1380,12 @@ public sealed class GraphQlApiPlugin : InterfacePluginBase
 
         try
         {
-            return (T)Convert.ChangeType(value, typeof(T));
+            var converted = Convert.ChangeType(value, typeof(T));
+            return converted != null ? (T)converted : default!;
         }
         catch
         {
-            return default;
+            return default!;
         }
     }
 

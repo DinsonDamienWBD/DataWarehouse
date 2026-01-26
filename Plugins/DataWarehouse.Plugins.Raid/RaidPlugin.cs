@@ -1,5 +1,7 @@
 using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Primitives;
+using DataWarehouse.SDK.Utilities;
+using DataWarehouse.Plugins.SharedRaidUtilities;
 using System.Collections.Concurrent;
 using System.Runtime.CompilerServices;
 using System.Security.Cryptography;
@@ -12,7 +14,7 @@ namespace DataWarehouse.Plugins.Raid
     /// degraded mode operation, rebuild capability, and scrubbing.
     /// Thread-safe and designed for hyperscale deployment.
     /// </summary>
-    public sealed class RaidPlugin : RaidProviderPluginBase
+    public sealed class RaidPlugin : RaidProviderPluginBase, IDisposable
     {
         private readonly RaidConfiguration _config;
         private readonly IStorageProvider[] _providers;
@@ -30,6 +32,7 @@ namespace DataWarehouse.Plugins.Raid
         private long _totalOperations;
         private long _totalBytesProcessed;
         private DateTime _lastScrubTime = DateTime.MinValue;
+        private bool _disposed;
 
         public override string Id => "datawarehouse.plugins.raid";
         public override string Name => "RAID Storage Provider";
@@ -958,7 +961,10 @@ namespace DataWarehouse.Plugins.Raid
                         };
                     }
                 }
-                catch { }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"[RaidPlugin] Operation failed: {ex.Message}");
+                }
             }
 
             return null;
@@ -1058,7 +1064,10 @@ namespace DataWarehouse.Plugins.Raid
                             parityData = ms.ToArray();
                             _providerStates[p].BytesRead += ms.Length;
                         }
-                        catch { }
+                        catch (Exception ex)
+                {
+                    Console.WriteLine($"[RaidPlugin] Operation failed: {ex.Message}");
+                }
                     }
                     else
                     {
@@ -1132,7 +1141,10 @@ namespace DataWarehouse.Plugins.Raid
                             pParity = ms.ToArray();
                             _providerStates[p].BytesRead += ms.Length;
                         }
-                        catch { }
+                        catch (Exception ex)
+                {
+                    Console.WriteLine($"[RaidPlugin] Operation failed: {ex.Message}");
+                }
                     }
                     else if (p == qParityIdx)
                     {
@@ -1145,7 +1157,10 @@ namespace DataWarehouse.Plugins.Raid
                             qParity = ms.ToArray();
                             _providerStates[p].BytesRead += ms.Length;
                         }
-                        catch { }
+                        catch (Exception ex)
+                {
+                    Console.WriteLine($"[RaidPlugin] Operation failed: {ex.Message}");
+                }
                     }
                     else
                     {
@@ -1218,7 +1233,10 @@ namespace DataWarehouse.Plugins.Raid
                             chunk = ms.ToArray();
                             _providerStates[primary].BytesRead += ms.Length;
                         }
-                        catch { }
+                        catch (Exception ex)
+                {
+                    Console.WriteLine($"[RaidPlugin] Operation failed: {ex.Message}");
+                }
                     }
 
                     if (chunk == null && _providerStates[secondary].IsHealthy)
@@ -1232,7 +1250,10 @@ namespace DataWarehouse.Plugins.Raid
                             chunk = ms.ToArray();
                             _providerStates[secondary].BytesRead += ms.Length;
                         }
-                        catch { }
+                        catch (Exception ex)
+                {
+                    Console.WriteLine($"[RaidPlugin] Operation failed: {ex.Message}");
+                }
                     }
 
                     if (chunk != null)
@@ -1272,7 +1293,10 @@ namespace DataWarehouse.Plugins.Raid
                             parityData = ms.ToArray();
                             _providerStates[providerIdx].BytesRead += ms.Length;
                         }
-                        catch { }
+                        catch (Exception ex)
+                {
+                    Console.WriteLine($"[RaidPlugin] Operation failed: {ex.Message}");
+                }
                     }
                     else
                     {
@@ -1344,7 +1368,10 @@ namespace DataWarehouse.Plugins.Raid
                             await stream.CopyToAsync(ms, ct);
                             p1Parity = ms.ToArray();
                         }
-                        catch { }
+                        catch (Exception ex)
+                {
+                    Console.WriteLine($"[RaidPlugin] Operation failed: {ex.Message}");
+                }
                     }
                     else if (i == 1)
                     {
@@ -1356,7 +1383,10 @@ namespace DataWarehouse.Plugins.Raid
                             await stream.CopyToAsync(ms, ct);
                             p2Parity = ms.ToArray();
                         }
-                        catch { }
+                        catch (Exception ex)
+                {
+                    Console.WriteLine($"[RaidPlugin] Operation failed: {ex.Message}");
+                }
                     }
                     else
                     {
@@ -1428,7 +1458,10 @@ namespace DataWarehouse.Plugins.Raid
                             await stream.CopyToAsync(ms, ct);
                             p1Parity = ms.ToArray();
                         }
-                        catch { }
+                        catch (Exception ex)
+                {
+                    Console.WriteLine($"[RaidPlugin] Operation failed: {ex.Message}");
+                }
                     }
                     else if (i == 1)
                     {
@@ -1440,7 +1473,10 @@ namespace DataWarehouse.Plugins.Raid
                             await stream.CopyToAsync(ms, ct);
                             p2Parity = ms.ToArray();
                         }
-                        catch { }
+                        catch (Exception ex)
+                {
+                    Console.WriteLine($"[RaidPlugin] Operation failed: {ex.Message}");
+                }
                     }
                     else if (i == 2)
                     {
@@ -1452,7 +1488,10 @@ namespace DataWarehouse.Plugins.Raid
                             await stream.CopyToAsync(ms, ct);
                             p3Parity = ms.ToArray();
                         }
-                        catch { }
+                        catch (Exception ex)
+                {
+                    Console.WriteLine($"[RaidPlugin] Operation failed: {ex.Message}");
+                }
                     }
                     else
                     {
@@ -1515,7 +1554,10 @@ namespace DataWarehouse.Plugins.Raid
                         result.AddRange(ms.ToArray());
                     }
                 }
-                catch { }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"[RaidPlugin] Operation failed: {ex.Message}");
+                }
             }
 
             return result.ToArray();
@@ -1571,7 +1613,10 @@ namespace DataWarehouse.Plugins.Raid
                                 }
                             }
                         }
-                        catch { }
+                        catch (Exception ex)
+                {
+                    Console.WriteLine($"[RaidPlugin] Operation failed: {ex.Message}");
+                }
                     }, ct));
                 }
 
@@ -1609,7 +1654,10 @@ namespace DataWarehouse.Plugins.Raid
                         if (await _providers[i].ExistsAsync(stripeUri))
                             return true;
                     }
-                    catch { }
+                    catch (Exception ex)
+                {
+                    Console.WriteLine($"[RaidPlugin] Operation failed: {ex.Message}");
+                }
                 }
 
                 return false;
@@ -1870,7 +1918,10 @@ namespace DataWarehouse.Plugins.Raid
                                 }
                             }
                         }
-                        catch { }
+                        catch (Exception ex)
+                {
+                    Console.WriteLine($"[RaidPlugin] Operation failed: {ex.Message}");
+                }
                     }
                 }
 
@@ -2267,14 +2318,50 @@ namespace DataWarehouse.Plugins.Raid
 
         public override Task StartAsync(CancellationToken ct)
         {
+            ObjectDisposedException.ThrowIf(_disposed, this);
             return CreateArrayAsync(ct).ContinueWith(_ => { }, ct);
         }
 
         public override Task StopAsync()
         {
-            _arrayLock.Dispose();
-            _rebuildSemaphore.Dispose();
+            Dispose();
             return Task.CompletedTask;
+        }
+
+        /// <summary>
+        /// Releases all resources used by the RAID plugin.
+        /// </summary>
+        public void Dispose()
+        {
+            Dispose(disposing: true);
+            GC.SuppressFinalize(this);
+        }
+
+        /// <summary>
+        /// Releases the unmanaged resources and optionally releases the managed resources.
+        /// </summary>
+        /// <param name="disposing">true to release both managed and unmanaged resources; false to release only unmanaged resources.</param>
+        private void Dispose(bool disposing)
+        {
+            if (_disposed)
+                return;
+
+            if (disposing)
+            {
+                // Dispose managed resources
+                _arrayLock.Dispose();
+                _rebuildSemaphore.Dispose();
+            }
+
+            _disposed = true;
+        }
+
+        /// <summary>
+        /// Finalizer for safety - ensures resources are released if Dispose is not called.
+        /// </summary>
+        ~RaidPlugin()
+        {
+            Dispose(disposing: false);
         }
 
         protected override List<PluginCapabilityDescriptor> GetCapabilities()
@@ -2407,112 +2494,6 @@ namespace DataWarehouse.Plugins.Raid
     {
         public RaidException(string message) : base(message) { }
         public RaidException(string message, Exception inner) : base(message, inner) { }
-    }
-
-    /// <summary>
-    /// GF(2^8) Galois Field implementation for Reed-Solomon error correction.
-    /// Uses the standard AES/Rijndael polynomial x^8 + x^4 + x^3 + x + 1 (0x11B).
-    /// </summary>
-    internal sealed class GaloisField
-    {
-        private const int FieldSize = 256;
-        private const int Polynomial = 0x11D;
-
-        private readonly byte[] _expTable;
-        private readonly byte[] _logTable;
-
-        public GaloisField()
-        {
-            _expTable = new byte[FieldSize * 2];
-            _logTable = new byte[FieldSize];
-
-            int x = 1;
-            for (int i = 0; i < FieldSize - 1; i++)
-            {
-                _expTable[i] = (byte)x;
-                _logTable[x] = (byte)i;
-
-                x <<= 1;
-                if (x >= FieldSize)
-                {
-                    x ^= Polynomial;
-                }
-            }
-
-            for (int i = FieldSize - 1; i < FieldSize * 2; i++)
-            {
-                _expTable[i] = _expTable[i - (FieldSize - 1)];
-            }
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public byte Add(byte a, byte b) => (byte)(a ^ b);
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public byte Subtract(byte a, byte b) => (byte)(a ^ b);
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public byte Multiply(byte a, byte b)
-        {
-            if (a == 0 || b == 0) return 0;
-            return _expTable[_logTable[a] + _logTable[b]];
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public byte Divide(byte a, byte b)
-        {
-            if (b == 0) throw new DivideByZeroException("Division by zero in Galois Field");
-            if (a == 0) return 0;
-            return _expTable[_logTable[a] + 255 - _logTable[b]];
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public byte Power(int @base, int exp)
-        {
-            if (@base == 0) return 0;
-            if (exp == 0) return 1;
-
-            var logBase = _logTable[@base];
-            var result = (logBase * exp) % 255;
-            if (result < 0) result += 255;
-            return _expTable[result];
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public byte Inverse(byte a)
-        {
-            if (a == 0) throw new ArgumentException("Zero has no multiplicative inverse");
-            return _expTable[255 - _logTable[a]];
-        }
-
-        public byte[] MultiplyPolynomial(byte[] p1, byte[] p2)
-        {
-            var result = new byte[p1.Length + p2.Length - 1];
-
-            for (int i = 0; i < p1.Length; i++)
-            {
-                for (int j = 0; j < p2.Length; j++)
-                {
-                    result[i + j] = Add(result[i + j], Multiply(p1[i], p2[j]));
-                }
-            }
-
-            return result;
-        }
-
-        public byte EvaluatePolynomial(byte[] poly, byte x)
-        {
-            byte result = 0;
-            byte xPower = 1;
-
-            for (int i = 0; i < poly.Length; i++)
-            {
-                result = Add(result, Multiply(poly[i], xPower));
-                xPower = Multiply(xPower, x);
-            }
-
-            return result;
-        }
     }
 
     #endregion

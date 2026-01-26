@@ -1,8 +1,6 @@
 using DataWarehouse.Kernel;
-using DataWarehouse.Kernel.AI;
 using DataWarehouse.Kernel.Messaging;
 using DataWarehouse.Kernel.Pipeline;
-using DataWarehouse.Kernel.Resilience;
 using DataWarehouse.Kernel.Storage;
 using DataWarehouse.SDK.AI;
 using DataWarehouse.SDK.Contracts;
@@ -419,6 +417,7 @@ namespace DataWarehouse.Tests.Integration
         {
             public string RootPath { get; }
             public OperatingMode Mode => OperatingMode.Laptop;
+            public IKernelStorageService Storage => throw new NotImplementedException();
 
             public TestKernelContext(string rootPath)
             {
@@ -429,6 +428,8 @@ namespace DataWarehouse.Tests.Integration
             public void LogInfo(string message) { }
             public void LogWarning(string message) { }
             public void LogError(string message, Exception? ex = null) { }
+            public T? GetPlugin<T>() where T : class, IPlugin => null;
+            public IEnumerable<T> GetPlugins<T>() where T : class, IPlugin => Enumerable.Empty<T>();
         }
 
         private class MockAIProvider : IAIProvider
@@ -448,11 +449,11 @@ namespace DataWarehouse.Tests.Integration
                 };
             }
 
-            public async IAsyncEnumerable<string> CompleteStreamingAsync(AIRequest request, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct = default)
+            public async IAsyncEnumerable<AIStreamChunk> CompleteStreamingAsync(AIRequest request, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct = default)
             {
-                yield return "Mock";
+                yield return new AIStreamChunk { Content = "Mock", IsFinal = false };
                 await Task.Delay(10, ct);
-                yield return " response";
+                yield return new AIStreamChunk { Content = " response", IsFinal = true };
             }
 
             public Task<float[]> GetEmbeddingsAsync(string text, CancellationToken ct = default)
@@ -460,7 +461,7 @@ namespace DataWarehouse.Tests.Integration
                 return Task.FromResult(new float[] { 0.1f, 0.2f, 0.3f });
             }
 
-            public Task<float[][]> GetBatchEmbeddingsAsync(IEnumerable<string> texts, CancellationToken ct = default)
+            public Task<float[][]> GetEmbeddingsBatchAsync(string[] texts, CancellationToken ct = default)
             {
                 return Task.FromResult(texts.Select(_ => new float[] { 0.1f, 0.2f, 0.3f }).ToArray());
             }

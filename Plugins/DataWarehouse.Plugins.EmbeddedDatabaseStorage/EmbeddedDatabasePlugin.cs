@@ -3,7 +3,9 @@ using DataWarehouse.SDK.Database;
 using DataWarehouse.SDK.Infrastructure;
 using DataWarehouse.SDK.Primitives;
 using DataWarehouse.SDK.Utilities;
-using System.Collections.Concurrent;
+using LiteDB;
+using Microsoft.Data.Sqlite;
+using RocksDbSharp;
 using System.Data;
 using System.Text;
 using System.Text.Json;
@@ -18,7 +20,6 @@ namespace DataWarehouse.Plugins.EmbeddedDatabaseStorage;
 /// - LiteDB, Realm, ObjectBox, Nitrite
 /// - RocksDB, LevelDB, LMDB, BerkeleyDB
 /// - FAISS, Annoy, Hnswlib, LanceDB
-/// - In-memory mode for testing
 ///
 /// Features:
 /// - Zero-configuration embedded databases
@@ -41,15 +42,24 @@ namespace DataWarehouse.Plugins.EmbeddedDatabaseStorage;
 /// - storage.embedded.backup: Create backup
 /// - storage.embedded.vacuum: Compact database
 /// </summary>
-public sealed class EmbeddedDatabasePlugin : HybridDatabasePluginBase<EmbeddedDbConfig>
+public sealed class EmbeddedDatabasePlugin : HybridDatabasePluginBase<EmbeddedDbConfig>, IDisposable
 {
     private readonly SemaphoreSlim _writeLock = new(1, 1);
 
-    // In-memory storage simulation
-    private readonly ConcurrentDictionary<string, ConcurrentDictionary<string, string>> _inMemoryTables = new();
-
     // Connection for actual embedded DB
     private object? _connection;
+
+    // SQLite connection
+    private SqliteConnection? _sqliteConnection;
+
+    // LiteDB connection
+    private LiteDatabase? _liteDb;
+
+    // RocksDB connection
+    private RocksDb? _rocksDb;
+    private readonly object _rocksDbLock = new();
+
+    private bool _disposed;
 
     public override string Id => "datawarehouse.plugins.database.embedded";
     public override string Name => "Embedded Database";
@@ -60,8 +70,7 @@ public sealed class EmbeddedDatabasePlugin : HybridDatabasePluginBase<EmbeddedDb
 
     public EmbeddedDatabasePlugin(EmbeddedDbConfig? config = null) : base(config)
     {
-        if (_config.Engine != EmbeddedEngine.InMemory &&
-            !string.IsNullOrEmpty(_config.FilePath))
+        if (!string.IsNullOrEmpty(_config.FilePath))
         {
             var directory = Path.GetDirectoryName(_config.FilePath);
             if (!string.IsNullOrEmpty(directory))
@@ -134,15 +143,17 @@ public sealed class EmbeddedDatabasePlugin : HybridDatabasePluginBase<EmbeddedDb
             {
                 switch (_config.Engine)
                 {
-                    case EmbeddedEngine.InMemory:
-                        SaveToMemory(table, id, json);
-                        break;
                     case EmbeddedEngine.SQLite:
                         await SaveToSQLiteAsync(table, id, json);
                         break;
                     case EmbeddedEngine.LiteDB:
                         await SaveToLiteDBAsync(table, id, json);
                         break;
+                    case EmbeddedEngine.RocksDB:
+                        await SaveToRocksDBAsync(table, id, json);
+                        break;
+                    default:
+                        throw new NotSupportedException($"Engine {_config.Engine} not supported");
                 }
             }
             finally
@@ -163,9 +174,9 @@ public sealed class EmbeddedDatabasePlugin : HybridDatabasePluginBase<EmbeddedDb
 
             string json = _config.Engine switch
             {
-                EmbeddedEngine.InMemory => LoadFromMemory(table, id),
                 EmbeddedEngine.SQLite => await LoadFromSQLiteAsync(table, id),
                 EmbeddedEngine.LiteDB => await LoadFromLiteDBAsync(table, id),
+                EmbeddedEngine.RocksDB => await LoadFromRocksDBAsync(table, id),
                 _ => throw new NotSupportedException($"Engine {_config.Engine} not supported")
             };
 
@@ -187,15 +198,17 @@ public sealed class EmbeddedDatabasePlugin : HybridDatabasePluginBase<EmbeddedDb
             {
                 switch (_config.Engine)
                 {
-                    case EmbeddedEngine.InMemory:
-                        DeleteFromMemory(table, id);
-                        break;
                     case EmbeddedEngine.SQLite:
                         await DeleteFromSQLiteAsync(table, id);
                         break;
                     case EmbeddedEngine.LiteDB:
                         await DeleteFromLiteDBAsync(table, id);
                         break;
+                    case EmbeddedEngine.RocksDB:
+                        await DeleteFromRocksDBAsync(table, id);
+                        break;
+                    default:
+                        throw new NotSupportedException($"Engine {_config.Engine} not supported");
                 }
             }
             finally
@@ -223,44 +236,23 @@ public sealed class EmbeddedDatabasePlugin : HybridDatabasePluginBase<EmbeddedDb
         {
             await EnsureConnectedAsync();
 
-            if (_config.Engine == EmbeddedEngine.InMemory)
+            var tables = await ListCollectionsAsync(null);
+            foreach (var table in tables)
             {
-                foreach (var table in _inMemoryTables)
-                {
-                    foreach (var record in table.Value)
-                    {
-                        if (ct.IsCancellationRequested) yield break;
+                if (ct.IsCancellationRequested) yield break;
 
-                        var path = $"{table.Key}/{record.Key}";
-                        if (string.IsNullOrEmpty(prefix) || path.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
-                        {
-                            yield return new StorageListItem(
-                                new Uri($"embedded:///{path}"),
-                                Encoding.UTF8.GetByteCount(record.Value));
-                        }
-                    }
-                }
-            }
-            else
-            {
-                var tables = await ListCollectionsAsync(null);
-                foreach (var table in tables)
+                var results = await ExecuteQueryAsync(null, table, "SELECT id FROM " + table, null);
+                foreach (var record in results)
                 {
                     if (ct.IsCancellationRequested) yield break;
 
-                    var results = await ExecuteQueryAsync(null, table, "SELECT id FROM " + table, null);
-                    foreach (var record in results)
+                    var id = GetRecordId(record);
+                    if (!string.IsNullOrEmpty(id))
                     {
-                        if (ct.IsCancellationRequested) yield break;
-
-                        var id = GetRecordId(record);
-                        if (!string.IsNullOrEmpty(id))
+                        var path = $"{table}/{id}";
+                        if (string.IsNullOrEmpty(prefix) || path.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
                         {
-                            var path = $"{table}/{id}";
-                            if (string.IsNullOrEmpty(prefix) || path.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
-                            {
-                                yield return new StorageListItem(new Uri($"embedded:///{path}"), 0);
-                            }
+                            yield return new StorageListItem(new Uri($"embedded:///{path}"), 0);
                         }
                     }
                 }
@@ -275,11 +267,9 @@ public sealed class EmbeddedDatabasePlugin : HybridDatabasePluginBase<EmbeddedDb
         {
             switch (_config.Engine)
             {
-                case EmbeddedEngine.InMemory:
-                    _isConnected = true;
-                    break;
                 case EmbeddedEngine.SQLite:
                 case EmbeddedEngine.LiteDB:
+                case EmbeddedEngine.RocksDB:
                     _isConnected = true;
                     break;
             }
@@ -302,22 +292,12 @@ public sealed class EmbeddedDatabasePlugin : HybridDatabasePluginBase<EmbeddedDb
         {
             await EnsureConnectedAsync();
 
-            if (_config.Engine == EmbeddedEngine.InMemory)
-            {
-                return QueryInMemory(collection ?? "documents", query);
-            }
-
             return await ExecuteEngineQueryAsync(collection, query, parameters);
         }
 
         protected override async Task<long> CountAsync(string? database, string? collection, string? filter, string? instanceId = null)
         {
             await EnsureConnectedAsync();
-
-            if (_config.Engine == EmbeddedEngine.InMemory)
-            {
-                return _inMemoryTables.TryGetValue(collection ?? "documents", out var t) ? t.Count : 0;
-            }
 
             var results = await ExecuteQueryAsync(database, collection, $"SELECT COUNT(*) as count FROM {collection}", null, instanceId);
             var first = results.FirstOrDefault();
@@ -344,20 +324,17 @@ public sealed class EmbeddedDatabasePlugin : HybridDatabasePluginBase<EmbeddedDb
 
         protected override async Task CreateCollectionAsync(string? database, string collection, Dictionary<string, object>? schema, string? instanceId = null)
         {
-            if (_config.Engine == EmbeddedEngine.InMemory)
-            {
-                _inMemoryTables.TryAdd(collection, new ConcurrentDictionary<string, string>());
-                return;
-            }
-
-            if (_config.Engine == EmbeddedEngine.SQLite && schema != null)
+            if (_config.Engine == EmbeddedEngine.SQLite)
             {
                 var columns = new List<string> { "id TEXT PRIMARY KEY", "data TEXT" };
 
-                foreach (var field in schema)
+                if (schema != null)
                 {
-                    var sqlType = MapToSqlType(field.Value?.ToString() ?? "TEXT");
-                    columns.Add($"{field.Key} {sqlType}");
+                    foreach (var field in schema)
+                    {
+                        var sqlType = MapToSqlType(field.Value?.ToString() ?? "TEXT");
+                        columns.Add($"{field.Key} {sqlType}");
+                    }
                 }
 
                 var createSql = $"CREATE TABLE IF NOT EXISTS {collection} ({string.Join(", ", columns)})";
@@ -367,12 +344,6 @@ public sealed class EmbeddedDatabasePlugin : HybridDatabasePluginBase<EmbeddedDb
 
         protected override async Task DropCollectionAsync(string? database, string collection, string? instanceId = null)
         {
-            if (_config.Engine == EmbeddedEngine.InMemory)
-            {
-                _inMemoryTables.TryRemove(collection, out _);
-                return;
-            }
-
             await ExecuteNonQueryAsync($"DROP TABLE IF EXISTS {collection}");
         }
 
@@ -383,11 +354,6 @@ public sealed class EmbeddedDatabasePlugin : HybridDatabasePluginBase<EmbeddedDb
 
         protected override async Task<IEnumerable<string>> ListCollectionsAsync(string? database, string? instanceId = null)
         {
-            if (_config.Engine == EmbeddedEngine.InMemory)
-            {
-                return _inMemoryTables.Keys.ToList();
-            }
-
             if (_config.Engine == EmbeddedEngine.SQLite)
             {
                 var results = await ExecuteQueryAsync(null, null,
@@ -438,13 +404,6 @@ public sealed class EmbeddedDatabasePlugin : HybridDatabasePluginBase<EmbeddedDb
             if (!string.IsNullOrEmpty(_config.FilePath) && File.Exists(_config.FilePath))
             {
                 await Task.Run(() => File.Copy(_config.FilePath, backupPath, overwrite: true));
-                return MessageResponse.Ok(new { BackupPath = backupPath, Success = true });
-            }
-
-            if (_config.Engine == EmbeddedEngine.InMemory)
-            {
-                var json = JsonSerializer.Serialize(_inMemoryTables, _jsonOptions);
-                await File.WriteAllTextAsync(backupPath, json);
                 return MessageResponse.Ok(new { BackupPath = backupPath, Success = true });
             }
 
@@ -532,59 +491,305 @@ public sealed class EmbeddedDatabasePlugin : HybridDatabasePluginBase<EmbeddedDb
 
         #endregion
 
-        #region In-Memory Implementation
+        #region SQLite Implementation
 
-        private void SaveToMemory(string table, string id, string json)
+        private async Task EnsureSqliteConnectionAsync()
         {
-            var t = _inMemoryTables.GetOrAdd(table, _ => new ConcurrentDictionary<string, string>());
-            t[id] = json;
-        }
+            if (_sqliteConnection != null && _sqliteConnection.State == ConnectionState.Open)
+                return;
 
-        private string LoadFromMemory(string table, string id)
-        {
-            if (_inMemoryTables.TryGetValue(table, out var t) && t.TryGetValue(id, out var json))
+            var connectionString = _config.ConnectionString;
+            if (string.IsNullOrEmpty(connectionString) && !string.IsNullOrEmpty(_config.FilePath))
             {
-                return json;
-            }
-            throw new FileNotFoundException($"Record not found: {table}/{id}");
-        }
-
-        private void DeleteFromMemory(string table, string id)
-        {
-            if (_inMemoryTables.TryGetValue(table, out var t))
-            {
-                t.TryRemove(id, out _);
-            }
-        }
-
-        private IEnumerable<object> QueryInMemory(string table, string? query)
-        {
-            if (!_inMemoryTables.TryGetValue(table, out var t))
-            {
-                return Enumerable.Empty<object>();
+                connectionString = $"Data Source={_config.FilePath}";
+                if (!string.IsNullOrEmpty(_config.Password))
+                    connectionString += $";Password={_config.Password}";
             }
 
-            return t.Select(kvp =>
+            _sqliteConnection = new SqliteConnection(connectionString);
+            await _sqliteConnection.OpenAsync();
+
+            // Enable WAL mode for better concurrency if configured
+            if (_config.EnableWal)
             {
-                var doc = JsonSerializer.Deserialize<Dictionary<string, object>>(kvp.Value, _jsonOptions) ?? new();
-                doc["id"] = kvp.Key;
-                return (object)doc;
-            }).ToList();
+                using var walCmd = _sqliteConnection.CreateCommand();
+                walCmd.CommandText = "PRAGMA journal_mode=WAL;";
+                await walCmd.ExecuteNonQueryAsync();
+            }
+        }
+
+        private async Task EnsureTableExistsAsync(string table)
+        {
+            await EnsureSqliteConnectionAsync();
+
+            using var cmd = _sqliteConnection!.CreateCommand();
+            cmd.CommandText = $"CREATE TABLE IF NOT EXISTS [{table}] (id TEXT PRIMARY KEY, data TEXT NOT NULL, created_at TEXT DEFAULT CURRENT_TIMESTAMP, updated_at TEXT DEFAULT CURRENT_TIMESTAMP)";
+            await cmd.ExecuteNonQueryAsync();
+        }
+
+        private async Task SaveToSQLiteAsync(string table, string id, string json)
+        {
+            await EnsureTableExistsAsync(table);
+
+            using var cmd = _sqliteConnection!.CreateCommand();
+            cmd.CommandText = $"INSERT OR REPLACE INTO [{table}] (id, data, updated_at) VALUES (@id, @data, CURRENT_TIMESTAMP)";
+            cmd.Parameters.AddWithValue("@id", id);
+            cmd.Parameters.AddWithValue("@data", json);
+            await cmd.ExecuteNonQueryAsync();
+        }
+
+        private async Task<string> LoadFromSQLiteAsync(string table, string id)
+        {
+            await EnsureTableExistsAsync(table);
+
+            using var cmd = _sqliteConnection!.CreateCommand();
+            cmd.CommandText = $"SELECT data FROM [{table}] WHERE id = @id";
+            cmd.Parameters.AddWithValue("@id", id);
+
+            var result = await cmd.ExecuteScalarAsync();
+            if (result == null || result == DBNull.Value)
+                throw new FileNotFoundException($"Record not found: {table}/{id}");
+
+            return result.ToString() ?? "{}";
+        }
+
+        private async Task DeleteFromSQLiteAsync(string table, string id)
+        {
+            await EnsureTableExistsAsync(table);
+
+            using var cmd = _sqliteConnection!.CreateCommand();
+            cmd.CommandText = $"DELETE FROM [{table}] WHERE id = @id";
+            cmd.Parameters.AddWithValue("@id", id);
+            await cmd.ExecuteNonQueryAsync();
+        }
+
+        private async Task<IEnumerable<object>> ExecuteEngineQueryAsync(string? table, string? query, Dictionary<string, object>? parameters)
+        {
+            await EnsureSqliteConnectionAsync();
+
+            using var cmd = _sqliteConnection!.CreateCommand();
+            cmd.CommandText = query ?? $"SELECT * FROM [{table}]";
+
+            if (parameters != null)
+            {
+                foreach (var param in parameters)
+                {
+                    cmd.Parameters.AddWithValue($"@{param.Key}", param.Value ?? DBNull.Value);
+                }
+            }
+
+            var results = new List<object>();
+            using var reader = await cmd.ExecuteReaderAsync();
+
+            while (await reader.ReadAsync())
+            {
+                var row = new Dictionary<string, object>();
+                for (int i = 0; i < reader.FieldCount; i++)
+                {
+                    var name = reader.GetName(i);
+                    var value = reader.IsDBNull(i) ? null : reader.GetValue(i);
+                    row[name] = value!;
+                }
+                results.Add(System.Text.Json.JsonSerializer.SerializeToElement(row, _jsonOptions));
+            }
+
+            return results;
+        }
+
+        private async Task<int> ExecuteNonQueryAsync(string sql)
+        {
+            return await ExecuteNonQueryWithParamsAsync(sql, null);
+        }
+
+        private async Task<int> ExecuteNonQueryWithParamsAsync(string sql, Dictionary<string, object>? parameters)
+        {
+            await EnsureSqliteConnectionAsync();
+
+            using var cmd = _sqliteConnection!.CreateCommand();
+            cmd.CommandText = sql;
+
+            if (parameters != null)
+            {
+                foreach (var param in parameters)
+                {
+                    cmd.Parameters.AddWithValue($"@{param.Key}", param.Value ?? DBNull.Value);
+                }
+            }
+
+            return await cmd.ExecuteNonQueryAsync();
         }
 
         #endregion
 
-        #region SQLite/LiteDB Implementation (Simulated)
+        #region LiteDB Implementation
 
-        private Task SaveToSQLiteAsync(string table, string id, string json) => Task.CompletedTask;
-        private Task<string> LoadFromSQLiteAsync(string table, string id) => Task.FromResult("{}");
-        private Task DeleteFromSQLiteAsync(string table, string id) => Task.CompletedTask;
-        private Task SaveToLiteDBAsync(string table, string id, string json) => Task.CompletedTask;
-        private Task<string> LoadFromLiteDBAsync(string table, string id) => Task.FromResult("{}");
-        private Task DeleteFromLiteDBAsync(string table, string id) => Task.CompletedTask;
-        private Task<IEnumerable<object>> ExecuteEngineQueryAsync(string? table, string? query, Dictionary<string, object>? parameters) => Task.FromResult<IEnumerable<object>>(Enumerable.Empty<object>());
-        private Task<int> ExecuteNonQueryAsync(string sql) => Task.FromResult(0);
-        private Task<int> ExecuteNonQueryWithParamsAsync(string sql, Dictionary<string, object>? parameters) => Task.FromResult(0);
+        private void EnsureLiteDbConnection()
+        {
+            if (_liteDb != null)
+                return;
+
+            var connectionString = _config.FilePath ?? "memory";
+
+            // Build connection string with options
+            var builder = new ConnectionString(connectionString);
+
+            if (!string.IsNullOrEmpty(_config.Password))
+            {
+                builder.Password = _config.Password;
+            }
+
+            // Configure connection mode
+            builder.Connection = ConnectionType.Shared; // Allow concurrent access
+
+            _liteDb = new LiteDatabase(builder);
+        }
+
+        private Task SaveToLiteDBAsync(string collection, string id, string json)
+        {
+            EnsureLiteDbConnection();
+
+            var col = _liteDb!.GetCollection<BsonDocument>(collection);
+
+            // Parse JSON to BsonDocument
+            var doc = LiteDB.JsonSerializer.Deserialize(json).AsDocument;
+
+            // Ensure _id is set
+            doc["_id"] = new BsonValue(id);
+
+            // Upsert the document
+            col.Upsert(doc);
+
+            return Task.CompletedTask;
+        }
+
+        private Task<string> LoadFromLiteDBAsync(string collection, string id)
+        {
+            EnsureLiteDbConnection();
+
+            var col = _liteDb!.GetCollection<BsonDocument>(collection);
+
+            var doc = col.FindById(new BsonValue(id));
+            if (doc == null)
+                throw new FileNotFoundException($"Record not found: {collection}/{id}");
+
+            // Convert BsonDocument to JSON
+            var json = LiteDB.JsonSerializer.Serialize(doc);
+            return Task.FromResult(json);
+        }
+
+        private Task DeleteFromLiteDBAsync(string collection, string id)
+        {
+            EnsureLiteDbConnection();
+
+            var col = _liteDb!.GetCollection<BsonDocument>(collection);
+            col.Delete(new BsonValue(id));
+
+            return Task.CompletedTask;
+        }
+
+        #endregion
+
+        #region RocksDB Implementation
+
+        private void EnsureRocksDbConnection()
+        {
+            if (_rocksDb != null)
+                return;
+
+            lock (_rocksDbLock)
+            {
+                if (_rocksDb != null)
+                    return;
+
+                var dbPath = _config.FilePath ?? Path.Combine(Path.GetTempPath(), "rocksdb_" + Guid.NewGuid().ToString("N"));
+
+                // Ensure directory exists
+                Directory.CreateDirectory(dbPath);
+
+                var options = new DbOptions()
+                    .SetCreateIfMissing(true)
+                    .SetCreateMissingColumnFamilies(true);
+
+                // Configure for performance
+                options.SetMaxBackgroundCompactions(4);
+                options.SetMaxBackgroundFlushes(2);
+                options.IncreaseParallelism(Environment.ProcessorCount);
+
+                _rocksDb = RocksDb.Open(options, dbPath);
+            }
+        }
+
+        private Task SaveToRocksDBAsync(string table, string id, string json)
+        {
+            EnsureRocksDbConnection();
+
+            // Use composite key: table:id
+            var key = $"{table}:{id}";
+            var keyBytes = Encoding.UTF8.GetBytes(key);
+            var valueBytes = Encoding.UTF8.GetBytes(json);
+
+            lock (_rocksDbLock)
+            {
+                _rocksDb!.Put(keyBytes, valueBytes);
+            }
+
+            return Task.CompletedTask;
+        }
+
+        private Task<string> LoadFromRocksDBAsync(string table, string id)
+        {
+            EnsureRocksDbConnection();
+
+            var key = $"{table}:{id}";
+            var keyBytes = Encoding.UTF8.GetBytes(key);
+
+            byte[]? valueBytes;
+            lock (_rocksDbLock)
+            {
+                valueBytes = _rocksDb!.Get(keyBytes);
+            }
+
+            if (valueBytes == null)
+                throw new FileNotFoundException($"Record not found: {table}/{id}");
+
+            return Task.FromResult(Encoding.UTF8.GetString(valueBytes));
+        }
+
+        private Task DeleteFromRocksDBAsync(string table, string id)
+        {
+            EnsureRocksDbConnection();
+
+            var key = $"{table}:{id}";
+            var keyBytes = Encoding.UTF8.GetBytes(key);
+
+            lock (_rocksDbLock)
+            {
+                _rocksDb!.Remove(keyBytes);
+            }
+
+            return Task.CompletedTask;
+        }
+
+        #endregion
+
+        #region IDisposable
+
+        public void Dispose()
+        {
+            if (_disposed)
+                return;
+
+            _sqliteConnection?.Dispose();
+            _liteDb?.Dispose();
+
+            lock (_rocksDbLock)
+            {
+                _rocksDb?.Dispose();
+            }
+
+            _writeLock.Dispose();
+            _disposed = true;
+        }
 
         #endregion
 
@@ -618,13 +823,11 @@ public sealed class EmbeddedDatabasePlugin : HybridDatabasePluginBase<EmbeddedDb
 /// </summary>
 public class EmbeddedDbConfig : DatabaseConfigBase
 {
-        public EmbeddedEngine Engine { get; set; } = EmbeddedEngine.InMemory;
+        public EmbeddedEngine Engine { get; set; } = EmbeddedEngine.SQLite;
         public string? FilePath { get; set; }
         public string? Password { get; set; }
         public bool EnableWal { get; set; } = true;
         public int PageSize { get; set; } = 4096;
-
-        public static EmbeddedDbConfig InMemory => new() { Engine = EmbeddedEngine.InMemory };
 
         public static EmbeddedDbConfig SQLite(string filePath, string? password = null) => new()
         {
@@ -640,6 +843,12 @@ public class EmbeddedDbConfig : DatabaseConfigBase
             FilePath = filePath,
             Password = password
         };
+
+        public static EmbeddedDbConfig RocksDB(string directoryPath) => new()
+        {
+            Engine = EmbeddedEngine.RocksDB,
+            FilePath = directoryPath
+        };
     }
 
     /// <summary>
@@ -647,10 +856,6 @@ public class EmbeddedDbConfig : DatabaseConfigBase
     /// </summary>
     public enum EmbeddedEngine
     {
-        // In-Memory / Testing
-        /// <summary>In-memory storage for testing.</summary>
-        InMemory,
-
         // SQL Embedded
         /// <summary>SQLite embedded database.</summary>
         SQLite,

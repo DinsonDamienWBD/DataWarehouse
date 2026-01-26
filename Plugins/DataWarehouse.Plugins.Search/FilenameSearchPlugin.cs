@@ -36,7 +36,7 @@ namespace DataWarehouse.Plugins.Search
         private readonly ConcurrentDictionary<string, Regex> _regexCache;
         private const int MaxRegexCacheSize = 1000;
 
-        public override bool IsAvailable => _isAvailable && IsRunning;
+        public override bool IsAvailable => _isAvailable;
 
         public FilenameSearchPlugin() : this(null) { }
 
@@ -499,12 +499,17 @@ namespace DataWarehouse.Plugins.Search
                     var hit = CreateSearchHit(entry, score, pattern);
 
                     // Add regex match highlights
-                    hit = hit with
+                    var updatedHit = new SearchHit
                     {
-                        Highlights = new[] { new HighlightRange { Start = match.Index, End = match.Index + match.Length } }
+                        ObjectId = hit.ObjectId,
+                        Score = hit.Score,
+                        FoundBy = hit.FoundBy,
+                        Snippet = hit.Snippet,
+                        Highlights = new[] { new HighlightRange { Start = match.Index, End = match.Index + match.Length } },
+                        Metadata = hit.Metadata
                     };
 
-                    hits.Add(hit);
+                    hits.Add(updatedHit);
                     count++;
                 }
             }
@@ -761,8 +766,6 @@ namespace DataWarehouse.Plugins.Search
                 }
             };
         }
-
-        #endregion
 
         #endregion
 

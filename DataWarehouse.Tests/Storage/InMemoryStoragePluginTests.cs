@@ -308,7 +308,7 @@ public class InMemoryStoragePluginTests
             tasks.Add(Task.Run(async () =>
             {
                 var uri = new Uri($"memory:///mixed/{index}.txt");
-                await plugin.SaveAsync(uri, new MemoryStream($"data-{index}"u8.ToArray()));
+                await plugin.SaveAsync(uri, new MemoryStream(Encoding.UTF8.GetBytes($"data-{index}")));
                 if (index % 2 == 0)
                 {
                     await plugin.DeleteAsync(uri);
@@ -367,7 +367,7 @@ public class InMemoryStoragePluginTests
         }
 
         // Act
-        var items = new List<StorageListItem>();
+        var items = new List<DataWarehouse.SDK.Contracts.StorageListItem>();
         await foreach (var item in plugin.ListFilesAsync())
         {
             items.Add(item);
@@ -387,7 +387,7 @@ public class InMemoryStoragePluginTests
         await plugin.SaveAsync(new Uri("memory:///images/logo.png"), new MemoryStream(new byte[10]));
 
         // Act
-        var docsItems = new List<StorageListItem>();
+        var docsItems = new List<DataWarehouse.SDK.Contracts.StorageListItem>();
         await foreach (var item in plugin.ListFilesAsync("docs"))
         {
             docsItems.Add(item);

@@ -581,7 +581,27 @@ public sealed class ContinuousBackupProvider :
                 if (info.Exists && info.Length > _config.MaxFileSizeBytes)
                     return false;
             }
-            catch { }
+            catch (UnauthorizedAccessException ex)
+            {
+                // Cannot access file - log warning but include in backup attempt
+                System.Diagnostics.Trace.TraceWarning(
+                    "[ContinuousBackupProvider] Cannot access file {0} to check size (access denied): {1}",
+                    path, ex.Message);
+            }
+            catch (IOException ex)
+            {
+                // I/O error - log warning but include in backup attempt
+                System.Diagnostics.Trace.TraceWarning(
+                    "[ContinuousBackupProvider] I/O error checking file size for {0}: {1}",
+                    path, ex.Message);
+            }
+            catch (Exception ex)
+            {
+                // Unexpected error - log and continue
+                System.Diagnostics.Trace.TraceWarning(
+                    "[ContinuousBackupProvider] Unexpected error checking file size for {0}: {1}",
+                    path, ex.Message);
+            }
         }
 
         return true;
@@ -618,9 +638,11 @@ public sealed class ContinuousBackupProvider :
         {
             await PerformIncrementalBackupAsync();
         }
-        catch
+        catch (Exception ex)
         {
-            // Log error
+            System.Diagnostics.Trace.TraceError(
+                "[ContinuousBackupProvider] Failed to process pending changes during batch backup: {0}",
+                ex.Message);
         }
     }
 
@@ -763,8 +785,11 @@ public sealed class ContinuousBackupProvider :
             await baseStream.CopyToAsync(ms, ct);
             return ms.ToArray();
         }
-        catch
+        catch (Exception ex)
         {
+            System.Diagnostics.Trace.TraceWarning(
+                "[ContinuousBackupProvider] Failed to reconstruct file {0} from backup: {1}",
+                filePath, ex.Message);
             return null;
         }
     }

@@ -936,7 +936,10 @@ namespace DataWarehouse.Plugins.DistributedTransactions
                         var entry = JsonSerializer.Deserialize<TransactionLogEntry>(line);
                         if (entry != null) entries.Add(entry);
                     }
-                    catch { }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"[DistributedTransactionPlugin] Failed to deserialize transaction log entry: {ex.Message}");
+                    }
                 }
             }
 

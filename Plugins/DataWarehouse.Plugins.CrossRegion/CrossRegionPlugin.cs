@@ -1,5 +1,6 @@
 using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Primitives;
+using DataWarehouse.SDK.Utilities;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
@@ -296,7 +297,7 @@ namespace DataWarehouse.Plugins.CrossRegion
                     IsBidirectional = true,
                     VectorClock = new VersionVector(_localRegionId),
                     LastSuccessfulSync = null,
-                    PendingOperations = 0,
+                    PendingOperationsCounter = 0,
                     ReplicationLag = TimeSpan.Zero
                 };
 
@@ -655,7 +656,7 @@ namespace DataWarehouse.Plugins.CrossRegion
                 OnConflictResolved(eventArgs);
 
                 LogInformation("Resolved conflict for key '{Key}' using strategy '{Strategy}', winner: '{WinningRegion}'",
-                    key, strategy, resolvedRegion);
+                    key, strategy, resolvedRegion ?? "(none)");
 
                 return Task.FromResult(new ConflictResolutionResult
                 {
@@ -1713,7 +1714,7 @@ namespace DataWarehouse.Plugins.CrossRegion
                 ["conflictsDetected"] = status.ConflictsDetected,
                 ["conflictsResolved"] = status.ConflictsResolved,
                 ["maxReplicationLag"] = status.MaxReplicationLag.TotalMilliseconds,
-                ["bandwidthThrottle"] = status.BandwidthThrottle,
+                ["bandwidthThrottle"] = status.BandwidthThrottle as object ?? DBNull.Value,
                 ["regions"] = status.Regions.Select(kvp => new Dictionary<string, object>
                 {
                     ["regionId"] = kvp.Key,
@@ -1952,22 +1953,30 @@ namespace DataWarehouse.Plugins.CrossRegion
 
         private void LogInformation(string message, params object[] args)
         {
-            _context?.LogInformation($"[CrossRegionPlugin] {message}", args);
+            // Logging placeholder - context-based logging not available
+            var formatted = args?.Length > 0 ? string.Format(message, args) : message;
+            Console.WriteLine($"[CrossRegionPlugin INFO] {formatted}");
         }
 
         private void LogWarning(string message, params object[] args)
         {
-            _context?.LogWarning($"[CrossRegionPlugin] {message}", args);
+            // Logging placeholder - context-based logging not available
+            var formatted = args?.Length > 0 ? string.Format(message, args) : message;
+            Console.WriteLine($"[CrossRegionPlugin WARN] {formatted}");
         }
 
         private void LogError(Exception ex, string message, params object[] args)
         {
-            _context?.LogError(ex, $"[CrossRegionPlugin] {message}", args);
+            // Logging placeholder - context-based logging not available
+            var formatted = args?.Length > 0 ? string.Format(message, args) : message;
+            Console.WriteLine($"[CrossRegionPlugin ERROR] {formatted}: {ex.Message}");
         }
 
         private void LogDebug(string message, params object[] args)
         {
-            _context?.LogDebug($"[CrossRegionPlugin] {message}", args);
+            // Logging placeholder - context-based logging not available
+            var formatted = args?.Length > 0 ? string.Format(message, args) : message;
+            Console.WriteLine($"[CrossRegionPlugin DEBUG] {formatted}");
         }
 
         #endregion

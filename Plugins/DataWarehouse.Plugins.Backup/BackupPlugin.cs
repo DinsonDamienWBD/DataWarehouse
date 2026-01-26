@@ -1,5 +1,8 @@
 using DataWarehouse.Plugins.Backup.Providers;
 using DataWarehouse.SDK.Contracts;
+using DataWarehouse.SDK.Primitives;
+using DataWarehouse.SDK.Utilities;
+using Microsoft.Extensions.Logging;
 using System.Collections.Concurrent;
 
 namespace DataWarehouse.Plugins.Backup;
@@ -17,6 +20,7 @@ public sealed class BackupPlugin : FeaturePluginBase, IAsyncDisposable
     private readonly ConcurrentDictionary<string, BackupPolicy> _policies = new();
     private readonly BackupPluginConfig _config;
     private readonly string _statePath;
+    private readonly ILogger<BackupPlugin>? _logger;
     private CancellationTokenSource? _cts;
     private volatile bool _disposed;
 
@@ -43,9 +47,10 @@ public sealed class BackupPlugin : FeaturePluginBase, IAsyncDisposable
     /// <summary>
     /// Creates a new backup plugin instance.
     /// </summary>
-    public BackupPlugin(BackupPluginConfig? config = null)
+    public BackupPlugin(BackupPluginConfig? config = null, ILogger<BackupPlugin>? logger = null)
     {
         _config = config ?? new BackupPluginConfig();
+        _logger = logger;
         _statePath = _config.StatePath ?? Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
             "DataWarehouse", "Backup");
@@ -225,19 +230,66 @@ public sealed class BackupPlugin : FeaturePluginBase, IAsyncDisposable
             throw new InvalidOperationException($"Provider '{job.DestinationName}' not found");
         }
 
+        // Validate source paths
+        if (job.SourcePaths == null || job.SourcePaths.Count == 0)
+        {
+            throw new InvalidOperationException($"Job '{job.Name}' has no source paths configured");
+        }
+
+        // Validate that at least one source path exists
+        var existingPaths = job.SourcePaths.Where(p => Directory.Exists(p) || File.Exists(p)).ToList();
+        if (existingPaths.Count == 0)
+        {
+            throw new InvalidOperationException($"Job '{job.Name}': None of the configured source paths exist");
+        }
+
+        // Log which paths are being backed up
+        _logger?.LogInformation("Starting backup job '{JobName}' for {PathCount} source path(s)",
+            job.Name, existingPaths.Count);
+
+        foreach (var path in job.SourcePaths)
+        {
+            if (Directory.Exists(path) || File.Exists(path))
+            {
+                _logger?.LogInformation("  Backing up: {Path}", path);
+            }
+            else
+            {
+                _logger?.LogWarning("  Source path does not exist (skipping): {Path}", path);
+            }
+        }
+
         job.Status = BackupJobStatus.Running;
         job.LastRunAt = DateTime.UtcNow;
         BackupStarted?.Invoke(this, job);
 
         try
         {
-            var result = await provider.PerformIncrementalBackupAsync(job.Options, ct);
+            BackupResult result;
+
+            // Check if this is the first backup for this provider (needs full backup to establish baseline)
+            var stats = provider.GetStatistics();
+            if (stats.LastFullBackupTime == null || stats.TrackedFiles == 0)
+            {
+                _logger?.LogInformation("Performing initial full backup for job '{JobName}'", job.Name);
+                result = await provider.PerformFullBackupAsync(existingPaths, job.Options, ct);
+            }
+            else
+            {
+                _logger?.LogInformation("Performing incremental backup for job '{JobName}'", job.Name);
+                result = await provider.PerformIncrementalBackupAsync(job.Options, ct);
+            }
+
             job.Status = BackupJobStatus.Completed;
+            _logger?.LogInformation("Backup job '{JobName}' completed: {FileCount} files, {ByteCount} bytes",
+                job.Name, result.TotalFiles, result.TotalBytes);
+
             return result;
         }
-        catch (Exception)
+        catch (Exception ex)
         {
             job.Status = BackupJobStatus.Failed;
+            _logger?.LogError(ex, "Backup job '{JobName}' failed", job.Name);
             throw;
         }
     }
@@ -410,49 +462,49 @@ public sealed class BackupPlugin : FeaturePluginBase, IAsyncDisposable
             {
                 Name = "FullBackup",
                 Description = "Performs a full backup of specified paths",
-                Parameters = new List<PluginParameterDescriptor>
+                Parameters = new Dictionary<string, object>
                 {
-                    new() { Name = "paths", Type = "string[]", Required = true, Description = "Paths to backup" },
-                    new() { Name = "provider", Type = "string", Required = true, Description = "Provider name" }
+                    ["paths"] = new PluginParameterDescriptor { Name = "paths", Type = "string[]", Required = true, Description = "Paths to backup" },
+                    ["provider"] = new PluginParameterDescriptor { Name = "provider", Type = "string", Required = true, Description = "Provider name" }
                 }
             },
             new()
             {
                 Name = "IncrementalBackup",
                 Description = "Performs an incremental backup",
-                Parameters = new List<PluginParameterDescriptor>
+                Parameters = new Dictionary<string, object>
                 {
-                    new() { Name = "provider", Type = "string", Required = true, Description = "Provider name" }
+                    ["provider"] = new PluginParameterDescriptor { Name = "provider", Type = "string", Required = true, Description = "Provider name" }
                 }
             },
             new()
             {
                 Name = "Restore",
                 Description = "Restores from a backup",
-                Parameters = new List<PluginParameterDescriptor>
+                Parameters = new Dictionary<string, object>
                 {
-                    new() { Name = "provider", Type = "string", Required = true, Description = "Provider name" },
-                    new() { Name = "backupId", Type = "string", Required = true, Description = "Backup ID to restore" },
-                    new() { Name = "targetPath", Type = "string", Required = false, Description = "Target restore path" }
+                    ["provider"] = new PluginParameterDescriptor { Name = "provider", Type = "string", Required = true, Description = "Provider name" },
+                    ["backupId"] = new PluginParameterDescriptor { Name = "backupId", Type = "string", Required = true, Description = "Backup ID to restore" },
+                    ["targetPath"] = new PluginParameterDescriptor { Name = "targetPath", Type = "string", Required = false, Description = "Target restore path" }
                 }
             },
             new()
             {
                 Name = "SyntheticFull",
                 Description = "Creates a synthetic full backup from incrementals",
-                Parameters = new List<PluginParameterDescriptor>
+                Parameters = new Dictionary<string, object>
                 {
-                    new() { Name = "provider", Type = "string", Required = true, Description = "Provider name" }
+                    ["provider"] = new PluginParameterDescriptor { Name = "provider", Type = "string", Required = true, Description = "Provider name" }
                 }
             },
             new()
             {
                 Name = "StartContinuous",
                 Description = "Starts continuous backup monitoring",
-                Parameters = new List<PluginParameterDescriptor>
+                Parameters = new Dictionary<string, object>
                 {
-                    new() { Name = "provider", Type = "string", Required = true, Description = "Provider name" },
-                    new() { Name = "paths", Type = "string[]", Required = true, Description = "Paths to monitor" }
+                    ["provider"] = new PluginParameterDescriptor { Name = "provider", Type = "string", Required = true, Description = "Provider name" },
+                    ["paths"] = new PluginParameterDescriptor { Name = "paths", Type = "string[]", Required = true, Description = "Paths to monitor" }
                 }
             }
         };
@@ -475,25 +527,54 @@ public sealed class BackupPlugin : FeaturePluginBase, IAsyncDisposable
     private async Task LoadStateAsync()
     {
         var stateFile = Path.Combine(_statePath, "plugin_state.json");
-        if (File.Exists(stateFile))
+        if (!File.Exists(stateFile))
         {
+            _logger?.LogInformation("No existing state file at {StatePath}, starting fresh", stateFile);
+            return;
+        }
+
+        try
+        {
+            var json = await File.ReadAllTextAsync(stateFile);
+            var state = System.Text.Json.JsonSerializer.Deserialize<PluginState>(json);
+
+            if (state == null)
+            {
+                _logger?.LogWarning("State file at {StatePath} was empty or invalid, starting fresh", stateFile);
+                return;
+            }
+
+            // Restore policies
+            foreach (var policy in state.Policies)
+                _policies[policy.Name] = policy;
+
+            // Restore jobs
+            foreach (var job in state.Jobs)
+                _jobs[job.Id] = job;
+
+            _logger?.LogInformation("Loaded backup state with {PolicyCount} policies and {JobCount} jobs from {StatePath}",
+                state.Policies?.Count ?? 0, state.Jobs?.Count ?? 0, stateFile);
+        }
+        catch (System.Text.Json.JsonException ex)
+        {
+            _logger?.LogError(ex, "State file at {StatePath} is corrupted, starting fresh", stateFile);
+
+            // Back up corrupted file for analysis
+            var backupPath = stateFile + ".corrupted." + DateTime.UtcNow.ToString("yyyyMMddHHmmss");
             try
             {
-                var json = await File.ReadAllTextAsync(stateFile);
-                var state = System.Text.Json.JsonSerializer.Deserialize<PluginState>(json);
-                if (state != null)
-                {
-                    foreach (var policy in state.Policies)
-                        _policies[policy.Name] = policy;
-
-                    foreach (var job in state.Jobs)
-                        _jobs[job.Id] = job;
-                }
+                File.Move(stateFile, backupPath);
+                _logger?.LogInformation("Moved corrupted state file to {BackupPath}", backupPath);
             }
-            catch
+            catch (Exception moveEx)
             {
-                // Ignore state load errors
+                _logger?.LogWarning(moveEx, "Failed to backup corrupted state file");
             }
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "Failed to load backup state from {StatePath}", stateFile);
+            throw; // Critical failure - don't silently continue
         }
     }
 

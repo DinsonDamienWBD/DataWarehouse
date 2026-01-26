@@ -1,6 +1,6 @@
-using DataWarehouse.Kernel.Replication;
 using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Primitives;
+using DataWarehouse.SDK.Utilities;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -49,10 +49,14 @@ namespace DataWarehouse.Plugins.GeoReplication
 
         public override Task<HandshakeResponse> OnHandshakeAsync(HandshakeRequest request)
         {
-            _context = request.Context;
+            _context = null; // Context property removed from HandshakeRequest
 
             // Initialize the manager with consensus enabled
             _manager = new GeoReplicationManager(_context, enableConsensus: true);
+
+            // Wire up manager events to plugin events
+            _manager.ConflictResolved += (sender, args) => ConflictResolved?.Invoke(this, args);
+            _manager.RegionHealthChanged += (sender, args) => RegionHealthChanged?.Invoke(this, args);
 
             return Task.FromResult(new HandshakeResponse
             {
@@ -65,6 +69,32 @@ namespace DataWarehouse.Plugins.GeoReplication
                 Capabilities = GetCapabilities(),
                 Metadata = GetMetadata()
             });
+        }
+
+        /// <inheritdoc />
+        public override async Task StartAsync(CancellationToken ct)
+        {
+            if (_manager == null)
+                throw new InvalidOperationException("Plugin not initialized. Call OnHandshakeAsync first.");
+
+            _cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+
+            // Start the manager's background tasks
+            await _manager.StartAsync(_cts.Token);
+        }
+
+        /// <inheritdoc />
+        public override async Task StopAsync()
+        {
+            _cts?.Cancel();
+
+            if (_manager != null)
+            {
+                await _manager.StopAsync();
+            }
+
+            _cts?.Dispose();
+            _cts = null;
         }
 
         protected override List<PluginCapabilityDescriptor> GetCapabilities()
@@ -417,7 +447,7 @@ namespace DataWarehouse.Plugins.GeoReplication
                 ["conflictsDetected"] = status.ConflictsDetected,
                 ["conflictsResolved"] = status.ConflictsResolved,
                 ["maxReplicationLag"] = status.MaxReplicationLag.TotalMilliseconds,
-                ["bandwidthThrottle"] = status.BandwidthThrottle,
+                ["bandwidthThrottle"] = status.BandwidthThrottle as object ?? DBNull.Value,
                 ["regions"] = status.Regions.Select(kvp => new Dictionary<string, object>
                 {
                     ["regionId"] = kvp.Key,

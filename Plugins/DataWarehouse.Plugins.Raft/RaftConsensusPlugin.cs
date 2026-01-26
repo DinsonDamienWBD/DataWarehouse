@@ -48,11 +48,10 @@ namespace DataWarehouse.Plugins.Raft
         private string _nodeEndpoint = string.Empty;
         private readonly ConcurrentDictionary<string, RaftPeer> _peers = new();
 
-        // Log
-        private readonly List<LogEntry> _log = new();
+        // Log storage - persistent
+        private IRaftLogStore? _logStore;
         private long _commitIndex;
         private long _lastApplied;
-        private readonly object _logLock = new();
 
         // Leader state (volatile, reset after election)
         private readonly ConcurrentDictionary<string, long> _nextIndex = new();
@@ -83,7 +82,7 @@ namespace DataWarehouse.Plugins.Raft
 
         // Network
         private TcpListener? _listener;
-        private int _listenPort = 5000;
+        private RaftConfiguration _config = new();
 
         public override bool IsLeader
         {
@@ -99,6 +98,33 @@ namespace DataWarehouse.Plugins.Raft
         public string NodeId => _nodeId;
         public long CurrentTerm => Interlocked.Read(ref _currentTerm);
         public string? LeaderId => _leaderId;
+
+        /// <summary>
+        /// Initializes a new instance of the RaftConsensusPlugin with default configuration.
+        /// </summary>
+        public RaftConsensusPlugin() : this(new RaftConfiguration())
+        {
+        }
+
+        /// <summary>
+        /// Initializes a new instance of the RaftConsensusPlugin with the specified configuration.
+        /// </summary>
+        /// <param name="config">The Raft configuration settings.</param>
+        public RaftConsensusPlugin(RaftConfiguration config)
+        {
+            _config = config ?? new RaftConfiguration();
+        }
+
+        /// <summary>
+        /// Initializes a new instance of the RaftConsensusPlugin with custom log store.
+        /// </summary>
+        /// <param name="config">The Raft configuration settings.</param>
+        /// <param name="logStore">Custom log store implementation.</param>
+        public RaftConsensusPlugin(RaftConfiguration config, IRaftLogStore logStore)
+        {
+            _config = config ?? new RaftConfiguration();
+            _logStore = logStore ?? throw new ArgumentNullException(nameof(logStore));
+        }
 
         public override Task<HandshakeResponse> OnHandshakeAsync(HandshakeRequest request)
         {
@@ -190,7 +216,7 @@ namespace DataWarehouse.Plugins.Raft
             meta["State"] = _state.ToString();
             meta["LeaderId"] = _leaderId ?? "none";
             meta["PeerCount"] = _peers.Count;
-            meta["LogLength"] = _log.Count;
+            meta["LogLength"] = _logStore?.GetLastIndexAsync().GetAwaiter().GetResult() ?? 0;
             meta["CommitIndex"] = _commitIndex;
             return meta;
         }
@@ -198,6 +224,29 @@ namespace DataWarehouse.Plugins.Raft
         public override async Task StartAsync(CancellationToken ct)
         {
             _cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+
+            // Initialize log store if not provided
+            if (_logStore == null)
+            {
+                var dataDir = Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                    "DataWarehouse", "Raft", _nodeId);
+                _logStore = new FileRaftLogStore(dataDir);
+            }
+
+            // Initialize and load persistent state
+            if (_logStore is FileRaftLogStore fileStore)
+            {
+                await fileStore.InitializeAsync();
+            }
+
+            // Restore persistent state
+            var (term, votedFor) = await _logStore.GetPersistentStateAsync();
+            lock (_stateLock)
+            {
+                _currentTerm = term;
+                _votedFor = votedFor;
+            }
 
             // Start TCP listener for peer communication
             await StartListenerAsync();
@@ -219,6 +268,12 @@ namespace DataWarehouse.Plugins.Raft
             if (_electionTask != null) await _electionTask.ContinueWith(_ => { });
             if (_heartbeatTask != null) await _heartbeatTask.ContinueWith(_ => { });
             if (_commitTask != null) await _commitTask.ContinueWith(_ => { });
+
+            // Dispose log store if owned
+            if (_logStore is IDisposable disposable)
+            {
+                disposable.Dispose();
+            }
 
             _cts?.Dispose();
             _cts = null;
@@ -253,9 +308,10 @@ namespace DataWarehouse.Plugins.Raft
             }
 
             // Create log entry
-            var entry = new LogEntry
+            var lastIndex = await GetLastLogIndexAsync();
+            var entry = new RaftLogEntry
             {
-                Index = GetLastLogIndex() + 1,
+                Index = lastIndex + 1,
                 Term = _currentTerm,
                 Command = proposal.Command,
                 Payload = proposal.Payload,
@@ -263,11 +319,11 @@ namespace DataWarehouse.Plugins.Raft
                 Timestamp = DateTime.UtcNow
             };
 
-            // Append to local log
-            lock (_logLock)
-            {
-                _log.Add(entry);
-            }
+            // Append to persistent log
+            if (_logStore == null)
+                throw new InvalidOperationException("Log store not initialized");
+
+            await _logStore.AppendAsync(entry);
 
             // Create completion source for quorum confirmation
             var tcs = new TaskCompletionSource<bool>();
@@ -335,8 +391,8 @@ namespace DataWarehouse.Plugins.Raft
                 "raft.cluster.leave" => HandleClusterLeave(message.Payload),
                 "raft.configure" => HandleConfigure(message.Payload),
                 // Internal RPC messages
-                "raft.rpc.request-vote" => HandleRequestVote(message.Payload),
-                "raft.rpc.append-entries" => HandleAppendEntries(message.Payload),
+                "raft.rpc.request-vote" => await HandleRequestVoteAsync(message.Payload),
+                "raft.rpc.append-entries" => await HandleAppendEntriesAsync(message.Payload),
                 _ => new Dictionary<string, object> { ["error"] = $"Unknown command: {message.Type}" }
             };
 
@@ -367,6 +423,7 @@ namespace DataWarehouse.Plugins.Raft
 
                     await Task.Delay(timeout, ct);
 
+                    bool shouldStartElection = false;
                     lock (_stateLock)
                     {
                         // Check if we should start election
@@ -379,18 +436,26 @@ namespace DataWarehouse.Plugins.Raft
                         _state = RaftState.Candidate;
                         _currentTerm++;
                         _votedFor = _nodeId;
+                        shouldStartElection = true;
                     }
 
-                    // Request votes from peers
-                    await RequestVotesAsync();
+                    if (shouldStartElection && _logStore != null)
+                    {
+                        // Persist state before requesting votes
+                        await _logStore.SavePersistentStateAsync(_currentTerm, _votedFor);
+
+                        // Request votes from peers
+                        await RequestVotesAsync();
+                    }
                 }
                 catch (OperationCanceledException)
                 {
                     break;
                 }
-                catch
+                catch (Exception ex)
                 {
                     // Election failed, will retry
+                    Console.WriteLine($"[Raft] Election attempt failed - Node: {_nodeId}, State: {_state}, Term: {_currentTerm}, Error: {ex.Message}");
                 }
             }
         }
@@ -398,8 +463,8 @@ namespace DataWarehouse.Plugins.Raft
         private async Task RequestVotesAsync()
         {
             var term = _currentTerm;
-            var lastLogIndex = GetLastLogIndex();
-            var lastLogTerm = GetLastLogTerm();
+            var lastLogIndex = await GetLastLogIndexAsync();
+            var lastLogTerm = await GetLastLogTermAsync();
 
             var voteRequest = new RequestVoteRequest
             {
@@ -415,7 +480,7 @@ namespace DataWarehouse.Plugins.Raft
             if (peers.Length == 0)
             {
                 // Single node cluster - become leader immediately
-                BecomeLeader();
+                await BecomeLeaderAsync();
                 return;
             }
 
@@ -429,7 +494,7 @@ namespace DataWarehouse.Plugins.Raft
                 if (response.Term > term)
                 {
                     // Higher term found, step down
-                    StepDown(response.Term);
+                    await StepDownAsync(response.Term);
                     return;
                 }
 
@@ -447,13 +512,13 @@ namespace DataWarehouse.Plugins.Raft
                 {
                     if (_state == RaftState.Candidate && _currentTerm == term)
                     {
-                        BecomeLeader();
+                        _ = BecomeLeaderAsync();
                     }
                 }
             }
         }
 
-        private void BecomeLeader()
+        private async Task BecomeLeaderAsync()
         {
             lock (_stateLock)
             {
@@ -462,7 +527,7 @@ namespace DataWarehouse.Plugins.Raft
             }
 
             // Initialize leader state
-            var lastLogIndex = GetLastLogIndex();
+            var lastLogIndex = await GetLastLogIndexAsync();
             foreach (var peer in _peers.Keys)
             {
                 _nextIndex[peer] = lastLogIndex + 1;
@@ -470,13 +535,18 @@ namespace DataWarehouse.Plugins.Raft
             }
         }
 
-        private void StepDown(long newTerm)
+        private async Task StepDownAsync(long newTerm)
         {
             lock (_stateLock)
             {
                 _currentTerm = newTerm;
                 _state = RaftState.Follower;
                 _votedFor = null;
+            }
+
+            if (_logStore != null)
+            {
+                await _logStore.SavePersistentStateAsync(newTerm, null);
             }
         }
 
@@ -504,37 +574,38 @@ namespace DataWarehouse.Plugins.Raft
                 {
                     break;
                 }
-                catch
+                catch (Exception ex)
                 {
-                    // Heartbeat failed, will retry
+                    // Heartbeat failed, will retry - expected during network partitions
+                    Console.WriteLine($"[Raft] Heartbeat failed - Node: {_nodeId}, State: {_state}, Term: {_currentTerm}, PeerCount: {_peers.Count}, Error: {ex.Message}");
                 }
             }
         }
 
         private async Task SendHeartbeatsAsync()
         {
-            var tasks = _peers.Values.Select(peer => SendAppendEntriesAsync(peer, Array.Empty<LogEntry>()));
+            var tasks = _peers.Values.Select(peer => SendAppendEntriesAsync(peer, Array.Empty<RaftLogEntry>()));
             await Task.WhenAll(tasks);
         }
 
-        private async Task ReplicateLogAsync(LogEntry entry)
+        private async Task ReplicateLogAsync(RaftLogEntry entry)
         {
             var tasks = _peers.Values.Select(async peer =>
             {
                 var nextIdx = _nextIndex.GetOrAdd(peer.NodeId, entry.Index);
-                var entriesToSend = GetEntriesFromIndex(nextIdx);
+                var entriesToSend = await GetEntriesFromIndexAsync(nextIdx);
                 return await SendAppendEntriesAsync(peer, entriesToSend);
             });
 
             await Task.WhenAll(tasks);
-            UpdateCommitIndex();
+            await UpdateCommitIndexAsync();
         }
 
-        private void UpdateCommitIndex()
+        private async Task UpdateCommitIndexAsync()
         {
             // Find the highest index that has been replicated to a quorum
             var matchIndices = _matchIndex.Values.ToList();
-            matchIndices.Add(GetLastLogIndex()); // Include self
+            matchIndices.Add(await GetLastLogIndexAsync()); // Include self
 
             matchIndices.Sort();
             var quorum = matchIndices.Count / 2;
@@ -543,28 +614,28 @@ namespace DataWarehouse.Plugins.Raft
             if (newCommitIndex > _commitIndex)
             {
                 // Verify the entry is from current term
-                var entry = GetLogEntry(newCommitIndex);
+                var entry = await GetLogEntryAsync(newCommitIndex);
                 if (entry != null && entry.Term == _currentTerm)
                 {
                     _commitIndex = newCommitIndex;
 
                     // Complete pending proposals up to commit index
-                    CompletePendingProposals(newCommitIndex);
+                    await CompletePendingProposalsAsync(newCommitIndex);
                 }
             }
         }
 
-        private void CompletePendingProposals(long commitIndex)
+        private async Task CompletePendingProposalsAsync(long commitIndex)
         {
-            lock (_logLock)
+            if (_logStore == null) return;
+
+            var lastIndex = await _logStore.GetLastIndexAsync();
+            for (var i = _lastApplied + 1; i <= commitIndex && i <= lastIndex; i++)
             {
-                for (var i = _lastApplied + 1; i <= commitIndex && i <= _log.Count; i++)
+                var entry = await _logStore.GetEntryAsync(i);
+                if (entry != null && _pendingProposals.TryRemove(entry.ProposalId, out var tcs))
                 {
-                    var entry = _log[(int)i - 1];
-                    if (_pendingProposals.TryRemove(entry.ProposalId, out var tcs))
-                    {
-                        tcs.TrySetResult(true);
-                    }
+                    tcs.TrySetResult(true);
                 }
             }
         }
@@ -580,7 +651,7 @@ namespace DataWarehouse.Plugins.Raft
                     while (_lastApplied < _commitIndex)
                     {
                         _lastApplied++;
-                        var entry = GetLogEntry(_lastApplied);
+                        var entry = await GetLogEntryAsync(_lastApplied);
                         if (entry != null)
                         {
                             ApplyEntry(entry);
@@ -588,7 +659,8 @@ namespace DataWarehouse.Plugins.Raft
                     }
 
                     // Check for snapshot
-                    if (_log.Count > _snapshotThreshold)
+                    var logLength = _logStore != null ? await _logStore.GetLastIndexAsync() : 0;
+                    if (logLength > _snapshotThreshold)
                     {
                         await CreateSnapshotAsync();
                     }
@@ -597,14 +669,15 @@ namespace DataWarehouse.Plugins.Raft
                 {
                     break;
                 }
-                catch
+                catch (Exception ex)
                 {
                     // Commit loop error, will retry
+                    Console.WriteLine($"[Raft] Commit loop error - Node: {_nodeId}, LastApplied: {_lastApplied}, CommitIndex: {_commitIndex}, Error: {ex.Message}");
                 }
             }
         }
 
-        private void ApplyEntry(LogEntry entry)
+        private void ApplyEntry(RaftLogEntry entry)
         {
             // Create proposal from entry
             var proposal = new Proposal
@@ -644,9 +717,10 @@ namespace DataWarehouse.Plugins.Raft
                 {
                     handler(proposal);
                 }
-                catch
+                catch (Exception ex)
                 {
-                    // Handler error, continue
+                    // Handler error, continue - individual handler failures should not block commit processing
+                    Console.WriteLine($"[Raft] Commit handler failed - Node: {_nodeId}, ProposalId: {proposal.Id}, Command: {proposal.Command}, Error: {ex.Message}");
                 }
             }
         }
@@ -787,7 +861,11 @@ namespace DataWarehouse.Plugins.Raft
 
                 _locks[lockId] = @lock;
             }
-            catch { }
+            catch (Exception ex)
+            {
+                // Failed to parse lock acquire payload
+                Console.WriteLine($"[Raft] Lock acquire parse failed - Node: {_nodeId}, PayloadLength: {payload.Length}, Error: {ex.Message}");
+            }
         }
 
         private void ApplyLockRelease(byte[] payload)
@@ -805,7 +883,11 @@ namespace DataWarehouse.Plugins.Raft
                     _locks.TryRemove(lockId, out _);
                 }
             }
-            catch { }
+            catch (Exception ex)
+            {
+                // Failed to parse lock release payload
+                Console.WriteLine($"[Raft] Lock release parse failed - Node: {_nodeId}, PayloadLength: {payload.Length}, Error: {ex.Message}");
+            }
         }
 
         #endregion
@@ -815,6 +897,7 @@ namespace DataWarehouse.Plugins.Raft
         private async Task<Dictionary<string, object>> HandleClusterStatusAsync()
         {
             var state = await GetClusterStateAsync();
+            var logLength = await GetLastLogIndexAsync();
 
             var peerList = _peers.Values.Select(p => new Dictionary<string, object>
             {
@@ -833,7 +916,7 @@ namespace DataWarehouse.Plugins.Raft
                 ["leaderId"] = _leaderId ?? "none",
                 ["commitIndex"] = _commitIndex,
                 ["lastApplied"] = _lastApplied,
-                ["logLength"] = _log.Count,
+                ["logLength"] = logLength,
                 ["peers"] = peerList,
                 ["isHealthy"] = state.IsHealthy
             };
@@ -907,7 +990,11 @@ namespace DataWarehouse.Plugins.Raft
                     };
                 }
             }
-            catch { }
+            catch (Exception ex)
+            {
+                // Failed to parse cluster join payload
+                Console.WriteLine($"[Raft] Cluster join parse failed - Node: {_nodeId}, PayloadLength: {payload.Length}, Error: {ex.Message}");
+            }
         }
 
         private void ApplyClusterLeave(byte[] payload)
@@ -919,19 +1006,26 @@ namespace DataWarehouse.Plugins.Raft
 
                 _peers.TryRemove(nodeId, out _);
             }
-            catch { }
+            catch (Exception ex)
+            {
+                // Failed to parse cluster leave payload
+                Console.WriteLine($"[Raft] Cluster leave parse failed - Node: {_nodeId}, PayloadLength: {payload.Length}, Error: {ex.Message}");
+            }
         }
 
         #endregion
 
         #region RPC Handlers
 
-        private Dictionary<string, object> HandleRequestVote(Dictionary<string, object> payload)
+        private async Task<Dictionary<string, object>> HandleRequestVoteAsync(Dictionary<string, object> payload)
         {
             var term = Convert.ToInt64(payload.GetValueOrDefault("term"));
             var candidateId = payload.GetValueOrDefault("candidateId")?.ToString() ?? "";
             var lastLogIndex = Convert.ToInt64(payload.GetValueOrDefault("lastLogIndex"));
             var lastLogTerm = Convert.ToInt64(payload.GetValueOrDefault("lastLogTerm"));
+
+            bool shouldStepDown = false;
+            bool shouldGrantVote = false;
 
             lock (_stateLock)
             {
@@ -948,15 +1042,23 @@ namespace DataWarehouse.Plugins.Raft
                 // Update term if newer
                 if (term > _currentTerm)
                 {
-                    StepDown(term);
+                    shouldStepDown = true;
                 }
+            }
 
+            if (shouldStepDown)
+            {
+                await StepDownAsync(term);
+            }
+
+            lock (_stateLock)
+            {
                 // Vote if haven't voted or already voted for this candidate
                 var canVote = _votedFor == null || _votedFor == candidateId;
 
                 // Check if candidate's log is at least as up-to-date
-                var myLastLogIndex = GetLastLogIndex();
-                var myLastLogTerm = GetLastLogTerm();
+                var myLastLogIndex = GetLastLogIndexAsync().GetAwaiter().GetResult();
+                var myLastLogTerm = GetLastLogTermAsync().GetAwaiter().GetResult();
                 var logOk = lastLogTerm > myLastLogTerm ||
                            (lastLogTerm == myLastLogTerm && lastLogIndex >= myLastLogIndex);
 
@@ -964,23 +1066,26 @@ namespace DataWarehouse.Plugins.Raft
                 {
                     _votedFor = candidateId;
                     _lastHeartbeat = DateTime.UtcNow;
-
-                    return new Dictionary<string, object>
-                    {
-                        ["term"] = _currentTerm,
-                        ["voteGranted"] = true
-                    };
+                    shouldGrantVote = true;
                 }
+            }
 
+            if (shouldGrantVote && _logStore != null)
+            {
+                await _logStore.SavePersistentStateAsync(_currentTerm, _votedFor);
+            }
+
+            lock (_stateLock)
+            {
                 return new Dictionary<string, object>
                 {
                     ["term"] = _currentTerm,
-                    ["voteGranted"] = false
+                    ["voteGranted"] = shouldGrantVote
                 };
             }
         }
 
-        private Dictionary<string, object> HandleAppendEntries(Dictionary<string, object> payload)
+        private async Task<Dictionary<string, object>> HandleAppendEntriesAsync(Dictionary<string, object> payload)
         {
             var term = Convert.ToInt64(payload.GetValueOrDefault("term"));
             var leaderId = payload.GetValueOrDefault("leaderId")?.ToString() ?? "";
@@ -989,6 +1094,7 @@ namespace DataWarehouse.Plugins.Raft
             var leaderCommit = Convert.ToInt64(payload.GetValueOrDefault("leaderCommit"));
             var entriesJson = payload.GetValueOrDefault("entries")?.ToString();
 
+            bool shouldStepDown = false;
             lock (_stateLock)
             {
                 // Reply false if term < currentTerm
@@ -1004,9 +1110,17 @@ namespace DataWarehouse.Plugins.Raft
                 // Update term and step down if needed
                 if (term > _currentTerm)
                 {
-                    StepDown(term);
+                    shouldStepDown = true;
                 }
+            }
 
+            if (shouldStepDown)
+            {
+                await StepDownAsync(term);
+            }
+
+            lock (_stateLock)
+            {
                 _state = RaftState.Follower;
                 _leaderId = leaderId;
                 _lastHeartbeat = DateTime.UtcNow;
@@ -1015,41 +1129,42 @@ namespace DataWarehouse.Plugins.Raft
             // Check log consistency
             if (prevLogIndex > 0)
             {
-                var prevEntry = GetLogEntry(prevLogIndex);
+                var prevEntry = await GetLogEntryAsync(prevLogIndex);
                 if (prevEntry == null || prevEntry.Term != prevLogTerm)
                 {
+                    var lastIndex = await GetLastLogIndexAsync();
                     return new Dictionary<string, object>
                     {
                         ["term"] = _currentTerm,
                         ["success"] = false,
-                        ["conflictIndex"] = prevEntry == null ? GetLastLogIndex() + 1 : prevLogIndex
+                        ["conflictIndex"] = prevEntry == null ? lastIndex + 1 : prevLogIndex
                     };
                 }
             }
 
             // Append entries
-            if (!string.IsNullOrEmpty(entriesJson))
+            if (!string.IsNullOrEmpty(entriesJson) && _logStore != null)
             {
-                var entries = JsonSerializer.Deserialize<List<LogEntry>>(entriesJson);
+                var entries = JsonSerializer.Deserialize<List<RaftLogEntry>>(entriesJson);
                 if (entries != null)
                 {
-                    lock (_logLock)
+                    foreach (var entry in entries)
                     {
-                        foreach (var entry in entries)
+                        var lastIndex = await _logStore.GetLastIndexAsync();
+                        if (entry.Index <= lastIndex)
                         {
-                            if (entry.Index <= _log.Count)
+                            // Check for conflict
+                            var existingEntry = await _logStore.GetEntryAsync(entry.Index);
+                            if (existingEntry != null && existingEntry.Term != entry.Term)
                             {
                                 // Overwrite conflicting entry
-                                if (_log[(int)entry.Index - 1].Term != entry.Term)
-                                {
-                                    _log.RemoveRange((int)entry.Index - 1, _log.Count - (int)entry.Index + 1);
-                                    _log.Add(entry);
-                                }
+                                await _logStore.TruncateFromAsync(entry.Index);
+                                await _logStore.AppendAsync(entry);
                             }
-                            else
-                            {
-                                _log.Add(entry);
-                            }
+                        }
+                        else
+                        {
+                            await _logStore.AppendAsync(entry);
                         }
                     }
                 }
@@ -1058,14 +1173,16 @@ namespace DataWarehouse.Plugins.Raft
             // Update commit index
             if (leaderCommit > _commitIndex)
             {
-                _commitIndex = Math.Min(leaderCommit, GetLastLogIndex());
+                var lastIndex = await GetLastLogIndexAsync();
+                _commitIndex = Math.Min(leaderCommit, lastIndex);
             }
 
+            var matchIndex = await GetLastLogIndexAsync();
             return new Dictionary<string, object>
             {
                 ["term"] = _currentTerm,
                 ["success"] = true,
-                ["matchIndex"] = GetLastLogIndex()
+                ["matchIndex"] = matchIndex
             };
         }
 
@@ -1077,19 +1194,39 @@ namespace DataWarehouse.Plugins.Raft
         {
             try
             {
-                _listener = new TcpListener(IPAddress.Any, _listenPort);
+                // Use configured base port (0 = OS-assigned)
+                _listener = new TcpListener(IPAddress.Any, _config.BasePort);
                 _listener.Start();
-                _nodeEndpoint = $"127.0.0.1:{_listenPort}";
+
+                // Get the actual port assigned by OS if BasePort was 0
+                var actualPort = ((IPEndPoint)_listener.LocalEndpoint).Port;
+                _nodeEndpoint = $"127.0.0.1:{actualPort}";
 
                 _ = AcceptConnectionsAsync(_cts!.Token);
             }
-            catch
+            catch (Exception ex)
             {
-                // Listener failed, try next port
-                _listenPort++;
-                if (_listenPort < 5100)
+                // Listener failed, try next port in range if configured
+                Console.WriteLine($"[Raft] TCP listener failed on port {_config.BasePort} - Node: {_nodeId}, Error: {ex.Message}");
+
+                if (_config.BasePort > 0 && _config.PortRange > 0)
                 {
-                    await StartListenerAsync();
+                    // Try incrementing within the port range
+                    var nextPort = _config.BasePort + 1;
+                    if (nextPort < _config.BasePort + _config.PortRange)
+                    {
+                        _config = _config with { BasePort = nextPort };
+                        await StartListenerAsync();
+                    }
+                    else
+                    {
+                        Console.WriteLine($"[Raft] Exhausted port range - Node: {_nodeId}, Range: [{_config.BasePort - _config.PortRange + 1}, {_config.BasePort}]");
+                        throw;
+                    }
+                }
+                else
+                {
+                    throw; // Re-throw if OS assignment failed or no range configured
                 }
             }
         }
@@ -1107,9 +1244,10 @@ namespace DataWarehouse.Plugins.Raft
                 {
                     break;
                 }
-                catch
+                catch (Exception ex)
                 {
-                    // Accept failed, continue
+                    // Accept failed, continue - expected during shutdown or temporary network issues
+                    Console.WriteLine($"[Raft] TCP accept failed - Node: {_nodeId}, State: {_state}, Error: {ex.Message}");
                 }
             }
         }
@@ -1149,9 +1287,10 @@ namespace DataWarehouse.Plugins.Raft
                     await writer.WriteLineAsync(JsonSerializer.Serialize(response));
                 }
             }
-            catch
+            catch (Exception ex)
             {
-                // Client handling failed
+                // Client handling failed - expected during network issues or malformed requests
+                Console.WriteLine($"[Raft] Client request handling failed - Node: {_nodeId}, State: {_state}, Error: {ex.Message}");
             }
         }
 
@@ -1189,13 +1328,15 @@ namespace DataWarehouse.Plugins.Raft
 
                 return response;
             }
-            catch
+            catch (Exception ex)
             {
+                // Failed to send vote request - expected during network partitions
+                Console.WriteLine($"[Raft] RequestVote RPC failed - Node: {_nodeId}, Peer: {peer.NodeId}, Endpoint: {peer.Endpoint}, Term: {request.Term}, Error: {ex.Message}");
                 return null;
             }
         }
 
-        private async Task<AppendEntriesResponse?> SendAppendEntriesAsync(RaftPeer peer, LogEntry[] entries)
+        private async Task<AppendEntriesResponse?> SendAppendEntriesAsync(RaftPeer peer, RaftLogEntry[] entries)
         {
             try
             {
@@ -1209,7 +1350,8 @@ namespace DataWarehouse.Plugins.Raft
 
                 var nextIdx = _nextIndex.GetOrAdd(peer.NodeId, 1);
                 var prevLogIndex = nextIdx - 1;
-                var prevLogTerm = prevLogIndex > 0 ? GetLogEntry(prevLogIndex)?.Term ?? 0 : 0;
+                var prevEntry = prevLogIndex > 0 ? await GetLogEntryAsync(prevLogIndex) : null;
+                var prevLogTerm = prevEntry?.Term ?? 0;
 
                 var requestJson = JsonSerializer.Serialize(new
                 {
@@ -1246,8 +1388,10 @@ namespace DataWarehouse.Plugins.Raft
 
                 return response;
             }
-            catch
+            catch (Exception ex)
             {
+                // Failed to send AppendEntries - expected during network partitions
+                Console.WriteLine($"[Raft] AppendEntries RPC failed - Node: {_nodeId}, Peer: {peer.NodeId}, Endpoint: {peer.Endpoint}, EntryCount: {entries.Length}, Term: {_currentTerm}, Error: {ex.Message}");
                 return null;
             }
         }
@@ -1282,8 +1426,10 @@ namespace DataWarehouse.Plugins.Raft
                 using var doc = JsonDocument.Parse(responseLine);
                 return doc.RootElement.TryGetProperty("success", out var success) && success.GetBoolean();
             }
-            catch
+            catch (Exception ex)
             {
+                // Failed to forward proposal to leader
+                Console.WriteLine($"[Raft] Proposal forwarding failed - Node: {_nodeId}, Leader: {leader.NodeId}, Endpoint: {leader.Endpoint}, ProposalId: {proposal.Id}, Error: {ex.Message}");
                 return false;
             }
         }
@@ -1292,38 +1438,29 @@ namespace DataWarehouse.Plugins.Raft
 
         #region Helpers
 
-        private long GetLastLogIndex()
+        private async Task<long> GetLastLogIndexAsync()
         {
-            lock (_logLock)
-            {
-                return _log.Count;
-            }
+            if (_logStore == null) return 0;
+            return await _logStore.GetLastIndexAsync();
         }
 
-        private long GetLastLogTerm()
+        private async Task<long> GetLastLogTermAsync()
         {
-            lock (_logLock)
-            {
-                return _log.Count > 0 ? _log[^1].Term : 0;
-            }
+            if (_logStore == null) return 0;
+            return await _logStore.GetLastTermAsync();
         }
 
-        private LogEntry? GetLogEntry(long index)
+        private async Task<RaftLogEntry?> GetLogEntryAsync(long index)
         {
-            lock (_logLock)
-            {
-                if (index <= 0 || index > _log.Count) return null;
-                return _log[(int)index - 1];
-            }
+            if (_logStore == null) return null;
+            return await _logStore.GetEntryAsync(index);
         }
 
-        private LogEntry[] GetEntriesFromIndex(long startIndex)
+        private async Task<RaftLogEntry[]> GetEntriesFromIndexAsync(long startIndex)
         {
-            lock (_logLock)
-            {
-                if (startIndex > _log.Count) return Array.Empty<LogEntry>();
-                return _log.Skip((int)startIndex - 1).ToArray();
-            }
+            if (_logStore == null) return Array.Empty<RaftLogEntry>();
+            var entries = await _logStore.GetEntriesFromAsync(startIndex);
+            return entries.ToArray();
         }
 
         private async Task CreateSnapshotAsync()
@@ -1331,41 +1468,37 @@ namespace DataWarehouse.Plugins.Raft
             // Snapshot creation for log compaction
             // Captures the current state machine state and allows truncating the log
 
-            Snapshot snapshot;
-            int entriesCompacted;
+            if (_logStore == null) return;
 
-            lock (_logLock)
+            var logLength = await _logStore.GetLastIndexAsync();
+            if (logLength <= _snapshotThreshold / 2)
             {
-                if (_log.Count <= _snapshotThreshold / 2)
-                {
-                    // Not enough entries to compact
-                    return;
-                }
+                // Not enough entries to compact
+                return;
+            }
 
-                // Capture current state
-                var lastIncludedIndex = _commitIndex;
-                var lastIncludedTerm = _log.Count > 0 && lastIncludedIndex <= _log.Count
-                    ? _log[(int)lastIncludedIndex - 1].Term
-                    : _currentTerm;
+            // Capture current state
+            var lastIncludedIndex = _commitIndex;
+            var committedEntry = await GetLogEntryAsync(lastIncludedIndex);
+            var lastIncludedTerm = committedEntry?.Term ?? _currentTerm;
 
-                // Serialize the committed state
-                var stateData = SerializeCommittedState();
+            // Serialize the committed state
+            var stateData = SerializeCommittedState();
 
-                snapshot = new Snapshot
-                {
-                    LastIncludedIndex = lastIncludedIndex,
-                    LastIncludedTerm = lastIncludedTerm,
-                    Data = stateData,
-                    CreatedAt = DateTime.UtcNow,
-                    NodeId = _nodeId
-                };
+            var snapshot = new Snapshot
+            {
+                LastIncludedIndex = lastIncludedIndex,
+                LastIncludedTerm = lastIncludedTerm,
+                Data = stateData,
+                CreatedAt = DateTime.UtcNow,
+                NodeId = _nodeId
+            };
 
-                // Truncate log - keep entries after snapshot
-                entriesCompacted = (int)lastIncludedIndex;
-                if (entriesCompacted > 0 && entriesCompacted <= _log.Count)
-                {
-                    _log.RemoveRange(0, entriesCompacted);
-                }
+            // Compact log - remove entries up to snapshot
+            var entriesCompacted = (int)lastIncludedIndex;
+            if (entriesCompacted > 0)
+            {
+                await _logStore.CompactAsync(entriesCompacted);
             }
 
             // Persist snapshot to storage
@@ -1385,9 +1518,9 @@ namespace DataWarehouse.Plugins.Raft
                 ["locks"] = _locks.ToDictionary(kv => kv.Key, kv => new
                 {
                     kv.Value.LockId,
-                    kv.Value.OwnerId,
+                    OwnerId = kv.Value.Owner,
                     kv.Value.AcquiredAt,
-                    kv.Value.LeaseExpires
+                    LeaseExpires = kv.Value.ExpiresAt
                 }),
                 ["nodeId"] = _nodeId,
                 ["votedFor"] = _votedFor ?? ""
@@ -1417,8 +1550,15 @@ namespace DataWarehouse.Plugins.Raft
 
             foreach (var oldSnapshot in snapshots)
             {
-                try { File.Delete(oldSnapshot); }
-                catch { /* Ignore cleanup errors */ }
+                try
+                {
+                    File.Delete(oldSnapshot);
+                }
+                catch (Exception ex)
+                {
+                    // Ignore cleanup errors - non-critical, will retry on next snapshot
+                    Console.WriteLine($"[Raft] Snapshot cleanup failed - Node: {_nodeId}, File: {Path.GetFileName(oldSnapshot)}, Error: {ex.Message}");
+                }
             }
         }
 
@@ -1443,8 +1583,10 @@ namespace DataWarehouse.Plugins.Raft
                 var json = await File.ReadAllTextAsync(latestFile);
                 return JsonSerializer.Deserialize<Snapshot>(json);
             }
-            catch
+            catch (Exception ex)
             {
+                // Failed to load snapshot - will start from empty state
+                Console.WriteLine($"[Raft] Snapshot load failed - Node: {_nodeId}, File: {Path.GetFileName(latestFile)}, Error: {ex.Message}");
                 return null;
             }
         }
@@ -1500,13 +1642,27 @@ namespace DataWarehouse.Plugins.Raft
                 _lockLeaseTime = TimeSpan.FromSeconds(Convert.ToDouble(leaseS));
             }
 
+            if (payload.TryGetValue("basePort", out var basePort))
+            {
+                var port = Convert.ToInt32(basePort);
+                _config = _config with { BasePort = port };
+            }
+
+            if (payload.TryGetValue("portRange", out var portRange))
+            {
+                var range = Convert.ToInt32(portRange);
+                _config = _config with { PortRange = range };
+            }
+
             return new Dictionary<string, object>
             {
                 ["success"] = true,
                 ["electionTimeoutMinMs"] = _electionTimeoutMin.TotalMilliseconds,
                 ["electionTimeoutMaxMs"] = _electionTimeoutMax.TotalMilliseconds,
                 ["heartbeatIntervalMs"] = _heartbeatInterval.TotalMilliseconds,
-                ["lockLeaseSeconds"] = _lockLeaseTime.TotalSeconds
+                ["lockLeaseSeconds"] = _lockLeaseTime.TotalSeconds,
+                ["basePort"] = _config.BasePort,
+                ["portRange"] = _config.PortRange
             };
         }
 
@@ -1520,16 +1676,6 @@ namespace DataWarehouse.Plugins.Raft
         Follower,
         Candidate,
         Leader
-    }
-
-    internal class LogEntry
-    {
-        public long Index { get; set; }
-        public long Term { get; set; }
-        public string Command { get; set; } = string.Empty;
-        public byte[] Payload { get; set; } = Array.Empty<byte>();
-        public string ProposalId { get; set; } = string.Empty;
-        public DateTime Timestamp { get; set; }
     }
 
     internal class RaftPeer
@@ -1569,6 +1715,31 @@ namespace DataWarehouse.Plugins.Raft
         public bool Success { get; set; }
         public long MatchIndex { get; set; }
         public long ConflictIndex { get; set; }
+    }
+
+    /// <summary>
+    /// Configuration for Raft consensus plugin.
+    /// </summary>
+    public record RaftConfiguration
+    {
+        /// <summary>
+        /// Base port for Raft communication. Default 0 = OS-assigned port (recommended for safety).
+        /// Set to a specific port number for production deployments where fixed ports are required.
+        /// </summary>
+        public int BasePort { get; init; } = 0;
+
+        /// <summary>
+        /// Port range size for multi-node clusters.
+        /// If BasePort is specified and port binding fails, the plugin will try ports in the range [BasePort, BasePort+PortRange).
+        /// Default 100. Ignored when BasePort is 0 (OS-assigned).
+        /// </summary>
+        public int PortRange { get; init; } = 100;
+
+        /// <summary>
+        /// Node endpoints for cluster membership. Format: "host:port".
+        /// Example: ["node1.example.com:5000", "node2.example.com:5000"]
+        /// </summary>
+        public List<string> ClusterEndpoints { get; init; } = new();
     }
 
     #endregion

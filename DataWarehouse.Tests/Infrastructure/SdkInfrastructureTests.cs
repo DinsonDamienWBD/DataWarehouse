@@ -432,6 +432,25 @@ namespace DataWarehouse.Tests.Infrastructure
 
         #endregion
 
+        // Stub interfaces for removed functionality
+        private interface ISelfHealingComponent
+        {
+            string ComponentId { get; }
+            ComponentHealth Health { get; }
+            event Action<ComponentHealth>? OnHealthChanged;
+            IEnumerable<HealingAction> GetHealingActions();
+            Task<ComponentHealth> CheckHealthAsync(CancellationToken ct = default);
+        }
+
+        private enum ComponentHealth { Healthy, Degraded, Unhealthy }
+
+        private class HealingAction
+        {
+            public string ActionId { get; set; } = "";
+            public string Description { get; set; } = "";
+            public TimeSpan RetryDelay { get; set; }
+        }
+
         private class TestSelfHealingComponent : ISelfHealingComponent
         {
             private readonly HealingAction[] _actions;

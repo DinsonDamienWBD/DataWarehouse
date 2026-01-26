@@ -1,5 +1,6 @@
 using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Primitives;
+using DataWarehouse.SDK.Utilities;
 using System.Collections.Concurrent;
 using System.Text.Json;
 
@@ -748,8 +749,8 @@ namespace DataWarehouse.Plugins.Resilience
             // Don't retry for these exception types
             return ex switch
             {
-                ArgumentException => false,
                 ArgumentNullException => false,
+                ArgumentException => false,
                 InvalidOperationException => false,
                 NotSupportedException => false,
                 UnauthorizedAccessException => false,

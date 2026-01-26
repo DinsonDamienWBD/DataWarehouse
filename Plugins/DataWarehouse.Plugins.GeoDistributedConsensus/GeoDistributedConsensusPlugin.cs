@@ -1,5 +1,6 @@
 using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Primitives;
+using DataWarehouse.SDK.Utilities;
 using System.Collections.Concurrent;
 using System.Security.Cryptography;
 using System.Text;
@@ -77,7 +78,7 @@ public sealed class GeoDistributedConsensusPlugin : ConsensusPluginBase
     private QuorumConfig _quorumConfig = new();
     private GeoConsensusConfig _config = new();
     private PartitionDetector? _partitionDetector;
-    private ConflictResolver _conflictResolver = new();
+    private ConflictResolver _conflictResolver = new(ConflictResolutionStrategy.LastWriteWins);
 
     // Raft extensions
     private GeoRaftState _raftState = new();
@@ -247,9 +248,9 @@ public sealed class GeoDistributedConsensusPlugin : ConsensusPluginBase
             NodeId = _nodeId,
             DatacenterId = _localDatacenterId,
             Endpoint = $"localhost:{5100 + Math.Abs(_nodeId.GetHashCode()) % 100}",
-            Role = GeoRaftRole.Follower,
+            Role = SDK.Contracts.NodeRole.Voter,
             VotingStatus = VotingStatus.Voter,
-            Status = NodeStatus.Active,
+            Status = SDK.Contracts.NodeStatus.Active,
             LastHeartbeat = DateTime.UtcNow
         };
         _raftNodes[_nodeId] = selfNode;
@@ -308,10 +309,13 @@ public sealed class GeoDistributedConsensusPlugin : ConsensusPluginBase
             try
             {
                 await Task.Delay(_config.LogCompactionIntervalMs, ct);
-                await _logReplicator.CompactLogAsync(_config.LogCompactionThreshold, ct);
+                await _logReplicator.CompactLogAsync(_config.LogCompactionThreshold);
             }
             catch (OperationCanceledException) { break; }
-            catch { /* Log compaction failed, will retry */ }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Trace.TraceWarning($"Log compaction failed, will retry: {ex.Message}");
+            }
         }
     }
 
@@ -324,11 +328,14 @@ public sealed class GeoDistributedConsensusPlugin : ConsensusPluginBase
                 await Task.Delay(_config.SnapshotIntervalMs, ct);
                 if (_raftState.CommitIndex - _snapshotManager.LastSnapshotIndex > _config.SnapshotThreshold)
                 {
-                    await _snapshotManager.CreateSnapshotAsync(ct);
+                    await _snapshotManager.CreateSnapshotAsync(_raftState.CommitIndex);
                 }
             }
             catch (OperationCanceledException) { break; }
-            catch { /* Snapshot failed, will retry */ }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Trace.TraceWarning($"Snapshot creation failed, will retry: {ex.Message}");
+            }
         }
     }
 
@@ -875,7 +882,7 @@ public sealed class GeoDistributedConsensusPlugin : ConsensusPluginBase
         var votes = new ConcurrentDictionary<string, PreVoteResponse>();
 
         var activeNodes = _raftNodes.Values
-            .Where(n => n.Status == NodeStatus.Active && n.VotingStatus == VotingStatus.Voter)
+            .Where(n => n.Status == SDK.Contracts.NodeStatus.Active && (VotingStatus)n.VotingStatus! == VotingStatus.Voter)
             .ToList();
 
         // Send pre-vote requests
@@ -975,7 +982,7 @@ public sealed class GeoDistributedConsensusPlugin : ConsensusPluginBase
 
         // Send RequestVote to all voting nodes
         var votingNodes = _raftNodes.Values
-            .Where(n => n.VotingStatus == VotingStatus.Voter && n.Status == NodeStatus.Active)
+            .Where(n => (VotingStatus)n.VotingStatus! == VotingStatus.Voter && n.Status == SDK.Contracts.NodeStatus.Active)
             .ToList();
 
         var voteTasks = votingNodes.Select(async node =>
@@ -1141,7 +1148,7 @@ public sealed class GeoDistributedConsensusPlugin : ConsensusPluginBase
         if (!_raftNodes.TryGetValue(targetNodeId, out var targetNode))
             return false;
 
-        if (targetNode.VotingStatus != VotingStatus.Voter)
+        if ((VotingStatus)targetNode.VotingStatus! != VotingStatus.Voter)
             return false;
 
         // Step 1: Stop accepting new client requests
@@ -1156,7 +1163,7 @@ public sealed class GeoDistributedConsensusPlugin : ConsensusPluginBase
 
             while (targetNode.MatchIndex < lastLogIndex && retries < maxRetries)
             {
-                await _logReplicator.ReplicateToNodeAsync(targetNode, ct);
+                await _logReplicator.ReplicateToNodeAsync(targetNode.NodeId, lastLogIndex);
                 retries++;
                 await Task.Delay(100, ct);
             }
@@ -1230,7 +1237,7 @@ public sealed class GeoDistributedConsensusPlugin : ConsensusPluginBase
 
         // Create joint configuration (old + new)
         var oldConfig = _raftNodes.Values
-            .Where(n => n.VotingStatus == VotingStatus.Voter)
+            .Where(n => (VotingStatus)n.VotingStatus! == VotingStatus.Voter)
             .Select(n => n.NodeId)
             .ToList();
 
@@ -1245,8 +1252,8 @@ public sealed class GeoDistributedConsensusPlugin : ConsensusPluginBase
         // Phase 1: Commit joint configuration (C_old,new)
         _jointConsensus = new JointConsensusState
         {
-            OldConfiguration = oldConfig,
-            NewConfiguration = newConfig,
+            OldConfiguration = oldConfig.ToHashSet(),
+            NewConfiguration = newConfig.ToHashSet(),
             Phase = JointConsensusPhase.Joint,
             StartedAt = DateTime.UtcNow
         };
@@ -1261,7 +1268,7 @@ public sealed class GeoDistributedConsensusPlugin : ConsensusPluginBase
             Timestamp = _hlc.Now()
         };
 
-        var jointCommitted = await _logReplicator.AppendAndReplicateAsync(jointEntry, ct);
+        var jointCommitted = await _logReplicator.AppendAndReplicateAsync(jointEntry);
         if (!jointCommitted)
         {
             _jointConsensus = null;
@@ -1288,15 +1295,15 @@ public sealed class GeoDistributedConsensusPlugin : ConsensusPluginBase
             Timestamp = _hlc.Now()
         };
 
-        var newCommitted = await _logReplicator.AppendAndReplicateAsync(newEntry, ct);
+        var newCommitted = await _logReplicator.AppendAndReplicateAsync(newEntry);
 
         _jointConsensus = null;
 
         return new MembershipChangeResult
         {
             Success = newCommitted,
-            OldConfiguration = oldConfig,
-            NewConfiguration = newConfig,
+            OldConfiguration = oldConfig.ToHashSet(),
+            NewConfiguration = newConfig.ToHashSet(),
             Error = newCommitted ? null : "Failed to commit new configuration"
         };
     }
@@ -1312,8 +1319,8 @@ public sealed class GeoDistributedConsensusPlugin : ConsensusPluginBase
                     DatacenterId = request.DatacenterId ?? _localDatacenterId,
                     Endpoint = request.Endpoint ?? "",
                     VotingStatus = VotingStatus.Voter,
-                    Status = NodeStatus.Active,
-                    Role = GeoRaftRole.Follower
+                    Status = SDK.Contracts.NodeStatus.Active,
+                    Role = SDK.Contracts.NodeRole.Voter
                 };
                 break;
 
@@ -1352,7 +1359,7 @@ public sealed class GeoDistributedConsensusPlugin : ConsensusPluginBase
     public void AddWitness(GeoRaftNode witness)
     {
         witness.VotingStatus = VotingStatus.Witness;
-        witness.Role = GeoRaftRole.Witness;
+        witness.Role = SDK.Contracts.NodeRole.Observer;
         _raftNodes[witness.NodeId] = witness;
     }
 
@@ -2564,6 +2571,21 @@ public sealed class GeoConsensusConfig
 
     /// <summary>Partition detection configuration.</summary>
     public PartitionDetectionConfig PartitionDetectionConfig { get; set; } = new();
+
+    /// <summary>Enable pre-vote protocol to prevent disruptive elections.</summary>
+    public bool EnablePreVote { get; set; } = true;
+
+    /// <summary>Snapshot threshold - create snapshot after this many log entries.</summary>
+    public int SnapshotThreshold { get; set; } = 10000;
+
+    /// <summary>Snapshot interval in milliseconds.</summary>
+    public int SnapshotIntervalMs { get; set; } = 300000;
+
+    /// <summary>Log compaction threshold - compact log after this many entries.</summary>
+    public int LogCompactionThreshold { get; set; } = 5000;
+
+    /// <summary>Log compaction interval in milliseconds.</summary>
+    public int LogCompactionIntervalMs { get; set; } = 60000;
 }
 
 /// <summary>
@@ -2851,6 +2873,103 @@ internal sealed class ProposalState
 
     /// <summary>Completion source for async waiting.</summary>
     public TaskCompletionSource<bool> CompletionSource { get; init; } = null!;
+}
+
+/// <summary>
+/// Voting status for Raft nodes.
+/// </summary>
+internal enum VotingStatus
+{
+    Voter,
+    Learner,
+    Witness
+}
+
+/// <summary>
+/// Membership change type.
+/// </summary>
+public enum MembershipChangeType
+{
+    AddNode,
+    RemoveNode,
+    PromoteLearner,
+    DemoteToLearner
+}
+
+/// <summary>
+/// Membership change request.
+/// </summary>
+public sealed class MembershipChangeRequest
+{
+    public string NodeId { get; init; } = string.Empty;
+    public MembershipChangeType ChangeType { get; init; }
+    public string? DatacenterId { get; init; }
+    public string? Endpoint { get; init; }
+}
+
+/// <summary>
+/// Membership change result.
+/// </summary>
+public sealed class MembershipChangeResult
+{
+    public bool Success { get; init; }
+    public string? Error { get; init; }
+    public HashSet<string> OldConfiguration { get; set; } = new();
+    public HashSet<string> NewConfiguration { get; set; } = new();
+}
+
+/// <summary>
+/// Pre-vote response for pre-vote protocol.
+/// </summary>
+public sealed class PreVoteResponse
+{
+    public long Term { get; set; }
+    public bool VoteGranted { get; set; }
+    public string NodeId { get; set; } = string.Empty;
+    public string Reason { get; set; } = string.Empty;
+}
+
+/// <summary>
+/// Timeout now message for leadership transfer.
+/// </summary>
+public sealed class TimeoutNowMessage
+{
+    public long Term { get; set; }
+    public string LeaderId { get; set; } = string.Empty;
+    public string FromNodeId { get; set; } = string.Empty;
+}
+
+/// <summary>
+/// Geo log entry for replication.
+/// </summary>
+public sealed class GeoLogEntry
+{
+    public long Index { get; set; }
+    public long Term { get; set; }
+    public LogEntryType Type { get; set; }
+    public byte[] Data { get; set; } = Array.Empty<byte>();
+    public string Command { get; set; } = string.Empty;
+    public HlcTimestamp Timestamp { get; set; }
+}
+
+/// <summary>
+/// Log entry type.
+/// </summary>
+public enum LogEntryType
+{
+    Normal,
+    Configuration,
+    NoOp
+}
+
+/// <summary>
+/// Joint consensus phase.
+/// </summary>
+public enum JointConsensusPhase
+{
+    OldConfiguration,
+    Joint,
+    New
 }
 
 #endregion

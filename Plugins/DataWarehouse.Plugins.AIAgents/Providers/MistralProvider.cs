@@ -198,7 +198,10 @@ namespace DataWarehouse.Plugins.AIAgents
                         }
                     }
                 }
-                catch { }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"[MistralProvider] Failed to parse streaming response: {ex.Message}");
+                }
 
                 if (!string.IsNullOrEmpty(text))
                     yield return text;

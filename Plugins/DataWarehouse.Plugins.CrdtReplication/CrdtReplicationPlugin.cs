@@ -1,6 +1,7 @@
 using DataWarehouse.Plugins.CrdtReplication.Crdts;
 using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Primitives;
+using DataWarehouse.SDK.Utilities;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
@@ -298,7 +299,7 @@ namespace DataWarehouse.Plugins.CrdtReplication
                     ["success"] = true,
                     ["key"] = key,
                     ["type"] = crdt.GetCrdtType(),
-                    ["value"] = crdt.GetValue(),
+                    ["value"] = crdt.GetValue() ?? DBNull.Value,
                     ["metadata"] = crdt.GetMetadata()
                 };
             }
@@ -336,7 +337,7 @@ namespace DataWarehouse.Plugins.CrdtReplication
                     ["success"] = true,
                     ["key"] = key,
                     ["operation"] = operation,
-                    ["newValue"] = crdt.GetValue()
+                    ["newValue"] = crdt.GetValue() ?? DBNull.Value
                 };
             }
             catch (Exception ex)
@@ -368,7 +369,7 @@ namespace DataWarehouse.Plugins.CrdtReplication
                 {
                     ["success"] = true,
                     ["key"] = key,
-                    ["newValue"] = crdt.GetValue()
+                    ["newValue"] = crdt.GetValue() ?? DBNull.Value
                 };
             }
             catch (Exception ex)
@@ -408,7 +409,7 @@ namespace DataWarehouse.Plugins.CrdtReplication
                 {
                     ["key"] = kv.Key,
                     ["type"] = kv.Value.GetCrdtType(),
-                    ["value"] = kv.Value.GetValue()
+                    ["value"] = kv.Value.GetValue() ?? DBNull.Value
                 }).ToList();
 
                 return new Dictionary<string, object>
@@ -1239,7 +1240,10 @@ namespace DataWarehouse.Plugins.CrdtReplication
                 {
                     await _gossipTask.WaitAsync(TimeSpan.FromSeconds(5));
                 }
-                catch { /* Ignore */ }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Trace.TraceWarning($"CRDT gossip task shutdown timeout: {ex.Message}");
+                }
             }
 
             _cts?.Dispose();

@@ -1,5 +1,6 @@
 using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Primitives;
+using DataWarehouse.SDK.Utilities;
 using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Security.Cryptography;
@@ -695,6 +696,7 @@ public interface IRealTimeSyncService
     /// Gets the replication lag for a specific replica.
     /// </summary>
     /// <param name="replicaId">Replica identifier.</param>
+    /// <param name="ct">Cancellation token.</param>
     /// <returns>Replication lag metrics.</returns>
     Task<ReplicationLag> GetReplicationLagAsync(string replicaId, CancellationToken ct = default);
 }
@@ -841,7 +843,6 @@ public sealed class RealTimeSyncPlugin : ReplicationPluginBase,
     private readonly object _statsLock = new();
     private readonly List<DateTime> _failoverHistory = new();
 
-    private IKernelContext? _context;
     private CancellationTokenSource? _healthMonitorCts;
     private Task? _healthMonitorTask;
 
@@ -883,7 +884,7 @@ public sealed class RealTimeSyncPlugin : ReplicationPluginBase,
     /// <inheritdoc />
     public override Task<HandshakeResponse> OnHandshakeAsync(HandshakeRequest request)
     {
-        _context = request.Context;
+        // Context property removed from HandshakeRequest
 
         return Task.FromResult(new HandshakeResponse
         {

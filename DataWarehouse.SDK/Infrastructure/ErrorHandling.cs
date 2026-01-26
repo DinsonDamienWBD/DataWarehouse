@@ -744,4 +744,97 @@ namespace DataWarehouse.SDK.Infrastructure
             return result;
         }
     }
+
+    /// <summary>
+    /// Simple retry policy for executing operations with exponential backoff.
+    /// </summary>
+    public class RetryPolicy
+    {
+        private readonly int _maxRetries;
+        private readonly TimeSpan _baseDelay;
+        private readonly double _backoffMultiplier;
+        private readonly TimeSpan _maxDelay;
+        private readonly double _jitterFactor;
+        private readonly Func<Exception, bool> _shouldRetry;
+
+        /// <summary>
+        /// Initializes a new instance of the RetryPolicy class.
+        /// </summary>
+        /// <param name="maxRetries">Maximum number of retry attempts.</param>
+        /// <param name="baseDelay">Base delay between retries.</param>
+        /// <param name="backoffMultiplier">Multiplier for exponential backoff (default: 2.0).</param>
+        /// <param name="maxDelay">Maximum delay between retries.</param>
+        /// <param name="jitterFactor">Factor for adding jitter to delays (default: 0.0).</param>
+        /// <param name="shouldRetry">Predicate to determine if an exception should be retried (default: retry all).</param>
+        public RetryPolicy(
+            int maxRetries,
+            TimeSpan baseDelay,
+            double backoffMultiplier = 2.0,
+            TimeSpan? maxDelay = null,
+            double jitterFactor = 0.0,
+            Func<Exception, bool>? shouldRetry = null)
+        {
+            _maxRetries = maxRetries;
+            _baseDelay = baseDelay;
+            _backoffMultiplier = backoffMultiplier;
+            _maxDelay = maxDelay ?? TimeSpan.FromMinutes(5);
+            _jitterFactor = jitterFactor;
+            _shouldRetry = shouldRetry ?? (_ => true);
+        }
+
+        /// <summary>
+        /// Executes an async operation with retry logic.
+        /// </summary>
+        public async Task<T> ExecuteAsync<T>(Func<CancellationToken, Task<T>> operation, CancellationToken cancellationToken = default)
+        {
+            var attempt = 0;
+            Exception? lastException = null;
+
+            while (attempt <= _maxRetries)
+            {
+                try
+                {
+                    return await operation(cancellationToken);
+                }
+                catch (Exception ex) when (_shouldRetry(ex) && attempt < _maxRetries)
+                {
+                    lastException = ex;
+                    attempt++;
+
+                    var delay = CalculateDelay(attempt);
+                    await Task.Delay(delay, cancellationToken);
+                }
+            }
+
+            throw lastException ?? new InvalidOperationException("Retry logic failed without exception");
+        }
+
+        /// <summary>
+        /// Executes an async operation with retry logic (no return value).
+        /// </summary>
+        public async Task ExecuteAsync(Func<CancellationToken, Task> operation, CancellationToken cancellationToken = default)
+        {
+            await ExecuteAsync(async ct =>
+            {
+                await operation(ct);
+                return true;
+            }, cancellationToken);
+        }
+
+        private TimeSpan CalculateDelay(int attempt)
+        {
+            var baseMs = _baseDelay.TotalMilliseconds;
+            var exponentialDelay = baseMs * Math.Pow(_backoffMultiplier, attempt - 1);
+
+            // Add jitter
+            if (_jitterFactor > 0)
+            {
+                var jitter = Random.Shared.NextDouble() * _jitterFactor * exponentialDelay;
+                exponentialDelay += jitter;
+            }
+
+            var delay = TimeSpan.FromMilliseconds(Math.Min(exponentialDelay, _maxDelay.TotalMilliseconds));
+            return delay;
+        }
+    }
 }

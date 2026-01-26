@@ -552,17 +552,17 @@ namespace DataWarehouse.SDK.Contracts
     public abstract class IndexingStorageOrchestratorBase : StoragePoolBase, IHybridStorage
     {
         protected HybridStorageConfig _config = new();
-        protected ISearchOrchestrator? _searchOrchestrator;
+        protected IStorageSearchOrchestrator? _searchOrchestrator;
 
         public HybridStorageConfig Config => _config;
-        public ISearchOrchestrator SearchOrchestrator => _searchOrchestrator ?? throw new InvalidOperationException("SearchOrchestrator not configured");
+        public IStorageSearchOrchestrator SearchOrchestrator => _searchOrchestrator ?? throw new InvalidOperationException("SearchOrchestrator not configured");
 
         public virtual void Configure(HybridStorageConfig config)
         {
             _config = config ?? throw new ArgumentNullException(nameof(config));
         }
 
-        public void SetSearchOrchestrator(ISearchOrchestrator orchestrator)
+        public void SetSearchOrchestrator(IStorageSearchOrchestrator orchestrator)
         {
             _searchOrchestrator = orchestrator;
         }
@@ -1043,7 +1043,7 @@ namespace DataWarehouse.SDK.Contracts
     ///
     /// Supports multiple merge strategies: Union, ScoreWeighted, ReciprocalRankFusion.
     /// </summary>
-    public abstract class SearchOrchestratorBase : ISearchOrchestrator
+    public abstract class SearchOrchestratorBase : IStorageSearchOrchestrator
     {
         protected SearchOrchestratorConfig _config = new();
         protected readonly List<(SearchProviderType Type, IPlugin Plugin)> _searchProviders = new();
@@ -1204,9 +1204,9 @@ namespace DataWarehouse.SDK.Contracts
             // Apply merge strategy
             var merged = _config.MergeStrategy switch
             {
-                MergeStrategy.Union => MergeUnion(allItems),
-                MergeStrategy.ScoreWeighted => MergeScoreWeighted(allItems),
-                MergeStrategy.ReciprocalRankFusion => MergeRRF(allItems, providerResults),
+                SearchMergeStrategy.Union => MergeUnion(allItems),
+                SearchMergeStrategy.ScoreWeighted => MergeScoreWeighted(allItems),
+                SearchMergeStrategy.ReciprocalRankFusion => MergeRRF(allItems, providerResults),
                 _ => MergeScoreWeighted(allItems)
             };
 

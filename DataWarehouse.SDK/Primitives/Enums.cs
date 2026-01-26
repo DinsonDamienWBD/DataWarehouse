@@ -71,7 +71,12 @@ namespace DataWarehouse.SDK.Primitives
         /// <summary>
         /// Interface providers for external access (REST, gRPC, SQL, WebSocket).
         /// </summary>
-        InterfaceProvider
+        InterfaceProvider,
+
+        /// <summary>
+        /// Interface category for interface-type plugins (GraphQL, REST, gRPC).
+        /// </summary>
+        Interface
     }
 
     /// <summary>
@@ -447,6 +452,7 @@ namespace DataWarehouse.SDK.Primitives
         Initializing,       // Still warming up (respond later)
         PartiallyReady,     // Some capabilities available, others pending
         Ready,              // Fully operational
-        Degraded            // Working but with reduced capabilities
+        Degraded,           // Working but with reduced capabilities
+        Failed              // Plugin has failed and cannot operate
     }
 }

@@ -1,5 +1,6 @@
 using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Primitives;
+using DataWarehouse.SDK.Utilities;
 using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
@@ -47,7 +48,7 @@ public sealed class BatteryAwarePlugin : FeaturePluginBase
     private PowerPolicy _policy;
     private long _totalDeferredOperations;
     private long _executedOperations;
-    private long _throttledOperations;
+    private long _throttledOperations = 0;
     private DateTime _lastPowerChange;
     private TimeSpan _timeOnBattery;
     private TimeSpan _timeOnAc;

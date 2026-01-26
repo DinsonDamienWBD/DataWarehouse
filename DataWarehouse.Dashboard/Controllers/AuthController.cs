@@ -163,7 +163,8 @@ public class AuthController : ControllerBase
         }
 
         // Get user
-        if (!_users.Values.FirstOrDefault(u => u.UserId == tokenInfo.UserId) is { } user)
+        var user = _users.Values.FirstOrDefault(u => u.UserId == tokenInfo.UserId);
+        if (user == null)
         {
             return Unauthorized(new ErrorResponse
             {

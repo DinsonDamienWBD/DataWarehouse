@@ -1,5 +1,7 @@
 using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Primitives;
+using DataWarehouse.SDK.Utilities;
+using DataWarehouse.Plugins.SharedRaidUtilities;
 using System.Collections.Concurrent;
 using System.Runtime.CompilerServices;
 using System.Security.Cryptography;
@@ -1789,7 +1791,10 @@ namespace DataWarehouse.Plugins.SelfHealingRaid
                             await stream.CopyToAsync(ms, ct);
                             pParity = ms.ToArray();
                         }
-                        catch { }
+                        catch (Exception ex)
+                        {
+                            Console.WriteLine($"[SelfHealingRaidPlugin] Parity read operation failed: {ex.Message}");
+                        }
                     }
                     else if (p == qParityIdx)
                     {
@@ -1801,7 +1806,10 @@ namespace DataWarehouse.Plugins.SelfHealingRaid
                             await stream.CopyToAsync(ms, ct);
                             qParity = ms.ToArray();
                         }
-                        catch { }
+                        catch (Exception ex)
+                        {
+                            Console.WriteLine($"[SelfHealingRaidPlugin] Parity read operation failed: {ex.Message}");
+                        }
                     }
                     else if (dataIdx < dataProviders)
                     {
@@ -2909,88 +2917,6 @@ namespace DataWarehouse.Plugins.SelfHealingRaid
         /// Creates a new SelfHealingRaidException with the specified message and inner exception.
         /// </summary>
         public SelfHealingRaidException(string message, Exception inner) : base(message, inner) { }
-    }
-
-    /// <summary>
-    /// GF(2^8) Galois Field implementation for Reed-Solomon error correction.
-    /// Uses the standard polynomial x^8 + x^4 + x^3 + x^2 + 1 (0x11D).
-    /// </summary>
-    internal sealed class GaloisField
-    {
-        private const int FieldSize = 256;
-        private const int Polynomial = 0x11D;
-
-        private readonly byte[] _expTable;
-        private readonly byte[] _logTable;
-
-        /// <summary>
-        /// Creates a new Galois Field instance with precomputed tables.
-        /// </summary>
-        public GaloisField()
-        {
-            _expTable = new byte[FieldSize * 2];
-            _logTable = new byte[FieldSize];
-
-            int x = 1;
-            for (int i = 0; i < FieldSize - 1; i++)
-            {
-                _expTable[i] = (byte)x;
-                _logTable[x] = (byte)i;
-
-                x <<= 1;
-                if (x >= FieldSize)
-                {
-                    x ^= Polynomial;
-                }
-            }
-
-            for (int i = FieldSize - 1; i < FieldSize * 2; i++)
-            {
-                _expTable[i] = _expTable[i - (FieldSize - 1)];
-            }
-        }
-
-        /// <summary>
-        /// Adds two elements in GF(2^8).
-        /// </summary>
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public byte Add(byte a, byte b) => (byte)(a ^ b);
-
-        /// <summary>
-        /// Multiplies two elements in GF(2^8).
-        /// </summary>
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public byte Multiply(byte a, byte b)
-        {
-            if (a == 0 || b == 0) return 0;
-            return _expTable[_logTable[a] + _logTable[b]];
-        }
-
-        /// <summary>
-        /// Computes the power of an element in GF(2^8).
-        /// </summary>
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public byte Power(int @base, int exp)
-        {
-            if (@base == 0) return 0;
-            if (exp == 0) return 1;
-
-            var logBase = _logTable[@base];
-            var result = (logBase * exp) % 255;
-            if (result < 0) result += 255;
-            return _expTable[result];
-        }
-
-        /// <summary>
-        /// Computes the multiplicative inverse of an element in GF(2^8).
-        /// </summary>
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public byte Inverse(byte a)
-        {
-            if (a == 0)
-                throw new ArgumentException("Zero has no multiplicative inverse", nameof(a));
-            return _expTable[255 - _logTable[a]];
-        }
     }
 
     #endregion

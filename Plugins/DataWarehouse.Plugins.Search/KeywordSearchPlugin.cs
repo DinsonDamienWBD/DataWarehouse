@@ -38,7 +38,7 @@ namespace DataWarehouse.Plugins.Search
         /// </summary>
         public const int DefaultFuzzyDistance = 2;
 
-        public override bool IsAvailable => _isAvailable && IsRunning;
+        public override bool IsAvailable => _isAvailable;
 
         public KeywordSearchPlugin() : this(null) { }
 

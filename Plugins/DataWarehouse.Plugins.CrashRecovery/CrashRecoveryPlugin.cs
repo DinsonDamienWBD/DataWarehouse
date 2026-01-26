@@ -4,6 +4,7 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using DataWarehouse.SDK.Contracts;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.CrashRecovery;
 
@@ -579,7 +580,7 @@ public sealed class CrashRecoveryPlugin : SnapshotPluginBase, IAsyncDisposable
         var pagePath = GetPagePath(pageId);
         if (!File.Exists(pagePath))
         {
-            return new PageReadResult { Success = false, ErrorType = PageErrorType.NotFound };
+            return new PageReadResult { Success = false, ErrorType = SDK.Contracts.PageErrorType.NotFound };
         }
 
         var data = await File.ReadAllBytesAsync(pagePath, ct);
@@ -607,7 +608,7 @@ public sealed class CrashRecoveryPlugin : SnapshotPluginBase, IAsyncDisposable
             return new PageReadResult
             {
                 Success = false,
-                ErrorType = verifyResult.IsTornWrite ? PageErrorType.TornWrite : PageErrorType.Corruption,
+                ErrorType = verifyResult.IsTornWrite ? SDK.Contracts.PageErrorType.TornWrite : SDK.Contracts.PageErrorType.Corruption,
                 ExpectedChecksum = verifyResult.ExpectedChecksum,
                 ActualChecksum = verifyResult.ActualChecksum
             };
@@ -1608,54 +1609,54 @@ public sealed class CrashRecoveryPlugin : SnapshotPluginBase, IAsyncDisposable
             {
                 Name = "CreateSnapshot",
                 Description = "Creates a crash-consistent snapshot with WAL checkpoint",
-                Parameters = new List<PluginParameterDescriptor>
+                Parameters = new Dictionary<string, object>
                 {
-                    new() { Name = "name", Type = "string", Required = true, Description = "Snapshot name" }
+                    ["name"] = new PluginParameterDescriptor { Name = "name", Type = "string", Required = true, Description = "Snapshot name" }
                 }
             },
             new()
             {
                 Name = "BeginTransaction",
                 Description = "Begins a new recoverable transaction",
-                Parameters = new List<PluginParameterDescriptor>
+                Parameters = new Dictionary<string, object>
                 {
-                    new() { Name = "transactionId", Type = "string", Required = false, Description = "Optional transaction ID" }
+                    ["transactionId"] = new PluginParameterDescriptor { Name = "transactionId", Type = "string", Required = false, Description = "Optional transaction ID" }
                 }
             },
             new()
             {
                 Name = "CommitTransaction",
                 Description = "Commits a transaction with WAL durability",
-                Parameters = new List<PluginParameterDescriptor>
+                Parameters = new Dictionary<string, object>
                 {
-                    new() { Name = "transactionId", Type = "string", Required = true, Description = "Transaction ID to commit" }
+                    ["transactionId"] = new PluginParameterDescriptor { Name = "transactionId", Type = "string", Required = true, Description = "Transaction ID to commit" }
                 }
             },
             new()
             {
                 Name = "CreateCheckpoint",
                 Description = "Creates a checkpoint for faster recovery",
-                Parameters = new List<PluginParameterDescriptor>
+                Parameters = new Dictionary<string, object>
                 {
-                    new() { Name = "type", Type = "CheckpointType", Required = false, Description = "Checkpoint type" }
+                    ["type"] = new PluginParameterDescriptor { Name = "type", Type = "CheckpointType", Required = false, Description = "Checkpoint type" }
                 }
             },
             new()
             {
                 Name = "RecoverToPointInTime",
                 Description = "Recovers database to a specific point in time",
-                Parameters = new List<PluginParameterDescriptor>
+                Parameters = new Dictionary<string, object>
                 {
-                    new() { Name = "targetTime", Type = "DateTime", Required = true, Description = "Target recovery time" }
+                    ["targetTime"] = new PluginParameterDescriptor { Name = "targetTime", Type = "DateTime", Required = true, Description = "Target recovery time" }
                 }
             },
             new()
             {
                 Name = "RecoverToLsn",
                 Description = "Recovers database to a specific Log Sequence Number",
-                Parameters = new List<PluginParameterDescriptor>
+                Parameters = new Dictionary<string, object>
                 {
-                    new() { Name = "targetLsn", Type = "long", Required = true, Description = "Target LSN" }
+                    ["targetLsn"] = new PluginParameterDescriptor { Name = "targetLsn", Type = "long", Required = true, Description = "Target LSN" }
                 }
             }
         };
@@ -2050,6 +2051,12 @@ public sealed record CrashRecoveryConfig
 
     /// <summary>WAL configuration.</summary>
     public WalConfig? WalConfig { get; init; }
+
+    /// <summary>Double-write buffer configuration.</summary>
+    public DoubleWriteBufferConfig? DoubleWriteBufferConfig { get; init; }
+
+    /// <summary>Page checksum configuration.</summary>
+    public PageChecksumConfig? ChecksumConfig { get; init; }
 }
 
 /// <summary>
@@ -2066,6 +2073,34 @@ public sealed record WalConfig
     /// <summary>Whether to use direct I/O.</summary>
     public bool UseDirectIO { get; init; } = false;
 }
+
+/// <summary>
+/// Configuration for double-write buffer.
+/// </summary>
+public sealed record DoubleWriteBufferConfig
+{
+    /// <summary>Page size in bytes.</summary>
+    public int PageSize { get; init; } = 16384; // 16KB default
+
+    /// <summary>Buffer size for double-write buffer.</summary>
+    public int BufferSize { get; init; } = 65536;
+
+    /// <summary>Path to double-write buffer.</summary>
+    public string? Path { get; init; }
+}
+
+/// <summary>
+/// Configuration for page checksums.
+/// </summary>
+public sealed record PageChecksumConfig
+{
+    /// <summary>Checksum algorithm (e.g., CRC32, XXHash).</summary>
+    public string Algorithm { get; init; } = "CRC32";
+
+    /// <summary>Path to store checksums.</summary>
+    public string? StorePath { get; init; }
+}
+
 
 /// <summary>
 /// Write-Ahead Log entry.

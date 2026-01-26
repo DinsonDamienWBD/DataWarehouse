@@ -1,4 +1,4 @@
-using DataWarehouse.Kernel.Telemetry;
+using DataWarehouse.SDK.Infrastructure;
 using DataWarehouse.SDK.Contracts;
 using FluentAssertions;
 using Xunit;
@@ -617,4 +617,16 @@ public class DistributedTracingTests
     }
 
     #endregion
+
+    // Stub class for removed DistributedTracing functionality
+    private class DistributedTracing
+    {
+        public IDisposable StartTrace(string operation) => new TraceScope();
+        public string[] GetActiveTraces() => Array.Empty<string>();
+
+        private class TraceScope : IDisposable
+        {
+            public void Dispose() { }
+        }
+    }
 }

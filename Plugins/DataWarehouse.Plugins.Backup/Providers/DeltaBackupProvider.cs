@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using System.Runtime.CompilerServices;
 using System.Security.Cryptography;
 using System.Text.Json;
+using Microsoft.Extensions.Logging;
 
 namespace DataWarehouse.Plugins.Backup.Providers;
 
@@ -10,28 +11,24 @@ namespace DataWarehouse.Plugins.Backup.Providers;
 /// for efficient incremental backups of large files. Uses fixed-size blocks
 /// with signature-based change detection.
 /// </summary>
-public sealed class DeltaBackupProvider : IBackupProvider, IDeltaBackupProvider
+public sealed class DeltaBackupProvider : BackupProviderBase, IDeltaBackupProvider
 {
     private readonly IBackupDestination _destination;
     private readonly DeltaBackupConfig _config;
     private readonly ConcurrentDictionary<string, DeltaFileState> _fileStates = new();
-    private readonly SemaphoreSlim _backupLock = new(1, 1);
     private readonly string _statePath;
     private long _sequence;
-    private volatile bool _disposed;
 
-    public string ProviderId => "delta-backup-provider";
-    public string Name => "Delta Backup Provider";
-    public BackupProviderType ProviderType => BackupProviderType.Delta;
-    public bool IsMonitoring => false;
-
-    public event EventHandler<BackupProgressEventArgs>? ProgressChanged;
-    public event EventHandler<BackupCompletedEventArgs>? BackupCompleted;
+    public override string ProviderId => "delta-backup-provider";
+    public override string Name => "Delta Backup Provider";
+    public override BackupProviderType ProviderType => BackupProviderType.Delta;
 
     public DeltaBackupProvider(
         IBackupDestination destination,
         string statePath,
-        DeltaBackupConfig? config = null)
+        DeltaBackupConfig? config = null,
+        ILogger<DeltaBackupProvider>? logger = null)
+        : base(logger)
     {
         _destination = destination ?? throw new ArgumentNullException(nameof(destination));
         _statePath = statePath ?? throw new ArgumentNullException(nameof(statePath));
@@ -40,13 +37,15 @@ public sealed class DeltaBackupProvider : IBackupProvider, IDeltaBackupProvider
         Directory.CreateDirectory(_statePath);
     }
 
-    public async Task InitializeAsync(CancellationToken ct = default)
+    protected override string GetStatePath() => _statePath;
+
+    public override async Task InitializeAsync(CancellationToken ct = default)
     {
         await _destination.InitializeAsync(ct);
         await LoadStateAsync();
     }
 
-    public async Task<BackupResult> PerformFullBackupAsync(
+    public override async Task<BackupResult> PerformFullBackupAsync(
         IEnumerable<string> paths,
         BackupOptions? options = null,
         CancellationToken ct = default)
@@ -102,7 +101,7 @@ public sealed class DeltaBackupProvider : IBackupProvider, IDeltaBackupProvider
         return result;
     }
 
-    public async Task<BackupResult> PerformIncrementalBackupAsync(
+    public override async Task<BackupResult> PerformIncrementalBackupAsync(
         BackupOptions? options = null,
         CancellationToken ct = default)
     {
@@ -271,7 +270,7 @@ public sealed class DeltaBackupProvider : IBackupProvider, IDeltaBackupProvider
         return result.ChangedBlocks;
     }
 
-    public async Task<RestoreResult> RestoreAsync(
+    public override async Task<RestoreResult> RestoreAsync(
         string backupId,
         string? targetPath = null,
         DateTime? pointInTime = null,
@@ -352,7 +351,7 @@ public sealed class DeltaBackupProvider : IBackupProvider, IDeltaBackupProvider
         }
     }
 
-    public BackupStatistics GetStatistics()
+    public override BackupStatistics GetStatistics()
     {
         return new BackupStatistics
         {
@@ -362,12 +361,12 @@ public sealed class DeltaBackupProvider : IBackupProvider, IDeltaBackupProvider
         };
     }
 
-    public Task<BackupMetadata?> GetBackupMetadataAsync(string backupId, CancellationToken ct = default)
+    public override Task<BackupMetadata?> GetBackupMetadataAsync(string backupId, CancellationToken ct = default)
     {
         return Task.FromResult<BackupMetadata?>(null);
     }
 
-    public async IAsyncEnumerable<BackupMetadata> ListBackupsAsync(
+    public override async IAsyncEnumerable<BackupMetadata> ListBackupsAsync(
         [EnumeratorCancellation] CancellationToken ct = default)
     {
         var seen = new HashSet<string>();
@@ -402,7 +401,7 @@ public sealed class DeltaBackupProvider : IBackupProvider, IDeltaBackupProvider
             RelativePath = relativePath,
             Size = fileInfo.Length,
             LastModified = fileInfo.LastWriteTimeUtc,
-            Checksum = await ComputeFileChecksumAsync(fileStream, ct)
+            Checksum = await ComputeChecksumAsync(fileStream, ct)
         };
 
         fileStream.Position = 0;
@@ -507,11 +506,6 @@ public sealed class DeltaBackupProvider : IBackupProvider, IDeltaBackupProvider
         };
     }
 
-    private static string ComputeBlockHash(byte[] data)
-    {
-        return Convert.ToHexString(SHA256.HashData(data)).ToLowerInvariant();
-    }
-
     private static uint ComputeWeakHash(byte[] data)
     {
         // Rolling hash (Adler-32 like)
@@ -527,52 +521,15 @@ public sealed class DeltaBackupProvider : IBackupProvider, IDeltaBackupProvider
         return (b << 16) | a;
     }
 
-    private static async Task<string> ComputeFileChecksumAsync(Stream stream, CancellationToken ct)
-    {
-        var hash = await SHA256.HashDataAsync(stream, ct);
-        return Convert.ToHexString(hash).ToLowerInvariant();
-    }
-
-    private static string GetRelativePath(string filePath)
-    {
-        return filePath.Replace('\\', '/').TrimStart('/');
-    }
-
-    private bool ShouldBackupFile(string path, BackupOptions? options)
-    {
-        if (options == null) return true;
-
-        if (options.MaxFileSizeBytes > 0)
-        {
-            try
-            {
-                var info = new FileInfo(path);
-                if (info.Length > options.MaxFileSizeBytes) return false;
-            }
-            catch { return false; }
-        }
-
-        return true;
-    }
-
-    private void RaiseBackupCompleted(BackupResult result)
-    {
-        BackupCompleted?.Invoke(this, new BackupCompletedEventArgs { Result = result });
-    }
 
     private async Task LoadStateAsync()
     {
-        var stateFile = Path.Combine(_statePath, "delta_state.json");
-        if (File.Exists(stateFile))
+        var state = await LoadStateAsync<DeltaStateData>("delta_state.json");
+        if (state != null)
         {
-            var json = await File.ReadAllTextAsync(stateFile);
-            var state = JsonSerializer.Deserialize<DeltaStateData>(json);
-            if (state != null)
-            {
-                _sequence = state.Sequence;
-                foreach (var fs in state.FileStates)
-                    _fileStates[fs.FilePath] = fs;
-            }
+            _sequence = state.Sequence;
+            foreach (var fs in state.FileStates)
+                _fileStates[fs.FilePath] = fs;
         }
     }
 
@@ -584,18 +541,12 @@ public sealed class DeltaBackupProvider : IBackupProvider, IDeltaBackupProvider
             FileStates = _fileStates.Values.ToList()
         };
 
-        var json = JsonSerializer.Serialize(state, new JsonSerializerOptions { WriteIndented = true });
-        var stateFile = Path.Combine(_statePath, "delta_state.json");
-        await File.WriteAllTextAsync(stateFile, json, ct);
+        await SaveStateAsync(state, "delta_state.json", ct);
     }
 
-    public async ValueTask DisposeAsync()
+    protected override async ValueTask DisposeAsyncCore()
     {
-        if (_disposed) return;
-        _disposed = true;
-
         await SaveStateAsync(CancellationToken.None);
-        _backupLock.Dispose();
     }
 }
 

@@ -60,15 +60,15 @@ public sealed class ValidationMiddleware
     /// <summary>
     /// Validates input and returns a validation result.
     /// </summary>
-    public async Task<ValidationResult> ValidateAsync(
+    public async Task<MiddlewareValidationResult> ValidateAsync(
         object? input,
-        ValidationContext context,
+        MiddlewareValidationContext context,
         CancellationToken ct = default)
     {
         var sw = Stopwatch.StartNew();
         Interlocked.Increment(ref _totalValidations);
 
-        var result = new ValidationResult
+        var result = new MiddlewareValidationResult
         {
             IsValid = true,
             ValidatedAt = DateTime.UtcNow,
@@ -82,7 +82,7 @@ public sealed class ValidationMiddleware
                 return result;
             }
             result.IsValid = false;
-            result.Errors.Add(new ValidationError
+            result.Errors.Add(new MiddlewareValidationError
             {
                 Code = "NULL_INPUT",
                 Message = "Input cannot be null",
@@ -136,7 +136,7 @@ public sealed class ValidationMiddleware
         catch (Exception ex)
         {
             result.IsValid = false;
-            result.Errors.Add(new ValidationError
+            result.Errors.Add(new MiddlewareValidationError
             {
                 Code = "VALIDATION_EXCEPTION",
                 Message = $"Validation failed: {ex.Message}",
@@ -157,12 +157,12 @@ public sealed class ValidationMiddleware
         return result;
     }
 
-    private async Task<ValidationResult> ValidateTypeAsync(
+    private async Task<MiddlewareValidationResult> ValidateTypeAsync(
         object input,
-        ValidationContext context,
+        MiddlewareValidationContext context,
         CancellationToken ct)
     {
-        var result = new ValidationResult { IsValid = true };
+        var result = new MiddlewareValidationResult { IsValid = true };
 
         // Get type-specific validators
         var inputType = input.GetType();
@@ -256,7 +256,7 @@ public sealed class ValidationMiddleware
 public interface IValidationFilter
 {
     string Name { get; }
-    Task<ValidationResult> ValidateAsync(string input, ValidationContext context, CancellationToken ct);
+    Task<MiddlewareValidationResult> ValidateAsync(string input, MiddlewareValidationContext context, CancellationToken ct);
 }
 
 /// <summary>
@@ -264,7 +264,7 @@ public interface IValidationFilter
 /// </summary>
 public interface ITypeValidator
 {
-    Task<ValidationResult> ValidateAsync(object input, ValidationContext context, CancellationToken ct);
+    Task<MiddlewareValidationResult> ValidateAsync(object input, MiddlewareValidationContext context, CancellationToken ct);
 }
 
 /// <summary>
@@ -274,14 +274,14 @@ public sealed class NullByteFilter : IValidationFilter
 {
     public string Name => "NullByte";
 
-    public Task<ValidationResult> ValidateAsync(string input, ValidationContext context, CancellationToken ct)
+    public Task<MiddlewareValidationResult> ValidateAsync(string input, MiddlewareValidationContext context, CancellationToken ct)
     {
-        var result = new ValidationResult { IsValid = true };
+        var result = new MiddlewareValidationResult { IsValid = true };
 
         if (input.Contains('\0'))
         {
             result.IsValid = false;
-            result.Errors.Add(new ValidationError
+            result.Errors.Add(new MiddlewareValidationError
             {
                 Code = "NULL_BYTE",
                 Message = "Input contains null byte (potential injection attack)",
@@ -302,9 +302,9 @@ public sealed class ControlCharacterFilter : IValidationFilter
 
     private static readonly HashSet<char> AllowedControlChars = new() { '\t', '\n', '\r' };
 
-    public Task<ValidationResult> ValidateAsync(string input, ValidationContext context, CancellationToken ct)
+    public Task<MiddlewareValidationResult> ValidateAsync(string input, MiddlewareValidationContext context, CancellationToken ct)
     {
-        var result = new ValidationResult { IsValid = true };
+        var result = new MiddlewareValidationResult { IsValid = true };
 
         foreach (var c in input)
         {
@@ -314,7 +314,7 @@ public sealed class ControlCharacterFilter : IValidationFilter
                 if (context.StrictMode)
                 {
                     result.IsValid = false;
-                    result.Errors.Add(new ValidationError
+                    result.Errors.Add(new MiddlewareValidationError
                     {
                         Code = "CONTROL_CHAR",
                         Message = $"Input contains disallowed control character (U+{(int)c:X4})",
@@ -345,14 +345,14 @@ public sealed class PathTraversalFilter : IValidationFilter
         @"(%c0%2f)",                           // Overlong UTF-8 slash
         RegexOptions.Compiled);
 
-    public Task<ValidationResult> ValidateAsync(string input, ValidationContext context, CancellationToken ct)
+    public Task<MiddlewareValidationResult> ValidateAsync(string input, MiddlewareValidationContext context, CancellationToken ct)
     {
-        var result = new ValidationResult { IsValid = true };
+        var result = new MiddlewareValidationResult { IsValid = true };
 
         if (PathTraversalPattern.IsMatch(input))
         {
             result.IsValid = false;
-            result.Errors.Add(new ValidationError
+            result.Errors.Add(new MiddlewareValidationError
             {
                 Code = "PATH_TRAVERSAL",
                 Message = "Input contains path traversal sequence",
@@ -390,14 +390,14 @@ public sealed class XssFilter : IValidationFilter
         @"(url\s*\([^)]*javascript:)",          // CSS url with JS
         RegexOptions.Compiled);
 
-    public Task<ValidationResult> ValidateAsync(string input, ValidationContext context, CancellationToken ct)
+    public Task<MiddlewareValidationResult> ValidateAsync(string input, MiddlewareValidationContext context, CancellationToken ct)
     {
-        var result = new ValidationResult { IsValid = true };
+        var result = new MiddlewareValidationResult { IsValid = true };
 
         if (XssPattern.IsMatch(input))
         {
             result.IsValid = false;
-            result.Errors.Add(new ValidationError
+            result.Errors.Add(new MiddlewareValidationError
             {
                 Code = "XSS",
                 Message = "Input contains potential XSS payload",
@@ -418,9 +418,9 @@ public sealed class SqlInjectionFilter : IValidationFilter
 
     private readonly SqlSecurityAnalyzer _analyzer = new();
 
-    public Task<ValidationResult> ValidateAsync(string input, ValidationContext context, CancellationToken ct)
+    public Task<MiddlewareValidationResult> ValidateAsync(string input, MiddlewareValidationContext context, CancellationToken ct)
     {
-        var result = new ValidationResult { IsValid = true };
+        var result = new MiddlewareValidationResult { IsValid = true };
 
         var analysisResult = _analyzer.Analyze(input);
         if (!analysisResult.IsValid)
@@ -428,7 +428,7 @@ public sealed class SqlInjectionFilter : IValidationFilter
             result.IsValid = false;
             foreach (var threat in analysisResult.Threats)
             {
-                result.Errors.Add(new ValidationError
+                result.Errors.Add(new MiddlewareValidationError
                 {
                     Code = "SQL_INJECTION",
                     Message = threat.Description,
@@ -463,14 +463,14 @@ public sealed class CommandInjectionFilter : IValidationFilter
         @"(%0[aAdD])",                         // Encoded newline
         RegexOptions.Compiled);
 
-    public Task<ValidationResult> ValidateAsync(string input, ValidationContext context, CancellationToken ct)
+    public Task<MiddlewareValidationResult> ValidateAsync(string input, MiddlewareValidationContext context, CancellationToken ct)
     {
-        var result = new ValidationResult { IsValid = true };
+        var result = new MiddlewareValidationResult { IsValid = true };
 
         if (CommandInjectionPattern.IsMatch(input))
         {
             result.IsValid = false;
-            result.Errors.Add(new ValidationError
+            result.Errors.Add(new MiddlewareValidationError
             {
                 Code = "COMMAND_INJECTION",
                 Message = "Input contains potential command injection characters",
@@ -496,9 +496,9 @@ public sealed class LdapInjectionFilter : IValidationFilter
         @"(!\()",                              // NOT filter
         RegexOptions.Compiled);
 
-    public Task<ValidationResult> ValidateAsync(string input, ValidationContext context, CancellationToken ct)
+    public Task<MiddlewareValidationResult> ValidateAsync(string input, MiddlewareValidationContext context, CancellationToken ct)
     {
-        var result = new ValidationResult { IsValid = true };
+        var result = new MiddlewareValidationResult { IsValid = true };
 
         if (LdapInjectionPattern.IsMatch(input))
         {
@@ -506,7 +506,7 @@ public sealed class LdapInjectionFilter : IValidationFilter
             if (context.StrictMode)
             {
                 result.IsValid = false;
-                result.Errors.Add(new ValidationError
+                result.Errors.Add(new MiddlewareValidationError
                 {
                     Code = "LDAP_INJECTION",
                     Message = "Input contains potential LDAP injection characters",
@@ -538,14 +538,14 @@ public sealed class XmlInjectionFilter : IValidationFilter
         @"(&#x[0-9a-fA-F]+;)",                 // Hex entity
         RegexOptions.Compiled);
 
-    public Task<ValidationResult> ValidateAsync(string input, ValidationContext context, CancellationToken ct)
+    public Task<MiddlewareValidationResult> ValidateAsync(string input, MiddlewareValidationContext context, CancellationToken ct)
     {
-        var result = new ValidationResult { IsValid = true };
+        var result = new MiddlewareValidationResult { IsValid = true };
 
         if (XmlInjectionPattern.IsMatch(input))
         {
             result.IsValid = false;
-            result.Errors.Add(new ValidationError
+            result.Errors.Add(new MiddlewareValidationError
             {
                 Code = "XML_INJECTION",
                 Message = "Input contains potential XML injection or XXE payload",
@@ -585,9 +585,9 @@ public sealed class ValidationMiddlewareConfig
 }
 
 /// <summary>
-/// Context for validation operations.
+/// Context for middleware validation operations.
 /// </summary>
-public sealed class ValidationContext
+public sealed class MiddlewareValidationContext
 {
     public required string Source { get; init; }
     public string? UserId { get; init; }
@@ -598,22 +598,22 @@ public sealed class ValidationContext
 }
 
 /// <summary>
-/// Result of validation.
+/// Result of middleware validation.
 /// </summary>
-public sealed class ValidationResult
+public sealed class MiddlewareValidationResult
 {
     public bool IsValid { get; set; }
-    public List<ValidationError> Errors { get; } = new();
+    public List<MiddlewareValidationError> Errors { get; } = new();
     public List<string> Warnings { get; } = new();
     public DateTime ValidatedAt { get; init; }
     public TimeSpan Duration { get; set; }
-    public ValidationContext? Context { get; init; }
+    public MiddlewareValidationContext? Context { get; init; }
 }
 
 /// <summary>
-/// Validation error.
+/// Middleware validation error.
 /// </summary>
-public sealed class ValidationError
+public sealed class MiddlewareValidationError
 {
     public required string Code { get; init; }
     public required string Message { get; init; }

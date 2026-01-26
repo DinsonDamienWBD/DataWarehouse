@@ -3,6 +3,8 @@ using DataWarehouse.SDK.Primitives;
 using DataWarehouse.SDK.Utilities;
 using System.Buffers;
 using System.IO.Compression;
+using SystemCompressionLevel = System.IO.Compression.CompressionLevel;
+using SdkCompressionLevel = DataWarehouse.SDK.Primitives.CompressionLevel;
 
 namespace DataWarehouse.Plugins.DeflateCompression
 {
@@ -174,7 +176,7 @@ namespace DataWarehouse.Plugins.DeflateCompression
             var originalSize = inputData.Length;
 
             // Check if compression should be bypassed for small data
-            if (originalSize < MinCompressionThreshold && compressionLevel != CompressionLevel.NoCompression)
+            if (originalSize < MinCompressionThreshold && compressionLevel != SystemCompressionLevel.NoCompression)
             {
                 context.LogDebug($"Deflate: Bypassing compression for small data ({originalSize} bytes)");
                 return CreateBypassedOutput(inputData, originalSize, context);
@@ -254,7 +256,7 @@ namespace DataWarehouse.Plugins.DeflateCompression
                 throw new InvalidDataException($"Unsupported Deflate header version: 0x{version:X2}");
             }
 
-            var level = (CompressionLevel)reader.ReadByte();
+            var level = (SystemCompressionLevel)reader.ReadByte();
             var originalSize = reader.ReadInt64();
             var flags = (DeflateFlags)reader.ReadByte();
 
@@ -360,7 +362,7 @@ namespace DataWarehouse.Plugins.DeflateCompression
                 Array.Copy(data, sample, sampleSize);
 
                 using var compressedSample = new MemoryStream();
-                using (var deflate = new DeflateStream(compressedSample, CompressionLevel.Fastest, true))
+                using (var deflate = new DeflateStream(compressedSample, SystemCompressionLevel.Fastest, true))
                 {
                     deflate.Write(sample, 0, sample.Length);
                 }
@@ -398,7 +400,7 @@ namespace DataWarehouse.Plugins.DeflateCompression
             // Write header with stored flag
             writer.Write(MagicBytes);
             writer.Write(HeaderVersion);
-            writer.Write((byte)CompressionLevel.NoCompression);
+            writer.Write((byte)SystemCompressionLevel.NoCompression);
             writer.Write((long)originalSize);
             writer.Write((byte)DeflateFlags.Stored);
 
@@ -412,23 +414,23 @@ namespace DataWarehouse.Plugins.DeflateCompression
             return output;
         }
 
-        private CompressionLevel GetCompressionLevel(Dictionary<string, object> args)
+        private System.IO.Compression.CompressionLevel GetCompressionLevel(Dictionary<string, object> args)
         {
             if (args.TryGetValue("compressionLevel", out var levelObj))
             {
-                if (levelObj is CompressionLevel level)
+                if (levelObj is System.IO.Compression.CompressionLevel level)
                 {
                     return level;
                 }
 
-                if (levelObj is string levelStr && Enum.TryParse<CompressionLevel>(levelStr, true, out var parsedLevel))
+                if (levelObj is string levelStr && Enum.TryParse<System.IO.Compression.CompressionLevel>(levelStr, true, out var parsedLevel))
                 {
                     return parsedLevel;
                 }
 
-                if (levelObj is int levelInt && Enum.IsDefined(typeof(CompressionLevel), levelInt))
+                if (levelObj is int levelInt && Enum.IsDefined(typeof(System.IO.Compression.CompressionLevel), levelInt))
                 {
-                    return (CompressionLevel)levelInt;
+                    return (System.IO.Compression.CompressionLevel)levelInt;
                 }
             }
 
@@ -453,7 +455,7 @@ namespace DataWarehouse.Plugins.DeflateCompression
         {
             if (message.Payload.TryGetValue("compressionLevel", out var levelObj))
             {
-                if (levelObj is string levelStr && Enum.TryParse<CompressionLevel>(levelStr, true, out var level))
+                if (levelObj is string levelStr && Enum.TryParse<System.IO.Compression.CompressionLevel>(levelStr, true, out var level))
                 {
                     _config.CompressionLevel = level;
                 }
@@ -535,7 +537,7 @@ namespace DataWarehouse.Plugins.DeflateCompression
         /// Compression level to use.
         /// Default is Optimal.
         /// </summary>
-        public CompressionLevel CompressionLevel { get; set; } = CompressionLevel.Optimal;
+        public System.IO.Compression.CompressionLevel CompressionLevel { get; set; } = System.IO.Compression.CompressionLevel.Optimal;
 
         /// <summary>
         /// Whether to bypass compression for incompressible data.

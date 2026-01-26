@@ -1,5 +1,6 @@
 using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Primitives;
+using DataWarehouse.Plugins.SharedRaidUtilities;
 using System.Collections.Concurrent;
 using System.Runtime.CompilerServices;
 using System.Security.Cryptography;
@@ -40,8 +41,10 @@ public sealed class AdvancedRaidPlugin : RaidProviderPluginBase, IAsyncDisposabl
     /// <inheritdoc />
     public override string Version => "1.0.0";
 
-    /// <inheritdoc />
-    public override RaidCapabilities Capabilities =>
+    /// <summary>
+    /// Gets the RAID capabilities supported by this plugin.
+    /// </summary>
+    public RaidCapabilities Capabilities =>
         RaidCapabilities.RAID50 |
         RaidCapabilities.RAID60 |
         RaidCapabilities.RAID1E |
@@ -50,6 +53,15 @@ public sealed class AdvancedRaidPlugin : RaidProviderPluginBase, IAsyncDisposabl
         RaidCapabilities.HotSpare |
         RaidCapabilities.AutoRebuild |
         RaidCapabilities.Scrubbing;
+
+    /// <inheritdoc />
+    public override PluginCategory Category => PluginCategory.StorageProvider;
+
+    /// <inheritdoc />
+    public override RaidLevel Level => RaidLevel.RAID_50; // Default to RAID 50, can be determined from active arrays
+
+    /// <inheritdoc />
+    public override int ProviderCount => _arrays.Values.FirstOrDefault()?.Drives.Count ?? 0;
 
     /// <summary>
     /// Creates a new advanced RAID plugin instance.
@@ -67,7 +79,7 @@ public sealed class AdvancedRaidPlugin : RaidProviderPluginBase, IAsyncDisposabl
 
         Directory.CreateDirectory(_statePath);
 
-        _galoisField = new GaloisField(0x11D);
+        _galoisField = new GaloisField();
         _rebuildSemaphore = new SemaphoreSlim(_config.MaxConcurrentRebuilds, _config.MaxConcurrentRebuilds);
 
         _healthCheckTimer = new Timer(
@@ -207,7 +219,7 @@ public sealed class AdvancedRaidPlugin : RaidProviderPluginBase, IAsyncDisposabl
             var group = new RaidGroup
             {
                 GroupId = $"group-{g:D2}",
-                GroupLevel = AdvancedRaidLevel.RAID5,
+                GroupLevel = AdvancedRaidLevel.RAID5E, // Use RAID5E as the group level for RAID50
                 ParityDriveCount = 1
             };
 
@@ -233,7 +245,7 @@ public sealed class AdvancedRaidPlugin : RaidProviderPluginBase, IAsyncDisposabl
             var group = new RaidGroup
             {
                 GroupId = $"group-{g:D2}",
-                GroupLevel = AdvancedRaidLevel.RAID6,
+                GroupLevel = AdvancedRaidLevel.RAID60, // Use RAID60 as the group level for RAID60 sub-groups
                 ParityDriveCount = 2
             };
 
@@ -382,23 +394,21 @@ public sealed class AdvancedRaidPlugin : RaidProviderPluginBase, IAsyncDisposabl
     }
 
     /// <inheritdoc />
-    public override async Task<bool> DeleteAsync(string key, CancellationToken ct = default)
+    public override async Task DeleteAsync(string key, CancellationToken ct = default)
     {
-        if (string.IsNullOrEmpty(key)) return false;
+        if (string.IsNullOrEmpty(key)) return;
 
         _arrayLock.EnterWriteLock();
         try
         {
             if (!_stripeIndex.TryRemove(key, out var metadata))
-                return false;
+                return;
 
             var array = GetArrayById(metadata.ArrayId);
             if (array != null)
             {
                 await DeleteStripesAsync(array, key, metadata, ct);
             }
-
-            return true;
         }
         finally
         {
@@ -407,9 +417,197 @@ public sealed class AdvancedRaidPlugin : RaidProviderPluginBase, IAsyncDisposabl
     }
 
     /// <inheritdoc />
-    public override Task<bool> ExistsAsync(string key)
+    public override Task<bool> ExistsAsync(string key, CancellationToken ct = default)
     {
         return Task.FromResult(_stripeIndex.ContainsKey(key));
+    }
+
+    /// <inheritdoc />
+    public override async Task<RebuildResult> RebuildAsync(int providerIndex, CancellationToken ct = default)
+    {
+        var sw = System.Diagnostics.Stopwatch.StartNew();
+
+        try
+        {
+            var array = GetPrimaryArray();
+            if (providerIndex < 0 || providerIndex >= array.Drives.Count)
+            {
+                return new RebuildResult
+                {
+                    Success = false,
+                    ProviderIndex = providerIndex,
+                    ErrorMessage = $"Invalid provider index: {providerIndex}"
+                };
+            }
+
+            var failedDrive = array.Drives[providerIndex];
+            var rebuildJob = await StartRebuildAsync(array.ArrayId, failedDrive.DriveId, ct: ct);
+
+            // Wait for rebuild to complete
+            while (rebuildJob.Status == RebuildStatus.Running || rebuildJob.Status == RebuildStatus.Pending)
+            {
+                await Task.Delay(100, ct);
+            }
+
+            sw.Stop();
+
+            return new RebuildResult
+            {
+                Success = rebuildJob.Status == RebuildStatus.Completed,
+                ProviderIndex = providerIndex,
+                Duration = sw.Elapsed,
+                BytesRebuilt = rebuildJob.StripesRebuilt * array.StripeSize,
+                ErrorMessage = rebuildJob.ErrorMessage
+            };
+        }
+        catch (Exception ex)
+        {
+            sw.Stop();
+            return new RebuildResult
+            {
+                Success = false,
+                ProviderIndex = providerIndex,
+                Duration = sw.Elapsed,
+                ErrorMessage = ex.Message
+            };
+        }
+    }
+
+    /// <inheritdoc />
+    public override IReadOnlyList<RaidProviderHealth> GetProviderHealth()
+    {
+        _arrayLock.EnterReadLock();
+        try
+        {
+            var array = GetPrimaryArray();
+            var healthList = new List<RaidProviderHealth>();
+
+            for (int i = 0; i < array.Drives.Count; i++)
+            {
+                var drive = array.Drives[i];
+                healthList.Add(new RaidProviderHealth
+                {
+                    Index = i,
+                    IsHealthy = drive.Status == DriveStatus.Online,
+                    IsRebuilding = drive.Status == DriveStatus.Rebuilding,
+                    RebuildProgress = 0.0, // Could track this from active rebuild jobs
+                    LastHealthCheck = DateTime.UtcNow,
+                    ErrorMessage = drive.Status == DriveStatus.Failed ? "Drive has failed" : null
+                });
+            }
+
+            return healthList;
+        }
+        catch
+        {
+            return Array.Empty<RaidProviderHealth>();
+        }
+        finally
+        {
+            _arrayLock.ExitReadLock();
+        }
+    }
+
+    /// <inheritdoc />
+    public override async Task<ScrubResult> ScrubAsync(CancellationToken ct = default)
+    {
+        var sw = System.Diagnostics.Stopwatch.StartNew();
+        long bytesScanned = 0;
+        int errorsFound = 0;
+        var uncorrectableErrors = new List<string>();
+
+        try
+        {
+            _arrayLock.EnterReadLock();
+            try
+            {
+                var array = GetPrimaryArray();
+
+                foreach (var (key, metadata) in _stripeIndex.Where(kv => kv.Value.ArrayId == array.ArrayId))
+                {
+                    ct.ThrowIfCancellationRequested();
+
+                    try
+                    {
+                        for (int s = 0; s < metadata.StripeCount; s++)
+                        {
+                            ct.ThrowIfCancellationRequested();
+
+                            var dataChunks = new List<byte[]>();
+                            byte[]? storedParity = null;
+
+                            foreach (var drive in array.Drives.Where(d => d.Status == DriveStatus.Online))
+                            {
+                                var driveKeyPath = Path.Combine(drive.Path, "data", key, $"stripe-{s:D6}");
+                                if (Directory.Exists(driveKeyPath))
+                                {
+                                    foreach (var file in Directory.GetFiles(driveKeyPath))
+                                    {
+                                        var fileName = Path.GetFileNameWithoutExtension(file);
+                                        var data = await File.ReadAllBytesAsync(file, ct);
+                                        bytesScanned += data.Length;
+
+                                        if (fileName.Contains("parity"))
+                                        {
+                                            storedParity = data;
+                                        }
+                                        else if (fileName.Contains("data"))
+                                        {
+                                            dataChunks.Add(data);
+                                        }
+                                    }
+                                }
+                            }
+
+                            if (storedParity != null && dataChunks.Count > 0)
+                            {
+                                var calculatedParity = CalculateXorParity(dataChunks.ToArray());
+
+                                if (!calculatedParity.SequenceEqual(storedParity))
+                                {
+                                    errorsFound++;
+                                    uncorrectableErrors.Add($"Parity mismatch in key '{key}' stripe {s}");
+                                }
+                            }
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        errorsFound++;
+                        uncorrectableErrors.Add($"Error scrubbing key '{key}': {ex.Message}");
+                    }
+                }
+            }
+            finally
+            {
+                _arrayLock.ExitReadLock();
+            }
+
+            sw.Stop();
+
+            return new ScrubResult
+            {
+                Success = uncorrectableErrors.Count == 0,
+                Duration = sw.Elapsed,
+                BytesScanned = bytesScanned,
+                ErrorsFound = errorsFound,
+                ErrorsCorrected = 0, // This implementation doesn't auto-correct
+                UncorrectableErrors = uncorrectableErrors
+            };
+        }
+        catch (Exception ex)
+        {
+            sw.Stop();
+            return new ScrubResult
+            {
+                Success = false,
+                Duration = sw.Elapsed,
+                BytesScanned = bytesScanned,
+                ErrorsFound = errorsFound + 1,
+                ErrorsCorrected = 0,
+                UncorrectableErrors = new List<string> { $"Scrub failed: {ex.Message}" }
+            };
+        }
     }
 
     private StripeData CreateStripeData(RaidArray array, byte[] data)
@@ -922,7 +1120,10 @@ public sealed class AdvancedRaidPlugin : RaidProviderPluginBase, IAsyncDisposabl
                     {
                         data = await ReadBlockFromDriveAsync(primary, key, s, $"chunk-{c}-primary", ct);
                     }
-                    catch { }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"[AdvancedRaidPlugin] Read operation failed: {ex.Message}");
+                    }
                 }
 
                 if (data == null && mirror.Status == DriveStatus.Online)
@@ -1087,7 +1288,7 @@ public sealed class AdvancedRaidPlugin : RaidProviderPluginBase, IAsyncDisposabl
     /// <summary>
     /// Calculates XOR parity for data blocks.
     /// </summary>
-    private byte[] CalculateXorParity(byte[][] chunks)
+    private new byte[] CalculateXorParity(byte[][] chunks)
     {
         if (chunks.Length == 0) return Array.Empty<byte>();
 
@@ -1112,32 +1313,13 @@ public sealed class AdvancedRaidPlugin : RaidProviderPluginBase, IAsyncDisposabl
     /// </summary>
     private byte[] CalculateReedSolomonParity(byte[][] chunks)
     {
-        if (chunks.Length == 0) return Array.Empty<byte>();
-
-        var maxLen = chunks.Max(c => c?.Length ?? 0);
-        var qParity = new byte[maxLen];
-
-        for (int i = 0; i < maxLen; i++)
-        {
-            byte result = 0;
-            for (int c = 0; c < chunks.Length; c++)
-            {
-                if (chunks[c] == null || i >= chunks[c].Length) continue;
-
-                var coefficient = _galoisField.Power(2, c);
-                var product = _galoisField.Multiply(coefficient, chunks[c][i]);
-                result = _galoisField.Add(result, product);
-            }
-            qParity[i] = result;
-        }
-
-        return qParity;
+        return _galoisField.CalculateQParity(chunks);
     }
 
     /// <summary>
     /// Reconstructs a single failed block from XOR parity.
     /// </summary>
-    private byte[] ReconstructFromParity(byte[][] chunks, byte[] parity, int failedIndex)
+    private new byte[] ReconstructFromParity(byte[][] chunks, byte[] parity, int failedIndex)
     {
         var maxLen = parity.Length;
         var reconstructed = new byte[maxLen];
@@ -1166,40 +1348,7 @@ public sealed class AdvancedRaidPlugin : RaidProviderPluginBase, IAsyncDisposabl
         int failedIndex1,
         int failedIndex2)
     {
-        var size = pParity.Length;
-        chunks[failedIndex1] = new byte[size];
-        chunks[failedIndex2] = new byte[size];
-
-        var g1 = (byte)_galoisField.Power(2, failedIndex1);
-        var g2 = (byte)_galoisField.Power(2, failedIndex2);
-
-        for (int i = 0; i < size; i++)
-        {
-            byte pXor = pParity[i];
-            byte qXor = qParity[i];
-
-            for (int c = 0; c < chunks.Length; c++)
-            {
-                if (c == failedIndex1 || c == failedIndex2 || chunks[c] == null) continue;
-
-                pXor ^= chunks[c][i];
-                var coef = (byte)_galoisField.Power(2, c);
-                qXor = _galoisField.Add(qXor, _galoisField.Multiply(coef, chunks[c][i]));
-            }
-
-            var gDiff = _galoisField.Add(g1, g2);
-            var gDiffInv = _galoisField.Inverse(gDiff);
-
-            var d1Temp = _galoisField.Add(
-                _galoisField.Multiply(g2, pXor),
-                qXor);
-            var d1 = _galoisField.Multiply(gDiffInv, d1Temp);
-
-            var d2 = _galoisField.Add(pXor, d1);
-
-            chunks[failedIndex1][i] = d1;
-            chunks[failedIndex2][i] = d2;
-        }
+        _galoisField.ReconstructFromPQ(chunks, pParity, qParity, failedIndex1, failedIndex2);
     }
 
     private async Task<byte[]> ReadParityAsync(
@@ -1779,74 +1928,6 @@ public sealed class AdvancedRaidPlugin : RaidProviderPluginBase, IAsyncDisposabl
         _arrayLock.Dispose();
     }
 }
-
-#region Galois Field Implementation
-
-/// <summary>
-/// GF(2^8) Galois Field implementation for Reed-Solomon parity calculations.
-/// </summary>
-internal sealed class GaloisField
-{
-    private readonly byte[] _expTable;
-    private readonly byte[] _logTable;
-    private readonly int _primitive;
-
-    public GaloisField(int primitive)
-    {
-        _primitive = primitive;
-        _expTable = new byte[512];
-        _logTable = new byte[256];
-
-        int x = 1;
-        for (int i = 0; i < 255; i++)
-        {
-            _expTable[i] = (byte)x;
-            _logTable[x] = (byte)i;
-            x <<= 1;
-            if (x >= 256)
-            {
-                x ^= _primitive;
-            }
-        }
-
-        for (int i = 255; i < 512; i++)
-        {
-            _expTable[i] = _expTable[i - 255];
-        }
-    }
-
-    public byte Add(byte a, byte b) => (byte)(a ^ b);
-
-    public byte Subtract(byte a, byte b) => (byte)(a ^ b);
-
-    public byte Multiply(byte a, byte b)
-    {
-        if (a == 0 || b == 0) return 0;
-        return _expTable[_logTable[a] + _logTable[b]];
-    }
-
-    public byte Divide(byte a, byte b)
-    {
-        if (b == 0) throw new DivideByZeroException();
-        if (a == 0) return 0;
-        return _expTable[_logTable[a] + 255 - _logTable[b]];
-    }
-
-    public byte Power(int b, int e)
-    {
-        if (e == 0) return 1;
-        if (b == 0) return 0;
-        return _expTable[(e * _logTable[b]) % 255];
-    }
-
-    public byte Inverse(byte a)
-    {
-        if (a == 0) throw new DivideByZeroException();
-        return _expTable[255 - _logTable[a]];
-    }
-}
-
-#endregion
 
 #region Configuration and Models
 

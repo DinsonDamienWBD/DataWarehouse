@@ -580,7 +580,7 @@ namespace DataWarehouse.Plugins.RAMDiskStorage
             _disposed = true;
 
             _backgroundCts.Cancel();
-            try { _backgroundPersister?.Wait(TimeSpan.FromSeconds(5)); } catch { }
+            try { _backgroundPersister?.Wait(TimeSpan.FromSeconds(5)); } catch (Exception ex) { Console.WriteLine($"[RamDiskStoragePlugin] Background persister shutdown failed: {ex.Message}"); }
 
             // Final flush
             FlushAsync(null).GetAwaiter().GetResult();

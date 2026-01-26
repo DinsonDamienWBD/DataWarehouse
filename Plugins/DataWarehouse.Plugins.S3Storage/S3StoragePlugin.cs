@@ -6,6 +6,7 @@ using DataWarehouse.SDK.Utilities;
 using System.Net;
 using System.Security.Cryptography;
 using System.Text;
+using System.Xml.Linq;
 using StorageTier = DataWarehouse.SDK.Primitives.StorageTier;
 
 namespace DataWarehouse.Plugins.S3Storage
@@ -360,8 +361,19 @@ namespace DataWarehouse.Plugins.S3Storage
             var response = await client.SendAsync(request);
             response.EnsureSuccessStatusCode();
 
-            // Remove from index
-            _ = RemoveFromIndexAsync(uri.ToString());
+            // Remove from index (fire-and-forget with error handling)
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    await RemoveFromIndexAsync(uri.ToString());
+                }
+                catch (Exception ex)
+                {
+                    // Log warning for background indexing failure - this is non-critical
+                    Console.Error.WriteLine($"[S3Storage] Background index removal failed for key '{key}': {ex.Message}");
+                }
+            });
         }
 
         public override Task DeleteAsync(Uri uri) => DeleteAsync(uri, null);
@@ -404,29 +416,40 @@ namespace DataWarehouse.Plugins.S3Storage
 
                 var xml = await response.Content.ReadAsStringAsync(ct);
 
-                // Parse XML response (simplified - in production use XML parser)
-                var lines = xml.Split('\n');
-                foreach (var line in lines)
+                // Parse XML response using proper XML parsing
+                XDocument doc;
+                try
+                {
+                    doc = XDocument.Parse(xml);
+                }
+                catch (Exception ex)
+                {
+                    throw new InvalidOperationException("Failed to parse S3 ListObjectsV2 XML response", ex);
+                }
+
+                // S3 uses a default namespace
+                var ns = doc.Root?.GetDefaultNamespace() ?? XNamespace.None;
+
+                // Extract objects from Contents elements
+                var contents = doc.Descendants(ns + "Contents");
+                foreach (var content in contents)
                 {
                     if (ct.IsCancellationRequested)
                         yield break;
 
-                    if (line.Contains("<Key>"))
-                    {
-                        var key = ExtractXmlValue(line, "Key");
-                        var size = 0L;
-                        var sizeLine = lines.FirstOrDefault(l => l.Contains("<Size>") && lines.ToList().IndexOf(l) > Array.IndexOf(lines, line));
-                        if (sizeLine != null)
-                            long.TryParse(ExtractXmlValue(sizeLine, "Size"), out size);
+                    var key = content.Element(ns + "Key")?.Value;
+                    if (string.IsNullOrEmpty(key))
+                        continue;
 
-                        var itemUri = new Uri($"s3://{_config.Bucket}/{key}");
-                        yield return new StorageListItem(itemUri, size);
-                    }
+                    var sizeStr = content.Element(ns + "Size")?.Value;
+                    var size = long.TryParse(sizeStr, out var parsedSize) ? parsedSize : 0L;
+
+                    var itemUri = new Uri($"s3://{_config.Bucket}/{key}");
+                    yield return new StorageListItem(itemUri, size);
                 }
 
-                continuationToken = xml.Contains("<NextContinuationToken>")
-                    ? ExtractXmlValue(xml, "NextContinuationToken")
-                    : null;
+                // Extract continuation token if present
+                continuationToken = doc.Descendants(ns + "NextContinuationToken").FirstOrDefault()?.Value;
 
             } while (continuationToken != null);
         }
@@ -456,6 +479,16 @@ namespace DataWarehouse.Plugins.S3Storage
                 ["LastModified"] = response.Content.Headers.LastModified?.ToString() ?? "",
                 ["ETag"] = response.Headers.ETag?.Tag ?? ""
             };
+
+            // Capture storage class from response headers
+            if (response.Headers.TryGetValues("x-amz-storage-class", out var storageClassValues))
+            {
+                metadata["StorageClass"] = storageClassValues.FirstOrDefault() ?? "STANDARD";
+            }
+            else
+            {
+                metadata["StorageClass"] = "STANDARD"; // Default if not specified
+            }
 
             foreach (var header in response.Headers.Where(h => h.Key.StartsWith("x-amz-meta-")))
             {
@@ -531,10 +564,25 @@ namespace DataWarehouse.Plugins.S3Storage
         public Task<string> MoveToTierAsync(Manifest manifest, StorageTier targetTier)
             => MoveToTierAsync(manifest, targetTier, null);
 
-        public Task<StorageTier> GetCurrentTierAsync(Uri uri)
+        public async Task<StorageTier> GetCurrentTierAsync(Uri uri)
         {
-            // Would need to parse x-amz-storage-class from HEAD response
-            return Task.FromResult(StorageTier.Hot);
+            var key = GetKey(uri);
+            var metadata = await HeadObjectAsync(key);
+
+            var storageClass = metadata.TryGetValue("StorageClass", out var value)
+                ? value?.ToString() ?? "STANDARD"
+                : "STANDARD";
+
+            return storageClass switch
+            {
+                "STANDARD" => StorageTier.Hot,
+                "STANDARD_IA" or "ONEZONE_IA" => StorageTier.Cool,
+                "GLACIER_IR" => StorageTier.Cold,
+                "GLACIER" => StorageTier.Archive,
+                "DEEP_ARCHIVE" => StorageTier.DeepArchive,
+                "INTELLIGENT_TIERING" => StorageTier.Hot, // Could be any tier, default to Hot
+                _ => StorageTier.Hot // Default for unknown classes
+            };
         }
 
         #endregion
@@ -628,20 +676,6 @@ namespace DataWarehouse.Plugins.S3Storage
             return hmac.ComputeHash(Encoding.UTF8.GetBytes(data));
         }
 
-        private static string ExtractXmlValue(string xml, string tag)
-        {
-            var startTag = $"<{tag}>";
-            var endTag = $"</{tag}>";
-            var startIndex = xml.IndexOf(startTag);
-            var endIndex = xml.IndexOf(endTag);
-
-            if (startIndex >= 0 && endIndex > startIndex)
-            {
-                return xml.Substring(startIndex + startTag.Length, endIndex - startIndex - startTag.Length);
-            }
-
-            return string.Empty;
-        }
 
         #endregion
     }

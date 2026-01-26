@@ -17,7 +17,7 @@ namespace DataWarehouse.Plugins.CrdtReplication.Crdts
     /// - Uses HLC timestamp for improved accuracy
     /// - Eventually converges to the same value on all replicas
     /// </remarks>
-    public sealed class LWWRegister<T> : ICrdt<LWWRegister<T>>
+    public class LWWRegister<T> : ICrdt<LWWRegister<T>>
     {
         private T? _value;
         private HlcTimestamp _timestamp;

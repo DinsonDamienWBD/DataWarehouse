@@ -1,5 +1,4 @@
 using FluentAssertions;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Moq;
 using Xunit;
@@ -607,6 +606,30 @@ public class TestStorageChangedEventArgs : EventArgs
 {
     public string PoolId { get; set; } = string.Empty;
     public string ChangeType { get; set; } = string.Empty;
+}
+
+// Stub interfaces for removed Microsoft.Extensions.Configuration dependency
+public interface IConfiguration
+{
+    string? this[string key] { get; set; }
+    IConfigurationSection GetSection(string key);
+    IEnumerable<IConfigurationSection> GetChildren();
+}
+
+public interface IConfigurationSection : IConfiguration
+{
+    string Key { get; }
+    string Path { get; }
+    string? Value { get; set; }
+}
+
+// Extension method for IConfiguration
+public static class ConfigurationExtensions
+{
+    public static T? GetValue<T>(this IConfiguration configuration, string key, T defaultValue = default!)
+    {
+        return defaultValue;
+    }
 }
 
 #endregion

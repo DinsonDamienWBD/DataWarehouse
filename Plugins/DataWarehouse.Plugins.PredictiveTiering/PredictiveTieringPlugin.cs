@@ -1,5 +1,6 @@
 using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Primitives;
+using DataWarehouse.SDK.Utilities;
 using System.Collections.Concurrent;
 using System.Text.Json;
 
@@ -47,7 +48,7 @@ public sealed class PredictiveTieringPlugin : IntelligencePluginBase
     private DateTime _lastModelTraining;
     private long _totalPredictions;
     private long _totalMigrations;
-    private long _correctPredictions;
+    private long _correctPredictions = 0;
     private DateTime _sessionStart;
 
     private const int MinSamplesForTraining = 100;
@@ -66,7 +67,7 @@ public sealed class PredictiveTieringPlugin : IntelligencePluginBase
     public override string Version => "1.0.0";
 
     /// <inheritdoc/>
-    public override PluginCategory Category => PluginCategory.IntelligenceProvider;
+    public override string ProviderType => "predictive-tiering";
 
     /// <summary>
     /// Initializes a new instance of the PredictiveTieringPlugin.
@@ -85,8 +86,10 @@ public sealed class PredictiveTieringPlugin : IntelligencePluginBase
         _sessionStart = DateTime.UtcNow;
     }
 
-    /// <inheritdoc/>
-    public override async Task StartAsync(CancellationToken ct)
+    /// <summary>
+    /// Starts the predictive tiering plugin.
+    /// </summary>
+    public async Task StartAsync(CancellationToken ct)
     {
         _sessionStart = DateTime.UtcNow;
 
@@ -105,8 +108,10 @@ public sealed class PredictiveTieringPlugin : IntelligencePluginBase
         await Task.CompletedTask;
     }
 
-    /// <inheritdoc/>
-    public override async Task StopAsync()
+    /// <summary>
+    /// Stops the predictive tiering plugin.
+    /// </summary>
+    public async Task StopAsync()
     {
         _cts.Cancel();
 

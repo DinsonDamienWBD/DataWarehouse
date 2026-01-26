@@ -180,6 +180,48 @@ namespace DataWarehouse.Plugins.KeyRotation
         }
 
         /// <summary>
+        /// Gets a key by ID (synchronous version).
+        /// </summary>
+        /// <param name="keyId">The key identifier.</param>
+        /// <returns>The key bytes.</returns>
+        public byte[] GetKey(string keyId)
+        {
+            ObjectDisposedException.ThrowIf(_disposed, this);
+
+            if (string.IsNullOrEmpty(keyId))
+            {
+                throw new ArgumentNullException(nameof(keyId));
+            }
+
+            // Try local cache first
+            if (_keyVersions.TryGetValue(keyId, out var keyVersion))
+            {
+                if (keyVersion.State == KeyState.Deactivated)
+                {
+                    throw new InvalidOperationException($"Key '{keyId}' has been deactivated");
+                }
+
+                if (keyVersion.State == KeyState.Destroyed)
+                {
+                    throw new KeyNotFoundException($"Key '{keyId}' has been destroyed");
+                }
+
+                // Return a copy to prevent external modification
+                var keyCopy = new byte[keyVersion.KeyMaterial.Length];
+                Array.Copy(keyVersion.KeyMaterial, keyCopy, keyVersion.KeyMaterial.Length);
+                return keyCopy;
+            }
+
+            // Try backing key store if available
+            if (_backingKeyStore != null)
+            {
+                return _backingKeyStore.GetKey(keyId);
+            }
+
+            throw new KeyNotFoundException($"Key '{keyId}' not found");
+        }
+
+        /// <summary>
         /// Retrieves a key by ID for the given security context.
         /// </summary>
         /// <param name="keyId">The key identifier.</param>
@@ -268,8 +310,8 @@ namespace DataWarehouse.Plugins.KeyRotation
         /// </summary>
         /// <param name="keyId">The key identifier.</param>
         /// <param name="context">The security context.</param>
-        /// <returns>A task representing the operation.</returns>
-        public Task CreateKeyAsync(string keyId, ISecurityContext context)
+        /// <returns>The created key bytes.</returns>
+        public Task<byte[]> CreateKeyAsync(string keyId, ISecurityContext context)
         {
             ObjectDisposedException.ThrowIf(_disposed, this);
 
@@ -327,7 +369,10 @@ namespace DataWarehouse.Plugins.KeyRotation
                 Details = $"Created new key (version 1)"
             });
 
-            return Task.CompletedTask;
+            // Return a copy to prevent external modification
+            var keyCopy = new byte[keyMaterial.Length];
+            Array.Copy(keyMaterial, keyCopy, keyMaterial.Length);
+            return Task.FromResult(keyCopy);
         }
 
         #endregion
@@ -714,7 +759,7 @@ namespace DataWarehouse.Plugins.KeyRotation
             message.Payload["newKeyId"] = result.NewKeyId;
             message.Payload["versionNumber"] = result.VersionNumber;
             message.Payload["rotatedAt"] = result.RotatedAt.ToString("O");
-            message.Payload["gracePeriodEndsAt"] = result.GracePeriodEndsAt?.ToString("O");
+            message.Payload["gracePeriodEndsAt"] = result.GracePeriodEndsAt?.ToString("O") ?? string.Empty;
         }
 
         private Task HandleScheduleAsync(PluginMessage message)
@@ -1088,7 +1133,22 @@ namespace DataWarehouse.Plugins.KeyRotation
             _plugin = plugin;
         }
 
-        public IEnumerable<T> GetPlugins<T>() where T : IPlugin
+        public OperatingMode Mode => OperatingMode.Workstation;
+
+        public string RootPath => Environment.CurrentDirectory;
+
+        public IKernelStorageService Storage => new MockKernelStorageService();
+
+        public T? GetPlugin<T>() where T : class, IPlugin
+        {
+            if (typeof(T) == typeof(IPlugin) || typeof(T).IsAssignableFrom(typeof(IKeyStore)))
+            {
+                return _plugin as T;
+            }
+            return null;
+        }
+
+        public IEnumerable<T> GetPlugins<T>() where T : class, IPlugin
         {
             if (typeof(T) == typeof(IPlugin) || typeof(T).IsAssignableFrom(typeof(IKeyStore)))
             {
@@ -1100,6 +1160,52 @@ namespace DataWarehouse.Plugins.KeyRotation
         public void LogInfo(string message) { }
         public void LogWarning(string message) { }
         public void LogError(string message, Exception? ex = null) { }
+    }
+
+    /// <summary>
+    /// Mock kernel storage service (not used in this plugin).
+    /// </summary>
+    internal sealed class MockKernelStorageService : IKernelStorageService
+    {
+        public Task SaveAsync(string path, Stream data, IDictionary<string, string>? metadata = null, CancellationToken ct = default)
+        {
+            throw new NotSupportedException("Mock storage service does not support save operations");
+        }
+
+        public Task SaveAsync(string path, byte[] data, IDictionary<string, string>? metadata = null, CancellationToken ct = default)
+        {
+            throw new NotSupportedException("Mock storage service does not support save operations");
+        }
+
+        public Task<Stream?> LoadAsync(string path, CancellationToken ct = default)
+        {
+            throw new NotSupportedException("Mock storage service does not support load operations");
+        }
+
+        public Task<byte[]?> LoadBytesAsync(string path, CancellationToken ct = default)
+        {
+            throw new NotSupportedException("Mock storage service does not support load operations");
+        }
+
+        public Task<bool> DeleteAsync(string path, CancellationToken ct = default)
+        {
+            throw new NotSupportedException("Mock storage service does not support delete operations");
+        }
+
+        public Task<bool> ExistsAsync(string path, CancellationToken ct = default)
+        {
+            return Task.FromResult(false);
+        }
+
+        public Task<IReadOnlyList<StorageItemInfo>> ListAsync(string prefix, int limit = 100, int offset = 0, CancellationToken ct = default)
+        {
+            return Task.FromResult<IReadOnlyList<StorageItemInfo>>(Array.Empty<StorageItemInfo>());
+        }
+
+        public Task<IDictionary<string, string>?> GetMetadataAsync(string path, CancellationToken ct = default)
+        {
+            return Task.FromResult<IDictionary<string, string>?>(null);
+        }
     }
 
     #endregion

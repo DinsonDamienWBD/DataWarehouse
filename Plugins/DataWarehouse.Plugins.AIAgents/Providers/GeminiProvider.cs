@@ -200,7 +200,10 @@ namespace DataWarehouse.Plugins.AIAgents
                                 textToYield = text;
                         }
                     }
-                    catch { }
+                    catch (Exception ex)
+                {
+                    Console.WriteLine($"[GeminiProvider] Failed to parse streaming response: {ex.Message}");
+                }
                     buffer.Clear();
 
                     if (textToYield != null)

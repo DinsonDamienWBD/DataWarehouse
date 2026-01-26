@@ -239,7 +239,7 @@ namespace DataWarehouse.Plugins.AuditLogging
 
             if (_flushTask != null)
             {
-                try { await _flushTask; } catch { }
+                try { await _flushTask; } catch (Exception ex) { Console.WriteLine($"[AuditLoggingPlugin] Flush task failed: {ex.Message}"); }
             }
 
             await FlushBufferAsync();
@@ -1757,7 +1757,7 @@ For detailed verification, use the VerifyChainIntegrityAsync() method in the SDK
             {
                 if (TryParseLogDate(Path.GetFileName(file), out var date) && date < cutoff)
                 {
-                    try { File.Delete(file); } catch { }
+                    try { File.Delete(file); } catch (Exception ex) { Console.WriteLine($"[AuditLoggingPlugin] Failed to delete old log file {file}: {ex.Message}"); }
                 }
             }
         }

@@ -1,5 +1,6 @@
 using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Primitives;
+using DataWarehouse.SDK.Utilities;
 using System.Collections.Concurrent;
 using System.Security.Claims;
 using System.Security.Cryptography;
@@ -836,7 +837,9 @@ namespace DataWarehouse.Plugins.IAM
                 PeriodStartedAt = DateTime.UtcNow
             });
 
-            Interlocked.Increment(ref usage.ApiCallsThisPeriod);
+            // Use local variable since properties can't be used with ref
+            var currentCalls = usage.ApiCallsThisPeriod;
+            usage.ApiCallsThisPeriod = Interlocked.Increment(ref currentCalls);
         }
 
         private void LogAudit(string tenantId, string userId, string action, string details)

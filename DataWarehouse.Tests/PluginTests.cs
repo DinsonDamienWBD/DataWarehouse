@@ -124,7 +124,7 @@ public class AesEncryptionPluginTests : IDisposable
         _mockKeyStore.Setup(k => k.CreateKeyAsync(It.IsAny<string>(), It.IsAny<ISecurityContext>()))
             .ReturnsAsync(RandomNumberGenerator.GetBytes(32));
 
-        var message = new PluginMessage
+        var message = new DataWarehouse.SDK.Utilities.PluginMessage
         {
             Type = "encryption.aes.rotate",
             Payload = new Dictionary<string, object>()
@@ -626,7 +626,7 @@ public class AIAgentPluginTests : IAsyncLifetime
     public async Task ConversationCreate_ShouldReturnConversationId()
     {
         // Arrange
-        var message = new PluginMessage
+        var message = new DataWarehouse.SDK.Utilities.PluginMessage
         {
             Type = "ai.conversation.create",
             Payload = new Dictionary<string, object> { ["system"] = "You are a helpful assistant." }
@@ -645,7 +645,7 @@ public class AIAgentPluginTests : IAsyncLifetime
     public async Task ConversationClear_ShouldRemoveConversation()
     {
         // Arrange - Create a conversation
-        var createMessage = new PluginMessage
+        var createMessage = new DataWarehouse.SDK.Utilities.PluginMessage
         {
             Type = "ai.conversation.create",
             Payload = new Dictionary<string, object>()
@@ -657,7 +657,7 @@ public class AIAgentPluginTests : IAsyncLifetime
         var conversationId = response?.GetType().GetProperty("conversationId")?.GetValue(response)?.ToString();
 
         // Act - Clear the conversation
-        var clearMessage = new PluginMessage
+        var clearMessage = new DataWarehouse.SDK.Utilities.PluginMessage
         {
             Type = "ai.conversation.clear",
             Payload = new Dictionary<string, object> { ["conversationId"] = conversationId }
@@ -672,7 +672,7 @@ public class AIAgentPluginTests : IAsyncLifetime
     public async Task HandleProviders_ShouldReturnProviderList()
     {
         // Arrange
-        var message = new PluginMessage
+        var message = new DataWarehouse.SDK.Utilities.PluginMessage
         {
             Type = "ai.providers",
             Payload = new Dictionary<string, object>()
@@ -689,7 +689,7 @@ public class AIAgentPluginTests : IAsyncLifetime
     public async Task HandleConfigure_WithValidProvider_ShouldRegisterProvider()
     {
         // Arrange
-        var message = new PluginMessage
+        var message = new DataWarehouse.SDK.Utilities.PluginMessage
         {
             Type = "ai.configure",
             Payload = new Dictionary<string, object?>
@@ -714,7 +714,7 @@ public class AIAgentPluginTests : IAsyncLifetime
     public async Task HandleConfigure_WithoutProviderName_ShouldReturnError()
     {
         // Arrange
-        var message = new PluginMessage
+        var message = new DataWarehouse.SDK.Utilities.PluginMessage
         {
             Type = "ai.configure",
             Payload = new Dictionary<string, object?>
@@ -737,7 +737,7 @@ public class AIAgentPluginTests : IAsyncLifetime
     public async Task HandleStats_ShouldReturnStatistics()
     {
         // Arrange
-        var message = new PluginMessage
+        var message = new DataWarehouse.SDK.Utilities.PluginMessage
         {
             Type = "ai.stats",
             Payload = new Dictionary<string, object>()
@@ -756,7 +756,7 @@ public class AIAgentPluginTests : IAsyncLifetime
     public async Task HandleChat_WithoutMessage_ShouldReturnError()
     {
         // Arrange
-        var message = new PluginMessage
+        var message = new DataWarehouse.SDK.Utilities.PluginMessage
         {
             Type = "ai.chat",
             Payload = new Dictionary<string, object?>
@@ -779,7 +779,7 @@ public class AIAgentPluginTests : IAsyncLifetime
     public async Task HandleEmbed_WithoutText_ShouldReturnError()
     {
         // Arrange
-        var message = new PluginMessage
+        var message = new DataWarehouse.SDK.Utilities.PluginMessage
         {
             Type = "ai.embed",
             Payload = new Dictionary<string, object?>

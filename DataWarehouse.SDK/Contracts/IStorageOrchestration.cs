@@ -251,7 +251,7 @@ namespace DataWarehouse.SDK.Contracts
         Task<HybridSaveResult> SaveWithIndexingAsync(Uri uri, Stream data, StorageIntent? intent = null, CancellationToken ct = default);
         Task<IndexingStatus> GetIndexingStatusAsync(Uri uri, CancellationToken ct = default);
         Task<IndexingStatus> ReindexAsync(Uri uri, CancellationToken ct = default);
-        ISearchOrchestrator SearchOrchestrator { get; }
+        IStorageSearchOrchestrator SearchOrchestrator { get; }
     }
 
     public class HybridStorageConfig
@@ -334,7 +334,7 @@ namespace DataWarehouse.SDK.Contracts
     /// Orchestrates multi-threaded search across SQL, NoSQL, Vector, and AI.
     /// Thread A (SQL ~10ms) | Thread B (NoSQL ~50ms) | Thread C (Vector ~200ms) | Thread D (AI ~3-10s)
     /// </summary>
-    public interface ISearchOrchestrator
+    public interface IStorageSearchOrchestrator
     {
         Task<SearchResult> SearchAsync(SearchQuery query, CancellationToken ct = default);
         IAsyncEnumerable<SearchResultBatch> SearchStreamingAsync(SearchQuery query, CancellationToken ct = default);
@@ -424,7 +424,7 @@ namespace DataWarehouse.SDK.Contracts
         public TimeSpan DefaultProviderTimeout { get; init; } = TimeSpan.FromSeconds(5);
         public TimeSpan MaxTotalTimeout { get; init; } = TimeSpan.FromSeconds(30);
         public bool EnableParallelExecution { get; init; } = true;
-        public MergeStrategy MergeStrategy { get; init; } = MergeStrategy.ScoreWeighted;
+        public SearchMergeStrategy MergeStrategy { get; init; } = SearchMergeStrategy.ScoreWeighted;
         public Dictionary<SearchProviderType, double> ProviderWeights { get; init; } = new()
         {
             [SearchProviderType.SqlMetadata] = 1.0,
@@ -434,7 +434,7 @@ namespace DataWarehouse.SDK.Contracts
         };
     }
 
-    public enum MergeStrategy { Union, ScoreWeighted, ReciprocalRankFusion, AiRanked }
+    public enum SearchMergeStrategy { Union, ScoreWeighted, ReciprocalRankFusion, AiRanked }
 
     #endregion
 

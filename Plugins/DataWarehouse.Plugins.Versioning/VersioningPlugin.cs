@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using System.Security.Cryptography;
 using System.Text.Json;
 using DataWarehouse.SDK.Contracts;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.Versioning;
 
@@ -941,7 +942,7 @@ public sealed class VersioningPlugin : VersioningPluginBase, IAsyncDisposable
                     conflicts.Add(new MergeConflict
                     {
                         Offset = position,
-                        Length = Math.Max(sourceChange.Length, targetChange.Length),
+                        Length = Math.Max(sourceChange!.Length, targetChange!.Length),
                         BaseData = position < baseData.Length
                             ? baseData.Skip((int)position).Take(Math.Max(sourceChange.Length, targetChange.Length)).ToArray()
                             : null,
@@ -950,14 +951,14 @@ public sealed class VersioningPlugin : VersioningPluginBase, IAsyncDisposable
                     });
 
                     // For now, take target's version (can be resolved later)
-                    result.AddRange(targetChange);
+                    result.AddRange(targetChange!);
                     position += targetChange.Length;
                 }
                 else
                 {
                     // Same change on both sides
-                    result.AddRange(sourceChange);
-                    position += sourceChange.Length;
+                    result.AddRange(sourceChange!);
+                    position += sourceChange!.Length;
                 }
             }
             else if (hasSourceChange)
@@ -1162,65 +1163,65 @@ public sealed class VersioningPlugin : VersioningPluginBase, IAsyncDisposable
             {
                 Name = "CreateVersion",
                 Description = "Creates a new version of an object with delta storage",
-                Parameters = new List<PluginParameterDescriptor>
+                Parameters = new Dictionary<string, object>
                 {
-                    new() { Name = "objectId", Type = "string", Required = true, Description = "Object identifier" },
-                    new() { Name = "data", Type = "Stream", Required = true, Description = "Version content" },
-                    new() { Name = "message", Type = "string", Required = false, Description = "Version message" }
+                    ["objectId"] = new { Type = "string", Required = true, Description = "Object identifier" },
+                    ["data"] = new { Type = "Stream", Required = true, Description = "Version content" },
+                    ["message"] = new { Type = "string", Required = false, Description = "Version message" }
                 }
             },
             new()
             {
                 Name = "GetVersion",
                 Description = "Retrieves a specific version",
-                Parameters = new List<PluginParameterDescriptor>
+                Parameters = new Dictionary<string, object>
                 {
-                    new() { Name = "objectId", Type = "string", Required = true, Description = "Object identifier" },
-                    new() { Name = "versionId", Type = "string", Required = true, Description = "Version identifier" }
+                    ["objectId"] = new { Type = "string", Required = true, Description = "Object identifier" },
+                    ["versionId"] = new { Type = "string", Required = true, Description = "Version identifier" }
                 }
             },
             new()
             {
                 Name = "CreateBranch",
                 Description = "Creates a new branch from a version",
-                Parameters = new List<PluginParameterDescriptor>
+                Parameters = new Dictionary<string, object>
                 {
-                    new() { Name = "objectId", Type = "string", Required = true, Description = "Object identifier" },
-                    new() { Name = "versionId", Type = "string", Required = true, Description = "Base version" },
-                    new() { Name = "branchName", Type = "string", Required = true, Description = "New branch name" }
+                    ["objectId"] = new { Type = "string", Required = true, Description = "Object identifier" },
+                    ["versionId"] = new { Type = "string", Required = true, Description = "Base version" },
+                    ["branchName"] = new { Type = "string", Required = true, Description = "New branch name" }
                 }
             },
             new()
             {
                 Name = "MergeBranches",
                 Description = "Merges two branches with conflict detection",
-                Parameters = new List<PluginParameterDescriptor>
+                Parameters = new Dictionary<string, object>
                 {
-                    new() { Name = "objectId", Type = "string", Required = true, Description = "Object identifier" },
-                    new() { Name = "sourceBranch", Type = "string", Required = true, Description = "Source branch" },
-                    new() { Name = "targetBranch", Type = "string", Required = true, Description = "Target branch" },
-                    new() { Name = "strategy", Type = "MergeStrategy", Required = false, Description = "Merge strategy" }
+                    ["objectId"] = new { Type = "string", Required = true, Description = "Object identifier" },
+                    ["sourceBranch"] = new { Type = "string", Required = true, Description = "Source branch" },
+                    ["targetBranch"] = new { Type = "string", Required = true, Description = "Target branch" },
+                    ["strategy"] = new { Type = "MergeStrategy", Required = false, Description = "Merge strategy" }
                 }
             },
             new()
             {
                 Name = "ComputeDiff",
                 Description = "Computes diff between two versions",
-                Parameters = new List<PluginParameterDescriptor>
+                Parameters = new Dictionary<string, object>
                 {
-                    new() { Name = "objectId", Type = "string", Required = true, Description = "Object identifier" },
-                    new() { Name = "fromVersionId", Type = "string", Required = true, Description = "From version" },
-                    new() { Name = "toVersionId", Type = "string", Required = true, Description = "To version" }
+                    ["objectId"] = new { Type = "string", Required = true, Description = "Object identifier" },
+                    ["fromVersionId"] = new { Type = "string", Required = true, Description = "From version" },
+                    ["toVersionId"] = new { Type = "string", Required = true, Description = "To version" }
                 }
             },
             new()
             {
                 Name = "RestoreVersion",
                 Description = "Restores object to a specific version",
-                Parameters = new List<PluginParameterDescriptor>
+                Parameters = new Dictionary<string, object>
                 {
-                    new() { Name = "objectId", Type = "string", Required = true, Description = "Object identifier" },
-                    new() { Name = "versionId", Type = "string", Required = true, Description = "Version to restore" }
+                    ["objectId"] = new { Type = "string", Required = true, Description = "Object identifier" },
+                    ["versionId"] = new { Type = "string", Required = true, Description = "Version to restore" }
                 }
             }
         };

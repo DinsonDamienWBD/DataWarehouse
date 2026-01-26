@@ -134,11 +134,20 @@ public sealed class DifferentialBackupPlugin : BackupPluginBase, IAsyncDisposabl
             }
             catch (Exception ex)
             {
-                differentialJob.Job = differentialJob.Job with
+                differentialJob.Job = new BackupJob
                 {
+                    JobId = differentialJob.Job.JobId,
+                    Name = differentialJob.Job.Name,
+                    Type = differentialJob.Job.Type,
                     State = BackupJobState.Failed,
+                    StartedAt = differentialJob.Job.StartedAt,
                     CompletedAt = DateTime.UtcNow,
-                    ErrorMessage = ex.Message
+                    BytesProcessed = differentialJob.Job.BytesProcessed,
+                    BytesTransferred = differentialJob.Job.BytesTransferred,
+                    FilesProcessed = differentialJob.Job.FilesProcessed,
+                    Progress = differentialJob.Job.Progress,
+                    ErrorMessage = ex.Message,
+                    Tags = differentialJob.Job.Tags
                 };
             }
             finally
@@ -154,7 +163,21 @@ public sealed class DifferentialBackupPlugin : BackupPluginBase, IAsyncDisposabl
     private async Task ExecuteBackupAsync(DifferentialJob job)
     {
         var ct = job.CancellationSource.Token;
-        job.Job = job.Job with { State = BackupJobState.Running };
+        job.Job = new BackupJob
+        {
+            JobId = job.Job.JobId,
+            Name = job.Job.Name,
+            Type = job.Job.Type,
+            State = BackupJobState.Running,
+            StartedAt = job.Job.StartedAt,
+            CompletedAt = job.Job.CompletedAt,
+            BytesProcessed = job.Job.BytesProcessed,
+            BytesTransferred = job.Job.BytesTransferred,
+            FilesProcessed = job.Job.FilesProcessed,
+            Progress = job.Job.Progress,
+            ErrorMessage = job.Job.ErrorMessage,
+            Tags = job.Job.Tags
+        };
 
         if (job.Request.Type == BackupType.Full)
         {
@@ -203,11 +226,20 @@ public sealed class DifferentialBackupPlugin : BackupPluginBase, IAsyncDisposabl
                     var bitmap = CreateInitialBitmap(file, fileBaseline);
                     _changeBitmaps[file] = bitmap;
 
-                    job.Job = job.Job with
+                    job.Job = new BackupJob
                     {
+                        JobId = job.Job.JobId,
+                        Name = job.Job.Name,
+                        Type = job.Job.Type,
+                        State = job.Job.State,
+                        StartedAt = job.Job.StartedAt,
+                        CompletedAt = job.Job.CompletedAt,
                         BytesProcessed = bytesProcessed,
+                        BytesTransferred = job.Job.BytesTransferred,
                         FilesProcessed = filesProcessed,
-                        Progress = files.Count > 0 ? (double)filesProcessed / files.Count : 0
+                        Progress = files.Count > 0 ? (double)filesProcessed / files.Count : 0,
+                        ErrorMessage = job.Job.ErrorMessage,
+                        Tags = job.Job.Tags
                     };
                 }
             }
@@ -228,12 +260,20 @@ public sealed class DifferentialBackupPlugin : BackupPluginBase, IAsyncDisposabl
 
             await SaveBaselineAsync(baseline, ct);
 
-            job.Job = job.Job with
+            job.Job = new BackupJob
             {
+                JobId = job.Job.JobId,
+                Name = job.Job.Name,
+                Type = job.Job.Type,
                 State = BackupJobState.Completed,
+                StartedAt = job.Job.StartedAt,
                 CompletedAt = DateTime.UtcNow,
                 BytesProcessed = bytesProcessed,
-                FilesProcessed = filesProcessed
+                BytesTransferred = job.Job.BytesTransferred,
+                FilesProcessed = filesProcessed,
+                Progress = job.Job.Progress,
+                ErrorMessage = job.Job.ErrorMessage,
+                Tags = job.Job.Tags
             };
         }
         finally
@@ -315,10 +355,20 @@ public sealed class DifferentialBackupPlugin : BackupPluginBase, IAsyncDisposabl
                     }
 
                     filesProcessed++;
-                    job.Job = job.Job with
+                    job.Job = new BackupJob
                     {
+                        JobId = job.Job.JobId,
+                        Name = job.Job.Name,
+                        Type = job.Job.Type,
+                        State = job.Job.State,
+                        StartedAt = job.Job.StartedAt,
+                        CompletedAt = job.Job.CompletedAt,
                         BytesProcessed = bytesProcessed,
-                        FilesProcessed = filesProcessed
+                        BytesTransferred = job.Job.BytesTransferred,
+                        FilesProcessed = filesProcessed,
+                        Progress = job.Job.Progress,
+                        ErrorMessage = job.Job.ErrorMessage,
+                        Tags = job.Job.Tags
                     };
                 }
                 catch (Exception ex)
@@ -356,13 +406,20 @@ public sealed class DifferentialBackupPlugin : BackupPluginBase, IAsyncDisposabl
             Interlocked.Add(ref _totalBytesProcessed, bytesProcessed);
             Interlocked.Add(ref _totalChangedBlocks, changedBlocks);
 
-            job.Job = job.Job with
+            job.Job = new BackupJob
             {
+                JobId = job.Job.JobId,
+                Name = job.Job.Name,
+                Type = job.Job.Type,
                 State = errors.Count > 0 ? BackupJobState.Failed : BackupJobState.Completed,
+                StartedAt = job.Job.StartedAt,
                 CompletedAt = DateTime.UtcNow,
                 BytesProcessed = bytesProcessed,
+                BytesTransferred = job.Job.BytesTransferred,
                 FilesProcessed = filesProcessed,
-                ErrorMessage = errors.Count > 0 ? string.Join("; ", errors) : null
+                Progress = job.Job.Progress,
+                ErrorMessage = errors.Count > 0 ? string.Join("; ", errors) : null,
+                Tags = job.Job.Tags
             };
         }
         finally
@@ -569,7 +626,7 @@ public sealed class DifferentialBackupPlugin : BackupPluginBase, IAsyncDisposabl
     /// Finds files that exist in source paths but not in the baseline.
     /// </summary>
     private Task<List<string>> FindNewFilesAsync(
-        string[] sourcePaths,
+        IReadOnlyList<string> sourcePaths,
         FullBackupBaseline baseline,
         CancellationToken ct)
     {
