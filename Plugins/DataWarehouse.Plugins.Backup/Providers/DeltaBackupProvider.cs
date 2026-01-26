@@ -37,6 +37,8 @@ public sealed class DeltaBackupProvider : BackupProviderBase, IDeltaBackupProvid
         Directory.CreateDirectory(_statePath);
     }
 
+    protected override string GetStatePath() => _statePath;
+
     public override async Task InitializeAsync(CancellationToken ct = default)
     {
         await _destination.InitializeAsync(ct);
@@ -522,17 +524,12 @@ public sealed class DeltaBackupProvider : BackupProviderBase, IDeltaBackupProvid
 
     private async Task LoadStateAsync()
     {
-        var stateFile = Path.Combine(_statePath, "delta_state.json");
-        if (File.Exists(stateFile))
+        var state = await LoadStateAsync<DeltaStateData>("delta_state.json");
+        if (state != null)
         {
-            var json = await File.ReadAllTextAsync(stateFile);
-            var state = JsonSerializer.Deserialize<DeltaStateData>(json);
-            if (state != null)
-            {
-                _sequence = state.Sequence;
-                foreach (var fs in state.FileStates)
-                    _fileStates[fs.FilePath] = fs;
-            }
+            _sequence = state.Sequence;
+            foreach (var fs in state.FileStates)
+                _fileStates[fs.FilePath] = fs;
         }
     }
 
@@ -544,9 +541,7 @@ public sealed class DeltaBackupProvider : BackupProviderBase, IDeltaBackupProvid
             FileStates = _fileStates.Values.ToList()
         };
 
-        var json = JsonSerializer.Serialize(state, new JsonSerializerOptions { WriteIndented = true });
-        var stateFile = Path.Combine(_statePath, "delta_state.json");
-        await File.WriteAllTextAsync(stateFile, json, ct);
+        await SaveStateAsync(state, "delta_state.json", ct);
     }
 
     protected override async ValueTask DisposeAsyncCore()

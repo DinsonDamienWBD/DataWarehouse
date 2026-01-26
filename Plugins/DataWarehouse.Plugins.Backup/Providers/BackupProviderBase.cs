@@ -1,4 +1,5 @@
 using System.Security.Cryptography;
+using System.Text.Json;
 using Microsoft.Extensions.Logging;
 
 namespace DataWarehouse.Plugins.Backup.Providers;
@@ -274,6 +275,104 @@ public abstract class BackupProviderBase : IBackupProvider, IAsyncDisposable
         if (_disposed)
         {
             throw new ObjectDisposedException(GetType().Name);
+        }
+    }
+
+    /// <summary>
+    /// Loads state from a JSON file in the state path.
+    /// </summary>
+    /// <typeparam name="T">The type of state to load.</typeparam>
+    /// <param name="fileName">The name of the state file.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The loaded state, or null if the file doesn't exist.</returns>
+    protected async Task<T?> LoadStateAsync<T>(string fileName, CancellationToken ct = default) where T : class
+    {
+        var stateFile = Path.Combine(GetStatePath(), fileName);
+        if (!File.Exists(stateFile))
+            return null;
+
+        var json = await File.ReadAllTextAsync(stateFile, ct);
+        return JsonSerializer.Deserialize<T>(json);
+    }
+
+    /// <summary>
+    /// Saves state to a JSON file in the state path.
+    /// </summary>
+    /// <typeparam name="T">The type of state to save.</typeparam>
+    /// <param name="state">The state to save.</param>
+    /// <param name="fileName">The name of the state file.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>A task representing the asynchronous operation.</returns>
+    protected async Task SaveStateAsync<T>(T state, string fileName, CancellationToken ct = default) where T : class
+    {
+        var json = JsonSerializer.Serialize(state, new JsonSerializerOptions { WriteIndented = true });
+        var stateFile = Path.Combine(GetStatePath(), fileName);
+        await File.WriteAllTextAsync(stateFile, json, ct);
+    }
+
+    /// <summary>
+    /// Gets the state path for this provider. Must be overridden by derived classes
+    /// that use state persistence.
+    /// </summary>
+    /// <returns>The state path directory.</returns>
+    protected virtual string GetStatePath()
+    {
+        throw new NotImplementedException("Derived class must override GetStatePath() to use state persistence methods.");
+    }
+
+    /// <summary>
+    /// Performs a backup loop over a collection of file paths, invoking a callback for each file.
+    /// This method handles common iteration patterns including directory enumeration, filtering,
+    /// progress tracking, and error handling.
+    /// </summary>
+    /// <param name="paths">The paths to back up (files or directories).</param>
+    /// <param name="options">Optional backup options for filtering.</param>
+    /// <param name="backupId">The backup identifier for progress reporting.</param>
+    /// <param name="result">The backup result to populate with statistics.</param>
+    /// <param name="fileProcessor">Async callback to process each file. Returns bytes processed.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>A task representing the asynchronous operation.</returns>
+    protected async Task PerformBackupLoopAsync(
+        IEnumerable<string> paths,
+        BackupOptions? options,
+        string backupId,
+        BackupResult result,
+        Func<string, CancellationToken, Task<long>> fileProcessor,
+        CancellationToken ct = default)
+    {
+        // Enumerate all files
+        var allFiles = new List<string>();
+        foreach (var path in paths)
+        {
+            if (Directory.Exists(path))
+                allFiles.AddRange(Directory.EnumerateFiles(path, "*", SearchOption.AllDirectories));
+            else if (File.Exists(path))
+                allFiles.Add(path);
+        }
+
+        result.TotalFiles = allFiles.Count;
+        var processedFiles = 0;
+
+        // Process each file
+        foreach (var filePath in allFiles)
+        {
+            ct.ThrowIfCancellationRequested();
+
+            if (!ShouldBackupFile(filePath, options))
+                continue;
+
+            try
+            {
+                var bytesProcessed = await fileProcessor(filePath, ct);
+                result.TotalBytes += bytesProcessed;
+                processedFiles++;
+
+                RaiseProgressChanged(backupId, processedFiles, result.TotalFiles, result.TotalBytes, 0);
+            }
+            catch (Exception ex)
+            {
+                result.Errors.Add(new BackupError { FilePath = filePath, Message = ex.Message });
+            }
         }
     }
 

@@ -39,6 +39,8 @@ public sealed class SyntheticFullBackupProvider : BackupProviderBase, ISynthetic
         Directory.CreateDirectory(_statePath);
     }
 
+    protected override string GetStatePath() => _statePath;
+
     public override async Task InitializeAsync(CancellationToken ct = default)
     {
         await _destination.InitializeAsync(ct);
@@ -62,36 +64,11 @@ public sealed class SyntheticFullBackupProvider : BackupProviderBase, ISynthetic
         await _backupLock.WaitAsync(ct);
         try
         {
-            var allFiles = new List<string>();
-            foreach (var path in paths)
+            await PerformBackupLoopAsync(paths, options, backupId, result, async (filePath, ct) =>
             {
-                if (Directory.Exists(path))
-                    allFiles.AddRange(Directory.EnumerateFiles(path, "*", SearchOption.AllDirectories));
-                else if (File.Exists(path))
-                    allFiles.Add(path);
-            }
-
-            result.TotalFiles = allFiles.Count;
-            var processedFiles = 0;
-
-            foreach (var filePath in allFiles)
-            {
-                ct.ThrowIfCancellationRequested();
-
-                if (!ShouldBackupFile(filePath, options)) continue;
-
-                try
-                {
-                    await BackupFileAsync(filePath, backupId, result, ct);
-                    processedFiles++;
-
-                    RaiseProgressChanged(backupId, processedFiles, result.TotalFiles, result.TotalBytes, 0);
-                }
-                catch (Exception ex)
-                {
-                    result.Errors.Add(new BackupError { FilePath = filePath, Message = ex.Message });
-                }
-            }
+                await BackupFileAsync(filePath, backupId, result, ct);
+                return new FileInfo(filePath).Length;
+            }, ct);
 
             // Record this as a full backup in the chain
             _lastFullSequence = _sequence;
@@ -101,7 +78,7 @@ public sealed class SyntheticFullBackupProvider : BackupProviderBase, ISynthetic
                 BackupId = backupId,
                 Type = BackupProviderType.Full,
                 CreatedAt = DateTime.UtcNow,
-                FileCount = processedFiles,
+                FileCount = (int)result.TotalFiles,
                 TotalBytes = result.TotalBytes
             };
 
@@ -585,22 +562,17 @@ public sealed class SyntheticFullBackupProvider : BackupProviderBase, ISynthetic
 
     private async Task LoadStateAsync()
     {
-        var stateFile = Path.Combine(_statePath, "synthetic_state.json");
-        if (File.Exists(stateFile))
+        var state = await LoadStateAsync<SyntheticStateData>("synthetic_state.json");
+        if (state != null)
         {
-            var json = await File.ReadAllTextAsync(stateFile);
-            var state = JsonSerializer.Deserialize<SyntheticStateData>(json);
-            if (state != null)
-            {
-                _sequence = state.Sequence;
-                _lastFullSequence = state.LastFullSequence;
+            _sequence = state.Sequence;
+            _lastFullSequence = state.LastFullSequence;
 
-                foreach (var entry in state.Catalog)
-                    _catalog[entry.FilePath] = entry;
+            foreach (var entry in state.Catalog)
+                _catalog[entry.FilePath] = entry;
 
-                foreach (var entry in state.BackupChain)
-                    _backupChain[entry.Sequence] = entry;
-            }
+            foreach (var entry in state.BackupChain)
+                _backupChain[entry.Sequence] = entry;
         }
     }
 
@@ -614,9 +586,7 @@ public sealed class SyntheticFullBackupProvider : BackupProviderBase, ISynthetic
             BackupChain = _backupChain.Values.ToList()
         };
 
-        var json = JsonSerializer.Serialize(state, new JsonSerializerOptions { WriteIndented = true });
-        var stateFile = Path.Combine(_statePath, "synthetic_state.json");
-        await File.WriteAllTextAsync(stateFile, json, ct);
+        await SaveStateAsync(state, "synthetic_state.json", ct);
     }
 
     protected override async ValueTask DisposeAsyncCore()

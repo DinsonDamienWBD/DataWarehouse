@@ -41,6 +41,8 @@ public sealed class IncrementalBackupProvider : BackupProviderBase, IDifferentia
         Directory.CreateDirectory(_statePath);
     }
 
+    protected override string GetStatePath() => _statePath;
+
     public override async Task InitializeAsync(CancellationToken ct = default)
     {
         await _destination.InitializeAsync(ct);
@@ -64,46 +66,21 @@ public sealed class IncrementalBackupProvider : BackupProviderBase, IDifferentia
         await _backupLock.WaitAsync(ct);
         try
         {
-            var allFiles = new List<string>();
-            foreach (var path in paths)
+            await PerformBackupLoopAsync(paths, options, backupId, result, async (filePath, ct) =>
             {
-                if (Directory.Exists(path))
-                    allFiles.AddRange(Directory.EnumerateFiles(path, "*", SearchOption.AllDirectories));
-                else if (File.Exists(path))
-                    allFiles.Add(path);
-            }
+                var fileResult = await BackupFileWithChunkingAsync(filePath, backupId, ct);
 
-            result.TotalFiles = allFiles.Count;
-            var processedFiles = 0;
-
-            foreach (var filePath in allFiles)
-            {
-                ct.ThrowIfCancellationRequested();
-
-                if (!ShouldBackupFile(filePath, options)) continue;
-
-                try
+                _entries[filePath] = new IncrementalBackupEntry
                 {
-                    var fileResult = await BackupFileWithChunkingAsync(filePath, backupId, ct);
-                    result.TotalBytes += fileResult.BytesProcessed;
+                    Path = filePath,
+                    Size = fileResult.BytesProcessed,
+                    ModifiedTime = File.GetLastWriteTimeUtc(filePath),
+                    ChunkHashes = fileResult.ChunkHashes,
+                    BackupSequence = _sequence
+                };
 
-                    _entries[filePath] = new IncrementalBackupEntry
-                    {
-                        Path = filePath,
-                        Size = fileResult.BytesProcessed,
-                        ModifiedTime = File.GetLastWriteTimeUtc(filePath),
-                        ChunkHashes = fileResult.ChunkHashes,
-                        BackupSequence = _sequence
-                    };
-
-                    processedFiles++;
-                    RaiseProgressChanged(backupId, processedFiles, result.TotalFiles, result.TotalBytes, 0);
-                }
-                catch (Exception ex)
-                {
-                    result.Errors.Add(new BackupError { FilePath = filePath, Message = ex.Message });
-                }
-            }
+                return fileResult.BytesProcessed;
+            }, ct);
 
             _lastFullBackupTime = DateTime.UtcNow;
             result.Success = result.Errors.Count == 0;
@@ -486,22 +463,17 @@ public sealed class IncrementalBackupProvider : BackupProviderBase, IDifferentia
 
     private async Task LoadStateAsync()
     {
-        var stateFile = Path.Combine(_statePath, "incremental_state.json");
-        if (File.Exists(stateFile))
+        var state = await LoadStateAsync<IncrementalStateData>("incremental_state.json");
+        if (state != null)
         {
-            var json = await File.ReadAllTextAsync(stateFile);
-            var state = JsonSerializer.Deserialize<IncrementalStateData>(json);
-            if (state != null)
-            {
-                _sequence = state.Sequence;
-                _lastFullBackupTime = state.LastFullBackupTime;
+            _sequence = state.Sequence;
+            _lastFullBackupTime = state.LastFullBackupTime;
 
-                foreach (var entry in state.Entries)
-                    _entries[entry.Path] = entry;
+            foreach (var entry in state.Entries)
+                _entries[entry.Path] = entry;
 
-                foreach (var (hash, path) in state.ChunkStore)
-                    _chunkStore[hash] = path;
-            }
+            foreach (var (hash, path) in state.ChunkStore)
+                _chunkStore[hash] = path;
         }
     }
 
@@ -515,9 +487,7 @@ public sealed class IncrementalBackupProvider : BackupProviderBase, IDifferentia
             ChunkStore = _chunkStore.ToDictionary(kv => kv.Key, kv => kv.Value)
         };
 
-        var json = JsonSerializer.Serialize(state, new JsonSerializerOptions { WriteIndented = true });
-        var stateFile = Path.Combine(_statePath, "incremental_state.json");
-        await File.WriteAllTextAsync(stateFile, json, ct);
+        await SaveStateAsync(state, "incremental_state.json", ct);
     }
 
     protected override async ValueTask DisposeAsyncCore()
