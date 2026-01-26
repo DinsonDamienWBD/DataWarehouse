@@ -83,9 +83,9 @@ namespace DataWarehouse.Plugins.BrotliCompression
         /// <inheritdoc/>
         public override int QualityLevel => _config.CompressionLevel switch
         {
-            CompressionLevel.Fastest => 40,
-            CompressionLevel.Optimal => 80,
-            CompressionLevel.SmallestSize => 95,
+            System.IO.Compression.CompressionLevel.Fastest => 40,
+            System.IO.Compression.CompressionLevel.Optimal => 80,
+            System.IO.Compression.CompressionLevel.SmallestSize => 95,
             _ => 70
         };
 
@@ -181,7 +181,7 @@ namespace DataWarehouse.Plugins.BrotliCompression
             var originalSize = inputData.Length;
 
             // Check if compression should be bypassed for small data
-            if (originalSize < MinCompressionThreshold && compressionLevel != CompressionLevel.NoCompression)
+            if (originalSize < MinCompressionThreshold && compressionLevel != System.IO.Compression.CompressionLevel.NoCompression)
             {
                 context.LogDebug($"Brotli: Bypassing compression for small data ({originalSize} bytes)");
                 return CreateBypassedOutput(inputData, originalSize, context);
@@ -261,7 +261,7 @@ namespace DataWarehouse.Plugins.BrotliCompression
                 throw new InvalidDataException($"Unsupported Brotli header version: 0x{version:X2}");
             }
 
-            var level = (CompressionLevel)reader.ReadByte();
+            var level = (System.IO.Compression.CompressionLevel)reader.ReadByte();
             var originalSize = reader.ReadInt64();
             var flags = (BrotliFlags)reader.ReadByte();
 
@@ -422,7 +422,7 @@ namespace DataWarehouse.Plugins.BrotliCompression
                 Array.Copy(data, sample, sampleSize);
 
                 using var compressedSample = new MemoryStream();
-                using (var brotli = new BrotliStream(compressedSample, CompressionLevel.Fastest, true))
+                using (var brotli = new BrotliStream(compressedSample, System.IO.Compression.CompressionLevel.Fastest, true))
                 {
                     brotli.Write(sample, 0, sample.Length);
                 }
@@ -499,7 +499,7 @@ namespace DataWarehouse.Plugins.BrotliCompression
             // Write header with stored flag
             writer.Write(MagicBytes);
             writer.Write(HeaderVersion);
-            writer.Write((byte)CompressionLevel.NoCompression);
+            writer.Write((byte)System.IO.Compression.CompressionLevel.NoCompression);
             writer.Write((long)originalSize);
             writer.Write((byte)BrotliFlags.Stored);
 
@@ -513,23 +513,23 @@ namespace DataWarehouse.Plugins.BrotliCompression
             return output;
         }
 
-        private CompressionLevel GetCompressionLevel(Dictionary<string, object> args)
+        private System.IO.Compression.CompressionLevel GetCompressionLevel(Dictionary<string, object> args)
         {
             if (args.TryGetValue("compressionLevel", out var levelObj))
             {
-                if (levelObj is CompressionLevel level)
+                if (levelObj is System.IO.Compression.CompressionLevel level)
                 {
                     return level;
                 }
 
-                if (levelObj is string levelStr && Enum.TryParse<CompressionLevel>(levelStr, true, out var parsedLevel))
+                if (levelObj is string levelStr && Enum.TryParse<System.IO.Compression.CompressionLevel>(levelStr, true, out var parsedLevel))
                 {
                     return parsedLevel;
                 }
 
-                if (levelObj is int levelInt && Enum.IsDefined(typeof(CompressionLevel), levelInt))
+                if (levelObj is int levelInt && Enum.IsDefined(typeof(System.IO.Compression.CompressionLevel), levelInt))
                 {
-                    return (CompressionLevel)levelInt;
+                    return (System.IO.Compression.CompressionLevel)levelInt;
                 }
             }
 
@@ -554,7 +554,7 @@ namespace DataWarehouse.Plugins.BrotliCompression
         {
             if (message.Payload.TryGetValue("compressionLevel", out var levelObj))
             {
-                if (levelObj is string levelStr && Enum.TryParse<CompressionLevel>(levelStr, true, out var level))
+                if (levelObj is string levelStr && Enum.TryParse<System.IO.Compression.CompressionLevel>(levelStr, true, out var level))
                 {
                     _config.CompressionLevel = level;
                 }
@@ -644,7 +644,7 @@ namespace DataWarehouse.Plugins.BrotliCompression
         /// Compression level to use.
         /// Default is Optimal.
         /// </summary>
-        public CompressionLevel CompressionLevel { get; set; } = CompressionLevel.Optimal;
+        public System.IO.Compression.CompressionLevel CompressionLevel { get; set; } = System.IO.Compression.CompressionLevel.Optimal;
 
         /// <summary>
         /// Whether to bypass compression for incompressible data.

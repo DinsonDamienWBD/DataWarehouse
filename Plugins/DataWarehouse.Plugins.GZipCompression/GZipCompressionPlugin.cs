@@ -89,9 +89,9 @@ namespace DataWarehouse.Plugins.GZipCompression
         /// <inheritdoc/>
         public override int QualityLevel => _config.CompressionLevel switch
         {
-            CompressionLevel.Fastest => 20,
-            CompressionLevel.Optimal => 60,
-            CompressionLevel.SmallestSize => 90,
+            System.IO.Compression.CompressionLevel.Fastest => 20,
+            System.IO.Compression.CompressionLevel.Optimal => 60,
+            System.IO.Compression.CompressionLevel.SmallestSize => 90,
             _ => 50
         };
 
@@ -199,7 +199,7 @@ namespace DataWarehouse.Plugins.GZipCompression
             var originalSize = inputData.Length;
 
             // Check if compression should be bypassed for small data
-            if (originalSize < MinCompressionThreshold && compressionLevel != CompressionLevel.NoCompression)
+            if (originalSize < MinCompressionThreshold && compressionLevel != System.IO.Compression.CompressionLevel.NoCompression)
             {
                 context.LogDebug($"GZip: Bypassing compression for small data ({originalSize} bytes < {MinCompressionThreshold} threshold)");
                 return CreateBypassedOutput(inputData, originalSize, context);
@@ -296,7 +296,7 @@ namespace DataWarehouse.Plugins.GZipCompression
                 throw new InvalidDataException($"Unsupported GZip header version: 0x{version:X2}");
             }
 
-            var level = (CompressionLevel)reader.ReadByte();
+            var level = (System.IO.Compression.CompressionLevel)reader.ReadByte();
             var originalSize = reader.ReadInt64();
             var flags = (GZipFlags)reader.ReadByte();
 
@@ -476,7 +476,7 @@ namespace DataWarehouse.Plugins.GZipCompression
             // Write header with stored flag
             writer.Write(MagicBytes);
             writer.Write(HeaderVersion);
-            writer.Write((byte)CompressionLevel.NoCompression);
+            writer.Write((byte)System.IO.Compression.CompressionLevel.NoCompression);
             writer.Write((long)originalSize);
             writer.Write((byte)GZipFlags.Stored);
 
@@ -490,15 +490,15 @@ namespace DataWarehouse.Plugins.GZipCompression
             return output;
         }
 
-        private CompressionLevel GetCompressionLevel(Dictionary<string, object> args)
+        private System.IO.Compression.CompressionLevel GetCompressionLevel(Dictionary<string, object> args)
         {
             if (args.TryGetValue("level", out var levelObj))
             {
                 return levelObj switch
                 {
-                    CompressionLevel cl => cl,
-                    string s when Enum.TryParse<CompressionLevel>(s, true, out var parsed) => parsed,
-                    int i when Enum.IsDefined(typeof(CompressionLevel), i) => (CompressionLevel)i,
+                    System.IO.Compression.CompressionLevel cl => cl,
+                    string s when Enum.TryParse<System.IO.Compression.CompressionLevel>(s, true, out var parsed) => parsed,
+                    int i when Enum.IsDefined(typeof(System.IO.Compression.CompressionLevel), i) => (System.IO.Compression.CompressionLevel)i,
                     _ => _config.CompressionLevel
                 };
             }
@@ -560,7 +560,7 @@ namespace DataWarehouse.Plugins.GZipCompression
         {
             if (message.Payload.TryGetValue("level", out var levelObj))
             {
-                if (levelObj is string levelStr && Enum.TryParse<CompressionLevel>(levelStr, true, out var level))
+                if (levelObj is string levelStr && Enum.TryParse<System.IO.Compression.CompressionLevel>(levelStr, true, out var level))
                 {
                     _config.CompressionLevel = level;
                 }
@@ -681,7 +681,7 @@ namespace DataWarehouse.Plugins.GZipCompression
         /// Compression level to use.
         /// Default is Optimal (balanced speed and compression).
         /// </summary>
-        public CompressionLevel CompressionLevel { get; set; } = CompressionLevel.Optimal;
+        public System.IO.Compression.CompressionLevel CompressionLevel { get; set; } = System.IO.Compression.CompressionLevel.Optimal;
 
         /// <summary>
         /// Buffer size for streaming operations in bytes.
@@ -700,7 +700,7 @@ namespace DataWarehouse.Plugins.GZipCompression
         /// </summary>
         public static GZipCompressionConfig ForSpeed() => new()
         {
-            CompressionLevel = CompressionLevel.Fastest,
+            CompressionLevel = System.IO.Compression.CompressionLevel.Fastest,
             BufferSize = 131072, // 128KB for faster streaming
             BypassIncompressible = true
         };
@@ -710,7 +710,7 @@ namespace DataWarehouse.Plugins.GZipCompression
         /// </summary>
         public static GZipCompressionConfig ForSize() => new()
         {
-            CompressionLevel = CompressionLevel.SmallestSize,
+            CompressionLevel = System.IO.Compression.CompressionLevel.SmallestSize,
             BufferSize = 65536, // 64KB
             BypassIncompressible = true
         };
@@ -720,7 +720,7 @@ namespace DataWarehouse.Plugins.GZipCompression
         /// </summary>
         public static GZipCompressionConfig Balanced() => new()
         {
-            CompressionLevel = CompressionLevel.Optimal,
+            CompressionLevel = System.IO.Compression.CompressionLevel.Optimal,
             BufferSize = 81920, // 80KB
             BypassIncompressible = true
         };

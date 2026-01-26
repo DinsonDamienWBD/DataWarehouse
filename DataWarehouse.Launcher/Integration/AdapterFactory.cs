@@ -1,4 +1,4 @@
-namespace DataWarehouse.Launcher.Adapters;
+namespace DataWarehouse.Launcher.Integration;
 
 /// <summary>
 /// Factory for creating kernel adapters.

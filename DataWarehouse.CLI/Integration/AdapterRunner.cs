@@ -1,13 +1,13 @@
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 
-namespace DataWarehouse.Launcher.Adapters;
+namespace DataWarehouse.CLI.Integration;
 
 /// <summary>
 /// Reusable runner for executing kernel adapters.
 /// Handles initialization, lifecycle management, and graceful shutdown.
 ///
-/// Copy this entire Adapters folder to your project to use this infrastructure.
+/// Copy this entire Adapter folder to your project to use this infrastructure.
 ///
 /// Usage:
 /// <code>

@@ -1,6 +1,6 @@
 using Microsoft.Extensions.Logging;
 
-namespace DataWarehouse.Launcher.Adapters;
+namespace DataWarehouse.CLI.Integration;
 
 /// <summary>
 /// Plug-and-play adapter interface for running any kernel-based application.

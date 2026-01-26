@@ -9,19 +9,32 @@
     <AssemblyName>dw</AssemblyName>
     <PackAsTool>true</PackAsTool>
     <ToolCommandName>dw</ToolCommandName>
-    <Description>DataWarehouse CLI - Command-line interface for DataWarehouse management</Description>
+    <Description>DataWarehouse CLI - Thin wrapper command-line interface for DataWarehouse management. All business logic is in DataWarehouse.Shared.</Description>
     <Authors>DataWarehouse Team</Authors>
     <Version>1.0.0</Version>
   </PropertyGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\DataWarehouse.SDK\DataWarehouse.SDK.csproj" />
-    <ProjectReference Include="..\DataWarehouse.Kernel\DataWarehouse.Kernel.csproj" />
+    <ProjectReference Include="..\DataWarehouse.Shared\DataWarehouse.Shared.csproj" />
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="System.CommandLine" Version="2.0.2" />
+    <PackageReference Include="System.CommandLine" Version="2.0.0-beta4.22272.1" />
     <PackageReference Include="Spectre.Console" Version="0.54.0" />
+    <PackageReference Include="Microsoft.Extensions.Logging" Version="10.0.2" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.2" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Console" Version="10.0.2" />
+  </ItemGroup>
+
+  <!-- Exclude old Commands folder - business logic moved to DataWarehouse.Shared -->
+  <ItemGroup>
+    <Compile Remove="Commands\**" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Link Integration files from Metadata/Adapter -->
+    <Compile Include="..\Metadata\Adapter\*.cs" Link="Integration\%(Filename)%(Extension)" />
   </ItemGroup>
 
 </Project>

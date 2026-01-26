@@ -54,6 +54,7 @@
     <Project Path="Plugins/DataWarehouse.Plugins.CrashRecovery/DataWarehouse.Plugins.CrashRecovery.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.CrdtReplication/DataWarehouse.Plugins.CrdtReplication.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.CrossRegion/DataWarehouse.Plugins.CrossRegion.csproj" />
+    <Project Path="Plugins/DataWarehouse.Plugins.DatabaseImport/DataWarehouse.Plugins.DatabaseImport.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.Datadog/DataWarehouse.Plugins.Datadog.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.DataRetention/DataWarehouse.Plugins.DataRetention.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.Deduplication/DataWarehouse.Plugins.Deduplication.csproj" />
@@ -73,6 +74,7 @@
       <Build Solution="Debug|*" Project="false" />
     </Project>
     <Project Path="Plugins/DataWarehouse.Plugins.Federation/DataWarehouse.Plugins.Federation.csproj" />
+    <Project Path="Plugins/DataWarehouse.Plugins.FederatedQuery/DataWarehouse.Plugins.FederatedQuery.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.FedRampCompliance/DataWarehouse.Plugins.FedRampCompliance.csproj">
       <Build Solution="Debug|*" Project="false" />
     </Project>
@@ -99,6 +101,7 @@
     <Project Path="Plugins/DataWarehouse.Plugins.IsalEc/DataWarehouse.Plugins.IsalEc.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.Jaeger/DataWarehouse.Plugins.Jaeger.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.K8sOperator/DataWarehouse.Plugins.K8sOperator.csproj" />
+    <Project Path="Plugins/DataWarehouse.Plugins.KubernetesCsi/DataWarehouse.Plugins.KubernetesCsi.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.KeyRotation/DataWarehouse.Plugins.KeyRotation.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.LoadBalancer/DataWarehouse.Plugins.LoadBalancer.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.LocalStorage/DataWarehouse.Plugins.LocalStorage.csproj" />
@@ -121,6 +124,9 @@
     <Project Path="Plugins/DataWarehouse.Plugins.VictoriaMetrics/DataWarehouse.Plugins.VictoriaMetrics.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.Chronograf/DataWarehouse.Plugins.Chronograf.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.Perses/DataWarehouse.Plugins.Perses.csproj" />
+    <Project Path="Plugins/DataWarehouse.Plugins.PostgresWireProtocol/DataWarehouse.Plugins.PostgresWireProtocol.csproj" />
+    <Project Path="Plugins/DataWarehouse.Plugins.MySqlProtocol/DataWarehouse.Plugins.MySqlProtocol.csproj" />
+    <Project Path="Plugins/DataWarehouse.Plugins.OdbcDriver/DataWarehouse.Plugins.OdbcDriver.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.ApacheSuperset/DataWarehouse.Plugins.ApacheSuperset.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.Redash/DataWarehouse.Plugins.Redash.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.Logzio/DataWarehouse.Plugins.Logzio.csproj" />
@@ -141,6 +147,7 @@
     <Project Path="Plugins/DataWarehouse.Plugins.RestInterface/DataWarehouse.Plugins.RestInterface.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.RetryPolicy/DataWarehouse.Plugins.RetryPolicy.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.S3Storage/DataWarehouse.Plugins.S3Storage.csproj" />
+    <Project Path="Plugins/DataWarehouse.Plugins.SchemaRegistry/DataWarehouse.Plugins.SchemaRegistry.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.Search/DataWarehouse.Plugins.Search.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.SecretManagement/DataWarehouse.Plugins.SecretManagement.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.SelfHealingRaid/DataWarehouse.Plugins.SelfHealingRaid.csproj" />
@@ -175,6 +182,16 @@
       <Build Solution="Debug|*" Project="false" />
     </Project>
     <Project Path="Plugins/DataWarehouse.Plugins.SharedRaidUtilities/DataWarehouse.Plugins.SharedRaidUtilities.csproj" />
+    <Project Path="Plugins/DataWarehouse.Plugins.QuantumSafe/DataWarehouse.Plugins.QuantumSafe.csproj">
+      <Build Solution="Debug|*" Project="false" />
+    </Project>
+    <Project Path="Plugins/DataWarehouse.Plugins.ZeroTrust/DataWarehouse.Plugins.ZeroTrust.csproj" />
+    <Project Path="Plugins/DataWarehouse.Plugins.TdsProtocol/DataWarehouse.Plugins.TdsProtocol.csproj" />
+    <Project Path="Plugins/DataWarehouse.Plugins.OracleTnsProtocol/DataWarehouse.Plugins.OracleTnsProtocol.csproj" />
+    <Project Path="Plugins/DataWarehouse.Plugins.JdbcBridge/DataWarehouse.Plugins.JdbcBridge.csproj" />
+    <Project Path="Plugins/DataWarehouse.Plugins.AdoNetProvider/DataWarehouse.Plugins.AdoNetProvider.csproj" />
+    <Project Path="Plugins/DataWarehouse.Plugins.NoSqlProtocol/DataWarehouse.Plugins.NoSqlProtocol.csproj" />
+    <Project Path="Plugins/DataWarehouse.Plugins.Docker/DataWarehouse.Plugins.Docker.csproj" />
   </Folder>
   <Project Path="DataWarehouse.Benchmarks/DataWarehouse.Benchmarks.csproj" />
   <Project Path="DataWarehouse.CLI/DataWarehouse.CLI.csproj" />
@@ -182,5 +199,7 @@
   <Project Path="DataWarehouse.Kernel/DataWarehouse.Kernel.csproj" />
   <Project Path="DataWarehouse.Launcher/DataWarehouse.Launcher.csproj" />
   <Project Path="DataWarehouse.SDK/DataWarehouse.SDK.csproj" />
+  <Project Path="DataWarehouse.Shared/DataWarehouse.Shared.csproj" />
   <Project Path="DataWarehouse.Tests/DataWarehouse.Tests.csproj" />
+  <Project Path="DataWarehouse.GUI/DataWarehouse.GUI.csproj" />
 </Solution>

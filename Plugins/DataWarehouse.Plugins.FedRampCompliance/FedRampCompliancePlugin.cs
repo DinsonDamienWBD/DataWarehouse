@@ -309,7 +309,7 @@ namespace DataWarehouse.Plugins.FedRampCompliance
                 .Select(c =>
                 {
                     _assessments.TryGetValue(c.ControlId, out var assessment);
-                    return new ControlAssessment
+                    return new DataWarehouse.SDK.Contracts.ControlAssessment
                     {
                         ControlId = c.ControlId,
                         ControlName = c.Name,

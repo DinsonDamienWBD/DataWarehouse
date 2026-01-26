@@ -348,8 +348,8 @@ public class InMemoryStoragePluginTests
         await Task.WhenAll(tasks);
 
         // Assert
-        plugin.Count.Should().BeLessOrEqualTo(10);
-        evictionCount.Should().BeGreaterOrEqualTo(90);
+        plugin.Count.Should().BeLessThanOrEqualTo(10);
+        evictionCount.Should().BeGreaterThanOrEqualTo(90);
     }
 
     #endregion

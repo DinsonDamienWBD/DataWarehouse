@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<Application xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:local="clr-namespace:DataWarehouse.GUI"
+             x:Class="DataWarehouse.GUI.App">
+    <Application.Resources>
+        <ResourceDictionary>
+            <!-- DataWarehouse theme colors -->
+            <Color x:Key="PrimaryColor">#2563EB</Color>
+            <Color x:Key="SecondaryColor">#7C3AED</Color>
+            <Color x:Key="AccentColor">#10B981</Color>
+            <Color x:Key="WarningColor">#F59E0B</Color>
+            <Color x:Key="ErrorColor">#EF4444</Color>
+            <Color x:Key="SuccessColor">#10B981</Color>
+
+            <!-- Dark theme colors -->
+            <Color x:Key="DarkBackground">#0F172A</Color>
+            <Color x:Key="DarkSurface">#1E293B</Color>
+            <Color x:Key="DarkText">#F8FAFC</Color>
+            <Color x:Key="DarkTextSecondary">#94A3B8</Color>
+
+            <!-- Light theme colors -->
+            <Color x:Key="LightBackground">#F8FAFC</Color>
+            <Color x:Key="LightSurface">#FFFFFF</Color>
+            <Color x:Key="LightText">#0F172A</Color>
+            <Color x:Key="LightTextSecondary">#64748B</Color>
+        </ResourceDictionary>
+    </Application.Resources>
+</Application>
