@@ -1081,7 +1081,7 @@ Tasks carried over from previous sprints that need to be completed before starti
 |-------|--------|
 |    6  |   [x]  |
 |    11 |   [x]  |
-|    25 |   [ ]  |
+|    25 |   [x]  |
 |    26 |   [x]  |
 |    28 |   [x]  |
 |    30 |   [x]  |
@@ -1096,8 +1096,8 @@ Task A1: Dashboard Plugin - Add support for:
   |b.| Prometheus                         | [x]    |
   |c.| Kibana                             | [x]    |
   |d.| SigNoz                             | [x]    |
-  |e.| Zabbix                             | [ ]    |
-  |f.| VictoriaMetrics                    | [ ]    |
+  |e.| Zabbix                             | [x]    |
+  |f.| VictoriaMetrics                    | [x]    |
   |g.| Netdata                            | [x]    |
   |h.| Perses                             | [x]    |
   |i.| Chronograf                         | [x]    |
@@ -1178,48 +1178,50 @@ iii. [x] Implement Schema Registry (Track imported database and table structures
        **Implementation:** Plugins/DataWarehouse.Plugins.SchemaRegistry/
  iv. [x] Implement PostgreSQL Wire Protocol (allows SQL tools supporting PostgreSQL protocol to connect)
        **Implementation:** Plugins/DataWarehouse.Plugins.PostgresWireProtocol/
-  v. [ ] Implement SQL Toolset Compatibility plugin (allow connecting to DataWarehouse from various SQL tools and IDEs to be able to qork with the imported databases and tables and records.):
-|1. |SSMS (TDS protocol)                                                            | [ ]    |
-|2. |Azure Data Studio                                                              | [ ]    |
-|3. |DBeaver                                                                        | [ ]    |
-|4. |HeidiSQL                                                                       | [ ]    |
-|5. |DataGrip                                                                       | [ ]    |
-|6. |Squirrel SQL                                                                   | [ ]    |
-|7. |Navicat                                                                        | [ ]    |
-|8. |TablePlus                                                                      | [ ]    |
-|9. |Valentina Studio                                                               | [ ]    |
-|10.|Beekeeper Studio                                                               | [ ]    |
-|11.|OmniDB                                                                         | [ ]    |
-|12.|DbVisualizer                                                                   | [ ]    |
-|13.|SQL Workbench/J                                                                | [ ]    |
-|14.|Aqua Data Studio                                                               | [ ]    |
-|15.|RazorSQL                                                                       | [ ]    |
-|16.|DbSchema                                                                       | [ ]    |
-|17.|FlySpeed SQL Query                                                             | [ ]    |
-|18.|MySQL Workbench (for MySQL compatibility mode)                                 | [ ]    |
-|19.|Posticope (for PostgreSQL compatibility mode)                                  | [ ]    |
-|20.|PostgreSQL Wire Protocol                                                       | [ ]    |
-|21.|ODBC/JDBC/ADO.NET/ADO drivers for various programming languages and frameworks | [ ]    |
-|22.|SQL Alchemy                                                                    | [ ]    |
-|23.|Entity Framework                                                               | [ ]    |
-|24.|Hibernate                                                                      | [ ]    |
-|25.|Django ORM                                                                     | [ ]    |
-|26.|Sequelize                                                                      | [ ]    |
-|27.|Knex.js/Node.js/Python libraries                                               | [ ]    |
-|28.|LINQ to SQL                                                                    | [ ]    |
-|29.|PHP PDO                                                                        | [ ]    |
-|30.|Power BI                                                                       | [ ]    |
-|31.|pgAdmin (for PostgreSQL compatibility mode)                                    | [ ]    |
-|32.|Adminer                                                                        | [ ]    |
-|33.|SQLyog (for MySQL compatibility mode)                                          | [ ]    |
-|34.|SQL Maestro                                                                    | [ ]    |
-|35.|Toad for SQL Server/MySQL/PostgreSQL                                           | [ ]    |
-|36.|SQL Developer (for Oracle compatibility mode)                                  | [ ]    |
-|37.|PL/SQL Developer (for Oracle compatibility mode)                               | [ ]    |
-|38.|SQL*Plus (for Oracle compatibility mode)                                       | [ ]    |
-|39.|SQLite tools (for SQLite compatibility mode)                                   | [ ]    |
-|40.|NoSQL tools (for NoSQL compatibility modes)                                    | [ ]    |
-|41.|REST API/GraphQL clients (for REST/GraphQL compatibility modes)                | [ ]    |
+  v. [PARTIAL] Implement SQL Toolset Compatibility plugin - PostgreSQL Wire Protocol enables many tools:
+|#  |Tool                                                                           | Status | Notes                          |
+|---|-------------------------------------------------------------------------------|--------|--------------------------------|
+|1. |SSMS (TDS protocol)                                                            | [ ]    | Needs TDS protocol             |
+|2. |Azure Data Studio                                                              | [ ]    | Needs TDS protocol             |
+|3. |DBeaver                                                                        | [x]    | Via PostgreSQL driver          |
+|4. |HeidiSQL                                                                       | [ ]    | Needs MySQL protocol           |
+|5. |DataGrip                                                                       | [x]    | Via PostgreSQL driver          |
+|6. |Squirrel SQL                                                                   | [x]    | Via JDBC PostgreSQL            |
+|7. |Navicat                                                                        | [x]    | Via PostgreSQL driver          |
+|8. |TablePlus                                                                      | [x]    | Via PostgreSQL driver          |
+|9. |Valentina Studio                                                               | [x]    | Via PostgreSQL driver          |
+|10.|Beekeeper Studio                                                               | [x]    | Via PostgreSQL driver          |
+|11.|OmniDB                                                                         | [x]    | Via PostgreSQL driver          |
+|12.|DbVisualizer                                                                   | [x]    | Via JDBC PostgreSQL            |
+|13.|SQL Workbench/J                                                                | [x]    | Via JDBC PostgreSQL            |
+|14.|Aqua Data Studio                                                               | [x]    | Via PostgreSQL driver          |
+|15.|RazorSQL                                                                       | [x]    | Via PostgreSQL driver          |
+|16.|DbSchema                                                                       | [x]    | Via PostgreSQL driver          |
+|17.|FlySpeed SQL Query                                                             | [x]    | Via ODBC/JDBC PostgreSQL       |
+|18.|MySQL Workbench (for MySQL compatibility mode)                                 | [ ]    | Needs MySQL protocol           |
+|19.|Postico (for PostgreSQL compatibility mode)                                    | [x]    | Native PostgreSQL              |
+|20.|PostgreSQL Wire Protocol                                                       | [x]    | Core protocol implemented      |
+|21.|ODBC/JDBC/ADO.NET/ADO drivers for various programming languages and frameworks | [x]    | Via PostgreSQL drivers         |
+|22.|SQL Alchemy                                                                    | [x]    | Via psycopg2/asyncpg           |
+|23.|Entity Framework                                                               | [x]    | Via Npgsql                     |
+|24.|Hibernate                                                                      | [x]    | Via JDBC PostgreSQL            |
+|25.|Django ORM                                                                     | [x]    | Via psycopg2                   |
+|26.|Sequelize                                                                      | [x]    | Via pg (node-postgres)         |
+|27.|Knex.js/Node.js/Python libraries                                               | [x]    | Via pg/psycopg2                |
+|28.|LINQ to SQL                                                                    | [x]    | Via Npgsql                     |
+|29.|PHP PDO                                                                        | [x]    | Via pdo_pgsql                  |
+|30.|Power BI                                                                       | [x]    | Via PostgreSQL connector       |
+|31.|pgAdmin (for PostgreSQL compatibility mode)                                    | [x]    | Native PostgreSQL              |
+|32.|Adminer                                                                        | [x]    | Via PostgreSQL driver          |
+|33.|SQLyog (for MySQL compatibility mode)                                          | [ ]    | Needs MySQL protocol           |
+|34.|SQL Maestro                                                                    | [x]    | PostgreSQL mode supported      |
+|35.|Toad for SQL Server/MySQL/PostgreSQL                                           | [x]    | PostgreSQL mode supported      |
+|36.|SQL Developer (for Oracle compatibility mode)                                  | [ ]    | Needs Oracle protocol          |
+|37.|PL/SQL Developer (for Oracle compatibility mode)                               | [ ]    | Needs Oracle protocol          |
+|38.|SQL*Plus (for Oracle compatibility mode)                                       | [ ]    | Needs Oracle protocol          |
+|39.|SQLite tools (for SQLite compatibility mode)                                   | [ ]    | Different architecture         |
+|40.|NoSQL tools (for NoSQL compatibility modes)                                    | [ ]    | Needs NoSQL protocols          |
+|41.|REST API/GraphQL clients (for REST/GraphQL compatibility modes)                | [x]    | Via existing REST/GraphQL APIs |
 
 * Many of these tools can connect via standard protocols (TDS, PostgreSQL Wire Protocol, MySQL protocol etc.).
   Instead of implementing each tool individually, we can focus on supporting the underlying protocols and standards,
