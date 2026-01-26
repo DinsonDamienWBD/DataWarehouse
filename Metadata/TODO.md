@@ -1160,6 +1160,10 @@ by both being able to run a local instance easily for testing purposes without h
 to remotly configure and manage any instance of DataWarehouse, embed DataWarehouse into their own applications with minimal effort etc., offering a great deal of versatility.
 
 Task A3: Implement support for full SQL toolset compatibility
+  i. Implement Database Import plugin (import SQL/Server/MySQL/PostgreSQL/Oracle/SQLite/NoSQL etc. databses and tables into DataWarehouse)
+ ii. Implement Federated Query plugin (allow querying accross heterogenious data, databases and tables from DataWarehouse in one go)
+iii. Implement Schema Registry (Track imported database and table structures, versions and changes over time)
+ iv. Implement SQL Toolset Compatibility plugin (allow connecting to DataWarehouse from various SQL tools and IDEs):
 |1. |SSMS (TDS protocol)                                                            | [ ]    |
 |2. |Azure Data Studio                                                              | [ ]    |
 |3. |DBeaver                                                                        | [ ]    |
