@@ -1078,12 +1078,10 @@ Tasks carried over from previous sprints that need to be completed before starti
 |    6  |   [ ]  |
 |    11 |   [ ]  |
 |    25 |   [ ]  |
-|    27 |   [ ]  |
+|    26 |   [ ]  |
+|    28 |   [ ]  |
 |    30 |   [ ]  |
-|    33 |   [ ]  |
-|    34 |   [ ]  |
-|    35 |   [ ]  |
-|    36 |   [ ]  |
+|    31 |   [ ]  |
 |    37 |   [ ]  |
 
 ## Include UI/UX improvements, bug fixes, performance optimizations, and minor features from previous sprints that are prerequisites for GOD TIER features.
