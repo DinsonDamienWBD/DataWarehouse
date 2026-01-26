@@ -1071,7 +1071,10 @@ namespace DataWarehouse.Plugins.ZfsRaid
                         };
                     }
                 }
-                catch { /* Continue trying other devices */ }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Trace.TraceWarning($"Failed to read metadata from device {i} for key {key}: {ex.Message}");
+                }
             }
 
             return null;
@@ -1096,7 +1099,10 @@ namespace DataWarehouse.Plugins.ZfsRaid
                             break;
                         }
                     }
-                    catch { /* Continue */ }
+                    catch (Exception ex)
+                    {
+                        System.Diagnostics.Trace.TraceWarning($"Failed to check existence on device {i} for stripe {count}: {ex.Message}");
+                    }
                 }
 
                 if (!found) break;
@@ -1151,7 +1157,10 @@ namespace DataWarehouse.Plugins.ZfsRaid
                                 dataBlocks[deviceOffset - ParityDeviceCount] = blockData;
                         }
                     }
-                    catch { /* Continue with other blocks */ }
+                    catch (Exception ex)
+                    {
+                        System.Diagnostics.Trace.TraceWarning($"Failed to read block from device {deviceIndex} for reconstruction: {ex.Message}");
+                    }
                 }
 
                 // Reconstruct the missing block

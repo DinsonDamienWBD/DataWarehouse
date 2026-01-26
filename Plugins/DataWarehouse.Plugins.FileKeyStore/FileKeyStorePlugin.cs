@@ -443,7 +443,10 @@ namespace DataWarehouse.Plugins.FileKeyStore
                 entropyParts.Add(Environment.ProcessorCount.ToString());
                 entropyParts.Add(Environment.SystemDirectory);
             }
-            catch { /* Ignore if not available */ }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Trace.TraceWarning($"Failed to collect hardware entropy for key derivation: {ex.Message}");
+            }
 
             var combinedEntropy = string.Join("|", entropyParts);
             var entropyBytes = Encoding.UTF8.GetBytes(combinedEntropy);

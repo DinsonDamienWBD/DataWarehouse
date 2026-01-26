@@ -1240,7 +1240,10 @@ namespace DataWarehouse.Plugins.CrdtReplication
                 {
                     await _gossipTask.WaitAsync(TimeSpan.FromSeconds(5));
                 }
-                catch { /* Ignore */ }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Trace.TraceWarning($"CRDT gossip task shutdown timeout: {ex.Message}");
+                }
             }
 
             _cts?.Dispose();

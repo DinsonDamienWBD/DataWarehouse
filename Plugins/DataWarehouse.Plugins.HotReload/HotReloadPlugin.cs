@@ -347,7 +347,10 @@ namespace DataWarehouse.Plugins.HotReload
                     {
                         await feature.StopAsync();
                     }
-                    catch { /* Ignore stop errors during unload */ }
+                    catch (Exception ex)
+                    {
+                        System.Diagnostics.Trace.TraceWarning($"Plugin stop failed during unload for {pluginId}: {ex.Message}");
+                    }
                 }
 
                 // Remove from tracking
@@ -441,7 +444,10 @@ namespace DataWarehouse.Plugins.HotReload
                     {
                         await ReloadPluginAsync(plugin.PluginId);
                     }
-                    catch { /* Log error */ }
+                    catch (Exception ex)
+                    {
+                        System.Diagnostics.Trace.TraceError($"Hot reload failed for plugin {plugin.PluginId}: {ex.Message}");
+                    }
                 }
             };
 

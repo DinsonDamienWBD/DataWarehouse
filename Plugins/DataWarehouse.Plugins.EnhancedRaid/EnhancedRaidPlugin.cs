@@ -345,7 +345,10 @@ public sealed class EnhancedRaidPlugin : RaidProviderPluginBase, IAsyncDisposabl
                     {
                         data = await ReadBlockFromDriveAsync(primaryDrive, key, s, $"chunk-{c:D3}-primary", ct);
                     }
-                    catch { /* Fall through to mirror */ }
+                    catch (Exception ex)
+                    {
+                        System.Diagnostics.Trace.TraceWarning($"Primary drive read failed for {key}, chunk {c}, shard {s}: {ex.Message}");
+                    }
                 }
 
                 // If primary failed, try mirror
@@ -355,7 +358,10 @@ public sealed class EnhancedRaidPlugin : RaidProviderPluginBase, IAsyncDisposabl
                     {
                         data = await ReadBlockFromDriveAsync(mirrorDrive, key, s, $"chunk-{c:D3}-mirror", ct);
                     }
-                    catch { /* Data loss if both fail */ }
+                    catch (Exception ex)
+                    {
+                        System.Diagnostics.Trace.TraceError($"CRITICAL: Both primary and mirror read failed for {key}, chunk {c}, shard {s}: {ex.Message}");
+                    }
                 }
 
                 chunks[c] = data ?? Array.Empty<byte>();

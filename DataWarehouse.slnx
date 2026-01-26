@@ -7,6 +7,13 @@
     <File Path="Metadata/RULES.md" />
     <File Path="Metadata/TODO.md" />
   </Folder>
+  <Folder Name="/Metadata/Adapter/">
+    <File Path="Metadata/Adapter/AdapterFactory.cs" />
+    <File Path="Metadata/Adapter/AdapterRunner.cs" />
+    <File Path="Metadata/Adapter/IKernelAdapter.cs" />
+    <File Path="Metadata/Adapter/OperatingMode.cs" />
+    <File Path="Metadata/Adapter/README.md" />
+  </Folder>
   <Folder Name="/Plugins/">
     <File Path="Plugin Readme.txt" />
     <Project Path="Plugins/DataWarehouse.Plugins.AccessControl/DataWarehouse.Plugins.AccessControl.csproj" />

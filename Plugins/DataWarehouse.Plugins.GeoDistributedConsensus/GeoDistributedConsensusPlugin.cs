@@ -312,7 +312,10 @@ public sealed class GeoDistributedConsensusPlugin : ConsensusPluginBase
                 await _logReplicator.CompactLogAsync(_config.LogCompactionThreshold);
             }
             catch (OperationCanceledException) { break; }
-            catch { /* Log compaction failed, will retry */ }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Trace.TraceWarning($"Log compaction failed, will retry: {ex.Message}");
+            }
         }
     }
 
@@ -329,7 +332,10 @@ public sealed class GeoDistributedConsensusPlugin : ConsensusPluginBase
                 }
             }
             catch (OperationCanceledException) { break; }
-            catch { /* Snapshot failed, will retry */ }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Trace.TraceWarning($"Snapshot creation failed, will retry: {ex.Message}");
+            }
         }
     }
 
