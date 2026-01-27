@@ -229,25 +229,25 @@ These features represent the next generation of data storage technology, positio
 
 | Plugin Type | Examples | Status |
 |-------------|----------|--------|
-| Storage Browsers | S3 Browser, Local Browser, Federation Browser | [ ] |
-| Monitoring Dashboards | Cluster Health, Performance, Capacity | [ ] |
-| Configuration Wizards | Setup, Migration, Backup Config | [ ] |
-| Compliance Reporters | GDPR Report, HIPAA Audit, SOC2 Evidence | [ ] |
-| AI Assistants | Natural Language Query, Semantic Search | [ ] |
-| Developer Tools | API Explorer, Schema Designer, Query Builder | [ ] |
+| Storage Browsers | S3 Browser, Local Browser, Federation Browser | [~] Partial (Local Browser via Storage.razor) |
+| Monitoring Dashboards | Cluster Health, Performance, Capacity | [~] Partial (Health.razor basic health) |
+| Configuration Wizards | Setup, Migration, Backup Config | [~] Partial (Config.razor, Backup.razor) |
+| Compliance Reporters | GDPR Report, HIPAA Audit, SOC2 Evidence | [ ] Not implemented |
+| AI Assistants | Natural Language Query, Semantic Search | [~] Partial (NLP via CommandPalette) |
+| Developer Tools | API Explorer, Schema Designer, Query Builder | [ ] Not implemented |
 
 **Features:**
 
 | Feature | Description | Status |
 |---------|-------------|--------|
-| Drag-and-Drop File Management | Native file operations with progress | [ ] |
-| Real-time Sync Visualization | See what's syncing, conflicts, bandwidth | [ ] |
-| Plugin Marketplace | Install GUI plugins from marketplace | [ ] |
-| Multi-tenant Dashboard | Switch between organizations | [ ] |
-| Dark/Light/System Themes | Accessibility compliance | [ ] |
-| Keyboard-First Navigation | Power user productivity | [ ] |
-| Touch/Tablet Support | Windows tablets, iPad (future) | [ ] |
-| Accessibility (WCAG 2.1 AA) | Screen readers, high contrast | [ ] |
+| Drag-and-Drop File Management | Native file operations with progress | [ ] Not implemented |
+| Real-time Sync Visualization | See what's syncing, conflicts, bandwidth | [ ] Not implemented |
+| Plugin Marketplace | Install GUI plugins from marketplace | [ ] Not implemented |
+| Multi-tenant Dashboard | Switch between organizations | [ ] Not implemented |
+| Dark/Light/System Themes | Accessibility compliance | [x] Implemented (ThemeManager.cs) |
+| Keyboard-First Navigation | Power user productivity | [x] Implemented (KeyboardManager.cs, CommandPalette) |
+| Touch/Tablet Support | Windows tablets, iPad (future) | [ ] Not implemented |
+| Accessibility (WCAG 2.1 AA) | Screen readers, high contrast | [ ] Not implemented |
 
 ---
 
@@ -264,16 +264,16 @@ These features represent the next generation of data storage technology, positio
 
 | Feature | Description | Status |
 |---------|-------------|--------|
-| Natural Language Commands | "backup my database to S3 with encryption" | [ ] |
-| AI-Powered Autocomplete | Context-aware suggestions | [ ] |
-| Interactive TUI Mode | Full terminal UI (Spectre.Console) | [ ] |
-| Command History with Search | Fuzzy search, categorization | [ ] |
-| Pipeline Support | Unix-style piping between commands | [ ] |
-| Scriptable Output | JSON, YAML, CSV, Table formats | [ ] |
-| Shell Completions | Bash, Zsh, Fish, PowerShell | [ ] |
-| Remote CLI | SSH-based remote management | [ ] |
-| Command Recording | Record and replay command sequences | [ ] |
-| Undo/Rollback | Undo destructive operations | [ ] |
+| Natural Language Commands | "backup my database to S3 with encryption" | [x] Implemented (NaturalLanguageProcessor.cs) |
+| AI-Powered Autocomplete | Context-aware suggestions | [x] Implemented (GetCompletions with frequency) |
+| Interactive TUI Mode | Full terminal UI (Spectre.Console) | [x] Implemented (InteractiveMode.cs) |
+| Command History with Search | Fuzzy search, categorization | [x] Implemented (CommandHistory.cs) |
+| Pipeline Support | Unix-style piping between commands | [ ] Not implemented |
+| Scriptable Output | JSON, YAML, CSV, Table formats | [x] Implemented (OutputFormatter.cs) |
+| Shell Completions | Bash, Zsh, Fish, PowerShell | [x] Implemented (ShellCompletionGenerator.cs) |
+| Remote CLI | SSH-based remote management | [x] Implemented (ConnectCommand.cs) |
+| Command Recording | Record and replay command sequences | [ ] Not implemented |
+| Undo/Rollback | Undo destructive operations | [ ] Not implemented |
 
 **AI CLI Examples:**
 ```bash
@@ -468,11 +468,11 @@ public enum FilesystemCapabilities
 
 | Artifact | Description | Status |
 |----------|-------------|--------|
-| Official Base Image | `datawarehouse/core:latest` | [ ] |
-| Minimal Image | Alpine-based, <100MB | [ ] |
-| Development Image | With debug tools | [ ] |
-| ARM64 Image | For Graviton, M1/M2 | [ ] |
-| Distroless Image | Maximum security | [ ] |
+| Official Base Image | `datawarehouse/core:latest` | [x] Implemented (Dockerfile.base) |
+| Minimal Image | Alpine-based, <100MB | [x] Implemented (Dockerfile.minimal) |
+| Development Image | With debug tools | [x] Implemented (Dockerfile.dev) |
+| ARM64 Image | For Graviton, M1/M2 | [x] Implemented (Dockerfile.arm64) |
+| Distroless Image | Maximum security | [x] Implemented (Dockerfile.distroless) |
 
 **Docker Volume Plugin:**
 
@@ -492,13 +492,13 @@ volumes:
 
 | Feature | Description | Status |
 |---------|-------------|--------|
-| Volume Plugin | Docker volume driver | [ ] |
-| Log Driver | Ship logs to DataWarehouse | [ ] |
-| Secret Backend | Docker secrets from DW | [ ] |
-| Health Checks | Built-in health endpoints | [ ] |
-| Graceful Shutdown | SIGTERM handling | [ ] |
-| Resource Limits | Respect cgroup limits | [ ] |
-| Rootless Mode | Run without root | [ ] |
+| Volume Plugin | Docker volume driver | [x] Implemented (DockerVolumeDriver.cs) |
+| Log Driver | Ship logs to DataWarehouse | [x] Implemented (DockerLogDriver.cs) |
+| Secret Backend | Docker secrets from DW | [x] Implemented (DockerSecretBackend.cs) |
+| Health Checks | Built-in health endpoints | [x] Implemented (all Dockerfiles + plugin) |
+| Graceful Shutdown | SIGTERM handling | [x] Implemented (Program.cs + plugin) |
+| Resource Limits | Respect cgroup limits | [x] Implemented (CheckCgroupLimits) |
+| Rootless Mode | Run without root | [x] Implemented (non-root users in images) |
 
 ---
 
@@ -514,14 +514,14 @@ volumes:
 
 | Feature | CSI Capability | Status |
 |---------|----------------|--------|
-| Dynamic Provisioning | CREATE_DELETE_VOLUME | [ ] |
-| Volume Expansion | EXPAND_VOLUME | [ ] |
-| Snapshots | CREATE_DELETE_SNAPSHOT | [ ] |
-| Cloning | CLONE_VOLUME | [ ] |
-| Topology Awareness | VOLUME_ACCESSIBILITY | [ ] |
-| Raw Block Volumes | BLOCK_VOLUME | [ ] |
-| ReadWriteMany | MULTI_NODE_MULTI_WRITER | [ ] |
-| Volume Limits | GET_CAPACITY | [ ] |
+| Dynamic Provisioning | CREATE_DELETE_VOLUME | [x] Implemented |
+| Volume Expansion | EXPAND_VOLUME | [x] Implemented |
+| Snapshots | CREATE_DELETE_SNAPSHOT | [x] Implemented |
+| Cloning | CLONE_VOLUME | [x] Implemented |
+| Topology Awareness | VOLUME_ACCESSIBILITY | [x] Implemented |
+| Raw Block Volumes | BLOCK_VOLUME | [x] Implemented |
+| ReadWriteMany | MULTI_NODE_MULTI_WRITER | [x] Implemented |
+| Volume Limits | GET_CAPACITY | [x] Implemented |
 
 **Storage Classes:**
 
@@ -544,24 +544,24 @@ allowVolumeExpansion: true
 
 | CRD | Purpose | Status |
 |-----|---------|--------|
-| DataWarehouseCluster | Manage DW clusters | [ ] |
-| DataWarehouseBackup | Scheduled backups | [ ] |
-| DataWarehouseReplication | Cross-cluster sync | [ ] |
-| DataWarehouseTenant | Multi-tenancy | [ ] |
-| DataWarehousePolicy | Governance policies | [ ] |
+| DataWarehouseCluster | Manage DW clusters | [x] Implemented (reconciliation works) |
+| DataWarehouseBackup | Scheduled backups | [x] Implemented (spec + reconciliation) |
+| DataWarehouseReplication | Cross-cluster sync | [x] Implemented (reconciliation works) |
+| DataWarehouseTenant | Multi-tenancy | [x] Implemented (quotas, RBAC specs) |
+| DataWarehousePolicy | Governance policies | [x] Implemented (rule enforcement) |
 
 **Operator Features:**
 
 | Feature | Description | Status |
 |---------|-------------|--------|
-| Automatic Scaling | HPA/VPA integration | [ ] |
-| Rolling Updates | Zero-downtime upgrades | [ ] |
-| Self-Healing | Auto-restart failed pods | [ ] |
-| Backup Scheduling | CronJob-based backups | [ ] |
-| Cross-Namespace | Manage multiple namespaces | [ ] |
-| RBAC Integration | K8s native auth | [ ] |
-| Prometheus Metrics | ServiceMonitor CRD | [ ] |
-| Cert-Manager | TLS certificate automation | [ ] |
+| Automatic Scaling | HPA/VPA integration | [ ] Not implemented |
+| Rolling Updates | Zero-downtime upgrades | [ ] Not implemented |
+| Self-Healing | Auto-restart failed pods | [~] Partial (health check + basic restart) |
+| Backup Scheduling | CronJob-based backups | [ ] Not implemented (spec only) |
+| Cross-Namespace | Manage multiple namespaces | [x] Implemented |
+| RBAC Integration | K8s native auth | [ ] Not implemented (spec fields only) |
+| Prometheus Metrics | ServiceMonitor CRD | [ ] Not implemented |
+| Cert-Manager | TLS certificate automation | [ ] Not implemented |
 
 ---
 
