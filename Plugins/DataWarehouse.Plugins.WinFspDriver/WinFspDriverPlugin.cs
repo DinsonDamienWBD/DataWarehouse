@@ -50,6 +50,7 @@ public sealed class WinFspDriverPlugin : FeaturePluginBase, IDisposable
     private readonly WinFspConfig _config;
     private readonly ConcurrentDictionary<string, WinFspMountedInstance> _mountedInstances;
     private readonly SemaphoreSlim _mountLock;
+    private readonly BitLockerIntegration? _bitLockerIntegration;
     private IStorageProvider? _storageProvider;
     private IKernelContext? _kernelContext;
     private bool _isRunning;
@@ -101,6 +102,20 @@ public sealed class WinFspDriverPlugin : FeaturePluginBase, IDisposable
         _config = config ?? throw new ArgumentNullException(nameof(config));
         _mountedInstances = new ConcurrentDictionary<string, WinFspMountedInstance>(StringComparer.OrdinalIgnoreCase);
         _mountLock = new SemaphoreSlim(1, 1);
+
+        // Initialize BitLocker integration if running on Windows
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows) && _config.BitLocker.EnableBitLockerSupport)
+        {
+            try
+            {
+                _bitLockerIntegration = new BitLockerIntegration(_config.BitLocker);
+            }
+            catch
+            {
+                // BitLocker integration failed - continue without it
+                _bitLockerIntegration = null;
+            }
+        }
     }
 
     #region Plugin Lifecycle
@@ -216,6 +231,9 @@ public sealed class WinFspDriverPlugin : FeaturePluginBase, IDisposable
             "winfsp.vss.snapshot" => await HandleVssSnapshotAsync(message),
             "winfsp.vss.list" => HandleVssList(message),
             "winfsp.shell.register" => await HandleShellRegisterAsync(message),
+            "winfsp.bitlocker.status" => HandleBitLockerStatus(message),
+            "winfsp.bitlocker.health" => HandleBitLockerHealth(message),
+            "winfsp.bitlocker.tpm" => HandleBitLockerTpm(message),
             _ => null
         };
 
@@ -406,6 +424,101 @@ public sealed class WinFspDriverPlugin : FeaturePluginBase, IDisposable
         }
     }
 
+    private MessageResponse HandleBitLockerStatus(PluginMessage message)
+    {
+        if (_bitLockerIntegration == null)
+            return MessageResponse.Error("BitLocker integration is not available");
+
+        if (message.Payload is not Dictionary<string, object> payload)
+            return MessageResponse.Error("Invalid payload");
+
+        var volumePath = payload.TryGetValue("volumePath", out var vp) ? vp?.ToString() : null;
+
+        if (string.IsNullOrEmpty(volumePath))
+            return MessageResponse.Error("Volume path required");
+
+        try
+        {
+            var status = _bitLockerIntegration.CheckVolumeEncryption(volumePath);
+            return MessageResponse.Ok(new
+            {
+                VolumePath = volumePath,
+                IsEncrypted = status.IsEncrypted,
+                ProtectionStatus = status.ProtectionStatus.ToString(),
+                ConversionStatus = status.ConversionStatus.ToString(),
+                EncryptionMethod = status.EncryptionMethod.ToString(),
+                VolumeType = status.VolumeType.ToString(),
+                EncryptionPercentage = status.EncryptionPercentage
+            });
+        }
+        catch (Exception ex)
+        {
+            return MessageResponse.Error($"Failed to query BitLocker status: {ex.Message}");
+        }
+    }
+
+    private MessageResponse HandleBitLockerHealth(PluginMessage message)
+    {
+        if (_bitLockerIntegration == null)
+            return MessageResponse.Error("BitLocker integration is not available");
+
+        if (message.Payload is not Dictionary<string, object> payload)
+            return MessageResponse.Error("Invalid payload");
+
+        var volumePath = payload.TryGetValue("volumePath", out var vp) ? vp?.ToString() : null;
+
+        if (string.IsNullOrEmpty(volumePath))
+            return MessageResponse.Error("Volume path required");
+
+        try
+        {
+            var healthCheck = _bitLockerIntegration.PerformHealthCheck(volumePath);
+            return MessageResponse.Ok(new
+            {
+                VolumePath = healthCheck.VolumeePath,
+                CheckedAt = healthCheck.CheckedAt,
+                OverallStatus = healthCheck.OverallStatus.ToString(),
+                Issues = healthCheck.Issues,
+                Recommendations = healthCheck.Recommendations,
+                BitLockerStatus = healthCheck.BitLockerStatus != null ? new
+                {
+                    IsEncrypted = healthCheck.BitLockerStatus.IsEncrypted,
+                    ProtectionStatus = healthCheck.BitLockerStatus.ProtectionStatus.ToString(),
+                    EncryptionMethod = healthCheck.BitLockerStatus.EncryptionMethod.ToString()
+                } : null
+            });
+        }
+        catch (Exception ex)
+        {
+            return MessageResponse.Error($"Failed to perform BitLocker health check: {ex.Message}");
+        }
+    }
+
+    private MessageResponse HandleBitLockerTpm(PluginMessage message)
+    {
+        if (_bitLockerIntegration == null)
+            return MessageResponse.Error("BitLocker integration is not available");
+
+        try
+        {
+            var tpmStatus = _bitLockerIntegration.DetectTpm();
+            return MessageResponse.Ok(new
+            {
+                IsPresent = tpmStatus.IsPresent,
+                IsEnabled = tpmStatus.IsEnabled,
+                IsActivated = tpmStatus.IsActivated,
+                IsOwned = tpmStatus.IsOwned,
+                SpecVersion = tpmStatus.SpecVersion,
+                ManufacturerId = tpmStatus.ManufacturerId,
+                ManufacturerVersion = tpmStatus.ManufacturerVersion
+            });
+        }
+        catch (Exception ex)
+        {
+            return MessageResponse.Error($"Failed to query TPM status: {ex.Message}");
+        }
+    }
+
     #endregion
 
     #region Mount/Unmount Operations
@@ -450,6 +563,27 @@ public sealed class WinFspDriverPlugin : FeaturePluginBase, IDisposable
             if (_mountedInstances.ContainsKey(effectiveMountPoint))
             {
                 return effectiveMountPoint;
+            }
+
+            // Perform BitLocker validation if enabled
+            if (_bitLockerIntegration != null)
+            {
+                var validationResult = _bitLockerIntegration.ValidateVolume(effectiveMountPoint);
+
+                if (config.BitLocker.LogEncryptionStatus && validationResult.BitLockerStatus != null)
+                {
+                    var status = validationResult.BitLockerStatus;
+                    // Log BitLocker status
+                    Console.WriteLine($"[BitLocker] Volume {effectiveMountPoint}: " +
+                        $"Encrypted={status.IsEncrypted}, " +
+                        $"Method={status.EncryptionMethod}, " +
+                        $"Status={status.ProtectionStatus}");
+                }
+
+                if (!validationResult.IsValid)
+                {
+                    throw new InvalidOperationException($"BitLocker validation failed: {validationResult.Message}");
+                }
             }
 
             // Create components
@@ -644,6 +778,7 @@ public sealed class WinFspDriverPlugin : FeaturePluginBase, IDisposable
             Shell = source.Shell,
             Vss = source.Vss,
             Debug = source.Debug,
+            BitLocker = source.BitLocker,
             StorageProviderId = source.StorageProviderId,
             StorageConnectionString = source.StorageConnectionString,
             MaxConcurrentOperations = source.MaxConcurrentOperations,
@@ -713,6 +848,24 @@ public sealed class WinFspDriverPlugin : FeaturePluginBase, IDisposable
                 Name = "winfsp.shell.register",
                 DisplayName = "Register Shell Extensions",
                 Description = "Register Windows Explorer integrations"
+            },
+            new()
+            {
+                Name = "winfsp.bitlocker.status",
+                DisplayName = "BitLocker Status",
+                Description = "Query BitLocker encryption status for a volume"
+            },
+            new()
+            {
+                Name = "winfsp.bitlocker.health",
+                DisplayName = "BitLocker Health Check",
+                Description = "Perform a comprehensive BitLocker health check"
+            },
+            new()
+            {
+                Name = "winfsp.bitlocker.tpm",
+                DisplayName = "TPM Status",
+                Description = "Query Trusted Platform Module (TPM) status"
             }
         };
     }
@@ -730,6 +883,8 @@ public sealed class WinFspDriverPlugin : FeaturePluginBase, IDisposable
         metadata["SupportsShellIntegration"] = true;
         metadata["SupportsCaching"] = true;
         metadata["SupportsACLs"] = true;
+        metadata["SupportsBitLocker"] = _bitLockerIntegration != null;
+        metadata["BitLockerEnabled"] = _config.BitLocker.EnableBitLockerSupport;
         metadata["MountedInstances"] = _mountedInstances.Count;
         metadata["IsRunning"] = _isRunning;
         return metadata;
@@ -750,6 +905,7 @@ public sealed class WinFspDriverPlugin : FeaturePluginBase, IDisposable
         // Stop the plugin
         StopAsync().Wait(TimeSpan.FromSeconds(30));
 
+        _bitLockerIntegration?.Dispose();
         _mountLock.Dispose();
         _disposed = true;
     }

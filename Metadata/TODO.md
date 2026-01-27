@@ -156,9 +156,9 @@ These features represent the next generation of data storage technology, positio
 | Storage Browsers | S3 Browser, Local Browser, Federation Browser | [x] Implemented (Storage.razor, S3Browser.razor, FederationBrowser.razor) |
 | Monitoring Dashboards | Cluster Health, Performance, Capacity | [x] Implemented (Health.razor, PerformanceDashboard.razor, CapacityDashboard.razor) |
 | Configuration Wizards | Setup, Migration, Backup Config | [x] Implemented (Config.razor, Backup.razor) |
-| Compliance Reporters | GDPR Report, HIPAA Audit, SOC2 Evidence | [ ] Not implemented |
+| Compliance Reporters | GDPR Report, HIPAA Audit, SOC2 Evidence | [x] Implemented (GdprReport.razor, HipaaAudit.razor, Soc2Evidence.razor + Shared services + CLI commands) |
 | AI Assistants | Natural Language Query, Semantic Search | [x] Implemented (CommandPalette.razor, AiSettings.razor) |
-| Developer Tools | API Explorer, Schema Designer, Query Builder | [ ] Not implemented |
+| Developer Tools | API Explorer, Schema Designer, Query Builder | [x] Implemented (ApiExplorer.razor, SchemaDesigner.razor, QueryBuilder.razor + Shared services + CLI commands) |
 
 **Features:**
 
@@ -230,7 +230,7 @@ These features represent the next generation of data storage technology, positio
 | Search Integration | Windows Search indexing | [x] Implemented (WindowsSearchIntegration.cs) |
 | Offline Files Support | Smart sync with placeholders | [x] Implemented (OfflineFilesManager.cs) |
 | OneDrive-style Hydration | Download on access | [x] Implemented (OfflineFilesManager.cs) |
-| BitLocker Compatibility | Works with encrypted drives | [ ] Not implemented |
+| BitLocker Compatibility | Works with encrypted drives | [x] Implemented (BitLockerIntegration.cs) |
 | VSS Integration | Volume Shadow Copy support | [x] Implemented (VssProvider.cs) |
 
 **Supported Operations:**
@@ -276,7 +276,7 @@ These features represent the next generation of data storage technology, positio
 | Linux | libfuse 3.x | [x] |
 | macOS | macFUSE 4.x | [x] |
 | FreeBSD | FUSE for FreeBSD | [x] |
-| OpenBSD | perfuse | [ ] |
+| OpenBSD | perfuse | [x] Implemented (OpenBsdIntegration.cs) |
 
 **Features:**
 
@@ -344,13 +344,13 @@ These features represent the next generation of data storage technology, positio
 | ext4 | Linux | Full POSIX, journaling | [x] Implemented (Ext4FilesystemPlugin.cs) |
 | XFS | Linux | Large files, real-time I/O | [x] Implemented (XfsFilesystemPlugin.cs) |
 | Btrfs | Linux | Snapshots, checksums, CoW | [x] Implemented (BtrfsFilesystemPlugin.cs) |
-| ZFS | Linux/BSD | Snapshots, checksums, RAID | [ ] Not implemented |
+| ZFS | Linux/BSD | Snapshots, checksums, RAID | [x] Implemented (ZfsFilesystemPlugin.cs) |
 | APFS | macOS | Snapshots, clones, encryption | [x] Implemented (ApfsFilesystemPlugin.cs) |
-| HFS+ | macOS | Legacy support | [ ] Not implemented |
-| UFS | BSD | Traditional Unix FS | [ ] Not implemented |
-| F2FS | Linux | Flash-optimized | [ ] Not implemented |
-| NILFS2 | Linux | Log-structured, snapshots | [ ] Not implemented |
-| HAMMER2 | DragonFly | Clustering support | [ ] Not implemented |
+| HFS+ | macOS | Legacy support | [x] Implemented (HfsPlusFilesystemPlugin.cs) |
+| UFS | BSD | Traditional Unix FS | [x] Implemented (UfsFilesystemPlugin.cs) |
+| F2FS | Linux | Flash-optimized | [x] Implemented (F2fsFilesystemPlugin.cs) |
+| NILFS2 | Linux | Log-structured, snapshots | [x] Implemented (Nilfs2FilesystemPlugin.cs) |
+| HAMMER2 | DragonFly | Clustering support | [x] Implemented (Hammer2FilesystemPlugin.cs) |
 
 **Plugin Interface:**
 

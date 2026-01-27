@@ -130,6 +130,11 @@ public sealed class WinFspConfig
     public DebugConfig Debug { get; set; } = new();
 
     /// <summary>
+    /// BitLocker encryption configuration.
+    /// </summary>
+    public BitLockerConfig BitLocker { get; set; } = new();
+
+    /// <summary>
     /// Backend storage provider ID. If null, uses default storage.
     /// </summary>
     public string? StorageProviderId { get; set; }

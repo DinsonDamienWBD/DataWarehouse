@@ -1,0 +1,691 @@
+@page "/developer/query"
+@inject InstanceManager InstanceManager
+@inject DialogService DialogService
+
+<div class="content-header">
+    <h2>Query Builder</h2>
+    <div class="d-flex gap-2">
+        <button class="btn btn-secondary" @onclick="LoadTemplates">Templates</button>
+        <button class="btn btn-primary" @onclick="ExecuteQuery" disabled="@_isExecuting">
+            @if (_isExecuting)
+            {
+                <span>Executing...</span>
+            }
+            else
+            {
+                <span>Execute Query</span>
+            }
+        </button>
+        <button class="btn btn-success" @onclick="SaveTemplate">Save Template</button>
+    </div>
+</div>
+
+<div class="content-body">
+    @if (!InstanceManager.IsConnected)
+    {
+        <div class="alert alert-warning" role="alert">
+            Not connected to a DataWarehouse instance.
+        </div>
+    }
+    else
+    {
+        <div class="d-flex gap-3" style="height: calc(100vh - 180px);">
+            <!-- Left panel: Query builder -->
+            <div style="flex: 1; overflow-y: auto;">
+                <!-- Data source selection -->
+                <div class="card">
+                    <div class="card-header">Data Source</div>
+                    <div class="card-body">
+                        <div class="form-group">
+                            <label class="form-label">Collection / Table</label>
+                            <div class="d-flex gap-2">
+                                <select class="form-select" value="@_query.Collection"
+                                        @onchange="OnCollectionChangedEvent" aria-label="Select collection">
+                                    <option value="">Select a collection...</option>
+                                    @foreach (var collection in _availableCollections)
+                                    {
+                                        <option value="@collection">@collection</option>
+                                    }
+                                </select>
+                                <button class="btn btn-secondary" @onclick="RefreshCollections">Refresh</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Field selection -->
+                <div class="card mt-3">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <span>Select Fields</span>
+                        <label style="font-weight: normal; font-size: 13px;">
+                            <input type="checkbox" checked="@_query.SelectAllFields"
+                                   @onchange="OnSelectAllFieldsChanged" />
+                            Select All
+                        </label>
+                    </div>
+                    <div class="card-body">
+                        @if (!string.IsNullOrEmpty(_query.Collection) && _availableFields.Any())
+                        {
+                            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px;">
+                                @foreach (var field in _availableFields)
+                                {
+                                    <label style="display: flex; align-items: center; gap: 6px; cursor: pointer;">
+                                        <input type="checkbox"
+                                               checked="@_query.SelectedFields.Contains(field)"
+                                               @onchange="e => ToggleField(field, (bool)e.Value!)"
+                                               aria-label="@field" />
+                                        <span>@field</span>
+                                    </label>
+                                }
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="text-muted" style="font-size: 13px;">
+                                Select a collection to view available fields
+                            </div>
+                        }
+                    </div>
+                </div>
+
+                <!-- Filter builder -->
+                <div class="card mt-3">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <span>Filters</span>
+                        <button class="btn btn-primary" style="padding: 4px 12px; font-size: 13px;"
+                                @onclick="AddFilter">
+                            + Add Filter
+                        </button>
+                    </div>
+                    <div class="card-body">
+                        @if (_query.Filters.Any())
+                        {
+                            @foreach (var (filter, index) in _query.Filters.Select((f, i) => (f, i)))
+                            {
+                                <div class="d-flex align-items-center gap-2 mb-2" style="flex-wrap: wrap;">
+                                    @if (index > 0)
+                                    {
+                                        <select class="form-select" style="width: 80px;" @bind="filter.LogicalOperator"
+                                                aria-label="Logical operator">
+                                            <option value="AND">AND</option>
+                                            <option value="OR">OR</option>
+                                        </select>
+                                    }
+
+                                    <select class="form-select" style="width: 150px;" @bind="filter.Field"
+                                            aria-label="Filter field">
+                                        <option value="">Select field...</option>
+                                        @foreach (var field in _availableFields)
+                                        {
+                                            <option value="@field">@field</option>
+                                        }
+                                    </select>
+
+                                    <select class="form-select" style="width: 120px;" @bind="filter.Operator"
+                                            aria-label="Filter operator">
+                                        <option value="=">=</option>
+                                        <option value="!=">!=</option>
+                                        <option value=">">&gt;</option>
+                                        <option value=">=">&gt;=</option>
+                                        <option value="<">&lt;</option>
+                                        <option value="<=">&lt;=</option>
+                                        <option value="LIKE">LIKE</option>
+                                        <option value="IN">IN</option>
+                                        <option value="NOT IN">NOT IN</option>
+                                    </select>
+
+                                    <input type="text" class="form-input" style="flex: 1; min-width: 150px;"
+                                           @bind="filter.Value" placeholder="Value"
+                                           aria-label="Filter value" />
+
+                                    <button class="btn btn-danger" style="padding: 4px 8px; font-size: 12px;"
+                                            @onclick="() => RemoveFilter(filter)">
+                                        Remove
+                                    </button>
+                                </div>
+                            }
+                        }
+                        else
+                        {
+                            <div class="text-muted" style="font-size: 13px;">
+                                No filters applied. Click "Add Filter" to add conditions.
+                            </div>
+                        }
+                    </div>
+                </div>
+
+                <!-- Sort configuration -->
+                <div class="card mt-3">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <span>Sort Order</span>
+                        <button class="btn btn-primary" style="padding: 4px 12px; font-size: 13px;"
+                                @onclick="AddSort">
+                            + Add Sort
+                        </button>
+                    </div>
+                    <div class="card-body">
+                        @if (_query.SortFields.Any())
+                        {
+                            @foreach (var sort in _query.SortFields)
+                            {
+                                <div class="d-flex align-items-center gap-2 mb-2">
+                                    <select class="form-select" style="width: 200px;" @bind="sort.Field"
+                                            aria-label="Sort field">
+                                        <option value="">Select field...</option>
+                                        @foreach (var field in _availableFields)
+                                        {
+                                            <option value="@field">@field</option>
+                                        }
+                                    </select>
+
+                                    <select class="form-select" style="width: 120px;" @bind="sort.Direction"
+                                            aria-label="Sort direction">
+                                        <option value="ASC">Ascending</option>
+                                        <option value="DESC">Descending</option>
+                                    </select>
+
+                                    <button class="btn btn-danger" style="padding: 4px 8px; font-size: 12px;"
+                                            @onclick="() => RemoveSort(sort)">
+                                        Remove
+                                    </button>
+                                </div>
+                            }
+                        }
+                        else
+                        {
+                            <div class="text-muted" style="font-size: 13px;">
+                                No sorting applied. Results will be in default order.
+                            </div>
+                        }
+                    </div>
+                </div>
+
+                <!-- Limit and offset -->
+                <div class="card mt-3">
+                    <div class="card-header">Pagination</div>
+                    <div class="card-body">
+                        <div class="d-flex gap-3">
+                            <div class="form-group" style="flex: 1;">
+                                <label class="form-label">Limit (max rows)</label>
+                                <input type="number" class="form-input" @bind="_query.Limit"
+                                       min="1" max="10000" aria-label="Query limit" />
+                            </div>
+                            <div class="form-group" style="flex: 1;">
+                                <label class="form-label">Offset (skip rows)</label>
+                                <input type="number" class="form-input" @bind="_query.Offset"
+                                       min="0" aria-label="Query offset" />
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right panel: Query preview and results -->
+            <div style="width: 450px; overflow-y: auto; border-left: 1px solid var(--border-color); padding-left: 16px;">
+                <!-- Query preview -->
+                <div class="card">
+                    <div class="card-header">Query Preview</div>
+                    <div class="card-body">
+                        <pre><code>@GenerateQueryPreview()</code></pre>
+                    </div>
+                </div>
+
+                <!-- Execution results -->
+                @if (_queryResult != null)
+                {
+                    <div class="card mt-3">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <span>Results</span>
+                            <span class="badge badge-info">@_queryResult.RowCount rows</span>
+                        </div>
+                        <div class="card-body">
+                            <div class="form-group">
+                                <label class="form-label">Execution Time</label>
+                                <div>@_queryResult.ExecutionTime ms</div>
+                            </div>
+
+                            @if (_queryResult.Success)
+                            {
+                                <div class="form-group">
+                                    <label class="form-label">Data</label>
+                                    <div style="max-height: 400px; overflow: auto;">
+                                        <table class="data-table" style="font-size: 12px;">
+                                            <thead>
+                                                <tr>
+                                                    @foreach (var column in _queryResult.Columns)
+                                                    {
+                                                        <th>@column</th>
+                                                    }
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                @foreach (var row in _queryResult.Rows)
+                                                {
+                                                    <tr>
+                                                        @foreach (var column in _queryResult.Columns)
+                                                        {
+                                                            <td>@(row.ContainsKey(column) ? row[column]?.ToString() ?? "" : "")</td>
+                                                        }
+                                                    </tr>
+                                                }
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            }
+                            else
+                            {
+                                <div class="alert alert-danger">
+                                    <strong>Error:</strong> @_queryResult.ErrorMessage
+                                </div>
+                            }
+                        </div>
+                    </div>
+                }
+
+                <!-- Saved templates -->
+                <div class="card mt-3">
+                    <div class="card-header">Saved Templates</div>
+                    <div class="card-body">
+                        @if (_templates.Any())
+                        {
+                            @foreach (var template in _templates)
+                            {
+                                <div class="d-flex align-items-center justify-content-between mb-2 p-2"
+                                     style="background-color: var(--bg-tertiary); border-radius: 6px;">
+                                    <div style="flex: 1;">
+                                        <div><strong>@template.Name</strong></div>
+                                        <div class="text-muted" style="font-size: 11px;">@template.Description</div>
+                                    </div>
+                                    <div class="d-flex gap-2">
+                                        <button class="btn btn-secondary" style="padding: 4px 8px; font-size: 11px;"
+                                                @onclick="() => LoadTemplate(template)">
+                                            Load
+                                        </button>
+                                        <button class="btn btn-danger" style="padding: 4px 8px; font-size: 11px;"
+                                                @onclick="() => DeleteTemplate(template)">
+                                            Delete
+                                        </button>
+                                    </div>
+                                </div>
+                            }
+                        }
+                        else
+                        {
+                            <div class="text-muted" style="font-size: 13px;">
+                                No saved templates. Save your current query to create a template.
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private bool _isExecuting = false;
+    private QueryDefinition _query = new();
+    private List<string> _availableCollections = new();
+    private List<string> _availableFields = new();
+    private QueryResult? _queryResult;
+    private List<QueryTemplate> _templates = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await RefreshCollections();
+        await LoadTemplates();
+    }
+
+    private async Task RefreshCollections()
+    {
+        if (!InstanceManager.IsConnected) return;
+
+        try
+        {
+            var result = await InstanceManager.ExecuteAsync("query.listCollections");
+            if (result is IEnumerable<object> list)
+            {
+                _availableCollections = list.Select(x => x?.ToString() ?? "").Where(x => !string.IsNullOrEmpty(x)).ToList();
+            }
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            await DialogService.AlertAsync("Error", $"Failed to load collections: {ex.Message}");
+        }
+    }
+
+    private async Task OnCollectionChanged()
+    {
+        if (string.IsNullOrEmpty(_query.Collection)) return;
+
+        try
+        {
+            var result = await InstanceManager.ExecuteAsync("query.getFields", new Dictionary<string, object>
+            {
+                ["collection"] = _query.Collection
+            });
+
+            if (result is IEnumerable<object> list)
+            {
+                _availableFields = list.Select(x => x?.ToString() ?? "").Where(x => !string.IsNullOrEmpty(x)).ToList();
+            }
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            await DialogService.AlertAsync("Error", $"Failed to load fields: {ex.Message}");
+        }
+    }
+
+    private async Task OnCollectionChangedEvent(ChangeEventArgs e)
+    {
+        _query.Collection = e.Value?.ToString() ?? "";
+        await OnCollectionChanged();
+    }
+
+    private void OnSelectAllFieldsChanged(ChangeEventArgs e)
+    {
+        _query.SelectAllFields = (bool)(e.Value ?? false);
+        if (_query.SelectAllFields)
+        {
+            _query.SelectedFields = new HashSet<string>(_availableFields);
+        }
+        else
+        {
+            _query.SelectedFields.Clear();
+        }
+        StateHasChanged();
+    }
+
+    private void ToggleField(string field, bool selected)
+    {
+        if (selected)
+        {
+            _query.SelectedFields.Add(field);
+        }
+        else
+        {
+            _query.SelectedFields.Remove(field);
+        }
+        _query.SelectAllFields = _query.SelectedFields.Count == _availableFields.Count;
+        StateHasChanged();
+    }
+
+    private void AddFilter()
+    {
+        _query.Filters.Add(new QueryFilter { LogicalOperator = _query.Filters.Any() ? "AND" : "" });
+        StateHasChanged();
+    }
+
+    private void RemoveFilter(QueryFilter filter)
+    {
+        _query.Filters.Remove(filter);
+        StateHasChanged();
+    }
+
+    private void AddSort()
+    {
+        _query.SortFields.Add(new SortField());
+        StateHasChanged();
+    }
+
+    private void RemoveSort(SortField sort)
+    {
+        _query.SortFields.Remove(sort);
+        StateHasChanged();
+    }
+
+    private async Task ExecuteQuery()
+    {
+        if (string.IsNullOrEmpty(_query.Collection))
+        {
+            await DialogService.AlertAsync("Error", "Please select a collection.");
+            return;
+        }
+
+        _isExecuting = true;
+        StateHasChanged();
+
+        var startTime = DateTime.UtcNow;
+
+        try
+        {
+            var result = await InstanceManager.ExecuteAsync("query.execute", new Dictionary<string, object>
+            {
+                ["collection"] = _query.Collection,
+                ["fields"] = _query.SelectAllFields ? new[] { "*" } : _query.SelectedFields.ToArray(),
+                ["filters"] = _query.Filters.Select(f => new Dictionary<string, object>
+                {
+                    ["field"] = f.Field,
+                    ["operator"] = f.Operator,
+                    ["value"] = f.Value,
+                    ["logical"] = f.LogicalOperator
+                }).ToList(),
+                ["sort"] = _query.SortFields.Select(s => new Dictionary<string, object>
+                {
+                    ["field"] = s.Field,
+                    ["direction"] = s.Direction
+                }).ToList(),
+                ["limit"] = _query.Limit,
+                ["offset"] = _query.Offset
+            });
+
+            var executionTime = (DateTime.UtcNow - startTime).TotalMilliseconds;
+            _queryResult = ParseQueryResult(result, executionTime);
+        }
+        catch (Exception ex)
+        {
+            var executionTime = (DateTime.UtcNow - startTime).TotalMilliseconds;
+            _queryResult = new QueryResult
+            {
+                Success = false,
+                ErrorMessage = ex.Message,
+                ExecutionTime = (int)executionTime
+            };
+        }
+        finally
+        {
+            _isExecuting = false;
+            StateHasChanged();
+        }
+    }
+
+    private string GenerateQueryPreview()
+    {
+        if (string.IsNullOrEmpty(_query.Collection))
+            return "-- Select a collection to build a query";
+
+        var preview = $"SELECT {(_query.SelectAllFields || !_query.SelectedFields.Any() ? "*" : string.Join(", ", _query.SelectedFields))}\n";
+        preview += $"FROM {_query.Collection}\n";
+
+        if (_query.Filters.Any())
+        {
+            preview += "WHERE ";
+            for (int i = 0; i < _query.Filters.Count; i++)
+            {
+                var filter = _query.Filters[i];
+                if (i > 0)
+                    preview += $"\n  {filter.LogicalOperator} ";
+                preview += $"{filter.Field} {filter.Operator} '{filter.Value}'";
+            }
+            preview += "\n";
+        }
+
+        if (_query.SortFields.Any())
+        {
+            preview += "ORDER BY " + string.Join(", ", _query.SortFields.Select(s => $"{s.Field} {s.Direction}")) + "\n";
+        }
+
+        if (_query.Limit > 0)
+        {
+            preview += $"LIMIT {_query.Limit}\n";
+        }
+
+        if (_query.Offset > 0)
+        {
+            preview += $"OFFSET {_query.Offset}\n";
+        }
+
+        return preview;
+    }
+
+    private async Task SaveTemplate()
+    {
+        var name = await DialogService.PromptAsync("Save Template", "Enter template name:");
+        if (string.IsNullOrEmpty(name)) return;
+
+        var description = await DialogService.PromptAsync("Template Description", "Enter description (optional):");
+
+        try
+        {
+            await InstanceManager.ExecuteAsync("query.saveTemplate", new Dictionary<string, object>
+            {
+                ["name"] = name,
+                ["description"] = description ?? "",
+                ["query"] = _query
+            });
+
+            await DialogService.AlertAsync("Success", "Template saved successfully.");
+            await LoadTemplates();
+        }
+        catch (Exception ex)
+        {
+            await DialogService.AlertAsync("Error", $"Failed to save template: {ex.Message}");
+        }
+    }
+
+    private async Task LoadTemplates()
+    {
+        if (!InstanceManager.IsConnected) return;
+
+        try
+        {
+            var result = await InstanceManager.ExecuteAsync("query.listTemplates");
+            _templates = ParseTemplates(result);
+            StateHasChanged();
+        }
+        catch { }
+    }
+
+    private void LoadTemplate(QueryTemplate template)
+    {
+        // In a real implementation, this would deserialize the template's query
+        _query = new QueryDefinition
+        {
+            Collection = template.Name // Placeholder
+        };
+        StateHasChanged();
+    }
+
+    private async Task DeleteTemplate(QueryTemplate template)
+    {
+        var confirmed = await DialogService.ConfirmAsync("Delete Template", $"Delete template '{template.Name}'?");
+        if (!confirmed) return;
+
+        try
+        {
+            await InstanceManager.ExecuteAsync("query.deleteTemplate", new Dictionary<string, object>
+            {
+                ["name"] = template.Name
+            });
+            await LoadTemplates();
+        }
+        catch (Exception ex)
+        {
+            await DialogService.AlertAsync("Error", $"Failed to delete: {ex.Message}");
+        }
+    }
+
+    private QueryResult ParseQueryResult(object? result, double executionTime)
+    {
+        var queryResult = new QueryResult
+        {
+            Success = true,
+            ExecutionTime = (int)executionTime
+        };
+
+        if (result is IEnumerable<object> list)
+        {
+            var rows = new List<Dictionary<string, object>>();
+            foreach (var item in list)
+            {
+                if (item is IDictionary<string, object> dict)
+                {
+                    rows.Add(new Dictionary<string, object>(dict));
+                }
+            }
+
+            queryResult.Rows = rows;
+            queryResult.RowCount = rows.Count;
+            if (rows.Any())
+            {
+                queryResult.Columns = rows[0].Keys.ToList();
+            }
+        }
+
+        return queryResult;
+    }
+
+    private List<QueryTemplate> ParseTemplates(object? result)
+    {
+        var templates = new List<QueryTemplate>();
+        if (result is IEnumerable<object> list)
+        {
+            foreach (var item in list)
+            {
+                if (item is IDictionary<string, object> dict)
+                {
+                    templates.Add(new QueryTemplate
+                    {
+                        Name = dict.TryGetValue("name", out var n) ? n?.ToString() ?? "" : "",
+                        Description = dict.TryGetValue("description", out var d) ? d?.ToString() ?? "" : ""
+                    });
+                }
+            }
+        }
+        return templates;
+    }
+
+    private class QueryDefinition
+    {
+        public string Collection { get; set; } = "";
+        public bool SelectAllFields { get; set; } = true;
+        public HashSet<string> SelectedFields { get; set; } = new();
+        public List<QueryFilter> Filters { get; set; } = new();
+        public List<SortField> SortFields { get; set; } = new();
+        public int Limit { get; set; } = 100;
+        public int Offset { get; set; } = 0;
+    }
+
+    private class QueryFilter
+    {
+        public string LogicalOperator { get; set; } = "AND";
+        public string Field { get; set; } = "";
+        public string Operator { get; set; } = "=";
+        public string Value { get; set; } = "";
+    }
+
+    private class SortField
+    {
+        public string Field { get; set; } = "";
+        public string Direction { get; set; } = "ASC";
+    }
+
+    private class QueryResult
+    {
+        public bool Success { get; set; }
+        public int ExecutionTime { get; set; }
+        public int RowCount { get; set; }
+        public List<string> Columns { get; set; } = new();
+        public List<Dictionary<string, object>> Rows { get; set; } = new();
+        public string ErrorMessage { get; set; } = "";
+    }
+
+    private class QueryTemplate
+    {
+        public string Name { get; set; } = "";
+        public string Description { get; set; } = "";
+    }
+}

@@ -1,0 +1,379 @@
+@page "/developer/api"
+@inject InstanceManager InstanceManager
+@inject DialogService DialogService
+
+<div class="content-header">
+    <h2>API Explorer</h2>
+    <div class="d-flex gap-2">
+        <button class="btn btn-secondary" @onclick="RefreshEndpoints">Refresh</button>
+        <button class="btn btn-primary" @onclick="ManageTokens">Tokens</button>
+    </div>
+</div>
+
+<div class="content-body">
+    @if (!InstanceManager.IsConnected)
+    {
+        <div class="alert alert-warning" role="alert">
+            Not connected to a DataWarehouse instance.
+        </div>
+    }
+    else if (_isLoading)
+    {
+        <div class="text-center mt-4">
+            <div class="spinner"></div>
+            <p class="mt-2">Loading API endpoints...</p>
+        </div>
+    }
+    else
+    {
+        <div class="d-flex gap-3" style="height: calc(100vh - 180px);">
+            <!-- Left panel: Endpoint list -->
+            <div style="width: 350px; overflow-y: auto; border-right: 1px solid var(--border-color); padding-right: 16px;">
+                <div class="mb-3">
+                    <input type="text" class="form-input" placeholder="Search endpoints..."
+                           @bind="_searchQuery" @bind:event="oninput" aria-label="Search endpoints" />
+                </div>
+
+                @foreach (var category in _categorizedEndpoints)
+                {
+                    <div class="mb-3">
+                        <div class="nav-section-title">@category.Key</div>
+                        @foreach (var endpoint in category.Value.Where(e =>
+                            string.IsNullOrEmpty(_searchQuery) ||
+                            e.Path.Contains(_searchQuery, StringComparison.OrdinalIgnoreCase) ||
+                            e.Description.Contains(_searchQuery, StringComparison.OrdinalIgnoreCase)))
+                        {
+                            <div class="nav-item @(endpoint == _selectedEndpoint ? "active" : "")"
+                                 @onclick="() => SelectEndpoint(endpoint)"
+                                 role="button"
+                                 tabindex="0"
+                                 aria-label="@endpoint.Path">
+                                <div style="flex: 1;">
+                                    <div><span class="badge @GetMethodBadgeClass(endpoint.Method)">@endpoint.Method</span> @endpoint.Path</div>
+                                    @if (!string.IsNullOrEmpty(endpoint.Description))
+                                    {
+                                        <div class="text-muted" style="font-size: 12px; margin-top: 4px;">@endpoint.Description</div>
+                                    }
+                                </div>
+                            </div>
+                        }
+                    </div>
+                }
+            </div>
+
+            <!-- Right panel: Endpoint details and testing -->
+            <div style="flex: 1; overflow-y: auto;">
+                @if (_selectedEndpoint != null)
+                {
+                    <div class="card">
+                        <div class="card-header">
+                            <span class="badge @GetMethodBadgeClass(_selectedEndpoint.Method)">@_selectedEndpoint.Method</span>
+                            @_selectedEndpoint.Path
+                        </div>
+                        <div class="card-body">
+                            @if (!string.IsNullOrEmpty(_selectedEndpoint.Description))
+                            {
+                                <p>@_selectedEndpoint.Description</p>
+                            }
+
+                            @if (_selectedEndpoint.RequiresAuth)
+                            {
+                                <div class="alert alert-info">
+                                    <strong>Authentication required:</strong> This endpoint requires a valid API token.
+                                </div>
+                            }
+                        </div>
+                    </div>
+
+                    <!-- Request builder -->
+                    <div class="card mt-3">
+                        <div class="card-header">Request</div>
+                        <div class="card-body">
+                            <div class="form-group">
+                                <label class="form-label">Endpoint URL</label>
+                                <input type="text" class="form-input" readonly value="@_selectedEndpoint.Path" aria-label="Endpoint URL" />
+                            </div>
+
+                            @if (_selectedEndpoint.Parameters.Any())
+                            {
+                                <div class="form-group">
+                                    <label class="form-label">Parameters</label>
+                                    @foreach (var param in _selectedEndpoint.Parameters)
+                                    {
+                                        <div class="mb-2">
+                                            <label class="form-label" style="font-weight: normal; font-size: 13px;">
+                                                @param.Name @(param.Required ? "*" : "")
+                                                <span class="text-muted">(@param.Type)</span>
+                                            </label>
+                                            <input type="text" class="form-input"
+                                                   @bind="_parameterValues[param.Name]"
+                                                   placeholder="@param.Description"
+                                                   aria-label="@param.Name" />
+                                        </div>
+                                    }
+                                </div>
+                            }
+
+                            @if (_selectedEndpoint.Method == "POST" || _selectedEndpoint.Method == "PUT")
+                            {
+                                <div class="form-group">
+                                    <label class="form-label">Request Body (JSON)</label>
+                                    <textarea class="form-input" rows="10" @bind="_requestBody"
+                                              style="font-family: 'SF Mono', 'Consolas', monospace;"
+                                              aria-label="Request body"></textarea>
+                                </div>
+                            }
+
+                            <button class="btn btn-primary" @onclick="ExecuteRequest" disabled="@_isExecuting">
+                                @if (_isExecuting)
+                                {
+                                    <span>Executing...</span>
+                                }
+                                else
+                                {
+                                    <span>Try It Now</span>
+                                }
+                            </button>
+                            <button class="btn btn-secondary" @onclick="GenerateCode">Generate Code</button>
+                        </div>
+                    </div>
+
+                    <!-- Response viewer -->
+                    @if (_response != null)
+                    {
+                        <div class="card mt-3">
+                            <div class="card-header d-flex justify-content-between align-items-center">
+                                <span>Response</span>
+                                <span class="badge @(_response.Success ? "badge-success" : "badge-danger")">
+                                    @_response.StatusCode
+                                </span>
+                            </div>
+                            <div class="card-body">
+                                <div class="form-group">
+                                    <label class="form-label">Response Time</label>
+                                    <div>@_response.Duration ms</div>
+                                </div>
+
+                                <div class="form-group">
+                                    <label class="form-label">Response Body</label>
+                                    <pre><code>@_response.Body</code></pre>
+                                </div>
+                            </div>
+                        </div>
+                    }
+                }
+                else
+                {
+                    <div class="text-center text-muted mt-4">
+                        <p>Select an endpoint from the list to view details and test it.</p>
+                    </div>
+                }
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private bool _isLoading = false;
+    private bool _isExecuting = false;
+    private string _searchQuery = "";
+    private Dictionary<string, List<ApiEndpoint>> _categorizedEndpoints = new();
+    private ApiEndpoint? _selectedEndpoint;
+    private Dictionary<string, string> _parameterValues = new();
+    private string _requestBody = "{\n  \n}";
+    private ApiResponse? _response;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await RefreshEndpoints();
+    }
+
+    private async Task RefreshEndpoints()
+    {
+        if (!InstanceManager.IsConnected) return;
+
+        _isLoading = true;
+        StateHasChanged();
+
+        try
+        {
+            var result = await InstanceManager.ExecuteAsync("api.listEndpoints");
+            var endpoints = ParseEndpoints(result);
+            _categorizedEndpoints = endpoints.GroupBy(e => e.Category)
+                .ToDictionary(g => g.Key, g => g.ToList());
+        }
+        catch (Exception ex)
+        {
+            await DialogService.AlertAsync("Error", $"Failed to load endpoints: {ex.Message}");
+        }
+        finally
+        {
+            _isLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private void SelectEndpoint(ApiEndpoint endpoint)
+    {
+        _selectedEndpoint = endpoint;
+        _parameterValues.Clear();
+        _requestBody = "{\n  \n}";
+        _response = null;
+        StateHasChanged();
+    }
+
+    private async Task ExecuteRequest()
+    {
+        if (_selectedEndpoint == null) return;
+
+        _isExecuting = true;
+        StateHasChanged();
+
+        var startTime = DateTime.UtcNow;
+
+        try
+        {
+            var requestParams = new Dictionary<string, object>();
+            foreach (var kvp in _parameterValues)
+            {
+                requestParams[kvp.Key] = kvp.Value;
+            }
+
+            if (!string.IsNullOrWhiteSpace(_requestBody) &&
+                (_selectedEndpoint.Method == "POST" || _selectedEndpoint.Method == "PUT"))
+            {
+                requestParams["body"] = _requestBody;
+            }
+
+            var result = await InstanceManager.ExecuteAsync($"api.execute.{_selectedEndpoint.Path}", requestParams);
+            var duration = (DateTime.UtcNow - startTime).TotalMilliseconds;
+
+            _response = new ApiResponse
+            {
+                Success = true,
+                StatusCode = 200,
+                Body = result?.ToString() ?? "",
+                Duration = (int)duration
+            };
+        }
+        catch (Exception ex)
+        {
+            var duration = (DateTime.UtcNow - startTime).TotalMilliseconds;
+            _response = new ApiResponse
+            {
+                Success = false,
+                StatusCode = 500,
+                Body = ex.Message,
+                Duration = (int)duration
+            };
+        }
+        finally
+        {
+            _isExecuting = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task GenerateCode()
+    {
+        if (_selectedEndpoint == null) return;
+
+        var code = GenerateCodeSnippet(_selectedEndpoint, "csharp");
+        await DialogService.AlertAsync("Generated Code", code);
+    }
+
+    private async Task ManageTokens()
+    {
+        await DialogService.AlertAsync("API Tokens", "Token management interface coming soon.");
+    }
+
+    private string GetMethodBadgeClass(string method) => method switch
+    {
+        "GET" => "badge-success",
+        "POST" => "badge-info",
+        "PUT" => "badge-warning",
+        "DELETE" => "badge-danger",
+        _ => "badge-info"
+    };
+
+    private string GenerateCodeSnippet(ApiEndpoint endpoint, string language)
+    {
+        if (language == "csharp")
+        {
+            var paramStr = string.Join(", ", _parameterValues.Select(kv => $"[\"{kv.Key}\"] = \"{kv.Value}\""));
+            return $@"var result = await instanceManager.ExecuteAsync(""{endpoint.Path}"", new Dictionary<string, object>
+{{
+    {paramStr}
+}});";
+        }
+        return "// Code generation for this language coming soon";
+    }
+
+    private List<ApiEndpoint> ParseEndpoints(object? result)
+    {
+        var endpoints = new List<ApiEndpoint>();
+        if (result is IEnumerable<object> list)
+        {
+            foreach (var item in list)
+            {
+                if (item is IDictionary<string, object> dict)
+                {
+                    var endpoint = new ApiEndpoint
+                    {
+                        Path = dict.TryGetValue("path", out var p) ? p?.ToString() ?? "" : "",
+                        Method = dict.TryGetValue("method", out var m) ? m?.ToString() ?? "GET" : "GET",
+                        Category = dict.TryGetValue("category", out var c) ? c?.ToString() ?? "General" : "General",
+                        Description = dict.TryGetValue("description", out var d) ? d?.ToString() ?? "" : "",
+                        RequiresAuth = dict.TryGetValue("requiresAuth", out var ra) && bool.TryParse(ra?.ToString(), out var rab) && rab
+                    };
+
+                    if (dict.TryGetValue("parameters", out var paramsObj) && paramsObj is IEnumerable<object> paramList)
+                    {
+                        foreach (var paramItem in paramList)
+                        {
+                            if (paramItem is IDictionary<string, object> paramDict)
+                            {
+                                endpoint.Parameters.Add(new ApiParameter
+                                {
+                                    Name = paramDict.TryGetValue("name", out var pn) ? pn?.ToString() ?? "" : "",
+                                    Type = paramDict.TryGetValue("type", out var pt) ? pt?.ToString() ?? "string" : "string",
+                                    Description = paramDict.TryGetValue("description", out var pd) ? pd?.ToString() ?? "" : "",
+                                    Required = paramDict.TryGetValue("required", out var pr) && bool.TryParse(pr?.ToString(), out var prb) && prb
+                                });
+                            }
+                        }
+                    }
+
+                    endpoints.Add(endpoint);
+                }
+            }
+        }
+        return endpoints;
+    }
+
+    private class ApiEndpoint
+    {
+        public string Path { get; set; } = "";
+        public string Method { get; set; } = "GET";
+        public string Category { get; set; } = "General";
+        public string Description { get; set; } = "";
+        public bool RequiresAuth { get; set; }
+        public List<ApiParameter> Parameters { get; set; } = new();
+    }
+
+    private class ApiParameter
+    {
+        public string Name { get; set; } = "";
+        public string Type { get; set; } = "string";
+        public string Description { get; set; } = "";
+        public bool Required { get; set; }
+    }
+
+    private class ApiResponse
+    {
+        public bool Success { get; set; }
+        public int StatusCode { get; set; }
+        public string Body { get; set; } = "";
+        public int Duration { get; set; }
+    }
+}
