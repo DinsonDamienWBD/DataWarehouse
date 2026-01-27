@@ -42,6 +42,75 @@ Do NOT wait for an entire phase to complete before committing.
 
 ---
 
+## ARCHITECTURAL NOTES
+
+### Launcher vs CLI/GUI Separation (Future Refactor)
+
+**Current State:** Launcher has 4 modes (Install, Connect, Embedded, Service), which overlaps with CLI/GUI (Install, Connect, Embedded).
+
+**Recommended Refactor:** Launcher should be **Service-only**. Rationale:
+
+| Project | Current | Recommended |
+|---------|---------|-------------|
+| **Launcher** | Install, Connect, Embedded, Service | **Service only** |
+| **CLI** | Install, Connect, Embedded | Install, Connect, Embedded (no change) |
+| **GUI** | Install, Connect, Embedded | Install, Connect, Embedded (no change) |
+
+**Why:**
+1. **Separation of concerns**: Launcher = runtime (the service), CLI/GUI = management tools (clients)
+2. **Reduces confusion**: Users know "Launcher runs the server, CLI/GUI manage it"
+3. **DRY principle**: Install/Connect logic stays in Shared only, not duplicated in Launcher
+4. **Clean deployment pattern**: Deploy Launcher on server (runs as daemon), use CLI/GUI from anywhere to manage
+
+**Pattern:**
+```
+Server: Launcher --service  (runs 24/7, exposes gRPC/REST)
+Admin:  CLI/GUI connect remotely to manage the instance
+```
+
+**Status:** [ ] Not started - documenting for future implementation
+
+---
+
+### GUI Feature Parity with CLI (Future Task)
+
+**Current State:** GUI shell is ready (MAUI + Blazor Hybrid, services registered), but Blazor pages/components are not yet implemented. CLI has full command implementations.
+
+**Goal:** Full bidirectional feature parity - everything a user can do with CLI, they should be able to do in GUI, and vice versa.
+
+**Architecture (Correct):**
+- Both CLI and GUI use `DataWarehouse.Shared` for all business logic
+- CLI: Thin terminal wrapper over Shared
+- GUI: Thin visual wrapper over Shared
+- Adding a feature to Shared automatically makes it available to both
+
+**What's Missing in GUI:**
+| Component | CLI Status | GUI Status |
+|-----------|------------|------------|
+| Storage commands | Done | [ ] Need Blazor pages |
+| Backup commands | Done | [ ] Need Blazor pages |
+| Plugin management | Done | [ ] Need Blazor pages |
+| Health/monitoring | Done | [ ] Need Blazor pages |
+| RAID management | Done | [ ] Need Blazor pages |
+| Config management | Done | [ ] Need Blazor pages |
+| Audit log viewer | Done | [ ] Need Blazor pages |
+| Benchmark tools | Done | [ ] Need Blazor pages |
+| System info | Done | [ ] Need Blazor pages |
+| NLP command input | Done | [ ] Need Blazor component |
+| Interactive mode | Done (Spectre.Console TUI) | [ ] Need equivalent UI |
+| Connection profiles | Done | [ ] Need Blazor pages |
+| Capability-aware UI | Done | [ ] Need dynamic UI based on capabilities |
+
+**Implementation Approach:**
+1. Create Blazor components that call `InstanceManager.ExecuteAsync()` from Shared
+2. Use `CapabilityManager` to show/hide features based on connected instance
+3. Reuse `NaturalLanguageProcessor` for a command bar in GUI
+4. Both CLI and GUI should support the same 3 modes: Install, Connect, Embedded
+
+**Status:** [ ] Not started - documenting for future implementation
+
+---
+
 ## Plugin Implementation Checklist
 
 For each plugin:
