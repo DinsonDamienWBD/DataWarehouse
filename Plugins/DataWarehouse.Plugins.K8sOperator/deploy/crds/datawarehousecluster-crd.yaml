@@ -1,0 +1,240 @@
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: datawarehouseclusters.datawarehouse.io
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.14.0
+  labels:
+    app.kubernetes.io/name: datawarehouse-operator
+    app.kubernetes.io/managed-by: datawarehouse
+spec:
+  group: datawarehouse.io
+  names:
+    kind: DataWarehouseCluster
+    listKind: DataWarehouseClusterList
+    plural: datawarehouseclusters
+    singular: datawarehousecluster
+    shortNames:
+      - dwc
+      - dwcluster
+    categories:
+      - all
+      - datawarehouse
+  scope: Namespaced
+  versions:
+    - name: v1
+      served: true
+      storage: true
+      schema:
+        openAPIV3Schema:
+          type: object
+          required:
+            - spec
+          properties:
+            apiVersion:
+              type: string
+            kind:
+              type: string
+            metadata:
+              type: object
+            spec:
+              type: object
+              required:
+                - replicas
+              properties:
+                replicas:
+                  type: integer
+                  minimum: 1
+                  maximum: 100
+                  default: 3
+                  description: Number of cluster replicas
+                version:
+                  type: string
+                  default: latest
+                  description: DataWarehouse version to deploy
+                storageClass:
+                  type: string
+                  default: standard
+                  description: Kubernetes StorageClass for persistent volumes
+                storageSize:
+                  type: string
+                  default: 10Gi
+                  pattern: ^[0-9]+(Ki|Mi|Gi|Ti|Pi|Ei)?$
+                  description: Size of storage per replica
+                resources:
+                  type: object
+                  properties:
+                    requests:
+                      type: object
+                      properties:
+                        cpu:
+                          type: string
+                          default: "500m"
+                        memory:
+                          type: string
+                          default: "1Gi"
+                    limits:
+                      type: object
+                      properties:
+                        cpu:
+                          type: string
+                          default: "2"
+                        memory:
+                          type: string
+                          default: "4Gi"
+                affinity:
+                  type: object
+                  x-kubernetes-preserve-unknown-fields: true
+                  description: Pod affinity rules
+                tolerations:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      key:
+                        type: string
+                      operator:
+                        type: string
+                        enum: [Equal, Exists]
+                      value:
+                        type: string
+                      effect:
+                        type: string
+                        enum: [NoSchedule, PreferNoSchedule, NoExecute]
+                      tolerationSeconds:
+                        type: integer
+                nodeSelector:
+                  type: object
+                  additionalProperties:
+                    type: string
+                podSecurityContext:
+                  type: object
+                  x-kubernetes-preserve-unknown-fields: true
+                containerSecurityContext:
+                  type: object
+                  x-kubernetes-preserve-unknown-fields: true
+                serviceAccountName:
+                  type: string
+                  description: Custom ServiceAccount name
+                imagePullSecrets:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      name:
+                        type: string
+                env:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      name:
+                        type: string
+                      value:
+                        type: string
+                      valueFrom:
+                        type: object
+                        x-kubernetes-preserve-unknown-fields: true
+                config:
+                  type: object
+                  additionalProperties:
+                    type: string
+                  description: Additional configuration key-value pairs
+                monitoring:
+                  type: object
+                  properties:
+                    enabled:
+                      type: boolean
+                      default: true
+                    prometheusServiceMonitor:
+                      type: boolean
+                      default: true
+                    grafanaDashboard:
+                      type: boolean
+                      default: false
+                backup:
+                  type: object
+                  properties:
+                    enabled:
+                      type: boolean
+                      default: false
+                    schedule:
+                      type: string
+                      default: "0 0 * * *"
+                    retention:
+                      type: string
+                      default: "720h"
+                    destination:
+                      type: string
+                tls:
+                  type: object
+                  properties:
+                    enabled:
+                      type: boolean
+                      default: false
+                    issuerRef:
+                      type: object
+                      properties:
+                        name:
+                          type: string
+                        kind:
+                          type: string
+                          enum: [Issuer, ClusterIssuer]
+                    secretName:
+                      type: string
+            status:
+              type: object
+              properties:
+                phase:
+                  type: string
+                  enum: [Pending, Running, Failed, Terminating]
+                replicas:
+                  type: integer
+                readyReplicas:
+                  type: integer
+                observedGeneration:
+                  type: integer
+                conditions:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      type:
+                        type: string
+                      status:
+                        type: string
+                        enum: ["True", "False", "Unknown"]
+                      reason:
+                        type: string
+                      message:
+                        type: string
+                      lastTransitionTime:
+                        type: string
+                        format: date-time
+                endpoints:
+                  type: object
+                  properties:
+                    api:
+                      type: string
+                    grpc:
+                      type: string
+                    metrics:
+                      type: string
+      subresources:
+        status: {}
+        scale:
+          specReplicasPath: .spec.replicas
+          statusReplicasPath: .status.replicas
+      additionalPrinterColumns:
+        - name: Replicas
+          type: integer
+          jsonPath: .spec.replicas
+        - name: Ready
+          type: integer
+          jsonPath: .status.readyReplicas
+        - name: Phase
+          type: string
+          jsonPath: .status.phase
+        - name: Age
+          type: date
+          jsonPath: .metadata.creationTimestamp

@@ -1,0 +1,217 @@
+---
+# Namespace for the DataWarehouse Operator
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: datawarehouse-system
+  labels:
+    app.kubernetes.io/name: datawarehouse-operator
+    app.kubernetes.io/managed-by: datawarehouse
+    control-plane: controller-manager
+---
+# ConfigMap for operator configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: datawarehouse-operator-config
+  namespace: datawarehouse-system
+  labels:
+    app.kubernetes.io/name: datawarehouse-operator
+data:
+  RECONCILE_INTERVAL_SECONDS: "30"
+  HEALTH_CHECK_INTERVAL_SECONDS: "10"
+  MAX_CONCURRENT_RECONCILES: "3"
+  LEADER_ELECTION_ENABLED: "true"
+  LEADER_ELECTION_LEASE_DURATION: "15s"
+  LEADER_ELECTION_RENEW_DEADLINE: "10s"
+  LEADER_ELECTION_RETRY_PERIOD: "2s"
+  METRICS_BIND_ADDRESS: ":8080"
+  HEALTH_PROBE_BIND_ADDRESS: ":8081"
+  WEBHOOK_PORT: "9443"
+  LOG_LEVEL: "info"
+---
+# Deployment for the DataWarehouse Operator
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: datawarehouse-operator
+  namespace: datawarehouse-system
+  labels:
+    app.kubernetes.io/name: datawarehouse-operator
+    app.kubernetes.io/component: operator
+    control-plane: controller-manager
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: datawarehouse-operator
+      control-plane: controller-manager
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: datawarehouse-operator
+        app.kubernetes.io/component: operator
+        control-plane: controller-manager
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8080"
+        prometheus.io/path: "/metrics"
+    spec:
+      serviceAccountName: datawarehouse-operator
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        fsGroup: 65532
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: operator
+          image: datawarehouse/operator:latest
+          imagePullPolicy: IfNotPresent
+          command:
+            - /manager
+          args:
+            - --leader-elect
+            - --health-probe-bind-address=:8081
+            - --metrics-bind-address=:8080
+          envFrom:
+            - configMapRef:
+                name: datawarehouse-operator-config
+          env:
+            - name: OPERATOR_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            - name: OPERATOR_POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+          ports:
+            - name: metrics
+              containerPort: 8080
+              protocol: TCP
+            - name: health
+              containerPort: 8081
+              protocol: TCP
+            - name: webhook
+              containerPort: 9443
+              protocol: TCP
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: health
+            initialDelaySeconds: 15
+            periodSeconds: 20
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: health
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+          volumeMounts:
+            - name: cert
+              mountPath: /tmp/k8s-webhook-server/serving-certs
+              readOnly: true
+      volumes:
+        - name: cert
+          secret:
+            secretName: datawarehouse-operator-webhook-cert
+            optional: true
+      terminationGracePeriodSeconds: 30
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchLabels:
+                    app.kubernetes.io/name: datawarehouse-operator
+                topologyKey: kubernetes.io/hostname
+      tolerations:
+        - key: CriticalAddonsOnly
+          operator: Exists
+        - effect: NoSchedule
+          key: node-role.kubernetes.io/control-plane
+          operator: Exists
+        - effect: NoSchedule
+          key: node-role.kubernetes.io/master
+          operator: Exists
+      nodeSelector:
+        kubernetes.io/os: linux
+---
+# Service for metrics
+apiVersion: v1
+kind: Service
+metadata:
+  name: datawarehouse-operator-metrics
+  namespace: datawarehouse-system
+  labels:
+    app.kubernetes.io/name: datawarehouse-operator
+    app.kubernetes.io/component: metrics
+spec:
+  type: ClusterIP
+  ports:
+    - name: metrics
+      port: 8080
+      targetPort: metrics
+      protocol: TCP
+  selector:
+    app.kubernetes.io/name: datawarehouse-operator
+    control-plane: controller-manager
+---
+# Service for webhooks
+apiVersion: v1
+kind: Service
+metadata:
+  name: datawarehouse-operator-webhook
+  namespace: datawarehouse-system
+  labels:
+    app.kubernetes.io/name: datawarehouse-operator
+    app.kubernetes.io/component: webhook
+spec:
+  type: ClusterIP
+  ports:
+    - name: webhook
+      port: 443
+      targetPort: webhook
+      protocol: TCP
+  selector:
+    app.kubernetes.io/name: datawarehouse-operator
+    control-plane: controller-manager
+---
+# PodDisruptionBudget for high availability
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: datawarehouse-operator-pdb
+  namespace: datawarehouse-system
+  labels:
+    app.kubernetes.io/name: datawarehouse-operator
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: datawarehouse-operator
+      control-plane: controller-manager

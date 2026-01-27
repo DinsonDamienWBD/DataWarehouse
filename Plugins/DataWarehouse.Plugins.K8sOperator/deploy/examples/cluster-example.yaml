@@ -1,0 +1,160 @@
+---
+# Example: Basic DataWarehouse Cluster
+apiVersion: datawarehouse.io/v1
+kind: DataWarehouseCluster
+metadata:
+  name: my-datawarehouse
+  namespace: default
+spec:
+  replicas: 3
+  version: "1.0.0"
+  storageClass: standard
+  storageSize: 50Gi
+  resources:
+    requests:
+      cpu: "500m"
+      memory: "1Gi"
+    limits:
+      cpu: "2"
+      memory: "4Gi"
+  monitoring:
+    enabled: true
+    prometheusServiceMonitor: true
+---
+# Example: Production DataWarehouse Cluster with TLS and Backup
+apiVersion: datawarehouse.io/v1
+kind: DataWarehouseCluster
+metadata:
+  name: production-cluster
+  namespace: datawarehouse-prod
+  labels:
+    environment: production
+    team: data-platform
+spec:
+  replicas: 5
+  version: "1.0.0"
+  storageClass: premium-ssd
+  storageSize: 500Gi
+  resources:
+    requests:
+      cpu: "2"
+      memory: "8Gi"
+    limits:
+      cpu: "4"
+      memory: "16Gi"
+  affinity:
+    podAntiAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        - labelSelector:
+            matchLabels:
+              app.kubernetes.io/name: datawarehousecluster
+              datawarehousecluster.datawarehouse.io/name: production-cluster
+          topologyKey: kubernetes.io/hostname
+    nodeAffinity:
+      preferredDuringSchedulingIgnoredDuringExecution:
+        - weight: 100
+          preference:
+            matchExpressions:
+              - key: node-type
+                operator: In
+                values:
+                  - compute-optimized
+  tolerations:
+    - key: dedicated
+      operator: Equal
+      value: datawarehouse
+      effect: NoSchedule
+  nodeSelector:
+    workload-type: database
+  config:
+    max_connections: "1000"
+    shared_buffers: "4GB"
+    effective_cache_size: "12GB"
+    maintenance_work_mem: "1GB"
+  monitoring:
+    enabled: true
+    prometheusServiceMonitor: true
+    grafanaDashboard: true
+  backup:
+    enabled: true
+    schedule: "0 */6 * * *"
+    retention: "2160h"
+    destination: s3://my-backup-bucket/datawarehouse
+  tls:
+    enabled: true
+    issuerRef:
+      name: letsencrypt-prod
+      kind: ClusterIssuer
+---
+# Example: DataWarehouse Backup Schedule
+apiVersion: datawarehouse.io/v1
+kind: DataWarehouseBackup
+metadata:
+  name: production-backup
+  namespace: datawarehouse-prod
+spec:
+  clusterRef:
+    name: production-cluster
+  schedule: "0 2 * * *"
+  backupType: Full
+  destination:
+    type: S3
+    bucket: my-backup-bucket
+    prefix: datawarehouse/production
+    region: us-east-1
+    credentialsSecret:
+      name: aws-backup-credentials
+  retention:
+    keepLast: 30
+    keepDaily: 7
+    keepWeekly: 4
+    keepMonthly: 12
+    ttl: "8760h"
+  encryption:
+    enabled: true
+    algorithm: AES256-GCM
+    keySecret:
+      name: backup-encryption-key
+  compression:
+    enabled: true
+    level: 6
+  verification:
+    enabled: true
+    type: Checksum
+  hooks:
+    preBackup:
+      - name: flush-data
+        command: ["/bin/sh", "-c", "datawarehouse-ctl checkpoint"]
+        container: datawarehouse
+        timeout: "60s"
+    postBackup:
+      - name: notify-slack
+        command: ["/bin/sh", "-c", "curl -X POST $SLACK_WEBHOOK_URL -d '{\"text\": \"Backup completed\"}'"]
+        container: backup
+        onError: Continue
+---
+# Example: Development Cluster with minimal resources
+apiVersion: datawarehouse.io/v1
+kind: DataWarehouseCluster
+metadata:
+  name: dev-cluster
+  namespace: datawarehouse-dev
+  labels:
+    environment: development
+spec:
+  replicas: 1
+  version: "1.0.0"
+  storageClass: standard
+  storageSize: 10Gi
+  resources:
+    requests:
+      cpu: "100m"
+      memory: "256Mi"
+    limits:
+      cpu: "500m"
+      memory: "1Gi"
+  monitoring:
+    enabled: true
+    prometheusServiceMonitor: false
+  backup:
+    enabled: false

@@ -1,0 +1,222 @@
+# Default values for datawarehouse-operator
+# This is a YAML-formatted file.
+
+# -- Number of operator replicas
+replicaCount: 2
+
+image:
+  # -- Operator image repository
+  repository: datawarehouse/operator
+  # -- Image pull policy
+  pullPolicy: IfNotPresent
+  # -- Image tag (defaults to Chart appVersion)
+  tag: ""
+
+# -- Image pull secrets
+imagePullSecrets: []
+
+# -- Override the name
+nameOverride: ""
+
+# -- Override the full name
+fullnameOverride: ""
+
+serviceAccount:
+  # -- Create a service account
+  create: true
+  # -- Annotations for the service account
+  annotations: {}
+  # -- Name of the service account
+  name: ""
+
+rbac:
+  # -- Create RBAC resources
+  create: true
+
+# -- Pod annotations
+podAnnotations:
+  prometheus.io/scrape: "true"
+  prometheus.io/port: "8080"
+  prometheus.io/path: "/metrics"
+
+# -- Pod labels
+podLabels: {}
+
+# -- Pod security context
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 65532
+  fsGroup: 65532
+  seccompProfile:
+    type: RuntimeDefault
+
+# -- Container security context
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop:
+      - ALL
+
+# -- Resource requests and limits
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    cpu: 500m
+    memory: 512Mi
+
+# -- Node selector
+nodeSelector:
+  kubernetes.io/os: linux
+
+# -- Tolerations
+tolerations:
+  - key: CriticalAddonsOnly
+    operator: Exists
+  - effect: NoSchedule
+    key: node-role.kubernetes.io/control-plane
+    operator: Exists
+  - effect: NoSchedule
+    key: node-role.kubernetes.io/master
+    operator: Exists
+
+# -- Affinity rules
+affinity:
+  podAntiAffinity:
+    preferredDuringSchedulingIgnoredDuringExecution:
+      - weight: 100
+        podAffinityTerm:
+          labelSelector:
+            matchLabels:
+              app.kubernetes.io/name: datawarehouse-operator
+          topologyKey: kubernetes.io/hostname
+
+# -- Priority class name
+priorityClassName: ""
+
+# Operator configuration
+operator:
+  # -- Reconciliation interval in seconds
+  reconcileInterval: 30
+  # -- Health check interval in seconds
+  healthCheckInterval: 10
+  # -- Maximum concurrent reconciliations
+  maxConcurrentReconciles: 3
+  # -- Log level (debug, info, warn, error)
+  logLevel: info
+
+# Leader election configuration
+leaderElection:
+  # -- Enable leader election
+  enabled: true
+  # -- Leader election lease duration
+  leaseDuration: 15s
+  # -- Leader election renew deadline
+  renewDeadline: 10s
+  # -- Leader election retry period
+  retryPeriod: 2s
+
+# Metrics configuration
+metrics:
+  # -- Enable metrics
+  enabled: true
+  # -- Metrics bind address
+  bindAddress: ":8080"
+  service:
+    # -- Metrics service type
+    type: ClusterIP
+    # -- Metrics service port
+    port: 8080
+  serviceMonitor:
+    # -- Create ServiceMonitor for Prometheus Operator
+    enabled: false
+    # -- Additional labels for ServiceMonitor
+    additionalLabels: {}
+    # -- Scrape interval
+    interval: 30s
+    # -- Scrape timeout
+    scrapeTimeout: 10s
+
+# Health probes configuration
+probes:
+  # -- Health probe bind address
+  bindAddress: ":8081"
+  liveness:
+    # -- Initial delay for liveness probe
+    initialDelaySeconds: 15
+    # -- Period for liveness probe
+    periodSeconds: 20
+    # -- Timeout for liveness probe
+    timeoutSeconds: 5
+    # -- Failure threshold for liveness probe
+    failureThreshold: 3
+  readiness:
+    # -- Initial delay for readiness probe
+    initialDelaySeconds: 5
+    # -- Period for readiness probe
+    periodSeconds: 10
+    # -- Timeout for readiness probe
+    timeoutSeconds: 5
+    # -- Failure threshold for readiness probe
+    failureThreshold: 3
+
+# Webhook configuration
+webhook:
+  # -- Enable webhooks
+  enabled: false
+  # -- Webhook port
+  port: 9443
+  # -- Certificate configuration
+  certManager:
+    # -- Use cert-manager for webhook certificates
+    enabled: false
+    # -- Issuer reference
+    issuerRef:
+      name: ""
+      kind: ClusterIssuer
+
+# PodDisruptionBudget configuration
+podDisruptionBudget:
+  # -- Create PodDisruptionBudget
+  enabled: true
+  # -- Minimum available pods
+  minAvailable: 1
+
+# CRD configuration
+crds:
+  # -- Install CRDs
+  install: true
+  # -- Keep CRDs on chart uninstall
+  keep: true
+  # -- Annotations for CRDs
+  annotations: {}
+
+# Monitoring configuration
+monitoring:
+  # -- Enable default PrometheusRules
+  prometheusRules:
+    enabled: false
+    # -- Additional labels for PrometheusRules
+    additionalLabels: {}
+  # -- Enable default Grafana dashboards
+  grafanaDashboards:
+    enabled: false
+    # -- Annotations for dashboard ConfigMaps
+    annotations: {}
+
+# Extra environment variables
+extraEnv: []
+
+# Extra volume mounts
+extraVolumeMounts: []
+
+# Extra volumes
+extraVolumes: []
+
+# Extra containers
+extraContainers: []
+
+# Extra init containers
+extraInitContainers: []

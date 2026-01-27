@@ -601,14 +601,25 @@ allowVolumeExpansion: true
 
 | Feature | Description | Status |
 |---------|-------------|--------|
-| Automatic Scaling | HPA/VPA integration | [ ] Not implemented |
-| Rolling Updates | Zero-downtime upgrades | [ ] Not implemented |
-| Self-Healing | Auto-restart failed pods | [~] Partial (health check + basic restart) |
-| Backup Scheduling | CronJob-based backups | [ ] Not implemented (spec only) |
+| Automatic Scaling | HPA/VPA integration | [x] Implemented (AutoScalingManager.cs - HPA, VPA, KEDA, scale-to-zero) |
+| Rolling Updates | Zero-downtime upgrades | [x] Implemented (RollingUpdateManager.cs - PDB, canary deployments) |
+| Self-Healing | Auto-restart failed pods | [x] Implemented (health check + auto-restart + reconciliation) |
+| Backup Scheduling | CronJob-based backups | [x] Implemented (BackupScheduler.cs - CronJob, Velero, retention) |
 | Cross-Namespace | Manage multiple namespaces | [x] Implemented |
-| RBAC Integration | K8s native auth | [ ] Not implemented (spec fields only) |
-| Prometheus Metrics | ServiceMonitor CRD | [ ] Not implemented |
-| Cert-Manager | TLS certificate automation | [ ] Not implemented |
+| RBAC Integration | K8s native auth | [x] Implemented (RbacManager.cs - ServiceAccount, Role, RoleBinding) |
+| Prometheus Metrics | ServiceMonitor CRD | [x] Implemented (PrometheusIntegration.cs - ServiceMonitor, PodMonitor, PrometheusRule) |
+| Cert-Manager | TLS certificate automation | [x] Implemented (CertManagerIntegration.cs - Certificate, Issuer, ACME) |
+
+**Additional Artifacts Created:**
+
+| Artifact | Location | Description |
+|----------|----------|-------------|
+| CRDs | deploy/crds/ | datawarehousecluster-crd.yaml, datawarehousebackup-crd.yaml |
+| RBAC | deploy/rbac/ | rbac.yaml with full operator permissions |
+| Deployment | deploy/operator/ | deployment.yaml with operator pod spec |
+| Examples | deploy/examples/ | cluster-example.yaml with basic/production/dev configs |
+| Helm Chart | charts/datawarehouse-operator/ | Full Helm chart with values, templates, NOTES.txt |
+| KubernetesClient | Managers/KubernetesClient.cs | Production-ready K8s API client |
 
 ---
 
