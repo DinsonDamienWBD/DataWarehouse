@@ -614,7 +614,7 @@ allowVolumeExpansion: true
 
 | Artifact | Location | Description |
 |----------|----------|-------------|
-| CRDs | deploy/crds/ | datawarehousecluster-crd.yaml, datawarehousebackup-crd.yaml |
+| CRDs | deploy/crds/ | All 5 CRDs: cluster, backup, replication, tenant, policy |
 | RBAC | deploy/rbac/ | rbac.yaml with full operator permissions |
 | Deployment | deploy/operator/ | deployment.yaml with operator pod spec |
 | Examples | deploy/examples/ | cluster-example.yaml with basic/production/dev configs |

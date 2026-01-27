@@ -1,0 +1,300 @@
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: datawarehousetenants.datawarehouse.io
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.14.0
+  labels:
+    app.kubernetes.io/name: datawarehouse-operator
+    app.kubernetes.io/managed-by: datawarehouse
+spec:
+  group: datawarehouse.io
+  names:
+    kind: DataWarehouseTenant
+    listKind: DataWarehouseTenantList
+    plural: datawarehousetenants
+    singular: datawarehousetenant
+    shortNames:
+      - dwt
+      - dwtenant
+    categories:
+      - all
+      - datawarehouse
+  scope: Namespaced
+  versions:
+    - name: v1
+      served: true
+      storage: true
+      schema:
+        openAPIV3Schema:
+          type: object
+          required:
+            - spec
+          properties:
+            apiVersion:
+              type: string
+            kind:
+              type: string
+            metadata:
+              type: object
+            spec:
+              type: object
+              required:
+                - clusterRef
+                - displayName
+              properties:
+                clusterRef:
+                  type: string
+                  description: Reference to the DataWarehouseCluster
+                displayName:
+                  type: string
+                  description: Human-readable tenant name
+                description:
+                  type: string
+                  description: Tenant description
+                quotas:
+                  type: object
+                  properties:
+                    storage:
+                      type: object
+                      properties:
+                        limit:
+                          type: string
+                          pattern: '^[0-9]+(Ki|Mi|Gi|Ti|Pi)$'
+                          description: Maximum storage capacity (e.g., 100Gi)
+                        warning:
+                          type: integer
+                          minimum: 0
+                          maximum: 100
+                          default: 80
+                          description: Warning threshold percentage
+                    objects:
+                      type: object
+                      properties:
+                        limit:
+                          type: integer
+                          format: int64
+                          description: Maximum number of objects
+                        warning:
+                          type: integer
+                          minimum: 0
+                          maximum: 100
+                          default: 80
+                    bandwidth:
+                      type: object
+                      properties:
+                        ingressLimit:
+                          type: string
+                          pattern: '^[0-9]+(Ki|Mi|Gi)$'
+                          description: Maximum ingress bandwidth per second
+                        egressLimit:
+                          type: string
+                          pattern: '^[0-9]+(Ki|Mi|Gi)$'
+                          description: Maximum egress bandwidth per second
+                    requests:
+                      type: object
+                      properties:
+                        perSecond:
+                          type: integer
+                          description: Maximum requests per second
+                        perDay:
+                          type: integer
+                          format: int64
+                          description: Maximum requests per day
+                isolation:
+                  type: object
+                  properties:
+                    level:
+                      type: string
+                      enum:
+                        - soft
+                        - hard
+                        - dedicated
+                      default: soft
+                      description: Tenant isolation level
+                    dedicatedNodes:
+                      type: boolean
+                      default: false
+                      description: Use dedicated nodes for this tenant
+                    nodeSelector:
+                      type: object
+                      additionalProperties:
+                        type: string
+                      description: Node selector for tenant workloads
+                    tolerations:
+                      type: array
+                      items:
+                        type: object
+                        properties:
+                          key:
+                            type: string
+                          operator:
+                            type: string
+                          value:
+                            type: string
+                          effect:
+                            type: string
+                          tolerationSeconds:
+                            type: integer
+                            format: int64
+                security:
+                  type: object
+                  properties:
+                    encryption:
+                      type: object
+                      properties:
+                        enabled:
+                          type: boolean
+                          default: true
+                        keyRef:
+                          type: string
+                          description: Reference to encryption key secret
+                        algorithm:
+                          type: string
+                          enum:
+                            - AES-256-GCM
+                            - ChaCha20-Poly1305
+                          default: AES-256-GCM
+                    accessControl:
+                      type: object
+                      properties:
+                        enabled:
+                          type: boolean
+                          default: true
+                        defaultPolicy:
+                          type: string
+                          enum:
+                            - allow
+                            - deny
+                          default: deny
+                    audit:
+                      type: object
+                      properties:
+                        enabled:
+                          type: boolean
+                          default: true
+                        retentionDays:
+                          type: integer
+                          default: 90
+                users:
+                  type: array
+                  items:
+                    type: object
+                    required:
+                      - name
+                      - role
+                    properties:
+                      name:
+                        type: string
+                        description: Username or service account
+                      role:
+                        type: string
+                        enum:
+                          - admin
+                          - write
+                          - read
+                        description: User role within tenant
+                      groups:
+                        type: array
+                        items:
+                          type: string
+                        description: User groups
+                dataRetention:
+                  type: object
+                  properties:
+                    enabled:
+                      type: boolean
+                      default: false
+                    defaultDays:
+                      type: integer
+                      description: Default retention period in days
+                    rules:
+                      type: array
+                      items:
+                        type: object
+                        properties:
+                          pathPattern:
+                            type: string
+                          retentionDays:
+                            type: integer
+                          action:
+                            type: string
+                            enum:
+                              - delete
+                              - archive
+                              - tier
+                suspended:
+                  type: boolean
+                  default: false
+                  description: Suspend tenant access
+            status:
+              type: object
+              properties:
+                phase:
+                  type: string
+                  enum:
+                    - Pending
+                    - Active
+                    - Suspended
+                    - Deleting
+                    - Failed
+                storageUsed:
+                  type: string
+                  description: Current storage usage
+                storageUsedBytes:
+                  type: integer
+                  format: int64
+                objectCount:
+                  type: integer
+                  format: int64
+                userCount:
+                  type: integer
+                quotaStatus:
+                  type: object
+                  properties:
+                    storagePercent:
+                      type: integer
+                    objectsPercent:
+                      type: integer
+                    isOverQuota:
+                      type: boolean
+                lastActivityTime:
+                  type: string
+                  format: date-time
+                conditions:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      type:
+                        type: string
+                      status:
+                        type: string
+                      lastTransitionTime:
+                        type: string
+                        format: date-time
+                      reason:
+                        type: string
+                      message:
+                        type: string
+      subresources:
+        status: {}
+      additionalPrinterColumns:
+        - name: Cluster
+          type: string
+          jsonPath: .spec.clusterRef
+        - name: Display Name
+          type: string
+          jsonPath: .spec.displayName
+        - name: Phase
+          type: string
+          jsonPath: .status.phase
+        - name: Storage
+          type: string
+          jsonPath: .status.storageUsed
+        - name: Objects
+          type: integer
+          jsonPath: .status.objectCount
+        - name: Age
+          type: date
+          jsonPath: .metadata.creationTimestamp
