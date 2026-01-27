@@ -44,70 +44,77 @@ Do NOT wait for an entire phase to complete before committing.
 
 ## ARCHITECTURAL NOTES
 
-### Launcher vs CLI/GUI Separation (Future Refactor)
+### Launcher vs CLI/GUI Separation ✅ **COMPLETED** (2026-01-27)
 
-**Current State:** Launcher has 4 modes (Install, Connect, Embedded, Service), which overlaps with CLI/GUI (Install, Connect, Embedded).
+**Current State:** Launcher is now **Service-only**. Install, Connect, and Embedded modes have been moved exclusively to CLI/GUI.
 
-**Recommended Refactor:** Launcher should be **Service-only**. Rationale:
+**Implementation:**
+- `DataWarehouse.Launcher/Program.cs` - Refactored to Service-only mode
+- `DataWarehouse.Launcher/Integration/ServiceHost.cs` - New simplified service host
+- Removed: Install, Connect, Embedded mode handlers from Launcher
+- Kept: AdapterRunner, AdapterFactory, DataWarehouseAdapter (core service infrastructure)
 
-| Project | Current | Recommended |
+| Project | Before | After |
 |---------|---------|-------------|
-| **Launcher** | Install, Connect, Embedded, Service | **Service only** |
+| **Launcher** | Install, Connect, Embedded, Service | **Service only** ✅ |
 | **CLI** | Install, Connect, Embedded | Install, Connect, Embedded (no change) |
 | **GUI** | Install, Connect, Embedded | Install, Connect, Embedded (no change) |
 
-**Why:**
-1. **Separation of concerns**: Launcher = runtime (the service), CLI/GUI = management tools (clients)
-2. **Reduces confusion**: Users know "Launcher runs the server, CLI/GUI manage it"
-3. **DRY principle**: Install/Connect logic stays in Shared only, not duplicated in Launcher
-4. **Clean deployment pattern**: Deploy Launcher on server (runs as daemon), use CLI/GUI from anywhere to manage
+**Why (achieved):**
+1. **Separation of concerns**: Launcher = runtime (the service), CLI/GUI = management tools (clients) ✅
+2. **Reduces confusion**: Users know "Launcher runs the server, CLI/GUI manage it" ✅
+3. **DRY principle**: Install/Connect logic stays in Shared only, not duplicated in Launcher ✅
+4. **Clean deployment pattern**: Deploy Launcher on server (runs as daemon), use CLI/GUI from anywhere to manage ✅
 
 **Pattern:**
 ```
-Server: Launcher --service  (runs 24/7, exposes gRPC/REST)
-Admin:  CLI/GUI connect remotely to manage the instance
+Server: DataWarehouse.Launcher  (runs 24/7 as service/daemon, exposes gRPC/REST)
+Admin:  dw --mode connect --host <server>  (CLI connects to manage)
+        DataWarehouse.GUI  (GUI connects to manage)
 ```
 
-**Status:** [ ] Not started - documenting for future implementation
+**Status:** [x] **COMPLETED** - Launcher refactored to Service-only
 
 ---
 
-### GUI Feature Parity with CLI (Future Task)
+### GUI Feature Parity with CLI ✅ **COMPLETED** (2026-01-27)
 
-**Current State:** GUI shell is ready (MAUI + Blazor Hybrid, services registered), but Blazor pages/components are not yet implemented. CLI has full command implementations.
+**Current State:** GUI now has full Blazor pages/components for all features matching CLI capabilities.
 
-**Goal:** Full bidirectional feature parity - everything a user can do with CLI, they should be able to do in GUI, and vice versa.
+**Architecture (Implemented):**
+- Both CLI and GUI use `DataWarehouse.Shared` for all business logic ✅
+- CLI: Thin terminal wrapper over Shared ✅
+- GUI: Thin visual wrapper over Shared ✅
+- Adding a feature to Shared automatically makes it available to both ✅
 
-**Architecture (Correct):**
-- Both CLI and GUI use `DataWarehouse.Shared` for all business logic
-- CLI: Thin terminal wrapper over Shared
-- GUI: Thin visual wrapper over Shared
-- Adding a feature to Shared automatically makes it available to both
-
-**What's Missing in GUI:**
+**GUI Implementation:**
 | Component | CLI Status | GUI Status |
 |-----------|------------|------------|
-| Storage commands | Done | [ ] Need Blazor pages |
-| Backup commands | Done | [ ] Need Blazor pages |
-| Plugin management | Done | [ ] Need Blazor pages |
-| Health/monitoring | Done | [ ] Need Blazor pages |
-| RAID management | Done | [ ] Need Blazor pages |
-| Config management | Done | [ ] Need Blazor pages |
-| Audit log viewer | Done | [ ] Need Blazor pages |
-| Benchmark tools | Done | [ ] Need Blazor pages |
-| System info | Done | [ ] Need Blazor pages |
-| NLP command input | Done | [ ] Need Blazor component |
-| Interactive mode | Done (Spectre.Console TUI) | [ ] Need equivalent UI |
-| Connection profiles | Done | [ ] Need Blazor pages |
-| Capability-aware UI | Done | [ ] Need dynamic UI based on capabilities |
+| Storage commands | Done | [x] `Components/Pages/Storage.razor` |
+| Backup commands | Done | [x] `Components/Pages/Backup.razor` |
+| Plugin management | Done | [x] `Components/Pages/Plugins.razor` |
+| Health/monitoring | Done | [x] `Components/Pages/Health.razor` |
+| RAID management | Done | [x] `Components/Pages/Raid.razor` |
+| Config management | Done | [x] `Components/Pages/Config.razor` |
+| Audit log viewer | Done | [x] `Components/Pages/Audit.razor` |
+| Benchmark tools | Done | [x] `Components/Pages/Benchmark.razor` |
+| System info | Done | [x] `Components/Pages/System.razor` |
+| NLP command input | Done | [x] `Components/Shared/CommandPalette.razor` (Ctrl+K) |
+| Interactive mode | Done (Spectre.Console TUI) | [x] Command palette + navigation |
+| Connection profiles | Done | [x] `Components/Pages/Connections.razor` |
+| Capability-aware UI | Done | [x] `MainLayout.razor` with `CapabilityManager` |
+| AI Provider settings | Done | [x] `Components/Pages/AiSettings.razor` |
 
-**Implementation Approach:**
-1. Create Blazor components that call `InstanceManager.ExecuteAsync()` from Shared
-2. Use `CapabilityManager` to show/hide features based on connected instance
-3. Reuse `NaturalLanguageProcessor` for a command bar in GUI
-4. Both CLI and GUI should support the same 3 modes: Install, Connect, Embedded
+**New Files Created:**
+- `wwwroot/index.html` - Blazor entry point
+- `wwwroot/css/app.css` - Dark/Light theme CSS
+- `_Imports.razor` - Global Blazor imports
+- `Components/Main.razor` - Router component
+- `Components/Layout/MainLayout.razor` - Main layout with sidebar navigation
+- `Components/Shared/CommandPalette.razor` - NLP command bar (Ctrl+K)
+- `Components/Pages/*.razor` - 12 feature pages
 
-**Status:** [ ] Not started - documenting for future implementation
+**Status:** [x] **COMPLETED** - Full feature parity achieved
 
 ---
 

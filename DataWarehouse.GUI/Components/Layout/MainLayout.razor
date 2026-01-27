@@ -1,0 +1,161 @@
+@inherits LayoutComponentBase
+@inject CapabilityManager CapabilityManager
+@inject InstanceManager InstanceManager
+@inject KeyboardManager KeyboardManager
+
+<div class="main-layout">
+    <aside class="sidebar">
+        <div class="sidebar-header">
+            <h1>DataWarehouse</h1>
+            <div class="connection-status @ConnectionStatusClass">
+                <span class="status-dot"></span>
+                <span>@ConnectionStatusText</span>
+            </div>
+        </div>
+        <nav class="sidebar-nav">
+            <div class="nav-section">
+                <div class="nav-section-title">Dashboard</div>
+                <NavLink class="nav-item" href="/" Match="NavLinkMatch.All">
+                    <span class="nav-icon">&#9776;</span>
+                    <span>Overview</span>
+                </NavLink>
+            </div>
+
+            <div class="nav-section">
+                <div class="nav-section-title">Storage</div>
+                <NavLink class=@GetNavItemClass("storage") href="/storage">
+                    <span class="nav-icon">&#128193;</span>
+                    <span>Storage Browser</span>
+                </NavLink>
+                <NavLink class=@GetNavItemClass("backup") href="/backup">
+                    <span class="nav-icon">&#128190;</span>
+                    <span>Backup & Restore</span>
+                </NavLink>
+            </div>
+
+            <div class="nav-section">
+                <div class="nav-section-title">System</div>
+                <NavLink class=@GetNavItemClass("health") href="/health">
+                    <span class="nav-icon">&#128147;</span>
+                    <span>Health Monitor</span>
+                </NavLink>
+                <NavLink class=@GetNavItemClass("plugins") href="/plugins">
+                    <span class="nav-icon">&#128268;</span>
+                    <span>Plugins</span>
+                </NavLink>
+                <NavLink class=@GetNavItemClass("raid") href="/raid">
+                    <span class="nav-icon">&#128421;</span>
+                    <span>RAID Management</span>
+                </NavLink>
+            </div>
+
+            <div class="nav-section">
+                <div class="nav-section-title">Administration</div>
+                <NavLink class="nav-item" href="/config">
+                    <span class="nav-icon">&#9881;</span>
+                    <span>Configuration</span>
+                </NavLink>
+                <NavLink class="nav-item" href="/audit">
+                    <span class="nav-icon">&#128203;</span>
+                    <span>Audit Logs</span>
+                </NavLink>
+                <NavLink class="nav-item" href="/connections">
+                    <span class="nav-icon">&#128279;</span>
+                    <span>Connections</span>
+                </NavLink>
+            </div>
+
+            <div class="nav-section">
+                <div class="nav-section-title">Tools</div>
+                <NavLink class="nav-item" href="/benchmark">
+                    <span class="nav-icon">&#9201;</span>
+                    <span>Benchmark</span>
+                </NavLink>
+                <NavLink class="nav-item" href="/system">
+                    <span class="nav-icon">&#128187;</span>
+                    <span>System Info</span>
+                </NavLink>
+                <NavLink class="nav-item" href="/ai">
+                    <span class="nav-icon">&#129302;</span>
+                    <span>AI Settings</span>
+                </NavLink>
+            </div>
+        </nav>
+    </aside>
+
+    <main class="main-content">
+        @if (_showCommandPalette)
+        {
+            <CommandPalette OnClose="CloseCommandPalette" />
+        }
+        @Body
+    </main>
+</div>
+
+@code {
+    private bool _showCommandPalette;
+    private bool _isConnected;
+
+    private string ConnectionStatusClass => _isConnected ? "connected" : "disconnected";
+    private string ConnectionStatusText => _isConnected ? "Connected" : "Disconnected";
+
+    protected override void OnInitialized()
+    {
+        KeyboardManager.ShortcutTriggered += HandleShortcutTriggered;
+        InstanceManager.ConnectionChanged += HandleConnectionChanged;
+        _isConnected = InstanceManager.IsConnected;
+    }
+
+    private string GetNavItemClass(string feature) => $"nav-item {GetNavClass(feature)}".Trim();
+
+    private string GetNavClass(string feature)
+    {
+        if (!_isConnected) return "disabled";
+
+        return feature switch
+        {
+            "storage" => "", // Always available
+            "backup" => CapabilityManager.HasFeature("backup") ? "" : "disabled",
+            "health" => "", // Always available
+            "plugins" => "", // Always available
+            "raid" => CapabilityManager.HasFeature("raid") ? "" : "disabled",
+            _ => ""
+        };
+    }
+
+    private void HandleShortcutTriggered(object? sender, ShortcutEventArgs e)
+    {
+        // Ctrl+K opens command palette
+        if (e.Shortcut.ActionId == "command-palette")
+        {
+            _showCommandPalette = !_showCommandPalette;
+            e.Handled = true;
+            InvokeAsync(StateHasChanged);
+        }
+        // Escape closes command palette
+        else if (e.Shortcut.ActionId == "escape" && _showCommandPalette)
+        {
+            _showCommandPalette = false;
+            e.Handled = true;
+            InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private void HandleConnectionChanged(object? sender, ConnectionTarget e)
+    {
+        _isConnected = InstanceManager.IsConnected;
+        InvokeAsync(StateHasChanged);
+    }
+
+    private void CloseCommandPalette()
+    {
+        _showCommandPalette = false;
+        StateHasChanged();
+    }
+
+    public void Dispose()
+    {
+        KeyboardManager.ShortcutTriggered -= HandleShortcutTriggered;
+        InstanceManager.ConnectionChanged -= HandleConnectionChanged;
+    }
+}

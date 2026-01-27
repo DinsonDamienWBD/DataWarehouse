@@ -20,6 +20,22 @@ public sealed class DialogService
     }
 
     /// <summary>
+    /// Shows an alert dialog (convenience alias for ShowAlertAsync).
+    /// </summary>
+    public Task AlertAsync(string title, string message) => ShowAlertAsync(title, message);
+
+    /// <summary>
+    /// Shows a confirmation dialog (convenience alias for ShowConfirmAsync).
+    /// </summary>
+    public Task<bool> ConfirmAsync(string title, string message) => ShowConfirmAsync(title, message);
+
+    /// <summary>
+    /// Shows a prompt dialog (convenience alias for ShowPromptAsync).
+    /// </summary>
+    public Task<string?> PromptAsync(string title, string message, string? placeholder = null)
+        => ShowPromptAsync(title, message, placeholder: placeholder);
+
+    /// <summary>
     /// Shows an alert dialog.
     /// </summary>
     /// <param name="title">Dialog title.</param>

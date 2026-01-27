@@ -1,0 +1,83 @@
+@page "/plugins"
+@inject InstanceManager InstanceManager
+@inject DialogService DialogService
+
+<div class="content-header">
+    <h2>Plugin Management</h2>
+    <button class="btn btn-secondary" @onclick="RefreshPlugins">Refresh</button>
+</div>
+
+<div class="content-body">
+    @if (!InstanceManager.IsConnected)
+    {
+        <div class="alert alert-warning">Not connected to a DataWarehouse instance.</div>
+    }
+    else if (_isLoading)
+    {
+        <div class="text-center mt-4"><div class="spinner"></div></div>
+    }
+    else
+    {
+        <div class="card">
+            <div class="card-body" style="padding: 0;">
+                <table class="data-table">
+                    <thead>
+                        <tr><th>Name</th><th>Version</th><th>Category</th><th>Status</th><th>Actions</th></tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var plugin in _plugins)
+                        {
+                            <tr>
+                                <td><strong>@plugin.Name</strong><div class="text-muted" style="font-size: 12px;">@plugin.Id</div></td>
+                                <td>@plugin.Version</td>
+                                <td><span class="badge badge-info">@plugin.Category</span></td>
+                                <td><span class="badge @(plugin.IsEnabled ? "badge-success" : "badge-danger")">@(plugin.IsEnabled ? "Enabled" : "Disabled")</span></td>
+                                <td>
+                                    @if (plugin.IsEnabled)
+                                    { <button class="btn btn-secondary" style="padding: 4px 8px; font-size: 12px;" @onclick="() => TogglePlugin(plugin)">Disable</button> }
+                                    else
+                                    { <button class="btn btn-success" style="padding: 4px 8px; font-size: 12px;" @onclick="() => TogglePlugin(plugin)">Enable</button> }
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private bool _isLoading = false;
+    private List<PluginInfo> _plugins = new();
+
+    protected override async Task OnInitializedAsync() => await RefreshPlugins();
+
+    private async Task RefreshPlugins()
+    {
+        if (!InstanceManager.IsConnected) return;
+        _isLoading = true; StateHasChanged();
+        try { var result = await InstanceManager.ExecuteAsync("plugin.list"); _plugins = ParsePlugins(result); }
+        finally { _isLoading = false; StateHasChanged(); }
+    }
+
+    private async Task TogglePlugin(PluginInfo plugin)
+    {
+        var cmd = plugin.IsEnabled ? "plugin.disable" : "plugin.enable";
+        await InstanceManager.ExecuteAsync(cmd, new Dictionary<string, object> { ["id"] = plugin.Id });
+        plugin.IsEnabled = !plugin.IsEnabled;
+        StateHasChanged();
+    }
+
+    private List<PluginInfo> ParsePlugins(object? result)
+    {
+        var plugins = new List<PluginInfo>();
+        if (result is IEnumerable<object> list)
+            foreach (var item in list)
+                if (item is IDictionary<string, object> d)
+                    plugins.Add(new() { Id = d.TryGetValue("id", out var id) ? id?.ToString() ?? "" : "", Name = d.TryGetValue("name", out var n) ? n?.ToString() ?? "" : "", Version = d.TryGetValue("version", out var v) ? v?.ToString() ?? "" : "", Category = d.TryGetValue("category", out var c) ? c?.ToString() ?? "" : "", IsEnabled = d.TryGetValue("enabled", out var e) && bool.TryParse(e?.ToString(), out var en) && en });
+        return plugins;
+    }
+
+    private class PluginInfo { public string Id { get; set; } = ""; public string Name { get; set; } = ""; public string Version { get; set; } = ""; public string Category { get; set; } = ""; public bool IsEnabled { get; set; } }
+}

@@ -1,0 +1,241 @@
+@inject InstanceManager InstanceManager
+@inject CapabilityManager CapabilityManager
+@inject NavigationManager NavigationManager
+
+<div class="command-palette" @onclick="HandleBackdropClick">
+    <div class="command-palette-dialog" @onclick:stopPropagation="true">
+        <input type="text"
+               class="command-palette-input"
+               placeholder="Type a command or search... (natural language supported)"
+               @bind="_searchQuery"
+               @bind:event="oninput"
+               @onkeydown="HandleKeyDown"
+               @ref="_inputRef" />
+
+        <div class="command-palette-results">
+            @if (_isProcessing)
+            {
+                <div class="command-palette-item">
+                    <div class="spinner"></div>
+                    <span>Processing...</span>
+                </div>
+            }
+            else if (_filteredCommands.Any())
+            {
+                @foreach (var (command, index) in _filteredCommands.Select((c, i) => (c, i)))
+                {
+                    <div class="command-palette-item @(index == _selectedIndex ? "selected" : "")"
+                         @onclick="() => ExecuteCommand(command)">
+                        <div>
+                            <div class="command-name">@command.Name</div>
+                            <div class="command-description">@command.Description</div>
+                        </div>
+                    </div>
+                }
+            }
+            else if (!string.IsNullOrEmpty(_searchQuery))
+            {
+                <div class="command-palette-item">
+                    <span class="text-muted">Press Enter to run as natural language command</span>
+                </div>
+            }
+            else
+            {
+                <div class="command-palette-item">
+                    <span class="text-muted">Start typing to search commands...</span>
+                </div>
+            }
+
+            @if (!string.IsNullOrEmpty(_lastResult))
+            {
+                <div class="command-palette-item" style="border-top: 1px solid var(--border-color);">
+                    <pre style="margin: 0; white-space: pre-wrap;">@_lastResult</pre>
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter]
+    public EventCallback OnClose { get; set; }
+
+    private string _searchQuery = string.Empty;
+    private int _selectedIndex = 0;
+    private bool _isProcessing = false;
+    private string _lastResult = string.Empty;
+    private ElementReference _inputRef;
+    private List<CommandDefinition> _filteredCommands = new();
+
+    private record CommandDefinition(string Name, string Description, string Category, Func<Task>? Action = null);
+
+    private List<CommandDefinition> _allCommands = new();
+
+    protected override void OnInitialized()
+    {
+        // Build command list from available capabilities
+        _allCommands = new List<CommandDefinition>
+        {
+            // Navigation commands
+            new("Go to Dashboard", "Navigate to the main dashboard", "Navigation", () => { NavigationManager.NavigateTo("/"); return Task.CompletedTask; }),
+            new("Go to Storage", "Browse storage contents", "Navigation", () => { NavigationManager.NavigateTo("/storage"); return Task.CompletedTask; }),
+            new("Go to Backup", "Manage backups and restore points", "Navigation", () => { NavigationManager.NavigateTo("/backup"); return Task.CompletedTask; }),
+            new("Go to Health", "View system health status", "Navigation", () => { NavigationManager.NavigateTo("/health"); return Task.CompletedTask; }),
+            new("Go to Plugins", "Manage plugins", "Navigation", () => { NavigationManager.NavigateTo("/plugins"); return Task.CompletedTask; }),
+            new("Go to RAID", "RAID configuration and status", "Navigation", () => { NavigationManager.NavigateTo("/raid"); return Task.CompletedTask; }),
+            new("Go to Configuration", "System configuration", "Navigation", () => { NavigationManager.NavigateTo("/config"); return Task.CompletedTask; }),
+            new("Go to Audit Logs", "View audit trail", "Navigation", () => { NavigationManager.NavigateTo("/audit"); return Task.CompletedTask; }),
+            new("Go to Benchmark", "Run performance benchmarks", "Navigation", () => { NavigationManager.NavigateTo("/benchmark"); return Task.CompletedTask; }),
+            new("Go to System Info", "View system information", "Navigation", () => { NavigationManager.NavigateTo("/system"); return Task.CompletedTask; }),
+            new("Go to AI Settings", "Configure AI providers", "Navigation", () => { NavigationManager.NavigateTo("/ai"); return Task.CompletedTask; }),
+
+            // Storage commands
+            new("storage.list", "List files in storage", "Storage"),
+            new("storage.upload", "Upload a file to storage", "Storage"),
+            new("storage.download", "Download a file from storage", "Storage"),
+            new("storage.delete", "Delete a file from storage", "Storage"),
+            new("storage.stats", "Show storage statistics", "Storage"),
+
+            // Backup commands
+            new("backup.create", "Create a new backup", "Backup"),
+            new("backup.list", "List available backups", "Backup"),
+            new("backup.restore", "Restore from backup", "Backup"),
+            new("backup.schedule", "Configure backup schedule", "Backup"),
+
+            // System commands
+            new("health.status", "Show system health status", "System"),
+            new("health.check", "Run health check", "System"),
+            new("plugin.list", "List installed plugins", "System"),
+            new("plugin.enable", "Enable a plugin", "System"),
+            new("plugin.disable", "Disable a plugin", "System"),
+            new("system.info", "Show system information", "System"),
+            new("system.capabilities", "Show instance capabilities", "System"),
+
+            // RAID commands
+            new("raid.status", "Show RAID array status", "RAID"),
+            new("raid.create", "Create a new RAID array", "RAID"),
+            new("raid.rebuild", "Rebuild a RAID array", "RAID"),
+
+            // AI commands
+            new("ai.providers", "List configured AI providers", "AI"),
+            new("ai.configure", "Configure an AI provider", "AI"),
+            new("ai.chat", "Send a message to AI", "AI"),
+        };
+
+        FilterCommands();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await _inputRef.FocusAsync();
+        }
+    }
+
+    private void FilterCommands()
+    {
+        if (string.IsNullOrWhiteSpace(_searchQuery))
+        {
+            _filteredCommands = _allCommands.Take(10).ToList();
+        }
+        else
+        {
+            _filteredCommands = _allCommands
+                .Where(c => c.Name.Contains(_searchQuery, StringComparison.OrdinalIgnoreCase) ||
+                            c.Description.Contains(_searchQuery, StringComparison.OrdinalIgnoreCase))
+                .Take(10)
+                .ToList();
+        }
+        _selectedIndex = 0;
+    }
+
+    private async Task HandleKeyDown(KeyboardEventArgs e)
+    {
+        switch (e.Key)
+        {
+            case "ArrowDown":
+                _selectedIndex = Math.Min(_selectedIndex + 1, _filteredCommands.Count - 1);
+                break;
+            case "ArrowUp":
+                _selectedIndex = Math.Max(_selectedIndex - 1, 0);
+                break;
+            case "Enter":
+                if (_filteredCommands.Any() && _selectedIndex < _filteredCommands.Count)
+                {
+                    await ExecuteCommand(_filteredCommands[_selectedIndex]);
+                }
+                else if (!string.IsNullOrWhiteSpace(_searchQuery))
+                {
+                    await ExecuteNaturalLanguageCommand(_searchQuery);
+                }
+                break;
+            case "Escape":
+                await OnClose.InvokeAsync();
+                break;
+        }
+    }
+
+    private async Task ExecuteCommand(CommandDefinition command)
+    {
+        if (command.Action != null)
+        {
+            await command.Action();
+            await OnClose.InvokeAsync();
+        }
+        else
+        {
+            await ExecuteInstanceCommand(command.Name);
+        }
+    }
+
+    private async Task ExecuteInstanceCommand(string commandName)
+    {
+        _isProcessing = true;
+        StateHasChanged();
+
+        try
+        {
+            var result = await InstanceManager.ExecuteAsync(commandName);
+            _lastResult = result?.ToString() ?? "Command executed successfully";
+        }
+        catch (Exception ex)
+        {
+            _lastResult = $"Error: {ex.Message}";
+        }
+        finally
+        {
+            _isProcessing = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task ExecuteNaturalLanguageCommand(string query)
+    {
+        _isProcessing = true;
+        StateHasChanged();
+
+        try
+        {
+            // Use NLP to interpret the command
+            var result = await InstanceManager.ExecuteNaturalLanguageAsync(query);
+            _lastResult = result?.ToString() ?? "Command executed successfully";
+        }
+        catch (Exception ex)
+        {
+            _lastResult = $"Error: {ex.Message}";
+        }
+        finally
+        {
+            _isProcessing = false;
+            _searchQuery = string.Empty;
+            FilterCommands();
+            StateHasChanged();
+        }
+    }
+
+    private void HandleBackdropClick()
+    {
+        OnClose.InvokeAsync();
+    }
+}

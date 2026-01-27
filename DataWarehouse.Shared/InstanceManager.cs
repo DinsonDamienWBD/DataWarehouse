@@ -320,4 +320,22 @@ public class InstanceManager
         await DisconnectAsync();
         return await ConnectAsync(target);
     }
+
+    /// <summary>
+    /// Executes a natural language command using AI-powered interpretation.
+    /// </summary>
+    /// <param name="query">Natural language query to interpret and execute.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>Command result.</returns>
+    public async Task<Message?> ExecuteNaturalLanguageAsync(
+        string query,
+        CancellationToken cancellationToken = default)
+    {
+        // Route through the NLP command interpreter
+        return await ExecuteAsync("nlp.interpret", new Dictionary<string, object>
+        {
+            ["query"] = query,
+            ["context"] = "command-palette"
+        }, cancellationToken);
+    }
 }

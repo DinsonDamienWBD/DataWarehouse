@@ -1,0 +1,154 @@
+@page "/connections"
+@inject InstanceManager InstanceManager
+@inject DialogService DialogService
+
+<div class="content-header">
+    <h2>Connection Profiles</h2>
+    <button class="btn btn-primary" @onclick="AddProfile">Add Connection</button>
+</div>
+
+<div class="content-body">
+    <div class="card">
+        <div class="card-header">Current Connection</div>
+        <div class="card-body">
+            @if (InstanceManager.IsConnected)
+            {
+                <div class="d-flex align-items-center gap-2">
+                    <span class="badge badge-success">Connected</span>
+                    <span>@_currentConnection</span>
+                    <button class="btn btn-secondary" style="margin-left: auto;" @onclick="Disconnect">Disconnect</button>
+                </div>
+            }
+            else
+            {
+                <div class="d-flex align-items-center gap-2">
+                    <span class="badge badge-danger">Disconnected</span>
+                    <span class="text-muted">No active connection</span>
+                </div>
+            }
+        </div>
+    </div>
+
+    <div class="card mt-3">
+        <div class="card-header">Saved Profiles</div>
+        <div class="card-body" style="padding: 0;">
+            <table class="data-table">
+                <thead>
+                    <tr><th>Name</th><th>Type</th><th>Host</th><th>Actions</th></tr>
+                </thead>
+                <tbody>
+                    @foreach (var profile in _profiles)
+                    {
+                        <tr>
+                            <td><strong>@profile.Name</strong></td>
+                            <td><span class="badge badge-info">@profile.Type</span></td>
+                            <td>@profile.Host</td>
+                            <td>
+                                <button class="btn btn-primary" style="padding: 4px 8px; font-size: 12px;" @onclick="() => Connect(profile)">Connect</button>
+                                <button class="btn btn-danger" style="padding: 4px 8px; font-size: 12px;" @onclick="() => DeleteProfile(profile)">Delete</button>
+                            </td>
+                        </tr>
+                    }
+                    @if (!_profiles.Any())
+                    {
+                        <tr><td colspan="4" class="text-center text-muted">No saved connection profiles</td></tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    @if (_showAddForm)
+    {
+        <div class="card mt-3">
+            <div class="card-header">New Connection Profile</div>
+            <div class="card-body">
+                <div class="form-group">
+                    <label class="form-label">Profile Name</label>
+                    <input type="text" class="form-input" @bind="_newProfile.Name" />
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Connection Type</label>
+                    <select class="form-select" @bind="_newProfile.Type">
+                        <option value="Local">Local (embedded)</option>
+                        <option value="Remote">Remote (TCP)</option>
+                    </select>
+                </div>
+                @if (_newProfile.Type == "Remote")
+                {
+                    <div class="form-group">
+                        <label class="form-label">Host</label>
+                        <input type="text" class="form-input" @bind="_newProfile.Host" placeholder="localhost:5000" />
+                    </div>
+                }
+                <div class="d-flex gap-2">
+                    <button class="btn btn-primary" @onclick="SaveProfile">Save</button>
+                    <button class="btn btn-secondary" @onclick="() => _showAddForm = false">Cancel</button>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private string _currentConnection = "localhost";
+    private List<ConnectionProfile> _profiles = new();
+    private bool _showAddForm = false;
+    private ConnectionProfile _newProfile = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        var result = await InstanceManager.ExecuteAsync("connection.profiles");
+        if (result is IEnumerable<object> list)
+            foreach (var item in list)
+                if (item is IDictionary<string, object> d)
+                    _profiles.Add(new() { Name = d.TryGetValue("name", out var n) ? n?.ToString() ?? "" : "", Type = d.TryGetValue("type", out var t) ? t?.ToString() ?? "" : "", Host = d.TryGetValue("host", out var h) ? h?.ToString() ?? "" : "" });
+    }
+
+    private void AddProfile() { _newProfile = new(); _showAddForm = true; }
+
+    private async Task SaveProfile()
+    {
+        if (string.IsNullOrWhiteSpace(_newProfile.Name)) return;
+        await InstanceManager.ExecuteAsync("connection.save", new Dictionary<string, object> { ["name"] = _newProfile.Name, ["type"] = _newProfile.Type, ["host"] = _newProfile.Host });
+        _profiles.Add(_newProfile);
+        _showAddForm = false;
+        StateHasChanged();
+    }
+
+    private async Task Connect(ConnectionProfile profile)
+    {
+        if (profile.Type == "Remote")
+        {
+            // Parse host:port from Host string
+            var parts = profile.Host.Split(':');
+            var host = parts[0];
+            var port = parts.Length > 1 && int.TryParse(parts[1], out var p) ? p : 5000;
+            await InstanceManager.ConnectRemoteAsync(host, port);
+        }
+        else
+        {
+            await InstanceManager.ConnectLocalAsync(profile.Host);
+        }
+        _currentConnection = profile.Name;
+        StateHasChanged();
+    }
+
+    private async Task Disconnect()
+    {
+        await InstanceManager.DisconnectAsync();
+        StateHasChanged();
+    }
+
+    private async Task DeleteProfile(ConnectionProfile profile)
+    {
+        if (await DialogService.ConfirmAsync("Delete Profile", $"Delete '{profile.Name}'?"))
+        {
+            await InstanceManager.ExecuteAsync("connection.delete", new Dictionary<string, object> { ["name"] = profile.Name });
+            _profiles.Remove(profile);
+            StateHasChanged();
+        }
+    }
+
+    private class ConnectionProfile { public string Name { get; set; } = ""; public string Type { get; set; } = "Local"; public string Host { get; set; } = ""; }
+}
