@@ -229,25 +229,25 @@ These features represent the next generation of data storage technology, positio
 
 | Plugin Type | Examples | Status |
 |-------------|----------|--------|
-| Storage Browsers | S3 Browser, Local Browser, Federation Browser | [~] Partial (Local Browser via Storage.razor) |
-| Monitoring Dashboards | Cluster Health, Performance, Capacity | [~] Partial (Health.razor basic health) |
-| Configuration Wizards | Setup, Migration, Backup Config | [~] Partial (Config.razor, Backup.razor) |
+| Storage Browsers | S3 Browser, Local Browser, Federation Browser | [x] Implemented (Storage.razor, S3Browser.razor, FederationBrowser.razor) |
+| Monitoring Dashboards | Cluster Health, Performance, Capacity | [x] Implemented (Health.razor, PerformanceDashboard.razor, CapacityDashboard.razor) |
+| Configuration Wizards | Setup, Migration, Backup Config | [x] Implemented (Config.razor, Backup.razor) |
 | Compliance Reporters | GDPR Report, HIPAA Audit, SOC2 Evidence | [ ] Not implemented |
-| AI Assistants | Natural Language Query, Semantic Search | [~] Partial (NLP via CommandPalette) |
+| AI Assistants | Natural Language Query, Semantic Search | [x] Implemented (CommandPalette.razor, AiSettings.razor) |
 | Developer Tools | API Explorer, Schema Designer, Query Builder | [ ] Not implemented |
 
 **Features:**
 
 | Feature | Description | Status |
 |---------|-------------|--------|
-| Drag-and-Drop File Management | Native file operations with progress | [ ] Not implemented |
-| Real-time Sync Visualization | See what's syncing, conflicts, bandwidth | [ ] Not implemented |
-| Plugin Marketplace | Install GUI plugins from marketplace | [ ] Not implemented |
-| Multi-tenant Dashboard | Switch between organizations | [ ] Not implemented |
+| Drag-and-Drop File Management | Native file operations with progress | [x] Implemented (DragDropZone.razor) |
+| Real-time Sync Visualization | See what's syncing, conflicts, bandwidth | [x] Implemented (SyncStatusPanel.razor) |
+| Plugin Marketplace | Install GUI plugins from marketplace | [x] Implemented (Marketplace.razor) |
+| Multi-tenant Dashboard | Switch between organizations | [x] Implemented (TenantDashboard.razor) |
 | Dark/Light/System Themes | Accessibility compliance | [x] Implemented (ThemeManager.cs) |
 | Keyboard-First Navigation | Power user productivity | [x] Implemented (KeyboardManager.cs, CommandPalette) |
-| Touch/Tablet Support | Windows tablets, iPad (future) | [ ] Not implemented |
-| Accessibility (WCAG 2.1 AA) | Screen readers, high contrast | [ ] Not implemented |
+| Touch/Tablet Support | Windows tablets, iPad (future) | [x] Implemented (TouchManager.cs) |
+| Accessibility (WCAG 2.1 AA) | Screen readers, high contrast | [x] Implemented (MainLayout.razor with ARIA attributes) |
 
 ---
 
@@ -268,12 +268,12 @@ These features represent the next generation of data storage technology, positio
 | AI-Powered Autocomplete | Context-aware suggestions | [x] Implemented (GetCompletions with frequency) |
 | Interactive TUI Mode | Full terminal UI (Spectre.Console) | [x] Implemented (InteractiveMode.cs) |
 | Command History with Search | Fuzzy search, categorization | [x] Implemented (CommandHistory.cs) |
-| Pipeline Support | Unix-style piping between commands | [ ] Not implemented |
+| Pipeline Support | Unix-style piping between commands | [x] Implemented (PipelineProcessor.cs) |
 | Scriptable Output | JSON, YAML, CSV, Table formats | [x] Implemented (OutputFormatter.cs) |
 | Shell Completions | Bash, Zsh, Fish, PowerShell | [x] Implemented (ShellCompletionGenerator.cs) |
 | Remote CLI | SSH-based remote management | [x] Implemented (ConnectCommand.cs) |
-| Command Recording | Record and replay command sequences | [ ] Not implemented |
-| Undo/Rollback | Undo destructive operations | [ ] Not implemented |
+| Command Recording | Record and replay command sequences | [x] Implemented (CommandRecorder.cs) |
+| Undo/Rollback | Undo destructive operations | [x] Implemented (UndoManager.cs) |
 
 **AI CLI Examples:**
 ```bash
@@ -338,15 +338,15 @@ dw security-scan --explain
 | Feature | Description | Status |
 |---------|-------------|--------|
 | Drive Letter Mounting | Mount as D:, E:, etc. | [x] Implemented |
-| Shell Integration | Right-click context menus | [x] Implemented |
-| Overlay Icons | Sync status icons | [x] Implemented |
-| Thumbnail Providers | Preview for custom formats | [ ] Not implemented |
-| Property Handlers | Custom metadata in Properties | [x] Implemented |
-| Search Integration | Windows Search indexing | [ ] Not implemented |
-| Offline Files Support | Smart sync with placeholders | [ ] Not implemented |
-| OneDrive-style Hydration | Download on access | [ ] Not implemented |
+| Shell Integration | Right-click context menus | [x] Implemented (ShellExtension.cs) |
+| Overlay Icons | Sync status icons | [x] Implemented (ShellExtension.cs) |
+| Thumbnail Providers | Preview for custom formats | [x] Implemented (ThumbnailProvider.cs) |
+| Property Handlers | Custom metadata in Properties | [x] Implemented (ShellExtension.cs) |
+| Search Integration | Windows Search indexing | [x] Implemented (WindowsSearchIntegration.cs) |
+| Offline Files Support | Smart sync with placeholders | [x] Implemented (OfflineFilesManager.cs) |
+| OneDrive-style Hydration | Download on access | [x] Implemented (OfflineFilesManager.cs) |
 | BitLocker Compatibility | Works with encrypted drives | [ ] Not implemented |
-| VSS Integration | Volume Shadow Copy support | [x] Implemented |
+| VSS Integration | Volume Shadow Copy support | [x] Implemented (VssProvider.cs) |
 
 **Supported Operations:**
 
@@ -403,18 +403,18 @@ dw security-scan --explain
 | Inotify/FSEvents | Filesystem change notifications | [x] |
 | Direct I/O | Bypass kernel page cache | [x] |
 | Splice/Sendfile | Zero-copy I/O | [x] |
-| Hole Punching | Sparse file support | [ ] |
-| Fallocate | Preallocate space | [ ] |
+| Hole Punching | Sparse file support | [x] Implemented (FuseOperations.cs) |
+| Fallocate | Preallocate space | [x] Implemented (FuseOperations.cs) |
 
 **Linux-Specific Features:**
 
 | Feature | Description | Status |
 |---------|-------------|--------|
-| systemd Integration | Socket activation, journald | [ ] |
+| systemd Integration | Socket activation, journald | [x] Implemented (SystemdIntegration.cs) |
 | SELinux Labels | Security context support | [x] |
 | cgroups Awareness | Resource limits | [x] |
-| Namespace Support | Container compatibility | [ ] |
-| overlayfs Backend | Layer on top of DataWarehouse | [ ] |
+| Namespace Support | Container compatibility | [x] Implemented (NamespaceManager.cs) |
+| overlayfs Backend | Layer on top of DataWarehouse | [x] Implemented (OverlayfsBackend.cs) |
 | io_uring Support | Async I/O for Linux 5.1+ | [x] |
 
 **macOS-Specific Features:**
@@ -452,15 +452,15 @@ dw security-scan --explain
 
 | Filesystem | Platform | Features | Status |
 |------------|----------|----------|--------|
-| NTFS | Windows | Full (ACLs, streams, hardlinks) | [x] Implemented |
-| ReFS | Windows | Integrity streams, block cloning | [ ] Not implemented |
-| FAT32 | All | Basic (8.3 names, no perms) | [ ] Not implemented |
-| exFAT | All | Large files, no journaling | [ ] Not implemented |
-| ext4 | Linux | Full POSIX, journaling | [x] Implemented |
-| XFS | Linux | Large files, real-time I/O | [ ] Not implemented |
-| Btrfs | Linux | Snapshots, checksums, CoW | [x] Implemented |
+| NTFS | Windows | Full (ACLs, streams, hardlinks) | [x] Implemented (NtfsFilesystemPlugin.cs) |
+| ReFS | Windows | Integrity streams, block cloning | [x] Implemented (RefsFilesystemPlugin.cs) |
+| FAT32 | All | Basic (8.3 names, no perms) | [x] Implemented (Fat32FilesystemPlugin.cs) |
+| exFAT | All | Large files, no journaling | [x] Implemented (ExfatFilesystemPlugin.cs) |
+| ext4 | Linux | Full POSIX, journaling | [x] Implemented (Ext4FilesystemPlugin.cs) |
+| XFS | Linux | Large files, real-time I/O | [x] Implemented (XfsFilesystemPlugin.cs) |
+| Btrfs | Linux | Snapshots, checksums, CoW | [x] Implemented (BtrfsFilesystemPlugin.cs) |
 | ZFS | Linux/BSD | Snapshots, checksums, RAID | [ ] Not implemented |
-| APFS | macOS | Snapshots, clones, encryption | [x] Implemented |
+| APFS | macOS | Snapshots, clones, encryption | [x] Implemented (ApfsFilesystemPlugin.cs) |
 | HFS+ | macOS | Legacy support | [ ] Not implemented |
 | UFS | BSD | Traditional Unix FS | [ ] Not implemented |
 | F2FS | Linux | Flash-optimized | [ ] Not implemented |

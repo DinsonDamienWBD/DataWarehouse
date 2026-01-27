@@ -587,7 +587,7 @@ public sealed class PrometheusIntegration
                     datasource = new { type = "prometheus", uid = "${datasource}" },
                     fieldConfig = new
                     {
-                        defaults = new { color = new { mode = "palette-classic" }, mappings = Array.Empty<object>(), thresholds = new { mode = "absolute", steps = new[] { new { color = "green", value = (int?)null }, new { color = "red", value = 80 } } } },
+                        defaults = new { color = new { mode = "palette-classic" }, mappings = Array.Empty<object>(), thresholds = new { mode = "absolute", steps = new object[] { new { color = "green", value = (int?)null }, new { color = "red", value = 80 } } } },
                         overrides = Array.Empty<object>()
                     },
                     gridPos = new { h = 8, w = 12, x = 0, y = 0 },
@@ -602,7 +602,7 @@ public sealed class PrometheusIntegration
                     datasource = new { type = "prometheus", uid = "${datasource}" },
                     fieldConfig = new
                     {
-                        defaults = new { color = new { mode = "palette-classic" }, mappings = Array.Empty<object>(), thresholds = new { mode = "absolute", steps = new[] { new { color = "green", value = (int?)null }, new { color = "red", value = 80 } } }, unit = "bytes" },
+                        defaults = new { color = new { mode = "palette-classic" }, mappings = Array.Empty<object>(), thresholds = new { mode = "absolute", steps = new object[] { new { color = "green", value = (int?)null }, new { color = "red", value = 80 } } }, unit = "bytes" },
                         overrides = Array.Empty<object>()
                     },
                     gridPos = new { h = 8, w = 12, x = 12, y = 0 },
@@ -617,7 +617,7 @@ public sealed class PrometheusIntegration
                     datasource = new { type = "prometheus", uid = "${datasource}" },
                     fieldConfig = new
                     {
-                        defaults = new { color = new { mode = "palette-classic" }, mappings = Array.Empty<object>(), thresholds = new { mode = "absolute", steps = new[] { new { color = "green", value = (int?)null }, new { color = "red", value = 80 } } }, unit = "percentunit" },
+                        defaults = new { color = new { mode = "palette-classic" }, mappings = Array.Empty<object>(), thresholds = new { mode = "absolute", steps = new object[] { new { color = "green", value = (int?)null }, new { color = "red", value = 80 } } }, unit = "percentunit" },
                         overrides = Array.Empty<object>()
                     },
                     gridPos = new { h = 8, w = 12, x = 0, y = 8 },
@@ -632,7 +632,7 @@ public sealed class PrometheusIntegration
                     datasource = new { type = "prometheus", uid = "${datasource}" },
                     fieldConfig = new
                     {
-                        defaults = new { color = new { mode = "palette-classic" }, mappings = Array.Empty<object>(), thresholds = new { mode = "absolute", steps = new[] { new { color = "green", value = (int?)null }, new { color = "red", value = 80 } } }, unit = "reqps" },
+                        defaults = new { color = new { mode = "palette-classic" }, mappings = Array.Empty<object>(), thresholds = new { mode = "absolute", steps = new object[] { new { color = "green", value = (int?)null }, new { color = "red", value = 80 } } }, unit = "reqps" },
                         overrides = Array.Empty<object>()
                     },
                     gridPos = new { h = 8, w = 12, x = 12, y = 8 },

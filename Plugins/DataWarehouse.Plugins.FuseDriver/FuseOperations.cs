@@ -543,6 +543,68 @@ public sealed class FuseOperations
 
     #endregion
 
+    #region Fallocate and Sparse Files
+
+    /// <summary>
+    /// Allocates or deallocates space for a file.
+    /// </summary>
+    /// <param name="path">The file path.</param>
+    /// <param name="mode">The fallocate mode flags.</param>
+    /// <param name="offset">The starting offset.</param>
+    /// <param name="length">The length of the region.</param>
+    /// <param name="fileInfo">The file info structure.</param>
+    /// <returns>0 on success, or a negative errno value on failure.</returns>
+    /// <remarks>
+    /// Supported modes:
+    /// - Default (0): Preallocate space
+    /// - FALLOC_FL_KEEP_SIZE: Preallocate without extending file
+    /// - FALLOC_FL_PUNCH_HOLE: Deallocate space (create hole)
+    /// - FALLOC_FL_COLLAPSE_RANGE: Remove range and shift data
+    /// - FALLOC_FL_ZERO_RANGE: Zero out range
+    /// - FALLOC_FL_INSERT_RANGE: Insert hole and shift data
+    /// </remarks>
+    public int Fallocate(string path, FallocateMode mode, long offset, long length, ref FuseFileInfo fileInfo)
+    {
+        try
+        {
+            return _fs.Fallocate(path, mode, offset, length, ref fileInfo);
+        }
+        catch (Exception ex)
+        {
+            LogError($"fallocate failed for {path}", ex);
+            return FuseErrno.FromException(ex);
+        }
+    }
+
+    /// <summary>
+    /// Seeks to a hole or data region in a sparse file.
+    /// </summary>
+    /// <param name="path">The file path.</param>
+    /// <param name="offset">The starting offset.</param>
+    /// <param name="whence">SEEK_HOLE (4) or SEEK_DATA (3).</param>
+    /// <param name="fileInfo">The file info structure.</param>
+    /// <returns>The new offset on success, or a negative errno value on failure.</returns>
+    /// <remarks>
+    /// This operation supports sparse file navigation:
+    /// - SEEK_HOLE: Find next hole at or after offset
+    /// - SEEK_DATA: Find next data region at or after offset
+    /// Returns ENXIO if no hole/data found after offset.
+    /// </remarks>
+    public long LSeek(string path, long offset, SeekWhence whence, ref FuseFileInfo fileInfo)
+    {
+        try
+        {
+            return _fs.LSeek(path, offset, whence, ref fileInfo);
+        }
+        catch (Exception ex)
+        {
+            LogError($"lseek failed for {path}", ex);
+            return FuseErrno.FromException(ex);
+        }
+    }
+
+    #endregion
+
     #region Access Control
 
     /// <summary>

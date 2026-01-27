@@ -1,0 +1,599 @@
+@page "/marketplace"
+@inject InstanceManager InstanceManager
+@inject DialogService DialogService
+
+<div class="content-header">
+    <h2 id="marketplace-title">Plugin Marketplace</h2>
+    <div class="d-flex gap-2">
+        <button class="btn btn-secondary"
+                @onclick="RefreshMarketplace"
+                aria-label="Refresh marketplace listings">
+            Refresh
+        </button>
+    </div>
+</div>
+
+<div class="content-body" role="main" aria-labelledby="marketplace-title">
+    @if (!InstanceManager.IsConnected)
+    {
+        <div class="alert alert-warning" role="alert">
+            Not connected to a DataWarehouse instance.
+        </div>
+    }
+    else
+    {
+        <!-- Search and Filter Bar -->
+        <div class="marketplace-toolbar" role="search" aria-label="Plugin search and filters">
+            <div class="search-box">
+                <label for="plugin-search" class="visually-hidden">Search plugins</label>
+                <input type="search"
+                       id="plugin-search"
+                       class="form-input"
+                       placeholder="Search plugins..."
+                       @bind="_searchQuery"
+                       @bind:event="oninput"
+                       @onkeydown="HandleSearchKeyDown"
+                       aria-describedby="search-hint" />
+                <span id="search-hint" class="visually-hidden">Press Enter to search</span>
+            </div>
+
+            <div class="filter-group">
+                <label for="category-filter" class="visually-hidden">Filter by category</label>
+                <select id="category-filter"
+                        class="form-select"
+                        @bind="_selectedCategory"
+                        @bind:event="onchange"
+                        aria-label="Category filter">
+                    <option value="">All Categories</option>
+                    @foreach (var category in _categories)
+                    {
+                        <option value="@category">@category</option>
+                    }
+                </select>
+            </div>
+
+            <div class="filter-group">
+                <label for="sort-filter" class="visually-hidden">Sort by</label>
+                <select id="sort-filter"
+                        class="form-select"
+                        @bind="_sortBy"
+                        @bind:event="onchange"
+                        aria-label="Sort order">
+                    <option value="popular">Most Popular</option>
+                    <option value="recent">Recently Updated</option>
+                    <option value="rating">Highest Rated</option>
+                    <option value="name">Name (A-Z)</option>
+                </select>
+            </div>
+
+            <div class="filter-toggle">
+                <label class="toggle-label">
+                    <input type="checkbox"
+                           @bind="_showInstalledOnly"
+                           aria-describedby="installed-filter-desc" />
+                    <span>Installed Only</span>
+                </label>
+                <span id="installed-filter-desc" class="visually-hidden">
+                    Show only plugins that are currently installed
+                </span>
+            </div>
+        </div>
+
+        @if (_isLoading)
+        {
+            <div class="text-center mt-4" role="status" aria-live="polite">
+                <div class="spinner" aria-hidden="true"></div>
+                <p class="mt-2">Loading marketplace...</p>
+            </div>
+        }
+        else
+        {
+            <!-- Results Summary -->
+            <div class="results-summary" aria-live="polite">
+                <span>Showing @FilteredPlugins.Count() of @_plugins.Count plugins</span>
+            </div>
+
+            <!-- Plugin Grid -->
+            <div class="plugin-grid" role="list" aria-label="Available plugins">
+                @foreach (var plugin in FilteredPlugins)
+                {
+                    <article class="plugin-card @(plugin.IsInstalled ? "installed" : "")"
+                             role="listitem"
+                             aria-labelledby="plugin-@plugin.Id-name">
+                        <div class="plugin-card-header">
+                            <div class="plugin-icon" aria-hidden="true">
+                                @GetPluginIcon(plugin.Category)
+                            </div>
+                            <div class="plugin-info">
+                                <h3 id="plugin-@plugin.Id-name" class="plugin-name">@plugin.Name</h3>
+                                <p class="plugin-author">by @plugin.Author</p>
+                            </div>
+                            @if (plugin.IsVerified)
+                            {
+                                <span class="verified-badge" title="Verified publisher" aria-label="Verified publisher">
+                                    &#10003;
+                                </span>
+                            }
+                        </div>
+
+                        <p class="plugin-description">@plugin.Description</p>
+
+                        <div class="plugin-meta">
+                            <span class="plugin-category badge badge-info">@plugin.Category</span>
+                            <span class="plugin-version">v@plugin.Version</span>
+                            <span class="plugin-downloads" aria-label="@plugin.Downloads downloads">
+                                &#8595; @FormatNumber(plugin.Downloads)
+                            </span>
+                        </div>
+
+                        <!-- Rating -->
+                        <div class="plugin-rating" role="img" aria-label="Rating: @plugin.Rating out of 5 stars">
+                            @for (int i = 1; i <= 5; i++)
+                            {
+                                var starIndex = i;
+                                <span class="star @(starIndex <= plugin.Rating ? "filled" : "")" aria-hidden="true">
+                                    @(starIndex <= plugin.Rating ? "&#9733;" : "&#9734;")
+                                </span>
+                            }
+                            <span class="rating-count">(@plugin.RatingCount)</span>
+                        </div>
+
+                        <!-- Reviews Preview -->
+                        @if (plugin.TopReview != null)
+                        {
+                            <blockquote class="review-preview">
+                                <p>"@plugin.TopReview.Text"</p>
+                                <footer>- @plugin.TopReview.Author</footer>
+                            </blockquote>
+                        }
+
+                        <div class="plugin-actions">
+                            @if (plugin.IsInstalled)
+                            {
+                                @if (plugin.HasUpdate)
+                                {
+                                    <button class="btn btn-primary"
+                                            @onclick="() => UpdatePlugin(plugin)"
+                                            disabled="@plugin.IsProcessing"
+                                            aria-busy="@plugin.IsProcessing">
+                                        @if (plugin.IsProcessing)
+                                        {
+                                            <span class="spinner-sm" aria-hidden="true"></span>
+                                            <span>Updating...</span>
+                                        }
+                                        else
+                                        {
+                                            <span>Update to v@plugin.LatestVersion</span>
+                                        }
+                                    </button>
+                                }
+                                <button class="btn btn-danger"
+                                        @onclick="() => UninstallPlugin(plugin)"
+                                        disabled="@plugin.IsProcessing"
+                                        aria-label="Uninstall @plugin.Name">
+                                    Uninstall
+                                </button>
+                            }
+                            else
+                            {
+                                <button class="btn btn-success"
+                                        @onclick="() => InstallPlugin(plugin)"
+                                        disabled="@plugin.IsProcessing"
+                                        aria-busy="@plugin.IsProcessing">
+                                    @if (plugin.IsProcessing)
+                                    {
+                                        <span class="spinner-sm" aria-hidden="true"></span>
+                                        <span>Installing...</span>
+                                    }
+                                    else
+                                    {
+                                        <span>Install</span>
+                                    }
+                                </button>
+                            }
+                            <button class="btn btn-secondary"
+                                    @onclick="() => ShowPluginDetails(plugin)"
+                                    aria-label="View details for @plugin.Name">
+                                Details
+                            </button>
+                        </div>
+                    </article>
+                }
+            </div>
+
+            @if (!FilteredPlugins.Any())
+            {
+                <div class="empty-state" role="status">
+                    <div class="empty-icon" aria-hidden="true">&#128269;</div>
+                    <h3>No plugins found</h3>
+                    <p>Try adjusting your search or filters</p>
+                </div>
+            }
+        }
+    }
+</div>
+
+<!-- Plugin Details Modal -->
+@if (_selectedPlugin != null)
+{
+    <div class="modal-overlay"
+         @onclick="ClosePluginDetails"
+         role="dialog"
+         aria-modal="true"
+         aria-labelledby="modal-title">
+        <div class="modal-content plugin-details-modal" @onclick:stopPropagation="true">
+            <header class="modal-header">
+                <h2 id="modal-title">@_selectedPlugin.Name</h2>
+                <button class="btn-close"
+                        @onclick="ClosePluginDetails"
+                        aria-label="Close details"
+                        type="button">
+                    &times;
+                </button>
+            </header>
+
+            <div class="modal-body">
+                <div class="detail-section">
+                    <h3>Description</h3>
+                    <p>@_selectedPlugin.FullDescription</p>
+                </div>
+
+                <div class="detail-section">
+                    <h3>Version History</h3>
+                    <ul class="version-list" role="list">
+                        @foreach (var version in _selectedPlugin.Versions)
+                        {
+                            <li role="listitem">
+                                <strong>v@version.Number</strong>
+                                <span class="version-date">@version.ReleaseDate.ToString("yyyy-MM-dd")</span>
+                                <p>@version.Changelog</p>
+                            </li>
+                        }
+                    </ul>
+                </div>
+
+                <div class="detail-section">
+                    <h3>Reviews (@_selectedPlugin.RatingCount)</h3>
+                    <ul class="review-list" role="list">
+                        @foreach (var review in _selectedPlugin.Reviews)
+                        {
+                            <li class="review-item" role="listitem">
+                                <div class="review-header">
+                                    <span class="review-author">@review.Author</span>
+                                    <span class="review-rating" role="img" aria-label="@review.Rating out of 5 stars">
+                                        @(new string('*', review.Rating))
+                                    </span>
+                                    <span class="review-date">@review.Date.ToString("yyyy-MM-dd")</span>
+                                </div>
+                                <p class="review-text">@review.Text</p>
+                            </li>
+                        }
+                    </ul>
+                </div>
+            </div>
+
+            <footer class="modal-footer">
+                <button class="btn btn-secondary" @onclick="ClosePluginDetails" type="button">Close</button>
+                @if (!_selectedPlugin.IsInstalled)
+                {
+                    <button class="btn btn-success" @onclick="() => InstallPlugin(_selectedPlugin)" type="button">
+                        Install
+                    </button>
+                }
+            </footer>
+        </div>
+    </div>
+}
+
+@code {
+    private bool _isLoading = false;
+    private string _searchQuery = "";
+    private string _selectedCategory = "";
+    private string _sortBy = "popular";
+    private bool _showInstalledOnly = false;
+    private List<MarketplacePlugin> _plugins = new();
+    private List<string> _categories = new();
+    private MarketplacePlugin? _selectedPlugin;
+
+    private IEnumerable<MarketplacePlugin> FilteredPlugins
+    {
+        get
+        {
+            var query = _plugins.AsEnumerable();
+
+            if (!string.IsNullOrWhiteSpace(_searchQuery))
+            {
+                var search = _searchQuery.ToLowerInvariant();
+                query = query.Where(p =>
+                    p.Name.Contains(search, StringComparison.OrdinalIgnoreCase) ||
+                    p.Description.Contains(search, StringComparison.OrdinalIgnoreCase) ||
+                    p.Author.Contains(search, StringComparison.OrdinalIgnoreCase));
+            }
+
+            if (!string.IsNullOrEmpty(_selectedCategory))
+            {
+                query = query.Where(p => p.Category == _selectedCategory);
+            }
+
+            if (_showInstalledOnly)
+            {
+                query = query.Where(p => p.IsInstalled);
+            }
+
+            query = _sortBy switch
+            {
+                "rating" => query.OrderByDescending(p => p.Rating),
+                "recent" => query.OrderByDescending(p => p.LastUpdated),
+                "name" => query.OrderBy(p => p.Name),
+                _ => query.OrderByDescending(p => p.Downloads) // popular
+            };
+
+            return query;
+        }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await RefreshMarketplace();
+    }
+
+    private async Task RefreshMarketplace()
+    {
+        if (!InstanceManager.IsConnected) return;
+
+        _isLoading = true;
+        StateHasChanged();
+
+        try
+        {
+            var result = await InstanceManager.ExecuteAsync("marketplace.list");
+            _plugins = ParsePlugins(result);
+            _categories = _plugins.Select(p => p.Category).Distinct().OrderBy(c => c).ToList();
+        }
+        catch (Exception ex)
+        {
+            await DialogService.AlertAsync("Error", $"Failed to load marketplace: {ex.Message}");
+        }
+        finally
+        {
+            _isLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task HandleSearchKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+        {
+            await RefreshMarketplace();
+        }
+    }
+
+    private async Task InstallPlugin(MarketplacePlugin plugin)
+    {
+        plugin.IsProcessing = true;
+        StateHasChanged();
+
+        try
+        {
+            await InstanceManager.ExecuteAsync("marketplace.install", new Dictionary<string, object>
+            {
+                ["pluginId"] = plugin.Id,
+                ["version"] = plugin.LatestVersion
+            });
+
+            plugin.IsInstalled = true;
+            plugin.HasUpdate = false;
+            await DialogService.AlertAsync("Success", $"{plugin.Name} has been installed successfully.");
+        }
+        catch (Exception ex)
+        {
+            await DialogService.AlertAsync("Error", $"Failed to install {plugin.Name}: {ex.Message}");
+        }
+        finally
+        {
+            plugin.IsProcessing = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task UninstallPlugin(MarketplacePlugin plugin)
+    {
+        var confirmed = await DialogService.ConfirmAsync(
+            "Confirm Uninstall",
+            $"Are you sure you want to uninstall {plugin.Name}?");
+
+        if (!confirmed) return;
+
+        plugin.IsProcessing = true;
+        StateHasChanged();
+
+        try
+        {
+            await InstanceManager.ExecuteAsync("marketplace.uninstall", new Dictionary<string, object>
+            {
+                ["pluginId"] = plugin.Id
+            });
+
+            plugin.IsInstalled = false;
+            await DialogService.AlertAsync("Success", $"{plugin.Name} has been uninstalled.");
+        }
+        catch (Exception ex)
+        {
+            await DialogService.AlertAsync("Error", $"Failed to uninstall {plugin.Name}: {ex.Message}");
+        }
+        finally
+        {
+            plugin.IsProcessing = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task UpdatePlugin(MarketplacePlugin plugin)
+    {
+        plugin.IsProcessing = true;
+        StateHasChanged();
+
+        try
+        {
+            await InstanceManager.ExecuteAsync("marketplace.update", new Dictionary<string, object>
+            {
+                ["pluginId"] = plugin.Id,
+                ["version"] = plugin.LatestVersion
+            });
+
+            plugin.Version = plugin.LatestVersion;
+            plugin.HasUpdate = false;
+            await DialogService.AlertAsync("Success", $"{plugin.Name} has been updated to v{plugin.LatestVersion}.");
+        }
+        catch (Exception ex)
+        {
+            await DialogService.AlertAsync("Error", $"Failed to update {plugin.Name}: {ex.Message}");
+        }
+        finally
+        {
+            plugin.IsProcessing = false;
+            StateHasChanged();
+        }
+    }
+
+    private void ShowPluginDetails(MarketplacePlugin plugin)
+    {
+        _selectedPlugin = plugin;
+    }
+
+    private void ClosePluginDetails()
+    {
+        _selectedPlugin = null;
+    }
+
+    private string GetPluginIcon(string category) => category.ToLowerInvariant() switch
+    {
+        "storage" => "&#128193;",
+        "security" => "&#128274;",
+        "backup" => "&#128190;",
+        "analytics" => "&#128200;",
+        "integration" => "&#128279;",
+        "ai" => "&#129302;",
+        "monitoring" => "&#128147;",
+        _ => "&#128268;"
+    };
+
+    private static string FormatNumber(long number)
+    {
+        if (number >= 1000000) return $"{number / 1000000.0:0.#}M";
+        if (number >= 1000) return $"{number / 1000.0:0.#}K";
+        return number.ToString();
+    }
+
+    private List<MarketplacePlugin> ParsePlugins(object? result)
+    {
+        var plugins = new List<MarketplacePlugin>();
+        if (result is IEnumerable<object> list)
+        {
+            foreach (var item in list)
+            {
+                if (item is IDictionary<string, object> d)
+                {
+                    var plugin = new MarketplacePlugin
+                    {
+                        Id = d.TryGetValue("id", out var id) ? id?.ToString() ?? "" : "",
+                        Name = d.TryGetValue("name", out var n) ? n?.ToString() ?? "" : "",
+                        Author = d.TryGetValue("author", out var a) ? a?.ToString() ?? "" : "",
+                        Description = d.TryGetValue("description", out var desc) ? desc?.ToString() ?? "" : "",
+                        FullDescription = d.TryGetValue("fullDescription", out var fd) ? fd?.ToString() ?? "" : "",
+                        Category = d.TryGetValue("category", out var c) ? c?.ToString() ?? "" : "",
+                        Version = d.TryGetValue("version", out var v) ? v?.ToString() ?? "" : "",
+                        LatestVersion = d.TryGetValue("latestVersion", out var lv) ? lv?.ToString() ?? "" : "",
+                        Downloads = d.TryGetValue("downloads", out var dl) && long.TryParse(dl?.ToString(), out var dls) ? dls : 0,
+                        Rating = d.TryGetValue("rating", out var r) && int.TryParse(r?.ToString(), out var rat) ? rat : 0,
+                        RatingCount = d.TryGetValue("ratingCount", out var rc) && int.TryParse(rc?.ToString(), out var rcc) ? rcc : 0,
+                        IsInstalled = d.TryGetValue("isInstalled", out var inst) && bool.TryParse(inst?.ToString(), out var isInst) && isInst,
+                        HasUpdate = d.TryGetValue("hasUpdate", out var upd) && bool.TryParse(upd?.ToString(), out var hasUpd) && hasUpd,
+                        IsVerified = d.TryGetValue("isVerified", out var ver) && bool.TryParse(ver?.ToString(), out var isVer) && isVer,
+                        LastUpdated = d.TryGetValue("lastUpdated", out var lu) && DateTime.TryParse(lu?.ToString(), out var lud) ? lud : DateTime.MinValue
+                    };
+
+                    // Parse top review
+                    if (d.TryGetValue("topReview", out var tr) && tr is IDictionary<string, object> trd)
+                    {
+                        plugin.TopReview = new PluginReview
+                        {
+                            Author = trd.TryGetValue("author", out var tra) ? tra?.ToString() ?? "" : "",
+                            Text = trd.TryGetValue("text", out var trt) ? trt?.ToString() ?? "" : "",
+                            Rating = trd.TryGetValue("rating", out var trr) && int.TryParse(trr?.ToString(), out var trrv) ? trrv : 0
+                        };
+                    }
+
+                    // Parse versions
+                    if (d.TryGetValue("versions", out var vers) && vers is IEnumerable<object> versList)
+                    {
+                        plugin.Versions = versList.OfType<IDictionary<string, object>>()
+                            .Select(vd => new PluginVersion
+                            {
+                                Number = vd.TryGetValue("number", out var vn) ? vn?.ToString() ?? "" : "",
+                                Changelog = vd.TryGetValue("changelog", out var vcl) ? vcl?.ToString() ?? "" : "",
+                                ReleaseDate = vd.TryGetValue("releaseDate", out var vrd) && DateTime.TryParse(vrd?.ToString(), out var vrdd) ? vrdd : DateTime.MinValue
+                            })
+                            .ToList();
+                    }
+
+                    // Parse reviews
+                    if (d.TryGetValue("reviews", out var revs) && revs is IEnumerable<object> revsList)
+                    {
+                        plugin.Reviews = revsList.OfType<IDictionary<string, object>>()
+                            .Select(rd => new PluginReview
+                            {
+                                Author = rd.TryGetValue("author", out var ra) ? ra?.ToString() ?? "" : "",
+                                Text = rd.TryGetValue("text", out var rt) ? rt?.ToString() ?? "" : "",
+                                Rating = rd.TryGetValue("rating", out var rr) && int.TryParse(rr?.ToString(), out var rrv) ? rrv : 0,
+                                Date = rd.TryGetValue("date", out var rdd) && DateTime.TryParse(rdd?.ToString(), out var rddd) ? rddd : DateTime.MinValue
+                            })
+                            .ToList();
+                    }
+
+                    plugins.Add(plugin);
+                }
+            }
+        }
+        return plugins;
+    }
+
+    private class MarketplacePlugin
+    {
+        public string Id { get; set; } = "";
+        public string Name { get; set; } = "";
+        public string Author { get; set; } = "";
+        public string Description { get; set; } = "";
+        public string FullDescription { get; set; } = "";
+        public string Category { get; set; } = "";
+        public string Version { get; set; } = "";
+        public string LatestVersion { get; set; } = "";
+        public long Downloads { get; set; }
+        public int Rating { get; set; }
+        public int RatingCount { get; set; }
+        public bool IsInstalled { get; set; }
+        public bool HasUpdate { get; set; }
+        public bool IsVerified { get; set; }
+        public bool IsProcessing { get; set; }
+        public DateTime LastUpdated { get; set; }
+        public PluginReview? TopReview { get; set; }
+        public List<PluginVersion> Versions { get; set; } = new();
+        public List<PluginReview> Reviews { get; set; } = new();
+    }
+
+    private class PluginVersion
+    {
+        public string Number { get; set; } = "";
+        public string Changelog { get; set; } = "";
+        public DateTime ReleaseDate { get; set; }
+    }
+
+    private class PluginReview
+    {
+        public string Author { get; set; } = "";
+        public string Text { get; set; } = "";
+        public int Rating { get; set; }
+        public DateTime Date { get; set; }
+    }
+}

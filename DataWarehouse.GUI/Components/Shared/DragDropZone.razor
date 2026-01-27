@@ -1,0 +1,338 @@
+@inject InstanceManager InstanceManager
+@inject DialogService DialogService
+@inject IJSRuntime JSRuntime
+
+<div class="drag-drop-zone @GetZoneClass()"
+     @ondragenter="HandleDragEnter"
+     @ondragover="HandleDragOver"
+     @ondragleave="HandleDragLeave"
+     @ondrop="HandleDrop"
+     tabindex="0"
+     role="region"
+     aria-label="@AriaLabel"
+     aria-describedby="@_descriptionId"
+     @onkeydown="HandleKeyDown">
+
+    <span id="@_descriptionId" class="visually-hidden">
+        Drag and drop files here, or press Enter to browse files. Press Space to paste from clipboard.
+    </span>
+
+    @if (_isUploading)
+    {
+        <div class="upload-progress" role="progressbar" aria-valuenow="@_uploadProgress" aria-valuemin="0" aria-valuemax="100">
+            <div class="upload-progress-header">
+                <span>Uploading @_currentFileName</span>
+                <button class="btn-cancel"
+                        @onclick="CancelUpload"
+                        aria-label="Cancel upload"
+                        type="button">
+                    Cancel
+                </button>
+            </div>
+            <div class="progress">
+                <div class="progress-bar" style="width: @_uploadProgress%"></div>
+            </div>
+            <div class="upload-stats">
+                <span>@_uploadedCount / @_totalFiles files</span>
+                <span>@FormatBytes(_uploadedBytes) / @FormatBytes(_totalBytes)</span>
+            </div>
+        </div>
+        <div aria-live="polite" class="visually-hidden">
+            Upload progress: @_uploadProgress percent complete
+        </div>
+    }
+    else if (_isDragging)
+    {
+        <div class="drop-indicator" aria-hidden="true">
+            <div class="drop-icon">&#128229;</div>
+            <div class="drop-text">Drop files here</div>
+            <div class="drop-hint">@_draggedFileCount file(s) ready to upload</div>
+        </div>
+        <div aria-live="assertive" class="visually-hidden">
+            @_draggedFileCount files ready to drop
+        </div>
+    }
+    else
+    {
+        <div class="drop-placeholder">
+            <div class="drop-icon" aria-hidden="true">&#128193;</div>
+            <div class="drop-text">@PlaceholderText</div>
+            <div class="drop-hint">
+                Drag files here or
+                <button class="btn-link" @onclick="BrowseFiles" type="button">
+                    browse
+                </button>
+            </div>
+            @if (AllowFolderDrop)
+            {
+                <div class="drop-hint">Folders are supported</div>
+            }
+        </div>
+    }
+
+    @ChildContent
+</div>
+
+<InputFile @ref="_inputFile"
+           OnChange="HandleFileSelected"
+           multiple="@AllowMultiple"
+           accept="@AcceptedTypes"
+           class="visually-hidden"
+           aria-hidden="true"
+           tabindex="-1" />
+
+@code {
+    private InputFile? _inputFile;
+    private ElementReference _inputRef;
+    private string _descriptionId = $"dragdrop-desc-{Guid.NewGuid():N}";
+
+    private bool _isDragging;
+    private bool _isUploading;
+    private int _draggedFileCount;
+    private int _uploadProgress;
+    private string _currentFileName = "";
+    private int _uploadedCount;
+    private int _totalFiles;
+    private long _uploadedBytes;
+    private long _totalBytes;
+    private CancellationTokenSource? _uploadCts;
+
+    [Parameter] public string TargetPath { get; set; } = "/";
+    [Parameter] public bool AllowMultiple { get; set; } = true;
+    [Parameter] public bool AllowFolderDrop { get; set; } = true;
+    [Parameter] public string AcceptedTypes { get; set; } = "*/*";
+    [Parameter] public string PlaceholderText { get; set; } = "Drop files to upload";
+    [Parameter] public string AriaLabel { get; set; } = "File upload drop zone";
+    [Parameter] public long MaxFileSize { get; set; } = 100 * 1024 * 1024; // 100MB default
+    [Parameter] public EventCallback<UploadResult> OnUploadComplete { get; set; }
+    [Parameter] public EventCallback<UploadError> OnUploadError { get; set; }
+    [Parameter] public EventCallback<FileMoveRequest> OnFileMoved { get; set; }
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+
+    private string GetZoneClass()
+    {
+        var classes = new List<string> { "drag-drop-container" };
+        if (_isDragging) classes.Add("dragging");
+        if (_isUploading) classes.Add("uploading");
+        return string.Join(" ", classes);
+    }
+
+    private void HandleDragEnter(DragEventArgs e)
+    {
+        _isDragging = true;
+        _draggedFileCount = 1; // JS would provide actual count
+    }
+
+    private void HandleDragOver(DragEventArgs e)
+    {
+        // Prevent default to allow drop
+    }
+
+    private void HandleDragLeave(DragEventArgs e)
+    {
+        _isDragging = false;
+        _draggedFileCount = 0;
+    }
+
+    private async Task HandleDrop(DragEventArgs e)
+    {
+        _isDragging = false;
+
+        // Check if this is an internal file move
+        var dragData = e.DataTransfer?.Items;
+        if (dragData != null)
+        {
+            // Handle internal file drag (move between folders)
+            var sourcePathData = e.DataTransfer!.Types?.FirstOrDefault(t => t == "application/x-datawarehouse-path") ?? string.Empty;
+            if (!string.IsNullOrEmpty(sourcePathData))
+            {
+                await OnFileMoved.InvokeAsync(new FileMoveRequest
+                {
+                    SourcePath = sourcePathData,
+                    DestinationPath = TargetPath
+                });
+                return;
+            }
+        }
+
+        // For external files, we rely on InputFile component
+        // In real implementation, this would use JS interop for direct drop handling
+        await DialogService.AlertAsync("File Drop",
+            "Files detected. Use the Browse button for file selection in this version.");
+    }
+
+    private async Task HandleKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter" || e.Key == " ")
+        {
+            await BrowseFiles();
+        }
+    }
+
+    private async Task BrowseFiles()
+    {
+        // Trigger the hidden InputFile element
+        await JSRuntime.InvokeVoidAsync("eval",
+            "document.querySelector('input[type=file]').click()");
+    }
+
+    private async Task HandleFileSelected(InputFileChangeEventArgs e)
+    {
+        if (!InstanceManager.IsConnected)
+        {
+            await DialogService.AlertAsync("Error", "Not connected to a DataWarehouse instance.");
+            return;
+        }
+
+        var files = AllowMultiple ? e.GetMultipleFiles() : new[] { e.File };
+
+        _isUploading = true;
+        _uploadedCount = 0;
+        _totalFiles = files.Count;
+        _uploadedBytes = 0;
+        _totalBytes = files.Sum(f => f.Size);
+        _uploadCts = new CancellationTokenSource();
+
+        StateHasChanged();
+
+        var results = new List<UploadFileResult>();
+
+        foreach (var file in files)
+        {
+            if (_uploadCts.Token.IsCancellationRequested) break;
+
+            if (file.Size > MaxFileSize)
+            {
+                await OnUploadError.InvokeAsync(new UploadError
+                {
+                    FileName = file.Name,
+                    Message = $"File exceeds maximum size of {FormatBytes(MaxFileSize)}"
+                });
+                continue;
+            }
+
+            _currentFileName = file.Name;
+            _uploadProgress = (int)((_uploadedBytes * 100) / Math.Max(1, _totalBytes));
+            StateHasChanged();
+
+            try
+            {
+                using var stream = file.OpenReadStream(MaxFileSize);
+                using var ms = new MemoryStream();
+
+                var buffer = new byte[81920];
+                int bytesRead;
+                while ((bytesRead = await stream.ReadAsync(buffer, _uploadCts.Token)) > 0)
+                {
+                    if (_uploadCts.Token.IsCancellationRequested) break;
+
+                    await ms.WriteAsync(buffer.AsMemory(0, bytesRead), _uploadCts.Token);
+                    _uploadedBytes += bytesRead;
+                    _uploadProgress = (int)((_uploadedBytes * 100) / Math.Max(1, _totalBytes));
+                    StateHasChanged();
+                }
+
+                if (!_uploadCts.Token.IsCancellationRequested)
+                {
+                    var targetFilePath = TargetPath.TrimEnd('/') + "/" + file.Name;
+
+                    await InstanceManager.ExecuteAsync("storage.upload", new Dictionary<string, object>
+                    {
+                        ["path"] = targetFilePath,
+                        ["content"] = Convert.ToBase64String(ms.ToArray()),
+                        ["contentType"] = file.ContentType
+                    });
+
+                    results.Add(new UploadFileResult
+                    {
+                        FileName = file.Name,
+                        Path = targetFilePath,
+                        Size = file.Size,
+                        Success = true
+                    });
+                }
+
+                _uploadedCount++;
+            }
+            catch (OperationCanceledException)
+            {
+                // Upload was cancelled
+                break;
+            }
+            catch (Exception ex)
+            {
+                await OnUploadError.InvokeAsync(new UploadError
+                {
+                    FileName = file.Name,
+                    Message = ex.Message
+                });
+            }
+        }
+
+        _isUploading = false;
+        _uploadCts?.Dispose();
+        _uploadCts = null;
+        StateHasChanged();
+
+        if (results.Any())
+        {
+            await OnUploadComplete.InvokeAsync(new UploadResult
+            {
+                Files = results,
+                TotalSize = results.Sum(r => r.Size),
+                TargetPath = TargetPath
+            });
+        }
+    }
+
+    private void CancelUpload()
+    {
+        _uploadCts?.Cancel();
+    }
+
+    private static string FormatBytes(long bytes)
+    {
+        string[] sizes = { "B", "KB", "MB", "GB", "TB" };
+        int order = 0;
+        double size = bytes;
+        while (size >= 1024 && order < sizes.Length - 1)
+        {
+            order++;
+            size /= 1024;
+        }
+        return $"{size:0.##} {sizes[order]}";
+    }
+
+    public void Dispose()
+    {
+        _uploadCts?.Cancel();
+        _uploadCts?.Dispose();
+    }
+
+    public record UploadResult
+    {
+        public List<UploadFileResult> Files { get; init; } = new();
+        public long TotalSize { get; init; }
+        public string TargetPath { get; init; } = "";
+    }
+
+    public record UploadFileResult
+    {
+        public string FileName { get; init; } = "";
+        public string Path { get; init; } = "";
+        public long Size { get; init; }
+        public bool Success { get; init; }
+    }
+
+    public record UploadError
+    {
+        public string FileName { get; init; } = "";
+        public string Message { get; init; } = "";
+    }
+
+    public record FileMoveRequest
+    {
+        public string SourcePath { get; init; } = "";
+        public string DestinationPath { get; init; } = "";
+    }
+}

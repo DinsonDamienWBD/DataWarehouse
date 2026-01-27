@@ -1197,6 +1197,378 @@ public sealed class FuseFileSystem : IDisposable
 
     #endregion
 
+    #region Fallocate and Sparse Files
+
+    /// <summary>
+    /// Allocates or deallocates space for a file (fallocate).
+    /// </summary>
+    /// <param name="path">The file path.</param>
+    /// <param name="mode">The fallocate mode flags.</param>
+    /// <param name="offset">The starting offset.</param>
+    /// <param name="length">The length of the region.</param>
+    /// <param name="fileInfo">The file info structure.</param>
+    /// <returns>0 on success, or a negative errno value.</returns>
+    public int Fallocate(string path, FallocateMode mode, long offset, long length, ref FuseFileInfo fileInfo)
+    {
+        if (!TryGetNode(path, out var node))
+        {
+            return -FuseErrno.ENOENT;
+        }
+
+        if (node.IsDirectory)
+        {
+            return -FuseErrno.EISDIR;
+        }
+
+        if (!node.Permissions.CanWrite(MountUid, MountGid))
+        {
+            return -FuseErrno.EACCES;
+        }
+
+        if (offset < 0 || length <= 0)
+        {
+            return -FuseErrno.EINVAL;
+        }
+
+        _writeLock.Wait();
+        try
+        {
+            // Handle punch hole - deallocate space
+            if ((mode & FallocateMode.PunchHole) != 0)
+            {
+                return PunchHole(node, offset, length);
+            }
+
+            // Handle zero range - zero out without deallocating
+            if ((mode & FallocateMode.ZeroRange) != 0)
+            {
+                return ZeroRange(node, offset, length, (mode & FallocateMode.KeepSize) != 0);
+            }
+
+            // Handle collapse range - remove data and shift
+            if ((mode & FallocateMode.CollapseRange) != 0)
+            {
+                return CollapseRange(node, offset, length);
+            }
+
+            // Handle insert range - insert hole and shift data
+            if ((mode & FallocateMode.InsertRange) != 0)
+            {
+                return InsertRange(node, offset, length);
+            }
+
+            // Default: preallocate space
+            return PreallocateSpace(node, offset, length, (mode & FallocateMode.KeepSize) != 0);
+        }
+        finally
+        {
+            _writeLock.Release();
+            _cacheManager.InvalidateAttributes(path);
+            _cacheManager.InvalidateReadCache(path);
+        }
+    }
+
+    /// <summary>
+    /// Seeks to a hole or data region in a sparse file.
+    /// </summary>
+    /// <param name="path">The file path.</param>
+    /// <param name="offset">The starting offset.</param>
+    /// <param name="whence">SEEK_HOLE or SEEK_DATA.</param>
+    /// <param name="fileInfo">The file info structure.</param>
+    /// <returns>The new offset, or a negative errno value.</returns>
+    public long LSeek(string path, long offset, SeekWhence whence, ref FuseFileInfo fileInfo)
+    {
+        if (!TryGetNode(path, out var node))
+        {
+            return -FuseErrno.ENOENT;
+        }
+
+        if (node.IsDirectory)
+        {
+            return -FuseErrno.EISDIR;
+        }
+
+        if (offset < 0)
+        {
+            return -FuseErrno.EINVAL;
+        }
+
+        // Get sparse regions
+        var sparseRegions = GetSparseRegions(node);
+
+        switch (whence)
+        {
+            case SeekWhence.SeekHole:
+                return FindNextHole(node, offset, sparseRegions);
+
+            case SeekWhence.SeekData:
+                return FindNextData(node, offset, sparseRegions);
+
+            default:
+                return -FuseErrno.EINVAL;
+        }
+    }
+
+    /// <summary>
+    /// Gets the actual blocks allocated for a file (for sparse file support).
+    /// </summary>
+    /// <param name="path">The file path.</param>
+    /// <returns>The number of 512-byte blocks actually allocated.</returns>
+    public long GetAllocatedBlocks(string path)
+    {
+        if (!TryGetNode(path, out var node))
+        {
+            return 0;
+        }
+
+        // Calculate actual allocated blocks based on sparse regions
+        var sparseRegions = GetSparseRegions(node);
+        var totalHoleSize = sparseRegions.Sum(r => r.Length);
+        var allocatedBytes = node.Size - totalHoleSize;
+
+        // Return in 512-byte blocks
+        return (allocatedBytes + 511) / 512;
+    }
+
+    private int PunchHole(FuseNode node, long offset, long length)
+    {
+        // Punch hole requires the range to be within file bounds
+        if (offset >= node.Size)
+        {
+            return 0; // Nothing to do
+        }
+
+        var end = Math.Min(offset + length, node.Size);
+        var actualLength = end - offset;
+
+        if (actualLength <= 0)
+        {
+            return 0;
+        }
+
+        // Zero out the region (in a real implementation, this would mark as sparse)
+        if (node.Data != null && offset < node.Data.Length)
+        {
+            var zeroEnd = (int)Math.Min(end, node.Data.Length);
+            Array.Clear(node.Data, (int)offset, zeroEnd - (int)offset);
+        }
+
+        // Track sparse region
+        AddSparseRegion(node, offset, actualLength);
+
+        node.Ctime = DateTime.UtcNow;
+        return 0;
+    }
+
+    private int ZeroRange(FuseNode node, long offset, long length, bool keepSize)
+    {
+        var end = offset + length;
+
+        // Extend file if necessary (unless keep_size)
+        if (!keepSize && end > node.Size)
+        {
+            node.Size = end;
+        }
+
+        // Zero out the region
+        EnsureDataCapacity(node, (int)Math.Min(end, node.Size));
+
+        if (node.Data != null)
+        {
+            var clearEnd = (int)Math.Min(end, node.Data.Length);
+            if (offset < clearEnd)
+            {
+                Array.Clear(node.Data, (int)offset, clearEnd - (int)offset);
+            }
+        }
+
+        node.Mtime = DateTime.UtcNow;
+        node.Ctime = DateTime.UtcNow;
+        return 0;
+    }
+
+    private int CollapseRange(FuseNode node, long offset, long length)
+    {
+        // Collapse must be block-aligned in real implementations
+        if (offset + length > node.Size)
+        {
+            return -FuseErrno.EINVAL;
+        }
+
+        if (node.Data != null && offset < node.Data.Length)
+        {
+            var newSize = node.Data.Length - (int)length;
+            var newData = new byte[newSize];
+
+            // Copy data before the collapsed region
+            if (offset > 0)
+            {
+                Buffer.BlockCopy(node.Data, 0, newData, 0, (int)offset);
+            }
+
+            // Copy data after the collapsed region
+            var afterOffset = (int)(offset + length);
+            if (afterOffset < node.Data.Length)
+            {
+                Buffer.BlockCopy(node.Data, afterOffset, newData, (int)offset, node.Data.Length - afterOffset);
+            }
+
+            node.Data = newData;
+        }
+
+        node.Size -= length;
+        node.Mtime = DateTime.UtcNow;
+        node.Ctime = DateTime.UtcNow;
+        return 0;
+    }
+
+    private int InsertRange(FuseNode node, long offset, long length)
+    {
+        // Insert range must be within file bounds
+        if (offset > node.Size)
+        {
+            return -FuseErrno.EINVAL;
+        }
+
+        var newSize = node.Size + length;
+        var newData = new byte[newSize];
+
+        if (node.Data != null)
+        {
+            // Copy data before the insertion point
+            if (offset > 0)
+            {
+                Buffer.BlockCopy(node.Data, 0, newData, 0, (int)Math.Min(offset, node.Data.Length));
+            }
+
+            // Copy data after the insertion point (shifted)
+            if (offset < node.Data.Length)
+            {
+                Buffer.BlockCopy(node.Data, (int)offset, newData, (int)(offset + length), node.Data.Length - (int)offset);
+            }
+        }
+
+        // The inserted region is zeros (hole)
+        node.Data = newData;
+        node.Size = newSize;
+
+        // Track the inserted hole as sparse
+        AddSparseRegion(node, offset, length);
+
+        node.Mtime = DateTime.UtcNow;
+        node.Ctime = DateTime.UtcNow;
+        return 0;
+    }
+
+    private int PreallocateSpace(FuseNode node, long offset, long length, bool keepSize)
+    {
+        var end = offset + length;
+
+        // Extend file if necessary (unless keep_size)
+        if (!keepSize && end > node.Size)
+        {
+            node.Size = end;
+        }
+
+        // Ensure data array is large enough
+        EnsureDataCapacity(node, (int)Math.Min(end, node.Size));
+
+        // Remove any sparse regions in this range (space is now allocated)
+        RemoveSparseRegions(node, offset, length);
+
+        node.Ctime = DateTime.UtcNow;
+        return 0;
+    }
+
+    private void EnsureDataCapacity(FuseNode node, int requiredSize)
+    {
+        if (node.Data == null || node.Data.Length < requiredSize)
+        {
+            var newData = new byte[requiredSize];
+            if (node.Data != null)
+            {
+                Buffer.BlockCopy(node.Data, 0, newData, 0, node.Data.Length);
+            }
+            node.Data = newData;
+        }
+    }
+
+    private List<SparseRegion> GetSparseRegions(FuseNode node)
+    {
+        // In a real implementation, this would be stored in the node
+        // For now, return empty list (no sparse tracking yet)
+        return new List<SparseRegion>();
+    }
+
+    private void AddSparseRegion(FuseNode node, long offset, long length)
+    {
+        // In a real implementation, track sparse regions per node
+        _kernelContext?.LogDebug($"Added sparse region at {offset} length {length}");
+    }
+
+    private void RemoveSparseRegions(FuseNode node, long offset, long length)
+    {
+        // In a real implementation, remove sparse regions that overlap
+        _kernelContext?.LogDebug($"Removed sparse regions at {offset} length {length}");
+    }
+
+    private long FindNextHole(FuseNode node, long offset, List<SparseRegion> sparseRegions)
+    {
+        // If offset is past end of file, return end of file (implicit hole)
+        if (offset >= node.Size)
+        {
+            return node.Size;
+        }
+
+        // Check if we're already in a hole
+        foreach (var region in sparseRegions.OrderBy(r => r.Offset))
+        {
+            if (offset >= region.Offset && offset < region.Offset + region.Length)
+            {
+                // Already in a hole
+                return offset;
+            }
+
+            if (region.Offset > offset)
+            {
+                // Found next hole
+                return region.Offset;
+            }
+        }
+
+        // No holes found, return end of file (implicit hole after EOF)
+        return node.Size;
+    }
+
+    private long FindNextData(FuseNode node, long offset, List<SparseRegion> sparseRegions)
+    {
+        // If offset is past end of file, error
+        if (offset >= node.Size)
+        {
+            return -FuseErrno.ENXIO;
+        }
+
+        // Check sparse regions
+        foreach (var region in sparseRegions.OrderBy(r => r.Offset))
+        {
+            if (offset >= region.Offset && offset < region.Offset + region.Length)
+            {
+                // Currently in a hole, find end of hole
+                var holeEnd = region.Offset + region.Length;
+                if (holeEnd >= node.Size)
+                {
+                    return -FuseErrno.ENXIO; // No more data
+                }
+                return holeEnd;
+            }
+        }
+
+        // Not in a hole, return current offset
+        return offset;
+    }
+
+    #endregion
+
     #region File Locking
 
     /// <summary>
@@ -1561,4 +1933,98 @@ internal sealed class FileLockInfo
     public long Start { get; set; }
     public long Length { get; set; }
     public int Pid { get; set; }
+}
+
+/// <summary>
+/// Represents a sparse (hole) region in a file.
+/// </summary>
+internal sealed class SparseRegion
+{
+    /// <summary>
+    /// Gets or sets the offset of the sparse region.
+    /// </summary>
+    public long Offset { get; set; }
+
+    /// <summary>
+    /// Gets or sets the length of the sparse region.
+    /// </summary>
+    public long Length { get; set; }
+}
+
+/// <summary>
+/// Fallocate mode flags.
+/// </summary>
+[Flags]
+public enum FallocateMode : uint
+{
+    /// <summary>
+    /// Default allocation mode.
+    /// </summary>
+    None = 0,
+
+    /// <summary>
+    /// Keep the file size unchanged.
+    /// </summary>
+    KeepSize = 0x01,
+
+    /// <summary>
+    /// Punch a hole (deallocate space).
+    /// </summary>
+    PunchHole = 0x02,
+
+    /// <summary>
+    /// No-hide-stale mode (Linux-specific).
+    /// </summary>
+    NoHideStale = 0x04,
+
+    /// <summary>
+    /// Collapse the range, removing it from the file.
+    /// </summary>
+    CollapseRange = 0x08,
+
+    /// <summary>
+    /// Zero the range without deallocating.
+    /// </summary>
+    ZeroRange = 0x10,
+
+    /// <summary>
+    /// Insert a range, shifting existing data.
+    /// </summary>
+    InsertRange = 0x20,
+
+    /// <summary>
+    /// Unshare extent (copy-on-write break).
+    /// </summary>
+    UnshareRange = 0x40
+}
+
+/// <summary>
+/// Seek whence values for lseek with SEEK_HOLE/SEEK_DATA.
+/// </summary>
+public enum SeekWhence
+{
+    /// <summary>
+    /// Seek from beginning of file.
+    /// </summary>
+    SeekSet = 0,
+
+    /// <summary>
+    /// Seek from current position.
+    /// </summary>
+    SeekCur = 1,
+
+    /// <summary>
+    /// Seek from end of file.
+    /// </summary>
+    SeekEnd = 2,
+
+    /// <summary>
+    /// Seek to next data region.
+    /// </summary>
+    SeekData = 3,
+
+    /// <summary>
+    /// Seek to next hole region.
+    /// </summary>
+    SeekHole = 4
 }

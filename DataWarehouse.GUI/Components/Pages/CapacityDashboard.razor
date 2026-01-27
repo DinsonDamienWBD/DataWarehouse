@@ -1,0 +1,677 @@
+@page "/capacity"
+@inject InstanceManager InstanceManager
+@inject CapabilityManager CapabilityManager
+@inject DialogService DialogService
+
+@*
+    CapacityDashboard.razor - Storage capacity management component.
+
+    Provides comprehensive capacity management including:
+    - Usage by tier (hot/warm/cold/archive)
+    - Growth trends and analytics
+    - Capacity forecasting
+    - Tier management recommendations
+
+    Requires the 'tiering' feature for full functionality.
+*@
+
+<div class="content-header">
+    <h2>Capacity Dashboard</h2>
+    <div class="d-flex gap-2">
+        <select class="form-select" style="width: 150px;" @bind="_timeRange" @bind:after="RefreshData">
+            <option value="7">Last 7 Days</option>
+            <option value="30">Last 30 Days</option>
+            <option value="90">Last 90 Days</option>
+            <option value="365">Last Year</option>
+        </select>
+        <button class="btn btn-secondary" @onclick="RefreshData">Refresh</button>
+        <button class="btn btn-primary" @onclick="GenerateReport">Generate Report</button>
+    </div>
+</div>
+
+<div class="content-body">
+    @if (!InstanceManager.IsConnected)
+    {
+        <div class="alert alert-warning">
+            <strong>Not Connected</strong><br />
+            Connect to a DataWarehouse instance to view capacity data.
+        </div>
+    }
+    else if (_isLoading)
+    {
+        <div class="text-center mt-4">
+            <div class="spinner"></div>
+            <p class="mt-2">Loading capacity data...</p>
+        </div>
+    }
+    else
+    {
+        <!-- Overall Capacity Summary -->
+        <div class="card mb-3">
+            <div class="card-header">Total Storage Capacity</div>
+            <div class="card-body">
+                <div class="d-flex justify-content-between mb-2">
+                    <span>Used: @FormatBytes(_totalUsed) / @FormatBytes(_totalCapacity)</span>
+                    <span>@_usagePercent.ToString("F1")% Used | @FormatBytes(_totalCapacity - _totalUsed) Available</span>
+                </div>
+                <div class="progress" style="height: 24px;">
+                    @foreach (var tier in _tierUsage)
+                    {
+                        var width = (_totalCapacity > 0) ? (double)tier.Used / _totalCapacity * 100 : 0;
+                        <div class="progress-bar @GetTierColorClass(tier.Name)"
+                             style="width: @width%;"
+                             title="@tier.Name: @FormatBytes(tier.Used)"></div>
+                    }
+                </div>
+                <div class="d-flex justify-content-center gap-4 mt-2">
+                    @foreach (var tier in _tierUsage)
+                    {
+                        <div class="d-flex align-items-center gap-1">
+                            <span class="badge @GetTierBadgeClass(tier.Name)" style="width: 12px; height: 12px; padding: 0;"></span>
+                            <span style="font-size: 12px;">@tier.Name (@FormatBytes(tier.Used))</span>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+
+        <!-- Tier Details -->
+        <div class="d-flex gap-3" style="flex-wrap: wrap;">
+            @foreach (var tier in _tierUsage)
+            {
+                <div class="card" style="flex: 1; min-width: 250px;">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <span class="badge @GetTierBadgeClass(tier.Name)">@tier.Name</span>
+                        <span>@tier.UsagePercent.ToString("F1")%</span>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-2">
+                            <div class="d-flex justify-content-between mb-1">
+                                <span>Capacity</span>
+                                <span>@FormatBytes(tier.Used) / @FormatBytes(tier.Total)</span>
+                            </div>
+                            <div class="progress">
+                                <div class="progress-bar @GetTierColorClass(tier.Name)"
+                                     style="width: @tier.UsagePercent%"></div>
+                            </div>
+                        </div>
+                        <div class="d-flex justify-content-between mb-1" style="font-size: 12px;">
+                            <span class="text-muted">Objects</span>
+                            <span>@tier.ObjectCount.ToString("N0")</span>
+                        </div>
+                        <div class="d-flex justify-content-between mb-1" style="font-size: 12px;">
+                            <span class="text-muted">Avg Object Size</span>
+                            <span>@(tier.ObjectCount > 0 ? FormatBytes(tier.Used / tier.ObjectCount) : "-")</span>
+                        </div>
+                        <div class="d-flex justify-content-between mb-1" style="font-size: 12px;">
+                            <span class="text-muted">Cost per GB/month</span>
+                            <span>$@tier.CostPerGbMonth.ToString("F3")</span>
+                        </div>
+                        <div class="d-flex justify-content-between" style="font-size: 12px;">
+                            <span class="text-muted">Monthly Cost</span>
+                            <span>$@((tier.Used / 1073741824.0 * tier.CostPerGbMonth).ToString("F2"))</span>
+                        </div>
+
+                        @if (_tieringEnabled && tier.Name != "Archive")
+                        {
+                            <div class="mt-3">
+                                <button class="btn btn-secondary" style="width: 100%; font-size: 12px;"
+                                        @onclick="() => ShowTierPolicy(tier)">
+                                    Configure Policy
+                                </button>
+                            </div>
+                        }
+                    </div>
+                </div>
+            }
+        </div>
+
+        <!-- Growth Trends Chart -->
+        <div class="card mt-3">
+            <div class="card-header">Storage Growth Trend</div>
+            <div class="card-body">
+                <div class="chart-container" style="height: 200px; display: flex; align-items: flex-end; gap: 2px; padding: 10px 0;">
+                    @foreach (var point in _growthHistory)
+                    {
+                        var maxValue = _growthHistory.Any() ? _growthHistory.Max(g => g.TotalUsed) : 1;
+                        var height = (maxValue > 0) ? ((double)point.TotalUsed / maxValue * 100) : 0;
+                        <div style="flex: 1; display: flex; flex-direction: column; align-items: stretch; gap: 0;">
+                            @foreach (var tier in _tierUsage.AsEnumerable().Reverse())
+                            {
+                                var tierValue = point.TierBreakdown.TryGetValue(tier.Name, out var tv) ? tv : 0;
+                                var tierHeight = (maxValue > 0) ? ((double)tierValue / maxValue * 100) : 0;
+                                <div class="@GetTierColorClass(tier.Name)"
+                                     style="height: @tierHeight%; min-height: @(tierHeight > 0 ? "1px" : "0");"
+                                     title="@point.Date.ToString("MMM dd"): @tier.Name - @FormatBytes(tierValue)"></div>
+                            }
+                        </div>
+                    }
+                </div>
+                <div class="d-flex justify-content-between text-muted" style="font-size: 11px;">
+                    <span>@_growthHistory.FirstOrDefault()?.Date.ToString("MMM dd")</span>
+                    <span>@_growthHistory.LastOrDefault()?.Date.ToString("MMM dd")</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Capacity Forecasting -->
+        <div class="card mt-3">
+            <div class="card-header">Capacity Forecast</div>
+            <div class="card-body">
+                <div class="d-flex gap-3" style="flex-wrap: wrap;">
+                    <div style="flex: 1; min-width: 200px; text-align: center; padding: 20px; border-right: 1px solid var(--border-color);">
+                        <div style="font-size: 24px; font-weight: bold; color: @GetForecastColor(_forecast.DaysUntilFull);">
+                            @(_forecast.DaysUntilFull > 0 ? $"{_forecast.DaysUntilFull}" : "N/A")
+                        </div>
+                        <div class="text-muted">Days Until Full</div>
+                        <small class="text-muted">At current growth rate</small>
+                    </div>
+                    <div style="flex: 1; min-width: 200px; text-align: center; padding: 20px; border-right: 1px solid var(--border-color);">
+                        <div style="font-size: 24px; font-weight: bold;">
+                            @FormatBytes(_forecast.ProjectedUsage30Days)
+                        </div>
+                        <div class="text-muted">30-Day Projection</div>
+                        <small class="@(_forecast.ProjectedUsage30Days > _totalCapacity * 0.9 ? "text-danger" : "text-muted")">
+                            @((_forecast.ProjectedUsage30Days / (double)_totalCapacity * 100).ToString("F1"))% of capacity
+                        </small>
+                    </div>
+                    <div style="flex: 1; min-width: 200px; text-align: center; padding: 20px; border-right: 1px solid var(--border-color);">
+                        <div style="font-size: 24px; font-weight: bold;">
+                            @FormatBytes(_forecast.DailyGrowthRate)
+                        </div>
+                        <div class="text-muted">Daily Growth Rate</div>
+                        <small class="text-muted">@FormatBytes(_forecast.DailyGrowthRate * 30)/month</small>
+                    </div>
+                    <div style="flex: 1; min-width: 200px; text-align: center; padding: 20px;">
+                        <div style="font-size: 24px; font-weight: bold;">
+                            @FormatBytes(_forecast.RecommendedExpansion)
+                        </div>
+                        <div class="text-muted">Recommended Expansion</div>
+                        <small class="text-muted">For 6-month runway</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Recommendations -->
+        @if (_recommendations.Any())
+        {
+            <div class="card mt-3">
+                <div class="card-header">Capacity Recommendations</div>
+                <div class="card-body">
+                    @foreach (var rec in _recommendations)
+                    {
+                        <div class="alert @GetRecommendationAlertClass(rec.Priority) mb-2">
+                            <div class="d-flex justify-content-between align-items-start">
+                                <div>
+                                    <strong>@rec.Title</strong>
+                                    <p class="mb-1">@rec.Description</p>
+                                    <small class="text-muted">
+                                        Potential savings: @FormatBytes(rec.SpaceSavings) |
+                                        Cost impact: $@rec.MonthlyCostImpact.ToString("F2")/month
+                                    </small>
+                                </div>
+                                <div class="d-flex gap-2">
+                                    <span class="badge @GetPriorityBadge(rec.Priority)">@rec.Priority</span>
+                                    @if (rec.CanAutoApply)
+                                    {
+                                        <button class="btn btn-primary" style="padding: 2px 8px; font-size: 11px;"
+                                                @onclick="() => ApplyRecommendation(rec)">Apply</button>
+                                    }
+                                </div>
+                            </div>
+                        </div>
+                    }
+                </div>
+            </div>
+        }
+
+        <!-- Large Files Analysis -->
+        <div class="card mt-3">
+            <div class="card-header">Largest Objects</div>
+            <div class="card-body" style="padding: 0;">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Path</th>
+                            <th>Size</th>
+                            <th>Tier</th>
+                            <th>Last Accessed</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var obj in _largestObjects)
+                        {
+                            <tr>
+                                <td><code style="font-size: 11px;">@TruncatePath(obj.Path, 50)</code></td>
+                                <td>@FormatBytes(obj.Size)</td>
+                                <td><span class="badge @GetTierBadgeClass(obj.Tier)">@obj.Tier</span></td>
+                                <td>@obj.LastAccessed.ToString("yyyy-MM-dd")</td>
+                                <td>
+                                    @if (_tieringEnabled && obj.Tier != "Archive")
+                                    {
+                                        <button class="btn btn-secondary" style="padding: 2px 6px; font-size: 11px;"
+                                                @onclick="() => MoveToArchive(obj)">Archive</button>
+                                    }
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private bool _isLoading = true;
+    private bool _tieringEnabled = false;
+    private int _timeRange = 30;
+
+    private long _totalUsed = 0;
+    private long _totalCapacity = 1;
+    private double _usagePercent => _totalCapacity > 0 ? (double)_totalUsed / _totalCapacity * 100 : 0;
+
+    private List<TierUsage> _tierUsage = new();
+    private List<GrowthDataPoint> _growthHistory = new();
+    private List<CapacityRecommendation> _recommendations = new();
+    private List<LargeObject> _largestObjects = new();
+    private CapacityForecast _forecast = new();
+
+    /// <summary>
+    /// Initializes the component and loads capacity data.
+    /// </summary>
+    protected override async Task OnInitializedAsync()
+    {
+        _tieringEnabled = CapabilityManager.HasFeature("tiering");
+        await RefreshData();
+    }
+
+    /// <summary>
+    /// Refreshes all capacity data from the backend.
+    /// </summary>
+    private async Task RefreshData()
+    {
+        if (!InstanceManager.IsConnected)
+        {
+            _isLoading = false;
+            return;
+        }
+
+        _isLoading = true;
+        StateHasChanged();
+
+        try
+        {
+            // Get tier usage
+            var tierResult = await InstanceManager.ExecuteAsync("capacity.tierUsage");
+            _tierUsage = ParseTierUsage(tierResult?.Data);
+            _totalUsed = _tierUsage.Sum(t => t.Used);
+            _totalCapacity = _tierUsage.Sum(t => t.Total);
+
+            // Get growth history
+            var growthResult = await InstanceManager.ExecuteAsync("capacity.growthHistory", new Dictionary<string, object>
+            {
+                ["days"] = _timeRange
+            });
+            _growthHistory = ParseGrowthHistory(growthResult?.Data);
+
+            // Get forecast
+            var forecastResult = await InstanceManager.ExecuteAsync("capacity.forecast");
+            _forecast = ParseForecast(forecastResult?.Data);
+
+            // Get recommendations
+            var recResult = await InstanceManager.ExecuteAsync("capacity.recommendations");
+            _recommendations = ParseRecommendations(recResult?.Data);
+
+            // Get largest objects
+            var largeResult = await InstanceManager.ExecuteAsync("capacity.largestObjects", new Dictionary<string, object>
+            {
+                ["limit"] = 10
+            });
+            _largestObjects = ParseLargeObjects(largeResult?.Data);
+        }
+        catch (Exception ex)
+        {
+            await DialogService.AlertAsync("Error", $"Failed to load capacity data: {ex.Message}");
+        }
+        finally
+        {
+            _isLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    /// <summary>
+    /// Generates a capacity report.
+    /// </summary>
+    private async Task GenerateReport()
+    {
+        try
+        {
+            var format = await DialogService.ShowActionSheetAsync(
+                "Select Report Format", "Cancel", null,
+                "PDF", "CSV", "JSON");
+
+            if (string.IsNullOrEmpty(format) || format == "Cancel") return;
+
+            await InstanceManager.ExecuteAsync("capacity.generateReport", new Dictionary<string, object>
+            {
+                ["format"] = format.ToLowerInvariant(),
+                ["timeRange"] = _timeRange
+            });
+
+            await DialogService.AlertAsync("Report Generated", $"Capacity report has been generated in {format} format.");
+        }
+        catch (Exception ex)
+        {
+            await DialogService.AlertAsync("Error", $"Failed to generate report: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Shows tier policy configuration dialog.
+    /// </summary>
+    private async Task ShowTierPolicy(TierUsage tier)
+    {
+        await DialogService.AlertAsync("Tier Policy",
+            $"Configure policies for {tier.Name} tier:\n\n" +
+            $"Current usage: {FormatBytes(tier.Used)}\n" +
+            $"Object count: {tier.ObjectCount:N0}\n" +
+            $"Cost: ${tier.CostPerGbMonth:F3}/GB/month\n\n" +
+            "Policy settings would be configured here.");
+    }
+
+    /// <summary>
+    /// Applies a capacity recommendation.
+    /// </summary>
+    private async Task ApplyRecommendation(CapacityRecommendation rec)
+    {
+        var confirmed = await DialogService.ConfirmAsync("Apply Recommendation",
+            $"Apply '{rec.Title}'?\n\n" +
+            $"This will save approximately {FormatBytes(rec.SpaceSavings)} of storage.");
+
+        if (!confirmed) return;
+
+        try
+        {
+            await InstanceManager.ExecuteAsync("capacity.applyRecommendation", new Dictionary<string, object>
+            {
+                ["recommendationId"] = rec.Id
+            });
+            await DialogService.AlertAsync("Success", "Recommendation applied successfully.");
+            await RefreshData();
+        }
+        catch (Exception ex)
+        {
+            await DialogService.AlertAsync("Error", $"Failed to apply recommendation: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Moves an object to the archive tier.
+    /// </summary>
+    private async Task MoveToArchive(LargeObject obj)
+    {
+        var confirmed = await DialogService.ConfirmAsync("Move to Archive",
+            $"Move '{obj.Path}' ({FormatBytes(obj.Size)}) to Archive tier?\n\n" +
+            "This may increase retrieval time for this object.");
+
+        if (!confirmed) return;
+
+        try
+        {
+            await InstanceManager.ExecuteAsync("tiering.moveToTier", new Dictionary<string, object>
+            {
+                ["path"] = obj.Path,
+                ["targetTier"] = "Archive"
+            });
+            await RefreshData();
+        }
+        catch (Exception ex)
+        {
+            await DialogService.AlertAsync("Error", $"Failed to move object: {ex.Message}");
+        }
+    }
+
+    private string GetTierColorClass(string tier) => tier?.ToLowerInvariant() switch
+    {
+        "hot" => "bg-danger",
+        "warm" => "bg-warning",
+        "cold" => "bg-info",
+        "archive" => "bg-secondary",
+        _ => "bg-primary"
+    };
+
+    private string GetTierBadgeClass(string tier) => tier?.ToLowerInvariant() switch
+    {
+        "hot" => "badge-danger",
+        "warm" => "badge-warning",
+        "cold" => "badge-info",
+        "archive" => "badge-secondary",
+        _ => "badge-primary"
+    };
+
+    private string GetForecastColor(int daysUntilFull)
+    {
+        if (daysUntilFull < 30) return "var(--danger-color)";
+        if (daysUntilFull < 90) return "var(--warning-color)";
+        return "var(--success-color)";
+    }
+
+    private string GetRecommendationAlertClass(string priority) => priority?.ToLowerInvariant() switch
+    {
+        "critical" => "alert-danger",
+        "high" => "alert-warning",
+        "medium" => "alert-info",
+        _ => "alert-secondary"
+    };
+
+    private string GetPriorityBadge(string priority) => priority?.ToLowerInvariant() switch
+    {
+        "critical" => "badge-danger",
+        "high" => "badge-warning",
+        "medium" => "badge-info",
+        _ => "badge-secondary"
+    };
+
+    private string FormatBytes(long bytes)
+    {
+        string[] sizes = { "B", "KB", "MB", "GB", "TB", "PB" };
+        int order = 0;
+        double size = bytes;
+        while (size >= 1024 && order < sizes.Length - 1) { order++; size /= 1024; }
+        return $"{size:0.##} {sizes[order]}";
+    }
+
+    private string TruncatePath(string path, int maxLength)
+    {
+        if (path.Length <= maxLength) return path;
+        return "..." + path[^(maxLength - 3)..];
+    }
+
+    private List<TierUsage> ParseTierUsage(IDictionary<string, object>? data)
+    {
+        var tiers = new List<TierUsage>();
+        if (data?.TryGetValue("tiers", out var tiersObj) == true && tiersObj is IEnumerable<object> list)
+        {
+            foreach (var item in list)
+            {
+                if (item is IDictionary<string, object> d)
+                {
+                    tiers.Add(new TierUsage
+                    {
+                        Name = d.TryGetValue("name", out var n) ? n?.ToString() ?? "" : "",
+                        Used = d.TryGetValue("used", out var u) && long.TryParse(u?.ToString(), out var uv) ? uv : 0,
+                        Total = d.TryGetValue("total", out var t) && long.TryParse(t?.ToString(), out var tv) ? tv : 1,
+                        ObjectCount = d.TryGetValue("objectCount", out var oc) && int.TryParse(oc?.ToString(), out var ocv) ? ocv : 0,
+                        CostPerGbMonth = d.TryGetValue("costPerGbMonth", out var c) && double.TryParse(c?.ToString(), out var cv) ? cv : 0
+                    });
+                }
+            }
+        }
+        // Default tiers if none returned
+        if (!tiers.Any())
+        {
+            tiers = new List<TierUsage>
+            {
+                new() { Name = "Hot", Used = 100_000_000_000, Total = 500_000_000_000, ObjectCount = 50000, CostPerGbMonth = 0.023 },
+                new() { Name = "Warm", Used = 250_000_000_000, Total = 1_000_000_000_000, ObjectCount = 100000, CostPerGbMonth = 0.0125 },
+                new() { Name = "Cold", Used = 500_000_000_000, Total = 2_000_000_000_000, ObjectCount = 200000, CostPerGbMonth = 0.004 },
+                new() { Name = "Archive", Used = 1_000_000_000_000, Total = 5_000_000_000_000, ObjectCount = 500000, CostPerGbMonth = 0.00099 }
+            };
+        }
+        return tiers;
+    }
+
+    private List<GrowthDataPoint> ParseGrowthHistory(IDictionary<string, object>? data)
+    {
+        var history = new List<GrowthDataPoint>();
+        if (data?.TryGetValue("history", out var historyObj) == true && historyObj is IEnumerable<object> list)
+        {
+            foreach (var item in list)
+            {
+                if (item is IDictionary<string, object> d)
+                {
+                    var point = new GrowthDataPoint
+                    {
+                        Date = d.TryGetValue("date", out var dt) && DateTime.TryParse(dt?.ToString(), out var dtv) ? dtv : DateTime.MinValue,
+                        TotalUsed = d.TryGetValue("totalUsed", out var tu) && long.TryParse(tu?.ToString(), out var tuv) ? tuv : 0,
+                        TierBreakdown = new Dictionary<string, long>()
+                    };
+                    if (d.TryGetValue("tiers", out var tiers) && tiers is IDictionary<string, object> tierDict)
+                    {
+                        foreach (var kvp in tierDict)
+                        {
+                            if (long.TryParse(kvp.Value?.ToString(), out var tierVal))
+                            {
+                                point.TierBreakdown[kvp.Key] = tierVal;
+                            }
+                        }
+                    }
+                    history.Add(point);
+                }
+            }
+        }
+        return history.OrderBy(h => h.Date).ToList();
+    }
+
+    private CapacityForecast ParseForecast(IDictionary<string, object>? data)
+    {
+        if (data == null) return new CapacityForecast();
+        return new CapacityForecast
+        {
+            DaysUntilFull = data.TryGetValue("daysUntilFull", out var d) && int.TryParse(d?.ToString(), out var dv) ? dv : 365,
+            ProjectedUsage30Days = data.TryGetValue("projectedUsage30Days", out var p) && long.TryParse(p?.ToString(), out var pv) ? pv : 0,
+            DailyGrowthRate = data.TryGetValue("dailyGrowthRate", out var g) && long.TryParse(g?.ToString(), out var gv) ? gv : 0,
+            RecommendedExpansion = data.TryGetValue("recommendedExpansion", out var r) && long.TryParse(r?.ToString(), out var rv) ? rv : 0
+        };
+    }
+
+    private List<CapacityRecommendation> ParseRecommendations(IDictionary<string, object>? data)
+    {
+        var recs = new List<CapacityRecommendation>();
+        if (data?.TryGetValue("recommendations", out var recsObj) == true && recsObj is IEnumerable<object> list)
+        {
+            foreach (var item in list)
+            {
+                if (item is IDictionary<string, object> d)
+                {
+                    recs.Add(new CapacityRecommendation
+                    {
+                        Id = d.TryGetValue("id", out var id) ? id?.ToString() ?? "" : "",
+                        Title = d.TryGetValue("title", out var t) ? t?.ToString() ?? "" : "",
+                        Description = d.TryGetValue("description", out var desc) ? desc?.ToString() ?? "" : "",
+                        Priority = d.TryGetValue("priority", out var p) ? p?.ToString() ?? "Low" : "Low",
+                        SpaceSavings = d.TryGetValue("spaceSavings", out var s) && long.TryParse(s?.ToString(), out var sv) ? sv : 0,
+                        MonthlyCostImpact = d.TryGetValue("monthlyCostImpact", out var c) && double.TryParse(c?.ToString(), out var cv) ? cv : 0,
+                        CanAutoApply = d.TryGetValue("canAutoApply", out var a) && bool.TryParse(a?.ToString(), out var av) && av
+                    });
+                }
+            }
+        }
+        return recs;
+    }
+
+    private List<LargeObject> ParseLargeObjects(IDictionary<string, object>? data)
+    {
+        var objects = new List<LargeObject>();
+        if (data?.TryGetValue("objects", out var objsObj) == true && objsObj is IEnumerable<object> list)
+        {
+            foreach (var item in list)
+            {
+                if (item is IDictionary<string, object> d)
+                {
+                    objects.Add(new LargeObject
+                    {
+                        Path = d.TryGetValue("path", out var p) ? p?.ToString() ?? "" : "",
+                        Size = d.TryGetValue("size", out var s) && long.TryParse(s?.ToString(), out var sv) ? sv : 0,
+                        Tier = d.TryGetValue("tier", out var t) ? t?.ToString() ?? "Hot" : "Hot",
+                        LastAccessed = d.TryGetValue("lastAccessed", out var la) && DateTime.TryParse(la?.ToString(), out var lav) ? lav : DateTime.MinValue
+                    });
+                }
+            }
+        }
+        return objects;
+    }
+
+    /// <summary>
+    /// Represents storage usage for a tier.
+    /// </summary>
+    private record TierUsage
+    {
+        public string Name { get; init; } = "";
+        public long Used { get; init; }
+        public long Total { get; init; }
+        public int ObjectCount { get; init; }
+        public double CostPerGbMonth { get; init; }
+        public double UsagePercent => Total > 0 ? (double)Used / Total * 100 : 0;
+    }
+
+    /// <summary>
+    /// Represents a historical growth data point.
+    /// </summary>
+    private record GrowthDataPoint
+    {
+        public DateTime Date { get; init; }
+        public long TotalUsed { get; init; }
+        public Dictionary<string, long> TierBreakdown { get; init; } = new();
+    }
+
+    /// <summary>
+    /// Represents a capacity forecast.
+    /// </summary>
+    private record CapacityForecast
+    {
+        public int DaysUntilFull { get; init; } = 365;
+        public long ProjectedUsage30Days { get; init; }
+        public long DailyGrowthRate { get; init; }
+        public long RecommendedExpansion { get; init; }
+    }
+
+    /// <summary>
+    /// Represents a capacity management recommendation.
+    /// </summary>
+    private record CapacityRecommendation
+    {
+        public string Id { get; init; } = "";
+        public string Title { get; init; } = "";
+        public string Description { get; init; } = "";
+        public string Priority { get; init; } = "Low";
+        public long SpaceSavings { get; init; }
+        public double MonthlyCostImpact { get; init; }
+        public bool CanAutoApply { get; init; }
+    }
+
+    /// <summary>
+    /// Represents a large storage object.
+    /// </summary>
+    private record LargeObject
+    {
+        public string Path { get; init; } = "";
+        public long Size { get; init; }
+        public string Tier { get; init; } = "Hot";
+        public DateTime LastAccessed { get; init; }
+    }
+}

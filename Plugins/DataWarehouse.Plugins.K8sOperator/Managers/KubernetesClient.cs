@@ -23,7 +23,6 @@ public sealed class KubernetesClientImpl : IKubernetesClient, IDisposable
     {
         const string tokenPath = "/var/run/secrets/kubernetes.io/serviceaccount/token";
         const string caPath = "/var/run/secrets/kubernetes.io/serviceaccount/ca.crt";
-        const string namespacePath = "/var/run/secrets/kubernetes.io/serviceaccount/namespace";
 
         var handler = new HttpClientHandler();
 

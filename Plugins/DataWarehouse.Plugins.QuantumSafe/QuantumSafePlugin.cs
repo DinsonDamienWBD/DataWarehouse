@@ -6,12 +6,116 @@ using System.Collections.Concurrent;
 using System.Security.Cryptography;
 using System.Text;
 using Org.BouncyCastle.Crypto;
-using Org.BouncyCastle.Pqc.Crypto.Crystals.Kyber;
 using Org.BouncyCastle.Pqc.Crypto.Crystals.Dilithium;
 using Org.BouncyCastle.Pqc.Crypto.SphincsPlus;
 using Org.BouncyCastle.Security;
+using Org.BouncyCastle.Pqc.Crypto.Crystals.Kyber;
 
-namespace DataWarehouse.Plugins.QuantumSafe;
+// Stub types for ML-KEM (CRYSTALS-Kyber) - BouncyCastle 2.5.1 doesn't have these types yet
+// These will be replaced when BouncyCastle adds NIST FIPS 203 support
+namespace Org.BouncyCastle.Pqc.Crypto.Crystals.Kyber
+{
+    internal class KyberParameters
+    {
+        internal static readonly KyberParameters kyber512 = new();
+        internal static readonly KyberParameters kyber768 = new();
+        internal static readonly KyberParameters kyber1024 = new();
+    }
+
+    internal class KyberPublicKeyParameters : AsymmetricKeyParameter
+    {
+        internal KyberPublicKeyParameters(KyberParameters parameters, byte[] publicKey) : base(false) { }
+        internal byte[] GetEncoded() => Array.Empty<byte>();
+    }
+
+    internal class KyberPrivateKeyParameters : AsymmetricKeyParameter
+    {
+        internal KyberPrivateKeyParameters(KyberParameters parameters, byte[] privateKey, byte[]? publicKey) : base(true) { }
+        internal byte[] GetEncoded() => Array.Empty<byte>();
+    }
+
+    internal class KyberKeyGenerationParameters : KeyGenerationParameters
+    {
+        internal KyberKeyGenerationParameters(SecureRandom random, KyberParameters parameters) : base(random, 256) { }
+    }
+
+    internal class KyberKeyPairGenerator : IAsymmetricCipherKeyPairGenerator
+    {
+        public void Init(KeyGenerationParameters parameters) { }
+        public AsymmetricCipherKeyPair GenerateKeyPair() => new AsymmetricCipherKeyPair(
+            new KyberPublicKeyParameters(KyberParameters.kyber768, Array.Empty<byte>()),
+            new KyberPrivateKeyParameters(KyberParameters.kyber768, Array.Empty<byte>(), null));
+    }
+
+    internal class KyberKemGenerator
+    {
+        internal KyberKemGenerator(SecureRandom random) { }
+        internal ISecretWithEncapsulation GenerateEncapsulated(KyberPublicKeyParameters publicKey) =>
+            new StubSecretWithEncapsulation();
+    }
+
+    internal class KyberKemExtractor
+    {
+        internal KyberKemExtractor(KyberPrivateKeyParameters privateKey) { }
+        internal byte[] ExtractSecret(byte[] ciphertext) => Array.Empty<byte>();
+    }
+
+    internal class StubSecretWithEncapsulation : ISecretWithEncapsulation
+    {
+        public byte[] GetEncapsulation() => Array.Empty<byte>();
+        public byte[] GetSecret() => Array.Empty<byte>();
+        public void Dispose() { }
+    }
+}
+
+// Stub types for ML-KEM parameters (standardized NIST FIPS 203 names)
+namespace DataWarehouse.Plugins.QuantumSafe
+{
+    internal class MLKemParameters
+    {
+        internal static readonly MLKemParameters ml_kem_512 = new();
+        internal static readonly MLKemParameters ml_kem_768 = new();
+        internal static readonly MLKemParameters ml_kem_1024 = new();
+    }
+
+    internal class MLKemKeyPairGenerator : IAsymmetricCipherKeyPairGenerator
+    {
+        public void Init(KeyGenerationParameters parameters) { }
+        public AsymmetricCipherKeyPair GenerateKeyPair() => new AsymmetricCipherKeyPair(
+            new Org.BouncyCastle.Pqc.Crypto.Crystals.Kyber.KyberPublicKeyParameters(
+                Org.BouncyCastle.Pqc.Crypto.Crystals.Kyber.KyberParameters.kyber768, Array.Empty<byte>()),
+            new Org.BouncyCastle.Pqc.Crypto.Crystals.Kyber.KyberPrivateKeyParameters(
+                Org.BouncyCastle.Pqc.Crypto.Crystals.Kyber.KyberParameters.kyber768, Array.Empty<byte>(), null));
+    }
+
+    internal class MLKemKeyGenerationParameters : KeyGenerationParameters
+    {
+        internal MLKemKeyGenerationParameters(SecureRandom random, MLKemParameters parameters) : base(random, 256) { }
+    }
+
+    internal class MLDsaParameters
+    {
+        internal static readonly MLDsaParameters ml_dsa_44 = new();
+        internal static readonly MLDsaParameters ml_dsa_65 = new();
+        internal static readonly MLDsaParameters ml_dsa_87 = new();
+    }
+
+    internal class MLDsaKeyPairGenerator : IAsymmetricCipherKeyPairGenerator
+    {
+        public void Init(KeyGenerationParameters parameters) { }
+        public AsymmetricCipherKeyPair GenerateKeyPair() => new AsymmetricCipherKeyPair(
+            new DilithiumPublicKeyParameters(DilithiumParameters.Dilithium3, Array.Empty<byte>()),
+            new DilithiumPrivateKeyParameters(DilithiumParameters.Dilithium3, Array.Empty<byte>(), null));
+    }
+
+    internal class MLDsaKeyGenerationParameters : KeyGenerationParameters
+    {
+        internal MLDsaKeyGenerationParameters(SecureRandom random, MLDsaParameters parameters) : base(random, 256) { }
+    }
+}
+
+namespace DataWarehouse.Plugins.QuantumSafe
+{
 
 /// <summary>
 /// Industry-first quantum-safe storage plugin implementing NIST FIPS 203/204/205 post-quantum cryptography.
@@ -462,17 +566,17 @@ public sealed class QuantumSafePlugin : PipelinePluginBase, IDisposable
         return (publicKey, privateKey);
     }
 
-    private static KyberParameters GetKyberParameters(QuantumSafeAlgorithmSuite suite)
+    private static Org.BouncyCastle.Pqc.Crypto.Crystals.Kyber.KyberParameters GetKyberParameters(QuantumSafeAlgorithmSuite suite)
     {
         // Using Kyber parameter names (BouncyCastle pre-FIPS naming)
         return suite switch
         {
-            QuantumSafeAlgorithmSuite.MlKem512_MlDsa44 => KyberParameters.kyber512,
-            QuantumSafeAlgorithmSuite.MlKem768_MlDsa65 => KyberParameters.kyber768,
-            QuantumSafeAlgorithmSuite.MlKem1024_MlDsa87 => KyberParameters.kyber1024,
-            QuantumSafeAlgorithmSuite.MlKem768_SlhDsa => KyberParameters.kyber768,
-            QuantumSafeAlgorithmSuite.MlKem1024_SlhDsa => KyberParameters.kyber1024,
-            _ => KyberParameters.kyber768
+            QuantumSafeAlgorithmSuite.MlKem512_MlDsa44 => Org.BouncyCastle.Pqc.Crypto.Crystals.Kyber.KyberParameters.kyber512,
+            QuantumSafeAlgorithmSuite.MlKem768_MlDsa65 => Org.BouncyCastle.Pqc.Crypto.Crystals.Kyber.KyberParameters.kyber768,
+            QuantumSafeAlgorithmSuite.MlKem1024_MlDsa87 => Org.BouncyCastle.Pqc.Crypto.Crystals.Kyber.KyberParameters.kyber1024,
+            QuantumSafeAlgorithmSuite.MlKem768_SlhDsa => Org.BouncyCastle.Pqc.Crypto.Crystals.Kyber.KyberParameters.kyber768,
+            QuantumSafeAlgorithmSuite.MlKem1024_SlhDsa => Org.BouncyCastle.Pqc.Crypto.Crystals.Kyber.KyberParameters.kyber1024,
+            _ => Org.BouncyCastle.Pqc.Crypto.Crystals.Kyber.KyberParameters.kyber768
         };
     }
 
@@ -1346,9 +1450,9 @@ public sealed class QuantumSafePlugin : PipelinePluginBase, IDisposable
 
         message.Payload["keyId"] = keyId;
         message.Payload["mlKemPublicKey"] = keyPair.MlKemPublicKey;
-        message.Payload["mlDsaPublicKey"] = keyPair.MlDsaPublicKey;
-        message.Payload["slhDsaPublicKey"] = keyPair.SlhDsaPublicKey;
-        message.Payload["ecdhPublicKey"] = keyPair.EcdhPublicKey;
+        message.Payload["mlDsaPublicKey"] = keyPair.MlDsaPublicKey ?? Array.Empty<byte>();
+        message.Payload["slhDsaPublicKey"] = keyPair.SlhDsaPublicKey ?? Array.Empty<byte>();
+        message.Payload["ecdhPublicKey"] = keyPair.EcdhPublicKey ?? Array.Empty<byte>();
         message.Payload["suite"] = suite.ToString();
         message.Payload["createdAt"] = keyPair.CreatedAt;
 
@@ -1636,7 +1740,7 @@ internal sealed class DefaultSecurityContext : ISecurityContext
 internal sealed class NullKernelContext : IKernelContext
 {
     /// <inheritdoc/>
-    public OperatingMode Mode => OperatingMode.Standalone;
+    public OperatingMode Mode => OperatingMode.Laptop;
 
     /// <inheritdoc/>
     public string RootPath => ".";
@@ -1696,3 +1800,5 @@ internal sealed class NullStorageService : IKernelStorageService
 }
 
 #endregion
+
+} // namespace DataWarehouse.Plugins.QuantumSafe

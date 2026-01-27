@@ -511,6 +511,11 @@ public static class FuseErrno
     public const int EIO = 5;
 
     /// <summary>
+    /// No such device or address.
+    /// </summary>
+    public const int ENXIO = 6;
+
+    /// <summary>
     /// Bad file descriptor.
     /// </summary>
     public const int EBADF = 9;

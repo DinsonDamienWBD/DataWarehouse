@@ -4,6 +4,7 @@
 using System.Collections.Concurrent;
 using System.Reflection;
 using DataWarehouse.Shared.Models;
+using DataWarehouse.Shared.Services;
 
 namespace DataWarehouse.Shared.Commands;
 
@@ -17,16 +18,46 @@ public sealed class CommandExecutor
     private readonly InstanceManager _instanceManager;
     private readonly CapabilityManager _capabilityManager;
     private readonly List<ICommand> _allCommands = new();
+    private readonly CommandRecorder? _recorder;
+    private readonly UndoManager? _undoManager;
 
     /// <summary>
     /// Initializes a new CommandExecutor with the given managers.
     /// </summary>
     public CommandExecutor(InstanceManager instanceManager, CapabilityManager capabilityManager)
+        : this(instanceManager, capabilityManager, null, null)
+    {
+    }
+
+    /// <summary>
+    /// Initializes a new CommandExecutor with services for recording and undo support.
+    /// </summary>
+    /// <param name="instanceManager">The instance manager.</param>
+    /// <param name="capabilityManager">The capability manager.</param>
+    /// <param name="recorder">Optional command recorder for session recording.</param>
+    /// <param name="undoManager">Optional undo manager for rollback support.</param>
+    public CommandExecutor(
+        InstanceManager instanceManager,
+        CapabilityManager capabilityManager,
+        CommandRecorder? recorder,
+        UndoManager? undoManager)
     {
         _instanceManager = instanceManager;
         _capabilityManager = capabilityManager;
+        _recorder = recorder;
+        _undoManager = undoManager;
         RegisterBuiltInCommands();
     }
+
+    /// <summary>
+    /// Gets the command recorder, if available.
+    /// </summary>
+    public CommandRecorder? Recorder => _recorder;
+
+    /// <summary>
+    /// Gets the undo manager, if available.
+    /// </summary>
+    public UndoManager? UndoManager => _undoManager;
 
     /// <summary>
     /// Gets all registered commands.

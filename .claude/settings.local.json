@@ -49,7 +49,10 @@
       "Bash(dotnet list:*)",
       "Bash(dotnet nuget:*)",
       "Bash(dotnet add:*)",
-      "Bash(grep:*)"
+      "Bash(grep:*)",
+      "Bash(cmd /c \"mkdir deploy\\\\crds 2>nul & mkdir deploy\\\\rbac 2>nul & mkdir deploy\\\\operator 2>nul & mkdir deploy\\\\examples 2>nul & mkdir charts\\\\datawarehouse-operator\\\\templates 2>nul\")",
+      "Bash(git pull:*)",
+      "Bash(Select-String -Pattern \"Error\\\\\\(s\\\\\\)|Warning\\\\\\(s\\\\\\)|Build succeeded|Build FAILED\")"
     ]
   }
 }

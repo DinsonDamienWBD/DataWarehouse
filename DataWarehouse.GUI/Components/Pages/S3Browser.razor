@@ -1,0 +1,643 @@
+@page "/s3"
+@inject InstanceManager InstanceManager
+@inject CapabilityManager CapabilityManager
+@inject DialogService DialogService
+
+@*
+    S3Browser.razor - S3-specific storage browser component.
+
+    Provides S3-specific functionality including:
+    - Bucket listing and navigation
+    - S3-specific metadata (storage class, versioning)
+    - Multipart upload progress tracking
+    - Pre-signed URL generation
+
+    Requires the 's3-storage' plugin to be loaded.
+*@
+
+<div class="content-header">
+    <h2>S3 Storage Browser</h2>
+    <div class="d-flex gap-2">
+        <button class="btn btn-primary" @onclick="CreateBucket" disabled="@(!_isFeatureAvailable)">New Bucket</button>
+        <button class="btn btn-secondary" @onclick="RefreshBuckets" disabled="@(!_isFeatureAvailable)">Refresh</button>
+    </div>
+</div>
+
+<div class="content-body">
+    @if (!InstanceManager.IsConnected)
+    {
+        <div class="alert alert-warning">
+            <strong>Not Connected</strong><br />
+            Connect to a DataWarehouse instance to browse S3 storage.
+        </div>
+    }
+    else if (!_isFeatureAvailable)
+    {
+        <div class="alert alert-warning">
+            <strong>S3 Storage Not Available</strong><br />
+            The S3 storage plugin is not loaded on this instance.
+        </div>
+    }
+    else if (_isLoading)
+    {
+        <div class="text-center mt-4">
+            <div class="spinner"></div>
+            <p class="mt-2">Loading S3 data...</p>
+        </div>
+    }
+    else
+    {
+        <div class="d-flex gap-3" style="flex-wrap: wrap;">
+            <!-- Bucket List Panel -->
+            <div class="card" style="flex: 0 0 300px;">
+                <div class="card-header">Buckets (@_buckets.Count)</div>
+                <div class="card-body" style="padding: 0; max-height: 400px; overflow-y: auto;">
+                    @if (_buckets.Any())
+                    {
+                        @foreach (var bucket in _buckets)
+                        {
+                            <div class="p-2 border-bottom @(_selectedBucket?.Name == bucket.Name ? "selected-item" : "")"
+                                 style="cursor: pointer;" @onclick="() => SelectBucket(bucket)">
+                                <div class="d-flex justify-content-between">
+                                    <strong>@bucket.Name</strong>
+                                    <span class="badge @GetStorageClassBadge(bucket.StorageClass)">@bucket.StorageClass</span>
+                                </div>
+                                <small class="text-muted">
+                                    Created: @bucket.CreatedAt.ToString("yyyy-MM-dd") |
+                                    @(bucket.VersioningEnabled ? "Versioned" : "No Versioning")
+                                </small>
+                            </div>
+                        }
+                    }
+                    else
+                    {
+                        <div class="p-3 text-muted text-center">No buckets found</div>
+                    }
+                </div>
+            </div>
+
+            <!-- Object Browser Panel -->
+            <div class="card" style="flex: 1; min-width: 400px;">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <span>Objects @(_selectedBucket != null ? $"in {_selectedBucket.Name}" : "")</span>
+                    @if (_selectedBucket != null)
+                    {
+                        <div class="d-flex gap-2">
+                            <button class="btn btn-secondary" style="padding: 4px 8px; font-size: 12px;"
+                                    @onclick="UploadObject">Upload</button>
+                            <button class="btn btn-secondary" style="padding: 4px 8px; font-size: 12px;"
+                                    @onclick="NavigateUp" disabled="@(_currentPrefix == "")">Up</button>
+                        </div>
+                    }
+                </div>
+                <div class="card-body" style="padding: 0;">
+                    @if (_selectedBucket == null)
+                    {
+                        <div class="p-3 text-muted text-center">Select a bucket to browse objects</div>
+                    }
+                    else
+                    {
+                        <!-- Path breadcrumb -->
+                        <div class="p-2 border-bottom" style="background: var(--surface-color);">
+                            <code>s3://@_selectedBucket.Name/@_currentPrefix</code>
+                        </div>
+
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Name</th>
+                                    <th>Size</th>
+                                    <th>Storage Class</th>
+                                    <th>Last Modified</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var obj in _objects)
+                                {
+                                    <tr>
+                                        <td>
+                                            @if (obj.IsPrefix)
+                                            {
+                                                <a href="javascript:void(0)" @onclick="() => NavigateToPrefix(obj.Key)">
+                                                    &#128193; @GetDisplayName(obj.Key)
+                                                </a>
+                                            }
+                                            else
+                                            {
+                                                <span>&#128196; @GetDisplayName(obj.Key)</span>
+                                            }
+                                        </td>
+                                        <td>@(obj.IsPrefix ? "-" : FormatBytes(obj.Size))</td>
+                                        <td>
+                                            @if (!obj.IsPrefix)
+                                            {
+                                                <span class="badge @GetStorageClassBadge(obj.StorageClass)">@obj.StorageClass</span>
+                                            }
+                                        </td>
+                                        <td>@(obj.IsPrefix ? "-" : obj.LastModified.ToString("yyyy-MM-dd HH:mm"))</td>
+                                        <td>
+                                            @if (!obj.IsPrefix)
+                                            {
+                                                <div class="d-flex gap-1">
+                                                    <button class="btn btn-secondary" style="padding: 2px 6px; font-size: 11px;"
+                                                            @onclick="() => GeneratePresignedUrl(obj)">URL</button>
+                                                    <button class="btn btn-secondary" style="padding: 2px 6px; font-size: 11px;"
+                                                            @onclick="() => ShowObjectMetadata(obj)">Info</button>
+                                                    <button class="btn btn-danger" style="padding: 2px 6px; font-size: 11px;"
+                                                            @onclick="() => DeleteObject(obj)">Del</button>
+                                                </div>
+                                            }
+                                        </td>
+                                    </tr>
+                                }
+                                @if (!_objects.Any())
+                                {
+                                    <tr>
+                                        <td colspan="5" class="text-center text-muted">No objects in this location</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    }
+                </div>
+            </div>
+        </div>
+
+        <!-- Active Uploads -->
+        @if (_activeUploads.Any())
+        {
+            <div class="card mt-3">
+                <div class="card-header">Active Multipart Uploads</div>
+                <div class="card-body">
+                    @foreach (var upload in _activeUploads)
+                    {
+                        <div class="mb-3">
+                            <div class="d-flex justify-content-between mb-1">
+                                <span>@upload.Key</span>
+                                <span>@upload.Progress% (@upload.UploadedParts / @upload.TotalParts parts)</span>
+                            </div>
+                            <div class="progress">
+                                <div class="progress-bar" style="width: @upload.Progress%"></div>
+                            </div>
+                            <div class="mt-1 d-flex justify-content-between">
+                                <small class="text-muted">Upload ID: @upload.UploadId[..8]...</small>
+                                <button class="btn btn-danger" style="padding: 2px 6px; font-size: 11px;"
+                                        @onclick="() => AbortUpload(upload)">Abort</button>
+                            </div>
+                        </div>
+                    }
+                </div>
+            </div>
+        }
+
+        <!-- S3 Statistics -->
+        <div class="d-flex gap-3 mt-3" style="flex-wrap: wrap;">
+            <div class="card" style="flex: 1; min-width: 200px;">
+                <div class="card-body text-center">
+                    <div style="font-size: 24px; font-weight: bold;">@_buckets.Count</div>
+                    <div class="text-muted">Total Buckets</div>
+                </div>
+            </div>
+            <div class="card" style="flex: 1; min-width: 200px;">
+                <div class="card-body text-center">
+                    <div style="font-size: 24px; font-weight: bold;">@FormatBytes(_totalSize)</div>
+                    <div class="text-muted">Total Storage</div>
+                </div>
+            </div>
+            <div class="card" style="flex: 1; min-width: 200px;">
+                <div class="card-body text-center">
+                    <div style="font-size: 24px; font-weight: bold;">@_totalObjects</div>
+                    <div class="text-muted">Total Objects</div>
+                </div>
+            </div>
+            <div class="card" style="flex: 1; min-width: 200px;">
+                <div class="card-body text-center">
+                    <div style="font-size: 24px; font-weight: bold;">@_activeUploads.Count</div>
+                    <div class="text-muted">Active Uploads</div>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private bool _isLoading = true;
+    private bool _isFeatureAvailable = false;
+    private List<S3Bucket> _buckets = new();
+    private List<S3Object> _objects = new();
+    private List<MultipartUpload> _activeUploads = new();
+    private S3Bucket? _selectedBucket;
+    private string _currentPrefix = "";
+    private long _totalSize = 0;
+    private int _totalObjects = 0;
+
+    /// <summary>
+    /// Initializes the component and loads S3 data if available.
+    /// </summary>
+    protected override async Task OnInitializedAsync()
+    {
+        _isFeatureAvailable = CapabilityManager.HasPlugin("s3-storage");
+        if (_isFeatureAvailable)
+        {
+            await RefreshBuckets();
+        }
+        else
+        {
+            _isLoading = false;
+        }
+    }
+
+    /// <summary>
+    /// Refreshes the list of S3 buckets from the backend.
+    /// </summary>
+    private async Task RefreshBuckets()
+    {
+        _isLoading = true;
+        StateHasChanged();
+
+        try
+        {
+            var result = await InstanceManager.ExecuteAsync("s3.listBuckets");
+            _buckets = ParseBuckets(result?.Data);
+
+            // Get statistics
+            var statsResult = await InstanceManager.ExecuteAsync("s3.stats");
+            if (statsResult?.Data != null)
+            {
+                _totalSize = GetLongValue(statsResult.Data, "totalSize", 0);
+                _totalObjects = GetIntValue(statsResult.Data, "totalObjects", 0);
+            }
+
+            // Get active uploads
+            var uploadsResult = await InstanceManager.ExecuteAsync("s3.listMultipartUploads");
+            _activeUploads = ParseUploads(uploadsResult?.Data);
+        }
+        catch (Exception ex)
+        {
+            await DialogService.AlertAsync("Error", $"Failed to load S3 data: {ex.Message}");
+        }
+        finally
+        {
+            _isLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    /// <summary>
+    /// Selects a bucket and loads its objects.
+    /// </summary>
+    private async Task SelectBucket(S3Bucket bucket)
+    {
+        _selectedBucket = bucket;
+        _currentPrefix = "";
+        await LoadObjects();
+    }
+
+    /// <summary>
+    /// Loads objects from the selected bucket with the current prefix.
+    /// </summary>
+    private async Task LoadObjects()
+    {
+        if (_selectedBucket == null) return;
+
+        try
+        {
+            var result = await InstanceManager.ExecuteAsync("s3.listObjects", new Dictionary<string, object>
+            {
+                ["bucket"] = _selectedBucket.Name,
+                ["prefix"] = _currentPrefix,
+                ["delimiter"] = "/"
+            });
+            _objects = ParseObjects(result?.Data);
+        }
+        catch (Exception ex)
+        {
+            await DialogService.AlertAsync("Error", $"Failed to list objects: {ex.Message}");
+        }
+        StateHasChanged();
+    }
+
+    /// <summary>
+    /// Navigates to a prefix (folder) in the bucket.
+    /// </summary>
+    private async Task NavigateToPrefix(string prefix)
+    {
+        _currentPrefix = prefix;
+        await LoadObjects();
+    }
+
+    /// <summary>
+    /// Navigates up one level in the prefix hierarchy.
+    /// </summary>
+    private async Task NavigateUp()
+    {
+        if (string.IsNullOrEmpty(_currentPrefix)) return;
+        var parts = _currentPrefix.TrimEnd('/').Split('/');
+        _currentPrefix = parts.Length > 1 ? string.Join("/", parts[..^1]) + "/" : "";
+        await LoadObjects();
+    }
+
+    /// <summary>
+    /// Creates a new S3 bucket.
+    /// </summary>
+    private async Task CreateBucket()
+    {
+        var bucketName = await DialogService.PromptAsync("Create Bucket", "Enter bucket name:");
+        if (string.IsNullOrEmpty(bucketName)) return;
+
+        try
+        {
+            await InstanceManager.ExecuteAsync("s3.createBucket", new Dictionary<string, object>
+            {
+                ["name"] = bucketName
+            });
+            await RefreshBuckets();
+        }
+        catch (Exception ex)
+        {
+            await DialogService.AlertAsync("Error", $"Failed to create bucket: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Uploads an object to the selected bucket.
+    /// </summary>
+    private async Task UploadObject()
+    {
+        if (_selectedBucket == null) return;
+
+        var objectKey = await DialogService.PromptAsync("Upload Object", "Enter object key:");
+        if (string.IsNullOrEmpty(objectKey)) return;
+
+        try
+        {
+            await InstanceManager.ExecuteAsync("s3.putObject", new Dictionary<string, object>
+            {
+                ["bucket"] = _selectedBucket.Name,
+                ["key"] = _currentPrefix + objectKey,
+                ["content"] = "placeholder"
+            });
+            await LoadObjects();
+        }
+        catch (Exception ex)
+        {
+            await DialogService.AlertAsync("Error", $"Failed to upload object: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Generates a pre-signed URL for an object.
+    /// </summary>
+    private async Task GeneratePresignedUrl(S3Object obj)
+    {
+        try
+        {
+            var result = await InstanceManager.ExecuteAsync("s3.generatePresignedUrl", new Dictionary<string, object>
+            {
+                ["bucket"] = _selectedBucket!.Name,
+                ["key"] = obj.Key,
+                ["expiresIn"] = 3600
+            });
+
+            var url = result?.Data?.TryGetValue("url", out var u) == true ? u?.ToString() : "URL generated";
+            await DialogService.AlertAsync("Pre-signed URL", $"URL (valid for 1 hour):\n\n{url}");
+        }
+        catch (Exception ex)
+        {
+            await DialogService.AlertAsync("Error", $"Failed to generate URL: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Shows metadata for an S3 object.
+    /// </summary>
+    private async Task ShowObjectMetadata(S3Object obj)
+    {
+        try
+        {
+            var result = await InstanceManager.ExecuteAsync("s3.headObject", new Dictionary<string, object>
+            {
+                ["bucket"] = _selectedBucket!.Name,
+                ["key"] = obj.Key
+            });
+
+            var metadata = $"Key: {obj.Key}\n" +
+                          $"Size: {FormatBytes(obj.Size)}\n" +
+                          $"Storage Class: {obj.StorageClass}\n" +
+                          $"Last Modified: {obj.LastModified}\n" +
+                          $"ETag: {obj.ETag}\n" +
+                          $"Content Type: {obj.ContentType}";
+
+            await DialogService.AlertAsync("Object Metadata", metadata);
+        }
+        catch (Exception ex)
+        {
+            await DialogService.AlertAsync("Error", $"Failed to get metadata: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Deletes an object from the bucket.
+    /// </summary>
+    private async Task DeleteObject(S3Object obj)
+    {
+        var confirmed = await DialogService.ConfirmAsync("Confirm Delete", $"Delete '{obj.Key}'?");
+        if (!confirmed) return;
+
+        try
+        {
+            await InstanceManager.ExecuteAsync("s3.deleteObject", new Dictionary<string, object>
+            {
+                ["bucket"] = _selectedBucket!.Name,
+                ["key"] = obj.Key
+            });
+            await LoadObjects();
+        }
+        catch (Exception ex)
+        {
+            await DialogService.AlertAsync("Error", $"Failed to delete object: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Aborts a multipart upload.
+    /// </summary>
+    private async Task AbortUpload(MultipartUpload upload)
+    {
+        var confirmed = await DialogService.ConfirmAsync("Confirm Abort", $"Abort upload for '{upload.Key}'?");
+        if (!confirmed) return;
+
+        try
+        {
+            await InstanceManager.ExecuteAsync("s3.abortMultipartUpload", new Dictionary<string, object>
+            {
+                ["bucket"] = upload.Bucket,
+                ["key"] = upload.Key,
+                ["uploadId"] = upload.UploadId
+            });
+            await RefreshBuckets();
+        }
+        catch (Exception ex)
+        {
+            await DialogService.AlertAsync("Error", $"Failed to abort upload: {ex.Message}");
+        }
+    }
+
+    private string GetDisplayName(string key)
+    {
+        var name = key.TrimEnd('/');
+        var lastSlash = name.LastIndexOf('/');
+        return lastSlash >= 0 ? name[(lastSlash + 1)..] : name;
+    }
+
+    private string GetStorageClassBadge(string storageClass) => storageClass?.ToUpperInvariant() switch
+    {
+        "STANDARD" => "badge-success",
+        "STANDARD_IA" or "ONEZONE_IA" => "badge-info",
+        "GLACIER" or "GLACIER_IR" => "badge-warning",
+        "DEEP_ARCHIVE" => "badge-danger",
+        _ => "badge-secondary"
+    };
+
+    private string FormatBytes(long bytes)
+    {
+        string[] sizes = { "B", "KB", "MB", "GB", "TB", "PB" };
+        int order = 0;
+        double size = bytes;
+        while (size >= 1024 && order < sizes.Length - 1) { order++; size /= 1024; }
+        return $"{size:0.##} {sizes[order]}";
+    }
+
+    private long GetLongValue(IDictionary<string, object>? dict, string key, long defaultValue)
+    {
+        if (dict?.TryGetValue(key, out var value) == true)
+        {
+            if (value is long l) return l;
+            if (value is int i) return i;
+            if (long.TryParse(value?.ToString(), out var parsed)) return parsed;
+        }
+        return defaultValue;
+    }
+
+    private int GetIntValue(IDictionary<string, object>? dict, string key, int defaultValue) =>
+        (int)GetLongValue(dict, key, defaultValue);
+
+    private List<S3Bucket> ParseBuckets(IDictionary<string, object>? data)
+    {
+        var buckets = new List<S3Bucket>();
+        if (data?.TryGetValue("buckets", out var bucketsObj) == true && bucketsObj is IEnumerable<object> list)
+        {
+            foreach (var item in list)
+            {
+                if (item is IDictionary<string, object> d)
+                {
+                    buckets.Add(new S3Bucket
+                    {
+                        Name = d.TryGetValue("name", out var n) ? n?.ToString() ?? "" : "",
+                        CreatedAt = d.TryGetValue("createdAt", out var c) && DateTime.TryParse(c?.ToString(), out var dt) ? dt : DateTime.MinValue,
+                        StorageClass = d.TryGetValue("storageClass", out var sc) ? sc?.ToString() ?? "STANDARD" : "STANDARD",
+                        VersioningEnabled = d.TryGetValue("versioningEnabled", out var v) && bool.TryParse(v?.ToString(), out var ve) && ve
+                    });
+                }
+            }
+        }
+        return buckets;
+    }
+
+    private List<S3Object> ParseObjects(IDictionary<string, object>? data)
+    {
+        var objects = new List<S3Object>();
+        // Parse common prefixes (folders)
+        if (data?.TryGetValue("commonPrefixes", out var prefixesObj) == true && prefixesObj is IEnumerable<object> prefixes)
+        {
+            foreach (var p in prefixes)
+            {
+                objects.Add(new S3Object { Key = p?.ToString() ?? "", IsPrefix = true });
+            }
+        }
+        // Parse objects
+        if (data?.TryGetValue("contents", out var contentsObj) == true && contentsObj is IEnumerable<object> contents)
+        {
+            foreach (var item in contents)
+            {
+                if (item is IDictionary<string, object> d)
+                {
+                    objects.Add(new S3Object
+                    {
+                        Key = d.TryGetValue("key", out var k) ? k?.ToString() ?? "" : "",
+                        Size = d.TryGetValue("size", out var s) && long.TryParse(s?.ToString(), out var sz) ? sz : 0,
+                        LastModified = d.TryGetValue("lastModified", out var m) && DateTime.TryParse(m?.ToString(), out var dt) ? dt : DateTime.MinValue,
+                        StorageClass = d.TryGetValue("storageClass", out var sc) ? sc?.ToString() ?? "STANDARD" : "STANDARD",
+                        ETag = d.TryGetValue("etag", out var e) ? e?.ToString() ?? "" : "",
+                        ContentType = d.TryGetValue("contentType", out var ct) ? ct?.ToString() ?? "" : "",
+                        IsPrefix = false
+                    });
+                }
+            }
+        }
+        return objects;
+    }
+
+    private List<MultipartUpload> ParseUploads(IDictionary<string, object>? data)
+    {
+        var uploads = new List<MultipartUpload>();
+        if (data?.TryGetValue("uploads", out var uploadsObj) == true && uploadsObj is IEnumerable<object> list)
+        {
+            foreach (var item in list)
+            {
+                if (item is IDictionary<string, object> d)
+                {
+                    uploads.Add(new MultipartUpload
+                    {
+                        UploadId = d.TryGetValue("uploadId", out var u) ? u?.ToString() ?? "" : "",
+                        Bucket = d.TryGetValue("bucket", out var b) ? b?.ToString() ?? "" : "",
+                        Key = d.TryGetValue("key", out var k) ? k?.ToString() ?? "" : "",
+                        Progress = d.TryGetValue("progress", out var p) && int.TryParse(p?.ToString(), out var pv) ? pv : 0,
+                        UploadedParts = d.TryGetValue("uploadedParts", out var up) && int.TryParse(up?.ToString(), out var upv) ? upv : 0,
+                        TotalParts = d.TryGetValue("totalParts", out var tp) && int.TryParse(tp?.ToString(), out var tpv) ? tpv : 1
+                    });
+                }
+            }
+        }
+        return uploads;
+    }
+
+    /// <summary>
+    /// Represents an S3 bucket with its metadata.
+    /// </summary>
+    private record S3Bucket
+    {
+        public string Name { get; init; } = "";
+        public DateTime CreatedAt { get; init; }
+        public string StorageClass { get; init; } = "STANDARD";
+        public bool VersioningEnabled { get; init; }
+    }
+
+    /// <summary>
+    /// Represents an S3 object or prefix (folder).
+    /// </summary>
+    private record S3Object
+    {
+        public string Key { get; init; } = "";
+        public long Size { get; init; }
+        public DateTime LastModified { get; init; }
+        public string StorageClass { get; init; } = "STANDARD";
+        public string ETag { get; init; } = "";
+        public string ContentType { get; init; } = "";
+        public bool IsPrefix { get; init; }
+    }
+
+    /// <summary>
+    /// Represents an active multipart upload.
+    /// </summary>
+    private record MultipartUpload
+    {
+        public string UploadId { get; init; } = "";
+        public string Bucket { get; init; } = "";
+        public string Key { get; init; } = "";
+        public int Progress { get; init; }
+        public int UploadedParts { get; init; }
+        public int TotalParts { get; init; }
+    }
+}
