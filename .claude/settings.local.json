@@ -48,7 +48,8 @@
       "Bash(dotnet restore:*)",
       "Bash(dotnet list:*)",
       "Bash(dotnet nuget:*)",
-      "Bash(dotnet add:*)"
+      "Bash(dotnet add:*)",
+      "Bash(grep:*)"
     ]
   }
 }
