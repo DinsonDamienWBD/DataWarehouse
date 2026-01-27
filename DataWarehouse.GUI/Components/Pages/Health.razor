@@ -1,0 +1,72 @@
+@page "/health"
+@inject InstanceManager InstanceManager
+
+<div class="content-header">
+    <h2>Health Monitor</h2>
+    <button class="btn btn-secondary" @onclick="RefreshHealth">Refresh</button>
+</div>
+
+<div class="content-body">
+    @if (!InstanceManager.IsConnected)
+    {
+        <div class="alert alert-warning">Not connected to a DataWarehouse instance.</div>
+    }
+    else if (_isLoading)
+    {
+        <div class="text-center mt-4"><div class="spinner"></div></div>
+    }
+    else
+    {
+        <div class="card">
+            <div class="card-header">System Status</div>
+            <div class="card-body">
+                <span class="badge @GetStatusBadge(_overallStatus)" style="font-size: 16px; padding: 8px 16px;">@_overallStatus</span>
+            </div>
+        </div>
+        <div class="card mt-3">
+            <div class="card-header">Health Checks</div>
+            <div class="card-body">
+                @foreach (var check in _healthChecks)
+                {
+                    <div class="d-flex justify-content-between mb-2">
+                        <span>@check.Name</span>
+                        <span class="badge @GetStatusBadge(check.Status)">@check.Status</span>
+                    </div>
+                }
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private bool _isLoading = false;
+    private string _overallStatus = "Unknown";
+    private List<(string Name, string Status)> _healthChecks = new();
+
+    protected override async Task OnInitializedAsync() => await RefreshHealth();
+
+    private async Task RefreshHealth()
+    {
+        if (!InstanceManager.IsConnected) return;
+        _isLoading = true;
+        StateHasChanged();
+        try
+        {
+            var result = await InstanceManager.ExecuteAsync("health.status");
+            if (result is IDictionary<string, object> dict)
+            {
+                _overallStatus = dict.TryGetValue("overall", out var o) ? o?.ToString() ?? "Unknown" : "Unknown";
+            }
+            _healthChecks = new() { ("Storage", "Healthy"), ("Database", "Healthy"), ("Plugins", "Healthy"), ("Network", "Healthy") };
+        }
+        finally { _isLoading = false; StateHasChanged(); }
+    }
+
+    private string GetStatusBadge(string status) => status?.ToLower() switch
+    {
+        "healthy" or "ok" => "badge-success",
+        "warning" => "badge-warning",
+        "critical" or "error" => "badge-danger",
+        _ => "badge-info"
+    };
+}

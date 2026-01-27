@@ -1,0 +1,220 @@
+@inherits LayoutComponentBase
+@inject CapabilityManager CapabilityManager
+@inject InstanceManager InstanceManager
+@inject KeyboardManager KeyboardManager
+@inject TouchManager TouchManager
+@implements IDisposable
+
+<!-- Skip to main content link for keyboard/screen reader users -->
+<a href="#main-content" class="skip-link" @onfocus="() => _skipLinkVisible = true" @onblur="() => _skipLinkVisible = false">
+    Skip to main content
+</a>
+
+<div class="main-layout" @onkeydown="HandleGlobalKeyDown">
+    <!-- Sidebar Navigation -->
+    <aside class="sidebar" role="navigation" aria-label="Main navigation">
+        <div class="sidebar-header">
+            <h1>DataWarehouse</h1>
+            <div class="connection-status @ConnectionStatusClass"
+                 role="status"
+                 aria-live="polite"
+                 aria-label="Connection status: @ConnectionStatusText">
+                <span class="status-dot" aria-hidden="true"></span>
+                <span>@ConnectionStatusText</span>
+            </div>
+        </div>
+        <nav class="sidebar-nav" aria-label="Primary navigation">
+            <div class="nav-section" role="group" aria-labelledby="nav-dashboard-label">
+                <div class="nav-section-title" id="nav-dashboard-label">Dashboard</div>
+                <NavLink class="nav-item" href="/" Match="NavLinkMatch.All" aria-current="page">
+                    <span class="nav-icon" aria-hidden="true">&#9776;</span>
+                    <span>Overview</span>
+                </NavLink>
+            </div>
+
+            <div class="nav-section" role="group" aria-labelledby="nav-storage-label">
+                <div class="nav-section-title" id="nav-storage-label">Storage</div>
+                <NavLink class=@GetNavItemClass("storage") href="/storage" aria-disabled="@(!_isConnected)">
+                    <span class="nav-icon" aria-hidden="true">&#128193;</span>
+                    <span>Storage Browser</span>
+                </NavLink>
+                <NavLink class=@GetNavItemClass("backup") href="/backup" aria-disabled="@(!CanAccessFeature("backup"))">
+                    <span class="nav-icon" aria-hidden="true">&#128190;</span>
+                    <span>Backup & Restore</span>
+                </NavLink>
+            </div>
+
+            <div class="nav-section" role="group" aria-labelledby="nav-system-label">
+                <div class="nav-section-title" id="nav-system-label">System</div>
+                <NavLink class=@GetNavItemClass("health") href="/health" aria-disabled="@(!_isConnected)">
+                    <span class="nav-icon" aria-hidden="true">&#128147;</span>
+                    <span>Health Monitor</span>
+                </NavLink>
+                <NavLink class=@GetNavItemClass("plugins") href="/plugins" aria-disabled="@(!_isConnected)">
+                    <span class="nav-icon" aria-hidden="true">&#128268;</span>
+                    <span>Plugins</span>
+                </NavLink>
+                <NavLink class="nav-item" href="/marketplace" aria-disabled="@(!_isConnected)">
+                    <span class="nav-icon" aria-hidden="true">&#128722;</span>
+                    <span>Marketplace</span>
+                </NavLink>
+                <NavLink class=@GetNavItemClass("raid") href="/raid" aria-disabled="@(!CanAccessFeature("raid"))">
+                    <span class="nav-icon" aria-hidden="true">&#128421;</span>
+                    <span>RAID Management</span>
+                </NavLink>
+            </div>
+
+            <div class="nav-section" role="group" aria-labelledby="nav-admin-label">
+                <div class="nav-section-title" id="nav-admin-label">Administration</div>
+                <NavLink class="nav-item" href="/tenants">
+                    <span class="nav-icon" aria-hidden="true">&#127970;</span>
+                    <span>Tenants</span>
+                </NavLink>
+                <NavLink class="nav-item" href="/config">
+                    <span class="nav-icon" aria-hidden="true">&#9881;</span>
+                    <span>Configuration</span>
+                </NavLink>
+                <NavLink class="nav-item" href="/audit">
+                    <span class="nav-icon" aria-hidden="true">&#128203;</span>
+                    <span>Audit Logs</span>
+                </NavLink>
+                <NavLink class="nav-item" href="/connections">
+                    <span class="nav-icon" aria-hidden="true">&#128279;</span>
+                    <span>Connections</span>
+                </NavLink>
+            </div>
+
+            <div class="nav-section" role="group" aria-labelledby="nav-tools-label">
+                <div class="nav-section-title" id="nav-tools-label">Tools</div>
+                <NavLink class="nav-item" href="/benchmark">
+                    <span class="nav-icon" aria-hidden="true">&#9201;</span>
+                    <span>Benchmark</span>
+                </NavLink>
+                <NavLink class="nav-item" href="/system">
+                    <span class="nav-icon" aria-hidden="true">&#128187;</span>
+                    <span>System Info</span>
+                </NavLink>
+                <NavLink class="nav-item" href="/ai">
+                    <span class="nav-icon" aria-hidden="true">&#129302;</span>
+                    <span>AI Settings</span>
+                </NavLink>
+            </div>
+        </nav>
+    </aside>
+
+    <!-- Main Content Area -->
+    <main id="main-content" class="main-content" role="main" aria-label="Main content" tabindex="-1">
+        @if (_showCommandPalette)
+        {
+            <div class="modal-backdrop" @onclick="CloseCommandPalette" aria-hidden="true"></div>
+            <div role="dialog"
+                 aria-modal="true"
+                 aria-label="Command palette"
+                 @onkeydown="HandleModalKeyDown"
+                 @onkeydown:stopPropagation="true">
+                <CommandPalette OnClose="CloseCommandPalette" />
+            </div>
+        }
+        @Body
+    </main>
+
+    <!-- Complementary Sidebar for Sync Status (optional) -->
+    @if (_showSyncPanel)
+    {
+        <SyncStatusPanel />
+    }
+
+    <!-- Screen reader announcements -->
+    <div class="visually-hidden" role="status" aria-live="polite" aria-atomic="true">
+        @_announcement
+    </div>
+</div>
+
+@code {
+    private bool _showCommandPalette;
+    private bool _isConnected;
+    private bool _skipLinkVisible;
+    private bool _showSyncPanel;
+    private string _announcement = string.Empty;
+
+    private string ConnectionStatusClass => _isConnected ? "connected" : "disconnected";
+    private string ConnectionStatusText => _isConnected ? "Connected" : "Disconnected";
+
+    protected override void OnInitialized()
+    {
+        KeyboardManager.ShortcutTriggered += HandleShortcutTriggered;
+        InstanceManager.ConnectionChanged += HandleConnectionChanged;
+        _isConnected = InstanceManager.IsConnected;
+    }
+
+    private string GetNavItemClass(string feature) => $"nav-item {GetNavClass(feature)}".Trim();
+
+    private string GetNavClass(string feature)
+    {
+        if (!_isConnected) return "disabled";
+
+        return feature switch
+        {
+            "storage" => "", // Always available
+            "backup" => CapabilityManager.HasFeature("backup") ? "" : "disabled",
+            "health" => "", // Always available
+            "plugins" => "", // Always available
+            "raid" => CapabilityManager.HasFeature("raid") ? "" : "disabled",
+            _ => ""
+        };
+    }
+
+    private void HandleShortcutTriggered(object? sender, ShortcutEventArgs e)
+    {
+        // Ctrl+K opens command palette
+        if (e.Shortcut.ActionId == "command-palette")
+        {
+            _showCommandPalette = !_showCommandPalette;
+            e.Handled = true;
+            InvokeAsync(StateHasChanged);
+        }
+        // Escape closes command palette
+        else if (e.Shortcut.ActionId == "escape" && _showCommandPalette)
+        {
+            _showCommandPalette = false;
+            e.Handled = true;
+            InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private void HandleConnectionChanged(object? sender, ConnectionTarget e)
+    {
+        _isConnected = InstanceManager.IsConnected;
+        InvokeAsync(StateHasChanged);
+    }
+
+    private void CloseCommandPalette()
+    {
+        _showCommandPalette = false;
+        StateHasChanged();
+    }
+
+    private bool CanAccessFeature(string feature)
+    {
+        return _isConnected && CapabilityManager.HasFeature(feature);
+    }
+
+    private void HandleGlobalKeyDown(Microsoft.AspNetCore.Components.Web.KeyboardEventArgs e)
+    {
+        // Global keyboard handlers can be implemented here
+    }
+
+    private void HandleModalKeyDown(Microsoft.AspNetCore.Components.Web.KeyboardEventArgs e)
+    {
+        if (e.Key == "Escape")
+        {
+            CloseCommandPalette();
+        }
+    }
+
+    public void Dispose()
+    {
+        KeyboardManager.ShortcutTriggered -= HandleShortcutTriggered;
+        InstanceManager.ConnectionChanged -= HandleConnectionChanged;
+    }
+}

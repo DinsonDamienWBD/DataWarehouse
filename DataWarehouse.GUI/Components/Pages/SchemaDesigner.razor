@@ -1,0 +1,481 @@
+@page "/developer/schema"
+@inject InstanceManager InstanceManager
+@inject DialogService DialogService
+
+<div class="content-header">
+    <h2>Schema Designer</h2>
+    <div class="d-flex gap-2">
+        <button class="btn btn-secondary" @onclick="LoadSchemas">Refresh</button>
+        <button class="btn btn-primary" @onclick="CreateNewSchema">New Schema</button>
+        <button class="btn btn-success" @onclick="SaveSchema" disabled="@(_currentSchema == null)">Save</button>
+    </div>
+</div>
+
+<div class="content-body">
+    @if (!InstanceManager.IsConnected)
+    {
+        <div class="alert alert-warning" role="alert">
+            Not connected to a DataWarehouse instance.
+        </div>
+    }
+    else if (_isLoading)
+    {
+        <div class="text-center mt-4">
+            <div class="spinner"></div>
+            <p class="mt-2">Loading schemas...</p>
+        </div>
+    }
+    else
+    {
+        <div class="d-flex gap-3" style="height: calc(100vh - 180px);">
+            <!-- Left panel: Schema list -->
+            <div style="width: 300px; overflow-y: auto; border-right: 1px solid var(--border-color); padding-right: 16px;">
+                <div class="mb-3">
+                    <input type="text" class="form-input" placeholder="Search schemas..."
+                           @bind="_searchQuery" @bind:event="oninput" aria-label="Search schemas" />
+                </div>
+
+                @if (_schemas.Any())
+                {
+                    @foreach (var schema in _schemas.Where(s =>
+                        string.IsNullOrEmpty(_searchQuery) ||
+                        s.Name.Contains(_searchQuery, StringComparison.OrdinalIgnoreCase)))
+                    {
+                        <div class="nav-item @(schema == _currentSchema ? "active" : "")"
+                             @onclick="() => SelectSchema(schema)"
+                             role="button"
+                             tabindex="0"
+                             aria-label="@schema.Name">
+                            <div style="flex: 1;">
+                                <div><strong>@schema.Name</strong></div>
+                                <div class="text-muted" style="font-size: 12px;">
+                                    v@schema.Version | @schema.Fields.Count fields
+                                </div>
+                            </div>
+                        </div>
+                    }
+                }
+                else
+                {
+                    <div class="text-center text-muted mt-4">
+                        <p>No schemas found. Create your first schema to get started.</p>
+                    </div>
+                }
+            </div>
+
+            <!-- Right panel: Schema editor -->
+            <div style="flex: 1; overflow-y: auto;">
+                @if (_currentSchema != null)
+                {
+                    <div class="card">
+                        <div class="card-header">Schema Information</div>
+                        <div class="card-body">
+                            <div class="form-group">
+                                <label class="form-label">Schema Name *</label>
+                                <input type="text" class="form-input" @bind="_currentSchema.Name"
+                                       placeholder="e.g., UserProfile" aria-label="Schema name" />
+                            </div>
+
+                            <div class="form-group">
+                                <label class="form-label">Description</label>
+                                <textarea class="form-input" rows="2" @bind="_currentSchema.Description"
+                                          placeholder="Describe the purpose of this schema..."
+                                          aria-label="Schema description"></textarea>
+                            </div>
+
+                            <div class="form-group">
+                                <label class="form-label">Version</label>
+                                <input type="text" class="form-input" @bind="_currentSchema.Version"
+                                       aria-label="Schema version" />
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Fields editor -->
+                    <div class="card mt-3">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <span>Fields (@_currentSchema.Fields.Count)</span>
+                            <button class="btn btn-primary" style="padding: 4px 12px; font-size: 13px;"
+                                    @onclick="AddField">
+                                + Add Field
+                            </button>
+                        </div>
+                        <div class="card-body" style="padding: 0;">
+                            @if (_currentSchema.Fields.Any())
+                            {
+                                <table class="data-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Field Name</th>
+                                            <th>Type</th>
+                                            <th>Required</th>
+                                            <th>Indexed</th>
+                                            <th>Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach (var field in _currentSchema.Fields)
+                                        {
+                                            <tr>
+                                                <td>
+                                                    <input type="text" class="form-input" style="width: 200px;"
+                                                           @bind="field.Name" placeholder="fieldName"
+                                                           aria-label="Field name" />
+                                                </td>
+                                                <td>
+                                                    <select class="form-select" style="width: 150px;" @bind="field.Type"
+                                                            aria-label="Field type">
+                                                        <option value="string">String</option>
+                                                        <option value="number">Number</option>
+                                                        <option value="boolean">Boolean</option>
+                                                        <option value="date">Date</option>
+                                                        <option value="binary">Binary</option>
+                                                        <option value="array">Array</option>
+                                                        <option value="object">Object</option>
+                                                    </select>
+                                                </td>
+                                                <td>
+                                                    <label style="display: flex; align-items: center; cursor: pointer;">
+                                                        <input type="checkbox" @bind="field.Required"
+                                                               aria-label="Required field" />
+                                                    </label>
+                                                </td>
+                                                <td>
+                                                    <label style="display: flex; align-items: center; cursor: pointer;">
+                                                        <input type="checkbox" @bind="field.Indexed"
+                                                               aria-label="Indexed field" />
+                                                    </label>
+                                                </td>
+                                                <td>
+                                                    <button class="btn btn-secondary"
+                                                            style="padding: 4px 8px; font-size: 12px; margin-right: 4px;"
+                                                            @onclick="() => EditFieldValidation(field)">
+                                                        Validation
+                                                    </button>
+                                                    <button class="btn btn-danger"
+                                                            style="padding: 4px 8px; font-size: 12px;"
+                                                            @onclick="() => RemoveField(field)">
+                                                        Remove
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                            @if (!string.IsNullOrEmpty(field.Description))
+                                            {
+                                                <tr>
+                                                    <td colspan="5" style="padding: 0 16px 8px 16px; border-bottom: 1px solid var(--border-color);">
+                                                        <span class="text-muted" style="font-size: 12px;">@field.Description</span>
+                                                    </td>
+                                                </tr>
+                                            }
+                                        }
+                                    </tbody>
+                                </table>
+                            }
+                            else
+                            {
+                                <div class="text-center text-muted" style="padding: 24px;">
+                                    No fields defined. Click "Add Field" to get started.
+                                </div>
+                            }
+                        </div>
+                    </div>
+
+                    <!-- Indexes configuration -->
+                    <div class="card mt-3">
+                        <div class="card-header">Indexes</div>
+                        <div class="card-body">
+                            <div class="form-group">
+                                <label class="form-label">
+                                    <input type="checkbox" @bind="_currentSchema.AutoIndex" />
+                                    Auto-index all required fields
+                                </label>
+                            </div>
+
+                            <div class="form-group">
+                                <label class="form-label">Composite Indexes</label>
+                                <div class="text-muted" style="font-size: 12px; margin-bottom: 8px;">
+                                    Create indexes on multiple fields for optimized queries
+                                </div>
+                                @foreach (var index in _currentSchema.CompositeIndexes)
+                                {
+                                    <div class="d-flex align-items-center gap-2 mb-2">
+                                        <input type="text" class="form-input" @bind="index.Fields"
+                                               placeholder="field1,field2,field3"
+                                               aria-label="Composite index fields" />
+                                        <button class="btn btn-danger" style="padding: 4px 8px; font-size: 12px;"
+                                                @onclick="() => _currentSchema.CompositeIndexes.Remove(index)">
+                                            Remove
+                                        </button>
+                                    </div>
+                                }
+                                <button class="btn btn-secondary" style="padding: 4px 12px; font-size: 13px;"
+                                        @onclick="AddCompositeIndex">
+                                    + Add Composite Index
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Export/Import -->
+                    <div class="card mt-3">
+                        <div class="card-header">Export / Import</div>
+                        <div class="card-body">
+                            <div class="d-flex gap-2">
+                                <button class="btn btn-secondary" @onclick='() => ExportSchema("json")'>
+                                    Export as JSON
+                                </button>
+                                <button class="btn btn-secondary" @onclick='() => ExportSchema("yaml")'>
+                                    Export as YAML
+                                </button>
+                                <button class="btn btn-secondary" @onclick="ImportSchema">
+                                    Import
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                }
+                else
+                {
+                    <div class="text-center text-muted mt-4">
+                        <p>Select a schema from the list or create a new one to begin editing.</p>
+                    </div>
+                }
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private bool _isLoading = false;
+    private string _searchQuery = "";
+    private List<SchemaDefinition> _schemas = new();
+    private SchemaDefinition? _currentSchema;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadSchemas();
+    }
+
+    private async Task LoadSchemas()
+    {
+        if (!InstanceManager.IsConnected) return;
+
+        _isLoading = true;
+        StateHasChanged();
+
+        try
+        {
+            var result = await InstanceManager.ExecuteAsync("schema.list");
+            _schemas = ParseSchemas(result);
+        }
+        catch (Exception ex)
+        {
+            await DialogService.AlertAsync("Error", $"Failed to load schemas: {ex.Message}");
+        }
+        finally
+        {
+            _isLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private void CreateNewSchema()
+    {
+        _currentSchema = new SchemaDefinition
+        {
+            Name = "NewSchema",
+            Version = "1.0.0",
+            Description = "",
+            AutoIndex = true
+        };
+        StateHasChanged();
+    }
+
+    private void SelectSchema(SchemaDefinition schema)
+    {
+        _currentSchema = schema;
+        StateHasChanged();
+    }
+
+    private void AddField()
+    {
+        if (_currentSchema == null) return;
+
+        _currentSchema.Fields.Add(new SchemaField
+        {
+            Name = "newField",
+            Type = "string",
+            Required = false,
+            Indexed = false
+        });
+        StateHasChanged();
+    }
+
+    private void RemoveField(SchemaField field)
+    {
+        _currentSchema?.Fields.Remove(field);
+        StateHasChanged();
+    }
+
+    private async Task EditFieldValidation(SchemaField field)
+    {
+        var validation = await DialogService.PromptAsync(
+            "Field Validation Rules",
+            $"Enter validation rules for '{field.Name}':");
+
+        if (!string.IsNullOrEmpty(validation))
+        {
+            field.Validation = validation;
+            StateHasChanged();
+        }
+    }
+
+    private void AddCompositeIndex()
+    {
+        _currentSchema?.CompositeIndexes.Add(new CompositeIndex { Fields = "" });
+        StateHasChanged();
+    }
+
+    private async Task SaveSchema()
+    {
+        if (_currentSchema == null) return;
+
+        try
+        {
+            await InstanceManager.ExecuteAsync("schema.save", new Dictionary<string, object>
+            {
+                ["name"] = _currentSchema.Name,
+                ["version"] = _currentSchema.Version,
+                ["description"] = _currentSchema.Description,
+                ["fields"] = _currentSchema.Fields.Select(f => new Dictionary<string, object>
+                {
+                    ["name"] = f.Name,
+                    ["type"] = f.Type,
+                    ["required"] = f.Required,
+                    ["indexed"] = f.Indexed,
+                    ["validation"] = f.Validation,
+                    ["description"] = f.Description
+                }).ToList(),
+                ["autoIndex"] = _currentSchema.AutoIndex,
+                ["compositeIndexes"] = _currentSchema.CompositeIndexes.Select(i => i.Fields).ToList()
+            });
+
+            await DialogService.AlertAsync("Success", "Schema saved successfully.");
+            await LoadSchemas();
+        }
+        catch (Exception ex)
+        {
+            await DialogService.AlertAsync("Error", $"Failed to save schema: {ex.Message}");
+        }
+    }
+
+    private async Task ExportSchema(string format)
+    {
+        if (_currentSchema == null) return;
+
+        try
+        {
+            var result = await InstanceManager.ExecuteAsync("schema.export", new Dictionary<string, object>
+            {
+                ["name"] = _currentSchema.Name,
+                ["format"] = format
+            });
+
+            await DialogService.AlertAsync($"Export as {format.ToUpper()}",
+                result?.ToString() ?? "Export completed");
+        }
+        catch (Exception ex)
+        {
+            await DialogService.AlertAsync("Error", $"Failed to export: {ex.Message}");
+        }
+    }
+
+    private async Task ImportSchema()
+    {
+        var schemaText = await DialogService.PromptAsync("Import Schema", "Paste schema JSON/YAML:");
+        if (!string.IsNullOrEmpty(schemaText))
+        {
+            try
+            {
+                await InstanceManager.ExecuteAsync("schema.import", new Dictionary<string, object>
+                {
+                    ["content"] = schemaText
+                });
+                await DialogService.AlertAsync("Success", "Schema imported successfully.");
+                await LoadSchemas();
+            }
+            catch (Exception ex)
+            {
+                await DialogService.AlertAsync("Error", $"Failed to import: {ex.Message}");
+            }
+        }
+    }
+
+    private List<SchemaDefinition> ParseSchemas(object? result)
+    {
+        var schemas = new List<SchemaDefinition>();
+        if (result is IEnumerable<object> list)
+        {
+            foreach (var item in list)
+            {
+                if (item is IDictionary<string, object> dict)
+                {
+                    var schema = new SchemaDefinition
+                    {
+                        Name = dict.TryGetValue("name", out var n) ? n?.ToString() ?? "" : "",
+                        Version = dict.TryGetValue("version", out var v) ? v?.ToString() ?? "1.0.0" : "1.0.0",
+                        Description = dict.TryGetValue("description", out var d) ? d?.ToString() ?? "" : "",
+                        AutoIndex = dict.TryGetValue("autoIndex", out var ai) && bool.TryParse(ai?.ToString(), out var aib) && aib
+                    };
+
+                    if (dict.TryGetValue("fields", out var fieldsObj) && fieldsObj is IEnumerable<object> fieldsList)
+                    {
+                        foreach (var fieldItem in fieldsList)
+                        {
+                            if (fieldItem is IDictionary<string, object> fieldDict)
+                            {
+                                schema.Fields.Add(new SchemaField
+                                {
+                                    Name = fieldDict.TryGetValue("name", out var fn) ? fn?.ToString() ?? "" : "",
+                                    Type = fieldDict.TryGetValue("type", out var ft) ? ft?.ToString() ?? "string" : "string",
+                                    Required = fieldDict.TryGetValue("required", out var fr) && bool.TryParse(fr?.ToString(), out var frb) && frb,
+                                    Indexed = fieldDict.TryGetValue("indexed", out var fi) && bool.TryParse(fi?.ToString(), out var fib) && fib,
+                                    Validation = fieldDict.TryGetValue("validation", out var fv) ? fv?.ToString() ?? "" : "",
+                                    Description = fieldDict.TryGetValue("description", out var fd) ? fd?.ToString() ?? "" : ""
+                                });
+                            }
+                        }
+                    }
+
+                    schemas.Add(schema);
+                }
+            }
+        }
+        return schemas;
+    }
+
+    private class SchemaDefinition
+    {
+        public string Name { get; set; } = "";
+        public string Version { get; set; } = "1.0.0";
+        public string Description { get; set; } = "";
+        public List<SchemaField> Fields { get; set; } = new();
+        public bool AutoIndex { get; set; }
+        public List<CompositeIndex> CompositeIndexes { get; set; } = new();
+    }
+
+    private class SchemaField
+    {
+        public string Name { get; set; } = "";
+        public string Type { get; set; } = "string";
+        public bool Required { get; set; }
+        public bool Indexed { get; set; }
+        public string Validation { get; set; } = "";
+        public string Description { get; set; } = "";
+    }
+
+    private class CompositeIndex
+    {
+        public string Fields { get; set; } = "";
+    }
+}

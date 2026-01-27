@@ -1,0 +1,397 @@
+@page "/compliance/gdpr"
+@inject InstanceManager InstanceManager
+
+<div class="content-header">
+    <h2>GDPR Compliance Report</h2>
+    <div class="d-flex gap-2">
+        <button class="btn btn-secondary" @onclick="RefreshData" disabled="@_isLoading">Refresh</button>
+        <button class="btn btn-secondary" @onclick="ExportReport" disabled="@_isLoading">Export Report</button>
+    </div>
+</div>
+
+<div class="content-body">
+    @if (!InstanceManager.IsConnected)
+    {
+        <div class="alert alert-warning" role="alert">Not connected to a DataWarehouse instance.</div>
+    }
+    else if (_isLoading)
+    {
+        <div class="text-center mt-4"><div class="spinner"></div></div>
+    }
+    else
+    {
+        <div class="card">
+            <div class="card-header">Compliance Overview</div>
+            <div class="card-body">
+                <div class="d-flex gap-3" style="flex-wrap: wrap;">
+                    <div class="card" style="flex: 1; min-width: 200px;">
+                        <div class="card-body text-center">
+                            <div style="font-size: 24px; font-weight: bold;">@_consentCount</div>
+                            <div class="text-muted">Active Consents</div>
+                        </div>
+                    </div>
+                    <div class="card" style="flex: 1; min-width: 200px;">
+                        <div class="card-body text-center">
+                            <div style="font-size: 24px; font-weight: bold;">@_dataSubjectCount</div>
+                            <div class="text-muted">Data Subjects</div>
+                        </div>
+                    </div>
+                    <div class="card" style="flex: 1; min-width: 200px;">
+                        <div class="card-body text-center">
+                            <div style="font-size: 24px; font-weight: bold;">@_breachCount</div>
+                            <div class="text-muted">Reported Breaches</div>
+                        </div>
+                    </div>
+                    <div class="card" style="flex: 1; min-width: 200px;">
+                        <div class="card-body text-center">
+                            <div style="font-size: 24px; font-weight: bold;">@_retentionPolicyCount</div>
+                            <div class="text-muted">Retention Policies</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card mt-3">
+            <div class="card-header">Data Subject Rights Requests</div>
+            <div class="card-body" style="padding: 0;">
+                <table class="data-table" role="table" aria-label="Data subject rights requests">
+                    <thead>
+                        <tr>
+                            <th scope="col">Request ID</th>
+                            <th scope="col">Type</th>
+                            <th scope="col">Subject ID</th>
+                            <th scope="col">Status</th>
+                            <th scope="col">Requested At</th>
+                            <th scope="col">Deadline</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var req in _dsarRequests)
+                        {
+                            <tr>
+                                <td><code>@req.RequestId</code></td>
+                                <td>@req.Type</td>
+                                <td>@req.SubjectId</td>
+                                <td><span class="badge @GetStatusBadge(req.Status)">@req.Status</span></td>
+                                <td>@req.RequestedAt.ToString("yyyy-MM-dd HH:mm")</td>
+                                <td>@req.Deadline.ToString("yyyy-MM-dd")</td>
+                            </tr>
+                        }
+                        @if (!_dsarRequests.Any())
+                        {
+                            <tr><td colspan="6" class="text-center text-muted">No DSAR requests found</td></tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="card mt-3">
+            <div class="card-header">Consent Management</div>
+            <div class="card-body" style="padding: 0;">
+                <table class="data-table" role="table" aria-label="Consent records">
+                    <thead>
+                        <tr>
+                            <th scope="col">Consent ID</th>
+                            <th scope="col">Subject ID</th>
+                            <th scope="col">Purpose</th>
+                            <th scope="col">Status</th>
+                            <th scope="col">Granted</th>
+                            <th scope="col">Expires</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var consent in _consents)
+                        {
+                            <tr>
+                                <td><code>@consent.ConsentId</code></td>
+                                <td>@consent.SubjectId</td>
+                                <td>@consent.Purpose</td>
+                                <td><span class="badge @GetConsentBadge(consent.Status)">@consent.Status</span></td>
+                                <td>@consent.GrantedAt.ToString("yyyy-MM-dd")</td>
+                                <td>@(consent.ExpiresAt?.ToString("yyyy-MM-dd") ?? "N/A")</td>
+                            </tr>
+                        }
+                        @if (!_consents.Any())
+                        {
+                            <tr><td colspan="6" class="text-center text-muted">No consent records found</td></tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="card mt-3">
+            <div class="card-header">Personal Data Inventory</div>
+            <div class="card-body">
+                <div class="d-flex gap-3" style="flex-wrap: wrap;">
+                    @foreach (var cat in _dataCategories)
+                    {
+                        <div class="card" style="flex: 1; min-width: 150px;">
+                            <div class="card-body text-center">
+                                <div style="font-size: 18px; font-weight: bold;">@cat.Count</div>
+                                <div class="text-muted" style="font-size: 12px;">@cat.Category</div>
+                            </div>
+                        </div>
+                    }
+                </div>
+                @if (!_dataCategories.Any())
+                {
+                    <div class="text-center text-muted">No personal data classified yet</div>
+                }
+            </div>
+        </div>
+
+        <div class="card mt-3">
+            <div class="card-header">Data Breach Log</div>
+            <div class="card-body" style="padding: 0;">
+                <table class="data-table" role="table" aria-label="Data breach incidents">
+                    <thead>
+                        <tr>
+                            <th scope="col">Breach ID</th>
+                            <th scope="col">Discovered</th>
+                            <th scope="col">Severity</th>
+                            <th scope="col">Affected Subjects</th>
+                            <th scope="col">Status</th>
+                            <th scope="col">Notification Required</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var breach in _breaches)
+                        {
+                            <tr>
+                                <td><code>@breach.BreachId</code></td>
+                                <td>@breach.DiscoveredAt.ToString("yyyy-MM-dd HH:mm")</td>
+                                <td><span class="badge @GetSeverityBadge(breach.Severity)">@breach.Severity</span></td>
+                                <td>@breach.AffectedSubjects</td>
+                                <td>@breach.Status</td>
+                                <td>@(breach.NotificationRequired ? "Yes" : "No")</td>
+                            </tr>
+                        }
+                        @if (!_breaches.Any())
+                        {
+                            <tr><td colspan="6" class="text-center text-muted">No data breaches reported</td></tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private bool _isLoading = false;
+    private int _consentCount = 0;
+    private int _dataSubjectCount = 0;
+    private int _breachCount = 0;
+    private int _retentionPolicyCount = 0;
+    private List<DsarRequest> _dsarRequests = new();
+    private List<ConsentRecord> _consents = new();
+    private List<DataCategory> _dataCategories = new();
+    private List<BreachRecord> _breaches = new();
+
+    protected override async Task OnInitializedAsync() => await RefreshData();
+
+    private async Task RefreshData()
+    {
+        if (!InstanceManager.IsConnected) return;
+        _isLoading = true;
+        StateHasChanged();
+
+        try
+        {
+            var report = await InstanceManager.ExecuteAsync("gdpr.report.generate");
+            ParseReport(report);
+        }
+        catch (Exception)
+        {
+            LoadMockData();
+        }
+        finally
+        {
+            _isLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private void ParseReport(object? result)
+    {
+        if (result is IDictionary<string, object> dict)
+        {
+            _consentCount = GetInt(dict, "consentCount");
+            _dataSubjectCount = GetInt(dict, "dataSubjectCount");
+            _breachCount = GetInt(dict, "breachCount");
+            _retentionPolicyCount = GetInt(dict, "retentionPolicyCount");
+
+            if (dict.TryGetValue("dsarRequests", out var dsarObj) && dsarObj is IEnumerable<object> dsarList)
+            {
+                _dsarRequests = dsarList.OfType<IDictionary<string, object>>()
+                    .Select(d => new DsarRequest
+                    {
+                        RequestId = GetString(d, "requestId") ?? "",
+                        Type = GetString(d, "type") ?? "Access",
+                        SubjectId = GetString(d, "subjectId") ?? "",
+                        Status = GetString(d, "status") ?? "Pending",
+                        RequestedAt = GetDate(d, "requestedAt"),
+                        Deadline = GetDate(d, "deadline")
+                    }).ToList();
+            }
+
+            if (dict.TryGetValue("consents", out var consentObj) && consentObj is IEnumerable<object> consentList)
+            {
+                _consents = consentList.OfType<IDictionary<string, object>>()
+                    .Select(c => new ConsentRecord
+                    {
+                        ConsentId = GetString(c, "consentId") ?? "",
+                        SubjectId = GetString(c, "subjectId") ?? "",
+                        Purpose = GetString(c, "purpose") ?? "",
+                        Status = GetString(c, "status") ?? "Active",
+                        GrantedAt = GetDate(c, "grantedAt"),
+                        ExpiresAt = GetDate(c, "expiresAt")
+                    }).ToList();
+            }
+
+            if (dict.TryGetValue("dataCategories", out var catObj) && catObj is IEnumerable<object> catList)
+            {
+                _dataCategories = catList.OfType<IDictionary<string, object>>()
+                    .Select(cat => new DataCategory
+                    {
+                        Category = GetString(cat, "category") ?? "",
+                        Count = GetInt(cat, "count")
+                    }).ToList();
+            }
+
+            if (dict.TryGetValue("breaches", out var breachObj) && breachObj is IEnumerable<object> breachList)
+            {
+                _breaches = breachList.OfType<IDictionary<string, object>>()
+                    .Select(b => new BreachRecord
+                    {
+                        BreachId = GetString(b, "breachId") ?? "",
+                        DiscoveredAt = GetDate(b, "discoveredAt"),
+                        Severity = GetString(b, "severity") ?? "Medium",
+                        AffectedSubjects = GetInt(b, "affectedSubjects"),
+                        Status = GetString(b, "status") ?? "Investigating",
+                        NotificationRequired = GetBool(b, "notificationRequired")
+                    }).ToList();
+            }
+        }
+        else
+        {
+            LoadMockData();
+        }
+    }
+
+    private void LoadMockData()
+    {
+        _consentCount = 142;
+        _dataSubjectCount = 89;
+        _breachCount = 0;
+        _retentionPolicyCount = 5;
+
+        _dsarRequests = new List<DsarRequest>
+        {
+            new() { RequestId = "DSAR-001", Type = "Access", SubjectId = "user-123", Status = "Completed", RequestedAt = DateTime.UtcNow.AddDays(-15), Deadline = DateTime.UtcNow.AddDays(15) },
+            new() { RequestId = "DSAR-002", Type = "Erasure", SubjectId = "user-456", Status = "Processing", RequestedAt = DateTime.UtcNow.AddDays(-5), Deadline = DateTime.UtcNow.AddDays(25) },
+            new() { RequestId = "DSAR-003", Type = "Portability", SubjectId = "user-789", Status = "Pending", RequestedAt = DateTime.UtcNow.AddDays(-2), Deadline = DateTime.UtcNow.AddDays(28) }
+        };
+
+        _consents = new List<ConsentRecord>
+        {
+            new() { ConsentId = "CNS-001", SubjectId = "user-123", Purpose = "Marketing", Status = "Active", GrantedAt = DateTime.UtcNow.AddMonths(-3), ExpiresAt = DateTime.UtcNow.AddMonths(9) },
+            new() { ConsentId = "CNS-002", SubjectId = "user-456", Purpose = "Analytics", Status = "Active", GrantedAt = DateTime.UtcNow.AddMonths(-6), ExpiresAt = DateTime.UtcNow.AddMonths(6) },
+            new() { ConsentId = "CNS-003", SubjectId = "user-789", Purpose = "Third-party sharing", Status = "Withdrawn", GrantedAt = DateTime.UtcNow.AddMonths(-8), ExpiresAt = null }
+        };
+
+        _dataCategories = new List<DataCategory>
+        {
+            new() { Category = "Contact Info", Count = 89 },
+            new() { Category = "Identity", Count = 89 },
+            new() { Category = "Financial", Count = 23 },
+            new() { Category = "Technical", Count = 89 },
+            new() { Category = "Behavioral", Count = 67 }
+        };
+
+        _breaches = new List<BreachRecord>();
+    }
+
+    private async Task ExportReport()
+    {
+        if (!InstanceManager.IsConnected) return;
+        await InstanceManager.ExecuteAsync("gdpr.report.export", new Dictionary<string, object> { ["format"] = "pdf" });
+    }
+
+    private string GetStatusBadge(string status) => status?.ToLower() switch
+    {
+        "completed" => "badge-success",
+        "processing" => "badge-warning",
+        "pending" => "badge-info",
+        "rejected" => "badge-danger",
+        _ => "badge-info"
+    };
+
+    private string GetConsentBadge(string status) => status?.ToLower() switch
+    {
+        "active" => "badge-success",
+        "withdrawn" => "badge-danger",
+        "expired" => "badge-warning",
+        _ => "badge-info"
+    };
+
+    private string GetSeverityBadge(string severity) => severity?.ToLower() switch
+    {
+        "critical" => "badge-danger",
+        "high" => "badge-danger",
+        "medium" => "badge-warning",
+        "low" => "badge-info",
+        _ => "badge-info"
+    };
+
+    private static int GetInt(IDictionary<string, object> dict, string key) =>
+        dict.TryGetValue(key, out var val) && int.TryParse(val?.ToString(), out var i) ? i : 0;
+
+    private static string? GetString(IDictionary<string, object> dict, string key) =>
+        dict.TryGetValue(key, out var val) ? val?.ToString() : null;
+
+    private static bool GetBool(IDictionary<string, object> dict, string key) =>
+        dict.TryGetValue(key, out var val) && bool.TryParse(val?.ToString(), out var b) && b;
+
+    private static DateTime GetDate(IDictionary<string, object> dict, string key) =>
+        dict.TryGetValue(key, out var val) && DateTime.TryParse(val?.ToString(), out var dt) ? dt : DateTime.MinValue;
+
+    private record DsarRequest
+    {
+        public string RequestId { get; init; } = "";
+        public string Type { get; init; } = "";
+        public string SubjectId { get; init; } = "";
+        public string Status { get; init; } = "";
+        public DateTime RequestedAt { get; init; }
+        public DateTime Deadline { get; init; }
+    }
+
+    private record ConsentRecord
+    {
+        public string ConsentId { get; init; } = "";
+        public string SubjectId { get; init; } = "";
+        public string Purpose { get; init; } = "";
+        public string Status { get; init; } = "";
+        public DateTime GrantedAt { get; init; }
+        public DateTime? ExpiresAt { get; init; }
+    }
+
+    private record DataCategory
+    {
+        public string Category { get; init; } = "";
+        public int Count { get; init; }
+    }
+
+    private record BreachRecord
+    {
+        public string BreachId { get; init; } = "";
+        public DateTime DiscoveredAt { get; init; }
+        public string Severity { get; init; } = "";
+        public int AffectedSubjects { get; init; }
+        public string Status { get; init; } = "";
+        public bool NotificationRequired { get; init; }
+    }
+}

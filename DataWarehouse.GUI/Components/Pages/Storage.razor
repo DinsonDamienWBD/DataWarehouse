@@ -1,0 +1,287 @@
+@page "/storage"
+@inject InstanceManager InstanceManager
+@inject CapabilityManager CapabilityManager
+@inject DialogService DialogService
+
+<div class="content-header">
+    <h2>Storage Browser</h2>
+    <div class="d-flex gap-2">
+        <button class="btn btn-primary" @onclick="UploadFile">Upload</button>
+        <button class="btn btn-secondary" @onclick="RefreshFiles">Refresh</button>
+    </div>
+</div>
+
+<div class="content-body">
+    @if (!InstanceManager.IsConnected)
+    {
+        <div class="alert alert-warning">
+            Not connected to a DataWarehouse instance.
+        </div>
+    }
+    else
+    {
+        <!-- Path navigation -->
+        <div class="d-flex align-items-center gap-2 mb-3">
+            <button class="btn btn-secondary" @onclick="NavigateUp" disabled="@(_currentPath == "/")">
+                &#8593; Up
+            </button>
+            <input type="text" class="form-input" style="flex: 1;"
+                   @bind="_currentPath" @bind:event="oninput"
+                   @onkeydown="HandlePathKeyDown"
+                   placeholder="Enter path..." />
+            <button class="btn btn-secondary" @onclick="NavigateToPath">Go</button>
+        </div>
+
+        @if (_isLoading)
+        {
+            <div class="text-center mt-4">
+                <div class="spinner"></div>
+                <p class="mt-2">Loading files...</p>
+            </div>
+        }
+        else
+        {
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Size</th>
+                        <th>Modified</th>
+                        <th>Type</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (_files.Any())
+                    {
+                        @foreach (var file in _files)
+                        {
+                            <tr>
+                                <td>
+                                    @if (file.IsDirectory)
+                                    {
+                                        <a href="javascript:void(0)" @onclick="() => NavigateToDirectory(file.Name)">
+                                            &#128193; @file.Name
+                                        </a>
+                                    }
+                                    else
+                                    {
+                                        <span>&#128196; @file.Name</span>
+                                    }
+                                </td>
+                                <td>@(file.IsDirectory ? "-" : FormatBytes(file.Size))</td>
+                                <td>@file.Modified.ToString("yyyy-MM-dd HH:mm")</td>
+                                <td>@(file.IsDirectory ? "Folder" : file.ContentType)</td>
+                                <td>
+                                    @if (!file.IsDirectory)
+                                    {
+                                        <button class="btn btn-secondary" style="padding: 4px 8px; font-size: 12px;"
+                                                @onclick="() => DownloadFile(file)">
+                                            Download
+                                        </button>
+                                    }
+                                    <button class="btn btn-danger" style="padding: 4px 8px; font-size: 12px;"
+                                            @onclick="() => DeleteFile(file)">
+                                        Delete
+                                    </button>
+                                </td>
+                            </tr>
+                        }
+                    }
+                    else
+                    {
+                        <tr>
+                            <td colspan="5" class="text-center text-muted">
+                                No files in this directory
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+
+            <div class="mt-3 text-muted">
+                @_files.Count(f => !f.IsDirectory) files, @_files.Count(f => f.IsDirectory) folders
+                @if (_totalSize > 0)
+                {
+                    <span> | Total size: @FormatBytes(_totalSize)</span>
+                }
+            </div>
+        }
+    }
+</div>
+
+@code {
+    private string _currentPath = "/";
+    private bool _isLoading = false;
+    private List<FileEntry> _files = new();
+    private long _totalSize = 0;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await RefreshFiles();
+    }
+
+    private async Task RefreshFiles()
+    {
+        if (!InstanceManager.IsConnected) return;
+
+        _isLoading = true;
+        StateHasChanged();
+
+        try
+        {
+            var result = await InstanceManager.ExecuteAsync("storage.list", new Dictionary<string, object>
+            {
+                ["path"] = _currentPath
+            });
+
+            _files = ParseFiles(result);
+            _totalSize = _files.Where(f => !f.IsDirectory).Sum(f => f.Size);
+        }
+        catch (Exception ex)
+        {
+            await DialogService.AlertAsync("Error", $"Failed to list files: {ex.Message}");
+        }
+        finally
+        {
+            _isLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private void NavigateUp()
+    {
+        if (_currentPath == "/") return;
+        var parts = _currentPath.TrimEnd('/').Split('/');
+        _currentPath = parts.Length <= 2 ? "/" : string.Join("/", parts[..^1]);
+        _ = RefreshFiles();
+    }
+
+    private void NavigateToDirectory(string name)
+    {
+        _currentPath = _currentPath.TrimEnd('/') + "/" + name;
+        _ = RefreshFiles();
+    }
+
+    private async Task NavigateToPath()
+    {
+        if (string.IsNullOrWhiteSpace(_currentPath))
+            _currentPath = "/";
+        await RefreshFiles();
+    }
+
+    private async Task HandlePathKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+        {
+            await NavigateToPath();
+        }
+    }
+
+    private async Task UploadFile()
+    {
+        // In a real implementation, this would use a file picker
+        var fileName = await DialogService.PromptAsync("Upload File", "Enter file name:");
+        if (!string.IsNullOrEmpty(fileName))
+        {
+            try
+            {
+                await InstanceManager.ExecuteAsync("storage.upload", new Dictionary<string, object>
+                {
+                    ["path"] = _currentPath.TrimEnd('/') + "/" + fileName,
+                    ["content"] = "placeholder" // Real implementation would handle file content
+                });
+                await DialogService.AlertAsync("Success", "File uploaded successfully");
+                await RefreshFiles();
+            }
+            catch (Exception ex)
+            {
+                await DialogService.AlertAsync("Error", $"Failed to upload: {ex.Message}");
+            }
+        }
+    }
+
+    private async Task DownloadFile(FileEntry file)
+    {
+        try
+        {
+            var result = await InstanceManager.ExecuteAsync("storage.download", new Dictionary<string, object>
+            {
+                ["path"] = _currentPath.TrimEnd('/') + "/" + file.Name
+            });
+            await DialogService.AlertAsync("Download", $"File '{file.Name}' downloaded successfully.");
+        }
+        catch (Exception ex)
+        {
+            await DialogService.AlertAsync("Error", $"Failed to download: {ex.Message}");
+        }
+    }
+
+    private async Task DeleteFile(FileEntry file)
+    {
+        var confirmed = await DialogService.ConfirmAsync(
+            "Confirm Delete",
+            $"Are you sure you want to delete '{file.Name}'?");
+
+        if (confirmed)
+        {
+            try
+            {
+                await InstanceManager.ExecuteAsync("storage.delete", new Dictionary<string, object>
+                {
+                    ["path"] = _currentPath.TrimEnd('/') + "/" + file.Name
+                });
+                await RefreshFiles();
+            }
+            catch (Exception ex)
+            {
+                await DialogService.AlertAsync("Error", $"Failed to delete: {ex.Message}");
+            }
+        }
+    }
+
+    private string FormatBytes(long bytes)
+    {
+        string[] sizes = { "B", "KB", "MB", "GB", "TB" };
+        int order = 0;
+        double size = bytes;
+        while (size >= 1024 && order < sizes.Length - 1)
+        {
+            order++;
+            size /= 1024;
+        }
+        return $"{size:0.##} {sizes[order]}";
+    }
+
+    private List<FileEntry> ParseFiles(object? result)
+    {
+        var files = new List<FileEntry>();
+        if (result is IEnumerable<object> list)
+        {
+            foreach (var item in list)
+            {
+                if (item is IDictionary<string, object> dict)
+                {
+                    files.Add(new FileEntry
+                    {
+                        Name = dict.TryGetValue("name", out var n) ? n?.ToString() ?? "" : "",
+                        Size = dict.TryGetValue("size", out var s) && long.TryParse(s?.ToString(), out var sz) ? sz : 0,
+                        Modified = dict.TryGetValue("modified", out var m) && DateTime.TryParse(m?.ToString(), out var dt) ? dt : DateTime.MinValue,
+                        ContentType = dict.TryGetValue("contentType", out var ct) ? ct?.ToString() ?? "" : "",
+                        IsDirectory = dict.TryGetValue("isDirectory", out var d) && bool.TryParse(d?.ToString(), out var isDir) && isDir
+                    });
+                }
+            }
+        }
+        return files.OrderByDescending(f => f.IsDirectory).ThenBy(f => f.Name).ToList();
+    }
+
+    private record FileEntry
+    {
+        public string Name { get; init; } = "";
+        public long Size { get; init; }
+        public DateTime Modified { get; init; }
+        public string ContentType { get; init; } = "";
+        public bool IsDirectory { get; init; }
+    }
+}

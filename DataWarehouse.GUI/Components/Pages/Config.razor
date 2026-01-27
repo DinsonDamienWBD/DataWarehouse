@@ -1,0 +1,130 @@
+@page "/config"
+@inject InstanceManager InstanceManager
+@inject DialogService DialogService
+
+<div class="content-header">
+    <h2>Configuration</h2>
+    <button class="btn btn-primary" @onclick="SaveConfig">Save Changes</button>
+</div>
+
+<div class="content-body">
+    @if (!InstanceManager.IsConnected)
+    {
+        <div class="alert alert-warning">Not connected to a DataWarehouse instance.</div>
+    }
+    else
+    {
+        <div class="card">
+            <div class="card-header">General Settings</div>
+            <div class="card-body">
+                <div class="form-group">
+                    <label class="form-label">Instance Name</label>
+                    <input type="text" class="form-input" @bind="_config.InstanceName" />
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Data Directory</label>
+                    <input type="text" class="form-input" @bind="_config.DataDirectory" />
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Log Level</label>
+                    <select class="form-select" @bind="_config.LogLevel">
+                        <option value="Debug">Debug</option>
+                        <option value="Info">Info</option>
+                        <option value="Warning">Warning</option>
+                        <option value="Error">Error</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <div class="card mt-3">
+            <div class="card-header">Storage Settings</div>
+            <div class="card-body">
+                <div class="form-group">
+                    <label class="form-label">Default Storage Backend</label>
+                    <select class="form-select" @bind="_config.DefaultBackend">
+                        <option value="local">Local Filesystem</option>
+                        <option value="s3">Amazon S3</option>
+                        <option value="azure">Azure Blob Storage</option>
+                        <option value="gcs">Google Cloud Storage</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Max Cache Size (MB)</label>
+                    <input type="number" class="form-input" @bind="_config.MaxCacheMb" />
+                </div>
+            </div>
+        </div>
+
+        <div class="card mt-3">
+            <div class="card-header">Security Settings</div>
+            <div class="card-body">
+                <div class="form-group">
+                    <label class="form-label">
+                        <input type="checkbox" @bind="_config.EnableEncryption" /> Enable Encryption at Rest
+                    </label>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">
+                        <input type="checkbox" @bind="_config.EnableAuditLog" /> Enable Audit Logging
+                    </label>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private ConfigModel _config = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (InstanceManager.IsConnected)
+        {
+            var result = await InstanceManager.ExecuteAsync("config.get");
+            if (result is IDictionary<string, object> d)
+            {
+                _config.InstanceName = d.TryGetValue("instanceName", out var n) ? n?.ToString() ?? "" : "";
+                _config.DataDirectory = d.TryGetValue("dataDirectory", out var dd) ? dd?.ToString() ?? "" : "";
+                _config.LogLevel = d.TryGetValue("logLevel", out var ll) ? ll?.ToString() ?? "Info" : "Info";
+                _config.DefaultBackend = d.TryGetValue("defaultBackend", out var db) ? db?.ToString() ?? "local" : "local";
+                _config.MaxCacheMb = d.TryGetValue("maxCacheMb", out var mc) && int.TryParse(mc?.ToString(), out var mci) ? mci : 1024;
+                _config.EnableEncryption = d.TryGetValue("enableEncryption", out var ee) && bool.TryParse(ee?.ToString(), out var eeb) && eeb;
+                _config.EnableAuditLog = d.TryGetValue("enableAuditLog", out var ea) && bool.TryParse(ea?.ToString(), out var eab) && eab;
+            }
+        }
+    }
+
+    private async Task SaveConfig()
+    {
+        try
+        {
+            await InstanceManager.ExecuteAsync("config.set", new Dictionary<string, object>
+            {
+                ["instanceName"] = _config.InstanceName,
+                ["dataDirectory"] = _config.DataDirectory,
+                ["logLevel"] = _config.LogLevel,
+                ["defaultBackend"] = _config.DefaultBackend,
+                ["maxCacheMb"] = _config.MaxCacheMb,
+                ["enableEncryption"] = _config.EnableEncryption,
+                ["enableAuditLog"] = _config.EnableAuditLog
+            });
+            await DialogService.AlertAsync("Success", "Configuration saved successfully");
+        }
+        catch (Exception ex)
+        {
+            await DialogService.AlertAsync("Error", $"Failed to save: {ex.Message}");
+        }
+    }
+
+    private class ConfigModel
+    {
+        public string InstanceName { get; set; } = "";
+        public string DataDirectory { get; set; } = "";
+        public string LogLevel { get; set; } = "Info";
+        public string DefaultBackend { get; set; } = "local";
+        public int MaxCacheMb { get; set; } = 1024;
+        public bool EnableEncryption { get; set; }
+        public bool EnableAuditLog { get; set; }
+    }
+}

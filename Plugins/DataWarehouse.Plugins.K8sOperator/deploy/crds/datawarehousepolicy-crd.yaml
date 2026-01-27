@@ -1,0 +1,389 @@
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: datawarehousepolicies.datawarehouse.io
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.14.0
+  labels:
+    app.kubernetes.io/name: datawarehouse-operator
+    app.kubernetes.io/managed-by: datawarehouse
+spec:
+  group: datawarehouse.io
+  names:
+    kind: DataWarehousePolicy
+    listKind: DataWarehousePolicyList
+    plural: datawarehousepolicies
+    singular: datawarehousepolicy
+    shortNames:
+      - dwp
+      - dwpolicy
+    categories:
+      - all
+      - datawarehouse
+  scope: Namespaced
+  versions:
+    - name: v1
+      served: true
+      storage: true
+      schema:
+        openAPIV3Schema:
+          type: object
+          required:
+            - spec
+          properties:
+            apiVersion:
+              type: string
+            kind:
+              type: string
+            metadata:
+              type: object
+            spec:
+              type: object
+              required:
+                - target
+                - rules
+              properties:
+                target:
+                  type: object
+                  properties:
+                    clusters:
+                      type: array
+                      items:
+                        type: string
+                      description: Target cluster names (empty = all clusters)
+                    tenants:
+                      type: array
+                      items:
+                        type: string
+                      description: Target tenant names (empty = all tenants)
+                    namespaces:
+                      type: array
+                      items:
+                        type: string
+                      description: Target namespaces (empty = all namespaces)
+                    pathPatterns:
+                      type: array
+                      items:
+                        type: string
+                      description: Path patterns to apply policy to
+                priority:
+                  type: integer
+                  minimum: 1
+                  maximum: 1000
+                  default: 100
+                  description: Policy priority (lower = higher priority)
+                enabled:
+                  type: boolean
+                  default: true
+                  description: Enable or disable this policy
+                rules:
+                  type: array
+                  items:
+                    type: object
+                    required:
+                      - name
+                      - type
+                    properties:
+                      name:
+                        type: string
+                        description: Rule name
+                      type:
+                        type: string
+                        enum:
+                          - access
+                          - retention
+                          - encryption
+                          - tiering
+                          - compliance
+                          - lifecycle
+                          - immutability
+                          - audit
+                        description: Rule type
+                      enabled:
+                        type: boolean
+                        default: true
+                      access:
+                        type: object
+                        description: Access control rule configuration
+                        properties:
+                          effect:
+                            type: string
+                            enum:
+                              - allow
+                              - deny
+                            default: allow
+                          principals:
+                            type: array
+                            items:
+                              type: string
+                            description: Users, groups, or service accounts
+                          actions:
+                            type: array
+                            items:
+                              type: string
+                              enum:
+                                - read
+                                - write
+                                - delete
+                                - list
+                                - admin
+                                - '*'
+                          conditions:
+                            type: object
+                            properties:
+                              ipRanges:
+                                type: array
+                                items:
+                                  type: string
+                              timeWindows:
+                                type: array
+                                items:
+                                  type: object
+                                  properties:
+                                    startTime:
+                                      type: string
+                                    endTime:
+                                      type: string
+                                    daysOfWeek:
+                                      type: array
+                                      items:
+                                        type: string
+                              mfaRequired:
+                                type: boolean
+                      retention:
+                        type: object
+                        description: Data retention rule configuration
+                        properties:
+                          minDays:
+                            type: integer
+                            description: Minimum retention period
+                          maxDays:
+                            type: integer
+                            description: Maximum retention period
+                          action:
+                            type: string
+                            enum:
+                              - delete
+                              - archive
+                              - tier-cold
+                              - tier-archive
+                            default: delete
+                          legalHold:
+                            type: boolean
+                            default: false
+                      encryption:
+                        type: object
+                        description: Encryption policy configuration
+                        properties:
+                          required:
+                            type: boolean
+                            default: true
+                          algorithm:
+                            type: string
+                            enum:
+                              - AES-256-GCM
+                              - ChaCha20-Poly1305
+                              - quantum-safe
+                            default: AES-256-GCM
+                          keyRotationDays:
+                            type: integer
+                            default: 90
+                          keySource:
+                            type: string
+                            enum:
+                              - managed
+                              - customer
+                              - hsm
+                            default: managed
+                      tiering:
+                        type: object
+                        description: Storage tiering rule configuration
+                        properties:
+                          fromTier:
+                            type: string
+                            enum:
+                              - hot
+                              - warm
+                              - cold
+                              - archive
+                          toTier:
+                            type: string
+                            enum:
+                              - hot
+                              - warm
+                              - cold
+                              - archive
+                          afterDays:
+                            type: integer
+                            description: Days of inactivity before tiering
+                          afterAccessCount:
+                            type: integer
+                            description: Minimum access count threshold
+                      compliance:
+                        type: object
+                        description: Compliance policy configuration
+                        properties:
+                          frameworks:
+                            type: array
+                            items:
+                              type: string
+                              enum:
+                                - gdpr
+                                - hipaa
+                                - pci-dss
+                                - sox
+                                - fedramp
+                                - iso27001
+                          dataClassification:
+                            type: string
+                            enum:
+                              - public
+                              - internal
+                              - confidential
+                              - restricted
+                              - top-secret
+                          geoRestrictions:
+                            type: array
+                            items:
+                              type: string
+                            description: Allowed geographic regions (ISO 3166-1)
+                          auditRequired:
+                            type: boolean
+                            default: true
+                      lifecycle:
+                        type: object
+                        description: Object lifecycle rule configuration
+                        properties:
+                          transitions:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                afterDays:
+                                  type: integer
+                                toTier:
+                                  type: string
+                                toStorageClass:
+                                  type: string
+                          expiration:
+                            type: object
+                            properties:
+                              afterDays:
+                                type: integer
+                              deleteMarker:
+                                type: boolean
+                          versions:
+                            type: object
+                            properties:
+                              maxCount:
+                                type: integer
+                              expireAfterDays:
+                                type: integer
+                      immutability:
+                        type: object
+                        description: Immutability (WORM) configuration
+                        properties:
+                          enabled:
+                            type: boolean
+                            default: false
+                          mode:
+                            type: string
+                            enum:
+                              - governance
+                              - compliance
+                            default: governance
+                          retentionDays:
+                            type: integer
+                          legalHold:
+                            type: boolean
+                      audit:
+                        type: object
+                        description: Audit logging configuration
+                        properties:
+                          enabled:
+                            type: boolean
+                            default: true
+                          operations:
+                            type: array
+                            items:
+                              type: string
+                              enum:
+                                - read
+                                - write
+                                - delete
+                                - admin
+                                - '*'
+                          destination:
+                            type: string
+                            description: Audit log destination (bucket path or external URL)
+                          format:
+                            type: string
+                            enum:
+                              - json
+                              - cef
+                              - leef
+                            default: json
+            status:
+              type: object
+              properties:
+                phase:
+                  type: string
+                  enum:
+                    - Pending
+                    - Active
+                    - Enforcing
+                    - Disabled
+                    - Failed
+                appliedTo:
+                  type: object
+                  properties:
+                    clusters:
+                      type: integer
+                    tenants:
+                      type: integer
+                    paths:
+                      type: integer
+                violations:
+                  type: integer
+                  description: Number of policy violations detected
+                lastEvaluationTime:
+                  type: string
+                  format: date-time
+                conditions:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      type:
+                        type: string
+                      status:
+                        type: string
+                      lastTransitionTime:
+                        type: string
+                        format: date-time
+                      reason:
+                        type: string
+                      message:
+                        type: string
+      subresources:
+        status: {}
+      additionalPrinterColumns:
+        - name: Priority
+          type: integer
+          jsonPath: .spec.priority
+        - name: Phase
+          type: string
+          jsonPath: .status.phase
+        - name: Rules
+          type: integer
+          jsonPath: .spec.rules
+          priority: 1
+        - name: Violations
+          type: integer
+          jsonPath: .status.violations
+        - name: Enabled
+          type: boolean
+          jsonPath: .spec.enabled
+        - name: Age
+          type: date
+          jsonPath: .metadata.creationTimestamp

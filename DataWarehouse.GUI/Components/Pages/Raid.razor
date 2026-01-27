@@ -1,0 +1,98 @@
+@page "/raid"
+@inject InstanceManager InstanceManager
+@inject CapabilityManager CapabilityManager
+@inject DialogService DialogService
+
+<div class="content-header">
+    <h2>RAID Management</h2>
+    <button class="btn btn-secondary" @onclick="RefreshRaid">Refresh</button>
+</div>
+
+<div class="content-body">
+    @if (!InstanceManager.IsConnected)
+    {
+        <div class="alert alert-warning">Not connected to a DataWarehouse instance.</div>
+    }
+    else if (!CapabilityManager.HasFeature("raid"))
+    {
+        <div class="alert alert-info">RAID capability not available on this instance.</div>
+    }
+    else if (_isLoading)
+    {
+        <div class="text-center mt-4"><div class="spinner"></div></div>
+    }
+    else
+    {
+        <div class="card">
+            <div class="card-header">RAID Arrays</div>
+            <div class="card-body">
+                @if (_arrays.Any())
+                {
+                    @foreach (var array in _arrays)
+                    {
+                        <div class="card mb-2">
+                            <div class="card-header d-flex justify-content-between">
+                                <span>@array.Name (RAID @array.Level)</span>
+                                <span class="badge @GetStatusBadge(array.Status)">@array.Status</span>
+                            </div>
+                            <div class="card-body">
+                                <div class="d-flex gap-3">
+                                    <div><strong>Devices:</strong> @array.DeviceCount</div>
+                                    <div><strong>Capacity:</strong> @FormatBytes(array.Capacity)</div>
+                                    <div><strong>Used:</strong> @FormatBytes(array.Used)</div>
+                                </div>
+                                @if (array.Status == "Degraded")
+                                {
+                                    <button class="btn btn-warning mt-2" @onclick="() => RebuildArray(array)">Rebuild</button>
+                                }
+                            </div>
+                        </div>
+                    }
+                }
+                else
+                {
+                    <p class="text-muted">No RAID arrays configured</p>
+                }
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private bool _isLoading = false;
+    private List<RaidArray> _arrays = new();
+
+    protected override async Task OnInitializedAsync() => await RefreshRaid();
+
+    private async Task RefreshRaid()
+    {
+        if (!InstanceManager.IsConnected || !CapabilityManager.HasFeature("raid")) return;
+        _isLoading = true; StateHasChanged();
+        try { var result = await InstanceManager.ExecuteAsync("raid.status"); _arrays = ParseArrays(result); }
+        finally { _isLoading = false; StateHasChanged(); }
+    }
+
+    private async Task RebuildArray(RaidArray array)
+    {
+        if (await DialogService.ConfirmAsync("Rebuild RAID", $"Start rebuild of {array.Name}?"))
+        {
+            await InstanceManager.ExecuteAsync("raid.rebuild", new Dictionary<string, object> { ["name"] = array.Name });
+            await DialogService.AlertAsync("Success", "Rebuild started");
+        }
+    }
+
+    private string GetStatusBadge(string s) => s switch { "Healthy" => "badge-success", "Degraded" => "badge-warning", _ => "badge-danger" };
+    private string FormatBytes(long b) { string[] s = { "B", "KB", "MB", "GB", "TB" }; int o = 0; double sz = b; while (sz >= 1024 && o < s.Length - 1) { o++; sz /= 1024; } return $"{sz:0.##} {s[o]}"; }
+
+    private List<RaidArray> ParseArrays(object? result)
+    {
+        var arrays = new List<RaidArray>();
+        if (result is IEnumerable<object> list)
+            foreach (var item in list)
+                if (item is IDictionary<string, object> d)
+                    arrays.Add(new() { Name = d.TryGetValue("name", out var n) ? n?.ToString() ?? "" : "", Level = d.TryGetValue("level", out var l) ? l?.ToString() ?? "" : "", Status = d.TryGetValue("status", out var s) ? s?.ToString() ?? "" : "", DeviceCount = d.TryGetValue("devices", out var dc) && int.TryParse(dc?.ToString(), out var dci) ? dci : 0, Capacity = d.TryGetValue("capacity", out var c) && long.TryParse(c?.ToString(), out var cl) ? cl : 0, Used = d.TryGetValue("used", out var u) && long.TryParse(u?.ToString(), out var ul) ? ul : 0 });
+        return arrays;
+    }
+
+    private record RaidArray { public string Name { get; init; } = ""; public string Level { get; init; } = ""; public string Status { get; init; } = ""; public int DeviceCount { get; init; } public long Capacity { get; init; } public long Used { get; init; } }
+}

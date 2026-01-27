@@ -1,0 +1,660 @@
+@page "/federation"
+@inject InstanceManager InstanceManager
+@inject CapabilityManager CapabilityManager
+@inject DialogService DialogService
+
+@*
+    FederationBrowser.razor - Multi-backend federation view component.
+
+    Provides unified view across all connected storage backends:
+    - View across all connected storage backends
+    - Unified search across backends
+    - Cross-backend copy/move operations
+
+    Requires the 'replication' feature to be available.
+*@
+
+<div class="content-header">
+    <h2>Storage Federation</h2>
+    <div class="d-flex gap-2">
+        <button class="btn btn-primary" @onclick="AddBackend" disabled="@(!_isFeatureAvailable)">Add Backend</button>
+        <button class="btn btn-secondary" @onclick="RefreshBackends" disabled="@(!_isFeatureAvailable)">Refresh</button>
+    </div>
+</div>
+
+<div class="content-body">
+    @if (!InstanceManager.IsConnected)
+    {
+        <div class="alert alert-warning">
+            <strong>Not Connected</strong><br />
+            Connect to a DataWarehouse instance to view federated storage.
+        </div>
+    }
+    else if (!_isFeatureAvailable)
+    {
+        <div class="alert alert-warning">
+            <strong>Federation Not Available</strong><br />
+            Storage federation requires the replication feature to be enabled.
+        </div>
+    }
+    else if (_isLoading)
+    {
+        <div class="text-center mt-4">
+            <div class="spinner"></div>
+            <p class="mt-2">Loading federation data...</p>
+        </div>
+    }
+    else
+    {
+        <!-- Unified Search -->
+        <div class="card mb-3">
+            <div class="card-header">Unified Search</div>
+            <div class="card-body">
+                <div class="d-flex gap-2">
+                    <input type="text" class="form-input" style="flex: 1;" placeholder="Search across all backends..."
+                           @bind="_searchQuery" @bind:event="oninput" @onkeydown="HandleSearchKeyDown" />
+                    <select class="form-select" style="width: 200px;" @bind="_searchBackendFilter">
+                        <option value="">All Backends</option>
+                        @foreach (var backend in _backends)
+                        {
+                            <option value="@backend.Id">@backend.Name</option>
+                        }
+                    </select>
+                    <button class="btn btn-primary" @onclick="ExecuteSearch">Search</button>
+                </div>
+                @if (_searchResults.Any())
+                {
+                    <div class="mt-3">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Backend</th>
+                                    <th>Path</th>
+                                    <th>Size</th>
+                                    <th>Modified</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var result in _searchResults.Take(50))
+                                {
+                                    <tr>
+                                        <td><span class="badge @GetBackendTypeBadge(result.BackendType)">@result.BackendName</span></td>
+                                        <td><code>@result.Path</code></td>
+                                        <td>@FormatBytes(result.Size)</td>
+                                        <td>@result.Modified.ToString("yyyy-MM-dd HH:mm")</td>
+                                        <td>
+                                            <button class="btn btn-secondary" style="padding: 2px 6px; font-size: 11px;"
+                                                    @onclick="() => ShowCopyDialog(result)">Copy</button>
+                                            <button class="btn btn-secondary" style="padding: 2px 6px; font-size: 11px;"
+                                                    @onclick="() => ShowMoveDialog(result)">Move</button>
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                        <div class="mt-2 text-muted">
+                            Found @_searchResults.Count results @(!string.IsNullOrEmpty(_searchBackendFilter) ? $"in selected backend" : "across all backends")
+                        </div>
+                    </div>
+                }
+            </div>
+        </div>
+
+        <!-- Backend Overview -->
+        <div class="d-flex gap-3" style="flex-wrap: wrap;">
+            @foreach (var backend in _backends)
+            {
+                <div class="card" style="flex: 1; min-width: 350px;">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <div>
+                            <span class="badge @GetBackendTypeBadge(backend.Type)">@backend.Type</span>
+                            <strong class="ms-2">@backend.Name</strong>
+                        </div>
+                        <span class="badge @GetStatusBadge(backend.Status)">@backend.Status</span>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <div class="d-flex justify-content-between mb-1">
+                                <span>Storage Used</span>
+                                <span>@FormatBytes(backend.UsedSpace) / @FormatBytes(backend.TotalSpace)</span>
+                            </div>
+                            <div class="progress">
+                                <div class="progress-bar @GetUsageBarClass(backend.UsagePercent)" style="width: @backend.UsagePercent%"></div>
+                            </div>
+                        </div>
+
+                        <div class="d-flex justify-content-between mb-2">
+                            <span class="text-muted">Objects</span>
+                            <span>@backend.ObjectCount.ToString("N0")</span>
+                        </div>
+                        <div class="d-flex justify-content-between mb-2">
+                            <span class="text-muted">Endpoint</span>
+                            <code style="font-size: 11px;">@backend.Endpoint</code>
+                        </div>
+                        <div class="d-flex justify-content-between mb-2">
+                            <span class="text-muted">Last Sync</span>
+                            <span>@backend.LastSync.ToString("yyyy-MM-dd HH:mm")</span>
+                        </div>
+                        <div class="d-flex justify-content-between mb-2">
+                            <span class="text-muted">Latency</span>
+                            <span>@backend.LatencyMs ms</span>
+                        </div>
+
+                        <div class="mt-3 d-flex gap-2">
+                            <button class="btn btn-secondary" style="flex: 1; font-size: 12px;"
+                                    @onclick="() => BrowseBackend(backend)">Browse</button>
+                            <button class="btn btn-secondary" style="flex: 1; font-size: 12px;"
+                                    @onclick="() => SyncBackend(backend)">Sync</button>
+                            <button class="btn btn-secondary" style="flex: 1; font-size: 12px;"
+                                    @onclick="() => ConfigureBackend(backend)">Config</button>
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+
+        @if (!_backends.Any())
+        {
+            <div class="alert alert-info mt-3">
+                No storage backends configured. Click "Add Backend" to connect a new storage backend.
+            </div>
+        }
+
+        <!-- Active Operations -->
+        @if (_activeOperations.Any())
+        {
+            <div class="card mt-3">
+                <div class="card-header">Active Cross-Backend Operations</div>
+                <div class="card-body" style="padding: 0;">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Operation</th>
+                                <th>Source</th>
+                                <th>Target</th>
+                                <th>Progress</th>
+                                <th>Status</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var op in _activeOperations)
+                            {
+                                <tr>
+                                    <td><span class="badge @GetOperationBadge(op.Type)">@op.Type</span></td>
+                                    <td><code>@op.SourceBackend:@op.SourcePath</code></td>
+                                    <td><code>@op.TargetBackend:@op.TargetPath</code></td>
+                                    <td>
+                                        <div class="progress" style="width: 100px;">
+                                            <div class="progress-bar" style="width: @op.Progress%"></div>
+                                        </div>
+                                    </td>
+                                    <td><span class="badge @GetStatusBadge(op.Status)">@op.Status</span></td>
+                                    <td>
+                                        @if (op.Status == "Running")
+                                        {
+                                            <button class="btn btn-danger" style="padding: 2px 6px; font-size: 11px;"
+                                                    @onclick="() => CancelOperation(op)">Cancel</button>
+                                        }
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        }
+
+        <!-- Federation Statistics -->
+        <div class="card mt-3">
+            <div class="card-header">Federation Statistics</div>
+            <div class="card-body">
+                <div class="d-flex gap-3" style="flex-wrap: wrap;">
+                    <div style="flex: 1; min-width: 150px; text-align: center;">
+                        <div style="font-size: 24px; font-weight: bold;">@_backends.Count</div>
+                        <div class="text-muted">Connected Backends</div>
+                    </div>
+                    <div style="flex: 1; min-width: 150px; text-align: center;">
+                        <div style="font-size: 24px; font-weight: bold;">@FormatBytes(_backends.Sum(b => b.UsedSpace))</div>
+                        <div class="text-muted">Total Used Space</div>
+                    </div>
+                    <div style="flex: 1; min-width: 150px; text-align: center;">
+                        <div style="font-size: 24px; font-weight: bold;">@_backends.Sum(b => b.ObjectCount).ToString("N0")</div>
+                        <div class="text-muted">Total Objects</div>
+                    </div>
+                    <div style="flex: 1; min-width: 150px; text-align: center;">
+                        <div style="font-size: 24px; font-weight: bold;">@_backends.Count(b => b.Status == "Healthy")</div>
+                        <div class="text-muted">Healthy Backends</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private bool _isLoading = true;
+    private bool _isFeatureAvailable = false;
+    private List<StorageBackend> _backends = new();
+    private List<SearchResult> _searchResults = new();
+    private List<FederationOperation> _activeOperations = new();
+    private string _searchQuery = "";
+    private string _searchBackendFilter = "";
+
+    /// <summary>
+    /// Initializes the component and loads federation data if available.
+    /// </summary>
+    protected override async Task OnInitializedAsync()
+    {
+        _isFeatureAvailable = CapabilityManager.HasFeature("replication");
+        if (_isFeatureAvailable)
+        {
+            await RefreshBackends();
+        }
+        else
+        {
+            _isLoading = false;
+        }
+    }
+
+    /// <summary>
+    /// Refreshes the list of storage backends.
+    /// </summary>
+    private async Task RefreshBackends()
+    {
+        _isLoading = true;
+        StateHasChanged();
+
+        try
+        {
+            var result = await InstanceManager.ExecuteAsync("federation.listBackends");
+            _backends = ParseBackends(result?.Data);
+
+            var opsResult = await InstanceManager.ExecuteAsync("federation.listOperations");
+            _activeOperations = ParseOperations(opsResult?.Data);
+        }
+        catch (Exception ex)
+        {
+            await DialogService.AlertAsync("Error", $"Failed to load federation data: {ex.Message}");
+        }
+        finally
+        {
+            _isLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    /// <summary>
+    /// Handles Enter key in search input.
+    /// </summary>
+    private async Task HandleSearchKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+        {
+            await ExecuteSearch();
+        }
+    }
+
+    /// <summary>
+    /// Executes a unified search across backends.
+    /// </summary>
+    private async Task ExecuteSearch()
+    {
+        if (string.IsNullOrWhiteSpace(_searchQuery)) return;
+
+        try
+        {
+            var parameters = new Dictionary<string, object>
+            {
+                ["query"] = _searchQuery
+            };
+            if (!string.IsNullOrEmpty(_searchBackendFilter))
+            {
+                parameters["backend"] = _searchBackendFilter;
+            }
+
+            var result = await InstanceManager.ExecuteAsync("federation.search", parameters);
+            _searchResults = ParseSearchResults(result?.Data);
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            await DialogService.AlertAsync("Error", $"Search failed: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Opens the add backend dialog.
+    /// </summary>
+    private async Task AddBackend()
+    {
+        var backendType = await DialogService.ShowActionSheetAsync(
+            "Select Backend Type", "Cancel", null,
+            "Local Storage", "S3 Compatible", "Azure Blob", "Google Cloud Storage", "SFTP");
+
+        if (string.IsNullOrEmpty(backendType) || backendType == "Cancel") return;
+
+        var endpoint = await DialogService.PromptAsync("Backend Endpoint", "Enter endpoint URL:");
+        if (string.IsNullOrEmpty(endpoint)) return;
+
+        var name = await DialogService.PromptAsync("Backend Name", "Enter a friendly name:");
+        if (string.IsNullOrEmpty(name)) return;
+
+        try
+        {
+            await InstanceManager.ExecuteAsync("federation.addBackend", new Dictionary<string, object>
+            {
+                ["type"] = backendType,
+                ["endpoint"] = endpoint,
+                ["name"] = name
+            });
+            await RefreshBackends();
+        }
+        catch (Exception ex)
+        {
+            await DialogService.AlertAsync("Error", $"Failed to add backend: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Opens the browse view for a specific backend.
+    /// </summary>
+    private async Task BrowseBackend(StorageBackend backend)
+    {
+        await DialogService.AlertAsync("Browse Backend",
+            $"Browsing {backend.Name}\n\nThis would open a dedicated browser for this backend.");
+    }
+
+    /// <summary>
+    /// Triggers a sync for a backend.
+    /// </summary>
+    private async Task SyncBackend(StorageBackend backend)
+    {
+        var confirmed = await DialogService.ConfirmAsync("Sync Backend",
+            $"Start synchronization for {backend.Name}?");
+        if (!confirmed) return;
+
+        try
+        {
+            await InstanceManager.ExecuteAsync("federation.syncBackend", new Dictionary<string, object>
+            {
+                ["backendId"] = backend.Id
+            });
+            await DialogService.AlertAsync("Sync Started", "Backend synchronization has been initiated.");
+            await RefreshBackends();
+        }
+        catch (Exception ex)
+        {
+            await DialogService.AlertAsync("Error", $"Failed to start sync: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Opens the configuration dialog for a backend.
+    /// </summary>
+    private async Task ConfigureBackend(StorageBackend backend)
+    {
+        await DialogService.AlertAsync("Configure Backend",
+            $"Configuration for {backend.Name}:\n\n" +
+            $"Type: {backend.Type}\n" +
+            $"Endpoint: {backend.Endpoint}\n" +
+            $"Status: {backend.Status}");
+    }
+
+    /// <summary>
+    /// Shows dialog to copy a file to another backend.
+    /// </summary>
+    private async Task ShowCopyDialog(SearchResult result)
+    {
+        var targetBackend = await DialogService.ShowActionSheetAsync(
+            "Select Target Backend", "Cancel", null,
+            _backends.Where(b => b.Id != result.BackendId).Select(b => b.Name).ToArray());
+
+        if (string.IsNullOrEmpty(targetBackend) || targetBackend == "Cancel") return;
+
+        try
+        {
+            var target = _backends.First(b => b.Name == targetBackend);
+            await InstanceManager.ExecuteAsync("federation.copy", new Dictionary<string, object>
+            {
+                ["sourceBackend"] = result.BackendId,
+                ["sourcePath"] = result.Path,
+                ["targetBackend"] = target.Id,
+                ["targetPath"] = result.Path
+            });
+            await DialogService.AlertAsync("Copy Started", "Cross-backend copy operation has been initiated.");
+            await RefreshBackends();
+        }
+        catch (Exception ex)
+        {
+            await DialogService.AlertAsync("Error", $"Failed to start copy: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Shows dialog to move a file to another backend.
+    /// </summary>
+    private async Task ShowMoveDialog(SearchResult result)
+    {
+        var targetBackend = await DialogService.ShowActionSheetAsync(
+            "Select Target Backend", "Cancel", null,
+            _backends.Where(b => b.Id != result.BackendId).Select(b => b.Name).ToArray());
+
+        if (string.IsNullOrEmpty(targetBackend) || targetBackend == "Cancel") return;
+
+        var confirmed = await DialogService.ConfirmAsync("Confirm Move",
+            $"Move '{result.Path}' from {result.BackendName} to {targetBackend}?\n\n" +
+            "This will delete the source file after successful transfer.");
+        if (!confirmed) return;
+
+        try
+        {
+            var target = _backends.First(b => b.Name == targetBackend);
+            await InstanceManager.ExecuteAsync("federation.move", new Dictionary<string, object>
+            {
+                ["sourceBackend"] = result.BackendId,
+                ["sourcePath"] = result.Path,
+                ["targetBackend"] = target.Id,
+                ["targetPath"] = result.Path
+            });
+            await DialogService.AlertAsync("Move Started", "Cross-backend move operation has been initiated.");
+            await RefreshBackends();
+        }
+        catch (Exception ex)
+        {
+            await DialogService.AlertAsync("Error", $"Failed to start move: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Cancels an active federation operation.
+    /// </summary>
+    private async Task CancelOperation(FederationOperation op)
+    {
+        var confirmed = await DialogService.ConfirmAsync("Cancel Operation",
+            $"Cancel {op.Type} operation?");
+        if (!confirmed) return;
+
+        try
+        {
+            await InstanceManager.ExecuteAsync("federation.cancelOperation", new Dictionary<string, object>
+            {
+                ["operationId"] = op.Id
+            });
+            await RefreshBackends();
+        }
+        catch (Exception ex)
+        {
+            await DialogService.AlertAsync("Error", $"Failed to cancel operation: {ex.Message}");
+        }
+    }
+
+    private string GetBackendTypeBadge(string type) => type?.ToLowerInvariant() switch
+    {
+        "local" => "badge-info",
+        "s3" or "s3 compatible" => "badge-warning",
+        "azure" or "azure blob" => "badge-primary",
+        "gcs" or "google cloud storage" => "badge-success",
+        "sftp" => "badge-secondary",
+        _ => "badge-info"
+    };
+
+    private string GetStatusBadge(string status) => status?.ToLowerInvariant() switch
+    {
+        "healthy" or "running" or "online" => "badge-success",
+        "degraded" or "syncing" => "badge-warning",
+        "offline" or "error" or "failed" => "badge-danger",
+        "pending" => "badge-info",
+        _ => "badge-secondary"
+    };
+
+    private string GetOperationBadge(string type) => type?.ToLowerInvariant() switch
+    {
+        "copy" => "badge-info",
+        "move" => "badge-warning",
+        "sync" => "badge-primary",
+        "delete" => "badge-danger",
+        _ => "badge-secondary"
+    };
+
+    private string GetUsageBarClass(double percent) => percent switch
+    {
+        >= 90 => "bg-danger",
+        >= 75 => "bg-warning",
+        _ => ""
+    };
+
+    private string FormatBytes(long bytes)
+    {
+        string[] sizes = { "B", "KB", "MB", "GB", "TB", "PB" };
+        int order = 0;
+        double size = bytes;
+        while (size >= 1024 && order < sizes.Length - 1) { order++; size /= 1024; }
+        return $"{size:0.##} {sizes[order]}";
+    }
+
+    private List<StorageBackend> ParseBackends(IDictionary<string, object>? data)
+    {
+        var backends = new List<StorageBackend>();
+        if (data?.TryGetValue("backends", out var backendsObj) == true && backendsObj is IEnumerable<object> list)
+        {
+            foreach (var item in list)
+            {
+                if (item is IDictionary<string, object> d)
+                {
+                    backends.Add(new StorageBackend
+                    {
+                        Id = d.TryGetValue("id", out var id) ? id?.ToString() ?? "" : "",
+                        Name = d.TryGetValue("name", out var n) ? n?.ToString() ?? "" : "",
+                        Type = d.TryGetValue("type", out var t) ? t?.ToString() ?? "" : "",
+                        Endpoint = d.TryGetValue("endpoint", out var e) ? e?.ToString() ?? "" : "",
+                        Status = d.TryGetValue("status", out var s) ? s?.ToString() ?? "Unknown" : "Unknown",
+                        UsedSpace = d.TryGetValue("usedSpace", out var us) && long.TryParse(us?.ToString(), out var usv) ? usv : 0,
+                        TotalSpace = d.TryGetValue("totalSpace", out var ts) && long.TryParse(ts?.ToString(), out var tsv) ? tsv : 1,
+                        ObjectCount = d.TryGetValue("objectCount", out var oc) && int.TryParse(oc?.ToString(), out var ocv) ? ocv : 0,
+                        LastSync = d.TryGetValue("lastSync", out var ls) && DateTime.TryParse(ls?.ToString(), out var lsdt) ? lsdt : DateTime.MinValue,
+                        LatencyMs = d.TryGetValue("latencyMs", out var lat) && int.TryParse(lat?.ToString(), out var latv) ? latv : 0
+                    });
+                }
+            }
+        }
+        return backends;
+    }
+
+    private List<SearchResult> ParseSearchResults(IDictionary<string, object>? data)
+    {
+        var results = new List<SearchResult>();
+        if (data?.TryGetValue("results", out var resultsObj) == true && resultsObj is IEnumerable<object> list)
+        {
+            foreach (var item in list)
+            {
+                if (item is IDictionary<string, object> d)
+                {
+                    results.Add(new SearchResult
+                    {
+                        BackendId = d.TryGetValue("backendId", out var bi) ? bi?.ToString() ?? "" : "",
+                        BackendName = d.TryGetValue("backendName", out var bn) ? bn?.ToString() ?? "" : "",
+                        BackendType = d.TryGetValue("backendType", out var bt) ? bt?.ToString() ?? "" : "",
+                        Path = d.TryGetValue("path", out var p) ? p?.ToString() ?? "" : "",
+                        Size = d.TryGetValue("size", out var s) && long.TryParse(s?.ToString(), out var sv) ? sv : 0,
+                        Modified = d.TryGetValue("modified", out var m) && DateTime.TryParse(m?.ToString(), out var mv) ? mv : DateTime.MinValue
+                    });
+                }
+            }
+        }
+        return results;
+    }
+
+    private List<FederationOperation> ParseOperations(IDictionary<string, object>? data)
+    {
+        var operations = new List<FederationOperation>();
+        if (data?.TryGetValue("operations", out var opsObj) == true && opsObj is IEnumerable<object> list)
+        {
+            foreach (var item in list)
+            {
+                if (item is IDictionary<string, object> d)
+                {
+                    operations.Add(new FederationOperation
+                    {
+                        Id = d.TryGetValue("id", out var id) ? id?.ToString() ?? "" : "",
+                        Type = d.TryGetValue("type", out var t) ? t?.ToString() ?? "" : "",
+                        SourceBackend = d.TryGetValue("sourceBackend", out var sb) ? sb?.ToString() ?? "" : "",
+                        SourcePath = d.TryGetValue("sourcePath", out var sp) ? sp?.ToString() ?? "" : "",
+                        TargetBackend = d.TryGetValue("targetBackend", out var tb) ? tb?.ToString() ?? "" : "",
+                        TargetPath = d.TryGetValue("targetPath", out var tp) ? tp?.ToString() ?? "" : "",
+                        Progress = d.TryGetValue("progress", out var p) && int.TryParse(p?.ToString(), out var pv) ? pv : 0,
+                        Status = d.TryGetValue("status", out var s) ? s?.ToString() ?? "" : ""
+                    });
+                }
+            }
+        }
+        return operations;
+    }
+
+    /// <summary>
+    /// Represents a connected storage backend.
+    /// </summary>
+    private record StorageBackend
+    {
+        public string Id { get; init; } = "";
+        public string Name { get; init; } = "";
+        public string Type { get; init; } = "";
+        public string Endpoint { get; init; } = "";
+        public string Status { get; init; } = "Unknown";
+        public long UsedSpace { get; init; }
+        public long TotalSpace { get; init; }
+        public int ObjectCount { get; init; }
+        public DateTime LastSync { get; init; }
+        public int LatencyMs { get; init; }
+        public double UsagePercent => TotalSpace > 0 ? (double)UsedSpace / TotalSpace * 100 : 0;
+    }
+
+    /// <summary>
+    /// Represents a search result from federated search.
+    /// </summary>
+    private record SearchResult
+    {
+        public string BackendId { get; init; } = "";
+        public string BackendName { get; init; } = "";
+        public string BackendType { get; init; } = "";
+        public string Path { get; init; } = "";
+        public long Size { get; init; }
+        public DateTime Modified { get; init; }
+    }
+
+    /// <summary>
+    /// Represents an active cross-backend operation.
+    /// </summary>
+    private record FederationOperation
+    {
+        public string Id { get; init; } = "";
+        public string Type { get; init; } = "";
+        public string SourceBackend { get; init; } = "";
+        public string SourcePath { get; init; } = "";
+        public string TargetBackend { get; init; } = "";
+        public string TargetPath { get; init; } = "";
+        public int Progress { get; init; }
+        public string Status { get; init; } = "";
+    }
+}

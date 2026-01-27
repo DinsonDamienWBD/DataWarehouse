@@ -1,0 +1,175 @@
+@page "/ai"
+@inject InstanceManager InstanceManager
+@inject DialogService DialogService
+
+<div class="content-header">
+    <h2>AI Provider Settings</h2>
+    <button class="btn btn-primary" @onclick="AddProvider">Add Provider</button>
+</div>
+
+<div class="content-body">
+    @if (!InstanceManager.IsConnected)
+    {
+        <div class="alert alert-warning">Not connected to a DataWarehouse instance.</div>
+    }
+    else
+    {
+        <div class="alert alert-info">
+            <strong>AI-Native SDK</strong><br />
+            DataWarehouse supports multiple AI providers. Configure your preferred provider below to enable natural language commands, semantic search, and AI-powered features.
+        </div>
+
+        <div class="card">
+            <div class="card-header">Configured Providers</div>
+            <div class="card-body" style="padding: 0;">
+                <table class="data-table">
+                    <thead><tr><th>Provider</th><th>Type</th><th>Model</th><th>Status</th><th>Default</th><th>Actions</th></tr></thead>
+                    <tbody>
+                        @foreach (var provider in _providers)
+                        {
+                            <tr>
+                                <td><strong>@provider.Name</strong></td>
+                                <td><span class="badge badge-info">@provider.Type</span></td>
+                                <td>@provider.Model</td>
+                                <td><span class="badge @(provider.IsActive ? "badge-success" : "badge-danger")">@(provider.IsActive ? "Active" : "Inactive")</span></td>
+                                <td>@(provider.IsDefault ? "Yes" : "-")</td>
+                                <td>
+                                    @if (!provider.IsDefault)
+                                    {
+                                        <button class="btn btn-secondary" style="padding: 4px 8px; font-size: 12px;" @onclick="() => SetDefault(provider)">Set Default</button>
+                                    }
+                                    <button class="btn btn-secondary" style="padding: 4px 8px; font-size: 12px;" @onclick="() => TestProvider(provider)">Test</button>
+                                    <button class="btn btn-danger" style="padding: 4px 8px; font-size: 12px;" @onclick="() => DeleteProvider(provider)">Delete</button>
+                                </td>
+                            </tr>
+                        }
+                        @if (!_providers.Any())
+                        {
+                            <tr><td colspan="6" class="text-center text-muted">No AI providers configured. Add one to enable AI features.</td></tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        @if (_showAddForm)
+        {
+            <div class="card mt-3">
+                <div class="card-header">Add AI Provider</div>
+                <div class="card-body">
+                    <div class="form-group">
+                        <label class="form-label">Provider Name</label>
+                        <input type="text" class="form-input" @bind="_newProvider.Name" placeholder="my-openai" />
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Provider Type</label>
+                        <select class="form-select" @bind="_newProvider.Type">
+                            <option value="openai">OpenAI (GPT-4, GPT-4o)</option>
+                            <option value="anthropic">Anthropic (Claude)</option>
+                            <option value="google">Google (Gemini)</option>
+                            <option value="azure">Azure OpenAI</option>
+                            <option value="ollama">Ollama (Local)</option>
+                            <option value="mistral">Mistral AI</option>
+                            <option value="cohere">Cohere</option>
+                            <option value="groq">Groq</option>
+                            <option value="bedrock">AWS Bedrock</option>
+                            <option value="huggingface">HuggingFace</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">API Key</label>
+                        <input type="password" class="form-input" @bind="_newProvider.ApiKey" placeholder="sk-..." />
+                        <small class="text-muted">Your API key is stored securely and never logged.</small>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Model (optional)</label>
+                        <input type="text" class="form-input" @bind="_newProvider.Model" placeholder="gpt-4o, claude-opus-4, gemini-2.0-flash" />
+                    </div>
+                    @if (_newProvider.Type == "ollama")
+                    {
+                        <div class="form-group">
+                            <label class="form-label">Endpoint</label>
+                            <input type="text" class="form-input" @bind="_newProvider.Endpoint" placeholder="http://localhost:11434" />
+                        </div>
+                    }
+                    <div class="d-flex gap-2">
+                        <button class="btn btn-primary" @onclick="SaveProvider">Save Provider</button>
+                        <button class="btn btn-secondary" @onclick="() => _showAddForm = false">Cancel</button>
+                    </div>
+                </div>
+            </div>
+        }
+
+        <div class="card mt-3">
+            <div class="card-header">Supported Providers</div>
+            <div class="card-body">
+                <div class="d-flex gap-2" style="flex-wrap: wrap;">
+                    @foreach (var p in _supportedProviders)
+                    {
+                        <span class="badge badge-info" style="padding: 8px 12px;">@p</span>
+                    }
+                </div>
+                <p class="text-muted mt-2">
+                    All providers use the same AI-agnostic interface. You can switch providers at any time without changing your workflows.
+                </p>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private List<ProviderConfig> _providers = new();
+    private bool _showAddForm = false;
+    private ProviderConfig _newProvider = new();
+    private readonly string[] _supportedProviders = { "OpenAI", "Anthropic/Claude", "Google Gemini", "Azure OpenAI", "Ollama", "Mistral", "Cohere", "Groq", "AWS Bedrock", "HuggingFace", "Perplexity", "Together AI" };
+
+    protected override async Task OnInitializedAsync()
+    {
+        var result = await InstanceManager.ExecuteAsync("ai.providers");
+        if (result is IEnumerable<object> list)
+            foreach (var item in list)
+                if (item is IDictionary<string, object> d)
+                    _providers.Add(new() { Name = d.TryGetValue("name", out var n) ? n?.ToString() ?? "" : "", Type = d.TryGetValue("type", out var t) ? t?.ToString() ?? "" : "", Model = d.TryGetValue("model", out var m) ? m?.ToString() ?? "" : "", IsActive = d.TryGetValue("active", out var a) && bool.TryParse(a?.ToString(), out var ab) && ab, IsDefault = d.TryGetValue("default", out var df) && bool.TryParse(df?.ToString(), out var dfb) && dfb });
+    }
+
+    private void AddProvider() { _newProvider = new(); _showAddForm = true; }
+
+    private async Task SaveProvider()
+    {
+        if (string.IsNullOrWhiteSpace(_newProvider.Name) || string.IsNullOrWhiteSpace(_newProvider.ApiKey)) { await DialogService.AlertAsync("Error", "Name and API Key are required"); return; }
+        await InstanceManager.ExecuteAsync("ai.configure", new Dictionary<string, object>
+        {
+            ["provider"] = _newProvider.Name, ["type"] = _newProvider.Type, ["apiKey"] = _newProvider.ApiKey, ["model"] = _newProvider.Model ?? "", ["endpoint"] = _newProvider.Endpoint ?? ""
+        });
+        _providers.Add(new() { Name = _newProvider.Name, Type = _newProvider.Type, Model = _newProvider.Model ?? "default", IsActive = true, IsDefault = !_providers.Any() });
+        _showAddForm = false;
+        await DialogService.AlertAsync("Success", "AI provider configured successfully");
+        StateHasChanged();
+    }
+
+    private async Task SetDefault(ProviderConfig provider)
+    {
+        foreach (var p in _providers) p.IsDefault = false;
+        provider.IsDefault = true;
+        await InstanceManager.ExecuteAsync("ai.setDefault", new Dictionary<string, object> { ["provider"] = provider.Name });
+        StateHasChanged();
+    }
+
+    private async Task TestProvider(ProviderConfig provider)
+    {
+        var result = await InstanceManager.ExecuteAsync("ai.test", new Dictionary<string, object> { ["provider"] = provider.Name });
+        await DialogService.AlertAsync("Test Result", result?.ToString() ?? "Provider is working correctly");
+    }
+
+    private async Task DeleteProvider(ProviderConfig provider)
+    {
+        if (await DialogService.ConfirmAsync("Delete Provider", $"Delete '{provider.Name}'?"))
+        {
+            await InstanceManager.ExecuteAsync("ai.remove", new Dictionary<string, object> { ["provider"] = provider.Name });
+            _providers.Remove(provider);
+            StateHasChanged();
+        }
+    }
+
+    private class ProviderConfig { public string Name { get; set; } = ""; public string Type { get; set; } = "openai"; public string ApiKey { get; set; } = ""; public string? Model { get; set; } public string? Endpoint { get; set; } public bool IsActive { get; set; } public bool IsDefault { get; set; } }
+}

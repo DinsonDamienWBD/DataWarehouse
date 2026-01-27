@@ -1,0 +1,795 @@
+@page "/tenants"
+@inject InstanceManager InstanceManager
+@inject DialogService DialogService
+
+<div class="content-header">
+    <h2 id="tenant-title">Multi-Tenant Dashboard</h2>
+    <div class="d-flex gap-2">
+        <button class="btn btn-primary"
+                @onclick="CreateTenant"
+                aria-label="Create new tenant">
+            New Tenant
+        </button>
+        <button class="btn btn-secondary"
+                @onclick="RefreshTenants"
+                aria-label="Refresh tenant list">
+            Refresh
+        </button>
+    </div>
+</div>
+
+<div class="content-body" role="main" aria-labelledby="tenant-title">
+    @if (!InstanceManager.IsConnected)
+    {
+        <div class="alert alert-warning" role="alert">
+            Not connected to a DataWarehouse instance.
+        </div>
+    }
+    else
+    {
+        <!-- Tenant Switcher -->
+        <div class="tenant-switcher card" role="region" aria-labelledby="switcher-label">
+            <div class="card-header" id="switcher-label">
+                <span>Current Tenant</span>
+            </div>
+            <div class="card-body">
+                <div class="switcher-controls">
+                    <label for="tenant-select" class="visually-hidden">Select tenant</label>
+                    <select id="tenant-select"
+                            class="form-select tenant-select"
+                            @bind="_selectedTenantId"
+                            @bind:event="onchange"
+                            @bind:after="OnTenantChanged"
+                            aria-describedby="tenant-desc">
+                        @foreach (var tenant in _tenants)
+                        {
+                            <option value="@tenant.Id">@tenant.Name</option>
+                        }
+                    </select>
+                    <span id="tenant-desc" class="visually-hidden">
+                        Switch between different tenants to manage their settings
+                    </span>
+                    @if (_currentTenant != null)
+                    {
+                        <span class="tenant-badge @GetTenantStatusClass(_currentTenant)"
+                              aria-label="Tenant status: @_currentTenant.Status">
+                            @_currentTenant.Status
+                        </span>
+                    }
+                </div>
+            </div>
+        </div>
+
+        @if (_isLoading)
+        {
+            <div class="text-center mt-4" role="status" aria-live="polite">
+                <div class="spinner" aria-hidden="true"></div>
+                <p class="mt-2">Loading tenant data...</p>
+            </div>
+        }
+        else if (_currentTenant != null)
+        {
+            <!-- Storage Usage Overview -->
+            <section class="tenant-section" aria-labelledby="storage-heading">
+                <h3 id="storage-heading">Storage Usage</h3>
+                <div class="storage-cards">
+                    <div class="storage-card" role="region" aria-labelledby="used-storage-label">
+                        <div class="storage-value" id="used-storage-value">
+                            @FormatBytes(_currentTenant.StorageUsed)
+                        </div>
+                        <div class="storage-label" id="used-storage-label">Used Storage</div>
+                        <div class="progress"
+                             role="progressbar"
+                             aria-valuenow="@GetStoragePercentage()"
+                             aria-valuemin="0"
+                             aria-valuemax="100"
+                             aria-label="Storage usage">
+                            <div class="progress-bar @GetStorageProgressClass()"
+                                 style="width: @GetStoragePercentage()%"></div>
+                        </div>
+                        <div class="storage-detail">
+                            @GetStoragePercentage()% of @FormatBytes(_currentTenant.StorageQuota) quota
+                        </div>
+                    </div>
+
+                    <div class="storage-card" role="region" aria-labelledby="files-label">
+                        <div class="storage-value">@_currentTenant.FileCount.ToString("N0")</div>
+                        <div class="storage-label" id="files-label">Total Files</div>
+                    </div>
+
+                    <div class="storage-card" role="region" aria-labelledby="bandwidth-label">
+                        <div class="storage-value">@FormatBytes(_currentTenant.BandwidthUsed)</div>
+                        <div class="storage-label" id="bandwidth-label">Bandwidth This Month</div>
+                        <div class="storage-detail">
+                            Limit: @FormatBytes(_currentTenant.BandwidthQuota)
+                        </div>
+                    </div>
+
+                    <div class="storage-card" role="region" aria-labelledby="users-label">
+                        <div class="storage-value">@_currentTenant.ActiveUsers</div>
+                        <div class="storage-label" id="users-label">Active Users</div>
+                        <div class="storage-detail">
+                            of @_currentTenant.MaxUsers max
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- User Management -->
+            <section class="tenant-section" aria-labelledby="users-heading">
+                <div class="section-header">
+                    <h3 id="users-heading">User Management</h3>
+                    <button class="btn btn-primary btn-sm"
+                            @onclick="AddUser"
+                            aria-label="Add new user to tenant">
+                        Add User
+                    </button>
+                </div>
+
+                <div class="card">
+                    <div class="card-body" style="padding: 0;">
+                        <table class="data-table" role="grid" aria-labelledby="users-heading">
+                            <thead>
+                                <tr role="row">
+                                    <th scope="col" role="columnheader">User</th>
+                                    <th scope="col" role="columnheader">Email</th>
+                                    <th scope="col" role="columnheader">Role</th>
+                                    <th scope="col" role="columnheader">Storage Used</th>
+                                    <th scope="col" role="columnheader">Last Active</th>
+                                    <th scope="col" role="columnheader">Status</th>
+                                    <th scope="col" role="columnheader">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var user in _tenantUsers)
+                                {
+                                    <tr role="row">
+                                        <td role="gridcell">
+                                            <div class="user-cell">
+                                                <div class="user-avatar" aria-hidden="true">
+                                                    @user.Name.FirstOrDefault()
+                                                </div>
+                                                <span>@user.Name</span>
+                                            </div>
+                                        </td>
+                                        <td role="gridcell">@user.Email</td>
+                                        <td role="gridcell">
+                                            <span class="badge @GetRoleBadgeClass(user.Role)">@user.Role</span>
+                                        </td>
+                                        <td role="gridcell">@FormatBytes(user.StorageUsed)</td>
+                                        <td role="gridcell">@FormatLastActive(user.LastActive)</td>
+                                        <td role="gridcell">
+                                            <span class="badge @GetUserStatusBadgeClass(user.Status)">@user.Status</span>
+                                        </td>
+                                        <td role="gridcell">
+                                            <div class="action-buttons">
+                                                <button class="btn btn-secondary btn-sm"
+                                                        @onclick="() => EditUser(user)"
+                                                        aria-label="Edit user @user.Name">
+                                                    Edit
+                                                </button>
+                                                <button class="btn btn-danger btn-sm"
+                                                        @onclick="() => RemoveUser(user)"
+                                                        aria-label="Remove user @user.Name"
+                                                        disabled="@(user.Role == "Owner")">
+                                                    Remove
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Tenant Settings -->
+            <section class="tenant-section" aria-labelledby="settings-heading">
+                <h3 id="settings-heading">Tenant Settings</h3>
+
+                <div class="settings-grid">
+                    <div class="card settings-card">
+                        <div class="card-header">General Settings</div>
+                        <div class="card-body">
+                            <div class="form-group">
+                                <label for="tenant-name" class="form-label">Tenant Name</label>
+                                <input type="text"
+                                       id="tenant-name"
+                                       class="form-input"
+                                       @bind="_currentTenant.Name"
+                                       aria-describedby="tenant-name-help" />
+                                <small id="tenant-name-help" class="form-help">
+                                    Display name for this tenant
+                                </small>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="tenant-domain" class="form-label">Custom Domain</label>
+                                <input type="text"
+                                       id="tenant-domain"
+                                       class="form-input"
+                                       @bind="_currentTenant.CustomDomain"
+                                       placeholder="storage.example.com"
+                                       aria-describedby="domain-help" />
+                                <small id="domain-help" class="form-help">
+                                    Optional custom domain for storage access
+                                </small>
+                            </div>
+
+                            <div class="form-group">
+                                <label class="toggle-label">
+                                    <input type="checkbox"
+                                           @bind="_currentTenant.AllowPublicSharing"
+                                           aria-describedby="sharing-help" />
+                                    <span>Allow Public Sharing</span>
+                                </label>
+                                <small id="sharing-help" class="form-help">
+                                    Enable users to create public share links
+                                </small>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card settings-card">
+                        <div class="card-header">Quota Settings</div>
+                        <div class="card-body">
+                            <div class="form-group">
+                                <label for="storage-quota" class="form-label">Storage Quota (GB)</label>
+                                <input type="number"
+                                       id="storage-quota"
+                                       class="form-input"
+                                       @bind="_storageQuotaGb"
+                                       min="1"
+                                       aria-describedby="storage-quota-help" />
+                                <small id="storage-quota-help" class="form-help">
+                                    Maximum storage allocation for this tenant
+                                </small>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="bandwidth-quota" class="form-label">Bandwidth Quota (GB/month)</label>
+                                <input type="number"
+                                       id="bandwidth-quota"
+                                       class="form-input"
+                                       @bind="_bandwidthQuotaGb"
+                                       min="1"
+                                       aria-describedby="bandwidth-quota-help" />
+                                <small id="bandwidth-quota-help" class="form-help">
+                                    Monthly bandwidth limit for this tenant
+                                </small>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="max-users" class="form-label">Maximum Users</label>
+                                <input type="number"
+                                       id="max-users"
+                                       class="form-input"
+                                       @bind="_currentTenant.MaxUsers"
+                                       min="1"
+                                       aria-describedby="max-users-help" />
+                                <small id="max-users-help" class="form-help">
+                                    Maximum number of users allowed
+                                </small>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card settings-card">
+                        <div class="card-header">Security Settings</div>
+                        <div class="card-body">
+                            <div class="form-group">
+                                <label class="toggle-label">
+                                    <input type="checkbox"
+                                           @bind="_currentTenant.RequireMfa"
+                                           aria-describedby="mfa-help" />
+                                    <span>Require MFA</span>
+                                </label>
+                                <small id="mfa-help" class="form-help">
+                                    Require multi-factor authentication for all users
+                                </small>
+                            </div>
+
+                            <div class="form-group">
+                                <label class="toggle-label">
+                                    <input type="checkbox"
+                                           @bind="_currentTenant.IpWhitelistEnabled"
+                                           aria-describedby="ip-help" />
+                                    <span>Enable IP Whitelist</span>
+                                </label>
+                                <small id="ip-help" class="form-help">
+                                    Restrict access to specific IP addresses
+                                </small>
+                            </div>
+
+                            @if (_currentTenant.IpWhitelistEnabled)
+                            {
+                                <div class="form-group">
+                                    <label for="ip-whitelist" class="form-label">IP Whitelist</label>
+                                    <textarea id="ip-whitelist"
+                                              class="form-input"
+                                              rows="3"
+                                              @bind="_currentTenant.IpWhitelist"
+                                              placeholder="192.168.1.0/24&#10;10.0.0.1"
+                                              aria-describedby="ip-list-help"></textarea>
+                                    <small id="ip-list-help" class="form-help">
+                                        One IP or CIDR range per line
+                                    </small>
+                                </div>
+                            }
+
+                            <div class="form-group">
+                                <label for="retention-days" class="form-label">Data Retention (days)</label>
+                                <input type="number"
+                                       id="retention-days"
+                                       class="form-input"
+                                       @bind="_currentTenant.RetentionDays"
+                                       min="0"
+                                       aria-describedby="retention-help" />
+                                <small id="retention-help" class="form-help">
+                                    Auto-delete files after this many days (0 = never)
+                                </small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="settings-actions mt-3">
+                    <button class="btn btn-primary"
+                            @onclick="SaveTenantSettings"
+                            aria-label="Save tenant settings">
+                        Save Settings
+                    </button>
+                    <button class="btn btn-secondary"
+                            @onclick="ResetSettings"
+                            aria-label="Reset settings to saved values">
+                        Reset
+                    </button>
+                </div>
+            </section>
+
+            <!-- Danger Zone -->
+            <section class="tenant-section danger-zone" aria-labelledby="danger-heading">
+                <h3 id="danger-heading">Danger Zone</h3>
+                <div class="card danger-card">
+                    <div class="card-body">
+                        <div class="danger-item">
+                            <div class="danger-info">
+                                <strong>Suspend Tenant</strong>
+                                <p>Temporarily disable all access to this tenant. Data will be preserved.</p>
+                            </div>
+                            <button class="btn @(_currentTenant.Status == "Suspended" ? "btn-success" : "btn-warning")"
+                                    @onclick="ToggleSuspendTenant"
+                                    aria-label="@(_currentTenant.Status == "Suspended" ? "Reactivate tenant" : "Suspend tenant")">
+                                @(_currentTenant.Status == "Suspended" ? "Reactivate" : "Suspend")
+                            </button>
+                        </div>
+                        <div class="danger-item">
+                            <div class="danger-info">
+                                <strong>Delete Tenant</strong>
+                                <p>Permanently delete this tenant and all associated data. This action cannot be undone.</p>
+                            </div>
+                            <button class="btn btn-danger"
+                                    @onclick="DeleteTenant"
+                                    aria-label="Permanently delete tenant">
+                                Delete Tenant
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        }
+    }
+</div>
+
+@code {
+    private bool _isLoading = false;
+    private string _selectedTenantId = "";
+    private List<Tenant> _tenants = new();
+    private Tenant? _currentTenant;
+    private List<TenantUser> _tenantUsers = new();
+    private int _storageQuotaGb;
+    private int _bandwidthQuotaGb;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await RefreshTenants();
+    }
+
+    private async Task RefreshTenants()
+    {
+        if (!InstanceManager.IsConnected) return;
+
+        _isLoading = true;
+        StateHasChanged();
+
+        try
+        {
+            var result = await InstanceManager.ExecuteAsync("tenant.list");
+            _tenants = ParseTenants(result);
+
+            if (_tenants.Any() && string.IsNullOrEmpty(_selectedTenantId))
+            {
+                _selectedTenantId = _tenants.First().Id;
+            }
+
+            await LoadTenantDetails();
+        }
+        catch (Exception ex)
+        {
+            await DialogService.AlertAsync("Error", $"Failed to load tenants: {ex.Message}");
+        }
+        finally
+        {
+            _isLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task OnTenantChanged()
+    {
+        await LoadTenantDetails();
+    }
+
+    private async Task LoadTenantDetails()
+    {
+        if (string.IsNullOrEmpty(_selectedTenantId)) return;
+
+        _currentTenant = _tenants.FirstOrDefault(t => t.Id == _selectedTenantId);
+        if (_currentTenant == null) return;
+
+        _storageQuotaGb = (int)(_currentTenant.StorageQuota / (1024 * 1024 * 1024));
+        _bandwidthQuotaGb = (int)(_currentTenant.BandwidthQuota / (1024 * 1024 * 1024));
+
+        try
+        {
+            var usersResult = await InstanceManager.ExecuteAsync("tenant.users", new Dictionary<string, object>
+            {
+                ["tenantId"] = _selectedTenantId
+            });
+            _tenantUsers = ParseUsers(usersResult);
+        }
+        catch
+        {
+            _tenantUsers = new();
+        }
+
+        StateHasChanged();
+    }
+
+    private async Task CreateTenant()
+    {
+        var name = await DialogService.PromptAsync("Create Tenant", "Enter tenant name:");
+        if (string.IsNullOrWhiteSpace(name)) return;
+
+        try
+        {
+            await InstanceManager.ExecuteAsync("tenant.create", new Dictionary<string, object>
+            {
+                ["name"] = name
+            });
+            await RefreshTenants();
+            await DialogService.AlertAsync("Success", $"Tenant '{name}' created successfully.");
+        }
+        catch (Exception ex)
+        {
+            await DialogService.AlertAsync("Error", $"Failed to create tenant: {ex.Message}");
+        }
+    }
+
+    private async Task AddUser()
+    {
+        var email = await DialogService.PromptAsync("Add User", "Enter user email:");
+        if (string.IsNullOrWhiteSpace(email)) return;
+
+        try
+        {
+            await InstanceManager.ExecuteAsync("tenant.addUser", new Dictionary<string, object>
+            {
+                ["tenantId"] = _selectedTenantId,
+                ["email"] = email
+            });
+            await LoadTenantDetails();
+            await DialogService.AlertAsync("Success", $"User invitation sent to {email}.");
+        }
+        catch (Exception ex)
+        {
+            await DialogService.AlertAsync("Error", $"Failed to add user: {ex.Message}");
+        }
+    }
+
+    private async Task EditUser(TenantUser user)
+    {
+        var role = await DialogService.ShowActionSheetAsync(
+            $"Edit {user.Name}",
+            "Cancel",
+            null,
+            "Admin", "Member", "Viewer");
+
+        if (string.IsNullOrEmpty(role) || role == "Cancel") return;
+
+        try
+        {
+            await InstanceManager.ExecuteAsync("tenant.updateUser", new Dictionary<string, object>
+            {
+                ["tenantId"] = _selectedTenantId,
+                ["userId"] = user.Id,
+                ["role"] = role
+            });
+            user.Role = role;
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            await DialogService.AlertAsync("Error", $"Failed to update user: {ex.Message}");
+        }
+    }
+
+    private async Task RemoveUser(TenantUser user)
+    {
+        var confirmed = await DialogService.ConfirmAsync(
+            "Remove User",
+            $"Remove {user.Name} from this tenant?");
+
+        if (!confirmed) return;
+
+        try
+        {
+            await InstanceManager.ExecuteAsync("tenant.removeUser", new Dictionary<string, object>
+            {
+                ["tenantId"] = _selectedTenantId,
+                ["userId"] = user.Id
+            });
+            _tenantUsers.Remove(user);
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            await DialogService.AlertAsync("Error", $"Failed to remove user: {ex.Message}");
+        }
+    }
+
+    private async Task SaveTenantSettings()
+    {
+        if (_currentTenant == null) return;
+
+        _currentTenant.StorageQuota = (long)_storageQuotaGb * 1024 * 1024 * 1024;
+        _currentTenant.BandwidthQuota = (long)_bandwidthQuotaGb * 1024 * 1024 * 1024;
+
+        try
+        {
+            await InstanceManager.ExecuteAsync("tenant.update", new Dictionary<string, object>
+            {
+                ["tenantId"] = _selectedTenantId,
+                ["name"] = _currentTenant.Name,
+                ["customDomain"] = _currentTenant.CustomDomain ?? "",
+                ["storageQuota"] = _currentTenant.StorageQuota,
+                ["bandwidthQuota"] = _currentTenant.BandwidthQuota,
+                ["maxUsers"] = _currentTenant.MaxUsers,
+                ["allowPublicSharing"] = _currentTenant.AllowPublicSharing,
+                ["requireMfa"] = _currentTenant.RequireMfa,
+                ["ipWhitelistEnabled"] = _currentTenant.IpWhitelistEnabled,
+                ["ipWhitelist"] = _currentTenant.IpWhitelist ?? "",
+                ["retentionDays"] = _currentTenant.RetentionDays
+            });
+            await DialogService.AlertAsync("Success", "Tenant settings saved successfully.");
+        }
+        catch (Exception ex)
+        {
+            await DialogService.AlertAsync("Error", $"Failed to save settings: {ex.Message}");
+        }
+    }
+
+    private async Task ResetSettings()
+    {
+        await LoadTenantDetails();
+    }
+
+    private async Task ToggleSuspendTenant()
+    {
+        if (_currentTenant == null) return;
+
+        var action = _currentTenant.Status == "Suspended" ? "reactivate" : "suspend";
+        var confirmed = await DialogService.ConfirmAsync(
+            $"Confirm {action}",
+            $"Are you sure you want to {action} tenant '{_currentTenant.Name}'?");
+
+        if (!confirmed) return;
+
+        try
+        {
+            await InstanceManager.ExecuteAsync($"tenant.{action}", new Dictionary<string, object>
+            {
+                ["tenantId"] = _selectedTenantId
+            });
+            _currentTenant.Status = _currentTenant.Status == "Suspended" ? "Active" : "Suspended";
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            await DialogService.AlertAsync("Error", $"Failed to {action} tenant: {ex.Message}");
+        }
+    }
+
+    private async Task DeleteTenant()
+    {
+        if (_currentTenant == null) return;
+
+        var confirmation = await DialogService.PromptAsync(
+            "Delete Tenant",
+            $"Type '{_currentTenant.Name}' to confirm deletion:");
+
+        if (confirmation != _currentTenant.Name)
+        {
+            await DialogService.AlertAsync("Cancelled", "Tenant name did not match.");
+            return;
+        }
+
+        try
+        {
+            await InstanceManager.ExecuteAsync("tenant.delete", new Dictionary<string, object>
+            {
+                ["tenantId"] = _selectedTenantId
+            });
+            await RefreshTenants();
+            await DialogService.AlertAsync("Deleted", "Tenant has been permanently deleted.");
+        }
+        catch (Exception ex)
+        {
+            await DialogService.AlertAsync("Error", $"Failed to delete tenant: {ex.Message}");
+        }
+    }
+
+    private int GetStoragePercentage()
+    {
+        if (_currentTenant == null || _currentTenant.StorageQuota == 0) return 0;
+        return (int)((_currentTenant.StorageUsed * 100) / _currentTenant.StorageQuota);
+    }
+
+    private string GetStorageProgressClass()
+    {
+        var pct = GetStoragePercentage();
+        if (pct >= 90) return "progress-danger";
+        if (pct >= 75) return "progress-warning";
+        return "";
+    }
+
+    private string GetTenantStatusClass(Tenant tenant) => tenant.Status switch
+    {
+        "Active" => "badge-success",
+        "Suspended" => "badge-warning",
+        "Pending" => "badge-info",
+        _ => "badge-secondary"
+    };
+
+    private string GetRoleBadgeClass(string role) => role switch
+    {
+        "Owner" => "badge-primary",
+        "Admin" => "badge-info",
+        "Member" => "badge-success",
+        "Viewer" => "badge-secondary",
+        _ => ""
+    };
+
+    private string GetUserStatusBadgeClass(string status) => status switch
+    {
+        "Active" => "badge-success",
+        "Pending" => "badge-warning",
+        "Disabled" => "badge-danger",
+        _ => "badge-secondary"
+    };
+
+    private string FormatLastActive(DateTime lastActive)
+    {
+        if (lastActive == DateTime.MinValue) return "Never";
+        var diff = DateTime.UtcNow - lastActive;
+        if (diff.TotalMinutes < 5) return "Just now";
+        if (diff.TotalHours < 1) return $"{(int)diff.TotalMinutes}m ago";
+        if (diff.TotalDays < 1) return $"{(int)diff.TotalHours}h ago";
+        if (diff.TotalDays < 7) return $"{(int)diff.TotalDays}d ago";
+        return lastActive.ToString("MMM dd, yyyy");
+    }
+
+    private static string FormatBytes(long bytes)
+    {
+        string[] sizes = { "B", "KB", "MB", "GB", "TB" };
+        int order = 0;
+        double size = bytes;
+        while (size >= 1024 && order < sizes.Length - 1)
+        {
+            order++;
+            size /= 1024;
+        }
+        return $"{size:0.##} {sizes[order]}";
+    }
+
+    private List<Tenant> ParseTenants(object? result)
+    {
+        var tenants = new List<Tenant>();
+        if (result is IEnumerable<object> list)
+        {
+            foreach (var item in list)
+            {
+                if (item is IDictionary<string, object> d)
+                {
+                    tenants.Add(new Tenant
+                    {
+                        Id = d.TryGetValue("id", out var id) ? id?.ToString() ?? "" : "",
+                        Name = d.TryGetValue("name", out var n) ? n?.ToString() ?? "" : "",
+                        Status = d.TryGetValue("status", out var s) ? s?.ToString() ?? "" : "",
+                        StorageUsed = d.TryGetValue("storageUsed", out var su) && long.TryParse(su?.ToString(), out var sul) ? sul : 0,
+                        StorageQuota = d.TryGetValue("storageQuota", out var sq) && long.TryParse(sq?.ToString(), out var sql) ? sql : 0,
+                        BandwidthUsed = d.TryGetValue("bandwidthUsed", out var bu) && long.TryParse(bu?.ToString(), out var bul) ? bul : 0,
+                        BandwidthQuota = d.TryGetValue("bandwidthQuota", out var bq) && long.TryParse(bq?.ToString(), out var bql) ? bql : 0,
+                        FileCount = d.TryGetValue("fileCount", out var fc) && int.TryParse(fc?.ToString(), out var fci) ? fci : 0,
+                        ActiveUsers = d.TryGetValue("activeUsers", out var au) && int.TryParse(au?.ToString(), out var aui) ? aui : 0,
+                        MaxUsers = d.TryGetValue("maxUsers", out var mu) && int.TryParse(mu?.ToString(), out var mui) ? mui : 0,
+                        CustomDomain = d.TryGetValue("customDomain", out var cd) ? cd?.ToString() : null,
+                        AllowPublicSharing = d.TryGetValue("allowPublicSharing", out var aps) && bool.TryParse(aps?.ToString(), out var apsb) && apsb,
+                        RequireMfa = d.TryGetValue("requireMfa", out var rm) && bool.TryParse(rm?.ToString(), out var rmb) && rmb,
+                        IpWhitelistEnabled = d.TryGetValue("ipWhitelistEnabled", out var iwe) && bool.TryParse(iwe?.ToString(), out var iweb) && iweb,
+                        IpWhitelist = d.TryGetValue("ipWhitelist", out var iw) ? iw?.ToString() : null,
+                        RetentionDays = d.TryGetValue("retentionDays", out var rd) && int.TryParse(rd?.ToString(), out var rdi) ? rdi : 0
+                    });
+                }
+            }
+        }
+        return tenants;
+    }
+
+    private List<TenantUser> ParseUsers(object? result)
+    {
+        var users = new List<TenantUser>();
+        if (result is IEnumerable<object> list)
+        {
+            foreach (var item in list)
+            {
+                if (item is IDictionary<string, object> d)
+                {
+                    users.Add(new TenantUser
+                    {
+                        Id = d.TryGetValue("id", out var id) ? id?.ToString() ?? "" : "",
+                        Name = d.TryGetValue("name", out var n) ? n?.ToString() ?? "" : "",
+                        Email = d.TryGetValue("email", out var e) ? e?.ToString() ?? "" : "",
+                        Role = d.TryGetValue("role", out var r) ? r?.ToString() ?? "" : "",
+                        Status = d.TryGetValue("status", out var s) ? s?.ToString() ?? "" : "",
+                        StorageUsed = d.TryGetValue("storageUsed", out var su) && long.TryParse(su?.ToString(), out var sul) ? sul : 0,
+                        LastActive = d.TryGetValue("lastActive", out var la) && DateTime.TryParse(la?.ToString(), out var lad) ? lad : DateTime.MinValue
+                    });
+                }
+            }
+        }
+        return users;
+    }
+
+    private class Tenant
+    {
+        public string Id { get; set; } = "";
+        public string Name { get; set; } = "";
+        public string Status { get; set; } = "";
+        public long StorageUsed { get; set; }
+        public long StorageQuota { get; set; }
+        public long BandwidthUsed { get; set; }
+        public long BandwidthQuota { get; set; }
+        public int FileCount { get; set; }
+        public int ActiveUsers { get; set; }
+        public int MaxUsers { get; set; }
+        public string? CustomDomain { get; set; }
+        public bool AllowPublicSharing { get; set; }
+        public bool RequireMfa { get; set; }
+        public bool IpWhitelistEnabled { get; set; }
+        public string? IpWhitelist { get; set; }
+        public int RetentionDays { get; set; }
+    }
+
+    private class TenantUser
+    {
+        public string Id { get; set; } = "";
+        public string Name { get; set; } = "";
+        public string Email { get; set; } = "";
+        public string Role { get; set; } = "";
+        public string Status { get; set; } = "";
+        public long StorageUsed { get; set; }
+        public DateTime LastActive { get; set; }
+    }
+}

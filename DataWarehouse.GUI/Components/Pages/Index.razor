@@ -1,0 +1,309 @@
+@page "/"
+@inject InstanceManager InstanceManager
+@inject CapabilityManager CapabilityManager
+
+<div class="content-header">
+    <h2>Dashboard</h2>
+    <button class="btn btn-secondary" @onclick="RefreshData">Refresh</button>
+</div>
+
+<div class="content-body">
+    @if (_isLoading)
+    {
+        <div class="text-center mt-4">
+            <div class="spinner"></div>
+            <p class="mt-2">Loading dashboard...</p>
+        </div>
+    }
+    else if (!InstanceManager.IsConnected)
+    {
+        <div class="alert alert-warning">
+            <strong>Not Connected</strong><br />
+            Connect to a DataWarehouse instance to view the dashboard.
+            <br /><br />
+            <a href="/connections" class="btn btn-primary">Manage Connections</a>
+        </div>
+    }
+    else
+    {
+        <div class="d-flex gap-3" style="flex-wrap: wrap;">
+            <!-- Storage Card -->
+            <div class="card" style="flex: 1; min-width: 300px;">
+                <div class="card-header">Storage Overview</div>
+                <div class="card-body">
+                    <div class="d-flex justify-content-between mb-2">
+                        <span>Used</span>
+                        <span>@FormatBytes(_storageUsed) / @FormatBytes(_storageTotal)</span>
+                    </div>
+                    <div class="progress">
+                        <div class="progress-bar" style="width: @StoragePercentage%"></div>
+                    </div>
+                    <div class="mt-3">
+                        <small class="text-muted">Files: @_fileCount | Backends: @_backendCount</small>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Health Card -->
+            <div class="card" style="flex: 1; min-width: 300px;">
+                <div class="card-header">System Health</div>
+                <div class="card-body">
+                    <div class="d-flex align-items-center gap-2 mb-3">
+                        <span class="badge @GetHealthBadgeClass(_overallHealth)">@_overallHealth</span>
+                        <span>Overall Status</span>
+                    </div>
+                    @foreach (var check in _healthChecks.Take(5))
+                    {
+                        <div class="d-flex justify-content-between mb-2">
+                            <span>@check.Name</span>
+                            <span class="badge @GetHealthBadgeClass(check.Status)">@check.Status</span>
+                        </div>
+                    }
+                </div>
+            </div>
+
+            <!-- Capabilities Card -->
+            <div class="card" style="flex: 1; min-width: 300px;">
+                <div class="card-header">Instance Capabilities</div>
+                <div class="card-body">
+                    @foreach (var cap in _capabilities)
+                    {
+                        <div class="d-flex justify-content-between mb-2">
+                            <span>@cap.Name</span>
+                            @if (cap.Enabled)
+                            {
+                                <span class="badge badge-success">Enabled</span>
+                            }
+                            else
+                            {
+                                <span class="badge badge-danger">Disabled</span>
+                            }
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+
+        <!-- Recent Activity -->
+        <div class="card mt-3">
+            <div class="card-header">Recent Activity</div>
+            <div class="card-body">
+                @if (_recentActivity.Any())
+                {
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Time</th>
+                                <th>Action</th>
+                                <th>Details</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var activity in _recentActivity.Take(10))
+                            {
+                                <tr>
+                                    <td>@activity.Timestamp.ToString("HH:mm:ss")</td>
+                                    <td>@activity.Action</td>
+                                    <td>@activity.Details</td>
+                                    <td><span class="badge @GetActivityBadgeClass(activity.Status)">@activity.Status</span></td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                }
+                else
+                {
+                    <p class="text-muted">No recent activity</p>
+                }
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private bool _isLoading = true;
+    private long _storageUsed = 0;
+    private long _storageTotal = 1;
+    private int _fileCount = 0;
+    private int _backendCount = 0;
+    private string _overallHealth = "Unknown";
+    private List<HealthCheck> _healthChecks = new();
+    private List<Capability> _capabilities = new();
+    private List<Activity> _recentActivity = new();
+
+    private double StoragePercentage => _storageTotal > 0 ? (double)_storageUsed / _storageTotal * 100 : 0;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await RefreshData();
+    }
+
+    private async Task RefreshData()
+    {
+        _isLoading = true;
+        StateHasChanged();
+
+        try
+        {
+            if (InstanceManager.IsConnected)
+            {
+                // Get storage stats
+                var storageStats = await InstanceManager.ExecuteAsync("storage.stats");
+                if (storageStats != null)
+                {
+                    _storageUsed = GetLongValue(storageStats, "used", 0);
+                    _storageTotal = GetLongValue(storageStats, "total", 1);
+                    _fileCount = GetIntValue(storageStats, "fileCount", 0);
+                    _backendCount = GetIntValue(storageStats, "backendCount", 0);
+                }
+
+                // Get health status
+                var healthStatus = await InstanceManager.ExecuteAsync("health.status");
+                if (healthStatus != null)
+                {
+                    _overallHealth = GetStringValue(healthStatus, "overall", "Unknown");
+                    _healthChecks = ParseHealthChecks(healthStatus);
+                }
+
+                // Get capabilities
+                _capabilities = ParseCapabilities(CapabilityManager.Capabilities);
+
+                // Get recent activity (from audit log)
+                var auditLog = await InstanceManager.ExecuteAsync("audit.recent");
+                if (auditLog != null)
+                {
+                    _recentActivity = ParseActivity(auditLog);
+                }
+            }
+        }
+        catch
+        {
+            // Handle errors gracefully
+        }
+        finally
+        {
+            _isLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private string FormatBytes(long bytes)
+    {
+        string[] sizes = { "B", "KB", "MB", "GB", "TB", "PB" };
+        int order = 0;
+        double size = bytes;
+        while (size >= 1024 && order < sizes.Length - 1)
+        {
+            order++;
+            size /= 1024;
+        }
+        return $"{size:0.##} {sizes[order]}";
+    }
+
+    private string GetHealthBadgeClass(string status) => status?.ToLower() switch
+    {
+        "healthy" or "ok" or "good" => "badge-success",
+        "warning" or "degraded" => "badge-warning",
+        "critical" or "unhealthy" or "error" => "badge-danger",
+        _ => "badge-info"
+    };
+
+    private string GetActivityBadgeClass(string status) => status?.ToLower() switch
+    {
+        "success" or "completed" => "badge-success",
+        "warning" => "badge-warning",
+        "failed" or "error" => "badge-danger",
+        _ => "badge-info"
+    };
+
+    private long GetLongValue(object? obj, string key, long defaultValue)
+    {
+        if (obj is IDictionary<string, object> dict && dict.TryGetValue(key, out var value))
+        {
+            if (value is long l) return l;
+            if (value is int i) return i;
+            if (long.TryParse(value?.ToString(), out var parsed)) return parsed;
+        }
+        return defaultValue;
+    }
+
+    private int GetIntValue(object? obj, string key, int defaultValue)
+    {
+        return (int)GetLongValue(obj, key, defaultValue);
+    }
+
+    private string GetStringValue(object? obj, string key, string defaultValue)
+    {
+        if (obj is IDictionary<string, object> dict && dict.TryGetValue(key, out var value))
+        {
+            return value?.ToString() ?? defaultValue;
+        }
+        return defaultValue;
+    }
+
+    private List<HealthCheck> ParseHealthChecks(object? obj)
+    {
+        var checks = new List<HealthCheck>();
+        if (obj is IDictionary<string, object> dict && dict.TryGetValue("checks", out var checksObj))
+        {
+            if (checksObj is IEnumerable<object> list)
+            {
+                foreach (var item in list)
+                {
+                    if (item is IDictionary<string, object> check)
+                    {
+                        checks.Add(new HealthCheck
+                        {
+                            Name = GetStringValue(check, "name", "Unknown"),
+                            Status = GetStringValue(check, "status", "Unknown")
+                        });
+                    }
+                }
+            }
+        }
+        return checks;
+    }
+
+    private List<Capability> ParseCapabilities(object? caps)
+    {
+        var result = new List<Capability>
+        {
+            new Capability { Name = "Encryption", Enabled = CapabilityManager.HasFeature("encryption") },
+            new Capability { Name = "Compression", Enabled = CapabilityManager.HasFeature("compression") },
+            new Capability { Name = "Backup", Enabled = CapabilityManager.HasFeature("backup") },
+            new Capability { Name = "RAID", Enabled = CapabilityManager.HasFeature("raid") },
+            new Capability { Name = "Replication", Enabled = CapabilityManager.HasFeature("replication") },
+            new Capability { Name = "Search", Enabled = CapabilityManager.HasFeature("search") },
+            new Capability { Name = "Tiering", Enabled = CapabilityManager.HasFeature("tiering") },
+            new Capability { Name = "Versioning", Enabled = CapabilityManager.HasFeature("versioning") },
+        };
+        return result;
+    }
+
+    private List<Activity> ParseActivity(object? obj)
+    {
+        var activities = new List<Activity>();
+        if (obj is IEnumerable<object> list)
+        {
+            foreach (var item in list)
+            {
+                if (item is IDictionary<string, object> activity)
+                {
+                    activities.Add(new Activity
+                    {
+                        Timestamp = DateTime.TryParse(GetStringValue(activity, "timestamp", ""), out var ts) ? ts : DateTime.Now,
+                        Action = GetStringValue(activity, "action", "Unknown"),
+                        Details = GetStringValue(activity, "details", ""),
+                        Status = GetStringValue(activity, "status", "Unknown")
+                    });
+                }
+            }
+        }
+        return activities;
+    }
+
+    private record HealthCheck { public string Name { get; init; } = ""; public string Status { get; init; } = ""; }
+    private record Capability { public string Name { get; init; } = ""; public bool Enabled { get; init; } }
+    private record Activity { public DateTime Timestamp { get; init; } public string Action { get; init; } = ""; public string Details { get; init; } = ""; public string Status { get; init; } = ""; }
+}

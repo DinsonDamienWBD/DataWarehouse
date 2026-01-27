@@ -1,0 +1,103 @@
+@page "/audit"
+@inject InstanceManager InstanceManager
+
+<div class="content-header">
+    <h2>Audit Logs</h2>
+    <div class="d-flex gap-2">
+        <input type="text" class="form-input" style="width: 200px;" placeholder="Search..." @bind="_searchTerm" @bind:event="oninput" />
+        <button class="btn btn-secondary" @onclick="RefreshLogs">Refresh</button>
+        <button class="btn btn-secondary" @onclick="ExportLogs">Export</button>
+    </div>
+</div>
+
+<div class="content-body">
+    @if (!InstanceManager.IsConnected)
+    {
+        <div class="alert alert-warning">Not connected to a DataWarehouse instance.</div>
+    }
+    else if (_isLoading)
+    {
+        <div class="text-center mt-4"><div class="spinner"></div></div>
+    }
+    else
+    {
+        <div class="card">
+            <div class="card-body" style="padding: 0;">
+                <table class="data-table">
+                    <thead>
+                        <tr><th>Timestamp</th><th>User</th><th>Action</th><th>Resource</th><th>Result</th><th>Details</th></tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var log in FilteredLogs)
+                        {
+                            <tr>
+                                <td>@log.Timestamp.ToString("yyyy-MM-dd HH:mm:ss")</td>
+                                <td>@log.User</td>
+                                <td>@log.Action</td>
+                                <td>@log.Resource</td>
+                                <td><span class="badge @(log.Success ? "badge-success" : "badge-danger")">@(log.Success ? "Success" : "Failed")</span></td>
+                                <td><code>@log.Details</code></td>
+                            </tr>
+                        }
+                        @if (!FilteredLogs.Any())
+                        {
+                            <tr><td colspan="6" class="text-center text-muted">No audit logs found</td></tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        <div class="mt-2 text-muted">Showing @FilteredLogs.Count() of @_logs.Count entries</div>
+    }
+</div>
+
+@code {
+    private bool _isLoading = false;
+    private string _searchTerm = "";
+    private List<AuditEntry> _logs = new();
+
+    private IEnumerable<AuditEntry> FilteredLogs => string.IsNullOrWhiteSpace(_searchTerm)
+        ? _logs
+        : _logs.Where(l => l.Action.Contains(_searchTerm, StringComparison.OrdinalIgnoreCase) ||
+                          l.User.Contains(_searchTerm, StringComparison.OrdinalIgnoreCase) ||
+                          l.Resource.Contains(_searchTerm, StringComparison.OrdinalIgnoreCase));
+
+    protected override async Task OnInitializedAsync() => await RefreshLogs();
+
+    private async Task RefreshLogs()
+    {
+        if (!InstanceManager.IsConnected) return;
+        _isLoading = true; StateHasChanged();
+        try
+        {
+            var result = await InstanceManager.ExecuteAsync("audit.list");
+            _logs = ParseLogs(result);
+        }
+        finally { _isLoading = false; StateHasChanged(); }
+    }
+
+    private async Task ExportLogs()
+    {
+        await InstanceManager.ExecuteAsync("audit.export", new Dictionary<string, object> { ["format"] = "csv" });
+    }
+
+    private List<AuditEntry> ParseLogs(object? result)
+    {
+        var logs = new List<AuditEntry>();
+        if (result is IEnumerable<object> list)
+            foreach (var item in list)
+                if (item is IDictionary<string, object> d)
+                    logs.Add(new()
+                    {
+                        Timestamp = d.TryGetValue("timestamp", out var t) && DateTime.TryParse(t?.ToString(), out var dt) ? dt : DateTime.MinValue,
+                        User = d.TryGetValue("user", out var u) ? u?.ToString() ?? "" : "",
+                        Action = d.TryGetValue("action", out var a) ? a?.ToString() ?? "" : "",
+                        Resource = d.TryGetValue("resource", out var r) ? r?.ToString() ?? "" : "",
+                        Success = d.TryGetValue("success", out var s) && bool.TryParse(s?.ToString(), out var sb) && sb,
+                        Details = d.TryGetValue("details", out var det) ? det?.ToString() ?? "" : ""
+                    });
+        return logs.OrderByDescending(l => l.Timestamp).ToList();
+    }
+
+    private record AuditEntry { public DateTime Timestamp { get; init; } public string User { get; init; } = ""; public string Action { get; init; } = ""; public string Resource { get; init; } = ""; public bool Success { get; init; } public string Details { get; init; } = ""; }
+}

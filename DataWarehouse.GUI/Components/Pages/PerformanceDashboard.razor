@@ -1,0 +1,601 @@
+@page "/performance"
+@inject InstanceManager InstanceManager
+@inject CapabilityManager CapabilityManager
+@inject DialogService DialogService
+@implements IDisposable
+
+@*
+    PerformanceDashboard.razor - Real-time performance monitoring component.
+
+    Provides comprehensive performance monitoring including:
+    - IOPS, throughput, and latency charts
+    - Active operations view
+    - Bottleneck identification
+    - Historical performance data
+
+    Auto-refreshes every 5 seconds when connected.
+*@
+
+<div class="content-header">
+    <h2>Performance Dashboard</h2>
+    <div class="d-flex gap-2 align-items-center">
+        <span class="badge @(_autoRefresh ? "badge-success" : "badge-secondary")">
+            @(_autoRefresh ? "Live" : "Paused")
+        </span>
+        <button class="btn btn-secondary" @onclick="ToggleAutoRefresh">
+            @(_autoRefresh ? "Pause" : "Resume")
+        </button>
+        <button class="btn btn-secondary" @onclick="RefreshMetrics">Refresh Now</button>
+    </div>
+</div>
+
+<div class="content-body">
+    @if (!InstanceManager.IsConnected)
+    {
+        <div class="alert alert-warning">
+            <strong>Not Connected</strong><br />
+            Connect to a DataWarehouse instance to view performance metrics.
+        </div>
+    }
+    else if (_isLoading && !_hasInitialData)
+    {
+        <div class="text-center mt-4">
+            <div class="spinner"></div>
+            <p class="mt-2">Loading performance data...</p>
+        </div>
+    }
+    else
+    {
+        <!-- Real-time Metrics Cards -->
+        <div class="d-flex gap-3" style="flex-wrap: wrap;">
+            <div class="card" style="flex: 1; min-width: 200px;">
+                <div class="card-body text-center">
+                    <div style="font-size: 32px; font-weight: bold; color: var(--primary-color);">
+                        @_currentMetrics.Iops.ToString("N0")
+                    </div>
+                    <div class="text-muted">IOPS</div>
+                    <small class="@GetTrendClass(_currentMetrics.IopsTrend)">
+                        @GetTrendIcon(_currentMetrics.IopsTrend) @_currentMetrics.IopsTrend.ToString("F1")%
+                    </small>
+                </div>
+            </div>
+            <div class="card" style="flex: 1; min-width: 200px;">
+                <div class="card-body text-center">
+                    <div style="font-size: 32px; font-weight: bold; color: var(--accent-color);">
+                        @_currentMetrics.ThroughputMbps.ToString("F1")
+                    </div>
+                    <div class="text-muted">Throughput (MB/s)</div>
+                    <small class="@GetTrendClass(_currentMetrics.ThroughputTrend)">
+                        @GetTrendIcon(_currentMetrics.ThroughputTrend) @_currentMetrics.ThroughputTrend.ToString("F1")%
+                    </small>
+                </div>
+            </div>
+            <div class="card" style="flex: 1; min-width: 200px;">
+                <div class="card-body text-center">
+                    <div style="font-size: 32px; font-weight: bold; color: @GetLatencyColor(_currentMetrics.LatencyMs);">
+                        @_currentMetrics.LatencyMs.ToString("F1")
+                    </div>
+                    <div class="text-muted">Latency (ms)</div>
+                    <small class="@GetTrendClass(-_currentMetrics.LatencyTrend)">
+                        @GetTrendIcon(-_currentMetrics.LatencyTrend) @Math.Abs(_currentMetrics.LatencyTrend).ToString("F1")%
+                    </small>
+                </div>
+            </div>
+            <div class="card" style="flex: 1; min-width: 200px;">
+                <div class="card-body text-center">
+                    <div style="font-size: 32px; font-weight: bold;">
+                        @_currentMetrics.ActiveConnections
+                    </div>
+                    <div class="text-muted">Active Connections</div>
+                    <small class="text-muted">Peak: @_currentMetrics.PeakConnections</small>
+                </div>
+            </div>
+        </div>
+
+        <!-- Performance Charts (Simulated with ASCII-style visualization) -->
+        <div class="d-flex gap-3 mt-3" style="flex-wrap: wrap;">
+            <div class="card" style="flex: 1; min-width: 400px;">
+                <div class="card-header">IOPS Over Time</div>
+                <div class="card-body">
+                    <div class="chart-container" style="height: 150px; display: flex; align-items: flex-end; gap: 4px; padding: 10px 0;">
+                        @foreach (double point in _iopsHistory.Cast<double>().TakeLast(30))
+                        {
+                            var height = _maxIops > 0 ? (point / _maxIops * 100) : 0;
+                            <div style="flex: 1; background: var(--primary-color); min-height: 2px; height: @height%; border-radius: 2px 2px 0 0;"
+                                 title="@point.ToString("N0") IOPS"></div>
+                        }
+                    </div>
+                    <div class="d-flex justify-content-between text-muted" style="font-size: 11px;">
+                        <span>-2.5 min</span>
+                        <span>Now</span>
+                    </div>
+                </div>
+            </div>
+            <div class="card" style="flex: 1; min-width: 400px;">
+                <div class="card-header">Throughput Over Time</div>
+                <div class="card-body">
+                    <div class="chart-container" style="height: 150px; display: flex; align-items: flex-end; gap: 4px; padding: 10px 0;">
+                        @foreach (double point in _throughputHistory.Cast<double>().TakeLast(30))
+                        {
+                            var height = _maxThroughput > 0 ? (point / _maxThroughput * 100) : 0;
+                            <div style="flex: 1; background: var(--accent-color); min-height: 2px; height: @height%; border-radius: 2px 2px 0 0;"
+                                 title="@point.ToString("F1") MB/s"></div>
+                        }
+                    </div>
+                    <div class="d-flex justify-content-between text-muted" style="font-size: 11px;">
+                        <span>-2.5 min</span>
+                        <span>Now</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Active Operations -->
+        <div class="card mt-3">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span>Active Operations (@_activeOperations.Count)</span>
+                <span class="badge badge-info">@(_activeOperations.Cast<ActiveOperation>().Sum(o => o.BytesPerSecond).ToString("N0")) B/s total</span>
+            </div>
+            <div class="card-body" style="padding: 0;">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Operation</th>
+                            <th>Path</th>
+                            <th>Progress</th>
+                            <th>Speed</th>
+                            <th>Duration</th>
+                            <th>Client</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @if (_activeOperations.Count > 0)
+                        {
+                            @foreach (ActiveOperation op in _activeOperations)
+                            {
+                                <tr>
+                                    <td>
+                                        <span class="badge @GetOperationBadge(op.Type)">@op.Type</span>
+                                    </td>
+                                    <td><code style="font-size: 11px;">@TruncatePath(op.Path, 40)</code></td>
+                                    <td>
+                                        <div class="d-flex align-items-center gap-2">
+                                            <div class="progress" style="flex: 1; max-width: 100px;">
+                                                <div class="progress-bar" style="width: @op.Progress%"></div>
+                                            </div>
+                                            <span style="font-size: 11px;">@op.Progress%</span>
+                                        </div>
+                                    </td>
+                                    <td>@FormatBytes(op.BytesPerSecond)/s</td>
+                                    <td>@op.Duration.ToString(@"mm\:ss")</td>
+                                    <td><code style="font-size: 11px;">@op.ClientId</code></td>
+                                </tr>
+                            }
+                        }
+                        else
+                        {
+                            <tr>
+                                <td colspan="6" class="text-center text-muted">No active operations</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Bottleneck Analysis -->
+        <div class="card mt-3">
+            <div class="card-header">Bottleneck Analysis</div>
+            <div class="card-body">
+                @if (_bottlenecks.Count > 0)
+                {
+                    @foreach (Bottleneck bottleneck in _bottlenecks)
+                    {
+                        <div class="alert @GetBottleneckAlertClass(bottleneck.Severity) mb-2">
+                            <div class="d-flex justify-content-between align-items-start">
+                                <div>
+                                    <strong>@bottleneck.Component</strong>
+                                    <p class="mb-0">@bottleneck.Description</p>
+                                </div>
+                                <span class="badge @GetSeverityBadge(bottleneck.Severity)">@bottleneck.Severity</span>
+                            </div>
+                            @if (!string.IsNullOrEmpty(bottleneck.Recommendation))
+                            {
+                                <small class="text-muted mt-1 d-block">
+                                    <strong>Recommendation:</strong> @bottleneck.Recommendation
+                                </small>
+                            }
+                        </div>
+                    }
+                }
+                else
+                {
+                    <div class="alert alert-success">
+                        <strong>No Bottlenecks Detected</strong><br />
+                        All system components are performing within normal parameters.
+                    </div>
+                }
+            </div>
+        </div>
+
+        <!-- Resource Utilization -->
+        <div class="d-flex gap-3 mt-3" style="flex-wrap: wrap;">
+            <div class="card" style="flex: 1; min-width: 300px;">
+                <div class="card-header">CPU Utilization</div>
+                <div class="card-body">
+                    <div class="d-flex justify-content-between mb-1">
+                        <span>Usage</span>
+                        <span>@_resourceMetrics.CpuPercent.ToString("F1")%</span>
+                    </div>
+                    <div class="progress">
+                        <div class="progress-bar @GetUsageBarClass(_resourceMetrics.CpuPercent)"
+                             style="width: @_resourceMetrics.CpuPercent%"></div>
+                    </div>
+                    <div class="mt-2 text-muted" style="font-size: 12px;">
+                        Load Average: @_resourceMetrics.LoadAverage.ToString("F2")
+                    </div>
+                </div>
+            </div>
+            <div class="card" style="flex: 1; min-width: 300px;">
+                <div class="card-header">Memory Utilization</div>
+                <div class="card-body">
+                    <div class="d-flex justify-content-between mb-1">
+                        <span>Usage</span>
+                        <span>@FormatBytes(_resourceMetrics.MemoryUsed) / @FormatBytes(_resourceMetrics.MemoryTotal)</span>
+                    </div>
+                    <div class="progress">
+                        <div class="progress-bar @GetUsageBarClass(_resourceMetrics.MemoryPercent)"
+                             style="width: @_resourceMetrics.MemoryPercent%"></div>
+                    </div>
+                    <div class="mt-2 text-muted" style="font-size: 12px;">
+                        Cache: @FormatBytes(_resourceMetrics.CacheUsed)
+                    </div>
+                </div>
+            </div>
+            <div class="card" style="flex: 1; min-width: 300px;">
+                <div class="card-header">Disk I/O</div>
+                <div class="card-body">
+                    <div class="d-flex justify-content-between mb-2">
+                        <span>Read</span>
+                        <span>@FormatBytes(_resourceMetrics.DiskReadBps)/s</span>
+                    </div>
+                    <div class="d-flex justify-content-between mb-2">
+                        <span>Write</span>
+                        <span>@FormatBytes(_resourceMetrics.DiskWriteBps)/s</span>
+                    </div>
+                    <div class="d-flex justify-content-between">
+                        <span>Queue Depth</span>
+                        <span>@_resourceMetrics.DiskQueueDepth</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Last Updated -->
+        <div class="mt-3 text-muted text-center" style="font-size: 12px;">
+            Last updated: @_lastUpdated.ToString("HH:mm:ss") |
+            Refresh interval: @(_autoRefresh ? "5 seconds" : "Paused")
+        </div>
+    }
+</div>
+
+@code {
+    /// <summary>
+    /// Real-time performance metrics.
+    /// </summary>
+    private record PerformanceMetrics
+    {
+        public double Iops { get; init; }
+        public double IopsTrend { get; init; }
+        public double ThroughputMbps { get; init; }
+        public double ThroughputTrend { get; init; }
+        public double LatencyMs { get; init; }
+        public double LatencyTrend { get; init; }
+        public int ActiveConnections { get; init; }
+        public int PeakConnections { get; init; }
+    }
+
+    /// <summary>
+    /// Resource utilization metrics.
+    /// </summary>
+    private record ResourceMetrics
+    {
+        public double CpuPercent { get; init; }
+        public double LoadAverage { get; init; }
+        public long MemoryUsed { get; init; }
+        public long MemoryTotal { get; init; }
+        public long CacheUsed { get; init; }
+        public long DiskReadBps { get; init; }
+        public long DiskWriteBps { get; init; }
+        public int DiskQueueDepth { get; init; }
+        public double MemoryPercent => MemoryTotal > 0 ? (double)MemoryUsed / MemoryTotal * 100 : 0;
+    }
+
+    /// <summary>
+    /// Represents an active I/O operation.
+    /// </summary>
+    private record ActiveOperation
+    {
+        public string Type { get; init; } = "";
+        public string Path { get; init; } = "";
+        public int Progress { get; init; }
+        public long BytesPerSecond { get; init; }
+        public TimeSpan Duration { get; init; }
+        public string ClientId { get; init; } = "";
+    }
+
+    /// <summary>
+    /// Represents an identified performance bottleneck.
+    /// </summary>
+    private record Bottleneck
+    {
+        public string Component { get; init; } = "";
+        public string Description { get; init; } = "";
+        public string Severity { get; init; } = "Info";
+        public string Recommendation { get; init; } = "";
+    }
+
+    private bool _isLoading = true;
+    private bool _hasInitialData = false;
+    private bool _autoRefresh = true;
+    private DateTime _lastUpdated = DateTime.Now;
+    private global::System.Threading.Timer? _refreshTimer;
+
+    private PerformanceMetrics _currentMetrics = new();
+    private ResourceMetrics _resourceMetrics = new();
+    private global::System.Collections.ArrayList _iopsHistory = new();
+    private global::System.Collections.ArrayList _throughputHistory = new();
+    private global::System.Collections.ArrayList _activeOperations = new();
+    private global::System.Collections.ArrayList _bottlenecks = new();
+
+    private double _maxIops = 1;
+    private double _maxThroughput = 1;
+
+    /// <summary>
+    /// Initializes the component and starts auto-refresh.
+    /// </summary>
+    protected override async Task OnInitializedAsync()
+    {
+        await RefreshMetrics();
+        StartAutoRefresh();
+    }
+
+    /// <summary>
+    /// Starts the auto-refresh timer.
+    /// </summary>
+    private void StartAutoRefresh()
+    {
+        _refreshTimer = new global::System.Threading.Timer(async _ =>
+        {
+            if (_autoRefresh && InstanceManager.IsConnected)
+            {
+                await RefreshMetrics();
+                await InvokeAsync(StateHasChanged);
+            }
+        }, null, TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(5));
+    }
+
+    /// <summary>
+    /// Toggles auto-refresh on/off.
+    /// </summary>
+    private void ToggleAutoRefresh()
+    {
+        _autoRefresh = !_autoRefresh;
+    }
+
+    /// <summary>
+    /// Refreshes all performance metrics from the backend.
+    /// </summary>
+    private async Task RefreshMetrics()
+    {
+        if (!InstanceManager.IsConnected)
+        {
+            _isLoading = false;
+            return;
+        }
+
+        _isLoading = true;
+
+        try
+        {
+            // Get performance metrics
+            var metricsResult = await InstanceManager.ExecuteAsync("performance.metrics");
+            if (metricsResult?.Data != null)
+            {
+                _currentMetrics = ParseMetrics(metricsResult.Data);
+                _iopsHistory.Add(_currentMetrics.Iops);
+                _throughputHistory.Add(_currentMetrics.ThroughputMbps);
+
+                // Keep last 60 data points (5 minutes at 5-second intervals)
+                if (_iopsHistory.Count > 60) _iopsHistory.RemoveAt(0);
+                if (_throughputHistory.Count > 60) _throughputHistory.RemoveAt(0);
+
+                _maxIops = _iopsHistory.Count > 0 ? Math.Max(_iopsHistory.Cast<double>().Max(), 1) : 1;
+                _maxThroughput = _throughputHistory.Count > 0 ? Math.Max(_throughputHistory.Cast<double>().Max(), 1) : 1;
+            }
+
+            // Get resource utilization
+            var resourceResult = await InstanceManager.ExecuteAsync("performance.resources");
+            if (resourceResult?.Data != null)
+            {
+                _resourceMetrics = ParseResourceMetrics(resourceResult.Data);
+            }
+
+            // Get active operations
+            var opsResult = await InstanceManager.ExecuteAsync("performance.operations");
+            _activeOperations = ParseOperations(opsResult?.Data!);
+
+            // Get bottleneck analysis
+            var bottleneckResult = await InstanceManager.ExecuteAsync("performance.bottlenecks");
+            _bottlenecks = ParseBottlenecks(bottleneckResult?.Data!);
+
+            _lastUpdated = DateTime.Now;
+            _hasInitialData = true;
+        }
+        catch
+        {
+            // Silently handle refresh errors to avoid disrupting the UI
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private string GetTrendClass(double trend)
+    {
+        if (trend > 5) return "text-success";
+        if (trend < -5) return "text-danger";
+        return "text-muted";
+    }
+
+    private string GetTrendIcon(double trend)
+    {
+        if (trend > 0) return "^";
+        if (trend < 0) return "v";
+        return "-";
+    }
+
+    private string GetLatencyColor(double latencyMs)
+    {
+        if (latencyMs < 10) return "var(--success-color)";
+        if (latencyMs < 50) return "var(--warning-color)";
+        return "var(--danger-color)";
+    }
+
+    private string GetOperationBadge(string type) => type?.ToLowerInvariant() switch
+    {
+        "read" => "badge-info",
+        "write" => "badge-warning",
+        "delete" => "badge-danger",
+        "list" => "badge-secondary",
+        "copy" => "badge-primary",
+        _ => "badge-secondary"
+    };
+
+    private string GetBottleneckAlertClass(string severity) => severity?.ToLowerInvariant() switch
+    {
+        "critical" => "alert-danger",
+        "warning" => "alert-warning",
+        "info" => "alert-info",
+        _ => "alert-secondary"
+    };
+
+    private string GetSeverityBadge(string severity) => severity?.ToLowerInvariant() switch
+    {
+        "critical" => "badge-danger",
+        "warning" => "badge-warning",
+        "info" => "badge-info",
+        _ => "badge-secondary"
+    };
+
+    private string GetUsageBarClass(double percent)
+    {
+        if (percent >= 90) return "bg-danger";
+        if (percent >= 75) return "bg-warning";
+        return "";
+    }
+
+    private string FormatBytes(long bytes)
+    {
+        string[] sizes = { "B", "KB", "MB", "GB", "TB" };
+        int order = 0;
+        double size = bytes;
+        while (size >= 1024 && order < sizes.Length - 1) { order++; size /= 1024; }
+        return $"{size:0.##} {sizes[order]}";
+    }
+
+    private string TruncatePath(string path, int maxLength)
+    {
+        if (path.Length <= maxLength) return path;
+        return "..." + path[^(maxLength - 3)..];
+    }
+
+    private PerformanceMetrics ParseMetrics(dynamic data)
+    {
+        IDictionary<string, object>? dict = data as IDictionary<string, object>;
+        return new PerformanceMetrics
+        {
+            Iops = dict != null && dict.TryGetValue("iops", out var i) && double.TryParse(i?.ToString(), out var iv) ? iv : 0,
+            IopsTrend = dict != null && dict.TryGetValue("iopsTrend", out var it) && double.TryParse(it?.ToString(), out var itv) ? itv : 0,
+            ThroughputMbps = dict != null && dict.TryGetValue("throughputMbps", out var t) && double.TryParse(t?.ToString(), out var tv) ? tv : 0,
+            ThroughputTrend = dict != null && dict.TryGetValue("throughputTrend", out var tt) && double.TryParse(tt?.ToString(), out var ttv) ? ttv : 0,
+            LatencyMs = dict != null && dict.TryGetValue("latencyMs", out var l) && double.TryParse(l?.ToString(), out var lv) ? lv : 0,
+            LatencyTrend = dict != null && dict.TryGetValue("latencyTrend", out var lt) && double.TryParse(lt?.ToString(), out var ltv) ? ltv : 0,
+            ActiveConnections = dict != null && dict.TryGetValue("activeConnections", out var ac) && int.TryParse(ac?.ToString(), out var acv) ? acv : 0,
+            PeakConnections = dict != null && dict.TryGetValue("peakConnections", out var pc) && int.TryParse(pc?.ToString(), out var pcv) ? pcv : 0
+        };
+    }
+
+    private ResourceMetrics ParseResourceMetrics(dynamic data)
+    {
+        IDictionary<string, object>? dict = data as IDictionary<string, object>;
+        return new ResourceMetrics
+        {
+            CpuPercent = dict != null && dict.TryGetValue("cpuPercent", out var cp) && double.TryParse(cp?.ToString(), out var cpv) ? cpv : 0,
+            LoadAverage = dict != null && dict.TryGetValue("loadAverage", out var la) && double.TryParse(la?.ToString(), out var lav) ? lav : 0,
+            MemoryUsed = dict != null && dict.TryGetValue("memoryUsed", out var mu) && long.TryParse(mu?.ToString(), out var muv) ? muv : 0,
+            MemoryTotal = dict != null && dict.TryGetValue("memoryTotal", out var mt) && long.TryParse(mt?.ToString(), out var mtv) ? mtv : 1,
+            CacheUsed = dict != null && dict.TryGetValue("cacheUsed", out var cu) && long.TryParse(cu?.ToString(), out var cuv) ? cuv : 0,
+            DiskReadBps = dict != null && dict.TryGetValue("diskReadBps", out var dr) && long.TryParse(dr?.ToString(), out var drv) ? drv : 0,
+            DiskWriteBps = dict != null && dict.TryGetValue("diskWriteBps", out var dw) && long.TryParse(dw?.ToString(), out var dwv) ? dwv : 0,
+            DiskQueueDepth = dict != null && dict.TryGetValue("diskQueueDepth", out var dq) && int.TryParse(dq?.ToString(), out var dqv) ? dqv : 0
+        };
+    }
+
+    private global::System.Collections.ArrayList ParseOperations(dynamic data)
+    {
+        var operations = new global::System.Collections.ArrayList();
+        IDictionary<string, object>? dict = data as IDictionary<string, object>;
+        if (dict != null && dict.TryGetValue("operations", out var opsObj) && opsObj is global::System.Collections.IEnumerable list)
+        {
+            foreach (var item in list)
+            {
+                if (item is global::System.Collections.Generic.IDictionary<string, object> d)
+                {
+                    operations.Add(new ActiveOperation
+                    {
+                        Type = d.TryGetValue("type", out var t) ? t?.ToString() ?? "" : "",
+                        Path = d.TryGetValue("path", out var p) ? p?.ToString() ?? "" : "",
+                        Progress = d.TryGetValue("progress", out var pr) && int.TryParse(pr?.ToString(), out var prv) ? prv : 0,
+                        BytesPerSecond = d.TryGetValue("bytesPerSecond", out var bps) && long.TryParse(bps?.ToString(), out var bpsv) ? bpsv : 0,
+                        Duration = d.TryGetValue("durationSeconds", out var dur) && int.TryParse(dur?.ToString(), out var durv) ? TimeSpan.FromSeconds(durv) : TimeSpan.Zero,
+                        ClientId = d.TryGetValue("clientId", out var c) ? c?.ToString() ?? "" : ""
+                    });
+                }
+            }
+        }
+        return operations;
+    }
+
+    private global::System.Collections.ArrayList ParseBottlenecks(dynamic data)
+    {
+        var bottlenecks = new global::System.Collections.ArrayList();
+        IDictionary<string, object>? dict = data as IDictionary<string, object>;
+        if (dict != null && dict.TryGetValue("bottlenecks", out var bnObj) && bnObj is global::System.Collections.IEnumerable list)
+        {
+            foreach (var item in list)
+            {
+                if (item is global::System.Collections.Generic.IDictionary<string, object> d)
+                {
+                    bottlenecks.Add(new Bottleneck
+                    {
+                        Component = d.TryGetValue("component", out var c) ? c?.ToString() ?? "" : "",
+                        Description = d.TryGetValue("description", out var desc) ? desc?.ToString() ?? "" : "",
+                        Severity = d.TryGetValue("severity", out var s) ? s?.ToString() ?? "Info" : "Info",
+                        Recommendation = d.TryGetValue("recommendation", out var r) ? r?.ToString() ?? "" : ""
+                    });
+                }
+            }
+        }
+        return bottlenecks;
+    }
+
+    /// <summary>
+    /// Disposes the refresh timer.
+    /// </summary>
+    public void Dispose()
+    {
+        _refreshTimer?.Dispose();
+    }
+}

@@ -1,0 +1,494 @@
+@inject InstanceManager InstanceManager
+@implements IDisposable
+
+<aside class="sync-status-panel @(_isExpanded ? "expanded" : "collapsed")"
+       role="complementary"
+       aria-label="Synchronization status">
+
+    <div class="sync-panel-header">
+        <button class="btn-toggle"
+                @onclick="ToggleExpanded"
+                aria-expanded="@_isExpanded"
+                aria-controls="sync-panel-content"
+                type="button">
+            <span class="toggle-icon" aria-hidden="true">@(_isExpanded ? "&#9660;" : "&#9658;")</span>
+            <span class="sync-title">Sync Status</span>
+            <span class="connection-indicator @ConnectionClass" aria-hidden="true"></span>
+            <span class="visually-hidden">@ConnectionStatusText</span>
+        </button>
+
+        @if (_activeSyncs.Any())
+        {
+            <span class="sync-badge" aria-label="@_activeSyncs.Count active sync operations">
+                @_activeSyncs.Count
+            </span>
+        }
+    </div>
+
+    <div id="sync-panel-content"
+         class="sync-panel-content"
+         role="region"
+         aria-live="polite"
+         hidden="@(!_isExpanded)">
+
+        <!-- Connection Status -->
+        <div class="sync-section">
+            <h3 class="sync-section-title">Connection</h3>
+            <div class="connection-status-detail">
+                <span class="status-label">Status:</span>
+                <span class="status-value @ConnectionClass">@ConnectionStatusText</span>
+            </div>
+            @if (_isConnected)
+            {
+                <div class="connection-info">
+                    <span class="info-label">Latency:</span>
+                    <span class="info-value">@_latencyMs ms</span>
+                </div>
+            }
+        </div>
+
+        <!-- Active Operations -->
+        <div class="sync-section">
+            <h3 class="sync-section-title">
+                Active Operations
+                @if (_activeSyncs.Any())
+                {
+                    <button class="btn-pause-all"
+                            @onclick="TogglePauseAll"
+                            aria-label="@(_isPaused ? "Resume all sync operations" : "Pause all sync operations")"
+                            type="button">
+                        @(_isPaused ? "Resume All" : "Pause All")
+                    </button>
+                }
+            </h3>
+
+            @if (!_activeSyncs.Any())
+            {
+                <p class="no-operations">No active sync operations</p>
+            }
+            else
+            {
+                <ul class="sync-operations-list" role="list">
+                    @foreach (var sync in _activeSyncs)
+                    {
+                        <li class="sync-operation @GetOperationClass(sync)" role="listitem">
+                            <div class="operation-header">
+                                <span class="operation-icon" aria-hidden="true">@GetOperationIcon(sync)</span>
+                                <span class="operation-name">@sync.FileName</span>
+                                @if (sync.HasConflict)
+                                {
+                                    <span class="conflict-indicator"
+                                          role="alert"
+                                          aria-label="Sync conflict detected">
+                                        &#9888; Conflict
+                                    </span>
+                                }
+                            </div>
+                            <div class="operation-progress">
+                                <div class="progress"
+                                     role="progressbar"
+                                     aria-valuenow="@sync.Progress"
+                                     aria-valuemin="0"
+                                     aria-valuemax="100"
+                                     aria-label="@sync.FileName sync progress">
+                                    <div class="progress-bar @GetProgressClass(sync)"
+                                         style="width: @sync.Progress%"></div>
+                                </div>
+                                <span class="progress-text">@sync.Progress%</span>
+                            </div>
+                            <div class="operation-details">
+                                <span>@FormatBytes(sync.TransferredBytes) / @FormatBytes(sync.TotalBytes)</span>
+                                <span>@FormatSpeed(sync.SpeedBytesPerSecond)</span>
+                            </div>
+                        </li>
+                    }
+                </ul>
+            }
+        </div>
+
+        <!-- Bandwidth Usage Graph -->
+        <div class="sync-section">
+            <h3 class="sync-section-title">Bandwidth Usage</h3>
+            <div class="bandwidth-graph" role="img" aria-label="Bandwidth usage over time">
+                <svg viewBox="0 0 200 60" preserveAspectRatio="none" class="bandwidth-chart">
+                    <defs>
+                        <linearGradient id="uploadGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+                            <stop offset="0%" style="stop-color:var(--accent-success);stop-opacity:0.4" />
+                            <stop offset="100%" style="stop-color:var(--accent-success);stop-opacity:0.1" />
+                        </linearGradient>
+                        <linearGradient id="downloadGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+                            <stop offset="0%" style="stop-color:var(--accent-primary);stop-opacity:0.4" />
+                            <stop offset="100%" style="stop-color:var(--accent-primary);stop-opacity:0.1" />
+                        </linearGradient>
+                    </defs>
+                    <!-- Upload area -->
+                    <path d="@GetUploadPath()" fill="url(#uploadGradient)" />
+                    <path d="@GetUploadLinePath()" fill="none" stroke="var(--accent-success)" stroke-width="1.5" />
+                    <!-- Download area -->
+                    <path d="@GetDownloadPath()" fill="url(#downloadGradient)" />
+                    <path d="@GetDownloadLinePath()" fill="none" stroke="var(--accent-primary)" stroke-width="1.5" />
+                </svg>
+                <div class="bandwidth-legend">
+                    <span class="legend-item upload">
+                        <span class="legend-color" aria-hidden="true"></span>
+                        Upload: @FormatSpeed(_currentUploadSpeed)
+                    </span>
+                    <span class="legend-item download">
+                        <span class="legend-color" aria-hidden="true"></span>
+                        Download: @FormatSpeed(_currentDownloadSpeed)
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Pending Conflicts -->
+        @if (_conflicts.Any())
+        {
+            <div class="sync-section conflicts-section" role="alert">
+                <h3 class="sync-section-title">
+                    <span class="conflict-icon" aria-hidden="true">&#9888;</span>
+                    Conflicts (@_conflicts.Count)
+                </h3>
+                <ul class="conflicts-list" role="list">
+                    @foreach (var conflict in _conflicts)
+                    {
+                        <li class="conflict-item" role="listitem">
+                            <span class="conflict-file">@conflict.FileName</span>
+                            <div class="conflict-actions">
+                                <button class="btn btn-secondary btn-sm"
+                                        @onclick="() => ResolveConflict(conflict, ConflictResolution.KeepLocal)"
+                                        aria-label="Keep local version of @conflict.FileName"
+                                        type="button">
+                                    Keep Local
+                                </button>
+                                <button class="btn btn-secondary btn-sm"
+                                        @onclick="() => ResolveConflict(conflict, ConflictResolution.KeepRemote)"
+                                        aria-label="Keep remote version of @conflict.FileName"
+                                        type="button">
+                                    Keep Remote
+                                </button>
+                                <button class="btn btn-primary btn-sm"
+                                        @onclick="() => ResolveConflict(conflict, ConflictResolution.Merge)"
+                                        aria-label="Merge versions of @conflict.FileName"
+                                        type="button">
+                                    Merge
+                                </button>
+                            </div>
+                        </li>
+                    }
+                </ul>
+            </div>
+        }
+
+        <!-- Session Statistics -->
+        <div class="sync-section">
+            <h3 class="sync-section-title">Session Statistics</h3>
+            <dl class="stats-list">
+                <div class="stat-item">
+                    <dt>Files Synced</dt>
+                    <dd>@_sessionStats.FilesSynced</dd>
+                </div>
+                <div class="stat-item">
+                    <dt>Data Uploaded</dt>
+                    <dd>@FormatBytes(_sessionStats.BytesUploaded)</dd>
+                </div>
+                <div class="stat-item">
+                    <dt>Data Downloaded</dt>
+                    <dd>@FormatBytes(_sessionStats.BytesDownloaded)</dd>
+                </div>
+                <div class="stat-item">
+                    <dt>Errors</dt>
+                    <dd class="@(_sessionStats.Errors > 0 ? "text-danger" : "")">@_sessionStats.Errors</dd>
+                </div>
+            </dl>
+        </div>
+    </div>
+</aside>
+
+@code {
+    private bool _isExpanded = true;
+    private bool _isConnected;
+    private bool _isPaused;
+    private int _latencyMs;
+    private long _currentUploadSpeed;
+    private long _currentDownloadSpeed;
+    private List<SyncOperation> _activeSyncs = new();
+    private List<SyncConflict> _conflicts = new();
+    private List<long> _uploadHistory = new();
+    private List<long> _downloadHistory = new();
+    private SessionStats _sessionStats = new();
+    private global::System.Timers.Timer? _refreshTimer;
+
+    [Parameter] public bool AutoRefresh { get; set; } = true;
+    [Parameter] public int RefreshIntervalMs { get; set; } = 1000;
+
+    private string ConnectionClass => _isConnected ? "connected" : "disconnected";
+    private string ConnectionStatusText => _isConnected ? "Connected" : "Disconnected";
+
+    protected override void OnInitialized()
+    {
+        _isConnected = InstanceManager.IsConnected;
+        InstanceManager.ConnectionChanged += HandleConnectionChanged;
+
+        if (AutoRefresh)
+        {
+            _refreshTimer = new global::System.Timers.Timer(RefreshIntervalMs);
+            _refreshTimer.Elapsed += async (s, e) => await RefreshSyncStatus();
+            _refreshTimer.Start();
+        }
+
+        // Initialize bandwidth history with zeros
+        for (int i = 0; i < 30; i++)
+        {
+            _uploadHistory.Add(0);
+            _downloadHistory.Add(0);
+        }
+    }
+
+    private void ToggleExpanded()
+    {
+        _isExpanded = !_isExpanded;
+    }
+
+    private async Task TogglePauseAll()
+    {
+        _isPaused = !_isPaused;
+
+        if (InstanceManager.IsConnected)
+        {
+            await InstanceManager.ExecuteAsync(_isPaused ? "sync.pause" : "sync.resume");
+        }
+    }
+
+    private async Task RefreshSyncStatus()
+    {
+        if (!InstanceManager.IsConnected) return;
+
+        try
+        {
+            var status = await InstanceManager.ExecuteAsync("sync.status");
+            if (status is IDictionary<string, object> dict)
+            {
+                _latencyMs = dict.TryGetValue("latency", out var lat) && int.TryParse(lat?.ToString(), out var l) ? l : 0;
+                _currentUploadSpeed = dict.TryGetValue("uploadSpeed", out var up) && long.TryParse(up?.ToString(), out var u) ? u : 0;
+                _currentDownloadSpeed = dict.TryGetValue("downloadSpeed", out var down) && long.TryParse(down?.ToString(), out var d) ? d : 0;
+
+                // Update history
+                _uploadHistory.Add(_currentUploadSpeed);
+                _downloadHistory.Add(_currentDownloadSpeed);
+                if (_uploadHistory.Count > 30) _uploadHistory.RemoveAt(0);
+                if (_downloadHistory.Count > 30) _downloadHistory.RemoveAt(0);
+
+                // Parse active operations
+                if (dict.TryGetValue("operations", out var ops) && ops is IEnumerable<object> opList)
+                {
+                    _activeSyncs = opList.OfType<IDictionary<string, object>>()
+                        .Select(o => new SyncOperation
+                        {
+                            Id = o.TryGetValue("id", out var id) ? id?.ToString() ?? "" : "",
+                            FileName = o.TryGetValue("fileName", out var fn) ? fn?.ToString() ?? "" : "",
+                            Direction = o.TryGetValue("direction", out var dir) ? dir?.ToString() ?? "" : "",
+                            Progress = o.TryGetValue("progress", out var p) && int.TryParse(p?.ToString(), out var prog) ? prog : 0,
+                            TransferredBytes = o.TryGetValue("transferred", out var t) && long.TryParse(t?.ToString(), out var tr) ? tr : 0,
+                            TotalBytes = o.TryGetValue("total", out var tot) && long.TryParse(tot?.ToString(), out var tb) ? tb : 0,
+                            SpeedBytesPerSecond = o.TryGetValue("speed", out var s) && long.TryParse(s?.ToString(), out var sp) ? sp : 0,
+                            HasConflict = o.TryGetValue("hasConflict", out var hc) && bool.TryParse(hc?.ToString(), out var conf) && conf
+                        })
+                        .ToList();
+                }
+
+                // Parse conflicts
+                if (dict.TryGetValue("conflicts", out var confs) && confs is IEnumerable<object> confList)
+                {
+                    _conflicts = confList.OfType<IDictionary<string, object>>()
+                        .Select(c => new SyncConflict
+                        {
+                            Id = c.TryGetValue("id", out var id) ? id?.ToString() ?? "" : "",
+                            FileName = c.TryGetValue("fileName", out var fn) ? fn?.ToString() ?? "" : "",
+                            LocalModified = c.TryGetValue("localModified", out var lm) && DateTime.TryParse(lm?.ToString(), out var lmd) ? lmd : DateTime.MinValue,
+                            RemoteModified = c.TryGetValue("remoteModified", out var rm) && DateTime.TryParse(rm?.ToString(), out var rmd) ? rmd : DateTime.MinValue
+                        })
+                        .ToList();
+                }
+
+                // Parse session stats
+                if (dict.TryGetValue("stats", out var stats) && stats is IDictionary<string, object> sd)
+                {
+                    _sessionStats = new SessionStats
+                    {
+                        FilesSynced = sd.TryGetValue("filesSynced", out var fs) && int.TryParse(fs?.ToString(), out var fsc) ? fsc : 0,
+                        BytesUploaded = sd.TryGetValue("bytesUploaded", out var bu) && long.TryParse(bu?.ToString(), out var bup) ? bup : 0,
+                        BytesDownloaded = sd.TryGetValue("bytesDownloaded", out var bd) && long.TryParse(bd?.ToString(), out var bdn) ? bdn : 0,
+                        Errors = sd.TryGetValue("errors", out var er) && int.TryParse(er?.ToString(), out var erc) ? erc : 0
+                    };
+                }
+            }
+        }
+        catch
+        {
+            // Silently handle refresh errors
+        }
+
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private void HandleConnectionChanged(object? sender, ConnectionTarget e)
+    {
+        _isConnected = InstanceManager.IsConnected;
+        InvokeAsync(StateHasChanged);
+    }
+
+    private async Task ResolveConflict(SyncConflict conflict, ConflictResolution resolution)
+    {
+        if (!InstanceManager.IsConnected) return;
+
+        await InstanceManager.ExecuteAsync("sync.resolveConflict", new Dictionary<string, object>
+        {
+            ["conflictId"] = conflict.Id,
+            ["resolution"] = resolution.ToString().ToLowerInvariant()
+        });
+
+        _conflicts.RemoveAll(c => c.Id == conflict.Id);
+        StateHasChanged();
+    }
+
+    private string GetOperationIcon(SyncOperation sync) => sync.Direction switch
+    {
+        "upload" => "&#8593;",
+        "download" => "&#8595;",
+        _ => "&#8596;"
+    };
+
+    private string GetOperationClass(SyncOperation sync)
+    {
+        if (sync.HasConflict) return "has-conflict";
+        return sync.Direction switch
+        {
+            "upload" => "uploading",
+            "download" => "downloading",
+            _ => ""
+        };
+    }
+
+    private string GetProgressClass(SyncOperation sync)
+    {
+        if (sync.HasConflict) return "progress-warning";
+        return sync.Direction == "upload" ? "progress-success" : "progress-primary";
+    }
+
+    private string GetUploadPath()
+    {
+        return GetAreaPath(_uploadHistory, 60);
+    }
+
+    private string GetUploadLinePath()
+    {
+        return GetLinePath(_uploadHistory, 60);
+    }
+
+    private string GetDownloadPath()
+    {
+        return GetAreaPath(_downloadHistory, 60);
+    }
+
+    private string GetDownloadLinePath()
+    {
+        return GetLinePath(_downloadHistory, 60);
+    }
+
+    private string GetAreaPath(List<long> data, int height)
+    {
+        if (!data.Any()) return "";
+
+        var max = Math.Max(1, data.Max());
+        var points = new List<string>();
+        var step = 200.0 / (data.Count - 1);
+
+        for (int i = 0; i < data.Count; i++)
+        {
+            var x = i * step;
+            var y = height - (data[i] * height / max);
+            points.Add($"{x:F1},{y:F1}");
+        }
+
+        return $"M0,{height} L{string.Join(" L", points)} L200,{height} Z";
+    }
+
+    private string GetLinePath(List<long> data, int height)
+    {
+        if (!data.Any()) return "";
+
+        var max = Math.Max(1, data.Max());
+        var points = new List<string>();
+        var step = 200.0 / (data.Count - 1);
+
+        for (int i = 0; i < data.Count; i++)
+        {
+            var x = i * step;
+            var y = height - (data[i] * height / max);
+            points.Add($"{x:F1},{y:F1}");
+        }
+
+        return $"M{string.Join(" L", points)}";
+    }
+
+    private static string FormatBytes(long bytes)
+    {
+        string[] sizes = { "B", "KB", "MB", "GB", "TB" };
+        int order = 0;
+        double size = bytes;
+        while (size >= 1024 && order < sizes.Length - 1)
+        {
+            order++;
+            size /= 1024;
+        }
+        return $"{size:0.##} {sizes[order]}";
+    }
+
+    private static string FormatSpeed(long bytesPerSecond)
+    {
+        return FormatBytes(bytesPerSecond) + "/s";
+    }
+
+    public void Dispose()
+    {
+        InstanceManager.ConnectionChanged -= HandleConnectionChanged;
+        _refreshTimer?.Stop();
+        _refreshTimer?.Dispose();
+    }
+
+    private record SyncOperation
+    {
+        public string Id { get; init; } = "";
+        public string FileName { get; init; } = "";
+        public string Direction { get; init; } = "";
+        public int Progress { get; init; }
+        public long TransferredBytes { get; init; }
+        public long TotalBytes { get; init; }
+        public long SpeedBytesPerSecond { get; init; }
+        public bool HasConflict { get; init; }
+    }
+
+    private record SyncConflict
+    {
+        public string Id { get; init; } = "";
+        public string FileName { get; init; } = "";
+        public DateTime LocalModified { get; init; }
+        public DateTime RemoteModified { get; init; }
+    }
+
+    private record SessionStats
+    {
+        public int FilesSynced { get; init; }
+        public long BytesUploaded { get; init; }
+        public long BytesDownloaded { get; init; }
+        public int Errors { get; init; }
+    }
+
+    private enum ConflictResolution
+    {
+        KeepLocal,
+        KeepRemote,
+        Merge
+    }
+}
