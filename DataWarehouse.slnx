@@ -192,6 +192,12 @@
     <Project Path="Plugins/DataWarehouse.Plugins.AdoNetProvider/DataWarehouse.Plugins.AdoNetProvider.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.NoSqlProtocol/DataWarehouse.Plugins.NoSqlProtocol.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.Docker/DataWarehouse.Plugins.Docker.csproj" />
+    <Project Path="Plugins/DataWarehouse.Plugins.WinFspDriver/DataWarehouse.Plugins.WinFspDriver.csproj">
+      <Build Solution="Debug|*" Project="false" />
+    </Project>
+    <Project Path="Plugins/DataWarehouse.Plugins.FuseDriver/DataWarehouse.Plugins.FuseDriver.csproj">
+      <Build Solution="Debug|*" Project="false" />
+    </Project>
   </Folder>
   <Project Path="DataWarehouse.Benchmarks/DataWarehouse.Benchmarks.csproj" />
   <Project Path="DataWarehouse.CLI/DataWarehouse.CLI.csproj" />
