@@ -1,6 +1,7 @@
 // Copyright (c) DataWarehouse Contributors. All rights reserved.
 // Licensed under the Apache License, Version 2.0.
 
+using DataWarehouse.SDK.AI;
 using DataWarehouse.Shared.Commands;
 using DataWarehouse.Shared.Services;
 using Spectre.Console;
@@ -9,26 +10,37 @@ namespace DataWarehouse.CLI;
 
 /// <summary>
 /// Interactive TUI mode for the DataWarehouse CLI using Spectre.Console.
-/// Provides a REPL-like interface with command history, autocomplete, and rich output.
+/// Provides a REPL-like interface with command history, autocomplete, rich output,
+/// conversational context, and AI-powered features.
 /// </summary>
 public sealed class InteractiveMode
 {
     private readonly CommandExecutor _executor;
     private readonly ConsoleRenderer _renderer = new();
-    private readonly NaturalLanguageProcessor _nlp = new();
+    private readonly NaturalLanguageProcessor _nlp;
+    private readonly IAIProviderRegistry? _aiRegistry;
     private readonly CommandHistory _history;
     private readonly CancellationTokenSource _cts = new();
 
     private OutputFormat _outputFormat = OutputFormat.Table;
     private bool _verbose = false;
+    private bool _conversationalMode = true;
+    private string? _sessionId;
 
     /// <summary>
     /// Creates a new InteractiveMode instance.
     /// </summary>
-    public InteractiveMode(CommandExecutor executor, CommandHistory history)
+    public InteractiveMode(
+        CommandExecutor executor,
+        CommandHistory history,
+        NaturalLanguageProcessor? nlp = null,
+        IAIProviderRegistry? aiRegistry = null)
     {
         _executor = executor;
         _history = history;
+        _nlp = nlp ?? new NaturalLanguageProcessor(aiRegistry);
+        _aiRegistry = aiRegistry;
+        _sessionId = Guid.NewGuid().ToString("N")[..12];
     }
 
     /// <summary>
@@ -78,10 +90,15 @@ public sealed class InteractiveMode
     private void PrintBanner()
     {
         AnsiConsole.Write(new FigletText("DataWarehouse").Color(Color.Blue));
-        AnsiConsole.MarkupLine("[grey]Interactive CLI Mode[/]\n");
+        AnsiConsole.MarkupLine("[grey]Interactive CLI Mode[/]");
+
+        // Show AI/conversational status
+        var aiStatus = _aiRegistry != null ? "[green]AI Enabled[/]" : "[yellow]AI Not Available[/]";
+        var convStatus = _conversationalMode ? "[green]Conversational[/]" : "[grey]Single-turn[/]";
+        AnsiConsole.MarkupLine($"[dim]Status: {aiStatus} | {convStatus} | Session: {_sessionId}[/]\n");
     }
 
-    private static void PrintHelp()
+    private void PrintHelp()
     {
         AnsiConsole.MarkupLine("[bold]Commands:[/]");
         AnsiConsole.MarkupLine("  [cyan]help[/]              - Show this help");
@@ -90,19 +107,25 @@ public sealed class InteractiveMode
         AnsiConsole.MarkupLine("  [cyan]clear[/]             - Clear screen");
         AnsiConsole.MarkupLine("  [cyan]format <fmt>[/]      - Set output format (table, json, yaml, csv)");
         AnsiConsole.MarkupLine("  [cyan]verbose[/]           - Toggle verbose mode");
+        AnsiConsole.MarkupLine("  [cyan]conversational[/]    - Toggle conversational mode");
+        AnsiConsole.MarkupLine("  [cyan]new session[/]       - Start new conversation session");
+        AnsiConsole.MarkupLine("  [cyan]ask <question>[/]    - Ask AI for help");
+        AnsiConsole.MarkupLine("  [cyan]correct[/]           - Correct the last interpretation");
+        AnsiConsole.MarkupLine("  [cyan]learning stats[/]    - Show learning statistics");
         AnsiConsole.MarkupLine("");
         AnsiConsole.MarkupLine("[bold]Natural Language:[/]");
         AnsiConsole.MarkupLine("  Type naturally: \"[cyan]show my storage pools[/]\" or \"[cyan]backup my database[/]\"");
+        AnsiConsole.MarkupLine("  Follow-ups work: \"[cyan]filter by last week[/]\" or \"[cyan]delete that one[/]\"");
         AnsiConsole.MarkupLine("");
         AnsiConsole.MarkupLine("[grey]Press Ctrl+C to exit[/]\n");
     }
 
     private string ReadInput()
     {
-        // Show prompt with connection status
-        var prompt = _executor.AllCommands.Count > 0
-            ? "[blue]dw[/] [grey]>[/] "
-            : "[yellow]dw[/] [grey](disconnected) >[/] ";
+        // Show prompt with connection and session status
+        var connectionStatus = _executor.AllCommands.Count > 0 ? "blue" : "yellow";
+        var modeIndicator = _conversationalMode ? $"[dim]({_sessionId})[/]" : "";
+        var prompt = $"[{connectionStatus}]dw[/] {modeIndicator}[grey]>[/] ";
 
         return AnsiConsole.Prompt(
             new TextPrompt<string>(prompt)
@@ -163,6 +186,50 @@ public sealed class InteractiveMode
                 AnsiConsole.MarkupLine($"[grey]Verbose mode:[/] [cyan]{(_verbose ? "enabled" : "disabled")}[/]");
                 return true;
 
+            case "conversational":
+                _conversationalMode = !_conversationalMode;
+                AnsiConsole.MarkupLine($"[grey]Conversational mode:[/] [cyan]{(_conversationalMode ? "enabled" : "disabled")}[/]");
+                if (_conversationalMode && string.IsNullOrEmpty(_sessionId))
+                {
+                    _sessionId = Guid.NewGuid().ToString("N")[..12];
+                    AnsiConsole.MarkupLine($"[grey]New session started:[/] [cyan]{_sessionId}[/]");
+                }
+                return true;
+
+            case "new":
+                if (parts.Length > 1 && parts[1] == "session")
+                {
+                    if (!string.IsNullOrEmpty(_sessionId))
+                    {
+                        _nlp.EndSession(_sessionId);
+                    }
+                    _sessionId = Guid.NewGuid().ToString("N")[..12];
+                    AnsiConsole.MarkupLine($"[green]New session started:[/] [cyan]{_sessionId}[/]");
+                    return true;
+                }
+                break;
+
+            case "ask":
+                if (parts.Length > 1)
+                {
+                    await HandleAIHelpAsync(string.Join(" ", parts.Skip(1)));
+                    return true;
+                }
+                AnsiConsole.MarkupLine("[yellow]Usage: ask <your question>[/]");
+                return true;
+
+            case "correct":
+                await HandleCorrectionAsync();
+                return true;
+
+            case "learning":
+                if (parts.Length > 1 && parts[1] == "stats")
+                {
+                    ShowLearningStats();
+                    return true;
+                }
+                break;
+
             case "search":
                 if (parts.Length > 1)
                 {
@@ -174,21 +241,149 @@ public sealed class InteractiveMode
                 }
                 return true;
 
+            case "forget":
+            case "reset":
+                if (!string.IsNullOrEmpty(_sessionId))
+                {
+                    _nlp.ClearSessionContext(_sessionId);
+                    AnsiConsole.MarkupLine("[green]Context cleared for current session.[/]");
+                }
+                return true;
+
             default:
                 return false;
         }
+
+        return false;
+    }
+
+    private async Task HandleAIHelpAsync(string query)
+    {
+        var result = await _nlp.GetAIHelpAsync(query, _cts.Token);
+
+        if (result.UsedAI)
+        {
+            AnsiConsole.MarkupLine("[cyan]AI-Powered Help:[/]");
+        }
+        else
+        {
+            AnsiConsole.MarkupLine("[yellow]Help (based on pattern matching):[/]");
+        }
+
+        AnsiConsole.WriteLine();
+        AnsiConsole.WriteLine(result.Answer);
+
+        if (result.SuggestedCommands.Count > 0)
+        {
+            AnsiConsole.WriteLine();
+            AnsiConsole.MarkupLine("[bold]Suggested Commands:[/]");
+            foreach (var cmd in result.SuggestedCommands)
+            {
+                AnsiConsole.MarkupLine($"  [cyan]{cmd}[/]");
+            }
+        }
+
+        if (result.Examples.Count > 0)
+        {
+            AnsiConsole.WriteLine();
+            AnsiConsole.MarkupLine("[bold]Examples:[/]");
+            foreach (var example in result.Examples)
+            {
+                AnsiConsole.MarkupLine($"  [green]{example}[/]");
+            }
+        }
+    }
+
+    private async Task HandleCorrectionAsync()
+    {
+        var recent = _history.GetRecent(1).FirstOrDefault();
+        if (recent == null)
+        {
+            AnsiConsole.MarkupLine("[yellow]No recent command to correct.[/]");
+            return;
+        }
+
+        AnsiConsole.MarkupLine($"[grey]Last command interpreted as:[/] [cyan]{recent.Command}[/]");
+        AnsiConsole.MarkupLine("[grey]What should it have been?[/]");
+
+        var correctCommand = AnsiConsole.Prompt(
+            new TextPrompt<string>("[cyan]Correct command:[/] ")
+                .AllowEmpty());
+
+        if (string.IsNullOrWhiteSpace(correctCommand))
+        {
+            AnsiConsole.MarkupLine("[yellow]Correction cancelled.[/]");
+            return;
+        }
+
+        // Record the correction
+        _nlp.RecordCorrection(
+            recent.Command,
+            recent.Command,
+            correctCommand,
+            recent.Parameters);
+
+        AnsiConsole.MarkupLine($"[green]Learned: '{recent.Command}' should be interpreted as '{correctCommand}'[/]");
+    }
+
+    private void ShowLearningStats()
+    {
+        var stats = _nlp.GetLearningStats();
+
+        var table = new Table().Border(TableBorder.Rounded);
+        table.AddColumn("Metric");
+        table.AddColumn("Value");
+
+        table.AddRow("Total Patterns Learned", stats.TotalPatterns.ToString());
+        table.AddRow("Corrections Applied", stats.CorrectionsLearned.ToString());
+        table.AddRow("Total Successes", stats.TotalSuccesses.ToString());
+        table.AddRow("Total Failures", stats.TotalFailures.ToString());
+        table.AddRow("Average Confidence", $"{stats.AverageConfidence:P1}");
+        table.AddRow("Synonyms Configured", stats.SynonymCount.ToString());
+        table.AddRow("User Preferences", stats.PreferenceCount.ToString());
+
+        if (stats.OldestPattern.HasValue)
+        {
+            table.AddRow("Learning Since", stats.OldestPattern.Value.ToString("yyyy-MM-dd"));
+        }
+
+        if (!string.IsNullOrEmpty(stats.MostUsedPattern))
+        {
+            table.AddRow("Most Used Pattern", stats.MostUsedPattern);
+        }
+
+        AnsiConsole.Write(table);
     }
 
     private async Task ExecuteCommandAsync(string input)
     {
         var startTime = DateTime.UtcNow;
+        CommandIntent intent;
 
-        // Try to parse as natural language first
-        var intent = _nlp.Process(input);
+        // Use conversational processing if enabled
+        if (_conversationalMode && !string.IsNullOrEmpty(_sessionId))
+        {
+            intent = await _nlp.ProcessConversationalAsync(input, _sessionId, _cts.Token);
+        }
+        else if (_aiRegistry != null)
+        {
+            intent = await _nlp.ProcessWithAIFallbackAsync(input, _cts.Token);
+        }
+        else
+        {
+            intent = _nlp.Process(input);
+        }
 
+        // Handle special CLI commands
+        if (intent.CommandName == "cli.context.clear")
+        {
+            AnsiConsole.MarkupLine("[green]Conversation context cleared.[/]");
+            return;
+        }
+
+        // Try as direct command if natural language failed
         if (intent.Confidence < 0.3)
         {
-            // Try as direct command (e.g., "storage.list")
             var directParts = input.Split(' ', 2, StringSplitOptions.RemoveEmptyEntries);
             if (directParts.Length > 0)
             {
@@ -209,7 +404,7 @@ public sealed class InteractiveMode
         if (intent.Confidence < 0.3)
         {
             AnsiConsole.MarkupLine($"[yellow]Could not understand:[/] {input}");
-            AnsiConsole.MarkupLine("[grey]Try 'help' for available commands[/]");
+            AnsiConsole.MarkupLine("[grey]Try 'help' for available commands or 'ask <question>' for AI help[/]");
 
             // Show suggestions
             var suggestions = _nlp.GetCompletions(input).Take(3).ToList();
@@ -224,10 +419,15 @@ public sealed class InteractiveMode
             return;
         }
 
-        // Show interpretation if verbose or low confidence
+        // Show interpretation with indicators
+        var indicators = new List<string>();
+        if (intent.ProcessedByAI) indicators.Add("[dim](AI)[/]");
+        if (!string.IsNullOrEmpty(intent.SessionId)) indicators.Add($"[dim](session)[/]");
+        var indicatorStr = indicators.Count > 0 ? " " + string.Join(" ", indicators) : "";
+
         if (_verbose || intent.Confidence < 0.8)
         {
-            AnsiConsole.MarkupLine($"[grey]{intent.Explanation}[/]");
+            AnsiConsole.MarkupLine($"[grey]{intent.Explanation}{indicatorStr}[/]");
         }
 
         // Execute the command
