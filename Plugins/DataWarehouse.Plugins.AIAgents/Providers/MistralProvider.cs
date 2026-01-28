@@ -1,3 +1,4 @@
+using DataWarehouse.SDK.AI;
 using System.Net.Http.Headers;
 using System.Runtime.CompilerServices;
 using System.Text;
@@ -9,7 +10,7 @@ namespace DataWarehouse.Plugins.AIAgents
     /// Mistral AI provider.
     /// Supports Mistral Large, Medium, Small, and Codestral models.
     /// </summary>
-    public class MistralProvider : IAIProvider
+    public class MistralProvider : IExtendedAIProvider
     {
         private readonly HttpClient _httpClient;
         private readonly ProviderConfig _config;
@@ -35,6 +36,15 @@ namespace DataWarehouse.Plugins.AIAgents
             "mistral-embed",
             "mistral-moderation-latest"
         };
+
+        public string ProviderId => "mistral";
+        public string DisplayName => "Mistral AI";
+        public bool IsAvailable => !string.IsNullOrEmpty(_config.ApiKey);
+        public AICapabilities Capabilities =>
+            AICapabilities.TextCompletion |
+            AICapabilities.ChatCompletion |
+            AICapabilities.Streaming |
+            AICapabilities.Embeddings;
 
         public MistralProvider(HttpClient httpClient, ProviderConfig config)
         {
@@ -143,6 +153,12 @@ namespace DataWarehouse.Plugins.AIAgents
                     .Select(v => v.GetDouble())
                     .ToArray())
                 .ToArray();
+        }
+
+        public async Task<float[]> GetEmbeddingsAsync(string text, CancellationToken ct = default)
+        {
+            var result = await EmbedAsync(new[] { text }, null, ct);
+            return result[0].Select(d => (float)d).ToArray();
         }
 
         public async IAsyncEnumerable<string> StreamChatAsync(ChatRequest request, [EnumeratorCancellation] CancellationToken ct = default)
@@ -306,5 +322,62 @@ namespace DataWarehouse.Plugins.AIAgents
 
             return new VisionResponse { Content = textContent };
         }
+
+        #region SDK IAIProvider Implementation
+
+        public async Task<AIResponse> CompleteAsync(AIRequest request, CancellationToken ct = default)
+        {
+            var chatRequest = new ChatRequest
+            {
+                Messages = request.ChatHistory.Count > 0
+                    ? request.ChatHistory.Select(m => new ChatMessage { Role = m.Role.ToString().ToLowerInvariant(), Content = m.Content }).ToList()
+                    : new List<ChatMessage> { new() { Role = "user", Content = request.Prompt } },
+                Model = request.Model ?? DefaultModel,
+                MaxTokens = request.MaxTokens,
+                Temperature = request.Temperature ?? 0.7f
+            };
+
+            if (!string.IsNullOrEmpty(request.SystemMessage))
+                chatRequest.Messages.Insert(0, new ChatMessage { Role = "system", Content = request.SystemMessage });
+
+            var response = await ChatAsync(chatRequest, ct);
+            return new AIResponse
+            {
+                Content = response.Content,
+                FinishReason = response.FinishReason,
+                Usage = new AIUsage
+                {
+                    PromptTokens = response.InputTokens,
+                    CompletionTokens = response.OutputTokens
+                }
+            };
+        }
+
+        public async IAsyncEnumerable<AIStreamChunk> CompleteStreamingAsync(AIRequest request, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct = default)
+        {
+            var chatRequest = new ChatRequest
+            {
+                Messages = request.ChatHistory.Count > 0
+                    ? request.ChatHistory.Select(m => new ChatMessage { Role = m.Role.ToString().ToLowerInvariant(), Content = m.Content }).ToList()
+                    : new List<ChatMessage> { new() { Role = "user", Content = request.Prompt } },
+                Model = request.Model ?? DefaultModel,
+                MaxTokens = request.MaxTokens,
+                Temperature = request.Temperature ?? 0.7f,
+                Stream = true
+            };
+
+            await foreach (var chunk in StreamChatAsync(chatRequest, ct))
+            {
+                yield return new AIStreamChunk { Content = chunk };
+            }
+        }
+
+        public async Task<float[][]> GetEmbeddingsBatchAsync(string[] texts, CancellationToken ct = default)
+        {
+            var result = await EmbedAsync(texts, null, ct);
+            return result.Select(r => r.Select(d => (float)d).ToArray()).ToArray();
+        }
+
+        #endregion
     }
 }

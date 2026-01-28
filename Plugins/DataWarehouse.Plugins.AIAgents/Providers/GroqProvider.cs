@@ -1,3 +1,4 @@
+using DataWarehouse.SDK.AI;
 using System.Net.Http.Headers;
 using System.Runtime.CompilerServices;
 using System.Text;
@@ -9,7 +10,7 @@ namespace DataWarehouse.Plugins.AIAgents
     /// Groq provider for ultra-fast inference.
     /// Supports Llama, Mixtral, Gemma models on custom LPU hardware.
     /// </summary>
-    public class GroqProvider : IAIProvider
+    public class GroqProvider : IExtendedAIProvider
     {
         private readonly HttpClient _httpClient;
         private readonly ProviderConfig _config;
@@ -38,6 +39,14 @@ namespace DataWarehouse.Plugins.AIAgents
             "whisper-large-v3",
             "whisper-large-v3-turbo"
         };
+
+        public string ProviderId => "groq";
+        public string DisplayName => "Groq";
+        public bool IsAvailable => !string.IsNullOrEmpty(_config.ApiKey);
+        public AICapabilities Capabilities =>
+            AICapabilities.TextCompletion |
+            AICapabilities.ChatCompletion |
+            AICapabilities.Streaming;
 
         public GroqProvider(HttpClient httpClient, ProviderConfig config)
         {
@@ -120,6 +129,11 @@ namespace DataWarehouse.Plugins.AIAgents
         }
 
         public Task<double[][]> EmbedAsync(string[] texts, string? model = null, CancellationToken ct = default)
+        {
+            throw new NotSupportedException("Groq does not support embeddings");
+        }
+
+        public Task<float[]> GetEmbeddingsAsync(string text, CancellationToken ct = default)
         {
             throw new NotSupportedException("Groq does not support embeddings");
         }
@@ -309,5 +323,61 @@ namespace DataWarehouse.Plugins.AIAgents
 
             return result.RootElement.GetProperty("text").GetString() ?? "";
         }
+
+        #region SDK IAIProvider Implementation
+
+        public async Task<AIResponse> CompleteAsync(AIRequest request, CancellationToken ct = default)
+        {
+            var chatRequest = new ChatRequest
+            {
+                Messages = request.ChatHistory.Count > 0
+                    ? request.ChatHistory.Select(m => new ChatMessage { Role = m.Role.ToString().ToLowerInvariant(), Content = m.Content }).ToList()
+                    : new List<ChatMessage> { new() { Role = "user", Content = request.Prompt } },
+                Model = request.Model ?? DefaultModel,
+                MaxTokens = request.MaxTokens,
+                Temperature = request.Temperature ?? 0.7f
+            };
+
+            if (!string.IsNullOrEmpty(request.SystemMessage))
+                chatRequest.Messages.Insert(0, new ChatMessage { Role = "system", Content = request.SystemMessage });
+
+            var response = await ChatAsync(chatRequest, ct);
+            return new AIResponse
+            {
+                Content = response.Content,
+                FinishReason = response.FinishReason,
+                Usage = new AIUsage
+                {
+                    PromptTokens = response.InputTokens,
+                    CompletionTokens = response.OutputTokens
+                }
+            };
+        }
+
+        public async IAsyncEnumerable<AIStreamChunk> CompleteStreamingAsync(AIRequest request, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct = default)
+        {
+            var chatRequest = new ChatRequest
+            {
+                Messages = request.ChatHistory.Count > 0
+                    ? request.ChatHistory.Select(m => new ChatMessage { Role = m.Role.ToString().ToLowerInvariant(), Content = m.Content }).ToList()
+                    : new List<ChatMessage> { new() { Role = "user", Content = request.Prompt } },
+                Model = request.Model ?? DefaultModel,
+                MaxTokens = request.MaxTokens,
+                Temperature = request.Temperature ?? 0.7f,
+                Stream = true
+            };
+
+            await foreach (var chunk in StreamChatAsync(chatRequest, ct))
+            {
+                yield return new AIStreamChunk { Content = chunk };
+            }
+        }
+
+        public async Task<float[][]> GetEmbeddingsBatchAsync(string[] texts, CancellationToken ct = default)
+        {
+            throw new NotSupportedException("Groq does not support embeddings");
+        }
+
+        #endregion
     }
 }

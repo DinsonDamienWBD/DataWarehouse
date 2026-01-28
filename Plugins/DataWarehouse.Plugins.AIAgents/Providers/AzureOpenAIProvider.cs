@@ -1,3 +1,4 @@
+using DataWarehouse.SDK.AI;
 using System.Net.Http.Headers;
 using System.Runtime.CompilerServices;
 using System.Text;
@@ -9,7 +10,7 @@ namespace DataWarehouse.Plugins.AIAgents
     /// Azure OpenAI provider (powers Microsoft Copilot).
     /// Supports GPT-4, GPT-4 Turbo, GPT-3.5 Turbo deployments.
     /// </summary>
-    public class AzureOpenAIProvider : IAIProvider
+    public class AzureOpenAIProvider : IExtendedAIProvider
     {
         private readonly HttpClient _httpClient;
         private readonly ProviderConfig _config;
@@ -35,6 +36,19 @@ namespace DataWarehouse.Plugins.AIAgents
             "text-embedding-3-small",
             "text-embedding-3-large"
         };
+
+        // SDK IAIProvider properties
+        public string ProviderId => "azure-openai";
+        public string DisplayName => "Azure OpenAI";
+        public bool IsAvailable => !string.IsNullOrEmpty(_config.ApiKey) && !string.IsNullOrEmpty(_config.Endpoint);
+        public AICapabilities Capabilities =>
+            AICapabilities.TextCompletion |
+            AICapabilities.ChatCompletion |
+            AICapabilities.Streaming |
+            AICapabilities.Embeddings |
+            AICapabilities.ImageAnalysis |
+            AICapabilities.FunctionCalling |
+            AICapabilities.CodeGeneration;
 
         public AzureOpenAIProvider(HttpClient httpClient, ProviderConfig config)
         {
@@ -149,6 +163,12 @@ namespace DataWarehouse.Plugins.AIAgents
                     .Select(v => v.GetDouble())
                     .ToArray())
                 .ToArray();
+        }
+
+        public async Task<float[]> GetEmbeddingsAsync(string text, CancellationToken ct = default)
+        {
+            var result = await EmbedAsync(new[] { text }, null, ct);
+            return result[0].Select(d => (float)d).ToArray();
         }
 
         public async IAsyncEnumerable<string> StreamChatAsync(ChatRequest request, [EnumeratorCancellation] CancellationToken ct = default)
@@ -314,5 +334,90 @@ namespace DataWarehouse.Plugins.AIAgents
 
             return new VisionResponse { Content = textContent };
         }
+
+        #region SDK IAIProvider Implementation
+
+        public async Task<AIResponse> CompleteAsync(AIRequest request, CancellationToken ct = default)
+        {
+            try
+            {
+                var messages = new List<ChatMessage>();
+                if (!string.IsNullOrEmpty(request.SystemMessage))
+                {
+                    messages.Add(new ChatMessage { Role = "system", Content = request.SystemMessage });
+                }
+                foreach (var msg in request.ChatHistory)
+                {
+                    messages.Add(new ChatMessage { Role = msg.Role, Content = msg.Content });
+                }
+                messages.Add(new ChatMessage { Role = "user", Content = request.Prompt });
+
+                var chatRequest = new ChatRequest
+                {
+                    Model = request.Model ?? DefaultModel,
+                    Messages = messages,
+                    MaxTokens = request.MaxTokens,
+                    Temperature = request.Temperature.HasValue ? (double)request.Temperature.Value : null
+                };
+
+                var response = await ChatAsync(chatRequest, ct);
+                return new AIResponse
+                {
+                    Success = true,
+                    Content = response.Content,
+                    FinishReason = response.FinishReason,
+                    Usage = new AIUsage
+                    {
+                        PromptTokens = response.InputTokens,
+                        CompletionTokens = response.OutputTokens
+                    }
+                };
+            }
+            catch (Exception ex)
+            {
+                return new AIResponse
+                {
+                    Success = false,
+                    ErrorMessage = ex.Message
+                };
+            }
+        }
+
+        public async IAsyncEnumerable<AIStreamChunk> CompleteStreamingAsync(AIRequest request, [EnumeratorCancellation] CancellationToken ct = default)
+        {
+            var messages = new List<ChatMessage>();
+            if (!string.IsNullOrEmpty(request.SystemMessage))
+            {
+                messages.Add(new ChatMessage { Role = "system", Content = request.SystemMessage });
+            }
+            foreach (var msg in request.ChatHistory)
+            {
+                messages.Add(new ChatMessage { Role = msg.Role, Content = msg.Content });
+            }
+            messages.Add(new ChatMessage { Role = "user", Content = request.Prompt });
+
+            var chatRequest = new ChatRequest
+            {
+                Model = request.Model ?? DefaultModel,
+                Messages = messages,
+                MaxTokens = request.MaxTokens,
+                Temperature = request.Temperature.HasValue ? (double)request.Temperature.Value : null
+            };
+
+            await foreach (var chunk in StreamChatAsync(chatRequest, ct))
+            {
+                yield return new AIStreamChunk { Content = chunk, IsFinal = false };
+            }
+
+            yield return new AIStreamChunk { Content = "", IsFinal = true };
+        }
+
+        public async Task<float[][]> GetEmbeddingsBatchAsync(string[] texts, CancellationToken ct = default)
+        {
+            var result = await EmbedAsync(texts, null, ct);
+            return result.Select(d => d.Select(v => (float)v).ToArray()).ToArray();
+        }
+
+        #endregion
     }
 }

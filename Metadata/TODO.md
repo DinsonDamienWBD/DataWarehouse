@@ -209,18 +209,29 @@ These features represent the next generation of data storage technology, positio
 
 ### CATEGORY D: Industry-First AI Features
 
+> **ARCHITECTURAL NOTE (2026-01-28):** AI capabilities have been consolidated into a unified architecture:
+> - **AIAgents Plugin** (`Plugins/DataWarehouse.Plugins.AIAgents/`) - Central AI capability hub with:
+>   - Two-level control model: Instance-level capabilities (admin) + User-level provider mappings
+>   - ChildrenMirrorParent toggle for simple vs fine-grained sub-capability control
+>   - Capabilities: Chat, NLP, Semantics, Generation, Embeddings, Vision, Audio, AIOps, Knowledge
+>   - 12 provider implementations using SDK's `DataWarehouse.SDK.AI.IAIProvider` interface
+> - **AIInterface Plugin** (`Plugins/DataWarehouse.Plugins.AIInterface/`) - Unified channel interface:
+>   - Protocol translation only (no AI work), routes to AIAgents via message bus
+>   - Supports: Slack, Teams, Discord, Voice (Alexa/Google/Siri), LLM integrations (ChatGPT/Claude/Webhook)
+> - **Deleted Legacy Plugins:** AutonomousDataManagement, NaturalLanguageInterface, SemanticUnderstanding
+
 #### Task 47: Autonomous Data Management (AIOps)
 **Priority:** P0 (Industry-First)
 **Effort:** Very High
-**Status:** ✅ **COMPLETED** (2026-01-28)
+**Status:** ✅ **COMPLETED** (2026-01-28) - **REFACTORED** (2026-01-28)
 
 **Description:** Implement fully autonomous data management where AI handles all routine operations without human intervention.
 
-**Implementation:** `Plugins/DataWarehouse.Plugins.AutonomousDataManagement/`
-- Main plugin: `AutonomousDataManagementPlugin.cs`
+**Implementation:** Consolidated into `Plugins/DataWarehouse.Plugins.AIAgents/Capabilities/AIOps/`
+- Capability Handler: `AIOpsCapabilityHandler.cs` (11 sub-capabilities with ChildrenMirrorParent toggle)
 - Engines: `TieringEngine.cs`, `ScalingEngine.cs`, `AnomalyEngine.cs`, `CostEngine.cs`, `SecurityEngine.cs`, `ComplianceEngine.cs`, `CapacityEngine.cs`, `PerformanceEngine.cs`
-- Models: `PredictionModels.cs`, `AnomalyModels.cs`, `OptimizationModels.cs`
-- Provider Support: `AIProviderSelector.cs` (provider-agnostic via SDK IAIProvider)
+- Models: `PredictionModels.cs` (ML-based predictions with graceful AI degradation)
+- Provider Support: Uses SDK `DataWarehouse.SDK.AI.IAIProvider` interface (provider-agnostic)
 
 **Autonomous Capabilities:**
 
@@ -250,16 +261,23 @@ These features represent the next generation of data storage technology, positio
 #### Task 48: Natural Language Data Interaction
 **Priority:** P1 (Industry-First)
 **Effort:** High
-**Status:** ✅ **COMPLETED** (2026-01-28)
+**Status:** ✅ **COMPLETED** (2026-01-28) - **REFACTORED** (2026-01-28)
 
 **Description:** Allow users to interact with their data using natural language, eliminating the need to learn query syntax.
 
-**Implementation:** `Plugins/DataWarehouse.Plugins.NaturalLanguageInterface/`
-- Main plugin: `NaturalLanguageInterfacePlugin.cs`
-- Engines: `QueryEngine.cs`, `ConversationEngine.cs`, `ExplanationEngine.cs`, `StorytellingEngine.cs`
-- Integrations: `SlackIntegration.cs`, `TeamsIntegration.cs`, `DiscordIntegration.cs`, `ChatGPTPlugin.cs`, `ClaudeMCPServer.cs`, `GenericLLMAdapter.cs`
-- Voice Handlers: `AlexaHandler.cs`, `GoogleAssistantHandler.cs`, `SiriHandler.cs`
-- Provider-agnostic via SDK IAIProvider interface
+**Implementation:** Split between two consolidated plugins:
+
+**NLP Capabilities:** `Plugins/DataWarehouse.Plugins.AIAgents/Capabilities/NLP/`
+- Capability Handler: `NLPCapabilityHandler.cs` (QueryParsing, IntentDetection, CommandExtraction, FollowUpHandling)
+- Engines: `QueryParsingEngine.cs` (40+ intent patterns, AI-enhanced), `ConversationContextEngine.cs` (session management, pronoun resolution)
+- Provider-agnostic via SDK `DataWarehouse.SDK.AI.IAIProvider` interface
+
+**Channel Interfaces:** `Plugins/DataWarehouse.Plugins.AIInterface/`
+- Main plugin: `AIInterfacePlugin.cs` (channel-agnostic routing via message bus)
+- Channels: `SlackChannel.cs`, `TeamsChannel.cs`, `DiscordChannel.cs`
+- Voice Channels: `AlexaChannel.cs`, `GoogleAssistantChannel.cs`, `SiriChannel.cs`
+- LLM Channels: `ChatGPTPluginChannel.cs`, `ClaudeMCPChannel.cs`, `GenericWebhookChannel.cs`
+- Registry: `ChannelRegistry.cs` (enable/disable individual channels per instance)
 
 **Capabilities:**
 
@@ -288,16 +306,17 @@ These features represent the next generation of data storage technology, positio
 #### Task 49: Semantic Data Understanding
 **Priority:** P1
 **Effort:** High
-**Status:** ✅ **COMPLETED** (2026-01-28)
+**Status:** ✅ **COMPLETED** (2026-01-28) - **REFACTORED** (2026-01-28)
 
 **Description:** Deep semantic understanding of stored data for intelligent organization and retrieval.
 
-**Implementation:**
+**Implementation:** Consolidated into `Plugins/DataWarehouse.Plugins.AIAgents/Capabilities/Semantics/`
 - SDK Interfaces: `DataWarehouse.SDK/AI/ISemanticAnalyzer.cs`
 - SDK Base Class: `DataWarehouse.SDK/AI/SemanticAnalyzerBase.cs` (2,063 lines, full implementations)
-- Plugin: `Plugins/DataWarehouse.Plugins.SemanticUnderstanding/SemanticUnderstandingPlugin.cs`
-- Engines: `CategorizationEngine.cs`, `EntityExtractionEngine.cs`, `RelationshipEngine.cs`, `DuplicateDetectionEngine.cs`, `SummarizationEngine.cs`
+- Capability Handler: `SemanticsCapabilityHandler.cs` (registry-based capability checking with ChildrenMirrorParent support)
+- Engines: `CategorizationEngine.cs`, `EntityExtractionEngine.cs`, `RelationshipEngine.cs`, `DuplicateDetectionEngine.cs`, `SummarizationEngine.cs`, `SentimentEngine.cs`, `PIIDetectionEngine.cs`, `LanguageDetectionEngine.cs`
 - Provider-agnostic via SDK IAIProvider, IVectorStore, IKnowledgeGraph interfaces
+- All operations return `CapabilityResult<T>` for graceful error handling
 
 **Features:**
 
