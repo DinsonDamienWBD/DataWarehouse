@@ -1266,55 +1266,135 @@ public record OrphanedWormRecord
 | Schumacher | Proprietary | Variable | Variable | [ ] Pending | Specialized use cases |
 
 **Additional Encryption Algorithms:**
+
+> **IMPORTANT: Composable Key Management Requirement**
+> All new encryption plugins that require keys MUST use the `IKeyStore` interface for composable key management.
+> This allows users to pair ANY encryption algorithm with ANY key management plugin at runtime:
+> - `FileKeyStorePlugin` (local DPAPI/CredentialManager/PBKDF2)
+> - `VaultKeyStorePlugin` (HSM: HashiCorp Vault, Azure Key Vault, AWS KMS, Google KMS)
+> - `KeyRotationPlugin` (key rotation layer wrapping any IKeyStore)
+> - `ShamirSecretPlugin` (M-of-N key splitting) [T5.4]
+> - Future key management plugins
+>
+> **Exception:** Educational/historical ciphers (T4.24) may skip IKeyStore if they don't use proper keys.
+
 | Task | Description | Dependencies | Status |
 |------|-------------|--------------|--------|
-| T4.24 | Implement historical/educational ciphers (NOT for production) | T4.23 | [ ] |
-| T4.24.1 | ↳ Caesar/ROT13 (educational only) | T4.24 | [ ] |
-| T4.24.2 | ↳ XOR cipher (educational only) | T4.24 | [ ] |
-| T4.24.3 | ↳ Vigenère cipher (educational only) | T4.24 | [ ] |
-| T4.25 | Implement legacy ciphers (compatibility only, NOT recommended) | T4.24 | [ ] |
-| T4.25.1 | ↳ DES (56-bit, legacy compatibility) | T4.25 | [ ] |
-| T4.25.2 | ↳ 3DES/Triple-DES (112/168-bit, legacy) | T4.25 | [ ] |
-| T4.25.3 | ↳ RC4 (stream cipher, legacy/WEP) | T4.25 | [ ] |
-| T4.25.4 | ↳ Blowfish (64-bit block, legacy) | T4.25 | [ ] |
-| T4.26 | Implement AES key size variants | T4.25 | [ ] |
-| T4.26.1 | ↳ AES-128-GCM | T4.26 | [ ] |
-| T4.26.2 | ↳ AES-192-GCM | T4.26 | [ ] |
-| T4.26.3 | ↳ AES-256-CBC (for compatibility) | T4.26 | [ ] |
-| T4.26.4 | ↳ AES-256-CTR (counter mode) | T4.26 | [ ] |
+| T4.24 | Implement historical/educational ciphers (NOT for production, no IKeyStore) | T4.23 | [ ] |
+| T4.24.1 | ↳ Caesar/ROT13 (educational only, no key management) | T4.24 | [ ] |
+| T4.24.2 | ↳ XOR cipher (educational only, no key management) | T4.24 | [ ] |
+| T4.24.3 | ↳ Vigenère cipher (educational only, no key management) | T4.24 | [ ] |
+| T4.25 | Implement legacy ciphers (compatibility only, **MUST use IKeyStore**) | T4.24 | [ ] |
+| T4.25.1 | ↳ DES (56-bit, legacy, uses IKeyStore) | T4.25 | [ ] |
+| T4.25.2 | ↳ 3DES/Triple-DES (112/168-bit, legacy, uses IKeyStore) | T4.25 | [ ] |
+| T4.25.3 | ↳ RC4 (stream cipher, legacy/WEP, uses IKeyStore) | T4.25 | [ ] |
+| T4.25.4 | ↳ Blowfish (64-bit block, legacy, uses IKeyStore) | T4.25 | [ ] |
+| T4.26 | Implement AES key size variants (**MUST use IKeyStore**) | T4.25 | [ ] |
+| T4.26.1 | ↳ AES-128-GCM (uses IKeyStore) | T4.26 | [ ] |
+| T4.26.2 | ↳ AES-192-GCM (uses IKeyStore) | T4.26 | [ ] |
+| T4.26.3 | ↳ AES-256-CBC (for compatibility, uses IKeyStore) | T4.26 | [ ] |
+| T4.26.4 | ↳ AES-256-CTR (counter mode, uses IKeyStore) | T4.26 | [ ] |
 | T4.26.5 | ↳ AES-NI hardware acceleration detection | T4.26 | [ ] |
-| T4.27 | Implement asymmetric/public-key encryption | T4.26 | [ ] |
-| T4.27.1 | ↳ RSA-2048 | T4.27 | [ ] |
-| T4.27.2 | ↳ RSA-4096 | T4.27 | [ ] |
-| T4.27.3 | ↳ ECDH/ECDSA (Elliptic Curve) | T4.27 | [ ] |
-| T4.28 | Implement post-quantum cryptography | T4.27 | [ ] |
-| T4.28.1 | ↳ ML-KEM (Kyber, NIST PQC standard) | T4.28 | [ ] |
-| T4.28.2 | ↳ ML-DSA (Dilithium, signatures) | T4.28 | [ ] |
-| T4.29 | Implement special-purpose encryption | T4.28 | [ ] |
-| T4.29.1 | ↳ One-Time Pad (OTP, theoretical perfect secrecy) | T4.29 | [ ] |
-| T4.29.2 | ↳ XTS-AES (disk encryption mode) | T4.29 | [ ] |
+| T4.27 | Implement asymmetric/public-key encryption (**MUST use IKeyStore**) | T4.26 | [ ] |
+| T4.27.1 | ↳ RSA-2048 (uses IKeyStore for private key) | T4.27 | [ ] |
+| T4.27.2 | ↳ RSA-4096 (uses IKeyStore for private key) | T4.27 | [ ] |
+| T4.27.3 | ↳ ECDH/ECDSA (Elliptic Curve, uses IKeyStore) | T4.27 | [ ] |
+| T4.28 | Implement post-quantum cryptography (**MUST use IKeyStore**) | T4.27 | [ ] |
+| T4.28.1 | ↳ ML-KEM (Kyber, NIST PQC standard, uses IKeyStore) | T4.28 | [ ] |
+| T4.28.2 | ↳ ML-DSA (Dilithium, signatures, uses IKeyStore) | T4.28 | [ ] |
+| T4.29 | Implement special-purpose encryption (**MUST use IKeyStore**) | T4.28 | [ ] |
+| T4.29.1 | ↳ One-Time Pad (OTP, uses IKeyStore for pad storage) | T4.29 | [ ] |
+| T4.29.2 | ↳ XTS-AES (disk encryption mode, uses IKeyStore) | T4.29 | [ ] |
 
 **Encryption Algorithm Reference:**
-| Algorithm | Type | Key Size | Status | Security | Use Case |
-|-----------|------|----------|--------|----------|----------|
-| AES-256-GCM | Symmetric | 256-bit | ✅ Implemented | Strong | Primary encryption |
-| ChaCha20-Poly1305 | Symmetric | 256-bit | ✅ Implemented | Strong | Mobile, no AES-NI |
-| Twofish | Symmetric | 256-bit | ✅ Implemented | Strong | AES finalist |
-| Serpent | Symmetric | 256-bit | ✅ Implemented | Very Strong | High security |
-| FIPS | Symmetric | Various | ✅ Implemented | Certified | Government compliance |
-| Caesar/ROT13 | Substitution | None | [ ] Pending | ❌ None | Educational only |
-| XOR | Stream | Variable | [ ] Pending | ❌ Weak | Educational only |
-| Vigenère | Substitution | Variable | [ ] Pending | ❌ Weak | Educational only |
-| DES | Symmetric | 56-bit | [ ] Pending | ❌ Broken | Legacy compatibility |
-| 3DES | Symmetric | 112/168-bit | [ ] Pending | ⚠️ Weak | Legacy compatibility |
-| RC4 | Stream | 40-2048-bit | [ ] Pending | ❌ Broken | Legacy (WEP) |
-| Blowfish | Symmetric | 32-448-bit | [ ] Pending | ⚠️ Aging | Legacy compatibility |
-| AES-128-GCM | Symmetric | 128-bit | [ ] Pending | Strong | Performance-critical |
-| AES-192-GCM | Symmetric | 192-bit | [ ] Pending | Strong | Middle ground |
-| RSA-2048 | Asymmetric | 2048-bit | [ ] Pending | Strong | Key exchange |
-| RSA-4096 | Asymmetric | 4096-bit | [ ] Pending | Very Strong | High security |
-| ML-KEM (Kyber) | Post-Quantum | Various | [ ] Pending | Quantum-Safe | Future-proof |
-| One-Time Pad | Perfect | ≥ Message | [ ] Pending | Perfect | Theoretical max |
+| Algorithm | Type | Key Size | IKeyStore | Status | Security | Use Case |
+|-----------|------|----------|-----------|--------|----------|----------|
+| AES-256-GCM | Symmetric | 256-bit | ✅ Yes | ✅ Implemented | Strong | Primary encryption |
+| ChaCha20-Poly1305 | Symmetric | 256-bit | ✅ Yes | ✅ Implemented | Strong | Mobile, no AES-NI |
+| Twofish | Symmetric | 256-bit | ✅ Yes | ✅ Implemented | Strong | AES finalist |
+| Serpent | Symmetric | 256-bit | ✅ Yes | ✅ Implemented | Very Strong | High security |
+| FIPS | Symmetric | Various | ✅ Yes | ✅ Implemented | Certified | Government compliance |
+| ZeroKnowledge | Symmetric | 256-bit | ✅ Yes | ✅ Implemented | Strong | Client-side + ZK proofs |
+| Caesar/ROT13 | Substitution | None | ❌ No | [ ] Pending | ❌ None | Educational only |
+| XOR | Stream | Variable | ❌ No | [ ] Pending | ❌ Weak | Educational only |
+| Vigenère | Substitution | Variable | ❌ No | [ ] Pending | ❌ Weak | Educational only |
+| DES | Symmetric | 56-bit | ✅ Yes | [ ] Pending | ❌ Broken | Legacy compatibility |
+| 3DES | Symmetric | 112/168-bit | ✅ Yes | [ ] Pending | ⚠️ Weak | Legacy compatibility |
+| RC4 | Stream | 40-2048-bit | ✅ Yes | [ ] Pending | ❌ Broken | Legacy (WEP) |
+| Blowfish | Symmetric | 32-448-bit | ✅ Yes | [ ] Pending | ⚠️ Aging | Legacy compatibility |
+| AES-128-GCM | Symmetric | 128-bit | ✅ Yes | [ ] Pending | Strong | Performance-critical |
+| AES-192-GCM | Symmetric | 192-bit | ✅ Yes | [ ] Pending | Strong | Middle ground |
+| RSA-2048 | Asymmetric | 2048-bit | ✅ Yes | [ ] Pending | Strong | Key exchange |
+| RSA-4096 | Asymmetric | 4096-bit | ✅ Yes | [ ] Pending | Very Strong | High security |
+| ML-KEM (Kyber) | Post-Quantum | Various | ✅ Yes | [ ] Pending | Quantum-Safe | Future-proof |
+| One-Time Pad | Perfect | ≥ Message | ✅ Yes | [ ] Pending | Perfect | Theoretical max |
+
+---
+
+### Encryption Metadata Requirements (CRITICAL for Decryption)
+
+**Problem:** When reading encrypted data back, the system MUST know:
+1. Which encryption algorithm was used
+2. Which key management mode (Direct vs Envelope)
+3. Key identifiers (key ID for Direct, wrapped DEK + KEK ID for Envelope)
+
+**Solution:** Store encryption metadata in the **TamperProofManifest** (for tamper-proof storage) or **ciphertext header** (for standalone encryption).
+
+**Encryption Metadata Structure:**
+```csharp
+/// <summary>
+/// Metadata stored with encrypted data to enable decryption.
+/// Stored in TamperProofManifest.EncryptionMetadata or embedded in ciphertext header.
+/// </summary>
+public record EncryptionMetadata
+{
+    /// <summary>Encryption plugin ID (e.g., "aes256gcm", "chacha20", "twofish256")</summary>
+    public string EncryptionPluginId { get; init; } = "";
+
+    /// <summary>Key management mode: Direct or Envelope</summary>
+    public KeyManagementMode KeyMode { get; init; }
+
+    /// <summary>For Direct mode: Key ID in the key store</summary>
+    public string? KeyId { get; init; }
+
+    /// <summary>For Envelope mode: Wrapped DEK (encrypted by HSM)</summary>
+    public byte[]? WrappedDek { get; init; }
+
+    /// <summary>For Envelope mode: KEK identifier in HSM</summary>
+    public string? KekId { get; init; }
+
+    /// <summary>Key store plugin ID used (for verification/routing)</summary>
+    public string? KeyStorePluginId { get; init; }
+
+    /// <summary>Algorithm-specific parameters (IV, nonce, tag location, etc.)</summary>
+    public Dictionary<string, object> AlgorithmParams { get; init; } = new();
+}
+```
+
+**Where Metadata is Stored:**
+
+| Storage Mode | Metadata Location | Format |
+|--------------|-------------------|--------|
+| **Tamper-Proof Storage** | `TamperProofManifest.EncryptionMetadata` | JSON in manifest |
+| **Standalone Encryption** | Ciphertext header | Binary prefix |
+| **Database/SQL TDE** | Encryption key table | SQL metadata |
+
+**Read Path with Metadata:**
+```
+1. Load manifest or parse ciphertext header
+2. Extract EncryptionMetadata
+3. Determine encryption plugin from EncryptionPluginId
+4. Determine key management mode from KeyMode:
+   - Direct: Get key from IKeyStore using KeyId
+   - Envelope: Unwrap DEK using VaultKeyStorePlugin with WrappedDek + KekId
+5. Decrypt using appropriate encryption plugin
+```
+
+**Benefits:**
+- ✅ Any encryption algorithm can be paired with any key management at runtime
+- ✅ Metadata ensures correct decryption even if defaults change
+- ✅ Supports migration between key management modes
+- ✅ Enables key rotation without re-encryption (for envelope mode)
 
 **Integrity Algorithm Reference:**
 | Category | Algorithms | Key Required | Salt | Use Case |
@@ -1497,12 +1577,107 @@ Add envelope mode (store wrapped DEK in ciphertext header) to ALL encryption plu
 | T5.1.F.1 | ↳ Config: `KeyManagementMode`, `EnvelopeKeyStore` | Add to `ZkEncryptionConfig` | [ ] |
 | T5.1.F.2 | ↳ OnWrite/OnRead: envelope support | Same pattern as AES | [ ] |
 
-**Other T5 Tasks:**
+---
+
+### T5.2-T5.3: Additional Encryption & Padding
+
 | Task | Component | Description | Status |
 |------|-----------|-------------|--------|
-| T5.2 | `KyberEncryptionPlugin` | Post-quantum cryptography (NIST PQC ML-KEM) | [ ] |
+| T5.2 | `KyberEncryptionPlugin` | Post-quantum cryptography (NIST PQC ML-KEM), **MUST use IKeyStore** | [ ] |
 | T5.3 | `ChaffPaddingPlugin` | Traffic analysis protection via dummy writes | [ ] |
-| T5.4 | `ShamirSecretPlugin` | Key splitting across N parties (M-of-N recovery) | [ ] |
+
+---
+
+### T5.4: Additional Key Management Plugins (Composable Architecture)
+
+> **CRITICAL: Composable Key Management Architecture**
+>
+> The composable key management architecture **already exists** and is **production-ready**:
+> - `IKeyStore` interface defined in SDK
+> - All 6 encryption plugins already use `IKeyStore`
+> - Users can pair ANY encryption with ANY key management at runtime
+>
+> **All new key management plugins MUST implement `IKeyStore`** to be compatible with:
+> - All existing encryption plugins (AES, ChaCha20, Twofish, Serpent, FIPS, ZK)
+> - All future encryption plugins (T4.24-T4.29)
+> - Envelope mode (T5.1) via `VaultKeyStorePlugin`
+
+**Existing Key Management Plugins (✅ Implement IKeyStore):**
+| Plugin | Type | Features | Status |
+|--------|------|----------|--------|
+| `FileKeyStorePlugin` | Local | DPAPI, CredentialManager, Database, PBKDF2 4-tier | ✅ Implemented |
+| `VaultKeyStorePlugin` | HSM/Cloud | HashiCorp, Azure, AWS KMS + WrapKey/UnwrapKey | ✅ Implemented |
+| `KeyRotationPlugin` | Layer | Wraps any IKeyStore, adds rotation/versioning/audit | ✅ Implemented |
+| `SecretManagementPlugin` | Secret Mgmt | Secure secret storage with access control | ✅ Implemented |
+
+**New Key Management Plugins (T5.4):**
+
+| Task | Component | Description | Status |
+|------|-----------|-------------|--------|
+| T5.4 | Additional key management plugins | More options for composable key management | [ ] |
+| T5.4.1 | `ShamirSecretKeyStorePlugin` | M-of-N key splitting (Shamir's Secret Sharing), implements IKeyStore | [ ] |
+| T5.4.1.1 | ↳ Key split generation | Split key into N shares | [ ] |
+| T5.4.1.2 | ↳ Key reconstruction | Reconstruct from M shares | [ ] |
+| T5.4.1.3 | ↳ Share distribution | Securely distribute shares to custodians | [ ] |
+| T5.4.1.4 | ↳ Share rotation | Rotate shares without changing key | [ ] |
+| T5.4.2 | `Pkcs11KeyStorePlugin` | PKCS#11 HSM interface (generic HSM support), implements IKeyStore | [ ] |
+| T5.4.2.1 | ↳ Token enumeration | List available PKCS#11 tokens | [ ] |
+| T5.4.2.2 | ↳ Key operations | Generate, import, wrap, unwrap via PKCS#11 | [ ] |
+| T5.4.3 | `TpmKeyStorePlugin` | TPM 2.0 hardware security, implements IKeyStore | [ ] |
+| T5.4.3.1 | ↳ TPM key sealing | Seal keys to PCR state | [ ] |
+| T5.4.3.2 | ↳ TPM key unsealing | Unseal with attestation | [ ] |
+| T5.4.4 | `YubikeyKeyStorePlugin` | YubiKey/FIDO2 hardware tokens, implements IKeyStore | [ ] |
+| T5.4.4.1 | ↳ PIV slot support | Use PIV slots for key storage | [ ] |
+| T5.4.4.2 | ↳ Challenge-response | HMAC-SHA1 challenge-response | [ ] |
+| T5.4.5 | `PasswordDerivedKeyStorePlugin` | Argon2id/scrypt key derivation, implements IKeyStore | [ ] |
+| T5.4.5.1 | ↳ Argon2id derivation | Memory-hard KDF | [ ] |
+| T5.4.5.2 | ↳ scrypt derivation | Alternative memory-hard KDF | [ ] |
+| T5.4.6 | `MultiPartyKeyStorePlugin` | Multi-party computation (MPC) key management, implements IKeyStore | [ ] |
+| T5.4.6.1 | ↳ Threshold signatures | t-of-n signing without key reconstruction | [ ] |
+| T5.4.6.2 | ↳ Distributed key generation | Generate keys without single point of failure | [ ] |
+
+**Key Management Plugin Reference:**
+| Plugin | IKeyStore | Security Level | Use Case |
+|--------|-----------|----------------|----------|
+| `FileKeyStorePlugin` | ✅ | Medium | Local/development deployments |
+| `VaultKeyStorePlugin` | ✅ | High | Enterprise HSM/cloud deployments |
+| `KeyRotationPlugin` | ✅ | N/A (layer) | Add rotation to any IKeyStore |
+| `ShamirSecretKeyStorePlugin` | ✅ | Very High | M-of-N custodian scenarios |
+| `Pkcs11KeyStorePlugin` | ✅ | Very High | Generic HSM hardware |
+| `TpmKeyStorePlugin` | ✅ | High | Hardware-bound keys |
+| `YubikeyKeyStorePlugin` | ✅ | High | User-owned hardware tokens |
+| `PasswordDerivedKeyStorePlugin` | ✅ | Medium-High | Password-based encryption |
+| `MultiPartyKeyStorePlugin` | ✅ | Maximum | Zero single-point-of-failure |
+
+**Composability Example:**
+```csharp
+// ANY encryption can use ANY key management - user choice at runtime
+var encryption = new AesEncryptionPlugin(new AesEncryptionConfig
+{
+    KeyStore = keyManagementChoice switch
+    {
+        "file" => new FileKeyStorePlugin(),
+        "hsm-hashicorp" => new VaultKeyStorePlugin(hashicorpConfig),
+        "hsm-azure" => new VaultKeyStorePlugin(azureConfig),
+        "hsm-aws" => new VaultKeyStorePlugin(awsConfig),
+        "shamir" => new ShamirSecretKeyStorePlugin(shamirConfig),
+        "pkcs11" => new Pkcs11KeyStorePlugin(pkcs11Config),
+        "tpm" => new TpmKeyStorePlugin(),
+        "yubikey" => new YubikeyKeyStorePlugin(),
+        "password" => new PasswordDerivedKeyStorePlugin(passwordConfig),
+        "mpc" => new MultiPartyKeyStorePlugin(mpcConfig),
+        "rotation" => new KeyRotationPlugin(innerKeyStore),  // Wrap any of the above
+        _ => throw new ArgumentException("Unknown key management")
+    }
+});
+```
+
+---
+
+### T5.5-T5.6: Geo-Distribution
+
+| Task | Component | Description | Status |
+|------|-----------|-------------|--------|
 | T5.5 | `GeoWormPlugin` | Geo-dispersed WORM replication across regions | [ ] |
 | T5.6 | `GeoDistributedShardingPlugin` | Geo-dispersed data sharding (shards across continents) | [ ] |
 
