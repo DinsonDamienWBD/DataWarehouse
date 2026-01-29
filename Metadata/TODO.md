@@ -1045,6 +1045,13 @@ READ REQUEST (ObjectGuid, ReadMode)
 | T3.8 | Implement tamper attribution analysis | T3.7, T1.8 | [ ] |
 | T3.9 | Implement `GetTamperIncidentAsync` with attribution | T3.8 | [ ] |
 
+**Read Modes:**
+| Mode | Verification Level | Use Case |
+|------|-------------------|----------|
+| `Fast` | Skip verification (trust shard hashes only) | Bulk reads, internal replication, performance-critical |
+| `Verified` | Compute hash, compare to manifest | Default mode, balance of security and performance |
+| `Audit` | Full chain verification + blockchain anchor + access logging | Compliance audits, legal discovery, incident investigation |
+
 #### Phase T4: Recovery & Advanced Features (Priority: MEDIUM)
 | Task | Description | Dependencies | Status |
 |------|-------------|--------------|--------|
@@ -1056,50 +1063,66 @@ READ REQUEST (ObjectGuid, ReadMode)
 | T4.6 | Implement `AuditAsync` with full chain verification | T4.5 | [ ] |
 | T4.7 | Implement seal mechanism (lock structural config after first write) | T4.6 | [ ] |
 | T4.8 | Implement instance degradation state management | T4.7 | [ ] |
-| T4.9 | Implement `RaftConsensus` mode support | T4.8 | [ ] |
-| T4.10 | Implement `HardwareIntegrated` WORM mode (S3 Object Lock, Azure Immutable) | T4.9 | [ ] |
+| T4.9 | Implement `RaftConsensus` mode support for blockchain | T4.8 | [ ] |
+| T4.10 | Implement `S3ObjectLockWormPlugin` (AWS S3 Object Lock) | T4.9 | [ ] |
+| T4.11 | Implement `AzureImmutableBlobWormPlugin` (Azure Immutable Blob) | T4.10 | [ ] |
+| T4.12 | Implement background integrity scanner (configurable intervals) | T4.11 | [ ] |
+| T4.13 | Implement additional integrity algorithms (SHA-3, HMAC-SHA256, HMAC-SHA3) | T4.12 | [ ] |
 
-#### Phase T5: Ultra Paranoid (Priority: LOW)
-  │ Task │                     Component                     │ Priority │
-  ├──────┼───────────────────────────────────────────────────┼──────────┤
-  │ T5.1 │ EnvelopeEncryptionPlugin (AES-GCM + key wrapping) │ LOW      │
-  ├──────┼───────────────────────────────────────────────────┼──────────┤
-  │ T5.2 │ KyberEncryptionPlugin (post-quantum)              │ LOW      │
-  ├──────┼───────────────────────────────────────────────────┼──────────┤
-  │ T5.3 │ ChaffPaddingPlugin (traffic analysis protection)  │ LOW      │
-  ├──────┼───────────────────────────────────────────────────┼──────────┤
-  │ T5.4 │ ShamirSecretPlugin (key splitting)                │ LOW      │
-  ├──────┼───────────────────────────────────────────────────┼──────────┤
-  │ T5.5 │ Geo-dispersed WORM replication                    │ LOW      │
-  └──────┴───────────────────────────────────────────────────┴──────────┘
+**Instance Degradation States:**
+| State | Cause | Impact | User Action |
+|-------|-------|--------|-------------|
+| `Healthy` | All systems operational | Full functionality | None |
+| `Degraded` | Some shards unavailable, but reconstructible | Reads slower, writes may be slower | Monitor, plan maintenance |
+| `DegradedReadOnly` | Parity exhausted, cannot guarantee writes | Reads work, writes blocked | Urgent: restore storage |
+| `DegradedNoRecovery` | WORM unavailable | Cannot auto-recover from tampering | Critical: restore WORM |
+| `Offline` | Primary storage unavailable | No operations possible | Emergency: restore storage |
+| `Corrupted` | Tampering detected, recovery failed | Data integrity compromised | Incident response required |
 
-  Goal: Audit-ready documentation
-  ┌──────┬─────────────────────────────────────────────────┬──────────┐
-  │ Task │                    Component                    │ Priority │
-  ├──────┼─────────────────────────────────────────────────┼──────────┤
-  │ T5.6 │ Compliance report generator (SOC2, HIPAA, etc.) │ LOW      │
-  ├──────┼─────────────────────────────────────────────────┼──────────┤
-  │ T5.7 │ Chain-of-custody export (PDF/JSON)              │ LOW      │
-  ├──────┼─────────────────────────────────────────────────┼──────────┤
-  │ T5.8 │ Dashboard integration for integrity status      │ LOW      │
-  ├──────┼─────────────────────────────────────────────────┼──────────┤
-  │ T5.9 │ Alert integrations (email, Slack, PagerDuty)    │ LOW      │
+**Seal Mechanism:**
+After the first write operation, structural configuration becomes immutable:
+- **Locked after seal:** Storage instances, RAID configuration, hash algorithm, blockchain mode
+- **Configurable always:** Recovery behavior, read mode defaults, logging verbosity, alert thresholds
+
+#### Phase T5: Ultra Paranoid Mode (Priority: LOW)
+
+**Goal:** Maximum security for government/military-grade deployments
+
+| Task | Component | Description | Status |
+|------|-----------|-------------|--------|
+| T5.1 | `EnvelopeEncryptionPlugin` | AES-GCM + HSM key wrapping | [ ] |
+| T5.2 | `KyberEncryptionPlugin` | Post-quantum cryptography (NIST PQC) | [ ] |
+| T5.3 | `ChaffPaddingPlugin` | Traffic analysis protection via dummy writes | [ ] |
+| T5.4 | `ShamirSecretPlugin` | Key splitting across N parties (M-of-N recovery) | [ ] |
+| T5.5 | `GeoWormPlugin` | Geo-dispersed WORM replication across regions | [ ] |
+
+**Goal:** Audit-ready documentation and compliance
+
+| Task | Component | Description | Status |
+|------|-----------|-------------|--------|
+| T5.6 | Compliance Report Generator | SOC2, HIPAA, FedRAMP, GDPR reports | [ ] |
+| T5.7 | Chain-of-Custody Export | PDF/JSON export for legal discovery | [ ] |
+| T5.8 | Dashboard Integration | Real-time integrity status widgets | [ ] |
+| T5.9 | Alert Integrations | Email, Slack, PagerDuty, OpsGenie | [ ] |
+| T5.10 | Tamper Incident Workflow | Automated incident ticket creation | [ ] |
 
 #### Phase T6: Testing & Documentation (Priority: HIGH)
 | Task | Description | Dependencies | Status |
 |------|-------------|--------------|--------|
-| T5.1 | Unit tests for integrity provider | T1.2 | [ ] |
-| T5.2 | Unit tests for blockchain provider | T1.4 | [ ] |
-| T5.3 | Unit tests for WORM provider | T1.6 | [ ] |
-| T5.4 | Unit tests for access log provider | T1.8 | [ ] |
-| T5.5 | Integration tests for write pipeline | T2.8 | [ ] |
-| T5.6 | Integration tests for read pipeline | T3.6 | [ ] |
-| T5.7 | Integration tests for tamper detection + attribution | T3.9 | [ ] |
-| T5.8 | Integration tests for recovery scenarios | T4.4 | [ ] |
-| T5.9 | Integration tests for correction workflow | T4.5 | [ ] |
-| T5.10 | Performance benchmarks | T4.* | [ ] |
-| T5.11 | XML documentation for all public APIs | T4.* | [ ] |
-| T5.12 | Update CLAUDE.md with tamper-proof documentation | T5.11 | [ ] |
+| T6.1 | Unit tests for integrity provider | T1.2 | [ ] |
+| T6.2 | Unit tests for blockchain provider | T1.4 | [ ] |
+| T6.3 | Unit tests for WORM provider | T1.6 | [ ] |
+| T6.4 | Unit tests for access log provider | T1.8 | [ ] |
+| T6.5 | Integration tests for write pipeline | T2.8 | [ ] |
+| T6.6 | Integration tests for read pipeline | T3.6 | [ ] |
+| T6.7 | Integration tests for tamper detection + attribution | T3.9 | [ ] |
+| T6.8 | Integration tests for recovery scenarios | T4.4 | [ ] |
+| T6.9 | Integration tests for correction workflow | T4.5 | [ ] |
+| T6.10 | Integration tests for degradation state transitions | T4.8 | [ ] |
+| T6.11 | Integration tests for hardware WORM providers | T4.11 | [ ] |
+| T6.12 | Performance benchmarks | T4.* | [ ] |
+| T6.13 | XML documentation for all public APIs | T4.* | [ ] |
+| T6.14 | Update CLAUDE.md with tamper-proof documentation | T6.13 | [ ] |
 
 ---
 
@@ -1160,6 +1183,149 @@ Plugins/
     ├── DefaultAccessLogPlugin.cs
     └── DataWarehouse.Plugins.AccessLog.csproj
 ```
+
+---
+
+### Security Level Quick Reference
+
+| Level | Integrity | Blockchain | WORM | Encryption | Padding | Use Case |
+|-------|-----------|------------|------|------------|---------|----------|
+| `Minimal` | SHA-256 | None | None | None | None | Development/testing only |
+| `Basic` | SHA-256 | Local (file) | Software | AES-256 | None | Small business, non-regulated |
+| `Standard` | SHA-384 | Local (file) | Software | AES-256-GCM | Content | General enterprise |
+| `Enhanced` | SHA-512 | Raft consensus | Software | AES-256-GCM | Content+Shard | Regulated industries |
+| `High` | Blake3 | Raft + external anchor | Hardware (S3/Azure) | Envelope | Full | Financial, healthcare |
+| `Maximum` | Blake3+HMAC | Raft + public blockchain | Hardware + geo-replicated | Kyber+AES | Full+Chaff | Government, military |
+
+---
+
+### Key Design Decisions
+
+#### 1. Blockchain Batching Strategy
+- **Single-object mode:** Immediate anchor after each write (highest integrity, higher latency)
+- **Batch mode:** Collect N objects or wait T seconds, then anchor with Merkle root (better throughput)
+- **Raft consensus mode:** Anchor must be confirmed by majority of nodes before success
+- **External anchor mode:** Periodically anchor Merkle root to public blockchain (Bitcoin, Ethereum)
+
+#### 2. WORM Implementation Choices
+| Type | Provider | Bypass Possible | Use Case |
+|------|----------|-----------------|----------|
+| Software | `SoftwareWormPlugin` | Admin override (logged) | Development, testing, small deployments |
+| S3 Object Lock | `S3ObjectLockWormPlugin` | Not possible (AWS enforced) | AWS-hosted production |
+| Azure Immutable | `AzureImmutableBlobWormPlugin` | Not possible (Azure enforced) | Azure-hosted production |
+| Geo-WORM | `GeoWormPlugin` | Requires multiple region compromise | Maximum security |
+
+#### 3. Correction Flow (Append-Only)
+```
+Original Data (v1) → Hash₁ → Blockchain₁
+                              │
+Correction Request ──────────►│
+                              ▼
+New Data (v2) → Hash₂ → Blockchain₂ (includes reference to v1)
+                              │
+                              ▼
+v1 marked as "superseded" but NEVER deleted
+Both v1 and v2 remain in WORM forever
+```
+
+#### 4. Transactional Write Strategy with WORM Orphan Handling
+```
+BEGIN TRANSACTION
+  ├─ Write to Data Instance (shards)
+  ├─ Write to Metadata Instance (manifest)
+  ├─ Write to WORM Instance (full blob) ← Cannot rollback!
+  └─ Queue blockchain anchor
+
+IF ANY STEP FAILS:
+  ├─ Rollback Data Instance
+  ├─ Rollback Metadata Instance
+  ├─ WORM: Mark as orphan (cannot delete)
+  │   └─ Orphan record: { guid, timestamp, reason: "tx_rollback" }
+  └─ Cancel blockchain anchor
+
+Orphan cleanup: Background process can mark orphans for eventual compliance expiry
+```
+
+---
+
+### Storage Tier Configuration
+
+Users configure storage instances independently. Each instance can use any compatible storage provider:
+
+| Instance | Purpose | Required | Example Configurations |
+|----------|---------|----------|------------------------|
+| `data` | Live RAID shards | Yes | LocalStorage, S3, Azure Blob, MinIO |
+| `metadata` | Manifests, indexes | Yes | Same as data, or dedicated fast storage |
+| `worm` | Immutable backup | Recommended | S3 Object Lock, Azure Immutable, Software WORM |
+| `blockchain` | Anchor records | Recommended | Local file, Raft cluster, external chain |
+
+**Configuration Example:**
+```csharp
+var config = new TamperProofConfiguration
+{
+    StorageInstances = new Dictionary<string, string>
+    {
+        ["data"] = "s3://my-bucket/data/",
+        ["metadata"] = "s3://my-bucket/metadata/",
+        ["worm"] = "s3://my-worm-bucket/?objectLock=true",
+        ["blockchain"] = "local://./blockchain/"
+    },
+    SecurityLevel = SecurityLevel.Enhanced,
+    RaidConfiguration = RaidConfiguration.Raid6(dataShards: 8, parityShards: 2),
+    HashAlgorithm = HashAlgorithmType.SHA512,
+    BlockchainMode = BlockchainMode.RaftConsensus,
+    WormMode = WormMode.HardwareIntegrated
+};
+```
+
+---
+
+### Content Padding vs Shard Padding
+
+| Type | When Applied | Covered by Hash | Purpose |
+|------|--------------|-----------------|---------|
+| **Content Padding** | Phase 1 (user transformations) | Yes | Hides true data size from observers |
+| **Shard Padding** | Phase 3 (RAID distribution) | No (shard-level only) | Uniform shard sizes for RAID efficiency |
+
+**Content Padding:** User-configurable, applied before integrity hash. Adds random bytes to obscure actual data length. Useful when data size itself is sensitive information.
+
+**Shard Padding:** System-applied, after integrity hash. Pads final shard to match others for uniform RAID stripe size. Not security-relevant, purely for storage efficiency.
+
+---
+
+### Tamper Attribution
+
+When tampering is detected, the system analyzes access logs to attribute responsibility:
+
+| Scenario | Attribution Confidence | Evidence |
+|----------|------------------------|----------|
+| Single accessor in window | High | Only one principal touched the data |
+| Multiple accessors | Medium | List of suspects provided |
+| No logged access | External/Physical | Indicates bypass of normal access paths |
+| Access log also tampered | Very Low | Sophisticated attack, forensic investigation needed |
+
+Attribution data is included in `TamperIncidentReport` for compliance and incident response.
+
+---
+
+### Mandatory Write Comments
+
+Like git commits, every write operation requires metadata:
+
+```csharp
+var context = new WriteContext
+{
+    Author = "john.doe@company.com",      // Required: Principal performing write
+    Comment = "Q4 2025 financial report", // Required: Human-readable description
+    SessionId = Guid.NewGuid(),           // Optional: Correlate related writes
+    ClientIp = "192.168.1.100",           // Auto-captured: Client IP address
+    Timestamp = DateTimeOffset.UtcNow     // Auto-set: UTC timestamp
+};
+
+await tamperProof.SecureWriteAsync(objectId, data, context, cancellationToken);
+```
+
+This creates a complete audit trail for every change, enabling compliance reporting and forensic investigation.
 
 ---
 
