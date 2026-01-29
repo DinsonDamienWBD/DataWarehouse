@@ -1230,6 +1230,92 @@ public record OrphanedWormRecord
 | T4.20.3 | ↳ Salted-HMAC-SHA3-256 | T4.20 | [ ] |
 | T4.20.4 | ↳ Salted-HMAC-SHA3-512 | T4.20 | [ ] |
 
+**Additional Compression Algorithms:**
+| Task | Description | Dependencies | Status |
+|------|-------------|--------------|--------|
+| T4.21 | Implement classic/simple compression algorithms | T4.20 | [ ] |
+| T4.21.1 | ↳ RLE (Run-Length Encoding) | T4.21 | [ ] |
+| T4.21.2 | ↳ Huffman coding | T4.21 | [ ] |
+| T4.21.3 | ↳ LZW (Lempel-Ziv-Welch) | T4.21 | [ ] |
+| T4.22 | Implement dictionary-based compression | T4.21 | [ ] |
+| T4.22.1 | ↳ BZip2 (Burrows-Wheeler + Huffman) | T4.22 | [ ] |
+| T4.22.2 | ↳ LZMA (7-Zip algorithm) | T4.22 | [ ] |
+| T4.22.3 | ↳ LZMA2 (improved LZMA with streaming) | T4.22 | [ ] |
+| T4.22.4 | ↳ Snappy (Google, optimized for speed) | T4.22 | [ ] |
+| T4.23 | Implement statistical/context compression | T4.22 | [ ] |
+| T4.23.1 | ↳ PPM (Prediction by Partial Matching) | T4.23 | [ ] |
+| T4.23.2 | ↳ NNCP (Neural Network Compression) | T4.23 | [ ] |
+| T4.23.3 | ↳ Schumacher Compression | T4.23 | [ ] |
+
+**Compression Algorithm Reference:**
+| Algorithm | Type | Speed | Ratio | Status | Use Case |
+|-----------|------|-------|-------|--------|----------|
+| GZip | Dictionary (DEFLATE) | Fast | Good | ✅ Implemented | General purpose, wide compatibility |
+| Deflate | Dictionary (LZ77+Huffman) | Fast | Good | ✅ Implemented | HTTP compression, ZIP files |
+| Brotli | Dictionary (LZ77+Huffman+Context) | Medium | Better | ✅ Implemented | Web content, text |
+| LZ4 | Dictionary (LZ77) | Very Fast | Lower | ✅ Implemented | Real-time, databases |
+| Zstd | Dictionary (FSE+Huffman) | Fast | Excellent | ✅ Implemented | Best all-around |
+| RLE | Simple | Very Fast | Variable | [ ] Pending | Simple patterns, bitmaps |
+| Huffman | Statistical | Fast | Good | [ ] Pending | Building block, education |
+| LZW | Dictionary | Fast | Good | [ ] Pending | GIF, legacy systems |
+| BZip2 | Block-sorting | Slow | Excellent | [ ] Pending | Large files, archives |
+| LZMA/LZMA2 | Dictionary | Slow | Best | [ ] Pending | 7-Zip, XZ archives |
+| Snappy | Dictionary | Very Fast | Lower | [ ] Pending | Google systems, speed-critical |
+| PPM | Statistical | Slow | Excellent | [ ] Pending | Text, high compression |
+| NNCP | Neural | Very Slow | Best | [ ] Pending | Research, maximum compression |
+| Schumacher | Proprietary | Variable | Variable | [ ] Pending | Specialized use cases |
+
+**Additional Encryption Algorithms:**
+| Task | Description | Dependencies | Status |
+|------|-------------|--------------|--------|
+| T4.24 | Implement historical/educational ciphers (NOT for production) | T4.23 | [ ] |
+| T4.24.1 | ↳ Caesar/ROT13 (educational only) | T4.24 | [ ] |
+| T4.24.2 | ↳ XOR cipher (educational only) | T4.24 | [ ] |
+| T4.24.3 | ↳ Vigenère cipher (educational only) | T4.24 | [ ] |
+| T4.25 | Implement legacy ciphers (compatibility only, NOT recommended) | T4.24 | [ ] |
+| T4.25.1 | ↳ DES (56-bit, legacy compatibility) | T4.25 | [ ] |
+| T4.25.2 | ↳ 3DES/Triple-DES (112/168-bit, legacy) | T4.25 | [ ] |
+| T4.25.3 | ↳ RC4 (stream cipher, legacy/WEP) | T4.25 | [ ] |
+| T4.25.4 | ↳ Blowfish (64-bit block, legacy) | T4.25 | [ ] |
+| T4.26 | Implement AES key size variants | T4.25 | [ ] |
+| T4.26.1 | ↳ AES-128-GCM | T4.26 | [ ] |
+| T4.26.2 | ↳ AES-192-GCM | T4.26 | [ ] |
+| T4.26.3 | ↳ AES-256-CBC (for compatibility) | T4.26 | [ ] |
+| T4.26.4 | ↳ AES-256-CTR (counter mode) | T4.26 | [ ] |
+| T4.26.5 | ↳ AES-NI hardware acceleration detection | T4.26 | [ ] |
+| T4.27 | Implement asymmetric/public-key encryption | T4.26 | [ ] |
+| T4.27.1 | ↳ RSA-2048 | T4.27 | [ ] |
+| T4.27.2 | ↳ RSA-4096 | T4.27 | [ ] |
+| T4.27.3 | ↳ ECDH/ECDSA (Elliptic Curve) | T4.27 | [ ] |
+| T4.28 | Implement post-quantum cryptography | T4.27 | [ ] |
+| T4.28.1 | ↳ ML-KEM (Kyber, NIST PQC standard) | T4.28 | [ ] |
+| T4.28.2 | ↳ ML-DSA (Dilithium, signatures) | T4.28 | [ ] |
+| T4.29 | Implement special-purpose encryption | T4.28 | [ ] |
+| T4.29.1 | ↳ One-Time Pad (OTP, theoretical perfect secrecy) | T4.29 | [ ] |
+| T4.29.2 | ↳ XTS-AES (disk encryption mode) | T4.29 | [ ] |
+
+**Encryption Algorithm Reference:**
+| Algorithm | Type | Key Size | Status | Security | Use Case |
+|-----------|------|----------|--------|----------|----------|
+| AES-256-GCM | Symmetric | 256-bit | ✅ Implemented | Strong | Primary encryption |
+| ChaCha20-Poly1305 | Symmetric | 256-bit | ✅ Implemented | Strong | Mobile, no AES-NI |
+| Twofish | Symmetric | 256-bit | ✅ Implemented | Strong | AES finalist |
+| Serpent | Symmetric | 256-bit | ✅ Implemented | Very Strong | High security |
+| FIPS | Symmetric | Various | ✅ Implemented | Certified | Government compliance |
+| Caesar/ROT13 | Substitution | None | [ ] Pending | ❌ None | Educational only |
+| XOR | Stream | Variable | [ ] Pending | ❌ Weak | Educational only |
+| Vigenère | Substitution | Variable | [ ] Pending | ❌ Weak | Educational only |
+| DES | Symmetric | 56-bit | [ ] Pending | ❌ Broken | Legacy compatibility |
+| 3DES | Symmetric | 112/168-bit | [ ] Pending | ⚠️ Weak | Legacy compatibility |
+| RC4 | Stream | 40-2048-bit | [ ] Pending | ❌ Broken | Legacy (WEP) |
+| Blowfish | Symmetric | 32-448-bit | [ ] Pending | ⚠️ Aging | Legacy compatibility |
+| AES-128-GCM | Symmetric | 128-bit | [ ] Pending | Strong | Performance-critical |
+| AES-192-GCM | Symmetric | 192-bit | [ ] Pending | Strong | Middle ground |
+| RSA-2048 | Asymmetric | 2048-bit | [ ] Pending | Strong | Key exchange |
+| RSA-4096 | Asymmetric | 4096-bit | [ ] Pending | Very Strong | High security |
+| ML-KEM (Kyber) | Post-Quantum | Various | [ ] Pending | Quantum-Safe | Future-proof |
+| One-Time Pad | Perfect | ≥ Message | [ ] Pending | Perfect | Theoretical max |
+
 **Integrity Algorithm Reference:**
 | Category | Algorithms | Key Required | Salt | Use Case |
 |----------|------------|--------------|------|----------|
@@ -1417,6 +1503,68 @@ Plugins/
 │   ├── KyberEncryptionPlugin.cs (post-quantum NIST PQC)
 │   └── DataWarehouse.Plugins.Encryption.Kyber.csproj
 │
+│   # Additional Compression Algorithms (T4.21-T4.23)
+├── DataWarehouse.Plugins.Compression.Rle/
+│   ├── RleCompressionPlugin.cs (Run-Length Encoding)
+│   └── DataWarehouse.Plugins.Compression.Rle.csproj
+├── DataWarehouse.Plugins.Compression.Huffman/
+│   ├── HuffmanCompressionPlugin.cs (Huffman coding)
+│   └── DataWarehouse.Plugins.Compression.Huffman.csproj
+├── DataWarehouse.Plugins.Compression.Lzw/
+│   ├── LzwCompressionPlugin.cs (Lempel-Ziv-Welch)
+│   └── DataWarehouse.Plugins.Compression.Lzw.csproj
+├── DataWarehouse.Plugins.Compression.Bzip2/
+│   ├── Bzip2CompressionPlugin.cs (Burrows-Wheeler + Huffman)
+│   └── DataWarehouse.Plugins.Compression.Bzip2.csproj
+├── DataWarehouse.Plugins.Compression.Lzma/
+│   ├── LzmaCompressionPlugin.cs (LZMA/LZMA2, 7-Zip)
+│   └── DataWarehouse.Plugins.Compression.Lzma.csproj
+├── DataWarehouse.Plugins.Compression.Snappy/
+│   ├── SnappyCompressionPlugin.cs (Google, speed-optimized)
+│   └── DataWarehouse.Plugins.Compression.Snappy.csproj
+├── DataWarehouse.Plugins.Compression.Ppm/
+│   ├── PpmCompressionPlugin.cs (Prediction by Partial Matching)
+│   └── DataWarehouse.Plugins.Compression.Ppm.csproj
+├── DataWarehouse.Plugins.Compression.Nncp/
+│   ├── NncpCompressionPlugin.cs (Neural Network Compression)
+│   └── DataWarehouse.Plugins.Compression.Nncp.csproj
+├── DataWarehouse.Plugins.Compression.Schumacher/
+│   ├── SchumacherCompressionPlugin.cs (Schumacher algorithm)
+│   └── DataWarehouse.Plugins.Compression.Schumacher.csproj
+│
+│   # Additional Encryption Algorithms (T4.24-T4.29)
+├── DataWarehouse.Plugins.Encryption.Educational/
+│   ├── CaesarCipherPlugin.cs (Caesar/ROT13, educational)
+│   ├── XorCipherPlugin.cs (XOR cipher, educational)
+│   ├── VigenereCipherPlugin.cs (Vigenère cipher, educational)
+│   └── DataWarehouse.Plugins.Encryption.Educational.csproj
+├── DataWarehouse.Plugins.Encryption.Legacy/
+│   ├── DesEncryptionPlugin.cs (DES, legacy compatibility)
+│   ├── TripleDesEncryptionPlugin.cs (3DES, legacy)
+│   ├── Rc4EncryptionPlugin.cs (RC4/WEP, legacy)
+│   ├── BlowfishEncryptionPlugin.cs (Blowfish, legacy)
+│   └── DataWarehouse.Plugins.Encryption.Legacy.csproj
+├── DataWarehouse.Plugins.Encryption.AesVariants/
+│   ├── Aes128GcmPlugin.cs (AES-128-GCM)
+│   ├── Aes192GcmPlugin.cs (AES-192-GCM)
+│   ├── Aes256CbcPlugin.cs (AES-256-CBC)
+│   ├── Aes256CtrPlugin.cs (AES-256-CTR)
+│   ├── AesNiDetector.cs (Hardware acceleration)
+│   └── DataWarehouse.Plugins.Encryption.AesVariants.csproj
+├── DataWarehouse.Plugins.Encryption.Asymmetric/
+│   ├── Rsa2048Plugin.cs (RSA-2048)
+│   ├── Rsa4096Plugin.cs (RSA-4096)
+│   ├── EcdhPlugin.cs (Elliptic Curve Diffie-Hellman)
+│   └── DataWarehouse.Plugins.Encryption.Asymmetric.csproj
+├── DataWarehouse.Plugins.Encryption.PostQuantum/
+│   ├── MlKemPlugin.cs (ML-KEM/Kyber)
+│   ├── MlDsaPlugin.cs (ML-DSA/Dilithium)
+│   └── DataWarehouse.Plugins.Encryption.PostQuantum.csproj
+├── DataWarehouse.Plugins.Encryption.Special/
+│   ├── OneTimePadPlugin.cs (OTP, perfect secrecy)
+│   ├── XtsAesPlugin.cs (XTS-AES disk encryption)
+│   └── DataWarehouse.Plugins.Encryption.Special.csproj
+│
 │   # Ultra Paranoid Padding/Obfuscation (T5.3)
 ├── DataWarehouse.Plugins.Padding.Chaff/
 │   ├── ChaffPaddingPlugin.cs (traffic analysis protection)
@@ -1432,7 +1580,7 @@ Plugins/
 │   ├── GeoDistributedShardingPlugin.cs (shards across continents)
 │   └── DataWarehouse.Plugins.GeoDistributedSharding.csproj
 │
-│   # Ultra Paranoid Compression (T5.7-T5.9)
+│   # Ultra Paranoid Compression (T5.7-T5.9) - Extreme ratios
 ├── DataWarehouse.Plugins.Compression.Paq/
 │   ├── PaqCompressionPlugin.cs (PAQ8/PAQ9 extreme compression)
 │   └── DataWarehouse.Plugins.Compression.Paq.csproj
