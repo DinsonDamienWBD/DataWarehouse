@@ -1267,67 +1267,68 @@ public record OrphanedWormRecord
 
 **Additional Encryption Algorithms:**
 
-> **IMPORTANT: Composable Key Management Requirement**
-> All new encryption plugins that require keys MUST use the `IKeyStore` interface for composable key management.
-> This allows users to pair ANY encryption algorithm with ANY key management plugin at runtime:
-> - `FileKeyStorePlugin` (local DPAPI/CredentialManager/PBKDF2)
-> - `VaultKeyStorePlugin` (HSM: HashiCorp Vault, Azure Key Vault, AWS KMS, Google KMS)
-> - `KeyRotationPlugin` (key rotation layer wrapping any IKeyStore)
-> - `ShamirSecretPlugin` (M-of-N key splitting) [T5.4]
-> - Future key management plugins
+> **CRITICAL: All New Encryption Plugins MUST Extend `EncryptionPluginBase`**
 >
-> **Exception:** Educational/historical ciphers (T4.24) may skip IKeyStore if they don't use proper keys.
+> **DEPENDENCY:** T4.25-T4.29 depend on T5.0 (SDK Base Classes). Complete T5.0 first.
+>
+> After T5.0 completion, ALL new encryption plugins (except educational ciphers):
+> - **MUST extend `EncryptionPluginBase`** (NOT `PipelinePluginBase` directly)
+> - Get composable key management (Direct and Envelope modes) for free via inheritance
+> - Only need to implement algorithm-specific `EncryptCoreAsync()` and `DecryptCoreAsync()`
+> - Automatically support pairing with ANY `IKeyStore` or `IEnvelopeKeyStore`
+>
+> **Exception:** Educational/historical ciphers (T4.24) may extend `PipelinePluginBase` directly if no real key management.
 
-| Task | Description | Dependencies | Status |
-|------|-------------|--------------|--------|
-| T4.24 | Implement historical/educational ciphers (NOT for production, no IKeyStore) | T4.23 | [ ] |
-| T4.24.1 | ↳ Caesar/ROT13 (educational only, no key management) | T4.24 | [ ] |
-| T4.24.2 | ↳ XOR cipher (educational only, no key management) | T4.24 | [ ] |
-| T4.24.3 | ↳ Vigenère cipher (educational only, no key management) | T4.24 | [ ] |
-| T4.25 | Implement legacy ciphers (compatibility only, **MUST use IKeyStore**) | T4.24 | [ ] |
-| T4.25.1 | ↳ DES (56-bit, legacy, uses IKeyStore) | T4.25 | [ ] |
-| T4.25.2 | ↳ 3DES/Triple-DES (112/168-bit, legacy, uses IKeyStore) | T4.25 | [ ] |
-| T4.25.3 | ↳ RC4 (stream cipher, legacy/WEP, uses IKeyStore) | T4.25 | [ ] |
-| T4.25.4 | ↳ Blowfish (64-bit block, legacy, uses IKeyStore) | T4.25 | [ ] |
-| T4.26 | Implement AES key size variants (**MUST use IKeyStore**) | T4.25 | [ ] |
-| T4.26.1 | ↳ AES-128-GCM (uses IKeyStore) | T4.26 | [ ] |
-| T4.26.2 | ↳ AES-192-GCM (uses IKeyStore) | T4.26 | [ ] |
-| T4.26.3 | ↳ AES-256-CBC (for compatibility, uses IKeyStore) | T4.26 | [ ] |
-| T4.26.4 | ↳ AES-256-CTR (counter mode, uses IKeyStore) | T4.26 | [ ] |
-| T4.26.5 | ↳ AES-NI hardware acceleration detection | T4.26 | [ ] |
-| T4.27 | Implement asymmetric/public-key encryption (**MUST use IKeyStore**) | T4.26 | [ ] |
-| T4.27.1 | ↳ RSA-2048 (uses IKeyStore for private key) | T4.27 | [ ] |
-| T4.27.2 | ↳ RSA-4096 (uses IKeyStore for private key) | T4.27 | [ ] |
-| T4.27.3 | ↳ ECDH/ECDSA (Elliptic Curve, uses IKeyStore) | T4.27 | [ ] |
-| T4.28 | Implement post-quantum cryptography (**MUST use IKeyStore**) | T4.27 | [ ] |
-| T4.28.1 | ↳ ML-KEM (Kyber, NIST PQC standard, uses IKeyStore) | T4.28 | [ ] |
-| T4.28.2 | ↳ ML-DSA (Dilithium, signatures, uses IKeyStore) | T4.28 | [ ] |
-| T4.29 | Implement special-purpose encryption (**MUST use IKeyStore**) | T4.28 | [ ] |
-| T4.29.1 | ↳ One-Time Pad (OTP, uses IKeyStore for pad storage) | T4.29 | [ ] |
-| T4.29.2 | ↳ XTS-AES (disk encryption mode, uses IKeyStore) | T4.29 | [ ] |
+| Task | Description | Base Class | Dependencies | Status |
+|------|-------------|------------|--------------|--------|
+| T4.24 | Implement historical/educational ciphers (NOT for production) | `PipelinePluginBase` | T4.23 | [ ] |
+| T4.24.1 | ↳ Caesar/ROT13 (educational only) | `PipelinePluginBase` | T4.24 | [ ] |
+| T4.24.2 | ↳ XOR cipher (educational only) | `PipelinePluginBase` | T4.24 | [ ] |
+| T4.24.3 | ↳ Vigenère cipher (educational only) | `PipelinePluginBase` | T4.24 | [ ] |
+| T4.25 | Implement legacy ciphers (compatibility only) | `EncryptionPluginBase` | T5.0, T4.24 | [ ] |
+| T4.25.1 | ↳ DES (56-bit, legacy) | `EncryptionPluginBase` | T4.25 | [ ] |
+| T4.25.2 | ↳ 3DES/Triple-DES (112/168-bit, legacy) | `EncryptionPluginBase` | T4.25 | [ ] |
+| T4.25.3 | ↳ RC4 (stream cipher, legacy/WEP) | `EncryptionPluginBase` | T4.25 | [ ] |
+| T4.25.4 | ↳ Blowfish (64-bit block, legacy) | `EncryptionPluginBase` | T4.25 | [ ] |
+| T4.26 | Implement AES key size variants | `EncryptionPluginBase` | T5.0, T4.25 | [ ] |
+| T4.26.1 | ↳ AES-128-GCM | `EncryptionPluginBase` | T4.26 | [ ] |
+| T4.26.2 | ↳ AES-192-GCM | `EncryptionPluginBase` | T4.26 | [ ] |
+| T4.26.3 | ↳ AES-256-CBC (for compatibility) | `EncryptionPluginBase` | T4.26 | [ ] |
+| T4.26.4 | ↳ AES-256-CTR (counter mode) | `EncryptionPluginBase` | T4.26 | [ ] |
+| T4.26.5 | ↳ AES-NI hardware acceleration detection | - | T4.26 | [ ] |
+| T4.27 | Implement asymmetric/public-key encryption | `EncryptionPluginBase` | T5.0, T4.26 | [ ] |
+| T4.27.1 | ↳ RSA-2048 | `EncryptionPluginBase` | T4.27 | [ ] |
+| T4.27.2 | ↳ RSA-4096 | `EncryptionPluginBase` | T4.27 | [ ] |
+| T4.27.3 | ↳ ECDH/ECDSA (Elliptic Curve) | `EncryptionPluginBase` | T4.27 | [ ] |
+| T4.28 | Implement post-quantum cryptography | `EncryptionPluginBase` | T5.0, T4.27 | [ ] |
+| T4.28.1 | ↳ ML-KEM (Kyber, NIST PQC standard) | `EncryptionPluginBase` | T4.28 | [ ] |
+| T4.28.2 | ↳ ML-DSA (Dilithium, signatures) | `EncryptionPluginBase` | T4.28 | [ ] |
+| T4.29 | Implement special-purpose encryption | `EncryptionPluginBase` | T5.0, T4.28 | [ ] |
+| T4.29.1 | ↳ One-Time Pad (OTP) | `EncryptionPluginBase` | T4.29 | [ ] |
+| T4.29.2 | ↳ XTS-AES (disk encryption mode) | `EncryptionPluginBase` | T4.29 | [ ] |
 
 **Encryption Algorithm Reference:**
-| Algorithm | Type | Key Size | IKeyStore | Status | Security | Use Case |
-|-----------|------|----------|-----------|--------|----------|----------|
-| AES-256-GCM | Symmetric | 256-bit | ✅ Yes | ✅ Implemented | Strong | Primary encryption |
-| ChaCha20-Poly1305 | Symmetric | 256-bit | ✅ Yes | ✅ Implemented | Strong | Mobile, no AES-NI |
-| Twofish | Symmetric | 256-bit | ✅ Yes | ✅ Implemented | Strong | AES finalist |
-| Serpent | Symmetric | 256-bit | ✅ Yes | ✅ Implemented | Very Strong | High security |
-| FIPS | Symmetric | Various | ✅ Yes | ✅ Implemented | Certified | Government compliance |
-| ZeroKnowledge | Symmetric | 256-bit | ✅ Yes | ✅ Implemented | Strong | Client-side + ZK proofs |
-| Caesar/ROT13 | Substitution | None | ❌ No | [ ] Pending | ❌ None | Educational only |
-| XOR | Stream | Variable | ❌ No | [ ] Pending | ❌ Weak | Educational only |
-| Vigenère | Substitution | Variable | ❌ No | [ ] Pending | ❌ Weak | Educational only |
-| DES | Symmetric | 56-bit | ✅ Yes | [ ] Pending | ❌ Broken | Legacy compatibility |
-| 3DES | Symmetric | 112/168-bit | ✅ Yes | [ ] Pending | ⚠️ Weak | Legacy compatibility |
-| RC4 | Stream | 40-2048-bit | ✅ Yes | [ ] Pending | ❌ Broken | Legacy (WEP) |
-| Blowfish | Symmetric | 32-448-bit | ✅ Yes | [ ] Pending | ⚠️ Aging | Legacy compatibility |
-| AES-128-GCM | Symmetric | 128-bit | ✅ Yes | [ ] Pending | Strong | Performance-critical |
-| AES-192-GCM | Symmetric | 192-bit | ✅ Yes | [ ] Pending | Strong | Middle ground |
-| RSA-2048 | Asymmetric | 2048-bit | ✅ Yes | [ ] Pending | Strong | Key exchange |
-| RSA-4096 | Asymmetric | 4096-bit | ✅ Yes | [ ] Pending | Very Strong | High security |
-| ML-KEM (Kyber) | Post-Quantum | Various | ✅ Yes | [ ] Pending | Quantum-Safe | Future-proof |
-| One-Time Pad | Perfect | ≥ Message | ✅ Yes | [ ] Pending | Perfect | Theoretical max |
+| Algorithm | Type | Key Size | Base Class | Envelope Mode | Status | Security | Use Case |
+|-----------|------|----------|------------|---------------|--------|----------|----------|
+| AES-256-GCM | Symmetric | 256-bit | `EncryptionPluginBase` | ✅ Supported | ✅ Implemented | Strong | Primary encryption |
+| ChaCha20-Poly1305 | Symmetric | 256-bit | `EncryptionPluginBase` | ✅ Supported | ✅ Implemented | Strong | Mobile, no AES-NI |
+| Twofish | Symmetric | 256-bit | `EncryptionPluginBase` | ✅ Supported | ✅ Implemented | Strong | AES finalist |
+| Serpent | Symmetric | 256-bit | `EncryptionPluginBase` | ✅ Supported | ✅ Implemented | Very Strong | High security |
+| FIPS | Symmetric | Various | `EncryptionPluginBase` | ✅ Supported | ✅ Implemented | Certified | Government compliance |
+| ZeroKnowledge | Symmetric | 256-bit | `EncryptionPluginBase` | ✅ Supported | ✅ Implemented | Strong | Client-side + ZK proofs |
+| Caesar/ROT13 | Substitution | None | `PipelinePluginBase` | ❌ N/A | [ ] Pending | ❌ None | Educational only |
+| XOR | Stream | Variable | `PipelinePluginBase` | ❌ N/A | [ ] Pending | ❌ Weak | Educational only |
+| Vigenère | Substitution | Variable | `PipelinePluginBase` | ❌ N/A | [ ] Pending | ❌ Weak | Educational only |
+| DES | Symmetric | 56-bit | `EncryptionPluginBase` | ✅ Supported | [ ] Pending | ❌ Broken | Legacy compatibility |
+| 3DES | Symmetric | 112/168-bit | `EncryptionPluginBase` | ✅ Supported | [ ] Pending | ⚠️ Weak | Legacy compatibility |
+| RC4 | Stream | 40-2048-bit | `EncryptionPluginBase` | ✅ Supported | [ ] Pending | ❌ Broken | Legacy (WEP) |
+| Blowfish | Symmetric | 32-448-bit | `EncryptionPluginBase` | ✅ Supported | [ ] Pending | ⚠️ Aging | Legacy compatibility |
+| AES-128-GCM | Symmetric | 128-bit | `EncryptionPluginBase` | ✅ Supported | [ ] Pending | Strong | Performance-critical |
+| AES-192-GCM | Symmetric | 192-bit | `EncryptionPluginBase` | ✅ Supported | [ ] Pending | Strong | Middle ground |
+| RSA-2048 | Asymmetric | 2048-bit | `EncryptionPluginBase` | ✅ Supported | [ ] Pending | Strong | Key exchange |
+| RSA-4096 | Asymmetric | 4096-bit | `EncryptionPluginBase` | ✅ Supported | [ ] Pending | Very Strong | High security |
+| ML-KEM (Kyber) | Post-Quantum | Various | `EncryptionPluginBase` | ✅ Supported | [ ] Pending | Quantum-Safe | Future-proof |
+| One-Time Pad | Perfect | ≥ Message | `EncryptionPluginBase` | ✅ Supported | [ ] Pending | Perfect | Theoretical max |
 
 ---
 
@@ -1523,7 +1524,434 @@ internal interface IVaultBackend
 
 ---
 
+### T5.0: SDK Base Classes and Plugin Refactoring (FOUNDATION - Must Complete First)
+
+> **CRITICAL: This section establishes the SDK foundation that ALL encryption and key management work depends on.**
+>
+> **Problem Identified:** Currently, all 6 encryption plugins and all key management plugins have duplicated code for:
+> - Key management (getting keys, security context validation)
+> - Key caching and initialization patterns
+> - Statistics tracking and message handling
+>
+> **Solution:** Create abstract base classes in the SDK that provide common functionality, then refactor existing plugins to extend these base classes. All new plugins MUST extend these base classes.
+
+#### Current Plugin Hierarchy (What Exists Today)
+
+```
+PluginBase (SDK)
+├── DataTransformationPluginBase (SDK, IDataTransformation)
+│   └── PipelinePluginBase (SDK, for ordered pipeline stages)
+│       └── AesEncryptionPlugin, ChaCha20EncryptionPlugin, etc. (Plugins)
+│           └── ⚠️ DUPLICATED: Key management logic in each plugin
+│
+├── SecurityProviderPluginBase (SDK)
+│   └── FileKeyStorePlugin, VaultKeyStorePlugin (Plugins, implement IKeyStore)
+│       └── ⚠️ DUPLICATED: Caching, initialization, validation logic
+```
+
+#### Target Plugin Hierarchy (After T5.0)
+
+```
+PluginBase (SDK)
+├── DataTransformationPluginBase (SDK, IDataTransformation)
+│   └── PipelinePluginBase (SDK)
+│       └── EncryptionPluginBase (SDK, NEW - T5.0.1) ◄── Common key management
+│           └── AesEncryptionPlugin, ChaCha20EncryptionPlugin, etc. (Refactored)
+│
+├── SecurityProviderPluginBase (SDK)
+│   └── KeyStorePluginBase (SDK, NEW - T5.0.2, implements IKeyStore) ◄── Common caching
+│       └── FileKeyStorePlugin, VaultKeyStorePlugin (Refactored)
+```
+
+---
+
+#### T5.0.1: SDK Types for Composable Key Management
+
+| Task | Component | Location | Description | Status |
+|------|-----------|----------|-------------|--------|
+| T5.0.1 | SDK Key Management Types | DataWarehouse.SDK/Security/ | Shared types for key management | [ ] |
+| T5.0.1.1 | `KeyManagementMode` enum | IKeyStore.cs | `Direct` (key from IKeyStore) vs `Envelope` (DEK wrapped by HSM KEK) | [ ] |
+| T5.0.1.2 | `IEnvelopeKeyStore` interface | IKeyStore.cs | Extends IKeyStore with `WrapKeyAsync`/`UnwrapKeyAsync` | [ ] |
+| T5.0.1.3 | `EnvelopeHeader` class | EnvelopeHeader.cs | Serialize/deserialize envelope header: WrappedDEK, KekId, etc. | [ ] |
+| T5.0.1.4 | `EncryptionMetadata` record | EncryptionMetadata.cs | Full metadata: plugin ID, mode, key IDs, algorithm params | [ ] |
+
+**KeyManagementMode Enum:**
+```csharp
+/// <summary>
+/// Determines how encryption keys are managed.
+/// User-configurable option for all encryption plugins.
+/// </summary>
+public enum KeyManagementMode
+{
+    /// <summary>
+    /// Direct mode (DEFAULT): Key is retrieved directly from any IKeyStore.
+    /// Works with: FileKeyStorePlugin, VaultKeyStorePlugin, KeyRotationPlugin, etc.
+    /// </summary>
+    Direct,
+
+    /// <summary>
+    /// Envelope mode: A unique DEK is generated per object, wrapped by HSM KEK,
+    /// and stored in the ciphertext header. Requires IEnvelopeKeyStore.
+    /// Works with: VaultKeyStorePlugin (or any IEnvelopeKeyStore implementation).
+    /// </summary>
+    Envelope
+}
+```
+
+**IEnvelopeKeyStore Interface:**
+```csharp
+/// <summary>
+/// Extended key store interface that supports envelope encryption operations.
+/// Required for KeyManagementMode.Envelope.
+/// </summary>
+public interface IEnvelopeKeyStore : IKeyStore
+{
+    /// <summary>
+    /// Wrap a Data Encryption Key (DEK) with a Key Encryption Key (KEK).
+    /// The KEK never leaves the HSM.
+    /// </summary>
+    Task<byte[]> WrapKeyAsync(string kekId, byte[] dataKey, ISecurityContext context);
+
+    /// <summary>
+    /// Unwrap a previously wrapped DEK using the KEK in the HSM.
+    /// </summary>
+    Task<byte[]> UnwrapKeyAsync(string kekId, byte[] wrappedKey, ISecurityContext context);
+}
+```
+
+---
+
+#### T5.0.2: KeyStorePluginBase Abstract Class
+
+| Task | Component | Location | Description | Status |
+|------|-----------|----------|-------------|--------|
+| T5.0.2 | `KeyStorePluginBase` | SDK/Contracts/PluginBase.cs | Abstract base for all key management plugins | [ ] |
+| T5.0.2.1 | ↳ Key caching infrastructure | Common | `ConcurrentDictionary<string, CachedKey>`, cache expiration | [ ] |
+| T5.0.2.2 | ↳ Initialization pattern | Common | `EnsureInitializedAsync()`, thread-safe init with `SemaphoreSlim` | [ ] |
+| T5.0.2.3 | ↳ Security context validation | Common | `ValidateAccess()`, `ValidateAdminAccess()` | [ ] |
+| T5.0.2.4 | ↳ Standard message handling | Common | `keystore.*.create`, `keystore.*.get`, `keystore.*.rotate` | [ ] |
+| T5.0.2.5 | ↳ Abstract storage methods | Abstract | `LoadKeyFromStorageAsync()`, `SaveKeyToStorageAsync()` | [ ] |
+
+**KeyStorePluginBase Design:**
+```csharp
+/// <summary>
+/// Abstract base class for all key management plugins.
+/// Provides common caching, initialization, and validation logic.
+/// All key management plugins MUST extend this class.
+/// </summary>
+public abstract class KeyStorePluginBase : SecurityProviderPluginBase, IKeyStore
+{
+    // COMMON INFRASTRUCTURE (implemented in base)
+    protected readonly ConcurrentDictionary<string, CachedKey> KeyCache;
+    protected readonly SemaphoreSlim InitLock;
+    protected string CurrentKeyId;
+    protected bool Initialized;
+
+    // CONFIGURATION (override in derived classes)
+    protected abstract TimeSpan CacheExpiration { get; }
+    protected abstract int KeySizeBytes { get; }
+    protected virtual bool RequireAuthentication => true;
+    protected virtual bool RequireAdminForCreate => true;
+
+    // IKeyStore IMPLEMENTATION (common logic, calls abstract methods)
+    public async Task<string> GetCurrentKeyIdAsync() { /* uses EnsureInitializedAsync */ }
+    public byte[] GetKey(string keyId) { /* sync wrapper */ }
+    public async Task<byte[]> GetKeyAsync(string keyId, ISecurityContext context) { /* cache + validation + abstract */ }
+    public async Task<byte[]> CreateKeyAsync(string keyId, ISecurityContext context) { /* validation + abstract */ }
+
+    // ABSTRACT METHODS (implement in derived classes)
+    protected abstract Task<byte[]?> LoadKeyFromStorageAsync(string keyId);
+    protected abstract Task SaveKeyToStorageAsync(string keyId, byte[] key);
+    protected abstract Task InitializeStorageAsync();
+
+    // COMMON UTILITIES (used by derived classes)
+    protected async Task EnsureInitializedAsync() { /* thread-safe init pattern */ }
+    protected void ValidateAccess(ISecurityContext context) { /* common validation */ }
+    protected void ValidateAdminAccess(ISecurityContext context) { /* admin validation */ }
+}
+```
+
+---
+
+#### T5.0.3: EncryptionPluginBase Abstract Class
+
+| Task | Component | Location | Description | Status |
+|------|-----------|----------|-------------|--------|
+| T5.0.3 | `EncryptionPluginBase` | SDK/Contracts/PluginBase.cs | Abstract base for all encryption plugins | [ ] |
+| T5.0.3.1 | ↳ Key store resolution | Common | `GetKeyStore()` from args, config, or kernel context | [ ] |
+| T5.0.3.2 | ↳ Security context resolution | Common | `GetSecurityContext()` from args or config | [ ] |
+| T5.0.3.3 | ↳ Key management mode support | Common | `KeyManagementMode` property, Direct vs Envelope | [ ] |
+| T5.0.3.4 | ↳ Envelope key handling | Common | `GetKeyForEncryption()`, `GetKeyForDecryption()` with envelope support | [ ] |
+| T5.0.3.5 | ↳ Statistics tracking | Common | Encryption/decryption counts, bytes processed | [ ] |
+| T5.0.3.6 | ↳ Key access logging | Common | Audit trail for key usage | [ ] |
+| T5.0.3.7 | ↳ Abstract encrypt/decrypt | Abstract | `EncryptCoreAsync()`, `DecryptCoreAsync()` | [ ] |
+
+**EncryptionPluginBase Design:**
+```csharp
+/// <summary>
+/// Abstract base class for all encryption plugins with composable key management.
+/// Provides common key handling, statistics, and envelope mode support.
+/// All encryption plugins MUST extend this class.
+/// </summary>
+public abstract class EncryptionPluginBase : PipelinePluginBase, IDisposable
+{
+    // KEY MANAGEMENT (common infrastructure)
+    protected IKeyStore? KeyStore;
+    protected ISecurityContext? SecurityContext;
+    protected KeyManagementMode KeyManagementMode = KeyManagementMode.Direct;
+    protected IEnvelopeKeyStore? EnvelopeKeyStore;
+    protected string? KekKeyId;
+
+    // STATISTICS (common tracking)
+    protected readonly object StatsLock = new();
+    protected long EncryptionCount;
+    protected long DecryptionCount;
+    protected long TotalBytesEncrypted;
+    protected long TotalBytesDecrypted;
+
+    // KEY ACCESS AUDIT (common)
+    protected readonly ConcurrentDictionary<string, DateTime> KeyAccessLog = new();
+
+    // CONFIGURATION (override in derived classes)
+    protected abstract int KeySizeBytes { get; }  // e.g., 32 for AES-256
+    protected abstract int IvSizeBytes { get; }   // e.g., 12 for GCM
+    protected abstract int TagSizeBytes { get; }  // e.g., 16 for GCM
+
+    // COMMON KEY MANAGEMENT (implemented in base)
+    protected IKeyStore GetKeyStore(Dictionary<string, object> args, IKernelContext context);
+    protected ISecurityContext GetSecurityContext(Dictionary<string, object> args);
+    protected async Task<(byte[] key, string keyId, EnvelopeHeader? envelope)> GetKeyForEncryptionAsync(...);
+    protected async Task<byte[]> GetKeyForDecryptionAsync(EnvelopeHeader? envelope, string? keyId, ...);
+    protected void ValidateKeySize(byte[] key);
+    protected void LogKeyAccess(string keyId);
+    protected void UpdateEncryptionStats(long bytesProcessed);
+    protected void UpdateDecryptionStats(long bytesProcessed);
+
+    // OnWrite/OnRead IMPLEMENTATION (common logic, calls abstract methods)
+    protected override async Task<Stream> OnWriteAsync(...) { /* key mgmt + abstract */ }
+    protected override async Task<Stream> OnReadAsync(...) { /* key mgmt + abstract */ }
+
+    // ABSTRACT METHODS (implement in derived classes - algorithm-specific)
+    protected abstract Task<Stream> EncryptCoreAsync(Stream input, byte[] key, byte[] iv, IKernelContext context);
+    protected abstract Task<(Stream data, byte[] tag)> DecryptCoreAsync(Stream input, byte[] key, IKernelContext context);
+    protected abstract byte[] GenerateIv();
+    protected abstract int CalculateHeaderSize(bool envelopeMode);
+}
+```
+
+**User Configuration (Unified Across All Encryption Plugins):**
+```csharp
+// DIRECT MODE (DEFAULT) - Key from any IKeyStore
+var aesPlugin = new AesEncryptionPlugin(new AesEncryptionConfig
+{
+    KeyManagementMode = KeyManagementMode.Direct,  // Default
+    KeyStore = new FileKeyStorePlugin()            // Or VaultKeyStorePlugin, KeyRotationPlugin, etc.
+});
+
+// ENVELOPE MODE - DEK wrapped by HSM, stored in ciphertext
+var aesEnvelopePlugin = new AesEncryptionPlugin(new AesEncryptionConfig
+{
+    KeyManagementMode = KeyManagementMode.Envelope,
+    EnvelopeKeyStore = new VaultKeyStorePlugin(vaultConfig),  // Must implement IEnvelopeKeyStore
+    KekKeyId = "alias/my-kek"
+});
+
+// Same pattern works for ALL encryption plugins:
+// ChaCha20EncryptionPlugin, TwofishEncryptionPlugin, SerpentEncryptionPlugin,
+// FipsEncryptionPlugin, ZeroKnowledgeEncryptionPlugin, and all future plugins
+```
+
+---
+
+#### T5.0.4: Refactor Existing Key Management Plugins
+
+> **CRITICAL:** All existing key management plugins MUST be refactored to extend `KeyStorePluginBase`.
+> This eliminates duplicated code and ensures consistent behavior.
+
+| Task | Plugin | Current | Target | Description | Status |
+|------|--------|---------|--------|-------------|--------|
+| T5.0.4 | Refactor key management plugins | - | - | Migrate to KeyStorePluginBase | [ ] |
+| T5.0.4.1 | `FileKeyStorePlugin` | `SecurityProviderPluginBase` | `KeyStorePluginBase` | Remove duplicated caching/init, implement abstract storage methods | [ ] |
+| T5.0.4.2 | `VaultKeyStorePlugin` | `SecurityProviderPluginBase` | `KeyStorePluginBase` + `IEnvelopeKeyStore` | Remove duplicated caching/init, implement abstract storage methods, add IEnvelopeKeyStore | [ ] |
+| T5.0.4.3 | `KeyRotationPlugin` | Custom | `KeyStorePluginBase` (decorator) | Verify compatibility with base class pattern | [ ] |
+| T5.0.4.4 | `SecretManagementPlugin` | Custom | Verify/Align | Ensure consistent with KeyStorePluginBase pattern | [ ] |
+
+**FileKeyStorePlugin Refactoring:**
+```csharp
+// BEFORE: Duplicated logic
+public sealed class FileKeyStorePlugin : SecurityProviderPluginBase, IKeyStore
+{
+    private readonly ConcurrentDictionary<string, CachedKey> _keyCache;  // ◄── DUPLICATED
+    private readonly SemaphoreSlim _lock;                                 // ◄── DUPLICATED
+    private bool _initialized;                                            // ◄── DUPLICATED
+    // ... 200+ lines of duplicated infrastructure code ...
+}
+
+// AFTER: Focused implementation
+public sealed class FileKeyStorePlugin : KeyStorePluginBase
+{
+    private readonly FileKeyStoreConfig _config;
+    private readonly IKeyProtectionTier[] _tiers;
+
+    // ONLY implement what's unique to file-based storage:
+    protected override TimeSpan CacheExpiration => _config.CacheExpiration;
+    protected override int KeySizeBytes => _config.KeySizeBytes;
+
+    protected override async Task<byte[]?> LoadKeyFromStorageAsync(string keyId)
+    {
+        // File-specific: load from disk, decrypt with tier
+    }
+
+    protected override async Task SaveKeyToStorageAsync(string keyId, byte[] key)
+    {
+        // File-specific: encrypt with tier, save to disk
+    }
+
+    protected override async Task InitializeStorageAsync()
+    {
+        // File-specific: ensure directory exists, load metadata
+    }
+}
+```
+
+---
+
+#### T5.0.5: Refactor Existing Encryption Plugins
+
+> **CRITICAL:** All existing encryption plugins MUST be refactored to extend `EncryptionPluginBase`.
+> This eliminates duplicated key management code and enables envelope mode support.
+
+| Task | Plugin | Current | Target | Description | Status |
+|------|--------|---------|--------|-------------|--------|
+| T5.0.5 | Refactor encryption plugins | - | - | Migrate to EncryptionPluginBase | [ ] |
+| T5.0.5.1 | `AesEncryptionPlugin` | `PipelinePluginBase` | `EncryptionPluginBase` | Remove duplicated key mgmt, implement abstract encrypt/decrypt | [ ] |
+| T5.0.5.2 | `ChaCha20EncryptionPlugin` | `PipelinePluginBase` | `EncryptionPluginBase` | Remove duplicated key mgmt, implement abstract encrypt/decrypt | [ ] |
+| T5.0.5.3 | `TwofishEncryptionPlugin` | `PipelinePluginBase` | `EncryptionPluginBase` | Remove duplicated key mgmt, implement abstract encrypt/decrypt | [ ] |
+| T5.0.5.4 | `SerpentEncryptionPlugin` | `PipelinePluginBase` | `EncryptionPluginBase` | Remove duplicated key mgmt, implement abstract encrypt/decrypt | [ ] |
+| T5.0.5.5 | `FipsEncryptionPlugin` | `PipelinePluginBase` | `EncryptionPluginBase` | Remove duplicated key mgmt, implement abstract encrypt/decrypt | [ ] |
+| T5.0.5.6 | `ZeroKnowledgeEncryptionPlugin` | `PipelinePluginBase` | `EncryptionPluginBase` | Remove duplicated key mgmt, implement abstract encrypt/decrypt | [ ] |
+
+**AesEncryptionPlugin Refactoring:**
+```csharp
+// BEFORE: Duplicated key management logic (~150 lines)
+public sealed class AesEncryptionPlugin : PipelinePluginBase, IDisposable
+{
+    private IKeyStore? _keyStore;                                       // ◄── DUPLICATED
+    private ISecurityContext? _securityContext;                         // ◄── DUPLICATED
+    private readonly ConcurrentDictionary<string, DateTime> _keyAccessLog; // ◄── DUPLICATED
+    private long _encryptionCount;                                      // ◄── DUPLICATED
+    // ... 150+ lines of duplicated key management code ...
+
+    private IKeyStore GetKeyStore(...) { /* DUPLICATED in all 6 plugins */ }
+    private ISecurityContext GetSecurityContext(...) { /* DUPLICATED in all 6 plugins */ }
+}
+
+// AFTER: Focused AES implementation
+public sealed class AesEncryptionPlugin : EncryptionPluginBase
+{
+    // ONLY implement what's unique to AES:
+    protected override int KeySizeBytes => 32;  // AES-256
+    protected override int IvSizeBytes => 12;   // GCM nonce
+    protected override int TagSizeBytes => 16;  // GCM tag
+
+    protected override async Task<Stream> EncryptCoreAsync(Stream input, byte[] key, byte[] iv, IKernelContext context)
+    {
+        // AES-specific: AesGcm.Encrypt()
+    }
+
+    protected override async Task<(Stream data, byte[] tag)> DecryptCoreAsync(Stream input, byte[] key, IKernelContext context)
+    {
+        // AES-specific: AesGcm.Decrypt()
+    }
+
+    protected override byte[] GenerateIv()
+    {
+        return RandomNumberGenerator.GetBytes(IvSizeBytes);
+    }
+}
+```
+
+---
+
+#### T5.0.6: Requirements for New Plugins
+
+> **MANDATORY:** All new encryption and key management plugins MUST follow these requirements.
+
+**New Key Management Plugins (T5.4.1-T5.4.6) Requirements:**
+
+| Requirement | Description |
+|-------------|-------------|
+| **MUST extend `KeyStorePluginBase`** | Do NOT implement `IKeyStore` directly |
+| **MUST implement abstract methods** | `LoadKeyFromStorageAsync`, `SaveKeyToStorageAsync`, `InitializeStorageAsync` |
+| **MAY implement `IEnvelopeKeyStore`** | If the backend supports HSM wrap/unwrap operations |
+| **MUST use inherited caching** | Do NOT implement custom caching logic |
+| **MUST use inherited validation** | Do NOT implement custom security context validation |
+
+**New Encryption Plugins (T4.24-T4.29) Requirements:**
+
+| Requirement | Description |
+|-------------|-------------|
+| **MUST extend `EncryptionPluginBase`** | Do NOT extend `PipelinePluginBase` directly |
+| **MUST implement abstract methods** | `EncryptCoreAsync`, `DecryptCoreAsync`, `GenerateIv` |
+| **MUST support both key modes** | Direct and Envelope modes via inherited infrastructure |
+| **MUST use inherited key management** | Do NOT implement custom key store resolution |
+| **MUST use inherited statistics** | Do NOT implement custom encryption/decryption counters |
+| **Exception: Educational ciphers (T4.24)** | May extend `PipelinePluginBase` directly if no key management |
+
+**Plugin Compliance Checklist:**
+```
+For each new KEY MANAGEMENT plugin:
+  [ ] Extends KeyStorePluginBase (NOT SecurityProviderPluginBase directly)
+  [ ] Implements LoadKeyFromStorageAsync()
+  [ ] Implements SaveKeyToStorageAsync()
+  [ ] Implements InitializeStorageAsync()
+  [ ] Overrides CacheExpiration property
+  [ ] Overrides KeySizeBytes property
+  [ ] If HSM: Also implements IEnvelopeKeyStore
+  [ ] Does NOT duplicate caching logic
+  [ ] Does NOT duplicate initialization logic
+
+For each new ENCRYPTION plugin:
+  [ ] Extends EncryptionPluginBase (NOT PipelinePluginBase directly)
+  [ ] Implements EncryptCoreAsync()
+  [ ] Implements DecryptCoreAsync()
+  [ ] Implements GenerateIv()
+  [ ] Overrides KeySizeBytes, IvSizeBytes, TagSizeBytes
+  [ ] Does NOT duplicate key management logic
+  [ ] Does NOT duplicate statistics tracking
+  [ ] Works with both KeyManagementMode.Direct and KeyManagementMode.Envelope
+```
+
+---
+
+#### T5.0 Summary
+
+| Task | Description | Dependencies | Status |
+|------|-------------|--------------|--------|
+| **T5.0** | **SDK Base Classes and Plugin Refactoring** | None | [ ] |
+| T5.0.1 | SDK Key Management Types (enum, interfaces, classes) | - | [ ] |
+| T5.0.2 | `KeyStorePluginBase` abstract class | T5.0.1 | [ ] |
+| T5.0.3 | `EncryptionPluginBase` abstract class | T5.0.1 | [ ] |
+| T5.0.4 | Refactor existing key management plugins (4 plugins) | T5.0.2 | [ ] |
+| T5.0.5 | Refactor existing encryption plugins (6 plugins) | T5.0.3 | [ ] |
+| T5.0.6 | Document requirements for new plugins | T5.0.4, T5.0.5 | [ ] |
+
+**Benefits of T5.0:**
+- ✅ Eliminates ~500+ lines of duplicated code across plugins
+- ✅ Ensures consistent caching, initialization, and validation
+- ✅ Enables envelope mode support via shared infrastructure
+- ✅ Simplifies new plugin development (implement only algorithm-specific logic)
+- ✅ Guarantees composability: ANY encryption + ANY key management at runtime
+- ✅ User-configurable key management mode (Direct vs Envelope)
+
+---
+
 ### T5.1: Envelope Mode for ALL Encryption Plugins
+
+> **DEPENDENCY:** T5.1 depends on T5.0 (SDK Base Classes). Complete T5.0 first.
+>
+> After T5.0 is complete, envelope mode support is **built into `EncryptionPluginBase`**.
+> T5.1 tasks are now primarily about testing and documentation.
 
 **What's Already Done:**
 - ✅ HSM backends (HashiCorp, Azure, AWS) → `VaultKeyStorePlugin`
@@ -1531,51 +1959,30 @@ internal interface IVaultBackend
 - ✅ Key storage with versioning → `VaultKeyStorePlugin` + `KeyRotationPlugin`
 - ✅ **All 6 encryption plugins use `IKeyStore`** → Already support composable key management
 
-**Existing Encryption Plugins (ALL use IKeyStore):**
-| Plugin | Algorithm | IKeyStore | Direct Mode | Envelope Mode |
-|--------|-----------|-----------|-------------|---------------|
-| `AesEncryptionPlugin` | AES-256-GCM | ✅ Yes | ✅ Working | [ ] T5.1.A |
-| `ChaCha20EncryptionPlugin` | ChaCha20-Poly1305 | ✅ Yes | ✅ Working | [ ] T5.1.B |
-| `TwofishEncryptionPlugin` | Twofish-256-CTR-HMAC | ✅ Yes | ✅ Working | [ ] T5.1.C |
-| `SerpentEncryptionPlugin` | Serpent-256-CTR-HMAC | ✅ Yes | ✅ Working | [ ] T5.1.D |
-| `FipsEncryptionPlugin` | AES-256-GCM (FIPS 140-2) | ✅ Yes | ✅ Working | [ ] T5.1.E |
-| `ZeroKnowledgeEncryptionPlugin` | AES-256-GCM + ZK proofs | ✅ Yes | ✅ Working | [ ] T5.1.F |
+**After T5.0 Completion:**
+- ✅ `KeyManagementMode` enum → T5.0.1.1
+- ✅ `IEnvelopeKeyStore` interface → T5.0.1.2
+- ✅ `EnvelopeHeader` helper class → T5.0.1.3
+- ✅ Envelope mode in `EncryptionPluginBase` → T5.0.3.4
+- ✅ All 6 encryption plugins refactored → T5.0.5
 
-**What T5.1 Actually Needs:**
-Add envelope mode (store wrapped DEK in ciphertext header) to ALL encryption plugins that use `IKeyStore`.
+**Existing Encryption Plugins (ALL extend EncryptionPluginBase after T5.0):**
+| Plugin | Algorithm | Base Class | Direct Mode | Envelope Mode |
+|--------|-----------|------------|-------------|---------------|
+| `AesEncryptionPlugin` | AES-256-GCM | `EncryptionPluginBase` | ✅ Inherited | ✅ Inherited |
+| `ChaCha20EncryptionPlugin` | ChaCha20-Poly1305 | `EncryptionPluginBase` | ✅ Inherited | ✅ Inherited |
+| `TwofishEncryptionPlugin` | Twofish-256-CTR-HMAC | `EncryptionPluginBase` | ✅ Inherited | ✅ Inherited |
+| `SerpentEncryptionPlugin` | Serpent-256-CTR-HMAC | `EncryptionPluginBase` | ✅ Inherited | ✅ Inherited |
+| `FipsEncryptionPlugin` | AES-256-GCM (FIPS 140-2) | `EncryptionPluginBase` | ✅ Inherited | ✅ Inherited |
+| `ZeroKnowledgeEncryptionPlugin` | AES-256-GCM + ZK proofs | `EncryptionPluginBase` | ✅ Inherited | ✅ Inherited |
 
-**Shared Infrastructure (T5.1.0):**
+**Remaining T5.1 Tasks (Post-T5.0):**
 | Task | Component | Description | Status |
 |------|-----------|-------------|--------|
-| T5.1.0 | Shared envelope infrastructure | Common code for all encryption plugins | [ ] |
-| T5.1.0.1 | ↳ `KeyManagementMode` enum | `Direct` (existing) vs `Envelope` (new) in SDK | [ ] |
-| T5.1.0.2 | ↳ `IEnvelopeKeyProvider` interface | Abstract envelope key operations | [ ] |
-| T5.1.0.3 | ↳ `EnvelopeKeyProvider` implementation | DEK generation + HSM wrapping via VaultKeyStorePlugin | [ ] |
-| T5.1.0.4 | ↳ `EnvelopeHeader` helper class | Serialize/deserialize envelope header format | [ ] |
-| T5.1.0.5 | ↳ Google Cloud KMS backend | Add to `VaultKeyStorePlugin` (config exists, impl partial) | [ ] |
-
-**Per-Plugin Envelope Mode (T5.1.A-F):**
-| Task | Plugin | Description | Status |
-|------|--------|-------------|--------|
-| T5.1.A | `AesEncryptionPlugin` | Add envelope mode support | [ ] |
-| T5.1.A.1 | ↳ Config: `KeyManagementMode`, `EnvelopeKeyStore` | Add to `AesEncryptionConfig` | [ ] |
-| T5.1.A.2 | ↳ OnWrite: envelope header generation | Write: DEK → wrap → [header][ciphertext] | [ ] |
-| T5.1.A.3 | ↳ OnRead: envelope header parsing | Read: parse → unwrap → decrypt | [ ] |
-| T5.1.B | `ChaCha20EncryptionPlugin` | Add envelope mode support | [ ] |
-| T5.1.B.1 | ↳ Config: `KeyManagementMode`, `EnvelopeKeyStore` | Add to `ChaCha20EncryptionConfig` | [ ] |
-| T5.1.B.2 | ↳ OnWrite/OnRead: envelope support | Same pattern as AES | [ ] |
-| T5.1.C | `TwofishEncryptionPlugin` | Add envelope mode support | [ ] |
-| T5.1.C.1 | ↳ Config: `KeyManagementMode`, `EnvelopeKeyStore` | Add to `TwofishEncryptionConfig` | [ ] |
-| T5.1.C.2 | ↳ OnWrite/OnRead: envelope support | Same pattern as AES | [ ] |
-| T5.1.D | `SerpentEncryptionPlugin` | Add envelope mode support | [ ] |
-| T5.1.D.1 | ↳ Config: `KeyManagementMode`, `EnvelopeKeyStore` | Add to `SerpentEncryptionConfig` | [ ] |
-| T5.1.D.2 | ↳ OnWrite/OnRead: envelope support | Same pattern as AES | [ ] |
-| T5.1.E | `FipsEncryptionPlugin` | Add envelope mode support | [ ] |
-| T5.1.E.1 | ↳ Config: `KeyManagementMode`, `EnvelopeKeyStore` | Add to `FipsEncryptionConfig` | [ ] |
-| T5.1.E.2 | ↳ OnWrite/OnRead: envelope support | Same pattern as AES | [ ] |
-| T5.1.F | `ZeroKnowledgeEncryptionPlugin` | Add envelope mode support | [ ] |
-| T5.1.F.1 | ↳ Config: `KeyManagementMode`, `EnvelopeKeyStore` | Add to `ZkEncryptionConfig` | [ ] |
-| T5.1.F.2 | ↳ OnWrite/OnRead: envelope support | Same pattern as AES | [ ] |
+| T5.1.1 | Google Cloud KMS backend | Add to `VaultKeyStorePlugin` (config exists, impl partial) | [ ] |
+| T5.1.2 | Envelope mode integration tests | Test all 6 plugins with envelope mode | [ ] |
+| T5.1.3 | Envelope mode documentation | Usage examples, configuration guide | [ ] |
+| T5.1.4 | Envelope mode benchmarks | Compare Direct vs Envelope performance | [ ] |
 
 ---
 
@@ -1590,64 +1997,62 @@ Add envelope mode (store wrapped DEK in ciphertext header) to ALL encryption plu
 
 ### T5.4: Additional Key Management Plugins (Composable Architecture)
 
-> **CRITICAL: Composable Key Management Architecture**
+> **DEPENDENCY:** T5.4 depends on T5.0 (SDK Base Classes). Complete T5.0 first.
 >
-> The composable key management architecture **already exists** and is **production-ready**:
-> - `IKeyStore` interface defined in SDK
-> - All 6 encryption plugins already use `IKeyStore`
+> **CRITICAL: All New Key Management Plugins MUST Extend `KeyStorePluginBase`**
+>
+> After T5.0 completion:
+> - `KeyStorePluginBase` provides common caching, initialization, and validation
+> - All new plugins extend `KeyStorePluginBase` (NOT `SecurityProviderPluginBase` directly)
+> - Plugins that support HSM wrap/unwrap also implement `IEnvelopeKeyStore`
 > - Users can pair ANY encryption with ANY key management at runtime
->
-> **All new key management plugins MUST implement `IKeyStore`** to be compatible with:
-> - All existing encryption plugins (AES, ChaCha20, Twofish, Serpent, FIPS, ZK)
-> - All future encryption plugins (T4.24-T4.29)
-> - Envelope mode (T5.1) via `VaultKeyStorePlugin`
 
-**Existing Key Management Plugins (✅ Implement IKeyStore):**
-| Plugin | Type | Features | Status |
-|--------|------|----------|--------|
-| `FileKeyStorePlugin` | Local | DPAPI, CredentialManager, Database, PBKDF2 4-tier | ✅ Implemented |
-| `VaultKeyStorePlugin` | HSM/Cloud | HashiCorp, Azure, AWS KMS + WrapKey/UnwrapKey | ✅ Implemented |
-| `KeyRotationPlugin` | Layer | Wraps any IKeyStore, adds rotation/versioning/audit | ✅ Implemented |
-| `SecretManagementPlugin` | Secret Mgmt | Secure secret storage with access control | ✅ Implemented |
+**Existing Key Management Plugins (✅ Extend KeyStorePluginBase after T5.0.4):**
+| Plugin | Base Class | Envelope Support | Features | Status |
+|--------|------------|------------------|----------|--------|
+| `FileKeyStorePlugin` | `KeyStorePluginBase` | ❌ No | DPAPI, CredentialManager, Database, PBKDF2 4-tier | ✅ → Refactor T5.0.4.1 |
+| `VaultKeyStorePlugin` | `KeyStorePluginBase` + `IEnvelopeKeyStore` | ✅ Yes | HashiCorp, Azure, AWS KMS + WrapKey/UnwrapKey | ✅ → Refactor T5.0.4.2 |
+| `KeyRotationPlugin` | `KeyStorePluginBase` (decorator) | Passthrough | Wraps any IKeyStore, adds rotation/versioning/audit | ✅ → Refactor T5.0.4.3 |
+| `SecretManagementPlugin` | `KeyStorePluginBase` | ❌ No | Secure secret storage with access control | ✅ → Verify T5.0.4.4 |
 
-**New Key Management Plugins (T5.4):**
+**New Key Management Plugins (T5.4) - MUST Extend KeyStorePluginBase:**
 
-| Task | Component | Description | Status |
-|------|-----------|-------------|--------|
-| T5.4 | Additional key management plugins | More options for composable key management | [ ] |
-| T5.4.1 | `ShamirSecretKeyStorePlugin` | M-of-N key splitting (Shamir's Secret Sharing), implements IKeyStore | [ ] |
-| T5.4.1.1 | ↳ Key split generation | Split key into N shares | [ ] |
-| T5.4.1.2 | ↳ Key reconstruction | Reconstruct from M shares | [ ] |
-| T5.4.1.3 | ↳ Share distribution | Securely distribute shares to custodians | [ ] |
-| T5.4.1.4 | ↳ Share rotation | Rotate shares without changing key | [ ] |
-| T5.4.2 | `Pkcs11KeyStorePlugin` | PKCS#11 HSM interface (generic HSM support), implements IKeyStore | [ ] |
-| T5.4.2.1 | ↳ Token enumeration | List available PKCS#11 tokens | [ ] |
-| T5.4.2.2 | ↳ Key operations | Generate, import, wrap, unwrap via PKCS#11 | [ ] |
-| T5.4.3 | `TpmKeyStorePlugin` | TPM 2.0 hardware security, implements IKeyStore | [ ] |
-| T5.4.3.1 | ↳ TPM key sealing | Seal keys to PCR state | [ ] |
-| T5.4.3.2 | ↳ TPM key unsealing | Unseal with attestation | [ ] |
-| T5.4.4 | `YubikeyKeyStorePlugin` | YubiKey/FIDO2 hardware tokens, implements IKeyStore | [ ] |
-| T5.4.4.1 | ↳ PIV slot support | Use PIV slots for key storage | [ ] |
-| T5.4.4.2 | ↳ Challenge-response | HMAC-SHA1 challenge-response | [ ] |
-| T5.4.5 | `PasswordDerivedKeyStorePlugin` | Argon2id/scrypt key derivation, implements IKeyStore | [ ] |
-| T5.4.5.1 | ↳ Argon2id derivation | Memory-hard KDF | [ ] |
-| T5.4.5.2 | ↳ scrypt derivation | Alternative memory-hard KDF | [ ] |
-| T5.4.6 | `MultiPartyKeyStorePlugin` | Multi-party computation (MPC) key management, implements IKeyStore | [ ] |
-| T5.4.6.1 | ↳ Threshold signatures | t-of-n signing without key reconstruction | [ ] |
-| T5.4.6.2 | ↳ Distributed key generation | Generate keys without single point of failure | [ ] |
+| Task | Component | Base Class | Description | Status |
+|------|-----------|------------|-------------|--------|
+| T5.4 | Additional key management plugins | - | More options for composable key management | [ ] |
+| T5.4.1 | `ShamirSecretKeyStorePlugin` | `KeyStorePluginBase` | M-of-N key splitting (Shamir's Secret Sharing) | [ ] |
+| T5.4.1.1 | ↳ Key split generation | - | Split key into N shares | [ ] |
+| T5.4.1.2 | ↳ Key reconstruction | - | Reconstruct from M shares | [ ] |
+| T5.4.1.3 | ↳ Share distribution | - | Securely distribute shares to custodians | [ ] |
+| T5.4.1.4 | ↳ Share rotation | - | Rotate shares without changing key | [ ] |
+| T5.4.2 | `Pkcs11KeyStorePlugin` | `KeyStorePluginBase` + `IEnvelopeKeyStore` | PKCS#11 HSM interface (generic HSM support) | [ ] |
+| T5.4.2.1 | ↳ Token enumeration | - | List available PKCS#11 tokens | [ ] |
+| T5.4.2.2 | ↳ Key operations | - | Generate, import, wrap, unwrap via PKCS#11 | [ ] |
+| T5.4.3 | `TpmKeyStorePlugin` | `KeyStorePluginBase` | TPM 2.0 hardware security | [ ] |
+| T5.4.3.1 | ↳ TPM key sealing | - | Seal keys to PCR state | [ ] |
+| T5.4.3.2 | ↳ TPM key unsealing | - | Unseal with attestation | [ ] |
+| T5.4.4 | `YubikeyKeyStorePlugin` | `KeyStorePluginBase` | YubiKey/FIDO2 hardware tokens | [ ] |
+| T5.4.4.1 | ↳ PIV slot support | - | Use PIV slots for key storage | [ ] |
+| T5.4.4.2 | ↳ Challenge-response | - | HMAC-SHA1 challenge-response | [ ] |
+| T5.4.5 | `PasswordDerivedKeyStorePlugin` | `KeyStorePluginBase` | Argon2id/scrypt key derivation | [ ] |
+| T5.4.5.1 | ↳ Argon2id derivation | - | Memory-hard KDF | [ ] |
+| T5.4.5.2 | ↳ scrypt derivation | - | Alternative memory-hard KDF | [ ] |
+| T5.4.6 | `MultiPartyKeyStorePlugin` | `KeyStorePluginBase` + `IEnvelopeKeyStore` | Multi-party computation (MPC) key management | [ ] |
+| T5.4.6.1 | ↳ Threshold signatures | - | t-of-n signing without key reconstruction | [ ] |
+| T5.4.6.2 | ↳ Distributed key generation | - | Generate keys without single point of failure | [ ] |
 
 **Key Management Plugin Reference:**
-| Plugin | IKeyStore | Security Level | Use Case |
-|--------|-----------|----------------|----------|
-| `FileKeyStorePlugin` | ✅ | Medium | Local/development deployments |
-| `VaultKeyStorePlugin` | ✅ | High | Enterprise HSM/cloud deployments |
-| `KeyRotationPlugin` | ✅ | N/A (layer) | Add rotation to any IKeyStore |
-| `ShamirSecretKeyStorePlugin` | ✅ | Very High | M-of-N custodian scenarios |
-| `Pkcs11KeyStorePlugin` | ✅ | Very High | Generic HSM hardware |
-| `TpmKeyStorePlugin` | ✅ | High | Hardware-bound keys |
-| `YubikeyKeyStorePlugin` | ✅ | High | User-owned hardware tokens |
-| `PasswordDerivedKeyStorePlugin` | ✅ | Medium-High | Password-based encryption |
-| `MultiPartyKeyStorePlugin` | ✅ | Maximum | Zero single-point-of-failure |
+| Plugin | Base Class | IEnvelopeKeyStore | Security Level | Use Case |
+|--------|------------|-------------------|----------------|----------|
+| `FileKeyStorePlugin` | `KeyStorePluginBase` | ❌ | Medium | Local/development deployments |
+| `VaultKeyStorePlugin` | `KeyStorePluginBase` | ✅ Yes | High | Enterprise HSM/cloud deployments |
+| `KeyRotationPlugin` | `KeyStorePluginBase` | Passthrough | N/A (layer) | Add rotation to any IKeyStore |
+| `ShamirSecretKeyStorePlugin` | `KeyStorePluginBase` | ❌ | Very High | M-of-N custodian scenarios |
+| `Pkcs11KeyStorePlugin` | `KeyStorePluginBase` | ✅ Yes | Very High | Generic HSM hardware |
+| `TpmKeyStorePlugin` | `KeyStorePluginBase` | ❌ | High | Hardware-bound keys |
+| `YubikeyKeyStorePlugin` | `KeyStorePluginBase` | ❌ | High | User-owned hardware tokens |
+| `PasswordDerivedKeyStorePlugin` | `KeyStorePluginBase` | ❌ | Medium-High | Password-based encryption |
+| `MultiPartyKeyStorePlugin` | `KeyStorePluginBase` | ✅ Yes | Maximum | Zero single-point-of-failure |
 
 **Composability Example:**
 ```csharp
