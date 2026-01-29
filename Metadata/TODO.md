@@ -863,49 +863,56 @@ USER DATA
     │
     ▼
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│ PHASE 2: System Integrity Hash (Fixed Position - ALWAYS After Phase 1)     │
-│ ┌─────────────────────────────────────────────────────────────────────┐    │
-│ │ SHA-256/SHA-384/SHA-512/Blake3 hash of transformed data             │    │
-│ │ This hash covers: Original data + Phase 1 transformations           │    │
-│ │ This hash does NOT cover: Phase 3 shard padding (by design)         │    │
-│ └─────────────────────────────────────────────────────────────────────┘    │
+│ PHASE 2: System Integrity Hash (Fixed Position - ALWAYS After Phase 1)      │
+│ ┌─────────────────────────────────────────────────────────────────────┐     │
+│ │ SHA-256/SHA-384/SHA-512/Blake3 hash of transformed data             │     │
+│ │ This hash covers: Original data + Phase 1 transformations           │     │
+│ │ This hash does NOT cover: Phase 3 shard padding (by design)         │     │
+│ └─────────────────────────────────────────────────────────────────────┘     │
+└─────────────────────────────────────────────────────────────────────────────┘
+    │
+    ▼
+┌────────────────────────────────────────────────────────────────────────────────────────────────────────┐
+│ PHASE 3: RAID Distribution + Shard Padding (Fixed Position)                                            │
+│ ┌─────────────────────────────────────────────────────────────────────────────────────────────────┐    │
+│ │ 1. Split into N data shards                                                                     │    │
+│ │ 2. Pad final shard to uniform size (optional/user configurable, NOT covered by Phase 2 hash)    │    │
+│ │ 3. Generate M parity shards                                                                     │    │
+│ │ 4. Each shard gets its own shard-level hash                                                     │    │
+│ │ 5. Save the optional Shard Padding details also for reversal during read.                       │    │
+│ └─────────────────────────────────────────────────────────────────────────────────────────────────┘    │
+└────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+    │
+    ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ PHASE 4: Parallel Storage Writes (Transactional Writes)                     │
+│ ┌─────────────────────────────────────────────────────────────────────┐     │
+│ │ PARALLEL WRITES TO ALL CONFIGURED TIERS:                            │     │
+│ │   • Data Instance → RAID shards                                     │     │
+│ │   • Metadata Instance → Manifest + access log entry                 │     │
+│ │   • WORM Instance → Full transformed blob + manifest                │     │
+│ │   • Blockchain Instance → Batched (see Phase 5)                     │     │
+│ │ * Write to all 4 configured tiers in a single transaction.          │     │
+│ │ * Write is only considered a success if the whole transaction       │     │
+│ │   completes successfully.                                           │     │
+│ │ * Allow ROLLBACK on failure. WORM might not allow rollback.         │     │
+│ │   So maybe we can leave that data as orphaned... Or use some other  │     │
+│ │   proper stratergy. Design accordingly.                             │     │
+│ └─────────────────────────────────────────────────────────────────────┘     │
 └─────────────────────────────────────────────────────────────────────────────┘
     │
     ▼
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│ PHASE 3: RAID Distribution + Shard Padding (Fixed Position)                │
-│ ┌─────────────────────────────────────────────────────────────────────┐    │
-│ │ 1. Split into N data shards                                         │    │
-│ │ 2. Pad final shard to uniform size (NOT covered by Phase 2 hash)    │    │
-│ │ 3. Generate M parity shards                                         │    │
-│ │ 4. Each shard gets its own shard-level hash                         │    │
-│ └─────────────────────────────────────────────────────────────────────┘    │
-└─────────────────────────────────────────────────────────────────────────────┘
-    │
-    ▼
-┌─────────────────────────────────────────────────────────────────────────────┐
-│ PHASE 4: Parallel Storage Writes                                           │
-│ ┌─────────────────────────────────────────────────────────────────────┐    │
-│ │ PARALLEL WRITES TO ALL CONFIGURED TIERS:                            │    │
-│ │   • Data Instance → RAID shards                                     │    │
-│ │   • Metadata Instance → Manifest + access log entry                 │    │
-│ │   • WORM Instance → Full transformed blob + manifest                │    │
-│ │   • Blockchain Instance → Batched (see Phase 5)                     │    │
-│ └─────────────────────────────────────────────────────────────────────┘    │
-└─────────────────────────────────────────────────────────────────────────────┘
-    │
-    ▼
-┌─────────────────────────────────────────────────────────────────────────────┐
-│ PHASE 5: Blockchain Anchoring (Batched for Efficiency)                     │
-│ ┌─────────────────────────────────────────────────────────────────────┐    │
-│ │ Anchor record contains:                                             │    │
-│ │   • Object GUID                                                     │    │
-│ │   • Phase 2 integrity hash                                          │    │
-│ │   • UTC timestamp                                                   │    │
-│ │   • Write context (author, comment, session)                        │    │
-│ │   • Previous block hash (chain linkage)                             │    │
-│ │   • Merkle root (when batching multiple objects)                    │    │
-│ └─────────────────────────────────────────────────────────────────────┘    │
+│ PHASE 5: Blockchain Anchoring (Batched for Efficiency)                      │
+│ ┌─────────────────────────────────────────────────────────────────────┐     │
+│ │ Anchor record contains:                                             │     │
+│ │   • Object GUID                                                     │     │
+│ │   • Phase 2 integrity hash                                          │     │
+│ │   • UTC timestamp                                                   │     │
+│ │   • Write context (author, comment, session)                        │     │
+│ │   • Previous block hash (chain linkage)                             │     │
+│ │   • Merkle root (when batching multiple objects)                    │     │
+│ └─────────────────────────────────────────────────────────────────────┘     │
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -918,53 +925,53 @@ READ REQUEST (ObjectGuid, ReadMode)
     │
     ▼
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│ PHASE 1: Manifest Retrieval                                                │
-│ ┌─────────────────────────────────────────────────────────────────────┐    │
-│ │ Load TamperProofManifest from Metadata Instance                     │    │
-│ │ Contains: Expected hash, transformation order, shard map, WORM ref  │    │
-│ └─────────────────────────────────────────────────────────────────────┘    │
+│ PHASE 1: Manifest Retrieval                                                 │
+│ ┌─────────────────────────────────────────────────────────────────────┐     │
+│ │ Load TamperProofManifest from Metadata Instance                     │     │
+│ │ Contains: Expected hash, transformation order, shard map, WORM ref  │     │
+│ └─────────────────────────────────────────────────────────────────────┘     │
 └─────────────────────────────────────────────────────────────────────────────┘
     │
     ▼
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│ PHASE 2: Shard Retrieval + Reconstruction                                  │
-│ ┌─────────────────────────────────────────────────────────────────────┐    │
-│ │ 1. Load required shards from Data Instance                          │    │
-│ │ 2. Verify individual shard hashes                                   │    │
-│ │ 3. Reconstruct original transformed blob (Reed-Solomon if needed)   │    │
-│ │ 4. Strip shard padding                                              │    │
-│ └─────────────────────────────────────────────────────────────────────┘    │
+│ PHASE 2: Shard Retrieval + Reconstruction                                   │
+│ ┌─────────────────────────────────────────────────────────────────────┐     │
+│ │ 1. Load required shards from Data Instance                          │     │
+│ │ 2. Verify individual shard hashes                                   │     │
+│ │ 3. Reconstruct original transformed blob (Reed-Solomon if needed)   │     │
+│ │ 4. Strip shard padding                                              │     │
+│ └─────────────────────────────────────────────────────────────────────┘     │
 └─────────────────────────────────────────────────────────────────────────────┘
     │
     ▼
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│ PHASE 3: Integrity Verification (Conditional on ReadMode)                  │
-│ ┌─────────────────────────────────────────────────────────────────────┐    │
-│ │ ReadMode.Fast: SKIP (trust shard hashes)                            │    │
-│ │ ReadMode.Verified: Compute hash, compare to manifest                │    │
-│ │ ReadMode.Audit: + Verify blockchain anchor + Log access             │    │
-│ └─────────────────────────────────────────────────────────────────────┘    │
+│ PHASE 3: Integrity Verification (Conditional on ReadMode)                   │
+│ ┌─────────────────────────────────────────────────────────────────────┐     │
+│ │ ReadMode.Fast: SKIP (trust shard hashes)                            │     │
+│ │ ReadMode.Verified: Compute hash, compare to manifest                │     │
+│ │ ReadMode.Audit: + Verify blockchain anchor + Log access             │     │
+│ └─────────────────────────────────────────────────────────────────────┘     │
 └─────────────────────────────────────────────────────────────────────────────┘
     │
     ▼
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│ PHASE 4: Reverse Transformations                                           │
-│ ┌─────────────────────────────────────────────────────────────────────┐    │
-│ │ Apply inverse of Phase 1 in reverse order:                          │    │
-│ │   Strip Content Padding → Decrypt → Decompress                      │    │
-│ └─────────────────────────────────────────────────────────────────────┘    │
+│ PHASE 4: Reverse Transformations                                            │
+│ ┌─────────────────────────────────────────────────────────────────────┐     │
+│ │ Apply inverse of Phase 1 in reverse order:                          │     │
+│ │   Strip Content Padding → Decrypt → Decompress                      │     │
+│ └─────────────────────────────────────────────────────────────────────┘     │
 └─────────────────────────────────────────────────────────────────────────────┘
     │
     ▼
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│ PHASE 5: Tamper Response (If Verification Failed)                          │
-│ ┌─────────────────────────────────────────────────────────────────────┐    │
-│ │ Based on TamperRecoveryBehavior:                                    │    │
-│ │   • AutoRecoverSilent: Recover from WORM, log internally            │    │
-│ │   • AutoRecoverWithReport: Recover + generate incident report       │    │
-│ │   • AlertAndWait: Notify admin, don't serve until resolved          │    │
-│ │ + Tamper Attribution: Analyze access logs to identify WHO           │    │
-│ └─────────────────────────────────────────────────────────────────────┘    │
+│ PHASE 5: Tamper Response (If Verification Failed)                           │
+│ ┌─────────────────────────────────────────────────────────────────────┐     │
+│ │ Based on TamperRecoveryBehavior:                                    │     │
+│ │   • AutoRecoverSilent: Recover from WORM, log internally            │     │
+│ │   • AutoRecoverWithReport: Recover + generate incident report       │     │
+│ │   • AlertAndWait: Notify admin, don't serve until resolved          │     │
+│ │ + Tamper Attribution: Analyze access logs to identify WHO           │     │
+│ └─────────────────────────────────────────────────────────────────────┘     │
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -1967,6 +1974,9 @@ public abstract class AccessLogProviderPluginBase : FeaturePluginBase, IAccessLo
 ---
 
 ### Implementation Phases
+# ** Consider the correct location for implementation. Common functions, enums etc. go in SDK. 
+# ** Abstract classes implement common features and lifecycle in SDK.
+# ** Only specific implementations go in the plugins.
 
 #### Phase T1: Core Infrastructure (Priority: CRITICAL)
 | Task | Description | Dependencies | Status |
