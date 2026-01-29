@@ -1364,14 +1364,17 @@ Encryption plugins can use **any** `IKeyStore` implementation for key management
 │                    COMPOSABLE KEY MANAGEMENT ARCHITECTURE                            │
 ├─────────────────────────────────────────────────────────────────────────────────────┤
 │                                                                                      │
-│   ENCRYPTION PLUGINS (Use ANY IKeyStore)                                             │
-│   ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐│
-│   │ AesEncryption   │  │ ChaCha20        │  │ Twofish         │  │ Serpent         ││
-│   │ Plugin          │  │ Plugin          │  │ Plugin          │  │ Plugin          ││
-│   │ ✅ Implemented  │  │ ✅ Implemented  │  │ ✅ Implemented  │  │ ✅ Implemented  ││
-│   └────────┬────────┘  └────────┬────────┘  └────────┬────────┘  └────────┬────────┘│
-│            │                    │                    │                    │          │
-│            └────────────────────┴────────────────────┴────────────────────┘          │
+│   ENCRYPTION PLUGINS (ALL use IKeyStore - composable key management)                 │
+│   ┌─────────────┐ ┌─────────────┐ ┌─────────────┐ ┌─────────────┐ ┌─────────────┐   │
+│   │ AES-256-GCM │ │ ChaCha20    │ │ Twofish-256 │ │ Serpent-256 │ │ FIPS-140-2  │   │
+│   │ ✅ IKeyStore│ │ ✅ IKeyStore│ │ ✅ IKeyStore│ │ ✅ IKeyStore│ │ ✅ IKeyStore│   │
+│   └──────┬──────┘ └──────┬──────┘ └──────┬──────┘ └──────┬──────┘ └──────┬──────┘   │
+│          │               │               │               │               │           │
+│   ┌──────┴──────┐                                                                    │
+│   │ZeroKnowledge│                                                                    │
+│   │ ✅ IKeyStore│ (6 plugins total, all support composable key management)          │
+│   └──────┬──────┘                                                                    │
+│          └───────────────────────────────────────────────────────────────────────────│
 │                                           │                                          │
 │                                           ▼                                          │
 │                              ┌───────────────────────┐                               │
@@ -1440,26 +1443,63 @@ internal interface IVaultBackend
 
 ---
 
-### T5.1: Envelope Mode for AesEncryptionPlugin (Reduced Scope)
+### T5.1: Envelope Mode for ALL Encryption Plugins
 
 **What's Already Done:**
 - ✅ HSM backends (HashiCorp, Azure, AWS) → `VaultKeyStorePlugin`
 - ✅ WrapKey/UnwrapKey operations → `IVaultBackend` interface
 - ✅ Key storage with versioning → `VaultKeyStorePlugin` + `KeyRotationPlugin`
+- ✅ **All 6 encryption plugins use `IKeyStore`** → Already support composable key management
+
+**Existing Encryption Plugins (ALL use IKeyStore):**
+| Plugin | Algorithm | IKeyStore | Direct Mode | Envelope Mode |
+|--------|-----------|-----------|-------------|---------------|
+| `AesEncryptionPlugin` | AES-256-GCM | ✅ Yes | ✅ Working | [ ] T5.1.A |
+| `ChaCha20EncryptionPlugin` | ChaCha20-Poly1305 | ✅ Yes | ✅ Working | [ ] T5.1.B |
+| `TwofishEncryptionPlugin` | Twofish-256-CTR-HMAC | ✅ Yes | ✅ Working | [ ] T5.1.C |
+| `SerpentEncryptionPlugin` | Serpent-256-CTR-HMAC | ✅ Yes | ✅ Working | [ ] T5.1.D |
+| `FipsEncryptionPlugin` | AES-256-GCM (FIPS 140-2) | ✅ Yes | ✅ Working | [ ] T5.1.E |
+| `ZeroKnowledgeEncryptionPlugin` | AES-256-GCM + ZK proofs | ✅ Yes | ✅ Working | [ ] T5.1.F |
 
 **What T5.1 Actually Needs:**
-Connect `AesEncryptionPlugin` to use `VaultKeyStorePlugin` for envelope mode (store wrapped DEK in ciphertext header).
+Add envelope mode (store wrapped DEK in ciphertext header) to ALL encryption plugins that use `IKeyStore`.
 
+**Shared Infrastructure (T5.1.0):**
 | Task | Component | Description | Status |
 |------|-----------|-------------|--------|
-| T5.1 | Envelope mode for encryption plugins | Use `VaultKeyStorePlugin` for DEK wrapping | [ ] |
-| T5.1.1 | ↳ `KeyManagementMode` enum | `Direct` (existing) vs `Envelope` (new) | [ ] |
-| T5.1.2 | ↳ Direct mode | Existing behavior - key from any `IKeyStore` | ✅ Already implemented |
-| T5.1.3 | ↳ Envelope mode header format | Store wrapped DEK in encryption header | [ ] |
-| T5.1.4 | ↳ `AesEncryptionConfig.EnvelopeKeyStore` | Point to `VaultKeyStorePlugin` for HSM operations | [ ] |
-| T5.1.5 | ↳ Write path: generate DEK → wrap → store | Use `IVaultBackend.WrapKeyAsync()` | [ ] |
-| T5.1.6 | ↳ Read path: parse header → unwrap → decrypt | Use `IVaultBackend.UnwrapKeyAsync()` | [ ] |
-| T5.1.7 | ↳ Google Cloud KMS backend | Add to `VaultKeyStorePlugin` (config exists, impl partial) | [ ] |
+| T5.1.0 | Shared envelope infrastructure | Common code for all encryption plugins | [ ] |
+| T5.1.0.1 | ↳ `KeyManagementMode` enum | `Direct` (existing) vs `Envelope` (new) in SDK | [ ] |
+| T5.1.0.2 | ↳ `IEnvelopeKeyProvider` interface | Abstract envelope key operations | [ ] |
+| T5.1.0.3 | ↳ `EnvelopeKeyProvider` implementation | DEK generation + HSM wrapping via VaultKeyStorePlugin | [ ] |
+| T5.1.0.4 | ↳ `EnvelopeHeader` helper class | Serialize/deserialize envelope header format | [ ] |
+| T5.1.0.5 | ↳ Google Cloud KMS backend | Add to `VaultKeyStorePlugin` (config exists, impl partial) | [ ] |
+
+**Per-Plugin Envelope Mode (T5.1.A-F):**
+| Task | Plugin | Description | Status |
+|------|--------|-------------|--------|
+| T5.1.A | `AesEncryptionPlugin` | Add envelope mode support | [ ] |
+| T5.1.A.1 | ↳ Config: `KeyManagementMode`, `EnvelopeKeyStore` | Add to `AesEncryptionConfig` | [ ] |
+| T5.1.A.2 | ↳ OnWrite: envelope header generation | Write: DEK → wrap → [header][ciphertext] | [ ] |
+| T5.1.A.3 | ↳ OnRead: envelope header parsing | Read: parse → unwrap → decrypt | [ ] |
+| T5.1.B | `ChaCha20EncryptionPlugin` | Add envelope mode support | [ ] |
+| T5.1.B.1 | ↳ Config: `KeyManagementMode`, `EnvelopeKeyStore` | Add to `ChaCha20EncryptionConfig` | [ ] |
+| T5.1.B.2 | ↳ OnWrite/OnRead: envelope support | Same pattern as AES | [ ] |
+| T5.1.C | `TwofishEncryptionPlugin` | Add envelope mode support | [ ] |
+| T5.1.C.1 | ↳ Config: `KeyManagementMode`, `EnvelopeKeyStore` | Add to `TwofishEncryptionConfig` | [ ] |
+| T5.1.C.2 | ↳ OnWrite/OnRead: envelope support | Same pattern as AES | [ ] |
+| T5.1.D | `SerpentEncryptionPlugin` | Add envelope mode support | [ ] |
+| T5.1.D.1 | ↳ Config: `KeyManagementMode`, `EnvelopeKeyStore` | Add to `SerpentEncryptionConfig` | [ ] |
+| T5.1.D.2 | ↳ OnWrite/OnRead: envelope support | Same pattern as AES | [ ] |
+| T5.1.E | `FipsEncryptionPlugin` | Add envelope mode support | [ ] |
+| T5.1.E.1 | ↳ Config: `KeyManagementMode`, `EnvelopeKeyStore` | Add to `FipsEncryptionConfig` | [ ] |
+| T5.1.E.2 | ↳ OnWrite/OnRead: envelope support | Same pattern as AES | [ ] |
+| T5.1.F | `ZeroKnowledgeEncryptionPlugin` | Add envelope mode support | [ ] |
+| T5.1.F.1 | ↳ Config: `KeyManagementMode`, `EnvelopeKeyStore` | Add to `ZkEncryptionConfig` | [ ] |
+| T5.1.F.2 | ↳ OnWrite/OnRead: envelope support | Same pattern as AES | [ ] |
+
+**Other T5 Tasks:**
+| Task | Component | Description | Status |
+|------|-----------|-------------|--------|
 | T5.2 | `KyberEncryptionPlugin` | Post-quantum cryptography (NIST PQC ML-KEM) | [ ] |
 | T5.3 | `ChaffPaddingPlugin` | Traffic analysis protection via dummy writes | [ ] |
 | T5.4 | `ShamirSecretPlugin` | Key splitting across N parties (M-of-N recovery) | [ ] |
@@ -1469,7 +1509,8 @@ Connect `AesEncryptionPlugin` to use `VaultKeyStorePlugin` for envelope mode (st
 **Configuration (Same Plugin, Different Key Sources):**
 ```csharp
 // MODE 1: DIRECT - Key from any IKeyStore (existing behavior, DEFAULT)
-var directConfig = new AesEncryptionConfig
+// Works with ALL 6 encryption plugins today
+var directConfig = new AesEncryptionConfig  // Or ChaCha20, Twofish, Serpent, FIPS, ZK
 {
     KeyManagementMode = KeyManagementMode.Direct,  // Default
     KeyStore = new FileKeyStorePlugin()            // Or ANY IKeyStore
@@ -1478,7 +1519,8 @@ var directConfig = new AesEncryptionConfig
 };
 
 // MODE 2: ENVELOPE - DEK wrapped by HSM, stored in ciphertext (T5.1)
-var envelopeConfig = new AesEncryptionConfig
+// After T5.1 implementation, works with ALL 6 encryption plugins
+var envelopeConfig = new AesEncryptionConfig  // Or ChaCha20, Twofish, Serpent, FIPS, ZK
 {
     KeyManagementMode = KeyManagementMode.Envelope,
     EnvelopeKeyStore = new VaultKeyStorePlugin(new VaultConfig
@@ -1491,14 +1533,14 @@ var envelopeConfig = new AesEncryptionConfig
     KekKeyId = "alias/my-kek"  // Which KEK to use for wrapping DEKs
 };
 
-// Both use the SAME AesEncryptionPlugin - no code duplication!
+// Both modes use the SAME encryption plugins - no code duplication!
 var plugin = new AesEncryptionPlugin(envelopeConfig);
 ```
 
-**Envelope Mode Header Format:**
+**Envelope Mode Header Format (Shared by All Plugins):**
 ```
-DIRECT MODE (existing):     [KeyIdLength:4][KeyId:32][IV:12][Tag:16][Ciphertext]
-ENVELOPE MODE (T5.1):       [Mode:1][WrappedDekLen:2][WrappedDEK:var][KekIdLen:1][KekId:var][IV:12][Tag:16][Ciphertext]
+DIRECT MODE (existing):     [KeyIdLength:4][KeyId:var][...plugin-specific...][Ciphertext]
+ENVELOPE MODE (T5.1):       [Mode:1][WrappedDekLen:2][WrappedDEK:var][KekIdLen:1][KekId:var][...plugin-specific...][Ciphertext]
 ```
 
 **Key Management Mode Comparison:**
@@ -1512,6 +1554,7 @@ ENVELOPE MODE (T5.1):       [Mode:1][WrappedDekLen:2][WrappedDEK:var][KekIdLen:1
 - DEK is unique per object - limits blast radius
 - Key rotation = re-wrap DEKs, NOT re-encrypt data
 - Compliance: PCI-DSS, HIPAA, FedRAMP
+- **Works with ALL 6 encryption algorithms** (after T5.1 implementation)
 
 **Goal:** Maximum compression for archival/cold storage
 
