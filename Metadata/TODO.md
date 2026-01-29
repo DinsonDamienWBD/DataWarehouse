@@ -2628,7 +2628,1063 @@ ENVELOPE MODE (T5.1):       [Mode:1][WrappedDekLen:2][WrappedDEK:var][KekIdLen:1
 | T5.15 | Alert Integrations | Email, Slack, PagerDuty, OpsGenie | [ ] |
 | T5.16 | Tamper Incident Workflow | Automated incident ticket creation | [ ] |
 
-#### Phase T6: Testing & Documentation (Priority: HIGH)
+---
+
+## Phase T6: Transit Encryption & Endpoint-Adaptive Security
+
+> **PROBLEM STATEMENT:**
+> High-security environments (government, military, enterprise) require strong encryption (Serpent-256, Twofish-256)
+> for data at rest. However, low-power endpoints (mobile, IoT, legacy systems) may not have the computational
+> resources to decrypt/encrypt efficiently. Additionally, even within "trusted" internal networks, data in transit
+> should remain encrypted to authorized parties only (true end-to-end encryption).
+>
+> **SOLUTION:** DataWarehouse provides a layered encryption architecture where:
+> 1. **At-rest encryption** uses the strongest cipher the server can handle
+> 2. **Transit encryption** automatically adapts to endpoint capabilities
+> 3. **End-to-end encryption** ensures only authorized key holders can read data
+> 4. **Transcryption** allows secure cipher transitions without exposing plaintext to disk
+
+---
+
+### T6.0: SDK Types for Transit & Endpoint-Adaptive Encryption
+
+#### T6.0.1: Core Interfaces
+
+```csharp
+// =============================================================================
+// FILE: DataWarehouse.SDK/Security/ITransitEncryption.cs
+// =============================================================================
+
+namespace DataWarehouse.SDK.Security;
+
+/// <summary>
+/// Defines how encryption is applied at different layers of data handling.
+/// </summary>
+public enum EncryptionLayer
+{
+    /// <summary>Data encrypted only when stored (at rest). Trust network security for transit.</summary>
+    AtRest,
+
+    /// <summary>Data encrypted both at rest and during transit (different ciphers possible).</summary>
+    AtRestAndTransit,
+
+    /// <summary>End-to-end encryption - same cipher from source to destination, no intermediate decryption.</summary>
+    EndToEnd
+}
+
+/// <summary>
+/// Defines how transit cipher is selected.
+/// </summary>
+public enum TransitCipherSelectionMode
+{
+    /// <summary>No transit encryption - trust network layer (TLS, VPN, etc.).</summary>
+    None,
+
+    /// <summary>Use the same cipher as at-rest storage (strongest, but may be slow on weak endpoints).</summary>
+    SameAsStorage,
+
+    /// <summary>Automatically select optimal cipher based on endpoint capabilities.</summary>
+    AutoNegotiate,
+
+    /// <summary>User/admin explicitly specifies the transit cipher.</summary>
+    Explicit,
+
+    /// <summary>Policy-driven selection based on data classification and endpoint trust level.</summary>
+    PolicyBased
+}
+
+/// <summary>
+/// Represents the cryptographic capabilities of an endpoint.
+/// Used for cipher negotiation and optimal algorithm selection.
+/// </summary>
+public interface IEndpointCapabilities
+{
+    /// <summary>Unique identifier for this endpoint.</summary>
+    string EndpointId { get; }
+
+    /// <summary>Human-readable endpoint name (e.g., "iPhone 14 Pro", "Legacy Terminal A3").</summary>
+    string EndpointName { get; }
+
+    /// <summary>List of cipher algorithms this endpoint can efficiently handle.</summary>
+    IReadOnlyList<string> SupportedCiphers { get; }
+
+    /// <summary>Preferred cipher for this endpoint (fastest while meeting security requirements).</summary>
+    string PreferredCipher { get; }
+
+    /// <summary>Whether endpoint has hardware AES acceleration (AES-NI, ARM Crypto Extensions).</summary>
+    bool HasHardwareAes { get; }
+
+    /// <summary>Whether endpoint has hardware SHA acceleration.</summary>
+    bool HasHardwareSha { get; }
+
+    /// <summary>Maximum key derivation iterations the endpoint can handle efficiently.</summary>
+    int MaxKeyDerivationIterations { get; }
+
+    /// <summary>Maximum memory available for cryptographic operations (affects Argon2, etc.).</summary>
+    long MaxCryptoMemoryBytes { get; }
+
+    /// <summary>Estimated encryption throughput in MB/s for the preferred cipher.</summary>
+    double EstimatedThroughputMBps { get; }
+
+    /// <summary>Trust level assigned to this endpoint by security policy.</summary>
+    EndpointTrustLevel TrustLevel { get; }
+
+    /// <summary>When these capabilities were last verified.</summary>
+    DateTime CapabilitiesVerifiedAt { get; }
+}
+
+/// <summary>
+/// Trust levels for endpoints, affecting cipher selection and access control.
+/// </summary>
+public enum EndpointTrustLevel
+{
+    /// <summary>Untrusted endpoint - maximum encryption, limited data access.</summary>
+    Untrusted = 0,
+
+    /// <summary>Basic trust - standard transit encryption.</summary>
+    Basic = 1,
+
+    /// <summary>Verified corporate device - optimized cipher selection.</summary>
+    Corporate = 2,
+
+    /// <summary>Highly trusted - server-to-server, secure enclave.</summary>
+    HighTrust = 3,
+
+    /// <summary>Maximum trust - HSM, secure facility.</summary>
+    Maximum = 4
+}
+
+/// <summary>
+/// Selects the optimal cipher for a given endpoint and data classification.
+/// </summary>
+public interface ICipherNegotiator
+{
+    /// <summary>
+    /// Selects the best cipher for transit encryption between server and endpoint.
+    /// </summary>
+    /// <param name="endpointCapabilities">The endpoint's cryptographic capabilities.</param>
+    /// <param name="dataClassification">The sensitivity level of the data.</param>
+    /// <param name="securityPolicy">The applicable security policy.</param>
+    /// <returns>The selected cipher configuration for transit.</returns>
+    Task<TransitCipherConfig> NegotiateCipherAsync(
+        IEndpointCapabilities endpointCapabilities,
+        DataClassification dataClassification,
+        ITransitSecurityPolicy securityPolicy);
+
+    /// <summary>
+    /// Gets the list of ciphers that meet both endpoint capabilities and policy requirements.
+    /// </summary>
+    IReadOnlyList<string> GetCompatibleCiphers(
+        IEndpointCapabilities endpointCapabilities,
+        ITransitSecurityPolicy securityPolicy);
+}
+
+/// <summary>
+/// Security policy for transit encryption decisions.
+/// </summary>
+public interface ITransitSecurityPolicy
+{
+    /// <summary>Policy identifier.</summary>
+    string PolicyId { get; }
+
+    /// <summary>Minimum acceptable cipher strength (bits) for transit.</summary>
+    int MinimumTransitKeyBits { get; }
+
+    /// <summary>Allowed cipher algorithms for transit (empty = all).</summary>
+    IReadOnlyList<string> AllowedTransitCiphers { get; }
+
+    /// <summary>Blocked cipher algorithms (takes precedence over allowed).</summary>
+    IReadOnlyList<string> BlockedCiphers { get; }
+
+    /// <summary>Minimum trust level required for cipher downgrade.</summary>
+    EndpointTrustLevel MinTrustForDowngrade { get; }
+
+    /// <summary>Whether to allow cipher negotiation or enforce fixed cipher.</summary>
+    bool AllowNegotiation { get; }
+
+    /// <summary>Whether to require end-to-end encryption for specific data classifications.</summary>
+    IReadOnlyDictionary<DataClassification, bool> RequireEndToEnd { get; }
+}
+
+/// <summary>
+/// Data sensitivity classification for policy-based cipher selection.
+/// </summary>
+public enum DataClassification
+{
+    /// <summary>Public data - minimum encryption required.</summary>
+    Public = 0,
+
+    /// <summary>Internal - standard encryption.</summary>
+    Internal = 1,
+
+    /// <summary>Confidential - strong encryption required.</summary>
+    Confidential = 2,
+
+    /// <summary>Secret - maximum encryption, strict access control.</summary>
+    Secret = 3,
+
+    /// <summary>Top Secret - government/military grade, HSM-backed.</summary>
+    TopSecret = 4
+}
+
+/// <summary>
+/// Configuration for the selected transit cipher.
+/// </summary>
+public record TransitCipherConfig
+{
+    /// <summary>Algorithm identifier (e.g., "AES-256-GCM", "ChaCha20-Poly1305").</summary>
+    public required string AlgorithmId { get; init; }
+
+    /// <summary>Key size in bits.</summary>
+    public required int KeySizeBits { get; init; }
+
+    /// <summary>Whether this cipher uses authenticated encryption (AEAD).</summary>
+    public required bool IsAead { get; init; }
+
+    /// <summary>Estimated performance impact vs optimal cipher (1.0 = no impact).</summary>
+    public double PerformanceFactor { get; init; } = 1.0;
+
+    /// <summary>Reason for selecting this cipher.</summary>
+    public string? SelectionReason { get; init; }
+
+    /// <summary>Key derivation parameters for transit key.</summary>
+    public KeyDerivationParams? KeyDerivation { get; init; }
+}
+
+/// <summary>
+/// Parameters for deriving transit-specific keys.
+/// </summary>
+public record KeyDerivationParams
+{
+    /// <summary>Key derivation function (e.g., "HKDF-SHA256", "Argon2id").</summary>
+    public required string Kdf { get; init; }
+
+    /// <summary>Salt or context info for key derivation.</summary>
+    public byte[]? Salt { get; init; }
+
+    /// <summary>Iteration count (for PBKDF2-style KDFs).</summary>
+    public int Iterations { get; init; } = 1;
+
+    /// <summary>Memory cost (for Argon2).</summary>
+    public int MemoryCostKB { get; init; } = 0;
+}
+```
+
+#### T6.0.2: Transcryption Interface
+
+```csharp
+// =============================================================================
+// FILE: DataWarehouse.SDK/Security/ITranscryptionService.cs
+// =============================================================================
+
+namespace DataWarehouse.SDK.Security;
+
+/// <summary>
+/// Performs secure cipher-to-cipher transcryption without exposing plaintext to storage.
+/// Used to convert between storage cipher and transit cipher while maintaining confidentiality.
+/// </summary>
+/// <remarks>
+/// SECURITY: Transcryption happens entirely in memory. The plaintext is:
+/// - Never written to disk
+/// - Never logged
+/// - Cleared from memory immediately after use (CryptographicOperations.ZeroMemory)
+///
+/// This allows data encrypted with Serpent-256 (strong, slow) to be re-encrypted
+/// with ChaCha20-Poly1305 (fast, mobile-friendly) for transit, then re-encrypted
+/// back to Serpent-256 at the destination.
+/// </remarks>
+public interface ITranscryptionService
+{
+    /// <summary>
+    /// Transcrypts data from source cipher to destination cipher.
+    /// </summary>
+    /// <param name="input">Input stream encrypted with source cipher.</param>
+    /// <param name="sourceConfig">Configuration for decrypting the input.</param>
+    /// <param name="destinationConfig">Configuration for encrypting the output.</param>
+    /// <param name="context">Security context for key access.</param>
+    /// <returns>Stream encrypted with destination cipher.</returns>
+    Task<Stream> TranscryptAsync(
+        Stream input,
+        TranscryptionSourceConfig sourceConfig,
+        TranscryptionDestinationConfig destinationConfig,
+        ISecurityContext context);
+
+    /// <summary>
+    /// Transcrypts in streaming mode for large files (constant memory usage).
+    /// </summary>
+    IAsyncEnumerable<TranscryptionChunk> TranscryptStreamingAsync(
+        Stream input,
+        TranscryptionSourceConfig sourceConfig,
+        TranscryptionDestinationConfig destinationConfig,
+        ISecurityContext context,
+        int chunkSizeBytes = 1024 * 1024);
+
+    /// <summary>
+    /// Gets the estimated transcryption throughput for a given cipher pair.
+    /// </summary>
+    Task<TranscryptionPerformanceEstimate> EstimatePerformanceAsync(
+        string sourceCipher,
+        string destinationCipher);
+}
+
+/// <summary>
+/// Configuration for the source (decryption) side of transcryption.
+/// </summary>
+public record TranscryptionSourceConfig
+{
+    /// <summary>The encryption plugin type to use for decryption.</summary>
+    public required string PluginId { get; init; }
+
+    /// <summary>Key store containing the decryption key.</summary>
+    public required IKeyStore KeyStore { get; init; }
+
+    /// <summary>Key identifier for decryption.</summary>
+    public required string KeyId { get; init; }
+
+    /// <summary>Additional decryption metadata (from manifest).</summary>
+    public EncryptionMetadata? Metadata { get; init; }
+}
+
+/// <summary>
+/// Configuration for the destination (encryption) side of transcryption.
+/// </summary>
+public record TranscryptionDestinationConfig
+{
+    /// <summary>The encryption plugin type to use for encryption.</summary>
+    public required string PluginId { get; init; }
+
+    /// <summary>Key store for the encryption key.</summary>
+    public required IKeyStore KeyStore { get; init; }
+
+    /// <summary>Key identifier for encryption (or null to generate new).</summary>
+    public string? KeyId { get; init; }
+
+    /// <summary>Key management mode for destination.</summary>
+    public KeyManagementMode KeyMode { get; init; } = KeyManagementMode.Direct;
+
+    /// <summary>Envelope key store (if KeyMode is Envelope).</summary>
+    public IEnvelopeKeyStore? EnvelopeKeyStore { get; init; }
+}
+
+/// <summary>
+/// A chunk of transcrypted data for streaming mode.
+/// </summary>
+public record TranscryptionChunk
+{
+    /// <summary>Chunk sequence number (0-based).</summary>
+    public required int SequenceNumber { get; init; }
+
+    /// <summary>Encrypted chunk data.</summary>
+    public required byte[] Data { get; init; }
+
+    /// <summary>Whether this is the final chunk.</summary>
+    public required bool IsFinal { get; init; }
+
+    /// <summary>Authentication tag for this chunk (if applicable).</summary>
+    public byte[]? Tag { get; init; }
+}
+
+/// <summary>
+/// Performance estimate for transcryption operations.
+/// </summary>
+public record TranscryptionPerformanceEstimate
+{
+    /// <summary>Source cipher algorithm.</summary>
+    public required string SourceCipher { get; init; }
+
+    /// <summary>Destination cipher algorithm.</summary>
+    public required string DestinationCipher { get; init; }
+
+    /// <summary>Estimated throughput in MB/s.</summary>
+    public required double EstimatedThroughputMBps { get; init; }
+
+    /// <summary>Whether hardware acceleration is available.</summary>
+    public required bool HardwareAccelerated { get; init; }
+
+    /// <summary>Recommended chunk size for streaming.</summary>
+    public required int RecommendedChunkSize { get; init; }
+}
+```
+
+#### T6.0.3: Transit Encryption Pipeline Stage
+
+```csharp
+// =============================================================================
+// FILE: DataWarehouse.SDK/Security/ITransitEncryptionStage.cs
+// =============================================================================
+
+namespace DataWarehouse.SDK.Security;
+
+/// <summary>
+/// A pipeline stage that handles transit encryption/decryption.
+/// Sits between the storage layer and the network layer.
+/// </summary>
+/// <remarks>
+/// Pipeline order for WRITE (client → server):
+/// 1. Client: Compress → Encrypt (transit cipher) → Network
+/// 2. Server: Network → Decrypt (transit) → Re-encrypt (storage cipher) → Storage
+///
+/// Pipeline order for READ (server → client):
+/// 1. Server: Storage → Decrypt (storage cipher) → Re-encrypt (transit cipher) → Network
+/// 2. Client: Network → Decrypt (transit) → Decompress → Client
+///
+/// If EndToEnd mode is used, transcryption is skipped and the same cipher is used throughout.
+/// </remarks>
+public interface ITransitEncryptionStage
+{
+    /// <summary>
+    /// Prepares data for transit from server to endpoint.
+    /// </summary>
+    Task<TransitPackage> PrepareForTransitAsync(
+        Stream storageEncryptedData,
+        EncryptionMetadata storageMetadata,
+        IEndpointCapabilities endpoint,
+        ITransitSecurityPolicy policy,
+        ISecurityContext context);
+
+    /// <summary>
+    /// Receives data from transit and prepares for storage.
+    /// </summary>
+    Task<StoragePackage> ReceiveFromTransitAsync(
+        Stream transitEncryptedData,
+        TransitMetadata transitMetadata,
+        EncryptionMetadata targetStorageConfig,
+        ISecurityContext context);
+
+    /// <summary>
+    /// Gets the transit metadata header that will be sent with the data.
+    /// </summary>
+    TransitMetadata GetTransitMetadata(TransitCipherConfig config, string sessionId);
+}
+
+/// <summary>
+/// Package prepared for network transit.
+/// </summary>
+public record TransitPackage
+{
+    /// <summary>Data encrypted with transit cipher.</summary>
+    public required Stream EncryptedData { get; init; }
+
+    /// <summary>Metadata about the transit encryption.</summary>
+    public required TransitMetadata Metadata { get; init; }
+
+    /// <summary>Whether transcryption was performed (vs end-to-end).</summary>
+    public required bool WasTranscrypted { get; init; }
+}
+
+/// <summary>
+/// Package prepared for storage after receiving from transit.
+/// </summary>
+public record StoragePackage
+{
+    /// <summary>Data encrypted with storage cipher.</summary>
+    public required Stream EncryptedData { get; init; }
+
+    /// <summary>Metadata for storage manifest.</summary>
+    public required EncryptionMetadata StorageMetadata { get; init; }
+}
+
+/// <summary>
+/// Metadata sent with transit-encrypted data.
+/// </summary>
+public record TransitMetadata
+{
+    /// <summary>Transit session identifier.</summary>
+    public required string SessionId { get; init; }
+
+    /// <summary>Transit cipher configuration.</summary>
+    public required TransitCipherConfig CipherConfig { get; init; }
+
+    /// <summary>Key identifier used for transit encryption.</summary>
+    public required string TransitKeyId { get; init; }
+
+    /// <summary>When transit encryption was performed.</summary>
+    public required DateTime EncryptedAt { get; init; }
+
+    /// <summary>Source endpoint identifier.</summary>
+    public string? SourceEndpointId { get; init; }
+
+    /// <summary>Destination endpoint identifier.</summary>
+    public string? DestinationEndpointId { get; init; }
+}
+```
+
+---
+
+### T6.1: Abstract Base Classes
+
+#### T6.1.1: EndpointCapabilitiesProviderPluginBase
+
+```csharp
+// =============================================================================
+// FILE: DataWarehouse.SDK/Contracts/TransitEncryptionPluginBases.cs
+// =============================================================================
+
+namespace DataWarehouse.SDK.Contracts;
+
+/// <summary>
+/// Base class for plugins that detect and report endpoint cryptographic capabilities.
+/// Extend this to support different endpoint types (mobile, desktop, IoT, etc.).
+/// </summary>
+public abstract class EndpointCapabilitiesProviderPluginBase : FeaturePluginBase, IEndpointCapabilitiesProvider
+{
+    #region Abstract Members - MUST Override
+
+    /// <summary>
+    /// Detects the cryptographic capabilities of the current endpoint.
+    /// </summary>
+    protected abstract Task<EndpointCapabilities> DetectCapabilitiesAsync();
+
+    /// <summary>
+    /// Gets the endpoint type this provider handles (e.g., "Desktop", "Mobile", "IoT").
+    /// </summary>
+    protected abstract string EndpointType { get; }
+
+    #endregion
+
+    #region Virtual Members - CAN Override
+
+    /// <summary>
+    /// Detects hardware acceleration availability. Override for platform-specific detection.
+    /// </summary>
+    protected virtual bool DetectHardwareAes()
+    {
+        // Default: Check .NET's intrinsics support
+        return System.Runtime.Intrinsics.X86.Aes.IsSupported ||
+               System.Runtime.Intrinsics.Arm.Aes.IsSupported;
+    }
+
+    /// <summary>
+    /// Gets the list of ciphers this endpoint can efficiently handle.
+    /// </summary>
+    protected virtual IReadOnlyList<string> GetSupportedCiphers()
+    {
+        var ciphers = new List<string>();
+
+        // AES-GCM - available if hardware accelerated or powerful enough
+        if (DetectHardwareAes() || EstimatedCpuPower > 1000)
+            ciphers.Add("AES-256-GCM");
+
+        // ChaCha20 - always available, optimized for software implementation
+        ciphers.Add("ChaCha20-Poly1305");
+
+        // Strong ciphers - only if powerful endpoint
+        if (EstimatedCpuPower > 2000)
+        {
+            ciphers.Add("Serpent-256-CTR-HMAC");
+            ciphers.Add("Twofish-256-CTR-HMAC");
+        }
+
+        return ciphers;
+    }
+
+    /// <summary>
+    /// Estimated CPU power metric (higher = more powerful). Override for accurate detection.
+    /// </summary>
+    protected virtual int EstimatedCpuPower => 1000;
+
+    /// <summary>
+    /// Cache duration for capabilities detection results.
+    /// </summary>
+    protected virtual TimeSpan CapabilitiesCacheDuration => TimeSpan.FromHours(1);
+
+    #endregion
+
+    #region Implementation
+
+    private EndpointCapabilities? _cachedCapabilities;
+    private DateTime _cacheExpiry = DateTime.MinValue;
+    private readonly SemaphoreSlim _detectLock = new(1, 1);
+
+    /// <inheritdoc/>
+    public async Task<IEndpointCapabilities> GetCapabilitiesAsync()
+    {
+        if (_cachedCapabilities != null && DateTime.UtcNow < _cacheExpiry)
+            return _cachedCapabilities;
+
+        await _detectLock.WaitAsync();
+        try
+        {
+            if (_cachedCapabilities != null && DateTime.UtcNow < _cacheExpiry)
+                return _cachedCapabilities;
+
+            _cachedCapabilities = await DetectCapabilitiesAsync();
+            _cacheExpiry = DateTime.UtcNow + CapabilitiesCacheDuration;
+            return _cachedCapabilities;
+        }
+        finally
+        {
+            _detectLock.Release();
+        }
+    }
+
+    /// <inheritdoc/>
+    public bool CanHandle(string endpointType) =>
+        endpointType.Equals(EndpointType, StringComparison.OrdinalIgnoreCase);
+
+    #endregion
+}
+
+/// <summary>
+/// Concrete endpoint capabilities implementation.
+/// </summary>
+public record EndpointCapabilities : IEndpointCapabilities
+{
+    public required string EndpointId { get; init; }
+    public required string EndpointName { get; init; }
+    public required IReadOnlyList<string> SupportedCiphers { get; init; }
+    public required string PreferredCipher { get; init; }
+    public required bool HasHardwareAes { get; init; }
+    public required bool HasHardwareSha { get; init; }
+    public required int MaxKeyDerivationIterations { get; init; }
+    public required long MaxCryptoMemoryBytes { get; init; }
+    public required double EstimatedThroughputMBps { get; init; }
+    public required EndpointTrustLevel TrustLevel { get; init; }
+    public required DateTime CapabilitiesVerifiedAt { get; init; }
+}
+```
+
+#### T6.1.2: CipherNegotiatorPluginBase
+
+```csharp
+/// <summary>
+/// Base class for cipher negotiation plugins.
+/// Extend to implement custom negotiation strategies.
+/// </summary>
+public abstract class CipherNegotiatorPluginBase : FeaturePluginBase, ICipherNegotiator
+{
+    #region Abstract Members - MUST Override
+
+    /// <summary>
+    /// Core negotiation logic. Returns the best cipher for the given constraints.
+    /// </summary>
+    protected abstract Task<TransitCipherConfig> NegotiateCoreAsync(
+        IEndpointCapabilities endpoint,
+        DataClassification classification,
+        ITransitSecurityPolicy policy);
+
+    #endregion
+
+    #region Virtual Members - CAN Override
+
+    /// <summary>
+    /// Cipher preference order (strongest to fastest). Override to customize.
+    /// </summary>
+    protected virtual IReadOnlyList<CipherPreference> CipherPreferences => new[]
+    {
+        new CipherPreference("Serpent-256-CTR-HMAC", 256, SecurityLevel: 10, PerformanceLevel: 3),
+        new CipherPreference("Twofish-256-CTR-HMAC", 256, SecurityLevel: 9, PerformanceLevel: 4),
+        new CipherPreference("AES-256-GCM", 256, SecurityLevel: 8, PerformanceLevel: 9),
+        new CipherPreference("ChaCha20-Poly1305", 256, SecurityLevel: 8, PerformanceLevel: 10),
+        new CipherPreference("AES-128-GCM", 128, SecurityLevel: 6, PerformanceLevel: 10),
+    };
+
+    /// <summary>
+    /// Minimum security level required for each data classification.
+    /// </summary>
+    protected virtual IReadOnlyDictionary<DataClassification, int> MinSecurityLevel => new Dictionary<DataClassification, int>
+    {
+        [DataClassification.Public] = 1,
+        [DataClassification.Internal] = 5,
+        [DataClassification.Confidential] = 7,
+        [DataClassification.Secret] = 8,
+        [DataClassification.TopSecret] = 10,
+    };
+
+    #endregion
+
+    #region Implementation
+
+    /// <inheritdoc/>
+    public async Task<TransitCipherConfig> NegotiateCipherAsync(
+        IEndpointCapabilities endpointCapabilities,
+        DataClassification dataClassification,
+        ITransitSecurityPolicy securityPolicy)
+    {
+        // Validate policy allows negotiation
+        if (!securityPolicy.AllowNegotiation)
+        {
+            // Policy enforces fixed cipher - return first allowed
+            var forcedCipher = securityPolicy.AllowedTransitCiphers.FirstOrDefault()
+                ?? throw new SecurityException("No allowed ciphers in policy");
+
+            return new TransitCipherConfig
+            {
+                AlgorithmId = forcedCipher,
+                KeySizeBits = GetKeySize(forcedCipher),
+                IsAead = IsAead(forcedCipher),
+                SelectionReason = "Policy enforced fixed cipher"
+            };
+        }
+
+        // Delegate to implementation
+        return await NegotiateCoreAsync(endpointCapabilities, dataClassification, securityPolicy);
+    }
+
+    /// <inheritdoc/>
+    public IReadOnlyList<string> GetCompatibleCiphers(
+        IEndpointCapabilities endpoint,
+        ITransitSecurityPolicy policy)
+    {
+        var endpointCiphers = endpoint.SupportedCiphers.ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var allowedCiphers = policy.AllowedTransitCiphers.Count > 0
+            ? policy.AllowedTransitCiphers
+            : CipherPreferences.Select(p => p.AlgorithmId);
+        var blockedCiphers = policy.BlockedCiphers.ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        return allowedCiphers
+            .Where(c => endpointCiphers.Contains(c))
+            .Where(c => !blockedCiphers.Contains(c))
+            .Where(c => GetKeySize(c) >= policy.MinimumTransitKeyBits)
+            .ToList();
+    }
+
+    protected int GetKeySize(string algorithm) => algorithm switch
+    {
+        var a when a.Contains("256") => 256,
+        var a when a.Contains("128") => 128,
+        var a when a.Contains("192") => 192,
+        _ => 256
+    };
+
+    protected bool IsAead(string algorithm) =>
+        algorithm.Contains("GCM") || algorithm.Contains("Poly1305") || algorithm.Contains("HMAC");
+
+    #endregion
+}
+
+/// <summary>
+/// Cipher preference with security and performance ratings.
+/// </summary>
+public record CipherPreference(
+    string AlgorithmId,
+    int KeySizeBits,
+    int SecurityLevel,    // 1-10 (10 = highest security)
+    int PerformanceLevel  // 1-10 (10 = fastest)
+);
+```
+
+#### T6.1.3: TranscryptionServicePluginBase
+
+```csharp
+/// <summary>
+/// Base class for transcryption service plugins.
+/// Handles secure cipher-to-cipher conversion in memory.
+/// </summary>
+public abstract class TranscryptionServicePluginBase : FeaturePluginBase, ITranscryptionService
+{
+    #region Dependencies
+
+    /// <summary>
+    /// Registry of available encryption plugins.
+    /// </summary>
+    protected IEncryptionPluginRegistry? EncryptionRegistry { get; private set; }
+
+    /// <inheritdoc/>
+    public override async Task<HandshakeResponse> OnHandshakeAsync(HandshakeRequest request)
+    {
+        var response = await base.OnHandshakeAsync(request);
+
+        // Discover encryption plugins
+        EncryptionRegistry = request.Context?.GetService<IEncryptionPluginRegistry>();
+
+        return response;
+    }
+
+    #endregion
+
+    #region Virtual Members - CAN Override
+
+    /// <summary>
+    /// Default chunk size for streaming transcryption.
+    /// </summary>
+    protected virtual int DefaultChunkSize => 1024 * 1024; // 1 MB
+
+    /// <summary>
+    /// Maximum plaintext to hold in memory at once.
+    /// </summary>
+    protected virtual long MaxMemoryBufferBytes => 100 * 1024 * 1024; // 100 MB
+
+    #endregion
+
+    #region Implementation
+
+    /// <inheritdoc/>
+    public async Task<Stream> TranscryptAsync(
+        Stream input,
+        TranscryptionSourceConfig sourceConfig,
+        TranscryptionDestinationConfig destinationConfig,
+        ISecurityContext context)
+    {
+        if (EncryptionRegistry == null)
+            throw new InvalidOperationException("Encryption registry not initialized");
+
+        // Get source and destination encryption plugins
+        var sourcePlugin = EncryptionRegistry.GetPlugin(sourceConfig.PluginId)
+            ?? throw new ArgumentException($"Unknown source plugin: {sourceConfig.PluginId}");
+        var destPlugin = EncryptionRegistry.GetPlugin(destinationConfig.PluginId)
+            ?? throw new ArgumentException($"Unknown destination plugin: {destinationConfig.PluginId}");
+
+        byte[]? plaintext = null;
+
+        try
+        {
+            // Step 1: Decrypt with source cipher
+            var decryptArgs = new Dictionary<string, object>
+            {
+                ["keyStore"] = sourceConfig.KeyStore,
+                ["securityContext"] = context,
+            };
+
+            if (sourceConfig.Metadata != null)
+                decryptArgs["metadata"] = sourceConfig.Metadata;
+
+            using var decryptedStream = await sourcePlugin.DecryptAsync(input, decryptArgs);
+            using var plaintextMs = new MemoryStream();
+            await decryptedStream.CopyToAsync(plaintextMs);
+            plaintext = plaintextMs.ToArray();
+
+            // Step 2: Encrypt with destination cipher
+            var encryptArgs = new Dictionary<string, object>
+            {
+                ["keyStore"] = destinationConfig.KeyStore,
+                ["securityContext"] = context,
+            };
+
+            if (destinationConfig.KeyId != null)
+                encryptArgs["keyId"] = destinationConfig.KeyId;
+
+            if (destinationConfig.KeyMode == KeyManagementMode.Envelope &&
+                destinationConfig.EnvelopeKeyStore != null)
+            {
+                encryptArgs["envelopeKeyStore"] = destinationConfig.EnvelopeKeyStore;
+                encryptArgs["keyManagementMode"] = KeyManagementMode.Envelope;
+            }
+
+            using var plaintextInput = new MemoryStream(plaintext);
+            return await destPlugin.EncryptAsync(plaintextInput, encryptArgs);
+        }
+        finally
+        {
+            // CRITICAL: Clear plaintext from memory immediately
+            if (plaintext != null)
+                CryptographicOperations.ZeroMemory(plaintext);
+        }
+    }
+
+    /// <inheritdoc/>
+    public async IAsyncEnumerable<TranscryptionChunk> TranscryptStreamingAsync(
+        Stream input,
+        TranscryptionSourceConfig sourceConfig,
+        TranscryptionDestinationConfig destinationConfig,
+        ISecurityContext context,
+        int chunkSizeBytes = 0)
+    {
+        if (chunkSizeBytes <= 0) chunkSizeBytes = DefaultChunkSize;
+
+        // For streaming, we need to use chunked encryption
+        // This is a simplified implementation - production would use proper AEAD chunking
+
+        int sequenceNumber = 0;
+        var buffer = new byte[chunkSizeBytes];
+        int bytesRead;
+
+        // First, decrypt the entire input (necessary for AEAD authentication)
+        // Then re-encrypt in chunks
+        using var transcrypted = await TranscryptAsync(input, sourceConfig, destinationConfig, context);
+
+        while ((bytesRead = await transcrypted.ReadAsync(buffer)) > 0)
+        {
+            var chunk = new byte[bytesRead];
+            Array.Copy(buffer, chunk, bytesRead);
+
+            yield return new TranscryptionChunk
+            {
+                SequenceNumber = sequenceNumber++,
+                Data = chunk,
+                IsFinal = transcrypted.Position >= transcrypted.Length
+            };
+        }
+
+        CryptographicOperations.ZeroMemory(buffer);
+    }
+
+    /// <inheritdoc/>
+    public Task<TranscryptionPerformanceEstimate> EstimatePerformanceAsync(
+        string sourceCipher,
+        string destinationCipher)
+    {
+        // Estimate based on cipher characteristics
+        var sourcePerf = EstimateCipherPerformance(sourceCipher);
+        var destPerf = EstimateCipherPerformance(destinationCipher);
+
+        // Transcryption throughput is limited by slower of decrypt/encrypt
+        var throughput = Math.Min(sourcePerf, destPerf);
+
+        return Task.FromResult(new TranscryptionPerformanceEstimate
+        {
+            SourceCipher = sourceCipher,
+            DestinationCipher = destinationCipher,
+            EstimatedThroughputMBps = throughput,
+            HardwareAccelerated = sourceCipher.Contains("AES") || destinationCipher.Contains("AES"),
+            RecommendedChunkSize = throughput > 500 ? 4 * 1024 * 1024 : 1024 * 1024
+        });
+    }
+
+    private double EstimateCipherPerformance(string cipher) => cipher switch
+    {
+        var c when c.Contains("ChaCha20") => 800,   // MB/s (software optimized)
+        var c when c.Contains("AES") => 1000,        // MB/s (with AES-NI)
+        var c when c.Contains("Serpent") => 200,     // MB/s (complex cipher)
+        var c when c.Contains("Twofish") => 250,     // MB/s (moderate complexity)
+        _ => 500
+    };
+
+    #endregion
+}
+```
+
+---
+
+### T6.2: Plugin Implementations
+
+| Task | Plugin | Base Class | Description | Status |
+|------|--------|------------|-------------|--------|
+| T6.2.1 | `DesktopEndpointCapabilitiesPlugin` | `EndpointCapabilitiesProviderPluginBase` | Detects capabilities of desktop endpoints (Windows, macOS, Linux) | [ ] |
+| T6.2.2 | `MobileEndpointCapabilitiesPlugin` | `EndpointCapabilitiesProviderPluginBase` | Detects capabilities of mobile endpoints (iOS, Android) | [ ] |
+| T6.2.3 | `IoTEndpointCapabilitiesPlugin` | `EndpointCapabilitiesProviderPluginBase` | Detects capabilities of IoT/embedded devices | [ ] |
+| T6.2.4 | `BrowserEndpointCapabilitiesPlugin` | `EndpointCapabilitiesProviderPluginBase` | Detects capabilities of browser-based clients (WebCrypto) | [ ] |
+| T6.2.5 | `DefaultCipherNegotiatorPlugin` | `CipherNegotiatorPluginBase` | Default negotiation: balance security vs performance | [ ] |
+| T6.2.6 | `SecurityFirstNegotiatorPlugin` | `CipherNegotiatorPluginBase` | Always prefer strongest cipher endpoint can handle | [ ] |
+| T6.2.7 | `PerformanceFirstNegotiatorPlugin` | `CipherNegotiatorPluginBase` | Prefer fastest cipher meeting minimum security | [ ] |
+| T6.2.8 | `PolicyDrivenNegotiatorPlugin` | `CipherNegotiatorPluginBase` | Negotiation based on data classification policies | [ ] |
+| T6.2.9 | `DefaultTranscryptionPlugin` | `TranscryptionServicePluginBase` | Default in-memory transcryption service | [ ] |
+| T6.2.10 | `StreamingTranscryptionPlugin` | `TranscryptionServicePluginBase` | Optimized for large files with chunked processing | [ ] |
+
+---
+
+### T6.3: Transit Security Policies
+
+| Task | Policy | Description | Status |
+|------|--------|-------------|--------|
+| T6.3.1 | `DefaultTransitPolicy` | Standard policy: AES-256-GCM or ChaCha20-Poly1305, negotiation allowed | [ ] |
+| T6.3.2 | `GovernmentTransitPolicy` | FIPS-only ciphers, minimum 256-bit, no negotiation below Secret classification | [ ] |
+| T6.3.3 | `HighPerformanceTransitPolicy` | Prefer ChaCha20, allow 128-bit for Public data | [ ] |
+| T6.3.4 | `MaximumSecurityTransitPolicy` | End-to-end only, no transcryption, Serpent/Twofish only | [ ] |
+| T6.3.5 | `MobileOptimizedPolicy` | Prefer ChaCha20 (no AES-NI on mobile), reduced KDF iterations | [ ] |
+
+---
+
+### T6.4: Configuration & Integration
+
+```csharp
+/// <summary>
+/// Top-level configuration for transit encryption behavior.
+/// Added to DataWarehouse global configuration.
+/// </summary>
+public class TransitEncryptionConfiguration
+{
+    /// <summary>
+    /// How encryption layers are applied.
+    /// </summary>
+    public EncryptionLayer EncryptionLayer { get; set; } = EncryptionLayer.AtRestAndTransit;
+
+    /// <summary>
+    /// How transit cipher is selected.
+    /// </summary>
+    public TransitCipherSelectionMode TransitCipherSelection { get; set; } = TransitCipherSelectionMode.AutoNegotiate;
+
+    /// <summary>
+    /// Explicit transit cipher (when TransitCipherSelection = Explicit).
+    /// </summary>
+    public string? ExplicitTransitCipher { get; set; }
+
+    /// <summary>
+    /// Security policy ID for transit encryption.
+    /// </summary>
+    public string TransitPolicyId { get; set; } = "default";
+
+    /// <summary>
+    /// Whether to cache endpoint capabilities.
+    /// </summary>
+    public bool CacheEndpointCapabilities { get; set; } = true;
+
+    /// <summary>
+    /// Endpoint capabilities cache duration.
+    /// </summary>
+    public TimeSpan CapabilitiesCacheDuration { get; set; } = TimeSpan.FromHours(1);
+
+    /// <summary>
+    /// Whether to log cipher negotiation decisions.
+    /// </summary>
+    public bool LogNegotiationDecisions { get; set; } = true;
+
+    /// <summary>
+    /// Whether to include performance metrics in transit metadata.
+    /// </summary>
+    public bool IncludePerformanceMetrics { get; set; } = false;
+}
+```
+
+---
+
+### T6.5: Summary Table
+
+| Task | Component | Type | Description | Dependencies | Status |
+|------|-----------|------|-------------|--------------|--------|
+| T6.0.1 | SDK Interfaces | Interface | Core transit encryption interfaces | None | [ ] |
+| T6.0.2 | Transcryption Interface | Interface | Secure cipher-to-cipher conversion | T6.0.1 | [ ] |
+| T6.0.3 | Transit Stage Interface | Interface | Pipeline stage for transit handling | T6.0.1, T6.0.2 | [ ] |
+| T6.1.1 | `EndpointCapabilitiesProviderPluginBase` | Abstract Base | Detect endpoint crypto capabilities | T6.0.1 | [ ] |
+| T6.1.2 | `CipherNegotiatorPluginBase` | Abstract Base | Select optimal transit cipher | T6.0.1 | [ ] |
+| T6.1.3 | `TranscryptionServicePluginBase` | Abstract Base | In-memory cipher conversion | T6.0.2 | [ ] |
+| T6.2.1-4 | Endpoint Capability Plugins | Plugin | Platform-specific detection | T6.1.1 | [ ] |
+| T6.2.5-8 | Cipher Negotiator Plugins | Plugin | Different negotiation strategies | T6.1.2 | [ ] |
+| T6.2.9-10 | Transcryption Plugins | Plugin | Default and streaming transcryption | T6.1.3 | [ ] |
+| T6.3.1-5 | Transit Policies | Config | Pre-built security policies | T6.0.1 | [ ] |
+| T6.4 | Configuration | Config | Global transit encryption settings | All | [ ] |
+
+---
+
+### T6.6: Architecture Diagram
+
+```
+                                    CLIENT                                                            SERVER
+┌─────────────────────────────────────────────────────────────────────┐    ┌─────────────────────────────────────────────────────────────────────┐
+│                                                                      │    │                                                                      │
+│   ┌─────────────┐    ┌──────────────────┐    ┌─────────────────┐   │    │   ┌─────────────────┐    ┌──────────────────┐    ┌─────────────┐   │
+│   │  User Data  │───▶│  Transit Encrypt │───▶│    NETWORK      │═══════▶│   Transit Decrypt │───▶│   Transcryption  │───▶│   Storage   │   │
+│   │  (plaintext)│    │  (ChaCha20)      │    │  (encrypted)    │   │    │   (ChaCha20)      │    │  ChaCha20→Serpent│    │  (Serpent)  │   │
+│   └─────────────┘    └──────────────────┘    └─────────────────┘   │    │   └─────────────────┘    └──────────────────┘    └─────────────┘   │
+│          ▲                    │                                     │    │                                   │                    │            │
+│          │            ┌───────┴───────┐                            │    │                           ┌───────┴───────┐            │            │
+│          │            │ Capabilities  │                            │    │                           │   Security    │            │            │
+│          │            │ Negotiation   │                            │    │                           │   Policy      │            ▼            │
+│          │            └───────────────┘                            │    │                           └───────────────┘    ┌─────────────┐   │
+│          │                                                         │    │                                               │ Encrypted   │   │
+│   ┌──────┴──────┐                                                  │    │                                               │ at Rest     │   │
+│   │ Endpoint    │                                                  │    │                                               │ (Serpent)   │   │
+│   │ Capabilities│                                                  │    │                                               └─────────────┘   │
+│   │ Provider    │                                                  │    │                                                                  │
+│   └─────────────┘                                                  │    │                                                                  │
+│                                                                      │    │                                                                  │
+│   Mobile: ChaCha20-Poly1305 (no AES-NI, optimized for ARM)          │    │   Storage: Serpent-256-CTR-HMAC (maximum security)              │
+│   Desktop: AES-256-GCM (AES-NI available)                           │    │                                                                  │
+│   IoT: ChaCha20-Poly1305 (limited resources)                        │    │                                                                  │
+│                                                                      │    │                                                                  │
+└─────────────────────────────────────────────────────────────────────┘    └─────────────────────────────────────────────────────────────────────┘
+
+KEY POINTS:
+• Data is ALWAYS encrypted - never exposed on network or disk
+• Transit cipher adapts to endpoint capabilities (ChaCha20 for mobile, AES for desktop)
+• Storage cipher is always the strongest (Serpent/Twofish for gov/mil, AES for enterprise)
+• Transcryption happens in server memory - plaintext never touches disk
+• End-to-end mode available when same cipher must be used throughout
+```
+
+---
+
+#### Phase T7: Testing & Documentation (Priority: HIGH)
 | Task | Description | Dependencies | Status |
 |------|-------------|--------------|--------|
 | T6.1 | Unit tests for integrity provider | T1.2 | [ ] |
