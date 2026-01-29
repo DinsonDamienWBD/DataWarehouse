@@ -159,6 +159,7 @@
     <Project Path="Plugins/DataWarehouse.Plugins.WinFspDriver/DataWarehouse.Plugins.WinFspDriver.csproj">
       <Platform Solution="Debug|*" Project="x64" />
     </Project>
+    <Project Path="Plugins/DataWarehouse.Plugins.TamperProof/DataWarehouse.Plugins.TamperProof.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.Worm.Software/DataWarehouse.Plugins.Worm.Software.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.Zabbix/DataWarehouse.Plugins.Zabbix.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.ZeroConfig/DataWarehouse.Plugins.ZeroConfig.csproj" />
