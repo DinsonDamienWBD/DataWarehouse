@@ -23,6 +23,7 @@
     <Project Path="Plugins/DataWarehouse.Plugins.AdvancedRaid/DataWarehouse.Plugins.AdvancedRaid.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.AesEncryption/DataWarehouse.Plugins.AesEncryption.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.AIAgents/DataWarehouse.Plugins.AIAgents.csproj" />
+    <Project Path="Plugins/DataWarehouse.Plugins.AIInterface/DataWarehouse.Plugins.AIInterface.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.AirGappedBackup/DataWarehouse.Plugins.AirGappedBackup.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.Alerting/DataWarehouse.Plugins.Alerting.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.AlertingOps/DataWarehouse.Plugins.AlertingOps.csproj" />

@@ -1,3 +1,4 @@
+using DataWarehouse.SDK.AI;
 using System.Net.Http.Headers;
 using System.Runtime.CompilerServices;
 using System.Text;
@@ -9,7 +10,7 @@ namespace DataWarehouse.Plugins.AIAgents
     /// Perplexity AI provider for search-enhanced AI.
     /// Models have built-in web search capabilities.
     /// </summary>
-    public class PerplexityProvider : IAIProvider
+    public class PerplexityProvider : IExtendedAIProvider
     {
         private readonly HttpClient _httpClient;
         private readonly ProviderConfig _config;
@@ -33,6 +34,14 @@ namespace DataWarehouse.Plugins.AIAgents
             "llama-3.1-8b-instruct",
             "llama-3.1-70b-instruct"
         };
+
+        public string ProviderId => "perplexity";
+        public string DisplayName => "Perplexity AI";
+        public bool IsAvailable => !string.IsNullOrEmpty(_config.ApiKey);
+        public AICapabilities Capabilities =>
+            AICapabilities.TextCompletion |
+            AICapabilities.ChatCompletion |
+            AICapabilities.Streaming;
 
         public PerplexityProvider(HttpClient httpClient, ProviderConfig config)
         {
@@ -113,6 +122,11 @@ namespace DataWarehouse.Plugins.AIAgents
         }
 
         public Task<double[][]> EmbedAsync(string[] texts, string? model = null, CancellationToken ct = default)
+        {
+            throw new NotSupportedException("Perplexity does not support embeddings");
+        }
+
+        public Task<float[]> GetEmbeddingsAsync(string text, CancellationToken ct = default)
         {
             throw new NotSupportedException("Perplexity does not support embeddings");
         }
@@ -248,5 +262,61 @@ namespace DataWarehouse.Plugins.AIAgents
 
             return (textContent, citations);
         }
+
+        #region SDK IAIProvider Implementation
+
+        public async Task<AIResponse> CompleteAsync(AIRequest request, CancellationToken ct = default)
+        {
+            var chatRequest = new ChatRequest
+            {
+                Messages = request.ChatHistory.Count > 0
+                    ? request.ChatHistory.Select(m => new ChatMessage { Role = m.Role.ToString().ToLowerInvariant(), Content = m.Content }).ToList()
+                    : new List<ChatMessage> { new() { Role = "user", Content = request.Prompt } },
+                Model = request.Model ?? DefaultModel,
+                MaxTokens = request.MaxTokens,
+                Temperature = request.Temperature ?? 0.7f
+            };
+
+            if (!string.IsNullOrEmpty(request.SystemMessage))
+                chatRequest.Messages.Insert(0, new ChatMessage { Role = "system", Content = request.SystemMessage });
+
+            var response = await ChatAsync(chatRequest, ct);
+            return new AIResponse
+            {
+                Content = response.Content,
+                FinishReason = response.FinishReason,
+                Usage = new AIUsage
+                {
+                    PromptTokens = response.InputTokens,
+                    CompletionTokens = response.OutputTokens
+                }
+            };
+        }
+
+        public async IAsyncEnumerable<AIStreamChunk> CompleteStreamingAsync(AIRequest request, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct = default)
+        {
+            var chatRequest = new ChatRequest
+            {
+                Messages = request.ChatHistory.Count > 0
+                    ? request.ChatHistory.Select(m => new ChatMessage { Role = m.Role.ToString().ToLowerInvariant(), Content = m.Content }).ToList()
+                    : new List<ChatMessage> { new() { Role = "user", Content = request.Prompt } },
+                Model = request.Model ?? DefaultModel,
+                MaxTokens = request.MaxTokens,
+                Temperature = request.Temperature ?? 0.7f,
+                Stream = true
+            };
+
+            await foreach (var chunk in StreamChatAsync(chatRequest, ct))
+            {
+                yield return new AIStreamChunk { Content = chunk };
+            }
+        }
+
+        public async Task<float[][]> GetEmbeddingsBatchAsync(string[] texts, CancellationToken ct = default)
+        {
+            throw new NotSupportedException("Perplexity does not support embeddings");
+        }
+
+        #endregion
     }
 }

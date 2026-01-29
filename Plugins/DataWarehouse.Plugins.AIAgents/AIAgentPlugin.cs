@@ -1,3 +1,4 @@
+using DataWarehouse.SDK.AI;
 using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Primitives;
 using DataWarehouse.SDK.Utilities;
@@ -58,7 +59,7 @@ namespace DataWarehouse.Plugins.AIAgents
         public override string Version => "1.0.0";
         public override PluginCategory Category => PluginCategory.AIProvider;
 
-        private readonly ConcurrentDictionary<string, IAIProvider> _providers = new();
+        private readonly ConcurrentDictionary<string, IExtendedAIProvider> _providers = new();
         private readonly ConcurrentDictionary<string, ConversationHistory> _conversations = new();
         private readonly ConcurrentDictionary<string, ProviderStats> _providerStats = new();
         private readonly AIAgentConfig _config;
@@ -665,13 +666,13 @@ namespace DataWarehouse.Plugins.AIAgents
 
         #region Provider Management
 
-        private IAIProvider? GetProvider(string? name)
+        private IExtendedAIProvider? GetProvider(string? name)
         {
             if (string.IsNullOrEmpty(name)) return null;
             return _providers.TryGetValue(name, out var provider) ? provider : null;
         }
 
-        private IAIProvider? CreateProvider(ProviderConfig config)
+        private IExtendedAIProvider? CreateProvider(ProviderConfig config)
         {
             return config.Type.ToLowerInvariant() switch
             {
@@ -846,9 +847,13 @@ namespace DataWarehouse.Plugins.AIAgents
         #endregion
     }
 
-    #region Provider Interface
+    #region Provider Interface - Extended from SDK IAIProvider
 
-    public interface IAIProvider
+    /// <summary>
+    /// Extended AI provider interface that builds on SDK IAIProvider
+    /// with plugin-specific capabilities.
+    /// </summary>
+    public interface IExtendedAIProvider : IAIProvider
     {
         string ProviderType { get; }
         string DefaultModel { get; }
@@ -859,6 +864,7 @@ namespace DataWarehouse.Plugins.AIAgents
         bool SupportsEmbeddings { get; }
         string[] AvailableModels { get; }
 
+        // Plugin-specific methods that don't map to SDK interface
         Task<ChatResponse> ChatAsync(ChatRequest request, CancellationToken ct = default);
         Task<CompletionResponse> CompleteAsync(CompletionRequest request, CancellationToken ct = default);
         Task<double[][]> EmbedAsync(string[] texts, string? model = null, CancellationToken ct = default);
@@ -867,10 +873,7 @@ namespace DataWarehouse.Plugins.AIAgents
         Task<VisionResponse> VisionAsync(VisionRequest request, CancellationToken ct = default);
     }
 
-    #endregion
-
-    #region Request/Response Types
-
+    // Plugin-specific request/response types
     public class ChatRequest
     {
         public string Model { get; set; } = string.Empty;
@@ -879,13 +882,6 @@ namespace DataWarehouse.Plugins.AIAgents
         public double? Temperature { get; set; }
         public bool Stream { get; set; }
         public string[]? StopSequences { get; set; }
-    }
-
-    public class ChatMessage
-    {
-        public string Role { get; set; } = string.Empty;
-        public string Content { get; set; } = string.Empty;
-        public string? Name { get; set; }
     }
 
     public class ChatResponse
@@ -922,13 +918,6 @@ namespace DataWarehouse.Plugins.AIAgents
         public string FunctionCall { get; set; } = "auto";
     }
 
-    public class FunctionDefinition
-    {
-        public string Name { get; set; } = string.Empty;
-        public string Description { get; set; } = string.Empty;
-        public Dictionary<string, object>? Parameters { get; set; }
-    }
-
     public class FunctionCallResponse
     {
         public string? FunctionName { get; set; }
@@ -950,6 +939,24 @@ namespace DataWarehouse.Plugins.AIAgents
         public string Content { get; set; } = string.Empty;
         public int InputTokens { get; set; }
         public int OutputTokens { get; set; }
+    }
+
+    #endregion
+
+    #region Shared Types
+
+    public class ChatMessage
+    {
+        public string Role { get; set; } = string.Empty;
+        public string Content { get; set; } = string.Empty;
+        public string? Name { get; set; }
+    }
+
+    public class FunctionDefinition
+    {
+        public string Name { get; set; } = string.Empty;
+        public string Description { get; set; } = string.Empty;
+        public Dictionary<string, object>? Parameters { get; set; }
     }
 
     #endregion

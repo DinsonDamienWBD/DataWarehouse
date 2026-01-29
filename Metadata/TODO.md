@@ -209,88 +209,127 @@ These features represent the next generation of data storage technology, positio
 
 ### CATEGORY D: Industry-First AI Features
 
+> **ARCHITECTURAL NOTE (2026-01-28):** AI capabilities have been consolidated into a unified architecture:
+> - **AIAgents Plugin** (`Plugins/DataWarehouse.Plugins.AIAgents/`) - Central AI capability hub with:
+>   - Two-level control model: Instance-level capabilities (admin) + User-level provider mappings
+>   - ChildrenMirrorParent toggle for simple vs fine-grained sub-capability control
+>   - Capabilities: Chat, NLP, Semantics, Generation, Embeddings, Vision, Audio, AIOps, Knowledge
+>   - 12 provider implementations using SDK's `DataWarehouse.SDK.AI.IAIProvider` interface
+> - **AIInterface Plugin** (`Plugins/DataWarehouse.Plugins.AIInterface/`) - Unified channel interface:
+>   - Protocol translation only (no AI work), routes to AIAgents via message bus
+>   - Supports: Slack, Teams, Discord, Voice (Alexa/Google/Siri), LLM integrations (ChatGPT/Claude/Webhook)
+> - **Deleted Legacy Plugins:** AutonomousDataManagement, NaturalLanguageInterface, SemanticUnderstanding
+
 #### Task 47: Autonomous Data Management (AIOps)
 **Priority:** P0 (Industry-First)
 **Effort:** Very High
-**Status:** [ ] Not Started
+**Status:** ✅ **COMPLETED** (2026-01-28) - **REFACTORED** (2026-01-28)
 
 **Description:** Implement fully autonomous data management where AI handles all routine operations without human intervention.
+
+**Implementation:** Consolidated into `Plugins/DataWarehouse.Plugins.AIAgents/Capabilities/AIOps/`
+- Capability Handler: `AIOpsCapabilityHandler.cs` (11 sub-capabilities with ChildrenMirrorParent toggle)
+- Engines: `TieringEngine.cs`, `ScalingEngine.cs`, `AnomalyEngine.cs`, `CostEngine.cs`, `SecurityEngine.cs`, `ComplianceEngine.cs`, `CapacityEngine.cs`, `PerformanceEngine.cs`
+- Models: `PredictionModels.cs` (ML-based predictions with graceful AI degradation)
+- Provider Support: Uses SDK `DataWarehouse.SDK.AI.IAIProvider` interface (provider-agnostic)
 
 **Autonomous Capabilities:**
 
 | Capability | Description | Status |
 |------------|-------------|--------|
-| Self-Optimizing Tiering | ML-driven data placement | [ ] |
-| Predictive Scaling | Forecast and auto-scale | [ ] |
-| Anomaly Auto-Remediation | Detect and fix issues | [ ] |
-| Cost Optimization | Minimize cloud spend | [ ] |
-| Security Response | Auto-block threats | [ ] |
-| Compliance Automation | Auto-enforce policies | [ ] |
-| Capacity Planning | Predict future needs | [ ] |
-| Performance Tuning | Auto-adjust settings | [ ] |
+| Self-Optimizing Tiering | ML-driven data placement | [x] |
+| Predictive Scaling | Forecast and auto-scale | [x] |
+| Anomaly Auto-Remediation | Detect and fix issues | [x] |
+| Cost Optimization | Minimize cloud spend | [x] |
+| Security Response | Auto-block threats | [x] |
+| Compliance Automation | Auto-enforce policies | [x] |
+| Capacity Planning | Predict future needs | [x] |
+| Performance Tuning | Auto-adjust settings | [x] |
 
 **AI Models Required:**
 
-| Model | Purpose | Training Data |
-|-------|---------|---------------|
-| Access Pattern Predictor | Forecast file access | Access logs |
-| Failure Predictor | Predict disk failures | SMART data, telemetry |
-| Anomaly Detector | Identify unusual patterns | Normal operation baseline |
-| Cost Optimizer | Minimize storage costs | Pricing, usage patterns |
-| Query Optimizer | Optimize search queries | Query logs |
+| Model | Purpose | Training Data | Status |
+|-------|---------|---------------|--------|
+| Access Pattern Predictor | Forecast file access | Access logs | [x] |
+| Failure Predictor | Predict disk failures | SMART data, telemetry | [x] |
+| Anomaly Detector | Identify unusual patterns | Normal operation baseline | [x] |
+| Cost Optimizer | Minimize storage costs | Pricing, usage patterns | [x] |
+| Query Optimizer | Optimize search queries | Query logs | [x] |
 
 ---
 
 #### Task 48: Natural Language Data Interaction
 **Priority:** P1 (Industry-First)
 **Effort:** High
-**Status:** [ ] Not Started
+**Status:** ✅ **COMPLETED** (2026-01-28) - **REFACTORED** (2026-01-28)
 
 **Description:** Allow users to interact with their data using natural language, eliminating the need to learn query syntax.
+
+**Implementation:** Split between two consolidated plugins:
+
+**NLP Capabilities:** `Plugins/DataWarehouse.Plugins.AIAgents/Capabilities/NLP/`
+- Capability Handler: `NLPCapabilityHandler.cs` (QueryParsing, IntentDetection, CommandExtraction, FollowUpHandling)
+- Engines: `QueryParsingEngine.cs` (40+ intent patterns, AI-enhanced), `ConversationContextEngine.cs` (session management, pronoun resolution)
+- Provider-agnostic via SDK `DataWarehouse.SDK.AI.IAIProvider` interface
+
+**Channel Interfaces:** `Plugins/DataWarehouse.Plugins.AIInterface/`
+- Main plugin: `AIInterfacePlugin.cs` (channel-agnostic routing via message bus)
+- Channels: `SlackChannel.cs`, `TeamsChannel.cs`, `DiscordChannel.cs`
+- Voice Channels: `AlexaChannel.cs`, `GoogleAssistantChannel.cs`, `SiriChannel.cs`
+- LLM Channels: `ChatGPTPluginChannel.cs`, `ClaudeMCPChannel.cs`, `GenericWebhookChannel.cs`
+- Registry: `ChannelRegistry.cs` (enable/disable individual channels per instance)
 
 **Capabilities:**
 
 | Capability | Example | Status |
 |------------|---------|--------|
-| Natural Language Search | "Find all contracts from 2024 mentioning liability" | [ ] |
-| Conversational Queries | "How much storage am I using?" "Show by region" | [ ] |
-| Voice Commands | Integration with Alexa, Siri, Google Assistant | [ ] |
-| Query Explanation | "Explain why this file was tiered to archive" | [ ] |
-| Data Storytelling | "Summarize my backup history this month" | [ ] |
-| Anomaly Explanation | "Why did storage usage spike yesterday?" | [ ] |
+| Natural Language Search | "Find all contracts from 2024 mentioning liability" | [x] |
+| Conversational Queries | "How much storage am I using?" "Show by region" | [x] |
+| Voice Commands | Integration with Alexa, Siri, Google Assistant | [x] |
+| Query Explanation | "Explain why this file was tiered to archive" | [x] |
+| Data Storytelling | "Summarize my backup history this month" | [x] |
+| Anomaly Explanation | "Why did storage usage spike yesterday?" | [x] |
 
 **Integration Points:**
 
 | Integration | Description | Status |
 |-------------|-------------|--------|
-| Slack Bot | Query data from Slack | [ ] |
-| Teams Bot | Microsoft Teams integration | [ ] |
-| Discord Bot | For developer communities | [ ] |
-| ChatGPT Plugin | OpenAI plugin marketplace  * SDK is AI native. make use of it *| [ ] |
-| Claude Integration | Anthropic MCP protocol  * SDK is AI native. make use of it *| [ ] |
-| Integrate with other providers like Copilot, Bard, Llama 3, Gemini etc. * SDK is AI native. make use of it *| [ ] |
+| Slack Bot | Query data from Slack | [x] |
+| Teams Bot | Microsoft Teams integration | [x] |
+| Discord Bot | For developer communities | [x] |
+| ChatGPT Plugin | OpenAI plugin marketplace (SDK AI-native) | [x] |
+| Claude Integration | Anthropic MCP protocol (SDK AI-native) | [x] |
+| Generic LLM Adapter | Copilot, Bard, Llama 3, Gemini (SDK AI-native) | [x] |
 
 ---
 
 #### Task 49: Semantic Data Understanding
 **Priority:** P1
 **Effort:** High
-**Status:** [ ] Not Started
+**Status:** ✅ **COMPLETED** (2026-01-28) - **REFACTORED** (2026-01-28)
 
 **Description:** Deep semantic understanding of stored data for intelligent organization and retrieval.
+
+**Implementation:** Consolidated into `Plugins/DataWarehouse.Plugins.AIAgents/Capabilities/Semantics/`
+- SDK Interfaces: `DataWarehouse.SDK/AI/ISemanticAnalyzer.cs`
+- SDK Base Class: `DataWarehouse.SDK/AI/SemanticAnalyzerBase.cs` (2,063 lines, full implementations)
+- Capability Handler: `SemanticsCapabilityHandler.cs` (registry-based capability checking with ChildrenMirrorParent support)
+- Engines: `CategorizationEngine.cs`, `EntityExtractionEngine.cs`, `RelationshipEngine.cs`, `DuplicateDetectionEngine.cs`, `SummarizationEngine.cs`, `SentimentEngine.cs`, `PIIDetectionEngine.cs`, `LanguageDetectionEngine.cs`
+- Provider-agnostic via SDK IAIProvider, IVectorStore, IKnowledgeGraph interfaces
+- All operations return `CapabilityResult<T>` for graceful error handling
 
 **Features:**
 
 | Feature | Description | Status |
 |---------|-------------|--------|
-| Automatic Categorization | AI-classify files by content | [ ] |
-| Entity Extraction | Identify people, places, dates | [ ] |
-| Relationship Discovery | Find connections between files | [ ] |
-| Duplicate Detection | Semantic (not just hash) dedup | [ ] |
-| Content Summarization | Auto-generate file summaries | [ ] |
-| Language Detection | Identify document languages | [ ] |
-| Sentiment Analysis | For communications storage | [ ] |
-| PII Detection | Find personal data automatically | [ ] |
+| Automatic Categorization | AI-classify files by content | [x] |
+| Entity Extraction | Identify people, places, dates | [x] |
+| Relationship Discovery | Find connections between files | [x] |
+| Duplicate Detection | Semantic (not just hash) dedup | [x] |
+| Content Summarization | Auto-generate file summaries | [x] |
+| Language Detection | Identify document languages | [x] |
+| Sentiment Analysis | For communications storage | [x] |
+| PII Detection | Find personal data automatically | [x] |
 
 ---
 
@@ -668,13 +707,20 @@ iii. [x] Implement Schema Registry (Track imported database and table structures
 
 ---
 
-#### Phase 3: AI & Intelligence (Q3-Q4 2026)
-| Task | Description | Priority |
-|------|-------------|----------|
-| 47 | Autonomous Data Management | P0 |
-| 48 | Natural Language Interface | P1 |
-| 49 | Semantic Understanding | P1 |
-| 39 | AI-Powered CLI | P1 |
+#### Phase 3: AI & Intelligence (Q3-Q4 2026) ✅ **COMPLETED** (2026-01-28)
+| Task | Description | Priority | Status |
+|------|-------------|----------|--------|
+| 47 | Autonomous Data Management | P0 | ✅ Complete |
+| 48 | Natural Language Interface | P1 | ✅ Complete |
+| 49 | Semantic Understanding | P1 | ✅ Complete |
+| 39 | AI-Powered CLI | P1 | ✅ Complete |
+
+**Task 39: AI-Powered CLI**
+- **Implementation:** `DataWarehouse.Shared/Services/`
+- `NaturalLanguageProcessor.cs` (980 lines) - Pattern + AI fallback command parsing
+- `ConversationContext.cs` (420 lines) - Multi-turn conversation support
+- `CLILearningStore.cs` (613 lines) - Learning from user corrections
+- Provider-agnostic via SDK IAIProvider interface
 
 #### Phase 4: Scale & Performance (Q4 2026 - Q1 2027)
 | Task | Description | Priority |

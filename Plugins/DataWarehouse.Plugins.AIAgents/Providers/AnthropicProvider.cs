@@ -1,3 +1,4 @@
+using DataWarehouse.SDK.AI;
 using System.Net.Http.Headers;
 using System.Runtime.CompilerServices;
 using System.Text;
@@ -9,7 +10,7 @@ namespace DataWarehouse.Plugins.AIAgents
     /// Anthropic Claude AI provider.
     /// Supports Claude 3 (Opus, Sonnet, Haiku) and Claude 4 models.
     /// </summary>
-    public class AnthropicProvider : IAIProvider
+    public class AnthropicProvider : IExtendedAIProvider
     {
         private readonly HttpClient _httpClient;
         private readonly ProviderConfig _config;
@@ -33,6 +34,18 @@ namespace DataWarehouse.Plugins.AIAgents
             "claude-3-sonnet-20240229",
             "claude-3-haiku-20240307"
         };
+
+        // SDK IAIProvider properties
+        public string ProviderId => "anthropic";
+        public string DisplayName => "Anthropic Claude";
+        public bool IsAvailable => !string.IsNullOrEmpty(_config.ApiKey);
+        public AICapabilities Capabilities =>
+            AICapabilities.TextCompletion |
+            AICapabilities.ChatCompletion |
+            AICapabilities.Streaming |
+            AICapabilities.ImageAnalysis |
+            AICapabilities.FunctionCalling |
+            AICapabilities.CodeGeneration;
 
         public AnthropicProvider(HttpClient httpClient, ProviderConfig config)
         {
@@ -125,6 +138,11 @@ namespace DataWarehouse.Plugins.AIAgents
         }
 
         public Task<double[][]> EmbedAsync(string[] texts, string? model = null, CancellationToken ct = default)
+        {
+            throw new NotSupportedException("Anthropic does not support embeddings. Use OpenAI or Cohere for embeddings.");
+        }
+
+        public Task<float[]> GetEmbeddingsAsync(string text, CancellationToken ct = default)
         {
             throw new NotSupportedException("Anthropic does not support embeddings. Use OpenAI or Cohere for embeddings.");
         }
@@ -337,5 +355,172 @@ namespace DataWarehouse.Plugins.AIAgents
                 OutputTokens = usage.GetProperty("output_tokens").GetInt32()
             };
         }
+
+        #region SDK IAIProvider Implementation
+
+        public async Task<AIResponse> CompleteAsync(AIRequest request, CancellationToken ct = default)
+        {
+            try
+            {
+                var endpoint = $"{_config.Endpoint ?? BaseUrl}/messages";
+
+                var messages = new List<object>();
+                foreach (var msg in request.ChatHistory)
+                {
+                    messages.Add(new { role = msg.Role, content = msg.Content });
+                }
+                messages.Add(new { role = "user", content = request.Prompt });
+
+                var payload = new
+                {
+                    model = request.Model ?? DefaultModel,
+                    max_tokens = request.MaxTokens ?? 4096,
+                    temperature = request.Temperature,
+                    system = request.SystemMessage,
+                    messages = messages
+                };
+
+                var json = JsonSerializer.Serialize(payload, new JsonSerializerOptions { DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull });
+                var content = new StringContent(json, Encoding.UTF8, "application/json");
+
+                var httpRequest = new HttpRequestMessage(HttpMethod.Post, endpoint) { Content = content };
+                httpRequest.Headers.Add("x-api-key", _config.ApiKey);
+                httpRequest.Headers.Add("anthropic-version", "2023-06-01");
+
+                var response = await _httpClient.SendAsync(httpRequest, ct);
+                var responseBody = await response.Content.ReadAsStringAsync(ct);
+
+                if (!response.IsSuccessStatusCode)
+                {
+                    return new AIResponse
+                    {
+                        Success = false,
+                        ErrorMessage = $"Anthropic API error: {responseBody}"
+                    };
+                }
+
+                var result = JsonDocument.Parse(responseBody);
+                var root = result.RootElement;
+
+                var textContent = root.GetProperty("content")
+                    .EnumerateArray()
+                    .FirstOrDefault(c => c.GetProperty("type").GetString() == "text")
+                    .GetProperty("text")
+                    .GetString() ?? "";
+
+                var usage = root.GetProperty("usage");
+
+                return new AIResponse
+                {
+                    Success = true,
+                    Content = textContent,
+                    FinishReason = root.GetProperty("stop_reason").GetString(),
+                    Usage = new AIUsage
+                    {
+                        PromptTokens = usage.GetProperty("input_tokens").GetInt32(),
+                        CompletionTokens = usage.GetProperty("output_tokens").GetInt32()
+                    }
+                };
+            }
+            catch (Exception ex)
+            {
+                return new AIResponse
+                {
+                    Success = false,
+                    ErrorMessage = ex.Message
+                };
+            }
+        }
+
+        public async IAsyncEnumerable<AIStreamChunk> CompleteStreamingAsync(AIRequest request, [EnumeratorCancellation] CancellationToken ct = default)
+        {
+            var endpoint = $"{_config.Endpoint ?? BaseUrl}/messages";
+
+            var messages = new List<object>();
+            foreach (var msg in request.ChatHistory)
+            {
+                messages.Add(new { role = msg.Role, content = msg.Content });
+            }
+            messages.Add(new { role = "user", content = request.Prompt });
+
+            var payload = new
+            {
+                model = request.Model ?? DefaultModel,
+                max_tokens = request.MaxTokens ?? 4096,
+                temperature = request.Temperature,
+                system = request.SystemMessage,
+                messages = messages,
+                stream = true
+            };
+
+            var json = JsonSerializer.Serialize(payload, new JsonSerializerOptions { DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull });
+            var content = new StringContent(json, Encoding.UTF8, "application/json");
+
+            var httpRequest = new HttpRequestMessage(HttpMethod.Post, endpoint) { Content = content };
+            httpRequest.Headers.Add("x-api-key", _config.ApiKey);
+            httpRequest.Headers.Add("anthropic-version", "2023-06-01");
+
+            var response = await _httpClient.SendAsync(httpRequest, HttpCompletionOption.ResponseHeadersRead, ct);
+            using var stream = await response.Content.ReadAsStreamAsync(ct);
+            using var reader = new StreamReader(stream);
+
+            while (!reader.EndOfStream && !ct.IsCancellationRequested)
+            {
+                var line = await reader.ReadLineAsync(ct);
+                if (string.IsNullOrEmpty(line) || !line.StartsWith("data: "))
+                    continue;
+
+                var data = line.Substring(6);
+                if (data == "[DONE]")
+                {
+                    yield return new AIStreamChunk { Content = "", IsFinal = true };
+                    break;
+                }
+
+                string? textChunk = null;
+                bool shouldBreak = false;
+
+                try
+                {
+                    var evt = JsonDocument.Parse(data);
+                    if (evt.RootElement.TryGetProperty("delta", out var delta) &&
+                        delta.TryGetProperty("text", out var text))
+                    {
+                        textChunk = text.GetString();
+                    }
+                    if (evt.RootElement.TryGetProperty("type", out var typeElem) &&
+                        typeElem.GetString() == "message_stop")
+                    {
+                        shouldBreak = true;
+                    }
+                }
+                catch
+                {
+                    continue;
+                }
+
+                if (shouldBreak)
+                {
+                    yield return new AIStreamChunk { Content = "", IsFinal = true };
+                    break;
+                }
+
+                if (textChunk != null)
+                {
+                    yield return new AIStreamChunk
+                    {
+                        Content = textChunk,
+                        IsFinal = false
+                    };
+                }
+            }
+        }
+
+        public Task<float[][]> GetEmbeddingsBatchAsync(string[] texts, CancellationToken ct = default)
+        {
+            throw new NotSupportedException("Anthropic does not support embeddings. Use OpenAI or Cohere for embeddings.");
+        }
+
+        #endregion
     }
 }

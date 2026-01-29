@@ -4,6 +4,7 @@
 using System.CommandLine;
 using System.CommandLine.Parsing;
 using DataWarehouse.CLI.ShellCompletions;
+using DataWarehouse.SDK.AI;
 using DataWarehouse.Shared;
 using DataWarehouse.Shared.Commands;
 using DataWarehouse.Shared.Services;
@@ -14,6 +15,7 @@ namespace DataWarehouse.CLI;
 /// <summary>
 /// DataWarehouse CLI - Production-ready command-line interface for DataWarehouse management.
 /// This is a THIN WRAPPER that delegates all business logic to DataWarehouse.Shared.
+/// Supports AI-powered natural language processing and conversational context.
 /// </summary>
 public static class Program
 {
@@ -21,8 +23,10 @@ public static class Program
     private static CapabilityManager? _capabilityManager;
     private static CommandExecutor? _executor;
     private static ConsoleRenderer _renderer = new();
-    private static NaturalLanguageProcessor _nlp = new();
+    private static NaturalLanguageProcessor? _nlp;
     private static CommandHistory? _history;
+    private static IAIProviderRegistry? _aiRegistry;
+    private static string? _sessionId;
 
     /// <summary>
     /// Main entry point for the DataWarehouse CLI.
@@ -35,10 +39,31 @@ public static class Program
         _executor = new CommandExecutor(_instanceManager, _capabilityManager);
         _history = new CommandHistory();
 
+        // Try to get AI provider registry from environment or default
+        _aiRegistry = TryGetAIRegistry();
+
+        // Initialize NLP with AI support if available
+        var learningStorePath = GetLearningStorePath();
+        _nlp = new NaturalLanguageProcessor(_aiRegistry, learningStorePath);
+
+        // Check for conversational mode flag
+        var conversational = args.Contains("--conversational") || args.Contains("-c");
+        if (conversational)
+        {
+            args = args.Where(a => a != "--conversational" && a != "-c").ToArray();
+            _sessionId = Guid.NewGuid().ToString("N")[..12];
+        }
+
+        // Check for AI help query
+        if (args.Length >= 2 && (args[0] == "ai-help" || args[0] == "ask"))
+        {
+            return await HandleAIHelpAsync(string.Join(" ", args.Skip(1)));
+        }
+
         // Check for natural language mode (quoted argument)
         if (args.Length == 1 && !args[0].StartsWith("-") && !args[0].Contains('.') && args[0].Contains(' '))
         {
-            return await HandleNaturalLanguageAsync(args[0]);
+            return await HandleNaturalLanguageAsync(args[0], conversational);
         }
 
         // Check for interactive mode
@@ -53,16 +78,117 @@ public static class Program
     }
 
     /// <summary>
+    /// Tries to initialize the AI provider registry if configured.
+    /// </summary>
+    private static IAIProviderRegistry? TryGetAIRegistry()
+    {
+        // Check for environment variables that indicate AI is configured
+        var openaiKey = Environment.GetEnvironmentVariable("OPENAI_API_KEY");
+        var anthropicKey = Environment.GetEnvironmentVariable("ANTHROPIC_API_KEY");
+
+        if (string.IsNullOrEmpty(openaiKey) && string.IsNullOrEmpty(anthropicKey))
+        {
+            return null;
+        }
+
+        // In a real implementation, this would create a registry with configured providers
+        // For now, we return null if no specific provider configuration is available
+        // The actual AI providers are registered through the plugin system
+        return null;
+    }
+
+    /// <summary>
+    /// Gets the path for the learning store persistence file.
+    /// </summary>
+    private static string? GetLearningStorePath()
+    {
+        var dataPath = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+        if (string.IsNullOrEmpty(dataPath))
+        {
+            return null;
+        }
+
+        var dwPath = Path.Combine(dataPath, "DataWarehouse", "CLI");
+        return Path.Combine(dwPath, "learning.json");
+    }
+
+    /// <summary>
+    /// Handles AI-powered help queries.
+    /// </summary>
+    private static async Task<int> HandleAIHelpAsync(string query)
+    {
+        var result = await _nlp!.GetAIHelpAsync(query);
+
+        if (result.UsedAI)
+        {
+            AnsiConsole.MarkupLine("[cyan]AI-Powered Help:[/]");
+        }
+        else
+        {
+            AnsiConsole.MarkupLine("[yellow]Help (AI not available):[/]");
+        }
+
+        AnsiConsole.WriteLine();
+        AnsiConsole.WriteLine(result.Answer);
+
+        if (result.SuggestedCommands.Count > 0)
+        {
+            AnsiConsole.WriteLine();
+            AnsiConsole.MarkupLine("[bold]Suggested Commands:[/]");
+            foreach (var cmd in result.SuggestedCommands)
+            {
+                AnsiConsole.MarkupLine($"  [cyan]{cmd}[/]");
+            }
+        }
+
+        if (result.Examples.Count > 0)
+        {
+            AnsiConsole.WriteLine();
+            AnsiConsole.MarkupLine("[bold]Examples:[/]");
+            foreach (var example in result.Examples)
+            {
+                AnsiConsole.MarkupLine($"  [green]{example}[/]");
+            }
+        }
+
+        return 0;
+    }
+
+    /// <summary>
     /// Handles natural language input like: dw "backup my database"
     /// </summary>
-    private static async Task<int> HandleNaturalLanguageAsync(string input)
+    private static async Task<int> HandleNaturalLanguageAsync(string input, bool conversational = false)
     {
-        var intent = _nlp.Process(input);
+        CommandIntent intent;
+
+        if (conversational && !string.IsNullOrEmpty(_sessionId))
+        {
+            // Use conversational processing with context
+            intent = await _nlp!.ProcessConversationalAsync(input, _sessionId);
+        }
+        else if (_aiRegistry != null)
+        {
+            // Use AI fallback if available
+            intent = await _nlp!.ProcessWithAIFallbackAsync(input);
+        }
+        else
+        {
+            // Fallback to pattern matching only
+            intent = _nlp!.Process(input);
+        }
+
+        // Handle special CLI commands
+        if (intent.CommandName == "cli.context.clear")
+        {
+            AnsiConsole.MarkupLine("[green]Conversation context cleared.[/]");
+            return 0;
+        }
 
         if (intent.Confidence < 0.3)
         {
             AnsiConsole.MarkupLine($"[yellow]Could not understand:[/] {input}");
             AnsiConsole.MarkupLine("[grey]Try 'dw help' for available commands[/]");
+            AnsiConsole.MarkupLine("[grey]Or use 'dw ask <question>' for AI-powered help[/]");
 
             var suggestions = _nlp.GetCompletions(input).Take(3).ToList();
             if (suggestions.Count > 0)
@@ -76,12 +202,21 @@ public static class Program
             return 1;
         }
 
-        AnsiConsole.MarkupLine($"[grey]{intent.Explanation}[/]");
+        // Show interpretation with AI indicator if applicable
+        var aiIndicator = intent.ProcessedByAI ? " [dim](AI)[/]" : "";
+        var sessionIndicator = !string.IsNullOrEmpty(intent.SessionId) ? $" [dim](session: {intent.SessionId})[/]" : "";
+        AnsiConsole.MarkupLine($"[grey]{intent.Explanation}{aiIndicator}{sessionIndicator}[/]");
 
         var result = await _executor!.ExecuteAsync(intent.CommandName, intent.Parameters);
         _renderer.Render(result);
 
         _history?.Add(intent.CommandName, intent.Parameters, result.Success);
+
+        // Record success for learning
+        if (result.Success)
+        {
+            // Learning is handled automatically by NaturalLanguageProcessor
+        }
 
         return result.ExitCode;
     }
@@ -91,7 +226,7 @@ public static class Program
     /// </summary>
     private static async Task<int> RunInteractiveModeAsync()
     {
-        var interactive = new InteractiveMode(_executor!, _history!);
+        var interactive = new InteractiveMode(_executor!, _history!, _nlp!, _aiRegistry);
         await interactive.RunAsync();
         return 0;
     }

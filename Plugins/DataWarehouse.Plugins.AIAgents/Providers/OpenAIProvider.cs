@@ -1,3 +1,4 @@
+using DataWarehouse.SDK.AI;
 using System.Net.Http.Headers;
 using System.Runtime.CompilerServices;
 using System.Text;
@@ -8,7 +9,7 @@ namespace DataWarehouse.Plugins.AIAgents
     /// <summary>
     /// OpenAI provider supporting GPT-4, GPT-4 Turbo, GPT-4o, o1, o3, and other models.
     /// </summary>
-    public class OpenAIProvider : IAIProvider
+    public class OpenAIProvider : IExtendedAIProvider
     {
         private readonly HttpClient _httpClient;
         private readonly ProviderConfig _config;
@@ -35,6 +36,19 @@ namespace DataWarehouse.Plugins.AIAgents
             "o1-preview",
             "o3-mini"
         };
+
+        // SDK IAIProvider properties
+        public string ProviderId => "openai";
+        public string DisplayName => "OpenAI";
+        public bool IsAvailable => !string.IsNullOrEmpty(_config.ApiKey);
+        public AICapabilities Capabilities =>
+            AICapabilities.TextCompletion |
+            AICapabilities.ChatCompletion |
+            AICapabilities.Streaming |
+            AICapabilities.Embeddings |
+            AICapabilities.ImageAnalysis |
+            AICapabilities.FunctionCalling |
+            AICapabilities.CodeGeneration;
 
         public OpenAIProvider(HttpClient httpClient, ProviderConfig config)
         {
@@ -150,6 +164,12 @@ namespace DataWarehouse.Plugins.AIAgents
                 .ToArray();
 
             return embeddings;
+        }
+
+        public async Task<float[]> GetEmbeddingsAsync(string text, CancellationToken ct = default)
+        {
+            var result = await EmbedAsync(new[] { text }, null, ct);
+            return result[0].Select(d => (float)d).ToArray();
         }
 
         public async IAsyncEnumerable<string> StreamChatAsync(ChatRequest request, [EnumeratorCancellation] CancellationToken ct = default)
@@ -330,5 +350,171 @@ namespace DataWarehouse.Plugins.AIAgents
                 OutputTokens = usage.GetProperty("completion_tokens").GetInt32()
             };
         }
+
+        #region SDK IAIProvider Implementation
+
+        public async Task<AIResponse> CompleteAsync(AIRequest request, CancellationToken ct = default)
+        {
+            try
+            {
+                var endpoint = $"{_config.Endpoint ?? BaseUrl}/chat/completions";
+
+                var messages = new List<object>();
+                if (!string.IsNullOrEmpty(request.SystemMessage))
+                {
+                    messages.Add(new { role = "system", content = request.SystemMessage });
+                }
+                foreach (var msg in request.ChatHistory)
+                {
+                    messages.Add(new { role = msg.Role, content = msg.Content });
+                }
+                messages.Add(new { role = "user", content = request.Prompt });
+
+                var payload = new
+                {
+                    model = request.Model ?? DefaultModel,
+                    messages = messages,
+                    max_tokens = request.MaxTokens,
+                    temperature = request.Temperature
+                };
+
+                var json = JsonSerializer.Serialize(payload, new JsonSerializerOptions { DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull });
+                var content = new StringContent(json, Encoding.UTF8, "application/json");
+
+                var httpRequest = new HttpRequestMessage(HttpMethod.Post, endpoint) { Content = content };
+                httpRequest.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _config.ApiKey);
+
+                if (!string.IsNullOrEmpty(_config.Organization))
+                {
+                    httpRequest.Headers.Add("OpenAI-Organization", _config.Organization);
+                }
+
+                var response = await _httpClient.SendAsync(httpRequest, ct);
+                var responseBody = await response.Content.ReadAsStringAsync(ct);
+
+                if (!response.IsSuccessStatusCode)
+                {
+                    return new AIResponse
+                    {
+                        Success = false,
+                        ErrorMessage = $"OpenAI API error: {responseBody}"
+                    };
+                }
+
+                var result = JsonDocument.Parse(responseBody);
+                var root = result.RootElement;
+                var choice = root.GetProperty("choices")[0];
+                var message = choice.GetProperty("message");
+                var usage = root.GetProperty("usage");
+
+                return new AIResponse
+                {
+                    Success = true,
+                    Content = message.GetProperty("content").GetString() ?? "",
+                    FinishReason = choice.GetProperty("finish_reason").GetString(),
+                    Usage = new AIUsage
+                    {
+                        PromptTokens = usage.GetProperty("prompt_tokens").GetInt32(),
+                        CompletionTokens = usage.GetProperty("completion_tokens").GetInt32()
+                    }
+                };
+            }
+            catch (Exception ex)
+            {
+                return new AIResponse
+                {
+                    Success = false,
+                    ErrorMessage = ex.Message
+                };
+            }
+        }
+
+        public async IAsyncEnumerable<AIStreamChunk> CompleteStreamingAsync(AIRequest request, [EnumeratorCancellation] CancellationToken ct = default)
+        {
+            var endpoint = $"{_config.Endpoint ?? BaseUrl}/chat/completions";
+
+            var messages = new List<object>();
+            if (!string.IsNullOrEmpty(request.SystemMessage))
+            {
+                messages.Add(new { role = "system", content = request.SystemMessage });
+            }
+            foreach (var msg in request.ChatHistory)
+            {
+                messages.Add(new { role = msg.Role, content = msg.Content });
+            }
+            messages.Add(new { role = "user", content = request.Prompt });
+
+            var payload = new
+            {
+                model = request.Model ?? DefaultModel,
+                messages = messages,
+                max_tokens = request.MaxTokens,
+                temperature = request.Temperature,
+                stream = true
+            };
+
+            var json = JsonSerializer.Serialize(payload);
+            var content = new StringContent(json, Encoding.UTF8, "application/json");
+
+            var httpRequest = new HttpRequestMessage(HttpMethod.Post, endpoint) { Content = content };
+            httpRequest.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _config.ApiKey);
+
+            var response = await _httpClient.SendAsync(httpRequest, HttpCompletionOption.ResponseHeadersRead, ct);
+            using var stream = await response.Content.ReadAsStreamAsync(ct);
+            using var reader = new StreamReader(stream);
+
+            while (!reader.EndOfStream && !ct.IsCancellationRequested)
+            {
+                var line = await reader.ReadLineAsync(ct);
+                if (string.IsNullOrEmpty(line) || !line.StartsWith("data: "))
+                    continue;
+
+                var data = line.Substring(6);
+                if (data == "[DONE]")
+                {
+                    yield return new AIStreamChunk { Content = "", IsFinal = true };
+                    break;
+                }
+
+                string? contentValue = null;
+                string? finishReason = null;
+                try
+                {
+                    var evt = JsonDocument.Parse(data);
+                    var choice = evt.RootElement.GetProperty("choices")[0];
+                    var delta = choice.GetProperty("delta");
+                    if (delta.TryGetProperty("content", out var contentProp))
+                    {
+                        contentValue = contentProp.GetString() ?? "";
+                    }
+                    if (choice.TryGetProperty("finish_reason", out var finishProp) && finishProp.ValueKind != JsonValueKind.Null)
+                    {
+                        finishReason = finishProp.GetString();
+                    }
+                }
+                catch
+                {
+                    continue;
+                }
+
+                if (contentValue != null)
+                {
+                    yield return new AIStreamChunk
+                    {
+                        Content = contentValue,
+                        IsFinal = finishReason != null,
+                        FinishReason = finishReason
+                    };
+                }
+            }
+        }
+
+        public async Task<float[][]> GetEmbeddingsBatchAsync(string[] texts, CancellationToken ct = default)
+        {
+            var result = await EmbedAsync(texts, null, ct);
+            return result.Select(d => d.Select(v => (float)v).ToArray()).ToArray();
+        }
+
+        #endregion
     }
 }
