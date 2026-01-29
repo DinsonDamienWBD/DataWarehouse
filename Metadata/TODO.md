@@ -1397,6 +1397,169 @@ public record EncryptionMetadata
 - ✅ Supports migration between key management modes
 - ✅ Enables key rotation without re-encryption (for envelope mode)
 
+---
+
+### Key Management + Tamper-Proof Storage Integration
+
+> **CRITICAL:** This section defines how per-user key management configuration works with tamper-proof storage.
+
+**The Challenge:**
+- Per-user configuration is resolved at runtime from user preferences
+- Tamper-proof storage requires deterministic decryption (MUST work even if preferences change)
+- What if user changes their key management preferences between write and read?
+- What if IKeyManagementConfigProvider returns different results over time?
+
+**Solution: Write-Time Config Stored in Manifest, Read-Time Uses Manifest**
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│           TAMPER-PROOF WRITE PATH (Config Resolved → Stored)            │
+├─────────────────────────────────────────────────────────────────────────┤
+│  1. User initiates write                                                 │
+│  2. Resolve KeyManagementConfig (args → user prefs → defaults)           │
+│  3. Encrypt data using resolved config                                   │
+│  4. Create TamperProofManifest with EncryptionMetadata:                  │
+│     - EncryptionPluginId: "aes256gcm"                                    │
+│     - KeyMode: Envelope                                                  │
+│     - WrappedDek: [encrypted DEK bytes]                                  │
+│     - KekId: "azure-kek-finance"                                         │
+│     - KeyStorePluginId: "vault-azure"  ◄── STORED FOR DECRYPTION        │
+│  5. Hash manifest + data, anchor to blockchain                           │
+│  6. Store to WORM for disaster recovery                                  │
+└─────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│           TAMPER-PROOF READ PATH (Config from Manifest Only)            │
+├─────────────────────────────────────────────────────────────────────────┤
+│  1. User initiates read                                                  │
+│  2. Load TamperProofManifest                                             │
+│  3. Verify integrity (hash chain, blockchain anchor)                     │
+│  4. Extract EncryptionMetadata from manifest                             │
+│     *** IGNORE current user preferences ***                              │
+│  5. Resolve key store from stored KeyStorePluginId                       │
+│  6. Decrypt using stored config:                                         │
+│     - Mode: from manifest (Envelope)                                     │
+│     - KEK: from manifest (azure-kek-finance)                             │
+│     - Key Store: from manifest (vault-azure)                             │
+│  7. Return decrypted data                                                │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+**Key Principles:**
+| Operation | Config Source | Rationale |
+|-----------|---------------|-----------|
+| **WRITE** | User's current config (resolved per-operation) | User chooses encryption settings |
+| **READ** | Manifest's stored config | Ensures decryption always works, even if user prefs change |
+
+**Why This Works for Tamper-Proof:**
+1. **Deterministic Decryption**: Config stored with data → can always decrypt
+2. **Tamper Detection**: If someone modifies EncryptionMetadata in manifest → integrity hash fails
+3. **Audit Trail**: Manifest shows exactly what config was used at write time
+4. **Flexibility Preserved**: Different objects can use different configs (per-user at write time)
+5. **No Degradation**: Read performance is the same (no config resolution needed)
+
+**Configuration Modes for Tamper-Proof Storage:**
+
+The `TamperProofStorageProvider` can be configured with different encryption flexibility levels:
+
+| Mode | Description | Use Case |
+|------|-------------|----------|
+| `PerObjectConfig` | Each object stores its own EncryptionMetadata (DEFAULT) | Multi-tenant, mixed compliance |
+| `FixedConfig` | All objects use same config (sealed at first write) | Single-tenant, strict compliance |
+| `PolicyEnforced` | Per-object, but must match tenant policy | Enterprise with compliance rules |
+
+```csharp
+// MODE 1: PerObjectConfig (DEFAULT) - Maximum flexibility
+var tamperProof = new TamperProofStorageProvider(new TamperProofConfig
+{
+    EncryptionConfigMode = EncryptionConfigMode.PerObjectConfig,
+    // Each object's manifest stores its own EncryptionMetadata
+    // Different users can use different configs
+});
+
+// MODE 2: FixedConfig - Strict consistency
+var tamperProofStrict = new TamperProofStorageProvider(new TamperProofConfig
+{
+    EncryptionConfigMode = EncryptionConfigMode.FixedConfig,
+    FixedEncryptionConfig = new EncryptionMetadata
+    {
+        EncryptionPluginId = "aes256gcm",
+        KeyMode = KeyManagementMode.Envelope,
+        KeyStorePluginId = "vault-hsm",
+        KekId = "master-kek"
+    }
+    // ALL objects MUST use this config - enforced at write time
+    // First write seals this config
+});
+
+// MODE 3: PolicyEnforced - Flexibility within policy
+var tamperProofPolicy = new TamperProofStorageProvider(new TamperProofConfig
+{
+    EncryptionConfigMode = EncryptionConfigMode.PolicyEnforced,
+    EncryptionPolicy = new EncryptionPolicy
+    {
+        AllowedModes = [KeyManagementMode.Envelope],  // Must be envelope
+        AllowedKeyStores = ["vault-azure", "vault-aws"],  // Only HSM backends
+        RequireHsmBackedKek = true  // KEK must be in HSM
+    }
+    // Per-object config allowed, but must satisfy policy
+});
+```
+
+**EncryptionMetadata in TamperProofManifest:**
+```csharp
+public class TamperProofManifest
+{
+    // ... existing fields ...
+
+    /// <summary>
+    /// Encryption configuration used for this object.
+    /// CRITICAL: Used on READ to decrypt, ignoring current user preferences.
+    /// </summary>
+    public EncryptionMetadata? EncryptionMetadata { get; set; }
+}
+
+public record EncryptionMetadata
+{
+    /// <summary>Encryption plugin used (e.g., "aes256gcm")</summary>
+    public string EncryptionPluginId { get; init; } = "";
+
+    /// <summary>Key management mode used</summary>
+    public KeyManagementMode KeyMode { get; init; }
+
+    /// <summary>For Direct mode: Key ID in the key store</summary>
+    public string? KeyId { get; init; }
+
+    /// <summary>For Envelope mode: Wrapped DEK</summary>
+    public byte[]? WrappedDek { get; init; }
+
+    /// <summary>For Envelope mode: KEK identifier</summary>
+    public string? KekId { get; init; }
+
+    /// <summary>Key store plugin ID (for resolving on read)</summary>
+    public string? KeyStorePluginId { get; init; }
+
+    /// <summary>Algorithm-specific params (IV, nonce, tag location)</summary>
+    public Dictionary<string, object> AlgorithmParams { get; init; } = new();
+
+    /// <summary>Timestamp when encryption was performed</summary>
+    public DateTime EncryptedAt { get; init; }
+
+    /// <summary>User/tenant who encrypted (for audit)</summary>
+    public string? EncryptedBy { get; init; }
+}
+```
+
+**Summary - Flexibility vs Tamper-Proof:**
+| Aspect | Standalone Encryption | Tamper-Proof Storage |
+|--------|----------------------|----------------------|
+| **Write Config** | Per-user, per-operation | Per-user, per-operation |
+| **Read Config** | Per-user, per-operation | FROM MANIFEST (stored at write) |
+| **Config Storage** | Ciphertext header | TamperProofManifest |
+| **Integrity** | Tag verification only | Hash chain + blockchain + WORM |
+| **Can Change Prefs?** | Yes, affects new ops | Yes, but read uses original config |
+| **Degradation** | None | None (manifest has all needed info) |
+
 **Integrity Algorithm Reference:**
 | Category | Algorithms | Key Required | Salt | Use Case |
 |----------|------------|--------------|------|----------|
