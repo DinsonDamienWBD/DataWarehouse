@@ -1136,9 +1136,64 @@ READ REQUEST (ObjectGuid, ReadMode)
 |------|-------------|--------------|--------|
 | T4.14 | Implement `TransactionalWriteManager` with atomicity guarantee | T4.13 | [ ] |
 | T4.14.1 | ↳ Write ordering: Data → Metadata → WORM → Blockchain queue | T4.14 | [ ] |
-| T4.14.2 | ↳ Rollback on failure: Data, Metadata (WORM orphaned) | T4.14 | [ ] |
-| T4.14.3 | ↳ WORM orphan tracking and cleanup job | T4.14 | [ ] |
-| T4.14.4 | ↳ Transaction timeout and retry configuration | T4.14 | [ ] |
+| T4.14.2 | ↳ Implement `TransactionFailureBehavior` enum | T4.14 | [ ] |
+| T4.14.3 | ↳ Implement `TransactionFailurePhase` enum | T4.14 | [ ] |
+| T4.14.4 | ↳ Rollback on failure: Data, Metadata (WORM orphaned) | T4.14 | [ ] |
+| T4.14.5 | ↳ Implement `OrphanedWormRecord` structure | T4.14 | [ ] |
+| T4.14.6 | ↳ Implement `OrphanStatus` enum | T4.14 | [ ] |
+| T4.14.7 | ↳ WORM orphan tracking registry | T4.14 | [ ] |
+| T4.14.8 | ↳ Background orphan cleanup job (compliance-aware) | T4.14 | [ ] |
+| T4.14.9 | ↳ Orphan recovery mechanism (link to retry) | T4.14 | [ ] |
+| T4.14.10 | ↳ Transaction timeout and retry configuration | T4.14 | [ ] |
+
+**TransactionFailureBehavior Enum:**
+| Value | Description |
+|-------|-------------|
+| `RollbackAndOrphan` | Rollback Data+Metadata, mark WORM as orphan (default) |
+| `RollbackAndRetry` | Rollback, then retry N times before orphaning |
+| `FailFast` | Rollback immediately, no retry, throw exception |
+| `OrphanAndContinue` | Mark WORM as orphan, return partial success status |
+| `BlockUntilResolved` | Hold transaction, alert admin, wait for manual resolution |
+
+**TransactionFailurePhase Enum:**
+| Value | Description |
+|-------|-------------|
+| `DataWrite` | Failed writing shards to data instance |
+| `MetadataWrite` | Failed writing manifest to metadata instance |
+| `WormWrite` | Failed writing to WORM (rare - usually succeeds first) |
+| `BlockchainQueue` | Failed queuing blockchain anchor |
+
+**OrphanedWormRecord Structure:**
+```csharp
+public record OrphanedWormRecord
+{
+    public Guid OrphanId { get; init; }            // Unique orphan identifier
+    public Guid OriginalObjectId { get; init; }    // Intended object GUID
+    public string WormInstanceId { get; init; }    // Which WORM instance
+    public string WormPath { get; init; }          // Path in WORM storage
+    public DateTimeOffset CreatedAt { get; init; } // When orphan was created
+    public string FailureReason { get; init; }     // Why transaction failed
+    public TransactionFailurePhase FailedPhase { get; init; }  // Which phase failed
+    public string FailedInstanceId { get; init; }  // Which storage instance failed
+    public byte[] ContentHash { get; init; }       // Hash of orphaned content
+    public long ContentSize { get; init; }         // Size of orphaned content
+    public WriteContext OriginalContext { get; init; }  // Original write context
+    public OrphanStatus Status { get; init; }      // Current orphan status
+    public DateTimeOffset? ExpiresAt { get; init; } // Compliance expiry (when can be purged)
+    public Guid? LinkedTransactionId { get; init; } // If recovered/linked to retry
+    public int RetryCount { get; init; }           // Number of retry attempts
+}
+```
+
+**OrphanStatus Enum:**
+| Value | Description |
+|-------|-------------|
+| `Active` | Orphan exists in WORM, not yet processed |
+| `PendingReview` | Flagged for admin review |
+| `MarkedForPurge` | Compliance period expired, can be deleted |
+| `Purged` | Orphan deleted from WORM (record kept for audit) |
+| `Recovered` | Orphan was recovered into valid object |
+| `LinkedToRetry` | Orphan linked to successful retry transaction |
 
 **Background Operations:**
 | Task | Description | Dependencies | Status |
