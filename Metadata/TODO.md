@@ -2035,7 +2035,33 @@ public abstract class AccessLogProviderPluginBase : FeaturePluginBase, IAccessLo
 | T4.9 | Implement `RaftConsensus` mode support | T4.8 | [ ] |
 | T4.10 | Implement `HardwareIntegrated` WORM mode (S3 Object Lock, Azure Immutable) | T4.9 | [ ] |
 
-#### Phase T5: Testing & Documentation (Priority: HIGH)
+#### Phase T5: Ultra Paranoid (Priority: LOW)
+  │ Task │                     Component                     │ Priority │
+  ├──────┼───────────────────────────────────────────────────┼──────────┤
+  │ T5.1 │ EnvelopeEncryptionPlugin (AES-GCM + key wrapping) │ LOW      │
+  ├──────┼───────────────────────────────────────────────────┼──────────┤
+  │ T5.2 │ KyberEncryptionPlugin (post-quantum)              │ LOW      │
+  ├──────┼───────────────────────────────────────────────────┼──────────┤
+  │ T5.3 │ ChaffPaddingPlugin (traffic analysis protection)  │ LOW      │
+  ├──────┼───────────────────────────────────────────────────┼──────────┤
+  │ T5.4 │ ShamirSecretPlugin (key splitting)                │ LOW      │
+  ├──────┼───────────────────────────────────────────────────┼──────────┤
+  │ T5.5 │ Geo-dispersed WORM replication                    │ LOW      │
+  └──────┴───────────────────────────────────────────────────┴──────────┘
+
+  Goal: Audit-ready documentation
+  ┌──────┬─────────────────────────────────────────────────┬──────────┐
+  │ Task │                    Component                    │ Priority │
+  ├──────┼─────────────────────────────────────────────────┼──────────┤
+  │ T5.6 │ Compliance report generator (SOC2, HIPAA, etc.) │ LOW      │
+  ├──────┼─────────────────────────────────────────────────┼──────────┤
+  │ T5.7 │ Chain-of-custody export (PDF/JSON)              │ LOW      │
+  ├──────┼─────────────────────────────────────────────────┼──────────┤
+  │ T5.8 │ Dashboard integration for integrity status      │ LOW      │
+  ├──────┼─────────────────────────────────────────────────┼──────────┤
+  │ T5.9 │ Alert integrations (email, Slack, PagerDuty)    │ LOW      │
+
+#### Phase T6: Testing & Documentation (Priority: HIGH)
 | Task | Description | Dependencies | Status |
 |------|-------------|--------------|--------|
 | T5.1 | Unit tests for integrity provider | T1.2 | [ ] |
