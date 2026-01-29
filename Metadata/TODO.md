@@ -798,5 +798,1336 @@ After each task completion:
 
 ---
 
+## Tamper-Proof Storage Provider Implementation Plan
+
+### Overview
+
+A military/government-grade tamper-proof storage system providing cryptographic integrity verification, blockchain-based audit trails, and WORM (Write-Once-Read-Many) disaster recovery capabilities. The system follows a Three-Pillar Architecture: **Live Data** (fast access) + **Blockchain Anchor** (immutable truth) + **WORM Vault** (disaster recovery).
+
+**Design Philosophy:**
+- Object-based storage (all retrievals via GUIDs, not sectors/blocks)
+- User freedom to choose storage instances (not locked to specific providers)
+- Configurable security levels from "I Don't Care" to "Ultra Paranoid"
+- Append-only corrections (original data preserved, new version supersedes)
+- Mandatory write comments (like git commit messages) for full audit trail
+- Tamper attribution (detect WHO tampered when possible)
+
+---
+
+### Architecture: Three Pillars
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                         TAMPER-PROOF STORAGE SYSTEM                          │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                              │
+│  ┌──────────────────┐  ┌──────────────────┐  ┌──────────────────┐          │
+│  │   PILLAR 1:      │  │   PILLAR 2:      │  │   PILLAR 3:      │          │
+│  │   LIVE DATA      │  │   BLOCKCHAIN     │  │   WORM VAULT     │          │
+│  │                  │  │   ANCHOR         │  │                  │          │
+│  │  • Fast access   │  │  • Immutable     │  │  • Disaster      │          │
+│  │  • Hot storage   │  │    truth         │  │    recovery      │          │
+│  │  • RAID shards   │  │  • Hash chains   │  │  • Legal hold    │          │
+│  │  • Metadata      │  │  • Timestamps    │  │  • Compliance    │          │
+│  └──────────────────┘  └──────────────────┘  └──────────────────┘          │
+│                                                                              │
+│  Storage Instances (User-Configurable):                                      │
+│  ┌─────────────────────────────────────────────────────────────────────┐   │
+│  │ Instance ID        │ Purpose         │ Plugin Type (User Choice)     │   │
+│  │────────────────────│─────────────────│──────────────────────────────│   │
+│  │ "data"             │ Live data       │ S3Storage, LocalStorage, etc. │   │
+│  │ "metadata"         │ Manifests       │ Same or different provider    │   │
+│  │ "worm"             │ WORM vault      │ Same or different provider    │   │
+│  │ "blockchain"       │ Anchor records  │ Same or different provider    │   │
+│  └─────────────────────────────────────────────────────────────────────┘   │
+│                                                                              │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+### Five-Phase Write Pipeline
+
+```
+USER DATA
+    │
+    ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ PHASE 1: User-Configurable Transformations (Order Configurable)             │
+│ ┌─────────────┐  ┌─────────────┐  ┌─────────────┐                          │
+│ │ Compression │─▶│ Encryption  │─▶│ Content Pad │  ◄─ Hides true data size │
+│ │ (optional)  │  │ (optional)  │  │ (optional)  │     Covered by hash      │
+│ └─────────────┘  └─────────────┘  └─────────────┘                          │
+│ Records: Which transformations applied + order → stored in manifest         │
+└─────────────────────────────────────────────────────────────────────────────┘
+    │
+    ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ PHASE 2: System Integrity Hash (Fixed Position - ALWAYS After Phase 1)     │
+│ ┌─────────────────────────────────────────────────────────────────────┐    │
+│ │ SHA-256/SHA-384/SHA-512/Blake3 hash of transformed data             │    │
+│ │ This hash covers: Original data + Phase 1 transformations           │    │
+│ │ This hash does NOT cover: Phase 3 shard padding (by design)         │    │
+│ └─────────────────────────────────────────────────────────────────────┘    │
+└─────────────────────────────────────────────────────────────────────────────┘
+    │
+    ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ PHASE 3: RAID Distribution + Shard Padding (Fixed Position)                │
+│ ┌─────────────────────────────────────────────────────────────────────┐    │
+│ │ 1. Split into N data shards                                         │    │
+│ │ 2. Pad final shard to uniform size (NOT covered by Phase 2 hash)    │    │
+│ │ 3. Generate M parity shards                                         │    │
+│ │ 4. Each shard gets its own shard-level hash                         │    │
+│ └─────────────────────────────────────────────────────────────────────┘    │
+└─────────────────────────────────────────────────────────────────────────────┘
+    │
+    ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ PHASE 4: Parallel Storage Writes                                           │
+│ ┌─────────────────────────────────────────────────────────────────────┐    │
+│ │ PARALLEL WRITES TO ALL CONFIGURED TIERS:                            │    │
+│ │   • Data Instance → RAID shards                                     │    │
+│ │   • Metadata Instance → Manifest + access log entry                 │    │
+│ │   • WORM Instance → Full transformed blob + manifest                │    │
+│ │   • Blockchain Instance → Batched (see Phase 5)                     │    │
+│ └─────────────────────────────────────────────────────────────────────┘    │
+└─────────────────────────────────────────────────────────────────────────────┘
+    │
+    ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ PHASE 5: Blockchain Anchoring (Batched for Efficiency)                     │
+│ ┌─────────────────────────────────────────────────────────────────────┐    │
+│ │ Anchor record contains:                                             │    │
+│ │   • Object GUID                                                     │    │
+│ │   • Phase 2 integrity hash                                          │    │
+│ │   • UTC timestamp                                                   │    │
+│ │   • Write context (author, comment, session)                        │    │
+│ │   • Previous block hash (chain linkage)                             │    │
+│ │   • Merkle root (when batching multiple objects)                    │    │
+│ └─────────────────────────────────────────────────────────────────────┘    │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+### Five-Phase Read Pipeline
+
+```
+READ REQUEST (ObjectGuid, ReadMode)
+    │
+    ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ PHASE 1: Manifest Retrieval                                                │
+│ ┌─────────────────────────────────────────────────────────────────────┐    │
+│ │ Load TamperProofManifest from Metadata Instance                     │    │
+│ │ Contains: Expected hash, transformation order, shard map, WORM ref  │    │
+│ └─────────────────────────────────────────────────────────────────────┘    │
+└─────────────────────────────────────────────────────────────────────────────┘
+    │
+    ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ PHASE 2: Shard Retrieval + Reconstruction                                  │
+│ ┌─────────────────────────────────────────────────────────────────────┐    │
+│ │ 1. Load required shards from Data Instance                          │    │
+│ │ 2. Verify individual shard hashes                                   │    │
+│ │ 3. Reconstruct original transformed blob (Reed-Solomon if needed)   │    │
+│ │ 4. Strip shard padding                                              │    │
+│ └─────────────────────────────────────────────────────────────────────┘    │
+└─────────────────────────────────────────────────────────────────────────────┘
+    │
+    ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ PHASE 3: Integrity Verification (Conditional on ReadMode)                  │
+│ ┌─────────────────────────────────────────────────────────────────────┐    │
+│ │ ReadMode.Fast: SKIP (trust shard hashes)                            │    │
+│ │ ReadMode.Verified: Compute hash, compare to manifest                │    │
+│ │ ReadMode.Audit: + Verify blockchain anchor + Log access             │    │
+│ └─────────────────────────────────────────────────────────────────────┘    │
+└─────────────────────────────────────────────────────────────────────────────┘
+    │
+    ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ PHASE 4: Reverse Transformations                                           │
+│ ┌─────────────────────────────────────────────────────────────────────┐    │
+│ │ Apply inverse of Phase 1 in reverse order:                          │    │
+│ │   Strip Content Padding → Decrypt → Decompress                      │    │
+│ └─────────────────────────────────────────────────────────────────────┘    │
+└─────────────────────────────────────────────────────────────────────────────┘
+    │
+    ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ PHASE 5: Tamper Response (If Verification Failed)                          │
+│ ┌─────────────────────────────────────────────────────────────────────┐    │
+│ │ Based on TamperRecoveryBehavior:                                    │    │
+│ │   • AutoRecoverSilent: Recover from WORM, log internally            │    │
+│ │   • AutoRecoverWithReport: Recover + generate incident report       │    │
+│ │   • AlertAndWait: Notify admin, don't serve until resolved          │    │
+│ │ + Tamper Attribution: Analyze access logs to identify WHO           │    │
+│ └─────────────────────────────────────────────────────────────────────┘    │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+### Interface Definitions
+
+#### IIntegrityProvider
+```csharp
+namespace DataWarehouse.SDK.Contracts;
+
+/// <summary>
+/// Provides cryptographic integrity operations for tamper-proof storage.
+/// </summary>
+public interface IIntegrityProvider
+{
+    /// <summary>Supported hash algorithms (SHA256, SHA384, SHA512, Blake3).</summary>
+    IReadOnlyList<HashAlgorithmType> SupportedAlgorithms { get; }
+
+    /// <summary>Computes integrity hash using specified algorithm.</summary>
+    Task<IntegrityHash> ComputeHashAsync(Stream data, HashAlgorithmType algorithm, CancellationToken ct = default);
+
+    /// <summary>Verifies data matches expected hash.</summary>
+    Task<IntegrityVerificationResult> VerifyAsync(Stream data, IntegrityHash expectedHash, CancellationToken ct = default);
+
+    /// <summary>Computes hash for a single shard with shard-specific metadata.</summary>
+    Task<ShardHash> ComputeShardHashAsync(byte[] shardData, int shardIndex, Guid objectId, CancellationToken ct = default);
+}
+```
+
+#### IBlockchainProvider
+```csharp
+namespace DataWarehouse.SDK.Contracts;
+
+/// <summary>
+/// Provides blockchain-based immutable audit trail for tamper-proof storage.
+/// </summary>
+public interface IBlockchainProvider
+{
+    /// <summary>Anchors a single object's integrity proof to the blockchain.</summary>
+    Task<BlockchainAnchor> AnchorAsync(AnchorRequest request, CancellationToken ct = default);
+
+    /// <summary>Anchors multiple objects in a single Merkle-tree batch for efficiency.</summary>
+    Task<BatchAnchorResult> AnchorBatchAsync(IEnumerable<AnchorRequest> requests, CancellationToken ct = default);
+
+    /// <summary>Verifies an object's blockchain anchor is valid and unchanged.</summary>
+    Task<AnchorVerificationResult> VerifyAnchorAsync(Guid objectId, IntegrityHash expectedHash, CancellationToken ct = default);
+
+    /// <summary>Retrieves full audit chain for an object (all versions, corrections).</summary>
+    Task<AuditChain> GetAuditChainAsync(Guid objectId, CancellationToken ct = default);
+
+    /// <summary>Gets the latest block information.</summary>
+    Task<BlockInfo> GetLatestBlockAsync(CancellationToken ct = default);
+}
+```
+
+#### IWormStorageProvider
+```csharp
+namespace DataWarehouse.SDK.Contracts;
+
+/// <summary>
+/// Provides WORM (Write-Once-Read-Many) storage for disaster recovery and compliance.
+/// </summary>
+public interface IWormStorageProvider
+{
+    /// <summary>WORM enforcement mode (Software, HardwareIntegrated, Hybrid).</summary>
+    WormEnforcementMode EnforcementMode { get; }
+
+    /// <summary>Writes data to WORM storage with retention policy.</summary>
+    Task<WormWriteResult> WriteAsync(Guid objectId, Stream data, WormRetentionPolicy retention, WriteContext context, CancellationToken ct = default);
+
+    /// <summary>Reads data from WORM storage (always read-only).</summary>
+    Task<Stream> ReadAsync(Guid objectId, CancellationToken ct = default);
+
+    /// <summary>Checks if object exists and is within retention period.</summary>
+    Task<WormObjectStatus> GetStatusAsync(Guid objectId, CancellationToken ct = default);
+
+    /// <summary>Extends retention period (can only extend, never shorten).</summary>
+    Task ExtendRetentionAsync(Guid objectId, DateTimeOffset newExpiry, CancellationToken ct = default);
+
+    /// <summary>Places legal hold on object (prevents deletion even after retention expires).</summary>
+    Task PlaceLegalHoldAsync(Guid objectId, string holdId, string reason, CancellationToken ct = default);
+
+    /// <summary>Removes legal hold (requires appropriate authorization).</summary>
+    Task RemoveLegalHoldAsync(Guid objectId, string holdId, CancellationToken ct = default);
+}
+```
+
+#### ITamperProofProvider
+```csharp
+namespace DataWarehouse.SDK.Contracts;
+
+/// <summary>
+/// Main interface for tamper-proof storage operations combining integrity, blockchain, and WORM.
+/// </summary>
+public interface ITamperProofProvider
+{
+    /// <summary>Current configuration.</summary>
+    TamperProofConfiguration Configuration { get; }
+
+    /// <summary>Current instance states.</summary>
+    IReadOnlyDictionary<string, InstanceDegradationState> InstanceStates { get; }
+
+    /// <summary>Whether the structural configuration has been sealed (first write occurred).</summary>
+    bool IsSealed { get; }
+
+    /// <summary>
+    /// Writes data with full tamper-proof protection.
+    /// </summary>
+    /// <param name="objectId">Unique identifier for the object.</param>
+    /// <param name="data">Data stream to store.</param>
+    /// <param name="context">Required write context including author and comment.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>Write result with manifest reference and blockchain anchor.</returns>
+    Task<SecureWriteResult> SecureWriteAsync(Guid objectId, Stream data, WriteContext context, CancellationToken ct = default);
+
+    /// <summary>
+    /// Reads data with specified verification level.
+    /// </summary>
+    Task<SecureReadResult> SecureReadAsync(Guid objectId, ReadMode mode = ReadMode.Verified, CancellationToken ct = default);
+
+    /// <summary>
+    /// Creates an append-only correction to existing data.
+    /// Original data remains in WORM; new version supersedes it.
+    /// </summary>
+    /// <param name="objectId">Object to correct (will get new version).</param>
+    /// <param name="correctedData">New data stream.</param>
+    /// <param name="context">Required context with correction reason.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>Correction result linking old and new versions.</returns>
+    Task<CorrectionResult> SecureCorrectAsync(Guid objectId, Stream correctedData, CorrectionContext context, CancellationToken ct = default);
+
+    /// <summary>
+    /// Performs full audit of an object including blockchain verification.
+    /// </summary>
+    Task<AuditResult> AuditAsync(Guid objectId, CancellationToken ct = default);
+
+    /// <summary>
+    /// Manually triggers recovery from WORM for a tampered object.
+    /// </summary>
+    Task<RecoveryResult> RecoverFromWormAsync(Guid objectId, CancellationToken ct = default);
+
+    /// <summary>
+    /// Gets tamper incident report with attribution if available.
+    /// </summary>
+    Task<TamperIncidentReport?> GetTamperIncidentAsync(Guid objectId, CancellationToken ct = default);
+}
+```
+
+#### IAccessLogProvider
+```csharp
+namespace DataWarehouse.SDK.Contracts;
+
+/// <summary>
+/// Provides access logging for tamper attribution.
+/// </summary>
+public interface IAccessLogProvider
+{
+    /// <summary>Records an access event.</summary>
+    Task LogAccessAsync(AccessLogEntry entry, CancellationToken ct = default);
+
+    /// <summary>Retrieves access history for an object within a time range.</summary>
+    Task<IReadOnlyList<AccessLogEntry>> GetAccessHistoryAsync(
+        Guid objectId,
+        DateTimeOffset from,
+        DateTimeOffset to,
+        CancellationToken ct = default);
+
+    /// <summary>Queries access logs for potential tampering attribution.</summary>
+    Task<IReadOnlyList<AccessLogEntry>> QuerySuspiciousAccessAsync(
+        Guid objectId,
+        DateTimeOffset tamperDetectedAt,
+        TimeSpan lookbackWindow,
+        CancellationToken ct = default);
+}
+```
+
+---
+
+### Enum Definitions
+
+```csharp
+namespace DataWarehouse.SDK.Contracts;
+
+/// <summary>Hash algorithm for integrity verification.</summary>
+public enum HashAlgorithmType
+{
+    SHA256,
+    SHA384,
+    SHA512,
+    Blake3
+}
+
+/// <summary>Consensus mode for multi-node deployments.</summary>
+public enum ConsensusMode
+{
+    /// <summary>Single writer, no consensus needed. Fast but no HA.</summary>
+    SingleWriter,
+
+    /// <summary>Raft-based consensus for writes. Slower but consistent.</summary>
+    RaftConsensus
+}
+
+/// <summary>WORM enforcement mechanism.</summary>
+public enum WormEnforcementMode
+{
+    /// <summary>Software-enforced immutability (can be bypassed with admin access).</summary>
+    Software,
+
+    /// <summary>Hardware-enforced (e.g., AWS S3 Object Lock, Azure Immutable Blob).</summary>
+    HardwareIntegrated,
+
+    /// <summary>Software primary with hardware backup verification.</summary>
+    Hybrid
+}
+
+/// <summary>Behavior when tampering is detected during read.</summary>
+public enum TamperRecoveryBehavior
+{
+    /// <summary>Automatically recover from WORM, log internally, serve recovered data.</summary>
+    AutoRecoverSilent,
+
+    /// <summary>Recover from WORM + generate incident report + alert admin.</summary>
+    AutoRecoverWithReport,
+
+    /// <summary>Do not serve data. Alert admin and wait for manual intervention.</summary>
+    AlertAndWait
+}
+
+/// <summary>Read verification level.</summary>
+public enum ReadMode
+{
+    /// <summary>Skip full verification, trust shard-level hashes. Fastest.</summary>
+    Fast,
+
+    /// <summary>Verify reconstructed data against manifest hash. Default.</summary>
+    Verified,
+
+    /// <summary>Full verification including blockchain anchor check. Slowest but complete.</summary>
+    Audit
+}
+
+/// <summary>Instance degradation state.</summary>
+public enum InstanceDegradationState
+{
+    /// <summary>All operations normal.</summary>
+    Healthy,
+
+    /// <summary>Some redundancy lost but fully operational.</summary>
+    Degraded,
+
+    /// <summary>Read-only mode (writes blocked).</summary>
+    DegradedReadOnly,
+
+    /// <summary>Operating but WORM recovery unavailable.</summary>
+    DegradedNoRecovery,
+
+    /// <summary>Instance unreachable.</summary>
+    Offline,
+
+    /// <summary>Data corruption detected, requires intervention.</summary>
+    Corrupted
+}
+
+/// <summary>Type of access for logging.</summary>
+public enum AccessType
+{
+    Read,
+    Write,
+    Correct,
+    Delete,
+    MetadataRead,
+    MetadataWrite,
+    AdminOperation,
+    SystemMaintenance
+}
+
+/// <summary>Tamper attribution confidence level.</summary>
+public enum AttributionConfidence
+{
+    /// <summary>Cannot determine who tampered (e.g., external/physical access).</summary>
+    Unknown,
+
+    /// <summary>Possible suspect based on access patterns.</summary>
+    Suspected,
+
+    /// <summary>Strong correlation with specific access.</summary>
+    Likely,
+
+    /// <summary>Definitive attribution (e.g., logged operation + hash mismatch).</summary>
+    Confirmed
+}
+```
+
+---
+
+### Configuration Classes
+
+```csharp
+namespace DataWarehouse.SDK.Contracts;
+
+/// <summary>
+/// Main configuration for tamper-proof storage.
+/// Structural settings become immutable after first write (sealed).
+/// </summary>
+public class TamperProofConfiguration
+{
+    // === STRUCTURAL (Immutable after seal) ===
+
+    /// <summary>Storage instances configuration.</summary>
+    public required StorageInstancesConfig StorageInstances { get; init; }
+
+    /// <summary>RAID configuration for data sharding.</summary>
+    public required RaidConfig Raid { get; init; }
+
+    /// <summary>Hash algorithm for integrity verification.</summary>
+    public HashAlgorithmType HashAlgorithm { get; init; } = HashAlgorithmType.SHA256;
+
+    /// <summary>Consensus mode (cannot change after first write).</summary>
+    public ConsensusMode ConsensusMode { get; init; } = ConsensusMode.SingleWriter;
+
+    /// <summary>WORM enforcement mode.</summary>
+    public WormEnforcementMode WormMode { get; init; } = WormEnforcementMode.Software;
+
+    // === BEHAVIORAL (Can change at runtime) ===
+
+    /// <summary>Behavior when tampering is detected. Changeable at runtime.</summary>
+    public TamperRecoveryBehavior RecoveryBehavior { get; set; } = TamperRecoveryBehavior.AutoRecoverWithReport;
+
+    /// <summary>Default read mode. Changeable at runtime.</summary>
+    public ReadMode DefaultReadMode { get; set; } = ReadMode.Verified;
+
+    /// <summary>Blockchain batching configuration. Changeable at runtime.</summary>
+    public BlockchainBatchConfig BlockchainBatching { get; set; } = new();
+
+    /// <summary>Alert/notification settings. Changeable at runtime.</summary>
+    public AlertConfig Alerts { get; set; } = new();
+}
+
+/// <summary>
+/// Configuration for the four storage instances.
+/// </summary>
+public class StorageInstancesConfig
+{
+    /// <summary>Primary data storage instance.</summary>
+    public required StorageInstanceConfig Data { get; init; }
+
+    /// <summary>Metadata/manifest storage instance.</summary>
+    public required StorageInstanceConfig Metadata { get; init; }
+
+    /// <summary>WORM vault storage instance.</summary>
+    public required StorageInstanceConfig Worm { get; init; }
+
+    /// <summary>Blockchain anchor storage instance.</summary>
+    public required StorageInstanceConfig Blockchain { get; init; }
+}
+
+/// <summary>
+/// Configuration for a single storage instance.
+/// </summary>
+public class StorageInstanceConfig
+{
+    /// <summary>Unique instance identifier (e.g., "data", "worm").</summary>
+    public required string InstanceId { get; init; }
+
+    /// <summary>Plugin ID to use (e.g., "com.datawarehouse.storage.s3").</summary>
+    public required string PluginId { get; init; }
+
+    /// <summary>Plugin-specific configuration.</summary>
+    public Dictionary<string, object> PluginConfig { get; init; } = new();
+}
+
+/// <summary>
+/// RAID configuration for data sharding.
+/// </summary>
+public class RaidConfig
+{
+    /// <summary>Number of data shards.</summary>
+    public int DataShards { get; init; } = 4;
+
+    /// <summary>Number of parity shards.</summary>
+    public int ParityShards { get; init; } = 2;
+
+    /// <summary>Fixed shard size in bytes (for uniform shards). 0 = variable.</summary>
+    public long FixedShardSize { get; init; } = 0;
+
+    /// <summary>Shard padding configuration.</summary>
+    public ShardPaddingConfig Padding { get; init; } = new();
+}
+
+/// <summary>
+/// Configuration for shard padding (Phase 3 padding, NOT covered by integrity hash).
+/// </summary>
+public class ShardPaddingConfig
+{
+    /// <summary>Whether to pad final shard to uniform size.</summary>
+    public bool Enabled { get; init; } = true;
+
+    /// <summary>Padding byte value (default 0x00).</summary>
+    public byte PaddingByte { get; init; } = 0x00;
+
+    /// <summary>Whether to use random padding (more secure but not reproducible).</summary>
+    public bool UseRandomPadding { get; init; } = false;
+}
+
+/// <summary>
+/// Configuration for content padding (Phase 1 padding, covered by integrity hash).
+/// </summary>
+public class ContentPaddingConfig
+{
+    /// <summary>Whether content padding is enabled.</summary>
+    public bool Enabled { get; init; } = false;
+
+    /// <summary>Pad to multiple of this size (e.g., 4096 for block alignment).</summary>
+    public int PadToMultipleOf { get; init; } = 4096;
+
+    /// <summary>Minimum padding to add (to hide true size).</summary>
+    public int MinimumPadding { get; init; } = 0;
+
+    /// <summary>Maximum padding to add (randomized within min-max range).</summary>
+    public int MaximumPadding { get; init; } = 4096;
+}
+
+/// <summary>
+/// Blockchain batching configuration.
+/// </summary>
+public class BlockchainBatchConfig
+{
+    /// <summary>Maximum objects per batch anchor.</summary>
+    public int MaxBatchSize { get; init; } = 100;
+
+    /// <summary>Maximum time to wait before flushing batch.</summary>
+    public TimeSpan MaxBatchDelay { get; init; } = TimeSpan.FromSeconds(5);
+
+    /// <summary>Whether to wait for anchor confirmation before returning.</summary>
+    public bool WaitForConfirmation { get; init; } = true;
+}
+
+/// <summary>
+/// Alert configuration for tamper incidents.
+/// </summary>
+public class AlertConfig
+{
+    /// <summary>Webhook URLs to notify on tamper detection.</summary>
+    public List<string> WebhookUrls { get; init; } = new();
+
+    /// <summary>Email addresses for alerts.</summary>
+    public List<string> EmailAddresses { get; init; } = new();
+
+    /// <summary>Whether to publish to message bus topic.</summary>
+    public bool PublishToMessageBus { get; init; } = true;
+
+    /// <summary>Message bus topic for alerts.</summary>
+    public string MessageBusTopic { get; init; } = "tamperproof.alerts";
+}
+```
+
+---
+
+### Manifest and Record Structures
+
+```csharp
+namespace DataWarehouse.SDK.Contracts;
+
+/// <summary>
+/// The manifest stored for each tamper-proof object.
+/// Contains all information needed to verify and reconstruct the object.
+/// </summary>
+public class TamperProofManifest
+{
+    /// <summary>Object unique identifier.</summary>
+    public required Guid ObjectId { get; init; }
+
+    /// <summary>Version number (1 for original, 2+ for corrections).</summary>
+    public required int Version { get; init; }
+
+    /// <summary>Write context (author, comment, timestamp).</summary>
+    public required WriteContextRecord WriteContext { get; init; }
+
+    /// <summary>Phase 1 transformation records in order applied.</summary>
+    public required List<PipelineStageRecord> TransformationStages { get; init; }
+
+    /// <summary>Phase 2 integrity hash (covers original data + Phase 1 transforms).</summary>
+    public required IntegrityHash IntegrityHash { get; init; }
+
+    /// <summary>Phase 3 RAID distribution record.</summary>
+    public required RaidRecord Raid { get; init; }
+
+    /// <summary>Content padding record (if Phase 1 padding was applied).</summary>
+    public ContentPaddingRecord? ContentPadding { get; init; }
+
+    /// <summary>Original unpadded, untransformed data size.</summary>
+    public required long OriginalSize { get; init; }
+
+    /// <summary>Size after Phase 1 transformations (before RAID).</summary>
+    public required long TransformedSize { get; init; }
+
+    /// <summary>WORM storage reference.</summary>
+    public required WormReference WormRef { get; init; }
+
+    /// <summary>Blockchain anchor reference.</summary>
+    public required BlockchainAnchorReference BlockchainRef { get; init; }
+
+    /// <summary>Previous version reference (for corrections).</summary>
+    public Guid? PreviousVersionId { get; init; }
+
+    /// <summary>Correction reason (if this is a correction).</summary>
+    public string? CorrectionReason { get; init; }
+
+    /// <summary>Manifest creation timestamp (UTC).</summary>
+    public required DateTimeOffset CreatedAt { get; init; }
+}
+
+/// <summary>
+/// Records write context information (author, comment, session).
+/// </summary>
+public class WriteContextRecord
+{
+    /// <summary>Author/principal who performed the write.</summary>
+    public required string Author { get; init; }
+
+    /// <summary>Mandatory comment explaining the write (like git commit message).</summary>
+    public required string Comment { get; init; }
+
+    /// <summary>Session identifier for correlation.</summary>
+    public string? SessionId { get; init; }
+
+    /// <summary>Source system or application.</summary>
+    public string? SourceSystem { get; init; }
+
+    /// <summary>Client IP address (if available).</summary>
+    public string? ClientIp { get; init; }
+
+    /// <summary>UTC timestamp of the write.</summary>
+    public required DateTimeOffset Timestamp { get; init; }
+}
+
+/// <summary>
+/// Records a pipeline transformation stage.
+/// </summary>
+public class PipelineStageRecord
+{
+    /// <summary>Stage type (e.g., "Compression", "Encryption", "ContentPadding").</summary>
+    public required string StageType { get; init; }
+
+    /// <summary>Plugin ID that performed the transformation.</summary>
+    public required string PluginId { get; init; }
+
+    /// <summary>Order in which this stage was applied.</summary>
+    public required int Order { get; init; }
+
+    /// <summary>Stage-specific parameters (for reversibility).</summary>
+    public Dictionary<string, object> Parameters { get; init; } = new();
+}
+
+/// <summary>
+/// Records RAID distribution details.
+/// </summary>
+public class RaidRecord
+{
+    /// <summary>Total number of data shards.</summary>
+    public required int DataShardCount { get; init; }
+
+    /// <summary>Total number of parity shards.</summary>
+    public required int ParityShardCount { get; init; }
+
+    /// <summary>Individual shard records.</summary>
+    public required List<ShardRecord> Shards { get; init; }
+
+    /// <summary>Shard padding configuration used.</summary>
+    public ShardPaddingRecord? ShardPadding { get; init; }
+}
+
+/// <summary>
+/// Records details for a single shard.
+/// </summary>
+public class ShardRecord
+{
+    /// <summary>Shard index (0-based).</summary>
+    public required int Index { get; init; }
+
+    /// <summary>Whether this is a parity shard.</summary>
+    public required bool IsParity { get; init; }
+
+    /// <summary>Shard size in bytes.</summary>
+    public required long Size { get; init; }
+
+    /// <summary>Shard-level integrity hash.</summary>
+    public required ShardHash Hash { get; init; }
+
+    /// <summary>Storage location key within Data instance.</summary>
+    public required string StorageKey { get; init; }
+
+    /// <summary>Bytes of padding added to this shard (for final data shard).</summary>
+    public int PaddingBytes { get; init; } = 0;
+}
+
+/// <summary>
+/// Records shard padding details.
+/// </summary>
+public class ShardPaddingRecord
+{
+    /// <summary>Which shard was padded (usually last data shard).</summary>
+    public required int PaddedShardIndex { get; init; }
+
+    /// <summary>Original size before padding.</summary>
+    public required long OriginalSize { get; init; }
+
+    /// <summary>Size after padding.</summary>
+    public required long PaddedSize { get; init; }
+
+    /// <summary>Padding byte used (if not random).</summary>
+    public byte? PaddingByte { get; init; }
+}
+
+/// <summary>
+/// Records content padding details (Phase 1).
+/// </summary>
+public class ContentPaddingRecord
+{
+    /// <summary>Original size before padding.</summary>
+    public required long OriginalSize { get; init; }
+
+    /// <summary>Size after padding.</summary>
+    public required long PaddedSize { get; init; }
+
+    /// <summary>Padding alignment used.</summary>
+    public required int Alignment { get; init; }
+}
+
+/// <summary>
+/// Reference to WORM storage.
+/// </summary>
+public class WormReference
+{
+    /// <summary>WORM storage key.</summary>
+    public required string StorageKey { get; init; }
+
+    /// <summary>Retention expiry date.</summary>
+    public required DateTimeOffset RetentionExpiry { get; init; }
+
+    /// <summary>Whether legal hold is active.</summary>
+    public bool HasLegalHold { get; init; } = false;
+}
+
+/// <summary>
+/// Reference to blockchain anchor.
+/// </summary>
+public class BlockchainAnchorReference
+{
+    /// <summary>Block number containing the anchor.</summary>
+    public required long BlockNumber { get; init; }
+
+    /// <summary>Transaction/record ID within block.</summary>
+    public required string TransactionId { get; init; }
+
+    /// <summary>Merkle proof path (if batched).</summary>
+    public List<string>? MerkleProofPath { get; init; }
+
+    /// <summary>Anchor timestamp.</summary>
+    public required DateTimeOffset AnchoredAt { get; init; }
+}
+```
+
+---
+
+### Write Context and Access Log Structures
+
+```csharp
+namespace DataWarehouse.SDK.Contracts;
+
+/// <summary>
+/// Required context for all write operations.
+/// Like a git commit, every write MUST have an author and comment.
+/// </summary>
+public class WriteContext
+{
+    /// <summary>
+    /// Author/principal performing the write. REQUIRED.
+    /// Can be username, service account, or system identifier.
+    /// </summary>
+    public required string Author { get; init; }
+
+    /// <summary>
+    /// Comment explaining what is being written and why. REQUIRED.
+    /// Like a git commit message - should explain the purpose.
+    /// </summary>
+    public required string Comment { get; init; }
+
+    /// <summary>
+    /// Optional session identifier for correlation across operations.
+    /// </summary>
+    public string? SessionId { get; init; }
+
+    /// <summary>
+    /// Optional source system identifier.
+    /// </summary>
+    public string? SourceSystem { get; init; }
+
+    /// <summary>
+    /// Optional additional metadata.
+    /// </summary>
+    public Dictionary<string, object>? Metadata { get; init; }
+}
+
+/// <summary>
+/// Context for correction operations (extends WriteContext with reason).
+/// </summary>
+public class CorrectionContext : WriteContext
+{
+    /// <summary>
+    /// Reason for the correction. REQUIRED.
+    /// Should explain what was wrong with the original data.
+    /// </summary>
+    public required string CorrectionReason { get; init; }
+
+    /// <summary>
+    /// Reference to the original object being corrected.
+    /// </summary>
+    public required Guid OriginalObjectId { get; init; }
+}
+
+/// <summary>
+/// Access log entry for tamper attribution.
+/// </summary>
+public class AccessLogEntry
+{
+    /// <summary>Unique log entry identifier.</summary>
+    public required Guid EntryId { get; init; }
+
+    /// <summary>Object that was accessed.</summary>
+    public required Guid ObjectId { get; init; }
+
+    /// <summary>Type of access.</summary>
+    public required AccessType AccessType { get; init; }
+
+    /// <summary>Principal who performed the access.</summary>
+    public required string Principal { get; init; }
+
+    /// <summary>UTC timestamp of access.</summary>
+    public required DateTimeOffset Timestamp { get; init; }
+
+    /// <summary>Session identifier (if available).</summary>
+    public string? SessionId { get; init; }
+
+    /// <summary>Client IP address (if available).</summary>
+    public string? ClientIp { get; init; }
+
+    /// <summary>User agent or application identifier.</summary>
+    public string? UserAgent { get; init; }
+
+    /// <summary>Whether the access succeeded.</summary>
+    public required bool Succeeded { get; init; }
+
+    /// <summary>Error message if access failed.</summary>
+    public string? ErrorMessage { get; init; }
+
+    /// <summary>Hash computed during access (for writes).</summary>
+    public string? ComputedHash { get; init; }
+
+    /// <summary>Additional context.</summary>
+    public Dictionary<string, object>? Context { get; init; }
+}
+
+/// <summary>
+/// Tamper incident report with attribution.
+/// </summary>
+public class TamperIncidentReport
+{
+    /// <summary>Unique incident identifier.</summary>
+    public required Guid IncidentId { get; init; }
+
+    /// <summary>Affected object.</summary>
+    public required Guid ObjectId { get; init; }
+
+    /// <summary>When tampering was detected.</summary>
+    public required DateTimeOffset DetectedAt { get; init; }
+
+    /// <summary>Expected hash from manifest.</summary>
+    public required string ExpectedHash { get; init; }
+
+    /// <summary>Actual hash computed from data.</summary>
+    public required string ActualHash { get; init; }
+
+    /// <summary>Which storage instance had tampered data.</summary>
+    public required string AffectedInstance { get; init; }
+
+    /// <summary>Which shards were affected (if RAID).</summary>
+    public List<int>? AffectedShards { get; init; }
+
+    /// <summary>Recovery action taken.</summary>
+    public required TamperRecoveryBehavior RecoveryAction { get; init; }
+
+    /// <summary>Whether recovery succeeded.</summary>
+    public required bool RecoverySucceeded { get; init; }
+
+    // === ATTRIBUTION ===
+
+    /// <summary>Confidence level of attribution.</summary>
+    public required AttributionConfidence AttributionConfidence { get; init; }
+
+    /// <summary>Suspected principal (if attribution available).</summary>
+    public string? SuspectedPrincipal { get; init; }
+
+    /// <summary>Access log entries analyzed for attribution.</summary>
+    public List<AccessLogEntry>? RelatedAccessLogs { get; init; }
+
+    /// <summary>Estimated time window when tampering occurred.</summary>
+    public DateTimeOffset? EstimatedTamperTimeFrom { get; init; }
+
+    /// <summary>Estimated time window when tampering occurred.</summary>
+    public DateTimeOffset? EstimatedTamperTimeTo { get; init; }
+
+    /// <summary>Attribution reasoning explanation.</summary>
+    public string? AttributionReasoning { get; init; }
+
+    /// <summary>Whether tampering appears to be internal or external.</summary>
+    public bool? IsInternalTampering { get; init; }
+}
+```
+
+---
+
+### Result Types
+
+```csharp
+namespace DataWarehouse.SDK.Contracts;
+
+/// <summary>Result of a secure write operation.</summary>
+public class SecureWriteResult
+{
+    public required Guid ObjectId { get; init; }
+    public required int Version { get; init; }
+    public required IntegrityHash IntegrityHash { get; init; }
+    public required string ManifestKey { get; init; }
+    public required BlockchainAnchorReference BlockchainAnchor { get; init; }
+    public required WormReference WormReference { get; init; }
+    public required DateTimeOffset Timestamp { get; init; }
+    public required bool Succeeded { get; init; }
+    public string? ErrorMessage { get; init; }
+}
+
+/// <summary>Result of a secure read operation.</summary>
+public class SecureReadResult
+{
+    public required Guid ObjectId { get; init; }
+    public required int Version { get; init; }
+    public required Stream Data { get; init; }
+    public required ReadMode ModeUsed { get; init; }
+    public required IntegrityVerificationResult Verification { get; init; }
+    public TamperIncidentReport? TamperIncident { get; init; }
+    public bool WasRecoveredFromWorm { get; init; } = false;
+}
+
+/// <summary>Result of a correction operation.</summary>
+public class CorrectionResult
+{
+    public required Guid OriginalObjectId { get; init; }
+    public required int OriginalVersion { get; init; }
+    public required Guid NewObjectId { get; init; }
+    public required int NewVersion { get; init; }
+    public required string CorrectionReason { get; init; }
+    public required SecureWriteResult WriteResult { get; init; }
+    public required BlockchainAnchorReference CorrectionAnchor { get; init; }
+}
+
+/// <summary>Result of an audit operation.</summary>
+public class AuditResult
+{
+    public required Guid ObjectId { get; init; }
+    public required bool IntegrityValid { get; init; }
+    public required bool BlockchainValid { get; init; }
+    public required bool WormValid { get; init; }
+    public required AuditChain AuditChain { get; init; }
+    public List<TamperIncidentReport>? HistoricalIncidents { get; init; }
+    public required DateTimeOffset AuditedAt { get; init; }
+}
+
+/// <summary>Result of a recovery operation.</summary>
+public class RecoveryResult
+{
+    public required Guid ObjectId { get; init; }
+    public required bool Succeeded { get; init; }
+    public required string RecoverySource { get; init; } // "WORM" or "RAID-Parity"
+    public IntegrityHash? RecoveredDataHash { get; init; }
+    public string? ErrorMessage { get; init; }
+    public required DateTimeOffset RecoveredAt { get; init; }
+}
+
+/// <summary>Integrity hash value.</summary>
+public class IntegrityHash
+{
+    public required HashAlgorithmType Algorithm { get; init; }
+    public required byte[] Value { get; init; }
+    public string HexString => Convert.ToHexString(Value);
+}
+
+/// <summary>Shard-level hash.</summary>
+public class ShardHash
+{
+    public required int ShardIndex { get; init; }
+    public required Guid ObjectId { get; init; }
+    public required byte[] Value { get; init; }
+}
+
+/// <summary>Result of integrity verification.</summary>
+public class IntegrityVerificationResult
+{
+    public required bool IsValid { get; init; }
+    public IntegrityHash? ExpectedHash { get; init; }
+    public IntegrityHash? ActualHash { get; init; }
+    public string? ErrorMessage { get; init; }
+}
+
+/// <summary>Audit chain showing all versions and corrections.</summary>
+public class AuditChain
+{
+    public required Guid ObjectId { get; init; }
+    public required List<AuditChainEntry> Entries { get; init; }
+}
+
+/// <summary>Single entry in audit chain.</summary>
+public class AuditChainEntry
+{
+    public required int Version { get; init; }
+    public required IntegrityHash Hash { get; init; }
+    public required BlockchainAnchorReference Anchor { get; init; }
+    public required WriteContextRecord WriteContext { get; init; }
+    public required DateTimeOffset Timestamp { get; init; }
+    public Guid? SupersededBy { get; init; }
+    public string? CorrectionReason { get; init; }
+}
+```
+
+---
+
+### Plugin Base Classes
+
+```csharp
+namespace DataWarehouse.SDK.Contracts;
+
+/// <summary>
+/// Base class for tamper-proof storage provider plugins.
+/// </summary>
+public abstract class TamperProofProviderPluginBase : FeaturePluginBase, ITamperProofProvider
+{
+    // Constructor receives dependencies via DI:
+    // - IStorageProvider[] storageProviders (for Data, Metadata, WORM, Blockchain instances)
+    // - IIntegrityProvider integrityProvider
+    // - IBlockchainProvider blockchainProvider
+    // - IWormStorageProvider wormProvider
+    // - IPipelineOrchestrator pipelineOrchestrator
+    // - IAccessLogProvider accessLogProvider
+    // - IRaidProvider raidProvider
+
+    protected abstract TamperProofConfiguration DefaultConfiguration { get; }
+
+    // Abstract methods for subclass implementation
+    protected abstract Task OnSealedAsync(CancellationToken ct);
+    protected abstract Task<TamperIncidentReport> AnalyzeTamperAttributionAsync(
+        Guid objectId,
+        DateTimeOffset tamperDetectedAt,
+        CancellationToken ct);
+}
+
+/// <summary>
+/// Base class for integrity provider plugins.
+/// </summary>
+public abstract class IntegrityProviderPluginBase : FeaturePluginBase, IIntegrityProvider
+{
+    protected abstract byte[] ComputeHashCore(Stream data, HashAlgorithmType algorithm);
+}
+
+/// <summary>
+/// Base class for blockchain provider plugins.
+/// </summary>
+public abstract class BlockchainProviderPluginBase : FeaturePluginBase, IBlockchainProvider
+{
+    protected abstract Task<BlockchainAnchor> CreateAnchorAsync(AnchorRequest request, CancellationToken ct);
+    protected abstract Task<bool> ValidateChainIntegrityAsync(CancellationToken ct);
+}
+
+/// <summary>
+/// Base class for WORM storage provider plugins.
+/// </summary>
+public abstract class WormStorageProviderPluginBase : FeaturePluginBase, IWormStorageProvider
+{
+    protected abstract Task EnforceRetentionAsync(Guid objectId, WormRetentionPolicy policy, CancellationToken ct);
+}
+
+/// <summary>
+/// Base class for access log provider plugins.
+/// </summary>
+public abstract class AccessLogProviderPluginBase : FeaturePluginBase, IAccessLogProvider
+{
+    protected abstract Task PersistLogEntryAsync(AccessLogEntry entry, CancellationToken ct);
+}
+```
+
+---
+
+### Implementation Phases
+
+#### Phase T1: Core Infrastructure (Priority: CRITICAL)
+| Task | Description | Dependencies | Status |
+|------|-------------|--------------|--------|
+| T1.1 | Create `IIntegrityProvider` interface and `IntegrityProviderPluginBase` | None | [ ] |
+| T1.2 | Implement `DefaultIntegrityProvider` with SHA256/SHA384/SHA512/Blake3 | T1.1 | [ ] |
+| T1.3 | Create `IBlockchainProvider` interface and `BlockchainProviderPluginBase` | None | [ ] |
+| T1.4 | Implement `LocalBlockchainProvider` (file-based chain for single-node) | T1.3 | [ ] |
+| T1.5 | Create `IWormStorageProvider` interface and `WormStorageProviderPluginBase` | None | [ ] |
+| T1.6 | Implement `SoftwareWormProvider` (software-enforced immutability) | T1.5 | [ ] |
+| T1.7 | Create `IAccessLogProvider` interface and `AccessLogProviderPluginBase` | None | [ ] |
+| T1.8 | Implement `DefaultAccessLogProvider` (persistent access logging) | T1.7 | [ ] |
+| T1.9 | Create all configuration classes | None | [ ] |
+| T1.10 | Create all enum definitions | None | [ ] |
+| T1.11 | Create all manifest and record structures | None | [ ] |
+| T1.12 | Create `WriteContext` and `CorrectionContext` classes | None | [ ] |
+
+#### Phase T2: Core Plugin (Priority: HIGH)
+| Task | Description | Dependencies | Status |
+|------|-------------|--------------|--------|
+| T2.1 | Create `ITamperProofProvider` interface | T1.* | [ ] |
+| T2.2 | Create `TamperProofProviderPluginBase` base class | T2.1 | [ ] |
+| T2.3 | Implement Phase 1 write pipeline (user transformations) | T2.2 | [ ] |
+| T2.4 | Implement Phase 2 write pipeline (integrity hash) | T2.3, T1.2 | [ ] |
+| T2.5 | Implement Phase 3 write pipeline (RAID + shard padding) | T2.4 | [ ] |
+| T2.6 | Implement Phase 4 write pipeline (parallel storage writes) | T2.5 | [ ] |
+| T2.7 | Implement Phase 5 write pipeline (blockchain anchoring) | T2.6, T1.4 | [ ] |
+| T2.8 | Implement `SecureWriteAsync` combining all phases | T2.7 | [ ] |
+| T2.9 | Implement mandatory write comment validation | T2.8, T1.12 | [ ] |
+| T2.10 | Implement access logging on all operations | T2.8, T1.8 | [ ] |
+
+#### Phase T3: Read Pipeline & Verification (Priority: HIGH)
+| Task | Description | Dependencies | Status |
+|------|-------------|--------------|--------|
+| T3.1 | Implement Phase 1 read (manifest retrieval) | T2.* | [ ] |
+| T3.2 | Implement Phase 2 read (shard retrieval + reconstruction) | T3.1 | [ ] |
+| T3.3 | Implement Phase 3 read (integrity verification by ReadMode) | T3.2 | [ ] |
+| T3.4 | Implement Phase 4 read (reverse transformations) | T3.3 | [ ] |
+| T3.5 | Implement Phase 5 read (tamper response) | T3.4 | [ ] |
+| T3.6 | Implement `SecureReadAsync` with all ReadModes | T3.5 | [ ] |
+| T3.7 | Implement tamper detection and incident creation | T3.6 | [ ] |
+| T3.8 | Implement tamper attribution analysis | T3.7, T1.8 | [ ] |
+| T3.9 | Implement `GetTamperIncidentAsync` with attribution | T3.8 | [ ] |
+
+#### Phase T4: Recovery & Advanced Features (Priority: MEDIUM)
+| Task | Description | Dependencies | Status |
+|------|-------------|--------------|--------|
+| T4.1 | Implement `AutoRecoverSilent` recovery behavior | T3.* | [ ] |
+| T4.2 | Implement `AutoRecoverWithReport` recovery behavior | T4.1 | [ ] |
+| T4.3 | Implement `AlertAndWait` recovery behavior | T4.2 | [ ] |
+| T4.4 | Implement `RecoverFromWormAsync` manual recovery | T4.3 | [ ] |
+| T4.5 | Implement `SecureCorrectAsync` (append-only corrections) | T4.4 | [ ] |
+| T4.6 | Implement `AuditAsync` with full chain verification | T4.5 | [ ] |
+| T4.7 | Implement seal mechanism (lock structural config after first write) | T4.6 | [ ] |
+| T4.8 | Implement instance degradation state management | T4.7 | [ ] |
+| T4.9 | Implement `RaftConsensus` mode support | T4.8 | [ ] |
+| T4.10 | Implement `HardwareIntegrated` WORM mode (S3 Object Lock, Azure Immutable) | T4.9 | [ ] |
+
+#### Phase T5: Testing & Documentation (Priority: HIGH)
+| Task | Description | Dependencies | Status |
+|------|-------------|--------------|--------|
+| T5.1 | Unit tests for integrity provider | T1.2 | [ ] |
+| T5.2 | Unit tests for blockchain provider | T1.4 | [ ] |
+| T5.3 | Unit tests for WORM provider | T1.6 | [ ] |
+| T5.4 | Unit tests for access log provider | T1.8 | [ ] |
+| T5.5 | Integration tests for write pipeline | T2.8 | [ ] |
+| T5.6 | Integration tests for read pipeline | T3.6 | [ ] |
+| T5.7 | Integration tests for tamper detection + attribution | T3.9 | [ ] |
+| T5.8 | Integration tests for recovery scenarios | T4.4 | [ ] |
+| T5.9 | Integration tests for correction workflow | T4.5 | [ ] |
+| T5.10 | Performance benchmarks | T4.* | [ ] |
+| T5.11 | XML documentation for all public APIs | T4.* | [ ] |
+| T5.12 | Update CLAUDE.md with tamper-proof documentation | T5.11 | [ ] |
+
+---
+
+### File Structure
+
+```
+DataWarehouse.SDK/
+├── Contracts/
+│   ├── TamperProof/
+│   │   ├── ITamperProofProvider.cs
+│   │   ├── IIntegrityProvider.cs
+│   │   ├── IBlockchainProvider.cs
+│   │   ├── IWormStorageProvider.cs
+│   │   ├── IAccessLogProvider.cs
+│   │   ├── TamperProofConfiguration.cs
+│   │   ├── TamperProofManifest.cs
+│   │   ├── WriteContext.cs
+│   │   ├── AccessLogEntry.cs
+│   │   ├── TamperIncidentReport.cs
+│   │   └── TamperProofEnums.cs
+│   └── PluginBases/
+│       ├── TamperProofProviderPluginBase.cs
+│       ├── IntegrityProviderPluginBase.cs
+│       ├── BlockchainProviderPluginBase.cs
+│       ├── WormStorageProviderPluginBase.cs
+│       └── AccessLogProviderPluginBase.cs
+
+Plugins/
+├── DataWarehouse.Plugins.TamperProof/
+│   ├── TamperProofPlugin.cs (main orchestrator)
+│   ├── Pipeline/
+│   │   ├── WritePhase1Handler.cs
+│   │   ├── WritePhase2Handler.cs
+│   │   ├── WritePhase3Handler.cs
+│   │   ├── WritePhase4Handler.cs
+│   │   ├── WritePhase5Handler.cs
+│   │   ├── ReadPhase1Handler.cs
+│   │   ├── ReadPhase2Handler.cs
+│   │   ├── ReadPhase3Handler.cs
+│   │   ├── ReadPhase4Handler.cs
+│   │   └── ReadPhase5Handler.cs
+│   ├── Attribution/
+│   │   └── TamperAttributionAnalyzer.cs
+│   └── DataWarehouse.Plugins.TamperProof.csproj
+├── DataWarehouse.Plugins.Integrity/
+│   ├── DefaultIntegrityPlugin.cs
+│   └── DataWarehouse.Plugins.Integrity.csproj
+├── DataWarehouse.Plugins.Blockchain.Local/
+│   ├── LocalBlockchainPlugin.cs
+│   └── DataWarehouse.Plugins.Blockchain.Local.csproj
+├── DataWarehouse.Plugins.Worm.Software/
+│   ├── SoftwareWormPlugin.cs
+│   └── DataWarehouse.Plugins.Worm.Software.csproj
+├── DataWarehouse.Plugins.Worm.S3ObjectLock/
+│   ├── S3ObjectLockWormPlugin.cs
+│   └── DataWarehouse.Plugins.Worm.S3ObjectLock.csproj
+└── DataWarehouse.Plugins.AccessLog/
+    ├── DefaultAccessLogPlugin.cs
+    └── DataWarehouse.Plugins.AccessLog.csproj
+```
+
+---
+
+### Security Considerations
+
+1. **Write Comment Validation**: All write operations MUST include non-empty `Author` and `Comment` fields. Empty or whitespace-only values are rejected.
+
+2. **Access Logging**: Every operation (read, write, correct, admin) is logged with principal, timestamp, client IP, and session ID for attribution.
+
+3. **Tamper Attribution Analysis**:
+   - Compare tampering detection time with access log history
+   - Look for write operations in time window before detection
+   - If only one principal accessed during window → high confidence attribution
+   - If multiple principals → list all as suspects
+   - If no logged access → indicates external/physical tampering
+
+4. **Seal Mechanism**: Structural configuration (storage instances, RAID config, hash algorithm) becomes immutable after first write. Only behavioral settings (recovery behavior, read mode) can change.
+
+5. **WORM Integrity**: WORM storage is the ultimate source of truth. Software WORM can be bypassed by admins (logged); hardware WORM (S3 Object Lock) cannot.
+
+6. **Blockchain Immutability**: Each anchor includes previous block hash, creating tamper-evident chain. Batch anchoring uses Merkle trees for efficiency.
+
+---
+
+*Section added: 2026-01-29*
+*Author: Claude AI*
+
+---
+
 *Document updated: 2026-01-25*
 *Next review: 2026-02-15*
