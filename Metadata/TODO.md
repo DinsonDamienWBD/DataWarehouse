@@ -1033,6 +1033,12 @@ READ REQUEST (ObjectGuid, ReadMode)
 - All builds pass with 0 errors
 
 #### Phase T3: Read Pipeline & Verification (Priority: HIGH)
+
+> **DEPENDENCY:** T3.4.2 "Decrypt (if encrypted)" requires T5.0 (SDK Base Classes) to be completed first.
+> - T5.0.3 provides `EncryptionPluginBase` with unified decryption infrastructure
+> - T5.0.1.4 provides `EncryptionMetadata` record for parsing manifest/header
+> - T5.0.1.9 provides `EncryptionConfigMode` enum for config resolution
+
 | Task | Description | Dependencies | Status |
 |------|-------------|--------------|--------|
 | T3.1 | Implement Phase 1 read (manifest retrieval) | T2.* | [ ] |
@@ -1047,7 +1053,7 @@ READ REQUEST (ObjectGuid, ReadMode)
 | T3.3.3 | ↳ Implement `ReadMode.Audit` (full chain + blockchain + access log) | T3.3 | [ ] |
 | T3.4 | Implement Phase 4 read (reverse transformations) | T3.3 | [ ] |
 | T3.4.1 | ↳ Strip content padding (if applied) | T3.4 | [ ] |
-| T3.4.2 | ↳ Decrypt (if encrypted) | T3.4 | [ ] |
+| T3.4.2 | ↳ Decrypt (if encrypted) | T3.4, **T5.0** | [ ] |
 | T3.4.3 | ↳ Decompress (if compressed) | T3.4 | [ ] |
 | T3.5 | Implement Phase 5 read (tamper response) | T3.4 | [ ] |
 | T3.6 | Implement `SecureReadAsync` with all ReadModes | T3.5 | [ ] |
@@ -1333,6 +1339,13 @@ public record OrphanedWormRecord
 ---
 
 ### Encryption Metadata Requirements (CRITICAL for Decryption)
+
+> **IMPORTANT: This pattern applies to ALL encryption, not just tamper-proof storage.**
+> - **Standalone encryption:** EncryptionMetadata stored in **ciphertext header** (binary prefix)
+> - **Tamper-proof storage:** EncryptionMetadata stored in **TamperProofManifest** (JSON field)
+>
+> The principle is identical: store write-time config WITH the data so read-time can always decrypt correctly.
+> The only difference is WHERE the metadata is stored (header vs manifest).
 
 **Problem:** When reading encrypted data back, the system MUST know:
 1. Which encryption algorithm was used
@@ -1691,6 +1704,15 @@ internal interface IVaultBackend
 
 > **CRITICAL: This section establishes the SDK foundation that ALL encryption and key management work depends on.**
 >
+> **DEPENDENCY ORDER: T5.0 MUST be completed BEFORE Phase T3 (Read Pipeline & Verification).**
+> - T3.4.2 "Decrypt (if encrypted)" requires `EncryptionPluginBase` infrastructure from T5.0.3
+> - T3.4.2 needs `EncryptionMetadata` from manifests to resolve decryption config
+> - Without T5.0, decryption in T3 would require hard-coded assumptions about key management
+>
+> **STORAGE PROVIDERS NOTE:** Storage providers (S3, Local, Azure, etc.) do NOT need modification for this feature.
+> Encryption/decryption happens at the **pipeline level** (`PipelinePluginBase`), which is independent of storage.
+> The storage provider only sees already-encrypted bytes - it has no knowledge of encryption at all.
+>
 > **Problem Identified:** Currently, all 6 encryption plugins and all key management plugins have duplicated code for:
 > - Key management (getting keys, security context validation)
 > - Key caching and initialization patterns
@@ -1741,6 +1763,7 @@ PluginBase (SDK)
 | T5.0.1.6 | `IKeyManagementConfigProvider` interface | IKeyManagementConfigProvider.cs | Resolve per-user/per-tenant key management preferences | [ ] |
 | T5.0.1.7 | `IKeyStoreRegistry` interface | IKeyStoreRegistry.cs | Registry for resolving plugin IDs to key store instances | [ ] |
 | T5.0.1.8 | `DefaultKeyStoreRegistry` implementation | DefaultKeyStoreRegistry.cs | Default in-memory implementation of IKeyStoreRegistry | [ ] |
+| T5.0.1.9 | `EncryptionConfigMode` enum | EncryptionConfigMode.cs | Per-object vs fixed vs policy-enforced configuration | [ ] |
 
 **KeyManagementMode Enum:**
 ```csharp
@@ -1783,6 +1806,40 @@ public interface IEnvelopeKeyStore : IKeyStore
     /// Unwrap a previously wrapped DEK using the KEK in the HSM.
     /// </summary>
     Task<byte[]> UnwrapKeyAsync(string kekId, byte[] wrappedKey, ISecurityContext context);
+}
+```
+
+**EncryptionConfigMode Enum (T5.0.1.9):**
+```csharp
+/// <summary>
+/// Determines how encryption configuration is managed for a storage context.
+/// Applies to BOTH tamper-proof storage (manifest) and standalone encryption (ciphertext header).
+/// </summary>
+public enum EncryptionConfigMode
+{
+    /// <summary>
+    /// DEFAULT: Each object stores its own EncryptionMetadata.
+    /// - Tamper-proof: EncryptionMetadata stored in TamperProofManifest
+    /// - Standalone: EncryptionMetadata stored in ciphertext header
+    /// Use case: Multi-tenant deployments, mixed compliance requirements.
+    /// </summary>
+    PerObjectConfig,
+
+    /// <summary>
+    /// All objects MUST use the same encryption configuration.
+    /// Configuration is sealed after first write - cannot be changed.
+    /// Any write with different config will be rejected.
+    /// Use case: Single-tenant deployments, strict compliance (all data same encryption).
+    /// </summary>
+    FixedConfig,
+
+    /// <summary>
+    /// Per-object configuration allowed, but must satisfy tenant/org policy.
+    /// Policy defines: allowed encryption algorithms, required key modes, allowed key stores.
+    /// Writes that violate policy are rejected with detailed error.
+    /// Use case: Enterprise with compliance rules but per-user flexibility within bounds.
+    /// </summary>
+    PolicyEnforced
 }
 ```
 
@@ -2339,7 +2396,7 @@ For each new ENCRYPTION plugin:
 | Task | Description | Dependencies | Status |
 |------|-------------|--------------|--------|
 | **T5.0** | **SDK Base Classes and Plugin Refactoring** | None | [ ] |
-| T5.0.1 | SDK Key Management Types (enum, interfaces, classes) | - | [ ] |
+| T5.0.1 | SDK Key Management Types (enums, interfaces, classes incl. EncryptionConfigMode) | - | [ ] |
 | T5.0.2 | `KeyStorePluginBase` abstract class | T5.0.1 | [ ] |
 | T5.0.3 | `EncryptionPluginBase` abstract class | T5.0.1 | [ ] |
 | T5.0.4 | Refactor existing key management plugins (4 plugins) | T5.0.2 | [ ] |
