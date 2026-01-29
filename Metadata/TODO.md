@@ -1354,12 +1354,65 @@ After the first write operation, structural configuration becomes immutable:
 
 | Task | Component | Description | Status |
 |------|-----------|-------------|--------|
-| T5.1 | `EnvelopeEncryptionPlugin` | AES-GCM + HSM key wrapping | [ ] |
-| T5.2 | `KyberEncryptionPlugin` | Post-quantum cryptography (NIST PQC) | [ ] |
+| T5.1 | `EnvelopeEncryptionPlugin` | Envelope encryption with HSM-backed key wrapping (see below) | [ ] |
+| T5.1.1 | ↳ DEK generation and data encryption | Use AES-256-GCM to encrypt data with random DEK | [ ] |
+| T5.1.2 | ↳ KEK wrapping via HSM | Wrap DEK with KEK stored in HSM (AWS KMS, Azure Key Vault, HashiCorp Vault) | [ ] |
+| T5.1.3 | ↳ Wrapped DEK storage in manifest | Store encrypted DEK alongside ciphertext | [ ] |
+| T5.1.4 | ↳ HSM provider abstraction | Support multiple HSM backends | [ ] |
+| T5.2 | `KyberEncryptionPlugin` | Post-quantum cryptography (NIST PQC ML-KEM) | [ ] |
 | T5.3 | `ChaffPaddingPlugin` | Traffic analysis protection via dummy writes | [ ] |
 | T5.4 | `ShamirSecretPlugin` | Key splitting across N parties (M-of-N recovery) | [ ] |
 | T5.5 | `GeoWormPlugin` | Geo-dispersed WORM replication across regions | [ ] |
 | T5.6 | `GeoDistributedShardingPlugin` | Geo-dispersed data sharding (shards across continents) | [ ] |
+
+**Encryption Mode Comparison:**
+| Mode | Implementation | Key Management | Security Level | Use Case |
+|------|---------------|----------------|----------------|----------|
+| **Direct AES-256-GCM** | ✅ `AesEncryptionPlugin` (existing) | Key from `IKeyStore` | High | General enterprise |
+| **Envelope Encryption** | [ ] `EnvelopeEncryptionPlugin` (T5.1) | DEK wrapped by HSM-backed KEK | Maximum | Government, military, PCI-DSS |
+
+**How Envelope Encryption Differs from Direct Encryption:**
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ DIRECT AES-256-GCM (Existing - AesEncryptionPlugin)                         │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│   Data ──► AES-256-GCM(Key) ──► Ciphertext                                  │
+│                   ▲                                                         │
+│                   │                                                         │
+│              Key from IKeyStore                                             │
+│              (software-managed)                                             │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ ENVELOPE ENCRYPTION (T5.1 - EnvelopeEncryptionPlugin)                       │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│   Data ──► AES-256-GCM(DEK) ──► Ciphertext ─────────────┐                   │
+│                   ▲                                      │                   │
+│                   │                                      ▼                   │
+│         DEK (random per-object)              ┌─────────────────────┐        │
+│                   │                          │  Stored Together:   │        │
+│                   ▼                          │  • Ciphertext       │        │
+│         HSM.Wrap(DEK, KEK) ──► Wrapped DEK ──│  • Wrapped DEK      │        │
+│                   ▲                          │  • KEK ID           │        │
+│                   │                          └─────────────────────┘        │
+│         KEK (NEVER leaves HSM)                                              │
+│         ┌─────────────────┐                                                 │
+│         │      HSM        │  AWS KMS / Azure Key Vault / HashiCorp Vault    │
+│         │  (Hardware)     │  Key never exposed to software                  │
+│         └─────────────────┘                                                 │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+Benefits of Envelope Encryption:
+• KEK never leaves HSM hardware - impossible to extract
+• DEK is unique per object - limits blast radius if one DEK is compromised
+• Key rotation only requires re-wrapping DEKs, not re-encrypting all data
+• Meets PCI-DSS, HIPAA, FedRAMP requirements for key management
+• Audit trail of all key operations via HSM logging
+```
 
 **Goal:** Maximum compression for archival/cold storage
 
