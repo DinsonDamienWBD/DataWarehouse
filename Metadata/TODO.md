@@ -1038,11 +1038,20 @@ READ REQUEST (ObjectGuid, ReadMode)
 | T3.1 | Implement Phase 1 read (manifest retrieval) | T2.* | [ ] |
 | T3.2 | Implement Phase 2 read (shard retrieval + reconstruction) | T3.1 | [ ] |
 | T3.3 | Implement Phase 3 read (integrity verification by ReadMode) | T3.2 | [ ] |
+| T3.3.1 | ↳ Implement `ReadMode.Fast` (skip verification, trust shard hashes) | T3.3 | [ ] |
+| T3.3.2 | ↳ Implement `ReadMode.Verified` (compute hash, compare to manifest) | T3.3 | [ ] |
+| T3.3.3 | ↳ Implement `ReadMode.Audit` (full chain + blockchain + access log) | T3.3 | [ ] |
 | T3.4 | Implement Phase 4 read (reverse transformations) | T3.3 | [ ] |
+| T3.4.1 | ↳ Strip content padding (if applied) | T3.4 | [ ] |
+| T3.4.2 | ↳ Decrypt (if encrypted) | T3.4 | [ ] |
+| T3.4.3 | ↳ Decompress (if compressed) | T3.4 | [ ] |
 | T3.5 | Implement Phase 5 read (tamper response) | T3.4 | [ ] |
 | T3.6 | Implement `SecureReadAsync` with all ReadModes | T3.5 | [ ] |
 | T3.7 | Implement tamper detection and incident creation | T3.6 | [ ] |
 | T3.8 | Implement tamper attribution analysis | T3.7, T1.8 | [ ] |
+| T3.8.1 | ↳ Correlate access logs with tampering window | T3.8 | [ ] |
+| T3.8.2 | ↳ Identify suspect principals (single/multiple/none) | T3.8 | [ ] |
+| T3.8.3 | ↳ Detect access log tampering (sophisticated attack) | T3.8 | [ ] |
 | T3.9 | Implement `GetTamperIncidentAsync` with attribution | T3.8 | [ ] |
 
 **Read Modes:**
@@ -1053,21 +1062,85 @@ READ REQUEST (ObjectGuid, ReadMode)
 | `Audit` | Full chain verification + blockchain anchor + access logging | Compliance audits, legal discovery, incident investigation |
 
 #### Phase T4: Recovery & Advanced Features (Priority: MEDIUM)
+
+**Recovery Behaviors (User-Configurable):**
 | Task | Description | Dependencies | Status |
 |------|-------------|--------------|--------|
-| T4.1 | Implement `AutoRecoverSilent` recovery behavior | T3.* | [ ] |
-| T4.2 | Implement `AutoRecoverWithReport` recovery behavior | T4.1 | [ ] |
-| T4.3 | Implement `AlertAndWait` recovery behavior | T4.2 | [ ] |
-| T4.4 | Implement `RecoverFromWormAsync` manual recovery | T4.3 | [ ] |
-| T4.5 | Implement `SecureCorrectAsync` (append-only corrections) | T4.4 | [ ] |
-| T4.6 | Implement `AuditAsync` with full chain verification | T4.5 | [ ] |
-| T4.7 | Implement seal mechanism (lock structural config after first write) | T4.6 | [ ] |
-| T4.8 | Implement instance degradation state management | T4.7 | [ ] |
-| T4.9 | Implement `RaftConsensus` mode support for blockchain | T4.8 | [ ] |
+| T4.1 | Implement `TamperRecoveryBehavior` enum and configuration | T3.* | [ ] |
+| T4.1.1 | ↳ `AutoRecoverSilent`: Recover from WORM, log internally only | T4.1 | [ ] |
+| T4.1.2 | ↳ `AutoRecoverWithReport`: Recover + generate incident report | T4.1 | [ ] |
+| T4.1.3 | ↳ `AlertAndWait`: Notify admin, block reads until resolved | T4.1 | [ ] |
+| T4.1.4 | ↳ `ManualOnly`: Never auto-recover, require explicit admin action | T4.1 | [ ] |
+| T4.1.5 | ↳ `FailClosed`: Reject all operations on tamper detection | T4.1 | [ ] |
+| T4.2 | Implement `RecoverFromWormAsync` manual recovery | T4.1 | [ ] |
+
+**Append-Only Corrections:**
+| Task | Description | Dependencies | Status |
+|------|-------------|--------------|--------|
+| T4.3 | Implement `SecureCorrectAsync` (append-only corrections) | T4.2 | [ ] |
+| T4.3.1 | ↳ Create new version, never delete original | T4.3 | [ ] |
+| T4.3.2 | ↳ Link new version to superseded version in manifest | T4.3 | [ ] |
+| T4.3.3 | ↳ Anchor correction in blockchain with supersedes reference | T4.3 | [ ] |
+| T4.4 | Implement `AuditAsync` with full chain verification | T4.3 | [ ] |
+
+**Seal Mechanism & Instance State:**
+| Task | Description | Dependencies | Status |
+|------|-------------|--------------|--------|
+| T4.5 | Implement seal mechanism (lock structural config after first write) | T4.4 | [ ] |
+| T4.5.1 | ↳ Lock: Storage instances, RAID config, hash algorithm, blockchain mode | T4.5 | [ ] |
+| T4.5.2 | ↳ Allow: Recovery behavior, read mode, logging, alerts | T4.5 | [ ] |
+| T4.5.3 | ↳ Persist seal state and validate on startup | T4.5 | [ ] |
+| T4.6 | Implement instance degradation state machine | T4.5 | [ ] |
+| T4.6.1 | ↳ State transitions and event notifications | T4.6 | [ ] |
+| T4.6.2 | ↳ Automatic state detection based on provider health | T4.6 | [ ] |
+| T4.6.3 | ↳ Admin override for manual state changes | T4.6 | [ ] |
+
+**Blockchain Consensus Modes:**
+| Task | Description | Dependencies | Status |
+|------|-------------|--------------|--------|
+| T4.7 | Implement `BlockchainMode` enum and mode selection | T4.6 | [ ] |
+| T4.7.1 | ↳ `SingleWriter`: Local file-based chain, single instance | T4.7 | [ ] |
+| T4.7.2 | ↳ `RaftConsensus`: Multi-node consensus, majority required | T4.7 | [ ] |
+| T4.7.3 | ↳ `ExternalAnchor`: Periodic anchoring to public blockchain | T4.7 | [ ] |
+| T4.8 | Implement blockchain batching (N objects or T seconds) | T4.7 | [ ] |
+| T4.8.1 | ↳ Merkle root calculation for batched anchors | T4.8 | [ ] |
+
+**WORM Provider Wrapping (Any Storage Provider):**
+| Task | Description | Dependencies | Status |
+|------|-------------|--------------|--------|
+| T4.9 | Implement `IWormWrapper` interface for wrapping any `IStorageProvider` | T4.8 | [ ] |
+| T4.9.1 | ↳ Software immutability wrapper (admin bypass with logging) | T4.9 | [ ] |
+| T4.9.2 | ↳ Hardware integration detection (S3 Object Lock, Azure Immutable) | T4.9 | [ ] |
 | T4.10 | Implement `S3ObjectLockWormPlugin` (AWS S3 Object Lock) | T4.9 | [ ] |
 | T4.11 | Implement `AzureImmutableBlobWormPlugin` (Azure Immutable Blob) | T4.10 | [ ] |
-| T4.12 | Implement background integrity scanner (configurable intervals) | T4.11 | [ ] |
-| T4.13 | Implement additional integrity algorithms (SHA-3, HMAC-SHA256, HMAC-SHA3) | T4.12 | [ ] |
+
+**Padding Configuration (User-Configurable):**
+| Task | Description | Dependencies | Status |
+|------|-------------|--------------|--------|
+| T4.12 | Implement `ContentPaddingMode` configuration | T4.11 | [ ] |
+| T4.12.1 | ↳ `None`: No padding | T4.12 | [ ] |
+| T4.12.2 | ↳ `SecureRandom`: Cryptographically secure random bytes | T4.12 | [ ] |
+| T4.12.3 | ↳ `Chaff`: Plausible-looking dummy data | T4.12 | [ ] |
+| T4.12.4 | ↳ `FixedSize`: Pad to fixed block size (e.g., 4KB, 64KB) | T4.12 | [ ] |
+| T4.13 | Implement `ShardPaddingMode` configuration | T4.12 | [ ] |
+| T4.13.1 | ↳ `None`: Variable shard sizes | T4.13 | [ ] |
+| T4.13.2 | ↳ `UniformSize`: Pad to largest shard size | T4.13 | [ ] |
+| T4.13.3 | ↳ `FixedBlock`: Pad to configured block boundary | T4.13 | [ ] |
+
+**Transactional Writes with Atomicity:**
+| Task | Description | Dependencies | Status |
+|------|-------------|--------------|--------|
+| T4.14 | Implement `TransactionalWriteManager` with atomicity guarantee | T4.13 | [ ] |
+| T4.14.1 | ↳ Write ordering: Data → Metadata → WORM → Blockchain queue | T4.14 | [ ] |
+| T4.14.2 | ↳ Rollback on failure: Data, Metadata (WORM orphaned) | T4.14 | [ ] |
+| T4.14.3 | ↳ WORM orphan tracking and cleanup job | T4.14 | [ ] |
+| T4.14.4 | ↳ Transaction timeout and retry configuration | T4.14 | [ ] |
+
+**Background Operations:**
+| Task | Description | Dependencies | Status |
+|------|-------------|--------------|--------|
+| T4.15 | Implement background integrity scanner (configurable intervals) | T4.14 | [ ] |
+| T4.16 | Implement additional integrity algorithms (SHA-3, HMAC-SHA256, HMAC-SHA3) | T4.15 | [ ] |
 
 **Instance Degradation States:**
 | State | Cause | Impact | User Action |
@@ -1075,14 +1148,15 @@ READ REQUEST (ObjectGuid, ReadMode)
 | `Healthy` | All systems operational | Full functionality | None |
 | `Degraded` | Some shards unavailable, but reconstructible | Reads slower, writes may be slower | Monitor, plan maintenance |
 | `DegradedReadOnly` | Parity exhausted, cannot guarantee writes | Reads work, writes blocked | Urgent: restore storage |
+| `DegradedVerifyOnly` | Blockchain unavailable, cannot anchor | Reads verified, writes unanchored | Restore blockchain |
 | `DegradedNoRecovery` | WORM unavailable | Cannot auto-recover from tampering | Critical: restore WORM |
 | `Offline` | Primary storage unavailable | No operations possible | Emergency: restore storage |
 | `Corrupted` | Tampering detected, recovery failed | Data integrity compromised | Incident response required |
 
 **Seal Mechanism:**
 After the first write operation, structural configuration becomes immutable:
-- **Locked after seal:** Storage instances, RAID configuration, hash algorithm, blockchain mode
-- **Configurable always:** Recovery behavior, read mode defaults, logging verbosity, alert thresholds
+- **Locked after seal:** Storage instances, RAID configuration, hash algorithm, blockchain mode, WORM provider
+- **Configurable always:** Recovery behavior, read mode defaults, logging verbosity, alert thresholds, padding modes
 
 #### Phase T5: Ultra Paranoid Mode (Priority: LOW)
 
@@ -1289,12 +1363,34 @@ Plugins/
 - **External anchor mode:** Periodically anchor Merkle root to public blockchain (Bitcoin, Ethereum)
 
 #### 2. WORM Implementation Choices
+
+**WORM Wraps ANY Storage Provider:**
+The WORM layer is a wrapper that can be applied to any `IStorageProvider`. This allows users to choose their preferred storage backend while adding immutability guarantees on top.
+
+```
+┌─────────────────────────────────────────────┐
+│           WORM Wrapper Layer                │
+│  (Software immutability OR Hardware detect) │
+├─────────────────────────────────────────────┤
+│         ANY IStorageProvider                │
+│  (S3, Azure, Local, MinIO, GCS, etc.)       │
+└─────────────────────────────────────────────┘
+```
+
 | Type | Provider | Bypass Possible | Use Case |
 |------|----------|-----------------|----------|
 | Software | `SoftwareWormPlugin` | Admin override (logged) | Development, testing, small deployments |
 | S3 Object Lock | `S3ObjectLockWormPlugin` | Not possible (AWS enforced) | AWS-hosted production |
 | Azure Immutable | `AzureImmutableBlobWormPlugin` | Not possible (Azure enforced) | Azure-hosted production |
 | Geo-WORM | `GeoWormPlugin` | Requires multiple region compromise | Maximum security |
+
+#### 2b. Blockchain Consensus Modes
+
+| Mode | Writers | Consensus | Latency | Use Case |
+|------|---------|-----------|---------|----------|
+| `SingleWriter` | 1 | None (local file) | Lowest | Single-node, development, small deployments |
+| `RaftConsensus` | N (odd) | Majority required | Medium | Multi-node production, HA requirements |
+| `ExternalAnchor` | N/A | Public blockchain | Highest | Maximum auditability, legal requirements |
 
 #### 3. Correction Flow (Append-Only)
 ```
@@ -1344,18 +1440,41 @@ Users configure storage instances independently. Each instance can use any compa
 ```csharp
 var config = new TamperProofConfiguration
 {
+    // Storage instance configuration (user chooses ANY provider)
     StorageInstances = new Dictionary<string, string>
     {
         ["data"] = "s3://my-bucket/data/",
         ["metadata"] = "s3://my-bucket/metadata/",
-        ["worm"] = "s3://my-worm-bucket/?objectLock=true",
+        ["worm"] = "s3://my-worm-bucket/?objectLock=true",  // WORM wraps S3
         ["blockchain"] = "local://./blockchain/"
     },
+
+    // Core settings (locked after seal)
     SecurityLevel = SecurityLevel.Enhanced,
     RaidConfiguration = RaidConfiguration.Raid6(dataShards: 8, parityShards: 2),
     HashAlgorithm = HashAlgorithmType.SHA512,
-    BlockchainMode = BlockchainMode.RaftConsensus,
-    WormMode = WormMode.HardwareIntegrated
+
+    // Blockchain consensus mode
+    BlockchainMode = BlockchainMode.RaftConsensus,  // or SingleWriter, ExternalAnchor
+    BlockchainBatchSize = 100,        // Batch N objects before anchoring
+    BlockchainBatchTimeout = TimeSpan.FromSeconds(30),  // Or anchor after T seconds
+
+    // WORM configuration
+    WormMode = WormMode.HardwareIntegrated,  // or SoftwareEnforced
+    WormProvider = "s3-object-lock",  // Wraps any IStorageProvider
+
+    // Padding configuration (user-configurable)
+    ContentPaddingMode = ContentPaddingMode.SecureRandom,  // or None, Chaff, FixedSize
+    ContentPaddingBlockSize = 4096,   // For FixedSize mode
+    ShardPaddingMode = ShardPaddingMode.UniformSize,  // or None, FixedBlock
+
+    // Recovery behavior (configurable always, even after seal)
+    RecoveryBehavior = TamperRecoveryBehavior.AutoRecoverWithReport,
+    DefaultReadMode = ReadMode.Verified,  // Fast, Verified, Audit
+
+    // Transactional write settings
+    WriteTransactionTimeout = TimeSpan.FromMinutes(5),
+    WriteRetryCount = 3
 };
 ```
 
@@ -1367,6 +1486,21 @@ var config = new TamperProofConfiguration
 |------|--------------|-----------------|---------|
 | **Content Padding** | Phase 1 (user transformations) | Yes | Hides true data size from observers |
 | **Shard Padding** | Phase 3 (RAID distribution) | No (shard-level only) | Uniform shard sizes for RAID efficiency |
+
+**Content Padding Modes (User-Configurable):**
+| Mode | Description | Security Level |
+|------|-------------|----------------|
+| `None` | No padding applied | Low (size visible) |
+| `SecureRandom` | Cryptographically secure random bytes | High |
+| `Chaff` | Plausible-looking dummy data (structured noise) | Maximum (traffic analysis resistant) |
+| `FixedSize` | Pad to fixed block boundary (4KB, 64KB, etc.) | Medium |
+
+**Shard Padding Modes:**
+| Mode | Description | Storage Overhead |
+|------|-------------|------------------|
+| `None` | Variable shard sizes (last shard smaller) | Minimal |
+| `UniformSize` | Pad final shard to match largest | Low |
+| `FixedBlock` | Pad all shards to configured boundary | Configurable |
 
 **Content Padding:** User-configurable, applied before integrity hash. Adds random bytes to obscure actual data length. Useful when data size itself is sensitive information.
 
