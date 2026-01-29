@@ -1354,64 +1354,125 @@ After the first write operation, structural configuration becomes immutable:
 
 | Task | Component | Description | Status |
 |------|-----------|-------------|--------|
-| T5.1 | `EnvelopeEncryptionPlugin` | Envelope encryption with HSM-backed key wrapping (see below) | [ ] |
-| T5.1.1 | ↳ DEK generation and data encryption | Use AES-256-GCM to encrypt data with random DEK | [ ] |
-| T5.1.2 | ↳ KEK wrapping via HSM | Wrap DEK with KEK stored in HSM (AWS KMS, Azure Key Vault, HashiCorp Vault) | [ ] |
-| T5.1.3 | ↳ Wrapped DEK storage in manifest | Store encrypted DEK alongside ciphertext | [ ] |
-| T5.1.4 | ↳ HSM provider abstraction | Support multiple HSM backends | [ ] |
+| T5.1 | `IKeyProvider` abstraction | Pluggable key management for existing `AesEncryptionPlugin` | [ ] |
+| T5.1.1 | ↳ `KeyManagementMode` enum | `Direct` (existing) vs `Envelope` (new) | [ ] |
+| T5.1.2 | ↳ `DirectKeyProvider` | Existing behavior - key from `IKeyStore` | [x] Already implemented |
+| T5.1.3 | ↳ `EnvelopeKeyProvider` | DEK generation + HSM wrapping | [ ] |
+| T5.1.4 | ↳ `IHsmProvider` interface | Abstract HSM operations (wrap/unwrap) | [ ] |
+| T5.1.5 | ↳ `AwsKmsHsmProvider` | AWS KMS integration | [ ] |
+| T5.1.6 | ↳ `AzureKeyVaultHsmProvider` | Azure Key Vault integration | [ ] |
+| T5.1.7 | ↳ `HashiCorpVaultHsmProvider` | HashiCorp Vault integration | [ ] |
+| T5.1.8 | ↳ Wrapped DEK storage in encryption header | Store encrypted DEK alongside ciphertext | [ ] |
 | T5.2 | `KyberEncryptionPlugin` | Post-quantum cryptography (NIST PQC ML-KEM) | [ ] |
 | T5.3 | `ChaffPaddingPlugin` | Traffic analysis protection via dummy writes | [ ] |
 | T5.4 | `ShamirSecretPlugin` | Key splitting across N parties (M-of-N recovery) | [ ] |
 | T5.5 | `GeoWormPlugin` | Geo-dispersed WORM replication across regions | [ ] |
 | T5.6 | `GeoDistributedShardingPlugin` | Geo-dispersed data sharding (shards across continents) | [ ] |
 
-**Encryption Mode Comparison:**
-| Mode | Implementation | Key Management | Security Level | Use Case |
-|------|---------------|----------------|----------------|----------|
-| **Direct AES-256-GCM** | ✅ `AesEncryptionPlugin` (existing) | Key from `IKeyStore` | High | General enterprise |
-| **Envelope Encryption** | [ ] `EnvelopeEncryptionPlugin` (T5.1) | DEK wrapped by HSM-backed KEK | Maximum | Government, military, PCI-DSS |
+**Key Management Architecture (No Code Duplication):**
 
-**How Envelope Encryption Differs from Direct Encryption:**
+The AES-256-GCM encryption logic is **identical** for both modes. T5.1 adds a **pluggable key provider**
+abstraction to the existing `AesEncryptionPlugin` - NOT a separate plugin:
+
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│ DIRECT AES-256-GCM (Existing - AesEncryptionPlugin)                         │
+│              AesEncryptionPlugin (SINGLE IMPLEMENTATION - NO DUPLICATION)   │
 ├─────────────────────────────────────────────────────────────────────────────┤
 │                                                                             │
 │   Data ──► AES-256-GCM(Key) ──► Ciphertext                                  │
 │                   ▲                                                         │
 │                   │                                                         │
-│              Key from IKeyStore                                             │
-│              (software-managed)                                             │
+│            IKeyProvider.GetKeyAsync()                                       │
+│                   │                                                         │
+│         ┌────────┴────────┐                                                 │
+│         ▼                 ▼                                                 │
+│   ┌─────────────┐   ┌─────────────────────┐                                 │
+│   │   DIRECT    │   │     ENVELOPE        │                                 │
+│   │ KeyProvider │   │   KeyProvider       │                                 │
+│   │   [x] Done  │   │    [ ] T5.1.3       │                                 │
+│   ├─────────────┤   ├─────────────────────┤                                 │
+│   │ Key from    │   │ 1. Generate DEK     │                                 │
+│   │ IKeyStore   │   │ 2. HSM.Wrap(DEK)    │                                 │
+│   │             │   │ 3. Return DEK       │                                 │
+│   └─────────────┘   └─────────────────────┘                                 │
+│                               │                                             │
+│                               ▼                                             │
+│                     ┌─────────────────┐                                     │
+│                     │  IHsmProvider   │ (T5.1.4)                            │
+│                     ├─────────────────┤                                     │
+│                     │ • WrapKey()     │                                     │
+│                     │ • UnwrapKey()   │                                     │
+│                     └────────┬────────┘                                     │
+│                              │                                              │
+│              ┌───────────────┼───────────────┐                              │
+│              ▼               ▼               ▼                              │
+│        ┌──────────┐   ┌──────────┐   ┌──────────────┐                       │
+│        │ AWS KMS  │   │  Azure   │   │  HashiCorp   │                       │
+│        │ (T5.1.5) │   │KeyVault  │   │   Vault      │                       │
+│        │          │   │ (T5.1.6) │   │  (T5.1.7)    │                       │
+│        └──────────┘   └──────────┘   └──────────────┘                       │
 │                                                                             │
 └─────────────────────────────────────────────────────────────────────────────┘
+```
 
-┌─────────────────────────────────────────────────────────────────────────────┐
-│ ENVELOPE ENCRYPTION (T5.1 - EnvelopeEncryptionPlugin)                       │
-├─────────────────────────────────────────────────────────────────────────────┤
-│                                                                             │
-│   Data ──► AES-256-GCM(DEK) ──► Ciphertext ─────────────┐                   │
-│                   ▲                                      │                   │
-│                   │                                      ▼                   │
-│         DEK (random per-object)              ┌─────────────────────┐        │
-│                   │                          │  Stored Together:   │        │
-│                   ▼                          │  • Ciphertext       │        │
-│         HSM.Wrap(DEK, KEK) ──► Wrapped DEK ──│  • Wrapped DEK      │        │
-│                   ▲                          │  • KEK ID           │        │
-│                   │                          └─────────────────────┘        │
-│         KEK (NEVER leaves HSM)                                              │
-│         ┌─────────────────┐                                                 │
-│         │      HSM        │  AWS KMS / Azure Key Vault / HashiCorp Vault    │
-│         │  (Hardware)     │  Key never exposed to software                  │
-│         └─────────────────┘                                                 │
-│                                                                             │
-└─────────────────────────────────────────────────────────────────────────────┘
+**Configuration (Same Plugin, Different Modes):**
+```csharp
+// Mode 1: DIRECT (existing behavior, already implemented)
+var directConfig = new AesEncryptionConfig
+{
+    KeyManagementMode = KeyManagementMode.Direct,  // Default
+    KeyStore = myKeyStore
+};
 
-Benefits of Envelope Encryption:
+// Mode 2: ENVELOPE (T5.1 addition - same AES plugin!)
+var envelopeConfig = new AesEncryptionConfig
+{
+    KeyManagementMode = KeyManagementMode.Envelope,
+    HsmProvider = new AwsKmsHsmProvider("arn:aws:kms:us-east-1:..."),
+    // OR: new AzureKeyVaultHsmProvider("https://myvault.vault.azure.net/")
+    // OR: new HashiCorpVaultHsmProvider("https://vault.example.com/")
+};
+
+// Both use the SAME AesEncryptionPlugin - no code duplication!
+var plugin = new AesEncryptionPlugin(envelopeConfig);
+```
+
+**Key Management Modes:**
+| Mode | Key Provider | Key Source | Security | Status |
+|------|--------------|------------|----------|--------|
+| `Direct` | `DirectKeyProvider` | Key from `IKeyStore` | High | ✅ Implemented |
+| `Envelope` | `EnvelopeKeyProvider` | DEK wrapped by HSM KEK | Maximum | [ ] T5.1.3 |
+
+**Benefits of This Architecture:**
+- ✅ **No code duplication** - AES-256-GCM logic stays in one place
+- ✅ **Backward compatible** - `Direct` mode unchanged (default)
+- ✅ **Pluggable HSM providers** - Easy to add new backends
+- ✅ **Separation of concerns** - Encryption logic vs key management are separate
+- ✅ **Single plugin to maintain** - Bug fixes benefit both modes
+
+**Envelope Mode Details:**
+```
+WRITE PATH:
+1. EnvelopeKeyProvider.GetKeyAsync() called
+   a. Generate random DEK (256-bit)
+   b. Call HsmProvider.WrapKey(DEK) → Wrapped DEK
+   c. Return { DEK, WrappedDEK, KekId }
+2. AesEncryptionPlugin encrypts data with DEK
+3. Store: [WrappedDEK][KekId][IV][Tag][Ciphertext]
+
+READ PATH:
+1. Parse header: WrappedDEK, KekId, IV, Tag
+2. EnvelopeKeyProvider.GetKeyAsync(WrappedDEK, KekId) called
+   a. Call HsmProvider.UnwrapKey(WrappedDEK, KekId) → DEK
+   b. Return DEK
+3. AesEncryptionPlugin decrypts data with DEK
+4. Securely clear DEK from memory
+
+Benefits:
 • KEK never leaves HSM hardware - impossible to extract
-• DEK is unique per object - limits blast radius if one DEK is compromised
-• Key rotation only requires re-wrapping DEKs, not re-encrypting all data
-• Meets PCI-DSS, HIPAA, FedRAMP requirements for key management
-• Audit trail of all key operations via HSM logging
+• DEK is unique per object - limits blast radius
+• Key rotation = re-wrap DEKs, NOT re-encrypt data
+• Compliance: PCI-DSS, HIPAA, FedRAMP
 ```
 
 **Goal:** Maximum compression for archival/cold storage
@@ -1548,12 +1609,26 @@ Plugins/
 │   ├── DefaultAccessLogPlugin.cs
 │   └── DataWarehouse.Plugins.AccessLog.csproj
 │
-│   # Ultra Paranoid Encryption (T5.1-T5.2)
-├── DataWarehouse.Plugins.Encryption.Envelope/
-│   ├── EnvelopeEncryptionPlugin.cs (AES-GCM + HSM key wrapping)
-│   └── DataWarehouse.Plugins.Encryption.Envelope.csproj
+│   # Envelope Key Management - HSM Providers (T5.1.4-T5.1.7)
+│   # Note: These ADD envelope mode to existing AesEncryptionPlugin - no separate encryption plugin needed
+├── DataWarehouse.SDK/Security/
+│   ├── IKeyProvider.cs (Direct vs Envelope key management abstraction)
+│   ├── DirectKeyProvider.cs (existing behavior - key from IKeyStore)
+│   ├── EnvelopeKeyProvider.cs (DEK + HSM wrapping)
+│   └── IHsmProvider.cs (HSM abstraction interface)
+├── DataWarehouse.Plugins.Hsm.AwsKms/
+│   ├── AwsKmsHsmProvider.cs (AWS KMS integration)
+│   └── DataWarehouse.Plugins.Hsm.AwsKms.csproj
+├── DataWarehouse.Plugins.Hsm.AzureKeyVault/
+│   ├── AzureKeyVaultHsmProvider.cs (Azure Key Vault integration)
+│   └── DataWarehouse.Plugins.Hsm.AzureKeyVault.csproj
+├── DataWarehouse.Plugins.Hsm.HashiCorpVault/
+│   ├── HashiCorpVaultHsmProvider.cs (HashiCorp Vault integration)
+│   └── DataWarehouse.Plugins.Hsm.HashiCorpVault.csproj
+│
+│   # Post-Quantum Encryption (T5.2)
 ├── DataWarehouse.Plugins.Encryption.Kyber/
-│   ├── KyberEncryptionPlugin.cs (post-quantum NIST PQC)
+│   ├── KyberEncryptionPlugin.cs (post-quantum NIST PQC ML-KEM)
 │   └── DataWarehouse.Plugins.Encryption.Kyber.csproj
 │
 │   # Additional Compression Algorithms (T4.21-T4.23)
