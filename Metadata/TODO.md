@@ -1095,16 +1095,32 @@ After the first write operation, structural configuration becomes immutable:
 | T5.3 | `ChaffPaddingPlugin` | Traffic analysis protection via dummy writes | [ ] |
 | T5.4 | `ShamirSecretPlugin` | Key splitting across N parties (M-of-N recovery) | [ ] |
 | T5.5 | `GeoWormPlugin` | Geo-dispersed WORM replication across regions | [ ] |
+| T5.6 | `GeoDistributedShardingPlugin` | Geo-dispersed data sharding (shards across continents) | [ ] |
+
+**Goal:** Maximum compression for archival/cold storage
+
+| Task | Component | Description | Status |
+|------|-----------|-------------|--------|
+| T5.7 | `PaqCompressionPlugin` | PAQ8/PAQ9 extreme compression (slow but best ratio) | [ ] |
+| T5.8 | `ZpaqCompressionPlugin` | ZPAQ journaling archiver with deduplication | [ ] |
+| T5.9 | `CmixCompressionPlugin` | CMIX context-mixing compressor (experimental) | [ ] |
+
+**Goal:** Database integration and metadata handling
+
+| Task | Component | Description | Status |
+|------|-----------|-------------|--------|
+| T5.10 | `SqlTdeMetadataPlugin` | SQL TDE (Transparent Data Encryption) metadata import/export | [ ] |
+| T5.11 | `DatabaseEncryptionKeyPlugin` | DEK/KEK management for imported encrypted databases | [ ] |
 
 **Goal:** Audit-ready documentation and compliance
 
 | Task | Component | Description | Status |
 |------|-----------|-------------|--------|
-| T5.6 | Compliance Report Generator | SOC2, HIPAA, FedRAMP, GDPR reports | [ ] |
-| T5.7 | Chain-of-Custody Export | PDF/JSON export for legal discovery | [ ] |
-| T5.8 | Dashboard Integration | Real-time integrity status widgets | [ ] |
-| T5.9 | Alert Integrations | Email, Slack, PagerDuty, OpsGenie | [ ] |
-| T5.10 | Tamper Incident Workflow | Automated incident ticket creation | [ ] |
+| T5.12 | Compliance Report Generator | SOC2, HIPAA, FedRAMP, GDPR reports | [ ] |
+| T5.13 | Chain-of-Custody Export | PDF/JSON export for legal discovery | [ ] |
+| T5.14 | Dashboard Integration | Real-time integrity status widgets | [ ] |
+| T5.15 | Alert Integrations | Email, Slack, PagerDuty, OpsGenie | [ ] |
+| T5.16 | Tamper Incident Workflow | Automated incident ticket creation | [ ] |
 
 #### Phase T6: Testing & Documentation (Priority: HIGH)
 | Task | Description | Dependencies | Status |
@@ -1220,9 +1236,33 @@ Plugins/
 │   └── DataWarehouse.Plugins.Padding.Chaff.csproj
 │
 │   # Ultra Paranoid Key Management (T5.4)
-└── DataWarehouse.Plugins.KeyManagement.Shamir/
-    ├── ShamirSecretPlugin.cs (M-of-N key splitting)
-    └── DataWarehouse.Plugins.KeyManagement.Shamir.csproj
+├── DataWarehouse.Plugins.KeyManagement.Shamir/
+│   ├── ShamirSecretPlugin.cs (M-of-N key splitting)
+│   └── DataWarehouse.Plugins.KeyManagement.Shamir.csproj
+│
+│   # Geo-Dispersed Distribution (T5.6)
+├── DataWarehouse.Plugins.GeoDistributedSharding/
+│   ├── GeoDistributedShardingPlugin.cs (shards across continents)
+│   └── DataWarehouse.Plugins.GeoDistributedSharding.csproj
+│
+│   # Ultra Paranoid Compression (T5.7-T5.9)
+├── DataWarehouse.Plugins.Compression.Paq/
+│   ├── PaqCompressionPlugin.cs (PAQ8/PAQ9 extreme compression)
+│   └── DataWarehouse.Plugins.Compression.Paq.csproj
+├── DataWarehouse.Plugins.Compression.Zpaq/
+│   ├── ZpaqCompressionPlugin.cs (ZPAQ journaling archiver)
+│   └── DataWarehouse.Plugins.Compression.Zpaq.csproj
+├── DataWarehouse.Plugins.Compression.Cmix/
+│   ├── CmixCompressionPlugin.cs (context-mixing compressor)
+│   └── DataWarehouse.Plugins.Compression.Cmix.csproj
+│
+│   # Database Encryption Integration (T5.10-T5.11)
+├── DataWarehouse.Plugins.DatabaseEncryption.Tde/
+│   ├── SqlTdeMetadataPlugin.cs (SQL Server/Oracle/PostgreSQL TDE)
+│   └── DataWarehouse.Plugins.DatabaseEncryption.Tde.csproj
+└── DataWarehouse.Plugins.DatabaseEncryption.KeyManagement/
+    ├── DatabaseEncryptionKeyPlugin.cs (DEK/KEK management)
+    └── DataWarehouse.Plugins.DatabaseEncryption.KeyManagement.csproj
 ```
 
 ---
