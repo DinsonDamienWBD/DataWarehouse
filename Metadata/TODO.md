@@ -1574,6 +1574,10 @@ PluginBase (SDK)
 | T5.0.1.2 | `IEnvelopeKeyStore` interface | IKeyStore.cs | Extends IKeyStore with `WrapKeyAsync`/`UnwrapKeyAsync` | [ ] |
 | T5.0.1.3 | `EnvelopeHeader` class | EnvelopeHeader.cs | Serialize/deserialize envelope header: WrappedDEK, KekId, etc. | [ ] |
 | T5.0.1.4 | `EncryptionMetadata` record | EncryptionMetadata.cs | Full metadata: plugin ID, mode, key IDs, algorithm params | [ ] |
+| T5.0.1.5 | `KeyManagementConfig` record | KeyManagementConfig.cs | Per-user configuration: mode, key store, KEK ID, etc. | [ ] |
+| T5.0.1.6 | `IKeyManagementConfigProvider` interface | IKeyManagementConfigProvider.cs | Resolve per-user/per-tenant key management preferences | [ ] |
+| T5.0.1.7 | `IKeyStoreRegistry` interface | IKeyStoreRegistry.cs | Registry for resolving plugin IDs to key store instances | [ ] |
+| T5.0.1.8 | `DefaultKeyStoreRegistry` implementation | DefaultKeyStoreRegistry.cs | Default in-memory implementation of IKeyStoreRegistry | [ ] |
 
 **KeyManagementMode Enum:**
 ```csharp
@@ -1686,30 +1690,32 @@ public abstract class KeyStorePluginBase : SecurityProviderPluginBase, IKeyStore
 | T5.0.3.6 | ↳ Key access logging | Common | Audit trail for key usage | [ ] |
 | T5.0.3.7 | ↳ Abstract encrypt/decrypt | Abstract | `EncryptCoreAsync()`, `DecryptCoreAsync()` | [ ] |
 
-**EncryptionPluginBase Design:**
+**EncryptionPluginBase Design (Per-User Configuration):**
 ```csharp
 /// <summary>
 /// Abstract base class for all encryption plugins with composable key management.
-/// Provides common key handling, statistics, and envelope mode support.
+/// Supports per-user, per-operation configuration for maximum flexibility.
 /// All encryption plugins MUST extend this class.
 /// </summary>
 public abstract class EncryptionPluginBase : PipelinePluginBase, IDisposable
 {
-    // KEY MANAGEMENT (common infrastructure)
-    protected IKeyStore? KeyStore;
-    protected ISecurityContext? SecurityContext;
-    protected KeyManagementMode KeyManagementMode = KeyManagementMode.Direct;
-    protected IEnvelopeKeyStore? EnvelopeKeyStore;
-    protected string? KekKeyId;
+    // DEFAULT CONFIGURATION (fallback when no user preference or explicit override)
+    protected IKeyStore? DefaultKeyStore;
+    protected KeyManagementMode DefaultKeyManagementMode = KeyManagementMode.Direct;
+    protected IEnvelopeKeyStore? DefaultEnvelopeKeyStore;
+    protected string? DefaultKekKeyId;
 
-    // STATISTICS (common tracking)
+    // PER-USER CONFIGURATION PROVIDER (optional, for multi-tenant)
+    protected IKeyManagementConfigProvider? ConfigProvider;
+
+    // STATISTICS (common tracking - aggregated across all users)
     protected readonly object StatsLock = new();
     protected long EncryptionCount;
     protected long DecryptionCount;
     protected long TotalBytesEncrypted;
     protected long TotalBytesDecrypted;
 
-    // KEY ACCESS AUDIT (common)
+    // KEY ACCESS AUDIT (common - tracks per key ID)
     protected readonly ConcurrentDictionary<string, DateTime> KeyAccessLog = new();
 
     // CONFIGURATION (override in derived classes)
@@ -1717,19 +1723,51 @@ public abstract class EncryptionPluginBase : PipelinePluginBase, IDisposable
     protected abstract int IvSizeBytes { get; }   // e.g., 12 for GCM
     protected abstract int TagSizeBytes { get; }  // e.g., 16 for GCM
 
-    // COMMON KEY MANAGEMENT (implemented in base)
-    protected IKeyStore GetKeyStore(Dictionary<string, object> args, IKernelContext context);
-    protected ISecurityContext GetSecurityContext(Dictionary<string, object> args);
-    protected async Task<(byte[] key, string keyId, EnvelopeHeader? envelope)> GetKeyForEncryptionAsync(...);
-    protected async Task<byte[]> GetKeyForDecryptionAsync(EnvelopeHeader? envelope, string? keyId, ...);
-    protected void ValidateKeySize(byte[] key);
-    protected void LogKeyAccess(string keyId);
-    protected void UpdateEncryptionStats(long bytesProcessed);
-    protected void UpdateDecryptionStats(long bytesProcessed);
+    // CONFIGURATION RESOLUTION (per-operation)
+    /// <summary>
+    /// Resolves key management configuration for this operation.
+    /// Priority: 1. Explicit args, 2. User preferences, 3. Plugin defaults
+    /// </summary>
+    protected async Task<ResolvedKeyManagementConfig> ResolveConfigAsync(
+        Dictionary<string, object> args,
+        ISecurityContext context)
+    {
+        // 1. Check for explicit overrides in args
+        if (TryGetConfigFromArgs(args, out var argsConfig))
+            return argsConfig;
 
-    // OnWrite/OnRead IMPLEMENTATION (common logic, calls abstract methods)
-    protected override async Task<Stream> OnWriteAsync(...) { /* key mgmt + abstract */ }
-    protected override async Task<Stream> OnReadAsync(...) { /* key mgmt + abstract */ }
+        // 2. Check for user preferences via ConfigProvider
+        if (ConfigProvider != null)
+        {
+            var userConfig = await ConfigProvider.GetConfigAsync(context);
+            if (userConfig != null)
+                return ResolveFromUserConfig(userConfig, context);
+        }
+
+        // 3. Fall back to plugin defaults
+        return new ResolvedKeyManagementConfig
+        {
+            Mode = DefaultKeyManagementMode,
+            KeyStore = DefaultKeyStore,
+            EnvelopeKeyStore = DefaultEnvelopeKeyStore,
+            KekKeyId = DefaultKekKeyId
+        };
+    }
+
+    // COMMON KEY MANAGEMENT (uses resolved config)
+    protected async Task<(byte[] key, string keyId, EnvelopeHeader? envelope)> GetKeyForEncryptionAsync(
+        ResolvedKeyManagementConfig config, ISecurityContext context);
+    protected async Task<byte[]> GetKeyForDecryptionAsync(
+        EnvelopeHeader? envelope, string? keyId, ResolvedKeyManagementConfig config, ISecurityContext context);
+
+    // OnWrite/OnRead IMPLEMENTATION (resolves config first, then processes)
+    protected override async Task<Stream> OnWriteAsync(Stream input, IKernelContext context, Dictionary<string, object> args)
+    {
+        var securityContext = GetSecurityContext(args);
+        var config = await ResolveConfigAsync(args, securityContext);  // Per-user resolution!
+        var (key, keyId, envelope) = await GetKeyForEncryptionAsync(config, securityContext);
+        // ... encrypt using resolved config ...
+    }
 
     // ABSTRACT METHODS (implement in derived classes - algorithm-specific)
     protected abstract Task<Stream> EncryptCoreAsync(Stream input, byte[] key, byte[] iv, IKernelContext context);
@@ -1737,28 +1775,237 @@ public abstract class EncryptionPluginBase : PipelinePluginBase, IDisposable
     protected abstract byte[] GenerateIv();
     protected abstract int CalculateHeaderSize(bool envelopeMode);
 }
+
+/// <summary>
+/// Resolved configuration for a single operation (after applying priority rules).
+/// </summary>
+internal record ResolvedKeyManagementConfig
+{
+    public KeyManagementMode Mode { get; init; }
+    public IKeyStore? KeyStore { get; init; }
+    public IEnvelopeKeyStore? EnvelopeKeyStore { get; init; }
+    public string? KekKeyId { get; init; }
+}
 ```
 
-**User Configuration (Unified Across All Encryption Plugins):**
+**Per-User, Per-Operation Configuration (Maximum Flexibility):**
+
+The key management configuration is resolved **per-operation** (each OnWrite/OnRead call), NOT per-instance. This enables:
+- Same plugin instance serves multiple users with different configurations
+- User A uses Envelope mode + Azure HSM, User B uses Direct mode + FileKeyStore
+- Configuration can change between operations for the same user
+- Multi-tenant deployments with different security requirements per tenant
+
+**Configuration Resolution Order (highest priority first):**
+1. **Explicit args** - passed directly to OnWrite/OnRead
+2. **User preferences** - resolved via `IKeyManagementConfigProvider` from `ISecurityContext`
+3. **Plugin defaults** - set at construction time (fallback)
+
 ```csharp
-// DIRECT MODE (DEFAULT) - Key from any IKeyStore
+// Plugin instance with DEFAULT configuration (fallback only)
 var aesPlugin = new AesEncryptionPlugin(new AesEncryptionConfig
 {
-    KeyManagementMode = KeyManagementMode.Direct,  // Default
-    KeyStore = new FileKeyStorePlugin()            // Or VaultKeyStorePlugin, KeyRotationPlugin, etc.
+    // These are DEFAULTS - can be overridden per-user or per-operation
+    DefaultKeyManagementMode = KeyManagementMode.Direct,
+    DefaultKeyStore = new FileKeyStorePlugin(),
+
+    // Optional: User preference resolver for multi-tenant scenarios
+    KeyManagementConfigProvider = new DatabaseKeyManagementConfigProvider(dbContext)
 });
 
-// ENVELOPE MODE - DEK wrapped by HSM, stored in ciphertext
-var aesEnvelopePlugin = new AesEncryptionPlugin(new AesEncryptionConfig
+// SCENARIO 1: User1 writes with explicit Envelope mode override
+await aesPlugin.OnWriteAsync(data, context, new Dictionary<string, object>
 {
-    KeyManagementMode = KeyManagementMode.Envelope,
-    EnvelopeKeyStore = new VaultKeyStorePlugin(vaultConfig),  // Must implement IEnvelopeKeyStore
-    KekKeyId = "alias/my-kek"
+    ["keyManagementMode"] = KeyManagementMode.Envelope,
+    ["envelopeKeyStore"] = azureVaultPlugin,
+    ["kekKeyId"] = "azure-kek-user1"
 });
 
-// Same pattern works for ALL encryption plugins:
-// ChaCha20EncryptionPlugin, TwofishEncryptionPlugin, SerpentEncryptionPlugin,
-// FipsEncryptionPlugin, ZeroKnowledgeEncryptionPlugin, and all future plugins
+// SCENARIO 2: User2 writes - uses their stored preferences (Direct + HashiCorp)
+// Preferences resolved automatically from ISecurityContext.UserId
+await aesPlugin.OnWriteAsync(data, contextUser2, args);  // No explicit override
+
+// SCENARIO 3: User3 writes - no preferences stored, uses plugin defaults
+await aesPlugin.OnWriteAsync(data, contextUser3, args);  // Falls back to defaults
+```
+
+**IKeyManagementConfigProvider Interface:**
+```csharp
+/// <summary>
+/// Resolves key management configuration per-user/per-tenant.
+/// Implement this to store user preferences in database, config files, etc.
+/// </summary>
+public interface IKeyManagementConfigProvider
+{
+    /// <summary>
+    /// Get key management configuration for a user/tenant.
+    /// Returns null if no preferences stored (use defaults).
+    /// </summary>
+    Task<KeyManagementConfig?> GetConfigAsync(ISecurityContext context);
+
+    /// <summary>
+    /// Save user preferences for key management.
+    /// </summary>
+    Task SaveConfigAsync(ISecurityContext context, KeyManagementConfig config);
+}
+
+/// <summary>
+/// User-specific key management configuration.
+/// </summary>
+public record KeyManagementConfig
+{
+    /// <summary>Direct or Envelope mode</summary>
+    public KeyManagementMode Mode { get; init; } = KeyManagementMode.Direct;
+
+    /// <summary>Key store plugin ID or instance for Direct mode</summary>
+    public string? KeyStorePluginId { get; init; }
+    public IKeyStore? KeyStore { get; init; }
+
+    /// <summary>Envelope key store for Envelope mode</summary>
+    public string? EnvelopeKeyStorePluginId { get; init; }
+    public IEnvelopeKeyStore? EnvelopeKeyStore { get; init; }
+
+    /// <summary>KEK identifier for Envelope mode</summary>
+    public string? KekKeyId { get; init; }
+
+    /// <summary>Preferred encryption algorithm (for systems with multiple)</summary>
+    public string? PreferredEncryptionPluginId { get; init; }
+}
+```
+
+**Multi-Tenant Example:**
+```csharp
+// Single AES plugin instance serves ALL users
+var aesPlugin = new AesEncryptionPlugin(new AesEncryptionConfig
+{
+    KeyManagementConfigProvider = new TenantConfigProvider(tenantDb)
+});
+
+// User1 (Tenant: FinanceCorp) - compliance requires HSM envelope encryption
+// Their config in DB: { Mode: Envelope, EnvelopeKeyStorePluginId: "azure-hsm", KekKeyId: "finance-kek" }
+await aesPlugin.OnWriteAsync(data, user1Context, args);  // → Envelope + Azure HSM
+
+// User2 (Tenant: StartupXYZ) - cost-conscious, uses file-based keys
+// Their config in DB: { Mode: Direct, KeyStorePluginId: "file-keystore" }
+await aesPlugin.OnWriteAsync(data, user2Context, args);  // → Direct + FileKeyStore
+
+// User3 (Tenant: GovAgency) - requires AWS GovCloud KMS
+// Their config in DB: { Mode: Envelope, EnvelopeKeyStorePluginId: "aws-govcloud", KekKeyId: "gov-kek" }
+await aesPlugin.OnWriteAsync(data, user3Context, args);  // → Envelope + AWS GovCloud
+
+// All three users share the SAME plugin instance!
+```
+
+**Flexibility Matrix:**
+| Configuration Level | When Resolved | Use Case |
+|---------------------|---------------|----------|
+| **Explicit args** | Per-operation | One-off overrides, testing, migration |
+| **User preferences** | Per-user via ISecurityContext | Multi-tenant SaaS, compliance per customer |
+| **Plugin defaults** | At construction | Single-tenant deployments, fallback |
+
+**Example IKeyManagementConfigProvider Implementations:**
+```csharp
+// EXAMPLE 1: Database-backed provider for multi-tenant SaaS
+public class DatabaseKeyManagementConfigProvider : IKeyManagementConfigProvider
+{
+    private readonly IDbContext _db;
+    private readonly IKeyStoreRegistry _keyStoreRegistry;  // Resolves plugin IDs to instances
+
+    public async Task<KeyManagementConfig?> GetConfigAsync(ISecurityContext context)
+    {
+        // Look up user/tenant preferences from database
+        var record = await _db.KeyManagementConfigs
+            .FirstOrDefaultAsync(c => c.TenantId == context.TenantId);
+
+        if (record == null) return null;  // Use defaults
+
+        return new KeyManagementConfig
+        {
+            Mode = record.Mode,
+            KeyStorePluginId = record.KeyStorePluginId,
+            KeyStore = _keyStoreRegistry.GetKeyStore(record.KeyStorePluginId),
+            EnvelopeKeyStorePluginId = record.EnvelopeKeyStorePluginId,
+            EnvelopeKeyStore = _keyStoreRegistry.GetEnvelopeKeyStore(record.EnvelopeKeyStorePluginId),
+            KekKeyId = record.KekKeyId
+        };
+    }
+
+    public async Task SaveConfigAsync(ISecurityContext context, KeyManagementConfig config)
+    {
+        // Save preferences to database
+        var record = await _db.KeyManagementConfigs
+            .FirstOrDefaultAsync(c => c.TenantId == context.TenantId);
+
+        if (record == null)
+        {
+            record = new KeyManagementConfigRecord { TenantId = context.TenantId };
+            _db.KeyManagementConfigs.Add(record);
+        }
+
+        record.Mode = config.Mode;
+        record.KeyStorePluginId = config.KeyStorePluginId;
+        record.EnvelopeKeyStorePluginId = config.EnvelopeKeyStorePluginId;
+        record.KekKeyId = config.KekKeyId;
+
+        await _db.SaveChangesAsync();
+    }
+}
+
+// EXAMPLE 2: JSON config file provider for simpler deployments
+public class JsonFileKeyManagementConfigProvider : IKeyManagementConfigProvider
+{
+    private readonly string _configPath;
+    private readonly IKeyStoreRegistry _keyStoreRegistry;
+
+    public async Task<KeyManagementConfig?> GetConfigAsync(ISecurityContext context)
+    {
+        var filePath = Path.Combine(_configPath, $"{context.UserId}.json");
+        if (!File.Exists(filePath)) return null;
+
+        var json = await File.ReadAllTextAsync(filePath);
+        return JsonSerializer.Deserialize<KeyManagementConfig>(json);
+    }
+
+    public async Task SaveConfigAsync(ISecurityContext context, KeyManagementConfig config)
+    {
+        var filePath = Path.Combine(_configPath, $"{context.UserId}.json");
+        var json = JsonSerializer.Serialize(config, new JsonSerializerOptions { WriteIndented = true });
+        await File.WriteAllTextAsync(filePath, json);
+    }
+}
+
+// EXAMPLE 3: In-memory provider for testing
+public class InMemoryKeyManagementConfigProvider : IKeyManagementConfigProvider
+{
+    private readonly ConcurrentDictionary<string, KeyManagementConfig> _configs = new();
+
+    public Task<KeyManagementConfig?> GetConfigAsync(ISecurityContext context)
+    {
+        _configs.TryGetValue(context.UserId, out var config);
+        return Task.FromResult(config);
+    }
+
+    public Task SaveConfigAsync(ISecurityContext context, KeyManagementConfig config)
+    {
+        _configs[context.UserId] = config;
+        return Task.CompletedTask;
+    }
+}
+```
+
+**IKeyStoreRegistry Interface (for resolving plugin IDs to instances):**
+```csharp
+/// <summary>
+/// Registry for resolving key store plugin IDs to instances.
+/// Used by IKeyManagementConfigProvider to resolve stored plugin IDs.
+/// </summary>
+public interface IKeyStoreRegistry
+{
+    void Register(string pluginId, IKeyStore keyStore);
+    void RegisterEnvelope(string pluginId, IEnvelopeKeyStore envelopeKeyStore);
+    IKeyStore? GetKeyStore(string? pluginId);
+    IEnvelopeKeyStore? GetEnvelopeKeyStore(string? pluginId);
+}
 ```
 
 ---
