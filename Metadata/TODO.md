@@ -1167,21 +1167,62 @@ Plugins/
 │   ├── Attribution/
 │   │   └── TamperAttributionAnalyzer.cs
 │   └── DataWarehouse.Plugins.TamperProof.csproj
+│
+│   # Integrity Providers (T1, T4.13)
 ├── DataWarehouse.Plugins.Integrity/
-│   ├── DefaultIntegrityPlugin.cs
+│   ├── DefaultIntegrityPlugin.cs (SHA-256/384/512, Blake3)
 │   └── DataWarehouse.Plugins.Integrity.csproj
+├── DataWarehouse.Plugins.Integrity.Sha3/
+│   ├── Sha3IntegrityPlugin.cs (SHA3-256/384/512)
+│   └── DataWarehouse.Plugins.Integrity.Sha3.csproj
+├── DataWarehouse.Plugins.Integrity.Hmac/
+│   ├── HmacIntegrityPlugin.cs (HMAC-SHA256, HMAC-SHA3)
+│   └── DataWarehouse.Plugins.Integrity.Hmac.csproj
+│
+│   # Blockchain Providers (T1, T4.9)
 ├── DataWarehouse.Plugins.Blockchain.Local/
 │   ├── LocalBlockchainPlugin.cs
 │   └── DataWarehouse.Plugins.Blockchain.Local.csproj
+├── DataWarehouse.Plugins.Blockchain.Raft/
+│   ├── RaftBlockchainPlugin.cs (consensus mode)
+│   └── DataWarehouse.Plugins.Blockchain.Raft.csproj
+│
+│   # WORM Providers (T1, T4.10-T4.11, T5.5)
 ├── DataWarehouse.Plugins.Worm.Software/
 │   ├── SoftwareWormPlugin.cs
 │   └── DataWarehouse.Plugins.Worm.Software.csproj
 ├── DataWarehouse.Plugins.Worm.S3ObjectLock/
-│   ├── S3ObjectLockWormPlugin.cs
+│   ├── S3ObjectLockWormPlugin.cs (AWS hardware WORM)
 │   └── DataWarehouse.Plugins.Worm.S3ObjectLock.csproj
-└── DataWarehouse.Plugins.AccessLog/
-    ├── DefaultAccessLogPlugin.cs
-    └── DataWarehouse.Plugins.AccessLog.csproj
+├── DataWarehouse.Plugins.Worm.AzureImmutable/
+│   ├── AzureImmutableWormPlugin.cs (Azure hardware WORM)
+│   └── DataWarehouse.Plugins.Worm.AzureImmutable.csproj
+├── DataWarehouse.Plugins.Worm.GeoDispersed/
+│   ├── GeoWormPlugin.cs (multi-region WORM)
+│   └── DataWarehouse.Plugins.Worm.GeoDispersed.csproj
+│
+│   # Access Logging (T1)
+├── DataWarehouse.Plugins.AccessLog/
+│   ├── DefaultAccessLogPlugin.cs
+│   └── DataWarehouse.Plugins.AccessLog.csproj
+│
+│   # Ultra Paranoid Encryption (T5.1-T5.2)
+├── DataWarehouse.Plugins.Encryption.Envelope/
+│   ├── EnvelopeEncryptionPlugin.cs (AES-GCM + HSM key wrapping)
+│   └── DataWarehouse.Plugins.Encryption.Envelope.csproj
+├── DataWarehouse.Plugins.Encryption.Kyber/
+│   ├── KyberEncryptionPlugin.cs (post-quantum NIST PQC)
+│   └── DataWarehouse.Plugins.Encryption.Kyber.csproj
+│
+│   # Ultra Paranoid Padding/Obfuscation (T5.3)
+├── DataWarehouse.Plugins.Padding.Chaff/
+│   ├── ChaffPaddingPlugin.cs (traffic analysis protection)
+│   └── DataWarehouse.Plugins.Padding.Chaff.csproj
+│
+│   # Ultra Paranoid Key Management (T5.4)
+└── DataWarehouse.Plugins.KeyManagement.Shamir/
+    ├── ShamirSecretPlugin.cs (M-of-N key splitting)
+    └── DataWarehouse.Plugins.KeyManagement.Shamir.csproj
 ```
 
 ---
