@@ -2237,9 +2237,9 @@ public interface IKeyStoreRegistry
 
 | Task | Plugin | Current | Target | Description | Status |
 |------|--------|---------|--------|-------------|--------|
-| T5.0.4 | Refactor key management plugins | - | - | Migrate to KeyStorePluginBase | [ ] |
-| T5.0.4.1 | `FileKeyStorePlugin` | `SecurityProviderPluginBase` | `KeyStorePluginBase` | Remove duplicated caching/init, implement abstract storage methods | [ ] |
-| T5.0.4.2 | `VaultKeyStorePlugin` | `SecurityProviderPluginBase` | `KeyStorePluginBase` + `IEnvelopeKeyStore` | Remove duplicated caching/init, implement abstract storage methods, add IEnvelopeKeyStore | [ ] |
+| T5.0.4 | Refactor key management plugins | - | - | Migrate to KeyStorePluginBase | [x] |
+| T5.0.4.1 | `FileKeyStorePlugin` | `SecurityProviderPluginBase` | `KeyStorePluginBase` | Remove duplicated caching/init, implement abstract storage methods | [x] |
+| T5.0.4.2 | `VaultKeyStorePlugin` | `SecurityProviderPluginBase` | `KeyStorePluginBase` + `IEnvelopeKeyStore` | Remove duplicated caching/init, implement abstract storage methods, add IEnvelopeKeyStore | [x] |
 | T5.0.4.3 | `KeyRotationPlugin` | Custom | `KeyStorePluginBase` (decorator) | Verify compatibility with base class pattern | [ ] |
 | T5.0.4.4 | `SecretManagementPlugin` | Custom | Verify/Align | Ensure consistent with KeyStorePluginBase pattern | [ ] |
 
@@ -2290,13 +2290,13 @@ public sealed class FileKeyStorePlugin : KeyStorePluginBase
 
 | Task | Plugin | Current | Target | Description | Status |
 |------|--------|---------|--------|-------------|--------|
-| T5.0.5 | Refactor encryption plugins | - | - | Migrate to EncryptionPluginBase | [ ] |
-| T5.0.5.1 | `AesEncryptionPlugin` | `PipelinePluginBase` | `EncryptionPluginBase` | Remove duplicated key mgmt, implement abstract encrypt/decrypt | [ ] |
-| T5.0.5.2 | `ChaCha20EncryptionPlugin` | `PipelinePluginBase` | `EncryptionPluginBase` | Remove duplicated key mgmt, implement abstract encrypt/decrypt | [ ] |
-| T5.0.5.3 | `TwofishEncryptionPlugin` | `PipelinePluginBase` | `EncryptionPluginBase` | Remove duplicated key mgmt, implement abstract encrypt/decrypt | [ ] |
-| T5.0.5.4 | `SerpentEncryptionPlugin` | `PipelinePluginBase` | `EncryptionPluginBase` | Remove duplicated key mgmt, implement abstract encrypt/decrypt | [ ] |
-| T5.0.5.5 | `FipsEncryptionPlugin` | `PipelinePluginBase` | `EncryptionPluginBase` | Remove duplicated key mgmt, implement abstract encrypt/decrypt | [ ] |
-| T5.0.5.6 | `ZeroKnowledgeEncryptionPlugin` | `PipelinePluginBase` | `EncryptionPluginBase` | Remove duplicated key mgmt, implement abstract encrypt/decrypt | [ ] |
+| T5.0.5 | Refactor encryption plugins | - | - | Migrate to EncryptionPluginBase | [x] |
+| T5.0.5.1 | `AesEncryptionPlugin` | `PipelinePluginBase` | `EncryptionPluginBase` | Remove duplicated key mgmt, implement abstract encrypt/decrypt | [x] |
+| T5.0.5.2 | `ChaCha20EncryptionPlugin` | `PipelinePluginBase` | `EncryptionPluginBase` | Remove duplicated key mgmt, implement abstract encrypt/decrypt | [x] |
+| T5.0.5.3 | `TwofishEncryptionPlugin` | `PipelinePluginBase` | `EncryptionPluginBase` | Remove duplicated key mgmt, implement abstract encrypt/decrypt | [x] |
+| T5.0.5.4 | `SerpentEncryptionPlugin` | `PipelinePluginBase` | `EncryptionPluginBase` | Remove duplicated key mgmt, implement abstract encrypt/decrypt | [x] |
+| T5.0.5.5 | `FipsEncryptionPlugin` | `PipelinePluginBase` | `EncryptionPluginBase` | Remove duplicated key mgmt, implement abstract encrypt/decrypt | [x] |
+| T5.0.5.6 | `ZeroKnowledgeEncryptionPlugin` | `PipelinePluginBase` | `EncryptionPluginBase` | Remove duplicated key mgmt, implement abstract encrypt/decrypt | [x] |
 
 **AesEncryptionPlugin Refactoring:**
 ```csharp
@@ -2477,10 +2477,10 @@ For each new ENCRYPTION plugin:
 **Existing Key Management Plugins (✅ Extend KeyStorePluginBase after T5.0.4):**
 | Plugin | Base Class | Envelope Support | Features | Status |
 |--------|------------|------------------|----------|--------|
-| `FileKeyStorePlugin` | `KeyStorePluginBase` | ❌ No | DPAPI, CredentialManager, Database, PBKDF2 4-tier | ✅ → Refactor T5.0.4.1 |
-| `VaultKeyStorePlugin` | `KeyStorePluginBase` + `IEnvelopeKeyStore` | ✅ Yes | HashiCorp, Azure, AWS KMS + WrapKey/UnwrapKey | ✅ → Refactor T5.0.4.2 |
-| `KeyRotationPlugin` | `KeyStorePluginBase` (decorator) | Passthrough | Wraps any IKeyStore, adds rotation/versioning/audit | ✅ → Refactor T5.0.4.3 |
-| `SecretManagementPlugin` | `KeyStorePluginBase` | ❌ No | Secure secret storage with access control | ✅ → Verify T5.0.4.4 |
+| `FileKeyStorePlugin` | `KeyStorePluginBase` | ❌ No | DPAPI, CredentialManager, Database, PBKDF2 4-tier | ✅ COMPLETE T5.0.4.1 |
+| `VaultKeyStorePlugin` | `KeyStorePluginBase` + `IEnvelopeKeyStore` | ✅ Yes | HashiCorp, Azure, AWS KMS + WrapKey/UnwrapKey | ✅ COMPLETE T5.0.4.2 |
+| `KeyRotationPlugin` | `KeyStorePluginBase` (decorator) | Passthrough | Wraps any IKeyStore, adds rotation/versioning/audit | ⏳ Pending T5.0.4.3 |
+| `SecretManagementPlugin` | `KeyStorePluginBase` | ❌ No | Secure secret storage with access control | ⏳ Pending T5.0.4.4 |
 
 **New Key Management Plugins (T5.4) - MUST Extend KeyStorePluginBase:**
 

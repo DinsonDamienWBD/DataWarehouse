@@ -12,6 +12,7 @@ namespace DataWarehouse.Plugins.ZeroKnowledgeEncryption
 {
     /// <summary>
     /// Zero-knowledge encryption plugin implementing client-side encryption with ZK proofs.
+    /// Extends EncryptionPluginBase for composable key management with Direct and Envelope modes.
     ///
     /// Security Features:
     /// - Client-side AES-256-GCM encryption (server never sees plaintext)
@@ -19,6 +20,7 @@ namespace DataWarehouse.Plugins.ZeroKnowledgeEncryption
     /// - Pedersen commitments for binding and hiding properties
     /// - Discrete logarithm based proofs over prime order groups
     /// - Non-interactive ZK proofs using Fiat-Shamir heuristic
+    /// - Composable key management: Direct mode (IKeyStore) or Envelope mode (IEnvelopeKeyStore)
     ///
     /// Cryptographic Foundations:
     /// - Uses NIST P-256 curve parameters for elliptic curve operations
@@ -33,41 +35,42 @@ namespace DataWarehouse.Plugins.ZeroKnowledgeEncryption
     /// - zk.encryption.commit: Create Pedersen commitment
     /// - zk.encryption.stats: Get encryption statistics
     /// </summary>
-    public sealed class ZeroKnowledgeEncryptionPlugin : PipelinePluginBase, IDisposable
+    public sealed class ZeroKnowledgeEncryptionPlugin : EncryptionPluginBase
     {
         private readonly ZkEncryptionConfig _config;
-        private readonly object _statsLock = new();
         private readonly ConcurrentDictionary<string, ZkProofRecord> _proofCache = new();
         private readonly SchnorrProver _schnorrProver;
         private readonly PedersenCommitter _pedersenCommitter;
-        private IKeyStore? _keyStore;
-        private ISecurityContext? _securityContext;
-        private long _encryptionCount;
-        private long _decryptionCount;
         private long _proofsGenerated;
         private long _proofsVerified;
-        private long _totalBytesEncrypted;
-        private bool _disposed;
 
         /// <summary>
-        /// IV size for AES-GCM (96 bits).
-        /// </summary>
-        private const int IvSizeBytes = 12;
-
-        /// <summary>
-        /// Authentication tag size (128 bits).
-        /// </summary>
-        private const int TagSizeBytes = 16;
-
-        /// <summary>
-        /// Maximum key ID length in header.
+        /// Maximum key ID length in header (for legacy format).
         /// </summary>
         private const int MaxKeyIdLength = 64;
 
         /// <summary>
-        /// Header version for ZK-encrypted data.
+        /// Header version for ZK-encrypted data (for legacy format).
         /// </summary>
-        private const byte HeaderVersion = 0x5A; // 'Z' for ZK
+        private const byte LegacyHeaderVersion = 0x5A; // 'Z' for ZK
+
+        #region Abstract Property Overrides
+
+        /// <inheritdoc/>
+        protected override int KeySizeBytes => 32; // 256 bits
+
+        /// <inheritdoc/>
+        protected override int IvSizeBytes => 12; // 96 bits for GCM
+
+        /// <inheritdoc/>
+        protected override int TagSizeBytes => 16; // 128-bit tag
+
+        /// <inheritdoc/>
+        protected override string AlgorithmId => "ZK-AES-256-GCM";
+
+        #endregion
+
+        #region Plugin Identity
 
         /// <inheritdoc/>
         public override string Id => "datawarehouse.plugins.encryption.zeroknowledge";
@@ -96,6 +99,8 @@ namespace DataWarehouse.Plugins.ZeroKnowledgeEncryption
         /// <inheritdoc/>
         public override string[] IncompatibleStages => new[] { "encryption.chacha20", "encryption.aes256", "encryption.fips" };
 
+        #endregion
+
         /// <summary>
         /// Initializes a new instance of the zero-knowledge encryption plugin.
         /// </summary>
@@ -105,19 +110,12 @@ namespace DataWarehouse.Plugins.ZeroKnowledgeEncryption
             _config = config ?? new ZkEncryptionConfig();
             _schnorrProver = new SchnorrProver();
             _pedersenCommitter = new PedersenCommitter();
-        }
 
-        /// <inheritdoc/>
-        public override async Task<HandshakeResponse> OnHandshakeAsync(HandshakeRequest request)
-        {
-            var response = await base.OnHandshakeAsync(request);
-
+            // Set defaults from config (backward compatibility)
             if (_config.KeyStore != null)
             {
-                _keyStore = _config.KeyStore;
+                DefaultKeyStore = _config.KeyStore;
             }
-
-            return response;
         }
 
         /// <inheritdoc/>
@@ -138,14 +136,18 @@ namespace DataWarehouse.Plugins.ZeroKnowledgeEncryption
         protected override Dictionary<string, object> GetMetadata()
         {
             var metadata = base.GetMetadata();
-            metadata["Algorithm"] = "AES-256-GCM";
+            metadata["Algorithm"] = AlgorithmId;
             metadata["ZkProtocol"] = "Schnorr";
             metadata["CommitmentScheme"] = "Pedersen";
-            metadata["KeySize"] = 256;
+            metadata["KeySize"] = KeySizeBytes * 8;
+            metadata["IVSize"] = IvSizeBytes * 8;
+            metadata["TagSize"] = TagSizeBytes * 8;
             metadata["CurveType"] = "P-256";
             metadata["SupportsClientSideEncryption"] = true;
             metadata["SupportsZkProofs"] = true;
             metadata["ServerSeesPlaintext"] = false;
+            metadata["SupportsKeyRotation"] = true;
+            metadata["SupportedModes"] = new[] { "Direct", "Envelope" };
             return metadata;
         }
 
@@ -159,57 +161,39 @@ namespace DataWarehouse.Plugins.ZeroKnowledgeEncryption
                 "zk.encryption.commit" => HandleCommitAsync(message),
                 "zk.encryption.stats" => HandleStatsAsync(message),
                 "zk.encryption.setKeyStore" => HandleSetKeyStoreAsync(message),
+                "zk.encryption.configure" => HandleConfigureAsync(message),
                 _ => base.OnMessageAsync(message)
             };
         }
 
+        #region Core Encryption/Decryption (Algorithm-Specific)
+
         /// <summary>
-        /// Encrypts data client-side and generates a ZK proof of encryption.
+        /// Performs ZK-AES-256-GCM encryption with Schnorr proof generation and Pedersen commitment.
+        /// Base class handles key resolution, config resolution, and statistics.
         /// </summary>
         /// <param name="input">The plaintext input stream.</param>
-        /// <param name="context">The kernel context.</param>
-        /// <param name="args">
-        /// Optional arguments:
-        /// - keyStore: IKeyStore instance
-        /// - securityContext: ISecurityContext for key access
-        /// - generateProof: Whether to generate ZK proof (default true)
-        /// </param>
-        /// <returns>Encrypted data with ZK proof in header.</returns>
-        public override Stream OnWrite(Stream input, IKernelContext context, Dictionary<string, object> args)
+        /// <param name="key">The encryption key (provided by base class).</param>
+        /// <param name="iv">The initialization vector (provided by base class).</param>
+        /// <param name="context">The kernel context for logging.</param>
+        /// <returns>A stream containing ZK proof data + [IV:12][Tag:16][Ciphertext].</returns>
+        /// <exception cref="CryptographicException">Thrown on encryption failure.</exception>
+        protected override async Task<Stream> EncryptCoreAsync(Stream input, byte[] key, byte[] iv, IKernelContext context)
         {
-            ObjectDisposedException.ThrowIf(_disposed, this);
-
-            var keyStore = GetKeyStore(args, context);
-            var securityContext = GetSecurityContext(args);
-            var generateProof = !args.TryGetValue("generateProof", out var gpObj) || gpObj is not bool gp || gp;
-
-            var keyId = RunSyncWithErrorHandling(
-                () => keyStore.GetCurrentKeyIdAsync(),
-                "Failed to retrieve current key ID");
-
-            var key = RunSyncWithErrorHandling(
-                () => keyStore.GetKeyAsync(keyId, securityContext),
-                "Failed to retrieve key for ZK encryption");
-
-            if (key.Length != 32)
-            {
-                CryptographicOperations.ZeroMemory(key);
-                throw new CryptographicException($"AES-256 requires 32-byte key. Got {key.Length} bytes.");
-            }
-
             byte[]? plaintext = null;
             byte[]? ciphertext = null;
 
             try
             {
+                // Read all input data
                 using var inputMs = new MemoryStream();
-                input.CopyTo(inputMs);
+                await input.CopyToAsync(inputMs);
                 plaintext = inputMs.ToArray();
 
-                var iv = RandomNumberGenerator.GetBytes(IvSizeBytes);
                 var tag = new byte[TagSizeBytes];
                 ciphertext = new byte[plaintext.Length];
 
+                // Perform AES-256-GCM encryption
                 using var aesGcm = new AesGcm(key, TagSizeBytes);
                 aesGcm.Encrypt(iv, plaintext, ciphertext, tag);
 
@@ -218,6 +202,7 @@ namespace DataWarehouse.Plugins.ZeroKnowledgeEncryption
                 var commitment = _pedersenCommitter.Commit(plaintextHash, out var commitmentRandomness);
 
                 // Generate Schnorr proof of knowledge of the key
+                var generateProof = _config.AutoGenerateProofs;
                 SchnorrProof? schnorrProof = null;
                 if (generateProof)
                 {
@@ -225,22 +210,10 @@ namespace DataWarehouse.Plugins.ZeroKnowledgeEncryption
                     Interlocked.Increment(ref _proofsGenerated);
                 }
 
-                var keyIdBytes = Encoding.UTF8.GetBytes(keyId);
-                if (keyIdBytes.Length > MaxKeyIdLength)
-                {
-                    throw new CryptographicException($"Key ID exceeds {MaxKeyIdLength} bytes");
-                }
-
-                // Build output: Header + ZK data + encrypted content
+                // Build output: Commitment + Proof + [IV:12][Tag:16][Ciphertext]
+                // Note: Key info is now stored in EncryptionMetadata by base class
                 using var output = new MemoryStream();
                 using var writer = new BinaryWriter(output, Encoding.UTF8, leaveOpen: true);
-
-                // Header
-                writer.Write(HeaderVersion);
-                writer.Write((byte)keyIdBytes.Length);
-                writer.Write(keyIdBytes);
-                writer.Write(iv);
-                writer.Write(tag);
 
                 // Commitment
                 writer.Write(commitment.Length);
@@ -257,15 +230,15 @@ namespace DataWarehouse.Plugins.ZeroKnowledgeEncryption
                     writer.Write(proofBytes);
                 }
 
-                // Ciphertext
+                // Write IV (12 bytes)
+                writer.Write(iv);
+
+                // Write authentication tag (16 bytes)
+                writer.Write(tag);
+
+                // Write ciphertext
                 writer.Write(ciphertext.Length);
                 writer.Write(ciphertext);
-
-                lock (_statsLock)
-                {
-                    _encryptionCount++;
-                    _totalBytesEncrypted += plaintext.Length;
-                }
 
                 // Cache proof for verification
                 var dataId = Convert.ToHexString(SHA256.HashData(output.ToArray())[..16]);
@@ -283,184 +256,247 @@ namespace DataWarehouse.Plugins.ZeroKnowledgeEncryption
             }
             finally
             {
+                // Security: Clear sensitive data from memory
                 if (plaintext != null) CryptographicOperations.ZeroMemory(plaintext);
                 if (ciphertext != null) CryptographicOperations.ZeroMemory(ciphertext);
-                CryptographicOperations.ZeroMemory(key);
             }
         }
 
         /// <summary>
-        /// Decrypts client-side encrypted data and optionally verifies ZK proof.
+        /// Performs ZK-AES-256-GCM decryption with Schnorr proof and Pedersen commitment verification.
+        /// Base class handles key resolution, config resolution, and statistics.
+        /// Supports both new format with commitment/proof and legacy format.
         /// </summary>
-        /// <param name="stored">The encrypted input stream.</param>
-        /// <param name="context">The kernel context.</param>
-        /// <param name="args">
-        /// Optional arguments:
-        /// - keyStore: IKeyStore instance
-        /// - securityContext: ISecurityContext for key access
-        /// - verifyProof: Whether to verify ZK proof (default true)
-        /// </param>
-        /// <returns>Decrypted plaintext stream.</returns>
-        public override Stream OnRead(Stream stored, IKernelContext context, Dictionary<string, object> args)
+        /// <param name="input">The encrypted input stream.</param>
+        /// <param name="key">The decryption key (provided by base class).</param>
+        /// <param name="iv">The initialization vector (null if embedded in ciphertext).</param>
+        /// <param name="context">The kernel context for logging.</param>
+        /// <returns>The decrypted stream and authentication tag.</returns>
+        /// <exception cref="CryptographicException">
+        /// Thrown on decryption failure, commitment verification failure, or proof verification failure.
+        /// </exception>
+        protected override async Task<(Stream data, byte[]? tag)> DecryptCoreAsync(Stream input, byte[] key, byte[]? iv, IKernelContext context)
         {
-            ObjectDisposedException.ThrowIf(_disposed, this);
-
-            var keyStore = GetKeyStore(args, context);
-            var securityContext = GetSecurityContext(args);
-            var verifyProof = !args.TryGetValue("verifyProof", out var vpObj) || vpObj is not bool vp || vp;
-
             byte[]? encryptedData = null;
             byte[]? plaintext = null;
-            byte[]? key = null;
 
             try
             {
+                // Read all encrypted data
                 using var inputMs = new MemoryStream();
-                stored.CopyTo(inputMs);
+                await input.CopyToAsync(inputMs);
                 encryptedData = inputMs.ToArray();
+
+                // Check if this is legacy format (has key ID header)
+                var isLegacyFormat = IsLegacyFormat(encryptedData);
 
                 using var reader = new BinaryReader(new MemoryStream(encryptedData), Encoding.UTF8);
 
-                // Read header
-                var version = reader.ReadByte();
-                if (version != HeaderVersion)
+                if (isLegacyFormat)
                 {
-                    throw new CryptographicException($"Invalid ZK encryption header version: 0x{version:X2}");
-                }
-
-                var keyIdLength = reader.ReadByte();
-                var keyIdBytes = reader.ReadBytes(keyIdLength);
-                var keyId = Encoding.UTF8.GetString(keyIdBytes);
-
-                var iv = reader.ReadBytes(IvSizeBytes);
-                var tag = reader.ReadBytes(TagSizeBytes);
-
-                // Read commitment
-                var commitmentLength = reader.ReadInt32();
-                var commitment = reader.ReadBytes(commitmentLength);
-                var randomnessLength = reader.ReadInt32();
-                var commitmentRandomness = reader.ReadBytes(randomnessLength);
-
-                // Read Schnorr proof
-                var hasProof = reader.ReadBoolean();
-                SchnorrProof? schnorrProof = null;
-                if (hasProof)
-                {
-                    var proofLength = reader.ReadInt32();
-                    var proofBytes = reader.ReadBytes(proofLength);
-                    schnorrProof = SchnorrProof.Deserialize(proofBytes);
-                }
-
-                // Read ciphertext
-                var ciphertextLength = reader.ReadInt32();
-                var ciphertext = reader.ReadBytes(ciphertextLength);
-
-                // Get decryption key
-                key = RunSyncWithErrorHandling(
-                    () => keyStore.GetKeyAsync(keyId, securityContext),
-                    "Failed to retrieve key for ZK decryption");
-
-                if (key.Length != 32)
-                {
-                    throw new CryptographicException($"AES-256 requires 32-byte key. Got {key.Length} bytes.");
-                }
-
-                // Decrypt
-                plaintext = new byte[ciphertextLength];
-                using var aesGcm = new AesGcm(key, TagSizeBytes);
-                aesGcm.Decrypt(iv, ciphertext, tag, plaintext);
-
-                // Verify commitment
-                var plaintextHash = SHA256.HashData(plaintext);
-                if (!_pedersenCommitter.Verify(commitment, plaintextHash, commitmentRandomness))
-                {
-                    throw new CryptographicException("Pedersen commitment verification failed. Data integrity compromised.");
-                }
-
-                // Verify Schnorr proof if present and requested
-                if (verifyProof && schnorrProof != null)
-                {
-                    if (!_schnorrProver.Verify(schnorrProof, plaintextHash))
+                    // Legacy format: [HeaderVersion:1][KeyIdLen:1][KeyId:variable][IV:12][Tag:16][Commitment][Proof][Ciphertext]
+                    var version = reader.ReadByte();
+                    if (version != LegacyHeaderVersion)
                     {
-                        throw new CryptographicException("Schnorr proof verification failed. Proof of knowledge invalid.");
+                        throw new CryptographicException($"Invalid ZK encryption header version: 0x{version:X2}");
                     }
-                    Interlocked.Increment(ref _proofsVerified);
-                }
 
-                lock (_statsLock)
+                    var keyIdLength = reader.ReadByte();
+                    var keyIdBytes = reader.ReadBytes(keyIdLength);
+                    // keyId already resolved by base class, skip it
+
+                    // Read IV from legacy format
+                    iv = reader.ReadBytes(IvSizeBytes);
+                    var tag = reader.ReadBytes(TagSizeBytes);
+
+                    // Read commitment
+                    var commitmentLength = reader.ReadInt32();
+                    var commitment = reader.ReadBytes(commitmentLength);
+                    var randomnessLength = reader.ReadInt32();
+                    var commitmentRandomness = reader.ReadBytes(randomnessLength);
+
+                    // Read Schnorr proof
+                    var hasProof = reader.ReadBoolean();
+                    SchnorrProof? schnorrProof = null;
+                    if (hasProof)
+                    {
+                        var proofLength = reader.ReadInt32();
+                        var proofBytes = reader.ReadBytes(proofLength);
+                        schnorrProof = SchnorrProof.Deserialize(proofBytes);
+                    }
+
+                    // Read ciphertext
+                    var ciphertextLength = reader.ReadInt32();
+                    var ciphertext = reader.ReadBytes(ciphertextLength);
+
+                    // Decrypt
+                    plaintext = new byte[ciphertextLength];
+                    using var aesGcm = new AesGcm(key, TagSizeBytes);
+                    aesGcm.Decrypt(iv, ciphertext, tag, plaintext);
+
+                    // Verify commitment
+                    var plaintextHash = SHA256.HashData(plaintext);
+                    if (!_pedersenCommitter.Verify(commitment, plaintextHash, commitmentRandomness))
+                    {
+                        throw new CryptographicException("Pedersen commitment verification failed. Data integrity compromised.");
+                    }
+
+                    // Verify Schnorr proof if present and requested
+                    var verifyProof = _config.VerifyProofsOnDecrypt;
+                    if (verifyProof && schnorrProof != null)
+                    {
+                        if (!_schnorrProver.Verify(schnorrProof, plaintextHash))
+                        {
+                            throw new CryptographicException("Schnorr proof verification failed. Proof of knowledge invalid.");
+                        }
+                        Interlocked.Increment(ref _proofsVerified);
+                    }
+
+                    context.LogDebug($"ZK decrypted {ciphertextLength} bytes (legacy format) with commitment verification");
+
+                    var result = new byte[plaintext.Length];
+                    Array.Copy(plaintext, result, plaintext.Length);
+                    return (new MemoryStream(result), tag);
+                }
+                else
                 {
-                    _decryptionCount++;
+                    // New format: [Commitment][Proof][IV:12][Tag:16][Ciphertext]
+                    // Read commitment
+                    var commitmentLength = reader.ReadInt32();
+                    var commitment = reader.ReadBytes(commitmentLength);
+                    var randomnessLength = reader.ReadInt32();
+                    var commitmentRandomness = reader.ReadBytes(randomnessLength);
+
+                    // Read Schnorr proof
+                    var hasProof = reader.ReadBoolean();
+                    SchnorrProof? schnorrProof = null;
+                    if (hasProof)
+                    {
+                        var proofLength = reader.ReadInt32();
+                        var proofBytes = reader.ReadBytes(proofLength);
+                        schnorrProof = SchnorrProof.Deserialize(proofBytes);
+                    }
+
+                    // If IV not provided by base class, read from data
+                    if (iv == null)
+                    {
+                        iv = reader.ReadBytes(IvSizeBytes);
+                    }
+                    else
+                    {
+                        // IV provided by base class (from metadata), skip in data
+                        reader.ReadBytes(IvSizeBytes);
+                    }
+
+                    // Read authentication tag
+                    var tag = reader.ReadBytes(TagSizeBytes);
+
+                    // Read ciphertext
+                    var ciphertextLength = reader.ReadInt32();
+                    var ciphertext = reader.ReadBytes(ciphertextLength);
+
+                    // Decrypt
+                    plaintext = new byte[ciphertextLength];
+                    using var aesGcm = new AesGcm(key, TagSizeBytes);
+                    aesGcm.Decrypt(iv, ciphertext, tag, plaintext);
+
+                    // Verify commitment
+                    var plaintextHash = SHA256.HashData(plaintext);
+                    if (!_pedersenCommitter.Verify(commitment, plaintextHash, commitmentRandomness))
+                    {
+                        throw new CryptographicException("Pedersen commitment verification failed. Data integrity compromised.");
+                    }
+
+                    // Verify Schnorr proof if present and requested
+                    var verifyProof = _config.VerifyProofsOnDecrypt;
+                    if (verifyProof && schnorrProof != null)
+                    {
+                        if (!_schnorrProver.Verify(schnorrProof, plaintextHash))
+                        {
+                            throw new CryptographicException("Schnorr proof verification failed. Proof of knowledge invalid.");
+                        }
+                        Interlocked.Increment(ref _proofsVerified);
+                    }
+
+                    context.LogDebug($"ZK decrypted {ciphertextLength} bytes with commitment verification");
+
+                    var result = new byte[plaintext.Length];
+                    Array.Copy(plaintext, result, plaintext.Length);
+                    return (new MemoryStream(result), tag);
                 }
-
-                context.LogDebug($"ZK decrypted {ciphertextLength} bytes with commitment verification");
-
-                var result = new byte[plaintext.Length];
-                Array.Copy(plaintext, result, plaintext.Length);
-                return new MemoryStream(result);
             }
             catch (AuthenticationTagMismatchException ex)
             {
-                throw new CryptographicException("Authentication tag verification failed", ex);
+                throw new CryptographicException("Authentication tag verification failed. Data may be corrupted or tampered with.", ex);
             }
             finally
             {
+                // Security: Clear sensitive data from memory
                 if (encryptedData != null) CryptographicOperations.ZeroMemory(encryptedData);
                 if (plaintext != null) CryptographicOperations.ZeroMemory(plaintext);
-                if (key != null) CryptographicOperations.ZeroMemory(key);
             }
         }
 
-        private IKeyStore GetKeyStore(Dictionary<string, object> args, IKernelContext context)
+        /// <summary>
+        /// Checks if the encrypted data uses the legacy format with key ID header.
+        /// Legacy format: [HeaderVersion:1][KeyIdLen:1][KeyId:variable]...
+        /// </summary>
+        private bool IsLegacyFormat(byte[] data)
         {
-            if (args.TryGetValue("keyStore", out var ksObj) && ksObj is IKeyStore ks)
+            if (data.Length < 2)
+                return false;
+
+            // Check for legacy header version (0x5A = 'Z' for ZK)
+            var version = data[0];
+            if (version != LegacyHeaderVersion)
+                return false;
+
+            // Check for valid key ID length
+            var keyIdLength = data[1];
+            return keyIdLength > 0 && keyIdLength <= MaxKeyIdLength;
+        }
+
+        #endregion
+
+        #region Helper Methods
+
+        /// <summary>
+        /// Gets key store for ZK-specific message operations.
+        /// Falls back to DefaultKeyStore (from base class).
+        /// </summary>
+        private IKeyStore GetKeyStoreForMessage(Dictionary<string, object> payload)
+        {
+            if (payload.TryGetValue("keyStore", out var ksObj) && ksObj is IKeyStore ks)
             {
                 return ks;
             }
 
-            if (_keyStore != null)
+            if (DefaultKeyStore != null)
             {
-                return _keyStore;
-            }
-
-            var keyStorePlugin = context.GetPlugins<IPlugin>()
-                .OfType<IKeyStore>()
-                .FirstOrDefault();
-
-            if (keyStorePlugin != null)
-            {
-                return keyStorePlugin;
+                return DefaultKeyStore;
             }
 
             throw new InvalidOperationException("No IKeyStore available for ZK encryption");
         }
 
-        private ISecurityContext GetSecurityContext(Dictionary<string, object> args)
+        /// <summary>
+        /// Gets security context from message payload.
+        /// </summary>
+        private ISecurityContext GetSecurityContext(Dictionary<string, object> payload)
         {
-            if (args.TryGetValue("securityContext", out var scObj) && scObj is ISecurityContext sc)
+            if (payload.TryGetValue("securityContext", out var scObj) && scObj is ISecurityContext sc)
             {
                 return sc;
             }
 
-            return _securityContext ?? new ZkSecurityContext();
+            return new ZkSecurityContext();
         }
 
-        private static T RunSyncWithErrorHandling<T>(Func<Task<T>> asyncOperation, string errorContext)
-        {
-            try
-            {
-                return Task.Run(asyncOperation).GetAwaiter().GetResult();
-            }
-            catch (AggregateException ae) when (ae.InnerException != null)
-            {
-                throw new CryptographicException($"{errorContext}: {ae.InnerException.Message}", ae.InnerException);
-            }
-            catch (Exception ex)
-            {
-                throw new CryptographicException($"{errorContext}: {ex.Message}", ex);
-            }
-        }
+        #endregion
 
-        private Task HandleProveAsync(PluginMessage message)
+        #region Message Handlers
+
+        private async Task HandleProveAsync(PluginMessage message)
         {
             if (!message.Payload.TryGetValue("data", out var dataObj) || dataObj is not byte[] data)
             {
@@ -468,16 +504,11 @@ namespace DataWarehouse.Plugins.ZeroKnowledgeEncryption
             }
 
             var hash = SHA256.HashData(data);
-            var keyStore = GetKeyStore(message.Payload as Dictionary<string, object> ?? new(), null!);
-            var securityContext = GetSecurityContext(message.Payload as Dictionary<string, object> ?? new());
+            var keyStore = GetKeyStoreForMessage(message.Payload);
+            var securityContext = GetSecurityContext(message.Payload);
 
-            var keyId = RunSyncWithErrorHandling(
-                () => keyStore.GetCurrentKeyIdAsync(),
-                "Failed to get key ID for proof generation");
-
-            var key = RunSyncWithErrorHandling(
-                () => keyStore.GetKeyAsync(keyId, securityContext),
-                "Failed to get key for proof generation");
+            var keyId = await keyStore.GetCurrentKeyIdAsync();
+            var key = await keyStore.GetKeyAsync(keyId, securityContext);
 
             try
             {
@@ -492,8 +523,6 @@ namespace DataWarehouse.Plugins.ZeroKnowledgeEncryption
             {
                 CryptographicOperations.ZeroMemory(key);
             }
-
-            return Task.CompletedTask;
         }
 
         private Task HandleVerifyAsync(PluginMessage message)
@@ -534,14 +563,46 @@ namespace DataWarehouse.Plugins.ZeroKnowledgeEncryption
 
         private Task HandleStatsAsync(PluginMessage message)
         {
-            lock (_statsLock)
+            // Use base class statistics
+            var stats = GetStatistics();
+
+            message.Payload["EncryptionCount"] = stats.EncryptionCount;
+            message.Payload["DecryptionCount"] = stats.DecryptionCount;
+            message.Payload["TotalBytesEncrypted"] = stats.TotalBytesEncrypted;
+            message.Payload["TotalBytesDecrypted"] = stats.TotalBytesDecrypted;
+            message.Payload["UniqueKeysUsed"] = stats.UniqueKeysUsed;
+            message.Payload["Algorithm"] = AlgorithmId;
+            message.Payload["ProofsGenerated"] = Interlocked.Read(ref _proofsGenerated);
+            message.Payload["ProofsVerified"] = Interlocked.Read(ref _proofsVerified);
+            message.Payload["CachedProofs"] = _proofCache.Count;
+
+            return Task.CompletedTask;
+        }
+
+        private Task HandleConfigureAsync(PluginMessage message)
+        {
+            // Use base class configuration methods
+            if (message.Payload.TryGetValue("keyStore", out var ksObj) && ksObj is IKeyStore ks)
             {
-                message.Payload["EncryptionCount"] = _encryptionCount;
-                message.Payload["DecryptionCount"] = _decryptionCount;
-                message.Payload["ProofsGenerated"] = Interlocked.Read(ref _proofsGenerated);
-                message.Payload["ProofsVerified"] = Interlocked.Read(ref _proofsVerified);
-                message.Payload["TotalBytesEncrypted"] = _totalBytesEncrypted;
-                message.Payload["CachedProofs"] = _proofCache.Count;
+                SetDefaultKeyStore(ks);
+            }
+
+            if (message.Payload.TryGetValue("envelopeKeyStore", out var eksObj) && eksObj is IEnvelopeKeyStore eks &&
+                message.Payload.TryGetValue("kekKeyId", out var kekObj) && kekObj is string kek)
+            {
+                SetDefaultEnvelopeKeyStore(eks, kek);
+            }
+
+            if (message.Payload.TryGetValue("mode", out var modeObj))
+            {
+                if (modeObj is KeyManagementMode mode)
+                {
+                    SetDefaultMode(mode);
+                }
+                else if (modeObj is string modeStr && Enum.TryParse<KeyManagementMode>(modeStr, true, out var parsedMode))
+                {
+                    SetDefaultMode(parsedMode);
+                }
             }
 
             return Task.CompletedTask;
@@ -551,18 +612,12 @@ namespace DataWarehouse.Plugins.ZeroKnowledgeEncryption
         {
             if (message.Payload.TryGetValue("keyStore", out var ksObj) && ksObj is IKeyStore ks)
             {
-                _keyStore = ks;
+                SetDefaultKeyStore(ks);
             }
             return Task.CompletedTask;
         }
 
-        /// <inheritdoc/>
-        public void Dispose()
-        {
-            if (_disposed) return;
-            _disposed = true;
-            _proofCache.Clear();
-        }
+        #endregion
     }
 
     /// <summary>

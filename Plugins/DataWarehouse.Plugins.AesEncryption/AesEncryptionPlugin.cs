@@ -2,7 +2,6 @@ using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Primitives;
 using DataWarehouse.SDK.Security;
 using DataWarehouse.SDK.Utilities;
-using System.Collections.Concurrent;
 using System.Security.Cryptography;
 using System.Text;
 
@@ -10,17 +9,21 @@ namespace DataWarehouse.Plugins.AesEncryption
 {
     /// <summary>
     /// Production-ready AES-256-GCM authenticated encryption plugin for DataWarehouse pipeline.
-    /// Extends PipelinePluginBase for bidirectional stream transformation with IKeyStore integration.
+    /// Extends EncryptionPluginBase for composable key management with Direct and Envelope modes.
     ///
     /// Security Features:
     /// - AES-256-GCM authenticated encryption (NIST SP 800-38D compliant)
     /// - Cryptographically secure random IV generation (96-bit / 12 bytes for GCM)
     /// - 128-bit authentication tag for integrity and authenticity verification
-    /// - Key ID stored with ciphertext for seamless key rotation support
+    /// - Composable key management: Direct mode (IKeyStore) or Envelope mode (IEnvelopeKeyStore)
     /// - Secure memory clearing for sensitive data (PCI-DSS compliance)
     /// - Thread-safe statistics tracking
     ///
-    /// Header Format: [KeyIdLength:4][KeyId:32][IV:12][Tag:16][Ciphertext:...]
+    /// Data Format (when using manifest-based metadata):
+    /// [IV:12][Tag:16][Ciphertext:...]
+    ///
+    /// Legacy Format (backward compatibility for old encrypted files):
+    /// [KeyIdLength:4][KeyId:32][IV:12][Tag:16][Ciphertext:...]
     ///
     /// Thread Safety: All operations are thread-safe.
     ///
@@ -30,43 +33,42 @@ namespace DataWarehouse.Plugins.AesEncryption
     /// - encryption.aes256gcm.stats: Get encryption statistics
     /// - encryption.aes256gcm.setKeyStore: Set the key store
     /// </summary>
-    public sealed class AesEncryptionPlugin : PipelinePluginBase, IDisposable
+    public sealed class AesEncryptionPlugin : EncryptionPluginBase
     {
         private readonly AesEncryptionConfig _config;
-        private readonly object _statsLock = new();
-        private readonly ConcurrentDictionary<string, DateTime> _keyAccessLog = new();
-        private IKeyStore? _keyStore;
-        private ISecurityContext? _securityContext;
-        private long _encryptionCount;
-        private long _decryptionCount;
-        private long _totalBytesEncrypted;
-        private long _totalBytesDecrypted;
-        private bool _disposed;
 
         /// <summary>
-        /// IV size for AES-GCM (96 bits / 12 bytes as per NIST SP 800-38D).
-        /// </summary>
-        private const int IvSizeBytes = 12;
-
-        /// <summary>
-        /// Authentication tag size (128 bits / 16 bytes for maximum security).
-        /// </summary>
-        private const int TagSizeBytes = 16;
-
-        /// <summary>
-        /// Key ID field size in header (fixed 32 bytes).
+        /// Key ID field size in header (fixed 32 bytes) - for legacy format only.
         /// </summary>
         private const int KeyIdFieldSize = 32;
 
         /// <summary>
-        /// Size of key ID length prefix (4 bytes for Int32).
+        /// Size of key ID length prefix (4 bytes for Int32) - for legacy format only.
         /// </summary>
         private const int KeyIdLengthSize = 4;
 
         /// <summary>
-        /// Total header size: KeyIdLength(4) + KeyId(32) + IV(12) + Tag(16) = 64 bytes.
+        /// Total legacy header size: KeyIdLength(4) + KeyId(32) + IV(12) + Tag(16) = 64 bytes.
         /// </summary>
-        private const int HeaderSize = KeyIdLengthSize + KeyIdFieldSize + IvSizeBytes + TagSizeBytes;
+        private int LegacyHeaderSize => KeyIdLengthSize + KeyIdFieldSize + IvSizeBytes + TagSizeBytes;
+
+        #region Abstract Property Overrides
+
+        /// <inheritdoc/>
+        protected override int KeySizeBytes => 32; // 256 bits
+
+        /// <inheritdoc/>
+        protected override int IvSizeBytes => 12; // 96 bits for GCM
+
+        /// <inheritdoc/>
+        protected override int TagSizeBytes => 16; // 128 bits
+
+        /// <inheritdoc/>
+        protected override string AlgorithmId => "AES-256-GCM";
+
+        #endregion
+
+        #region Plugin Identity
 
         /// <inheritdoc/>
         public override string Id => "datawarehouse.plugins.encryption.aes256gcm";
@@ -95,6 +97,8 @@ namespace DataWarehouse.Plugins.AesEncryption
         /// <inheritdoc/>
         public override string[] IncompatibleStages => ["encryption.chacha20", "encryption.fips"];
 
+        #endregion
+
         /// <summary>
         /// Initializes a new instance of the AES-256-GCM encryption plugin.
         /// </summary>
@@ -102,22 +106,18 @@ namespace DataWarehouse.Plugins.AesEncryption
         public AesEncryptionPlugin(AesEncryptionConfig? config = null)
         {
             _config = config ?? new AesEncryptionConfig();
+
+            // Set defaults from config (backward compatibility)
+            if (_config.KeyStore != null)
+            {
+                DefaultKeyStore = _config.KeyStore;
+            }
         }
 
         /// <inheritdoc/>
         public override async Task<HandshakeResponse> OnHandshakeAsync(HandshakeRequest request)
         {
             var response = await base.OnHandshakeAsync(request);
-
-            if (_config.KeyStore != null)
-            {
-                _keyStore = _config.KeyStore;
-            }
-
-            if (_config.SecurityContext != null)
-            {
-                _securityContext = _config.SecurityContext;
-            }
 
             // Verify AES-GCM is available on this platform
             try
@@ -151,15 +151,15 @@ namespace DataWarehouse.Plugins.AesEncryption
         protected override Dictionary<string, object> GetMetadata()
         {
             var metadata = base.GetMetadata();
-            metadata["Algorithm"] = "AES-256-GCM";
-            metadata["KeySize"] = 256;
+            metadata["Algorithm"] = AlgorithmId;
+            metadata["KeySize"] = KeySizeBytes * 8;
             metadata["IVSize"] = IvSizeBytes * 8;
             metadata["TagSize"] = TagSizeBytes * 8;
-            metadata["HeaderSize"] = HeaderSize;
             metadata["SupportsKeyRotation"] = true;
             metadata["SupportsStreaming"] = true;
             metadata["RequiresKeyStore"] = true;
             metadata["NistCompliant"] = true;
+            metadata["SupportedModes"] = new[] { "Direct", "Envelope" };
             return metadata;
         }
 
@@ -176,91 +176,31 @@ namespace DataWarehouse.Plugins.AesEncryption
             };
         }
 
-        /// <summary>
-        /// Encrypts data from the input stream using AES-256-GCM authenticated encryption.
-        /// LEGACY: Use OnWriteAsync for proper async support. This method calls OnWriteAsync synchronously.
-        /// </summary>
-        /// <param name="input">The plaintext input stream.</param>
-        /// <param name="context">The kernel context for logging and plugin access.</param>
-        /// <param name="args">
-        /// Optional arguments:
-        /// - keyStore: IKeyStore instance
-        /// - securityContext: ISecurityContext for key access
-        /// - keyId: Specific key ID to use (otherwise current key is used)
-        /// </param>
-        /// <returns>A stream containing the encrypted data with header.</returns>
-        /// <exception cref="InvalidOperationException">Thrown when no key store is configured.</exception>
-        /// <exception cref="CryptographicException">Thrown on encryption failure.</exception>
-        /// <remarks>
-        /// Output format: [KeyIdLength:4][KeyId:32][IV:12][Tag:16][Ciphertext:...]
-        /// </remarks>
-        public override Stream OnWrite(Stream input, IKernelContext context, Dictionary<string, object> args)
-        {
-            // LEGACY SYNC WRAPPER: Calls async version
-            // This is maintained for backward compatibility with sync-only callers
-            return OnWriteAsync(input, context, args).GetAwaiter().GetResult();
-        }
+        #region Core Encryption/Decryption (Algorithm-Specific)
 
         /// <summary>
-        /// Async version: Encrypts data from the input stream using AES-256-GCM authenticated encryption.
-        /// This is the preferred method for proper async/await support without blocking.
+        /// Performs AES-256-GCM encryption on the input stream.
+        /// Base class handles key resolution, config resolution, and statistics.
         /// </summary>
         /// <param name="input">The plaintext input stream.</param>
-        /// <param name="context">The kernel context for logging and plugin access.</param>
-        /// <param name="args">
-        /// Optional arguments:
-        /// - keyStore: IKeyStore instance
-        /// - securityContext: ISecurityContext for key access
-        /// - keyId: Specific key ID to use (otherwise current key is used)
-        /// </param>
-        /// <returns>A task that completes with a stream containing the encrypted data with header.</returns>
-        /// <exception cref="InvalidOperationException">Thrown when no key store is configured.</exception>
+        /// <param name="key">The encryption key (provided by base class).</param>
+        /// <param name="iv">The initialization vector (provided by base class).</param>
+        /// <param name="context">The kernel context for logging.</param>
+        /// <returns>A stream containing [IV:12][Tag:16][Ciphertext].</returns>
         /// <exception cref="CryptographicException">Thrown on encryption failure.</exception>
-        /// <remarks>
-        /// Output format: [KeyIdLength:4][KeyId:32][IV:12][Tag:16][Ciphertext:...]
-        /// </remarks>
-        protected override async Task<Stream> OnWriteAsync(Stream input, IKernelContext context, Dictionary<string, object> args)
+        protected override async Task<Stream> EncryptCoreAsync(Stream input, byte[] key, byte[] iv, IKernelContext context)
         {
-            ObjectDisposedException.ThrowIf(_disposed, this);
-
-            var keyStore = GetKeyStore(args, context);
-            var securityContext = GetSecurityContext(args);
-
-            // Determine key ID to use
-            string keyId;
-            if (args.TryGetValue("keyId", out var kidObj) && kidObj is string specificKeyId)
-            {
-                keyId = specificKeyId;
-            }
-            else
-            {
-                // PROPER ASYNC: Use await instead of blocking
-                keyId = await keyStore.GetCurrentKeyIdAsync().ConfigureAwait(false);
-            }
-
-            // PROPER ASYNC: Use await instead of blocking
-            var key = await keyStore.GetKeyAsync(keyId, securityContext).ConfigureAwait(false);
-
-            if (key.Length != 32)
-            {
-                CryptographicOperations.ZeroMemory(key);
-                throw new CryptographicException($"AES-256 requires a 256-bit (32-byte) key. Received {key.Length * 8}-bit key.");
-            }
-
             byte[]? plaintext = null;
             byte[]? ciphertext = null;
-            byte[]? iv = null;
             byte[]? tag = null;
 
             try
             {
                 // Read all input data
                 using var inputMs = new MemoryStream();
-                input.CopyTo(inputMs);
+                await input.CopyToAsync(inputMs);
                 plaintext = inputMs.ToArray();
 
-                // Generate cryptographically secure random IV
-                iv = RandomNumberGenerator.GetBytes(IvSizeBytes);
                 tag = new byte[TagSizeBytes];
                 ciphertext = new byte[plaintext.Length];
 
@@ -268,28 +208,11 @@ namespace DataWarehouse.Plugins.AesEncryption
                 using var aesGcm = new AesGcm(key, TagSizeBytes);
                 aesGcm.Encrypt(iv, plaintext, ciphertext, tag);
 
-                // Prepare key ID bytes (UTF-8 encoded, padded to KeyIdFieldSize)
-                var keyIdUtf8 = Encoding.UTF8.GetBytes(keyId);
-                if (keyIdUtf8.Length > KeyIdFieldSize)
-                {
-                    throw new CryptographicException($"Key ID exceeds maximum length of {KeyIdFieldSize} bytes when UTF-8 encoded");
-                }
-
-                var keyIdBytes = new byte[KeyIdFieldSize];
-                Array.Copy(keyIdUtf8, keyIdBytes, keyIdUtf8.Length);
-
-                // Build output: [KeyIdLength:4][KeyId:32][IV:12][Tag:16][Ciphertext]
-                var outputLength = HeaderSize + ciphertext.Length;
+                // Build output: [IV:12][Tag:16][Ciphertext]
+                // Note: Key info is now stored in EncryptionMetadata by base class
+                var outputLength = IvSizeBytes + TagSizeBytes + ciphertext.Length;
                 var output = new byte[outputLength];
                 var pos = 0;
-
-                // Write key ID length (4 bytes, little-endian)
-                BitConverter.GetBytes(keyIdUtf8.Length).CopyTo(output, pos);
-                pos += KeyIdLengthSize;
-
-                // Write key ID (32 bytes, null-padded)
-                keyIdBytes.CopyTo(output, pos);
-                pos += KeyIdFieldSize;
 
                 // Write IV (12 bytes)
                 iv.CopyTo(output, pos);
@@ -302,15 +225,7 @@ namespace DataWarehouse.Plugins.AesEncryption
                 // Write ciphertext
                 ciphertext.CopyTo(output, pos);
 
-                // Update statistics (thread-safe)
-                lock (_statsLock)
-                {
-                    _encryptionCount++;
-                    _totalBytesEncrypted += plaintext.Length;
-                }
-
-                LogKeyAccess(keyId);
-                context.LogDebug($"AES-256-GCM encrypted {plaintext.Length} bytes with key {TruncateKeyId(keyId)}");
+                context.LogDebug($"AES-256-GCM encrypted {plaintext.Length} bytes");
 
                 return new MemoryStream(output);
             }
@@ -319,92 +234,66 @@ namespace DataWarehouse.Plugins.AesEncryption
                 // Security: Clear sensitive data from memory (PCI-DSS requirement)
                 if (plaintext != null) CryptographicOperations.ZeroMemory(plaintext);
                 if (ciphertext != null) CryptographicOperations.ZeroMemory(ciphertext);
-                CryptographicOperations.ZeroMemory(key);
             }
         }
 
         /// <summary>
-        /// Decrypts data from the stored stream using AES-256-GCM authenticated encryption.
-        /// LEGACY: Use OnReadAsync for proper async support. This method calls OnReadAsync synchronously.
+        /// Performs AES-256-GCM decryption on the input stream.
+        /// Base class handles key resolution, config resolution, and statistics.
+        /// Supports both new format [IV:12][Tag:16][Ciphertext] and legacy format with key ID header.
         /// </summary>
-        /// <param name="stored">The encrypted input stream with header.</param>
-        /// <param name="context">The kernel context for logging and plugin access.</param>
-        /// <param name="args">
-        /// Optional arguments:
-        /// - keyStore: IKeyStore instance
-        /// - securityContext: ISecurityContext for key access
-        /// </param>
-        /// <returns>A stream containing the decrypted plaintext.</returns>
-        /// <exception cref="InvalidOperationException">Thrown when no key store is configured.</exception>
+        /// <param name="input">The encrypted input stream.</param>
+        /// <param name="key">The decryption key (provided by base class).</param>
+        /// <param name="iv">The initialization vector (null if embedded in ciphertext).</param>
+        /// <param name="context">The kernel context for logging.</param>
+        /// <returns>The decrypted stream and authentication tag.</returns>
         /// <exception cref="CryptographicException">
         /// Thrown on decryption failure or authentication tag verification failure.
         /// </exception>
-        public override Stream OnRead(Stream stored, IKernelContext context, Dictionary<string, object> args)
+        protected override async Task<(Stream data, byte[]? tag)> DecryptCoreAsync(Stream input, byte[] key, byte[]? iv, IKernelContext context)
         {
-            // LEGACY SYNC WRAPPER: Calls async version
-            // This is maintained for backward compatibility with sync-only callers
-            return OnReadAsync(stored, context, args).GetAwaiter().GetResult();
-        }
-
-        /// <summary>
-        /// Async version: Decrypts data from the stored stream using AES-256-GCM authenticated encryption.
-        /// This is the preferred method for proper async/await support without blocking.
-        /// </summary>
-        /// <param name="stored">The encrypted input stream with header.</param>
-        /// <param name="context">The kernel context for logging and plugin access.</param>
-        /// <param name="args">
-        /// Optional arguments:
-        /// - keyStore: IKeyStore instance
-        /// - securityContext: ISecurityContext for key access
-        /// </param>
-        /// <returns>A task that completes with a stream containing the decrypted plaintext.</returns>
-        /// <exception cref="InvalidOperationException">Thrown when no key store is configured.</exception>
-        /// <exception cref="CryptographicException">
-        /// Thrown on decryption failure or authentication tag verification failure.
-        /// </exception>
-        protected override async Task<Stream> OnReadAsync(Stream stored, IKernelContext context, Dictionary<string, object> args)
-        {
-            ObjectDisposedException.ThrowIf(_disposed, this);
-
-            var keyStore = GetKeyStore(args, context);
-            var securityContext = GetSecurityContext(args);
-
             byte[]? encryptedData = null;
             byte[]? plaintext = null;
-            byte[]? key = null;
 
             try
             {
                 // Read all encrypted data
                 using var inputMs = new MemoryStream();
-                stored.CopyTo(inputMs);
+                await input.CopyToAsync(inputMs);
                 encryptedData = inputMs.ToArray();
 
-                // Validate minimum size
-                if (encryptedData.Length < HeaderSize)
-                {
-                    throw new CryptographicException($"Encrypted data too short. Minimum size is {HeaderSize} bytes (header only). Received {encryptedData.Length} bytes.");
-                }
+                // Check if this is legacy format (has key ID header)
+                var isLegacyFormat = IsLegacyFormat(encryptedData);
 
                 var pos = 0;
 
-                // Read key ID length (4 bytes)
-                var keyIdLength = BitConverter.ToInt32(encryptedData, pos);
-                pos += KeyIdLengthSize;
-
-                if (keyIdLength <= 0 || keyIdLength > KeyIdFieldSize)
+                if (isLegacyFormat)
                 {
-                    throw new CryptographicException($"Invalid key ID length in header: {keyIdLength}. Expected 1-{KeyIdFieldSize}.");
+                    // Legacy format: [KeyIdLength:4][KeyId:32][IV:12][Tag:16][Ciphertext]
+                    if (encryptedData.Length < LegacyHeaderSize)
+                        throw new CryptographicException($"Legacy encrypted data too short. Minimum size is {LegacyHeaderSize} bytes.");
+
+                    // Skip key ID header (already resolved by base class)
+                    pos += KeyIdLengthSize + KeyIdFieldSize;
                 }
 
-                // Read key ID (extract actual length from padded field)
-                var keyId = Encoding.UTF8.GetString(encryptedData, pos, keyIdLength).TrimEnd('\0');
-                pos += KeyIdFieldSize;
+                // Parse: [IV:12][Tag:16][Ciphertext]
+                var remainingLength = encryptedData.Length - pos;
+                if (remainingLength < IvSizeBytes + TagSizeBytes)
+                    throw new CryptographicException("Encrypted data too short");
 
-                // Read IV (12 bytes)
-                var iv = new byte[IvSizeBytes];
-                Array.Copy(encryptedData, pos, iv, 0, IvSizeBytes);
-                pos += IvSizeBytes;
+                // If IV not provided by base class, read from data
+                if (iv == null)
+                {
+                    iv = new byte[IvSizeBytes];
+                    Array.Copy(encryptedData, pos, iv, 0, IvSizeBytes);
+                    pos += IvSizeBytes;
+                }
+                else
+                {
+                    // IV provided by base class (from metadata), skip in data
+                    pos += IvSizeBytes;
+                }
 
                 // Read authentication tag (16 bytes)
                 var tag = new byte[TagSizeBytes];
@@ -413,23 +302,10 @@ namespace DataWarehouse.Plugins.AesEncryption
 
                 // Read ciphertext (remaining bytes)
                 var ciphertextLength = encryptedData.Length - pos;
-                if (ciphertextLength < 0)
-                {
-                    throw new CryptographicException("Encrypted data truncated: no ciphertext present");
-                }
-
                 var ciphertext = new byte[ciphertextLength];
                 if (ciphertextLength > 0)
                 {
                     Array.Copy(encryptedData, pos, ciphertext, 0, ciphertextLength);
-                }
-
-                // PROPER ASYNC: Use await instead of blocking
-                key = await keyStore.GetKeyAsync(keyId, securityContext).ConfigureAwait(false);
-
-                if (key.Length != 32)
-                {
-                    throw new CryptographicException($"AES-256 requires a 256-bit (32-byte) key. Retrieved key is {key.Length * 8}-bit.");
                 }
 
                 // Perform AES-256-GCM decryption with authentication
@@ -438,20 +314,12 @@ namespace DataWarehouse.Plugins.AesEncryption
                 using var aesGcm = new AesGcm(key, TagSizeBytes);
                 aesGcm.Decrypt(iv, ciphertext, tag, plaintext);
 
-                // Update statistics (thread-safe)
-                lock (_statsLock)
-                {
-                    _decryptionCount++;
-                    _totalBytesDecrypted += plaintext.Length;
-                }
-
-                LogKeyAccess(keyId);
-                context.LogDebug($"AES-256-GCM decrypted {ciphertextLength} bytes with key {TruncateKeyId(keyId)}");
+                context.LogDebug($"AES-256-GCM decrypted {ciphertextLength} bytes");
 
                 // Return a copy since we'll zero the original
                 var result = new byte[plaintext.Length];
                 Array.Copy(plaintext, result, plaintext.Length);
-                return new MemoryStream(result);
+                return (new MemoryStream(result), tag);
             }
             catch (AuthenticationTagMismatchException ex)
             {
@@ -462,17 +330,35 @@ namespace DataWarehouse.Plugins.AesEncryption
                 // Security: Clear sensitive data from memory (PCI-DSS requirement)
                 if (encryptedData != null) CryptographicOperations.ZeroMemory(encryptedData);
                 if (plaintext != null) CryptographicOperations.ZeroMemory(plaintext);
-                if (key != null) CryptographicOperations.ZeroMemory(key);
             }
         }
+
+        /// <summary>
+        /// Checks if the encrypted data uses the legacy format with key ID header.
+        /// </summary>
+        private bool IsLegacyFormat(byte[] data)
+        {
+            if (data.Length < KeyIdLengthSize + KeyIdFieldSize)
+                return false;
+
+            // Read key ID length from header
+            var keyIdLength = BitConverter.ToInt32(data, 0);
+
+            // Legacy format has a valid key ID length (1 to KeyIdFieldSize)
+            return keyIdLength > 0 && keyIdLength <= KeyIdFieldSize;
+        }
+
+        #endregion
+
+        #region Helper Methods
 
         /// <summary>
         /// Verifies that AES-GCM is available on this platform.
         /// </summary>
         /// <exception cref="PlatformNotSupportedException">Thrown if AES-GCM is not available.</exception>
-        private static void VerifyAesGcmAvailability()
+        private void VerifyAesGcmAvailability()
         {
-            var testKey = RandomNumberGenerator.GetBytes(32);
+            var testKey = RandomNumberGenerator.GetBytes(KeySizeBytes);
             var testIv = RandomNumberGenerator.GetBytes(IvSizeBytes);
             var testData = new byte[16];
             var testCiphertext = new byte[16];
@@ -491,76 +377,34 @@ namespace DataWarehouse.Plugins.AesEncryption
             }
         }
 
-        /// <summary>
-        /// Gets the key store from arguments, plugin configuration, or kernel context.
-        /// </summary>
-        private IKeyStore GetKeyStore(Dictionary<string, object> args, IKernelContext context)
-        {
-            if (args.TryGetValue("keyStore", out var ksObj) && ksObj is IKeyStore ks)
-            {
-                return ks;
-            }
+        #endregion
 
-            if (_keyStore != null)
-            {
-                return _keyStore;
-            }
-
-            // Search for a plugin that implements IKeyStore
-            var keyStorePlugin = context.GetPlugins<IPlugin>()
-                .OfType<IKeyStore>()
-                .FirstOrDefault();
-
-            if (keyStorePlugin != null)
-            {
-                return keyStorePlugin;
-            }
-
-            throw new InvalidOperationException(
-                "No IKeyStore available. Configure a key store before using encryption. " +
-                "Use the 'encryption.aes256gcm.setKeyStore' message or pass 'keyStore' in args.");
-        }
-
-        /// <summary>
-        /// Gets the security context from arguments or plugin configuration.
-        /// </summary>
-        private ISecurityContext GetSecurityContext(Dictionary<string, object> args)
-        {
-            if (args.TryGetValue("securityContext", out var scObj) && scObj is ISecurityContext sc)
-            {
-                return sc;
-            }
-
-            return _securityContext ?? new DefaultSecurityContext();
-        }
-
-
-        /// <summary>
-        /// Logs key access for auditing purposes.
-        /// </summary>
-        private void LogKeyAccess(string keyId)
-        {
-            _keyAccessLog[keyId] = DateTime.UtcNow;
-        }
-
-        /// <summary>
-        /// Truncates a key ID for safe logging (shows first 8 characters).
-        /// </summary>
-        private static string TruncateKeyId(string keyId)
-        {
-            return keyId.Length > 8 ? $"{keyId[..8]}..." : keyId;
-        }
+        #region Message Handlers
 
         private Task HandleConfigureAsync(PluginMessage message)
         {
+            // Use base class configuration methods
             if (message.Payload.TryGetValue("keyStore", out var ksObj) && ksObj is IKeyStore ks)
             {
-                _keyStore = ks;
+                SetDefaultKeyStore(ks);
             }
 
-            if (message.Payload.TryGetValue("securityContext", out var scObj) && scObj is ISecurityContext sc)
+            if (message.Payload.TryGetValue("envelopeKeyStore", out var eksObj) && eksObj is IEnvelopeKeyStore eks &&
+                message.Payload.TryGetValue("kekKeyId", out var kekObj) && kekObj is string kek)
             {
-                _securityContext = sc;
+                SetDefaultEnvelopeKeyStore(eks, kek);
+            }
+
+            if (message.Payload.TryGetValue("mode", out var modeObj))
+            {
+                if (modeObj is KeyManagementMode mode)
+                {
+                    SetDefaultMode(mode);
+                }
+                else if (modeObj is string modeStr && Enum.TryParse<KeyManagementMode>(modeStr, true, out var parsedMode))
+                {
+                    SetDefaultMode(parsedMode);
+                }
             }
 
             return Task.CompletedTask;
@@ -568,14 +412,18 @@ namespace DataWarehouse.Plugins.AesEncryption
 
         private async Task HandleRotateAsync(PluginMessage message)
         {
-            if (_keyStore == null)
+            if (DefaultKeyStore == null)
             {
                 throw new InvalidOperationException("No key store configured. Cannot rotate keys.");
             }
 
-            var context = GetSecurityContext(message.Payload as Dictionary<string, object> ?? new());
+            // Get security context from message
+            var securityContext = message.Payload.TryGetValue("securityContext", out var scObj) && scObj is ISecurityContext sc
+                ? sc
+                : new DefaultSecurityContext();
+
             var newKeyId = Guid.NewGuid().ToString("N");
-            await _keyStore.CreateKeyAsync(newKeyId, context);
+            await DefaultKeyStore.CreateKeyAsync(newKeyId, securityContext);
 
             message.Payload["NewKeyId"] = newKeyId;
             message.Payload["RotatedAt"] = DateTime.UtcNow;
@@ -583,17 +431,17 @@ namespace DataWarehouse.Plugins.AesEncryption
 
         private Task HandleStatsAsync(PluginMessage message)
         {
-            lock (_statsLock)
-            {
-                message.Payload["EncryptionCount"] = _encryptionCount;
-                message.Payload["DecryptionCount"] = _decryptionCount;
-                message.Payload["TotalBytesEncrypted"] = _totalBytesEncrypted;
-                message.Payload["TotalBytesDecrypted"] = _totalBytesDecrypted;
-                message.Payload["UniqueKeysUsed"] = _keyAccessLog.Count;
-                message.Payload["Algorithm"] = "AES-256-GCM";
-                message.Payload["IVSizeBits"] = IvSizeBytes * 8;
-                message.Payload["TagSizeBits"] = TagSizeBytes * 8;
-            }
+            // Use base class statistics
+            var stats = GetStatistics();
+
+            message.Payload["EncryptionCount"] = stats.EncryptionCount;
+            message.Payload["DecryptionCount"] = stats.DecryptionCount;
+            message.Payload["TotalBytesEncrypted"] = stats.TotalBytesEncrypted;
+            message.Payload["TotalBytesDecrypted"] = stats.TotalBytesDecrypted;
+            message.Payload["UniqueKeysUsed"] = stats.UniqueKeysUsed;
+            message.Payload["Algorithm"] = AlgorithmId;
+            message.Payload["IVSizeBits"] = IvSizeBytes * 8;
+            message.Payload["TagSizeBits"] = TagSizeBytes * 8;
 
             return Task.CompletedTask;
         }
@@ -602,20 +450,12 @@ namespace DataWarehouse.Plugins.AesEncryption
         {
             if (message.Payload.TryGetValue("keyStore", out var ksObj) && ksObj is IKeyStore ks)
             {
-                _keyStore = ks;
+                SetDefaultKeyStore(ks);
             }
             return Task.CompletedTask;
         }
 
-        /// <summary>
-        /// Releases all resources used by this plugin.
-        /// </summary>
-        public void Dispose()
-        {
-            if (_disposed) return;
-            _disposed = true;
-            _keyAccessLog.Clear();
-        }
+        #endregion
     }
 
     /// <summary>
@@ -625,30 +465,8 @@ namespace DataWarehouse.Plugins.AesEncryption
     {
         /// <summary>
         /// Gets or sets the key store to use for encryption keys.
+        /// This is used as the default when not explicitly specified per operation.
         /// </summary>
         public IKeyStore? KeyStore { get; set; }
-
-        /// <summary>
-        /// Gets or sets the security context for key access.
-        /// </summary>
-        public ISecurityContext? SecurityContext { get; set; }
-    }
-
-    /// <summary>
-    /// Default security context for AES encryption operations.
-    /// </summary>
-    internal sealed class DefaultSecurityContext : ISecurityContext
-    {
-        /// <inheritdoc/>
-        public string UserId => Environment.UserName;
-
-        /// <inheritdoc/>
-        public string? TenantId => "local";
-
-        /// <inheritdoc/>
-        public IEnumerable<string> Roles => ["user"];
-
-        /// <inheritdoc/>
-        public bool IsSystemAdmin => false;
     }
 }

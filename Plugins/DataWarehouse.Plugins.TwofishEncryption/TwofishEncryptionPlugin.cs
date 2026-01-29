@@ -2,15 +2,14 @@ using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Primitives;
 using DataWarehouse.SDK.Security;
 using DataWarehouse.SDK.Utilities;
-using System.Collections.Concurrent;
 using System.Security.Cryptography;
-using System.Text;
 
 namespace DataWarehouse.Plugins.TwofishEncryption;
 
 /// <summary>
 /// Production-ready Twofish-256-CTR-HMAC encryption plugin for DataWarehouse.
 /// Implements the full Twofish block cipher per the official specification.
+/// Extends EncryptionPluginBase for composable key management with Direct and Envelope modes.
 ///
 /// Security Features:
 /// - Full Twofish-256 block cipher implementation per official specification
@@ -20,30 +19,25 @@ namespace DataWarehouse.Plugins.TwofishEncryption;
 /// - Reed-Solomon matrix for key schedule over GF(2^8)
 /// - MDS matrix application for diffusion
 /// - 256-bit key, 16-byte blocks, 16 rounds
-/// - Key management integration via IKeyStore interface
+/// - Composable key management: Direct mode (IKeyStore) or Envelope mode (IEnvelopeKeyStore)
 /// - Secure memory clearing for sensitive data (CryptographicOperations.ZeroMemory)
 ///
-/// Thread Safety: All operations are thread-safe.
+/// Data Format (when using manifest-based metadata):
+/// [IV:16][Tag:32][Ciphertext]
 ///
-/// Header Format: [KeyIdLength:4][KeyId:variable][Nonce:16][Tag:32][Ciphertext]
+/// Legacy Format (backward compatibility for old encrypted files):
+/// [KeyIdLength:4][KeyId:variable][Nonce:16][Tag:32][Ciphertext]
+///
+/// Thread Safety: All operations are thread-safe.
 ///
 /// Message Commands:
 /// - twofish.encryption.configure: Configure encryption settings
 /// - twofish.encryption.stats: Get encryption statistics
 /// - twofish.encryption.setKeyStore: Set the key store
 /// </summary>
-public sealed class TwofishEncryptionPlugin : PipelinePluginBase, IDisposable
+public sealed class TwofishEncryptionPlugin : EncryptionPluginBase
 {
     private readonly TwofishEncryptionConfig _config;
-    private readonly object _statsLock = new();
-    private readonly ConcurrentDictionary<string, DateTime> _keyAccessLog = new();
-    private IKeyStore? _keyStore;
-    private ISecurityContext? _securityContext;
-    private long _encryptionCount;
-    private long _decryptionCount;
-    private long _totalBytesEncrypted;
-    private long _totalBytesDecrypted;
-    private bool _disposed;
 
     /// <summary>
     /// Block size for Twofish (128 bits = 16 bytes).
@@ -51,22 +45,7 @@ public sealed class TwofishEncryptionPlugin : PipelinePluginBase, IDisposable
     private const int BlockSizeBytes = 16;
 
     /// <summary>
-    /// Nonce size for CTR mode (128 bits = 16 bytes).
-    /// </summary>
-    private const int NonceSizeBytes = 16;
-
-    /// <summary>
-    /// HMAC-SHA256 tag size (256 bits = 32 bytes).
-    /// </summary>
-    private const int TagSizeBytes = 32;
-
-    /// <summary>
-    /// Key size for Twofish-256 (256 bits = 32 bytes).
-    /// </summary>
-    private const int KeySizeBytes = 32;
-
-    /// <summary>
-    /// Maximum key ID length.
+    /// Maximum key ID length for legacy format.
     /// </summary>
     private const int MaxKeyIdLength = 64;
 
@@ -74,6 +53,22 @@ public sealed class TwofishEncryptionPlugin : PipelinePluginBase, IDisposable
     /// Number of Twofish rounds.
     /// </summary>
     private const int NumRounds = 16;
+
+    #region Abstract Property Overrides
+
+    /// <inheritdoc/>
+    protected override int KeySizeBytes => 32; // 256 bits
+
+    /// <inheritdoc/>
+    protected override int IvSizeBytes => 16; // 128 bits for CTR mode
+
+    /// <inheritdoc/>
+    protected override int TagSizeBytes => 32; // 256-bit HMAC-SHA256
+
+    /// <inheritdoc/>
+    protected override string AlgorithmId => "Twofish-256-CTR-HMAC";
+
+    #endregion
 
     #region Twofish Specification Tables
 
@@ -211,19 +206,12 @@ public sealed class TwofishEncryptionPlugin : PipelinePluginBase, IDisposable
     public TwofishEncryptionPlugin(TwofishEncryptionConfig? config = null)
     {
         _config = config ?? new TwofishEncryptionConfig();
-    }
 
-    /// <inheritdoc/>
-    public override async Task<HandshakeResponse> OnHandshakeAsync(HandshakeRequest request)
-    {
-        var response = await base.OnHandshakeAsync(request);
-
+        // Set defaults from config (backward compatibility)
         if (_config.KeyStore != null)
         {
-            _keyStore = _config.KeyStore;
+            DefaultKeyStore = _config.KeyStore;
         }
-
-        return response;
     }
 
     /// <inheritdoc/>
@@ -243,18 +231,19 @@ public sealed class TwofishEncryptionPlugin : PipelinePluginBase, IDisposable
     protected override Dictionary<string, object> GetMetadata()
     {
         var metadata = base.GetMetadata();
-        metadata["Algorithm"] = "Twofish-256-CTR-HMAC";
+        metadata["Algorithm"] = AlgorithmId;
         metadata["BlockCipher"] = "Twofish";
         metadata["Mode"] = "CTR";
         metadata["Authentication"] = "HMAC-SHA256";
-        metadata["KeySize"] = 256;
+        metadata["KeySize"] = KeySizeBytes * 8;
         metadata["BlockSize"] = BlockSizeBytes * 8;
-        metadata["NonceSize"] = NonceSizeBytes * 8;
+        metadata["IVSize"] = IvSizeBytes * 8;
         metadata["TagSize"] = TagSizeBytes * 8;
         metadata["Rounds"] = NumRounds;
         metadata["SupportsKeyRotation"] = true;
         metadata["SupportsStreaming"] = true;
         metadata["RequiresKeyStore"] = true;
+        metadata["SupportedModes"] = new[] { "Direct", "Envelope" };
         return metadata;
     }
 
@@ -270,67 +259,32 @@ public sealed class TwofishEncryptionPlugin : PipelinePluginBase, IDisposable
         };
     }
 
+    #region Core Encryption/Decryption (Algorithm-Specific)
+
     /// <summary>
-    /// Encrypts data from the input stream using Twofish-256-CTR with HMAC-SHA256 authentication.
+    /// Performs Twofish-256-CTR-HMAC encryption on the input stream.
+    /// Base class handles key resolution, config resolution, and statistics.
     /// </summary>
     /// <param name="input">The plaintext input stream.</param>
-    /// <param name="context">The kernel context for logging and plugin access.</param>
-    /// <param name="args">
-    /// Optional arguments:
-    /// - keyStore: IKeyStore instance
-    /// - securityContext: ISecurityContext for key access
-    /// - keyId: Specific key ID to use (otherwise current key is used)
-    /// </param>
-    /// <returns>A stream containing the encrypted data with header.</returns>
-    /// <exception cref="InvalidOperationException">Thrown when no key store is configured.</exception>
+    /// <param name="key">The encryption key (provided by base class).</param>
+    /// <param name="iv">The initialization vector (nonce for CTR mode, provided by base class).</param>
+    /// <param name="context">The kernel context for logging.</param>
+    /// <returns>A stream containing [IV:16][Tag:32][Ciphertext].</returns>
     /// <exception cref="CryptographicException">Thrown on encryption failure.</exception>
-    /// <remarks>
-    /// Output format: [KeyIdLength:4][KeyId:variable][Nonce:16][Tag:32][Ciphertext]
-    /// </remarks>
-    public override Stream OnWrite(Stream input, IKernelContext context, Dictionary<string, object> args)
+    protected override async Task<Stream> EncryptCoreAsync(Stream input, byte[] key, byte[] iv, IKernelContext context)
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
-
-        var keyStore = GetKeyStore(args, context);
-        var securityContext = GetSecurityContext(args);
-
-        string keyId;
-        if (args.TryGetValue("keyId", out var kidObj) && kidObj is string specificKeyId)
-        {
-            keyId = specificKeyId;
-        }
-        else
-        {
-            keyId = RunSyncWithErrorHandling(
-                () => keyStore.GetCurrentKeyIdAsync(),
-                "Failed to retrieve current key ID from key store");
-        }
-
-        var key = RunSyncWithErrorHandling(
-            () => keyStore.GetKeyAsync(keyId, securityContext),
-            "Failed to retrieve key from key store for encryption");
-
-        if (key.Length != KeySizeBytes)
-        {
-            CryptographicOperations.ZeroMemory(key);
-            throw new CryptographicException($"Twofish-256 requires a 256-bit (32-byte) key. Received {key.Length * 8}-bit key.");
-        }
-
         byte[]? plaintext = null;
         byte[]? ciphertext = null;
-        byte[]? nonce = null;
         byte[]? tag = null;
         byte[]? macKey = null;
         TwofishContext? twofishCtx = null;
 
         try
         {
+            // Read all input data
             using var inputMs = new MemoryStream();
-            input.CopyTo(inputMs);
+            await input.CopyToAsync(inputMs);
             plaintext = inputMs.ToArray();
-
-            // Generate cryptographically secure random nonce
-            nonce = RandomNumberGenerator.GetBytes(NonceSizeBytes);
 
             // Derive separate MAC key from encryption key using HKDF-like derivation
             macKey = SHA256.HashData(key);
@@ -341,7 +295,7 @@ public sealed class TwofishEncryptionPlugin : PipelinePluginBase, IDisposable
             // Encrypt using CTR mode
             ciphertext = new byte[plaintext.Length];
             var counter = new byte[BlockSizeBytes];
-            Array.Copy(nonce, counter, NonceSizeBytes);
+            Array.Copy(iv, counter, IvSizeBytes);
 
             for (int i = 0; i < plaintext.Length; i += BlockSizeBytes)
             {
@@ -359,158 +313,129 @@ public sealed class TwofishEncryptionPlugin : PipelinePluginBase, IDisposable
 
             CryptographicOperations.ZeroMemory(counter);
 
-            // Compute HMAC-SHA256 tag over nonce and ciphertext
-            var dataToMac = new byte[nonce.Length + ciphertext.Length];
-            Array.Copy(nonce, dataToMac, nonce.Length);
-            Array.Copy(ciphertext, 0, dataToMac, nonce.Length, ciphertext.Length);
+            // Compute HMAC-SHA256 tag over IV and ciphertext
+            var dataToMac = new byte[iv.Length + ciphertext.Length];
+            Array.Copy(iv, dataToMac, iv.Length);
+            Array.Copy(ciphertext, 0, dataToMac, iv.Length, ciphertext.Length);
             tag = HMACSHA256.HashData(macKey, dataToMac);
             CryptographicOperations.ZeroMemory(dataToMac);
 
-            // Encode key ID
-            var keyIdBytes = Encoding.UTF8.GetBytes(keyId);
-            if (keyIdBytes.Length > MaxKeyIdLength)
-            {
-                throw new CryptographicException($"Key ID exceeds maximum length of {MaxKeyIdLength} bytes");
-            }
-
-            // Build output: [KeyIdLength:4][KeyId:variable][Nonce:16][Tag:32][Ciphertext]
-            var outputLength = 4 + keyIdBytes.Length + NonceSizeBytes + TagSizeBytes + ciphertext.Length;
+            // Build output: [IV:16][Tag:32][Ciphertext]
+            // Note: Key info is now stored in EncryptionMetadata by base class
+            var outputLength = IvSizeBytes + TagSizeBytes + ciphertext.Length;
             var output = new byte[outputLength];
             var pos = 0;
 
-            // Write key ID length (4 bytes, little-endian)
-            BitConverter.GetBytes(keyIdBytes.Length).CopyTo(output, pos);
-            pos += 4;
+            // Write IV (16 bytes)
+            iv.CopyTo(output, pos);
+            pos += IvSizeBytes;
 
-            // Write key ID
-            Array.Copy(keyIdBytes, 0, output, pos, keyIdBytes.Length);
-            pos += keyIdBytes.Length;
-
-            // Write nonce
-            Array.Copy(nonce, 0, output, pos, NonceSizeBytes);
-            pos += NonceSizeBytes;
-
-            // Write tag
-            Array.Copy(tag, 0, output, pos, TagSizeBytes);
+            // Write authentication tag (32 bytes)
+            tag.CopyTo(output, pos);
             pos += TagSizeBytes;
 
             // Write ciphertext
-            Array.Copy(ciphertext, 0, output, pos, ciphertext.Length);
+            ciphertext.CopyTo(output, pos);
 
-            lock (_statsLock)
-            {
-                _encryptionCount++;
-                _totalBytesEncrypted += plaintext.Length;
-            }
-
-            LogKeyAccess(keyId);
-            context.LogDebug($"Twofish-256-CTR-HMAC encrypted {plaintext.Length} bytes with key {TruncateKeyId(keyId)}");
+            context.LogDebug($"Twofish-256-CTR-HMAC encrypted {plaintext.Length} bytes");
 
             return new MemoryStream(output);
         }
         finally
         {
+            // Security: Clear sensitive data from memory
             if (plaintext != null) CryptographicOperations.ZeroMemory(plaintext);
             if (ciphertext != null) CryptographicOperations.ZeroMemory(ciphertext);
             if (macKey != null) CryptographicOperations.ZeroMemory(macKey);
-            CryptographicOperations.ZeroMemory(key);
             twofishCtx?.Dispose();
         }
     }
 
     /// <summary>
-    /// Decrypts data from the stored stream using Twofish-256-CTR with HMAC-SHA256 verification.
+    /// Performs Twofish-256-CTR-HMAC decryption on the input stream.
+    /// Base class handles key resolution, config resolution, and statistics.
+    /// Supports both new format [IV:16][Tag:32][Ciphertext] and legacy format with key ID header.
     /// </summary>
-    /// <param name="stored">The encrypted input stream with header.</param>
-    /// <param name="context">The kernel context for logging and plugin access.</param>
-    /// <param name="args">
-    /// Optional arguments:
-    /// - keyStore: IKeyStore instance
-    /// - securityContext: ISecurityContext for key access
-    /// </param>
-    /// <returns>A stream containing the decrypted plaintext.</returns>
-    /// <exception cref="InvalidOperationException">Thrown when no key store is configured.</exception>
+    /// <param name="input">The encrypted input stream.</param>
+    /// <param name="key">The decryption key (provided by base class).</param>
+    /// <param name="iv">The initialization vector (null if embedded in ciphertext).</param>
+    /// <param name="context">The kernel context for logging.</param>
+    /// <returns>The decrypted stream and authentication tag.</returns>
     /// <exception cref="CryptographicException">
     /// Thrown on decryption failure or HMAC verification failure.
     /// </exception>
-    public override Stream OnRead(Stream stored, IKernelContext context, Dictionary<string, object> args)
+    protected override async Task<(Stream data, byte[]? tag)> DecryptCoreAsync(Stream input, byte[] key, byte[]? iv, IKernelContext context)
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
-
-        var keyStore = GetKeyStore(args, context);
-        var securityContext = GetSecurityContext(args);
-
         byte[]? encryptedData = null;
         byte[]? plaintext = null;
-        byte[]? key = null;
         byte[]? macKey = null;
         TwofishContext? twofishCtx = null;
 
         try
         {
+            // Read all encrypted data
             using var inputMs = new MemoryStream();
-            stored.CopyTo(inputMs);
+            await input.CopyToAsync(inputMs);
             encryptedData = inputMs.ToArray();
 
-            // Minimum header size: 4 (keyIdLen) + 0 (keyId) + 16 (nonce) + 32 (tag) = 52
-            const int MinHeaderSize = 4 + NonceSizeBytes + TagSizeBytes;
-            if (encryptedData.Length < MinHeaderSize)
-            {
-                throw new CryptographicException($"Encrypted data too short. Minimum size is {MinHeaderSize} bytes.");
-            }
+            // Check if this is legacy format (has key ID header)
+            var isLegacyFormat = IsLegacyFormat(encryptedData);
 
             var pos = 0;
 
-            // Read key ID length
-            var keyIdLength = BitConverter.ToInt32(encryptedData, pos);
-            pos += 4;
-
-            if (keyIdLength < 0 || keyIdLength > MaxKeyIdLength || pos + keyIdLength > encryptedData.Length)
+            if (isLegacyFormat)
             {
-                throw new CryptographicException("Invalid key ID length in encrypted data header");
+                // Legacy format: [KeyIdLength:4][KeyId:variable][IV:16][Tag:32][Ciphertext]
+                var legacyHeaderSize = 4 + MaxKeyIdLength + IvSizeBytes + TagSizeBytes;
+                if (encryptedData.Length < legacyHeaderSize)
+                    throw new CryptographicException($"Legacy encrypted data too short. Minimum size is {legacyHeaderSize} bytes.");
+
+                // Read key ID length
+                var keyIdLength = BitConverter.ToInt32(encryptedData, pos);
+                pos += 4;
+
+                // Skip key ID (already resolved by base class)
+                pos += keyIdLength;
             }
 
-            // Read key ID
-            var keyId = Encoding.UTF8.GetString(encryptedData, pos, keyIdLength);
-            pos += keyIdLength;
+            // Parse: [IV:16][Tag:32][Ciphertext]
+            var remainingLength = encryptedData.Length - pos;
+            if (remainingLength < IvSizeBytes + TagSizeBytes)
+                throw new CryptographicException("Encrypted data too short");
 
-            if (encryptedData.Length < pos + NonceSizeBytes + TagSizeBytes)
+            // If IV not provided by base class, read from data
+            if (iv == null)
             {
-                throw new CryptographicException("Encrypted data truncated: missing nonce or tag");
+                iv = new byte[IvSizeBytes];
+                Array.Copy(encryptedData, pos, iv, 0, IvSizeBytes);
+                pos += IvSizeBytes;
+            }
+            else
+            {
+                // IV provided by base class (from metadata), skip in data
+                pos += IvSizeBytes;
             }
 
-            // Read nonce
-            var nonce = new byte[NonceSizeBytes];
-            Array.Copy(encryptedData, pos, nonce, 0, NonceSizeBytes);
-            pos += NonceSizeBytes;
-
-            // Read tag
+            // Read authentication tag (32 bytes)
             var storedTag = new byte[TagSizeBytes];
             Array.Copy(encryptedData, pos, storedTag, 0, TagSizeBytes);
             pos += TagSizeBytes;
 
-            // Read ciphertext
+            // Read ciphertext (remaining bytes)
             var ciphertextLength = encryptedData.Length - pos;
             var ciphertext = new byte[ciphertextLength];
-            Array.Copy(encryptedData, pos, ciphertext, 0, ciphertextLength);
-
-            // Get key from key store
-            key = RunSyncWithErrorHandling(
-                () => keyStore.GetKeyAsync(keyId, securityContext),
-                "Failed to retrieve key from key store for decryption");
-
-            if (key.Length != KeySizeBytes)
+            if (ciphertextLength > 0)
             {
-                throw new CryptographicException($"Twofish-256 requires a 256-bit (32-byte) key. Retrieved key is {key.Length * 8}-bit.");
+                Array.Copy(encryptedData, pos, ciphertext, 0, ciphertextLength);
             }
 
             // Derive MAC key
             macKey = SHA256.HashData(key);
 
             // Verify HMAC-SHA256 tag before decryption (authenticate-then-decrypt)
-            var dataToMac = new byte[nonce.Length + ciphertext.Length];
-            Array.Copy(nonce, dataToMac, nonce.Length);
-            Array.Copy(ciphertext, 0, dataToMac, nonce.Length, ciphertext.Length);
+            var dataToMac = new byte[iv.Length + ciphertext.Length];
+            Array.Copy(iv, dataToMac, iv.Length);
+            Array.Copy(ciphertext, 0, dataToMac, iv.Length, ciphertext.Length);
             var expectedTag = HMACSHA256.HashData(macKey, dataToMac);
             CryptographicOperations.ZeroMemory(dataToMac);
 
@@ -527,7 +452,7 @@ public sealed class TwofishEncryptionPlugin : PipelinePluginBase, IDisposable
             // Decrypt using CTR mode
             plaintext = new byte[ciphertextLength];
             var counter = new byte[BlockSizeBytes];
-            Array.Copy(nonce, counter, NonceSizeBytes);
+            Array.Copy(iv, counter, IvSizeBytes);
 
             for (int i = 0; i < ciphertext.Length; i += BlockSizeBytes)
             {
@@ -546,28 +471,39 @@ public sealed class TwofishEncryptionPlugin : PipelinePluginBase, IDisposable
             CryptographicOperations.ZeroMemory(counter);
             CryptographicOperations.ZeroMemory(ciphertext);
 
-            lock (_statsLock)
-            {
-                _decryptionCount++;
-                _totalBytesDecrypted += plaintext.Length;
-            }
+            context.LogDebug($"Twofish-256-CTR-HMAC decrypted {ciphertextLength} bytes");
 
-            LogKeyAccess(keyId);
-            context.LogDebug($"Twofish-256-CTR-HMAC decrypted {ciphertextLength} bytes with key {TruncateKeyId(keyId)}");
-
+            // Return a copy since we'll zero the original
             var result = new byte[plaintext.Length];
             Array.Copy(plaintext, result, plaintext.Length);
-            return new MemoryStream(result);
+            return (new MemoryStream(result), storedTag);
         }
         finally
         {
+            // Security: Clear sensitive data from memory
             if (encryptedData != null) CryptographicOperations.ZeroMemory(encryptedData);
             if (plaintext != null) CryptographicOperations.ZeroMemory(plaintext);
-            if (key != null) CryptographicOperations.ZeroMemory(key);
             if (macKey != null) CryptographicOperations.ZeroMemory(macKey);
             twofishCtx?.Dispose();
         }
     }
+
+    /// <summary>
+    /// Checks if the encrypted data uses the legacy format with key ID header.
+    /// </summary>
+    private bool IsLegacyFormat(byte[] data)
+    {
+        if (data.Length < 4 + MaxKeyIdLength)
+            return false;
+
+        // Read key ID length from header
+        var keyIdLength = BitConverter.ToInt32(data, 0);
+
+        // Legacy format has a valid key ID length (1 to MaxKeyIdLength)
+        return keyIdLength > 0 && keyIdLength <= MaxKeyIdLength;
+    }
+
+    #endregion
 
     #region Twofish Implementation
 
@@ -842,88 +778,32 @@ public sealed class TwofishEncryptionPlugin : PipelinePluginBase, IDisposable
 
     #endregion
 
-    #region Helper Methods
-
-    private IKeyStore GetKeyStore(Dictionary<string, object> args, IKernelContext context)
-    {
-        if (args.TryGetValue("keyStore", out var ksObj) && ksObj is IKeyStore ks)
-        {
-            return ks;
-        }
-
-        if (_keyStore != null)
-        {
-            return _keyStore;
-        }
-
-        var keyStorePlugin = context.GetPlugins<IPlugin>()
-            .OfType<IKeyStore>()
-            .FirstOrDefault();
-
-        if (keyStorePlugin != null)
-        {
-            return keyStorePlugin;
-        }
-
-        throw new InvalidOperationException(
-            "No IKeyStore available. Configure a key store before using Twofish encryption.");
-    }
-
-    private ISecurityContext GetSecurityContext(Dictionary<string, object> args)
-    {
-        if (args.TryGetValue("securityContext", out var scObj) && scObj is ISecurityContext sc)
-        {
-            return sc;
-        }
-
-        return _securityContext ?? new TwofishSecurityContext();
-    }
-
-    private static T RunSyncWithErrorHandling<T>(Func<Task<T>> asyncOperation, string errorContext)
-    {
-        try
-        {
-            return Task.Run(asyncOperation).GetAwaiter().GetResult();
-        }
-        catch (AggregateException ae) when (ae.InnerException != null)
-        {
-            var innerException = ae.InnerException;
-            if (innerException is CryptographicException)
-            {
-                throw innerException;
-            }
-            throw new CryptographicException($"{errorContext}: {innerException.Message}", innerException);
-        }
-        catch (CryptographicException)
-        {
-            throw;
-        }
-        catch (Exception ex)
-        {
-            throw new CryptographicException($"{errorContext}: {ex.Message}", ex);
-        }
-    }
-
-    private void LogKeyAccess(string keyId)
-    {
-        _keyAccessLog[keyId] = DateTime.UtcNow;
-    }
-
-    private static string TruncateKeyId(string keyId)
-    {
-        return keyId.Length > 8 ? $"{keyId[..8]}..." : keyId;
-    }
+    #region Message Handlers
 
     private Task HandleConfigureAsync(PluginMessage message)
     {
+        // Use base class configuration methods
         if (message.Payload.TryGetValue("keyStore", out var ksObj) && ksObj is IKeyStore ks)
         {
-            _keyStore = ks;
+            SetDefaultKeyStore(ks);
         }
 
-        if (message.Payload.TryGetValue("securityContext", out var scObj) && scObj is ISecurityContext sc)
+        if (message.Payload.TryGetValue("envelopeKeyStore", out var eksObj) && eksObj is IEnvelopeKeyStore eks &&
+            message.Payload.TryGetValue("kekKeyId", out var kekObj) && kekObj is string kek)
         {
-            _securityContext = sc;
+            SetDefaultEnvelopeKeyStore(eks, kek);
+        }
+
+        if (message.Payload.TryGetValue("mode", out var modeObj))
+        {
+            if (modeObj is KeyManagementMode mode)
+            {
+                SetDefaultMode(mode);
+            }
+            else if (modeObj is string modeStr && Enum.TryParse<KeyManagementMode>(modeStr, true, out var parsedMode))
+            {
+                SetDefaultMode(parsedMode);
+            }
         }
 
         return Task.CompletedTask;
@@ -931,14 +811,17 @@ public sealed class TwofishEncryptionPlugin : PipelinePluginBase, IDisposable
 
     private Task HandleStatsAsync(PluginMessage message)
     {
-        lock (_statsLock)
-        {
-            message.Payload["EncryptionCount"] = _encryptionCount;
-            message.Payload["DecryptionCount"] = _decryptionCount;
-            message.Payload["TotalBytesEncrypted"] = _totalBytesEncrypted;
-            message.Payload["TotalBytesDecrypted"] = _totalBytesDecrypted;
-            message.Payload["UniqueKeysUsed"] = _keyAccessLog.Count;
-        }
+        // Use base class statistics
+        var stats = GetStatistics();
+
+        message.Payload["EncryptionCount"] = stats.EncryptionCount;
+        message.Payload["DecryptionCount"] = stats.DecryptionCount;
+        message.Payload["TotalBytesEncrypted"] = stats.TotalBytesEncrypted;
+        message.Payload["TotalBytesDecrypted"] = stats.TotalBytesDecrypted;
+        message.Payload["UniqueKeysUsed"] = stats.UniqueKeysUsed;
+        message.Payload["Algorithm"] = AlgorithmId;
+        message.Payload["IVSizeBytes"] = IvSizeBytes;
+        message.Payload["TagSizeBytes"] = TagSizeBytes;
 
         return Task.CompletedTask;
     }
@@ -947,22 +830,12 @@ public sealed class TwofishEncryptionPlugin : PipelinePluginBase, IDisposable
     {
         if (message.Payload.TryGetValue("keyStore", out var ksObj) && ksObj is IKeyStore ks)
         {
-            _keyStore = ks;
+            SetDefaultKeyStore(ks);
         }
         return Task.CompletedTask;
     }
 
     #endregion
-
-    /// <summary>
-    /// Releases all resources used by this plugin.
-    /// </summary>
-    public void Dispose()
-    {
-        if (_disposed) return;
-        _disposed = true;
-        _keyAccessLog.Clear();
-    }
 }
 
 /// <summary>
@@ -972,29 +845,7 @@ public sealed class TwofishEncryptionConfig
 {
     /// <summary>
     /// Gets or sets the key store to use for encryption keys.
+    /// This is used as the default when not explicitly specified per operation.
     /// </summary>
     public IKeyStore? KeyStore { get; set; }
-
-    /// <summary>
-    /// Gets or sets the security context for key access.
-    /// </summary>
-    public ISecurityContext? SecurityContext { get; set; }
-}
-
-/// <summary>
-/// Default security context for Twofish encryption operations.
-/// </summary>
-internal sealed class TwofishSecurityContext : ISecurityContext
-{
-    /// <inheritdoc/>
-    public string UserId => Environment.UserName;
-
-    /// <inheritdoc/>
-    public string? TenantId => "twofish-local";
-
-    /// <inheritdoc/>
-    public IEnumerable<string> Roles => new[] { "twofish-user" };
-
-    /// <inheritdoc/>
-    public bool IsSystemAdmin => false;
 }

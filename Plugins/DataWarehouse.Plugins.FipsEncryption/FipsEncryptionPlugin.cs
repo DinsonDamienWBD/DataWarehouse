@@ -2,16 +2,15 @@ using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Primitives;
 using DataWarehouse.SDK.Security;
 using DataWarehouse.SDK.Utilities;
-using System.Collections.Concurrent;
 using System.Runtime.InteropServices;
 using System.Security.Cryptography;
-using System.Text;
 
 namespace DataWarehouse.Plugins.FipsEncryption
 {
     /// <summary>
     /// FIPS 140-2 validated encryption plugin for DataWarehouse.
     /// Uses exclusively FIPS-compliant .NET BCL cryptographic primitives (AES-GCM).
+    /// Extends EncryptionPluginBase for composable key management with Direct and Envelope modes.
     ///
     /// Security Features:
     /// - FIPS 140-2 Level 1 compliance verification at startup
@@ -19,8 +18,14 @@ namespace DataWarehouse.Plugins.FipsEncryption
     /// - Cryptographically secure random IV generation (96-bit)
     /// - 128-bit authentication tag for integrity verification
     /// - Automatic FIPS mode detection on Windows (CNG) and Linux (OpenSSL)
-    /// - Key management integration via IKeyStore interface
+    /// - Composable key management: Direct mode (IKeyStore) or Envelope mode (IEnvelopeKeyStore)
     /// - Secure memory clearing for sensitive data (PCI-DSS compliance)
+    ///
+    /// Data Format (when using manifest-based metadata):
+    /// [IV:12][Tag:16][Ciphertext:...]
+    ///
+    /// Legacy Format (backward compatibility for old encrypted files):
+    /// [Version:1][KeyIdLen:1][KeyId:variable][IV:12][Tag:16][Ciphertext:...]
     ///
     /// Thread Safety: All operations are thread-safe.
     ///
@@ -30,45 +35,39 @@ namespace DataWarehouse.Plugins.FipsEncryption
     /// - fips.encryption.stats: Get encryption statistics
     /// - fips.encryption.setKeyStore: Set the key store
     /// </summary>
-    public sealed class FipsEncryptionPlugin : PipelinePluginBase, IDisposable
+    public sealed class FipsEncryptionPlugin : EncryptionPluginBase
     {
         private readonly FipsEncryptionConfig _config;
-        private readonly object _statsLock = new();
-        private readonly ConcurrentDictionary<string, DateTime> _keyAccessLog = new();
-        private IKeyStore? _keyStore;
-        private ISecurityContext? _securityContext;
-        private long _encryptionCount;
-        private long _decryptionCount;
-        private long _totalBytesEncrypted;
-        private long _totalBytesDecrypted;
         private long _fipsVerificationCount;
         private bool _fipsVerified;
-        private bool _disposed;
 
         /// <summary>
-        /// IV size for AES-GCM (96 bits as per NIST SP 800-38D).
-        /// </summary>
-        private const int IvSizeBytes = 12;
-
-        /// <summary>
-        /// Authentication tag size (128 bits for maximum security).
-        /// </summary>
-        private const int TagSizeBytes = 16;
-
-        /// <summary>
-        /// Maximum key ID length in header.
+        /// Maximum key ID length in legacy header format.
         /// </summary>
         private const int MaxKeyIdLength = 64;
 
         /// <summary>
-        /// Header format: [Version:1][KeyIdLen:1][KeyId:KeyIdLen][IV:12][Tag:16][Ciphertext:...]
+        /// Header format version for legacy format: [Version:1][KeyIdLen:1][KeyId:KeyIdLen][IV:12][Tag:16][Ciphertext:...]
         /// </summary>
         private const byte HeaderVersion = 0x01;
 
-        /// <summary>
-        /// Minimum header size without key ID.
-        /// </summary>
-        private const int MinHeaderSize = 2 + IvSizeBytes + TagSizeBytes;
+        #region Abstract Property Overrides
+
+        /// <inheritdoc/>
+        protected override int KeySizeBytes => 32; // 256 bits
+
+        /// <inheritdoc/>
+        protected override int IvSizeBytes => 12; // 96 bits for GCM
+
+        /// <inheritdoc/>
+        protected override int TagSizeBytes => 16; // 128 bits
+
+        /// <inheritdoc/>
+        protected override string AlgorithmId => "FIPS-AES-256-GCM";
+
+        #endregion
+
+        #region Plugin Identity
 
         /// <inheritdoc/>
         public override string Id => "datawarehouse.plugins.encryption.fips";
@@ -97,6 +96,8 @@ namespace DataWarehouse.Plugins.FipsEncryption
         /// <inheritdoc/>
         public override string[] IncompatibleStages => new[] { "encryption.chacha20", "encryption.aes256" };
 
+        #endregion
+
         /// <summary>
         /// Initializes a new instance of the FIPS encryption plugin.
         /// </summary>
@@ -108,6 +109,12 @@ namespace DataWarehouse.Plugins.FipsEncryption
         {
             _config = config ?? new FipsEncryptionConfig();
 
+            // Set defaults from config (backward compatibility)
+            if (_config.KeyStore != null)
+            {
+                DefaultKeyStore = _config.KeyStore;
+            }
+
             if (_config.EnforceFipsMode)
             {
                 VerifyFipsCompliance();
@@ -118,11 +125,6 @@ namespace DataWarehouse.Plugins.FipsEncryption
         public override async Task<HandshakeResponse> OnHandshakeAsync(HandshakeRequest request)
         {
             var response = await base.OnHandshakeAsync(request);
-
-            if (_config.KeyStore != null)
-            {
-                _keyStore = _config.KeyStore;
-            }
 
             // Verify FIPS compliance on handshake
             if (_config.VerifyOnHandshake)
@@ -164,9 +166,9 @@ namespace DataWarehouse.Plugins.FipsEncryption
         protected override Dictionary<string, object> GetMetadata()
         {
             var metadata = base.GetMetadata();
-            metadata["Algorithm"] = "AES-256-GCM";
+            metadata["Algorithm"] = AlgorithmId;
             metadata["Standard"] = "FIPS 140-2";
-            metadata["KeySize"] = 256;
+            metadata["KeySize"] = KeySizeBytes * 8;
             metadata["IVSize"] = IvSizeBytes * 8;
             metadata["TagSize"] = TagSizeBytes * 8;
             metadata["FipsVerified"] = _fipsVerified;
@@ -176,6 +178,7 @@ namespace DataWarehouse.Plugins.FipsEncryption
             metadata["RequiresKeyStore"] = true;
             metadata["NistCompliant"] = true;
             metadata["PciDssCompliant"] = true;
+            metadata["SupportedModes"] = new[] { "Direct", "Envelope" };
             return metadata;
         }
 
@@ -192,205 +195,160 @@ namespace DataWarehouse.Plugins.FipsEncryption
             };
         }
 
+        #region Core Encryption/Decryption (Algorithm-Specific)
+
         /// <summary>
-        /// Encrypts data from the input stream using FIPS-compliant AES-256-GCM.
+        /// Performs FIPS-compliant AES-256-GCM encryption on the input stream.
+        /// Base class handles key resolution, config resolution, and statistics.
         /// </summary>
         /// <param name="input">The plaintext input stream.</param>
-        /// <param name="context">The kernel context for logging and plugin access.</param>
-        /// <param name="args">
-        /// Optional arguments:
-        /// - keyStore: IKeyStore instance
-        /// - securityContext: ISecurityContext for key access
-        /// - keyId: Specific key ID to use (otherwise current key is used)
-        /// </param>
-        /// <returns>A stream containing the encrypted data with header.</returns>
-        /// <exception cref="InvalidOperationException">Thrown when no key store is configured.</exception>
+        /// <param name="key">The encryption key (provided by base class).</param>
+        /// <param name="iv">The initialization vector (provided by base class).</param>
+        /// <param name="context">The kernel context for logging.</param>
+        /// <returns>A stream containing [IV:12][Tag:16][Ciphertext].</returns>
         /// <exception cref="CryptographicException">Thrown on encryption failure.</exception>
-        /// <remarks>
-        /// Output format: [Version:1][KeyIdLen:1][KeyId:KeyIdLen][IV:12][Tag:16][Ciphertext:...]
-        /// </remarks>
-        public override Stream OnWrite(Stream input, IKernelContext context, Dictionary<string, object> args)
+        protected override async Task<Stream> EncryptCoreAsync(Stream input, byte[] key, byte[] iv, IKernelContext context)
         {
-            ObjectDisposedException.ThrowIf(_disposed, this);
-
-            var keyStore = GetKeyStore(args, context);
-            var securityContext = GetSecurityContext(args);
-
-            string keyId;
-            if (args.TryGetValue("keyId", out var kidObj) && kidObj is string specificKeyId)
-            {
-                keyId = specificKeyId;
-            }
-            else
-            {
-                keyId = RunSyncWithErrorHandling(
-                    () => keyStore.GetCurrentKeyIdAsync(),
-                    "Failed to retrieve current key ID from key store");
-            }
-
-            var key = RunSyncWithErrorHandling(
-                () => keyStore.GetKeyAsync(keyId, securityContext),
-                $"Failed to retrieve key from key store for encryption");
-
-            if (key.Length != 32)
-            {
-                CryptographicOperations.ZeroMemory(key);
-                throw new CryptographicException($"FIPS AES-256 requires a 256-bit (32-byte) key. Received {key.Length * 8}-bit key.");
-            }
-
             byte[]? plaintext = null;
             byte[]? ciphertext = null;
-            byte[]? iv = null;
             byte[]? tag = null;
 
             try
             {
+                // Read all input data
                 using var inputMs = new MemoryStream();
-                input.CopyTo(inputMs);
+                await input.CopyToAsync(inputMs);
                 plaintext = inputMs.ToArray();
 
-                iv = RandomNumberGenerator.GetBytes(IvSizeBytes);
                 tag = new byte[TagSizeBytes];
                 ciphertext = new byte[plaintext.Length];
 
+                // Perform FIPS-compliant AES-256-GCM encryption
                 using var aesGcm = new AesGcm(key, TagSizeBytes);
                 aesGcm.Encrypt(iv, plaintext, ciphertext, tag);
 
-                var keyIdBytes = Encoding.UTF8.GetBytes(keyId);
-                if (keyIdBytes.Length > MaxKeyIdLength)
-                {
-                    throw new CryptographicException($"Key ID exceeds maximum length of {MaxKeyIdLength} bytes");
-                }
-
-                var outputLength = 2 + keyIdBytes.Length + IvSizeBytes + TagSizeBytes + ciphertext.Length;
+                // Build output: [IV:12][Tag:16][Ciphertext]
+                // Note: Key info is now stored in EncryptionMetadata by base class
+                var outputLength = IvSizeBytes + TagSizeBytes + ciphertext.Length;
                 var output = new byte[outputLength];
                 var pos = 0;
 
-                output[pos++] = HeaderVersion;
-                output[pos++] = (byte)keyIdBytes.Length;
-                Array.Copy(keyIdBytes, 0, output, pos, keyIdBytes.Length);
-                pos += keyIdBytes.Length;
-                Array.Copy(iv, 0, output, pos, IvSizeBytes);
+                // Write IV (12 bytes)
+                iv.CopyTo(output, pos);
                 pos += IvSizeBytes;
-                Array.Copy(tag, 0, output, pos, TagSizeBytes);
+
+                // Write authentication tag (16 bytes)
+                tag.CopyTo(output, pos);
                 pos += TagSizeBytes;
-                Array.Copy(ciphertext, 0, output, pos, ciphertext.Length);
 
-                lock (_statsLock)
-                {
-                    _encryptionCount++;
-                    _totalBytesEncrypted += plaintext.Length;
-                }
+                // Write ciphertext
+                ciphertext.CopyTo(output, pos);
 
-                LogKeyAccess(keyId);
-                context.LogDebug($"FIPS AES-256-GCM encrypted {plaintext.Length} bytes with key {TruncateKeyId(keyId)}");
+                context.LogDebug($"FIPS AES-256-GCM encrypted {plaintext.Length} bytes");
 
                 return new MemoryStream(output);
             }
             finally
             {
+                // Security: Clear sensitive data from memory (PCI-DSS requirement)
                 if (plaintext != null) CryptographicOperations.ZeroMemory(plaintext);
                 if (ciphertext != null) CryptographicOperations.ZeroMemory(ciphertext);
-                CryptographicOperations.ZeroMemory(key);
             }
         }
 
         /// <summary>
-        /// Decrypts data from the stored stream using FIPS-compliant AES-256-GCM.
+        /// Performs FIPS-compliant AES-256-GCM decryption on the input stream.
+        /// Base class handles key resolution, config resolution, and statistics.
+        /// Supports both new format [IV:12][Tag:16][Ciphertext] and legacy format with key ID header.
         /// </summary>
-        /// <param name="stored">The encrypted input stream with header.</param>
-        /// <param name="context">The kernel context for logging and plugin access.</param>
-        /// <param name="args">
-        /// Optional arguments:
-        /// - keyStore: IKeyStore instance
-        /// - securityContext: ISecurityContext for key access
-        /// </param>
-        /// <returns>A stream containing the decrypted plaintext.</returns>
-        /// <exception cref="InvalidOperationException">Thrown when no key store is configured.</exception>
+        /// <param name="input">The encrypted input stream.</param>
+        /// <param name="key">The decryption key (provided by base class).</param>
+        /// <param name="iv">The initialization vector (null if embedded in ciphertext).</param>
+        /// <param name="context">The kernel context for logging.</param>
+        /// <returns>The decrypted stream and authentication tag.</returns>
         /// <exception cref="CryptographicException">
         /// Thrown on decryption failure or authentication tag verification failure.
         /// </exception>
-        public override Stream OnRead(Stream stored, IKernelContext context, Dictionary<string, object> args)
+        protected override async Task<(Stream data, byte[]? tag)> DecryptCoreAsync(Stream input, byte[] key, byte[]? iv, IKernelContext context)
         {
-            ObjectDisposedException.ThrowIf(_disposed, this);
-
-            var keyStore = GetKeyStore(args, context);
-            var securityContext = GetSecurityContext(args);
-
             byte[]? encryptedData = null;
             byte[]? plaintext = null;
-            byte[]? key = null;
 
             try
             {
+                // Read all encrypted data
                 using var inputMs = new MemoryStream();
-                stored.CopyTo(inputMs);
+                await input.CopyToAsync(inputMs);
                 encryptedData = inputMs.ToArray();
 
-                if (encryptedData.Length < MinHeaderSize)
-                {
-                    throw new CryptographicException($"Encrypted data too short. Minimum size is {MinHeaderSize} bytes.");
-                }
+                // Check if this is legacy format (has key ID header)
+                var isLegacyFormat = IsLegacyFormat(encryptedData);
 
                 var pos = 0;
-                var version = encryptedData[pos++];
-                if (version != HeaderVersion)
+
+                if (isLegacyFormat)
                 {
-                    throw new CryptographicException($"Unsupported encryption format version: {version}");
+                    // Legacy format: [Version:1][KeyIdLen:1][KeyId:variable][IV:12][Tag:16][Ciphertext]
+                    if (encryptedData.Length < 2)
+                        throw new CryptographicException("Encrypted data too short for legacy format header");
+
+                    // Skip version byte
+                    pos++;
+
+                    // Read key ID length
+                    var keyIdLength = encryptedData[pos++];
+                    if (keyIdLength > MaxKeyIdLength || pos + keyIdLength > encryptedData.Length)
+                    {
+                        throw new CryptographicException("Invalid key ID length in encrypted data header");
+                    }
+
+                    // Skip key ID (already resolved by base class)
+                    pos += keyIdLength;
                 }
 
-                var keyIdLength = encryptedData[pos++];
-                if (keyIdLength > MaxKeyIdLength || pos + keyIdLength > encryptedData.Length)
+                // Parse: [IV:12][Tag:16][Ciphertext]
+                var remainingLength = encryptedData.Length - pos;
+                if (remainingLength < IvSizeBytes + TagSizeBytes)
+                    throw new CryptographicException("Encrypted data too short");
+
+                // If IV not provided by base class, read from data
+                if (iv == null)
                 {
-                    throw new CryptographicException("Invalid key ID length in encrypted data header");
+                    iv = new byte[IvSizeBytes];
+                    Array.Copy(encryptedData, pos, iv, 0, IvSizeBytes);
+                    pos += IvSizeBytes;
+                }
+                else
+                {
+                    // IV provided by base class (from metadata), skip in data
+                    pos += IvSizeBytes;
                 }
 
-                var keyId = Encoding.UTF8.GetString(encryptedData, pos, keyIdLength);
-                pos += keyIdLength;
-
-                if (encryptedData.Length < pos + IvSizeBytes + TagSizeBytes)
-                {
-                    throw new CryptographicException("Encrypted data truncated: missing IV or tag");
-                }
-
-                var iv = new byte[IvSizeBytes];
-                Array.Copy(encryptedData, pos, iv, 0, IvSizeBytes);
-                pos += IvSizeBytes;
-
+                // Read authentication tag (16 bytes)
                 var tag = new byte[TagSizeBytes];
                 Array.Copy(encryptedData, pos, tag, 0, TagSizeBytes);
                 pos += TagSizeBytes;
 
+                // Read ciphertext (remaining bytes)
                 var ciphertextLength = encryptedData.Length - pos;
                 var ciphertext = new byte[ciphertextLength];
-                Array.Copy(encryptedData, pos, ciphertext, 0, ciphertextLength);
-
-                key = RunSyncWithErrorHandling(
-                    () => keyStore.GetKeyAsync(keyId, securityContext),
-                    $"Failed to retrieve key from key store for decryption");
-
-                if (key.Length != 32)
+                if (ciphertextLength > 0)
                 {
-                    throw new CryptographicException($"FIPS AES-256 requires a 256-bit (32-byte) key. Retrieved key is {key.Length * 8}-bit.");
+                    Array.Copy(encryptedData, pos, ciphertext, 0, ciphertextLength);
                 }
 
+                // Perform FIPS-compliant AES-256-GCM decryption with authentication
                 plaintext = new byte[ciphertextLength];
 
                 using var aesGcm = new AesGcm(key, TagSizeBytes);
                 aesGcm.Decrypt(iv, ciphertext, tag, plaintext);
 
-                lock (_statsLock)
-                {
-                    _decryptionCount++;
-                    _totalBytesDecrypted += plaintext.Length;
-                }
+                context.LogDebug($"FIPS AES-256-GCM decrypted {ciphertextLength} bytes");
 
-                LogKeyAccess(keyId);
-                context.LogDebug($"FIPS AES-256-GCM decrypted {ciphertextLength} bytes with key {TruncateKeyId(keyId)}");
-
+                // Return a copy since we'll zero the original
                 var result = new byte[plaintext.Length];
                 Array.Copy(plaintext, result, plaintext.Length);
-                return new MemoryStream(result);
+                return (new MemoryStream(result), tag);
             }
             catch (AuthenticationTagMismatchException ex)
             {
@@ -398,11 +356,32 @@ namespace DataWarehouse.Plugins.FipsEncryption
             }
             finally
             {
+                // Security: Clear sensitive data from memory (PCI-DSS requirement)
                 if (encryptedData != null) CryptographicOperations.ZeroMemory(encryptedData);
                 if (plaintext != null) CryptographicOperations.ZeroMemory(plaintext);
-                if (key != null) CryptographicOperations.ZeroMemory(key);
             }
         }
+
+        /// <summary>
+        /// Checks if the encrypted data uses the legacy format with key ID header.
+        /// Legacy format: [Version:1][KeyIdLen:1][KeyId:variable][IV:12][Tag:16][Ciphertext]
+        /// </summary>
+        private bool IsLegacyFormat(byte[] data)
+        {
+            if (data.Length < 2)
+                return false;
+
+            // Check for version header
+            var version = data[0];
+            if (version != HeaderVersion)
+                return false;
+
+            // Check key ID length is reasonable
+            var keyIdLength = data[1];
+            return keyIdLength > 0 && keyIdLength <= MaxKeyIdLength && data.Length >= 2 + keyIdLength + IvSizeBytes + TagSizeBytes;
+        }
+
+        #endregion
 
         /// <summary>
         /// Verifies that the system is running in FIPS-compliant mode.
@@ -450,6 +429,8 @@ namespace DataWarehouse.Plugins.FipsEncryption
             }
             return _fipsVerified;
         }
+
+        #region FIPS Verification Methods
 
         private void VerifyWindowsFipsMode()
         {
@@ -568,7 +549,7 @@ namespace DataWarehouse.Plugins.FipsEncryption
             // Test that AES-GCM is available and functional
             try
             {
-                var testKey = RandomNumberGenerator.GetBytes(32);
+                var testKey = RandomNumberGenerator.GetBytes(KeySizeBytes);
                 var testIv = RandomNumberGenerator.GetBytes(IvSizeBytes);
                 var testData = new byte[16];
                 var testCiphertext = new byte[16];
@@ -593,87 +574,34 @@ namespace DataWarehouse.Plugins.FipsEncryption
             }
         }
 
-        private IKeyStore GetKeyStore(Dictionary<string, object> args, IKernelContext context)
-        {
-            if (args.TryGetValue("keyStore", out var ksObj) && ksObj is IKeyStore ks)
-            {
-                return ks;
-            }
+        #endregion
 
-            if (_keyStore != null)
-            {
-                return _keyStore;
-            }
-
-            var keyStorePlugin = context.GetPlugins<IPlugin>()
-                .OfType<IKeyStore>()
-                .FirstOrDefault();
-
-            if (keyStorePlugin != null)
-            {
-                return keyStorePlugin;
-            }
-
-            throw new InvalidOperationException(
-                "No IKeyStore available. Configure a FIPS-compliant key store before using encryption. " +
-                "Ensure the key store uses FIPS-approved key derivation functions (PBKDF2, HKDF with SHA-256/384/512).");
-        }
-
-        private ISecurityContext GetSecurityContext(Dictionary<string, object> args)
-        {
-            if (args.TryGetValue("securityContext", out var scObj) && scObj is ISecurityContext sc)
-            {
-                return sc;
-            }
-
-            return _securityContext ?? new FipsSecurityContext();
-        }
-
-        private static T RunSyncWithErrorHandling<T>(Func<Task<T>> asyncOperation, string errorContext)
-        {
-            try
-            {
-                return Task.Run(asyncOperation).GetAwaiter().GetResult();
-            }
-            catch (AggregateException ae) when (ae.InnerException != null)
-            {
-                var innerException = ae.InnerException;
-                if (innerException is CryptographicException)
-                {
-                    throw innerException;
-                }
-                throw new CryptographicException($"{errorContext}: {innerException.Message}", innerException);
-            }
-            catch (CryptographicException)
-            {
-                throw;
-            }
-            catch (Exception ex)
-            {
-                throw new CryptographicException($"{errorContext}: {ex.Message}", ex);
-            }
-        }
-
-        private void LogKeyAccess(string keyId)
-        {
-            _keyAccessLog[keyId] = DateTime.UtcNow;
-        }
-
-        private static string TruncateKeyId(string keyId)
-        {
-            return keyId.Length > 8 ? $"{keyId[..8]}..." : keyId;
-        }
+        #region Message Handlers
 
         private Task HandleConfigureAsync(PluginMessage message)
         {
+            // Use base class configuration methods
             if (message.Payload.TryGetValue("keyStore", out var ksObj) && ksObj is IKeyStore ks)
             {
-                _keyStore = ks;
+                SetDefaultKeyStore(ks);
             }
 
-            if (message.Payload.TryGetValue("securityContext", out var scObj) && scObj is ISecurityContext sc)
+            if (message.Payload.TryGetValue("envelopeKeyStore", out var eksObj) && eksObj is IEnvelopeKeyStore eks &&
+                message.Payload.TryGetValue("kekKeyId", out var kekObj) && kekObj is string kek)
             {
-                _securityContext = sc;
+                SetDefaultEnvelopeKeyStore(eks, kek);
+            }
+
+            if (message.Payload.TryGetValue("mode", out var modeObj))
+            {
+                if (modeObj is KeyManagementMode mode)
+                {
+                    SetDefaultMode(mode);
+                }
+                else if (modeObj is string modeStr && Enum.TryParse<KeyManagementMode>(modeStr, true, out var parsedMode))
+                {
+                    SetDefaultMode(parsedMode);
+                }
             }
 
             return Task.CompletedTask;
@@ -700,16 +628,21 @@ namespace DataWarehouse.Plugins.FipsEncryption
 
         private Task HandleStatsAsync(PluginMessage message)
         {
-            lock (_statsLock)
-            {
-                message.Payload["EncryptionCount"] = _encryptionCount;
-                message.Payload["DecryptionCount"] = _decryptionCount;
-                message.Payload["TotalBytesEncrypted"] = _totalBytesEncrypted;
-                message.Payload["TotalBytesDecrypted"] = _totalBytesDecrypted;
-                message.Payload["FipsVerificationCount"] = Interlocked.Read(ref _fipsVerificationCount);
-                message.Payload["FipsVerified"] = _fipsVerified;
-                message.Payload["UniqueKeysUsed"] = _keyAccessLog.Count;
-            }
+            // Use base class statistics
+            var stats = GetStatistics();
+
+            message.Payload["EncryptionCount"] = stats.EncryptionCount;
+            message.Payload["DecryptionCount"] = stats.DecryptionCount;
+            message.Payload["TotalBytesEncrypted"] = stats.TotalBytesEncrypted;
+            message.Payload["TotalBytesDecrypted"] = stats.TotalBytesDecrypted;
+            message.Payload["UniqueKeysUsed"] = stats.UniqueKeysUsed;
+            message.Payload["Algorithm"] = AlgorithmId;
+            message.Payload["IVSizeBits"] = IvSizeBytes * 8;
+            message.Payload["TagSizeBits"] = TagSizeBytes * 8;
+
+            // Add FIPS-specific statistics
+            message.Payload["FipsVerificationCount"] = Interlocked.Read(ref _fipsVerificationCount);
+            message.Payload["FipsVerified"] = _fipsVerified;
 
             return Task.CompletedTask;
         }
@@ -718,20 +651,12 @@ namespace DataWarehouse.Plugins.FipsEncryption
         {
             if (message.Payload.TryGetValue("keyStore", out var ksObj) && ksObj is IKeyStore ks)
             {
-                _keyStore = ks;
+                SetDefaultKeyStore(ks);
             }
             return Task.CompletedTask;
         }
 
-        /// <summary>
-        /// Releases all resources used by this plugin.
-        /// </summary>
-        public void Dispose()
-        {
-            if (_disposed) return;
-            _disposed = true;
-            _keyAccessLog.Clear();
-        }
+        #endregion
     }
 
     /// <summary>
@@ -741,13 +666,9 @@ namespace DataWarehouse.Plugins.FipsEncryption
     {
         /// <summary>
         /// Gets or sets the key store to use for encryption keys.
+        /// This is used as the default when not explicitly specified per operation.
         /// </summary>
         public IKeyStore? KeyStore { get; set; }
-
-        /// <summary>
-        /// Gets or sets the security context for key access.
-        /// </summary>
-        public ISecurityContext? SecurityContext { get; set; }
 
         /// <summary>
         /// Gets or sets whether to enforce FIPS mode.
@@ -761,23 +682,5 @@ namespace DataWarehouse.Plugins.FipsEncryption
         /// Default is true.
         /// </summary>
         public bool VerifyOnHandshake { get; set; } = true;
-    }
-
-    /// <summary>
-    /// Default security context for FIPS encryption operations.
-    /// </summary>
-    internal sealed class FipsSecurityContext : ISecurityContext
-    {
-        /// <inheritdoc/>
-        public string UserId => Environment.UserName;
-
-        /// <inheritdoc/>
-        public string? TenantId => "fips-local";
-
-        /// <inheritdoc/>
-        public IEnumerable<string> Roles => new[] { "fips-user" };
-
-        /// <inheritdoc/>
-        public bool IsSystemAdmin => false;
     }
 }
