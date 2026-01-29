@@ -305,3 +305,131 @@ _ = Task.Run(async () =>
 4. Report export: Implement PDF/Excel generation in backend plugins
 5. Testing: Verify message-based communication with actual plugin instances
 
+---
+
+## ZeroKnowledgeEncryptionPlugin Refactoring to EncryptionPluginBase
+
+**Date:** 2026-01-30
+
+**Changes Made:**
+- Refactored ZeroKnowledgeEncryptionPlugin to extend EncryptionPluginBase instead of PipelinePluginBase, IDisposable
+- Referenced refactored AesEncryptionPlugin as template for implementation
+- Implemented composable key management architecture supporting both Direct and Envelope modes
+
+**File Structure:**
+- **ZeroKnowledgeEncryptionPlugin.cs** (C:\Temp\DataWarehouse\DataWarehouse\Plugins\DataWarehouse.Plugins.ZeroKnowledgeEncryption\)
+
+**Key Changes:**
+
+1. **Class Declaration:**
+   - Changed from: `public sealed class ZeroKnowledgeEncryptionPlugin : PipelinePluginBase, IDisposable`
+   - Changed to: `public sealed class ZeroKnowledgeEncryptionPlugin : EncryptionPluginBase`
+
+2. **Abstract Property Overrides:**
+   - `protected override int KeySizeBytes => 32;` (256 bits)
+   - `protected override int IvSizeBytes => 12;` (96-bit for GCM)
+   - `protected override int TagSizeBytes => 16;` (128-bit authentication tag)
+   - `protected override string AlgorithmId => "ZK-AES-256-GCM";`
+
+3. **Core Method Implementations:**
+   - **EncryptCoreAsync**: Performs AES-256-GCM encryption with ZK proof generation
+     - Format: `[Commitment][Proof][IV:12][Tag:16][Ciphertext]`
+     - Base class now handles key resolution and metadata storage
+     - Generates Pedersen commitment to plaintext hash
+     - Generates Schnorr proof of knowledge of the key (optional)
+     - Caches proof records for verification
+
+   - **DecryptCoreAsync**: Performs decryption with commitment/proof verification
+     - Supports legacy format detection: `[HeaderVersion:1][KeyIdLen:1][KeyId:variable][IV:12][Tag:16][Commitment][Proof][Ciphertext]`
+     - Supports new format: `[Commitment][Proof][IV:12][Tag:16][Ciphertext]`
+     - Verifies Pedersen commitment for data integrity
+     - Verifies Schnorr proof if present and configured
+     - Base class handles key resolution from metadata
+
+4. **Removed Duplicated Code:**
+   - Removed `_keyStore`, `_securityContext` fields (use base class: `DefaultKeyStore`)
+   - Removed `GetKeyStore()` method
+   - Removed `GetSecurityContext()` method (added simpler version for message handlers)
+   - Removed `RunSyncWithErrorHandling()` method (use proper async/await)
+   - Removed statistics fields `_encryptionCount`, `_decryptionCount`, `_totalBytesEncrypted`, `_statsLock` (use base class)
+   - Removed `_disposed` field and `IDisposable` implementation (handled by base class)
+   - Removed `OnHandshakeAsync` override (not needed with base class initialization)
+
+5. **Preserved ZK-Specific Functionality:**
+   - Kept `_schnorrProver` and `_pedersenCommitter` fields
+   - Kept `_proofCache`, `_proofsGenerated`, `_proofsVerified` fields for ZK-specific stats
+   - Kept `SchnorrProver`, `SchnorrProof`, `PedersenCommitter` classes intact
+   - Kept `ZkProofRecord` class
+   - Kept ZK-specific message handlers (prove, verify, commit)
+
+6. **Updated Message Handlers:**
+   - **HandleConfigureAsync**: New handler using base class methods
+     - `SetDefaultKeyStore(ks)` for Direct mode
+     - `SetDefaultEnvelopeKeyStore(eks, kek)` for Envelope mode
+     - `SetDefaultMode(mode)` for mode selection
+   - **HandleStatsAsync**: Uses `GetStatistics()` from base class, adds ZK-specific stats
+   - **HandleSetKeyStoreAsync**: Uses `SetDefaultKeyStore(ks)` instead of direct field assignment
+   - **HandleProveAsync**: Changed to async, uses `GetKeyStoreForMessage()` helper
+   - **HandleVerifyAsync**: Unchanged
+   - **HandleCommitAsync**: Unchanged
+
+7. **Legacy Format Detection:**
+   - Added `IsLegacyFormat(byte[] data)` method
+   - Checks for `LegacyHeaderVersion` (0x5A = 'Z' for ZK)
+   - Validates key ID length (1 to MaxKeyIdLength)
+   - Enables backward compatibility with old encrypted files
+
+8. **Configuration:**
+   - Constructor now sets `DefaultKeyStore` from config (base class field)
+   - Config supports `AutoGenerateProofs` and `VerifyProofsOnDecrypt` booleans
+   - Removed SecurityContext from config (handled per-operation)
+
+**Implementation Patterns:**
+1. Async/await throughout (no more RunSyncWithErrorHandling)
+2. Base class handles key management, statistics, and metadata
+3. Derived class focuses on algorithm-specific encryption/decryption
+4. Legacy format support via detection method in DecryptCoreAsync
+5. ZK-specific stats tracked separately from base encryption stats
+
+**Benefits of EncryptionPluginBase:**
+1. **Composable Key Management**: Supports both Direct and Envelope modes via configuration
+2. **Automatic Statistics**: Base class tracks encryption/decryption counts and bytes
+3. **Metadata Storage**: Key info stored in EncryptionMetadata instead of ciphertext header
+4. **Reduced Code Duplication**: ~200 lines of code removed (key store resolution, stats tracking, etc.)
+5. **Consistent Interface**: Same pattern as AesEncryptionPlugin and other encryption plugins
+6. **Memory Management**: Base class handles IDisposable pattern and secure key clearing
+
+**Encryption Format Changes:**
+- **Old Format**: `[HeaderVersion:1][KeyIdLen:1][KeyId:variable][IV:12][Tag:16][Commitment][Proof][Ciphertext]`
+- **New Format**: `[Commitment][Proof][IV:12][Tag:16][Ciphertext]` (key info in metadata)
+- Both formats supported for backward compatibility
+
+**ZK-Specific Features Retained:**
+- Schnorr identification protocol for proof of knowledge
+- Pedersen commitments for binding and hiding properties
+- Non-interactive ZK proofs using Fiat-Shamir heuristic
+- P-256 elliptic curve operations
+- Proof caching for verification
+
+**Verification:**
+- Build succeeded: `dotnet build Plugins/DataWarehouse.Plugins.ZeroKnowledgeEncryption/DataWarehouse.Plugins.ZeroKnowledgeEncryption.csproj` (0 errors)
+- Full solution build succeeded: `dotnet build` (266 warnings, 0 errors)
+- All warnings are pre-existing (not introduced by this refactoring)
+- Type safety verified through successful compilation
+- Ready for integration testing with EncryptionPluginBase infrastructure
+
+**Key Design Decisions:**
+1. Used AesEncryptionPlugin as reference implementation
+2. Preserved all ZK cryptographic functionality
+3. Maintained backward compatibility with legacy format
+4. Separated base encryption logic from ZK-specific proof logic
+5. Used base class for common operations (key resolution, stats, metadata)
+6. Converted synchronous helper methods to proper async implementations
+
+**Next Steps:**
+1. Integration testing with EncryptionPluginBase key management modes
+2. Verify Envelope mode works correctly with IEnvelopeKeyStore
+3. Test legacy format detection with old encrypted files
+4. Performance testing of ZK proof generation/verification
+5. Update documentation to reflect composable key management
+

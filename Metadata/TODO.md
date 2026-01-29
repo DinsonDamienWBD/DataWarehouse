@@ -42,6 +42,51 @@ Do NOT wait for an entire phase to complete before committing.
 
 ---
 
+## CORE DESIGN PRINCIPLE: Maximum User Configurability & Freedom
+
+> **PHILOSOPHY:** DataWarehouse provides every capability imaginable in a fully configurable and selectable way.
+> Users have complete freedom to pick, choose, and apply features in whatever order they want, exactly as they need.
+
+### User Freedom Examples
+
+| Feature | User Options | Implementation Requirement |
+|---------|--------------|---------------------------|
+| **Encryption** | Always encrypted, at-rest only, transit-only, none, or use hardware encryption for specific stages | Must support per-operation encryption mode selection |
+| **Compression** | At rest, during transit, both, or none | Must support per-operation compression mode selection |
+| **WORM Retention** | 1 day, 1 year, 2 years, forever, device lifetime | Must support configurable retention periods |
+| **Cipher Selection** | AES, ChaCha20, Serpent, Twofish, FIPS-only, or custom | Must support user-selectable algorithms |
+| **Key Management** | Direct keys, envelope encryption, HSM-backed, or hybrid | Must support multiple key management modes |
+| **Transit Mode** | End-to-end same cipher, transcryption, no transit encryption | Must support all transit modes |
+| **Pipeline Order** | User-defined stage ordering | Must support runtime pipeline configuration |
+| **Storage Tier** | Hot, warm, cold, archive, or auto-tiering | Must support explicit tier selection |
+
+### Implementation Checklist for Plugins
+
+When implementing ANY plugin, verify:
+
+1. [ ] **Configurable Behavior**: Can users enable/disable the feature entirely?
+2. [ ] **Selectable Options**: Can users choose between multiple implementations/algorithms?
+3. [ ] **Customizable Parameters**: Can users tune numeric values (iterations, sizes, durations)?
+4. [ ] **Per-Operation Override**: Can users override defaults on a per-call basis?
+5. [ ] **Policy Integration**: Can administrators set organization-wide defaults while allowing user overrides?
+6. [ ] **No Forced Behavior**: Does the plugin avoid forcing any behavior the user didn't explicitly request?
+
+### Task: Review All Plugins for Configurability
+
+| Task | Category | Description | Status |
+|------|----------|-------------|--------|
+| CFG-1 | Encryption | Review all 6 encryption plugins for user-selectable modes | [ ] |
+| CFG-2 | Compression | Review compression plugins for at-rest/transit/both/none options | [ ] |
+| CFG-3 | Key Management | Review key store plugins for configurable key modes | [ ] |
+| CFG-4 | Storage | Review storage plugins for tier selection and retention options | [ ] |
+| CFG-5 | Pipeline | Verify pipeline supports user-defined stage ordering | [ ] |
+| CFG-6 | Transit | Verify transit encryption supports all mode combinations | [ ] |
+| CFG-7 | WORM | Review WORM plugins for configurable retention periods | [ ] |
+| CFG-8 | Governance | Review compliance plugins for configurable policy enforcement | [ ] |
+| CFG-9 | All Plugins | Comprehensive audit of all plugins for configurability gaps | [ ] |
+
+---
+
 ## Plugin Implementation Checklist
 
 For each plugin:
@@ -2637,18 +2682,332 @@ ENVELOPE MODE (T5.1):       [Mode:1][WrappedDekLen:2][WrappedDEK:var][KekIdLen:1
 > for data at rest. However, low-power endpoints (mobile, IoT, legacy systems) may not have the computational
 > resources to decrypt/encrypt efficiently. Additionally, even within "trusted" internal networks, data in transit
 > should remain encrypted to authorized parties only (true end-to-end encryption).
->
-> **SOLUTION:** DataWarehouse provides a layered encryption architecture where:
-> 1. **At-rest encryption** uses the strongest cipher the server can handle
-> 2. **Transit encryption** automatically adapts to endpoint capabilities
-> 3. **End-to-end encryption** ensures only authorized key holders can read data
-> 4. **Transcryption** allows secure cipher transitions without exposing plaintext to disk
+
+### T6.0: Solution Overview - 8 Encryption Strategy Options
+
+DataWarehouse provides **8 distinct encryption strategies** that can be combined based on requirements:
+
+| # | Strategy | Description | Use Case |
+|---|----------|-------------|----------|
+| 1 | **Common Selection** | Pre-defined cipher presets (Fast, Balanced, Secure, Maximum) | Quick setup, no expertise needed |
+| 2 | **User Configurable** | Manual cipher selection per operation | Expert users, specific requirements |
+| 3 | **Tiered/Hybrid Scheme** | Different ciphers for storage vs transit layers | Enterprise with mixed endpoints |
+| 4 | **Re-encryption Gateway** | Dedicated proxy service for cipher conversion | High-security perimeter architecture |
+| 5 | **Negotiated Cipher** | Client-server handshake to agree on cipher | Dynamic endpoint environments |
+| 6 | **Streaming Chunks** | Progressive decrypt/encrypt in fixed-size chunks | Low-memory devices, large files |
+| 7 | **Hardware-Assisted** | Auto-detect and use hardware acceleration | Performance optimization |
+| 8 | **Transcryption** | In-memory cipher-to-cipher conversion | Secure gateway operations |
 
 ---
 
-### T6.0: SDK Types for Transit & Endpoint-Adaptive Encryption
+### T6.1: Strategy 1 - Common Selection (Pre-defined Presets)
 
-#### T6.0.1: Core Interfaces
+> **GOAL:** Allow users to select from pre-defined, tested cipher configurations without needing crypto expertise.
+
+#### T6.1.1: SDK Interface
+
+```csharp
+// =============================================================================
+// FILE: DataWarehouse.SDK/Security/ICommonCipherPresets.cs
+// =============================================================================
+
+namespace DataWarehouse.SDK.Security;
+
+/// <summary>
+/// Pre-defined cipher configuration presets for common use cases.
+/// Each preset is a tested, validated combination of algorithms.
+/// </summary>
+public enum CipherPreset
+{
+    /// <summary>
+    /// FAST: ChaCha20-Poly1305 for both storage and transit.
+    /// Best for: High-throughput systems, mobile-first, IoT.
+    /// Throughput: ~800 MB/s (software), ~1.2 GB/s (with SIMD).
+    /// Security: 256-bit, AEAD, constant-time.
+    /// </summary>
+    Fast,
+
+    /// <summary>
+    /// BALANCED: AES-256-GCM for storage, ChaCha20 for transit to weak endpoints.
+    /// Best for: Enterprise with mixed endpoints (desktop + mobile).
+    /// Throughput: ~1 GB/s with AES-NI, ~300 MB/s without.
+    /// Security: 256-bit, AEAD, NIST approved.
+    /// </summary>
+    Balanced,
+
+    /// <summary>
+    /// SECURE: AES-256-GCM for everything, no cipher downgrade.
+    /// Best for: Compliance-driven environments (PCI-DSS, HIPAA).
+    /// Throughput: ~1 GB/s with AES-NI.
+    /// Security: 256-bit, AEAD, FIPS 140-2 validated.
+    /// </summary>
+    Secure,
+
+    /// <summary>
+    /// MAXIMUM: Serpent-256 for storage, AES-256 for transit.
+    /// Best for: Government, military, classified data.
+    /// Throughput: ~200 MB/s (Serpent), ~1 GB/s (AES transit).
+    /// Security: Conservative design, 32 rounds, AES finalist.
+    /// </summary>
+    Maximum,
+
+    /// <summary>
+    /// FIPS_ONLY: Only FIPS 140-2 validated algorithms.
+    /// Best for: US Federal agencies, FedRAMP compliance.
+    /// Algorithms: AES-256-GCM, SHA-256/384/512, HMAC.
+    /// </summary>
+    FipsOnly,
+
+    /// <summary>
+    /// QUANTUM_RESISTANT: Post-quantum algorithms where available.
+    /// Best for: Long-term data protection (>10 years).
+    /// Note: May use hybrid classical+PQ approach.
+    /// </summary>
+    QuantumResistant
+}
+
+/// <summary>
+/// Provides pre-defined cipher configurations.
+/// </summary>
+public interface ICommonCipherPresetProvider
+{
+    /// <summary>Gets the full configuration for a preset.</summary>
+    CipherPresetConfiguration GetPreset(CipherPreset preset);
+
+    /// <summary>Gets recommended preset based on endpoint capabilities.</summary>
+    CipherPreset RecommendPreset(IEndpointCapabilities endpoint);
+
+    /// <summary>Lists all available presets with descriptions.</summary>
+    IReadOnlyList<CipherPresetInfo> ListPresets();
+}
+
+/// <summary>
+/// Full configuration for a cipher preset.
+/// </summary>
+public record CipherPresetConfiguration
+{
+    /// <summary>Preset identifier.</summary>
+    public required CipherPreset Preset { get; init; }
+
+    /// <summary>Cipher for data at rest (storage).</summary>
+    public required string StorageCipher { get; init; }
+
+    /// <summary>Cipher for data in transit (network).</summary>
+    public required string TransitCipher { get; init; }
+
+    /// <summary>Key derivation function.</summary>
+    public required string KeyDerivationFunction { get; init; }
+
+    /// <summary>KDF iteration count.</summary>
+    public required int KdfIterations { get; init; }
+
+    /// <summary>Hash algorithm for integrity.</summary>
+    public required string HashAlgorithm { get; init; }
+
+    /// <summary>Whether cipher downgrade is allowed for weak endpoints.</summary>
+    public required bool AllowDowngrade { get; init; }
+
+    /// <summary>Minimum endpoint trust level required.</summary>
+    public required EndpointTrustLevel MinTrustLevel { get; init; }
+
+    /// <summary>Human-readable description.</summary>
+    public required string Description { get; init; }
+
+    /// <summary>Compliance standards this preset meets.</summary>
+    public required IReadOnlyList<string> ComplianceStandards { get; init; }
+}
+
+/// <summary>
+/// Information about a preset for display purposes.
+/// </summary>
+public record CipherPresetInfo(
+    CipherPreset Preset,
+    string Name,
+    string Description,
+    string StorageCipher,
+    string TransitCipher,
+    int EstimatedThroughputMBps,
+    IReadOnlyList<string> ComplianceStandards
+);
+```
+
+#### T6.1.2: Abstract Base Class
+
+```csharp
+// =============================================================================
+// FILE: DataWarehouse.SDK/Contracts/CipherPresetProviderPluginBase.cs
+// =============================================================================
+
+namespace DataWarehouse.SDK.Contracts;
+
+/// <summary>
+/// Base class for cipher preset providers.
+/// Extend to add custom presets or modify existing ones.
+/// </summary>
+public abstract class CipherPresetProviderPluginBase : FeaturePluginBase, ICommonCipherPresetProvider
+{
+    #region Pre-defined Presets (Override to customize)
+
+    /// <summary>
+    /// Default preset configurations. Override to customize.
+    /// </summary>
+    protected virtual IReadOnlyDictionary<CipherPreset, CipherPresetConfiguration> Presets => new Dictionary<CipherPreset, CipherPresetConfiguration>
+    {
+        [CipherPreset.Fast] = new()
+        {
+            Preset = CipherPreset.Fast,
+            StorageCipher = "ChaCha20-Poly1305",
+            TransitCipher = "ChaCha20-Poly1305",
+            KeyDerivationFunction = "Argon2id",
+            KdfIterations = 3,
+            HashAlgorithm = "BLAKE3",
+            AllowDowngrade = false,
+            MinTrustLevel = EndpointTrustLevel.Basic,
+            Description = "Maximum throughput with strong security. Ideal for mobile and IoT.",
+            ComplianceStandards = new[] { "SOC2" }
+        },
+        [CipherPreset.Balanced] = new()
+        {
+            Preset = CipherPreset.Balanced,
+            StorageCipher = "AES-256-GCM",
+            TransitCipher = "ChaCha20-Poly1305", // Fallback for non-AES-NI
+            KeyDerivationFunction = "Argon2id",
+            KdfIterations = 4,
+            HashAlgorithm = "SHA-256",
+            AllowDowngrade = true,
+            MinTrustLevel = EndpointTrustLevel.Basic,
+            Description = "Balance of security and performance. AES for storage, ChaCha20 for weak endpoints.",
+            ComplianceStandards = new[] { "SOC2", "ISO27001" }
+        },
+        [CipherPreset.Secure] = new()
+        {
+            Preset = CipherPreset.Secure,
+            StorageCipher = "AES-256-GCM",
+            TransitCipher = "AES-256-GCM",
+            KeyDerivationFunction = "PBKDF2-SHA256",
+            KdfIterations = 100000,
+            HashAlgorithm = "SHA-256",
+            AllowDowngrade = false,
+            MinTrustLevel = EndpointTrustLevel.Corporate,
+            Description = "Compliance-focused. No cipher downgrade, NIST-approved algorithms only.",
+            ComplianceStandards = new[] { "PCI-DSS", "HIPAA", "SOC2", "ISO27001" }
+        },
+        [CipherPreset.Maximum] = new()
+        {
+            Preset = CipherPreset.Maximum,
+            StorageCipher = "Serpent-256-CTR-HMAC",
+            TransitCipher = "AES-256-GCM",
+            KeyDerivationFunction = "Argon2id",
+            KdfIterations = 10,
+            HashAlgorithm = "SHA-512",
+            AllowDowngrade = false,
+            MinTrustLevel = EndpointTrustLevel.HighTrust,
+            Description = "Maximum security. Serpent (AES finalist, conservative design) for storage.",
+            ComplianceStandards = new[] { "ITAR", "EAR", "Classified" }
+        },
+        [CipherPreset.FipsOnly] = new()
+        {
+            Preset = CipherPreset.FipsOnly,
+            StorageCipher = "FIPS-AES-256-GCM",
+            TransitCipher = "FIPS-AES-256-GCM",
+            KeyDerivationFunction = "PBKDF2-SHA256",
+            KdfIterations = 100000,
+            HashAlgorithm = "SHA-256",
+            AllowDowngrade = false,
+            MinTrustLevel = EndpointTrustLevel.Corporate,
+            Description = "FIPS 140-2 validated only. Required for US Federal systems.",
+            ComplianceStandards = new[] { "FIPS 140-2", "FedRAMP", "FISMA" }
+        }
+    };
+
+    #endregion
+
+    #region Implementation
+
+    /// <inheritdoc/>
+    public CipherPresetConfiguration GetPreset(CipherPreset preset)
+    {
+        if (Presets.TryGetValue(preset, out var config))
+            return config;
+        throw new ArgumentException($"Unknown preset: {preset}");
+    }
+
+    /// <inheritdoc/>
+    public CipherPreset RecommendPreset(IEndpointCapabilities endpoint)
+    {
+        // Decision tree for preset recommendation
+        if (endpoint.HasHardwareAes && endpoint.EstimatedThroughputMBps > 500)
+            return CipherPreset.Secure;
+
+        if (endpoint.EstimatedThroughputMBps > 200)
+            return CipherPreset.Balanced;
+
+        return CipherPreset.Fast;
+    }
+
+    /// <inheritdoc/>
+    public IReadOnlyList<CipherPresetInfo> ListPresets()
+    {
+        return Presets.Values.Select(p => new CipherPresetInfo(
+            p.Preset,
+            p.Preset.ToString(),
+            p.Description,
+            p.StorageCipher,
+            p.TransitCipher,
+            EstimateThroughput(p.StorageCipher),
+            p.ComplianceStandards
+        )).ToList();
+    }
+
+    private int EstimateThroughput(string cipher) => cipher switch
+    {
+        var c when c.Contains("ChaCha20") => 800,
+        var c when c.Contains("AES") => 1000,
+        var c when c.Contains("Serpent") => 200,
+        var c when c.Contains("Twofish") => 250,
+        _ => 500
+    };
+
+    #endregion
+}
+```
+
+#### T6.1.3: Plugin Implementation
+
+| Task | Plugin | Description | Status |
+|------|--------|-------------|--------|
+| T6.1.3.1 | `DefaultCipherPresetPlugin` | Standard presets (Fast, Balanced, Secure, Maximum, FipsOnly) | [ ] |
+| T6.1.3.2 | `EnterpriseCipherPresetPlugin` | Enterprise-specific presets with compliance mappings | [ ] |
+| T6.1.3.3 | `GovernmentCipherPresetPlugin` | Government/military presets (ITAR, Classified, TopSecret) | [ ] |
+
+#### T6.1.4: Usage Example
+
+```csharp
+// USAGE: Select a preset and apply it
+var presetProvider = kernel.GetPlugin<ICommonCipherPresetProvider>();
+var config = presetProvider.GetPreset(CipherPreset.Balanced);
+
+// Apply preset to encryption pipeline
+var encryptionConfig = new EncryptionPipelineConfig
+{
+    StorageCipher = config.StorageCipher,       // "AES-256-GCM"
+    TransitCipher = config.TransitCipher,       // "ChaCha20-Poly1305"
+    AllowDowngrade = config.AllowDowngrade,     // true
+    KeyDerivation = new KeyDerivationConfig
+    {
+        Function = config.KeyDerivationFunction, // "Argon2id"
+        Iterations = config.KdfIterations        // 4
+    }
+};
+
+// Or: Get recommendation based on endpoint
+var endpoint = await endpointDetector.GetCapabilitiesAsync();
+var recommendedPreset = presetProvider.RecommendPreset(endpoint);
+```
+
+---
+
+### T6.2: Strategy 2 - User Configurable (Manual Selection)
 
 ```csharp
 // =============================================================================
