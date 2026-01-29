@@ -1144,7 +1144,52 @@ READ REQUEST (ObjectGuid, ReadMode)
 | Task | Description | Dependencies | Status |
 |------|-------------|--------------|--------|
 | T4.15 | Implement background integrity scanner (configurable intervals) | T4.14 | [ ] |
-| T4.16 | Implement additional integrity algorithms (SHA-3, HMAC-SHA256, HMAC-SHA3) | T4.15 | [ ] |
+
+**Additional Integrity Algorithms:**
+| Task | Description | Dependencies | Status |
+|------|-------------|--------------|--------|
+| T4.16 | Implement SHA-3 family (Keccak-based NIST standard) | T4.15 | [ ] |
+| T4.16.1 | ↳ SHA3-256 | T4.16 | [ ] |
+| T4.16.2 | ↳ SHA3-384 | T4.16 | [ ] |
+| T4.16.3 | ↳ SHA3-512 | T4.16 | [ ] |
+| T4.17 | Implement Keccak family (original, pre-NIST) | T4.16 | [ ] |
+| T4.17.1 | ↳ Keccak-256 | T4.17 | [ ] |
+| T4.17.2 | ↳ Keccak-384 | T4.17 | [ ] |
+| T4.17.3 | ↳ Keccak-512 | T4.17 | [ ] |
+| T4.18 | Implement HMAC variants (keyed hashes) | T4.17 | [ ] |
+| T4.18.1 | ↳ HMAC-SHA256 (keyed) | T4.18 | [ ] |
+| T4.18.2 | ↳ HMAC-SHA384 (keyed) | T4.18 | [ ] |
+| T4.18.3 | ↳ HMAC-SHA512 (keyed) | T4.18 | [ ] |
+| T4.18.4 | ↳ HMAC-SHA3-256 (keyed) | T4.18 | [ ] |
+| T4.18.5 | ↳ HMAC-SHA3-384 (keyed) | T4.18 | [ ] |
+| T4.18.6 | ↳ HMAC-SHA3-512 (keyed) | T4.18 | [ ] |
+| T4.19 | Implement Salted hash variants (per-object random salt) | T4.18 | [ ] |
+| T4.19.1 | ↳ Salted-SHA256 | T4.19 | [ ] |
+| T4.19.2 | ↳ Salted-SHA512 | T4.19 | [ ] |
+| T4.19.3 | ↳ Salted-SHA3-256 | T4.19 | [ ] |
+| T4.19.4 | ↳ Salted-SHA3-512 | T4.19 | [ ] |
+| T4.19.5 | ↳ Salted-Blake3 | T4.19 | [ ] |
+| T4.20 | Implement Salted HMAC variants (key + per-object salt) | T4.19 | [ ] |
+| T4.20.1 | ↳ Salted-HMAC-SHA256 | T4.20 | [ ] |
+| T4.20.2 | ↳ Salted-HMAC-SHA512 | T4.20 | [ ] |
+| T4.20.3 | ↳ Salted-HMAC-SHA3-256 | T4.20 | [ ] |
+| T4.20.4 | ↳ Salted-HMAC-SHA3-512 | T4.20 | [ ] |
+
+**Integrity Algorithm Reference:**
+| Category | Algorithms | Key Required | Salt | Use Case |
+|----------|------------|--------------|------|----------|
+| **SHA-2** | SHA-256, SHA-384, SHA-512 | No | No | Standard integrity verification |
+| **SHA-3** | SHA3-256, SHA3-384, SHA3-512 | No | No | NIST standard, quantum-resistant design |
+| **Keccak** | Keccak-256, Keccak-384, Keccak-512 | No | No | Original (pre-NIST), used by Ethereum |
+| **Blake3** | Blake3 | No | No | Fastest, modern, parallel-friendly |
+| **HMAC** | HMAC-SHA256/384/512, HMAC-SHA3-256/384/512 | Yes | No | Keyed authentication, prevents length extension |
+| **Salted** | Salted-SHA256/512, Salted-SHA3, Salted-Blake3 | No | Yes | Per-object salt prevents rainbow tables |
+| **Salted HMAC** | Salted-HMAC-SHA256/512, Salted-HMAC-SHA3 | Yes | Yes | Maximum security: key + per-object salt |
+
+**Note:**
+- **HMAC** uses a secret key for authentication (proves data wasn't tampered AND you have the key)
+- **Salted** adds a random per-object salt stored in manifest (prevents precomputation attacks)
+- **Salted HMAC** combines both: key-based authentication with per-object salt randomization
 
 **Instance Degradation States:**
 | State | Cause | Impact | User Action |
@@ -1262,16 +1307,25 @@ Plugins/
 │   │   └── TamperAttributionAnalyzer.cs
 │   └── DataWarehouse.Plugins.TamperProof.csproj
 │
-│   # Integrity Providers (T1, T4.13)
+│   # Integrity Providers (T1, T4.16-T4.20)
 ├── DataWarehouse.Plugins.Integrity/
 │   ├── DefaultIntegrityPlugin.cs (SHA-256/384/512, Blake3)
 │   └── DataWarehouse.Plugins.Integrity.csproj
 ├── DataWarehouse.Plugins.Integrity.Sha3/
-│   ├── Sha3IntegrityPlugin.cs (SHA3-256/384/512)
+│   ├── Sha3IntegrityPlugin.cs (SHA3-256/384/512 - NIST standard)
 │   └── DataWarehouse.Plugins.Integrity.Sha3.csproj
+├── DataWarehouse.Plugins.Integrity.Keccak/
+│   ├── KeccakIntegrityPlugin.cs (Keccak-256/384/512 - original pre-NIST)
+│   └── DataWarehouse.Plugins.Integrity.Keccak.csproj
 ├── DataWarehouse.Plugins.Integrity.Hmac/
-│   ├── HmacIntegrityPlugin.cs (HMAC-SHA256, HMAC-SHA3)
+│   ├── HmacIntegrityPlugin.cs (HMAC-SHA256/384/512, HMAC-SHA3-256/384/512)
 │   └── DataWarehouse.Plugins.Integrity.Hmac.csproj
+├── DataWarehouse.Plugins.Integrity.Salted/
+│   ├── SaltedHashIntegrityPlugin.cs (Salted-SHA256/512, Salted-SHA3, Salted-Blake3)
+│   └── DataWarehouse.Plugins.Integrity.Salted.csproj
+├── DataWarehouse.Plugins.Integrity.SaltedHmac/
+│   ├── SaltedHmacIntegrityPlugin.cs (Salted-HMAC-SHA256/512, Salted-HMAC-SHA3)
+│   └── DataWarehouse.Plugins.Integrity.SaltedHmac.csproj
 │
 │   # Blockchain Providers (T1, T4.9)
 ├── DataWarehouse.Plugins.Blockchain.Local/
