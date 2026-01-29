@@ -1037,6 +1037,10 @@ READ REQUEST (ObjectGuid, ReadMode)
 |------|-------------|--------------|--------|
 | T3.1 | Implement Phase 1 read (manifest retrieval) | T2.* | [ ] |
 | T3.2 | Implement Phase 2 read (shard retrieval + reconstruction) | T3.1 | [ ] |
+| T3.2.1 | ↳ Load required shards from Data Instance | T3.2 | [ ] |
+| T3.2.2 | ↳ Verify individual shard hashes | T3.2 | [ ] |
+| T3.2.3 | ↳ Reconstruct original blob (Reed-Solomon if needed) | T3.2 | [ ] |
+| T3.2.4 | ↳ Strip shard padding (if applied) | T3.2 | [ ] |
 | T3.3 | Implement Phase 3 read (integrity verification by ReadMode) | T3.2 | [ ] |
 | T3.3.1 | ↳ Implement `ReadMode.Fast` (skip verification, trust shard hashes) | T3.3 | [ ] |
 | T3.3.2 | ↳ Implement `ReadMode.Verified` (compute hash, compare to manifest) | T3.3 | [ ] |
