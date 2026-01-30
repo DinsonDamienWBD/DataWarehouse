@@ -6,72 +6,68 @@ using DataWarehouse.SDK.Sustainability;
 namespace DataWarehouse.Plugins.CarbonAwareness;
 
 /// <summary>
-/// Simulated carbon offset provider for development and testing.
-/// In production, replace with integration to actual offset marketplaces
-/// like Patch, Cloverly, or direct registry APIs.
+/// Simulated carbon offset provider for development, testing, and offline scenarios.
+///
+/// IMPORTANT: This is NOT a production implementation. Use <see cref="PatchCarbonOffsetProviderPlugin"/>
+/// for production deployments with real offset marketplace integration.
+///
+/// This simulated provider is useful for:
+/// - Unit and integration testing without API dependencies
+/// - Development and prototyping
+/// - Offline demonstrations
+/// - CI/CD pipelines
 /// </summary>
+/// <remarks>
+/// For production use, configure the <see cref="PatchCarbonOffsetProviderPlugin"/> with your
+/// Patch API key from https://dashboard.patch.io/
+/// </remarks>
 public class SimulatedCarbonOffsetProviderPlugin : CarbonOffsetProviderPluginBase
 {
     private readonly ConcurrentBag<OffsetPurchase> _purchaseHistory = new();
 
-    // Simulated offset projects
-    private static readonly List<OffsetProject> _projects = new()
+    // Reference offset projects for testing
+    // These mirror real project types available from offset marketplaces
+    private static readonly List<OffsetProject> TestProjects = new()
     {
         new OffsetProject(
-            "PROJ-001",
-            "Amazon Rainforest Conservation",
+            "test-proj-001",
+            "Test: Amazon Rainforest Conservation",
             "Reforestation",
             OffsetStandard.VCS,
             15.00,
             "Brazil"
         ),
         new OffsetProject(
-            "PROJ-002",
-            "Nordic Wind Farm",
+            "test-proj-002",
+            "Test: Nordic Wind Farm",
             "Renewable Energy",
             OffsetStandard.GoldStandard,
             12.50,
             "Sweden"
         ),
         new OffsetProject(
-            "PROJ-003",
-            "California Forest Carbon",
+            "test-proj-003",
+            "Test: California Forest Carbon",
             "Forest Management",
             OffsetStandard.ACR,
             18.00,
             "USA"
         ),
         new OffsetProject(
-            "PROJ-004",
-            "Kenya Cookstoves",
+            "test-proj-004",
+            "Test: Kenya Cookstoves",
             "Energy Efficiency",
             OffsetStandard.GoldStandard,
             8.00,
             "Kenya"
         ),
         new OffsetProject(
-            "PROJ-005",
-            "Texas Methane Capture",
+            "test-proj-005",
+            "Test: Texas Methane Capture",
             "Methane Capture",
             OffsetStandard.CAR,
             10.00,
             "USA"
-        ),
-        new OffsetProject(
-            "PROJ-006",
-            "Indonesian Mangrove Restoration",
-            "Blue Carbon",
-            OffsetStandard.VCS,
-            20.00,
-            "Indonesia"
-        ),
-        new OffsetProject(
-            "PROJ-007",
-            "Indian Solar Initiative",
-            "Renewable Energy",
-            OffsetStandard.GoldStandard,
-            9.50,
-            "India"
         ),
     };
 
@@ -79,7 +75,7 @@ public class SimulatedCarbonOffsetProviderPlugin : CarbonOffsetProviderPluginBas
     public override string Id => "datawarehouse.carbon.offsetprovider.simulated";
 
     /// <inheritdoc />
-    public override string Name => "Simulated Carbon Offset Provider";
+    public override string Name => "Simulated Carbon Offset Provider (Test Only)";
 
     /// <inheritdoc />
     public override string Version => "1.0.0";
@@ -95,30 +91,30 @@ public class SimulatedCarbonOffsetProviderPlugin : CarbonOffsetProviderPluginBas
 
         if (!string.IsNullOrEmpty(options.PreferredProjectId))
         {
-            project = _projects.FirstOrDefault(p => p.ProjectId == options.PreferredProjectId)
-                ?? throw new ArgumentException($"Project {options.PreferredProjectId} not found");
+            project = TestProjects.FirstOrDefault(p => p.ProjectId == options.PreferredProjectId)
+                ?? throw new ArgumentException($"Test project {options.PreferredProjectId} not found");
         }
         else if (options.RequiredStandard.HasValue)
         {
-            project = _projects
+            project = TestProjects
                 .Where(p => p.Standard == options.RequiredStandard.Value)
                 .OrderBy(p => p.PricePerTonCO2)
                 .FirstOrDefault()
-                ?? throw new InvalidOperationException($"No projects with {options.RequiredStandard} certification");
+                ?? throw new InvalidOperationException($"No test projects with {options.RequiredStandard} certification");
         }
         else
         {
             // Default: cheapest project
-            project = _projects.OrderBy(p => p.PricePerTonCO2).First();
+            project = TestProjects.OrderBy(p => p.PricePerTonCO2).First();
         }
 
         // Calculate cost
         var tons = GramsToTons(carbonGrams);
         var cost = tons * project.PricePerTonCO2;
 
-        // Generate certificate
-        var purchaseId = $"PUR-{Guid.NewGuid():N}";
-        var certificateUrl = $"https://offsets.example.com/certificates/{purchaseId}";
+        // Generate test certificate
+        var purchaseId = $"TEST-PUR-{Guid.NewGuid():N}";
+        var certificateUrl = $"https://test.offsets.example.com/certificates/{purchaseId}";
 
         var purchase = new OffsetPurchase(
             purchaseId,
@@ -137,7 +133,7 @@ public class SimulatedCarbonOffsetProviderPlugin : CarbonOffsetProviderPluginBas
     /// <inheritdoc />
     protected override Task<IReadOnlyList<OffsetProject>> FetchProjectsAsync()
     {
-        return Task.FromResult<IReadOnlyList<OffsetProject>>(_projects);
+        return Task.FromResult<IReadOnlyList<OffsetProject>>(TestProjects);
     }
 
     /// <inheritdoc />
@@ -185,8 +181,8 @@ public class SimulatedCarbonOffsetProviderPlugin : CarbonOffsetProviderPluginBas
     public double EstimateCost(double carbonGrams, OffsetStandard? standard = null)
     {
         var eligibleProjects = standard.HasValue
-            ? _projects.Where(p => p.Standard == standard.Value)
-            : _projects;
+            ? TestProjects.Where(p => p.Standard == standard.Value)
+            : TestProjects;
 
         var cheapestPrice = eligibleProjects.Min(p => p.PricePerTonCO2);
         return GramsToTons(carbonGrams) * cheapestPrice;
