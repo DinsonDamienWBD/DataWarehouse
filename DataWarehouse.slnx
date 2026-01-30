@@ -66,6 +66,7 @@
     <Project Path="Plugins/DataWarehouse.Plugins.EnhancedRaid/DataWarehouse.Plugins.EnhancedRaid.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.EntropyAnalysis/DataWarehouse.Plugins.EntropyAnalysis.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.ErasureCoding/DataWarehouse.Plugins.ErasureCoding.csproj" />
+    <Project Path="Plugins/DataWarehouse.Plugins.ExabyteScale/DataWarehouse.Plugins.ExabyteScale.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.ExtendedRaid/DataWarehouse.Plugins.ExtendedRaid.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.FederatedQuery/DataWarehouse.Plugins.FederatedQuery.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.Federation/DataWarehouse.Plugins.Federation.csproj" />
@@ -100,11 +101,13 @@
     <Project Path="Plugins/DataWarehouse.Plugins.LoadBalancer/DataWarehouse.Plugins.LoadBalancer.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.LocalStorage/DataWarehouse.Plugins.LocalStorage.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.LogicMonitor/DataWarehouse.Plugins.LogicMonitor.csproj" />
+    <Project Path="Plugins/DataWarehouse.Plugins.LowLatency/DataWarehouse.Plugins.LowLatency.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.Logzio/DataWarehouse.Plugins.Logzio.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.Lz4Compression/DataWarehouse.Plugins.Lz4Compression.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.Metabase/DataWarehouse.Plugins.Metabase.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.Metadata/DataWarehouse.Plugins.Metadata.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.MetadataStorage/DataWarehouse.Plugins.MetadataStorage.csproj" />
+    <Project Path="Plugins/DataWarehouse.Plugins.MultiMaster/DataWarehouse.Plugins.MultiMaster.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.MySqlProtocol/DataWarehouse.Plugins.MySqlProtocol.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.NestedRaid/DataWarehouse.Plugins.NestedRaid.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.Netdata/DataWarehouse.Plugins.Netdata.csproj" />
