@@ -76,7 +76,12 @@ namespace DataWarehouse.SDK.Primitives
         /// <summary>
         /// Interface category for interface-type plugins (GraphQL, REST, gRPC).
         /// </summary>
-        Interface
+        Interface,
+
+        /// <summary>
+        /// Infrastructure providers for low-level system operations (RDMA, io_uring, NUMA).
+        /// </summary>
+        InfrastructureProvider
     }
 
     /// <summary>
