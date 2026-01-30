@@ -593,6 +593,1119 @@ These features represent the next generation of data storage technology, positio
 
 ---
 
+### CATEGORY I: Active Enterprise Distribution System (AEDS)
+
+> **VISION:** Transform DataWarehouse from a passive storage repository into an **Active Logistics Platform**
+> that enables governed, secure, and intelligent propagation of data, commands, and software updates
+> from a central authority to distributed endpoints (and vice-versa) without requiring user intervention.
+
+#### Task 60: AEDS Core Infrastructure
+**Priority:** P0 (Enterprise)
+**Effort:** Very High
+**Status:** [ ] Not Started
+
+**Description:** The foundational infrastructure for the Active Enterprise Distribution System, providing the control plane, data plane, and core messaging primitives that all AEDS extensions build upon.
+
+---
+
+##### AEDS.1: Architecture Overview
+
+```
+┌─────────────────────────────────────────────────────────────────────────────────────┐
+│                      ACTIVE ENTERPRISE DISTRIBUTION SYSTEM                           │
+├─────────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                      │
+│   ┌─────────────────────────┐              ┌─────────────────────────┐              │
+│   │     CONTROL PLANE       │◄────────────►│       DATA PLANE        │              │
+│   │    (Signal Channel)     │              │   (Transport Channel)   │              │
+│   │                         │              │                         │              │
+│   │  Plugins:               │              │  Plugins:               │              │
+│   │  • WebSocket/SignalR    │              │  • HTTP/3 over QUIC     │              │
+│   │  • MQTT                 │              │  • Raw QUIC Streams     │              │
+│   │  • gRPC Streaming       │              │  • HTTP/2 (fallback)    │              │
+│   │  • Custom               │              │  • WebTransport         │              │
+│   └───────────┬─────────────┘              └───────────┬─────────────┘              │
+│               │                                        │                             │
+│   ┌───────────▼────────────────────────────────────────▼─────────────┐              │
+│   │                    SERVER-SIDE DISPATCHER                         │              │
+│   │  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐  ┌──────────┐ │              │
+│   │  │ Job Queue   │  │  Targeting  │  │  Manifest   │  │ Channel  │ │              │
+│   │  │ Management  │  │  Engine     │  │  Signing    │  │ Manager  │ │              │
+│   │  └─────────────┘  └─────────────┘  └─────────────┘  └──────────┘ │              │
+│   └──────────────────────────────┬───────────────────────────────────┘              │
+│                                  │                                                   │
+│              ┌───────────────────┼───────────────────┐                              │
+│              ▼                   ▼                   ▼                              │
+│   ┌──────────────────┐ ┌──────────────────┐ ┌──────────────────┐                   │
+│   │    CLIENT A      │ │    CLIENT B      │ │    CLIENT C      │                   │
+│   │  ┌────────────┐  │ │  ┌────────────┐  │ │  ┌────────────┐  │                   │
+│   │  │  Sentinel  │  │ │  │  Sentinel  │  │ │  │  Sentinel  │  │                   │
+│   │  │  Executor  │  │◄──►│  Executor  │◄──►│  │  Executor  │  │ P2P Mesh          │
+│   │  │  Watchdog  │  │ │  │  Watchdog  │  │ │  │  Watchdog  │  │                   │
+│   │  │  Policy    │  │ │  │  Policy    │  │ │  │  Policy    │  │                   │
+│   │  └────────────┘  │ │  └────────────┘  │ │  └────────────┘  │                   │
+│   └──────────────────┘ └──────────────────┘ └──────────────────┘                   │
+│                                                                                      │
+└─────────────────────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+##### AEDS.2: SDK Interfaces
+
+```csharp
+// =============================================================================
+// FILE: DataWarehouse.SDK/Distribution/IAedsCore.cs
+// =============================================================================
+
+namespace DataWarehouse.SDK.Distribution;
+
+#region Enums
+
+/// <summary>
+/// Delivery mode for distributing content.
+/// </summary>
+public enum DeliveryMode
+{
+    /// <summary>Direct delivery to a specific ClientID.</summary>
+    Unicast,
+
+    /// <summary>Delivery to all clients subscribed to a ChannelID.</summary>
+    Broadcast,
+
+    /// <summary>Delivery to a subset of clients matching criteria.</summary>
+    Multicast
+}
+
+/// <summary>
+/// Post-download action to perform on the client.
+/// </summary>
+public enum ActionPrimitive
+{
+    /// <summary>Silent background download (cache only).</summary>
+    Passive,
+
+    /// <summary>Download + Toast Notification.</summary>
+    Notify,
+
+    /// <summary>Download + Run Executable (Requires Code Signing).</summary>
+    Execute,
+
+    /// <summary>Download + Open File + Watchdog (Monitor for edits &amp; Sync back).</summary>
+    Interactive,
+
+    /// <summary>Custom action defined by ActionScript.</summary>
+    Custom
+}
+
+/// <summary>
+/// Notification urgency tier.
+/// </summary>
+public enum NotificationTier
+{
+    /// <summary>Log entry only, no user notification.</summary>
+    Silent = 1,
+
+    /// <summary>Transient popup/toast notification.</summary>
+    Toast = 2,
+
+    /// <summary>Persistent modal requiring user acknowledgement.</summary>
+    Modal = 3
+}
+
+/// <summary>
+/// Channel subscription type.
+/// </summary>
+public enum SubscriptionType
+{
+    /// <summary>Admin-enforced subscription, cannot be unsubscribed.</summary>
+    Mandatory,
+
+    /// <summary>User-initiated subscription, can opt-out.</summary>
+    Voluntary
+}
+
+/// <summary>
+/// Client trust level for zero-trust model.
+/// </summary>
+public enum ClientTrustLevel
+{
+    /// <summary>Unknown/unpaired client - all connections rejected.</summary>
+    Untrusted = 0,
+
+    /// <summary>Pending admin verification.</summary>
+    PendingVerification = 1,
+
+    /// <summary>Verified and paired client.</summary>
+    Trusted = 2,
+
+    /// <summary>Elevated trust for executing signed code.</summary>
+    Elevated = 3,
+
+    /// <summary>Administrative client with full capabilities.</summary>
+    Admin = 4
+}
+
+#endregion
+
+#region Records - Intent Manifest
+
+/// <summary>
+/// The Intent Manifest defines what to deliver and what to do after delivery.
+/// This is the fundamental unit of work in AEDS.
+/// </summary>
+public record IntentManifest
+{
+    /// <summary>Unique manifest identifier.</summary>
+    public required string ManifestId { get; init; }
+
+    /// <summary>When this manifest was created.</summary>
+    public required DateTimeOffset CreatedAt { get; init; }
+
+    /// <summary>When this manifest expires (optional).</summary>
+    public DateTimeOffset? ExpiresAt { get; init; }
+
+    /// <summary>The action to perform after delivery.</summary>
+    public required ActionPrimitive Action { get; init; }
+
+    /// <summary>Notification tier for user alerts.</summary>
+    public NotificationTier NotificationTier { get; init; } = NotificationTier.Toast;
+
+    /// <summary>Delivery mode (unicast, broadcast, multicast).</summary>
+    public required DeliveryMode DeliveryMode { get; init; }
+
+    /// <summary>Target ClientIDs for Unicast, or ChannelIDs for Broadcast.</summary>
+    public required string[] Targets { get; init; }
+
+    /// <summary>Priority level (0 = lowest, 100 = critical).</summary>
+    public int Priority { get; init; } = 50;
+
+    /// <summary>Payload descriptor (what to download).</summary>
+    public required PayloadDescriptor Payload { get; init; }
+
+    /// <summary>Custom action script (for ActionPrimitive.Custom).</summary>
+    public string? ActionScript { get; init; }
+
+    /// <summary>Cryptographic signature of this manifest.</summary>
+    public required ManifestSignature Signature { get; init; }
+
+    /// <summary>Additional metadata.</summary>
+    public Dictionary<string, object>? Metadata { get; init; }
+}
+
+/// <summary>
+/// Describes the payload to be delivered.
+/// </summary>
+public record PayloadDescriptor
+{
+    /// <summary>Unique payload identifier (content-addressable hash).</summary>
+    public required string PayloadId { get; init; }
+
+    /// <summary>Human-readable name.</summary>
+    public required string Name { get; init; }
+
+    /// <summary>MIME type of the payload.</summary>
+    public required string ContentType { get; init; }
+
+    /// <summary>Total size in bytes.</summary>
+    public required long SizeBytes { get; init; }
+
+    /// <summary>SHA-256 hash of the complete payload.</summary>
+    public required string ContentHash { get; init; }
+
+    /// <summary>Chunk hashes for integrity verification.</summary>
+    public string[]? ChunkHashes { get; init; }
+
+    /// <summary>Whether delta sync is available.</summary>
+    public bool DeltaAvailable { get; init; }
+
+    /// <summary>Base version for delta sync (if available).</summary>
+    public string? DeltaBaseVersion { get; init; }
+
+    /// <summary>Encryption info (null if unencrypted).</summary>
+    public PayloadEncryption? Encryption { get; init; }
+}
+
+/// <summary>
+/// Payload encryption information.
+/// </summary>
+public record PayloadEncryption
+{
+    /// <summary>Encryption algorithm used.</summary>
+    public required string Algorithm { get; init; }
+
+    /// <summary>Key ID for decryption (client must have access).</summary>
+    public required string KeyId { get; init; }
+
+    /// <summary>Key management mode.</summary>
+    public required string KeyMode { get; init; }
+}
+
+/// <summary>
+/// Cryptographic signature for the manifest.
+/// </summary>
+public record ManifestSignature
+{
+    /// <summary>Signing key identifier.</summary>
+    public required string KeyId { get; init; }
+
+    /// <summary>Signature algorithm (e.g., "Ed25519", "RSA-PSS-SHA256").</summary>
+    public required string Algorithm { get; init; }
+
+    /// <summary>Base64-encoded signature.</summary>
+    public required string Value { get; init; }
+
+    /// <summary>Certificate chain (for verification).</summary>
+    public string[]? CertificateChain { get; init; }
+
+    /// <summary>Whether this is a Release Signing Key (required for Execute action).</summary>
+    public required bool IsReleaseKey { get; init; }
+}
+
+#endregion
+
+#region Records - Client & Channel
+
+/// <summary>
+/// Registered AEDS client.
+/// </summary>
+public record AedsClient
+{
+    /// <summary>Unique client identifier.</summary>
+    public required string ClientId { get; init; }
+
+    /// <summary>Human-readable client name.</summary>
+    public required string Name { get; init; }
+
+    /// <summary>Client's public key for encrypted communications.</summary>
+    public required string PublicKey { get; init; }
+
+    /// <summary>Current trust level.</summary>
+    public required ClientTrustLevel TrustLevel { get; init; }
+
+    /// <summary>When the client was registered.</summary>
+    public required DateTimeOffset RegisteredAt { get; init; }
+
+    /// <summary>Last heartbeat timestamp.</summary>
+    public DateTimeOffset? LastHeartbeat { get; init; }
+
+    /// <summary>Subscribed channel IDs.</summary>
+    public required string[] SubscribedChannels { get; init; }
+
+    /// <summary>Client capabilities.</summary>
+    public ClientCapabilities Capabilities { get; init; }
+}
+
+/// <summary>
+/// Client capability flags.
+/// </summary>
+[Flags]
+public enum ClientCapabilities
+{
+    None = 0,
+    ReceivePassive = 1,
+    ReceiveNotify = 2,
+    ExecuteSigned = 4,
+    Interactive = 8,
+    P2PMesh = 16,
+    DeltaSync = 32,
+    AirGapMule = 64,
+    All = ReceivePassive | ReceiveNotify | ExecuteSigned | Interactive | P2PMesh | DeltaSync | AirGapMule
+}
+
+/// <summary>
+/// Distribution channel for pub/sub.
+/// </summary>
+public record DistributionChannel
+{
+    /// <summary>Unique channel identifier.</summary>
+    public required string ChannelId { get; init; }
+
+    /// <summary>Human-readable channel name.</summary>
+    public required string Name { get; init; }
+
+    /// <summary>Channel description.</summary>
+    public string? Description { get; init; }
+
+    /// <summary>Whether this is a mandatory subscription channel.</summary>
+    public required SubscriptionType SubscriptionType { get; init; }
+
+    /// <summary>Required trust level to receive from this channel.</summary>
+    public required ClientTrustLevel MinTrustLevel { get; init; }
+
+    /// <summary>Number of subscribers.</summary>
+    public int SubscriberCount { get; init; }
+
+    /// <summary>When the channel was created.</summary>
+    public required DateTimeOffset CreatedAt { get; init; }
+}
+
+#endregion
+
+#region Interfaces - Control Plane
+
+/// <summary>
+/// Control plane transport provider (WebSocket, MQTT, gRPC, etc.).
+/// Handles low-bandwidth signaling, commands, and heartbeats.
+/// </summary>
+public interface IControlPlaneTransport
+{
+    /// <summary>Transport identifier (e.g., "websocket", "mqtt").</summary>
+    string TransportId { get; }
+
+    /// <summary>Whether this transport is connected.</summary>
+    bool IsConnected { get; }
+
+    /// <summary>Connect to the control plane.</summary>
+    Task ConnectAsync(ControlPlaneConfig config, CancellationToken ct = default);
+
+    /// <summary>Disconnect from the control plane.</summary>
+    Task DisconnectAsync();
+
+    /// <summary>Send an intent manifest to clients.</summary>
+    Task SendManifestAsync(IntentManifest manifest, CancellationToken ct = default);
+
+    /// <summary>Receive intent manifests (client-side).</summary>
+    IAsyncEnumerable<IntentManifest> ReceiveManifestsAsync(CancellationToken ct = default);
+
+    /// <summary>Send heartbeat.</summary>
+    Task SendHeartbeatAsync(HeartbeatMessage heartbeat, CancellationToken ct = default);
+
+    /// <summary>Subscribe to a channel.</summary>
+    Task SubscribeChannelAsync(string channelId, CancellationToken ct = default);
+
+    /// <summary>Unsubscribe from a channel.</summary>
+    Task UnsubscribeChannelAsync(string channelId, CancellationToken ct = default);
+}
+
+public record ControlPlaneConfig(
+    string ServerUrl,
+    string ClientId,
+    string AuthToken,
+    TimeSpan HeartbeatInterval,
+    TimeSpan ReconnectDelay,
+    Dictionary<string, string>? Options = null
+);
+
+public record HeartbeatMessage(
+    string ClientId,
+    DateTimeOffset Timestamp,
+    ClientStatus Status,
+    Dictionary<string, object>? Metrics = null
+);
+
+public enum ClientStatus { Online, Busy, Away, Offline }
+
+#endregion
+
+#region Interfaces - Data Plane
+
+/// <summary>
+/// Data plane transport provider (HTTP/3, QUIC, HTTP/2, etc.).
+/// Handles high-bandwidth binary blob transfers.
+/// </summary>
+public interface IDataPlaneTransport
+{
+    /// <summary>Transport identifier (e.g., "http3", "quic").</summary>
+    string TransportId { get; }
+
+    /// <summary>Download a payload from the server.</summary>
+    Task<Stream> DownloadAsync(string payloadId, DataPlaneConfig config, IProgress<TransferProgress>? progress = null, CancellationToken ct = default);
+
+    /// <summary>Download with delta sync (if available).</summary>
+    Task<Stream> DownloadDeltaAsync(string payloadId, string baseVersion, DataPlaneConfig config, IProgress<TransferProgress>? progress = null, CancellationToken ct = default);
+
+    /// <summary>Upload a payload to the server.</summary>
+    Task<string> UploadAsync(Stream data, PayloadMetadata metadata, DataPlaneConfig config, IProgress<TransferProgress>? progress = null, CancellationToken ct = default);
+
+    /// <summary>Check if a payload exists on the server.</summary>
+    Task<bool> ExistsAsync(string payloadId, DataPlaneConfig config, CancellationToken ct = default);
+
+    /// <summary>Get payload info without downloading.</summary>
+    Task<PayloadDescriptor?> GetPayloadInfoAsync(string payloadId, DataPlaneConfig config, CancellationToken ct = default);
+}
+
+public record DataPlaneConfig(
+    string ServerUrl,
+    string AuthToken,
+    int MaxConcurrentChunks,
+    int ChunkSizeBytes,
+    TimeSpan Timeout,
+    Dictionary<string, string>? Options = null
+);
+
+public record TransferProgress(
+    long BytesTransferred,
+    long TotalBytes,
+    double PercentComplete,
+    double BytesPerSecond,
+    TimeSpan EstimatedRemaining
+);
+
+public record PayloadMetadata(
+    string Name,
+    string ContentType,
+    long SizeBytes,
+    string ContentHash,
+    Dictionary<string, object>? Tags = null
+);
+
+#endregion
+
+#region Interfaces - Server Components
+
+/// <summary>
+/// Server-side dispatcher for managing distribution jobs.
+/// </summary>
+public interface IServerDispatcher
+{
+    /// <summary>Queue a new distribution job.</summary>
+    Task<string> QueueJobAsync(IntentManifest manifest, CancellationToken ct = default);
+
+    /// <summary>Get job status.</summary>
+    Task<JobStatus> GetJobStatusAsync(string jobId, CancellationToken ct = default);
+
+    /// <summary>Cancel a queued job.</summary>
+    Task CancelJobAsync(string jobId, CancellationToken ct = default);
+
+    /// <summary>List all pending jobs.</summary>
+    Task<IReadOnlyList<DistributionJob>> ListJobsAsync(JobFilter? filter = null, CancellationToken ct = default);
+
+    /// <summary>Register a new client.</summary>
+    Task<AedsClient> RegisterClientAsync(ClientRegistration registration, CancellationToken ct = default);
+
+    /// <summary>Update client trust level (admin operation).</summary>
+    Task UpdateClientTrustAsync(string clientId, ClientTrustLevel newLevel, string adminId, CancellationToken ct = default);
+
+    /// <summary>Create a distribution channel.</summary>
+    Task<DistributionChannel> CreateChannelAsync(ChannelCreation channel, CancellationToken ct = default);
+
+    /// <summary>List all channels.</summary>
+    Task<IReadOnlyList<DistributionChannel>> ListChannelsAsync(CancellationToken ct = default);
+}
+
+public record DistributionJob(
+    string JobId,
+    IntentManifest Manifest,
+    JobStatus Status,
+    int TotalTargets,
+    int DeliveredCount,
+    int FailedCount,
+    DateTimeOffset QueuedAt,
+    DateTimeOffset? CompletedAt
+);
+
+public enum JobStatus { Queued, InProgress, Completed, PartiallyCompleted, Failed, Cancelled }
+
+public record JobFilter(
+    JobStatus? Status = null,
+    DateTimeOffset? Since = null,
+    string? ChannelId = null,
+    int Limit = 100
+);
+
+public record ClientRegistration(
+    string ClientName,
+    string PublicKey,
+    string VerificationPin,
+    ClientCapabilities Capabilities
+);
+
+public record ChannelCreation(
+    string Name,
+    string Description,
+    SubscriptionType SubscriptionType,
+    ClientTrustLevel MinTrustLevel
+);
+
+#endregion
+
+#region Interfaces - Client Components
+
+/// <summary>
+/// The Sentinel: Listens for wake-up signals from the Control Plane.
+/// </summary>
+public interface IClientSentinel
+{
+    /// <summary>Whether the sentinel is active.</summary>
+    bool IsActive { get; }
+
+    /// <summary>Start listening for manifests.</summary>
+    Task StartAsync(SentinelConfig config, CancellationToken ct = default);
+
+    /// <summary>Stop listening.</summary>
+    Task StopAsync();
+
+    /// <summary>Event raised when a manifest is received.</summary>
+    event EventHandler<ManifestReceivedEventArgs>? ManifestReceived;
+}
+
+public record SentinelConfig(
+    string ServerUrl,
+    string ClientId,
+    string PrivateKey,
+    string[] SubscribedChannels,
+    TimeSpan HeartbeatInterval
+);
+
+public class ManifestReceivedEventArgs : EventArgs
+{
+    public required IntentManifest Manifest { get; init; }
+    public required DateTimeOffset ReceivedAt { get; init; }
+}
+
+/// <summary>
+/// The Executor: Parses Manifests and executes actions.
+/// </summary>
+public interface IClientExecutor
+{
+    /// <summary>Execute an intent manifest.</summary>
+    Task<ExecutionResult> ExecuteAsync(IntentManifest manifest, ExecutorConfig config, CancellationToken ct = default);
+
+    /// <summary>Verify manifest signature.</summary>
+    Task<bool> VerifySignatureAsync(IntentManifest manifest);
+
+    /// <summary>Check if action is allowed by policy.</summary>
+    Task<PolicyDecision> EvaluatePolicyAsync(IntentManifest manifest, ClientPolicyEngine policy);
+}
+
+public record ExecutorConfig(
+    string CachePath,
+    string ExecutionSandbox,
+    bool AllowUnsigned,
+    Dictionary<string, string>? TrustedSigningKeys
+);
+
+public record ExecutionResult(
+    string ManifestId,
+    bool Success,
+    string? Error,
+    string? LocalPath,
+    DateTimeOffset ExecutedAt
+);
+
+public record PolicyDecision(
+    bool Allowed,
+    string Reason,
+    PolicyAction RequiredAction
+);
+
+public enum PolicyAction { Allow, Prompt, Deny, Sandbox }
+
+/// <summary>
+/// The Watchdog: Monitors local files for changes to trigger auto-sync.
+/// </summary>
+public interface IClientWatchdog
+{
+    /// <summary>Start watching a file for changes.</summary>
+    Task WatchAsync(string localPath, string payloadId, WatchdogConfig config, CancellationToken ct = default);
+
+    /// <summary>Stop watching a file.</summary>
+    Task UnwatchAsync(string localPath);
+
+    /// <summary>Get all watched files.</summary>
+    IReadOnlyList<WatchedFile> GetWatchedFiles();
+
+    /// <summary>Event raised when a watched file changes.</summary>
+    event EventHandler<FileChangedEventArgs>? FileChanged;
+}
+
+public record WatchdogConfig(
+    TimeSpan DebounceInterval,
+    bool AutoSync,
+    string SyncTargetUrl
+);
+
+public record WatchedFile(
+    string LocalPath,
+    string PayloadId,
+    DateTimeOffset LastModified,
+    bool PendingSync
+);
+
+public class FileChangedEventArgs : EventArgs
+{
+    public required string LocalPath { get; init; }
+    public required string PayloadId { get; init; }
+    public required FileChangeType ChangeType { get; init; }
+}
+
+public enum FileChangeType { Modified, Deleted, Renamed }
+
+/// <summary>
+/// Client-side policy engine for controlling behavior.
+/// </summary>
+public interface IClientPolicyEngine
+{
+    /// <summary>Evaluate whether to allow an action.</summary>
+    Task<PolicyDecision> EvaluateAsync(IntentManifest manifest, PolicyContext context);
+
+    /// <summary>Load policy rules.</summary>
+    Task LoadPolicyAsync(string policyPath);
+
+    /// <summary>Add a policy rule.</summary>
+    void AddRule(PolicyRule rule);
+}
+
+public record PolicyContext(
+    ClientTrustLevel SourceTrustLevel,
+    long FileSizeBytes,
+    NetworkType NetworkType,
+    int Priority,
+    bool IsPeer
+);
+
+public enum NetworkType { Wired, Wifi, Cellular, Metered, Offline }
+
+public record PolicyRule(
+    string Name,
+    string Condition,     // Expression like "Priority == 'Critical' AND NetworkType != 'Metered'"
+    PolicyAction Action,
+    string? Reason
+);
+
+#endregion
+```
+
+---
+
+##### AEDS.3: Abstract Base Classes
+
+```csharp
+// =============================================================================
+// FILE: DataWarehouse.SDK/Contracts/AedsPluginBases.cs
+// =============================================================================
+
+namespace DataWarehouse.SDK.Contracts;
+
+/// <summary>
+/// Base class for Control Plane transport plugins.
+/// </summary>
+public abstract class ControlPlaneTransportPluginBase : FeaturePluginBase, IControlPlaneTransport
+{
+    public abstract string TransportId { get; }
+    public bool IsConnected { get; protected set; }
+
+    protected ControlPlaneConfig? Config { get; private set; }
+
+    protected abstract Task EstablishConnectionAsync(ControlPlaneConfig config, CancellationToken ct);
+    protected abstract Task CloseConnectionAsync();
+    protected abstract Task TransmitManifestAsync(IntentManifest manifest, CancellationToken ct);
+    protected abstract IAsyncEnumerable<IntentManifest> ListenForManifestsAsync(CancellationToken ct);
+    protected abstract Task TransmitHeartbeatAsync(HeartbeatMessage heartbeat, CancellationToken ct);
+    protected abstract Task JoinChannelAsync(string channelId, CancellationToken ct);
+    protected abstract Task LeaveChannelAsync(string channelId, CancellationToken ct);
+
+    public async Task ConnectAsync(ControlPlaneConfig config, CancellationToken ct = default)
+    {
+        Config = config;
+        await EstablishConnectionAsync(config, ct);
+        IsConnected = true;
+    }
+
+    public async Task DisconnectAsync()
+    {
+        await CloseConnectionAsync();
+        IsConnected = false;
+    }
+
+    public Task SendManifestAsync(IntentManifest manifest, CancellationToken ct = default)
+        => TransmitManifestAsync(manifest, ct);
+
+    public IAsyncEnumerable<IntentManifest> ReceiveManifestsAsync(CancellationToken ct = default)
+        => ListenForManifestsAsync(ct);
+
+    public Task SendHeartbeatAsync(HeartbeatMessage heartbeat, CancellationToken ct = default)
+        => TransmitHeartbeatAsync(heartbeat, ct);
+
+    public Task SubscribeChannelAsync(string channelId, CancellationToken ct = default)
+        => JoinChannelAsync(channelId, ct);
+
+    public Task UnsubscribeChannelAsync(string channelId, CancellationToken ct = default)
+        => LeaveChannelAsync(channelId, ct);
+}
+
+/// <summary>
+/// Base class for Data Plane transport plugins.
+/// </summary>
+public abstract class DataPlaneTransportPluginBase : FeaturePluginBase, IDataPlaneTransport
+{
+    public abstract string TransportId { get; }
+
+    protected abstract Task<Stream> FetchPayloadAsync(string payloadId, DataPlaneConfig config, IProgress<TransferProgress>? progress, CancellationToken ct);
+    protected abstract Task<Stream> FetchDeltaAsync(string payloadId, string baseVersion, DataPlaneConfig config, IProgress<TransferProgress>? progress, CancellationToken ct);
+    protected abstract Task<string> PushPayloadAsync(Stream data, PayloadMetadata metadata, DataPlaneConfig config, IProgress<TransferProgress>? progress, CancellationToken ct);
+    protected abstract Task<bool> CheckExistsAsync(string payloadId, DataPlaneConfig config, CancellationToken ct);
+    protected abstract Task<PayloadDescriptor?> FetchInfoAsync(string payloadId, DataPlaneConfig config, CancellationToken ct);
+
+    public Task<Stream> DownloadAsync(string payloadId, DataPlaneConfig config, IProgress<TransferProgress>? progress = null, CancellationToken ct = default)
+        => FetchPayloadAsync(payloadId, config, progress, ct);
+
+    public Task<Stream> DownloadDeltaAsync(string payloadId, string baseVersion, DataPlaneConfig config, IProgress<TransferProgress>? progress = null, CancellationToken ct = default)
+        => FetchDeltaAsync(payloadId, baseVersion, config, progress, ct);
+
+    public Task<string> UploadAsync(Stream data, PayloadMetadata metadata, DataPlaneConfig config, IProgress<TransferProgress>? progress = null, CancellationToken ct = default)
+        => PushPayloadAsync(data, metadata, config, progress, ct);
+
+    public Task<bool> ExistsAsync(string payloadId, DataPlaneConfig config, CancellationToken ct = default)
+        => CheckExistsAsync(payloadId, config, ct);
+
+    public Task<PayloadDescriptor?> GetPayloadInfoAsync(string payloadId, DataPlaneConfig config, CancellationToken ct = default)
+        => FetchInfoAsync(payloadId, config, ct);
+}
+
+/// <summary>
+/// Base class for Server Dispatcher plugins.
+/// </summary>
+public abstract class ServerDispatcherPluginBase : FeaturePluginBase, IServerDispatcher
+{
+    protected readonly Dictionary<string, DistributionJob> _jobs = new();
+    protected readonly Dictionary<string, AedsClient> _clients = new();
+    protected readonly Dictionary<string, DistributionChannel> _channels = new();
+
+    protected abstract Task<string> EnqueueJobAsync(IntentManifest manifest, CancellationToken ct);
+    protected abstract Task ProcessJobAsync(string jobId, CancellationToken ct);
+    protected abstract Task<AedsClient> CreateClientAsync(ClientRegistration registration, CancellationToken ct);
+    protected abstract Task<DistributionChannel> CreateChannelInternalAsync(ChannelCreation channel, CancellationToken ct);
+
+    // Implementation delegates to abstract methods...
+    public Task<string> QueueJobAsync(IntentManifest manifest, CancellationToken ct = default) => EnqueueJobAsync(manifest, ct);
+    public Task<JobStatus> GetJobStatusAsync(string jobId, CancellationToken ct = default)
+        => Task.FromResult(_jobs.TryGetValue(jobId, out var job) ? job.Status : throw new KeyNotFoundException(jobId));
+    public Task CancelJobAsync(string jobId, CancellationToken ct = default) { /* implementation */ return Task.CompletedTask; }
+    public Task<IReadOnlyList<DistributionJob>> ListJobsAsync(JobFilter? filter = null, CancellationToken ct = default)
+        => Task.FromResult<IReadOnlyList<DistributionJob>>(_jobs.Values.ToList());
+    public Task<AedsClient> RegisterClientAsync(ClientRegistration registration, CancellationToken ct = default)
+        => CreateClientAsync(registration, ct);
+    public Task UpdateClientTrustAsync(string clientId, ClientTrustLevel newLevel, string adminId, CancellationToken ct = default) { /* implementation */ return Task.CompletedTask; }
+    public Task<DistributionChannel> CreateChannelAsync(ChannelCreation channel, CancellationToken ct = default)
+        => CreateChannelInternalAsync(channel, ct);
+    public Task<IReadOnlyList<DistributionChannel>> ListChannelsAsync(CancellationToken ct = default)
+        => Task.FromResult<IReadOnlyList<DistributionChannel>>(_channels.Values.ToList());
+}
+
+/// <summary>
+/// Base class for Client Sentinel plugins.
+/// </summary>
+public abstract class ClientSentinelPluginBase : FeaturePluginBase, IClientSentinel
+{
+    public bool IsActive { get; protected set; }
+    public event EventHandler<ManifestReceivedEventArgs>? ManifestReceived;
+
+    protected abstract Task StartListeningAsync(SentinelConfig config, CancellationToken ct);
+    protected abstract Task StopListeningAsync();
+
+    protected void OnManifestReceived(IntentManifest manifest)
+        => ManifestReceived?.Invoke(this, new ManifestReceivedEventArgs { Manifest = manifest, ReceivedAt = DateTimeOffset.UtcNow });
+
+    public async Task StartAsync(SentinelConfig config, CancellationToken ct = default)
+    {
+        await StartListeningAsync(config, ct);
+        IsActive = true;
+    }
+
+    public async Task StopAsync()
+    {
+        await StopListeningAsync();
+        IsActive = false;
+    }
+}
+
+/// <summary>
+/// Base class for Client Executor plugins.
+/// </summary>
+public abstract class ClientExecutorPluginBase : FeaturePluginBase, IClientExecutor
+{
+    protected abstract Task<ExecutionResult> PerformExecutionAsync(IntentManifest manifest, ExecutorConfig config, CancellationToken ct);
+    protected abstract Task<bool> ValidateSignatureAsync(IntentManifest manifest);
+    protected abstract Task<PolicyDecision> ApplyPolicyAsync(IntentManifest manifest, ClientPolicyEngine policy);
+
+    public Task<ExecutionResult> ExecuteAsync(IntentManifest manifest, ExecutorConfig config, CancellationToken ct = default)
+        => PerformExecutionAsync(manifest, config, ct);
+
+    public Task<bool> VerifySignatureAsync(IntentManifest manifest)
+        => ValidateSignatureAsync(manifest);
+
+    public Task<PolicyDecision> EvaluatePolicyAsync(IntentManifest manifest, ClientPolicyEngine policy)
+        => ApplyPolicyAsync(manifest, policy);
+}
+```
+
+---
+
+##### AEDS.4: Plugin Implementation Plan
+
+###### Core Plugins (Required)
+
+| Task | Plugin | Base Class | Description | Status |
+|------|--------|------------|-------------|--------|
+| AEDS-C1 | `AedsCorePlugin` | `FeaturePluginBase` | Core orchestration, manifest validation, job queue | [ ] |
+| AEDS-C2 | `IntentManifestSignerPlugin` | `FeaturePluginBase` | Ed25519/RSA signing for manifests | [ ] |
+| AEDS-C3 | `ServerDispatcherPlugin` | `ServerDispatcherPluginBase` | Default server-side job dispatch | [ ] |
+| AEDS-C4 | `ClientCourierPlugin` | `FeaturePluginBase` | Combines Sentinel + Executor + Watchdog | [ ] |
+
+###### Control Plane Transport Plugins (User Picks)
+
+| Task | Plugin | Base Class | Description | Status |
+|------|--------|------------|-------------|--------|
+| AEDS-CP1 | `WebSocketControlPlanePlugin` | `ControlPlaneTransportPluginBase` | WebSocket/SignalR transport | [ ] |
+| AEDS-CP2 | `MqttControlPlanePlugin` | `ControlPlaneTransportPluginBase` | MQTT 5.0 transport | [ ] |
+| AEDS-CP3 | `GrpcStreamingControlPlanePlugin` | `ControlPlaneTransportPluginBase` | gRPC bidirectional streaming | [ ] |
+
+###### Data Plane Transport Plugins (User Picks)
+
+| Task | Plugin | Base Class | Description | Status |
+|------|--------|------------|-------------|--------|
+| AEDS-DP1 | `Http3DataPlanePlugin` | `DataPlaneTransportPluginBase` | HTTP/3 over QUIC | [ ] |
+| AEDS-DP2 | `QuicDataPlanePlugin` | `DataPlaneTransportPluginBase` | Raw QUIC streams | [ ] |
+| AEDS-DP3 | `Http2DataPlanePlugin` | `DataPlaneTransportPluginBase` | HTTP/2 fallback | [ ] |
+| AEDS-DP4 | `WebTransportDataPlanePlugin` | `DataPlaneTransportPluginBase` | WebTransport for browsers | [ ] |
+
+###### Extension Plugins (Optional, Composable)
+
+| Task | Plugin | Description | Status |
+|------|--------|-------------|--------|
+| AEDS-X1 | `SwarmIntelligencePlugin` | P2P mesh with mDNS/DHT peer discovery | [ ] |
+| AEDS-X2 | `DeltaSyncPlugin` | Binary differencing (Rabin fingerprinting) | [ ] |
+| AEDS-X3 | `PreCogPlugin` | AI-based pre-fetching prediction | [ ] |
+| AEDS-X4 | `MulePlugin` | Air-gap USB transport support | [ ] |
+| AEDS-X5 | `GlobalDeduplicationPlugin` | Convergent encryption for dedup | [ ] |
+| AEDS-X6 | `NotificationPlugin` | Toast/Modal notification system | [ ] |
+| AEDS-X7 | `CodeSigningPlugin` | Release key management & verification | [ ] |
+| AEDS-X8 | `ClientPolicyEnginePlugin` | Local rule engine for auto-decisions | [ ] |
+| AEDS-X9 | `ZeroTrustPairingPlugin` | Client registration & key exchange | [ ] |
+
+---
+
+##### AEDS.5: Security Model
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                    ZERO-TRUST PAIRING PROCESS                        │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                      │
+│  1. Client generates Ed25519 Key Pair                               │
+│     ┌─────────────┐                                                 │
+│     │ Private Key │ (stored securely on client)                    │
+│     │ Public Key  │ (sent to server)                               │
+│     └─────────────┘                                                 │
+│                                                                      │
+│  2. Client sends Connection Request to Server                       │
+│     { ClientId, PublicKey, VerificationPIN }                        │
+│                                                                      │
+│  3. Admin verifies Client identity (out-of-band PIN display)        │
+│     Admin sees: "Client 'Marketing-PC-42' requests pairing: 847291" │
+│     Admin clicks: [Approve] or [Reject]                             │
+│                                                                      │
+│  4. Server signs Client's Public Key                                │
+│     ServerSignature = Sign(ClientPublicKey, ServerPrivateKey)       │
+│                                                                      │
+│  5. Result: Connection is Trusted                                   │
+│     Client can now receive manifests from this server               │
+│                                                                      │
+└─────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────┐
+│                    CODE SIGNING MANDATE                              │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                      │
+│  The Executor module REFUSES to run ANY binary or script unless:    │
+│                                                                      │
+│  1. The Intent Manifest is signed by a RELEASE SIGNING KEY          │
+│     (separate from Transport Key - defense in depth)                │
+│                                                                      │
+│  2. The Release Signing Key is in the client's trust store          │
+│                                                                      │
+│  3. The signature is valid and not expired                          │
+│                                                                      │
+│  WHY: Prevents the distribution system from becoming a botnet       │
+│       vector if the Server is compromised. An attacker would need   │
+│       to also compromise the offline Release Signing Key.           │
+│                                                                      │
+│  ┌──────────────────────┐    ┌──────────────────────┐               │
+│  │   Transport Key      │    │  Release Signing Key │               │
+│  │   (Online, Server)   │    │  (Offline, HSM)      │               │
+│  │                      │    │                      │               │
+│  │  Signs: Manifests    │    │  Signs: Executables  │               │
+│  │  Risk: If compromised│    │  Risk: Much harder   │               │
+│  │  attacker can push   │    │  to compromise       │               │
+│  │  data, NOT execute   │    │                      │               │
+│  └──────────────────────┘    └──────────────────────┘               │
+│                                                                      │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+##### AEDS.6: Client Policy Engine Rules
+
+```yaml
+# Example client policy configuration
+# FILE: client-policy.yaml
+
+rules:
+  - name: "Critical Priority Auto-Download"
+    condition: "Priority >= 90"
+    action: "Allow"
+    reason: "Critical updates download immediately"
+
+  - name: "Large File on Metered Network"
+    condition: "SizeBytes > 1073741824 AND NetworkType == 'Metered'"
+    action: "Prompt"
+    reason: "Large file (>1GB) on metered connection requires user approval"
+
+  - name: "Peer Source Sandbox"
+    condition: "IsPeer == true"
+    action: "Sandbox"
+    reason: "Content from peers must be sandboxed until verified"
+
+  - name: "Untrusted Source Deny"
+    condition: "SourceTrustLevel < 2"
+    action: "Deny"
+    reason: "Untrusted sources are blocked"
+
+  - name: "Execute Requires Elevated Trust"
+    condition: "Action == 'Execute' AND SourceTrustLevel < 3"
+    action: "Deny"
+    reason: "Execution requires elevated trust level"
+
+  - name: "Default Allow"
+    condition: "true"
+    action: "Allow"
+    reason: "Default policy"
+```
+
+---
+
+##### AEDS.7: Usage Examples
+
+```csharp
+// =============================================================================
+// EXAMPLE 1: Server pushing a security patch to all clients
+// =============================================================================
+
+var dispatcher = kernel.GetPlugin<IServerDispatcher>();
+
+var manifest = new IntentManifest
+{
+    ManifestId = Guid.NewGuid().ToString(),
+    CreatedAt = DateTimeOffset.UtcNow,
+    ExpiresAt = DateTimeOffset.UtcNow.AddDays(7),
+    Action = ActionPrimitive.Execute,
+    NotificationTier = NotificationTier.Modal,
+    DeliveryMode = DeliveryMode.Broadcast,
+    Targets = new[] { "#Security-Updates" },  // Channel broadcast
+    Priority = 95,  // Critical
+    Payload = new PayloadDescriptor
+    {
+        PayloadId = "patch-2026-001",
+        Name = "Security Patch 2026-001",
+        ContentType = "application/x-msdownload",
+        SizeBytes = 15_000_000,
+        ContentHash = "sha256:abc123...",
+        DeltaAvailable = true,
+        DeltaBaseVersion = "patch-2025-012"
+    },
+    Signature = await signer.SignManifestAsync(manifest, releaseKey)
+};
+
+var jobId = await dispatcher.QueueJobAsync(manifest);
+
+// =============================================================================
+// EXAMPLE 2: Client receiving and executing with policy evaluation
+// =============================================================================
+
+sentinel.ManifestReceived += async (sender, e) =>
+{
+    var manifest = e.Manifest;
+
+    // Verify signature first
+    if (!await executor.VerifySignatureAsync(manifest))
+    {
+        logger.LogWarning("Invalid signature on manifest {Id}", manifest.ManifestId);
+        return;
+    }
+
+    // Evaluate local policy
+    var context = new PolicyContext(
+        SourceTrustLevel: ClientTrustLevel.Trusted,
+        FileSizeBytes: manifest.Payload.SizeBytes,
+        NetworkType: NetworkType.Wifi,
+        Priority: manifest.Priority,
+        IsPeer: false
+    );
+
+    var decision = await executor.EvaluatePolicyAsync(manifest, policyEngine);
+
+    if (decision.Action == PolicyAction.Allow)
+    {
+        var result = await executor.ExecuteAsync(manifest, executorConfig);
+        logger.LogInformation("Executed manifest {Id}: {Success}", manifest.ManifestId, result.Success);
+    }
+    else if (decision.Action == PolicyAction.Prompt)
+    {
+        // Show UI to user for approval
+        await notificationService.PromptUserAsync(manifest, decision.Reason);
+    }
+};
+
+// =============================================================================
+// EXAMPLE 3: Using AEDS as a simple notification/chat system
+// =============================================================================
+
+// User enables ONLY the notification feature, disabling execution
+var config = new AedsClientConfig
+{
+    EnabledCapabilities = ClientCapabilities.ReceivePassive | ClientCapabilities.ReceiveNotify,
+    // ExecuteSigned is NOT enabled - this is a notification-only client
+};
+
+// Server sends a "chat message" as a notification-only manifest
+var chatManifest = new IntentManifest
+{
+    ManifestId = Guid.NewGuid().ToString(),
+    CreatedAt = DateTimeOffset.UtcNow,
+    Action = ActionPrimitive.Notify,  // No execution, just notify
+    NotificationTier = NotificationTier.Toast,
+    DeliveryMode = DeliveryMode.Broadcast,
+    Targets = new[] { "#Team-Chat" },
+    Priority = 30,
+    Payload = new PayloadDescriptor
+    {
+        PayloadId = "msg-" + Guid.NewGuid(),
+        Name = "New message from Alice",
+        ContentType = "text/plain",
+        SizeBytes = 256,
+        ContentHash = "sha256:...",
+    },
+    Metadata = new Dictionary<string, object>
+    {
+        ["sender"] = "alice@example.com",
+        ["message"] = "Hey team, the quarterly report is ready!",
+        ["timestamp"] = DateTimeOffset.UtcNow
+    },
+    Signature = await signer.SignManifestAsync(manifest, transportKey)
+};
+```
+
+---
+
+##### AEDS.8: Implementation Order
+
+| Phase | Tasks | Description | Dependencies |
+|-------|-------|-------------|--------------|
+| **Phase 1** | AEDS-C1, AEDS-C2 | Core infrastructure, manifest signing | None |
+| **Phase 2** | AEDS-CP1, AEDS-DP1 | Primary transports (WebSocket, HTTP/3) | Phase 1 |
+| **Phase 3** | AEDS-C3, AEDS-C4 | Server dispatcher, client courier | Phase 2 |
+| **Phase 4** | AEDS-X9, AEDS-X7 | Zero-trust pairing, code signing | Phase 3 |
+| **Phase 5** | AEDS-X8, AEDS-X6 | Policy engine, notifications | Phase 4 |
+| **Phase 6** | AEDS-CP2, AEDS-CP3 | Additional control plane transports | Phase 2 |
+| **Phase 7** | AEDS-DP2, AEDS-DP3, AEDS-DP4 | Additional data plane transports | Phase 2 |
+| **Phase 8** | AEDS-X1, AEDS-X2 | P2P mesh, delta sync | Phase 3 |
+| **Phase 9** | AEDS-X3, AEDS-X4, AEDS-X5 | Pre-cog AI, Mule, Dedup | Phase 3 |
+
+---
+
 ### Implementation Roadmap
 
 #### Pre-Phase 1: Pending/Defferred task from previous sprint
