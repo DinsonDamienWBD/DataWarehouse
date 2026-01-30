@@ -86,7 +86,9 @@
     <Project Path="Plugins/DataWarehouse.Plugins.GrpcInterface/DataWarehouse.Plugins.GrpcInterface.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.GrpcStorage/DataWarehouse.Plugins.GrpcStorage.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.GZipCompression/DataWarehouse.Plugins.GZipCompression.csproj" />
+    <Project Path="Plugins/DataWarehouse.Plugins.HardwareAcceleration/DataWarehouse.Plugins.HardwareAcceleration.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.HierarchicalQuorum/DataWarehouse.Plugins.HierarchicalQuorum.csproj" />
+    <Project Path="Plugins/DataWarehouse.Plugins.Hypervisor/DataWarehouse.Plugins.Hypervisor.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.HotReload/DataWarehouse.Plugins.HotReload.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.IAM/DataWarehouse.Plugins.IAM.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.Integrity/DataWarehouse.Plugins.Integrity.csproj" />
@@ -105,6 +107,7 @@
     <Project Path="Plugins/DataWarehouse.Plugins.Logzio/DataWarehouse.Plugins.Logzio.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.Lz4Compression/DataWarehouse.Plugins.Lz4Compression.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.Metabase/DataWarehouse.Plugins.Metabase.csproj" />
+    <Project Path="Plugins/DataWarehouse.Plugins.MilitarySecurity/DataWarehouse.Plugins.MilitarySecurity.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.Metadata/DataWarehouse.Plugins.Metadata.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.MetadataStorage/DataWarehouse.Plugins.MetadataStorage.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.MultiMaster/DataWarehouse.Plugins.MultiMaster.csproj" />
