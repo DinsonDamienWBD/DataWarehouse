@@ -509,14 +509,16 @@ These features represent the next generation of data storage technology, positio
 
 **Description:** Create a framework for connecting to any data source or destination.
 
+> **Code Review Note (2026-01-30):** PostgreSQL and Kafka connector plugins exist in `DataWarehouse.Plugins.DataConnectors/` but contain simulations (Task.Delay, generated sample records, no real database/broker connections). These are NOT production-ready and require real client library integration.
+
 **Connectors:**
 
 | Category | Connectors | Status |
 |----------|------------|--------|
-| Databases | PostgreSQL, MySQL, MongoDB, Cassandra, Redis | [ ] |
+| Databases | PostgreSQL, MySQL, MongoDB, Cassandra, Redis | [ ] SIMULATED - needs real Npgsql/drivers |
 | Cloud Storage | S3, Azure Blob, GCS, Backblaze B2, Wasabi | [x] Partial |
 | SaaS | Salesforce, HubSpot, Zendesk, Jira | [ ] |
-| Messaging | Kafka, RabbitMQ, Pulsar, NATS | [ ] |
+| Messaging | Kafka, RabbitMQ, Pulsar, NATS | [ ] SIMULATED - needs real Confluent.Kafka |
 | Analytics | Snowflake, Databricks, BigQuery | [ ] |
 | Enterprise | SAP, Oracle EBS, Microsoft Dynamics | [ ] |
 | Legacy | Mainframe, AS/400, Tape libraries | [ ] |
@@ -553,15 +555,22 @@ These features represent the next generation of data storage technology, positio
 
 **Description:** Optimize storage operations based on carbon intensity of power grid.
 
+> **Code Review Note (2026-01-30):** Plugins exist in `DataWarehouse.Plugins.CarbonAwareness/` but ALL contain simulations:
+> - `ElectricityMapsCarbonProviderPlugin.cs`: Static hardcoded region data, Task.Delay, Random variance
+> - `WattTimeCarbonProviderPlugin.cs`: Simulated authentication and API responses
+> - `DefaultGreenRegionSelectorPlugin.cs`: Simulated latency/availability data
+> - `SimulatedCarbonOffsetProviderPlugin.cs`: Explicitly named as simulation
+> These require real API integrations (Electricity Maps, WattTime, carbon offset providers) for production use.
+
 **Features:**
 
 | Feature | Description | Status |
 |---------|-------------|--------|
-| Carbon Intensity API | Real-time grid carbon data | [ ] |
-| Carbon-Aware Scheduling | Delay non-urgent ops | [ ] |
-| Green Region Preference | Route to renewable regions | [ ] |
-| Carbon Reporting | Track and report emissions | [ ] |
-| Carbon Offsetting | Integration with offset providers | [ ] |
+| Carbon Intensity API | Real-time grid carbon data | [ ] SIMULATED - needs real Electricity Maps/WattTime API |
+| Carbon-Aware Scheduling | Delay non-urgent ops | [ ] SIMULATED - in-memory only |
+| Green Region Preference | Route to renewable regions | [ ] SIMULATED - hardcoded latency data |
+| Carbon Reporting | Track and report emissions | [~] In-memory implementation exists |
+| Carbon Offsetting | Integration with offset providers | [ ] SIMULATED - no real offset provider API |
 
 ---
 
@@ -572,13 +581,19 @@ These features represent the next generation of data storage technology, positio
 
 **Description:** Automate compliance for all major regulatory frameworks.
 
+> **Code Review Note (2026-01-30):** Two separate plugin sets exist:
+> 1. **Production plugins** in `DataWarehouse.Plugins.Compliance/` - More complete implementations with real PAN detection, tokenization, audit logging
+> 2. **Simulated plugins** in `DataWarehouse.Plugins.ComplianceAutomation/` - All compliance check methods return hardcoded `true` or `Random.Shared.NextDouble()` values with Task.Delay
+>
+> The ComplianceAutomation plugins (GDPR, HIPAA, PCI-DSS) are NOT production-ready - they simulate checks instead of performing real compliance validation against system state.
+
 **Frameworks:**
 
 | Framework | Region | Industry | Status |
 |-----------|--------|----------|--------|
-| GDPR | EU | All | [x] Plugin exists |
-| HIPAA | US | Healthcare | [x] Plugin exists |
-| PCI-DSS | Global | Financial | [ ] |
+| GDPR | EU | All | [x] Plugin exists (Compliance/), [~] ComplianceAutomation/ SIMULATED |
+| HIPAA | US | Healthcare | [x] Plugin exists (Compliance/), [~] ComplianceAutomation/ SIMULATED |
+| PCI-DSS | Global | Financial | [x] Plugin exists (Compliance/), [~] ComplianceAutomation/ SIMULATED |
 | SOX | US | Public companies | [ ] |
 | FedRAMP | US | Government | [x] Plugin exists |
 | CCPA/CPRA | California | All | [ ] |
@@ -590,6 +605,13 @@ These features represent the next generation of data storage technology, positio
 | TISAX | Germany | Automotive | [ ] |
 | ISO 27001 | Global | All | [ ] |
 | SOC 2 Type II | Global | All | [x] Plugin exists |
+
+**Additional DSR/Audit Components:**
+
+| Component | Description | Status |
+|-----------|-------------|--------|
+| Data Subject Rights | GDPR/CCPA DSR handling | [~] In-memory implementation exists |
+| Compliance Audit Trail | Immutable audit logging | [~] In-memory implementation exists |
 
 ---
 
