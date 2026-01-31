@@ -57,11 +57,9 @@ public class WasabiConnectorPlugin : DataConnectorPluginBase
         {
             var props = (IReadOnlyDictionary<string, string?>)config.Properties;
 
-            var accessKey = props.GetValueOrDefault("AccessKey", "");
-
-            var secretKey = props.GetValueOrDefault("SecretKey", "");
-
-            var region = props.GetValueOrDefault("Region", "us-east-1");
+            string accessKey = props.GetValueOrDefault("AccessKey", "") ?? "";
+            string secretKey = props.GetValueOrDefault("SecretKey", "") ?? "";
+            string region = props.GetValueOrDefault("Region", "us-east-1") ?? "us-east-1";
             _bucketName = props.GetValueOrDefault("BucketName", "") ?? "";
 
             if (string.IsNullOrWhiteSpace(accessKey) || string.IsNullOrWhiteSpace(secretKey))
@@ -233,7 +231,7 @@ public class WasabiConnectorPlugin : DataConnectorPluginBase
             }
 
             request.ContinuationToken = response.NextContinuationToken;
-        } while (response.IsTruncated && !ct.IsCancellationRequested);
+        } while (response.IsTruncated == true && !ct.IsCancellationRequested);
     }
 
     /// <inheritdoc />
@@ -302,10 +300,13 @@ public class WasabiConnectorPlugin : DataConnectorPluginBase
                 try
                 {
                     // Validate stream length if available
-                    if (contentLength.HasValue && _config.MaxFileSizeBytes > 0 && contentLength.Value > _config.MaxFileSizeBytes)
+                    if (contentLength.HasValue && _config.MaxFileSizeBytes > 0)
                     {
-                        throw new InvalidOperationException(
-                            $"File size {contentLength.Value} bytes exceeds maximum allowed size of {_config.MaxFileSizeBytes} bytes");
+                        if (contentLength.Value > _config.MaxFileSizeBytes)
+                        {
+                            throw new InvalidOperationException(
+                                $"File size {contentLength.Value} bytes exceeds maximum allowed size of {_config.MaxFileSizeBytes} bytes");
+                        }
                     }
 
                     // Direct streaming upload without loading to MemoryStream

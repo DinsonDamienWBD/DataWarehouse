@@ -67,7 +67,7 @@ public class RedisConnectorPlugin : DatabaseConnectorPluginBase
             }
 
             // Parse database index from properties or use default
-            _databaseIndex = int.TryParse(props.GetValueOrDefault("Database", "0"), out var dbIdx)
+            _databaseIndex = int.TryParse(config.Properties?.GetValueOrDefault("Database", "0"), out var dbIdx)
                 ? dbIdx
                 : 0;
 
@@ -257,7 +257,14 @@ public class RedisConnectorPlugin : DatabaseConnectorPluginBase
         if (_database == null)
             throw new InvalidOperationException("Not connected to Redis");
 
-        return await _database.StringSetAsync(key, value, expiry);
+        if (expiry.HasValue)
+        {
+            return await _database.StringSetAsync(key, value, expiry.Value);
+        }
+        else
+        {
+            return await _database.StringSetAsync(key, value);
+        }
     }
 
     /// <summary>
@@ -769,7 +776,15 @@ public class RedisConnectorPlugin : DatabaseConnectorPluginBase
                     }
                 }
 
-                var success = await _database.StringSetAsync(key, value, expiry);
+                bool success;
+                if (expiry.HasValue)
+                {
+                    success = await _database.StringSetAsync(key, value, expiry.Value);
+                }
+                else
+                {
+                    success = await _database.StringSetAsync(key, value);
+                }
                 if (success)
                     written++;
                 else

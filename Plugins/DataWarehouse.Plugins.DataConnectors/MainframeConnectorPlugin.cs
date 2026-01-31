@@ -1,4 +1,5 @@
 using System.Data;
+using System.Data.Odbc;
 using System.Runtime.CompilerServices;
 using System.Text;
 using System.Net.Http;
@@ -6,7 +7,6 @@ using System.Net.Http.Json;
 using DataWarehouse.SDK.Connectors;
 using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Primitives;
-using IBM.Data.DB2.Core;
 
 namespace DataWarehouse.Plugins.DataConnectors;
 
@@ -19,7 +19,7 @@ namespace DataWarehouse.Plugins.DataConnectors;
 public class MainframeConnectorPlugin : DataConnectorPluginBase
 {
     private HttpClient? _httpClient;
-    private DB2Connection? _db2Connection;
+    private OdbcConnection? _db2Connection;
     private string? _zosConnectUrl;
     private string? _db2ConnectionString;
     private MainframeConnectorConfig _config = new();
@@ -120,15 +120,13 @@ public class MainframeConnectorPlugin : DataConnectorPluginBase
             {
                 try
                 {
-                    var connBuilder = new DB2ConnectionStringBuilder(_db2ConnectionString);
+                    var connBuilder = new OdbcConnectionStringBuilder(_db2ConnectionString);
 
-                    if (_config.Db2MaxPoolSize > 0)
-                        connBuilder.MaxPoolSize = _config.Db2MaxPoolSize;
-                    // Note: DB2ConnectionStringBuilder does not have ConnectionTimeout property
-                    // Connection timeout is handled through other connection parameters
+                    // Note: ODBC connection pooling is handled by the driver/DSN configuration
+                    // MaxPoolSize and ConnectionTimeout are configured in the ODBC Data Source settings
 
                     _db2ConnectionString = connBuilder.ConnectionString;
-                    _db2Connection = new DB2Connection(_db2ConnectionString);
+                    _db2Connection = new OdbcConnection(_db2ConnectionString);
                     await _db2Connection.OpenAsync(ct);
 
                     serverInfo["DB2Status"] = "Connected";
@@ -850,7 +848,7 @@ public class MainframeConnectorPlugin : DataConnectorPluginBase
     /// Writes a batch of records to DB2 z/OS.
     /// </summary>
     private async Task<(long written, long failed, List<string> errors)> WriteDb2BatchAsync(
-        DB2Connection connection,
+        OdbcConnection connection,
         System.Data.Common.DbTransaction transaction,
         string tableName,
         List<DataRecord> batch,
@@ -866,7 +864,7 @@ public class MainframeConnectorPlugin : DataConnectorPluginBase
             try
             {
                 await using var cmd = connection.CreateCommand();
-                cmd.Transaction = (DB2Transaction)transaction;
+                cmd.Transaction = (OdbcTransaction)transaction;
 
                 var columns = record.Values.Keys.ToArray();
 

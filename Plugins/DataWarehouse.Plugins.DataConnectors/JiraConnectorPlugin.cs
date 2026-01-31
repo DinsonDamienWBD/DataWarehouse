@@ -139,8 +139,8 @@ public class JiraConnectorPlugin : SaaSConnectorPluginBase
             ["grant_type"] = "authorization_code",
             ["client_id"] = _clientId!,
             ["client_secret"] = _clientSecret!,
-            ["code"] = authCode,
-            ["redirect_uri"] = redirectUri
+            ["code"] = authCode ?? "",
+            ["redirect_uri"] = redirectUri ?? ""
         });
 
         var response = await _httpClient!.PostAsync("https://auth.atlassian.com/oauth/token", content);

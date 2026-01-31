@@ -77,33 +77,33 @@ public class SnowflakeConnectorPlugin : DatabaseConnectorPluginBase
 
             // Apply configuration overrides
             if (!string.IsNullOrEmpty(_config.Account))
-                builder.Account = _config.Account;
+                builder["account"] = _config.Account;
             if (!string.IsNullOrEmpty(_config.User))
-                builder.User = _config.User;
+                builder["user"] = _config.User;
             if (!string.IsNullOrEmpty(_config.Password))
-                builder.Password = _config.Password;
+                builder["password"] = _config.Password;
             if (!string.IsNullOrEmpty(_config.Warehouse))
             {
-                builder.Warehouse = _config.Warehouse;
+                builder["warehouse"] = _config.Warehouse;
                 _currentWarehouse = _config.Warehouse;
             }
             if (!string.IsNullOrEmpty(_config.Database))
             {
-                builder.Database = _config.Database;
+                builder["db"] = _config.Database;
                 _currentDatabase = _config.Database;
             }
             if (!string.IsNullOrEmpty(_config.Schema))
             {
-                builder.Schema = _config.Schema;
+                builder["schema"] = _config.Schema;
                 _currentSchema = _config.Schema;
             }
             if (!string.IsNullOrEmpty(_config.Role))
             {
-                builder.Role = _config.Role;
+                builder["role"] = _config.Role;
                 _currentRole = _config.Role;
             }
             if (_config.ConnectionTimeout > 0)
-                builder.ConnectionTimeout = _config.ConnectionTimeout;
+                builder["connection_timeout"] = _config.ConnectionTimeout.ToString();
 
             _connectionString = builder.ToString();
 
@@ -192,7 +192,6 @@ public class SnowflakeConnectorPlugin : DatabaseConnectorPluginBase
             _currentDatabase = null;
             _currentSchema = null;
             _currentRole = null;
-            SnowflakeDbConnection.ClearAllPools();
         }
         finally
         {
@@ -367,7 +366,7 @@ public class SnowflakeConnectorPlugin : DatabaseConnectorPluginBase
               AND c.TABLE_NAME = :table
             ORDER BY c.ORDINAL_POSITION";
 
-        cmd.Parameters.Add(new SnowflakeDbParameter("table", tableName));
+        cmd.Parameters.Add(new SnowflakeDbParameter { ParameterName = "table", Value = tableName });
 
         var fields = new List<DataSchemaField>();
         var primaryKeys = new List<string>();
@@ -490,10 +489,10 @@ public class SnowflakeConnectorPlugin : DatabaseConnectorPluginBase
 
                 if (batch.Count >= options.BatchSize)
                 {
-                    var (w, f, e) = await WriteBatchAsync(conn, transaction, tableName, columns, batch, options.Mode, ct);
-                    written += w;
-                    failed += f;
-                    errors.AddRange(e);
+                    var result = await WriteBatchAsync(conn, (SnowflakeDbTransaction)transaction, tableName, columns, batch, options.Mode, ct);
+                    written += result.written;
+                    failed += result.failed;
+                    errors.AddRange(result.errors);
                     batch.Clear();
                 }
             }
@@ -501,10 +500,10 @@ public class SnowflakeConnectorPlugin : DatabaseConnectorPluginBase
             // Write remaining records
             if (batch.Count > 0)
             {
-                var (w, f, e) = await WriteBatchAsync(conn, transaction, tableName, columns, batch, options.Mode, ct);
-                written += w;
-                failed += f;
-                errors.AddRange(e);
+                var result = await WriteBatchAsync(conn, (SnowflakeDbTransaction)transaction, tableName, columns, batch, options.Mode, ct);
+                written += result.written;
+                failed += result.failed;
+                errors.AddRange(result.errors);
             }
 
             await transaction.CommitAsync(ct);
@@ -565,7 +564,7 @@ public class SnowflakeConnectorPlugin : DatabaseConnectorPluginBase
                 for (int i = 0; i < recordColumns.Length; i++)
                 {
                     var value = record.Values[recordColumns[i]];
-                    cmd.Parameters.Add(new SnowflakeDbParameter($"p{i}", value ?? DBNull.Value));
+                    cmd.Parameters.Add(new SnowflakeDbParameter { ParameterName = $"p{i}", Value = value ?? DBNull.Value });
                 }
 
                 await cmd.ExecuteNonQueryAsync(ct);

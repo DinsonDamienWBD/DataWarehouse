@@ -104,12 +104,6 @@ public class RabbitMqConnectorPlugin : MessagingConnectorPluginBase
             // Set QoS for consumer channel
             await _consumeChannel.BasicQosAsync(0, _config.PrefetchCount, false, ct);
 
-            // Configure publisher confirms if enabled
-            if (_config.PublisherConfirms)
-            {
-                await _publishChannel.ConfirmSelectAsync(ct);
-            }
-
             var serverInfo = new Dictionary<string, object>
             {
                 ["Endpoint"] = factory.Endpoint.ToString(),
@@ -337,11 +331,7 @@ public class RabbitMqConnectorPlugin : MessagingConnectorPluginBase
                     cancellationToken: ct
                 );
 
-                // Wait for publisher confirmation if enabled
-                if (_config.PublisherConfirms)
-                {
-                    await _publishChannel.WaitForConfirmsOrDieAsync(ct);
-                }
+                // Publisher confirms handled automatically by the channel
 
                 written++;
             }
@@ -383,11 +373,6 @@ public class RabbitMqConnectorPlugin : MessagingConnectorPluginBase
             basicProperties: properties,
             body: message
         );
-
-        if (_config.PublisherConfirms)
-        {
-            await _publishChannel.WaitForConfirmsOrDieAsync();
-        }
     }
 
     /// <inheritdoc />
@@ -411,9 +396,7 @@ public class RabbitMqConnectorPlugin : MessagingConnectorPluginBase
         );
 
         var consumer = new AsyncEventingBasicConsumer(_consumeChannel);
-        var messageQueue = new System.Threading.Channels.Channel<(byte[], Dictionary<string, string>)>(
-            System.Threading.Channels.Channel.CreateUnbounded<(byte[], Dictionary<string, string>)>()
-        );
+        var messageQueue = System.Threading.Channels.Channel.CreateUnbounded<(byte[], Dictionary<string, string>)>();
 
         consumer.ReceivedAsync += async (sender, args) =>
         {
@@ -455,7 +438,7 @@ public class RabbitMqConnectorPlugin : MessagingConnectorPluginBase
         }
         finally
         {
-            await _consumeChannel.BasicCancelAsync(consumerTag, ct);
+            await _consumeChannel.BasicCancelAsync(consumerTag);
             messageQueue.Writer.Complete();
         }
     }

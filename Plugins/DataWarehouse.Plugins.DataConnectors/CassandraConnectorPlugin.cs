@@ -388,12 +388,13 @@ public class CassandraConnectorPlugin : DatabaseConnectorPluginBase
             if (ct.IsCancellationRequested) yield break;
 
             var values = new Dictionary<string, object?>();
-            var columns = row.GetColumns();
 
-            foreach (var column in columns)
+            // Use rowSet column metadata to iterate through row values
+            for (int i = 0; i < rowSet.Columns.Length; i++)
             {
+                var column = rowSet.Columns[i];
                 var columnName = column.Name;
-                var value = row.IsNull(columnName) ? null : row.GetValue<object>(column.Type, columnName);
+                var value = row.IsNull(columnName) ? null : row.GetValue<object>(columnName);
                 values[columnName] = value;
             }
 
@@ -496,8 +497,9 @@ public class CassandraConnectorPlugin : DatabaseConnectorPluginBase
             }
         }
 
-        // Execute batch statement
-        if (batchStatement.Queries.Count > 0)
+        // Execute batch statement if it has statements
+        // Note: BatchStatement doesn't expose count, execute if we added any statements
+        if (batch.Count > failed)
         {
             try
             {
@@ -599,12 +601,13 @@ public class CassandraConnectorPlugin : DatabaseConnectorPluginBase
             if (ct.IsCancellationRequested) yield break;
 
             var values = new Dictionary<string, object?>();
-            var columns = row.GetColumns();
 
-            foreach (var column in columns)
+            // Use rowSet column metadata to iterate through row values
+            for (int i = 0; i < rowSet.Columns.Length; i++)
             {
+                var column = rowSet.Columns[i];
                 var columnName = column.Name;
-                values[columnName] = row.IsNull(columnName) ? null : row.GetValue<object>(column.Type, columnName);
+                values[columnName] = row.IsNull(columnName) ? null : row.GetValue<object>(columnName);
             }
 
             yield return new DataRecord(values, position++, DateTimeOffset.UtcNow);

@@ -344,7 +344,7 @@ public class DatabricksConnectorPlugin : DatabaseConnectorPluginBase
     private async Task<DataSchema> GetTableSchemaViaSqlAsync(string fullTableName, CancellationToken ct)
     {
         var sql = $"DESCRIBE TABLE EXTENDED {QuoteIdentifier(fullTableName)}";
-        var results = await ExecuteSqlQueryAsync(sql, ct);
+        var results = ExecuteSqlQueryAsync(sql, ct);
 
         var fields = new List<DataSchemaField>();
 
@@ -399,7 +399,7 @@ public class DatabricksConnectorPlugin : DatabaseConnectorPluginBase
 
         var sql = BuildSelectQuery(query);
 
-        await foreach (var record in ExecuteSqlQueryAsync(sql, ct).WithCancellation(ct))
+        await foreach (var record in ExecuteSqlQueryAsync(sql, ct))
         {
             yield return record;
         }

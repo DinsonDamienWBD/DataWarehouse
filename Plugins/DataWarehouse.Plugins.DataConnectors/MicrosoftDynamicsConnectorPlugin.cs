@@ -115,8 +115,8 @@ public class MicrosoftDynamicsConnectorPlugin : SaaSConnectorPluginBase
 
             var serverInfo = new Dictionary<string, object>
             {
-                ["ResourceUrl"] = _resourceUrl,
-                ["ApiVersion"] = _apiVersion,
+                ["ResourceUrl"] = _resourceUrl ?? "",
+                ["ApiVersion"] = _apiVersion ?? "",
                 ["AuthType"] = "AzureAD_OAuth2",
                 ["UserId"] = whoAmI.GetValueOrDefault("UserId", ""),
                 ["BusinessUnitId"] = whoAmI.GetValueOrDefault("BusinessUnitId", ""),
@@ -341,23 +341,8 @@ public class MicrosoftDynamicsConnectorPlugin : SaaSConnectorPluginBase
         var entitySetName = query.TableOrCollection ?? "accounts";
         string url;
 
-        // Check if FetchXML query is provided
-        if (query.CustomParameters?.ContainsKey("FetchXml") == true)
-        {
-            var fetchXml = query.CustomParameters["FetchXml"]?.ToString();
-            if (!string.IsNullOrWhiteSpace(fetchXml))
-            {
-                url = $"{_resourceUrl}/api/data/{_apiVersion}/{entitySetName}?fetchXml={Uri.EscapeDataString(fetchXml)}";
-            }
-            else
-            {
-                url = BuildODataUrl(entitySetName, query);
-            }
-        }
-        else
-        {
-            url = BuildODataUrl(entitySetName, query);
-        }
+        // Build OData URL (FetchXML not supported via CustomParameters)
+        url = BuildODataUrl(entitySetName, query);
 
         long position = 0;
 
@@ -396,8 +381,8 @@ public class MicrosoftDynamicsConnectorPlugin : SaaSConnectorPluginBase
 
             // Check for next page (pagination)
             url = root.TryGetProperty("@odata.nextLink", out var nextLink) && nextLink.ValueKind != JsonValueKind.Null
-                ? nextLink.GetString()
-                : null!;
+                ? nextLink.GetString() ?? ""
+                : "";
         }
     }
 
@@ -429,25 +414,7 @@ public class MicrosoftDynamicsConnectorPlugin : SaaSConnectorPluginBase
             queryParams.Add($"$top={query.Limit.Value}");
         }
 
-        // $expand (from custom parameters)
-        if (query.CustomParameters?.ContainsKey("$expand") == true)
-        {
-            var expand = query.CustomParameters["$expand"]?.ToString();
-            if (!string.IsNullOrWhiteSpace(expand))
-            {
-                queryParams.Add($"$expand={Uri.EscapeDataString(expand)}");
-            }
-        }
-
-        // $orderby (from custom parameters)
-        if (query.CustomParameters?.ContainsKey("$orderby") == true)
-        {
-            var orderby = query.CustomParameters["$orderby"]?.ToString();
-            if (!string.IsNullOrWhiteSpace(orderby))
-            {
-                queryParams.Add($"$orderby={Uri.EscapeDataString(orderby)}");
-            }
-        }
+        // Note: $expand and $orderby can be added via Filter parameter if needed
 
         var queryString = queryParams.Count > 0 ? "?" + string.Join("&", queryParams) : "";
         return $"{_resourceUrl}/api/data/{_apiVersion}/{entitySetName}{queryString}";
@@ -498,8 +465,8 @@ public class MicrosoftDynamicsConnectorPlugin : SaaSConnectorPluginBase
         await EnsureValidTokenAsync();
 
         var entitySetName = options.TargetTable ?? throw new ArgumentException("Target entity set name is required");
-        var mode = options.Mode ?? "Insert";
-        var batchSize = options.BatchSize ?? 100;
+        var mode = options.Mode;
+        var batchSize = options.BatchSize;
         if (batchSize > 1000) batchSize = 1000; // Dynamics 365 limit
 
         long written = 0;
@@ -545,7 +512,7 @@ public class MicrosoftDynamicsConnectorPlugin : SaaSConnectorPluginBase
     private async Task<(long Written, long Failed, string[]? Errors)> ExecuteBatchWriteAsync(
         string entitySetName,
         List<DataRecord> records,
-        string mode,
+        SDK.Connectors.WriteMode mode,
         CancellationToken ct)
     {
         await EnsureValidTokenAsync();
@@ -573,7 +540,7 @@ public class MicrosoftDynamicsConnectorPlugin : SaaSConnectorPluginBase
                 DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull
             });
 
-            if (mode.Equals("Update", StringComparison.OrdinalIgnoreCase))
+            if (mode == SDK.Connectors.WriteMode.Update)
             {
                 var id = record.Values.GetValueOrDefault("id")?.ToString();
                 if (string.IsNullOrEmpty(id))
@@ -582,7 +549,7 @@ public class MicrosoftDynamicsConnectorPlugin : SaaSConnectorPluginBase
                 }
                 content.AppendLine($"PATCH {_resourceUrl}/api/data/{_apiVersion}/{entitySetName}({id}) HTTP/1.1");
             }
-            else if (mode.Equals("Upsert", StringComparison.OrdinalIgnoreCase))
+            else if (mode == SDK.Connectors.WriteMode.Upsert)
             {
                 var id = record.Values.GetValueOrDefault("id")?.ToString();
                 if (!string.IsNullOrEmpty(id))

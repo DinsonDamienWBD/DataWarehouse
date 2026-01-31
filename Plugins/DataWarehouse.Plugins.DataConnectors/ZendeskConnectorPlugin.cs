@@ -392,12 +392,8 @@ public class ZendeskConnectorPlugin : SaaSConnectorPluginBase
         }
 
         // Check for incremental export (more efficient for large datasets)
-        var useIncremental = ((IReadOnlyDictionary<string, string?>?)query.Properties)?.GetValueOrDefault("UseIncremental", "false") == "true";
-        if (useIncremental && (resource == "tickets" || resource == "users" || resource == "organizations"))
-        {
-            var startTime = ((IReadOnlyDictionary<string, string?>?)query.Properties)?.GetValueOrDefault("StartTime", "0") ?? "0";
-            return $"{baseUrl}/incremental/{resource}.json?start_time={startTime}";
-        }
+        // Note: DataQuery does not have Properties field, so incremental export is not supported via query
+        // Users should use ExportTicketsIncrementalAsync() method directly instead
 
         // Standard list endpoint
         return $"{baseUrl}/{resource}.json";

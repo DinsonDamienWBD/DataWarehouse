@@ -416,12 +416,14 @@ public class BigQueryConnectorPlugin : DatabaseConnectorPluginBase
                 {
                     var insertResult = await _client.InsertRowsAsync(tableRef, batch, cancellationToken: ct);
 
-                    if (insertResult.Errors != null && insertResult.Errors.Count > 0)
+                    if (insertResult.Errors != null && insertResult.Errors.Any())
                     {
                         foreach (var error in insertResult.Errors)
                         {
                             failed++;
-                            errors.Add($"Row insert error: {string.Join(", ", error.Select(e => e.Message))}");
+                            // BigQueryInsertRowErrors is IEnumerable<SingleError>, not a container with Errors property
+                            var errorMessages = error.Select(e => e.Message);
+                            errors.Add($"Row insert error: {string.Join(", ", errorMessages)}");
                         }
                     }
                     else
@@ -446,12 +448,14 @@ public class BigQueryConnectorPlugin : DatabaseConnectorPluginBase
             {
                 var insertResult = await _client.InsertRowsAsync(tableRef, batch, cancellationToken: ct);
 
-                if (insertResult.Errors != null && insertResult.Errors.Count > 0)
+                if (insertResult.Errors != null && insertResult.Errors.Any())
                 {
                     foreach (var error in insertResult.Errors)
                     {
                         failed++;
-                        errors.Add($"Row insert error: {string.Join(", ", error.Select(e => e.Message))}");
+                        // BigQueryInsertRowErrors is IEnumerable<SingleError>, not a container with Errors property
+                        var errorMessages = error.Select(e => e.Message);
+                        errors.Add($"Row insert error: {string.Join(", ", errorMessages)}");
                     }
                 }
                 else

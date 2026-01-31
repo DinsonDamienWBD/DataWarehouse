@@ -147,12 +147,12 @@ public class HubSpotConnectorPlugin : SaaSConnectorPluginBase
 
         if (grantType == "refresh_token")
         {
-            formData["refresh_token"] = refreshToken;
+            formData["refresh_token"] = refreshToken ?? "";
         }
         else
         {
-            formData["code"] = authCode;
-            formData["redirect_uri"] = redirectUri;
+            formData["code"] = authCode ?? "";
+            formData["redirect_uri"] = redirectUri ?? "";
         }
 
         var content = new FormUrlEncodedContent(formData);

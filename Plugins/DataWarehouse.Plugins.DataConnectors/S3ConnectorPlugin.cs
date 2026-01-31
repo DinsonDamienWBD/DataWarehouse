@@ -102,19 +102,11 @@ public class S3ConnectorPlugin : DataConnectorPluginBase
         {
             var props = (IReadOnlyDictionary<string, string?>)config.Properties;
 
-            var accessKey = props.GetValueOrDefault("AccessKey", "");
-            var props = (IReadOnlyDictionary<string, string?>)config.Properties;
-
-            var secretKey = props.GetValueOrDefault("SecretKey", "");
-            var props = (IReadOnlyDictionary<string, string?>)config.Properties;
-
-            var region = props.GetValueOrDefault("Region", "us-east-1");
-            var props = (IReadOnlyDictionary<string, string?>)config.Properties;
-
-            var useCredentialChain = props.GetValueOrDefault("UseCredentialChain", "false").Equals("true", StringComparison.OrdinalIgnoreCase);
-            var props = (IReadOnlyDictionary<string, string?>)config.Properties;
-
-            var profileName = props.GetValueOrDefault("ProfileName", "");
+            var accessKey = props.GetValueOrDefault("AccessKey", "") ?? "";
+            var secretKey = props.GetValueOrDefault("SecretKey", "") ?? "";
+            var region = props.GetValueOrDefault("Region", "us-east-1") ?? "us-east-1";
+            var useCredentialChain = (props.GetValueOrDefault("UseCredentialChain", "false") ?? "false").Equals("true", StringComparison.OrdinalIgnoreCase);
+            var profileName = props.GetValueOrDefault("ProfileName", "") ?? "";
             _bucketName = props.GetValueOrDefault("BucketName", "") ?? "";
 
             var s3Config = new AmazonS3Config
@@ -214,7 +206,8 @@ public class S3ConnectorPlugin : DataConnectorPluginBase
     /// <inheritdoc />
     protected override async Task<bool> PingAsync()
     {
-        if (_s3Client == null || _retryPolicy == null) return false;
+        if (_s3Client == null) return false;
+        if (_retryPolicy == null) return false;
 
         try
         {
@@ -300,7 +293,7 @@ public class S3ConnectorPlugin : DataConnectorPluginBase
             }
 
             request.ContinuationToken = response.NextContinuationToken;
-        } while (response.IsTruncated && !ct.IsCancellationRequested);
+        } while (response.IsTruncated == true && !ct.IsCancellationRequested);
     }
 
     /// <summary>

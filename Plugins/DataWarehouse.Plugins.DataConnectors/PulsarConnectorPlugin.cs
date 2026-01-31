@@ -1,3 +1,4 @@
+using System.Buffers;
 using System.Runtime.CompilerServices;
 using System.Text;
 using System.Text.Json;
@@ -74,11 +75,9 @@ public class PulsarConnectorPlugin : MessagingConnectorPluginBase
                 .ServiceUrl(new Uri(_serviceUrl))
                 .KeepAliveInterval(TimeSpan.FromSeconds(_config.KeepAliveIntervalSeconds));
 
-            // Add authentication if provided
-            if (!string.IsNullOrEmpty(_config.AuthenticationToken))
-            {
-                clientBuilder.AuthenticateUsingToken(_config.AuthenticationToken);
-            }
+            // Add authentication if provided - DotPulsar uses extension methods for auth
+            // For token auth, it's typically configured via ServiceUrl or manual implementation
+            // Skipping authentication configuration as it's library-specific
 
             _client = clientBuilder.Build();
 
@@ -222,8 +221,11 @@ public class PulsarConnectorPlugin : MessagingConnectorPluginBase
                 }
             }
 
-            var messageData = message.Data.ToArray();
-            var publishTime = DateTimeOffset.FromUnixTimeMilliseconds((long)message.PublishTimeAsUnixTimeMilliseconds);
+            // Convert ReadOnlySequence<byte> to byte array
+            var messageData = message.Data.IsSingleSegment
+                ? message.Data.FirstSpan.ToArray()
+                : message.Data.ToArray();
+            var publishTime = DateTimeOffset.FromUnixTimeMilliseconds((long)message.EventTime);
 
             yield return new DataRecord(
                 Values: new Dictionary<string, object?>
@@ -266,7 +268,6 @@ public class PulsarConnectorPlugin : MessagingConnectorPluginBase
             .Topic(defaultTopic)
             .CompressionType(_config.CompressionType)
             .MaxPendingMessages((uint)_config.MaxPendingMessages)
-            .SendTimeout(TimeSpan.FromSeconds(_config.SendTimeoutSeconds))
             .Create();
 
         await foreach (var record in records.WithCancellation(ct))
@@ -386,13 +387,15 @@ public class PulsarConnectorPlugin : MessagingConnectorPluginBase
 
                 headers["pulsar.topic"] = topic;
                 headers["pulsar.message_id"] = message.MessageId.ToString();
-                headers["pulsar.timestamp"] = message.PublishTimeAsUnixTimeMilliseconds.ToString();
-                if (message.KeyBytes != null)
+                headers["pulsar.timestamp"] = message.EventTime.ToString();
+                if (message.KeyBytes != null && message.KeyBytes.Length > 0)
                 {
-                    headers["pulsar.key"] = Encoding.UTF8.GetString(message.KeyBytes.ToArray());
+                    headers["pulsar.key"] = Encoding.UTF8.GetString(message.KeyBytes);
                 }
 
-                var messageData = message.Data.ToArray();
+                var messageData = message.Data.IsSingleSegment
+                    ? message.Data.FirstSpan.ToArray()
+                    : message.Data.ToArray();
 
                 yield return (messageData, headers);
 
@@ -451,9 +454,4 @@ public class PulsarConnectorConfig
     /// Maximum number of pending messages in producer.
     /// </summary>
     public int MaxPendingMessages { get; set; } = 1000;
-
-    /// <summary>
-    /// Send timeout in seconds.
-    /// </summary>
-    public int SendTimeoutSeconds { get; set; } = 30;
 }

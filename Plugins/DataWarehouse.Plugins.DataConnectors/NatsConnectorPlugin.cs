@@ -68,13 +68,13 @@ public class NatsConnectorPlugin : MessagingConnectorPluginBase
             }
 
             // Build NATS options with authentication
-            NatsAuthOpts? authOpts = null;
+            NatsAuthOpts authOpts = NatsAuthOpts.Default;
             if (!string.IsNullOrEmpty(_config.Username))
             {
                 authOpts = new NatsAuthOpts
                 {
                     Username = _config.Username,
-                    Password = _config.Password ?? ""
+                    Password = _config.Password
                 };
             }
             else if (!string.IsNullOrEmpty(_config.Token))
@@ -247,7 +247,7 @@ public class NatsConnectorPlugin : MessagingConnectorPluginBase
                 {
                     foreach (var header in msg.Headers)
                     {
-                        headers[header.Key] = string.Join(",", header.Value ?? Array.Empty<string>());
+                        headers[header.Key] = string.Join(",", header.Value.ToArray());
                     }
                 }
 
@@ -295,7 +295,7 @@ public class NatsConnectorPlugin : MessagingConnectorPluginBase
             {
                 foreach (var header in msg.Headers)
                 {
-                    headers[header.Key] = string.Join(",", header.Value ?? Array.Empty<string>());
+                    headers[header.Key] = string.Join(",", header.Value.ToArray());
                 }
             }
 
@@ -452,7 +452,7 @@ public class NatsConnectorPlugin : MessagingConnectorPluginBase
             {
                 foreach (var header in msg.Headers)
                 {
-                    headers[header.Key] = string.Join(",", header.Value ?? Array.Empty<string>());
+                    headers[header.Key] = string.Join(",", header.Value.ToArray());
                 }
             }
 

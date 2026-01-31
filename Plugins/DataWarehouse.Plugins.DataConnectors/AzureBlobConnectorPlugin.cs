@@ -181,7 +181,7 @@ public class AzureBlobConnectorPlugin : DataConnectorPluginBase
         var containerClient = _serviceClient.GetBlobContainerClient(container);
         long position = 0;
 
-        await foreach (var blobItem in containerClient.GetBlobsAsync(prefix: prefix, cancellationToken: ct))
+        await foreach (var blobItem in containerClient.GetBlobsAsync(BlobTraits.None, BlobStates.None, prefix: prefix, cancellationToken: ct))
         {
             if (ct.IsCancellationRequested) yield break;
 

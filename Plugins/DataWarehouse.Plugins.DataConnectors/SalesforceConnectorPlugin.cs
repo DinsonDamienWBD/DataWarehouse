@@ -70,7 +70,7 @@ public class SalesforceConnectorPlugin : SaaSConnectorPluginBase
 
             var serverInfo = new Dictionary<string, object>
             {
-                ["InstanceUrl"] = _instanceUrl,
+                ["InstanceUrl"] = _instanceUrl ?? "",
                 ["AuthType"] = "OAuth2",
                 ["ApiVersion"] = "v57.0",
                 ["BulkApiSupport"] = true
@@ -102,8 +102,8 @@ public class SalesforceConnectorPlugin : SaaSConnectorPluginBase
             ["grant_type"] = "password",
             ["client_id"] = _clientId!,
             ["client_secret"] = _clientSecret!,
-            ["username"] = username,
-            ["password"] = password + securityToken
+            ["username"] = username ?? "",
+            ["password"] = (password ?? "") + (securityToken ?? "")
         });
 
         var response = await ExecuteWithRetryAsync(
@@ -374,12 +374,12 @@ public class SalesforceConnectorPlugin : SaaSConnectorPluginBase
         ValidateSObjectName(sobject);
 
         // Determine operation mode
-        var operation = options.Mode.ToLowerInvariant() switch
+        var operation = options.Mode switch
         {
-            "insert" or "create" => "insert",
-            "update" => "update",
-            "upsert" => "upsert",
-            "delete" => "delete",
+            SDK.Connectors.WriteMode.Insert => "insert",
+            SDK.Connectors.WriteMode.Update => "update",
+            SDK.Connectors.WriteMode.Upsert => "upsert",
+            SDK.Connectors.WriteMode.Delete => "delete",
             _ => "insert"
         };
 
