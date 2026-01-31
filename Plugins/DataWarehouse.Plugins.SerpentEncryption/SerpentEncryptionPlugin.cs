@@ -2,7 +2,6 @@ using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Primitives;
 using DataWarehouse.SDK.Security;
 using DataWarehouse.SDK.Utilities;
-using System.Collections.Concurrent;
 using System.Runtime.CompilerServices;
 using System.Security.Cryptography;
 using System.Text;
@@ -11,6 +10,7 @@ namespace DataWarehouse.Plugins.SerpentEncryption;
 
 /// <summary>
 /// Production-ready Serpent-256-CTR-HMAC encryption plugin for DataWarehouse.
+/// Extends EncryptionPluginBase for composable key management with Direct and Envelope modes.
 /// Implements the full Serpent block cipher according to the official specification.
 ///
 /// Serpent Cipher Specification:
@@ -22,12 +22,16 @@ namespace DataWarehouse.Plugins.SerpentEncryption;
 ///
 /// Security Features:
 /// - CTR mode for encryption (parallelizable, no padding required)
-/// - HMAC-SHA256 authentication (128-bit tag)
+/// - HMAC-SHA256 authentication (256-bit tag)
 /// - Cryptographically secure random nonce generation (128-bit)
-/// - Key management integration via IKeyStore interface
+/// - Composable key management: Direct mode (IKeyStore) or Envelope mode (IEnvelopeKeyStore)
 /// - Secure memory clearing for sensitive data (CryptographicOperations.ZeroMemory)
 ///
-/// Header Format: [KeyIdLength:4][KeyId:variable][Nonce:16][Tag:32][Ciphertext]
+/// Data Format (when using manifest-based metadata):
+/// [IV:16][Tag:32][Ciphertext:...]
+///
+/// Legacy Format (backward compatibility for old encrypted files):
+/// [KeyIdLength:4][KeyId:variable][Nonce:16][Tag:32][Ciphertext]
 ///
 /// Thread Safety: All operations are thread-safe.
 ///
@@ -36,18 +40,9 @@ namespace DataWarehouse.Plugins.SerpentEncryption;
 /// - serpent.encryption.stats: Get encryption statistics
 /// - serpent.encryption.setKeyStore: Set the key store
 /// </summary>
-public sealed class SerpentEncryptionPlugin : PipelinePluginBase, IDisposable
+public sealed class SerpentEncryptionPlugin : EncryptionPluginBase
 {
     private readonly SerpentEncryptionConfig _config;
-    private readonly object _statsLock = new();
-    private readonly ConcurrentDictionary<string, DateTime> _keyAccessLog = new();
-    private IKeyStore? _keyStore;
-    private ISecurityContext? _securityContext;
-    private long _encryptionCount;
-    private long _decryptionCount;
-    private long _totalBytesEncrypted;
-    private long _totalBytesDecrypted;
-    private bool _disposed;
 
     /// <summary>
     /// PHI constant used in Serpent key schedule (golden ratio fractional part).
@@ -55,24 +50,32 @@ public sealed class SerpentEncryptionPlugin : PipelinePluginBase, IDisposable
     private const uint PHI = 0x9E3779B9;
 
     /// <summary>
-    /// Nonce size for CTR mode (128 bits = 16 bytes, matching Serpent block size).
-    /// </summary>
-    private const int NonceSizeBytes = 16;
-
-    /// <summary>
-    /// HMAC-SHA256 tag size (256 bits = 32 bytes).
-    /// </summary>
-    private const int TagSizeBytes = 32;
-
-    /// <summary>
-    /// Key size for Serpent-256 (256 bits = 32 bytes).
-    /// </summary>
-    private const int KeySizeBytes = 32;
-
-    /// <summary>
-    /// Maximum key ID length in header.
+    /// Maximum key ID length in legacy header format.
     /// </summary>
     private const int MaxKeyIdLength = 64;
+
+    /// <summary>
+    /// Size of key ID length prefix (4 bytes for Int32) - for legacy format only.
+    /// </summary>
+    private const int KeyIdLengthSize = 4;
+
+    #region Abstract Property Overrides
+
+    /// <inheritdoc/>
+    protected override int KeySizeBytes => 32; // 256 bits
+
+    /// <inheritdoc/>
+    protected override int IvSizeBytes => 16; // 128 bits for CTR mode
+
+    /// <inheritdoc/>
+    protected override int TagSizeBytes => 32; // 256 bits for HMAC-SHA256
+
+    /// <inheritdoc/>
+    protected override string AlgorithmId => "Serpent-256-CTR-HMAC";
+
+    #endregion
+
+    #region Plugin Identity
 
     /// <inheritdoc/>
     public override string Id => "datawarehouse.plugins.encryption.serpent256";
@@ -101,6 +104,8 @@ public sealed class SerpentEncryptionPlugin : PipelinePluginBase, IDisposable
     /// <inheritdoc/>
     public override string[] IncompatibleStages => new[] { "encryption.aes256", "encryption.chacha20", "encryption.fips" };
 
+    #endregion
+
     /// <summary>
     /// Initializes a new instance of the Serpent encryption plugin.
     /// </summary>
@@ -108,19 +113,12 @@ public sealed class SerpentEncryptionPlugin : PipelinePluginBase, IDisposable
     public SerpentEncryptionPlugin(SerpentEncryptionConfig? config = null)
     {
         _config = config ?? new SerpentEncryptionConfig();
-    }
 
-    /// <inheritdoc/>
-    public override async Task<HandshakeResponse> OnHandshakeAsync(HandshakeRequest request)
-    {
-        var response = await base.OnHandshakeAsync(request);
-
+        // Set defaults from config (backward compatibility)
         if (_config.KeyStore != null)
         {
-            _keyStore = _config.KeyStore;
+            DefaultKeyStore = _config.KeyStore;
         }
-
-        return response;
     }
 
     /// <inheritdoc/>
@@ -140,12 +138,12 @@ public sealed class SerpentEncryptionPlugin : PipelinePluginBase, IDisposable
     protected override Dictionary<string, object> GetMetadata()
     {
         var metadata = base.GetMetadata();
-        metadata["Algorithm"] = "Serpent-256-CTR-HMAC";
+        metadata["Algorithm"] = AlgorithmId;
         metadata["BlockSize"] = 128;
-        metadata["KeySize"] = 256;
+        metadata["KeySize"] = KeySizeBytes * 8;
         metadata["Rounds"] = 32;
         metadata["SBoxCount"] = 8;
-        metadata["NonceSize"] = NonceSizeBytes * 8;
+        metadata["NonceSize"] = IvSizeBytes * 8;
         metadata["TagSize"] = TagSizeBytes * 8;
         metadata["SupportsKeyRotation"] = true;
         metadata["SupportsStreaming"] = true;
@@ -153,6 +151,7 @@ public sealed class SerpentEncryptionPlugin : PipelinePluginBase, IDisposable
         metadata["CipherType"] = "BlockCipher";
         metadata["Mode"] = "CTR";
         metadata["Authentication"] = "HMAC-SHA256";
+        metadata["SupportedModes"] = new[] { "Direct", "Envelope" };
         return metadata;
     }
 
@@ -168,67 +167,32 @@ public sealed class SerpentEncryptionPlugin : PipelinePluginBase, IDisposable
         };
     }
 
+    #region Core Encryption/Decryption (Algorithm-Specific)
+
     /// <summary>
-    /// Encrypts data from the input stream using Serpent-256-CTR with HMAC-SHA256 authentication.
+    /// Performs Serpent-256-CTR-HMAC encryption on the input stream.
+    /// Base class handles key resolution, config resolution, and statistics.
     /// </summary>
     /// <param name="input">The plaintext input stream.</param>
-    /// <param name="context">The kernel context for logging and plugin access.</param>
-    /// <param name="args">
-    /// Optional arguments:
-    /// - keyStore: IKeyStore instance
-    /// - securityContext: ISecurityContext for key access
-    /// - keyId: Specific key ID to use (otherwise current key is used)
-    /// </param>
-    /// <returns>A stream containing the encrypted data with header.</returns>
-    /// <exception cref="InvalidOperationException">Thrown when no key store is configured.</exception>
+    /// <param name="key">The encryption key (provided by base class).</param>
+    /// <param name="iv">The initialization vector / nonce (provided by base class).</param>
+    /// <param name="context">The kernel context for logging.</param>
+    /// <returns>A stream containing [IV:16][Tag:32][Ciphertext].</returns>
     /// <exception cref="CryptographicException">Thrown on encryption failure.</exception>
-    /// <remarks>
-    /// Output format: [KeyIdLen:4][KeyId:KeyIdLen][Nonce:16][Tag:32][Ciphertext:...]
-    /// </remarks>
-    public override Stream OnWrite(Stream input, IKernelContext context, Dictionary<string, object> args)
+    protected override async Task<Stream> EncryptCoreAsync(Stream input, byte[] key, byte[] iv, IKernelContext context)
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
-
-        var keyStore = GetKeyStore(args, context);
-        var securityContext = GetSecurityContext(args);
-
-        string keyId;
-        if (args.TryGetValue("keyId", out var kidObj) && kidObj is string specificKeyId)
-        {
-            keyId = specificKeyId;
-        }
-        else
-        {
-            keyId = RunSyncWithErrorHandling(
-                () => keyStore.GetCurrentKeyIdAsync(),
-                "Failed to retrieve current key ID from key store");
-        }
-
-        var key = RunSyncWithErrorHandling(
-            () => keyStore.GetKeyAsync(keyId, securityContext),
-            "Failed to retrieve key from key store for encryption");
-
-        if (key.Length != KeySizeBytes)
-        {
-            CryptographicOperations.ZeroMemory(key);
-            throw new CryptographicException($"Serpent-256 requires a 256-bit (32-byte) key. Received {key.Length * 8}-bit key.");
-        }
-
         byte[]? plaintext = null;
         byte[]? ciphertext = null;
-        byte[]? nonce = null;
         byte[]? tag = null;
         byte[]? macKey = null;
         uint[]? subkeys = null;
 
         try
         {
+            // Read all input data
             using var inputMs = new MemoryStream();
-            input.CopyTo(inputMs);
+            await input.CopyToAsync(inputMs);
             plaintext = inputMs.ToArray();
-
-            // Generate cryptographically secure random nonce
-            nonce = RandomNumberGenerator.GetBytes(NonceSizeBytes);
 
             // Derive MAC key from encryption key using SHA256
             macKey = SHA256.HashData(key);
@@ -239,7 +203,7 @@ public sealed class SerpentEncryptionPlugin : PipelinePluginBase, IDisposable
             // Encrypt using CTR mode
             ciphertext = new byte[plaintext.Length];
             var counter = new byte[16];
-            Array.Copy(nonce, counter, 16);
+            Array.Copy(iv, counter, 16);
 
             for (int i = 0; i < plaintext.Length; i += 16)
             {
@@ -252,155 +216,128 @@ public sealed class SerpentEncryptionPlugin : PipelinePluginBase, IDisposable
                 IncrementCounter(counter);
             }
 
-            // Compute HMAC-SHA256 tag over nonce || ciphertext
-            var dataToMac = new byte[nonce.Length + ciphertext.Length];
-            Array.Copy(nonce, dataToMac, nonce.Length);
-            Array.Copy(ciphertext, 0, dataToMac, nonce.Length, ciphertext.Length);
+            // Compute HMAC-SHA256 tag over iv || ciphertext
+            var dataToMac = new byte[iv.Length + ciphertext.Length];
+            Array.Copy(iv, dataToMac, iv.Length);
+            Array.Copy(ciphertext, 0, dataToMac, iv.Length, ciphertext.Length);
             tag = HMACSHA256.HashData(macKey, dataToMac);
 
-            // Build output: [KeyIdLen:4][KeyId:KeyIdLen][Nonce:16][Tag:32][Ciphertext]
-            var keyIdBytes = Encoding.UTF8.GetBytes(keyId);
-            if (keyIdBytes.Length > MaxKeyIdLength)
-            {
-                throw new CryptographicException($"Key ID exceeds maximum length of {MaxKeyIdLength} bytes");
-            }
-
-            var outputLength = 4 + keyIdBytes.Length + NonceSizeBytes + TagSizeBytes + ciphertext.Length;
+            // Build output: [IV:16][Tag:32][Ciphertext]
+            // Note: Key info is now stored in EncryptionMetadata by base class
+            var outputLength = IvSizeBytes + TagSizeBytes + ciphertext.Length;
             var output = new byte[outputLength];
             var pos = 0;
 
-            // Write key ID length as 4-byte little-endian integer
-            BitConverter.GetBytes(keyIdBytes.Length).CopyTo(output, pos);
-            pos += 4;
+            // Write IV (16 bytes)
+            iv.CopyTo(output, pos);
+            pos += IvSizeBytes;
 
-            // Write key ID
-            Array.Copy(keyIdBytes, 0, output, pos, keyIdBytes.Length);
-            pos += keyIdBytes.Length;
-
-            // Write nonce
-            Array.Copy(nonce, 0, output, pos, NonceSizeBytes);
-            pos += NonceSizeBytes;
-
-            // Write tag
-            Array.Copy(tag, 0, output, pos, TagSizeBytes);
+            // Write authentication tag (32 bytes)
+            tag.CopyTo(output, pos);
             pos += TagSizeBytes;
 
             // Write ciphertext
-            Array.Copy(ciphertext, 0, output, pos, ciphertext.Length);
+            ciphertext.CopyTo(output, pos);
 
-            lock (_statsLock)
-            {
-                _encryptionCount++;
-                _totalBytesEncrypted += plaintext.Length;
-            }
-
-            LogKeyAccess(keyId);
-            context.LogDebug($"Serpent-256-CTR-HMAC encrypted {plaintext.Length} bytes with key {TruncateKeyId(keyId)}");
+            context.LogDebug($"Serpent-256-CTR-HMAC encrypted {plaintext.Length} bytes");
 
             return new MemoryStream(output);
         }
         finally
         {
+            // Security: Clear sensitive data from memory
             if (plaintext != null) CryptographicOperations.ZeroMemory(plaintext);
             if (ciphertext != null) CryptographicOperations.ZeroMemory(ciphertext);
             if (macKey != null) CryptographicOperations.ZeroMemory(macKey);
-            CryptographicOperations.ZeroMemory(key);
             if (subkeys != null) Array.Clear(subkeys, 0, subkeys.Length);
         }
     }
 
     /// <summary>
-    /// Decrypts data from the stored stream using Serpent-256-CTR with HMAC-SHA256 verification.
+    /// Performs Serpent-256-CTR-HMAC decryption on the input stream.
+    /// Base class handles key resolution, config resolution, and statistics.
+    /// Supports both new format [IV:16][Tag:32][Ciphertext] and legacy format with key ID header.
     /// </summary>
-    /// <param name="stored">The encrypted input stream with header.</param>
-    /// <param name="context">The kernel context for logging and plugin access.</param>
-    /// <param name="args">
-    /// Optional arguments:
-    /// - keyStore: IKeyStore instance
-    /// - securityContext: ISecurityContext for key access
-    /// </param>
-    /// <returns>A stream containing the decrypted plaintext.</returns>
-    /// <exception cref="InvalidOperationException">Thrown when no key store is configured.</exception>
+    /// <param name="input">The encrypted input stream.</param>
+    /// <param name="key">The decryption key (provided by base class).</param>
+    /// <param name="iv">The initialization vector / nonce (null if embedded in ciphertext).</param>
+    /// <param name="context">The kernel context for logging.</param>
+    /// <returns>The decrypted stream and authentication tag.</returns>
     /// <exception cref="CryptographicException">
     /// Thrown on decryption failure or HMAC verification failure.
     /// </exception>
-    public override Stream OnRead(Stream stored, IKernelContext context, Dictionary<string, object> args)
+    protected override async Task<(Stream data, byte[]? tag)> DecryptCoreAsync(Stream input, byte[] key, byte[]? iv, IKernelContext context)
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
-
-        var keyStore = GetKeyStore(args, context);
-        var securityContext = GetSecurityContext(args);
-
         byte[]? encryptedData = null;
         byte[]? plaintext = null;
-        byte[]? key = null;
         byte[]? macKey = null;
         uint[]? subkeys = null;
 
         try
         {
+            // Read all encrypted data
             using var inputMs = new MemoryStream();
-            stored.CopyTo(inputMs);
+            await input.CopyToAsync(inputMs);
             encryptedData = inputMs.ToArray();
 
-            // Minimum size: 4 (keyIdLen) + 1 (min keyId) + 16 (nonce) + 32 (tag) = 53 bytes
-            if (encryptedData.Length < 53)
-            {
-                throw new CryptographicException($"Encrypted data too short. Minimum size is 53 bytes.");
-            }
+            // Check if this is legacy format (has key ID header)
+            var isLegacyFormat = IsLegacyFormat(encryptedData);
 
             var pos = 0;
 
-            // Read key ID length
-            var keyIdLength = BitConverter.ToInt32(encryptedData, pos);
-            pos += 4;
-
-            if (keyIdLength <= 0 || keyIdLength > MaxKeyIdLength || pos + keyIdLength > encryptedData.Length)
+            if (isLegacyFormat)
             {
-                throw new CryptographicException("Invalid key ID length in encrypted data header");
+                // Legacy format: [KeyIdLength:4][KeyId:variable][IV:16][Tag:32][Ciphertext]
+                var keyIdLength = BitConverter.ToInt32(encryptedData, pos);
+                pos += 4;
+
+                if (keyIdLength <= 0 || keyIdLength > MaxKeyIdLength || pos + keyIdLength > encryptedData.Length)
+                {
+                    throw new CryptographicException("Invalid key ID length in encrypted data header");
+                }
+
+                // Skip key ID (already resolved by base class)
+                pos += keyIdLength;
             }
 
-            // Read key ID
-            var keyId = Encoding.UTF8.GetString(encryptedData, pos, keyIdLength);
-            pos += keyIdLength;
+            // Parse: [IV:16][Tag:32][Ciphertext]
+            var remainingLength = encryptedData.Length - pos;
+            if (remainingLength < IvSizeBytes + TagSizeBytes)
+                throw new CryptographicException("Encrypted data too short");
 
-            if (encryptedData.Length < pos + NonceSizeBytes + TagSizeBytes)
+            // If IV not provided by base class, read from data
+            if (iv == null)
             {
-                throw new CryptographicException("Encrypted data truncated: missing nonce or tag");
+                iv = new byte[IvSizeBytes];
+                Array.Copy(encryptedData, pos, iv, 0, IvSizeBytes);
+                pos += IvSizeBytes;
+            }
+            else
+            {
+                // IV provided by base class (from metadata), skip in data
+                pos += IvSizeBytes;
             }
 
-            // Read nonce
-            var nonce = new byte[NonceSizeBytes];
-            Array.Copy(encryptedData, pos, nonce, 0, NonceSizeBytes);
-            pos += NonceSizeBytes;
-
-            // Read tag
+            // Read authentication tag (32 bytes)
             var tag = new byte[TagSizeBytes];
             Array.Copy(encryptedData, pos, tag, 0, TagSizeBytes);
             pos += TagSizeBytes;
 
-            // Read ciphertext
+            // Read ciphertext (remaining bytes)
             var ciphertextLength = encryptedData.Length - pos;
             var ciphertext = new byte[ciphertextLength];
-            Array.Copy(encryptedData, pos, ciphertext, 0, ciphertextLength);
-
-            // Get key from key store
-            key = RunSyncWithErrorHandling(
-                () => keyStore.GetKeyAsync(keyId, securityContext),
-                "Failed to retrieve key from key store for decryption");
-
-            if (key.Length != KeySizeBytes)
+            if (ciphertextLength > 0)
             {
-                throw new CryptographicException($"Serpent-256 requires a 256-bit (32-byte) key. Retrieved key is {key.Length * 8}-bit.");
+                Array.Copy(encryptedData, pos, ciphertext, 0, ciphertextLength);
             }
 
             // Derive MAC key
             macKey = SHA256.HashData(key);
 
             // Verify HMAC tag
-            var dataToMac = new byte[nonce.Length + ciphertext.Length];
-            Array.Copy(nonce, dataToMac, nonce.Length);
-            Array.Copy(ciphertext, 0, dataToMac, nonce.Length, ciphertext.Length);
+            var dataToMac = new byte[iv.Length + ciphertext.Length];
+            Array.Copy(iv, dataToMac, iv.Length);
+            Array.Copy(ciphertext, 0, dataToMac, iv.Length, ciphertext.Length);
             var expectedTag = HMACSHA256.HashData(macKey, dataToMac);
 
             if (!CryptographicOperations.FixedTimeEquals(expectedTag, tag))
@@ -412,7 +349,7 @@ public sealed class SerpentEncryptionPlugin : PipelinePluginBase, IDisposable
             subkeys = GenerateSerpentSubkeys(key);
             plaintext = new byte[ciphertextLength];
             var counter = new byte[16];
-            Array.Copy(nonce, counter, 16);
+            Array.Copy(iv, counter, 16);
 
             for (int i = 0; i < ciphertext.Length; i += 16)
             {
@@ -425,28 +362,39 @@ public sealed class SerpentEncryptionPlugin : PipelinePluginBase, IDisposable
                 IncrementCounter(counter);
             }
 
-            lock (_statsLock)
-            {
-                _decryptionCount++;
-                _totalBytesDecrypted += plaintext.Length;
-            }
+            context.LogDebug($"Serpent-256-CTR-HMAC decrypted {ciphertextLength} bytes");
 
-            LogKeyAccess(keyId);
-            context.LogDebug($"Serpent-256-CTR-HMAC decrypted {ciphertextLength} bytes with key {TruncateKeyId(keyId)}");
-
+            // Return a copy since we'll zero the original
             var result = new byte[plaintext.Length];
             Array.Copy(plaintext, result, plaintext.Length);
-            return new MemoryStream(result);
+            return (new MemoryStream(result), tag);
         }
         finally
         {
+            // Security: Clear sensitive data from memory
             if (encryptedData != null) CryptographicOperations.ZeroMemory(encryptedData);
             if (plaintext != null) CryptographicOperations.ZeroMemory(plaintext);
-            if (key != null) CryptographicOperations.ZeroMemory(key);
             if (macKey != null) CryptographicOperations.ZeroMemory(macKey);
             if (subkeys != null) Array.Clear(subkeys, 0, subkeys.Length);
         }
     }
+
+    /// <summary>
+    /// Checks if the encrypted data uses the legacy format with key ID header.
+    /// </summary>
+    private bool IsLegacyFormat(byte[] data)
+    {
+        if (data.Length < KeyIdLengthSize + 1)
+            return false;
+
+        // Read key ID length from header
+        var keyIdLength = BitConverter.ToInt32(data, 0);
+
+        // Legacy format has a valid key ID length (1 to MaxKeyIdLength)
+        return keyIdLength > 0 && keyIdLength <= MaxKeyIdLength;
+    }
+
+    #endregion
 
     #region Serpent Block Cipher Implementation
 
@@ -689,89 +637,32 @@ public sealed class SerpentEncryptionPlugin : PipelinePluginBase, IDisposable
 
     #endregion
 
-    #region Helper Methods
-
-    private IKeyStore GetKeyStore(Dictionary<string, object> args, IKernelContext context)
-    {
-        if (args.TryGetValue("keyStore", out var ksObj) && ksObj is IKeyStore ks)
-        {
-            return ks;
-        }
-
-        if (_keyStore != null)
-        {
-            return _keyStore;
-        }
-
-        var keyStorePlugin = context.GetPlugins<IPlugin>()
-            .OfType<IKeyStore>()
-            .FirstOrDefault();
-
-        if (keyStorePlugin != null)
-        {
-            return keyStorePlugin;
-        }
-
-        throw new InvalidOperationException(
-            "No IKeyStore available. Configure a key store before using encryption. " +
-            "Use SetKeyStore message or pass keyStore in args.");
-    }
-
-    private ISecurityContext GetSecurityContext(Dictionary<string, object> args)
-    {
-        if (args.TryGetValue("securityContext", out var scObj) && scObj is ISecurityContext sc)
-        {
-            return sc;
-        }
-
-        return _securityContext ?? new SerpentSecurityContext();
-    }
-
-    private static T RunSyncWithErrorHandling<T>(Func<Task<T>> asyncOperation, string errorContext)
-    {
-        try
-        {
-            return Task.Run(asyncOperation).GetAwaiter().GetResult();
-        }
-        catch (AggregateException ae) when (ae.InnerException != null)
-        {
-            var innerException = ae.InnerException;
-            if (innerException is CryptographicException)
-            {
-                throw innerException;
-            }
-            throw new CryptographicException($"{errorContext}: {innerException.Message}", innerException);
-        }
-        catch (CryptographicException)
-        {
-            throw;
-        }
-        catch (Exception ex)
-        {
-            throw new CryptographicException($"{errorContext}: {ex.Message}", ex);
-        }
-    }
-
-    private void LogKeyAccess(string keyId)
-    {
-        _keyAccessLog[keyId] = DateTime.UtcNow;
-    }
-
-    private static string TruncateKeyId(string keyId)
-    {
-        return keyId.Length > 8 ? $"{keyId[..8]}..." : keyId;
-    }
+    #region Message Handlers
 
     private Task HandleConfigureAsync(PluginMessage message)
     {
+        // Use base class configuration methods
         if (message.Payload.TryGetValue("keyStore", out var ksObj) && ksObj is IKeyStore ks)
         {
-            _keyStore = ks;
+            SetDefaultKeyStore(ks);
         }
 
-        if (message.Payload.TryGetValue("securityContext", out var scObj) && scObj is ISecurityContext sc)
+        if (message.Payload.TryGetValue("envelopeKeyStore", out var eksObj) && eksObj is IEnvelopeKeyStore eks &&
+            message.Payload.TryGetValue("kekKeyId", out var kekObj) && kekObj is string kek)
         {
-            _securityContext = sc;
+            SetDefaultEnvelopeKeyStore(eks, kek);
+        }
+
+        if (message.Payload.TryGetValue("mode", out var modeObj))
+        {
+            if (modeObj is KeyManagementMode mode)
+            {
+                SetDefaultMode(mode);
+            }
+            else if (modeObj is string modeStr && Enum.TryParse<KeyManagementMode>(modeStr, true, out var parsedMode))
+            {
+                SetDefaultMode(parsedMode);
+            }
         }
 
         return Task.CompletedTask;
@@ -779,14 +670,17 @@ public sealed class SerpentEncryptionPlugin : PipelinePluginBase, IDisposable
 
     private Task HandleStatsAsync(PluginMessage message)
     {
-        lock (_statsLock)
-        {
-            message.Payload["EncryptionCount"] = _encryptionCount;
-            message.Payload["DecryptionCount"] = _decryptionCount;
-            message.Payload["TotalBytesEncrypted"] = _totalBytesEncrypted;
-            message.Payload["TotalBytesDecrypted"] = _totalBytesDecrypted;
-            message.Payload["UniqueKeysUsed"] = _keyAccessLog.Count;
-        }
+        // Use base class statistics
+        var stats = GetStatistics();
+
+        message.Payload["EncryptionCount"] = stats.EncryptionCount;
+        message.Payload["DecryptionCount"] = stats.DecryptionCount;
+        message.Payload["TotalBytesEncrypted"] = stats.TotalBytesEncrypted;
+        message.Payload["TotalBytesDecrypted"] = stats.TotalBytesDecrypted;
+        message.Payload["UniqueKeysUsed"] = stats.UniqueKeysUsed;
+        message.Payload["Algorithm"] = AlgorithmId;
+        message.Payload["IVSizeBits"] = IvSizeBytes * 8;
+        message.Payload["TagSizeBits"] = TagSizeBytes * 8;
 
         return Task.CompletedTask;
     }
@@ -795,22 +689,12 @@ public sealed class SerpentEncryptionPlugin : PipelinePluginBase, IDisposable
     {
         if (message.Payload.TryGetValue("keyStore", out var ksObj) && ksObj is IKeyStore ks)
         {
-            _keyStore = ks;
+            SetDefaultKeyStore(ks);
         }
         return Task.CompletedTask;
     }
 
     #endregion
-
-    /// <summary>
-    /// Releases all resources used by this plugin.
-    /// </summary>
-    public void Dispose()
-    {
-        if (_disposed) return;
-        _disposed = true;
-        _keyAccessLog.Clear();
-    }
 }
 
 /// <summary>
@@ -820,29 +704,7 @@ public sealed class SerpentEncryptionConfig
 {
     /// <summary>
     /// Gets or sets the key store to use for encryption keys.
+    /// This is used as the default when not explicitly specified per operation.
     /// </summary>
     public IKeyStore? KeyStore { get; set; }
-
-    /// <summary>
-    /// Gets or sets the security context for key access.
-    /// </summary>
-    public ISecurityContext? SecurityContext { get; set; }
-}
-
-/// <summary>
-/// Default security context for Serpent encryption operations.
-/// </summary>
-internal sealed class SerpentSecurityContext : ISecurityContext
-{
-    /// <inheritdoc/>
-    public string UserId => Environment.UserName;
-
-    /// <inheritdoc/>
-    public string? TenantId => "serpent-local";
-
-    /// <inheritdoc/>
-    public IEnumerable<string> Roles => new[] { "serpent-user" };
-
-    /// <inheritdoc/>
-    public bool IsSystemAdmin => false;
 }

@@ -54,7 +54,18 @@
       "Bash(git pull:*)",
       "Bash(Select-String -Pattern \"Error\\\\\\(s\\\\\\)|Warning\\\\\\(s\\\\\\)|Build succeeded|Build FAILED\")",
       "Bash(Select-String -Pattern \"error|warning|DeveloperCommands\" -Context 0,2)",
-      "Bash(Select-Object -First 50)"
+      "Bash(Select-Object -First 50)",
+      "Bash(cmd /c \"dir C:\\\\Temp\\\\DataWarehouse\\\\DataWarehouse\\\\Plugins\\\\DataWarehouse.Plugins.AIAgents\\\\Capabilities\")",
+      "Bash(wc:*)",
+      "Bash(for file in OllamaProvider MistralProvider CohereProvider PerplexityProvider GroqProvider TogetherProvider BedrockProvider HuggingFaceProvider)",
+      "Bash(/dev/null -exec grep -l \"interface IStorageProvider[^a-zA-Z]\" {} ;)",
+      "Bash(Select-Object -First 100)",
+      "Bash(timeout 60 tail:*)",
+      "Bash(Select-String -Pattern \"\\(error|warning|succeeded|failed\\)\" -Context 0,2)",
+      "Bash(if not exist \"C:\\\\Temp\\\\DataWarehouse\\\\DataWarehouse\\\\Plugins\\\\DataWarehouse.Plugins.Integrity\" mkdir \"C:\\\\Temp\\\\DataWarehouse\\\\DataWarehouse\\\\Plugins\\\\DataWarehouse.Plugins.Integrity\")",
+      "Bash(test:*)",
+      "Bash(dotnet sln:*)",
+      "Bash(Select-String -Pattern \"error|warning|succeeded|failed\")"
     ]
   }
 }

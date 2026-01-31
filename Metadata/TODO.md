@@ -42,6 +42,51 @@ Do NOT wait for an entire phase to complete before committing.
 
 ---
 
+## CORE DESIGN PRINCIPLE: Maximum User Configurability & Freedom
+
+> **PHILOSOPHY:** DataWarehouse provides every capability imaginable in a fully configurable and selectable way.
+> Users have complete freedom to pick, choose, and apply features in whatever order they want, exactly as they need.
+
+### User Freedom Examples
+
+| Feature | User Options | Implementation Requirement |
+|---------|--------------|---------------------------|
+| **Encryption** | Always encrypted, at-rest only, transit-only, none, or use hardware encryption for specific stages | Must support per-operation encryption mode selection |
+| **Compression** | At rest, during transit, both, or none | Must support per-operation compression mode selection |
+| **WORM Retention** | 1 day, 1 year, 2 years, forever, device lifetime | Must support configurable retention periods |
+| **Cipher Selection** | AES, ChaCha20, Serpent, Twofish, FIPS-only, or custom | Must support user-selectable algorithms |
+| **Key Management** | Direct keys, envelope encryption, HSM-backed, or hybrid | Must support multiple key management modes |
+| **Transit Mode** | End-to-end same cipher, transcryption, no transit encryption | Must support all transit modes |
+| **Pipeline Order** | User-defined stage ordering | Must support runtime pipeline configuration |
+| **Storage Tier** | Hot, warm, cold, archive, or auto-tiering | Must support explicit tier selection |
+
+### Implementation Checklist for Plugins
+
+When implementing ANY plugin, verify:
+
+1. [ ] **Configurable Behavior**: Can users enable/disable the feature entirely?
+2. [ ] **Selectable Options**: Can users choose between multiple implementations/algorithms?
+3. [ ] **Customizable Parameters**: Can users tune numeric values (iterations, sizes, durations)?
+4. [ ] **Per-Operation Override**: Can users override defaults on a per-call basis?
+5. [ ] **Policy Integration**: Can administrators set organization-wide defaults while allowing user overrides?
+6. [ ] **No Forced Behavior**: Does the plugin avoid forcing any behavior the user didn't explicitly request?
+
+### Task: Review All Plugins for Configurability
+
+| Task | Category | Description | Status |
+|------|----------|-------------|--------|
+| CFG-1 | Encryption | Review all 6 encryption plugins for user-selectable modes | [ ] |
+| CFG-2 | Compression | Review compression plugins for at-rest/transit/both/none options | [ ] |
+| CFG-3 | Key Management | Review key store plugins for configurable key modes | [ ] |
+| CFG-4 | Storage | Review storage plugins for tier selection and retention options | [ ] |
+| CFG-5 | Pipeline | Verify pipeline supports user-defined stage ordering | [ ] |
+| CFG-6 | Transit | Verify transit encryption supports all mode combinations | [ ] |
+| CFG-7 | WORM | Review WORM plugins for configurable retention periods | [ ] |
+| CFG-8 | Governance | Review compliance plugins for configurable policy enforcement | [ ] |
+| CFG-9 | All Plugins | Comprehensive audit of all plugins for configurability gaps | [ ] |
+
+---
+
 ## Plugin Implementation Checklist
 
 For each plugin:
@@ -133,7 +178,7 @@ These features represent the next generation of data storage technology, positio
 #### Task 45: Hypervisor Support (VMware, Hyper-V, KVM, Xen)
 **Priority:** P1
 **Effort:** High
-**Status:** [ ] Not Started
+**Status:** [~] SDK Interfaces & Base Classes Complete (2026-01-30)
 
 **Description:** Enable DataWarehouse to run optimally in virtualized environments with hypervisor-specific optimizations.
 
@@ -166,7 +211,7 @@ These features represent the next generation of data storage technology, positio
 #### Task 46: Bare Metal Optimization & Hardware Acceleration
 **Priority:** P1
 **Effort:** High
-**Status:** [ ] Not Started
+**Status:** [~] SDK Interfaces & Base Classes Complete (2026-01-30)
 
 **Description:** Optimize DataWarehouse for bare metal deployments with hardware acceleration support.
 
@@ -338,7 +383,7 @@ These features represent the next generation of data storage technology, positio
 #### Task 52: Military-Grade Security Hardening
 **Priority:** P0 (Government/Military Tier)
 **Effort:** Very High
-**Status:** [ ] Not Started
+**Status:** [~] SDK Interfaces & Base Classes Complete (2026-01-30)
 
 **Description:** Implement security features required for handling classified data.
 
@@ -372,7 +417,7 @@ These features represent the next generation of data storage technology, positio
 #### Task 53: Exabyte-Scale Architecture
 **Priority:** P0 (Hyperscale Tier)
 **Effort:** Very High
-**Status:** [ ] Not Started
+**Status:** [~] SDK Interfaces & Base Classes Complete (2026-01-30)
 
 **Description:** Architect the system to handle exabyte-scale deployments with trillions of objects.
 
@@ -400,7 +445,7 @@ These features represent the next generation of data storage technology, positio
 #### Task 54: Sub-Millisecond Latency Tier
 **Priority:** P1 (Financial Services)
 **Effort:** High
-**Status:** [ ] Not Started
+**Status:** [~] SDK Interfaces & Base Classes Complete (2026-01-30)
 
 **Description:** Create an ultra-low-latency storage tier for high-frequency trading and real-time applications.
 
@@ -429,7 +474,7 @@ These features represent the next generation of data storage technology, positio
 #### Task 55: Global Multi-Master Replication
 **Priority:** P1
 **Effort:** Very High
-**Status:** [ ] Not Started
+**Status:** [~] SDK Interfaces & Base Classes Complete (2026-01-30)
 
 **Description:** Enable true multi-master writes across global regions with conflict resolution.
 
@@ -460,18 +505,24 @@ These features represent the next generation of data storage technology, positio
 #### Task 56: Universal Data Connector Framework
 **Priority:** P1
 **Effort:** High
-**Status:** [ ] Not Started
+**Status:** [x] Production-Ready Core Connectors (2026-01-30)
 
 **Description:** Create a framework for connecting to any data source or destination.
+
+> **Code Review Note (2026-01-30 - UPDATED):** Production-ready implementations now exist for PostgreSQL and Kafka:
+> - `PostgreSqlConnectorPlugin.cs`: Uses real Npgsql with connection pooling, schema discovery, parameterized queries, and transaction support
+> - `KafkaMessagingConnectorPlugin.cs`: Uses real Confluent.Kafka with producer/consumer/admin client, SSL/SASL security, idempotent producer, consumer groups
+>
+> Both plugins have no simulations - all Task.Delay usage is for legitimate operational purposes (Kafka consumer polling backoff).
 
 **Connectors:**
 
 | Category | Connectors | Status |
 |----------|------------|--------|
-| Databases | PostgreSQL, MySQL, MongoDB, Cassandra, Redis | [ ] |
+| Databases | PostgreSQL, MySQL, MongoDB, Cassandra, Redis | [x] PostgreSQL PRODUCTION-READY (Npgsql) |
 | Cloud Storage | S3, Azure Blob, GCS, Backblaze B2, Wasabi | [x] Partial |
 | SaaS | Salesforce, HubSpot, Zendesk, Jira | [ ] |
-| Messaging | Kafka, RabbitMQ, Pulsar, NATS | [ ] |
+| Messaging | Kafka, RabbitMQ, Pulsar, NATS | [x] Kafka PRODUCTION-READY (Confluent.Kafka) |
 | Analytics | Snowflake, Databricks, BigQuery | [ ] |
 | Enterprise | SAP, Oracle EBS, Microsoft Dynamics | [ ] |
 | Legacy | Mainframe, AS/400, Tape libraries | [ ] |
@@ -504,36 +555,59 @@ These features represent the next generation of data storage technology, positio
 #### Task 58: Carbon-Aware Storage (Industry-First)
 **Priority:** P2
 **Effort:** Medium
-**Status:** [ ] Not Started
+**Status:** [x] Production-Ready Core Features (2026-01-30)
 
 **Description:** Optimize storage operations based on carbon intensity of power grid.
+
+> **Code Review Note (2026-01-30 - UPDATED):** Production-ready implementations now exist:
+> - `ElectricityMapsCarbonProviderPlugin.cs`: Real Electricity Maps API integration with zone mapping, power breakdown analysis, renewable % calculation
+> - `WattTimeCarbonProviderPlugin.cs`: Real WattTime API integration with OAuth auth, signal-to-intensity conversion, MOER data support
+> - `DefaultGreenRegionSelectorPlugin.cs`: Configurable IRegionMetricsProvider pattern with PingBasedMetricsProvider and AwsCloudWatchMetricsProvider implementations
+> - `PatchCarbonOffsetProviderPlugin.cs`: NEW - Real Patch API integration for carbon offset purchasing with order management and project selection
+> - `SimulatedCarbonOffsetProviderPlugin.cs`: Explicitly test-only (intentional for unit testing without API dependencies)
+>
+> All production plugins use real HTTP clients with proper authentication - no simulation artifacts.
 
 **Features:**
 
 | Feature | Description | Status |
 |---------|-------------|--------|
-| Carbon Intensity API | Real-time grid carbon data | [ ] |
-| Carbon-Aware Scheduling | Delay non-urgent ops | [ ] |
-| Green Region Preference | Route to renewable regions | [ ] |
-| Carbon Reporting | Track and report emissions | [ ] |
-| Carbon Offsetting | Integration with offset providers | [ ] |
+| Carbon Intensity API | Real-time grid carbon data | [x] PRODUCTION-READY (Electricity Maps + WattTime APIs) |
+| Carbon-Aware Scheduling | Delay non-urgent ops | [x] PRODUCTION-READY (DefaultCarbonAwareSchedulerPlugin) |
+| Green Region Preference | Route to renewable regions | [x] PRODUCTION-READY (configurable metrics providers) |
+| Carbon Reporting | Track and report emissions | [~] In-memory implementation exists |
+| Carbon Offsetting | Integration with offset providers | [x] PRODUCTION-READY (Patch API integration) |
 
 ---
 
 #### Task 59: Comprehensive Compliance Automation
 **Priority:** P0
 **Effort:** Very High
-**Status:** [ ] Not Started
+**Status:** [~] Partial - Core Compliance Operations Production-Ready (2026-01-30)
 
 **Description:** Automate compliance for all major regulatory frameworks.
+
+> **Code Review Note (2026-01-30 - UPDATED):** Two complementary plugin sets exist:
+>
+> 1. **Production plugins** in `DataWarehouse.Plugins.Compliance/` - PRODUCTION-READY for compliance data operations:
+>    - `GdprCompliancePlugin.cs`: Real PII detection (regex patterns), consent management, data subject rights, file-based persistence
+>    - `HipaaCompliancePlugin.cs`: Real PHI detection (HIPAA 18 identifiers), authorization management, de-identification (Safe Harbor), audit logging
+>    - `PciDssCompliancePlugin.cs`: Real PAN detection (Luhn algorithm), card tokenization, encryption verification
+>
+> 2. **Status-checking plugins** in `DataWarehouse.Plugins.ComplianceAutomation/` - Still simulated:
+>    - These check compliance status against system state (is encryption enabled? are backups configured?)
+>    - Currently return hardcoded/random values - needs integration with actual system configuration
+>
+> **Recommendation:** The Compliance/ plugins handle the data-level compliance operations and are production-ready.
+> The ComplianceAutomation/ plugins provide system-wide compliance status checks and need refactoring to query actual system state.
 
 **Frameworks:**
 
 | Framework | Region | Industry | Status |
 |-----------|--------|----------|--------|
-| GDPR | EU | All | [x] Plugin exists |
-| HIPAA | US | Healthcare | [x] Plugin exists |
-| PCI-DSS | Global | Financial | [ ] |
+| GDPR | EU | All | [x] Compliance/ PRODUCTION-READY, [~] ComplianceAutomation/ needs refactor |
+| HIPAA | US | Healthcare | [x] Compliance/ PRODUCTION-READY, [~] ComplianceAutomation/ needs refactor |
+| PCI-DSS | Global | Financial | [x] Compliance/ PRODUCTION-READY, [~] ComplianceAutomation/ needs refactor |
 | SOX | US | Public companies | [ ] |
 | FedRAMP | US | Government | [x] Plugin exists |
 | CCPA/CPRA | California | All | [ ] |
@@ -545,6 +619,1126 @@ These features represent the next generation of data storage technology, positio
 | TISAX | Germany | Automotive | [ ] |
 | ISO 27001 | Global | All | [ ] |
 | SOC 2 Type II | Global | All | [x] Plugin exists |
+
+**Additional DSR/Audit Components:**
+
+| Component | Description | Status |
+|-----------|-------------|--------|
+| Data Subject Rights | GDPR/CCPA DSR handling | [~] In-memory implementation exists |
+| Compliance Audit Trail | Immutable audit logging | [~] In-memory implementation exists |
+
+---
+
+### CATEGORY I: Active Enterprise Distribution System (AEDS)
+
+> **VISION:** Transform DataWarehouse from a passive storage repository into an **Active Logistics Platform**
+> that enables governed, secure, and intelligent propagation of data, commands, and software updates
+> from a central authority to distributed endpoints (and vice-versa) without requiring user intervention.
+
+#### Task 60: AEDS Core Infrastructure
+**Priority:** P0 (Enterprise)
+**Effort:** Very High
+**Status:** [ ] Not Started
+
+**Description:** The foundational infrastructure for the Active Enterprise Distribution System, providing the control plane, data plane, and core messaging primitives that all AEDS extensions build upon.
+
+---
+
+##### AEDS.1: Architecture Overview
+
+```
+┌─────────────────────────────────────────────────────────────────────────────────────┐
+│                      ACTIVE ENTERPRISE DISTRIBUTION SYSTEM                           │
+├─────────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                      │
+│   ┌─────────────────────────┐              ┌─────────────────────────┐              │
+│   │     CONTROL PLANE       │◄────────────►│       DATA PLANE        │              │
+│   │    (Signal Channel)     │              │   (Transport Channel)   │              │
+│   │                         │              │                         │              │
+│   │  Plugins:               │              │  Plugins:               │              │
+│   │  • WebSocket/SignalR    │              │  • HTTP/3 over QUIC     │              │
+│   │  • MQTT                 │              │  • Raw QUIC Streams     │              │
+│   │  • gRPC Streaming       │              │  • HTTP/2 (fallback)    │              │
+│   │  • Custom               │              │  • WebTransport         │              │
+│   └───────────┬─────────────┘              └───────────┬─────────────┘              │
+│               │                                        │                             │
+│   ┌───────────▼────────────────────────────────────────▼─────────────┐              │
+│   │                    SERVER-SIDE DISPATCHER                         │              │
+│   │  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐  ┌──────────┐ │              │
+│   │  │ Job Queue   │  │  Targeting  │  │  Manifest   │  │ Channel  │ │              │
+│   │  │ Management  │  │  Engine     │  │  Signing    │  │ Manager  │ │              │
+│   │  └─────────────┘  └─────────────┘  └─────────────┘  └──────────┘ │              │
+│   └──────────────────────────────┬───────────────────────────────────┘              │
+│                                  │                                                   │
+│              ┌───────────────────┼───────────────────┐                              │
+│              ▼                   ▼                   ▼                              │
+│   ┌──────────────────┐ ┌──────────────────┐ ┌──────────────────┐                   │
+│   │    CLIENT A      │ │    CLIENT B      │ │    CLIENT C      │                   │
+│   │  ┌────────────┐  │ │  ┌────────────┐  │ │  ┌────────────┐  │                   │
+│   │  │  Sentinel  │  │ │  │  Sentinel  │  │ │  │  Sentinel  │  │                   │
+│   │  │  Executor  │  │◄──►│  Executor  │◄──►│  │  Executor  │  │ P2P Mesh          │
+│   │  │  Watchdog  │  │ │  │  Watchdog  │  │ │  │  Watchdog  │  │                   │
+│   │  │  Policy    │  │ │  │  Policy    │  │ │  │  Policy    │  │                   │
+│   │  └────────────┘  │ │  └────────────┘  │ │  └────────────┘  │                   │
+│   └──────────────────┘ └──────────────────┘ └──────────────────┘                   │
+│                                                                                      │
+└─────────────────────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+##### AEDS.2: SDK Interfaces
+
+```csharp
+// =============================================================================
+// FILE: DataWarehouse.SDK/Distribution/IAedsCore.cs
+// =============================================================================
+
+namespace DataWarehouse.SDK.Distribution;
+
+#region Enums
+
+/// <summary>
+/// Delivery mode for distributing content.
+/// </summary>
+public enum DeliveryMode
+{
+    /// <summary>Direct delivery to a specific ClientID.</summary>
+    Unicast,
+
+    /// <summary>Delivery to all clients subscribed to a ChannelID.</summary>
+    Broadcast,
+
+    /// <summary>Delivery to a subset of clients matching criteria.</summary>
+    Multicast
+}
+
+/// <summary>
+/// Post-download action to perform on the client.
+/// </summary>
+public enum ActionPrimitive
+{
+    /// <summary>Silent background download (cache only).</summary>
+    Passive,
+
+    /// <summary>Download + Toast Notification.</summary>
+    Notify,
+
+    /// <summary>Download + Run Executable (Requires Code Signing).</summary>
+    Execute,
+
+    /// <summary>Download + Open File + Watchdog (Monitor for edits &amp; Sync back).</summary>
+    Interactive,
+
+    /// <summary>Custom action defined by ActionScript.</summary>
+    Custom
+}
+
+/// <summary>
+/// Notification urgency tier.
+/// </summary>
+public enum NotificationTier
+{
+    /// <summary>Log entry only, no user notification.</summary>
+    Silent = 1,
+
+    /// <summary>Transient popup/toast notification.</summary>
+    Toast = 2,
+
+    /// <summary>Persistent modal requiring user acknowledgement.</summary>
+    Modal = 3
+}
+
+/// <summary>
+/// Channel subscription type.
+/// </summary>
+public enum SubscriptionType
+{
+    /// <summary>Admin-enforced subscription, cannot be unsubscribed.</summary>
+    Mandatory,
+
+    /// <summary>User-initiated subscription, can opt-out.</summary>
+    Voluntary
+}
+
+/// <summary>
+/// Client trust level for zero-trust model.
+/// </summary>
+public enum ClientTrustLevel
+{
+    /// <summary>Unknown/unpaired client - all connections rejected.</summary>
+    Untrusted = 0,
+
+    /// <summary>Pending admin verification.</summary>
+    PendingVerification = 1,
+
+    /// <summary>Verified and paired client.</summary>
+    Trusted = 2,
+
+    /// <summary>Elevated trust for executing signed code.</summary>
+    Elevated = 3,
+
+    /// <summary>Administrative client with full capabilities.</summary>
+    Admin = 4
+}
+
+#endregion
+
+#region Records - Intent Manifest
+
+/// <summary>
+/// The Intent Manifest defines what to deliver and what to do after delivery.
+/// This is the fundamental unit of work in AEDS.
+/// </summary>
+public record IntentManifest
+{
+    /// <summary>Unique manifest identifier.</summary>
+    public required string ManifestId { get; init; }
+
+    /// <summary>When this manifest was created.</summary>
+    public required DateTimeOffset CreatedAt { get; init; }
+
+    /// <summary>When this manifest expires (optional).</summary>
+    public DateTimeOffset? ExpiresAt { get; init; }
+
+    /// <summary>The action to perform after delivery.</summary>
+    public required ActionPrimitive Action { get; init; }
+
+    /// <summary>Notification tier for user alerts.</summary>
+    public NotificationTier NotificationTier { get; init; } = NotificationTier.Toast;
+
+    /// <summary>Delivery mode (unicast, broadcast, multicast).</summary>
+    public required DeliveryMode DeliveryMode { get; init; }
+
+    /// <summary>Target ClientIDs for Unicast, or ChannelIDs for Broadcast.</summary>
+    public required string[] Targets { get; init; }
+
+    /// <summary>Priority level (0 = lowest, 100 = critical).</summary>
+    public int Priority { get; init; } = 50;
+
+    /// <summary>Payload descriptor (what to download).</summary>
+    public required PayloadDescriptor Payload { get; init; }
+
+    /// <summary>Custom action script (for ActionPrimitive.Custom).</summary>
+    public string? ActionScript { get; init; }
+
+    /// <summary>Cryptographic signature of this manifest.</summary>
+    public required ManifestSignature Signature { get; init; }
+
+    /// <summary>Additional metadata.</summary>
+    public Dictionary<string, object>? Metadata { get; init; }
+}
+
+/// <summary>
+/// Describes the payload to be delivered.
+/// </summary>
+public record PayloadDescriptor
+{
+    /// <summary>Unique payload identifier (content-addressable hash).</summary>
+    public required string PayloadId { get; init; }
+
+    /// <summary>Human-readable name.</summary>
+    public required string Name { get; init; }
+
+    /// <summary>MIME type of the payload.</summary>
+    public required string ContentType { get; init; }
+
+    /// <summary>Total size in bytes.</summary>
+    public required long SizeBytes { get; init; }
+
+    /// <summary>SHA-256 hash of the complete payload.</summary>
+    public required string ContentHash { get; init; }
+
+    /// <summary>Chunk hashes for integrity verification.</summary>
+    public string[]? ChunkHashes { get; init; }
+
+    /// <summary>Whether delta sync is available.</summary>
+    public bool DeltaAvailable { get; init; }
+
+    /// <summary>Base version for delta sync (if available).</summary>
+    public string? DeltaBaseVersion { get; init; }
+
+    /// <summary>Encryption info (null if unencrypted).</summary>
+    public PayloadEncryption? Encryption { get; init; }
+}
+
+/// <summary>
+/// Payload encryption information.
+/// </summary>
+public record PayloadEncryption
+{
+    /// <summary>Encryption algorithm used.</summary>
+    public required string Algorithm { get; init; }
+
+    /// <summary>Key ID for decryption (client must have access).</summary>
+    public required string KeyId { get; init; }
+
+    /// <summary>Key management mode.</summary>
+    public required string KeyMode { get; init; }
+}
+
+/// <summary>
+/// Cryptographic signature for the manifest.
+/// </summary>
+public record ManifestSignature
+{
+    /// <summary>Signing key identifier.</summary>
+    public required string KeyId { get; init; }
+
+    /// <summary>Signature algorithm (e.g., "Ed25519", "RSA-PSS-SHA256").</summary>
+    public required string Algorithm { get; init; }
+
+    /// <summary>Base64-encoded signature.</summary>
+    public required string Value { get; init; }
+
+    /// <summary>Certificate chain (for verification).</summary>
+    public string[]? CertificateChain { get; init; }
+
+    /// <summary>Whether this is a Release Signing Key (required for Execute action).</summary>
+    public required bool IsReleaseKey { get; init; }
+}
+
+#endregion
+
+#region Records - Client & Channel
+
+/// <summary>
+/// Registered AEDS client.
+/// </summary>
+public record AedsClient
+{
+    /// <summary>Unique client identifier.</summary>
+    public required string ClientId { get; init; }
+
+    /// <summary>Human-readable client name.</summary>
+    public required string Name { get; init; }
+
+    /// <summary>Client's public key for encrypted communications.</summary>
+    public required string PublicKey { get; init; }
+
+    /// <summary>Current trust level.</summary>
+    public required ClientTrustLevel TrustLevel { get; init; }
+
+    /// <summary>When the client was registered.</summary>
+    public required DateTimeOffset RegisteredAt { get; init; }
+
+    /// <summary>Last heartbeat timestamp.</summary>
+    public DateTimeOffset? LastHeartbeat { get; init; }
+
+    /// <summary>Subscribed channel IDs.</summary>
+    public required string[] SubscribedChannels { get; init; }
+
+    /// <summary>Client capabilities.</summary>
+    public ClientCapabilities Capabilities { get; init; }
+}
+
+/// <summary>
+/// Client capability flags.
+/// </summary>
+[Flags]
+public enum ClientCapabilities
+{
+    None = 0,
+    ReceivePassive = 1,
+    ReceiveNotify = 2,
+    ExecuteSigned = 4,
+    Interactive = 8,
+    P2PMesh = 16,
+    DeltaSync = 32,
+    AirGapMule = 64,
+    All = ReceivePassive | ReceiveNotify | ExecuteSigned | Interactive | P2PMesh | DeltaSync | AirGapMule
+}
+
+/// <summary>
+/// Distribution channel for pub/sub.
+/// </summary>
+public record DistributionChannel
+{
+    /// <summary>Unique channel identifier.</summary>
+    public required string ChannelId { get; init; }
+
+    /// <summary>Human-readable channel name.</summary>
+    public required string Name { get; init; }
+
+    /// <summary>Channel description.</summary>
+    public string? Description { get; init; }
+
+    /// <summary>Whether this is a mandatory subscription channel.</summary>
+    public required SubscriptionType SubscriptionType { get; init; }
+
+    /// <summary>Required trust level to receive from this channel.</summary>
+    public required ClientTrustLevel MinTrustLevel { get; init; }
+
+    /// <summary>Number of subscribers.</summary>
+    public int SubscriberCount { get; init; }
+
+    /// <summary>When the channel was created.</summary>
+    public required DateTimeOffset CreatedAt { get; init; }
+}
+
+#endregion
+
+#region Interfaces - Control Plane
+
+/// <summary>
+/// Control plane transport provider (WebSocket, MQTT, gRPC, etc.).
+/// Handles low-bandwidth signaling, commands, and heartbeats.
+/// </summary>
+public interface IControlPlaneTransport
+{
+    /// <summary>Transport identifier (e.g., "websocket", "mqtt").</summary>
+    string TransportId { get; }
+
+    /// <summary>Whether this transport is connected.</summary>
+    bool IsConnected { get; }
+
+    /// <summary>Connect to the control plane.</summary>
+    Task ConnectAsync(ControlPlaneConfig config, CancellationToken ct = default);
+
+    /// <summary>Disconnect from the control plane.</summary>
+    Task DisconnectAsync();
+
+    /// <summary>Send an intent manifest to clients.</summary>
+    Task SendManifestAsync(IntentManifest manifest, CancellationToken ct = default);
+
+    /// <summary>Receive intent manifests (client-side).</summary>
+    IAsyncEnumerable<IntentManifest> ReceiveManifestsAsync(CancellationToken ct = default);
+
+    /// <summary>Send heartbeat.</summary>
+    Task SendHeartbeatAsync(HeartbeatMessage heartbeat, CancellationToken ct = default);
+
+    /// <summary>Subscribe to a channel.</summary>
+    Task SubscribeChannelAsync(string channelId, CancellationToken ct = default);
+
+    /// <summary>Unsubscribe from a channel.</summary>
+    Task UnsubscribeChannelAsync(string channelId, CancellationToken ct = default);
+}
+
+public record ControlPlaneConfig(
+    string ServerUrl,
+    string ClientId,
+    string AuthToken,
+    TimeSpan HeartbeatInterval,
+    TimeSpan ReconnectDelay,
+    Dictionary<string, string>? Options = null
+);
+
+public record HeartbeatMessage(
+    string ClientId,
+    DateTimeOffset Timestamp,
+    ClientStatus Status,
+    Dictionary<string, object>? Metrics = null
+);
+
+public enum ClientStatus { Online, Busy, Away, Offline }
+
+#endregion
+
+#region Interfaces - Data Plane
+
+/// <summary>
+/// Data plane transport provider (HTTP/3, QUIC, HTTP/2, etc.).
+/// Handles high-bandwidth binary blob transfers.
+/// </summary>
+public interface IDataPlaneTransport
+{
+    /// <summary>Transport identifier (e.g., "http3", "quic").</summary>
+    string TransportId { get; }
+
+    /// <summary>Download a payload from the server.</summary>
+    Task<Stream> DownloadAsync(string payloadId, DataPlaneConfig config, IProgress<TransferProgress>? progress = null, CancellationToken ct = default);
+
+    /// <summary>Download with delta sync (if available).</summary>
+    Task<Stream> DownloadDeltaAsync(string payloadId, string baseVersion, DataPlaneConfig config, IProgress<TransferProgress>? progress = null, CancellationToken ct = default);
+
+    /// <summary>Upload a payload to the server.</summary>
+    Task<string> UploadAsync(Stream data, PayloadMetadata metadata, DataPlaneConfig config, IProgress<TransferProgress>? progress = null, CancellationToken ct = default);
+
+    /// <summary>Check if a payload exists on the server.</summary>
+    Task<bool> ExistsAsync(string payloadId, DataPlaneConfig config, CancellationToken ct = default);
+
+    /// <summary>Get payload info without downloading.</summary>
+    Task<PayloadDescriptor?> GetPayloadInfoAsync(string payloadId, DataPlaneConfig config, CancellationToken ct = default);
+}
+
+public record DataPlaneConfig(
+    string ServerUrl,
+    string AuthToken,
+    int MaxConcurrentChunks,
+    int ChunkSizeBytes,
+    TimeSpan Timeout,
+    Dictionary<string, string>? Options = null
+);
+
+public record TransferProgress(
+    long BytesTransferred,
+    long TotalBytes,
+    double PercentComplete,
+    double BytesPerSecond,
+    TimeSpan EstimatedRemaining
+);
+
+public record PayloadMetadata(
+    string Name,
+    string ContentType,
+    long SizeBytes,
+    string ContentHash,
+    Dictionary<string, object>? Tags = null
+);
+
+#endregion
+
+#region Interfaces - Server Components
+
+/// <summary>
+/// Server-side dispatcher for managing distribution jobs.
+/// </summary>
+public interface IServerDispatcher
+{
+    /// <summary>Queue a new distribution job.</summary>
+    Task<string> QueueJobAsync(IntentManifest manifest, CancellationToken ct = default);
+
+    /// <summary>Get job status.</summary>
+    Task<JobStatus> GetJobStatusAsync(string jobId, CancellationToken ct = default);
+
+    /// <summary>Cancel a queued job.</summary>
+    Task CancelJobAsync(string jobId, CancellationToken ct = default);
+
+    /// <summary>List all pending jobs.</summary>
+    Task<IReadOnlyList<DistributionJob>> ListJobsAsync(JobFilter? filter = null, CancellationToken ct = default);
+
+    /// <summary>Register a new client.</summary>
+    Task<AedsClient> RegisterClientAsync(ClientRegistration registration, CancellationToken ct = default);
+
+    /// <summary>Update client trust level (admin operation).</summary>
+    Task UpdateClientTrustAsync(string clientId, ClientTrustLevel newLevel, string adminId, CancellationToken ct = default);
+
+    /// <summary>Create a distribution channel.</summary>
+    Task<DistributionChannel> CreateChannelAsync(ChannelCreation channel, CancellationToken ct = default);
+
+    /// <summary>List all channels.</summary>
+    Task<IReadOnlyList<DistributionChannel>> ListChannelsAsync(CancellationToken ct = default);
+}
+
+public record DistributionJob(
+    string JobId,
+    IntentManifest Manifest,
+    JobStatus Status,
+    int TotalTargets,
+    int DeliveredCount,
+    int FailedCount,
+    DateTimeOffset QueuedAt,
+    DateTimeOffset? CompletedAt
+);
+
+public enum JobStatus { Queued, InProgress, Completed, PartiallyCompleted, Failed, Cancelled }
+
+public record JobFilter(
+    JobStatus? Status = null,
+    DateTimeOffset? Since = null,
+    string? ChannelId = null,
+    int Limit = 100
+);
+
+public record ClientRegistration(
+    string ClientName,
+    string PublicKey,
+    string VerificationPin,
+    ClientCapabilities Capabilities
+);
+
+public record ChannelCreation(
+    string Name,
+    string Description,
+    SubscriptionType SubscriptionType,
+    ClientTrustLevel MinTrustLevel
+);
+
+#endregion
+
+#region Interfaces - Client Components
+
+/// <summary>
+/// The Sentinel: Listens for wake-up signals from the Control Plane.
+/// </summary>
+public interface IClientSentinel
+{
+    /// <summary>Whether the sentinel is active.</summary>
+    bool IsActive { get; }
+
+    /// <summary>Start listening for manifests.</summary>
+    Task StartAsync(SentinelConfig config, CancellationToken ct = default);
+
+    /// <summary>Stop listening.</summary>
+    Task StopAsync();
+
+    /// <summary>Event raised when a manifest is received.</summary>
+    event EventHandler<ManifestReceivedEventArgs>? ManifestReceived;
+}
+
+public record SentinelConfig(
+    string ServerUrl,
+    string ClientId,
+    string PrivateKey,
+    string[] SubscribedChannels,
+    TimeSpan HeartbeatInterval
+);
+
+public class ManifestReceivedEventArgs : EventArgs
+{
+    public required IntentManifest Manifest { get; init; }
+    public required DateTimeOffset ReceivedAt { get; init; }
+}
+
+/// <summary>
+/// The Executor: Parses Manifests and executes actions.
+/// </summary>
+public interface IClientExecutor
+{
+    /// <summary>Execute an intent manifest.</summary>
+    Task<ExecutionResult> ExecuteAsync(IntentManifest manifest, ExecutorConfig config, CancellationToken ct = default);
+
+    /// <summary>Verify manifest signature.</summary>
+    Task<bool> VerifySignatureAsync(IntentManifest manifest);
+
+    /// <summary>Check if action is allowed by policy.</summary>
+    Task<PolicyDecision> EvaluatePolicyAsync(IntentManifest manifest, ClientPolicyEngine policy);
+}
+
+public record ExecutorConfig(
+    string CachePath,
+    string ExecutionSandbox,
+    bool AllowUnsigned,
+    Dictionary<string, string>? TrustedSigningKeys
+);
+
+public record ExecutionResult(
+    string ManifestId,
+    bool Success,
+    string? Error,
+    string? LocalPath,
+    DateTimeOffset ExecutedAt
+);
+
+public record PolicyDecision(
+    bool Allowed,
+    string Reason,
+    PolicyAction RequiredAction
+);
+
+public enum PolicyAction { Allow, Prompt, Deny, Sandbox }
+
+/// <summary>
+/// The Watchdog: Monitors local files for changes to trigger auto-sync.
+/// </summary>
+public interface IClientWatchdog
+{
+    /// <summary>Start watching a file for changes.</summary>
+    Task WatchAsync(string localPath, string payloadId, WatchdogConfig config, CancellationToken ct = default);
+
+    /// <summary>Stop watching a file.</summary>
+    Task UnwatchAsync(string localPath);
+
+    /// <summary>Get all watched files.</summary>
+    IReadOnlyList<WatchedFile> GetWatchedFiles();
+
+    /// <summary>Event raised when a watched file changes.</summary>
+    event EventHandler<FileChangedEventArgs>? FileChanged;
+}
+
+public record WatchdogConfig(
+    TimeSpan DebounceInterval,
+    bool AutoSync,
+    string SyncTargetUrl
+);
+
+public record WatchedFile(
+    string LocalPath,
+    string PayloadId,
+    DateTimeOffset LastModified,
+    bool PendingSync
+);
+
+public class FileChangedEventArgs : EventArgs
+{
+    public required string LocalPath { get; init; }
+    public required string PayloadId { get; init; }
+    public required FileChangeType ChangeType { get; init; }
+}
+
+public enum FileChangeType { Modified, Deleted, Renamed }
+
+/// <summary>
+/// Client-side policy engine for controlling behavior.
+/// </summary>
+public interface IClientPolicyEngine
+{
+    /// <summary>Evaluate whether to allow an action.</summary>
+    Task<PolicyDecision> EvaluateAsync(IntentManifest manifest, PolicyContext context);
+
+    /// <summary>Load policy rules.</summary>
+    Task LoadPolicyAsync(string policyPath);
+
+    /// <summary>Add a policy rule.</summary>
+    void AddRule(PolicyRule rule);
+}
+
+public record PolicyContext(
+    ClientTrustLevel SourceTrustLevel,
+    long FileSizeBytes,
+    NetworkType NetworkType,
+    int Priority,
+    bool IsPeer
+);
+
+public enum NetworkType { Wired, Wifi, Cellular, Metered, Offline }
+
+public record PolicyRule(
+    string Name,
+    string Condition,     // Expression like "Priority == 'Critical' AND NetworkType != 'Metered'"
+    PolicyAction Action,
+    string? Reason
+);
+
+#endregion
+```
+
+---
+
+##### AEDS.3: Abstract Base Classes
+
+```csharp
+// =============================================================================
+// FILE: DataWarehouse.SDK/Contracts/AedsPluginBases.cs
+// =============================================================================
+
+namespace DataWarehouse.SDK.Contracts;
+
+/// <summary>
+/// Base class for Control Plane transport plugins.
+/// </summary>
+public abstract class ControlPlaneTransportPluginBase : FeaturePluginBase, IControlPlaneTransport
+{
+    public abstract string TransportId { get; }
+    public bool IsConnected { get; protected set; }
+
+    protected ControlPlaneConfig? Config { get; private set; }
+
+    protected abstract Task EstablishConnectionAsync(ControlPlaneConfig config, CancellationToken ct);
+    protected abstract Task CloseConnectionAsync();
+    protected abstract Task TransmitManifestAsync(IntentManifest manifest, CancellationToken ct);
+    protected abstract IAsyncEnumerable<IntentManifest> ListenForManifestsAsync(CancellationToken ct);
+    protected abstract Task TransmitHeartbeatAsync(HeartbeatMessage heartbeat, CancellationToken ct);
+    protected abstract Task JoinChannelAsync(string channelId, CancellationToken ct);
+    protected abstract Task LeaveChannelAsync(string channelId, CancellationToken ct);
+
+    public async Task ConnectAsync(ControlPlaneConfig config, CancellationToken ct = default)
+    {
+        Config = config;
+        await EstablishConnectionAsync(config, ct);
+        IsConnected = true;
+    }
+
+    public async Task DisconnectAsync()
+    {
+        await CloseConnectionAsync();
+        IsConnected = false;
+    }
+
+    public Task SendManifestAsync(IntentManifest manifest, CancellationToken ct = default)
+        => TransmitManifestAsync(manifest, ct);
+
+    public IAsyncEnumerable<IntentManifest> ReceiveManifestsAsync(CancellationToken ct = default)
+        => ListenForManifestsAsync(ct);
+
+    public Task SendHeartbeatAsync(HeartbeatMessage heartbeat, CancellationToken ct = default)
+        => TransmitHeartbeatAsync(heartbeat, ct);
+
+    public Task SubscribeChannelAsync(string channelId, CancellationToken ct = default)
+        => JoinChannelAsync(channelId, ct);
+
+    public Task UnsubscribeChannelAsync(string channelId, CancellationToken ct = default)
+        => LeaveChannelAsync(channelId, ct);
+}
+
+/// <summary>
+/// Base class for Data Plane transport plugins.
+/// </summary>
+public abstract class DataPlaneTransportPluginBase : FeaturePluginBase, IDataPlaneTransport
+{
+    public abstract string TransportId { get; }
+
+    protected abstract Task<Stream> FetchPayloadAsync(string payloadId, DataPlaneConfig config, IProgress<TransferProgress>? progress, CancellationToken ct);
+    protected abstract Task<Stream> FetchDeltaAsync(string payloadId, string baseVersion, DataPlaneConfig config, IProgress<TransferProgress>? progress, CancellationToken ct);
+    protected abstract Task<string> PushPayloadAsync(Stream data, PayloadMetadata metadata, DataPlaneConfig config, IProgress<TransferProgress>? progress, CancellationToken ct);
+    protected abstract Task<bool> CheckExistsAsync(string payloadId, DataPlaneConfig config, CancellationToken ct);
+    protected abstract Task<PayloadDescriptor?> FetchInfoAsync(string payloadId, DataPlaneConfig config, CancellationToken ct);
+
+    public Task<Stream> DownloadAsync(string payloadId, DataPlaneConfig config, IProgress<TransferProgress>? progress = null, CancellationToken ct = default)
+        => FetchPayloadAsync(payloadId, config, progress, ct);
+
+    public Task<Stream> DownloadDeltaAsync(string payloadId, string baseVersion, DataPlaneConfig config, IProgress<TransferProgress>? progress = null, CancellationToken ct = default)
+        => FetchDeltaAsync(payloadId, baseVersion, config, progress, ct);
+
+    public Task<string> UploadAsync(Stream data, PayloadMetadata metadata, DataPlaneConfig config, IProgress<TransferProgress>? progress = null, CancellationToken ct = default)
+        => PushPayloadAsync(data, metadata, config, progress, ct);
+
+    public Task<bool> ExistsAsync(string payloadId, DataPlaneConfig config, CancellationToken ct = default)
+        => CheckExistsAsync(payloadId, config, ct);
+
+    public Task<PayloadDescriptor?> GetPayloadInfoAsync(string payloadId, DataPlaneConfig config, CancellationToken ct = default)
+        => FetchInfoAsync(payloadId, config, ct);
+}
+
+/// <summary>
+/// Base class for Server Dispatcher plugins.
+/// </summary>
+public abstract class ServerDispatcherPluginBase : FeaturePluginBase, IServerDispatcher
+{
+    protected readonly Dictionary<string, DistributionJob> _jobs = new();
+    protected readonly Dictionary<string, AedsClient> _clients = new();
+    protected readonly Dictionary<string, DistributionChannel> _channels = new();
+
+    protected abstract Task<string> EnqueueJobAsync(IntentManifest manifest, CancellationToken ct);
+    protected abstract Task ProcessJobAsync(string jobId, CancellationToken ct);
+    protected abstract Task<AedsClient> CreateClientAsync(ClientRegistration registration, CancellationToken ct);
+    protected abstract Task<DistributionChannel> CreateChannelInternalAsync(ChannelCreation channel, CancellationToken ct);
+
+    // Implementation delegates to abstract methods...
+    public Task<string> QueueJobAsync(IntentManifest manifest, CancellationToken ct = default) => EnqueueJobAsync(manifest, ct);
+    public Task<JobStatus> GetJobStatusAsync(string jobId, CancellationToken ct = default)
+        => Task.FromResult(_jobs.TryGetValue(jobId, out var job) ? job.Status : throw new KeyNotFoundException(jobId));
+    public Task CancelJobAsync(string jobId, CancellationToken ct = default) { /* implementation */ return Task.CompletedTask; }
+    public Task<IReadOnlyList<DistributionJob>> ListJobsAsync(JobFilter? filter = null, CancellationToken ct = default)
+        => Task.FromResult<IReadOnlyList<DistributionJob>>(_jobs.Values.ToList());
+    public Task<AedsClient> RegisterClientAsync(ClientRegistration registration, CancellationToken ct = default)
+        => CreateClientAsync(registration, ct);
+    public Task UpdateClientTrustAsync(string clientId, ClientTrustLevel newLevel, string adminId, CancellationToken ct = default) { /* implementation */ return Task.CompletedTask; }
+    public Task<DistributionChannel> CreateChannelAsync(ChannelCreation channel, CancellationToken ct = default)
+        => CreateChannelInternalAsync(channel, ct);
+    public Task<IReadOnlyList<DistributionChannel>> ListChannelsAsync(CancellationToken ct = default)
+        => Task.FromResult<IReadOnlyList<DistributionChannel>>(_channels.Values.ToList());
+}
+
+/// <summary>
+/// Base class for Client Sentinel plugins.
+/// </summary>
+public abstract class ClientSentinelPluginBase : FeaturePluginBase, IClientSentinel
+{
+    public bool IsActive { get; protected set; }
+    public event EventHandler<ManifestReceivedEventArgs>? ManifestReceived;
+
+    protected abstract Task StartListeningAsync(SentinelConfig config, CancellationToken ct);
+    protected abstract Task StopListeningAsync();
+
+    protected void OnManifestReceived(IntentManifest manifest)
+        => ManifestReceived?.Invoke(this, new ManifestReceivedEventArgs { Manifest = manifest, ReceivedAt = DateTimeOffset.UtcNow });
+
+    public async Task StartAsync(SentinelConfig config, CancellationToken ct = default)
+    {
+        await StartListeningAsync(config, ct);
+        IsActive = true;
+    }
+
+    public async Task StopAsync()
+    {
+        await StopListeningAsync();
+        IsActive = false;
+    }
+}
+
+/// <summary>
+/// Base class for Client Executor plugins.
+/// </summary>
+public abstract class ClientExecutorPluginBase : FeaturePluginBase, IClientExecutor
+{
+    protected abstract Task<ExecutionResult> PerformExecutionAsync(IntentManifest manifest, ExecutorConfig config, CancellationToken ct);
+    protected abstract Task<bool> ValidateSignatureAsync(IntentManifest manifest);
+    protected abstract Task<PolicyDecision> ApplyPolicyAsync(IntentManifest manifest, ClientPolicyEngine policy);
+
+    public Task<ExecutionResult> ExecuteAsync(IntentManifest manifest, ExecutorConfig config, CancellationToken ct = default)
+        => PerformExecutionAsync(manifest, config, ct);
+
+    public Task<bool> VerifySignatureAsync(IntentManifest manifest)
+        => ValidateSignatureAsync(manifest);
+
+    public Task<PolicyDecision> EvaluatePolicyAsync(IntentManifest manifest, ClientPolicyEngine policy)
+        => ApplyPolicyAsync(manifest, policy);
+}
+```
+
+---
+
+##### AEDS.4: Plugin Implementation Plan
+
+###### Core Plugins (Required)
+
+| Task | Plugin | Base Class | Description | Status |
+|------|--------|------------|-------------|--------|
+| AEDS-C1 | `AedsCorePlugin` | `FeaturePluginBase` | Core orchestration, manifest validation, job queue | [ ] |
+| AEDS-C2 | `IntentManifestSignerPlugin` | `FeaturePluginBase` | Ed25519/RSA signing for manifests | [ ] |
+| AEDS-C3 | `ServerDispatcherPlugin` | `ServerDispatcherPluginBase` | Default server-side job dispatch | [ ] |
+| AEDS-C4 | `ClientCourierPlugin` | `FeaturePluginBase` | Combines Sentinel + Executor + Watchdog | [ ] |
+
+###### Control Plane Transport Plugins (User Picks)
+
+| Task | Plugin | Base Class | Description | Status |
+|------|--------|------------|-------------|--------|
+| AEDS-CP1 | `WebSocketControlPlanePlugin` | `ControlPlaneTransportPluginBase` | WebSocket/SignalR transport | [ ] |
+| AEDS-CP2 | `MqttControlPlanePlugin` | `ControlPlaneTransportPluginBase` | MQTT 5.0 transport | [ ] |
+| AEDS-CP3 | `GrpcStreamingControlPlanePlugin` | `ControlPlaneTransportPluginBase` | gRPC bidirectional streaming | [ ] |
+
+###### Data Plane Transport Plugins (User Picks)
+
+| Task | Plugin | Base Class | Description | Status |
+|------|--------|------------|-------------|--------|
+| AEDS-DP1 | `Http3DataPlanePlugin` | `DataPlaneTransportPluginBase` | HTTP/3 over QUIC | [ ] |
+| AEDS-DP2 | `QuicDataPlanePlugin` | `DataPlaneTransportPluginBase` | Raw QUIC streams | [ ] |
+| AEDS-DP3 | `Http2DataPlanePlugin` | `DataPlaneTransportPluginBase` | HTTP/2 fallback | [ ] |
+| AEDS-DP4 | `WebTransportDataPlanePlugin` | `DataPlaneTransportPluginBase` | WebTransport for browsers | [ ] |
+
+###### Extension Plugins (Optional, Composable)
+
+| Task | Plugin | Description | Status |
+|------|--------|-------------|--------|
+| AEDS-X1 | `SwarmIntelligencePlugin` | P2P mesh with mDNS/DHT peer discovery | [ ] |
+| AEDS-X2 | `DeltaSyncPlugin` | Binary differencing (Rabin fingerprinting) | [ ] |
+| AEDS-X3 | `PreCogPlugin` | AI-based pre-fetching prediction | [ ] |
+| AEDS-X4 | `MulePlugin` | Air-gap USB transport support | [ ] |
+| AEDS-X5 | `GlobalDeduplicationPlugin` | Convergent encryption for dedup | [ ] |
+| AEDS-X6 | `NotificationPlugin` | Toast/Modal notification system | [ ] |
+| AEDS-X7 | `CodeSigningPlugin` | Release key management & verification | [ ] |
+| AEDS-X8 | `ClientPolicyEnginePlugin` | Local rule engine for auto-decisions | [ ] |
+| AEDS-X9 | `ZeroTrustPairingPlugin` | Client registration & key exchange | [ ] |
+
+---
+
+##### AEDS.5: Security Model
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                    ZERO-TRUST PAIRING PROCESS                        │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                      │
+│  1. Client generates Ed25519 Key Pair                               │
+│     ┌─────────────┐                                                 │
+│     │ Private Key │ (stored securely on client)                    │
+│     │ Public Key  │ (sent to server)                               │
+│     └─────────────┘                                                 │
+│                                                                      │
+│  2. Client sends Connection Request to Server                       │
+│     { ClientId, PublicKey, VerificationPIN }                        │
+│                                                                      │
+│  3. Admin verifies Client identity (out-of-band PIN display)        │
+│     Admin sees: "Client 'Marketing-PC-42' requests pairing: 847291" │
+│     Admin clicks: [Approve] or [Reject]                             │
+│                                                                      │
+│  4. Server signs Client's Public Key                                │
+│     ServerSignature = Sign(ClientPublicKey, ServerPrivateKey)       │
+│                                                                      │
+│  5. Result: Connection is Trusted                                   │
+│     Client can now receive manifests from this server               │
+│                                                                      │
+└─────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────┐
+│                    CODE SIGNING MANDATE                              │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                      │
+│  The Executor module REFUSES to run ANY binary or script unless:    │
+│                                                                      │
+│  1. The Intent Manifest is signed by a RELEASE SIGNING KEY          │
+│     (separate from Transport Key - defense in depth)                │
+│                                                                      │
+│  2. The Release Signing Key is in the client's trust store          │
+│                                                                      │
+│  3. The signature is valid and not expired                          │
+│                                                                      │
+│  WHY: Prevents the distribution system from becoming a botnet       │
+│       vector if the Server is compromised. An attacker would need   │
+│       to also compromise the offline Release Signing Key.           │
+│                                                                      │
+│  ┌──────────────────────┐    ┌──────────────────────┐               │
+│  │   Transport Key      │    │  Release Signing Key │               │
+│  │   (Online, Server)   │    │  (Offline, HSM)      │               │
+│  │                      │    │                      │               │
+│  │  Signs: Manifests    │    │  Signs: Executables  │               │
+│  │  Risk: If compromised│    │  Risk: Much harder   │               │
+│  │  attacker can push   │    │  to compromise       │               │
+│  │  data, NOT execute   │    │                      │               │
+│  └──────────────────────┘    └──────────────────────┘               │
+│                                                                      │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+##### AEDS.6: Client Policy Engine Rules
+
+```yaml
+# Example client policy configuration
+# FILE: client-policy.yaml
+
+rules:
+  - name: "Critical Priority Auto-Download"
+    condition: "Priority >= 90"
+    action: "Allow"
+    reason: "Critical updates download immediately"
+
+  - name: "Large File on Metered Network"
+    condition: "SizeBytes > 1073741824 AND NetworkType == 'Metered'"
+    action: "Prompt"
+    reason: "Large file (>1GB) on metered connection requires user approval"
+
+  - name: "Peer Source Sandbox"
+    condition: "IsPeer == true"
+    action: "Sandbox"
+    reason: "Content from peers must be sandboxed until verified"
+
+  - name: "Untrusted Source Deny"
+    condition: "SourceTrustLevel < 2"
+    action: "Deny"
+    reason: "Untrusted sources are blocked"
+
+  - name: "Execute Requires Elevated Trust"
+    condition: "Action == 'Execute' AND SourceTrustLevel < 3"
+    action: "Deny"
+    reason: "Execution requires elevated trust level"
+
+  - name: "Default Allow"
+    condition: "true"
+    action: "Allow"
+    reason: "Default policy"
+```
+
+---
+
+##### AEDS.7: Usage Examples
+
+```csharp
+// =============================================================================
+// EXAMPLE 1: Server pushing a security patch to all clients
+// =============================================================================
+
+var dispatcher = kernel.GetPlugin<IServerDispatcher>();
+
+var manifest = new IntentManifest
+{
+    ManifestId = Guid.NewGuid().ToString(),
+    CreatedAt = DateTimeOffset.UtcNow,
+    ExpiresAt = DateTimeOffset.UtcNow.AddDays(7),
+    Action = ActionPrimitive.Execute,
+    NotificationTier = NotificationTier.Modal,
+    DeliveryMode = DeliveryMode.Broadcast,
+    Targets = new[] { "#Security-Updates" },  // Channel broadcast
+    Priority = 95,  // Critical
+    Payload = new PayloadDescriptor
+    {
+        PayloadId = "patch-2026-001",
+        Name = "Security Patch 2026-001",
+        ContentType = "application/x-msdownload",
+        SizeBytes = 15_000_000,
+        ContentHash = "sha256:abc123...",
+        DeltaAvailable = true,
+        DeltaBaseVersion = "patch-2025-012"
+    },
+    Signature = await signer.SignManifestAsync(manifest, releaseKey)
+};
+
+var jobId = await dispatcher.QueueJobAsync(manifest);
+
+// =============================================================================
+// EXAMPLE 2: Client receiving and executing with policy evaluation
+// =============================================================================
+
+sentinel.ManifestReceived += async (sender, e) =>
+{
+    var manifest = e.Manifest;
+
+    // Verify signature first
+    if (!await executor.VerifySignatureAsync(manifest))
+    {
+        logger.LogWarning("Invalid signature on manifest {Id}", manifest.ManifestId);
+        return;
+    }
+
+    // Evaluate local policy
+    var context = new PolicyContext(
+        SourceTrustLevel: ClientTrustLevel.Trusted,
+        FileSizeBytes: manifest.Payload.SizeBytes,
+        NetworkType: NetworkType.Wifi,
+        Priority: manifest.Priority,
+        IsPeer: false
+    );
+
+    var decision = await executor.EvaluatePolicyAsync(manifest, policyEngine);
+
+    if (decision.Action == PolicyAction.Allow)
+    {
+        var result = await executor.ExecuteAsync(manifest, executorConfig);
+        logger.LogInformation("Executed manifest {Id}: {Success}", manifest.ManifestId, result.Success);
+    }
+    else if (decision.Action == PolicyAction.Prompt)
+    {
+        // Show UI to user for approval
+        await notificationService.PromptUserAsync(manifest, decision.Reason);
+    }
+};
+
+// =============================================================================
+// EXAMPLE 3: Using AEDS as a simple notification/chat system
+// =============================================================================
+
+// User enables ONLY the notification feature, disabling execution
+var config = new AedsClientConfig
+{
+    EnabledCapabilities = ClientCapabilities.ReceivePassive | ClientCapabilities.ReceiveNotify,
+    // ExecuteSigned is NOT enabled - this is a notification-only client
+};
+
+// Server sends a "chat message" as a notification-only manifest
+var chatManifest = new IntentManifest
+{
+    ManifestId = Guid.NewGuid().ToString(),
+    CreatedAt = DateTimeOffset.UtcNow,
+    Action = ActionPrimitive.Notify,  // No execution, just notify
+    NotificationTier = NotificationTier.Toast,
+    DeliveryMode = DeliveryMode.Broadcast,
+    Targets = new[] { "#Team-Chat" },
+    Priority = 30,
+    Payload = new PayloadDescriptor
+    {
+        PayloadId = "msg-" + Guid.NewGuid(),
+        Name = "New message from Alice",
+        ContentType = "text/plain",
+        SizeBytes = 256,
+        ContentHash = "sha256:...",
+    },
+    Metadata = new Dictionary<string, object>
+    {
+        ["sender"] = "alice@example.com",
+        ["message"] = "Hey team, the quarterly report is ready!",
+        ["timestamp"] = DateTimeOffset.UtcNow
+    },
+    Signature = await signer.SignManifestAsync(manifest, transportKey)
+};
+```
+
+---
+
+##### AEDS.8: Implementation Order
+
+| Phase | Tasks | Description | Dependencies |
+|-------|-------|-------------|--------------|
+| **Phase 1** | AEDS-C1, AEDS-C2 | Core infrastructure, manifest signing | None |
+| **Phase 2** | AEDS-CP1, AEDS-DP1 | Primary transports (WebSocket, HTTP/3) | Phase 1 |
+| **Phase 3** | AEDS-C3, AEDS-C4 | Server dispatcher, client courier | Phase 2 |
+| **Phase 4** | AEDS-X9, AEDS-X7 | Zero-trust pairing, code signing | Phase 3 |
+| **Phase 5** | AEDS-X8, AEDS-X6 | Policy engine, notifications | Phase 4 |
+| **Phase 6** | AEDS-CP2, AEDS-CP3 | Additional control plane transports | Phase 2 |
+| **Phase 7** | AEDS-DP2, AEDS-DP3, AEDS-DP4 | Additional data plane transports | Phase 2 |
+| **Phase 8** | AEDS-X1, AEDS-X2 | P2P mesh, delta sync | Phase 3 |
+| **Phase 9** | AEDS-X3, AEDS-X4, AEDS-X5 | Pre-cog AI, Mule, Dedup | Phase 3 |
 
 ---
 
@@ -795,6 +1989,3665 @@ After each task completion:
 4. **Production Ready:** No mocks, simulations, hardcoded values, or shortcuts
 5. **Update TODO.md:** Mark task complete only after verification passes
 6. **Commit:** Create atomic commit with descriptive message
+
+---
+
+## Tamper-Proof Storage Provider Implementation Plan
+
+### Overview
+
+A military/government-grade tamper-proof storage system providing cryptographic integrity verification, blockchain-based audit trails, and WORM (Write-Once-Read-Many) disaster recovery capabilities. The system follows a Three-Pillar Architecture: **Live Data** (fast access) + **Blockchain Anchor** (immutable truth) + **WORM Vault** (disaster recovery).
+
+**Design Philosophy:**
+- Object-based storage (all retrievals via GUIDs, not sectors/blocks)
+- User freedom to choose storage instances (not locked to specific providers)
+- Configurable security levels from "I Don't Care" to "Ultra Paranoid"
+- Append-only corrections (original data preserved, new version supersedes)
+- Mandatory write comments (like git commit messages) for full audit trail
+- Tamper attribution (detect WHO tampered when possible)
+
+---
+
+### Architecture: Three Pillars
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                         TAMPER-PROOF STORAGE SYSTEM                          │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                              │
+│  ┌──────────────────┐  ┌──────────────────┐  ┌──────────────────┐          │
+│  │   PILLAR 1:      │  │   PILLAR 2:      │  │   PILLAR 3:      │          │
+│  │   LIVE DATA      │  │   BLOCKCHAIN     │  │   WORM VAULT     │          │
+│  │                  │  │   ANCHOR         │  │                  │          │
+│  │  • Fast access   │  │  • Immutable     │  │  • Disaster      │          │
+│  │  • Hot storage   │  │    truth         │  │    recovery      │          │
+│  │  • RAID shards   │  │  • Hash chains   │  │  • Legal hold    │          │
+│  │  • Metadata      │  │  • Timestamps    │  │  • Compliance    │          │
+│  └──────────────────┘  └──────────────────┘  └──────────────────┘          │
+│                                                                              │
+│  Storage Instances (User-Configurable):                                      │
+│  ┌─────────────────────────────────────────────────────────────────────┐   │
+│  │ Instance ID        │ Purpose         │ Plugin Type (User Choice)     │   │
+│  │────────────────────│─────────────────│──────────────────────────────│   │
+│  │ "data"             │ Live data       │ S3Storage, LocalStorage, etc. │   │
+│  │ "metadata"         │ Manifests       │ Same or different provider    │   │
+│  │ "worm"             │ WORM vault      │ Same or different provider    │   │
+│  │ "blockchain"       │ Anchor records  │ Same or different provider    │   │
+│  └─────────────────────────────────────────────────────────────────────┘   │
+│                                                                              │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+### Five-Phase Write Pipeline
+
+```
+USER DATA
+    │
+    ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ PHASE 1: User-Configurable Transformations (Order Configurable)             │
+│ ┌─────────────┐  ┌─────────────┐  ┌─────────────┐                          │
+│ │ Compression │─▶│ Encryption  │─▶│ Content Pad │  ◄─ Hides true data size │
+│ │ (optional)  │  │ (optional)  │  │ (optional)  │     Covered by hash      │
+│ └─────────────┘  └─────────────┘  └─────────────┘                          │
+│ Records: Which transformations applied + order → stored in manifest         │
+└─────────────────────────────────────────────────────────────────────────────┘
+    │
+    ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ PHASE 2: System Integrity Hash (Fixed Position - ALWAYS After Phase 1)      │
+│ ┌─────────────────────────────────────────────────────────────────────┐     │
+│ │ SHA-256/SHA-384/SHA-512/Blake3 hash of transformed data             │     │
+│ │ This hash covers: Original data + Phase 1 transformations           │     │
+│ │ This hash does NOT cover: Phase 3 shard padding (by design)         │     │
+│ └─────────────────────────────────────────────────────────────────────┘     │
+└─────────────────────────────────────────────────────────────────────────────┘
+    │
+    ▼
+┌────────────────────────────────────────────────────────────────────────────────────────────────────────┐
+│ PHASE 3: RAID Distribution + Shard Padding (Fixed Position)                                            │
+│ ┌─────────────────────────────────────────────────────────────────────────────────────────────────┐    │
+│ │ 1. Split into N data shards                                                                     │    │
+│ │ 2. Pad final shard to uniform size (optional/user configurable, NOT covered by Phase 2 hash)    │    │
+│ │ 3. Generate M parity shards                                                                     │    │
+│ │ 4. Each shard gets its own shard-level hash                                                     │    │
+│ │ 5. Save the optional Shard Padding details also for reversal during read.                       │    │
+│ └─────────────────────────────────────────────────────────────────────────────────────────────────┘    │
+└────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+    │
+    ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ PHASE 4: Parallel Storage Writes (Transactional Writes)                     │
+│ ┌─────────────────────────────────────────────────────────────────────┐     │
+│ │ PARALLEL WRITES TO ALL CONFIGURED TIERS:                            │     │
+│ │   • Data Instance → RAID shards                                     │     │
+│ │   • Metadata Instance → Manifest + access log entry                 │     │
+│ │   • WORM Instance → Full transformed blob + manifest                │     │
+│ │   • Blockchain Instance → Batched (see Phase 5)                     │     │
+│ │ * Write to all 4 configured tiers in a single transaction.          │     │
+│ │ * Write is only considered a success if the whole transaction       │     │
+│ │   completes successfully.                                           │     │
+│ │ * Allow ROLLBACK on failure. WORM might not allow rollback.         │     │
+│ │   So maybe we can leave that data as orphaned... Or use some other  │     │
+│ │   proper stratergy. Design accordingly.                             │     │
+│ └─────────────────────────────────────────────────────────────────────┘     │
+└─────────────────────────────────────────────────────────────────────────────┘
+    │
+    ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ PHASE 5: Blockchain Anchoring (Batched for Efficiency)                      │
+│ ┌─────────────────────────────────────────────────────────────────────┐     │
+│ │ Anchor record contains:                                             │     │
+│ │   • Object GUID                                                     │     │
+│ │   • Phase 2 integrity hash                                          │     │
+│ │   • UTC timestamp                                                   │     │
+│ │   • Write context (author, comment, session)                        │     │
+│ │   • Previous block hash (chain linkage)                             │     │
+│ │   • Merkle root (when batching multiple objects)                    │     │
+│ └─────────────────────────────────────────────────────────────────────┘     │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+### Five-Phase Read Pipeline
+
+```
+READ REQUEST (ObjectGuid, ReadMode)
+    │
+    ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ PHASE 1: Manifest Retrieval                                                 │
+│ ┌─────────────────────────────────────────────────────────────────────┐     │
+│ │ Load TamperProofManifest from Metadata Instance                     │     │
+│ │ Contains: Expected hash, transformation order, shard map, WORM ref  │     │
+│ └─────────────────────────────────────────────────────────────────────┘     │
+└─────────────────────────────────────────────────────────────────────────────┘
+    │
+    ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ PHASE 2: Shard Retrieval + Reconstruction                                   │
+│ ┌─────────────────────────────────────────────────────────────────────┐     │
+│ │ 1. Load required shards from Data Instance                          │     │
+│ │ 2. Verify individual shard hashes                                   │     │
+│ │ 3. Reconstruct original transformed blob (Reed-Solomon if needed)   │     │
+│ │ 4. Strip shard padding                                              │     │
+│ └─────────────────────────────────────────────────────────────────────┘     │
+└─────────────────────────────────────────────────────────────────────────────┘
+    │
+    ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ PHASE 3: Integrity Verification (Conditional on ReadMode)                   │
+│ ┌─────────────────────────────────────────────────────────────────────┐     │
+│ │ ReadMode.Fast: SKIP (trust shard hashes)                            │     │
+│ │ ReadMode.Verified: Compute hash, compare to manifest                │     │
+│ │ ReadMode.Audit: + Verify blockchain anchor + Log access             │     │
+│ └─────────────────────────────────────────────────────────────────────┘     │
+└─────────────────────────────────────────────────────────────────────────────┘
+    │
+    ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ PHASE 4: Reverse Transformations                                            │
+│ ┌─────────────────────────────────────────────────────────────────────┐     │
+│ │ Apply inverse of Phase 1 in reverse order:                          │     │
+│ │   Strip Content Padding → Decrypt → Decompress                      │     │
+│ └─────────────────────────────────────────────────────────────────────┘     │
+└─────────────────────────────────────────────────────────────────────────────┘
+    │
+    ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ PHASE 5: Tamper Response (If Verification Failed)                           │
+│ ┌─────────────────────────────────────────────────────────────────────┐     │
+│ │ Based on TamperRecoveryBehavior:                                    │     │
+│ │   • AutoRecoverSilent: Recover from WORM, log internally            │     │
+│ │   • AutoRecoverWithReport: Recover + generate incident report       │     │
+│ │   • AlertAndWait: Notify admin, don't serve until resolved          │     │
+│ │ + Tamper Attribution: Analyze access logs to identify WHO           │     │
+│ └─────────────────────────────────────────────────────────────────────┘     │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+> **Note:** Sample code for T1/T2 (interfaces, enums, classes, base classes) has been removed.
+> Implementations are in:
+> - **SDK:** `DataWarehouse.SDK/Contracts/TamperProof/` (11 files)
+> - **Plugins:** See T1 and T2 implementation summaries below
+
+---
+
+### Implementation Phases
+# ** Consider the correct location for implementation. Common functions, enums etc. go in SDK. 
+# ** Abstract classes implement common features and lifecycle in SDK.
+# ** Only specific implementations go in the plugins.
+
+#### Phase T1: Core Infrastructure (Priority: CRITICAL) - **COMPLETED** (2026-01-29)
+| Task | Description | Dependencies | Status |
+|------|-------------|--------------|--------|
+| T1.1 | Create `IIntegrityProvider` interface and `IntegrityProviderPluginBase` | None | [x] |
+| T1.2 | Implement `DefaultIntegrityProvider` with SHA256/SHA384/SHA512/Blake3 | T1.1 | [x] |
+| T1.3 | Create `IBlockchainProvider` interface and `BlockchainProviderPluginBase` | None | [x] |
+| T1.4 | Implement `LocalBlockchainProvider` (file-based chain for single-node) | T1.3 | [x] |
+| T1.5 | Create `IWormStorageProvider` interface and `WormStorageProviderPluginBase` | None | [x] |
+| T1.6 | Implement `SoftwareWormProvider` (software-enforced immutability) | T1.5 | [x] |
+| T1.7 | Create `IAccessLogProvider` interface and `AccessLogProviderPluginBase` | None | [x] |
+| T1.8 | Implement `DefaultAccessLogProvider` (persistent access logging) | T1.7 | [x] |
+| T1.9 | Create all configuration classes | None | [x] |
+| T1.10 | Create all enum definitions | None | [x] |
+| T1.11 | Create all manifest and record structures | None | [x] |
+| T1.12 | Create `WriteContext` and `CorrectionContext` classes | None | [x] |
+
+**T1 Implementation Summary:**
+- SDK Contracts: `DataWarehouse.SDK/Contracts/TamperProof/` (11 files)
+- Plugins: `Plugins/DataWarehouse.Plugins.Integrity/`, `Plugins/DataWarehouse.Plugins.Blockchain.Local/`, `Plugins/DataWarehouse.Plugins.Worm.Software/`, `Plugins/DataWarehouse.Plugins.AccessLog/`
+- All builds pass with 0 errors
+
+#### Phase T2: Core Plugin (Priority: HIGH) ✅ COMPLETE
+| Task | Description | Dependencies | Status |
+|------|-------------|--------------|--------|
+| T2.1 | Create `ITamperProofProvider` interface | T1.* | [x] |
+| T2.2 | Create `TamperProofProviderPluginBase` base class | T2.1 | [x] |
+| T2.3 | Implement Phase 1 write pipeline (user transformations) | T2.2 | [x] |
+| T2.4 | Implement Phase 2 write pipeline (integrity hash) | T2.3, T1.2 | [x] |
+| T2.5 | Implement Phase 3 write pipeline (RAID + shard padding) | T2.4 | [x] |
+| T2.6 | Implement Phase 4 write pipeline (parallel storage writes) | T2.5 | [x] |
+| T2.7 | Implement Phase 5 write pipeline (blockchain anchoring) | T2.6, T1.4 | [x] |
+| T2.8 | Implement `SecureWriteAsync` combining all phases | T2.7 | [x] |
+| T2.9 | Implement mandatory write comment validation | T2.8, T1.12 | [x] |
+| T2.10 | Implement access logging on all operations | T2.8, T1.8 | [x] |
+
+**T2 Implementation Summary:**
+- SDK: `DataWarehouse.SDK/Contracts/TamperProof/ITamperProofProvider.cs` (interface + base class, 692 lines)
+- Plugin: `Plugins/DataWarehouse.Plugins.TamperProof/`
+  - `TamperProofPlugin.cs` - Main plugin with 5-phase write/read pipelines
+  - `Pipeline/WritePhaseHandlers.cs` - Write phases 1-5 with transactional rollback
+  - `Pipeline/ReadPhaseHandlers.cs` - Read phases 1-5 with WORM recovery
+- All builds pass with 0 errors
+
+#### Phase T3: Read Pipeline & Verification (Priority: HIGH)
+
+> **DEPENDENCY:** T3.4.2 "Decrypt (if encrypted)" requires T5.0 (SDK Base Classes) to be completed first.
+> - T5.0.3 provides `EncryptionPluginBase` with unified decryption infrastructure
+> - T5.0.1.4 provides `EncryptionMetadata` record for parsing manifest/header
+> - T5.0.1.9 provides `EncryptionConfigMode` enum for config resolution
+
+| Task | Description | Dependencies | Status |
+|------|-------------|--------------|--------|
+| T3.1 | Implement Phase 1 read (manifest retrieval) | T2.* | [ ] |
+| T3.2 | Implement Phase 2 read (shard retrieval + reconstruction) | T3.1 | [ ] |
+| T3.2.1 | ↳ Load required shards from Data Instance | T3.2 | [ ] |
+| T3.2.2 | ↳ Verify individual shard hashes | T3.2 | [ ] |
+| T3.2.3 | ↳ Reconstruct original blob (Reed-Solomon if needed) | T3.2 | [ ] |
+| T3.2.4 | ↳ Strip shard padding (if applied) | T3.2 | [ ] |
+| T3.3 | Implement Phase 3 read (integrity verification by ReadMode) | T3.2 | [ ] |
+| T3.3.1 | ↳ Implement `ReadMode.Fast` (skip verification, trust shard hashes) | T3.3 | [ ] |
+| T3.3.2 | ↳ Implement `ReadMode.Verified` (compute hash, compare to manifest) | T3.3 | [ ] |
+| T3.3.3 | ↳ Implement `ReadMode.Audit` (full chain + blockchain + access log) | T3.3 | [ ] |
+| T3.4 | Implement Phase 4 read (reverse transformations) | T3.3 | [ ] |
+| T3.4.1 | ↳ Strip content padding (if applied) | T3.4 | [ ] |
+| T3.4.2 | ↳ Decrypt (if encrypted) | T3.4, **T5.0** | [ ] |
+| T3.4.3 | ↳ Decompress (if compressed) | T3.4 | [ ] |
+| T3.5 | Implement Phase 5 read (tamper response) | T3.4 | [ ] |
+| T3.6 | Implement `SecureReadAsync` with all ReadModes | T3.5 | [ ] |
+| T3.7 | Implement tamper detection and incident creation | T3.6 | [ ] |
+| T3.8 | Implement tamper attribution analysis | T3.7, T1.8 | [ ] |
+| T3.8.1 | ↳ Correlate access logs with tampering window | T3.8 | [ ] |
+| T3.8.2 | ↳ Identify suspect principals (single/multiple/none) | T3.8 | [ ] |
+| T3.8.3 | ↳ Detect access log tampering (sophisticated attack) | T3.8 | [ ] |
+| T3.9 | Implement `GetTamperIncidentAsync` with attribution | T3.8 | [ ] |
+
+**Read Modes:**
+| Mode | Verification Level | Use Case |
+|------|-------------------|----------|
+| `Fast` | Skip verification (trust shard hashes only) | Bulk reads, internal replication, performance-critical |
+| `Verified` | Compute hash, compare to manifest | Default mode, balance of security and performance |
+| `Audit` | Full chain verification + blockchain anchor + access logging | Compliance audits, legal discovery, incident investigation |
+
+#### Phase T4: Recovery & Advanced Features (Priority: MEDIUM)
+
+**Recovery Behaviors (User-Configurable):**
+| Task | Description | Dependencies | Status |
+|------|-------------|--------------|--------|
+| T4.1 | Implement `TamperRecoveryBehavior` enum and configuration | T3.* | [ ] |
+| T4.1.1 | ↳ `AutoRecoverSilent`: Recover from WORM, log internally only | T4.1 | [ ] |
+| T4.1.2 | ↳ `AutoRecoverWithReport`: Recover + generate incident report | T4.1 | [ ] |
+| T4.1.3 | ↳ `AlertAndWait`: Notify admin, block reads until resolved | T4.1 | [ ] |
+| T4.1.4 | ↳ `ManualOnly`: Never auto-recover, require explicit admin action | T4.1 | [ ] |
+| T4.1.5 | ↳ `FailClosed`: Reject all operations on tamper detection | T4.1 | [ ] |
+| T4.2 | Implement `RecoverFromWormAsync` manual recovery | T4.1 | [ ] |
+
+**Append-Only Corrections:**
+| Task | Description | Dependencies | Status |
+|------|-------------|--------------|--------|
+| T4.3 | Implement `SecureCorrectAsync` (append-only corrections) | T4.2 | [ ] |
+| T4.3.1 | ↳ Create new version, never delete original | T4.3 | [ ] |
+| T4.3.2 | ↳ Link new version to superseded version in manifest | T4.3 | [ ] |
+| T4.3.3 | ↳ Anchor correction in blockchain with supersedes reference | T4.3 | [ ] |
+| T4.4 | Implement `AuditAsync` with full chain verification | T4.3 | [ ] |
+
+**Seal Mechanism & Instance State:**
+| Task | Description | Dependencies | Status |
+|------|-------------|--------------|--------|
+| T4.5 | Implement seal mechanism (lock structural config after first write) | T4.4 | [ ] |
+| T4.5.1 | ↳ Lock: Storage instances, RAID config, hash algorithm, blockchain mode | T4.5 | [ ] |
+| T4.5.2 | ↳ Allow: Recovery behavior, read mode, logging, alerts | T4.5 | [ ] |
+| T4.5.3 | ↳ Persist seal state and validate on startup | T4.5 | [ ] |
+| T4.6 | Implement instance degradation state machine | T4.5 | [ ] |
+| T4.6.1 | ↳ State transitions and event notifications | T4.6 | [ ] |
+| T4.6.2 | ↳ Automatic state detection based on provider health | T4.6 | [ ] |
+| T4.6.3 | ↳ Admin override for manual state changes | T4.6 | [ ] |
+
+**Blockchain Consensus Modes:**
+| Task | Description | Dependencies | Status |
+|------|-------------|--------------|--------|
+| T4.7 | Implement `BlockchainMode` enum and mode selection | T4.6 | [ ] |
+| T4.7.1 | ↳ `SingleWriter`: Local file-based chain, single instance | T4.7 | [ ] |
+| T4.7.2 | ↳ `RaftConsensus`: Multi-node consensus, majority required | T4.7 | [ ] |
+| T4.7.3 | ↳ `ExternalAnchor`: Periodic anchoring to public blockchain | T4.7 | [ ] |
+| T4.8 | Implement blockchain batching (N objects or T seconds) | T4.7 | [ ] |
+| T4.8.1 | ↳ Merkle root calculation for batched anchors | T4.8 | [ ] |
+
+**WORM Provider Wrapping (Any Storage Provider):**
+| Task | Description | Dependencies | Status |
+|------|-------------|--------------|--------|
+| T4.9 | Implement `IWormWrapper` interface for wrapping any `IStorageProvider` | T4.8 | [ ] |
+| T4.9.1 | ↳ Software immutability wrapper (admin bypass with logging) | T4.9 | [ ] |
+| T4.9.2 | ↳ Hardware integration detection (S3 Object Lock, Azure Immutable) | T4.9 | [ ] |
+| T4.10 | Implement `S3ObjectLockWormPlugin` (AWS S3 Object Lock) | T4.9 | [ ] |
+| T4.11 | Implement `AzureImmutableBlobWormPlugin` (Azure Immutable Blob) | T4.10 | [ ] |
+
+**Padding Configuration (User-Configurable):**
+| Task | Description | Dependencies | Status |
+|------|-------------|--------------|--------|
+| T4.12 | Implement `ContentPaddingMode` configuration | T4.11 | [ ] |
+| T4.12.1 | ↳ `None`: No padding | T4.12 | [ ] |
+| T4.12.2 | ↳ `SecureRandom`: Cryptographically secure random bytes | T4.12 | [ ] |
+| T4.12.3 | ↳ `Chaff`: Plausible-looking dummy data | T4.12 | [ ] |
+| T4.12.4 | ↳ `FixedSize`: Pad to fixed block size (e.g., 4KB, 64KB) | T4.12 | [ ] |
+| T4.13 | Implement `ShardPaddingMode` configuration | T4.12 | [ ] |
+| T4.13.1 | ↳ `None`: Variable shard sizes | T4.13 | [ ] |
+| T4.13.2 | ↳ `UniformSize`: Pad to largest shard size | T4.13 | [ ] |
+| T4.13.3 | ↳ `FixedBlock`: Pad to configured block boundary | T4.13 | [ ] |
+
+**Transactional Writes with Atomicity:**
+| Task | Description | Dependencies | Status |
+|------|-------------|--------------|--------|
+| T4.14 | Implement `TransactionalWriteManager` with atomicity guarantee | T4.13 | [ ] |
+| T4.14.1 | ↳ Write ordering: Data → Metadata → WORM → Blockchain queue | T4.14 | [ ] |
+| T4.14.2 | ↳ Implement `TransactionFailureBehavior` enum | T4.14 | [ ] |
+| T4.14.3 | ↳ Implement `TransactionFailurePhase` enum | T4.14 | [ ] |
+| T4.14.4 | ↳ Rollback on failure: Data, Metadata (WORM orphaned) | T4.14 | [ ] |
+| T4.14.5 | ↳ Implement `OrphanedWormRecord` structure | T4.14 | [ ] |
+| T4.14.6 | ↳ Implement `OrphanStatus` enum | T4.14 | [ ] |
+| T4.14.7 | ↳ WORM orphan tracking registry | T4.14 | [ ] |
+| T4.14.8 | ↳ Background orphan cleanup job (compliance-aware) | T4.14 | [ ] |
+| T4.14.9 | ↳ Orphan recovery mechanism (link to retry) | T4.14 | [ ] |
+| T4.14.10 | ↳ Transaction timeout and retry configuration | T4.14 | [ ] |
+
+**TransactionFailureBehavior Enum:**
+| Value | Description |
+|-------|-------------|
+| `RollbackAndOrphan` | Rollback Data+Metadata, mark WORM as orphan (default) |
+| `RollbackAndRetry` | Rollback, then retry N times before orphaning |
+| `FailFast` | Rollback immediately, no retry, throw exception |
+| `OrphanAndContinue` | Mark WORM as orphan, return partial success status |
+| `BlockUntilResolved` | Hold transaction, alert admin, wait for manual resolution |
+
+**TransactionFailurePhase Enum:**
+| Value | Description |
+|-------|-------------|
+| `DataWrite` | Failed writing shards to data instance |
+| `MetadataWrite` | Failed writing manifest to metadata instance |
+| `WormWrite` | Failed writing to WORM (rare - usually succeeds first) |
+| `BlockchainQueue` | Failed queuing blockchain anchor |
+
+**OrphanedWormRecord Structure:**
+```csharp
+public record OrphanedWormRecord
+{
+    public Guid OrphanId { get; init; }            // Unique orphan identifier
+    public Guid OriginalObjectId { get; init; }    // Intended object GUID
+    public string WormInstanceId { get; init; }    // Which WORM instance
+    public string WormPath { get; init; }          // Path in WORM storage
+    public DateTimeOffset CreatedAt { get; init; } // When orphan was created
+    public string FailureReason { get; init; }     // Why transaction failed
+    public TransactionFailurePhase FailedPhase { get; init; }  // Which phase failed
+    public string FailedInstanceId { get; init; }  // Which storage instance failed
+    public byte[] ContentHash { get; init; }       // Hash of orphaned content
+    public long ContentSize { get; init; }         // Size of orphaned content
+    public WriteContext OriginalContext { get; init; }  // Original write context
+    public OrphanStatus Status { get; init; }      // Current orphan status
+    public DateTimeOffset? ExpiresAt { get; init; } // Compliance expiry (when can be purged)
+    public Guid? LinkedTransactionId { get; init; } // If recovered/linked to retry
+    public int RetryCount { get; init; }           // Number of retry attempts
+}
+```
+
+**OrphanStatus Enum:**
+| Value | Description |
+|-------|-------------|
+| `Active` | Orphan exists in WORM, not yet processed |
+| `PendingReview` | Flagged for admin review |
+| `MarkedForPurge` | Compliance period expired, can be deleted |
+| `Purged` | Orphan deleted from WORM (record kept for audit) |
+| `Recovered` | Orphan was recovered into valid object |
+| `LinkedToRetry` | Orphan linked to successful retry transaction |
+
+**Background Operations:**
+| Task | Description | Dependencies | Status |
+|------|-------------|--------------|--------|
+| T4.15 | Implement background integrity scanner (configurable intervals) | T4.14 | [ ] |
+
+**Additional Integrity Algorithms:**
+| Task | Description | Dependencies | Status |
+|------|-------------|--------------|--------|
+| T4.16 | Implement SHA-3 family (Keccak-based NIST standard) | T4.15 | [ ] |
+| T4.16.1 | ↳ SHA3-256 | T4.16 | [ ] |
+| T4.16.2 | ↳ SHA3-384 | T4.16 | [ ] |
+| T4.16.3 | ↳ SHA3-512 | T4.16 | [ ] |
+| T4.17 | Implement Keccak family (original, pre-NIST) | T4.16 | [ ] |
+| T4.17.1 | ↳ Keccak-256 | T4.17 | [ ] |
+| T4.17.2 | ↳ Keccak-384 | T4.17 | [ ] |
+| T4.17.3 | ↳ Keccak-512 | T4.17 | [ ] |
+| T4.18 | Implement HMAC variants (keyed hashes) | T4.17 | [ ] |
+| T4.18.1 | ↳ HMAC-SHA256 (keyed) | T4.18 | [ ] |
+| T4.18.2 | ↳ HMAC-SHA384 (keyed) | T4.18 | [ ] |
+| T4.18.3 | ↳ HMAC-SHA512 (keyed) | T4.18 | [ ] |
+| T4.18.4 | ↳ HMAC-SHA3-256 (keyed) | T4.18 | [ ] |
+| T4.18.5 | ↳ HMAC-SHA3-384 (keyed) | T4.18 | [ ] |
+| T4.18.6 | ↳ HMAC-SHA3-512 (keyed) | T4.18 | [ ] |
+| T4.19 | Implement Salted hash variants (per-object random salt) | T4.18 | [ ] |
+| T4.19.1 | ↳ Salted-SHA256 | T4.19 | [ ] |
+| T4.19.2 | ↳ Salted-SHA512 | T4.19 | [ ] |
+| T4.19.3 | ↳ Salted-SHA3-256 | T4.19 | [ ] |
+| T4.19.4 | ↳ Salted-SHA3-512 | T4.19 | [ ] |
+| T4.19.5 | ↳ Salted-Blake3 | T4.19 | [ ] |
+| T4.20 | Implement Salted HMAC variants (key + per-object salt) | T4.19 | [ ] |
+| T4.20.1 | ↳ Salted-HMAC-SHA256 | T4.20 | [ ] |
+| T4.20.2 | ↳ Salted-HMAC-SHA512 | T4.20 | [ ] |
+| T4.20.3 | ↳ Salted-HMAC-SHA3-256 | T4.20 | [ ] |
+| T4.20.4 | ↳ Salted-HMAC-SHA3-512 | T4.20 | [ ] |
+
+**Additional Compression Algorithms:**
+| Task | Description | Dependencies | Status |
+|------|-------------|--------------|--------|
+| T4.21 | Implement classic/simple compression algorithms | T4.20 | [ ] |
+| T4.21.1 | ↳ RLE (Run-Length Encoding) | T4.21 | [ ] |
+| T4.21.2 | ↳ Huffman coding | T4.21 | [ ] |
+| T4.21.3 | ↳ LZW (Lempel-Ziv-Welch) | T4.21 | [ ] |
+| T4.22 | Implement dictionary-based compression | T4.21 | [ ] |
+| T4.22.1 | ↳ BZip2 (Burrows-Wheeler + Huffman) | T4.22 | [ ] |
+| T4.22.2 | ↳ LZMA (7-Zip algorithm) | T4.22 | [ ] |
+| T4.22.3 | ↳ LZMA2 (improved LZMA with streaming) | T4.22 | [ ] |
+| T4.22.4 | ↳ Snappy (Google, optimized for speed) | T4.22 | [ ] |
+| T4.23 | Implement statistical/context compression | T4.22 | [ ] |
+| T4.23.1 | ↳ PPM (Prediction by Partial Matching) | T4.23 | [ ] |
+| T4.23.2 | ↳ NNCP (Neural Network Compression) | T4.23 | [ ] |
+| T4.23.3 | ↳ Schumacher Compression | T4.23 | [ ] |
+
+**Compression Algorithm Reference:**
+| Algorithm | Type | Speed | Ratio | Status | Use Case |
+|-----------|------|-------|-------|--------|----------|
+| GZip | Dictionary (DEFLATE) | Fast | Good | ✅ Implemented | General purpose, wide compatibility |
+| Deflate | Dictionary (LZ77+Huffman) | Fast | Good | ✅ Implemented | HTTP compression, ZIP files |
+| Brotli | Dictionary (LZ77+Huffman+Context) | Medium | Better | ✅ Implemented | Web content, text |
+| LZ4 | Dictionary (LZ77) | Very Fast | Lower | ✅ Implemented | Real-time, databases |
+| Zstd | Dictionary (FSE+Huffman) | Fast | Excellent | ✅ Implemented | Best all-around |
+| RLE | Simple | Very Fast | Variable | [ ] Pending | Simple patterns, bitmaps |
+| Huffman | Statistical | Fast | Good | [ ] Pending | Building block, education |
+| LZW | Dictionary | Fast | Good | [ ] Pending | GIF, legacy systems |
+| BZip2 | Block-sorting | Slow | Excellent | [ ] Pending | Large files, archives |
+| LZMA/LZMA2 | Dictionary | Slow | Best | [ ] Pending | 7-Zip, XZ archives |
+| Snappy | Dictionary | Very Fast | Lower | [ ] Pending | Google systems, speed-critical |
+| PPM | Statistical | Slow | Excellent | [ ] Pending | Text, high compression |
+| NNCP | Neural | Very Slow | Best | [ ] Pending | Research, maximum compression |
+| Schumacher | Proprietary | Variable | Variable | [ ] Pending | Specialized use cases |
+
+**Additional Encryption Algorithms:**
+
+> **CRITICAL: All New Encryption Plugins MUST Extend `EncryptionPluginBase`**
+>
+> **DEPENDENCY:** T4.25-T4.29 depend on T5.0 (SDK Base Classes). Complete T5.0 first.
+>
+> After T5.0 completion, ALL new encryption plugins (except educational ciphers):
+> - **MUST extend `EncryptionPluginBase`** (NOT `PipelinePluginBase` directly)
+> - Get composable key management (Direct and Envelope modes) for free via inheritance
+> - Only need to implement algorithm-specific `EncryptCoreAsync()` and `DecryptCoreAsync()`
+> - Automatically support pairing with ANY `IKeyStore` or `IEnvelopeKeyStore`
+>
+> **Exception:** Educational/historical ciphers (T4.24) may extend `PipelinePluginBase` directly if no real key management.
+
+| Task | Description | Base Class | Dependencies | Status |
+|------|-------------|------------|--------------|--------|
+| T4.24 | Implement historical/educational ciphers (NOT for production) | `PipelinePluginBase` | T4.23 | [ ] |
+| T4.24.1 | ↳ Caesar/ROT13 (educational only) | `PipelinePluginBase` | T4.24 | [ ] |
+| T4.24.2 | ↳ XOR cipher (educational only) | `PipelinePluginBase` | T4.24 | [ ] |
+| T4.24.3 | ↳ Vigenère cipher (educational only) | `PipelinePluginBase` | T4.24 | [ ] |
+| T4.25 | Implement legacy ciphers (compatibility only) | `EncryptionPluginBase` | T5.0, T4.24 | [ ] |
+| T4.25.1 | ↳ DES (56-bit, legacy) | `EncryptionPluginBase` | T4.25 | [ ] |
+| T4.25.2 | ↳ 3DES/Triple-DES (112/168-bit, legacy) | `EncryptionPluginBase` | T4.25 | [ ] |
+| T4.25.3 | ↳ RC4 (stream cipher, legacy/WEP) | `EncryptionPluginBase` | T4.25 | [ ] |
+| T4.25.4 | ↳ Blowfish (64-bit block, legacy) | `EncryptionPluginBase` | T4.25 | [ ] |
+| T4.26 | Implement AES key size variants | `EncryptionPluginBase` | T5.0, T4.25 | [ ] |
+| T4.26.1 | ↳ AES-128-GCM | `EncryptionPluginBase` | T4.26 | [ ] |
+| T4.26.2 | ↳ AES-192-GCM | `EncryptionPluginBase` | T4.26 | [ ] |
+| T4.26.3 | ↳ AES-256-CBC (for compatibility) | `EncryptionPluginBase` | T4.26 | [ ] |
+| T4.26.4 | ↳ AES-256-CTR (counter mode) | `EncryptionPluginBase` | T4.26 | [ ] |
+| T4.26.5 | ↳ AES-NI hardware acceleration detection | - | T4.26 | [ ] |
+| T4.27 | Implement asymmetric/public-key encryption | `EncryptionPluginBase` | T5.0, T4.26 | [ ] |
+| T4.27.1 | ↳ RSA-2048 | `EncryptionPluginBase` | T4.27 | [ ] |
+| T4.27.2 | ↳ RSA-4096 | `EncryptionPluginBase` | T4.27 | [ ] |
+| T4.27.3 | ↳ ECDH/ECDSA (Elliptic Curve) | `EncryptionPluginBase` | T4.27 | [ ] |
+| T4.28 | Implement post-quantum cryptography | `EncryptionPluginBase` | T5.0, T4.27 | [ ] |
+| T4.28.1 | ↳ ML-KEM (Kyber, NIST PQC standard) | `EncryptionPluginBase` | T4.28 | [ ] |
+| T4.28.2 | ↳ ML-DSA (Dilithium, signatures) | `EncryptionPluginBase` | T4.28 | [ ] |
+| T4.29 | Implement special-purpose encryption | `EncryptionPluginBase` | T5.0, T4.28 | [ ] |
+| T4.29.1 | ↳ One-Time Pad (OTP) | `EncryptionPluginBase` | T4.29 | [ ] |
+| T4.29.2 | ↳ XTS-AES (disk encryption mode) | `EncryptionPluginBase` | T4.29 | [ ] |
+
+**Encryption Algorithm Reference:**
+| Algorithm | Type | Key Size | Base Class | Envelope Mode | Status | Security | Use Case |
+|-----------|------|----------|------------|---------------|--------|----------|----------|
+| AES-256-GCM | Symmetric | 256-bit | `EncryptionPluginBase` | ✅ Supported | ✅ Implemented | Strong | Primary encryption |
+| ChaCha20-Poly1305 | Symmetric | 256-bit | `EncryptionPluginBase` | ✅ Supported | ✅ Implemented | Strong | Mobile, no AES-NI |
+| Twofish | Symmetric | 256-bit | `EncryptionPluginBase` | ✅ Supported | ✅ Implemented | Strong | AES finalist |
+| Serpent | Symmetric | 256-bit | `EncryptionPluginBase` | ✅ Supported | ✅ Implemented | Very Strong | High security |
+| FIPS | Symmetric | Various | `EncryptionPluginBase` | ✅ Supported | ✅ Implemented | Certified | Government compliance |
+| ZeroKnowledge | Symmetric | 256-bit | `EncryptionPluginBase` | ✅ Supported | ✅ Implemented | Strong | Client-side + ZK proofs |
+| Caesar/ROT13 | Substitution | None | `PipelinePluginBase` | ❌ N/A | [ ] Pending | ❌ None | Educational only |
+| XOR | Stream | Variable | `PipelinePluginBase` | ❌ N/A | [ ] Pending | ❌ Weak | Educational only |
+| Vigenère | Substitution | Variable | `PipelinePluginBase` | ❌ N/A | [ ] Pending | ❌ Weak | Educational only |
+| DES | Symmetric | 56-bit | `EncryptionPluginBase` | ✅ Supported | [ ] Pending | ❌ Broken | Legacy compatibility |
+| 3DES | Symmetric | 112/168-bit | `EncryptionPluginBase` | ✅ Supported | [ ] Pending | ⚠️ Weak | Legacy compatibility |
+| RC4 | Stream | 40-2048-bit | `EncryptionPluginBase` | ✅ Supported | [ ] Pending | ❌ Broken | Legacy (WEP) |
+| Blowfish | Symmetric | 32-448-bit | `EncryptionPluginBase` | ✅ Supported | [ ] Pending | ⚠️ Aging | Legacy compatibility |
+| AES-128-GCM | Symmetric | 128-bit | `EncryptionPluginBase` | ✅ Supported | [ ] Pending | Strong | Performance-critical |
+| AES-192-GCM | Symmetric | 192-bit | `EncryptionPluginBase` | ✅ Supported | [ ] Pending | Strong | Middle ground |
+| RSA-2048 | Asymmetric | 2048-bit | `EncryptionPluginBase` | ✅ Supported | [ ] Pending | Strong | Key exchange |
+| RSA-4096 | Asymmetric | 4096-bit | `EncryptionPluginBase` | ✅ Supported | [ ] Pending | Very Strong | High security |
+| ML-KEM (Kyber) | Post-Quantum | Various | `EncryptionPluginBase` | ✅ Supported | [ ] Pending | Quantum-Safe | Future-proof |
+| One-Time Pad | Perfect | ≥ Message | `EncryptionPluginBase` | ✅ Supported | [ ] Pending | Perfect | Theoretical max |
+
+---
+
+### Encryption Metadata Requirements (CRITICAL for Decryption)
+
+> **IMPORTANT: This pattern applies to ALL encryption, not just tamper-proof storage.**
+> - **Standalone encryption:** EncryptionMetadata stored in **ciphertext header** (binary prefix)
+> - **Tamper-proof storage:** EncryptionMetadata stored in **TamperProofManifest** (JSON field)
+>
+> The principle is identical: store write-time config WITH the data so read-time can always decrypt correctly.
+> The only difference is WHERE the metadata is stored (header vs manifest).
+
+**Problem:** When reading encrypted data back, the system MUST know:
+1. Which encryption algorithm was used
+2. Which key management mode (Direct vs Envelope)
+3. Key identifiers (key ID for Direct, wrapped DEK + KEK ID for Envelope)
+
+**Solution:** Store encryption metadata in the **TamperProofManifest** (for tamper-proof storage) or **ciphertext header** (for standalone encryption).
+
+**Encryption Metadata Structure:**
+```csharp
+/// <summary>
+/// Metadata stored with encrypted data to enable decryption.
+/// Stored in TamperProofManifest.EncryptionMetadata or embedded in ciphertext header.
+/// </summary>
+public record EncryptionMetadata
+{
+    /// <summary>Encryption plugin ID (e.g., "aes256gcm", "chacha20", "twofish256")</summary>
+    public string EncryptionPluginId { get; init; } = "";
+
+    /// <summary>Key management mode: Direct or Envelope</summary>
+    public KeyManagementMode KeyMode { get; init; }
+
+    /// <summary>For Direct mode: Key ID in the key store</summary>
+    public string? KeyId { get; init; }
+
+    /// <summary>For Envelope mode: Wrapped DEK (encrypted by HSM)</summary>
+    public byte[]? WrappedDek { get; init; }
+
+    /// <summary>For Envelope mode: KEK identifier in HSM</summary>
+    public string? KekId { get; init; }
+
+    /// <summary>Key store plugin ID used (for verification/routing)</summary>
+    public string? KeyStorePluginId { get; init; }
+
+    /// <summary>Algorithm-specific parameters (IV, nonce, tag location, etc.)</summary>
+    public Dictionary<string, object> AlgorithmParams { get; init; } = new();
+}
+```
+
+**Where Metadata is Stored:**
+
+| Storage Mode | Metadata Location | Format |
+|--------------|-------------------|--------|
+| **Tamper-Proof Storage** | `TamperProofManifest.EncryptionMetadata` | JSON in manifest |
+| **Standalone Encryption** | Ciphertext header | Binary prefix |
+| **Database/SQL TDE** | Encryption key table | SQL metadata |
+
+**Read Path with Metadata:**
+```
+1. Load manifest or parse ciphertext header
+2. Extract EncryptionMetadata
+3. Determine encryption plugin from EncryptionPluginId
+4. Determine key management mode from KeyMode:
+   - Direct: Get key from IKeyStore using KeyId
+   - Envelope: Unwrap DEK using VaultKeyStorePlugin with WrappedDek + KekId
+5. Decrypt using appropriate encryption plugin
+```
+
+**Benefits:**
+- ✅ Any encryption algorithm can be paired with any key management at runtime
+- ✅ Metadata ensures correct decryption even if defaults change
+- ✅ Supports migration between key management modes
+- ✅ Enables key rotation without re-encryption (for envelope mode)
+
+---
+
+### Key Management + Tamper-Proof Storage Integration
+
+> **CRITICAL:** This section defines how per-user key management configuration works with tamper-proof storage.
+
+**The Challenge:**
+- Per-user configuration is resolved at runtime from user preferences
+- Tamper-proof storage requires deterministic decryption (MUST work even if preferences change)
+- What if user changes their key management preferences between write and read?
+- What if IKeyManagementConfigProvider returns different results over time?
+
+**Solution: Write-Time Config Stored in Manifest, Read-Time Uses Manifest**
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│           TAMPER-PROOF WRITE PATH (Config Resolved → Stored)            │
+├─────────────────────────────────────────────────────────────────────────┤
+│  1. User initiates write                                                 │
+│  2. Resolve KeyManagementConfig (args → user prefs → defaults)           │
+│  3. Encrypt data using resolved config                                   │
+│  4. Create TamperProofManifest with EncryptionMetadata:                  │
+│     - EncryptionPluginId: "aes256gcm"                                    │
+│     - KeyMode: Envelope                                                  │
+│     - WrappedDek: [encrypted DEK bytes]                                  │
+│     - KekId: "azure-kek-finance"                                         │
+│     - KeyStorePluginId: "vault-azure"  ◄── STORED FOR DECRYPTION        │
+│  5. Hash manifest + data, anchor to blockchain                           │
+│  6. Store to WORM for disaster recovery                                  │
+└─────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│           TAMPER-PROOF READ PATH (Config from Manifest Only)            │
+├─────────────────────────────────────────────────────────────────────────┤
+│  1. User initiates read                                                  │
+│  2. Load TamperProofManifest                                             │
+│  3. Verify integrity (hash chain, blockchain anchor)                     │
+│  4. Extract EncryptionMetadata from manifest                             │
+│     *** IGNORE current user preferences ***                              │
+│  5. Resolve key store from stored KeyStorePluginId                       │
+│  6. Decrypt using stored config:                                         │
+│     - Mode: from manifest (Envelope)                                     │
+│     - KEK: from manifest (azure-kek-finance)                             │
+│     - Key Store: from manifest (vault-azure)                             │
+│  7. Return decrypted data                                                │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+**Key Principles:**
+| Operation | Config Source | Rationale |
+|-----------|---------------|-----------|
+| **WRITE** | User's current config (resolved per-operation) | User chooses encryption settings |
+| **READ** | Manifest's stored config | Ensures decryption always works, even if user prefs change |
+
+**Why This Works for Tamper-Proof:**
+1. **Deterministic Decryption**: Config stored with data → can always decrypt
+2. **Tamper Detection**: If someone modifies EncryptionMetadata in manifest → integrity hash fails
+3. **Audit Trail**: Manifest shows exactly what config was used at write time
+4. **Flexibility Preserved**: Different objects can use different configs (per-user at write time)
+5. **No Degradation**: Read performance is the same (no config resolution needed)
+
+**Configuration Modes for Tamper-Proof Storage:**
+
+The `TamperProofStorageProvider` can be configured with different encryption flexibility levels:
+
+| Mode | Description | Use Case |
+|------|-------------|----------|
+| `PerObjectConfig` | Each object stores its own EncryptionMetadata (DEFAULT) | Multi-tenant, mixed compliance |
+| `FixedConfig` | All objects use same config (sealed at first write) | Single-tenant, strict compliance |
+| `PolicyEnforced` | Per-object, but must match tenant policy | Enterprise with compliance rules |
+
+```csharp
+// MODE 1: PerObjectConfig (DEFAULT) - Maximum flexibility
+var tamperProof = new TamperProofStorageProvider(new TamperProofConfig
+{
+    EncryptionConfigMode = EncryptionConfigMode.PerObjectConfig,
+    // Each object's manifest stores its own EncryptionMetadata
+    // Different users can use different configs
+});
+
+// MODE 2: FixedConfig - Strict consistency
+var tamperProofStrict = new TamperProofStorageProvider(new TamperProofConfig
+{
+    EncryptionConfigMode = EncryptionConfigMode.FixedConfig,
+    FixedEncryptionConfig = new EncryptionMetadata
+    {
+        EncryptionPluginId = "aes256gcm",
+        KeyMode = KeyManagementMode.Envelope,
+        KeyStorePluginId = "vault-hsm",
+        KekId = "master-kek"
+    }
+    // ALL objects MUST use this config - enforced at write time
+    // First write seals this config
+});
+
+// MODE 3: PolicyEnforced - Flexibility within policy
+var tamperProofPolicy = new TamperProofStorageProvider(new TamperProofConfig
+{
+    EncryptionConfigMode = EncryptionConfigMode.PolicyEnforced,
+    EncryptionPolicy = new EncryptionPolicy
+    {
+        AllowedModes = [KeyManagementMode.Envelope],  // Must be envelope
+        AllowedKeyStores = ["vault-azure", "vault-aws"],  // Only HSM backends
+        RequireHsmBackedKek = true  // KEK must be in HSM
+    }
+    // Per-object config allowed, but must satisfy policy
+});
+```
+
+**EncryptionMetadata in TamperProofManifest:**
+```csharp
+public class TamperProofManifest
+{
+    // ... existing fields ...
+
+    /// <summary>
+    /// Encryption configuration used for this object.
+    /// CRITICAL: Used on READ to decrypt, ignoring current user preferences.
+    /// </summary>
+    public EncryptionMetadata? EncryptionMetadata { get; set; }
+}
+
+public record EncryptionMetadata
+{
+    /// <summary>Encryption plugin used (e.g., "aes256gcm")</summary>
+    public string EncryptionPluginId { get; init; } = "";
+
+    /// <summary>Key management mode used</summary>
+    public KeyManagementMode KeyMode { get; init; }
+
+    /// <summary>For Direct mode: Key ID in the key store</summary>
+    public string? KeyId { get; init; }
+
+    /// <summary>For Envelope mode: Wrapped DEK</summary>
+    public byte[]? WrappedDek { get; init; }
+
+    /// <summary>For Envelope mode: KEK identifier</summary>
+    public string? KekId { get; init; }
+
+    /// <summary>Key store plugin ID (for resolving on read)</summary>
+    public string? KeyStorePluginId { get; init; }
+
+    /// <summary>Algorithm-specific params (IV, nonce, tag location)</summary>
+    public Dictionary<string, object> AlgorithmParams { get; init; } = new();
+
+    /// <summary>Timestamp when encryption was performed</summary>
+    public DateTime EncryptedAt { get; init; }
+
+    /// <summary>User/tenant who encrypted (for audit)</summary>
+    public string? EncryptedBy { get; init; }
+}
+```
+
+**Summary - Flexibility vs Tamper-Proof:**
+| Aspect | Standalone Encryption | Tamper-Proof Storage |
+|--------|----------------------|----------------------|
+| **Write Config** | Per-user, per-operation | Per-user, per-operation |
+| **Read Config** | Per-user, per-operation | FROM MANIFEST (stored at write) |
+| **Config Storage** | Ciphertext header | TamperProofManifest |
+| **Integrity** | Tag verification only | Hash chain + blockchain + WORM |
+| **Can Change Prefs?** | Yes, affects new ops | Yes, but read uses original config |
+| **Degradation** | None | None (manifest has all needed info) |
+
+**Integrity Algorithm Reference:**
+| Category | Algorithms | Key Required | Salt | Use Case |
+|----------|------------|--------------|------|----------|
+| **SHA-2** | SHA-256, SHA-384, SHA-512 | No | No | Standard integrity verification |
+| **SHA-3** | SHA3-256, SHA3-384, SHA3-512 | No | No | NIST standard, quantum-resistant design |
+| **Keccak** | Keccak-256, Keccak-384, Keccak-512 | No | No | Original (pre-NIST), used by Ethereum |
+| **Blake3** | Blake3 | No | No | Fastest, modern, parallel-friendly |
+| **HMAC** | HMAC-SHA256/384/512, HMAC-SHA3-256/384/512 | Yes | No | Keyed authentication, prevents length extension |
+| **Salted** | Salted-SHA256/512, Salted-SHA3, Salted-Blake3 | No | Yes | Per-object salt prevents rainbow tables |
+| **Salted HMAC** | Salted-HMAC-SHA256/512, Salted-HMAC-SHA3 | Yes | Yes | Maximum security: key + per-object salt |
+
+**Note:**
+- **HMAC** uses a secret key for authentication (proves data wasn't tampered AND you have the key)
+- **Salted** adds a random per-object salt stored in manifest (prevents precomputation attacks)
+- **Salted HMAC** combines both: key-based authentication with per-object salt randomization
+
+**Instance Degradation States:**
+| State | Cause | Impact | User Action |
+|-------|-------|--------|-------------|
+| `Healthy` | All systems operational | Full functionality | None |
+| `Degraded` | Some shards unavailable, but reconstructible | Reads slower, writes may be slower | Monitor, plan maintenance |
+| `DegradedReadOnly` | Parity exhausted, cannot guarantee writes | Reads work, writes blocked | Urgent: restore storage |
+| `DegradedVerifyOnly` | Blockchain unavailable, cannot anchor | Reads verified, writes unanchored | Restore blockchain |
+| `DegradedNoRecovery` | WORM unavailable | Cannot auto-recover from tampering | Critical: restore WORM |
+| `Offline` | Primary storage unavailable | No operations possible | Emergency: restore storage |
+| `Corrupted` | Tampering detected, recovery failed | Data integrity compromised | Incident response required |
+
+**Seal Mechanism:**
+After the first write operation, structural configuration becomes immutable:
+- **Locked after seal:** Storage instances, RAID configuration, hash algorithm, blockchain mode, WORM provider
+- **Configurable always:** Recovery behavior, read mode defaults, logging verbosity, alert thresholds, padding modes
+
+#### Phase T5: Ultra Paranoid Mode (Priority: LOW)
+
+**Goal:** Maximum security for government/military-grade deployments
+
+---
+
+### Key Management Architecture (EXISTING - Composable Plugins)
+
+**IMPORTANT:** The key management infrastructure is **already implemented** with composable plugins.
+Encryption plugins can use **any** `IKeyStore` implementation for key management:
+
+```
+┌─────────────────────────────────────────────────────────────────────────────────────┐
+│                    COMPOSABLE KEY MANAGEMENT ARCHITECTURE                            │
+├─────────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                      │
+│   ENCRYPTION PLUGINS (ALL use IKeyStore - composable key management)                 │
+│   ┌─────────────┐ ┌─────────────┐ ┌─────────────┐ ┌─────────────┐ ┌─────────────┐   │
+│   │ AES-256-GCM │ │ ChaCha20    │ │ Twofish-256 │ │ Serpent-256 │ │ FIPS-140-2  │   │
+│   │ ✅ IKeyStore│ │ ✅ IKeyStore│ │ ✅ IKeyStore│ │ ✅ IKeyStore│ │ ✅ IKeyStore│   │
+│   └──────┬──────┘ └──────┬──────┘ └──────┬──────┘ └──────┬──────┘ └──────┬──────┘   │
+│          │               │               │               │               │           │
+│   ┌──────┴──────┐                                                                    │
+│   │ZeroKnowledge│                                                                    │
+│   │ ✅ IKeyStore│ (6 plugins total, all support composable key management)          │
+│   └──────┬──────┘                                                                    │
+│          └───────────────────────────────────────────────────────────────────────────│
+│                                           │                                          │
+│                                           ▼                                          │
+│                              ┌───────────────────────┐                               │
+│                              │      IKeyStore        │                               │
+│                              │ interface (SDK)       │                               │
+│                              └───────────┬───────────┘                               │
+│                                          │                                           │
+│            ┌─────────────────────────────┼─────────────────────────────┐             │
+│            ▼                             ▼                             ▼             │
+│   ┌─────────────────────┐   ┌─────────────────────────┐   ┌─────────────────────┐   │
+│   │  FileKeyStorePlugin │   │   VaultKeyStorePlugin   │   │  KeyRotationPlugin  │   │
+│   │  ✅ Implemented     │   │   ✅ Implemented        │   │  ✅ Implemented     │   │
+│   ├─────────────────────┤   ├─────────────────────────┤   ├─────────────────────┤   │
+│   │ 4-Tier Protection:  │   │ HSM/Cloud Integration:  │   │ Features:           │   │
+│   │ • DPAPI (Windows)   │   │ • HashiCorp Vault       │   │ • Auto rotation     │   │
+│   │ • CredentialManager │   │ • Azure Key Vault       │   │ • Key versioning    │   │
+│   │ • Database-backed   │   │ • AWS KMS               │   │ • Re-encryption     │   │
+│   │ • Password (PBKDF2) │   │ • Google Cloud KMS      │   │ • Audit trail       │   │
+│   │                     │   │                         │   │ • Wraps IKeyStore   │   │
+│   │ Use Case: Local     │   │ Use Case: Enterprise    │   │ Use Case: Layered   │   │
+│   │ deployments         │   │ HSM/envelope encryption │   │ on any IKeyStore    │   │
+│   └─────────────────────┘   └──────────┬──────────────┘   └─────────────────────┘   │
+│                                        │                                             │
+│                                        ▼                                             │
+│                           ┌───────────────────────┐                                  │
+│                           │    IVaultBackend      │                                  │
+│                           │ (internal interface)  │                                  │
+│                           ├───────────────────────┤                                  │
+│                           │ • WrapKeyAsync()      │ ◄── ENVELOPE ENCRYPTION!        │
+│                           │ • UnwrapKeyAsync()    │     (already implemented)       │
+│                           │ • GetKeyAsync()       │                                  │
+│                           │ • CreateKeyAsync()    │                                  │
+│                           └───────────┬───────────┘                                  │
+│                                       │                                              │
+│              ┌────────────────────────┼────────────────────────┐                     │
+│              ▼                        ▼                        ▼                     │
+│     ┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐             │
+│     │ HashiCorpVault  │     │  AzureKeyVault  │     │    AwsKms       │             │
+│     │ Backend         │     │  Backend        │     │    Backend      │             │
+│     │ ✅ Implemented  │     │  ✅ Implemented │     │  ✅ Implemented │             │
+│     └─────────────────┘     └─────────────────┘     └─────────────────┘             │
+│                                                                                      │
+└─────────────────────────────────────────────────────────────────────────────────────┘
+```
+
+**Existing Key Store Plugins:**
+| Plugin | Type | Features | Status |
+|--------|------|----------|--------|
+| `FileKeyStorePlugin` | Local/File | DPAPI, CredentialManager, Database, PBKDF2 tiers | ✅ Implemented |
+| `VaultKeyStorePlugin` | HSM/Cloud | HashiCorp Vault, Azure Key Vault, AWS KMS, Google KMS + **WrapKey/UnwrapKey** | ✅ Implemented |
+| `KeyRotationPlugin` | Layer | Wraps any IKeyStore, adds rotation, versioning, audit | ✅ Implemented |
+| `SecretManagementPlugin` | Secret Mgmt | Secure secret storage with access control | ✅ Implemented |
+
+**VaultKeyStorePlugin Already Supports Envelope Encryption:**
+```csharp
+// VaultKeyStorePlugin's IVaultBackend interface (ALREADY EXISTS):
+internal interface IVaultBackend
+{
+    Task<byte[]> WrapKeyAsync(string keyId, byte[] dataKey);   // ◄── Wrap DEK with KEK
+    Task<byte[]> UnwrapKeyAsync(string keyId, byte[] wrappedKey); // ◄── Unwrap DEK
+    Task<byte[]> GetKeyAsync(string keyId);
+    Task<byte[]> CreateKeyAsync(string keyId);
+    // ...
+}
+```
+
+---
+
+### T5.0: SDK Base Classes and Plugin Refactoring (FOUNDATION - Must Complete First)
+
+> **CRITICAL: This section establishes the SDK foundation that ALL encryption and key management work depends on.**
+>
+> **DEPENDENCY ORDER: T5.0 MUST be completed BEFORE Phase T3 (Read Pipeline & Verification).**
+> - T3.4.2 "Decrypt (if encrypted)" requires `EncryptionPluginBase` infrastructure from T5.0.3
+> - T3.4.2 needs `EncryptionMetadata` from manifests to resolve decryption config
+> - Without T5.0, decryption in T3 would require hard-coded assumptions about key management
+>
+> **STORAGE PROVIDERS NOTE:** Storage providers (S3, Local, Azure, etc.) do NOT need modification for this feature.
+> Encryption/decryption happens at the **pipeline level** (`PipelinePluginBase`), which is independent of storage.
+> The storage provider only sees already-encrypted bytes - it has no knowledge of encryption at all.
+>
+> **Problem Identified:** Currently, all 6 encryption plugins and all key management plugins have duplicated code for:
+> - Key management (getting keys, security context validation)
+> - Key caching and initialization patterns
+> - Statistics tracking and message handling
+>
+> **Solution:** Create abstract base classes in the SDK that provide common functionality, then refactor existing plugins to extend these base classes. All new plugins MUST extend these base classes.
+
+#### Current Plugin Hierarchy (What Exists Today)
+
+```
+PluginBase (SDK)
+├── DataTransformationPluginBase (SDK, IDataTransformation)
+│   └── PipelinePluginBase (SDK, for ordered pipeline stages)
+│       └── AesEncryptionPlugin, ChaCha20EncryptionPlugin, etc. (Plugins)
+│           └── ⚠️ DUPLICATED: Key management logic in each plugin
+│
+├── SecurityProviderPluginBase (SDK)
+│   └── FileKeyStorePlugin, VaultKeyStorePlugin (Plugins, implement IKeyStore)
+│       └── ⚠️ DUPLICATED: Caching, initialization, validation logic
+```
+
+#### Target Plugin Hierarchy (After T5.0)
+
+```
+PluginBase (SDK)
+├── DataTransformationPluginBase (SDK, IDataTransformation)
+│   └── PipelinePluginBase (SDK)
+│       └── EncryptionPluginBase (SDK, NEW - T5.0.1) ◄── Common key management
+│           └── AesEncryptionPlugin, ChaCha20EncryptionPlugin, etc. (Refactored)
+│
+├── SecurityProviderPluginBase (SDK)
+│   └── KeyStorePluginBase (SDK, NEW - T5.0.2, implements IKeyStore) ◄── Common caching
+│       └── FileKeyStorePlugin, VaultKeyStorePlugin (Refactored)
+```
+
+---
+
+#### T5.0.1: SDK Types for Composable Key Management
+
+| Task | Component | Location | Description | Status |
+|------|-----------|----------|-------------|--------|
+| T5.0.1 | SDK Key Management Types | DataWarehouse.SDK/Security/ | Shared types for key management | [ ] |
+| T5.0.1.1 | `KeyManagementMode` enum | IKeyStore.cs | `Direct` (key from IKeyStore) vs `Envelope` (DEK wrapped by HSM KEK) | [ ] |
+| T5.0.1.2 | `IEnvelopeKeyStore` interface | IKeyStore.cs | Extends IKeyStore with `WrapKeyAsync`/`UnwrapKeyAsync` | [ ] |
+| T5.0.1.3 | `EnvelopeHeader` class | EnvelopeHeader.cs | Serialize/deserialize envelope header: WrappedDEK, KekId, etc. | [ ] |
+| T5.0.1.4 | `EncryptionMetadata` record | EncryptionMetadata.cs | Full metadata: plugin ID, mode, key IDs, algorithm params | [ ] |
+| T5.0.1.5 | `KeyManagementConfig` record | KeyManagementConfig.cs | Per-user configuration: mode, key store, KEK ID, etc. | [ ] |
+| T5.0.1.6 | `IKeyManagementConfigProvider` interface | IKeyManagementConfigProvider.cs | Resolve per-user/per-tenant key management preferences | [ ] |
+| T5.0.1.7 | `IKeyStoreRegistry` interface | IKeyStoreRegistry.cs | Registry for resolving plugin IDs to key store instances | [ ] |
+| T5.0.1.8 | `DefaultKeyStoreRegistry` implementation | DefaultKeyStoreRegistry.cs | Default in-memory implementation of IKeyStoreRegistry | [ ] |
+| T5.0.1.9 | `EncryptionConfigMode` enum | EncryptionConfigMode.cs | Per-object vs fixed vs policy-enforced configuration | [ ] |
+
+**KeyManagementMode Enum:**
+```csharp
+/// <summary>
+/// Determines how encryption keys are managed.
+/// User-configurable option for all encryption plugins.
+/// </summary>
+public enum KeyManagementMode
+{
+    /// <summary>
+    /// Direct mode (DEFAULT): Key is retrieved directly from any IKeyStore.
+    /// Works with: FileKeyStorePlugin, VaultKeyStorePlugin, KeyRotationPlugin, etc.
+    /// </summary>
+    Direct,
+
+    /// <summary>
+    /// Envelope mode: A unique DEK is generated per object, wrapped by HSM KEK,
+    /// and stored in the ciphertext header. Requires IEnvelopeKeyStore.
+    /// Works with: VaultKeyStorePlugin (or any IEnvelopeKeyStore implementation).
+    /// </summary>
+    Envelope
+}
+```
+
+**IEnvelopeKeyStore Interface:**
+```csharp
+/// <summary>
+/// Extended key store interface that supports envelope encryption operations.
+/// Required for KeyManagementMode.Envelope.
+/// </summary>
+public interface IEnvelopeKeyStore : IKeyStore
+{
+    /// <summary>
+    /// Wrap a Data Encryption Key (DEK) with a Key Encryption Key (KEK).
+    /// The KEK never leaves the HSM.
+    /// </summary>
+    Task<byte[]> WrapKeyAsync(string kekId, byte[] dataKey, ISecurityContext context);
+
+    /// <summary>
+    /// Unwrap a previously wrapped DEK using the KEK in the HSM.
+    /// </summary>
+    Task<byte[]> UnwrapKeyAsync(string kekId, byte[] wrappedKey, ISecurityContext context);
+}
+```
+
+**EncryptionConfigMode Enum (T5.0.1.9):**
+```csharp
+/// <summary>
+/// Determines how encryption configuration is managed for a storage context.
+/// Applies to BOTH tamper-proof storage (manifest) and standalone encryption (ciphertext header).
+/// </summary>
+public enum EncryptionConfigMode
+{
+    /// <summary>
+    /// DEFAULT: Each object stores its own EncryptionMetadata.
+    /// - Tamper-proof: EncryptionMetadata stored in TamperProofManifest
+    /// - Standalone: EncryptionMetadata stored in ciphertext header
+    /// Use case: Multi-tenant deployments, mixed compliance requirements.
+    /// </summary>
+    PerObjectConfig,
+
+    /// <summary>
+    /// All objects MUST use the same encryption configuration.
+    /// Configuration is sealed after first write - cannot be changed.
+    /// Any write with different config will be rejected.
+    /// Use case: Single-tenant deployments, strict compliance (all data same encryption).
+    /// </summary>
+    FixedConfig,
+
+    /// <summary>
+    /// Per-object configuration allowed, but must satisfy tenant/org policy.
+    /// Policy defines: allowed encryption algorithms, required key modes, allowed key stores.
+    /// Writes that violate policy are rejected with detailed error.
+    /// Use case: Enterprise with compliance rules but per-user flexibility within bounds.
+    /// </summary>
+    PolicyEnforced
+}
+```
+
+---
+
+#### T5.0.2: KeyStorePluginBase Abstract Class
+
+| Task | Component | Location | Description | Status |
+|------|-----------|----------|-------------|--------|
+| T5.0.2 | `KeyStorePluginBase` | SDK/Contracts/PluginBase.cs | Abstract base for all key management plugins | [ ] |
+| T5.0.2.1 | ↳ Key caching infrastructure | Common | `ConcurrentDictionary<string, CachedKey>`, cache expiration | [ ] |
+| T5.0.2.2 | ↳ Initialization pattern | Common | `EnsureInitializedAsync()`, thread-safe init with `SemaphoreSlim` | [ ] |
+| T5.0.2.3 | ↳ Security context validation | Common | `ValidateAccess()`, `ValidateAdminAccess()` | [ ] |
+| T5.0.2.4 | ↳ Standard message handling | Common | `keystore.*.create`, `keystore.*.get`, `keystore.*.rotate` | [ ] |
+| T5.0.2.5 | ↳ Abstract storage methods | Abstract | `LoadKeyFromStorageAsync()`, `SaveKeyToStorageAsync()` | [ ] |
+
+**KeyStorePluginBase Design:**
+```csharp
+/// <summary>
+/// Abstract base class for all key management plugins.
+/// Provides common caching, initialization, and validation logic.
+/// All key management plugins MUST extend this class.
+/// </summary>
+public abstract class KeyStorePluginBase : SecurityProviderPluginBase, IKeyStore
+{
+    // COMMON INFRASTRUCTURE (implemented in base)
+    protected readonly ConcurrentDictionary<string, CachedKey> KeyCache;
+    protected readonly SemaphoreSlim InitLock;
+    protected string CurrentKeyId;
+    protected bool Initialized;
+
+    // CONFIGURATION (override in derived classes)
+    protected abstract TimeSpan CacheExpiration { get; }
+    protected abstract int KeySizeBytes { get; }
+    protected virtual bool RequireAuthentication => true;
+    protected virtual bool RequireAdminForCreate => true;
+
+    // IKeyStore IMPLEMENTATION (common logic, calls abstract methods)
+    public async Task<string> GetCurrentKeyIdAsync() { /* uses EnsureInitializedAsync */ }
+    public byte[] GetKey(string keyId) { /* sync wrapper */ }
+    public async Task<byte[]> GetKeyAsync(string keyId, ISecurityContext context) { /* cache + validation + abstract */ }
+    public async Task<byte[]> CreateKeyAsync(string keyId, ISecurityContext context) { /* validation + abstract */ }
+
+    // ABSTRACT METHODS (implement in derived classes)
+    protected abstract Task<byte[]?> LoadKeyFromStorageAsync(string keyId);
+    protected abstract Task SaveKeyToStorageAsync(string keyId, byte[] key);
+    protected abstract Task InitializeStorageAsync();
+
+    // COMMON UTILITIES (used by derived classes)
+    protected async Task EnsureInitializedAsync() { /* thread-safe init pattern */ }
+    protected void ValidateAccess(ISecurityContext context) { /* common validation */ }
+    protected void ValidateAdminAccess(ISecurityContext context) { /* admin validation */ }
+}
+```
+
+---
+
+#### T5.0.3: EncryptionPluginBase Abstract Class
+
+| Task | Component | Location | Description | Status |
+|------|-----------|----------|-------------|--------|
+| T5.0.3 | `EncryptionPluginBase` | SDK/Contracts/PluginBase.cs | Abstract base for all encryption plugins | [ ] |
+| T5.0.3.1 | ↳ Key store resolution | Common | `GetKeyStore()` from args, config, or kernel context | [ ] |
+| T5.0.3.2 | ↳ Security context resolution | Common | `GetSecurityContext()` from args or config | [ ] |
+| T5.0.3.3 | ↳ Key management mode support | Common | `KeyManagementMode` property, Direct vs Envelope | [ ] |
+| T5.0.3.4 | ↳ Envelope key handling | Common | `GetKeyForEncryption()`, `GetKeyForDecryption()` with envelope support | [ ] |
+| T5.0.3.5 | ↳ Statistics tracking | Common | Encryption/decryption counts, bytes processed | [ ] |
+| T5.0.3.6 | ↳ Key access logging | Common | Audit trail for key usage | [ ] |
+| T5.0.3.7 | ↳ Abstract encrypt/decrypt | Abstract | `EncryptCoreAsync()`, `DecryptCoreAsync()` | [ ] |
+
+**EncryptionPluginBase Design (Per-User Configuration):**
+```csharp
+/// <summary>
+/// Abstract base class for all encryption plugins with composable key management.
+/// Supports per-user, per-operation configuration for maximum flexibility.
+/// All encryption plugins MUST extend this class.
+/// </summary>
+public abstract class EncryptionPluginBase : PipelinePluginBase, IDisposable
+{
+    // DEFAULT CONFIGURATION (fallback when no user preference or explicit override)
+    protected IKeyStore? DefaultKeyStore;
+    protected KeyManagementMode DefaultKeyManagementMode = KeyManagementMode.Direct;
+    protected IEnvelopeKeyStore? DefaultEnvelopeKeyStore;
+    protected string? DefaultKekKeyId;
+
+    // PER-USER CONFIGURATION PROVIDER (optional, for multi-tenant)
+    protected IKeyManagementConfigProvider? ConfigProvider;
+
+    // STATISTICS (common tracking - aggregated across all users)
+    protected readonly object StatsLock = new();
+    protected long EncryptionCount;
+    protected long DecryptionCount;
+    protected long TotalBytesEncrypted;
+    protected long TotalBytesDecrypted;
+
+    // KEY ACCESS AUDIT (common - tracks per key ID)
+    protected readonly ConcurrentDictionary<string, DateTime> KeyAccessLog = new();
+
+    // CONFIGURATION (override in derived classes)
+    protected abstract int KeySizeBytes { get; }  // e.g., 32 for AES-256
+    protected abstract int IvSizeBytes { get; }   // e.g., 12 for GCM
+    protected abstract int TagSizeBytes { get; }  // e.g., 16 for GCM
+
+    // CONFIGURATION RESOLUTION (per-operation)
+    /// <summary>
+    /// Resolves key management configuration for this operation.
+    /// Priority: 1. Explicit args, 2. User preferences, 3. Plugin defaults
+    /// </summary>
+    protected async Task<ResolvedKeyManagementConfig> ResolveConfigAsync(
+        Dictionary<string, object> args,
+        ISecurityContext context)
+    {
+        // 1. Check for explicit overrides in args
+        if (TryGetConfigFromArgs(args, out var argsConfig))
+            return argsConfig;
+
+        // 2. Check for user preferences via ConfigProvider
+        if (ConfigProvider != null)
+        {
+            var userConfig = await ConfigProvider.GetConfigAsync(context);
+            if (userConfig != null)
+                return ResolveFromUserConfig(userConfig, context);
+        }
+
+        // 3. Fall back to plugin defaults
+        return new ResolvedKeyManagementConfig
+        {
+            Mode = DefaultKeyManagementMode,
+            KeyStore = DefaultKeyStore,
+            EnvelopeKeyStore = DefaultEnvelopeKeyStore,
+            KekKeyId = DefaultKekKeyId
+        };
+    }
+
+    // COMMON KEY MANAGEMENT (uses resolved config)
+    protected async Task<(byte[] key, string keyId, EnvelopeHeader? envelope)> GetKeyForEncryptionAsync(
+        ResolvedKeyManagementConfig config, ISecurityContext context);
+    protected async Task<byte[]> GetKeyForDecryptionAsync(
+        EnvelopeHeader? envelope, string? keyId, ResolvedKeyManagementConfig config, ISecurityContext context);
+
+    // OnWrite/OnRead IMPLEMENTATION (resolves config first, then processes)
+    protected override async Task<Stream> OnWriteAsync(Stream input, IKernelContext context, Dictionary<string, object> args)
+    {
+        var securityContext = GetSecurityContext(args);
+        var config = await ResolveConfigAsync(args, securityContext);  // Per-user resolution!
+        var (key, keyId, envelope) = await GetKeyForEncryptionAsync(config, securityContext);
+        // ... encrypt using resolved config ...
+    }
+
+    // ABSTRACT METHODS (implement in derived classes - algorithm-specific)
+    protected abstract Task<Stream> EncryptCoreAsync(Stream input, byte[] key, byte[] iv, IKernelContext context);
+    protected abstract Task<(Stream data, byte[] tag)> DecryptCoreAsync(Stream input, byte[] key, IKernelContext context);
+    protected abstract byte[] GenerateIv();
+    protected abstract int CalculateHeaderSize(bool envelopeMode);
+}
+
+/// <summary>
+/// Resolved configuration for a single operation (after applying priority rules).
+/// </summary>
+internal record ResolvedKeyManagementConfig
+{
+    public KeyManagementMode Mode { get; init; }
+    public IKeyStore? KeyStore { get; init; }
+    public IEnvelopeKeyStore? EnvelopeKeyStore { get; init; }
+    public string? KekKeyId { get; init; }
+}
+```
+
+**Per-User, Per-Operation Configuration (Maximum Flexibility):**
+
+The key management configuration is resolved **per-operation** (each OnWrite/OnRead call), NOT per-instance. This enables:
+- Same plugin instance serves multiple users with different configurations
+- User A uses Envelope mode + Azure HSM, User B uses Direct mode + FileKeyStore
+- Configuration can change between operations for the same user
+- Multi-tenant deployments with different security requirements per tenant
+
+**Configuration Resolution Order (highest priority first):**
+1. **Explicit args** - passed directly to OnWrite/OnRead
+2. **User preferences** - resolved via `IKeyManagementConfigProvider` from `ISecurityContext`
+3. **Plugin defaults** - set at construction time (fallback)
+
+```csharp
+// Plugin instance with DEFAULT configuration (fallback only)
+var aesPlugin = new AesEncryptionPlugin(new AesEncryptionConfig
+{
+    // These are DEFAULTS - can be overridden per-user or per-operation
+    DefaultKeyManagementMode = KeyManagementMode.Direct,
+    DefaultKeyStore = new FileKeyStorePlugin(),
+
+    // Optional: User preference resolver for multi-tenant scenarios
+    KeyManagementConfigProvider = new DatabaseKeyManagementConfigProvider(dbContext)
+});
+
+// SCENARIO 1: User1 writes with explicit Envelope mode override
+await aesPlugin.OnWriteAsync(data, context, new Dictionary<string, object>
+{
+    ["keyManagementMode"] = KeyManagementMode.Envelope,
+    ["envelopeKeyStore"] = azureVaultPlugin,
+    ["kekKeyId"] = "azure-kek-user1"
+});
+
+// SCENARIO 2: User2 writes - uses their stored preferences (Direct + HashiCorp)
+// Preferences resolved automatically from ISecurityContext.UserId
+await aesPlugin.OnWriteAsync(data, contextUser2, args);  // No explicit override
+
+// SCENARIO 3: User3 writes - no preferences stored, uses plugin defaults
+await aesPlugin.OnWriteAsync(data, contextUser3, args);  // Falls back to defaults
+```
+
+**IKeyManagementConfigProvider Interface:**
+```csharp
+/// <summary>
+/// Resolves key management configuration per-user/per-tenant.
+/// Implement this to store user preferences in database, config files, etc.
+/// </summary>
+public interface IKeyManagementConfigProvider
+{
+    /// <summary>
+    /// Get key management configuration for a user/tenant.
+    /// Returns null if no preferences stored (use defaults).
+    /// </summary>
+    Task<KeyManagementConfig?> GetConfigAsync(ISecurityContext context);
+
+    /// <summary>
+    /// Save user preferences for key management.
+    /// </summary>
+    Task SaveConfigAsync(ISecurityContext context, KeyManagementConfig config);
+}
+
+/// <summary>
+/// User-specific key management configuration.
+/// </summary>
+public record KeyManagementConfig
+{
+    /// <summary>Direct or Envelope mode</summary>
+    public KeyManagementMode Mode { get; init; } = KeyManagementMode.Direct;
+
+    /// <summary>Key store plugin ID or instance for Direct mode</summary>
+    public string? KeyStorePluginId { get; init; }
+    public IKeyStore? KeyStore { get; init; }
+
+    /// <summary>Envelope key store for Envelope mode</summary>
+    public string? EnvelopeKeyStorePluginId { get; init; }
+    public IEnvelopeKeyStore? EnvelopeKeyStore { get; init; }
+
+    /// <summary>KEK identifier for Envelope mode</summary>
+    public string? KekKeyId { get; init; }
+
+    /// <summary>Preferred encryption algorithm (for systems with multiple)</summary>
+    public string? PreferredEncryptionPluginId { get; init; }
+}
+```
+
+**Multi-Tenant Example:**
+```csharp
+// Single AES plugin instance serves ALL users
+var aesPlugin = new AesEncryptionPlugin(new AesEncryptionConfig
+{
+    KeyManagementConfigProvider = new TenantConfigProvider(tenantDb)
+});
+
+// User1 (Tenant: FinanceCorp) - compliance requires HSM envelope encryption
+// Their config in DB: { Mode: Envelope, EnvelopeKeyStorePluginId: "azure-hsm", KekKeyId: "finance-kek" }
+await aesPlugin.OnWriteAsync(data, user1Context, args);  // → Envelope + Azure HSM
+
+// User2 (Tenant: StartupXYZ) - cost-conscious, uses file-based keys
+// Their config in DB: { Mode: Direct, KeyStorePluginId: "file-keystore" }
+await aesPlugin.OnWriteAsync(data, user2Context, args);  // → Direct + FileKeyStore
+
+// User3 (Tenant: GovAgency) - requires AWS GovCloud KMS
+// Their config in DB: { Mode: Envelope, EnvelopeKeyStorePluginId: "aws-govcloud", KekKeyId: "gov-kek" }
+await aesPlugin.OnWriteAsync(data, user3Context, args);  // → Envelope + AWS GovCloud
+
+// All three users share the SAME plugin instance!
+```
+
+**Flexibility Matrix:**
+| Configuration Level | When Resolved | Use Case |
+|---------------------|---------------|----------|
+| **Explicit args** | Per-operation | One-off overrides, testing, migration |
+| **User preferences** | Per-user via ISecurityContext | Multi-tenant SaaS, compliance per customer |
+| **Plugin defaults** | At construction | Single-tenant deployments, fallback |
+
+**Example IKeyManagementConfigProvider Implementations:**
+```csharp
+// EXAMPLE 1: Database-backed provider for multi-tenant SaaS
+public class DatabaseKeyManagementConfigProvider : IKeyManagementConfigProvider
+{
+    private readonly IDbContext _db;
+    private readonly IKeyStoreRegistry _keyStoreRegistry;  // Resolves plugin IDs to instances
+
+    public async Task<KeyManagementConfig?> GetConfigAsync(ISecurityContext context)
+    {
+        // Look up user/tenant preferences from database
+        var record = await _db.KeyManagementConfigs
+            .FirstOrDefaultAsync(c => c.TenantId == context.TenantId);
+
+        if (record == null) return null;  // Use defaults
+
+        return new KeyManagementConfig
+        {
+            Mode = record.Mode,
+            KeyStorePluginId = record.KeyStorePluginId,
+            KeyStore = _keyStoreRegistry.GetKeyStore(record.KeyStorePluginId),
+            EnvelopeKeyStorePluginId = record.EnvelopeKeyStorePluginId,
+            EnvelopeKeyStore = _keyStoreRegistry.GetEnvelopeKeyStore(record.EnvelopeKeyStorePluginId),
+            KekKeyId = record.KekKeyId
+        };
+    }
+
+    public async Task SaveConfigAsync(ISecurityContext context, KeyManagementConfig config)
+    {
+        // Save preferences to database
+        var record = await _db.KeyManagementConfigs
+            .FirstOrDefaultAsync(c => c.TenantId == context.TenantId);
+
+        if (record == null)
+        {
+            record = new KeyManagementConfigRecord { TenantId = context.TenantId };
+            _db.KeyManagementConfigs.Add(record);
+        }
+
+        record.Mode = config.Mode;
+        record.KeyStorePluginId = config.KeyStorePluginId;
+        record.EnvelopeKeyStorePluginId = config.EnvelopeKeyStorePluginId;
+        record.KekKeyId = config.KekKeyId;
+
+        await _db.SaveChangesAsync();
+    }
+}
+
+// EXAMPLE 2: JSON config file provider for simpler deployments
+public class JsonFileKeyManagementConfigProvider : IKeyManagementConfigProvider
+{
+    private readonly string _configPath;
+    private readonly IKeyStoreRegistry _keyStoreRegistry;
+
+    public async Task<KeyManagementConfig?> GetConfigAsync(ISecurityContext context)
+    {
+        var filePath = Path.Combine(_configPath, $"{context.UserId}.json");
+        if (!File.Exists(filePath)) return null;
+
+        var json = await File.ReadAllTextAsync(filePath);
+        return JsonSerializer.Deserialize<KeyManagementConfig>(json);
+    }
+
+    public async Task SaveConfigAsync(ISecurityContext context, KeyManagementConfig config)
+    {
+        var filePath = Path.Combine(_configPath, $"{context.UserId}.json");
+        var json = JsonSerializer.Serialize(config, new JsonSerializerOptions { WriteIndented = true });
+        await File.WriteAllTextAsync(filePath, json);
+    }
+}
+
+// EXAMPLE 3: In-memory provider for testing
+public class InMemoryKeyManagementConfigProvider : IKeyManagementConfigProvider
+{
+    private readonly ConcurrentDictionary<string, KeyManagementConfig> _configs = new();
+
+    public Task<KeyManagementConfig?> GetConfigAsync(ISecurityContext context)
+    {
+        _configs.TryGetValue(context.UserId, out var config);
+        return Task.FromResult(config);
+    }
+
+    public Task SaveConfigAsync(ISecurityContext context, KeyManagementConfig config)
+    {
+        _configs[context.UserId] = config;
+        return Task.CompletedTask;
+    }
+}
+```
+
+**IKeyStoreRegistry Interface (for resolving plugin IDs to instances):**
+```csharp
+/// <summary>
+/// Registry for resolving key store plugin IDs to instances.
+/// Used by IKeyManagementConfigProvider to resolve stored plugin IDs.
+/// </summary>
+public interface IKeyStoreRegistry
+{
+    void Register(string pluginId, IKeyStore keyStore);
+    void RegisterEnvelope(string pluginId, IEnvelopeKeyStore envelopeKeyStore);
+    IKeyStore? GetKeyStore(string? pluginId);
+    IEnvelopeKeyStore? GetEnvelopeKeyStore(string? pluginId);
+}
+```
+
+---
+
+#### T5.0.4: Refactor Existing Key Management Plugins
+
+> **CRITICAL:** All existing key management plugins MUST be refactored to extend `KeyStorePluginBase`.
+> This eliminates duplicated code and ensures consistent behavior.
+
+| Task | Plugin | Current | Target | Description | Status |
+|------|--------|---------|--------|-------------|--------|
+| T5.0.4 | Refactor key management plugins | - | - | Migrate to KeyStorePluginBase | [x] |
+| T5.0.4.1 | `FileKeyStorePlugin` | `SecurityProviderPluginBase` | `KeyStorePluginBase` | Remove duplicated caching/init, implement abstract storage methods | [x] |
+| T5.0.4.2 | `VaultKeyStorePlugin` | `SecurityProviderPluginBase` | `KeyStorePluginBase` + `IEnvelopeKeyStore` | Remove duplicated caching/init, implement abstract storage methods, add IEnvelopeKeyStore | [x] |
+| T5.0.4.3 | `KeyRotationPlugin` | Custom | `KeyStorePluginBase` (decorator) | Verify compatibility with base class pattern | [ ] |
+| T5.0.4.4 | `SecretManagementPlugin` | Custom | Verify/Align | Ensure consistent with KeyStorePluginBase pattern | [ ] |
+
+**FileKeyStorePlugin Refactoring:**
+```csharp
+// BEFORE: Duplicated logic
+public sealed class FileKeyStorePlugin : SecurityProviderPluginBase, IKeyStore
+{
+    private readonly ConcurrentDictionary<string, CachedKey> _keyCache;  // ◄── DUPLICATED
+    private readonly SemaphoreSlim _lock;                                 // ◄── DUPLICATED
+    private bool _initialized;                                            // ◄── DUPLICATED
+    // ... 200+ lines of duplicated infrastructure code ...
+}
+
+// AFTER: Focused implementation
+public sealed class FileKeyStorePlugin : KeyStorePluginBase
+{
+    private readonly FileKeyStoreConfig _config;
+    private readonly IKeyProtectionTier[] _tiers;
+
+    // ONLY implement what's unique to file-based storage:
+    protected override TimeSpan CacheExpiration => _config.CacheExpiration;
+    protected override int KeySizeBytes => _config.KeySizeBytes;
+
+    protected override async Task<byte[]?> LoadKeyFromStorageAsync(string keyId)
+    {
+        // File-specific: load from disk, decrypt with tier
+    }
+
+    protected override async Task SaveKeyToStorageAsync(string keyId, byte[] key)
+    {
+        // File-specific: encrypt with tier, save to disk
+    }
+
+    protected override async Task InitializeStorageAsync()
+    {
+        // File-specific: ensure directory exists, load metadata
+    }
+}
+```
+
+---
+
+#### T5.0.5: Refactor Existing Encryption Plugins
+
+> **CRITICAL:** All existing encryption plugins MUST be refactored to extend `EncryptionPluginBase`.
+> This eliminates duplicated key management code and enables envelope mode support.
+
+| Task | Plugin | Current | Target | Description | Status |
+|------|--------|---------|--------|-------------|--------|
+| T5.0.5 | Refactor encryption plugins | - | - | Migrate to EncryptionPluginBase | [x] |
+| T5.0.5.1 | `AesEncryptionPlugin` | `PipelinePluginBase` | `EncryptionPluginBase` | Remove duplicated key mgmt, implement abstract encrypt/decrypt | [x] |
+| T5.0.5.2 | `ChaCha20EncryptionPlugin` | `PipelinePluginBase` | `EncryptionPluginBase` | Remove duplicated key mgmt, implement abstract encrypt/decrypt | [x] |
+| T5.0.5.3 | `TwofishEncryptionPlugin` | `PipelinePluginBase` | `EncryptionPluginBase` | Remove duplicated key mgmt, implement abstract encrypt/decrypt | [x] |
+| T5.0.5.4 | `SerpentEncryptionPlugin` | `PipelinePluginBase` | `EncryptionPluginBase` | Remove duplicated key mgmt, implement abstract encrypt/decrypt | [x] |
+| T5.0.5.5 | `FipsEncryptionPlugin` | `PipelinePluginBase` | `EncryptionPluginBase` | Remove duplicated key mgmt, implement abstract encrypt/decrypt | [x] |
+| T5.0.5.6 | `ZeroKnowledgeEncryptionPlugin` | `PipelinePluginBase` | `EncryptionPluginBase` | Remove duplicated key mgmt, implement abstract encrypt/decrypt | [x] |
+
+**AesEncryptionPlugin Refactoring:**
+```csharp
+// BEFORE: Duplicated key management logic (~150 lines)
+public sealed class AesEncryptionPlugin : PipelinePluginBase, IDisposable
+{
+    private IKeyStore? _keyStore;                                       // ◄── DUPLICATED
+    private ISecurityContext? _securityContext;                         // ◄── DUPLICATED
+    private readonly ConcurrentDictionary<string, DateTime> _keyAccessLog; // ◄── DUPLICATED
+    private long _encryptionCount;                                      // ◄── DUPLICATED
+    // ... 150+ lines of duplicated key management code ...
+
+    private IKeyStore GetKeyStore(...) { /* DUPLICATED in all 6 plugins */ }
+    private ISecurityContext GetSecurityContext(...) { /* DUPLICATED in all 6 plugins */ }
+}
+
+// AFTER: Focused AES implementation
+public sealed class AesEncryptionPlugin : EncryptionPluginBase
+{
+    // ONLY implement what's unique to AES:
+    protected override int KeySizeBytes => 32;  // AES-256
+    protected override int IvSizeBytes => 12;   // GCM nonce
+    protected override int TagSizeBytes => 16;  // GCM tag
+
+    protected override async Task<Stream> EncryptCoreAsync(Stream input, byte[] key, byte[] iv, IKernelContext context)
+    {
+        // AES-specific: AesGcm.Encrypt()
+    }
+
+    protected override async Task<(Stream data, byte[] tag)> DecryptCoreAsync(Stream input, byte[] key, IKernelContext context)
+    {
+        // AES-specific: AesGcm.Decrypt()
+    }
+
+    protected override byte[] GenerateIv()
+    {
+        return RandomNumberGenerator.GetBytes(IvSizeBytes);
+    }
+}
+```
+
+---
+
+#### T5.0.6: Requirements for New Plugins
+
+> **MANDATORY:** All new encryption and key management plugins MUST follow these requirements.
+
+**New Key Management Plugins (T5.4.1-T5.4.6) Requirements:**
+
+| Requirement | Description |
+|-------------|-------------|
+| **MUST extend `KeyStorePluginBase`** | Do NOT implement `IKeyStore` directly |
+| **MUST implement abstract methods** | `LoadKeyFromStorageAsync`, `SaveKeyToStorageAsync`, `InitializeStorageAsync` |
+| **MAY implement `IEnvelopeKeyStore`** | If the backend supports HSM wrap/unwrap operations |
+| **MUST use inherited caching** | Do NOT implement custom caching logic |
+| **MUST use inherited validation** | Do NOT implement custom security context validation |
+
+**New Encryption Plugins (T4.24-T4.29) Requirements:**
+
+| Requirement | Description |
+|-------------|-------------|
+| **MUST extend `EncryptionPluginBase`** | Do NOT extend `PipelinePluginBase` directly |
+| **MUST implement abstract methods** | `EncryptCoreAsync`, `DecryptCoreAsync`, `GenerateIv` |
+| **MUST support both key modes** | Direct and Envelope modes via inherited infrastructure |
+| **MUST use inherited key management** | Do NOT implement custom key store resolution |
+| **MUST use inherited statistics** | Do NOT implement custom encryption/decryption counters |
+| **Exception: Educational ciphers (T4.24)** | May extend `PipelinePluginBase` directly if no key management |
+
+**Plugin Compliance Checklist:**
+```
+For each new KEY MANAGEMENT plugin:
+  [ ] Extends KeyStorePluginBase (NOT SecurityProviderPluginBase directly)
+  [ ] Implements LoadKeyFromStorageAsync()
+  [ ] Implements SaveKeyToStorageAsync()
+  [ ] Implements InitializeStorageAsync()
+  [ ] Overrides CacheExpiration property
+  [ ] Overrides KeySizeBytes property
+  [ ] If HSM: Also implements IEnvelopeKeyStore
+  [ ] Does NOT duplicate caching logic
+  [ ] Does NOT duplicate initialization logic
+
+For each new ENCRYPTION plugin:
+  [ ] Extends EncryptionPluginBase (NOT PipelinePluginBase directly)
+  [ ] Implements EncryptCoreAsync()
+  [ ] Implements DecryptCoreAsync()
+  [ ] Implements GenerateIv()
+  [ ] Overrides KeySizeBytes, IvSizeBytes, TagSizeBytes
+  [ ] Does NOT duplicate key management logic
+  [ ] Does NOT duplicate statistics tracking
+  [ ] Works with both KeyManagementMode.Direct and KeyManagementMode.Envelope
+```
+
+---
+
+#### T5.0 Summary
+
+| Task | Description | Dependencies | Status |
+|------|-------------|--------------|--------|
+| **T5.0** | **SDK Base Classes and Plugin Refactoring** | None | [ ] |
+| T5.0.1 | SDK Key Management Types (enums, interfaces, classes incl. EncryptionConfigMode) | - | [ ] |
+| T5.0.2 | `KeyStorePluginBase` abstract class | T5.0.1 | [ ] |
+| T5.0.3 | `EncryptionPluginBase` abstract class | T5.0.1 | [ ] |
+| T5.0.4 | Refactor existing key management plugins (4 plugins) | T5.0.2 | [ ] |
+| T5.0.5 | Refactor existing encryption plugins (6 plugins) | T5.0.3 | [ ] |
+| T5.0.6 | Document requirements for new plugins | T5.0.4, T5.0.5 | [ ] |
+
+**Benefits of T5.0:**
+- ✅ Eliminates ~500+ lines of duplicated code across plugins
+- ✅ Ensures consistent caching, initialization, and validation
+- ✅ Enables envelope mode support via shared infrastructure
+- ✅ Simplifies new plugin development (implement only algorithm-specific logic)
+- ✅ Guarantees composability: ANY encryption + ANY key management at runtime
+- ✅ User-configurable key management mode (Direct vs Envelope)
+
+---
+
+### T5.1: Envelope Mode for ALL Encryption Plugins
+
+> **DEPENDENCY:** T5.1 depends on T5.0 (SDK Base Classes). Complete T5.0 first.
+>
+> After T5.0 is complete, envelope mode support is **built into `EncryptionPluginBase`**.
+> T5.1 tasks are now primarily about testing and documentation.
+
+**What's Already Done:**
+- ✅ HSM backends (HashiCorp, Azure, AWS) → `VaultKeyStorePlugin`
+- ✅ WrapKey/UnwrapKey operations → `IVaultBackend` interface
+- ✅ Key storage with versioning → `VaultKeyStorePlugin` + `KeyRotationPlugin`
+- ✅ **All 6 encryption plugins use `IKeyStore`** → Already support composable key management
+
+**After T5.0 Completion:**
+- ✅ `KeyManagementMode` enum → T5.0.1.1
+- ✅ `IEnvelopeKeyStore` interface → T5.0.1.2
+- ✅ `EnvelopeHeader` helper class → T5.0.1.3
+- ✅ Envelope mode in `EncryptionPluginBase` → T5.0.3.4
+- ✅ All 6 encryption plugins refactored → T5.0.5
+
+**Existing Encryption Plugins (ALL extend EncryptionPluginBase after T5.0):**
+| Plugin | Algorithm | Base Class | Direct Mode | Envelope Mode |
+|--------|-----------|------------|-------------|---------------|
+| `AesEncryptionPlugin` | AES-256-GCM | `EncryptionPluginBase` | ✅ Inherited | ✅ Inherited |
+| `ChaCha20EncryptionPlugin` | ChaCha20-Poly1305 | `EncryptionPluginBase` | ✅ Inherited | ✅ Inherited |
+| `TwofishEncryptionPlugin` | Twofish-256-CTR-HMAC | `EncryptionPluginBase` | ✅ Inherited | ✅ Inherited |
+| `SerpentEncryptionPlugin` | Serpent-256-CTR-HMAC | `EncryptionPluginBase` | ✅ Inherited | ✅ Inherited |
+| `FipsEncryptionPlugin` | AES-256-GCM (FIPS 140-2) | `EncryptionPluginBase` | ✅ Inherited | ✅ Inherited |
+| `ZeroKnowledgeEncryptionPlugin` | AES-256-GCM + ZK proofs | `EncryptionPluginBase` | ✅ Inherited | ✅ Inherited |
+
+**Remaining T5.1 Tasks (Post-T5.0):**
+| Task | Component | Description | Status |
+|------|-----------|-------------|--------|
+| T5.1.1 | Google Cloud KMS backend | Add to `VaultKeyStorePlugin` (config exists, impl partial) | [ ] |
+| T5.1.2 | Envelope mode integration tests | Test all 6 plugins with envelope mode | [ ] |
+| T5.1.3 | Envelope mode documentation | Usage examples, configuration guide | [ ] |
+| T5.1.4 | Envelope mode benchmarks | Compare Direct vs Envelope performance | [ ] |
+
+---
+
+### T5.2-T5.3: Additional Encryption & Padding
+
+| Task | Component | Description | Status |
+|------|-----------|-------------|--------|
+| T5.2 | `KyberEncryptionPlugin` | Post-quantum cryptography (NIST PQC ML-KEM), **MUST use IKeyStore** | [ ] |
+| T5.3 | `ChaffPaddingPlugin` | Traffic analysis protection via dummy writes | [ ] |
+
+---
+
+### T5.4: Additional Key Management Plugins (Composable Architecture)
+
+> **DEPENDENCY:** T5.4 depends on T5.0 (SDK Base Classes). Complete T5.0 first.
+>
+> **CRITICAL: All New Key Management Plugins MUST Extend `KeyStorePluginBase`**
+>
+> After T5.0 completion:
+> - `KeyStorePluginBase` provides common caching, initialization, and validation
+> - All new plugins extend `KeyStorePluginBase` (NOT `SecurityProviderPluginBase` directly)
+> - Plugins that support HSM wrap/unwrap also implement `IEnvelopeKeyStore`
+> - Users can pair ANY encryption with ANY key management at runtime
+
+**Existing Key Management Plugins (✅ Extend KeyStorePluginBase after T5.0.4):**
+| Plugin | Base Class | Envelope Support | Features | Status |
+|--------|------------|------------------|----------|--------|
+| `FileKeyStorePlugin` | `KeyStorePluginBase` | ❌ No | DPAPI, CredentialManager, Database, PBKDF2 4-tier | ✅ COMPLETE T5.0.4.1 |
+| `VaultKeyStorePlugin` | `KeyStorePluginBase` + `IEnvelopeKeyStore` | ✅ Yes | HashiCorp, Azure, AWS KMS + WrapKey/UnwrapKey | ✅ COMPLETE T5.0.4.2 |
+| `KeyRotationPlugin` | `KeyStorePluginBase` (decorator) | Passthrough | Wraps any IKeyStore, adds rotation/versioning/audit | ⏳ Pending T5.0.4.3 |
+| `SecretManagementPlugin` | `KeyStorePluginBase` | ❌ No | Secure secret storage with access control | ⏳ Pending T5.0.4.4 |
+
+**New Key Management Plugins (T5.4) - MUST Extend KeyStorePluginBase:**
+
+| Task | Component | Base Class | Description | Status |
+|------|-----------|------------|-------------|--------|
+| T5.4 | Additional key management plugins | - | More options for composable key management | [ ] |
+| T5.4.1 | `ShamirSecretKeyStorePlugin` | `KeyStorePluginBase` | M-of-N key splitting (Shamir's Secret Sharing) | [ ] |
+| T5.4.1.1 | ↳ Key split generation | - | Split key into N shares | [ ] |
+| T5.4.1.2 | ↳ Key reconstruction | - | Reconstruct from M shares | [ ] |
+| T5.4.1.3 | ↳ Share distribution | - | Securely distribute shares to custodians | [ ] |
+| T5.4.1.4 | ↳ Share rotation | - | Rotate shares without changing key | [ ] |
+| T5.4.2 | `Pkcs11KeyStorePlugin` | `KeyStorePluginBase` + `IEnvelopeKeyStore` | PKCS#11 HSM interface (generic HSM support) | [ ] |
+| T5.4.2.1 | ↳ Token enumeration | - | List available PKCS#11 tokens | [ ] |
+| T5.4.2.2 | ↳ Key operations | - | Generate, import, wrap, unwrap via PKCS#11 | [ ] |
+| T5.4.3 | `TpmKeyStorePlugin` | `KeyStorePluginBase` | TPM 2.0 hardware security | [ ] |
+| T5.4.3.1 | ↳ TPM key sealing | - | Seal keys to PCR state | [ ] |
+| T5.4.3.2 | ↳ TPM key unsealing | - | Unseal with attestation | [ ] |
+| T5.4.4 | `YubikeyKeyStorePlugin` | `KeyStorePluginBase` | YubiKey/FIDO2 hardware tokens | [ ] |
+| T5.4.4.1 | ↳ PIV slot support | - | Use PIV slots for key storage | [ ] |
+| T5.4.4.2 | ↳ Challenge-response | - | HMAC-SHA1 challenge-response | [ ] |
+| T5.4.5 | `PasswordDerivedKeyStorePlugin` | `KeyStorePluginBase` | Argon2id/scrypt key derivation | [ ] |
+| T5.4.5.1 | ↳ Argon2id derivation | - | Memory-hard KDF | [ ] |
+| T5.4.5.2 | ↳ scrypt derivation | - | Alternative memory-hard KDF | [ ] |
+| T5.4.6 | `MultiPartyKeyStorePlugin` | `KeyStorePluginBase` + `IEnvelopeKeyStore` | Multi-party computation (MPC) key management | [ ] |
+| T5.4.6.1 | ↳ Threshold signatures | - | t-of-n signing without key reconstruction | [ ] |
+| T5.4.6.2 | ↳ Distributed key generation | - | Generate keys without single point of failure | [ ] |
+
+**Key Management Plugin Reference:**
+| Plugin | Base Class | IEnvelopeKeyStore | Security Level | Use Case |
+|--------|------------|-------------------|----------------|----------|
+| `FileKeyStorePlugin` | `KeyStorePluginBase` | ❌ | Medium | Local/development deployments |
+| `VaultKeyStorePlugin` | `KeyStorePluginBase` | ✅ Yes | High | Enterprise HSM/cloud deployments |
+| `KeyRotationPlugin` | `KeyStorePluginBase` | Passthrough | N/A (layer) | Add rotation to any IKeyStore |
+| `ShamirSecretKeyStorePlugin` | `KeyStorePluginBase` | ❌ | Very High | M-of-N custodian scenarios |
+| `Pkcs11KeyStorePlugin` | `KeyStorePluginBase` | ✅ Yes | Very High | Generic HSM hardware |
+| `TpmKeyStorePlugin` | `KeyStorePluginBase` | ❌ | High | Hardware-bound keys |
+| `YubikeyKeyStorePlugin` | `KeyStorePluginBase` | ❌ | High | User-owned hardware tokens |
+| `PasswordDerivedKeyStorePlugin` | `KeyStorePluginBase` | ❌ | Medium-High | Password-based encryption |
+| `MultiPartyKeyStorePlugin` | `KeyStorePluginBase` | ✅ Yes | Maximum | Zero single-point-of-failure |
+
+**Composability Example:**
+```csharp
+// ANY encryption can use ANY key management - user choice at runtime
+var encryption = new AesEncryptionPlugin(new AesEncryptionConfig
+{
+    KeyStore = keyManagementChoice switch
+    {
+        "file" => new FileKeyStorePlugin(),
+        "hsm-hashicorp" => new VaultKeyStorePlugin(hashicorpConfig),
+        "hsm-azure" => new VaultKeyStorePlugin(azureConfig),
+        "hsm-aws" => new VaultKeyStorePlugin(awsConfig),
+        "shamir" => new ShamirSecretKeyStorePlugin(shamirConfig),
+        "pkcs11" => new Pkcs11KeyStorePlugin(pkcs11Config),
+        "tpm" => new TpmKeyStorePlugin(),
+        "yubikey" => new YubikeyKeyStorePlugin(),
+        "password" => new PasswordDerivedKeyStorePlugin(passwordConfig),
+        "mpc" => new MultiPartyKeyStorePlugin(mpcConfig),
+        "rotation" => new KeyRotationPlugin(innerKeyStore),  // Wrap any of the above
+        _ => throw new ArgumentException("Unknown key management")
+    }
+});
+```
+
+---
+
+### T5.5-T5.6: Geo-Distribution
+
+| Task | Component | Description | Status |
+|------|-----------|-------------|--------|
+| T5.5 | `GeoWormPlugin` | Geo-dispersed WORM replication across regions | [ ] |
+| T5.6 | `GeoDistributedShardingPlugin` | Geo-dispersed data sharding (shards across continents) | [ ] |
+
+**Configuration (Same Plugin, Different Key Sources):**
+```csharp
+// MODE 1: DIRECT - Key from any IKeyStore (existing behavior, DEFAULT)
+// Works with ALL 6 encryption plugins today
+var directConfig = new AesEncryptionConfig  // Or ChaCha20, Twofish, Serpent, FIPS, ZK
+{
+    KeyManagementMode = KeyManagementMode.Direct,  // Default
+    KeyStore = new FileKeyStorePlugin()            // Or ANY IKeyStore
+    // OR: KeyStore = new VaultKeyStorePlugin(...)  // Even HSM, but no envelope
+    // OR: KeyStore = new KeyRotationPlugin(...)    // With rotation layer
+};
+
+// MODE 2: ENVELOPE - DEK wrapped by HSM, stored in ciphertext (T5.1)
+// After T5.1 implementation, works with ALL 6 encryption plugins
+var envelopeConfig = new AesEncryptionConfig  // Or ChaCha20, Twofish, Serpent, FIPS, ZK
+{
+    KeyManagementMode = KeyManagementMode.Envelope,
+    EnvelopeKeyStore = new VaultKeyStorePlugin(new VaultConfig
+    {
+        // Pick ONE HSM backend:
+        HashiCorpVault = new HashiCorpVaultConfig { Address = "https://vault:8200", Token = "..." },
+        // OR: AzureKeyVault = new AzureKeyVaultConfig { VaultUrl = "https://myvault.vault.azure.net" },
+        // OR: AwsKms = new AwsKmsConfig { Region = "us-east-1", DefaultKeyId = "alias/my-kek" }
+    }),
+    KekKeyId = "alias/my-kek"  // Which KEK to use for wrapping DEKs
+};
+
+// Both modes use the SAME encryption plugins - no code duplication!
+var plugin = new AesEncryptionPlugin(envelopeConfig);
+```
+
+**Envelope Mode Header Format (Shared by All Plugins):**
+```
+DIRECT MODE (existing):     [KeyIdLength:4][KeyId:var][...plugin-specific...][Ciphertext]
+ENVELOPE MODE (T5.1):       [Mode:1][WrappedDekLen:2][WrappedDEK:var][KekIdLen:1][KekId:var][...plugin-specific...][Ciphertext]
+```
+
+**Key Management Mode Comparison:**
+| Mode | Key Provider | Key Source | Security | Use Case |
+|------|--------------|------------|----------|----------|
+| `Direct` | Any `IKeyStore` | Key retrieved directly | High | General use |
+| `Envelope` | `VaultKeyStorePlugin` | DEK wrapped by HSM KEK | Maximum | Gov/military compliance |
+
+**Envelope Mode Benefits:**
+- KEK never leaves HSM hardware - impossible to extract
+- DEK is unique per object - limits blast radius
+- Key rotation = re-wrap DEKs, NOT re-encrypt data
+- Compliance: PCI-DSS, HIPAA, FedRAMP
+- **Works with ALL 6 encryption algorithms** (after T5.1 implementation)
+
+**Goal:** Maximum compression for archival/cold storage
+
+| Task | Component | Description | Status |
+|------|-----------|-------------|--------|
+| T5.7 | `PaqCompressionPlugin` | PAQ8/PAQ9 extreme compression (slow but best ratio) | [ ] |
+| T5.8 | `ZpaqCompressionPlugin` | ZPAQ journaling archiver with deduplication | [ ] |
+| T5.9 | `CmixCompressionPlugin` | CMIX context-mixing compressor (experimental) | [ ] |
+
+**Goal:** Database integration and metadata handling
+
+| Task | Component | Description | Status |
+|------|-----------|-------------|--------|
+| T5.10 | `SqlTdeMetadataPlugin` | SQL TDE (Transparent Data Encryption) metadata import/export | [ ] |
+| T5.11 | `DatabaseEncryptionKeyPlugin` | DEK/KEK management for imported encrypted databases | [ ] |
+
+**Goal:** Audit-ready documentation and compliance
+
+| Task | Component | Description | Status |
+|------|-----------|-------------|--------|
+| T5.12 | Compliance Report Generator | SOC2, HIPAA, FedRAMP, GDPR reports | [ ] |
+| T5.13 | Chain-of-Custody Export | PDF/JSON export for legal discovery | [ ] |
+| T5.14 | Dashboard Integration | Real-time integrity status widgets | [ ] |
+| T5.15 | Alert Integrations | Email, Slack, PagerDuty, OpsGenie | [ ] |
+| T5.16 | Tamper Incident Workflow | Automated incident ticket creation | [ ] |
+
+---
+
+## Phase T6: Transit Encryption & Endpoint-Adaptive Security
+
+> **PROBLEM STATEMENT:**
+> High-security environments (government, military, enterprise) require strong encryption (Serpent-256, Twofish-256)
+> for data at rest. However, low-power endpoints (mobile, IoT, legacy systems) may not have the computational
+> resources to decrypt/encrypt efficiently. Additionally, even within "trusted" internal networks, data in transit
+> should remain encrypted to authorized parties only (true end-to-end encryption).
+
+### T6.0: Solution Overview - 8 Encryption Strategy Options
+
+DataWarehouse provides **8 distinct encryption strategies** that can be combined based on requirements:
+
+| # | Strategy | Description | Use Case |
+|---|----------|-------------|----------|
+| 1 | **Common Selection** | Pre-defined cipher presets (Fast, Balanced, Secure, Maximum) | Quick setup, no expertise needed |
+| 2 | **User Configurable** | Manual cipher selection per operation | Expert users, specific requirements |
+| 3 | **Tiered/Hybrid Scheme** | Different ciphers for storage vs transit layers | Enterprise with mixed endpoints |
+| 4 | **Re-encryption Gateway** | Dedicated proxy service for cipher conversion | High-security perimeter architecture |
+| 5 | **Negotiated Cipher** | Client-server handshake to agree on cipher | Dynamic endpoint environments |
+| 6 | **Streaming Chunks** | Progressive decrypt/encrypt in fixed-size chunks | Low-memory devices, large files |
+| 7 | **Hardware-Assisted** | Auto-detect and use hardware acceleration | Performance optimization |
+| 8 | **Transcryption** | In-memory cipher-to-cipher conversion | Secure gateway operations |
+
+---
+
+### T6.1: Strategy 1 - Common Selection (Pre-defined Presets)
+
+> **GOAL:** Allow users to select from pre-defined, tested cipher configurations without needing crypto expertise.
+
+#### T6.1.1: SDK Interface
+
+```csharp
+// =============================================================================
+// FILE: DataWarehouse.SDK/Security/ICommonCipherPresets.cs
+// =============================================================================
+
+namespace DataWarehouse.SDK.Security;
+
+/// <summary>
+/// Pre-defined cipher configuration presets for common use cases.
+/// Each preset is a tested, validated combination of algorithms.
+/// </summary>
+public enum CipherPreset
+{
+    /// <summary>
+    /// FAST: ChaCha20-Poly1305 for both storage and transit.
+    /// Best for: High-throughput systems, mobile-first, IoT.
+    /// Throughput: ~800 MB/s (software), ~1.2 GB/s (with SIMD).
+    /// Security: 256-bit, AEAD, constant-time.
+    /// </summary>
+    Fast,
+
+    /// <summary>
+    /// BALANCED: AES-256-GCM for storage, ChaCha20 for transit to weak endpoints.
+    /// Best for: Enterprise with mixed endpoints (desktop + mobile).
+    /// Throughput: ~1 GB/s with AES-NI, ~300 MB/s without.
+    /// Security: 256-bit, AEAD, NIST approved.
+    /// </summary>
+    Balanced,
+
+    /// <summary>
+    /// SECURE: AES-256-GCM for everything, no cipher downgrade.
+    /// Best for: Compliance-driven environments (PCI-DSS, HIPAA).
+    /// Throughput: ~1 GB/s with AES-NI.
+    /// Security: 256-bit, AEAD, FIPS 140-2 validated.
+    /// </summary>
+    Secure,
+
+    /// <summary>
+    /// MAXIMUM: Serpent-256 for storage, AES-256 for transit.
+    /// Best for: Government, military, classified data.
+    /// Throughput: ~200 MB/s (Serpent), ~1 GB/s (AES transit).
+    /// Security: Conservative design, 32 rounds, AES finalist.
+    /// </summary>
+    Maximum,
+
+    /// <summary>
+    /// FIPS_ONLY: Only FIPS 140-2 validated algorithms.
+    /// Best for: US Federal agencies, FedRAMP compliance.
+    /// Algorithms: AES-256-GCM, SHA-256/384/512, HMAC.
+    /// </summary>
+    FipsOnly,
+
+    /// <summary>
+    /// QUANTUM_RESISTANT: Post-quantum algorithms where available.
+    /// Best for: Long-term data protection (>10 years).
+    /// Note: May use hybrid classical+PQ approach.
+    /// </summary>
+    QuantumResistant
+}
+
+/// <summary>
+/// Provides pre-defined cipher configurations.
+/// </summary>
+public interface ICommonCipherPresetProvider
+{
+    /// <summary>Gets the full configuration for a preset.</summary>
+    CipherPresetConfiguration GetPreset(CipherPreset preset);
+
+    /// <summary>Gets recommended preset based on endpoint capabilities.</summary>
+    CipherPreset RecommendPreset(IEndpointCapabilities endpoint);
+
+    /// <summary>Lists all available presets with descriptions.</summary>
+    IReadOnlyList<CipherPresetInfo> ListPresets();
+}
+
+/// <summary>
+/// Full configuration for a cipher preset.
+/// </summary>
+public record CipherPresetConfiguration
+{
+    /// <summary>Preset identifier.</summary>
+    public required CipherPreset Preset { get; init; }
+
+    /// <summary>Cipher for data at rest (storage).</summary>
+    public required string StorageCipher { get; init; }
+
+    /// <summary>Cipher for data in transit (network).</summary>
+    public required string TransitCipher { get; init; }
+
+    /// <summary>Key derivation function.</summary>
+    public required string KeyDerivationFunction { get; init; }
+
+    /// <summary>KDF iteration count.</summary>
+    public required int KdfIterations { get; init; }
+
+    /// <summary>Hash algorithm for integrity.</summary>
+    public required string HashAlgorithm { get; init; }
+
+    /// <summary>Whether cipher downgrade is allowed for weak endpoints.</summary>
+    public required bool AllowDowngrade { get; init; }
+
+    /// <summary>Minimum endpoint trust level required.</summary>
+    public required EndpointTrustLevel MinTrustLevel { get; init; }
+
+    /// <summary>Human-readable description.</summary>
+    public required string Description { get; init; }
+
+    /// <summary>Compliance standards this preset meets.</summary>
+    public required IReadOnlyList<string> ComplianceStandards { get; init; }
+}
+
+/// <summary>
+/// Information about a preset for display purposes.
+/// </summary>
+public record CipherPresetInfo(
+    CipherPreset Preset,
+    string Name,
+    string Description,
+    string StorageCipher,
+    string TransitCipher,
+    int EstimatedThroughputMBps,
+    IReadOnlyList<string> ComplianceStandards
+);
+```
+
+#### T6.1.2: Abstract Base Class
+
+```csharp
+// =============================================================================
+// FILE: DataWarehouse.SDK/Contracts/CipherPresetProviderPluginBase.cs
+// =============================================================================
+
+namespace DataWarehouse.SDK.Contracts;
+
+/// <summary>
+/// Base class for cipher preset providers.
+/// Extend to add custom presets or modify existing ones.
+/// </summary>
+public abstract class CipherPresetProviderPluginBase : FeaturePluginBase, ICommonCipherPresetProvider
+{
+    #region Pre-defined Presets (Override to customize)
+
+    /// <summary>
+    /// Default preset configurations. Override to customize.
+    /// </summary>
+    protected virtual IReadOnlyDictionary<CipherPreset, CipherPresetConfiguration> Presets => new Dictionary<CipherPreset, CipherPresetConfiguration>
+    {
+        [CipherPreset.Fast] = new()
+        {
+            Preset = CipherPreset.Fast,
+            StorageCipher = "ChaCha20-Poly1305",
+            TransitCipher = "ChaCha20-Poly1305",
+            KeyDerivationFunction = "Argon2id",
+            KdfIterations = 3,
+            HashAlgorithm = "BLAKE3",
+            AllowDowngrade = false,
+            MinTrustLevel = EndpointTrustLevel.Basic,
+            Description = "Maximum throughput with strong security. Ideal for mobile and IoT.",
+            ComplianceStandards = new[] { "SOC2" }
+        },
+        [CipherPreset.Balanced] = new()
+        {
+            Preset = CipherPreset.Balanced,
+            StorageCipher = "AES-256-GCM",
+            TransitCipher = "ChaCha20-Poly1305", // Fallback for non-AES-NI
+            KeyDerivationFunction = "Argon2id",
+            KdfIterations = 4,
+            HashAlgorithm = "SHA-256",
+            AllowDowngrade = true,
+            MinTrustLevel = EndpointTrustLevel.Basic,
+            Description = "Balance of security and performance. AES for storage, ChaCha20 for weak endpoints.",
+            ComplianceStandards = new[] { "SOC2", "ISO27001" }
+        },
+        [CipherPreset.Secure] = new()
+        {
+            Preset = CipherPreset.Secure,
+            StorageCipher = "AES-256-GCM",
+            TransitCipher = "AES-256-GCM",
+            KeyDerivationFunction = "PBKDF2-SHA256",
+            KdfIterations = 100000,
+            HashAlgorithm = "SHA-256",
+            AllowDowngrade = false,
+            MinTrustLevel = EndpointTrustLevel.Corporate,
+            Description = "Compliance-focused. No cipher downgrade, NIST-approved algorithms only.",
+            ComplianceStandards = new[] { "PCI-DSS", "HIPAA", "SOC2", "ISO27001" }
+        },
+        [CipherPreset.Maximum] = new()
+        {
+            Preset = CipherPreset.Maximum,
+            StorageCipher = "Serpent-256-CTR-HMAC",
+            TransitCipher = "AES-256-GCM",
+            KeyDerivationFunction = "Argon2id",
+            KdfIterations = 10,
+            HashAlgorithm = "SHA-512",
+            AllowDowngrade = false,
+            MinTrustLevel = EndpointTrustLevel.HighTrust,
+            Description = "Maximum security. Serpent (AES finalist, conservative design) for storage.",
+            ComplianceStandards = new[] { "ITAR", "EAR", "Classified" }
+        },
+        [CipherPreset.FipsOnly] = new()
+        {
+            Preset = CipherPreset.FipsOnly,
+            StorageCipher = "FIPS-AES-256-GCM",
+            TransitCipher = "FIPS-AES-256-GCM",
+            KeyDerivationFunction = "PBKDF2-SHA256",
+            KdfIterations = 100000,
+            HashAlgorithm = "SHA-256",
+            AllowDowngrade = false,
+            MinTrustLevel = EndpointTrustLevel.Corporate,
+            Description = "FIPS 140-2 validated only. Required for US Federal systems.",
+            ComplianceStandards = new[] { "FIPS 140-2", "FedRAMP", "FISMA" }
+        }
+    };
+
+    #endregion
+
+    #region Implementation
+
+    /// <inheritdoc/>
+    public CipherPresetConfiguration GetPreset(CipherPreset preset)
+    {
+        if (Presets.TryGetValue(preset, out var config))
+            return config;
+        throw new ArgumentException($"Unknown preset: {preset}");
+    }
+
+    /// <inheritdoc/>
+    public CipherPreset RecommendPreset(IEndpointCapabilities endpoint)
+    {
+        // Decision tree for preset recommendation
+        if (endpoint.HasHardwareAes && endpoint.EstimatedThroughputMBps > 500)
+            return CipherPreset.Secure;
+
+        if (endpoint.EstimatedThroughputMBps > 200)
+            return CipherPreset.Balanced;
+
+        return CipherPreset.Fast;
+    }
+
+    /// <inheritdoc/>
+    public IReadOnlyList<CipherPresetInfo> ListPresets()
+    {
+        return Presets.Values.Select(p => new CipherPresetInfo(
+            p.Preset,
+            p.Preset.ToString(),
+            p.Description,
+            p.StorageCipher,
+            p.TransitCipher,
+            EstimateThroughput(p.StorageCipher),
+            p.ComplianceStandards
+        )).ToList();
+    }
+
+    private int EstimateThroughput(string cipher) => cipher switch
+    {
+        var c when c.Contains("ChaCha20") => 800,
+        var c when c.Contains("AES") => 1000,
+        var c when c.Contains("Serpent") => 200,
+        var c when c.Contains("Twofish") => 250,
+        _ => 500
+    };
+
+    #endregion
+}
+```
+
+#### T6.1.3: Plugin Implementation
+
+| Task | Plugin | Description | Status |
+|------|--------|-------------|--------|
+| T6.1.3.1 | `DefaultCipherPresetPlugin` | Standard presets (Fast, Balanced, Secure, Maximum, FipsOnly) | [ ] |
+| T6.1.3.2 | `EnterpriseCipherPresetPlugin` | Enterprise-specific presets with compliance mappings | [ ] |
+| T6.1.3.3 | `GovernmentCipherPresetPlugin` | Government/military presets (ITAR, Classified, TopSecret) | [ ] |
+
+#### T6.1.4: Usage Example
+
+```csharp
+// USAGE: Select a preset and apply it
+var presetProvider = kernel.GetPlugin<ICommonCipherPresetProvider>();
+var config = presetProvider.GetPreset(CipherPreset.Balanced);
+
+// Apply preset to encryption pipeline
+var encryptionConfig = new EncryptionPipelineConfig
+{
+    StorageCipher = config.StorageCipher,       // "AES-256-GCM"
+    TransitCipher = config.TransitCipher,       // "ChaCha20-Poly1305"
+    AllowDowngrade = config.AllowDowngrade,     // true
+    KeyDerivation = new KeyDerivationConfig
+    {
+        Function = config.KeyDerivationFunction, // "Argon2id"
+        Iterations = config.KdfIterations        // 4
+    }
+};
+
+// Or: Get recommendation based on endpoint
+var endpoint = await endpointDetector.GetCapabilitiesAsync();
+var recommendedPreset = presetProvider.RecommendPreset(endpoint);
+```
+
+---
+
+### T6.2: Strategy 2 - User Configurable (Manual Selection)
+
+```csharp
+// =============================================================================
+// FILE: DataWarehouse.SDK/Security/ITransitEncryption.cs
+// =============================================================================
+
+namespace DataWarehouse.SDK.Security;
+
+/// <summary>
+/// Defines how encryption is applied at different layers of data handling.
+/// </summary>
+public enum EncryptionLayer
+{
+    /// <summary>Data encrypted only when stored (at rest). Trust network security for transit.</summary>
+    AtRest,
+
+    /// <summary>Data encrypted both at rest and during transit (different ciphers possible).</summary>
+    AtRestAndTransit,
+
+    /// <summary>End-to-end encryption - same cipher from source to destination, no intermediate decryption.</summary>
+    EndToEnd
+}
+
+/// <summary>
+/// Defines how transit cipher is selected.
+/// </summary>
+public enum TransitCipherSelectionMode
+{
+    /// <summary>No transit encryption - trust network layer (TLS, VPN, etc.).</summary>
+    None,
+
+    /// <summary>Use the same cipher as at-rest storage (strongest, but may be slow on weak endpoints).</summary>
+    SameAsStorage,
+
+    /// <summary>Automatically select optimal cipher based on endpoint capabilities.</summary>
+    AutoNegotiate,
+
+    /// <summary>User/admin explicitly specifies the transit cipher.</summary>
+    Explicit,
+
+    /// <summary>Policy-driven selection based on data classification and endpoint trust level.</summary>
+    PolicyBased
+}
+
+/// <summary>
+/// Represents the cryptographic capabilities of an endpoint.
+/// Used for cipher negotiation and optimal algorithm selection.
+/// </summary>
+public interface IEndpointCapabilities
+{
+    /// <summary>Unique identifier for this endpoint.</summary>
+    string EndpointId { get; }
+
+    /// <summary>Human-readable endpoint name (e.g., "iPhone 14 Pro", "Legacy Terminal A3").</summary>
+    string EndpointName { get; }
+
+    /// <summary>List of cipher algorithms this endpoint can efficiently handle.</summary>
+    IReadOnlyList<string> SupportedCiphers { get; }
+
+    /// <summary>Preferred cipher for this endpoint (fastest while meeting security requirements).</summary>
+    string PreferredCipher { get; }
+
+    /// <summary>Whether endpoint has hardware AES acceleration (AES-NI, ARM Crypto Extensions).</summary>
+    bool HasHardwareAes { get; }
+
+    /// <summary>Whether endpoint has hardware SHA acceleration.</summary>
+    bool HasHardwareSha { get; }
+
+    /// <summary>Maximum key derivation iterations the endpoint can handle efficiently.</summary>
+    int MaxKeyDerivationIterations { get; }
+
+    /// <summary>Maximum memory available for cryptographic operations (affects Argon2, etc.).</summary>
+    long MaxCryptoMemoryBytes { get; }
+
+    /// <summary>Estimated encryption throughput in MB/s for the preferred cipher.</summary>
+    double EstimatedThroughputMBps { get; }
+
+    /// <summary>Trust level assigned to this endpoint by security policy.</summary>
+    EndpointTrustLevel TrustLevel { get; }
+
+    /// <summary>When these capabilities were last verified.</summary>
+    DateTime CapabilitiesVerifiedAt { get; }
+}
+
+/// <summary>
+/// Trust levels for endpoints, affecting cipher selection and access control.
+/// </summary>
+public enum EndpointTrustLevel
+{
+    /// <summary>Untrusted endpoint - maximum encryption, limited data access.</summary>
+    Untrusted = 0,
+
+    /// <summary>Basic trust - standard transit encryption.</summary>
+    Basic = 1,
+
+    /// <summary>Verified corporate device - optimized cipher selection.</summary>
+    Corporate = 2,
+
+    /// <summary>Highly trusted - server-to-server, secure enclave.</summary>
+    HighTrust = 3,
+
+    /// <summary>Maximum trust - HSM, secure facility.</summary>
+    Maximum = 4
+}
+
+/// <summary>
+/// Selects the optimal cipher for a given endpoint and data classification.
+/// </summary>
+public interface ICipherNegotiator
+{
+    /// <summary>
+    /// Selects the best cipher for transit encryption between server and endpoint.
+    /// </summary>
+    /// <param name="endpointCapabilities">The endpoint's cryptographic capabilities.</param>
+    /// <param name="dataClassification">The sensitivity level of the data.</param>
+    /// <param name="securityPolicy">The applicable security policy.</param>
+    /// <returns>The selected cipher configuration for transit.</returns>
+    Task<TransitCipherConfig> NegotiateCipherAsync(
+        IEndpointCapabilities endpointCapabilities,
+        DataClassification dataClassification,
+        ITransitSecurityPolicy securityPolicy);
+
+    /// <summary>
+    /// Gets the list of ciphers that meet both endpoint capabilities and policy requirements.
+    /// </summary>
+    IReadOnlyList<string> GetCompatibleCiphers(
+        IEndpointCapabilities endpointCapabilities,
+        ITransitSecurityPolicy securityPolicy);
+}
+
+/// <summary>
+/// Security policy for transit encryption decisions.
+/// </summary>
+public interface ITransitSecurityPolicy
+{
+    /// <summary>Policy identifier.</summary>
+    string PolicyId { get; }
+
+    /// <summary>Minimum acceptable cipher strength (bits) for transit.</summary>
+    int MinimumTransitKeyBits { get; }
+
+    /// <summary>Allowed cipher algorithms for transit (empty = all).</summary>
+    IReadOnlyList<string> AllowedTransitCiphers { get; }
+
+    /// <summary>Blocked cipher algorithms (takes precedence over allowed).</summary>
+    IReadOnlyList<string> BlockedCiphers { get; }
+
+    /// <summary>Minimum trust level required for cipher downgrade.</summary>
+    EndpointTrustLevel MinTrustForDowngrade { get; }
+
+    /// <summary>Whether to allow cipher negotiation or enforce fixed cipher.</summary>
+    bool AllowNegotiation { get; }
+
+    /// <summary>Whether to require end-to-end encryption for specific data classifications.</summary>
+    IReadOnlyDictionary<DataClassification, bool> RequireEndToEnd { get; }
+}
+
+/// <summary>
+/// Data sensitivity classification for policy-based cipher selection.
+/// </summary>
+public enum DataClassification
+{
+    /// <summary>Public data - minimum encryption required.</summary>
+    Public = 0,
+
+    /// <summary>Internal - standard encryption.</summary>
+    Internal = 1,
+
+    /// <summary>Confidential - strong encryption required.</summary>
+    Confidential = 2,
+
+    /// <summary>Secret - maximum encryption, strict access control.</summary>
+    Secret = 3,
+
+    /// <summary>Top Secret - government/military grade, HSM-backed.</summary>
+    TopSecret = 4
+}
+
+/// <summary>
+/// Configuration for the selected transit cipher.
+/// </summary>
+public record TransitCipherConfig
+{
+    /// <summary>Algorithm identifier (e.g., "AES-256-GCM", "ChaCha20-Poly1305").</summary>
+    public required string AlgorithmId { get; init; }
+
+    /// <summary>Key size in bits.</summary>
+    public required int KeySizeBits { get; init; }
+
+    /// <summary>Whether this cipher uses authenticated encryption (AEAD).</summary>
+    public required bool IsAead { get; init; }
+
+    /// <summary>Estimated performance impact vs optimal cipher (1.0 = no impact).</summary>
+    public double PerformanceFactor { get; init; } = 1.0;
+
+    /// <summary>Reason for selecting this cipher.</summary>
+    public string? SelectionReason { get; init; }
+
+    /// <summary>Key derivation parameters for transit key.</summary>
+    public KeyDerivationParams? KeyDerivation { get; init; }
+}
+
+/// <summary>
+/// Parameters for deriving transit-specific keys.
+/// </summary>
+public record KeyDerivationParams
+{
+    /// <summary>Key derivation function (e.g., "HKDF-SHA256", "Argon2id").</summary>
+    public required string Kdf { get; init; }
+
+    /// <summary>Salt or context info for key derivation.</summary>
+    public byte[]? Salt { get; init; }
+
+    /// <summary>Iteration count (for PBKDF2-style KDFs).</summary>
+    public int Iterations { get; init; } = 1;
+
+    /// <summary>Memory cost (for Argon2).</summary>
+    public int MemoryCostKB { get; init; } = 0;
+}
+```
+
+#### T6.0.2: Transcryption Interface
+
+```csharp
+// =============================================================================
+// FILE: DataWarehouse.SDK/Security/ITranscryptionService.cs
+// =============================================================================
+
+namespace DataWarehouse.SDK.Security;
+
+/// <summary>
+/// Performs secure cipher-to-cipher transcryption without exposing plaintext to storage.
+/// Used to convert between storage cipher and transit cipher while maintaining confidentiality.
+/// </summary>
+/// <remarks>
+/// SECURITY: Transcryption happens entirely in memory. The plaintext is:
+/// - Never written to disk
+/// - Never logged
+/// - Cleared from memory immediately after use (CryptographicOperations.ZeroMemory)
+///
+/// This allows data encrypted with Serpent-256 (strong, slow) to be re-encrypted
+/// with ChaCha20-Poly1305 (fast, mobile-friendly) for transit, then re-encrypted
+/// back to Serpent-256 at the destination.
+/// </remarks>
+public interface ITranscryptionService
+{
+    /// <summary>
+    /// Transcrypts data from source cipher to destination cipher.
+    /// </summary>
+    /// <param name="input">Input stream encrypted with source cipher.</param>
+    /// <param name="sourceConfig">Configuration for decrypting the input.</param>
+    /// <param name="destinationConfig">Configuration for encrypting the output.</param>
+    /// <param name="context">Security context for key access.</param>
+    /// <returns>Stream encrypted with destination cipher.</returns>
+    Task<Stream> TranscryptAsync(
+        Stream input,
+        TranscryptionSourceConfig sourceConfig,
+        TranscryptionDestinationConfig destinationConfig,
+        ISecurityContext context);
+
+    /// <summary>
+    /// Transcrypts in streaming mode for large files (constant memory usage).
+    /// </summary>
+    IAsyncEnumerable<TranscryptionChunk> TranscryptStreamingAsync(
+        Stream input,
+        TranscryptionSourceConfig sourceConfig,
+        TranscryptionDestinationConfig destinationConfig,
+        ISecurityContext context,
+        int chunkSizeBytes = 1024 * 1024);
+
+    /// <summary>
+    /// Gets the estimated transcryption throughput for a given cipher pair.
+    /// </summary>
+    Task<TranscryptionPerformanceEstimate> EstimatePerformanceAsync(
+        string sourceCipher,
+        string destinationCipher);
+}
+
+/// <summary>
+/// Configuration for the source (decryption) side of transcryption.
+/// </summary>
+public record TranscryptionSourceConfig
+{
+    /// <summary>The encryption plugin type to use for decryption.</summary>
+    public required string PluginId { get; init; }
+
+    /// <summary>Key store containing the decryption key.</summary>
+    public required IKeyStore KeyStore { get; init; }
+
+    /// <summary>Key identifier for decryption.</summary>
+    public required string KeyId { get; init; }
+
+    /// <summary>Additional decryption metadata (from manifest).</summary>
+    public EncryptionMetadata? Metadata { get; init; }
+}
+
+/// <summary>
+/// Configuration for the destination (encryption) side of transcryption.
+/// </summary>
+public record TranscryptionDestinationConfig
+{
+    /// <summary>The encryption plugin type to use for encryption.</summary>
+    public required string PluginId { get; init; }
+
+    /// <summary>Key store for the encryption key.</summary>
+    public required IKeyStore KeyStore { get; init; }
+
+    /// <summary>Key identifier for encryption (or null to generate new).</summary>
+    public string? KeyId { get; init; }
+
+    /// <summary>Key management mode for destination.</summary>
+    public KeyManagementMode KeyMode { get; init; } = KeyManagementMode.Direct;
+
+    /// <summary>Envelope key store (if KeyMode is Envelope).</summary>
+    public IEnvelopeKeyStore? EnvelopeKeyStore { get; init; }
+}
+
+/// <summary>
+/// A chunk of transcrypted data for streaming mode.
+/// </summary>
+public record TranscryptionChunk
+{
+    /// <summary>Chunk sequence number (0-based).</summary>
+    public required int SequenceNumber { get; init; }
+
+    /// <summary>Encrypted chunk data.</summary>
+    public required byte[] Data { get; init; }
+
+    /// <summary>Whether this is the final chunk.</summary>
+    public required bool IsFinal { get; init; }
+
+    /// <summary>Authentication tag for this chunk (if applicable).</summary>
+    public byte[]? Tag { get; init; }
+}
+
+/// <summary>
+/// Performance estimate for transcryption operations.
+/// </summary>
+public record TranscryptionPerformanceEstimate
+{
+    /// <summary>Source cipher algorithm.</summary>
+    public required string SourceCipher { get; init; }
+
+    /// <summary>Destination cipher algorithm.</summary>
+    public required string DestinationCipher { get; init; }
+
+    /// <summary>Estimated throughput in MB/s.</summary>
+    public required double EstimatedThroughputMBps { get; init; }
+
+    /// <summary>Whether hardware acceleration is available.</summary>
+    public required bool HardwareAccelerated { get; init; }
+
+    /// <summary>Recommended chunk size for streaming.</summary>
+    public required int RecommendedChunkSize { get; init; }
+}
+```
+
+#### T6.0.3: Transit Encryption Pipeline Stage
+
+```csharp
+// =============================================================================
+// FILE: DataWarehouse.SDK/Security/ITransitEncryptionStage.cs
+// =============================================================================
+
+namespace DataWarehouse.SDK.Security;
+
+/// <summary>
+/// A pipeline stage that handles transit encryption/decryption.
+/// Sits between the storage layer and the network layer.
+/// </summary>
+/// <remarks>
+/// Pipeline order for WRITE (client → server):
+/// 1. Client: Compress → Encrypt (transit cipher) → Network
+/// 2. Server: Network → Decrypt (transit) → Re-encrypt (storage cipher) → Storage
+///
+/// Pipeline order for READ (server → client):
+/// 1. Server: Storage → Decrypt (storage cipher) → Re-encrypt (transit cipher) → Network
+/// 2. Client: Network → Decrypt (transit) → Decompress → Client
+///
+/// If EndToEnd mode is used, transcryption is skipped and the same cipher is used throughout.
+/// </remarks>
+public interface ITransitEncryptionStage
+{
+    /// <summary>
+    /// Prepares data for transit from server to endpoint.
+    /// </summary>
+    Task<TransitPackage> PrepareForTransitAsync(
+        Stream storageEncryptedData,
+        EncryptionMetadata storageMetadata,
+        IEndpointCapabilities endpoint,
+        ITransitSecurityPolicy policy,
+        ISecurityContext context);
+
+    /// <summary>
+    /// Receives data from transit and prepares for storage.
+    /// </summary>
+    Task<StoragePackage> ReceiveFromTransitAsync(
+        Stream transitEncryptedData,
+        TransitMetadata transitMetadata,
+        EncryptionMetadata targetStorageConfig,
+        ISecurityContext context);
+
+    /// <summary>
+    /// Gets the transit metadata header that will be sent with the data.
+    /// </summary>
+    TransitMetadata GetTransitMetadata(TransitCipherConfig config, string sessionId);
+}
+
+/// <summary>
+/// Package prepared for network transit.
+/// </summary>
+public record TransitPackage
+{
+    /// <summary>Data encrypted with transit cipher.</summary>
+    public required Stream EncryptedData { get; init; }
+
+    /// <summary>Metadata about the transit encryption.</summary>
+    public required TransitMetadata Metadata { get; init; }
+
+    /// <summary>Whether transcryption was performed (vs end-to-end).</summary>
+    public required bool WasTranscrypted { get; init; }
+}
+
+/// <summary>
+/// Package prepared for storage after receiving from transit.
+/// </summary>
+public record StoragePackage
+{
+    /// <summary>Data encrypted with storage cipher.</summary>
+    public required Stream EncryptedData { get; init; }
+
+    /// <summary>Metadata for storage manifest.</summary>
+    public required EncryptionMetadata StorageMetadata { get; init; }
+}
+
+/// <summary>
+/// Metadata sent with transit-encrypted data.
+/// </summary>
+public record TransitMetadata
+{
+    /// <summary>Transit session identifier.</summary>
+    public required string SessionId { get; init; }
+
+    /// <summary>Transit cipher configuration.</summary>
+    public required TransitCipherConfig CipherConfig { get; init; }
+
+    /// <summary>Key identifier used for transit encryption.</summary>
+    public required string TransitKeyId { get; init; }
+
+    /// <summary>When transit encryption was performed.</summary>
+    public required DateTime EncryptedAt { get; init; }
+
+    /// <summary>Source endpoint identifier.</summary>
+    public string? SourceEndpointId { get; init; }
+
+    /// <summary>Destination endpoint identifier.</summary>
+    public string? DestinationEndpointId { get; init; }
+}
+```
+
+---
+
+### T6.1: Abstract Base Classes
+
+#### T6.1.1: EndpointCapabilitiesProviderPluginBase
+
+```csharp
+// =============================================================================
+// FILE: DataWarehouse.SDK/Contracts/TransitEncryptionPluginBases.cs
+// =============================================================================
+
+namespace DataWarehouse.SDK.Contracts;
+
+/// <summary>
+/// Base class for plugins that detect and report endpoint cryptographic capabilities.
+/// Extend this to support different endpoint types (mobile, desktop, IoT, etc.).
+/// </summary>
+public abstract class EndpointCapabilitiesProviderPluginBase : FeaturePluginBase, IEndpointCapabilitiesProvider
+{
+    #region Abstract Members - MUST Override
+
+    /// <summary>
+    /// Detects the cryptographic capabilities of the current endpoint.
+    /// </summary>
+    protected abstract Task<EndpointCapabilities> DetectCapabilitiesAsync();
+
+    /// <summary>
+    /// Gets the endpoint type this provider handles (e.g., "Desktop", "Mobile", "IoT").
+    /// </summary>
+    protected abstract string EndpointType { get; }
+
+    #endregion
+
+    #region Virtual Members - CAN Override
+
+    /// <summary>
+    /// Detects hardware acceleration availability. Override for platform-specific detection.
+    /// </summary>
+    protected virtual bool DetectHardwareAes()
+    {
+        // Default: Check .NET's intrinsics support
+        return System.Runtime.Intrinsics.X86.Aes.IsSupported ||
+               System.Runtime.Intrinsics.Arm.Aes.IsSupported;
+    }
+
+    /// <summary>
+    /// Gets the list of ciphers this endpoint can efficiently handle.
+    /// </summary>
+    protected virtual IReadOnlyList<string> GetSupportedCiphers()
+    {
+        var ciphers = new List<string>();
+
+        // AES-GCM - available if hardware accelerated or powerful enough
+        if (DetectHardwareAes() || EstimatedCpuPower > 1000)
+            ciphers.Add("AES-256-GCM");
+
+        // ChaCha20 - always available, optimized for software implementation
+        ciphers.Add("ChaCha20-Poly1305");
+
+        // Strong ciphers - only if powerful endpoint
+        if (EstimatedCpuPower > 2000)
+        {
+            ciphers.Add("Serpent-256-CTR-HMAC");
+            ciphers.Add("Twofish-256-CTR-HMAC");
+        }
+
+        return ciphers;
+    }
+
+    /// <summary>
+    /// Estimated CPU power metric (higher = more powerful). Override for accurate detection.
+    /// </summary>
+    protected virtual int EstimatedCpuPower => 1000;
+
+    /// <summary>
+    /// Cache duration for capabilities detection results.
+    /// </summary>
+    protected virtual TimeSpan CapabilitiesCacheDuration => TimeSpan.FromHours(1);
+
+    #endregion
+
+    #region Implementation
+
+    private EndpointCapabilities? _cachedCapabilities;
+    private DateTime _cacheExpiry = DateTime.MinValue;
+    private readonly SemaphoreSlim _detectLock = new(1, 1);
+
+    /// <inheritdoc/>
+    public async Task<IEndpointCapabilities> GetCapabilitiesAsync()
+    {
+        if (_cachedCapabilities != null && DateTime.UtcNow < _cacheExpiry)
+            return _cachedCapabilities;
+
+        await _detectLock.WaitAsync();
+        try
+        {
+            if (_cachedCapabilities != null && DateTime.UtcNow < _cacheExpiry)
+                return _cachedCapabilities;
+
+            _cachedCapabilities = await DetectCapabilitiesAsync();
+            _cacheExpiry = DateTime.UtcNow + CapabilitiesCacheDuration;
+            return _cachedCapabilities;
+        }
+        finally
+        {
+            _detectLock.Release();
+        }
+    }
+
+    /// <inheritdoc/>
+    public bool CanHandle(string endpointType) =>
+        endpointType.Equals(EndpointType, StringComparison.OrdinalIgnoreCase);
+
+    #endregion
+}
+
+/// <summary>
+/// Concrete endpoint capabilities implementation.
+/// </summary>
+public record EndpointCapabilities : IEndpointCapabilities
+{
+    public required string EndpointId { get; init; }
+    public required string EndpointName { get; init; }
+    public required IReadOnlyList<string> SupportedCiphers { get; init; }
+    public required string PreferredCipher { get; init; }
+    public required bool HasHardwareAes { get; init; }
+    public required bool HasHardwareSha { get; init; }
+    public required int MaxKeyDerivationIterations { get; init; }
+    public required long MaxCryptoMemoryBytes { get; init; }
+    public required double EstimatedThroughputMBps { get; init; }
+    public required EndpointTrustLevel TrustLevel { get; init; }
+    public required DateTime CapabilitiesVerifiedAt { get; init; }
+}
+```
+
+#### T6.1.2: CipherNegotiatorPluginBase
+
+```csharp
+/// <summary>
+/// Base class for cipher negotiation plugins.
+/// Extend to implement custom negotiation strategies.
+/// </summary>
+public abstract class CipherNegotiatorPluginBase : FeaturePluginBase, ICipherNegotiator
+{
+    #region Abstract Members - MUST Override
+
+    /// <summary>
+    /// Core negotiation logic. Returns the best cipher for the given constraints.
+    /// </summary>
+    protected abstract Task<TransitCipherConfig> NegotiateCoreAsync(
+        IEndpointCapabilities endpoint,
+        DataClassification classification,
+        ITransitSecurityPolicy policy);
+
+    #endregion
+
+    #region Virtual Members - CAN Override
+
+    /// <summary>
+    /// Cipher preference order (strongest to fastest). Override to customize.
+    /// </summary>
+    protected virtual IReadOnlyList<CipherPreference> CipherPreferences => new[]
+    {
+        new CipherPreference("Serpent-256-CTR-HMAC", 256, SecurityLevel: 10, PerformanceLevel: 3),
+        new CipherPreference("Twofish-256-CTR-HMAC", 256, SecurityLevel: 9, PerformanceLevel: 4),
+        new CipherPreference("AES-256-GCM", 256, SecurityLevel: 8, PerformanceLevel: 9),
+        new CipherPreference("ChaCha20-Poly1305", 256, SecurityLevel: 8, PerformanceLevel: 10),
+        new CipherPreference("AES-128-GCM", 128, SecurityLevel: 6, PerformanceLevel: 10),
+    };
+
+    /// <summary>
+    /// Minimum security level required for each data classification.
+    /// </summary>
+    protected virtual IReadOnlyDictionary<DataClassification, int> MinSecurityLevel => new Dictionary<DataClassification, int>
+    {
+        [DataClassification.Public] = 1,
+        [DataClassification.Internal] = 5,
+        [DataClassification.Confidential] = 7,
+        [DataClassification.Secret] = 8,
+        [DataClassification.TopSecret] = 10,
+    };
+
+    #endregion
+
+    #region Implementation
+
+    /// <inheritdoc/>
+    public async Task<TransitCipherConfig> NegotiateCipherAsync(
+        IEndpointCapabilities endpointCapabilities,
+        DataClassification dataClassification,
+        ITransitSecurityPolicy securityPolicy)
+    {
+        // Validate policy allows negotiation
+        if (!securityPolicy.AllowNegotiation)
+        {
+            // Policy enforces fixed cipher - return first allowed
+            var forcedCipher = securityPolicy.AllowedTransitCiphers.FirstOrDefault()
+                ?? throw new SecurityException("No allowed ciphers in policy");
+
+            return new TransitCipherConfig
+            {
+                AlgorithmId = forcedCipher,
+                KeySizeBits = GetKeySize(forcedCipher),
+                IsAead = IsAead(forcedCipher),
+                SelectionReason = "Policy enforced fixed cipher"
+            };
+        }
+
+        // Delegate to implementation
+        return await NegotiateCoreAsync(endpointCapabilities, dataClassification, securityPolicy);
+    }
+
+    /// <inheritdoc/>
+    public IReadOnlyList<string> GetCompatibleCiphers(
+        IEndpointCapabilities endpoint,
+        ITransitSecurityPolicy policy)
+    {
+        var endpointCiphers = endpoint.SupportedCiphers.ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var allowedCiphers = policy.AllowedTransitCiphers.Count > 0
+            ? policy.AllowedTransitCiphers
+            : CipherPreferences.Select(p => p.AlgorithmId);
+        var blockedCiphers = policy.BlockedCiphers.ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        return allowedCiphers
+            .Where(c => endpointCiphers.Contains(c))
+            .Where(c => !blockedCiphers.Contains(c))
+            .Where(c => GetKeySize(c) >= policy.MinimumTransitKeyBits)
+            .ToList();
+    }
+
+    protected int GetKeySize(string algorithm) => algorithm switch
+    {
+        var a when a.Contains("256") => 256,
+        var a when a.Contains("128") => 128,
+        var a when a.Contains("192") => 192,
+        _ => 256
+    };
+
+    protected bool IsAead(string algorithm) =>
+        algorithm.Contains("GCM") || algorithm.Contains("Poly1305") || algorithm.Contains("HMAC");
+
+    #endregion
+}
+
+/// <summary>
+/// Cipher preference with security and performance ratings.
+/// </summary>
+public record CipherPreference(
+    string AlgorithmId,
+    int KeySizeBits,
+    int SecurityLevel,    // 1-10 (10 = highest security)
+    int PerformanceLevel  // 1-10 (10 = fastest)
+);
+```
+
+#### T6.1.3: TranscryptionServicePluginBase
+
+```csharp
+/// <summary>
+/// Base class for transcryption service plugins.
+/// Handles secure cipher-to-cipher conversion in memory.
+/// </summary>
+public abstract class TranscryptionServicePluginBase : FeaturePluginBase, ITranscryptionService
+{
+    #region Dependencies
+
+    /// <summary>
+    /// Registry of available encryption plugins.
+    /// </summary>
+    protected IEncryptionPluginRegistry? EncryptionRegistry { get; private set; }
+
+    /// <inheritdoc/>
+    public override async Task<HandshakeResponse> OnHandshakeAsync(HandshakeRequest request)
+    {
+        var response = await base.OnHandshakeAsync(request);
+
+        // Discover encryption plugins
+        EncryptionRegistry = request.Context?.GetService<IEncryptionPluginRegistry>();
+
+        return response;
+    }
+
+    #endregion
+
+    #region Virtual Members - CAN Override
+
+    /// <summary>
+    /// Default chunk size for streaming transcryption.
+    /// </summary>
+    protected virtual int DefaultChunkSize => 1024 * 1024; // 1 MB
+
+    /// <summary>
+    /// Maximum plaintext to hold in memory at once.
+    /// </summary>
+    protected virtual long MaxMemoryBufferBytes => 100 * 1024 * 1024; // 100 MB
+
+    #endregion
+
+    #region Implementation
+
+    /// <inheritdoc/>
+    public async Task<Stream> TranscryptAsync(
+        Stream input,
+        TranscryptionSourceConfig sourceConfig,
+        TranscryptionDestinationConfig destinationConfig,
+        ISecurityContext context)
+    {
+        if (EncryptionRegistry == null)
+            throw new InvalidOperationException("Encryption registry not initialized");
+
+        // Get source and destination encryption plugins
+        var sourcePlugin = EncryptionRegistry.GetPlugin(sourceConfig.PluginId)
+            ?? throw new ArgumentException($"Unknown source plugin: {sourceConfig.PluginId}");
+        var destPlugin = EncryptionRegistry.GetPlugin(destinationConfig.PluginId)
+            ?? throw new ArgumentException($"Unknown destination plugin: {destinationConfig.PluginId}");
+
+        byte[]? plaintext = null;
+
+        try
+        {
+            // Step 1: Decrypt with source cipher
+            var decryptArgs = new Dictionary<string, object>
+            {
+                ["keyStore"] = sourceConfig.KeyStore,
+                ["securityContext"] = context,
+            };
+
+            if (sourceConfig.Metadata != null)
+                decryptArgs["metadata"] = sourceConfig.Metadata;
+
+            using var decryptedStream = await sourcePlugin.DecryptAsync(input, decryptArgs);
+            using var plaintextMs = new MemoryStream();
+            await decryptedStream.CopyToAsync(plaintextMs);
+            plaintext = plaintextMs.ToArray();
+
+            // Step 2: Encrypt with destination cipher
+            var encryptArgs = new Dictionary<string, object>
+            {
+                ["keyStore"] = destinationConfig.KeyStore,
+                ["securityContext"] = context,
+            };
+
+            if (destinationConfig.KeyId != null)
+                encryptArgs["keyId"] = destinationConfig.KeyId;
+
+            if (destinationConfig.KeyMode == KeyManagementMode.Envelope &&
+                destinationConfig.EnvelopeKeyStore != null)
+            {
+                encryptArgs["envelopeKeyStore"] = destinationConfig.EnvelopeKeyStore;
+                encryptArgs["keyManagementMode"] = KeyManagementMode.Envelope;
+            }
+
+            using var plaintextInput = new MemoryStream(plaintext);
+            return await destPlugin.EncryptAsync(plaintextInput, encryptArgs);
+        }
+        finally
+        {
+            // CRITICAL: Clear plaintext from memory immediately
+            if (plaintext != null)
+                CryptographicOperations.ZeroMemory(plaintext);
+        }
+    }
+
+    /// <inheritdoc/>
+    public async IAsyncEnumerable<TranscryptionChunk> TranscryptStreamingAsync(
+        Stream input,
+        TranscryptionSourceConfig sourceConfig,
+        TranscryptionDestinationConfig destinationConfig,
+        ISecurityContext context,
+        int chunkSizeBytes = 0)
+    {
+        if (chunkSizeBytes <= 0) chunkSizeBytes = DefaultChunkSize;
+
+        // For streaming, we need to use chunked encryption
+        // This is a simplified implementation - production would use proper AEAD chunking
+
+        int sequenceNumber = 0;
+        var buffer = new byte[chunkSizeBytes];
+        int bytesRead;
+
+        // First, decrypt the entire input (necessary for AEAD authentication)
+        // Then re-encrypt in chunks
+        using var transcrypted = await TranscryptAsync(input, sourceConfig, destinationConfig, context);
+
+        while ((bytesRead = await transcrypted.ReadAsync(buffer)) > 0)
+        {
+            var chunk = new byte[bytesRead];
+            Array.Copy(buffer, chunk, bytesRead);
+
+            yield return new TranscryptionChunk
+            {
+                SequenceNumber = sequenceNumber++,
+                Data = chunk,
+                IsFinal = transcrypted.Position >= transcrypted.Length
+            };
+        }
+
+        CryptographicOperations.ZeroMemory(buffer);
+    }
+
+    /// <inheritdoc/>
+    public Task<TranscryptionPerformanceEstimate> EstimatePerformanceAsync(
+        string sourceCipher,
+        string destinationCipher)
+    {
+        // Estimate based on cipher characteristics
+        var sourcePerf = EstimateCipherPerformance(sourceCipher);
+        var destPerf = EstimateCipherPerformance(destinationCipher);
+
+        // Transcryption throughput is limited by slower of decrypt/encrypt
+        var throughput = Math.Min(sourcePerf, destPerf);
+
+        return Task.FromResult(new TranscryptionPerformanceEstimate
+        {
+            SourceCipher = sourceCipher,
+            DestinationCipher = destinationCipher,
+            EstimatedThroughputMBps = throughput,
+            HardwareAccelerated = sourceCipher.Contains("AES") || destinationCipher.Contains("AES"),
+            RecommendedChunkSize = throughput > 500 ? 4 * 1024 * 1024 : 1024 * 1024
+        });
+    }
+
+    private double EstimateCipherPerformance(string cipher) => cipher switch
+    {
+        var c when c.Contains("ChaCha20") => 800,   // MB/s (software optimized)
+        var c when c.Contains("AES") => 1000,        // MB/s (with AES-NI)
+        var c when c.Contains("Serpent") => 200,     // MB/s (complex cipher)
+        var c when c.Contains("Twofish") => 250,     // MB/s (moderate complexity)
+        _ => 500
+    };
+
+    #endregion
+}
+```
+
+---
+
+### T6.2: Plugin Implementations
+
+| Task | Plugin | Base Class | Description | Status |
+|------|--------|------------|-------------|--------|
+| T6.2.1 | `DesktopEndpointCapabilitiesPlugin` | `EndpointCapabilitiesProviderPluginBase` | Detects capabilities of desktop endpoints (Windows, macOS, Linux) | [ ] |
+| T6.2.2 | `MobileEndpointCapabilitiesPlugin` | `EndpointCapabilitiesProviderPluginBase` | Detects capabilities of mobile endpoints (iOS, Android) | [ ] |
+| T6.2.3 | `IoTEndpointCapabilitiesPlugin` | `EndpointCapabilitiesProviderPluginBase` | Detects capabilities of IoT/embedded devices | [ ] |
+| T6.2.4 | `BrowserEndpointCapabilitiesPlugin` | `EndpointCapabilitiesProviderPluginBase` | Detects capabilities of browser-based clients (WebCrypto) | [ ] |
+| T6.2.5 | `DefaultCipherNegotiatorPlugin` | `CipherNegotiatorPluginBase` | Default negotiation: balance security vs performance | [ ] |
+| T6.2.6 | `SecurityFirstNegotiatorPlugin` | `CipherNegotiatorPluginBase` | Always prefer strongest cipher endpoint can handle | [ ] |
+| T6.2.7 | `PerformanceFirstNegotiatorPlugin` | `CipherNegotiatorPluginBase` | Prefer fastest cipher meeting minimum security | [ ] |
+| T6.2.8 | `PolicyDrivenNegotiatorPlugin` | `CipherNegotiatorPluginBase` | Negotiation based on data classification policies | [ ] |
+| T6.2.9 | `DefaultTranscryptionPlugin` | `TranscryptionServicePluginBase` | Default in-memory transcryption service | [ ] |
+| T6.2.10 | `StreamingTranscryptionPlugin` | `TranscryptionServicePluginBase` | Optimized for large files with chunked processing | [ ] |
+
+---
+
+### T6.3: Transit Security Policies
+
+| Task | Policy | Description | Status |
+|------|--------|-------------|--------|
+| T6.3.1 | `DefaultTransitPolicy` | Standard policy: AES-256-GCM or ChaCha20-Poly1305, negotiation allowed | [ ] |
+| T6.3.2 | `GovernmentTransitPolicy` | FIPS-only ciphers, minimum 256-bit, no negotiation below Secret classification | [ ] |
+| T6.3.3 | `HighPerformanceTransitPolicy` | Prefer ChaCha20, allow 128-bit for Public data | [ ] |
+| T6.3.4 | `MaximumSecurityTransitPolicy` | End-to-end only, no transcryption, Serpent/Twofish only | [ ] |
+| T6.3.5 | `MobileOptimizedPolicy` | Prefer ChaCha20 (no AES-NI on mobile), reduced KDF iterations | [ ] |
+
+---
+
+### T6.4: Configuration & Integration
+
+```csharp
+/// <summary>
+/// Top-level configuration for transit encryption behavior.
+/// Added to DataWarehouse global configuration.
+/// </summary>
+public class TransitEncryptionConfiguration
+{
+    /// <summary>
+    /// How encryption layers are applied.
+    /// </summary>
+    public EncryptionLayer EncryptionLayer { get; set; } = EncryptionLayer.AtRestAndTransit;
+
+    /// <summary>
+    /// How transit cipher is selected.
+    /// </summary>
+    public TransitCipherSelectionMode TransitCipherSelection { get; set; } = TransitCipherSelectionMode.AutoNegotiate;
+
+    /// <summary>
+    /// Explicit transit cipher (when TransitCipherSelection = Explicit).
+    /// </summary>
+    public string? ExplicitTransitCipher { get; set; }
+
+    /// <summary>
+    /// Security policy ID for transit encryption.
+    /// </summary>
+    public string TransitPolicyId { get; set; } = "default";
+
+    /// <summary>
+    /// Whether to cache endpoint capabilities.
+    /// </summary>
+    public bool CacheEndpointCapabilities { get; set; } = true;
+
+    /// <summary>
+    /// Endpoint capabilities cache duration.
+    /// </summary>
+    public TimeSpan CapabilitiesCacheDuration { get; set; } = TimeSpan.FromHours(1);
+
+    /// <summary>
+    /// Whether to log cipher negotiation decisions.
+    /// </summary>
+    public bool LogNegotiationDecisions { get; set; } = true;
+
+    /// <summary>
+    /// Whether to include performance metrics in transit metadata.
+    /// </summary>
+    public bool IncludePerformanceMetrics { get; set; } = false;
+}
+```
+
+---
+
+### T6.5: Summary Table
+
+| Task | Component | Type | Description | Dependencies | Status |
+|------|-----------|------|-------------|--------------|--------|
+| T6.0.1 | SDK Interfaces | Interface | Core transit encryption interfaces | None | [ ] |
+| T6.0.2 | Transcryption Interface | Interface | Secure cipher-to-cipher conversion | T6.0.1 | [ ] |
+| T6.0.3 | Transit Stage Interface | Interface | Pipeline stage for transit handling | T6.0.1, T6.0.2 | [ ] |
+| T6.1.1 | `EndpointCapabilitiesProviderPluginBase` | Abstract Base | Detect endpoint crypto capabilities | T6.0.1 | [ ] |
+| T6.1.2 | `CipherNegotiatorPluginBase` | Abstract Base | Select optimal transit cipher | T6.0.1 | [ ] |
+| T6.1.3 | `TranscryptionServicePluginBase` | Abstract Base | In-memory cipher conversion | T6.0.2 | [ ] |
+| T6.2.1-4 | Endpoint Capability Plugins | Plugin | Platform-specific detection | T6.1.1 | [ ] |
+| T6.2.5-8 | Cipher Negotiator Plugins | Plugin | Different negotiation strategies | T6.1.2 | [ ] |
+| T6.2.9-10 | Transcryption Plugins | Plugin | Default and streaming transcryption | T6.1.3 | [ ] |
+| T6.3.1-5 | Transit Policies | Config | Pre-built security policies | T6.0.1 | [ ] |
+| T6.4 | Configuration | Config | Global transit encryption settings | All | [ ] |
+
+---
+
+### T6.6: Architecture Diagram
+
+```
+                                    CLIENT                                                            SERVER
+┌─────────────────────────────────────────────────────────────────────┐    ┌─────────────────────────────────────────────────────────────────────┐
+│                                                                      │    │                                                                      │
+│   ┌─────────────┐    ┌──────────────────┐    ┌─────────────────┐   │    │   ┌─────────────────┐    ┌──────────────────┐    ┌─────────────┐   │
+│   │  User Data  │───▶│  Transit Encrypt │───▶│    NETWORK      │═══════▶│   Transit Decrypt │───▶│   Transcryption  │───▶│   Storage   │   │
+│   │  (plaintext)│    │  (ChaCha20)      │    │  (encrypted)    │   │    │   (ChaCha20)      │    │  ChaCha20→Serpent│    │  (Serpent)  │   │
+│   └─────────────┘    └──────────────────┘    └─────────────────┘   │    │   └─────────────────┘    └──────────────────┘    └─────────────┘   │
+│          ▲                    │                                     │    │                                   │                    │            │
+│          │            ┌───────┴───────┐                            │    │                           ┌───────┴───────┐            │            │
+│          │            │ Capabilities  │                            │    │                           │   Security    │            │            │
+│          │            │ Negotiation   │                            │    │                           │   Policy      │            ▼            │
+│          │            └───────────────┘                            │    │                           └───────────────┘    ┌─────────────┐   │
+│          │                                                         │    │                                               │ Encrypted   │   │
+│   ┌──────┴──────┐                                                  │    │                                               │ at Rest     │   │
+│   │ Endpoint    │                                                  │    │                                               │ (Serpent)   │   │
+│   │ Capabilities│                                                  │    │                                               └─────────────┘   │
+│   │ Provider    │                                                  │    │                                                                  │
+│   └─────────────┘                                                  │    │                                                                  │
+│                                                                      │    │                                                                  │
+│   Mobile: ChaCha20-Poly1305 (no AES-NI, optimized for ARM)          │    │   Storage: Serpent-256-CTR-HMAC (maximum security)              │
+│   Desktop: AES-256-GCM (AES-NI available)                           │    │                                                                  │
+│   IoT: ChaCha20-Poly1305 (limited resources)                        │    │                                                                  │
+│                                                                      │    │                                                                  │
+└─────────────────────────────────────────────────────────────────────┘    └─────────────────────────────────────────────────────────────────────┘
+
+KEY POINTS:
+• Data is ALWAYS encrypted - never exposed on network or disk
+• Transit cipher adapts to endpoint capabilities (ChaCha20 for mobile, AES for desktop)
+• Storage cipher is always the strongest (Serpent/Twofish for gov/mil, AES for enterprise)
+• Transcryption happens in server memory - plaintext never touches disk
+• End-to-end mode available when same cipher must be used throughout
+```
+
+---
+
+#### Phase T7: Testing & Documentation (Priority: HIGH)
+| Task | Description | Dependencies | Status |
+|------|-------------|--------------|--------|
+| T6.1 | Unit tests for integrity provider | T1.2 | [ ] |
+| T6.2 | Unit tests for blockchain provider | T1.4 | [ ] |
+| T6.3 | Unit tests for WORM provider | T1.6 | [ ] |
+| T6.4 | Unit tests for access log provider | T1.8 | [ ] |
+| T6.5 | Integration tests for write pipeline | T2.8 | [ ] |
+| T6.6 | Integration tests for read pipeline | T3.6 | [ ] |
+| T6.7 | Integration tests for tamper detection + attribution | T3.9 | [ ] |
+| T6.8 | Integration tests for recovery scenarios | T4.4 | [ ] |
+| T6.9 | Integration tests for correction workflow | T4.5 | [ ] |
+| T6.10 | Integration tests for degradation state transitions | T4.8 | [ ] |
+| T6.11 | Integration tests for hardware WORM providers | T4.11 | [ ] |
+| T6.12 | Performance benchmarks | T4.* | [ ] |
+| T6.13 | XML documentation for all public APIs | T4.* | [ ] |
+| T6.14 | Update CLAUDE.md with tamper-proof documentation | T6.13 | [ ] |
+
+---
+
+### File Structure
+
+```
+DataWarehouse.SDK/
+├── Contracts/
+│   ├── TamperProof/
+│   │   ├── ITamperProofProvider.cs
+│   │   ├── IIntegrityProvider.cs
+│   │   ├── IBlockchainProvider.cs
+│   │   ├── IWormStorageProvider.cs
+│   │   ├── IAccessLogProvider.cs
+│   │   ├── TamperProofConfiguration.cs
+│   │   ├── TamperProofManifest.cs
+│   │   ├── WriteContext.cs
+│   │   ├── AccessLogEntry.cs
+│   │   ├── TamperIncidentReport.cs
+│   │   └── TamperProofEnums.cs
+│   └── PluginBases/
+│       ├── TamperProofProviderPluginBase.cs
+│       ├── IntegrityProviderPluginBase.cs
+│       ├── BlockchainProviderPluginBase.cs
+│       ├── WormStorageProviderPluginBase.cs
+│       └── AccessLogProviderPluginBase.cs
+
+Plugins/
+├── DataWarehouse.Plugins.TamperProof/
+│   ├── TamperProofPlugin.cs (main orchestrator)
+│   ├── Pipeline/
+│   │   ├── WritePhase1Handler.cs
+│   │   ├── WritePhase2Handler.cs
+│   │   ├── WritePhase3Handler.cs
+│   │   ├── WritePhase4Handler.cs
+│   │   ├── WritePhase5Handler.cs
+│   │   ├── ReadPhase1Handler.cs
+│   │   ├── ReadPhase2Handler.cs
+│   │   ├── ReadPhase3Handler.cs
+│   │   ├── ReadPhase4Handler.cs
+│   │   └── ReadPhase5Handler.cs
+│   ├── Attribution/
+│   │   └── TamperAttributionAnalyzer.cs
+│   └── DataWarehouse.Plugins.TamperProof.csproj
+│
+│   # Integrity Providers (T1, T4.16-T4.20)
+├── DataWarehouse.Plugins.Integrity/
+│   ├── DefaultIntegrityPlugin.cs (SHA-256/384/512, Blake3)
+│   └── DataWarehouse.Plugins.Integrity.csproj
+├── DataWarehouse.Plugins.Integrity.Sha3/
+│   ├── Sha3IntegrityPlugin.cs (SHA3-256/384/512 - NIST standard)
+│   └── DataWarehouse.Plugins.Integrity.Sha3.csproj
+├── DataWarehouse.Plugins.Integrity.Keccak/
+│   ├── KeccakIntegrityPlugin.cs (Keccak-256/384/512 - original pre-NIST)
+│   └── DataWarehouse.Plugins.Integrity.Keccak.csproj
+├── DataWarehouse.Plugins.Integrity.Hmac/
+│   ├── HmacIntegrityPlugin.cs (HMAC-SHA256/384/512, HMAC-SHA3-256/384/512)
+│   └── DataWarehouse.Plugins.Integrity.Hmac.csproj
+├── DataWarehouse.Plugins.Integrity.Salted/
+│   ├── SaltedHashIntegrityPlugin.cs (Salted-SHA256/512, Salted-SHA3, Salted-Blake3)
+│   └── DataWarehouse.Plugins.Integrity.Salted.csproj
+├── DataWarehouse.Plugins.Integrity.SaltedHmac/
+│   ├── SaltedHmacIntegrityPlugin.cs (Salted-HMAC-SHA256/512, Salted-HMAC-SHA3)
+│   └── DataWarehouse.Plugins.Integrity.SaltedHmac.csproj
+│
+│   # Blockchain Providers (T1, T4.9)
+├── DataWarehouse.Plugins.Blockchain.Local/
+│   ├── LocalBlockchainPlugin.cs
+│   └── DataWarehouse.Plugins.Blockchain.Local.csproj
+├── DataWarehouse.Plugins.Blockchain.Raft/
+│   ├── RaftBlockchainPlugin.cs (consensus mode)
+│   └── DataWarehouse.Plugins.Blockchain.Raft.csproj
+│
+│   # WORM Providers (T1, T4.10-T4.11, T5.5)
+├── DataWarehouse.Plugins.Worm.Software/
+│   ├── SoftwareWormPlugin.cs
+│   └── DataWarehouse.Plugins.Worm.Software.csproj
+├── DataWarehouse.Plugins.Worm.S3ObjectLock/
+│   ├── S3ObjectLockWormPlugin.cs (AWS hardware WORM)
+│   └── DataWarehouse.Plugins.Worm.S3ObjectLock.csproj
+├── DataWarehouse.Plugins.Worm.AzureImmutable/
+│   ├── AzureImmutableWormPlugin.cs (Azure hardware WORM)
+│   └── DataWarehouse.Plugins.Worm.AzureImmutable.csproj
+├── DataWarehouse.Plugins.Worm.GeoDispersed/
+│   ├── GeoWormPlugin.cs (multi-region WORM)
+│   └── DataWarehouse.Plugins.Worm.GeoDispersed.csproj
+│
+│   # Access Logging (T1)
+├── DataWarehouse.Plugins.AccessLog/
+│   ├── DefaultAccessLogPlugin.cs
+│   └── DataWarehouse.Plugins.AccessLog.csproj
+│
+│   # Envelope Key Management - HSM Providers (T5.1.4-T5.1.7)
+│   # Note: These ADD envelope mode to existing AesEncryptionPlugin - no separate encryption plugin needed
+├── DataWarehouse.SDK/Security/
+│   ├── IKeyProvider.cs (Direct vs Envelope key management abstraction)
+│   ├── DirectKeyProvider.cs (existing behavior - key from IKeyStore)
+│   ├── EnvelopeKeyProvider.cs (DEK + HSM wrapping)
+│   └── IHsmProvider.cs (HSM abstraction interface)
+├── DataWarehouse.Plugins.Hsm.AwsKms/
+│   ├── AwsKmsHsmProvider.cs (AWS KMS integration)
+│   └── DataWarehouse.Plugins.Hsm.AwsKms.csproj
+├── DataWarehouse.Plugins.Hsm.AzureKeyVault/
+│   ├── AzureKeyVaultHsmProvider.cs (Azure Key Vault integration)
+│   └── DataWarehouse.Plugins.Hsm.AzureKeyVault.csproj
+├── DataWarehouse.Plugins.Hsm.HashiCorpVault/
+│   ├── HashiCorpVaultHsmProvider.cs (HashiCorp Vault integration)
+│   └── DataWarehouse.Plugins.Hsm.HashiCorpVault.csproj
+│
+│   # Post-Quantum Encryption (T5.2)
+├── DataWarehouse.Plugins.Encryption.Kyber/
+│   ├── KyberEncryptionPlugin.cs (post-quantum NIST PQC ML-KEM)
+│   └── DataWarehouse.Plugins.Encryption.Kyber.csproj
+│
+│   # Additional Compression Algorithms (T4.21-T4.23)
+├── DataWarehouse.Plugins.Compression.Rle/
+│   ├── RleCompressionPlugin.cs (Run-Length Encoding)
+│   └── DataWarehouse.Plugins.Compression.Rle.csproj
+├── DataWarehouse.Plugins.Compression.Huffman/
+│   ├── HuffmanCompressionPlugin.cs (Huffman coding)
+│   └── DataWarehouse.Plugins.Compression.Huffman.csproj
+├── DataWarehouse.Plugins.Compression.Lzw/
+│   ├── LzwCompressionPlugin.cs (Lempel-Ziv-Welch)
+│   └── DataWarehouse.Plugins.Compression.Lzw.csproj
+├── DataWarehouse.Plugins.Compression.Bzip2/
+│   ├── Bzip2CompressionPlugin.cs (Burrows-Wheeler + Huffman)
+│   └── DataWarehouse.Plugins.Compression.Bzip2.csproj
+├── DataWarehouse.Plugins.Compression.Lzma/
+│   ├── LzmaCompressionPlugin.cs (LZMA/LZMA2, 7-Zip)
+│   └── DataWarehouse.Plugins.Compression.Lzma.csproj
+├── DataWarehouse.Plugins.Compression.Snappy/
+│   ├── SnappyCompressionPlugin.cs (Google, speed-optimized)
+│   └── DataWarehouse.Plugins.Compression.Snappy.csproj
+├── DataWarehouse.Plugins.Compression.Ppm/
+│   ├── PpmCompressionPlugin.cs (Prediction by Partial Matching)
+│   └── DataWarehouse.Plugins.Compression.Ppm.csproj
+├── DataWarehouse.Plugins.Compression.Nncp/
+│   ├── NncpCompressionPlugin.cs (Neural Network Compression)
+│   └── DataWarehouse.Plugins.Compression.Nncp.csproj
+├── DataWarehouse.Plugins.Compression.Schumacher/
+│   ├── SchumacherCompressionPlugin.cs (Schumacher algorithm)
+│   └── DataWarehouse.Plugins.Compression.Schumacher.csproj
+│
+│   # Additional Encryption Algorithms (T4.24-T4.29)
+├── DataWarehouse.Plugins.Encryption.Educational/
+│   ├── CaesarCipherPlugin.cs (Caesar/ROT13, educational)
+│   ├── XorCipherPlugin.cs (XOR cipher, educational)
+│   ├── VigenereCipherPlugin.cs (Vigenère cipher, educational)
+│   └── DataWarehouse.Plugins.Encryption.Educational.csproj
+├── DataWarehouse.Plugins.Encryption.Legacy/
+│   ├── DesEncryptionPlugin.cs (DES, legacy compatibility)
+│   ├── TripleDesEncryptionPlugin.cs (3DES, legacy)
+│   ├── Rc4EncryptionPlugin.cs (RC4/WEP, legacy)
+│   ├── BlowfishEncryptionPlugin.cs (Blowfish, legacy)
+│   └── DataWarehouse.Plugins.Encryption.Legacy.csproj
+├── DataWarehouse.Plugins.Encryption.AesVariants/
+│   ├── Aes128GcmPlugin.cs (AES-128-GCM)
+│   ├── Aes192GcmPlugin.cs (AES-192-GCM)
+│   ├── Aes256CbcPlugin.cs (AES-256-CBC)
+│   ├── Aes256CtrPlugin.cs (AES-256-CTR)
+│   ├── AesNiDetector.cs (Hardware acceleration)
+│   └── DataWarehouse.Plugins.Encryption.AesVariants.csproj
+├── DataWarehouse.Plugins.Encryption.Asymmetric/
+│   ├── Rsa2048Plugin.cs (RSA-2048)
+│   ├── Rsa4096Plugin.cs (RSA-4096)
+│   ├── EcdhPlugin.cs (Elliptic Curve Diffie-Hellman)
+│   └── DataWarehouse.Plugins.Encryption.Asymmetric.csproj
+├── DataWarehouse.Plugins.Encryption.PostQuantum/
+│   ├── MlKemPlugin.cs (ML-KEM/Kyber)
+│   ├── MlDsaPlugin.cs (ML-DSA/Dilithium)
+│   └── DataWarehouse.Plugins.Encryption.PostQuantum.csproj
+├── DataWarehouse.Plugins.Encryption.Special/
+│   ├── OneTimePadPlugin.cs (OTP, perfect secrecy)
+│   ├── XtsAesPlugin.cs (XTS-AES disk encryption)
+│   └── DataWarehouse.Plugins.Encryption.Special.csproj
+│
+│   # Ultra Paranoid Padding/Obfuscation (T5.3)
+├── DataWarehouse.Plugins.Padding.Chaff/
+│   ├── ChaffPaddingPlugin.cs (traffic analysis protection)
+│   └── DataWarehouse.Plugins.Padding.Chaff.csproj
+│
+│   # Ultra Paranoid Key Management (T5.4)
+├── DataWarehouse.Plugins.KeyManagement.Shamir/
+│   ├── ShamirSecretPlugin.cs (M-of-N key splitting)
+│   └── DataWarehouse.Plugins.KeyManagement.Shamir.csproj
+│
+│   # Geo-Dispersed Distribution (T5.6)
+├── DataWarehouse.Plugins.GeoDistributedSharding/
+│   ├── GeoDistributedShardingPlugin.cs (shards across continents)
+│   └── DataWarehouse.Plugins.GeoDistributedSharding.csproj
+│
+│   # Ultra Paranoid Compression (T5.7-T5.9) - Extreme ratios
+├── DataWarehouse.Plugins.Compression.Paq/
+│   ├── PaqCompressionPlugin.cs (PAQ8/PAQ9 extreme compression)
+│   └── DataWarehouse.Plugins.Compression.Paq.csproj
+├── DataWarehouse.Plugins.Compression.Zpaq/
+│   ├── ZpaqCompressionPlugin.cs (ZPAQ journaling archiver)
+│   └── DataWarehouse.Plugins.Compression.Zpaq.csproj
+├── DataWarehouse.Plugins.Compression.Cmix/
+│   ├── CmixCompressionPlugin.cs (context-mixing compressor)
+│   └── DataWarehouse.Plugins.Compression.Cmix.csproj
+│
+│   # Database Encryption Integration (T5.10-T5.11)
+├── DataWarehouse.Plugins.DatabaseEncryption.Tde/
+│   ├── SqlTdeMetadataPlugin.cs (SQL Server/Oracle/PostgreSQL TDE)
+│   └── DataWarehouse.Plugins.DatabaseEncryption.Tde.csproj
+└── DataWarehouse.Plugins.DatabaseEncryption.KeyManagement/
+    ├── DatabaseEncryptionKeyPlugin.cs (DEK/KEK management)
+    └── DataWarehouse.Plugins.DatabaseEncryption.KeyManagement.csproj
+```
+
+---
+
+### Security Level Quick Reference
+
+| Level | Integrity | Blockchain | WORM | Encryption | Padding | Use Case |
+|-------|-----------|------------|------|------------|---------|----------|
+| `Minimal` | SHA-256 | None | None | None | None | Development/testing only |
+| `Basic` | SHA-256 | Local (file) | Software | AES-256 | None | Small business, non-regulated |
+| `Standard` | SHA-384 | Local (file) | Software | AES-256-GCM | Content | General enterprise |
+| `Enhanced` | SHA-512 | Raft consensus | Software | AES-256-GCM | Content+Shard | Regulated industries |
+| `High` | Blake3 | Raft + external anchor | Hardware (S3/Azure) | Envelope | Full | Financial, healthcare |
+| `Maximum` | Blake3+HMAC | Raft + public blockchain | Hardware + geo-replicated | Kyber+AES | Full+Chaff | Government, military |
+
+---
+
+### Key Design Decisions
+
+#### 1. Blockchain Batching Strategy
+- **Single-object mode:** Immediate anchor after each write (highest integrity, higher latency)
+- **Batch mode:** Collect N objects or wait T seconds, then anchor with Merkle root (better throughput)
+- **Raft consensus mode:** Anchor must be confirmed by majority of nodes before success
+- **External anchor mode:** Periodically anchor Merkle root to public blockchain (Bitcoin, Ethereum)
+
+#### 2. WORM Implementation Choices
+
+**WORM Wraps ANY Storage Provider:**
+The WORM layer is a wrapper that can be applied to any `IStorageProvider`. This allows users to choose their preferred storage backend while adding immutability guarantees on top.
+
+```
+┌─────────────────────────────────────────────┐
+│           WORM Wrapper Layer                │
+│  (Software immutability OR Hardware detect) │
+├─────────────────────────────────────────────┤
+│         ANY IStorageProvider                │
+│  (S3, Azure, Local, MinIO, GCS, etc.)       │
+└─────────────────────────────────────────────┘
+```
+
+| Type | Provider | Bypass Possible | Use Case |
+|------|----------|-----------------|----------|
+| Software | `SoftwareWormPlugin` | Admin override (logged) | Development, testing, small deployments |
+| S3 Object Lock | `S3ObjectLockWormPlugin` | Not possible (AWS enforced) | AWS-hosted production |
+| Azure Immutable | `AzureImmutableBlobWormPlugin` | Not possible (Azure enforced) | Azure-hosted production |
+| Geo-WORM | `GeoWormPlugin` | Requires multiple region compromise | Maximum security |
+
+#### 2b. Blockchain Consensus Modes
+
+| Mode | Writers | Consensus | Latency | Use Case |
+|------|---------|-----------|---------|----------|
+| `SingleWriter` | 1 | None (local file) | Lowest | Single-node, development, small deployments |
+| `RaftConsensus` | N (odd) | Majority required | Medium | Multi-node production, HA requirements |
+| `ExternalAnchor` | N/A | Public blockchain | Highest | Maximum auditability, legal requirements |
+
+#### 3. Correction Flow (Append-Only)
+```
+Original Data (v1) → Hash₁ → Blockchain₁
+                              │
+Correction Request ──────────►│
+                              ▼
+New Data (v2) → Hash₂ → Blockchain₂ (includes reference to v1)
+                              │
+                              ▼
+v1 marked as "superseded" but NEVER deleted
+Both v1 and v2 remain in WORM forever
+```
+
+#### 4. Transactional Write Strategy with WORM Orphan Handling
+```
+BEGIN TRANSACTION
+  ├─ Write to Data Instance (shards)
+  ├─ Write to Metadata Instance (manifest)
+  ├─ Write to WORM Instance (full blob) ← Cannot rollback!
+  └─ Queue blockchain anchor
+
+IF ANY STEP FAILS:
+  ├─ Rollback Data Instance
+  ├─ Rollback Metadata Instance
+  ├─ WORM: Mark as orphan (cannot delete)
+  │   └─ Orphan record: { guid, timestamp, reason: "tx_rollback" }
+  └─ Cancel blockchain anchor
+
+Orphan cleanup: Background process can mark orphans for eventual compliance expiry
+```
+
+---
+
+### Storage Tier Configuration
+
+Users configure storage instances independently. Each instance can use any compatible storage provider:
+
+| Instance | Purpose | Required | Example Configurations |
+|----------|---------|----------|------------------------|
+| `data` | Live RAID shards | Yes | LocalStorage, S3, Azure Blob, MinIO |
+| `metadata` | Manifests, indexes | Yes | Same as data, or dedicated fast storage |
+| `worm` | Immutable backup | Recommended | S3 Object Lock, Azure Immutable, Software WORM |
+| `blockchain` | Anchor records | Recommended | Local file, Raft cluster, external chain |
+
+**Configuration Example:**
+```csharp
+var config = new TamperProofConfiguration
+{
+    // Storage instance configuration (user chooses ANY provider)
+    StorageInstances = new Dictionary<string, string>
+    {
+        ["data"] = "s3://my-bucket/data/",
+        ["metadata"] = "s3://my-bucket/metadata/",
+        ["worm"] = "s3://my-worm-bucket/?objectLock=true",  // WORM wraps S3
+        ["blockchain"] = "local://./blockchain/"
+    },
+
+    // Core settings (locked after seal)
+    SecurityLevel = SecurityLevel.Enhanced,
+    RaidConfiguration = RaidConfiguration.Raid6(dataShards: 8, parityShards: 2),
+    HashAlgorithm = HashAlgorithmType.SHA512,
+
+    // Blockchain consensus mode
+    BlockchainMode = BlockchainMode.RaftConsensus,  // or SingleWriter, ExternalAnchor
+    BlockchainBatchSize = 100,        // Batch N objects before anchoring
+    BlockchainBatchTimeout = TimeSpan.FromSeconds(30),  // Or anchor after T seconds
+
+    // WORM configuration
+    WormMode = WormMode.HardwareIntegrated,  // or SoftwareEnforced
+    WormProvider = "s3-object-lock",  // Wraps any IStorageProvider
+
+    // Padding configuration (user-configurable)
+    ContentPaddingMode = ContentPaddingMode.SecureRandom,  // or None, Chaff, FixedSize
+    ContentPaddingBlockSize = 4096,   // For FixedSize mode
+    ShardPaddingMode = ShardPaddingMode.UniformSize,  // or None, FixedBlock
+
+    // Recovery behavior (configurable always, even after seal)
+    RecoveryBehavior = TamperRecoveryBehavior.AutoRecoverWithReport,
+    DefaultReadMode = ReadMode.Verified,  // Fast, Verified, Audit
+
+    // Transactional write settings
+    WriteTransactionTimeout = TimeSpan.FromMinutes(5),
+    WriteRetryCount = 3
+};
+```
+
+---
+
+### Content Padding vs Shard Padding
+
+| Type | When Applied | Covered by Hash | Purpose |
+|------|--------------|-----------------|---------|
+| **Content Padding** | Phase 1 (user transformations) | Yes | Hides true data size from observers |
+| **Shard Padding** | Phase 3 (RAID distribution) | No (shard-level only) | Uniform shard sizes for RAID efficiency |
+
+**Content Padding Modes (User-Configurable):**
+| Mode | Description | Security Level |
+|------|-------------|----------------|
+| `None` | No padding applied | Low (size visible) |
+| `SecureRandom` | Cryptographically secure random bytes | High |
+| `Chaff` | Plausible-looking dummy data (structured noise) | Maximum (traffic analysis resistant) |
+| `FixedSize` | Pad to fixed block boundary (4KB, 64KB, etc.) | Medium |
+
+**Shard Padding Modes:**
+| Mode | Description | Storage Overhead |
+|------|-------------|------------------|
+| `None` | Variable shard sizes (last shard smaller) | Minimal |
+| `UniformSize` | Pad final shard to match largest | Low |
+| `FixedBlock` | Pad all shards to configured boundary | Configurable |
+
+**Content Padding:** User-configurable, applied before integrity hash. Adds random bytes to obscure actual data length. Useful when data size itself is sensitive information.
+
+**Shard Padding:** System-applied, after integrity hash. Pads final shard to match others for uniform RAID stripe size. Not security-relevant, purely for storage efficiency.
+
+---
+
+### Tamper Attribution
+
+When tampering is detected, the system analyzes access logs to attribute responsibility:
+
+| Scenario | Attribution Confidence | Evidence |
+|----------|------------------------|----------|
+| Single accessor in window | High | Only one principal touched the data |
+| Multiple accessors | Medium | List of suspects provided |
+| No logged access | External/Physical | Indicates bypass of normal access paths |
+| Access log also tampered | Very Low | Sophisticated attack, forensic investigation needed |
+
+Attribution data is included in `TamperIncidentReport` for compliance and incident response.
+
+---
+
+### Mandatory Write Comments
+
+Like git commits, every write operation requires metadata:
+
+```csharp
+var context = new WriteContext
+{
+    Author = "john.doe@company.com",      // Required: Principal performing write
+    Comment = "Q4 2025 financial report", // Required: Human-readable description
+    SessionId = Guid.NewGuid(),           // Optional: Correlate related writes
+    ClientIp = "192.168.1.100",           // Auto-captured: Client IP address
+    Timestamp = DateTimeOffset.UtcNow     // Auto-set: UTC timestamp
+};
+
+await tamperProof.SecureWriteAsync(objectId, data, context, cancellationToken);
+```
+
+This creates a complete audit trail for every change, enabling compliance reporting and forensic investigation.
+
+---
+
+### Security Considerations
+
+1. **Write Comment Validation**: All write operations MUST include non-empty `Author` and `Comment` fields. Empty or whitespace-only values are rejected.
+
+2. **Access Logging**: Every operation (read, write, correct, admin) is logged with principal, timestamp, client IP, and session ID for attribution.
+
+3. **Tamper Attribution Analysis**:
+   - Compare tampering detection time with access log history
+   - Look for write operations in time window before detection
+   - If only one principal accessed during window → high confidence attribution
+   - If multiple principals → list all as suspects
+   - If no logged access → indicates external/physical tampering
+
+4. **Seal Mechanism**: Structural configuration (storage instances, RAID config, hash algorithm) becomes immutable after first write. Only behavioral settings (recovery behavior, read mode) can change.
+
+5. **WORM Integrity**: WORM storage is the ultimate source of truth. Software WORM can be bypassed by admins (logged); hardware WORM (S3 Object Lock) cannot.
+
+6. **Blockchain Immutability**: Each anchor includes previous block hash, creating tamper-evident chain. Batch anchoring uses Merkle trees for efficiency.
+
+---
+
+*Section added: 2026-01-29*
+*Author: Claude AI*
 
 ---
 

@@ -2,7 +2,6 @@ using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Primitives;
 using DataWarehouse.SDK.Security;
 using DataWarehouse.SDK.Utilities;
-using System.Collections.Concurrent;
 using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using System.Text;
@@ -33,25 +32,20 @@ namespace DataWarehouse.Plugins.FileKeyStore
     /// - keystore.file.list: List all key IDs
     /// - keystore.file.configure: Configure key store settings
     /// </summary>
-    public sealed class FileKeyStorePlugin : SecurityProviderPluginBase, IKeyStore, IPlugin
+    public sealed class FileKeyStorePlugin : KeyStorePluginBase
     {
         private readonly FileKeyStoreConfig _config;
-        private readonly ConcurrentDictionary<string, CachedKey> _keyCache;
-        private readonly SemaphoreSlim _lock = new(1, 1);
         private readonly IKeyProtectionTier[] _tiers;
-
-        private string _currentKeyId = string.Empty;
-        private bool _initialized;
 
         public override string Id => "datawarehouse.plugins.keystore.file";
         public override string Name => "File-based KeyStore";
         public override string Version => "1.0.0";
 
+        protected override string KeyStoreType => "File";
+
         public FileKeyStorePlugin(FileKeyStoreConfig? config = null)
         {
             _config = config ?? new FileKeyStoreConfig();
-            _keyCache = new ConcurrentDictionary<string, CachedKey>();
-
             _tiers = InitializeTiers();
         }
 
@@ -71,12 +65,78 @@ namespace DataWarehouse.Plugins.FileKeyStore
             return tiers.ToArray();
         }
 
+        #region Configuration Overrides
+
+        protected override TimeSpan CacheExpiration => _config.CacheExpiration;
+        protected override int KeySizeBytes => _config.KeySizeBytes;
+        protected override bool RequireAuthentication => _config.RequireAuthentication;
+        protected override bool RequireAdminForCreate => _config.RequireAdminForCreate;
+
+        #endregion
+
+        #region Abstract Method Implementations
+
+        protected override async Task InitializeStorageAsync()
+        {
+            Directory.CreateDirectory(_config.KeyStorePath);
+
+            var metadataPath = Path.Combine(_config.KeyStorePath, "keystore.meta");
+            if (File.Exists(metadataPath))
+            {
+                var metadata = await LoadMetadataAsync();
+                CurrentKeyId = metadata.CurrentKeyId;
+            }
+            else
+            {
+                CurrentKeyId = Guid.NewGuid().ToString("N");
+                var key = RandomNumberGenerator.GetBytes(_config.KeySizeBytes);
+                await SaveKeyToStorageAsync(CurrentKeyId, key);
+                await SaveMetadataAsync();
+            }
+        }
+
+        protected override async Task<byte[]?> LoadKeyFromStorageAsync(string keyId)
+        {
+            var keyPath = GetKeyPath(keyId);
+            if (!File.Exists(keyPath))
+                return null;
+
+            var encryptedData = await File.ReadAllBytesAsync(keyPath);
+
+            foreach (var tier in _tiers.Where(t => t.IsAvailable))
+            {
+                try
+                {
+                    return tier.Decrypt(encryptedData);
+                }
+                catch
+                {
+                    continue;
+                }
+            }
+
+            throw new CryptographicException("Unable to decrypt key with any available protection tier");
+        }
+
+        protected override async Task SaveKeyToStorageAsync(string keyId, byte[] key)
+        {
+            var tier = _tiers.FirstOrDefault(t => t.IsAvailable)
+                ?? throw new InvalidOperationException("No key protection tier available");
+
+            var encryptedData = tier.Encrypt(key);
+            var keyPath = GetKeyPath(keyId);
+
+            await File.WriteAllBytesAsync(keyPath, encryptedData);
+        }
+
+        #endregion
+
+        #region Plugin Lifecycle
+
         public override async Task<HandshakeResponse> OnHandshakeAsync(HandshakeRequest request)
         {
             var response = await base.OnHandshakeAsync(request);
-
-            await InitializeAsync();
-
+            await EnsureInitializedAsync();
             return response;
         }
 
@@ -131,184 +191,9 @@ namespace DataWarehouse.Plugins.FileKeyStore
             }
         }
 
-        public async Task<string> GetCurrentKeyIdAsync()
-        {
-            await EnsureInitializedAsync();
-            return _currentKeyId;
-        }
+        #endregion
 
-        public byte[] GetKey(string keyId)
-        {
-            return GetKeyAsync(keyId, new DefaultSecurityContext()).GetAwaiter().GetResult();
-        }
-
-        public async Task<byte[]> GetKeyAsync(string keyId, ISecurityContext context)
-        {
-            await EnsureInitializedAsync();
-            ValidateAccess(context);
-
-            if (_keyCache.TryGetValue(keyId, out var cached) && !cached.IsExpired)
-            {
-                return cached.Key;
-            }
-
-            await _lock.WaitAsync();
-            try
-            {
-                if (_keyCache.TryGetValue(keyId, out cached) && !cached.IsExpired)
-                {
-                    return cached.Key;
-                }
-
-                var key = await LoadKeyAsync(keyId);
-                if (key == null)
-                    throw new KeyNotFoundException($"Key '{keyId}' not found");
-
-                _keyCache[keyId] = new CachedKey(key, _config.CacheExpiration);
-                return key;
-            }
-            finally
-            {
-                _lock.Release();
-            }
-        }
-
-        public async Task<byte[]> CreateKeyAsync(string keyId, ISecurityContext context)
-        {
-            await EnsureInitializedAsync();
-            ValidateAdminAccess(context);
-
-            await _lock.WaitAsync();
-            try
-            {
-                var key = RandomNumberGenerator.GetBytes(_config.KeySizeBytes);
-                await SaveKeyAsync(keyId, key);
-
-                _currentKeyId = keyId;
-                await SaveMetadataAsync();
-
-                _keyCache[keyId] = new CachedKey(key, _config.CacheExpiration);
-
-                return key;
-            }
-            finally
-            {
-                _lock.Release();
-            }
-        }
-
-        private async Task InitializeAsync()
-        {
-            if (_initialized) return;
-
-            await _lock.WaitAsync();
-            try
-            {
-                if (_initialized) return;
-
-                Directory.CreateDirectory(_config.KeyStorePath);
-
-                var metadataPath = Path.Combine(_config.KeyStorePath, "keystore.meta");
-                if (File.Exists(metadataPath))
-                {
-                    var metadata = await LoadMetadataAsync();
-                    _currentKeyId = metadata.CurrentKeyId;
-                }
-                else
-                {
-                    _currentKeyId = Guid.NewGuid().ToString("N");
-                    var key = RandomNumberGenerator.GetBytes(_config.KeySizeBytes);
-                    await SaveKeyAsync(_currentKeyId, key);
-                    await SaveMetadataAsync();
-                }
-
-                _initialized = true;
-            }
-            finally
-            {
-                _lock.Release();
-            }
-        }
-
-        private async Task EnsureInitializedAsync()
-        {
-            if (!_initialized)
-                await InitializeAsync();
-        }
-
-        private async Task<byte[]?> LoadKeyAsync(string keyId)
-        {
-            var keyPath = GetKeyPath(keyId);
-            if (!File.Exists(keyPath))
-                return null;
-
-            var encryptedData = await File.ReadAllBytesAsync(keyPath);
-
-            foreach (var tier in _tiers.Where(t => t.IsAvailable))
-            {
-                try
-                {
-                    return tier.Decrypt(encryptedData);
-                }
-                catch
-                {
-                    continue;
-                }
-            }
-
-            throw new CryptographicException("Unable to decrypt key with any available protection tier");
-        }
-
-        private async Task SaveKeyAsync(string keyId, byte[] key)
-        {
-            var tier = _tiers.FirstOrDefault(t => t.IsAvailable)
-                ?? throw new InvalidOperationException("No key protection tier available");
-
-            var encryptedData = tier.Encrypt(key);
-            var keyPath = GetKeyPath(keyId);
-
-            await File.WriteAllBytesAsync(keyPath, encryptedData);
-        }
-
-        private async Task SaveMetadataAsync()
-        {
-            var metadata = new KeyStoreMetadata
-            {
-                CurrentKeyId = _currentKeyId,
-                LastUpdated = DateTime.UtcNow,
-                Version = 1
-            };
-
-            var json = JsonSerializer.Serialize(metadata);
-            var metadataPath = Path.Combine(_config.KeyStorePath, "keystore.meta");
-            await File.WriteAllTextAsync(metadataPath, json);
-        }
-
-        private async Task<KeyStoreMetadata> LoadMetadataAsync()
-        {
-            var metadataPath = Path.Combine(_config.KeyStorePath, "keystore.meta");
-            var json = await File.ReadAllTextAsync(metadataPath);
-            return JsonSerializer.Deserialize<KeyStoreMetadata>(json) ?? new KeyStoreMetadata();
-        }
-
-        private string GetKeyPath(string keyId)
-        {
-            var safeId = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(keyId)))[..32];
-            return Path.Combine(_config.KeyStorePath, $"{safeId}.key");
-        }
-
-        private void ValidateAccess(ISecurityContext context)
-        {
-            if (_config.RequireAuthentication && string.IsNullOrEmpty(context.UserId))
-                throw new UnauthorizedAccessException("Authentication required to access keys");
-        }
-
-        private void ValidateAdminAccess(ISecurityContext context)
-        {
-            ValidateAccess(context);
-            if (_config.RequireAdminForCreate && !context.IsSystemAdmin && !context.Roles.Contains("admin"))
-                throw new UnauthorizedAccessException("Admin access required to create keys");
-        }
+        #region Message Handlers
 
         private async Task HandleCreateKeyAsync(PluginMessage message)
         {
@@ -360,7 +245,42 @@ namespace DataWarehouse.Plugins.FileKeyStore
                 _config.RequireAdminForCreate = rac;
             return Task.CompletedTask;
         }
+
+        #endregion
+
+        #region Helper Methods
+
+        private async Task SaveMetadataAsync()
+        {
+            var metadata = new KeyStoreMetadata
+            {
+                CurrentKeyId = CurrentKeyId ?? string.Empty,
+                LastUpdated = DateTime.UtcNow,
+                Version = 1
+            };
+
+            var json = JsonSerializer.Serialize(metadata);
+            var metadataPath = Path.Combine(_config.KeyStorePath, "keystore.meta");
+            await File.WriteAllTextAsync(metadataPath, json);
+        }
+
+        private async Task<KeyStoreMetadata> LoadMetadataAsync()
+        {
+            var metadataPath = Path.Combine(_config.KeyStorePath, "keystore.meta");
+            var json = await File.ReadAllTextAsync(metadataPath);
+            return JsonSerializer.Deserialize<KeyStoreMetadata>(json) ?? new KeyStoreMetadata();
+        }
+
+        private string GetKeyPath(string keyId)
+        {
+            var safeId = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(keyId)))[..32];
+            return Path.Combine(_config.KeyStorePath, $"{safeId}.key");
+        }
+
+        #endregion
     }
+
+    #region Key Protection Tiers
 
     internal interface IKeyProtectionTier
     {
@@ -688,6 +608,10 @@ namespace DataWarehouse.Plugins.FileKeyStore
         }
     }
 
+    #endregion
+
+    #region Configuration and Supporting Classes
+
     public class FileKeyStoreConfig
     {
         public string KeyStorePath { get; set; } = Path.Combine(
@@ -712,19 +636,6 @@ namespace DataWarehouse.Plugins.FileKeyStore
         Machine
     }
 
-    internal class CachedKey
-    {
-        public byte[] Key { get; }
-        public DateTime Expiration { get; }
-        public bool IsExpired => DateTime.UtcNow >= Expiration;
-
-        public CachedKey(byte[] key, TimeSpan expiration)
-        {
-            Key = key;
-            Expiration = DateTime.UtcNow.Add(expiration);
-        }
-    }
-
     internal class KeyStoreMetadata
     {
         public string CurrentKeyId { get; set; } = string.Empty;
@@ -739,4 +650,6 @@ namespace DataWarehouse.Plugins.FileKeyStore
         public IEnumerable<string> Roles => ["user"];
         public bool IsSystemAdmin => false;
     }
+
+    #endregion
 }

@@ -17,6 +17,7 @@
   <Folder Name="/Plugins/">
     <File Path="Plugin Readme.txt" />
     <Project Path="Plugins/DataWarehouse.Plugins.AccessControl/DataWarehouse.Plugins.AccessControl.csproj" />
+    <Project Path="Plugins/DataWarehouse.Plugins.AccessLog/DataWarehouse.Plugins.AccessLog.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.AccessPrediction/DataWarehouse.Plugins.AccessPrediction.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.AdaptiveEc/DataWarehouse.Plugins.AdaptiveEc.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.AdoNetProvider/DataWarehouse.Plugins.AdoNetProvider.csproj" />
@@ -34,20 +35,24 @@
     <Project Path="Plugins/DataWarehouse.Plugins.Backup/DataWarehouse.Plugins.Backup.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.BackupVerification/DataWarehouse.Plugins.BackupVerification.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.BatteryAware/DataWarehouse.Plugins.BatteryAware.csproj" />
+    <Project Path="Plugins/DataWarehouse.Plugins.Blockchain.Local/DataWarehouse.Plugins.Blockchain.Local.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.BlueGreenDeployment/DataWarehouse.Plugins.BlueGreenDeployment.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.BreakGlassRecovery/DataWarehouse.Plugins.BreakGlassRecovery.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.BrotliCompression/DataWarehouse.Plugins.BrotliCompression.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.CanaryDeployment/DataWarehouse.Plugins.CanaryDeployment.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.CarbonAware/DataWarehouse.Plugins.CarbonAware.csproj" />
+    <Project Path="Plugins/DataWarehouse.Plugins.CarbonAwareness/DataWarehouse.Plugins.CarbonAwareness.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.ChaCha20Encryption/DataWarehouse.Plugins.ChaCha20Encryption.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.Chronograf/DataWarehouse.Plugins.Chronograf.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.CloudStorage/DataWarehouse.Plugins.CloudStorage.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.Compliance/DataWarehouse.Plugins.Compliance.csproj" />
+    <Project Path="Plugins/DataWarehouse.Plugins.ComplianceAutomation/DataWarehouse.Plugins.ComplianceAutomation.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.Compression/DataWarehouse.Plugins.Compression.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.ContentProcessing/DataWarehouse.Plugins.ContentProcessing.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.CrashRecovery/DataWarehouse.Plugins.CrashRecovery.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.CrdtReplication/DataWarehouse.Plugins.CrdtReplication.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.CrossRegion/DataWarehouse.Plugins.CrossRegion.csproj" />
+    <Project Path="Plugins/DataWarehouse.Plugins.DataConnectors/DataWarehouse.Plugins.DataConnectors.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.DatabaseImport/DataWarehouse.Plugins.DatabaseImport.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.Datadog/DataWarehouse.Plugins.Datadog.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.DataRetention/DataWarehouse.Plugins.DataRetention.csproj" />
@@ -64,6 +69,7 @@
     <Project Path="Plugins/DataWarehouse.Plugins.EnhancedRaid/DataWarehouse.Plugins.EnhancedRaid.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.EntropyAnalysis/DataWarehouse.Plugins.EntropyAnalysis.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.ErasureCoding/DataWarehouse.Plugins.ErasureCoding.csproj" />
+    <Project Path="Plugins/DataWarehouse.Plugins.ExabyteScale/DataWarehouse.Plugins.ExabyteScale.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.ExtendedRaid/DataWarehouse.Plugins.ExtendedRaid.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.FederatedQuery/DataWarehouse.Plugins.FederatedQuery.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.Federation/DataWarehouse.Plugins.Federation.csproj" />
@@ -83,9 +89,12 @@
     <Project Path="Plugins/DataWarehouse.Plugins.GrpcInterface/DataWarehouse.Plugins.GrpcInterface.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.GrpcStorage/DataWarehouse.Plugins.GrpcStorage.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.GZipCompression/DataWarehouse.Plugins.GZipCompression.csproj" />
+    <Project Path="Plugins/DataWarehouse.Plugins.HardwareAcceleration/DataWarehouse.Plugins.HardwareAcceleration.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.HierarchicalQuorum/DataWarehouse.Plugins.HierarchicalQuorum.csproj" />
+    <Project Path="Plugins/DataWarehouse.Plugins.Hypervisor/DataWarehouse.Plugins.Hypervisor.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.HotReload/DataWarehouse.Plugins.HotReload.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.IAM/DataWarehouse.Plugins.IAM.csproj" />
+    <Project Path="Plugins/DataWarehouse.Plugins.Integrity/DataWarehouse.Plugins.Integrity.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.IpfsStorage/DataWarehouse.Plugins.IpfsStorage.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.IsalEc/DataWarehouse.Plugins.IsalEc.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.Jaeger/DataWarehouse.Plugins.Jaeger.csproj" />
@@ -97,11 +106,14 @@
     <Project Path="Plugins/DataWarehouse.Plugins.LoadBalancer/DataWarehouse.Plugins.LoadBalancer.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.LocalStorage/DataWarehouse.Plugins.LocalStorage.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.LogicMonitor/DataWarehouse.Plugins.LogicMonitor.csproj" />
+    <Project Path="Plugins/DataWarehouse.Plugins.LowLatency/DataWarehouse.Plugins.LowLatency.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.Logzio/DataWarehouse.Plugins.Logzio.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.Lz4Compression/DataWarehouse.Plugins.Lz4Compression.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.Metabase/DataWarehouse.Plugins.Metabase.csproj" />
+    <Project Path="Plugins/DataWarehouse.Plugins.MilitarySecurity/DataWarehouse.Plugins.MilitarySecurity.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.Metadata/DataWarehouse.Plugins.Metadata.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.MetadataStorage/DataWarehouse.Plugins.MetadataStorage.csproj" />
+    <Project Path="Plugins/DataWarehouse.Plugins.MultiMaster/DataWarehouse.Plugins.MultiMaster.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.MySqlProtocol/DataWarehouse.Plugins.MySqlProtocol.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.NestedRaid/DataWarehouse.Plugins.NestedRaid.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.Netdata/DataWarehouse.Plugins.Netdata.csproj" />
@@ -153,7 +165,11 @@
     <Project Path="Plugins/DataWarehouse.Plugins.VendorSpecificRaid/DataWarehouse.Plugins.VendorSpecificRaid.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.Versioning/DataWarehouse.Plugins.Versioning.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.VictoriaMetrics/DataWarehouse.Plugins.VictoriaMetrics.csproj" />
-    <Project Path="Plugins/DataWarehouse.Plugins.WinFspDriver/DataWarehouse.Plugins.WinFspDriver.csproj" />
+    <Project Path="Plugins/DataWarehouse.Plugins.WinFspDriver/DataWarehouse.Plugins.WinFspDriver.csproj">
+      <Platform Solution="Debug|*" Project="x64" />
+    </Project>
+    <Project Path="Plugins/DataWarehouse.Plugins.TamperProof/DataWarehouse.Plugins.TamperProof.csproj" />
+    <Project Path="Plugins/DataWarehouse.Plugins.Worm.Software/DataWarehouse.Plugins.Worm.Software.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.Zabbix/DataWarehouse.Plugins.Zabbix.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.ZeroConfig/DataWarehouse.Plugins.ZeroConfig.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.ZeroDowntimeUpgrade/DataWarehouse.Plugins.ZeroDowntimeUpgrade.csproj" />

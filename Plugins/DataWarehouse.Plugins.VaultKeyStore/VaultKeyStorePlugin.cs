@@ -2,7 +2,6 @@ using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Primitives;
 using DataWarehouse.SDK.Security;
 using DataWarehouse.SDK.Utilities;
-using System.Collections.Concurrent;
 using System.Net.Http.Headers;
 using System.Security.Cryptography;
 using System.Text;
@@ -12,7 +11,7 @@ namespace DataWarehouse.Plugins.VaultKeyStore
 {
     /// <summary>
     /// HSM/Vault integration KeyStore plugin supporting multiple cloud providers.
-    /// Implements IKeyStore with pluggable vault backends.
+    /// Implements IEnvelopeKeyStore with pluggable vault backends.
     ///
     /// Supported backends:
     /// - HashiCorp Vault (KV secrets engine, Transit engine)
@@ -22,9 +21,9 @@ namespace DataWarehouse.Plugins.VaultKeyStore
     ///
     /// Features:
     /// - Automatic failover between vault providers
-    /// - Key caching with configurable TTL
+    /// - Key caching with configurable TTL (inherited from base)
     /// - Key rotation support
-    /// - Envelope encryption pattern
+    /// - Envelope encryption pattern (HSM-backed wrap/unwrap)
     /// - HSM-backed key operations
     ///
     /// Message Commands:
@@ -33,27 +32,32 @@ namespace DataWarehouse.Plugins.VaultKeyStore
     /// - keystore.vault.rotate: Rotate a key
     /// - keystore.vault.configure: Configure vault backend
     /// - keystore.vault.health: Check vault health
+    /// - keystore.vault.wrap: Wrap a data encryption key
+    /// - keystore.vault.unwrap: Unwrap a data encryption key
     /// </summary>
-    public sealed class VaultKeyStorePlugin : SecurityProviderPluginBase, IKeyStore, IPlugin
+    public sealed class VaultKeyStorePlugin : KeyStorePluginBase, IEnvelopeKeyStore
     {
         private readonly VaultConfig _config;
-        private readonly ConcurrentDictionary<string, CachedKey> _keyCache;
-        private readonly SemaphoreSlim _lock = new(1, 1);
         private readonly HttpClient _httpClient;
 
         private IVaultBackend? _activeBackend;
         private IVaultBackend[]? _backends;
-        private string _currentKeyId = string.Empty;
-        private bool _initialized;
 
         public override string Id => "datawarehouse.plugins.keystore.vault";
         public override string Name => "Vault KeyStore";
         public override string Version => "1.0.0";
 
+        protected override string KeyStoreType => "Vault";
+        protected override TimeSpan CacheExpiration => _config.CacheExpiration;
+
+        public IReadOnlyList<string> SupportedWrappingAlgorithms =>
+            new[] { "AES-256-GCM", "RSA-OAEP-256" };
+
+        public bool SupportsHsmKeyGeneration => true;
+
         public VaultKeyStorePlugin(VaultConfig? config = null)
         {
             _config = config ?? new VaultConfig();
-            _keyCache = new ConcurrentDictionary<string, CachedKey>();
             _httpClient = new HttpClient { Timeout = _config.RequestTimeout };
         }
 
@@ -61,7 +65,7 @@ namespace DataWarehouse.Plugins.VaultKeyStore
         {
             var response = await base.OnHandshakeAsync(request);
 
-            await InitializeAsync();
+            await EnsureInitializedAsync();
 
             return response;
         }
@@ -83,11 +87,11 @@ namespace DataWarehouse.Plugins.VaultKeyStore
         protected override Dictionary<string, object> GetMetadata()
         {
             var metadata = base.GetMetadata();
-            metadata["SecurityType"] = "VaultKeyStore";
             metadata["SupportsHSM"] = true;
             metadata["SupportsEnvelopeEncryption"] = true;
             metadata["SupportedBackends"] = new[] { "HashiCorpVault", "AzureKeyVault", "AwsKms", "GoogleKms" };
             metadata["ActiveBackend"] = _activeBackend?.Name ?? "None";
+            metadata["SupportedWrappingAlgorithms"] = SupportedWrappingAlgorithms;
             return metadata;
         }
 
@@ -116,113 +120,68 @@ namespace DataWarehouse.Plugins.VaultKeyStore
             }
         }
 
-        public async Task<string> GetCurrentKeyIdAsync()
+        public async Task<byte[]> WrapKeyAsync(string kekId, byte[] dataKey, ISecurityContext context)
         {
             await EnsureInitializedAsync();
-            return _currentKeyId;
+            if (_activeBackend == null)
+                throw new InvalidOperationException("No vault backend available");
+            return await _activeBackend.WrapKeyAsync(kekId, dataKey);
         }
 
-        public byte[] GetKey(string keyId)
-        {
-            return GetKeyAsync(keyId, new DefaultSecurityContext()).GetAwaiter().GetResult();
-        }
-
-        public async Task<byte[]> GetKeyAsync(string keyId, ISecurityContext context)
+        public async Task<byte[]> UnwrapKeyAsync(string kekId, byte[] wrappedKey, ISecurityContext context)
         {
             await EnsureInitializedAsync();
+            if (_activeBackend == null)
+                throw new InvalidOperationException("No vault backend available");
+            return await _activeBackend.UnwrapKeyAsync(kekId, wrappedKey);
+        }
 
-            if (_keyCache.TryGetValue(keyId, out var cached) && !cached.IsExpired)
-            {
-                return cached.Key;
-            }
+        protected override async Task InitializeStorageAsync()
+        {
+            _backends = CreateBackends();
 
-            await _lock.WaitAsync();
-            try
+            foreach (var backend in _backends)
             {
-                if (_keyCache.TryGetValue(keyId, out cached) && !cached.IsExpired)
+                try
                 {
-                    return cached.Key;
-                }
-
-                var key = await _activeBackend!.GetKeyAsync(keyId);
-                _keyCache[keyId] = new CachedKey(key, _config.CacheExpiration);
-                return key;
-            }
-            finally
-            {
-                _lock.Release();
-            }
-        }
-
-        public async Task<byte[]> CreateKeyAsync(string keyId, ISecurityContext context)
-        {
-            await EnsureInitializedAsync();
-
-            await _lock.WaitAsync();
-            try
-            {
-                var key = await _activeBackend!.CreateKeyAsync(keyId);
-                _currentKeyId = keyId;
-                _keyCache[keyId] = new CachedKey(key, _config.CacheExpiration);
-                return key;
-            }
-            finally
-            {
-                _lock.Release();
-            }
-        }
-
-        private async Task InitializeAsync()
-        {
-            if (_initialized) return;
-
-            await _lock.WaitAsync();
-            try
-            {
-                if (_initialized) return;
-
-                _backends = CreateBackends();
-
-                foreach (var backend in _backends)
-                {
-                    try
+                    if (await backend.IsHealthyAsync())
                     {
-                        if (await backend.IsHealthyAsync())
-                        {
-                            _activeBackend = backend;
-                            break;
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        Console.WriteLine($"[VaultKeyStorePlugin] Backend health check failed: {ex.Message}");
+                        _activeBackend = backend;
+                        break;
                     }
                 }
-
-                if (_activeBackend == null && _backends.Length > 0)
+                catch
                 {
-                    _activeBackend = _backends[0];
+                    // Ignore and try next backend
                 }
-
-                if (_activeBackend == null)
-                {
-                    throw new InvalidOperationException("No vault backend available");
-                }
-
-                _currentKeyId = await _activeBackend.GetCurrentKeyIdAsync() ?? Guid.NewGuid().ToString("N");
-
-                _initialized = true;
             }
-            finally
+
+            if (_activeBackend == null && _backends.Length > 0)
             {
-                _lock.Release();
+                _activeBackend = _backends[0];
             }
+
+            if (_activeBackend == null)
+            {
+                throw new InvalidOperationException("No vault backend available");
+            }
+
+            CurrentKeyId = await _activeBackend.GetCurrentKeyIdAsync() ?? Guid.NewGuid().ToString("N");
         }
 
-        private async Task EnsureInitializedAsync()
+        protected override async Task<byte[]?> LoadKeyFromStorageAsync(string keyId)
         {
-            if (!_initialized)
-                await InitializeAsync();
+            if (_activeBackend == null)
+                throw new InvalidOperationException("No vault backend available");
+            return await _activeBackend.GetKeyAsync(keyId);
+        }
+
+        protected override async Task SaveKeyToStorageAsync(string keyId, byte[] key)
+        {
+            if (_activeBackend == null)
+                throw new InvalidOperationException("No vault backend available");
+            // Vault backends create keys internally, we just verify it exists
+            await _activeBackend.CreateKeyAsync(keyId);
         }
 
         private IVaultBackend[] CreateBackends()
@@ -266,9 +225,9 @@ namespace DataWarehouse.Plugins.VaultKeyStore
 
         private async Task HandleRotateKeyAsync(PluginMessage message)
         {
-            var keyId = GetString(message.Payload, "keyId") ?? _currentKeyId;
+            var keyId = GetString(message.Payload, "keyId") ?? CurrentKeyId ?? throw new InvalidOperationException("No key ID specified");
             await _activeBackend!.RotateKeyAsync(keyId);
-            _keyCache.TryRemove(keyId, out _);
+            InvalidateCachedKey(keyId);
         }
 
         private async Task HandleConfigureAsync(PluginMessage message)
@@ -325,9 +284,8 @@ namespace DataWarehouse.Plugins.VaultKeyStore
                 var response = await _httpClient.SendAsync(request);
                 return response.IsSuccessStatusCode;
             }
-            catch (Exception ex)
+            catch
             {
-                Console.WriteLine($"[VaultKeyStorePlugin] Vault operation failed: {ex.Message}");
                 return false;
             }
         }
@@ -432,9 +390,8 @@ namespace DataWarehouse.Plugins.VaultKeyStore
                 var response = await _httpClient.SendAsync(request);
                 return response.IsSuccessStatusCode;
             }
-            catch (Exception ex)
+            catch
             {
-                Console.WriteLine($"[VaultKeyStorePlugin] Vault operation failed: {ex.Message}");
                 return false;
             }
         }
@@ -557,9 +514,8 @@ namespace DataWarehouse.Plugins.VaultKeyStore
                 var response = await _httpClient.SendAsync(request);
                 return response.IsSuccessStatusCode;
             }
-            catch (Exception ex)
+            catch
             {
-                Console.WriteLine($"[VaultKeyStorePlugin] Vault operation failed: {ex.Message}");
                 return false;
             }
         }
@@ -722,19 +678,6 @@ namespace DataWarehouse.Plugins.VaultKeyStore
         public string AccessKeyId { get; set; } = string.Empty;
         public string SecretAccessKey { get; set; } = string.Empty;
         public string DefaultKeyId { get; set; } = string.Empty;
-    }
-
-    internal class CachedKey
-    {
-        public byte[] Key { get; }
-        public DateTime Expiration { get; }
-        public bool IsExpired => DateTime.UtcNow >= Expiration;
-
-        public CachedKey(byte[] key, TimeSpan expiration)
-        {
-            Key = key;
-            Expiration = DateTime.UtcNow.Add(expiration);
-        }
     }
 
     internal class DefaultSecurityContext : ISecurityContext

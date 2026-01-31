@@ -1528,6 +1528,1090 @@ namespace DataWarehouse.SDK.Contracts
         }
     }
 
+    #region Key Store Plugin Base
+
+    /// <summary>
+    /// Abstract base class for all key management plugins.
+    /// Provides common caching, initialization, and validation logic.
+    /// All key management plugins MUST extend this class.
+    /// </summary>
+    public abstract class KeyStorePluginBase : SecurityProviderPluginBase, Security.IKeyStore
+    {
+        #region Cache Infrastructure
+
+        /// <summary>
+        /// Cache entry for keys with expiration tracking.
+        /// </summary>
+        protected class CachedKey
+        {
+            public byte[] Key { get; init; } = Array.Empty<byte>();
+            public DateTime CachedAt { get; init; }
+            public DateTime? ExpiresAt { get; init; }
+            public int AccessCount { get; set; }
+            public DateTime LastAccessedAt { get; set; }
+        }
+
+        /// <summary>
+        /// Thread-safe key cache.
+        /// </summary>
+        protected readonly System.Collections.Concurrent.ConcurrentDictionary<string, CachedKey> KeyCache = new();
+
+        /// <summary>
+        /// Lock for thread-safe initialization.
+        /// </summary>
+        protected readonly SemaphoreSlim InitLock = new(1, 1);
+
+        /// <summary>
+        /// The current active key ID.
+        /// </summary>
+        protected string? CurrentKeyId;
+
+        /// <summary>
+        /// Whether the key store has been initialized.
+        /// </summary>
+        protected bool Initialized;
+
+        #endregion
+
+        #region Configuration (Override in Derived Classes)
+
+        /// <summary>
+        /// Cache expiration time. Override to customize.
+        /// Default: 1 hour.
+        /// </summary>
+        protected virtual TimeSpan CacheExpiration => TimeSpan.FromHours(1);
+
+        /// <summary>
+        /// Key size in bytes for newly created keys.
+        /// Override to customize (e.g., 32 for AES-256).
+        /// </summary>
+        protected virtual int KeySizeBytes => 32;
+
+        /// <summary>
+        /// Maximum number of keys to cache.
+        /// </summary>
+        protected virtual int MaxCachedKeys => 100;
+
+        /// <summary>
+        /// Whether authentication is required for key operations.
+        /// </summary>
+        protected virtual bool RequireAuthentication => true;
+
+        /// <summary>
+        /// Whether admin access is required for key creation.
+        /// </summary>
+        protected virtual bool RequireAdminForCreate => true;
+
+        /// <summary>
+        /// Key store type for metadata (e.g., "file", "vault", "hsm").
+        /// </summary>
+        protected abstract string KeyStoreType { get; }
+
+        #endregion
+
+        #region IKeyStore Implementation
+
+        /// <inheritdoc/>
+        public virtual async Task<string> GetCurrentKeyIdAsync()
+        {
+            await EnsureInitializedAsync();
+            return CurrentKeyId ?? throw new InvalidOperationException("No current key ID set. Call CreateKeyAsync first.");
+        }
+
+        /// <inheritdoc/>
+        public virtual byte[] GetKey(string keyId)
+        {
+            // Sync wrapper - prefer async version
+            return GetKeyInternalAsync(keyId, null).GetAwaiter().GetResult();
+        }
+
+        /// <inheritdoc/>
+        public virtual async Task<byte[]> GetKeyAsync(string keyId, Security.ISecurityContext context)
+        {
+            ValidateAccess(context);
+            return await GetKeyInternalAsync(keyId, context);
+        }
+
+        /// <inheritdoc/>
+        public virtual async Task<byte[]> CreateKeyAsync(string keyId, Security.ISecurityContext context)
+        {
+            ValidateAdminAccess(context);
+            await EnsureInitializedAsync();
+
+            // Generate new key
+            var key = GenerateKey();
+
+            // Save to storage
+            await SaveKeyToStorageAsync(keyId, key);
+
+            // Update current key ID
+            CurrentKeyId = keyId;
+
+            // Cache the key
+            CacheKey(keyId, key);
+
+            // Log key creation for audit
+            OnKeyCreated(keyId, context);
+
+            return key;
+        }
+
+        #endregion
+
+        #region Internal Key Operations
+
+        private async Task<byte[]> GetKeyInternalAsync(string keyId, Security.ISecurityContext? context)
+        {
+            await EnsureInitializedAsync();
+
+            // Check cache first
+            if (TryGetFromCache(keyId, out var cachedKey))
+            {
+                OnKeyAccessed(keyId, context, fromCache: true);
+                return cachedKey;
+            }
+
+            // Load from storage
+            var key = await LoadKeyFromStorageAsync(keyId);
+            if (key == null)
+            {
+                throw new KeyNotFoundException($"Key '{keyId}' not found in storage.");
+            }
+
+            // Cache and return
+            CacheKey(keyId, key);
+            OnKeyAccessed(keyId, context, fromCache: false);
+
+            return key;
+        }
+
+        /// <summary>
+        /// Attempts to get a key from cache.
+        /// </summary>
+        protected bool TryGetFromCache(string keyId, out byte[] key)
+        {
+            key = Array.Empty<byte>();
+
+            if (!KeyCache.TryGetValue(keyId, out var cached))
+                return false;
+
+            // Check expiration
+            if (cached.ExpiresAt.HasValue && cached.ExpiresAt.Value < DateTime.UtcNow)
+            {
+                KeyCache.TryRemove(keyId, out _);
+                return false;
+            }
+
+            // Update access stats
+            cached.AccessCount++;
+            cached.LastAccessedAt = DateTime.UtcNow;
+            key = cached.Key;
+            return true;
+        }
+
+        /// <summary>
+        /// Caches a key with expiration.
+        /// </summary>
+        protected void CacheKey(string keyId, byte[] key)
+        {
+            // Evict oldest if at capacity
+            if (KeyCache.Count >= MaxCachedKeys)
+            {
+                var oldest = KeyCache
+                    .OrderBy(kv => kv.Value.LastAccessedAt)
+                    .FirstOrDefault();
+                if (oldest.Key != null)
+                {
+                    KeyCache.TryRemove(oldest.Key, out _);
+                }
+            }
+
+            KeyCache[keyId] = new CachedKey
+            {
+                Key = key,
+                CachedAt = DateTime.UtcNow,
+                ExpiresAt = DateTime.UtcNow.Add(CacheExpiration),
+                AccessCount = 1,
+                LastAccessedAt = DateTime.UtcNow
+            };
+        }
+
+        /// <summary>
+        /// Generates a cryptographically secure random key.
+        /// </summary>
+        protected virtual byte[] GenerateKey()
+        {
+            var key = new byte[KeySizeBytes];
+            System.Security.Cryptography.RandomNumberGenerator.Fill(key);
+            return key;
+        }
+
+        #endregion
+
+        #region Initialization
+
+        /// <summary>
+        /// Ensures the key store is initialized (thread-safe).
+        /// </summary>
+        protected async Task EnsureInitializedAsync()
+        {
+            if (Initialized) return;
+
+            await InitLock.WaitAsync();
+            try
+            {
+                if (Initialized) return;
+                await InitializeStorageAsync();
+                Initialized = true;
+            }
+            finally
+            {
+                InitLock.Release();
+            }
+        }
+
+        #endregion
+
+        #region Validation
+
+        /// <summary>
+        /// Validates that the caller has access to key operations.
+        /// </summary>
+        protected virtual void ValidateAccess(Security.ISecurityContext context)
+        {
+            if (context == null)
+                throw new ArgumentNullException(nameof(context));
+
+            if (RequireAuthentication && string.IsNullOrEmpty(context.UserId))
+                throw new UnauthorizedAccessException("Authentication required for key access.");
+        }
+
+        /// <summary>
+        /// Validates that the caller has admin access for key creation.
+        /// </summary>
+        protected virtual void ValidateAdminAccess(Security.ISecurityContext context)
+        {
+            ValidateAccess(context);
+
+            if (RequireAdminForCreate && !context.IsSystemAdmin)
+                throw new UnauthorizedAccessException("Admin access required for key creation.");
+        }
+
+        #endregion
+
+        #region Abstract Methods (Implement in Derived Classes)
+
+        /// <summary>
+        /// Loads a key from the underlying storage.
+        /// Returns null if key not found.
+        /// </summary>
+        protected abstract Task<byte[]?> LoadKeyFromStorageAsync(string keyId);
+
+        /// <summary>
+        /// Saves a key to the underlying storage.
+        /// </summary>
+        protected abstract Task SaveKeyToStorageAsync(string keyId, byte[] key);
+
+        /// <summary>
+        /// Initializes the key storage (create directories, connect to services, etc.).
+        /// Called once during first operation.
+        /// </summary>
+        protected abstract Task InitializeStorageAsync();
+
+        #endregion
+
+        #region Event Hooks (Override for Custom Behavior)
+
+        /// <summary>
+        /// Called when a key is accessed. Override for custom logging/auditing.
+        /// </summary>
+        protected virtual void OnKeyAccessed(string keyId, Security.ISecurityContext? context, bool fromCache)
+        {
+            // Default: no-op. Override for audit logging.
+        }
+
+        /// <summary>
+        /// Called when a key is created. Override for custom logging/auditing.
+        /// </summary>
+        protected virtual void OnKeyCreated(string keyId, Security.ISecurityContext context)
+        {
+            // Default: no-op. Override for audit logging.
+        }
+
+        #endregion
+
+        #region Cache Management
+
+        /// <summary>
+        /// Clears all cached keys.
+        /// </summary>
+        public virtual void ClearCache()
+        {
+            KeyCache.Clear();
+        }
+
+        /// <summary>
+        /// Removes a specific key from cache.
+        /// </summary>
+        public virtual bool InvalidateCachedKey(string keyId)
+        {
+            return KeyCache.TryRemove(keyId, out _);
+        }
+
+        /// <summary>
+        /// Gets cache statistics.
+        /// </summary>
+        public virtual (int Count, int TotalAccesses) GetCacheStats()
+        {
+            var entries = KeyCache.Values.ToList();
+            return (entries.Count, entries.Sum(e => e.AccessCount));
+        }
+
+        #endregion
+
+        #region Metadata
+
+        protected override Dictionary<string, object> GetMetadata()
+        {
+            var metadata = base.GetMetadata();
+            metadata["SecurityType"] = "KeyStore";
+            metadata["KeyStoreType"] = KeyStoreType;
+            metadata["KeySizeBytes"] = KeySizeBytes;
+            metadata["CacheEnabled"] = true;
+            metadata["CacheExpirationMinutes"] = CacheExpiration.TotalMinutes;
+            metadata["SupportsEncryption"] = true;
+            return metadata;
+        }
+
+        #endregion
+
+        #region IDisposable
+
+        private bool _disposed;
+
+        protected virtual void Dispose(bool disposing)
+        {
+            if (_disposed) return;
+
+            if (disposing)
+            {
+                // Clear sensitive data from cache
+                foreach (var entry in KeyCache.Values)
+                {
+                    Array.Clear(entry.Key, 0, entry.Key.Length);
+                }
+                KeyCache.Clear();
+                InitLock.Dispose();
+            }
+
+            _disposed = true;
+        }
+
+        public void Dispose()
+        {
+            Dispose(true);
+            GC.SuppressFinalize(this);
+        }
+
+        #endregion
+    }
+
+    #endregion
+
+    #region Encryption Plugin Base
+
+    /// <summary>
+    /// Abstract base class for all encryption plugins with composable key management.
+    /// Supports per-user, per-operation configuration for maximum flexibility.
+    /// All encryption plugins MUST extend this class.
+    /// </summary>
+    public abstract class EncryptionPluginBase : PipelinePluginBase, IDisposable
+    {
+        #region Configuration
+
+        /// <summary>
+        /// Default key store (fallback when no user preference or explicit override).
+        /// </summary>
+        protected Security.IKeyStore? DefaultKeyStore;
+
+        /// <summary>
+        /// Default key management mode.
+        /// </summary>
+        protected Security.KeyManagementMode DefaultKeyManagementMode = Security.KeyManagementMode.Direct;
+
+        /// <summary>
+        /// Default envelope key store for Envelope mode.
+        /// </summary>
+        protected Security.IEnvelopeKeyStore? DefaultEnvelopeKeyStore;
+
+        /// <summary>
+        /// Default KEK key ID for Envelope mode.
+        /// </summary>
+        protected string? DefaultKekKeyId;
+
+        /// <summary>
+        /// Per-user configuration provider (optional, for multi-tenant).
+        /// </summary>
+        protected Security.IKeyManagementConfigProvider? ConfigProvider;
+
+        /// <summary>
+        /// Key store registry for resolving plugin IDs.
+        /// </summary>
+        protected Security.IKeyStoreRegistry? KeyStoreRegistry;
+
+        #endregion
+
+        #region Statistics
+
+        /// <summary>
+        /// Lock for thread-safe statistics updates.
+        /// </summary>
+        protected readonly object StatsLock = new();
+
+        /// <summary>
+        /// Total encryption operations performed.
+        /// </summary>
+        protected long EncryptionCount;
+
+        /// <summary>
+        /// Total decryption operations performed.
+        /// </summary>
+        protected long DecryptionCount;
+
+        /// <summary>
+        /// Total bytes encrypted.
+        /// </summary>
+        protected long TotalBytesEncrypted;
+
+        /// <summary>
+        /// Total bytes decrypted.
+        /// </summary>
+        protected long TotalBytesDecrypted;
+
+        /// <summary>
+        /// Key access audit log (tracks when each key was last used).
+        /// </summary>
+        protected readonly System.Collections.Concurrent.ConcurrentDictionary<string, DateTime> KeyAccessLog = new();
+
+        #endregion
+
+        #region Abstract Configuration Properties
+
+        /// <summary>
+        /// Key size in bytes for this encryption algorithm.
+        /// E.g., 32 for AES-256.
+        /// </summary>
+        protected abstract int KeySizeBytes { get; }
+
+        /// <summary>
+        /// IV/nonce size in bytes for this encryption algorithm.
+        /// E.g., 12 for AES-GCM.
+        /// </summary>
+        protected abstract int IvSizeBytes { get; }
+
+        /// <summary>
+        /// Authentication tag size in bytes (for AEAD algorithms).
+        /// E.g., 16 for AES-GCM.
+        /// </summary>
+        protected abstract int TagSizeBytes { get; }
+
+        /// <summary>
+        /// The encryption algorithm identifier.
+        /// E.g., "AES-256-GCM", "ChaCha20-Poly1305".
+        /// </summary>
+        protected abstract string AlgorithmId { get; }
+
+        #endregion
+
+        #region Configuration Resolution
+
+        /// <summary>
+        /// Resolves key management configuration for this operation.
+        /// Priority: 1. Explicit args, 2. User preferences, 3. Plugin defaults
+        /// </summary>
+        protected virtual async Task<Security.ResolvedKeyManagementConfig> ResolveConfigAsync(
+            Dictionary<string, object> args,
+            Security.ISecurityContext context)
+        {
+            // 1. Check for explicit overrides in args
+            if (TryGetConfigFromArgs(args, out var argsConfig))
+                return argsConfig;
+
+            // 2. Check for user preferences via ConfigProvider
+            if (ConfigProvider != null)
+            {
+                var userConfig = await ConfigProvider.GetConfigAsync(context);
+                if (userConfig != null)
+                    return ResolveFromUserConfig(userConfig);
+            }
+
+            // 3. Fall back to plugin defaults
+            return new Security.ResolvedKeyManagementConfig
+            {
+                Mode = DefaultKeyManagementMode,
+                KeyStore = DefaultKeyStore,
+                EnvelopeKeyStore = DefaultEnvelopeKeyStore,
+                KekKeyId = DefaultKekKeyId
+            };
+        }
+
+        /// <summary>
+        /// Attempts to extract configuration from operation arguments.
+        /// </summary>
+        protected virtual bool TryGetConfigFromArgs(Dictionary<string, object> args, out Security.ResolvedKeyManagementConfig config)
+        {
+            config = default!;
+
+            // Check if explicit mode is specified
+            if (!args.TryGetValue("keyManagementMode", out var modeObj))
+                return false;
+
+            var mode = modeObj switch
+            {
+                Security.KeyManagementMode m => m,
+                string s when Enum.TryParse<Security.KeyManagementMode>(s, true, out var parsed) => parsed,
+                _ => Security.KeyManagementMode.Direct
+            };
+
+            // Resolve key store from args
+            Security.IKeyStore? keyStore = null;
+            Security.IEnvelopeKeyStore? envelopeKeyStore = null;
+            string? keyStorePluginId = null;
+            string? envelopeKeyStorePluginId = null;
+            string? kekKeyId = null;
+            string? keyId = null;
+
+            if (args.TryGetValue("keyStore", out var ksObj) && ksObj is Security.IKeyStore ks)
+                keyStore = ks;
+            else if (args.TryGetValue("keyStorePluginId", out var kspObj) && kspObj is string ksp)
+            {
+                keyStorePluginId = ksp;
+                keyStore = KeyStoreRegistry?.GetKeyStore(ksp);
+            }
+
+            if (args.TryGetValue("envelopeKeyStore", out var eksObj) && eksObj is Security.IEnvelopeKeyStore eks)
+                envelopeKeyStore = eks;
+            else if (args.TryGetValue("envelopeKeyStorePluginId", out var ekspObj) && ekspObj is string eksp)
+            {
+                envelopeKeyStorePluginId = eksp;
+                envelopeKeyStore = KeyStoreRegistry?.GetEnvelopeKeyStore(eksp);
+            }
+
+            if (args.TryGetValue("kekKeyId", out var kekObj) && kekObj is string kek)
+                kekKeyId = kek;
+
+            if (args.TryGetValue("keyId", out var kidObj) && kidObj is string kid)
+                keyId = kid;
+
+            config = new Security.ResolvedKeyManagementConfig
+            {
+                Mode = mode,
+                KeyStore = keyStore ?? DefaultKeyStore,
+                KeyId = keyId,
+                EnvelopeKeyStore = envelopeKeyStore ?? DefaultEnvelopeKeyStore,
+                KekKeyId = kekKeyId ?? DefaultKekKeyId,
+                KeyStorePluginId = keyStorePluginId,
+                EnvelopeKeyStorePluginId = envelopeKeyStorePluginId
+            };
+
+            return true;
+        }
+
+        /// <summary>
+        /// Resolves configuration from user preferences.
+        /// </summary>
+        protected virtual Security.ResolvedKeyManagementConfig ResolveFromUserConfig(Security.KeyManagementConfig userConfig)
+        {
+            return new Security.ResolvedKeyManagementConfig
+            {
+                Mode = userConfig.Mode,
+                KeyStore = userConfig.KeyStore ?? KeyStoreRegistry?.GetKeyStore(userConfig.KeyStorePluginId),
+                KeyId = userConfig.KeyId,
+                EnvelopeKeyStore = userConfig.EnvelopeKeyStore ?? KeyStoreRegistry?.GetEnvelopeKeyStore(userConfig.EnvelopeKeyStorePluginId),
+                KekKeyId = userConfig.KekKeyId,
+                KeyStorePluginId = userConfig.KeyStorePluginId,
+                EnvelopeKeyStorePluginId = userConfig.EnvelopeKeyStorePluginId
+            };
+        }
+
+        #endregion
+
+        #region Key Management
+
+        /// <summary>
+        /// Gets a key for encryption based on resolved configuration.
+        /// For Direct mode: retrieves key from key store.
+        /// For Envelope mode: generates random DEK, wraps with KEK.
+        /// </summary>
+        protected virtual async Task<(byte[] key, string keyId, Security.EnvelopeHeader? envelope)> GetKeyForEncryptionAsync(
+            Security.ResolvedKeyManagementConfig config,
+            Security.ISecurityContext context)
+        {
+            if (config.Mode == Security.KeyManagementMode.Envelope)
+            {
+                return await GetEnvelopeKeyForEncryptionAsync(config, context);
+            }
+            else
+            {
+                return await GetDirectKeyForEncryptionAsync(config, context);
+            }
+        }
+
+        /// <summary>
+        /// Gets a key for Direct mode encryption.
+        /// </summary>
+        protected virtual async Task<(byte[] key, string keyId, Security.EnvelopeHeader? envelope)> GetDirectKeyForEncryptionAsync(
+            Security.ResolvedKeyManagementConfig config,
+            Security.ISecurityContext context)
+        {
+            if (config.KeyStore == null)
+                throw new InvalidOperationException("No key store configured for Direct mode encryption.");
+
+            var keyId = config.KeyId ?? await config.KeyStore.GetCurrentKeyIdAsync();
+            var key = await config.KeyStore.GetKeyAsync(keyId, context);
+
+            // Log key access
+            KeyAccessLog[keyId] = DateTime.UtcNow;
+
+            return (key, keyId, null);
+        }
+
+        /// <summary>
+        /// Gets a key for Envelope mode encryption.
+        /// Generates a random DEK and wraps it with the KEK.
+        /// </summary>
+        protected virtual async Task<(byte[] key, string keyId, Security.EnvelopeHeader? envelope)> GetEnvelopeKeyForEncryptionAsync(
+            Security.ResolvedKeyManagementConfig config,
+            Security.ISecurityContext context)
+        {
+            if (config.EnvelopeKeyStore == null)
+                throw new InvalidOperationException("No envelope key store configured for Envelope mode encryption.");
+            if (string.IsNullOrEmpty(config.KekKeyId))
+                throw new InvalidOperationException("No KEK key ID configured for Envelope mode encryption.");
+
+            // Generate random DEK
+            var dek = new byte[KeySizeBytes];
+            System.Security.Cryptography.RandomNumberGenerator.Fill(dek);
+
+            // Wrap DEK with KEK
+            var wrappedDek = await config.EnvelopeKeyStore.WrapKeyAsync(config.KekKeyId, dek, context);
+
+            // Generate IV
+            var iv = GenerateIv();
+
+            // Create envelope header
+            var envelope = new Security.EnvelopeHeader
+            {
+                KekId = config.KekKeyId,
+                KeyStorePluginId = config.EnvelopeKeyStorePluginId ?? "",
+                WrappedDek = wrappedDek,
+                Iv = iv,
+                EncryptionAlgorithm = AlgorithmId,
+                EncryptionPluginId = Id,
+                EncryptedAtTicks = DateTime.UtcNow.Ticks,
+                EncryptedBy = context.UserId
+            };
+
+            // Log key access
+            KeyAccessLog[$"envelope:{config.KekKeyId}"] = DateTime.UtcNow;
+
+            return (dek, $"envelope:{Guid.NewGuid():N}", envelope);
+        }
+
+        /// <summary>
+        /// Gets a key for decryption based on stored metadata.
+        /// </summary>
+        protected virtual async Task<byte[]> GetKeyForDecryptionAsync(
+            Security.EnvelopeHeader? envelope,
+            string? keyId,
+            Security.ResolvedKeyManagementConfig config,
+            Security.ISecurityContext context)
+        {
+            if (envelope != null)
+            {
+                // Envelope mode: unwrap DEK
+                var envelopeKeyStore = config.EnvelopeKeyStore
+                    ?? KeyStoreRegistry?.GetEnvelopeKeyStore(envelope.KeyStorePluginId)
+                    ?? throw new InvalidOperationException($"Cannot find envelope key store '{envelope.KeyStorePluginId}' to unwrap DEK.");
+
+                var dek = await envelopeKeyStore.UnwrapKeyAsync(envelope.KekId, envelope.WrappedDek, context);
+
+                KeyAccessLog[$"envelope:{envelope.KekId}"] = DateTime.UtcNow;
+
+                return dek;
+            }
+            else
+            {
+                // Direct mode: get key from store
+                if (string.IsNullOrEmpty(keyId))
+                    throw new InvalidOperationException("Key ID required for Direct mode decryption.");
+
+                var keyStore = config.KeyStore
+                    ?? DefaultKeyStore
+                    ?? throw new InvalidOperationException("No key store configured for Direct mode decryption.");
+
+                var key = await keyStore.GetKeyAsync(keyId, context);
+
+                KeyAccessLog[keyId] = DateTime.UtcNow;
+
+                return key;
+            }
+        }
+
+        #endregion
+
+        #region Security Context Resolution
+
+        /// <summary>
+        /// Gets the security context from operation arguments.
+        /// </summary>
+        protected virtual Security.ISecurityContext GetSecurityContext(Dictionary<string, object> args, IKernelContext context)
+        {
+            // Check for explicit security context in args
+            if (args.TryGetValue("securityContext", out var ctxObj) && ctxObj is Security.ISecurityContext secCtx)
+                return secCtx;
+
+            // Try to get from kernel context
+            // TODO: Define how kernel context provides security context
+
+            // Fallback to system context
+            return new DefaultSecurityContext();
+        }
+
+        /// <summary>
+        /// Default security context for when none is provided.
+        /// </summary>
+        protected class DefaultSecurityContext : Security.ISecurityContext
+        {
+            public string UserId => "system";
+            public string? TenantId => null;
+            public IEnumerable<string> Roles => new[] { "system" };
+            public bool IsSystemAdmin => true;
+        }
+
+        #endregion
+
+        #region OnWrite/OnRead Implementation
+
+        /// <summary>
+        /// Encrypts data during write operations.
+        /// Resolves config per-operation, supports both Direct and Envelope modes.
+        /// </summary>
+        protected override async Task<Stream> OnWriteAsync(Stream input, IKernelContext context, Dictionary<string, object> args)
+        {
+            var securityContext = GetSecurityContext(args, context);
+            var config = await ResolveConfigAsync(args, securityContext);
+
+            var (key, keyId, envelope) = await GetKeyForEncryptionAsync(config, securityContext);
+
+            try
+            {
+                // Get IV (from envelope or generate new)
+                var iv = envelope?.Iv ?? GenerateIv();
+
+                // Create encryption metadata for storage
+                var metadata = new Security.EncryptionMetadata
+                {
+                    EncryptionPluginId = Id,
+                    KeyMode = config.Mode,
+                    KeyId = config.Mode == Security.KeyManagementMode.Direct ? keyId : null,
+                    WrappedDek = envelope?.WrappedDek,
+                    KekId = envelope?.KekId,
+                    KeyStorePluginId = config.Mode == Security.KeyManagementMode.Direct
+                        ? config.KeyStorePluginId
+                        : config.EnvelopeKeyStorePluginId,
+                    AlgorithmParams = new Dictionary<string, object>
+                    {
+                        ["iv"] = Convert.ToBase64String(iv),
+                        ["algorithm"] = AlgorithmId
+                    },
+                    EncryptedAt = DateTime.UtcNow,
+                    EncryptedBy = securityContext.UserId
+                };
+
+                // Store metadata in args for downstream consumers (tamper-proof manifest, etc.)
+                args["encryptionMetadata"] = metadata;
+
+                // Perform encryption
+                var result = await EncryptCoreAsync(input, key, iv, context);
+
+                // Update statistics
+                UpdateEncryptionStats(input.Length);
+
+                return result;
+            }
+            finally
+            {
+                // Clear key from memory
+                Array.Clear(key, 0, key.Length);
+            }
+        }
+
+        /// <summary>
+        /// Decrypts data during read operations.
+        /// Uses stored metadata to determine correct decryption approach.
+        /// </summary>
+        protected override async Task<Stream> OnReadAsync(Stream stored, IKernelContext context, Dictionary<string, object> args)
+        {
+            var securityContext = GetSecurityContext(args, context);
+
+            // Try to get encryption metadata from args (from manifest or header)
+            Security.EnvelopeHeader? envelope = null;
+            string? keyId = null;
+            byte[]? iv = null;
+
+            if (args.TryGetValue("encryptionMetadata", out var metaObj) && metaObj is Security.EncryptionMetadata metadata)
+            {
+                // Use metadata from manifest
+                envelope = metadata.KeyMode == Security.KeyManagementMode.Envelope
+                    ? new Security.EnvelopeHeader
+                    {
+                        KekId = metadata.KekId ?? "",
+                        KeyStorePluginId = metadata.KeyStorePluginId ?? "",
+                        WrappedDek = metadata.WrappedDek ?? Array.Empty<byte>()
+                    }
+                    : null;
+                keyId = metadata.KeyId;
+
+                if (metadata.AlgorithmParams.TryGetValue("iv", out var ivObj) && ivObj is string ivStr)
+                    iv = Convert.FromBase64String(ivStr);
+            }
+            else
+            {
+                // Check for envelope header in stream
+                if (await Security.EnvelopeHeader.IsEnvelopeEncryptedAsync(stored))
+                {
+                    // Read and parse envelope header
+                    var headerBuffer = new byte[4096]; // Reasonable max header size
+                    var bytesRead = await stored.ReadAsync(headerBuffer, 0, headerBuffer.Length);
+                    stored.Position = 0;
+
+                    if (Security.EnvelopeHeader.TryDeserialize(headerBuffer, out envelope, out var headerLength))
+                    {
+                        // Skip header for decryption
+                        stored.Position = headerLength;
+                        iv = envelope!.Iv;
+                    }
+                }
+                else if (args.TryGetValue("keyId", out var kidObj) && kidObj is string kid)
+                {
+                    keyId = kid;
+                }
+            }
+
+            // Resolve config (may be overridden by args for testing/migration)
+            var config = await ResolveConfigAsync(args, securityContext);
+
+            // Get decryption key
+            var key = await GetKeyForDecryptionAsync(envelope, keyId, config, securityContext);
+
+            try
+            {
+                // Perform decryption
+                var (result, _) = await DecryptCoreAsync(stored, key, iv, context);
+
+                // Update statistics
+                UpdateDecryptionStats(stored.Length);
+
+                return result;
+            }
+            finally
+            {
+                // Clear key from memory
+                Array.Clear(key, 0, key.Length);
+            }
+        }
+
+        #endregion
+
+        #region Abstract Methods (Algorithm-Specific)
+
+        /// <summary>
+        /// Performs the core encryption operation.
+        /// Must be implemented by derived classes with specific algorithms.
+        /// </summary>
+        /// <param name="input">The plaintext input stream.</param>
+        /// <param name="key">The encryption key.</param>
+        /// <param name="iv">The initialization vector.</param>
+        /// <param name="context">The kernel context.</param>
+        /// <returns>The encrypted stream.</returns>
+        protected abstract Task<Stream> EncryptCoreAsync(Stream input, byte[] key, byte[] iv, IKernelContext context);
+
+        /// <summary>
+        /// Performs the core decryption operation.
+        /// Must be implemented by derived classes with specific algorithms.
+        /// </summary>
+        /// <param name="input">The ciphertext input stream.</param>
+        /// <param name="key">The decryption key.</param>
+        /// <param name="iv">The initialization vector (null if embedded in ciphertext).</param>
+        /// <param name="context">The kernel context.</param>
+        /// <returns>The decrypted stream and authentication tag (if applicable).</returns>
+        protected abstract Task<(Stream data, byte[]? tag)> DecryptCoreAsync(Stream input, byte[] key, byte[]? iv, IKernelContext context);
+
+        /// <summary>
+        /// Generates a random IV/nonce.
+        /// Override if algorithm requires specific IV generation.
+        /// </summary>
+        protected virtual byte[] GenerateIv()
+        {
+            var iv = new byte[IvSizeBytes];
+            System.Security.Cryptography.RandomNumberGenerator.Fill(iv);
+            return iv;
+        }
+
+        #endregion
+
+        #region Statistics
+
+        /// <summary>
+        /// Updates encryption statistics.
+        /// </summary>
+        protected virtual void UpdateEncryptionStats(long bytesProcessed)
+        {
+            lock (StatsLock)
+            {
+                EncryptionCount++;
+                TotalBytesEncrypted += bytesProcessed;
+            }
+        }
+
+        /// <summary>
+        /// Updates decryption statistics.
+        /// </summary>
+        protected virtual void UpdateDecryptionStats(long bytesProcessed)
+        {
+            lock (StatsLock)
+            {
+                DecryptionCount++;
+                TotalBytesDecrypted += bytesProcessed;
+            }
+        }
+
+        /// <summary>
+        /// Gets encryption statistics.
+        /// </summary>
+        public virtual EncryptionStatistics GetStatistics()
+        {
+            lock (StatsLock)
+            {
+                return new EncryptionStatistics
+                {
+                    EncryptionCount = EncryptionCount,
+                    DecryptionCount = DecryptionCount,
+                    TotalBytesEncrypted = TotalBytesEncrypted,
+                    TotalBytesDecrypted = TotalBytesDecrypted,
+                    UniqueKeysUsed = KeyAccessLog.Count,
+                    LastKeyAccess = KeyAccessLog.Values.DefaultIfEmpty().Max()
+                };
+            }
+        }
+
+        #endregion
+
+        #region Configuration Methods
+
+        /// <summary>
+        /// Configures the default key store for Direct mode.
+        /// </summary>
+        public virtual void SetDefaultKeyStore(Security.IKeyStore keyStore)
+        {
+            DefaultKeyStore = keyStore ?? throw new ArgumentNullException(nameof(keyStore));
+        }
+
+        /// <summary>
+        /// Configures the default envelope key store for Envelope mode.
+        /// </summary>
+        public virtual void SetDefaultEnvelopeKeyStore(Security.IEnvelopeKeyStore envelopeKeyStore, string kekKeyId)
+        {
+            DefaultEnvelopeKeyStore = envelopeKeyStore ?? throw new ArgumentNullException(nameof(envelopeKeyStore));
+            DefaultKekKeyId = kekKeyId ?? throw new ArgumentNullException(nameof(kekKeyId));
+        }
+
+        /// <summary>
+        /// Sets the default key management mode.
+        /// </summary>
+        public virtual void SetDefaultMode(Security.KeyManagementMode mode)
+        {
+            DefaultKeyManagementMode = mode;
+        }
+
+        /// <summary>
+        /// Sets the per-user configuration provider.
+        /// </summary>
+        public virtual void SetConfigProvider(Security.IKeyManagementConfigProvider provider)
+        {
+            ConfigProvider = provider;
+        }
+
+        /// <summary>
+        /// Sets the key store registry.
+        /// </summary>
+        public virtual void SetKeyStoreRegistry(Security.IKeyStoreRegistry registry)
+        {
+            KeyStoreRegistry = registry;
+        }
+
+        #endregion
+
+        #region Metadata
+
+        public override string SubCategory => "Encryption";
+
+        protected override Dictionary<string, object> GetMetadata()
+        {
+            var metadata = base.GetMetadata();
+            metadata["EncryptionAlgorithm"] = AlgorithmId;
+            metadata["KeySizeBytes"] = KeySizeBytes;
+            metadata["IvSizeBytes"] = IvSizeBytes;
+            metadata["TagSizeBytes"] = TagSizeBytes;
+            metadata["SupportsEnvelopeMode"] = true;
+            metadata["SupportsDirectMode"] = true;
+            metadata["SupportsPerUserConfig"] = true;
+            return metadata;
+        }
+
+        #endregion
+
+        #region IDisposable
+
+        private bool _disposed;
+
+        protected virtual void Dispose(bool disposing)
+        {
+            if (_disposed) return;
+
+            if (disposing)
+            {
+                KeyAccessLog.Clear();
+            }
+
+            _disposed = true;
+        }
+
+        public void Dispose()
+        {
+            Dispose(true);
+            GC.SuppressFinalize(this);
+        }
+
+        #endregion
+    }
+
+    /// <summary>
+    /// Statistics for encryption plugin operations.
+    /// </summary>
+    public record EncryptionStatistics
+    {
+        public long EncryptionCount { get; init; }
+        public long DecryptionCount { get; init; }
+        public long TotalBytesEncrypted { get; init; }
+        public long TotalBytesDecrypted { get; init; }
+        public int UniqueKeysUsed { get; init; }
+        public DateTime LastKeyAccess { get; init; }
+    }
+
+    #endregion
+
     /// <summary>
     /// Abstract base class for container/partition manager plugins.
     /// Provides storage-agnostic partition management.
