@@ -62,8 +62,9 @@ public class KafkaMessagingConnectorPlugin : MessagingConnectorPluginBase
         await _connectionLock.WaitAsync(ct);
         try
         {
+            var props = (IReadOnlyDictionary<string, string?>)config.Properties;
             _bootstrapServers = config.ConnectionString;
-            _groupId = config.Properties.GetValueOrDefault("GroupId", _config.DefaultGroupId);
+            _groupId = props.GetValueOrDefault("GroupId", _config.DefaultGroupId);
 
             if (string.IsNullOrWhiteSpace(_bootstrapServers))
             {

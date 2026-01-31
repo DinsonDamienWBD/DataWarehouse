@@ -36,12 +36,12 @@
 
   <!-- Windows Service Framework for VSS -->
   <ItemGroup>
-    <PackageReference Include="System.ServiceProcess.ServiceController" Version="10.0.0" />
+    <PackageReference Include="System.ServiceProcess.ServiceController" Version="10.0.2" />
   </ItemGroup>
 
   <!-- Windows Management Instrumentation for BitLocker -->
   <ItemGroup>
-    <PackageReference Include="System.Management" Version="10.0.0" />
+    <PackageReference Include="System.Management" Version="10.0.2" />
   </ItemGroup>
 
 </Project>

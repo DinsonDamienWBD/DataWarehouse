@@ -19,7 +19,7 @@
 
   <!-- BouncyCastle provides production-ready PQC implementations -->
   <ItemGroup>
-    <PackageReference Include="BouncyCastle.Cryptography" Version="2.5.1" />
+    <PackageReference Include="BouncyCastle.Cryptography" Version="2.6.2" />
   </ItemGroup>
 
 </Project>
