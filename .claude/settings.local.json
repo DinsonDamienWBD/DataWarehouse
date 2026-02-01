@@ -83,7 +83,12 @@
       "Bash(git checkout:*)",
       "Bash(Select-String -Pattern \"\\(NatsConnectorPlugin|CassandraConnectorPlugin|RabbitMqConnectorPlugin\\)\" -Context 0,2)",
       "Bash(Select-String -Pattern \"\\(MongoDbConnectorPlugin|BigQueryConnectorPlugin|PulsarConnectorPlugin\\)\" -Context 0,2)",
-      "Bash(Select-String -Pattern \"\\(MainframeConnectorPlugin|SapConnectorPlugin|BackblazeB2ConnectorPlugin|GcsConnectorPlugin\\)\" -Context 0,1)"
+      "Bash(Select-String -Pattern \"\\(MainframeConnectorPlugin|SapConnectorPlugin|BackblazeB2ConnectorPlugin|GcsConnectorPlugin\\)\" -Context 0,1)",
+      "Bash(Select-String -Pattern \"\\(error|warning CS\\)\")",
+      "Bash(Select-String -Pattern \"Wasabi|S3Connector\")",
+      "Bash(Select-Object -First 10)",
+      "Bash(Remove-Item -Recurse -Force \"C:\\\\Temp\\\\DataWarehouse\\\\DataWarehouse\\\\Plugins\\\\DataWarehouse.Plugins.CarbonAware\")",
+      "Bash(Select-String -Pattern \"OpenApi\")"
     ]
   }
 }
