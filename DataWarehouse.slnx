@@ -40,7 +40,6 @@
     <Project Path="Plugins/DataWarehouse.Plugins.BreakGlassRecovery/DataWarehouse.Plugins.BreakGlassRecovery.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.BrotliCompression/DataWarehouse.Plugins.BrotliCompression.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.CanaryDeployment/DataWarehouse.Plugins.CanaryDeployment.csproj" />
-    <Project Path="Plugins/DataWarehouse.Plugins.CarbonAware/DataWarehouse.Plugins.CarbonAware.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.CarbonAwareness/DataWarehouse.Plugins.CarbonAwareness.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.ChaCha20Encryption/DataWarehouse.Plugins.ChaCha20Encryption.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.Chronograf/DataWarehouse.Plugins.Chronograf.csproj" />

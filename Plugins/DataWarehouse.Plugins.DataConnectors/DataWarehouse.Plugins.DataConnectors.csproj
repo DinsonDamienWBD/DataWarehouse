@@ -28,6 +28,8 @@
     <PackageReference Include="MongoDB.Driver" Version="3.6.0" />
     <!-- SQL Server client -->
     <PackageReference Include="Microsoft.Data.SqlClient" Version="6.1.4" />
+    <!-- SQLite client -->
+    <PackageReference Include="Microsoft.Data.Sqlite" Version="9.0.2" />
     <!-- Cassandra client -->
     <PackageReference Include="CassandraCSharpDriver" Version="3.22.0" />
     <!-- RabbitMQ client -->
