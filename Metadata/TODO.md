@@ -5306,5 +5306,716 @@ This creates a complete audit trail for every change, enabling compliance report
 
 ---
 
-*Document updated: 2026-01-25*
+## PHASE 5: ACTIVE STORAGE - The Sentient Data Platform
+
+**Vision:** Transform DataWarehouse from a passive storage system into an **Active, Intelligent, Self-Defending Data Organism** that processes, protects, and evolves data autonomously.
+
+**Target:** Create a **Category of One** platform with capabilities no existing system (AWS S3, Dropbox, Synology, Snowflake) can match.
+
+---
+
+### CATEGORY A: Computational & "Active" Storage
+
+#### Task 70: Serverless Compute-on-Storage (WASM Containers)
+**Priority:** P0
+**Effort:** Very High
+**Status:** [ ] Not Started
+**Plugin:** `DataWarehouse.Plugins.Compute.Wasm`
+
+**Description:** Generic user-defined compute layer allowing WebAssembly functions to run directly inside storage nodes, eliminating network transfer for data processing.
+
+**Sub-Tasks:**
+
+| # | Sub-Task | Description | Status |
+|---|----------|-------------|--------|
+| 70.1 | WASM Runtime Integration | Integrate Wasmtime/WasmEdge runtime into plugin architecture | [ ] |
+| 70.2 | Function Registry | Create registry for deploying/managing WASM functions | [ ] |
+| 70.3 | Sandboxed Execution | Implement memory/CPU/time limits for function execution | [ ] |
+| 70.4 | Data Binding API | Create API for functions to access storage objects directly | [ ] |
+| 70.5 | Trigger System | Event-based triggers (on-write, on-read, scheduled) | [ ] |
+| 70.6 | Function Chaining | Allow output of one function to feed another | [ ] |
+| 70.7 | Hot Reload | Deploy new function versions without restart | [ ] |
+| 70.8 | Metrics & Logging | Execution metrics, logs, and error tracking | [ ] |
+| 70.9 | Pre-built Templates | Video transcoder, log parser, image resizer templates | [ ] |
+| 70.10 | Multi-language Support | Compile from Rust/Go/C/AssemblyScript to WASM | [ ] |
+
+**SDK Requirements:**
+- `IWasmRuntime` interface for WASM execution
+- `WasmFunctionPluginBase` base class
+- `FunctionTrigger` enum (OnWrite, OnRead, OnSchedule, OnEvent)
+- `WasmExecutionContext` for function I/O
+
+---
+
+#### Task 71: SQL-over-Object (Data Virtualization)
+**Priority:** P0
+**Effort:** High
+**Status:** [ ] Not Started
+**Plugin:** `DataWarehouse.Plugins.Virtualization.SqlOverObject`
+
+**Description:** Execute SQL queries directly against raw CSV/JSON/Parquet/Avro files stored as objects without ETL or data movement.
+
+**Sub-Tasks:**
+
+| # | Sub-Task | Description | Status |
+|---|----------|-------------|--------|
+| 71.1 | Schema Inference Engine | Auto-detect schema from CSV/JSON/Parquet headers | [ ] |
+| 71.2 | Virtual Table Registry | Register object paths as queryable virtual tables | [ ] |
+| 71.3 | Predicate Pushdown | Push WHERE clauses to file scanners for efficiency | [ ] |
+| 71.4 | Columnar Projection | Only read required columns from Parquet/ORC | [ ] |
+| 71.5 | Partition Pruning | Skip files based on partition metadata | [ ] |
+| 71.6 | Join Optimization | Hash/merge joins across multiple object files | [ ] |
+| 71.7 | Aggregation Engine | GROUP BY, COUNT, SUM, AVG on streaming data | [ ] |
+| 71.8 | Query Cache | Cache query plans and intermediate results | [ ] |
+| 71.9 | Format Handlers | CSV, JSON, NDJSON, Parquet, Avro, ORC readers | [ ] |
+| 71.10 | JDBC/ODBC Bridge | Standard database connectivity for BI tools | [ ] |
+
+**SDK Requirements:**
+- `IVirtualTableProvider` interface
+- `DataVirtualizationPluginBase` base class
+- `SchemaInference` utility class
+- `QueryExecutionPlan` for optimization
+
+---
+
+#### Task 72: Auto-Transcoding Pipeline (Media & Docs)
+**Priority:** P1
+**Effort:** High
+**Status:** [ ] Not Started
+**Plugin:** `DataWarehouse.Plugins.Transcoding.Media`
+
+**Description:** "Store Once, View Anywhere" - automatic on-the-fly conversion of media and documents to requested formats.
+
+**Sub-Tasks:**
+
+| # | Sub-Task | Description | Status |
+|---|----------|-------------|--------|
+| 72.1 | FFmpeg Integration | Integrate FFmpeg for video/audio transcoding | [ ] |
+| 72.2 | ImageMagick Integration | Image format conversion and resizing | [ ] |
+| 72.3 | Document Conversion | PDF/DOCX/HTML conversion via LibreOffice headless | [ ] |
+| 72.4 | Format Negotiation | Content-Type negotiation in API requests | [ ] |
+| 72.5 | Quality Presets | 4K/1080p/720p/480p/thumbnail presets | [ ] |
+| 72.6 | Adaptive Bitrate | HLS/DASH streaming manifest generation | [ ] |
+| 72.7 | Transcoding Queue | Priority queue for transcoding jobs | [ ] |
+| 72.8 | Result Caching | Cache transcoded versions for repeated access | [ ] |
+| 72.9 | Watermark Injection | Add watermarks during transcoding | [ ] |
+| 72.10 | Progress Tracking | Real-time transcoding progress API | [ ] |
+
+**SDK Requirements:**
+- `ITranscodingProvider` interface
+- `MediaTranscodingPluginBase` base class
+- `TranscodingProfile` configuration class
+- `MediaFormat` enum for supported formats
+
+---
+
+### CATEGORY B: Advanced Security & Counter-Measures
+
+#### Task 73: Canary Objects (Honeytokens)
+**Priority:** P0
+**Effort:** Medium
+**Status:** [ ] Not Started
+**Plugin:** `DataWarehouse.Plugins.Security.Canary`
+
+**Description:** Active defense using decoy files that trigger instant lockdown when accessed, detecting ransomware and insider threats before damage occurs.
+
+**Sub-Tasks:**
+
+| # | Sub-Task | Description | Status |
+|---|----------|-------------|--------|
+| 73.1 | Canary Generator | Create convincing fake files (passwords.xlsx, wallet.dat) | [ ] |
+| 73.2 | Placement Strategy | Intelligent placement in directories likely to be scanned | [ ] |
+| 73.3 | Access Monitoring | Real-time monitoring of canary file access | [ ] |
+| 73.4 | Instant Lockdown | Automatic account/session termination on access | [ ] |
+| 73.5 | Alert Pipeline | Multi-channel alerts (email, SMS, webhook, SIEM) | [ ] |
+| 73.6 | Forensic Capture | Capture process info, network state on trigger | [ ] |
+| 73.7 | Canary Rotation | Periodic rotation of canary files to avoid detection | [ ] |
+| 73.8 | Exclusion Rules | Whitelist legitimate backup/AV processes | [ ] |
+| 73.9 | Canary Types | File canaries, directory canaries, API honeytokens | [ ] |
+| 73.10 | Effectiveness Metrics | Track canary trigger rates and false positives | [ ] |
+
+**SDK Requirements:**
+- `ICanaryProvider` interface
+- `CanaryPluginBase` base class
+- `CanaryTriggerEvent` for alert handling
+- `ThreatResponse` enum (Lock, Alert, Quarantine, Kill)
+
+---
+
+#### Task 74: Steganographic Sharding
+**Priority:** P1
+**Effort:** Very High
+**Status:** [ ] Not Started
+**Plugin:** `DataWarehouse.Plugins.Obfuscation.Steganography`
+
+**Description:** Plausible deniability through embedding data shards into innocent-looking media files, making sensitive data existence undetectable to forensic analysis.
+
+**Sub-Tasks:**
+
+| # | Sub-Task | Description | Status |
+|---|----------|-------------|--------|
+| 74.1 | LSB Embedding Engine | Least Significant Bit embedding for images | [ ] |
+| 74.2 | DCT Coefficient Hiding | Frequency domain hiding for JPEG images | [ ] |
+| 74.3 | Audio Steganography | Echo hiding and phase coding for audio files | [ ] |
+| 74.4 | Video Frame Embedding | Temporal redundancy exploitation in video | [ ] |
+| 74.5 | Carrier Selection | Automatically select optimal carrier files | [ ] |
+| 74.6 | Capacity Calculator | Calculate maximum payload for each carrier | [ ] |
+| 74.7 | Shard Distribution | Distribute shards across multiple carriers | [ ] |
+| 74.8 | Extraction Engine | Reassemble data from stego-carriers | [ ] |
+| 74.9 | Steganalysis Resistance | Resist statistical detection methods | [ ] |
+| 74.10 | Decoy Layers | Multiple decoy data layers for plausible deniability | [ ] |
+
+**SDK Requirements:**
+- `ISteganographyProvider` interface
+- `SteganographyPluginBase` base class
+- `CarrierFile` class for media containers
+- `EmbeddingAlgorithm` enum (LSB, DCT, Echo, Phase)
+
+---
+
+#### Task 75: Multi-Party Computation (SMPC) Vaults
+**Priority:** P1
+**Effort:** Very High
+**Status:** [ ] Not Started
+**Plugin:** `DataWarehouse.Plugins.Privacy.SMPC`
+
+**Description:** Secure computation between multiple organizations without revealing raw data - compute shared results while keeping inputs private.
+
+**Sub-Tasks:**
+
+| # | Sub-Task | Description | Status |
+|---|----------|-------------|--------|
+| 75.1 | Secret Sharing Scheme | Implement Shamir's Secret Sharing | [ ] |
+| 75.2 | Garbled Circuits | Yao's garbled circuit protocol implementation | [ ] |
+| 75.3 | Oblivious Transfer | 1-out-of-2 and 1-out-of-N OT protocols | [ ] |
+| 75.4 | Arithmetic Circuits | Addition and multiplication over secret shares | [ ] |
+| 75.5 | Boolean Circuits | AND, OR, XOR over encrypted bits | [ ] |
+| 75.6 | Party Coordination | Multi-party session setup and coordination | [ ] |
+| 75.7 | Result Revelation | Secure result disclosure to authorized parties | [ ] |
+| 75.8 | Common Operations | Set intersection, sum, average, comparison | [ ] |
+| 75.9 | Malicious Security | Protection against cheating parties | [ ] |
+| 75.10 | Audit Trail | Cryptographic proof of computation integrity | [ ] |
+
+**SDK Requirements:**
+- `ISecureComputationProvider` interface
+- `SMPCPluginBase` base class
+- `SecretShare` class for distributed secrets
+- `ComputationCircuit` for defining operations
+
+---
+
+#### Task 76: Digital Dead Drops (Ephemeral Sharing)
+**Priority:** P1
+**Effort:** Medium
+**Status:** [ ] Not Started
+**Plugin:** `DataWarehouse.Plugins.Sharing.Ephemeral`
+
+**Description:** Mission Impossible-style sharing with self-destructing links that expire after exactly N reads or N minutes.
+
+**Sub-Tasks:**
+
+| # | Sub-Task | Description | Status |
+|---|----------|-------------|--------|
+| 76.1 | Ephemeral Link Generator | Create time/access-limited sharing URLs | [ ] |
+| 76.2 | Access Counter | Atomic counter for remaining access attempts | [ ] |
+| 76.3 | TTL Engine | Precise time-based expiration (seconds granularity) | [ ] |
+| 76.4 | Burn After Reading | Immediate deletion after final read | [ ] |
+| 76.5 | Destruction Proof | Cryptographic proof that data was destroyed | [ ] |
+| 76.6 | Access Logging | Record accessor IP, time, user-agent | [ ] |
+| 76.7 | Password Protection | Optional password layer on ephemeral links | [ ] |
+| 76.8 | Recipient Notification | Notify sender when link is accessed | [ ] |
+| 76.9 | Revocation | Sender can revoke link before expiration | [ ] |
+| 76.10 | Anti-Screenshot | Browser-side protections against capture | [ ] |
+
+**SDK Requirements:**
+- `IEphemeralSharingProvider` interface
+- `EphemeralSharingPluginBase` base class
+- `EphemeralLink` class with expiration rules
+- `DestructionPolicy` enum (OnRead, OnTime, OnRevoke)
+
+---
+
+### CATEGORY C: Physics & Logistics
+
+#### Task 77: Sovereignty Geofencing
+**Priority:** P0
+**Effort:** High
+**Status:** [ ] Not Started
+**Plugin:** `DataWarehouse.Plugins.Governance.Geofencing`
+
+**Description:** Hard-coded compliance that defies admin overrides - data tagged with sovereignty requirements physically cannot write to unauthorized regions.
+
+**Sub-Tasks:**
+
+| # | Sub-Task | Description | Status |
+|---|----------|-------------|--------|
+| 77.1 | Geolocation Service | IP-to-location mapping with multiple providers | [ ] |
+| 77.2 | Region Registry | Define geographic regions (EU, US, APAC, etc.) | [ ] |
+| 77.3 | Data Tagging | Tag objects with sovereignty requirements | [ ] |
+| 77.4 | Write Interception | Block writes to non-compliant storage nodes | [ ] |
+| 77.5 | Replication Fence | Prevent replication across sovereignty boundaries | [ ] |
+| 77.6 | Admin Override Prevention | Cryptographic enforcement even admins can't bypass | [ ] |
+| 77.7 | Compliance Audit | Log all sovereignty decisions for auditors | [ ] |
+| 77.8 | Dynamic Reconfiguration | Handle node location changes | [ ] |
+| 77.9 | Attestation | Hardware attestation of node physical location | [ ] |
+| 77.10 | Cross-Border Exceptions | Controlled exceptions with legal approval workflow | [ ] |
+
+**SDK Requirements:**
+- `IGeofenceProvider` interface
+- `GeofencingPluginBase` base class
+- `SovereigntyTag` class for data tagging
+- `GeographicRegion` enum and custom region definitions
+
+---
+
+#### Task 78: Protocol Morphing (Adaptive Transport)
+**Priority:** P1
+**Effort:** High
+**Status:** [ ] Not Started
+**Plugin:** `DataWarehouse.Plugins.Transport.Adaptive`
+
+**Description:** Dynamic transport layer switching based on network conditions - TCP to UDP/QUIC or custom high-latency protocols for degraded networks.
+
+**Sub-Tasks:**
+
+| # | Sub-Task | Description | Status |
+|---|----------|-------------|--------|
+| 78.1 | Network Quality Monitor | Real-time latency, jitter, packet loss measurement | [ ] |
+| 78.2 | QUIC Implementation | HTTP/3 and QUIC transport support | [ ] |
+| 78.3 | UDP Reliable Layer | Reliable UDP with custom ACK mechanism | [ ] |
+| 78.4 | High-Latency Protocol | Store-and-forward for satellite/field networks | [ ] |
+| 78.5 | Protocol Negotiation | Automatic protocol selection based on conditions | [ ] |
+| 78.6 | Seamless Switching | Mid-stream protocol transitions | [ ] |
+| 78.7 | Compression Adaptation | Adjust compression based on bandwidth | [ ] |
+| 78.8 | Connection Pooling | Maintain pools for each protocol type | [ ] |
+| 78.9 | Fallback Chain | Ordered fallback sequence for connectivity | [ ] |
+| 78.10 | Satellite Mode | Special optimizations for >500ms latency | [ ] |
+
+**SDK Requirements:**
+- `IAdaptiveTransport` interface
+- `AdaptiveTransportPluginBase` base class
+- `NetworkConditions` class for quality metrics
+- `TransportProtocol` enum (TCP, QUIC, ReliableUDP, StoreForward)
+
+---
+
+#### Task 79: The Mule (Air-Gap Bridge) - Tri-Mode USB System
+**Priority:** P0
+**Effort:** Very High
+**Status:** [ ] Not Started
+**Plugin:** `DataWarehouse.Plugins.Transport.AirGap`
+
+**Description:** Standardized "Sneakernet" with encrypted USB drives supporting three modes: Transport (encrypted blob container), Storage Extension (capacity tier), and Pocket Instance (full portable DataWarehouse).
+
+**Sub-Tasks:**
+
+| # | Sub-Task | Description | Status |
+|---|----------|-------------|--------|
+| **Detection & Handshake** |
+| 79.1 | USB Sentinel Service | Windows service monitoring drive insertion events | [ ] |
+| 79.2 | Config File Scanner | Detect `.dw-config` identity file on drive root | [ ] |
+| 79.3 | Mode Detection | Parse config to determine Transport/Storage/Instance mode | [ ] |
+| 79.4 | Cryptographic Signature | Verify drive authenticity via embedded signatures | [ ] |
+| **Mode 1: Transport (The Mule)** |
+| 79.5 | Package Creator | Create `.dwpack` files (encrypted shards + manifest) | [ ] |
+| 79.6 | Auto-Ingest Engine | Detect BlobContainer tag and import automatically | [ ] |
+| 79.7 | Signature Verification | Verify package against trusted keys before import | [ ] |
+| 79.8 | Shard Unpacker | Extract and store shards to local storage | [ ] |
+| 79.9 | Result Logging | Write `result.log` to USB for sender feedback | [ ] |
+| 79.10 | Secure Wipe | Optional cryptographic wipe after successful import | [ ] |
+| **Mode 2: Storage Extension (The Sidecar)** |
+| 79.11 | Dynamic Provider Loading | Load `LocalFileSystemProvider` for USB path | [ ] |
+| 79.12 | Capacity Registration | Register USB capacity with storage pool | [ ] |
+| 79.13 | Cold Data Migration | Auto-migrate cold data to USB tier | [ ] |
+| 79.14 | Safe Removal Handler | Handle unplugging gracefully | [ ] |
+| 79.15 | Offline Index | Maintain index entries for offline USB data | [ ] |
+| **Mode 3: Pocket Instance (Full DW on a Stick)** |
+| 79.16 | Guest Context Isolation | Spin up isolated DW instance for USB | [ ] |
+| 79.17 | Portable Index DB | SQLite/LiteDB index on USB drive | [ ] |
+| 79.18 | Bridge Mode UI | Show "External: [Name] (USB)" in sidebar | [ ] |
+| 79.19 | Cross-Instance Transfer | Drag-drop between laptop DW and USB DW | [ ] |
+| 79.20 | Sync Tasks | Configurable sync rules between instances | [ ] |
+| **Security** |
+| 79.21 | Full Volume Encryption | BitLocker or internal encryption-at-rest | [ ] |
+| 79.22 | PIN/Password Prompt | Authentication dialog on USB detection | [ ] |
+| 79.23 | Keyfile Authentication | Auto-mount from trusted machines | [ ] |
+| 79.24 | Time-to-Live Kill Switch | Auto-delete keys after N days offline | [ ] |
+| 79.25 | Hardware Key Support | YubiKey/FIDO2 for USB authentication | [ ] |
+| **Setup & Management** |
+| 79.26 | Pocket Setup Wizard | Format Drive as Pocket DW utility | [ ] |
+| 79.27 | Instance ID Generator | Unique cryptographic instance identifiers | [ ] |
+| 79.28 | Portable Client Bundler | Include portable DW client on USB | [ ] |
+
+**SDK Requirements:**
+- `IAirGapTransport` interface
+- `AirGapPluginBase` base class
+- `UsbDriveMode` enum (Transport, StorageExtension, PocketInstance)
+- `DwPackage` class for encrypted transport packages
+- `PortableInstance` class for USB-based DW instances
+- `UsbSecurityPolicy` class for authentication rules
+
+---
+
+### CATEGORY D: Data Physics & Time
+
+#### Task 80: Infinite Versioning (Continuous Data Protection)
+**Priority:** P0
+**Effort:** Very High
+**Status:** [ ] Not Started
+**Plugin:** `DataWarehouse.Plugins.Recovery.CDP`
+
+**Description:** Record every I/O operation enabling "Time Travel" recovery to any specific second, not just scheduled snapshots.
+
+**Sub-Tasks:**
+
+| # | Sub-Task | Description | Status |
+|---|----------|-------------|--------|
+| 80.1 | Write-Ahead Log | Append-only log of all write operations | [ ] |
+| 80.2 | Operation Journal | Record operation type, offset, length, data hash | [ ] |
+| 80.3 | Timestamp Index | Microsecond-precision timestamp indexing | [ ] |
+| 80.4 | Point-in-Time Recovery | Reconstruct object state at any timestamp | [ ] |
+| 80.5 | Journal Compaction | Merge old journal entries to save space | [ ] |
+| 80.6 | Retention Policies | Configurable retention (seconds/minutes/hours/days) | [ ] |
+| 80.7 | Time Travel API | Query historical state via timestamp parameter | [ ] |
+| 80.8 | Recovery Validation | Verify reconstructed data integrity | [ ] |
+| 80.9 | Continuous Backup Stream | Real-time replication of journal to remote | [ ] |
+| 80.10 | Storage Efficiency | Deduplication and compression of journal | [ ] |
+
+**SDK Requirements:**
+- `IContinuousDataProtection` interface
+- `CDPPluginBase` base class
+- `JournalEntry` class for operation records
+- `TimePoint` struct for microsecond timestamps
+- `RecoveryTarget` class for point-in-time specification
+
+---
+
+#### Task 81: Liquid Storage Tiers (Block-Level Heatmap)
+**Priority:** P1
+**Effort:** Very High
+**Status:** [ ] Not Started
+**Plugin:** `DataWarehouse.Plugins.Tiering.BlockLevel`
+
+**Description:** Sub-file block-level tiering - keep hot blocks on NVMe while cold blocks of the same file reside on S3, transparently.
+
+**Sub-Tasks:**
+
+| # | Sub-Task | Description | Status |
+|---|----------|-------------|--------|
+| 81.1 | Block Access Tracker | Track access frequency per block (not file) | [ ] |
+| 81.2 | Heatmap Generator | Visual and queryable block heat distribution | [ ] |
+| 81.3 | Block Splitter | Split files into independently movable blocks | [ ] |
+| 81.4 | Transparent Reassembly | Seamlessly reassemble blocks for file reads | [ ] |
+| 81.5 | Tier Migration Engine | Move individual blocks between storage tiers | [ ] |
+| 81.6 | Predictive Prefetch | Anticipate block access and pre-stage | [ ] |
+| 81.7 | Block Metadata Index | Track which blocks are on which tier | [ ] |
+| 81.8 | Cost Optimizer | Balance performance vs storage cost per block | [ ] |
+| 81.9 | Database Optimization | Special handling for database file patterns | [ ] |
+| 81.10 | Real-time Rebalancing | Continuous optimization as access patterns change | [ ] |
+
+**SDK Requirements:**
+- `IBlockLevelTiering` interface
+- `BlockLevelTieringPluginBase` base class
+- `BlockHeatmap` class for access tracking
+- `BlockLocation` class for tier mapping
+- `TierMigrationPolicy` for block movement rules
+
+---
+
+### CATEGORY E: Collaboration
+
+#### Task 82: Data Branching (Git-for-Data)
+**Priority:** P0
+**Effort:** Very High
+**Status:** [ ] Not Started
+**Plugin:** `DataWarehouse.Plugins.VersionControl.Branching`
+
+**Description:** Fork datasets instantly using Copy-on-Write semantics, modify independently, and merge changes - without duplicating storage.
+
+**Sub-Tasks:**
+
+| # | Sub-Task | Description | Status |
+|---|----------|-------------|--------|
+| 82.1 | Branch Creation | Instant fork via pointer arithmetic (no copy) | [ ] |
+| 82.2 | Copy-on-Write Engine | Only copy modified blocks on write | [ ] |
+| 82.3 | Branch Registry | Track all branches and their relationships | [ ] |
+| 82.4 | Diff Engine | Calculate differences between branches | [ ] |
+| 82.5 | Merge Engine | Three-way merge with conflict detection | [ ] |
+| 82.6 | Conflict Resolution | Manual and automatic conflict resolution | [ ] |
+| 82.7 | Branch Visualization | Tree view of branch history | [ ] |
+| 82.8 | Pull Requests | Propose and review merges before execution | [ ] |
+| 82.9 | Branch Permissions | Access control per branch | [ ] |
+| 82.10 | Garbage Collection | Reclaim space from deleted branches | [ ] |
+
+**SDK Requirements:**
+- `IDataBranching` interface
+- `DataBranchingPluginBase` base class
+- `Branch` class representing a data branch
+- `MergeResult` class with conflict information
+- `BranchDiff` class for change tracking
+
+---
+
+#### Task 83: Data Marketplace (Smart Contracts)
+**Priority:** P1
+**Effort:** High
+**Status:** [ ] Not Started
+**Plugin:** `DataWarehouse.Plugins.Commerce.Marketplace`
+
+**Description:** Billing and tracking layer for dataset monetization - internal chargebacks and external data sales with usage metering.
+
+**Sub-Tasks:**
+
+| # | Sub-Task | Description | Status |
+|---|----------|-------------|--------|
+| 83.1 | Data Listing | Publish datasets with pricing and terms | [ ] |
+| 83.2 | Subscription Engine | Time-based and query-based access models | [ ] |
+| 83.3 | Usage Metering | Track queries, bytes transferred, compute used | [ ] |
+| 83.4 | Billing Integration | Generate invoices and integrate with payment | [ ] |
+| 83.5 | License Management | Enforce usage terms and restrictions | [ ] |
+| 83.6 | Access Revocation | Automatic revocation on payment failure | [ ] |
+| 83.7 | Data Preview | Sample data without full access | [ ] |
+| 83.8 | Rating & Reviews | Buyer feedback on data quality | [ ] |
+| 83.9 | Chargeback Reporting | Internal cost allocation reports | [ ] |
+| 83.10 | Smart Contract Integration | Optional blockchain-based contracts | [ ] |
+
+**SDK Requirements:**
+- `IDataMarketplace` interface
+- `MarketplacePluginBase` base class
+- `DataListing` class for published datasets
+- `UsageRecord` class for metering
+- `PricingModel` enum (PerQuery, PerByte, Subscription, OneTime)
+
+---
+
+### CATEGORY F: Generative & Probabilistic Layer
+
+#### Task 84: Generative/Semantic Compression (The "Dream" Store)
+**Priority:** P1
+**Effort:** Extreme
+**Status:** [ ] Not Started
+**Plugin:** `DataWarehouse.Plugins.Storage.Generative`
+
+**Description:** Replace raw data with AI model weights + prompts, achieving 10,000x compression for specific data types by storing descriptions rather than pixels.
+
+**Sub-Tasks:**
+
+| # | Sub-Task | Description | Status |
+|---|----------|-------------|--------|
+| 84.1 | Content Analyzer | Detect data types suitable for generative compression | [ ] |
+| 84.2 | Video Scene Detector | Identify static scenes in video (parking lots, etc.) | [ ] |
+| 84.3 | Model Training Pipeline | Train lightweight reconstruction models | [ ] |
+| 84.4 | Prompt Generator | Create minimal prompts describing content | [ ] |
+| 84.5 | Model Storage | Store model weights efficiently | [ ] |
+| 84.6 | Reconstruction Engine | Regenerate data from model + prompt | [ ] |
+| 84.7 | Quality Validation | Verify reconstruction meets quality threshold | [ ] |
+| 84.8 | Hybrid Mode | Mix generative and lossless for important frames | [ ] |
+| 84.9 | Compression Ratio Reporting | Track and report compression achievements | [ ] |
+| 84.10 | GPU Acceleration | Leverage GPU for training and reconstruction | [ ] |
+
+**SDK Requirements:**
+- `IGenerativeCompression` interface
+- `GenerativeCompressionPluginBase` base class
+- `CompressionProfile` class for model + prompt storage
+- `ReconstructionQuality` enum (Exact, High, Medium, Low)
+
+---
+
+#### Task 85: Uncertainty Engine (Probabilistic Data Structures)
+**Priority:** P1
+**Effort:** High
+**Status:** [ ] Not Started
+**Plugin:** `DataWarehouse.Plugins.Storage.Probabilistic`
+
+**Description:** Store massive datasets with 99.5% accuracy using 0.1% of the space via probabilistic data structures - perfect for IoT/telemetry.
+
+**Sub-Tasks:**
+
+| # | Sub-Task | Description | Status |
+|---|----------|-------------|--------|
+| 85.1 | Count-Min Sketch | Frequency estimation with bounded error | [ ] |
+| 85.2 | HyperLogLog | Cardinality estimation for distinct counts | [ ] |
+| 85.3 | Bloom Filters | Membership testing with false positive control | [ ] |
+| 85.4 | Top-K Heavy Hitters | Track most frequent items | [ ] |
+| 85.5 | Quantile Sketches | Approximate percentiles (t-digest, KLL) | [ ] |
+| 85.6 | Error Bound Configuration | User-specified accuracy vs space tradeoff | [ ] |
+| 85.7 | Merge Operations | Combine sketches from distributed nodes | [ ] |
+| 85.8 | Query Interface | SQL-like queries over probabilistic stores | [ ] |
+| 85.9 | Accuracy Reporting | Report confidence intervals on results | [ ] |
+| 85.10 | Upgrade Path | Convert probabilistic to exact when needed | [ ] |
+
+**SDK Requirements:**
+- `IProbabilisticStorage` interface
+- `ProbabilisticStoragePluginBase` base class
+- `Sketch` base class for probabilistic structures
+- `AccuracyBound` class for error specification
+
+---
+
+### CATEGORY G: The Immortal Layer
+
+#### Task 86: Self-Emulating Objects (The Time Capsule)
+**Priority:** P1
+**Effort:** Very High
+**Status:** [ ] Not Started
+**Plugin:** `DataWarehouse.Plugins.Archival.SelfEmulation`
+
+**Description:** Objects that include their own viewer software - 50 years from now, files open themselves without external software dependencies.
+
+**Sub-Tasks:**
+
+| # | Sub-Task | Description | Status |
+|---|----------|-------------|--------|
+| 86.1 | Format Detection | Identify file formats requiring preservation | [ ] |
+| 86.2 | Viewer Compilation | Compile headless viewers to WASM | [ ] |
+| 86.3 | Bundle Creator | Package file + viewer into self-contained object | [ ] |
+| 86.4 | Universal Container | Cross-platform container format | [ ] |
+| 86.5 | Viewer Registry | Library of format viewers (Excel, PDF, etc.) | [ ] |
+| 86.6 | Dependency Bundling | Include all viewer dependencies | [ ] |
+| 86.7 | Execution Sandbox | Safe execution of bundled viewers | [ ] |
+| 86.8 | Format Migration | Option to convert to modern format instead | [ ] |
+| 86.9 | Size Optimization | Minimize viewer overhead per object | [ ] |
+| 86.10 | Backwards Compatibility | Support opening legacy self-emulating objects | [ ] |
+
+**SDK Requirements:**
+- `ISelfEmulatingArchive` interface
+- `SelfEmulatingPluginBase` base class
+- `EmulationBundle` class for file + viewer package
+- `ViewerCapability` enum for viewer features
+
+---
+
+### CATEGORY H: Spatial & Human Layer
+
+#### Task 87: Spatial AR Anchors (The Metaverse Interface)
+**Priority:** P2
+**Effort:** Very High
+**Status:** [ ] Not Started
+**Plugin:** `DataWarehouse.Plugins.Spatial.ArAnchors`
+
+**Description:** Data tied to physical coordinates - place files in physical space via AR, accessible only to users physically present at that location.
+
+**Sub-Tasks:**
+
+| # | Sub-Task | Description | Status |
+|---|----------|-------------|--------|
+| 87.1 | GPS Coordinate Binding | Associate objects with GPS coordinates | [ ] |
+| 87.2 | SLAM Integration | Indoor positioning via visual SLAM | [ ] |
+| 87.3 | Anchor Persistence | Store AR anchors across sessions | [ ] |
+| 87.4 | Proximity Verification | Verify user is within access radius | [ ] |
+| 87.5 | AR Client SDK | iOS/Android AR integration libraries | [ ] |
+| 87.6 | Visual Rendering | Render file icons in AR space | [ ] |
+| 87.7 | Gesture Interaction | Pick up, move, open files via gestures | [ ] |
+| 87.8 | Room Mapping | Map rooms for indoor anchor placement | [ ] |
+| 87.9 | Multi-User Sync | Multiple users see same AR content | [ ] |
+| 87.10 | Location Spoofing Detection | Prevent GPS/location spoofing attacks | [ ] |
+
+**SDK Requirements:**
+- `ISpatialAnchor` interface
+- `SpatialAnchorPluginBase` base class
+- `GeoCoordinate` class for GPS + altitude
+- `SpatialBoundary` class for access zones
+
+---
+
+#### Task 88: Psychometric Indexing (Sentiment Search)
+**Priority:** P2
+**Effort:** High
+**Status:** [ ] Not Started
+**Plugin:** `DataWarehouse.Plugins.Indexing.Psychometric`
+
+**Description:** Index documents by emotional tone - search for "panicked emails" or "deceptive communications" using sentiment and psychological analysis.
+
+**Sub-Tasks:**
+
+| # | Sub-Task | Description | Status |
+|---|----------|-------------|--------|
+| 88.1 | Sentiment Analysis | Positive/negative/neutral classification | [ ] |
+| 88.2 | Emotion Detection | Fear, anger, joy, sadness, surprise, disgust | [ ] |
+| 88.3 | Deception Indicators | Linguistic markers of dishonesty | [ ] |
+| 88.4 | Stress Detection | Urgency and pressure indicators | [ ] |
+| 88.5 | Tone Classification | Formal, casual, aggressive, passive | [ ] |
+| 88.6 | Psychometric Index | Searchable index of emotional metadata | [ ] |
+| 88.7 | Query Interface | "Show emails where tone = panicked" | [ ] |
+| 88.8 | Confidence Scores | Reliability metrics for classifications | [ ] |
+| 88.9 | Multi-language Support | Sentiment analysis across languages | [ ] |
+| 88.10 | Privacy Controls | Opt-out and data minimization options | [ ] |
+
+**SDK Requirements:**
+- `IPsychometricIndexer` interface
+- `PsychometricIndexPluginBase` base class
+- `EmotionScore` class for multi-dimensional emotion
+- `SentimentQuery` class for emotional searches
+
+---
+
+### CATEGORY I: The Traitor Layer
+
+#### Task 89: Dynamic Forensic Watermarking (Traitor Tracing)
+**Priority:** P0
+**Effort:** High
+**Status:** [ ] Not Started
+**Plugin:** `DataWarehouse.Plugins.Security.Watermarking`
+
+**Description:** Every download embeds invisible user-specific watermarks - if a document leaks, scan it to identify exactly who leaked it and when.
+
+**Sub-Tasks:**
+
+| # | Sub-Task | Description | Status |
+|---|----------|-------------|--------|
+| 89.1 | Text Watermarking | Invisible kerning/spacing modifications | [ ] |
+| 89.2 | Image Watermarking | LSB and frequency domain watermarks | [ ] |
+| 89.3 | PDF Watermarking | Embedded metadata and visual artifacts | [ ] |
+| 89.4 | Video Watermarking | Frame-level user identification | [ ] |
+| 89.5 | Watermark Encoder | Encode user ID + timestamp into content | [ ] |
+| 89.6 | Extraction Engine | Recover watermark from leaked content | [ ] |
+| 89.7 | Screenshot Detection | Watermark survives screen capture | [ ] |
+| 89.8 | Print Detection | Watermark survives printing and scanning | [ ] |
+| 89.9 | Collision Resistance | Prevent watermark forgery | [ ] |
+| 89.10 | Audit Integration | Link watermark detection to audit logs | [ ] |
+
+**SDK Requirements:**
+- `IForensicWatermarking` interface
+- `WatermarkingPluginBase` base class
+- `Watermark` class containing user + timestamp
+- `WatermarkPayload` for encoded data
+- `ExtractionResult` class for leak investigation
+
+---
+
+### Summary: Active Storage Task Matrix
+
+| Task | Name | Category | Priority | Effort | Status |
+|------|------|----------|----------|--------|--------|
+| 70 | WASM Compute-on-Storage | Computational | P0 | Very High | [ ] |
+| 71 | SQL-over-Object | Computational | P0 | High | [ ] |
+| 72 | Auto-Transcoding Pipeline | Computational | P1 | High | [ ] |
+| 73 | Canary Objects | Security | P0 | Medium | [ ] |
+| 74 | Steganographic Sharding | Security | P1 | Very High | [ ] |
+| 75 | SMPC Vaults | Security | P1 | Very High | [ ] |
+| 76 | Digital Dead Drops | Security | P1 | Medium | [ ] |
+| 77 | Sovereignty Geofencing | Governance | P0 | High | [ ] |
+| 78 | Protocol Morphing | Transport | P1 | High | [ ] |
+| 79 | Tri-Mode USB (Air-Gap) | Transport | P0 | Very High | [ ] |
+| 80 | Continuous Data Protection | Recovery | P0 | Very High | [ ] |
+| 81 | Block-Level Tiering | Tiering | P1 | Very High | [ ] |
+| 82 | Data Branching | Collaboration | P0 | Very High | [ ] |
+| 83 | Data Marketplace | Collaboration | P1 | High | [ ] |
+| 84 | Generative Compression | Storage | P1 | Extreme | [ ] |
+| 85 | Probabilistic Storage | Storage | P1 | High | [ ] |
+| 86 | Self-Emulating Objects | Archival | P1 | Very High | [ ] |
+| 87 | Spatial AR Anchors | Spatial | P2 | Very High | [ ] |
+| 88 | Psychometric Indexing | Indexing | P2 | High | [ ] |
+| 89 | Forensic Watermarking | Security | P0 | High | [ ] |
+
+**Total:** 20 Tasks, ~220 Sub-Tasks
+
+---
+
+*Section added: 2026-02-01*
+*Author: Claude AI*
+
+---
+
+*Document updated: 2026-02-01*
 *Next review: 2026-02-15*
