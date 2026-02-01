@@ -88,7 +88,12 @@
       "Bash(Select-String -Pattern \"Wasabi|S3Connector\")",
       "Bash(Select-Object -First 10)",
       "Bash(Remove-Item -Recurse -Force \"C:\\\\Temp\\\\DataWarehouse\\\\DataWarehouse\\\\Plugins\\\\DataWarehouse.Plugins.CarbonAware\")",
-      "Bash(Select-String -Pattern \"OpenApi\")"
+      "Bash(Select-String -Pattern \"OpenApi\")",
+      "Bash(Select-String -Pattern \"LgpdCompliancePlugin\")",
+      "Bash(for cat in CON PL NOT AC ACC PRO RET TL DBN DNC)",
+      "Bash(Select-String -Pattern \"PipedaCompliancePlugin\" -Context 2,2)",
+      "Bash(for cat in RM IH BC SC CRY AC HR VH)",
+      "Bash(do echo -n \"NIS2.$cat: \")"
     ]
   }
 }

@@ -173,39 +173,6 @@ These features represent the next generation of data storage technology, positio
 
 ---
 
-#### Task 55: Global Multi-Master Replication
-**Priority:** P1
-**Effort:** Very High
-**Status:** [x] Complete (2026-02-01)
-
-**Description:** Enable true multi-master writes across global regions with conflict resolution.
-
-> **Implementation Note (2026-02-01):** Production-ready implementation in `Plugins/DataWarehouse.Plugins.GeoReplication/GlobalMultiMasterReplicationPlugin.cs` (1200+ lines).
-> Features: Full vector clock implementation, gossip-based replication protocol, all 5 consistency levels, all 5 conflict resolution strategies,
-> thread-safe region management with ConcurrentDictionary, configurable replication timeouts and retry logic.
-
-**Features:**
-
-| Feature | Description | Status |
-|---------|-------------|--------|
-| Write Anywhere | Accept writes in any region | [x] |
-| Conflict Resolution | Automatic + manual options | [x] |
-| Causal Consistency | Respect causality | [x] |
-| Read-Your-Writes | Session consistency | [x] |
-| Bounded Staleness | Configurable lag | [x] |
-
-**Conflict Resolution Strategies:**
-
-| Strategy | Use Case | Status |
-|----------|----------|--------|
-| Last-Write-Wins | Simple, fast | [x] |
-| Vector Clocks | Detect conflicts | [x] |
-| CRDTs | Automatic merge | [x] |
-| Custom Resolver | Application-specific | [x] |
-| Human Resolution | Manual intervention | [x] |
-
----
-
 ### CATEGORY G: Integration & Ecosystem
 
 #### Task 57: Plugin Marketplace & Certification
@@ -1394,256 +1361,6 @@ var chatManifest = new IntentManifest
 | **Phase 7** | AEDS-DP2, AEDS-DP3, AEDS-DP4 | Additional data plane transports | Phase 2 |
 | **Phase 8** | AEDS-X1, AEDS-X2 | P2P mesh, delta sync | Phase 3 |
 | **Phase 9** | AEDS-X3, AEDS-X4, AEDS-X5 | Pre-cog AI, Mule, Dedup | Phase 3 |
-
----
-
-### Implementation Roadmap
-
-#### Pre-Phase 1: Pending/Defferred task from previous sprint
-Tasks carried over from previous sprints that need to be completed before starting GOD TIER features.
-| Tasks | Status |
-|-------|--------|
-|    6  |   [x]  |
-|    11 |   [x]  |
-|    25 |   [x]  |
-|    26 |   [x]  |
-|    28 |   [x]  |
-|    30 |   [x]  |
-|    31 |   [x]  |
-|    37 |   [x]  |
-
-## Include UI/UX improvements, bug fixes, performance optimizations, and minor features from previous sprints that are prerequisites for GOD TIER features.
-Task A1: Dashboard Plugin - Add support for:
-  |#.| Task                               | Status |
-  |--|------------------------------------|--------|
-  |a.| Grafana Loki                       | [x]    |
-  |b.| Prometheus                         | [x]    |
-  |c.| Kibana                             | [x]    |
-  |d.| SigNoz                             | [x]    |
-  |e.| Zabbix                             | [x]    |
-  |f.| VictoriaMetrics                    | [x]    |
-  |g.| Netdata                            | [x]    |
-  |h.| Perses                             | [x]    |
-  |i.| Chronograf                         | [x]    |
-  |j.| Datadog                            | [x]    |
-  |k.| New Relic                          | [x]    |
-  |l.| Dynatrace                          | [x]    |
-  |m.| Splunk/Splunk Observability Cloud  | [x]    |
-  |n.| Logx.io                            | [x]    |
-  |o.| LogicMonitor                       | [x]    |
-  |p.| Tableau                            | [x]    |
-  |q.| Microsoft Power BI                 | [x]    |
-  |r.| Apache Superset                    | [x]    |
-  |s.| Metabase                           | [x]    |
-  |t.| Geckoboard                         | [x]    |
-  |u.| Redash                             | [x]    |
-
-  Verify the existing implementation first for already supported dashboard plugins (partial or full),
-  then, implement the above missing pieces one by one.
-
-  Task A2: Improve UI/UX ✅ **COMPLETED** (2026-01-26)
-  Concept: A modular live media/installer, sinilar to a Linux Live CD/USB distro where users can pick and choose which components to include in their build or run a live version directly from the media without installation.
-    1. [x] Create a full fledged Adapter class in 'DataWarehouse/Metadata/' that can be copy/pasted into any other project.
-       This Adapter allows the host project to communicate with DataWarehouse, without needing any direct project reference.
-       This is one of the ways how our customers will be integrating/using DataWarehouse with their own applications.
-       **Implementation:** `Metadata/Adapter/` - IKernelAdapter.cs, AdapterFactory.cs, AdapterRunner.cs, README.md
-
-    2. [x] Create a base piece that supports 3 modes:
-         i. Install and initialize an instance of DataWarehouse
-        ii. Connect to an existing DataWarehouse instance - allows configuration of remote instances without having to login to the remote server/machine.
-            It can also be used to configure the local or standalone instances also).
-       iii. Runs a tiny embedded version of DataWarehouse for local/single-user
-       This base piece will be use an excat copy of the Adapter we created in step 1. to become able to perform i ~ iii.
-       Thus, this will not only allow us to demo DataWarehouse in a standalone fashion, but also allow customers to embed DataWarehouse
-       into their own applications with minimal effort, using a copy of the Adapter (using this base piece as an example, as it already uses the Adapter).
-       And for users who want to just run an instance with minimal hassle, they can also use this base piece as it is (maybe run it as a service, autostart at login...),
-       without needing any separate 'project' just to run an instance of DataWarehouse.
-       The 'ii' mode will also allow users to connect to a remote (or really, any) instances easily, without needing to login to the remote server/machine.
-       This mode will provide and support Configuraion management for the connected instances, including configuring the tiny embedded instance present
-       in 'iii' mode. They can then save this configuration for 'future use'/'configuration change' for that instance. (In case of the tiny embedded version,
-       the configuration can be saved to the live media itself, so that next time the user boots from the live media, their configuration is already present).
-       And when they proceed to 'Install' from 'i' mode, the configuration used in 'ii' mode can be used as the default configuration for the installed instance also
-       if the user wnats it that way.
-       **Implementation:** `Metadata/Adapter/` - DataWarehouseHost.cs, OperatingMode.cs, InstanceConnection.cs
-
-    3. [x] Upgrade the CLI to use the base piece, and support all 3 modes above.
-       This will allow users to use the CLI to manage both local embedded instances, as well as any local and remote instances.
-       **Implementation:** CLI/Commands/ - InstallCommand.cs, ConnectCommand.cs, EmbeddedCommand.cs + CLI/Integration/
-
-    4. [x] Rename the Launcher project to a more appropriate name.
-       Upgrade it to use the base piece, and support all 3 modes above.
-       This will allow users to use the GUI to manage both local embedded instances, as well as any local and remote instances.
-       **Implementation:** Launcher/Integration/ + updated Adapters
-
-    5. [x] Can we make both the CLI and GUI support the 'condition' of the instance of DataWarehouse they are connected to (local embedded, remote instance...).
-       For example if running a local SDK & Kernel standalone instance (without any plugins), both will allow commands and messages that can call the
-       in-memory storage engine and the basic features provided by the standalone Kernel. But as the user adds more plugins to the instance, both CLI and GUI
-       will automatically gain access to call and use those new features too... This way, both CLI and GUI will be 'aware' of the capabilities of the instance
-       they are connected to, but if the user switches to another instance (remote or local) with different capabilities, both CLI and GUI will automatically adjust.
-       Even if the user tries to use a feature not supported by the connected instance, both CLI and GUI will just inform the user that the feature is not available
-       in the current instance, without error or crash.
-       **Implementation:** DataWarehouse.Shared/ - CapabilityManager.cs, CommandRegistry.cs
-
-    6. [x] Can we make both CLI and GUI share as much code as possible, especially the business logic layer? The idea is that the CLI and GUI will have the same
-      features and capabilities, and sharing code will ensure consistency between both interfaces, and we can avoid duplication of effort in implementing features
-      in both places.
-      **Implementation:** DataWarehouse.Shared/ - InstanceManager.cs, MessageBridge.cs, Models/
-
-Implementing this 'Live Media/Installer' concept will greatly enhance the usability and flexibility of DataWarehouse, making it easier for users to get started, 
-by both being able to run a local instance easily for testing purposes without having to modify their system by installing anything, as well as allow user 
-to remotly configure and manage any instance of DataWarehouse, embed DataWarehouse into their own applications with minimal effort etc., offering a great deal of versatility.
-
-Task A3: Implement support for full SQL toolset compatibility ✅ **COMPLETED** (2026-01-26)
-  i. [x] Implement Database Import plugin (import SQL/Server/MySQL/PostgreSQL/Oracle/SQLite/NoSQL etc. databses and tables into DataWarehouse)
-       **Implementation:** Plugins/DataWarehouse.Plugins.DatabaseImport/
- ii. [x] Implement Federated Query plugin (allow querying accross heterogenious data, databases and tables from DataWarehouse in one go)
-       **Implementation:** Plugins/DataWarehouse.Plugins.FederatedQuery/
-iii. [x] Implement Schema Registry (Track imported database and table structures, versions and changes over time)
-       **Implementation:** Plugins/DataWarehouse.Plugins.SchemaRegistry/
- iv. [x] Implement PostgreSQL Wire Protocol (allows SQL tools supporting PostgreSQL protocol to connect)
-       **Implementation:** Plugins/DataWarehouse.Plugins.PostgresWireProtocol/
-  v. [x] Implement SQL Toolset Compatibility - All major protocols implemented:
-       **Protocols:** TDS (SQL Server), MySQL, Oracle TNS, PostgreSQL Wire, ODBC, JDBC, ADO.NET, NoSQL (MongoDB/Redis)
-       **Implementation:** Plugins/DataWarehouse.Plugins.{TdsProtocol,MySqlProtocol,OracleTnsProtocol,OdbcDriver,JdbcBridge,AdoNetProvider,NoSqlProtocol}/
- vi. SQL Tools Compatibility Matrix (all protocols now supported):
-|#  |Tool                                                                           | Status | Notes                          |
-|---|-------------------------------------------------------------------------------|--------|--------------------------------|
-|1. |SSMS (TDS protocol)                                                            | [x]    | Via TDS protocol               |
-|2. |Azure Data Studio                                                              | [x]    | Via TDS protocol               |
-|3. |DBeaver                                                                        | [x]    | Via PostgreSQL driver          |
-|4. |HeidiSQL                                                                       | [x]    | Via MySQL protocol             |
-|5. |DataGrip                                                                       | [x]    | Via PostgreSQL driver          |
-|6. |Squirrel SQL                                                                   | [x]    | Via JDBC PostgreSQL            |
-|7. |Navicat                                                                        | [x]    | Via PostgreSQL driver          |
-|8. |TablePlus                                                                      | [x]    | Via PostgreSQL driver          |
-|9. |Valentina Studio                                                               | [x]    | Via PostgreSQL driver          |
-|10.|Beekeeper Studio                                                               | [x]    | Via PostgreSQL driver          |
-|11.|OmniDB                                                                         | [x]    | Via PostgreSQL driver          |
-|12.|DbVisualizer                                                                   | [x]    | Via JDBC PostgreSQL            |
-|13.|SQL Workbench/J                                                                | [x]    | Via JDBC PostgreSQL            |
-|14.|Aqua Data Studio                                                               | [x]    | Via PostgreSQL driver          |
-|15.|RazorSQL                                                                       | [x]    | Via PostgreSQL driver          |
-|16.|DbSchema                                                                       | [x]    | Via PostgreSQL driver          |
-|17.|FlySpeed SQL Query                                                             | [x]    | Via ODBC/JDBC PostgreSQL       |
-|18.|MySQL Workbench (for MySQL compatibility mode)                                 | [x]    | Via MySQL protocol             |
-|19.|Postico (for PostgreSQL compatibility mode)                                    | [x]    | Native PostgreSQL              |
-|20.|PostgreSQL Wire Protocol                                                       | [x]    | Core protocol implemented      |
-|21.|ODBC/JDBC/ADO.NET/ADO drivers for various programming languages and frameworks | [x]    | Via PostgreSQL drivers         |
-|22.|SQL Alchemy                                                                    | [x]    | Via psycopg2/asyncpg           |
-|23.|Entity Framework                                                               | [x]    | Via Npgsql                     |
-|24.|Hibernate                                                                      | [x]    | Via JDBC PostgreSQL            |
-|25.|Django ORM                                                                     | [x]    | Via psycopg2                   |
-|26.|Sequelize                                                                      | [x]    | Via pg (node-postgres)         |
-|27.|Knex.js/Node.js/Python libraries                                               | [x]    | Via pg/psycopg2                |
-|28.|LINQ to SQL                                                                    | [x]    | Via Npgsql                     |
-|29.|PHP PDO                                                                        | [x]    | Via pdo_pgsql                  |
-|30.|Power BI                                                                       | [x]    | Via PostgreSQL connector       |
-|31.|pgAdmin (for PostgreSQL compatibility mode)                                    | [x]    | Native PostgreSQL              |
-|32.|Adminer                                                                        | [x]    | Via PostgreSQL driver          |
-|33.|SQLyog (for MySQL compatibility mode)                                          | [x]    | Via MySQL protocol             |
-|34.|SQL Maestro                                                                    | [x]    | PostgreSQL mode supported      |
-|35.|Toad for SQL Server/MySQL/PostgreSQL                                           | [x]    | PostgreSQL mode supported      |
-|36.|SQL Developer (for Oracle compatibility mode)                                  | [x]    | Via Oracle TNS protocol        |
-|37.|PL/SQL Developer (for Oracle compatibility mode)                               | [x]    | Via Oracle TNS protocol        |
-|38.|SQL*Plus (for Oracle compatibility mode)                                       | [x]    | Via Oracle TNS protocol        |
-|39.|SQLite tools (for SQLite compatibility mode)                                   | [ ]    | Different architecture         |
-|40.|NoSQL tools (for NoSQL compatibility modes)                                    | [x]    | Via MongoDB/Redis protocols    |
-|41.|REST API/GraphQL clients (for REST/GraphQL compatibility modes)                | [x]    | Via existing REST/GraphQL APIs |
-
-* Many of these tools can connect via standard protocols (TDS, PostgreSQL Wire Protocol, MySQL protocol etc.).
-  Instead of implementing each tool individually, we can focus on supporting the underlying protocols and standards,
-  so implementing support for those protocols in DataWarehouse will enable compatibility with multiple tools at once.
-
----
-
-#### Phase 3: AI & Intelligence (Q3-Q4 2026) ✅ **COMPLETED** (2026-01-28)
-| Task | Description | Priority | Status |
-|------|-------------|----------|--------|
-| 47 | Autonomous Data Management | P0 | ✅ Complete |
-| 48 | Natural Language Interface | P1 | ✅ Complete |
-| 49 | Semantic Understanding | P1 | ✅ Complete |
-| 39 | AI-Powered CLI | P1 | ✅ Complete |
-
-**Task 39: AI-Powered CLI**
-- **Implementation:** `DataWarehouse.Shared/Services/`
-- `NaturalLanguageProcessor.cs` (980 lines) - Pattern + AI fallback command parsing
-- `ConversationContext.cs` (420 lines) - Multi-turn conversation support
-- `CLILearningStore.cs` (613 lines) - Learning from user corrections
-- Provider-agnostic via SDK IAIProvider interface
-
-#### Phase 4: Scale & Performance (Q4 2026 - Q1 2027)
-| Task | Description | Priority |
-|------|-------------|----------|
-| 53 | Exabyte-Scale Architecture | P0 |
-| 54 | Sub-Millisecond Latency | P1 |
-| 55 | Global Multi-Master | P1 |
-| 46 | Bare Metal Optimization | P1 |
-
-#### Phase 5: Ecosystem (Q1-Q2 2027)
-| Task | Description | Priority |
-|------|-------------|----------|
-| 45 | Hypervisor Support | P1 |
-| 52 | Military Security | P0 |
-| 56 | Universal Connectors | P1 |
-| 57 | Plugin Marketplace | P1 |
-| 58 | Carbon-Aware Storage | P2 |
-| 59 | Compliance Automation | P0 |
-
----
-
-### Success Metrics
-
-| Metric | Target | Timeline |
-|--------|--------|----------|
-| GUI Active Users | 100,000 | Q4 2026 |
-| Kubernetes Deployments | 10,000 | Q3 2026 |
-| Filesystem Driver Downloads | 50,000 | Q3 2026 |
-| Plugin Marketplace Listings | 500 | Q2 2027 |
-| Enterprise Customers | 1,000 | Q4 2026 |
-| Government Certifications | 5 (FedRAMP, CC, etc.) | Q4 2026 |
-| Hyperscale Deployments | 10 | Q1 2027 |
-
----
-
-### Resource Requirements
-
-| Team | Focus | FTEs |
-|------|-------|------|
-| GUI/Desktop | Tasks 38, 40, 41, 42 | 6 |
-| Containers/K8s | Tasks 43, 44, 45 | 4 |
-| Security | Tasks 50, 51, 52 | 5 |
-| AI/ML | Tasks 47, 48, 49 | 4 |
-| Performance | Tasks 53, 54, 55, 46 | 5 |
-| Ecosystem | Tasks 56, 57, 58, 59 | 4 |
-| CLI | Task 39 | 2 |
-
-**Total: 30 FTEs**
-
-## Verification Checklist
-
-After implementing fixes:
-
-| Check | Status |
-|-------|--------|
-| All unit tests pass | [ ] |
-| Database plugins tested against real databases | [ ] |
-| RAID rebuild tested with actual data | [ ] |
-| Geo-replication syncs data across regions | [ ] |
-| All 10 RAID plugins use SharedRaidUtilities | [ ] |
-| RAID parity calculations verified with test vectors | [ ] |
-
----
-
-### Verification Protocol
-
-After each task completion:
-
-1. **Build Verification:** `dotnet build DataWarehouse.slnx`
-2. **Runtime Test:** Verify no `NotImplementedException` or empty catches in changed code
-3. **No Placeholders:** Grep for TODO, FIXME, HACK, SIMULATION, PLACEHOLDER
-4. **Production Ready:** No mocks, simulations, hardcoded values, or shortcuts
-5. **Update TODO.md:** Mark task complete only after verification passes
-6. **Commit:** Create atomic commit with descriptive message
 
 ---
 
@@ -5314,107 +5031,6 @@ This creates a complete audit trail for every change, enabling compliance report
 
 ---
 
-### CATEGORY A: Computational & "Active" Storage
-
-#### Task 70: Serverless Compute-on-Storage (WASM Containers)
-**Priority:** P0
-**Effort:** Very High
-**Status:** [x] Complete (2026-02-01)
-**Plugin:** `DataWarehouse.Plugins.Compute.Wasm`
-
-**Description:** Generic user-defined compute layer allowing WebAssembly functions to run directly inside storage nodes, eliminating network transfer for data processing.
-
-> **Implementation Note (2026-02-01):** Production-ready implementation with full stack-based WASM interpreter (~50 opcodes), bytecode parser, sandboxed execution, trigger system, function chaining, and 10 pre-built templates. Code review: PASS with minor thread-safety improvements recommended.
-
-**Sub-Tasks:**
-
-| # | Sub-Task | Description | Status |
-|---|----------|-------------|--------|
-| 70.1 | WASM Runtime Integration | Integrate Wasmtime/WasmEdge runtime into plugin architecture | [x] |
-| 70.2 | Function Registry | Create registry for deploying/managing WASM functions | [x] |
-| 70.3 | Sandboxed Execution | Implement memory/CPU/time limits for function execution | [x] |
-| 70.4 | Data Binding API | Create API for functions to access storage objects directly | [x] |
-| 70.5 | Trigger System | Event-based triggers (on-write, on-read, scheduled) | [x] |
-| 70.6 | Function Chaining | Allow output of one function to feed another | [x] |
-| 70.7 | Hot Reload | Deploy new function versions without restart | [x] |
-| 70.8 | Metrics & Logging | Execution metrics, logs, and error tracking | [x] |
-| 70.9 | Pre-built Templates | Video transcoder, log parser, image resizer templates | [x] |
-| 70.10 | Multi-language Support | Compile from Rust/Go/C/AssemblyScript to WASM | [x] |
-
-**SDK Requirements:**
-- `IWasmRuntime` interface for WASM execution
-- `WasmFunctionPluginBase` base class
-- `FunctionTrigger` enum (OnWrite, OnRead, OnSchedule, OnEvent)
-- `WasmExecutionContext` for function I/O
-
----
-
-#### Task 71: SQL-over-Object (Data Virtualization)
-**Priority:** P0
-**Effort:** High
-**Status:** [x] Complete (2026-02-01)
-**Plugin:** `DataWarehouse.Plugins.Virtualization.SqlOverObject`
-
-**Description:** Execute SQL queries directly against raw CSV/JSON/Parquet/Avro files stored as objects without ETL or data movement.
-
-> **Implementation Note (2026-02-01):** Production-ready SQL engine with full parser (SELECT, FROM, WHERE, JOIN, GROUP BY, HAVING, ORDER BY, LIMIT), hash joins, streaming aggregation, LRU query cache, and JDBC/ODBC metadata. Code review: CONDITIONAL PASS - Parquet support is placeholder only.
-
-**Sub-Tasks:**
-
-| # | Sub-Task | Description | Status |
-|---|----------|-------------|--------|
-| 71.1 | Schema Inference Engine | Auto-detect schema from CSV/JSON/Parquet headers | [x] |
-| 71.2 | Virtual Table Registry | Register object paths as queryable virtual tables | [x] |
-| 71.3 | Predicate Pushdown | Push WHERE clauses to file scanners for efficiency | [x] |
-| 71.4 | Columnar Projection | Only read required columns from Parquet/ORC | [x] |
-| 71.5 | Partition Pruning | Skip files based on partition metadata | [x] |
-| 71.6 | Join Optimization | Hash/merge joins across multiple object files | [x] |
-| 71.7 | Aggregation Engine | GROUP BY, COUNT, SUM, AVG on streaming data | [x] |
-| 71.8 | Query Cache | Cache query plans and intermediate results | [x] |
-| 71.9 | Format Handlers | CSV, JSON, NDJSON, Parquet, Avro, ORC readers | [x] |
-| 71.10 | JDBC/ODBC Bridge | Standard database connectivity for BI tools | [x] |
-
-**SDK Requirements:**
-- `IVirtualTableProvider` interface
-- `DataVirtualizationPluginBase` base class
-- `SchemaInference` utility class
-- `QueryExecutionPlan` for optimization
-
----
-
-#### Task 72: Auto-Transcoding Pipeline (Media & Docs)
-**Priority:** P1
-**Effort:** High
-**Status:** [x] Complete (2026-02-01)
-**Plugin:** `DataWarehouse.Plugins.Transcoding.Media`
-
-**Description:** "Store Once, View Anywhere" - automatic on-the-fly conversion of media and documents to requested formats.
-
-> **Implementation Note (2026-02-01):** Production-ready transcoding pipeline with FFmpeg/ImageMagick command building, HLS/DASH manifest generation, priority queue, result caching, watermarking, and magic-byte format detection. Code review: PASS with minor input validation recommendations.
-
-**Sub-Tasks:**
-
-| # | Sub-Task | Description | Status |
-|---|----------|-------------|--------|
-| 72.1 | FFmpeg Integration | Integrate FFmpeg for video/audio transcoding | [x] |
-| 72.2 | ImageMagick Integration | Image format conversion and resizing | [x] |
-| 72.3 | Document Conversion | PDF/DOCX/HTML conversion via LibreOffice headless | [x] |
-| 72.4 | Format Negotiation | Content-Type negotiation in API requests | [x] |
-| 72.5 | Quality Presets | 4K/1080p/720p/480p/thumbnail presets | [x] |
-| 72.6 | Adaptive Bitrate | HLS/DASH streaming manifest generation | [x] |
-| 72.7 | Transcoding Queue | Priority queue for transcoding jobs | [x] |
-| 72.8 | Result Caching | Cache transcoded versions for repeated access | [x] |
-| 72.9 | Watermark Injection | Add watermarks during transcoding | [x] |
-| 72.10 | Progress Tracking | Real-time transcoding progress API | [x] |
-
-**SDK Requirements:**
-- `ITranscodingProvider` interface
-- `MediaTranscodingPluginBase` base class
-- `TranscodingProfile` configuration class
-- `MediaFormat` enum for supported formats
-
----
-
 ### CATEGORY B: Advanced Security & Counter-Measures
 
 #### Task 73: Canary Objects (Honeytokens)
@@ -5605,20 +5221,20 @@ This creates a complete audit trail for every change, enabling compliance report
 
 ---
 
-#### Task 79: The Mule (Air-Gap Bridge) - Tri-Mode USB System
+#### Task 79: The Mule (Air-Gap Bridge) - Tri-Mode Removable System
 **Priority:** P0
 **Effort:** Very High
 **Status:** [ ] Not Started
 **Plugin:** `DataWarehouse.Plugins.Transport.AirGap`
 
-**Description:** Standardized "Sneakernet" with encrypted USB drives supporting three modes: Transport (encrypted blob container), Storage Extension (capacity tier), and Pocket Instance (full portable DataWarehouse).
+**Description:** Standardized "Sneakernet" with encrypted storage supporting three modes: Transport (encrypted blob container), Storage Extension (capacity tier), and Pocket Instance (full portable DataWarehouse). Any storage system that is removable and attachable (USB, SD, NVMe, SATA, Network drives, Optical drives etc.) can be configured as an Air-Gap Bridge.
 
 **Sub-Tasks:**
 
 | # | Sub-Task | Description | Status |
 |---|----------|-------------|--------|
 | **Detection & Handshake** |
-| 79.1 | USB Sentinel Service | Windows service monitoring drive insertion events | [ ] |
+| 79.1 | USB/External storage/Network Storage Sentinel Service | Windows service monitoring drive insertion/mounting/connection events | [ ] |
 | 79.2 | Config File Scanner | Detect `.dw-config` identity file on drive root | [ ] |
 | 79.3 | Mode Detection | Parse config to determine Transport/Storage/Instance mode | [ ] |
 | 79.4 | Cryptographic Signature | Verify drive authenticity via embedded signatures | [ ] |
@@ -5630,34 +5246,34 @@ This creates a complete audit trail for every change, enabling compliance report
 | 79.9 | Result Logging | Write `result.log` to USB for sender feedback | [ ] |
 | 79.10 | Secure Wipe | Optional cryptographic wipe after successful import | [ ] |
 | **Mode 2: Storage Extension (The Sidecar)** |
-| 79.11 | Dynamic Provider Loading | Load `LocalFileSystemProvider` for USB path | [ ] |
-| 79.12 | Capacity Registration | Register USB capacity with storage pool | [ ] |
-| 79.13 | Cold Data Migration | Auto-migrate cold data to USB tier | [ ] |
-| 79.14 | Safe Removal Handler | Handle unplugging gracefully | [ ] |
-| 79.15 | Offline Index | Maintain index entries for offline USB data | [ ] |
+| 79.11 | Dynamic Provider Loading | Load `LocalFileSystemProvider` for drive path | [ ] |
+| 79.12 | Capacity Registration | Register drive capacity with storage pool | [ ] |
+| 79.13 | Cold Data Migration | Auto-migrate cold data to drive tier | [ ] |
+| 79.14 | Safe Removal/unmounting/disconnect Handler | Handle unplugging gracefully | [ ] |
+| 79.15 | Offline Index | Maintain index entries for offline drive data | [ ] |
 | **Mode 3: Pocket Instance (Full DW on a Stick)** |
-| 79.16 | Guest Context Isolation | Spin up isolated DW instance for USB | [ ] |
-| 79.17 | Portable Index DB | SQLite/LiteDB index on USB drive | [ ] |
+| 79.16 | Guest Context Isolation | Spin up isolated DW instance for removable drive | [ ] |
+| 79.17 | Portable Index DB | SQLite/LiteDB index on removable drive | [ ] |
 | 79.18 | Bridge Mode UI | Show "External: [Name] (USB)" in sidebar | [ ] |
-| 79.19 | Cross-Instance Transfer | Drag-drop between laptop DW and USB DW | [ ] |
+| 79.19 | Cross-Instance Transfer | Drag-drop between laptop DW and removable drive DW | [ ] |
 | 79.20 | Sync Tasks | Configurable sync rules between instances | [ ] |
 | **Security** |
 | 79.21 | Full Volume Encryption | BitLocker or internal encryption-at-rest | [ ] |
-| 79.22 | PIN/Password Prompt | Authentication dialog on USB detection | [ ] |
+| 79.22 | PIN/Password Prompt | Authentication dialog on drive detection | [ ] |
 | 79.23 | Keyfile Authentication | Auto-mount from trusted machines | [ ] |
 | 79.24 | Time-to-Live Kill Switch | Auto-delete keys after N days offline | [ ] |
-| 79.25 | Hardware Key Support | YubiKey/FIDO2 for USB authentication | [ ] |
+| 79.25 | Hardware Key Support | YubiKey/FIDO2 for drive authentication | [ ] |
 | **Setup & Management** |
 | 79.26 | Pocket Setup Wizard | Format Drive as Pocket DW utility | [ ] |
 | 79.27 | Instance ID Generator | Unique cryptographic instance identifiers | [ ] |
-| 79.28 | Portable Client Bundler | Include portable DW client on USB | [ ] |
+| 79.28 | Portable Client Bundler | Include portable DW client on removable drive | [ ] |
 
 **SDK Requirements:**
 - `IAirGapTransport` interface
 - `AirGapPluginBase` base class
 - `UsbDriveMode` enum (Transport, StorageExtension, PocketInstance)
 - `DwPackage` class for encrypted transport packages
-- `PortableInstance` class for USB-based DW instances
+- `PortableInstance` class for removable drive-based DW instances
 - `UsbSecurityPolicy` class for authentication rules
 
 ---
