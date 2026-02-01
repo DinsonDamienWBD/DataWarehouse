@@ -48,6 +48,7 @@
     <Project Path="Plugins/DataWarehouse.Plugins.ComplianceAutomation/DataWarehouse.Plugins.ComplianceAutomation.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.Compression/DataWarehouse.Plugins.Compression.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.ContentProcessing/DataWarehouse.Plugins.ContentProcessing.csproj" />
+    <Project Path="Plugins/DataWarehouse.Plugins.Compute.Wasm/DataWarehouse.Plugins.Compute.Wasm.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.CrashRecovery/DataWarehouse.Plugins.CrashRecovery.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.CrdtReplication/DataWarehouse.Plugins.CrdtReplication.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.CrossRegion/DataWarehouse.Plugins.CrossRegion.csproj" />
@@ -159,10 +160,12 @@
     <Project Path="Plugins/DataWarehouse.Plugins.TdsProtocol/DataWarehouse.Plugins.TdsProtocol.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.ThreatDetection/DataWarehouse.Plugins.ThreatDetection.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.Tiering/DataWarehouse.Plugins.Tiering.csproj" />
+    <Project Path="Plugins/DataWarehouse.Plugins.Transcoding.Media/DataWarehouse.Plugins.Transcoding.Media.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.TwofishEncryption/DataWarehouse.Plugins.TwofishEncryption.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.VaultKeyStore/DataWarehouse.Plugins.VaultKeyStore.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.VendorSpecificRaid/DataWarehouse.Plugins.VendorSpecificRaid.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.Versioning/DataWarehouse.Plugins.Versioning.csproj" />
+    <Project Path="Plugins/DataWarehouse.Plugins.Virtualization.SqlOverObject/DataWarehouse.Plugins.Virtualization.SqlOverObject.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.VictoriaMetrics/DataWarehouse.Plugins.VictoriaMetrics.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.WinFspDriver/DataWarehouse.Plugins.WinFspDriver.csproj">
       <Platform Solution="Debug|*" Project="x64" />
