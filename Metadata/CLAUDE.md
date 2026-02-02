@@ -696,7 +696,7 @@ Features requiring T90 (Universal Intelligence) MUST:
 | Compression | `UltimateCompression` (T92) | ~~BrotliPlugin~~, ~~ZstdPlugin~~ |
 | Storage | `UltimateStorage` (T97) | ~~S3Storage~~, ~~LocalStorage~~ |
 | RAID | `UltimateRAID` (T91) | ~~StandardRaidPlugin~~, ~~ZfsRaidPlugin~~ |
-| Security | `UltimateSecurity` (T95) | ~~IntegrityPlugin~~, ~~WormPlugin~~ |
+| Access Control | `UltimateAccessControl` (T95) | ~~IntegrityPlugin~~, ~~WormPlugin~~ |
 | Compliance | `UltimateCompliance` (T96) | ~~GdprPlugin~~, ~~HipaaPlugin~~ |
 | Replication | `UltimateReplication` (T98) | ~~GeoReplicationPlugin~~ |
 | AI/Knowledge | `UniversalIntelligence` (T90) | ~~AIAgentsPlugin~~ |

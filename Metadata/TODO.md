@@ -5643,12 +5643,19 @@ var config = new DataProtectionConfig
 **Priority:** P1
 **Effort:** High
 **Status:** [ ] Not Started
-**Implements In:** Standalone plugin `DataWarehouse.Plugins.ProbabilisticStructures`
+**Implements In:**
+- **SDK (T99):** Core probabilistic data structures as primitives
+- **T104 (Ultimate Data Management):** `ProbabilisticStorageStrategy` for persistence and queries
+**SDK Additions:**
+- `BloomFilter<T>` - Membership testing with configurable false positive rate
+- `HyperLogLog` - Cardinality estimation for distinct counts
+- `CountMinSketch` - Frequency estimation with bounded error
+- `QuantileSketch` - Approximate percentiles (t-digest, KLL)
+- `IProbabilisticStructure` - Common interface for all structures
 **Dependencies (via Message Bus):**
-- T90 (Universal Intelligence) - Probabilistic predictions, pattern recognition
-- T97 (Ultimate Storage) - Persistence for Bloom filters, HyperLogLog, Count-Min Sketch structures
-**Fallback:** Returns "unknown" confidence levels when AI unavailable; uses in-memory structures when storage unavailable
-**Rationale:** Standalone because probabilistic data structures are unique primitives consumed by other plugins, not a variation of an existing category.
+- T97 (Ultimate Storage) - Persistence for sketch serialization
+**Fallback:** In-memory structures when storage unavailable; structures remain fully functional without AI
+**Rationale:** Probabilistic structures are fundamental data structures (like Dictionary or HashSet) that should be available to ALL plugins without message bus overhead. The persistence and query layer is data management.
 
 **Description:** Store massive datasets with 99.5% accuracy using 0.1% of the space via probabilistic data structures - perfect for IoT/telemetry.
 
@@ -5667,11 +5674,14 @@ var config = new DataProtectionConfig
 | 85.9 | Accuracy Reporting | Report confidence intervals on results | [ ] |
 | 85.10 | Upgrade Path | Convert probabilistic to exact when needed | [ ] |
 
-**SDK Requirements:**
-- `IProbabilisticStructures` interface
-- `ProbabilisticStructuresPluginBase` base class
-- `Sketch` base class for probabilistic structures (Bloom, HyperLogLog, Count-Min Sketch)
-- `AccuracyBound` class for error specification
+**SDK Additions (in T99):**
+- `IProbabilisticStructure` - Common interface for all probabilistic structures
+- `BloomFilter<T>` - Membership testing with configurable false positive rate
+- `HyperLogLog` - Cardinality estimation for distinct counts
+- `CountMinSketch` - Frequency estimation with bounded error
+- `QuantileSketch` - Approximate percentiles (t-digest, KLL)
+- `SketchMerger` - Utilities for combining distributed sketches
+- `AccuracyBound` - Error specification for accuracy vs space tradeoff
 
 ---
 
@@ -5714,14 +5724,23 @@ var config = new DataProtectionConfig
 **Priority:** P2
 **Effort:** Very High
 **Status:** [ ] Not Started
-**Implements In:** Standalone plugin `DataWarehouse.Plugins.SpatialAnchors`
+**Implements In:**
+- **SDK (T99):** Spatial primitives (`GeoCoordinate`, `SpatialBoundary`, `ISpatialAnchor`)
+- **T104 (Ultimate Data Management):** `SpatialAnchorStrategy` for file-location binding and queries
+- **T95 (Ultimate Access Control):** Geo-fencing via existing `GeoFencingStrategy`
+- **Client Libraries (separate repos):** AR visualization for iOS/Android
+**SDK Additions:**
+- `GeoCoordinate` - Latitude, longitude, altitude, accuracy
+- `SpatialBoundary` - Polygon/radius-based access zones
+- `ISpatialAnchor` - Interface for location-bound objects
+- `ProximityVerification` - Distance calculation utilities
 **Dependencies (via Message Bus):**
-- T90 (Universal Intelligence) - Spatial reasoning, AR scene understanding, location prediction
-- T95 (Ultimate Security) - Geo-fencing, location-based access control
-- T97 (Ultimate Storage) - Anchor point persistence, spatial data storage
-- T98 (Ultimate Replication) - Cross-region spatial anchor synchronization
-**Fallback:** Degrades to basic coordinate storage without AR features when dependencies unavailable
-**Rationale:** Standalone because AR/spatial/metaverse functionality is a unique domain not fitting existing Ultimate plugin categories.
+- T90 (Universal Intelligence) - Spatial reasoning, location prediction
+- T95 (Ultimate Access Control) - Location-based access enforcement
+- T97 (Ultimate Storage) - Anchor persistence
+- T98 (Ultimate Replication) - Cross-region anchor sync
+**Fallback:** Basic coordinate storage and queries work without AI; access control degrades to non-location-based when T95 unavailable
+**Rationale:** Server-side spatial anchoring is data management (file metadata includes location). AR visualization is client-side (iOS ARKit, Android ARCore) and belongs in separate client SDK repos, not server plugins.
 
 **Description:** Data tied to physical coordinates - place files in physical space via AR, accessible only to users physically present at that location.
 
@@ -5740,12 +5759,17 @@ var config = new DataProtectionConfig
 | 87.9 | Multi-User Sync | Multiple users see same AR content | [ ] |
 | 87.10 | Location Spoofing Detection | Prevent GPS/location spoofing attacks | [ ] |
 
-**SDK Requirements:**
-- `ISpatialAnchors` interface
-- `SpatialAnchorsPluginBase` base class
-- `GeoCoordinate` class for GPS + altitude
-- `SpatialBoundary` class for access zones
-- `ArAnchorPoint` class for AR anchor metadata
+**SDK Additions (in T99):**
+- `GeoCoordinate` - Latitude, longitude, altitude, accuracy, timestamp
+- `SpatialBoundary` - Polygon/radius-based geographic boundaries
+- `ISpatialAnchor` - Interface for location-bound objects
+- `ProximityVerification` - Distance calculation and proximity checking utilities
+- `SpatialMetadata` - Location metadata for files
+
+**Client Libraries (separate repositories - NOT server plugins):**
+- `DataWarehouse.iOS.AR` - iOS ARKit integration for spatial visualization
+- `DataWarehouse.Android.AR` - Android ARCore integration for spatial visualization
+- `DataWarehouse.Unity.AR` - Unity package for cross-platform AR
 
 ---
 
@@ -5789,7 +5813,7 @@ var config = new DataProtectionConfig
 **Priority:** P0
 **Effort:** High
 **Status:** [ ] Not Started
-**Implements In:** T95 (Ultimate Security) as `ForensicWatermarkingStrategy`
+**Implements In:** T95 (Ultimate Access Control) as `ForensicWatermarkingStrategy`
 **Dependencies (via Message Bus):**
 - T90 (Universal Intelligence) - AI-adaptive watermark generation, ML-based detection
 - T97 (Ultimate Storage) - Watermark key storage, audit trail persistence
@@ -5813,7 +5837,7 @@ var config = new DataProtectionConfig
 | 89.10 | Audit Integration | Link watermark detection to audit logs | [ ] |
 
 **SDK Requirements:**
-- `IWatermarkingStrategy` interface (within T95 Ultimate Security)
+- `IWatermarkingStrategy` interface (within T95 Ultimate Access Control)
 - `ForensicWatermarkingStrategy` class implementing the strategy
 - `Watermark` class containing user + timestamp
 - `WatermarkPayload` for encoded data
@@ -6924,7 +6948,7 @@ var config = new UltimateRaidConfig
 | 92 | Ultimate Compression | Data | P0 | High | [ ] |
 | 93 | Ultimate Encryption | Security | P0 | High | [ ] |
 | 94 | Ultimate Key Management | Security | P0 | High | [ ] |
-| 95 | Ultimate Security | Security | P0 | Very High | [ ] |
+| 95 | Ultimate Access Control | Security | P0 | Very High | [ ] |
 | 96 | Ultimate Compliance | Governance | P0 | High | [ ] |
 | 97 | Ultimate Storage | Infrastructure | P0 | Very High | [ ] |
 | 98 | Ultimate Replication | Infrastructure | P0 | Very High | [ ] |
@@ -7399,7 +7423,7 @@ public record KeyStoreCapabilities
 
 ---
 
-## Task 95: Ultimate Security Plugin
+## Task 95: Ultimate Access Control Plugin
 
 **Status:** [ ] Not Started
 **Priority:** P0 - Critical
@@ -7408,7 +7432,21 @@ public record KeyStoreCapabilities
 
 ### Overview
 
-Consolidate all 8 security plugins into a single Ultimate Security plugin.
+Consolidate all 8 security plugins into a single Ultimate Access Control plugin.
+
+**Scope Clarification:**
+T95 focuses on **authorization and access control** - determining WHO can access WHAT under WHICH conditions.
+
+| In Scope (T95) | Out of Scope (Other Plugins) |
+|----------------|------------------------------|
+| ACL, RBAC, ABAC, Capabilities | Encryption algorithms → T93 |
+| Zero Trust verification | Key storage/rotation → T94 |
+| WORM enforcement | Regulatory compliance → T96 |
+| Geo-fencing (location-based access) | Audit logging → T100 |
+| Forensic Watermarking (T89) | ML anomaly detection → T90 |
+| Rule-based threat detection | Integrity hash storage → T104 |
+
+**Note:** ML-based strategies (UebaStrategy, AiSentinelStrategy, PredictiveThreatStrategy, AnomalyDetectionStrategy) delegate ML analysis to T90 (Universal Intelligence) and only handle rule-based fallbacks locally.
 
 **Plugins to Merge:**
 - DataWarehouse.Plugins.AccessControl
@@ -7466,8 +7504,8 @@ public enum SecurityDomain
 | Sub-Task | Description | Status |
 |----------|-------------|--------|
 | **B1: Project Setup** |
-| 95.B1.1 | Create DataWarehouse.Plugins.UltimateSecurity project | [ ] |
-| 95.B1.2 | Implement UltimateSecurityPlugin orchestrator | [ ] |
+| 95.B1.1 | Create DataWarehouse.Plugins.UltimateAccessControl project | [ ] |
+| 95.B1.2 | Implement UltimateAccessControlPlugin orchestrator | [ ] |
 | 95.B1.3 | Implement unified security policy engine | [ ] |
 | **B2: Access Control Models** |
 | 95.B2.1 | RbacStrategy - Role-Based Access Control | [ ] |
@@ -7517,7 +7555,7 @@ public enum SecurityDomain
 | 95.B7.1 | ThreatDetectionStrategy - Generic threat detection | [ ] |
 | 95.B7.2 | ⭐ SiemIntegrationStrategy - SIEM integration (Splunk, Sentinel) | [ ] |
 | 95.B7.3 | ⭐ SoarStrategy - Security orchestration & response | [ ] |
-| 95.B7.4 | ⭐ UebaStrategy - User/Entity Behavior Analytics | [ ] |
+| 95.B7.4 | ⭐ UebaStrategy - User/Entity Behavior Analytics (delegates ML to T90) | [ ] |
 | 95.B7.5 | ⭐ NdRStrategy - Network Detection & Response | [ ] |
 | 95.B7.6 | ⭐ EdRStrategy - Endpoint Detection & Response | [ ] |
 | 95.B7.7 | ⭐ XdRStrategy - Extended Detection & Response | [ ] |
@@ -7556,20 +7594,20 @@ public enum SecurityDomain
 | **B12: 🚀 INDUSTRY-FIRST Security Innovations** |
 | 95.B12.1 | 🚀 QuantumSecureChannelStrategy - QKD-secured communication | [ ] |
 | 95.B12.2 | 🚀 HomomorphicAccessControlStrategy - Encrypted policy evaluation | [ ] |
-| 95.B12.3 | 🚀 AiSentinelStrategy - AI-powered security orchestration | [ ] |
+| 95.B12.3 | 🚀 AiSentinelStrategy - AI-powered security orchestration (delegates ML to T90) | [ ] |
 | 95.B12.4 | 🚀 BehavioralBiometricStrategy - Continuous behavioral auth | [ ] |
 | 95.B12.5 | 🚀 DecentralizedIdStrategy - Self-sovereign identity (DID) | [ ] |
 | 95.B12.6 | 🚀 ZkProofAccessStrategy - Zero-knowledge access proofs | [ ] |
 | 95.B12.7 | 🚀 ChameleonHashStrategy - Chameleon hash redaction | [ ] |
 | 95.B12.8 | 🚀 SteganographicSecurityStrategy - Hidden security channels | [ ] |
-| 95.B12.9 | 🚀 PredictiveThreatStrategy - AI threat prediction | [ ] |
+| 95.B12.9 | 🚀 PredictiveThreatStrategy - AI threat prediction (delegates ML to T90) | [ ] |
 | 95.B12.10 | 🚀 SelfHealingSecurityStrategy - Autonomous incident response | [ ] |
 
 ### Phase C: Advanced Features (Sub-Tasks C1-C10)
 
 | Sub-Task | Description | Status |
 |----------|-------------|--------|
-| C1 | ML-based anomaly detection | [ ] |
+| C1 | ML-based anomaly detection (delegates ML to T90) | [ ] |
 | C2 | Real-time threat intelligence integration | [ ] |
 | C3 | Behavioral analysis and user profiling | [ ] |
 | C4 | Data loss prevention (DLP) engine | [ ] |
@@ -7584,7 +7622,7 @@ public enum SecurityDomain
 
 | Sub-Task | Description | Status |
 |----------|-------------|--------|
-| D1 | Update all plugin references to use UltimateSecurity | [ ] |
+| D1 | Update all plugin references to use UltimateAccessControl | [ ] |
 | D2 | Create migration guide for security policies | [ ] |
 | D3 | Deprecate individual security plugins | [ ] |
 | D4 | Remove deprecated plugins after transition period | [ ] |
@@ -7788,7 +7826,7 @@ public record ComplianceRequirements
 | C4 | Audit trail with tamper-proof logging | [ ] |
 | C5 | Data sovereignty enforcement | [ ] |
 | C6 | Right to be forgotten automation (GDPR) | [ ] |
-| C7 | Integration with Ultimate Security for policy enforcement | [ ] |
+| C7 | Integration with Ultimate Access Control for policy enforcement | [ ] |
 | C8 | AI-assisted compliance gap analysis | [ ] |
 
 ### Phase D: Migration & Cleanup (Sub-Tasks D1-D5)
@@ -8342,7 +8380,7 @@ T99 (Ultimate SDK)
 ├── T92 (Ultimate Compression) - depends on ICompressionStrategy
 ├── T93 (Ultimate Encryption) - depends on IEncryptionStrategy, EncryptionPluginBase
 ├── T94 (Ultimate Key Management) - depends on IKeyStoreStrategy, KeyStorePluginBase
-├── T95 (Ultimate Security) - depends on ISecurityStrategy
+├── T95 (Ultimate Access Control) - depends on ISecurityStrategy
 ├── T96 (Ultimate Compliance) - depends on IComplianceStrategy
 ├── T97 (Ultimate Storage) - depends on IStorageStrategy
 └── T98 (Ultimate Replication) - depends on IReplicationStrategy
@@ -9955,7 +9993,7 @@ public enum InterfaceProtocol { REST, gRPC, GraphQL, SQL, WebSocket, MQTT, AMQP,
 | 109.C3 | Unified authentication across protocols | [ ] |
 | 109.C4 | Request/response transformation | [ ] |
 | 109.C5 | API analytics and usage tracking | [ ] |
-| 109.C6 | Integration with Ultimate Security for auth | [ ] |
+| 109.C6 | Integration with Ultimate Access Control for auth | [ ] |
 | 109.C7 | Integration with Universal Intelligence for NL queries | [ ] |
 | 109.C8 | Integration with Universal Observability for monitoring | [ ] |
 
@@ -10131,20 +10169,21 @@ Explicit task for deprecating and removing obsolete plugins after Ultimate/Unive
 
 ---
 
-### T95 (Ultimate Security) Dependencies
+### T95 (Ultimate Access Control) Dependencies
 
 | This Plugin | Depends On | Dependency Type | Communication | Fallback |
 |-------------|------------|-----------------|---------------|----------|
-| T95 Ultimate Security | T99 SDK | → Hard | Direct (SDK ref) | None - required |
-| T95 Ultimate Security | T94 Key Management | ⇢ Soft 📨 🔑 | `keystore.get` (for crypto ops) | Skip crypto-based security |
-| T95 Ultimate Security | T90 Intelligence | ⇢ Soft 📨 🧠 | `intelligence.anomaly.detect` | Rule-based detection |
-| T95 Ultimate Security | T100 Observability | ⇢ Soft 📨 | `security.events.publish` | Local logging |
+| T95 Ultimate Access Control | T99 SDK | → Hard | Direct (SDK ref) | None - required |
+| T95 Ultimate Access Control | T94 Key Management | ⇢ Soft 📨 🔑 | `keystore.get` (for crypto ops) | Skip crypto-based security |
+| T95 Ultimate Access Control | T90 Intelligence | ⇢ Soft 📨 🧠 | `intelligence.anomaly.detect` | Rule-based detection |
+| T95 Ultimate Access Control | T100 Observability | ⇢ Soft 📨 | `security.events.publish` | Local logging |
 
-**AI-Dependent Sub-Tasks in T95:**
-- `UebaStrategy` (User Behavior Analytics) → Requires T90
-- `AiSentinelStrategy` → Requires T90
-- `PredictiveThreatStrategy` → Requires T90
-- `BehavioralBiometricStrategy` → Requires T90
+**AI-Dependent Sub-Tasks in T95 (delegate ML to T90, fallback to rule-based):**
+- `UebaStrategy` (User Behavior Analytics) → Delegates ML analysis to T90, rule-based fallback
+- `AiSentinelStrategy` → Delegates ML analysis to T90, rule-based fallback
+- `PredictiveThreatStrategy` → Delegates ML analysis to T90, rule-based fallback
+- `BehavioralBiometricStrategy` → Delegates ML analysis to T90, rule-based fallback
+- `AnomalyDetectionStrategy` → Delegates ML analysis to T90, threshold-based fallback
 
 ---
 
@@ -10153,7 +10192,7 @@ Explicit task for deprecating and removing obsolete plugins after Ultimate/Unive
 | This Plugin | Depends On | Dependency Type | Communication | Fallback |
 |-------------|------------|-----------------|---------------|----------|
 | T96 Ultimate Compliance | T99 SDK | → Hard | Direct (SDK ref) | None - required |
-| T96 Ultimate Compliance | T95 Security | ⇢ Soft 📨 | `security.policy.get` | Manual policy config |
+| T96 Ultimate Compliance | T95 Access Control | ⇢ Soft 📨 | `security.policy.get` | Manual policy config |
 | T96 Ultimate Compliance | T94 Key Management | ⇢ Soft 📨 🔑 | `keystore.audit` | Skip key audit |
 | T96 Ultimate Compliance | T100 Observability | ⇢ Soft 📨 | `compliance.report.publish` | Local reports |
 | T96 Ultimate Compliance | T90 Intelligence | ⇢ Soft 📨 🧠 | `intelligence.nlp.parse` | Manual evidence |
@@ -10273,7 +10312,7 @@ Explicit task for deprecating and removing obsolete plugins after Ultimate/Unive
 | 92 | Ultimate Compression | 6 compression plugins | T99 | 📋 Planned |
 | 93 | Ultimate Encryption | 8 encryption plugins | T99, T94 | 📋 Planned |
 | 94 | Ultimate Key Management | 4 key plugins + T5.x | T99 | 📋 Planned |
-| 95 | Ultimate Security | 8 security plugins | T99 | 📋 Planned |
+| 95 | Ultimate Access Control | 8 security plugins | T99 | 📋 Planned |
 | 96 | Ultimate Compliance | 5 compliance plugins | T99 | 📋 Planned |
 | 97 | Ultimate Storage | 10 storage plugins | T99 | 📋 Planned |
 | 98 | Ultimate Replication | 8 replication plugins | T99 | 📋 Planned |
@@ -10314,7 +10353,7 @@ T99 (Ultimate SDK)
 | 92 | Ultimate Compression | 6 compression plugins | 📋 Planned |
 | 93 | Ultimate Encryption | 8 encryption plugins | 📋 Planned |
 | 94 | Ultimate Key Management | 4 key plugins | 📋 Planned |
-| 95 | Ultimate Security | 8 security plugins | 📋 Planned |
+| 95 | Ultimate Access Control | 8 security plugins | 📋 Planned |
 | 96 | Ultimate Compliance | 5 compliance plugins | 📋 Planned |
 | 97 | Ultimate Storage | 10 storage plugins | 📋 Planned |
 | 98 | Ultimate Replication | 8 replication plugins | 📋 Planned |
@@ -10342,7 +10381,7 @@ T99 (Ultimate SDK)
 | T92 (Ultimate Compression) | ~80 | High | 50+ compression algorithms |
 | T93 (Ultimate Encryption) | ~100 | Very High | 70+ ciphers + PQ + FPE + HE |
 | T94 (Ultimate Key Management) | ~110 | High | 60+ key store types |
-| T95 (Ultimate Security) | ~130 | Very High | 90+ security strategies |
+| T95 (Ultimate Access Control) | ~130 | Very High | 90+ access control strategies |
 | T96 (Ultimate Compliance) | ~120 | High | 100+ compliance frameworks |
 | T97 (Ultimate Storage) | ~110 | Very High | 80+ storage backends |
 | T98 (Ultimate Replication) | ~100 | Very High | 60+ replication modes |
@@ -10430,7 +10469,7 @@ T99 (Ultimate SDK)
 | **1.3** | **T92** | **Ultimate Compression** | All compression as strategies | T99 | [ ] |
 | **1.4** | **T97** | **Ultimate Storage** | All storage backends as strategies | T99 | [ ] |
 | **1.5** | **T91** | **Ultimate RAID** | All RAID levels as strategies | T99 | [ ] |
-| **1.6** | **T95** | **Ultimate Security** | All security features as strategies | T99 | [ ] |
+| **1.6** | **T95** | **Ultimate Access Control** | All access control features as strategies | T99 | [ ] |
 | **1.7** | **T96** | **Ultimate Compliance** | All compliance frameworks as strategies | T99 | [ ] |
 | **1.8** | **T98** | **Ultimate Replication** | All replication modes as strategies | T99 | [ ] |
 | **1.9** | **T90** | **Universal Intelligence** | Unified AI/knowledge layer | T99 | [ ] |
@@ -10462,9 +10501,9 @@ T99 (SDK) → T94 (Key Mgmt) → T93 (Encryption) → TamperProof (T3.4.2)
 | Compression | `UltimateCompression` (T92) | ~~BrotliPlugin~~, ~~ZstdPlugin~~ |
 | Storage | `UltimateStorage` (T97) | ~~S3Storage~~, ~~LocalStorage~~ |
 | RAID | `UltimateRAID` (T91) | ~~StandardRaidPlugin~~, ~~ZfsRaidPlugin~~ |
-| Integrity | `UltimateSecurity` (T95) | ~~IntegrityPlugin~~ |
-| WORM | `UltimateSecurity` (T95) via WormStrategy | ~~Worm.SoftwarePlugin~~ |
-| Blockchain | `UltimateSecurity` (T95) via BlockchainStrategy | ~~Blockchain.LocalPlugin~~ |
+| Integrity | `UltimateAccessControl` (T95) | ~~IntegrityPlugin~~ |
+| WORM | `UltimateAccessControl` (T95) via WormStrategy | ~~Worm.SoftwarePlugin~~ |
+| Blockchain | `UltimateAccessControl` (T95) via BlockchainStrategy | ~~Blockchain.LocalPlugin~~ |
 
 ---
 
@@ -10508,10 +10547,10 @@ T99 (SDK) → T94 (Key Mgmt) → T93 (Encryption) → TamperProof (T3.4.2)
 
 | Order | Task | Name | Original Plugin | NOW: Implement In | Status |
 |-------|------|------|-----------------|-------------------|--------|
-| **4.1** | T73 | Canary Objects | ~~DataWarehouse.Plugins.Security.Canary~~ | **T95 (UltimateSecurity)** as `CanaryStrategy` | [ ] |
-| **4.2** | T74 | Steganographic Sharding | ~~DataWarehouse.Plugins.Obfuscation.Steganography~~ | **T95 (UltimateSecurity)** as `SteganographyStrategy` | [ ] |
+| **4.1** | T73 | Canary Objects | ~~DataWarehouse.Plugins.Security.Canary~~ | **T95 (UltimateAccessControl)** as `CanaryStrategy` | [ ] |
+| **4.2** | T74 | Steganographic Sharding | ~~DataWarehouse.Plugins.Obfuscation.Steganography~~ | **T95 (UltimateAccessControl)** as `SteganographyStrategy` | [ ] |
 | **4.3** | T75 | SMPC Vaults | ~~DataWarehouse.Plugins.Privacy.SMPC~~ | **T94 (UltimateKeyManagement)** as `SmpcVaultStrategy` | [ ] |
-| **4.4** | T76 | Digital Dead Drops | ~~DataWarehouse.Plugins.Sharing.Ephemeral~~ | **T95 (UltimateSecurity)** as `EphemeralSharingStrategy` | [ ] |
+| **4.4** | T76 | Digital Dead Drops | ~~DataWarehouse.Plugins.Sharing.Ephemeral~~ | **T95 (UltimateAccessControl)** as `EphemeralSharingStrategy` | [ ] |
 
 **SDK Requirements (from T73-T76) → Now in Task 99:**
 - `ICanaryProvider` → T99.A4 (Security interfaces)
@@ -10548,7 +10587,7 @@ T99 (SDK) → T94 (Key Mgmt) → T93 (Encryption) → TamperProof (T3.4.2)
 | Order | Task | Name | Original Plugin | NOW: Implement In | Status |
 |-------|------|------|-----------------|-------------------|--------|
 | **4.12** | T84 | Generative Compression | ~~DataWarehouse.Plugins.Storage.Generative~~ | **T92 (UltimateCompression)** as `GenerativeCompressionStrategy` | [ ] |
-| **4.13** | T85 | Probabilistic Storage | ~~DataWarehouse.Plugins.Storage.Probabilistic~~ | **Standalone** (unique probabilistic structures) | [ ] |
+| **4.13** | T85 | Probabilistic Storage | ~~DataWarehouse.Plugins.Storage.Probabilistic~~ | **SDK (T99)** primitives + **T104** `ProbabilisticStorageStrategy` | [ ] |
 
 #### CATEGORY G: The Immortal Layer (Task 86)
 
@@ -10560,14 +10599,14 @@ T99 (SDK) → T94 (Key Mgmt) → T93 (Encryption) → TamperProof (T3.4.2)
 
 | Order | Task | Name | Original Plugin | NOW: Implement In | Status |
 |-------|------|------|-----------------|-------------------|--------|
-| **4.15** | T87 | Spatial AR Anchors | ~~DataWarehouse.Plugins.Spatial.ArAnchors~~ | **Standalone** (unique AR/spatial) | [ ] |
+| **4.15** | T87 | Spatial AR Anchors | ~~DataWarehouse.Plugins.Spatial.ArAnchors~~ | **SDK (T99)** primitives + **T104** `SpatialAnchorStrategy` + client libs | [ ] |
 | **4.16** | T88 | Psychometric Indexing | ~~DataWarehouse.Plugins.Indexing.Psychometric~~ | **T90 (UniversalIntelligence)** as `PsychometricIndexingStrategy` | [ ] |
 
 #### CATEGORY I: The Traitor Layer (Task 89)
 
 | Order | Task | Name | Original Plugin | NOW: Implement In | Status |
 |-------|------|------|-----------------|-------------------|--------|
-| **4.17** | T89 | Forensic Watermarking | ~~DataWarehouse.Plugins.Security.Watermarking~~ | **T95 (UltimateSecurity)** as `WatermarkingStrategy` | [ ] |
+| **4.17** | T89 | Forensic Watermarking | ~~DataWarehouse.Plugins.Security.Watermarking~~ | **T95 (UltimateAccessControl)** as `WatermarkingStrategy` | [ ] |
 
 ---
 
@@ -10640,14 +10679,14 @@ T99 (SDK) → T94 (Key Mgmt) → T93 (Encryption) → TamperProof (T3.4.2)
 | `KeyRotation` | T94 UltimateKeyManagement | `KeyRotationStrategy` |
 | `SecretManagement` | T94 UltimateKeyManagement | `SecretManagementStrategy` |
 | **Security (8 plugins)** |
-| `AccessControl` | T95 UltimateSecurity | `RbacStrategy`, `AbacStrategy` |
-| `IAM` | T95 UltimateSecurity | `IamStrategy` |
-| `MilitarySecurity` | T95 UltimateSecurity | `MilitarySecurityStrategy` |
-| `TamperProof` | T95 UltimateSecurity | `TamperProofStrategy` |
-| `ThreatDetection` | T95 UltimateSecurity | `ThreatDetectionStrategy` |
-| `ZeroTrust` | T95 UltimateSecurity | `ZeroTrustStrategy` |
-| `Integrity` | T95 UltimateSecurity | `IntegrityStrategy` |
-| `EntropyAnalysis` | T95 UltimateSecurity | `EntropyAnalysisStrategy` |
+| `AccessControl` | T95 UltimateAccessControl | `RbacStrategy`, `AbacStrategy` |
+| `IAM` | T95 UltimateAccessControl | `IamStrategy` |
+| `MilitarySecurity` | T95 UltimateAccessControl | `MilitarySecurityStrategy` |
+| `TamperProof` | T95 UltimateAccessControl | `TamperProofStrategy` |
+| `ThreatDetection` | T95 UltimateAccessControl | `ThreatDetectionStrategy` |
+| `ZeroTrust` | T95 UltimateAccessControl | `ZeroTrustStrategy` |
+| `Integrity` | T95 UltimateAccessControl | `IntegrityStrategy` |
+| `EntropyAnalysis` | T95 UltimateAccessControl | `EntropyAnalysisStrategy` |
 | **Compliance (5 plugins)** |
 | `Compliance` | T96 UltimateCompliance | (orchestrator) |
 | `ComplianceAutomation` | T96 UltimateCompliance | (automation features) |
@@ -10701,9 +10740,9 @@ T99 (SDK) → T94 (Key Mgmt) → T93 (Encryption) → TamperProof (T3.4.2)
 | `Transport.Adaptive` (T78) | Unique transport layer protocol morphing | Uses T93 for encryption |
 | `Transport.AirGap` (T79) | Unique hardware USB/external storage integration | Uses T93, T94, T97 |
 | `Commerce.Marketplace` (T83) | Unique commerce/billing functionality | Uses T90 for AI |
-| `Storage.Probabilistic` (T85) | Unique probabilistic data structures | Uses T97 for storage |
+| ~~`Storage.Probabilistic` (T85)~~ | **Moved to SDK (T99) + T104** | SDK primitives + T104 `ProbabilisticStorageStrategy` |
 | `Archival.SelfEmulation` (T86) | Unique WASM bundling for format preservation | Uses T92 for compression |
-| `Spatial.ArAnchors` (T87) | Unique AR/spatial coordinate binding | Uses T95 for security |
+| ~~`Spatial.ArAnchors` (T87)~~ | **Moved to SDK (T99) + T104 + client libs** | SDK primitives + T104 `SpatialAnchorStrategy` |
 | `Blockchain.Local` | Unique blockchain anchoring | Used by T95 |
 | `Compute.Wasm` | Unique WASM compute-on-storage | Uses T97 |
 | `Transcoding.Media` | Unique media transcoding | Uses T92 |
@@ -10759,7 +10798,7 @@ T99 (SDK) → T94 (Key Mgmt) → T93 (Encryption) → TamperProof (T3.4.2)
 | Replicate data | **UltimateReplication** | T98 |
 | **Expose APIs** | **UltimateInterface** | **T109** |
 | Implement RAID | **UltimateRAID** | T91 |
-| Add security features | **UltimateSecurity** | T95 |
+| Add access control features | **UltimateAccessControl** | T95 |
 | Add compliance | **UltimateCompliance** | T96 |
 | Add AI/intelligence | **UniversalIntelligence** | T90 |
 | Add monitoring | **UniversalObservability** | T100 |
