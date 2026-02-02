@@ -186,6 +186,243 @@ public override string Id => "com.company.plugin.storage.s3";
 - Console logging
 - Empty catch blocks
 - Magic numbers
+- **Simulations, mock-ups, or stub implementations** (see Rule 13 below)
+- **Direct project references between plugins** (see Plugin Isolation below)
+
+---
+
+## RULE 13: Production-Ready Only - NO Simulations, NO Mock-ups
+
+> **ABSOLUTE RULE:** Every feature, algorithm, and strategy MUST be fully production-ready.
+> There are NO exceptions to this rule.
+
+### What This Means
+
+| ❌ FORBIDDEN | ✅ REQUIRED |
+|--------------|-------------|
+| "QKD simulation" | Real QKD hardware integration OR don't implement |
+| "Mock HSM" | Real PKCS#11/HSM driver integration |
+| "Simulated quantum" | Real quantum computing API (IBM Quantum, AWS Braket) |
+| "Placeholder logic" | Complete, working implementation |
+| "TODO: implement later" | Full implementation now |
+| "Stub for testing" | Real implementation with real tests |
+
+### Naming Conventions
+
+- **DO NOT** use words like: `Simulation`, `Mock`, `Stub`, `Fake`, `Placeholder`, `Demo`
+- **DO** use: `Strategy`, `Provider`, `Handler`, `Engine`, `Service`
+
+### Hardware-Dependent Features
+
+For features requiring specialized hardware (quantum, HSM, TPM, etc.):
+
+```csharp
+// CORRECT: Real hardware integration with graceful degradation
+public class TpmKeyStoreStrategy : IKeyStoreStrategy
+{
+    public async Task<bool> IsAvailableAsync()
+    {
+        // Actually check for TPM 2.0 hardware
+        return await _tpmDriver.DetectTpmAsync();
+    }
+
+    public async Task<EncryptionKey> GetKeyAsync(string keyId, CancellationToken ct)
+    {
+        if (!await IsAvailableAsync())
+            throw new HardwareNotAvailableException("TPM 2.0 hardware not detected");
+
+        // Real TPM operations
+        return await _tpmDriver.UnsealKeyAsync(keyId, ct);
+    }
+}
+```
+
+### Cutting-Edge Technologies
+
+For truly cutting-edge features (DNA storage, quantum memory, etc.):
+- Either integrate with real research APIs/hardware
+- Or mark the feature as **"Future Roadmap"** in TODO.md and don't implement it yet
+- **NEVER** create a fake/simulated version
+
+---
+
+## Plugin Isolation Rules
+
+### RULE: Plugins Reference ONLY the SDK
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                        ALLOWED REFERENCES                            │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                      │
+│   Plugin A ──────► DataWarehouse.SDK                                │
+│   Plugin B ──────► DataWarehouse.SDK                                │
+│   Plugin C ──────► DataWarehouse.SDK                                │
+│                                                                      │
+│   ❌ Plugin A ──X──► Plugin B  (FORBIDDEN - direct reference)       │
+│   ❌ Plugin B ──X──► Plugin C  (FORBIDDEN - direct reference)       │
+│                                                                      │
+│   ✅ Plugin A ──► MessageBus ──► Plugin B  (ALLOWED - via messages) │
+│                                                                      │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+### .csproj File Pattern
+
+```xml
+<!-- CORRECT: Only reference SDK -->
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="..\..\DataWarehouse.SDK\DataWarehouse.SDK.csproj" />
+  </ItemGroup>
+
+  <!-- ❌ NEVER DO THIS: -->
+  <!-- <ProjectReference Include="..\OtherPlugin\OtherPlugin.csproj" /> -->
+</Project>
+```
+
+### Inter-Plugin Communication
+
+All plugin-to-plugin communication MUST use the message bus:
+
+```csharp
+// CORRECT: Request AI processing via message bus
+public class SemanticDeduplicationStrategy : IDeduplicationStrategy
+{
+    private readonly IMessageBus _messageBus;
+
+    public async Task<string> GetSemanticHashAsync(Stream content, CancellationToken ct)
+    {
+        // Request embeddings from Intelligence plugin via message bus
+        var response = await _messageBus.RequestAsync<EmbeddingResponse>(
+            topic: "intelligence.embeddings.generate",
+            request: new EmbeddingRequest { Content = content },
+            timeout: TimeSpan.FromSeconds(30),
+            ct: ct
+        );
+
+        if (!response.Success)
+        {
+            // Graceful degradation: fall back to content hash
+            _logger.LogWarning("Intelligence plugin unavailable, falling back to content hash");
+            return await ComputeContentHashAsync(content, ct);
+        }
+
+        return ComputeHashFromEmbedding(response.Embedding);
+    }
+}
+```
+
+---
+
+## AI-Dependent Features & Graceful Degradation
+
+### Features Requiring Intelligence Plugin
+
+Many advanced features require AI capabilities from the Universal Intelligence plugin (T90).
+These features MUST:
+
+1. **Declare the dependency explicitly** in their documentation and TODO.md
+2. **Use message bus** to communicate with Intelligence plugin
+3. **Fail gracefully** if Intelligence plugin is unavailable
+4. **Provide fallback behavior** where possible
+
+### Dependency Declaration Pattern
+
+```csharp
+/// <summary>
+/// Semantic deduplication using AI-generated embeddings.
+/// </summary>
+/// <remarks>
+/// <b>DEPENDENCY:</b> Requires Universal Intelligence plugin (T90) for embedding generation.
+/// If Intelligence plugin is unavailable, falls back to content-hash deduplication.
+/// </remarks>
+public class SemanticDeduplicationStrategy : IDeduplicationStrategy
+{
+    public bool RequiresIntelligencePlugin => true;
+
+    public string[] RequiredCapabilities => new[]
+    {
+        "intelligence.embeddings.generate"
+    };
+}
+```
+
+### Graceful Degradation Patterns
+
+| Feature | With Intelligence | Without Intelligence (Fallback) |
+|---------|-------------------|--------------------------------|
+| Semantic Deduplication | Embedding-based similarity | Content hash deduplication |
+| AI-Driven Tiering | Predicted access patterns | Rule-based tiering |
+| Natural Language Queries | Full NL understanding | Keyword matching |
+| Anomaly Detection | ML-based detection | Threshold-based detection |
+| Predictive Failure | ML prediction | SMART data only |
+
+### Message Topics for Intelligence Plugin
+
+```csharp
+// Standard topics for Intelligence plugin communication
+public static class IntelligenceTopics
+{
+    public const string EmbeddingsGenerate = "intelligence.embeddings.generate";
+    public const string EmbeddingsCompare = "intelligence.embeddings.compare";
+    public const string NlpParse = "intelligence.nlp.parse";
+    public const string NlpIntent = "intelligence.nlp.intent";
+    public const string AnomalyDetect = "intelligence.anomaly.detect";
+    public const string PredictAccess = "intelligence.predict.access";
+    public const string KnowledgeQuery = "intelligence.knowledge.query";
+    public const string KnowledgeRegister = "intelligence.knowledge.register";
+}
+```
+
+---
+
+## RULE 14: Explicit Dependency Documentation
+
+> **ABSOLUTE RULE:** ALL inter-plugin dependencies MUST be documented in TODO.md.
+
+### What Must Be Documented
+
+For EVERY feature/strategy that depends on another plugin:
+
+1. **Which plugin it depends on** (e.g., T93 Encryption → T94 Key Management)
+2. **The message bus topic used** (e.g., `keystore.get`, `encryption.encrypt`)
+3. **Whether it's a hard or soft dependency**
+4. **The fallback behavior** when dependency is unavailable
+
+### Dependency Matrix in TODO.md
+
+See `Metadata/TODO.md` section: **"COMPREHENSIVE INTER-PLUGIN DEPENDENCY MATRIX"**
+
+This matrix documents:
+- Hard dependencies (→) - Feature fails without it
+- Soft dependencies (⇢) - Graceful degradation possible
+- Message topics used for communication
+- Fallback behavior
+
+### When Adding New Features
+
+Before implementing any feature that uses another plugin:
+
+1. **Check the dependency matrix** in TODO.md
+2. **Add your feature** to the matrix if not already there
+3. **Implement graceful degradation** for soft dependencies
+4. **Document the message topics** your feature uses
+
+```csharp
+/// <summary>
+/// Encrypts data using the specified cipher.
+/// </summary>
+/// <remarks>
+/// <b>HARD DEPENDENCY:</b> T94 Ultimate Key Management
+/// <b>MESSAGE TOPIC:</b> keystore.get
+/// <b>FALLBACK:</b> None - encryption requires keys
+/// </remarks>
+public class AesGcmStrategy : IEncryptionStrategy
+{
+    // Implementation...
+}
+```
 
 ## Interfaces vs Base Classes
 

@@ -7896,7 +7896,7 @@ public record StorageCapabilities
 | **B12: 🚀 INDUSTRY-FIRST Storage Innovations** |
 | 97.B12.1 | 🚀 DnaDriveStrategy - DNA-based storage | [ ] |
 | 97.B12.2 | 🚀 HolographicStrategy - Holographic storage media | [ ] |
-| 97.B12.3 | 🚀 QuantumMemoryStrategy - Quantum memory simulation | [ ] |
+| 97.B12.3 | 🚀 QuantumMemoryStrategy - Quantum memory hardware integration (future roadmap) | [ ] |
 | 97.B12.4 | 🚀 SatelliteStorageStrategy - LEO satellite storage network | [ ] |
 | 97.B12.5 | 🚀 NeuralStorageStrategy - Neural network-encoded data | [ ] |
 | 97.B12.6 | 🚀 AiTieredStorageStrategy - AI-predicted tiering | [ ] |
@@ -8531,7 +8531,7 @@ Consolidate all key management functionality into a single Ultimate Key Manageme
 | 94.B10.5 | ⭐ FrostStrategy - FROST threshold Schnorr signatures | [ ] |
 | 94.B10.6 | ⭐ SsssStrategy - Social Secret Sharing Schemes | [ ] |
 | **B11: 🚀 INDUSTRY-FIRST Key Management Innovations** |
-| 94.B11.1 | 🚀 QuantumEntanglementKeyStrategy - QKD simulation | [ ] |
+| 94.B11.1 | 🚀 QuantumKeyDistributionStrategy - Real QKD hardware integration (ID Quantique, Toshiba QKD) | [ ] |
 | 94.B11.2 | 🚀 DnaEncodedKeyStrategy - DNA-encoded key storage | [ ] |
 | 94.B11.3 | 🚀 StellarAnchorsStrategy - Stellar blockchain key anchoring | [ ] |
 | 94.B11.4 | 🚀 SmartContractKeyStrategy - Ethereum smart contract escrow | [ ] |
@@ -9648,6 +9648,192 @@ Explicit task for deprecating and removing obsolete plugins after Ultimate/Unive
 | Phase | Plugins Removed | Status |
 |-------|-----------------|--------|
 | B1-B17 | 127 plugins | [ ] |
+
+---
+
+## COMPREHENSIVE INTER-PLUGIN DEPENDENCY MATRIX
+
+> **CRITICAL RULE:** Plugins ONLY reference the SDK. All inter-plugin communication uses the message bus.
+> Dependencies listed below indicate which plugins a feature communicates with via message bus.
+> If a dependency is unavailable, the feature MUST fail gracefully (fallback or clear error).
+
+### Dependency Legend
+
+| Symbol | Meaning |
+|--------|---------|
+| **→** | Hard dependency (fails without it) |
+| **⇢** | Soft dependency (graceful degradation without it) |
+| **📨** | Communication via message bus |
+| **🔑** | Key/encryption related |
+| **🧠** | AI/Intelligence related |
+
+---
+
+### T90 (Universal Intelligence) Dependencies
+
+| This Plugin | Depends On | Dependency Type | Communication | Fallback |
+|-------------|------------|-----------------|---------------|----------|
+| T90 Universal Intelligence | T99 SDK | → Hard | Direct (SDK ref) | None - required |
+| T90 Universal Intelligence | T97 Storage | ⇢ Soft 📨 | `storage.read/write` | In-memory only |
+| T90 Universal Intelligence | T94 Key Management | ⇢ Soft 📨 🔑 | `keystore.get` | Unencrypted knowledge |
+
+---
+
+### T91 (Ultimate RAID) Dependencies
+
+| This Plugin | Depends On | Dependency Type | Communication | Fallback |
+|-------------|------------|-----------------|---------------|----------|
+| T91 Ultimate RAID | T99 SDK | → Hard | Direct (SDK ref) | None - required |
+| T91 Ultimate RAID | T97 Storage | → Hard 📨 | `storage.read/write` | None - RAID needs storage |
+| T91 Ultimate RAID | T90 Intelligence | ⇢ Soft 📨 🧠 | `intelligence.predict.access` | Rule-based decisions |
+| T91 Ultimate RAID | T100 Observability | ⇢ Soft 📨 | `metrics.publish` | Local logging only |
+
+---
+
+### T92 (Ultimate Compression) Dependencies
+
+| This Plugin | Depends On | Dependency Type | Communication | Fallback |
+|-------------|------------|-----------------|---------------|----------|
+| T92 Ultimate Compression | T99 SDK | → Hard | Direct (SDK ref) | None - required |
+| T92 Ultimate Compression | T90 Intelligence | ⇢ Soft 📨 🧠 | `intelligence.predict.compressibility` | Entropy analysis |
+
+**AI-Dependent Sub-Tasks in T92:**
+- `GenerativeCompressionStrategy` → Requires T90 for neural network encoding
+- `ContentAwareCompressionStrategy` → Requires T90 for content classification
+
+---
+
+### T93 (Ultimate Encryption) Dependencies
+
+| This Plugin | Depends On | Dependency Type | Communication | Fallback |
+|-------------|------------|-----------------|---------------|----------|
+| T93 Ultimate Encryption | T99 SDK | → Hard | Direct (SDK ref) | None - required |
+| T93 Ultimate Encryption | **T94 Key Management** | → Hard 📨 🔑 | `keystore.get/wrap/unwrap` | **CANNOT encrypt without keys** |
+| T93 Ultimate Encryption | T96 Compliance | ⇢ Soft 📨 | `compliance.validate.cipher` | Skip compliance check |
+
+**Sub-Task Dependencies:**
+- ALL encryption strategies → T94 (keys required)
+- FIPS strategies → T96 (compliance validation recommended)
+- Envelope encryption → T94 with `IEnvelopeKeyStore` support
+
+---
+
+### T94 (Ultimate Key Management) Dependencies
+
+| This Plugin | Depends On | Dependency Type | Communication | Fallback |
+|-------------|------------|-----------------|---------------|----------|
+| T94 Ultimate Key Management | T99 SDK | → Hard | Direct (SDK ref) | None - required |
+| T94 Ultimate Key Management | T97 Storage | ⇢ Soft 📨 | `storage.write` (for file-based) | FileSystem only |
+| T94 Ultimate Key Management | T100 Observability | ⇢ Soft 📨 | `audit.log.key-access` | Local logging |
+
+**Sub-Task Dependencies:**
+- `VaultKeyStoreStrategy` → External HashiCorp Vault (not a plugin)
+- `AwsKmsStrategy` → External AWS KMS (not a plugin)
+- `HsmKeyStoreStrategy` → External HSM hardware (PKCS#11)
+
+---
+
+### T95 (Ultimate Security) Dependencies
+
+| This Plugin | Depends On | Dependency Type | Communication | Fallback |
+|-------------|------------|-----------------|---------------|----------|
+| T95 Ultimate Security | T99 SDK | → Hard | Direct (SDK ref) | None - required |
+| T95 Ultimate Security | T94 Key Management | ⇢ Soft 📨 🔑 | `keystore.get` (for crypto ops) | Skip crypto-based security |
+| T95 Ultimate Security | T90 Intelligence | ⇢ Soft 📨 🧠 | `intelligence.anomaly.detect` | Rule-based detection |
+| T95 Ultimate Security | T100 Observability | ⇢ Soft 📨 | `security.events.publish` | Local logging |
+
+**AI-Dependent Sub-Tasks in T95:**
+- `UebaStrategy` (User Behavior Analytics) → Requires T90
+- `AiSentinelStrategy` → Requires T90
+- `PredictiveThreatStrategy` → Requires T90
+- `BehavioralBiometricStrategy` → Requires T90
+
+---
+
+### T96 (Ultimate Compliance) Dependencies
+
+| This Plugin | Depends On | Dependency Type | Communication | Fallback |
+|-------------|------------|-----------------|---------------|----------|
+| T96 Ultimate Compliance | T99 SDK | → Hard | Direct (SDK ref) | None - required |
+| T96 Ultimate Compliance | T95 Security | ⇢ Soft 📨 | `security.policy.get` | Manual policy config |
+| T96 Ultimate Compliance | T94 Key Management | ⇢ Soft 📨 🔑 | `keystore.audit` | Skip key audit |
+| T96 Ultimate Compliance | T100 Observability | ⇢ Soft 📨 | `compliance.report.publish` | Local reports |
+| T96 Ultimate Compliance | T90 Intelligence | ⇢ Soft 📨 🧠 | `intelligence.nlp.parse` | Manual evidence |
+
+**AI-Dependent Sub-Tasks in T96:**
+- `AiAssistedAuditStrategy` → Requires T90
+- `PredictiveComplianceStrategy` → Requires T90
+
+---
+
+### T97 (Ultimate Storage) Dependencies
+
+| This Plugin | Depends On | Dependency Type | Communication | Fallback |
+|-------------|------------|-----------------|---------------|----------|
+| T97 Ultimate Storage | T99 SDK | → Hard | Direct (SDK ref) | None - required |
+| T97 Ultimate Storage | T93 Encryption | ⇢ Soft 📨 🔑 | `encryption.encrypt/decrypt` | Unencrypted storage |
+| T97 Ultimate Storage | T92 Compression | ⇢ Soft 📨 | `compression.compress/decompress` | Uncompressed storage |
+| T97 Ultimate Storage | T90 Intelligence | ⇢ Soft 📨 🧠 | `intelligence.predict.access` | Rule-based tiering |
+
+---
+
+### T98 (Ultimate Replication) Dependencies
+
+| This Plugin | Depends On | Dependency Type | Communication | Fallback |
+|-------------|------------|-----------------|---------------|----------|
+| T98 Ultimate Replication | T99 SDK | → Hard | Direct (SDK ref) | None - required |
+| T98 Ultimate Replication | T97 Storage | → Hard 📨 | `storage.read/write` | None - needs storage |
+| T98 Ultimate Replication | T93 Encryption | ⇢ Soft 📨 🔑 | `encryption.encrypt` (transit) | Unencrypted replication |
+| T98 Ultimate Replication | T105 Resilience | ⇢ Soft 📨 | `consensus.propose` | Basic replication |
+| T98 Ultimate Replication | T90 Intelligence | ⇢ Soft 📨 🧠 | `intelligence.predict.conflict` | LWW resolution |
+
+**AI-Dependent Sub-Tasks in T98:**
+- `SemanticConflictResolutionStrategy` → Requires T90
+- `AiPredictiveReplicationStrategy` → Requires T90
+
+---
+
+### T100 (Universal Observability) Dependencies
+
+| This Plugin | Depends On | Dependency Type | Communication | Fallback |
+|-------------|------------|-----------------|---------------|----------|
+| T100 Universal Observability | T99 SDK | → Hard | Direct (SDK ref) | None - required |
+| T100 Universal Observability | T97 Storage | ⇢ Soft 📨 | `storage.write` (metrics) | In-memory only |
+| T100 Universal Observability | T90 Intelligence | ⇢ Soft 📨 🧠 | `intelligence.anomaly.detect` | Threshold alerts |
+
+---
+
+### T104 (Ultimate Data Management) Dependencies
+
+| This Plugin | Depends On | Dependency Type | Communication | Fallback |
+|-------------|------------|-----------------|---------------|----------|
+| T104 Ultimate Data Management | T99 SDK | → Hard | Direct (SDK ref) | None - required |
+| T104 Ultimate Data Management | T97 Storage | → Hard 📨 | `storage.read/write/delete` | None - needs storage |
+| T104 Ultimate Data Management | T90 Intelligence | ⇢ Soft 📨 🧠 | `intelligence.embeddings.generate` | Content-hash dedup |
+
+**AI-Dependent Sub-Tasks in T104:**
+- `SemanticDeduplicationStrategy` → Requires T90 for embeddings
+- `PredictiveTieringStrategy` → Requires T90 for access prediction
+- `SmartRetentionStrategy` → Requires T90 for importance scoring
+- `AiDataOrchestratorStrategy` → Requires T90
+
+---
+
+### AI-Dependent Features Summary
+
+> **RULE:** All features marked 🧠 MUST communicate with T90 via message bus and provide graceful fallback.
+
+| Plugin | Feature | Message Topic | Fallback When T90 Unavailable |
+|--------|---------|---------------|------------------------------|
+| T91 RAID | AI-driven optimization | `intelligence.predict.access` | Rule-based |
+| T92 Compression | Generative compression | `intelligence.neural.encode` | Traditional algorithms |
+| T95 Security | UEBA, anomaly detection | `intelligence.anomaly.detect` | Threshold-based rules |
+| T95 Security | Behavioral biometrics | `intelligence.biometric.analyze` | Password-only auth |
+| T96 Compliance | AI-assisted audit | `intelligence.nlp.parse` | Manual evidence collection |
+| T98 Replication | Semantic conflict resolution | `intelligence.semantic.compare` | Last-write-wins |
+| T100 Observability | Predictive alerting | `intelligence.predict.anomaly` | Threshold alerts |
+| T104 Data Mgmt | Semantic deduplication | `intelligence.embeddings.generate` | Content-hash dedup |
+| T104 Data Mgmt | Predictive tiering | `intelligence.predict.access` | Age-based tiering |
 
 ---
 
