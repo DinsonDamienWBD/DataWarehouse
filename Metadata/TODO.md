@@ -5608,7 +5608,11 @@ var config = new DataProtectionConfig
 **Priority:** P1
 **Effort:** Extreme
 **Status:** [ ] Not Started
-**Plugin:** `DataWarehouse.Plugins.Storage.Generative`
+**Implements In:** T92 (UltimateCompression) as `GenerativeCompressionStrategy`
+**Dependencies (via Message Bus):**
+- T90 (Universal Intelligence) - Neural network encoding, semantic understanding
+- T97 (Ultimate Storage) - Model storage, compressed data persistence
+**Fallback:** Traditional entropy-based compression when AI unavailable
 
 **Description:** Replace raw data with AI model weights + prompts, achieving 10,000x compression for specific data types by storing descriptions rather than pixels.
 
@@ -5628,8 +5632,8 @@ var config = new DataProtectionConfig
 | 84.10 | GPU Acceleration | Leverage GPU for training and reconstruction | [ ] |
 
 **SDK Requirements:**
-- `IGenerativeCompression` interface
-- `GenerativeCompressionPluginBase` base class
+- `ICompressionStrategy` interface (within T92 UltimateCompression)
+- `GenerativeCompressionStrategy` class implementing the strategy
 - `CompressionProfile` class for model + prompt storage
 - `ReconstructionQuality` enum (Exact, High, Medium, Low)
 
@@ -5639,7 +5643,12 @@ var config = new DataProtectionConfig
 **Priority:** P1
 **Effort:** High
 **Status:** [ ] Not Started
-**Plugin:** `DataWarehouse.Plugins.Storage.Probabilistic`
+**Implements In:** Standalone plugin `DataWarehouse.Plugins.ProbabilisticStructures`
+**Dependencies (via Message Bus):**
+- T90 (Universal Intelligence) - Probabilistic predictions, pattern recognition
+- T97 (Ultimate Storage) - Persistence for Bloom filters, HyperLogLog, Count-Min Sketch structures
+**Fallback:** Returns "unknown" confidence levels when AI unavailable; uses in-memory structures when storage unavailable
+**Rationale:** Standalone because probabilistic data structures are unique primitives consumed by other plugins, not a variation of an existing category.
 
 **Description:** Store massive datasets with 99.5% accuracy using 0.1% of the space via probabilistic data structures - perfect for IoT/telemetry.
 
@@ -5659,9 +5668,9 @@ var config = new DataProtectionConfig
 | 85.10 | Upgrade Path | Convert probabilistic to exact when needed | [ ] |
 
 **SDK Requirements:**
-- `IProbabilisticStorage` interface
-- `ProbabilisticStoragePluginBase` base class
-- `Sketch` base class for probabilistic structures
+- `IProbabilisticStructures` interface
+- `ProbabilisticStructuresPluginBase` base class
+- `Sketch` base class for probabilistic structures (Bloom, HyperLogLog, Count-Min Sketch)
 - `AccuracyBound` class for error specification
 
 ---
@@ -5705,7 +5714,14 @@ var config = new DataProtectionConfig
 **Priority:** P2
 **Effort:** Very High
 **Status:** [ ] Not Started
-**Plugin:** `DataWarehouse.Plugins.Spatial.ArAnchors`
+**Implements In:** Standalone plugin `DataWarehouse.Plugins.SpatialAnchors`
+**Dependencies (via Message Bus):**
+- T90 (Universal Intelligence) - Spatial reasoning, AR scene understanding, location prediction
+- T95 (Ultimate Security) - Geo-fencing, location-based access control
+- T97 (Ultimate Storage) - Anchor point persistence, spatial data storage
+- T98 (Ultimate Replication) - Cross-region spatial anchor synchronization
+**Fallback:** Degrades to basic coordinate storage without AR features when dependencies unavailable
+**Rationale:** Standalone because AR/spatial/metaverse functionality is a unique domain not fitting existing Ultimate plugin categories.
 
 **Description:** Data tied to physical coordinates - place files in physical space via AR, accessible only to users physically present at that location.
 
@@ -5725,10 +5741,11 @@ var config = new DataProtectionConfig
 | 87.10 | Location Spoofing Detection | Prevent GPS/location spoofing attacks | [ ] |
 
 **SDK Requirements:**
-- `ISpatialAnchor` interface
-- `SpatialAnchorPluginBase` base class
+- `ISpatialAnchors` interface
+- `SpatialAnchorsPluginBase` base class
 - `GeoCoordinate` class for GPS + altitude
 - `SpatialBoundary` class for access zones
+- `ArAnchorPoint` class for AR anchor metadata
 
 ---
 
@@ -5736,7 +5753,10 @@ var config = new DataProtectionConfig
 **Priority:** P2
 **Effort:** High
 **Status:** [ ] Not Started
-**Plugin:** `DataWarehouse.Plugins.Indexing.Psychometric`
+**Implements In:** T90 (Universal Intelligence) as `PsychometricIndexingStrategy`
+**Dependencies (via Message Bus):**
+- T97 (Ultimate Storage) - Sentiment index persistence, psychometric profile storage
+**Fallback:** Falls back to keyword-only search when AI sentiment analysis unavailable
 
 **Description:** Index documents by emotional tone - search for "panicked emails" or "deceptive communications" using sentiment and psychological analysis.
 
@@ -5756,8 +5776,8 @@ var config = new DataProtectionConfig
 | 88.10 | Privacy Controls | Opt-out and data minimization options | [ ] |
 
 **SDK Requirements:**
-- `IPsychometricIndexer` interface
-- `PsychometricIndexPluginBase` base class
+- `IPsychometricIndexingStrategy` interface (within T90 Universal Intelligence)
+- `PsychometricIndexingStrategy` class implementing the strategy
 - `EmotionScore` class for multi-dimensional emotion
 - `SentimentQuery` class for emotional searches
 
@@ -5769,7 +5789,11 @@ var config = new DataProtectionConfig
 **Priority:** P0
 **Effort:** High
 **Status:** [ ] Not Started
-**Plugin:** `DataWarehouse.Plugins.Security.Watermarking`
+**Implements In:** T95 (Ultimate Security) as `ForensicWatermarkingStrategy`
+**Dependencies (via Message Bus):**
+- T90 (Universal Intelligence) - AI-adaptive watermark generation, ML-based detection
+- T97 (Ultimate Storage) - Watermark key storage, audit trail persistence
+**Fallback:** Falls back to static/deterministic watermarks when AI unavailable
 
 **Description:** Every download embeds invisible user-specific watermarks - if a document leaks, scan it to identify exactly who leaked it and when.
 
@@ -5789,8 +5813,8 @@ var config = new DataProtectionConfig
 | 89.10 | Audit Integration | Link watermark detection to audit logs | [ ] |
 
 **SDK Requirements:**
-- `IForensicWatermarking` interface
-- `WatermarkingPluginBase` base class
+- `IWatermarkingStrategy` interface (within T95 Ultimate Security)
+- `ForensicWatermarkingStrategy` class implementing the strategy
 - `Watermark` class containing user + timestamp
 - `WatermarkPayload` for encoded data
 - `ExtractionResult` class for leak investigation
