@@ -5855,6 +5855,426 @@ var config = new DataProtectionConfig
 
 ---
 
+### CATEGORY J: AI & Intelligence Layer
+
+#### Task 90: Ultimate Intelligence Plugin
+**Priority:** P0
+**Effort:** Extreme
+**Status:** [ ] Not Started
+**Plugin:** `DataWarehouse.Plugins.Intelligence`
+
+**Description:** Unified, AI-native intelligence plugin that serves as the single point of entry for ALL AI functionality in DataWarehouse. Consolidates AIAgents plugin and Shared library AI features into a multi-instance, multi-provider, multi-mode system. Provides a channel-agnostic gateway (CLI, GUI, API, plugins) with hot-reload support for dynamic capability expansion as plugins register their knowledge sources.
+
+**Architecture Philosophy:**
+- **Single Entry Point**: All AI interactions flow through this plugin
+- **Multi-Instance**: Users can create multiple AI profiles with different configurations
+- **Multi-Provider**: Link multiple AI subscriptions (OpenAI, Anthropic, Azure, Ollama)
+- **Multi-Mode**: OnDemand (chat), Background (autonomous), Scheduled, Reactive
+- **Provider Agnostic**: Works with any IAIProvider implementation
+- **Channel Agnostic**: CLI, GUI, REST API, gRPC, plugins - all route through same gateway
+- **Hot-Reload Knowledge**: Plugins dynamically register knowledge sources; AI gains/loses capabilities as plugins load/unload
+- **SDK Auto-Registration**: PluginBase lifecycle automatically registers plugin knowledge (no duplicate code in plugins)
+
+---
+
+**PHASE A: SDK Contracts & Base Classes**
+
+| # | Sub-Task | Description | Status |
+|---|----------|-------------|--------|
+| **A1: Knowledge Source Interfaces** |
+| 90.A1.1 | IIntelligenceKnowledgeSource | Interface for plugins to expose knowledge, commands, and state to Intelligence | [ ] |
+| 90.A1.2 | IKnowledgeCommand | Interface for commands a plugin exposes (e.g., "create backup", "list versions") | [ ] |
+| 90.A1.3 | IKnowledgeQuery | Interface for queryable knowledge domains (e.g., "What backups exist?") | [ ] |
+| 90.A1.4 | IIntelligenceCallback | Callback interface for Intelligence to proactively notify knowledge sources | [ ] |
+| **A2: Gateway Interfaces** |
+| 90.A2.1 | IIntelligenceGateway | Master interface for all AI interactions | [ ] |
+| 90.A2.2 | IIntelligenceSession | Session management for multi-turn conversations | [ ] |
+| 90.A2.3 | IIntelligenceChannel | Channel abstraction (CLI, GUI, API) | [ ] |
+| 90.A2.4 | IProviderRouter | Route requests to appropriate provider based on capability/cost/latency | [ ] |
+| **A3: Provider Management** |
+| 90.A3.1 | IProviderSubscription | User's AI provider subscription (API keys, quotas, limits) | [ ] |
+| 90.A3.2 | IProviderSelector | Select optimal provider for a given task | [ ] |
+| 90.A3.3 | ICapabilityRouter | Map capabilities to providers that support them | [ ] |
+| **A4: Base Classes** |
+| 90.A4.1 | IntelligenceGatewayPluginBase | Base class for the main Intelligence plugin | [ ] |
+| 90.A4.2 | IntelligenceChannelBase | Base class for channel implementations | [ ] |
+| 90.A4.3 | KnowledgeSourceBase | Base class for knowledge source implementations | [ ] |
+| **A5: PluginBase Enhancement** |
+| 90.A5.1 | IPluginKnowledge | Optional interface for plugins providing knowledge (null-safe) | [ ] |
+| 90.A5.2 | PluginBase.RegisterKnowledgeAsync | Lifecycle method that auto-registers knowledge with Intelligence | [ ] |
+| 90.A5.3 | PluginBase.UnregisterKnowledgeAsync | Lifecycle method that auto-unregisters on plugin unload | [ ] |
+| 90.A5.4 | PluginBase.GetKnowledgeDeclaration | Virtual method plugins override to provide knowledge lists | [ ] |
+| 90.A5.5 | KnowledgeDeclaration record | Record containing capabilities, commands, topics, queries | [ ] |
+| 90.A5.6 | Null/Empty Handling | PluginBase gracefully handles null/empty knowledge (no AI interaction) | [ ] |
+| **A6: Types & Models** |
+| 90.A6.1 | IntelligenceCapabilities | Flags enum for Intelligence capabilities | [ ] |
+| 90.A6.2 | IntelligenceMode | Enum: OnDemand, Background, Scheduled, Reactive | [ ] |
+| 90.A6.3 | ChannelType | Enum: CLI, GUI, REST, gRPC, Plugin, WebSocket | [ ] |
+| 90.A6.4 | IntelligenceRequest | Universal request model for all AI operations | [ ] |
+| 90.A6.5 | IntelligenceResponse | Universal response model with routing metadata | [ ] |
+| 90.A6.6 | KnowledgeDomain | Record describing a plugin's knowledge domain | [ ] |
+| 90.A6.7 | CommandDefinition | Record describing an executable command | [ ] |
+| 90.A6.8 | QueryDefinition | Record describing a queryable topic | [ ] |
+| 90.A6.9 | Configuration Records | IntelligenceConfig, ProviderConfig, ChannelConfig, ModeConfig | [ ] |
+
+---
+
+**PHASE B: Plugin Core Implementation**
+
+| # | Sub-Task | Description | Status |
+|---|----------|-------------|--------|
+| **B1: Main Plugin** |
+| 90.B1.1 | IntelligencePlugin | Main plugin extending IntelligenceGatewayPluginBase | [ ] |
+| 90.B1.2 | Configuration Loading | Load/save intelligence configuration with validation | [ ] |
+| 90.B1.3 | Provider Registry | Registry of configured AI providers with their subscriptions | [ ] |
+| 90.B1.4 | Channel Manager | Manage active channels and their sessions | [ ] |
+| 90.B1.5 | Knowledge Aggregator | Aggregate knowledge from all registered sources | [ ] |
+| 90.B1.6 | Message Bus Integration | Handle intelligence-related messages | [ ] |
+| **B2: Gateway Implementation** |
+| 90.B2.1 | IntelligenceGateway | Implementation of IIntelligenceGateway | [ ] |
+| 90.B2.2 | Session Manager | Create, maintain, and expire sessions | [ ] |
+| 90.B2.3 | Request Router | Route requests to appropriate providers | [ ] |
+| 90.B2.4 | Response Aggregator | Combine responses from multiple sources if needed | [ ] |
+| 90.B2.5 | Context Builder | Build comprehensive context from knowledge sources | [ ] |
+| **B3: Provider Management** |
+| 90.B3.1 | ProviderRegistry | Registry of all configured providers | [ ] |
+| 90.B3.2 | SubscriptionManager | Manage API keys, quotas, billing | [ ] |
+| 90.B3.3 | CapabilityRouter | Map capabilities to providers | [ ] |
+| 90.B3.4 | LoadBalancer | Distribute load across providers | [ ] |
+| 90.B3.5 | FallbackHandler | Fallback to alternative providers on failure | [ ] |
+| 90.B3.6 | CostOptimizer | Select cheapest provider meeting requirements | [ ] |
+
+---
+
+**PHASE C: Knowledge Aggregation System**
+
+| # | Sub-Task | Description | Status |
+|---|----------|-------------|--------|
+| **C1: Knowledge Discovery** |
+| 90.C1.1 | KnowledgeAggregator | Discover and aggregate all knowledge sources | [ ] |
+| 90.C1.2 | PluginScanner | Scan plugins for IIntelligenceKnowledgeSource | [ ] |
+| 90.C1.3 | HotReloadHandler | Handle plugin load/unload events | [ ] |
+| 90.C1.4 | KnowledgeGraph | Build graph of knowledge relationships | [ ] |
+| 90.C1.5 | CapabilityMatrix | Matrix of what each plugin can do | [ ] |
+| **C2: Unified Context** |
+| 90.C2.1 | ContextBuilder | Build system prompt from aggregated knowledge | [ ] |
+| 90.C2.2 | DomainSelector | Select relevant domains for a query | [ ] |
+| 90.C2.3 | StateAggregator | Aggregate current state from all sources | [ ] |
+| 90.C2.4 | CommandRegistry | Registry of all available commands | [ ] |
+| **C3: Command Execution** |
+| 90.C3.1 | CommandParser | Parse natural language to commands | [ ] |
+| 90.C3.2 | CommandRouter | Route commands to appropriate knowledge source | [ ] |
+| 90.C3.3 | CommandExecutor | Execute commands with validation | [ ] |
+| 90.C3.4 | ResultFormatter | Format command results for AI response | [ ] |
+
+---
+
+**PHASE D: Multi-Mode Support**
+
+| # | Sub-Task | Description | Status |
+|---|----------|-------------|--------|
+| **D1: OnDemand Mode (Interactive)** |
+| 90.D1.1 | ChatHandler | Handle interactive chat sessions | [ ] |
+| 90.D1.2 | StreamingSupport | Stream responses for large outputs | [ ] |
+| 90.D1.3 | ConversationMemory | Maintain conversation context | [ ] |
+| 90.D1.4 | QuickActions | One-shot commands without session | [ ] |
+| **D2: Background Mode (Autonomous)** |
+| 90.D2.1 | BackgroundProcessor | Process tasks autonomously | [ ] |
+| 90.D2.2 | TaskQueue | Queue of background tasks | [ ] |
+| 90.D2.3 | ProgressReporter | Report progress of background tasks | [ ] |
+| 90.D2.4 | AutoDecision | Make autonomous decisions within policies | [ ] |
+| **D3: Scheduled Mode** |
+| 90.D3.1 | ScheduledTasks | Run AI tasks on schedule | [ ] |
+| 90.D3.2 | ReportGenerator | Generate scheduled reports | [ ] |
+| 90.D3.3 | HealthAnalyzer | Scheduled health analysis | [ ] |
+| **D4: Reactive Mode** |
+| 90.D4.1 | EventListener | Listen for events to react to | [ ] |
+| 90.D4.2 | TriggerEngine | Define triggers for AI actions | [ ] |
+| 90.D4.3 | AnomalyResponder | Respond to detected anomalies | [ ] |
+
+---
+
+**PHASE E: Channel Implementations**
+
+| # | Sub-Task | Description | Status |
+|---|----------|-------------|--------|
+| 90.E1 | CLIChannel | Command-line interface channel | [ ] |
+| 90.E2 | RESTChannel | REST API channel for web clients | [ ] |
+| 90.E3 | gRPCChannel | gRPC channel for service-to-service | [ ] |
+| 90.E4 | WebSocketChannel | Real-time bidirectional channel | [ ] |
+| 90.E5 | PluginChannel | Internal plugin-to-Intelligence channel | [ ] |
+| 90.E6 | ChannelAdapter | Adapt external channels (GUI frameworks) | [ ] |
+
+---
+
+**PHASE F: AI Features**
+
+| # | Sub-Task | Description | Status |
+|---|----------|-------------|--------|
+| **F1: Natural Language Processing** |
+| 90.F1.1 | QueryParser | Parse user queries to structured format | [ ] |
+| 90.F1.2 | IntentDetector | Detect user intent from natural language | [ ] |
+| 90.F1.3 | EntityExtractor | Extract entities (file names, dates, etc.) | [ ] |
+| 90.F1.4 | ResponseGenerator | Generate natural language responses | [ ] |
+| **F2: Semantic Search** |
+| 90.F2.1 | UnifiedVectorStore | Unified vector store across all knowledge | [ ] |
+| 90.F2.2 | SemanticIndexer | Index all knowledge for semantic search | [ ] |
+| 90.F2.3 | SemanticSearch | Cross-domain semantic search | [ ] |
+| **F3: Knowledge Graph** |
+| 90.F3.1 | UnifiedKnowledgeGraph | Graph of all system knowledge | [ ] |
+| 90.F3.2 | RelationshipDiscovery | Discover relationships across domains | [ ] |
+| 90.F3.3 | GraphQuery | Query knowledge graph with natural language | [ ] |
+| **F4: Recommendations** |
+| 90.F4.1 | RecommendationEngine | Generate proactive recommendations | [ ] |
+| 90.F4.2 | OptimizationSuggestions | Suggest system optimizations | [ ] |
+| 90.F4.3 | ActionSuggestions | Suggest actions based on context | [ ] |
+
+---
+
+**PHASE G: Admin & Security**
+
+| # | Sub-Task | Description | Status |
+|---|----------|-------------|--------|
+| **G1: Access Control** |
+| 90.G1.1 | InstancePermissions | Control what each instance can access | [ ] |
+| 90.G1.2 | UserPermissions | Control what users can do via AI | [ ] |
+| 90.G1.3 | CommandWhitelist | Restrict which commands AI can execute | [ ] |
+| 90.G1.4 | DomainRestrictions | Restrict which knowledge domains are accessible | [ ] |
+| **G2: Audit & Compliance** |
+| 90.G2.1 | QueryLogging | Log all AI queries and responses | [ ] |
+| 90.G2.2 | CommandAudit | Audit trail of AI-executed commands | [ ] |
+| 90.G2.3 | CostTracking | Track AI usage costs per user/instance | [ ] |
+| 90.G2.4 | ComplianceReporting | Generate compliance reports | [ ] |
+| **G3: Rate Limiting** |
+| 90.G3.1 | QueryRateLimiter | Rate limit queries per user/instance | [ ] |
+| 90.G3.2 | CostLimiter | Limit spending per user/instance | [ ] |
+| 90.G3.3 | ThrottleManager | Throttle during high load | [ ] |
+
+---
+
+**PHASE H: Migration & Integration**
+
+| # | Sub-Task | Description | Status |
+|---|----------|-------------|--------|
+| 90.H1 | AIAgentsPlugin Migration | Migrate existing AIAgents users to new plugin | [ ] |
+| 90.H2 | SharedNLP Migration | Migrate Shared NLP features to Intelligence | [ ] |
+| 90.H3 | DataProtection Integration | Integrate with Task 80's AI features | [ ] |
+| 90.H4 | ExistingProvider Compatibility | Support existing IAIProvider implementations | [ ] |
+| 90.H5 | Deprecation Notices | Mark old components as deprecated | [ ] |
+| 90.H6 | Backward Compatibility | Support old configurations during transition | [ ] |
+
+---
+
+**SDK Requirements:**
+
+**Interfaces (in DataWarehouse.SDK.Contracts):**
+- `IIntelligenceGateway` - Master interface for AI interactions
+- `IIntelligenceSession` - Session management
+- `IIntelligenceKnowledgeSource` - Plugin knowledge exposure
+- `IKnowledgeCommand` - Executable command interface
+- `IKnowledgeQuery` - Queryable knowledge interface
+- `IIntelligenceChannel` - Channel abstraction
+- `IProviderRouter` - Provider routing
+- `IPluginKnowledge` - Optional interface for plugins with knowledge
+
+**Base Classes (in DataWarehouse.SDK.Contracts):**
+- `IntelligenceGatewayPluginBase` - Main Intelligence plugin base
+- `IntelligenceChannelBase` - Channel implementation base
+- `KnowledgeSourceBase` - Knowledge source base
+- `PluginBase` enhancement - Auto-registration lifecycle methods
+
+**Types (in DataWarehouse.SDK.Primitives):**
+- `IntelligenceCapabilities` flags enum
+- `IntelligenceMode` enum
+- `ChannelType` enum
+- `IntelligenceRequest`, `IntelligenceResponse` records
+- `KnowledgeDomain`, `CommandDefinition`, `QueryDefinition` records
+- `KnowledgeDeclaration` record for plugin knowledge
+- Configuration records
+
+**PluginBase Lifecycle Enhancement:**
+
+```csharp
+public abstract class PluginBase : IPlugin
+{
+    // Existing members...
+
+    /// <summary>
+    /// Override to declare this plugin's knowledge, commands, and capabilities
+    /// for the Intelligence plugin. Return null if this plugin has no AI-relevant knowledge.
+    /// </summary>
+    protected virtual KnowledgeDeclaration? GetKnowledgeDeclaration() => null;
+
+    /// <summary>
+    /// Called during plugin initialization to register knowledge with Intelligence.
+    /// Base implementation handles null/empty gracefully - no action taken.
+    /// </summary>
+    protected virtual async Task RegisterKnowledgeAsync(IIntelligenceGateway? intelligence, CancellationToken ct = default)
+    {
+        if (intelligence == null) return;
+        var declaration = GetKnowledgeDeclaration();
+        if (declaration == null || declaration.IsEmpty) return;
+        await intelligence.RegisterKnowledgeSourceAsync(this, declaration, ct);
+    }
+
+    /// <summary>
+    /// Called during plugin disposal to unregister knowledge from Intelligence.
+    /// </summary>
+    protected virtual async Task UnregisterKnowledgeAsync(IIntelligenceGateway? intelligence, CancellationToken ct = default)
+    {
+        if (intelligence == null) return;
+        await intelligence.UnregisterKnowledgeSourceAsync(Id, ct);
+    }
+}
+```
+
+**Extensibility:**
+- Level 1 (Plugin-only): New channels, modes, knowledge sources - no SDK changes
+- Level 2 (Additive): New capability flags, optional interfaces - non-breaking SDK changes
+- Level 3 (Evolution): Interface default methods, versioned base classes - backward compatible
+
+---
+
+**Configuration Example:**
+
+```csharp
+var config = new IntelligenceConfig
+{
+    // Enable/disable main features
+    EnableOnDemand = true,
+    EnableBackground = true,
+    EnableScheduled = false,
+    EnableReactive = true,
+
+    // Providers: User configures multiple subscriptions
+    Providers = new[]
+    {
+        new ProviderConfig
+        {
+            Name = "Primary",
+            ProviderId = "openai",
+            ApiKey = "sk-...",
+            DefaultModel = "gpt-4",
+            Capabilities = AICapabilities.All
+        },
+        new ProviderConfig
+        {
+            Name = "Fallback",
+            ProviderId = "anthropic",
+            ApiKey = "sk-ant-...",
+            DefaultModel = "claude-3-opus",
+            Capabilities = AICapabilities.ChatCompletion | AICapabilities.Streaming
+        },
+        new ProviderConfig
+        {
+            Name = "Local",
+            ProviderId = "ollama",
+            BaseUrl = "http://localhost:11434",
+            DefaultModel = "llama3",
+            Capabilities = AICapabilities.TextCompletion
+        }
+    },
+
+    // Capability routing: Which provider for which capability
+    CapabilityRouting = new Dictionary<AICapabilities, string>
+    {
+        [AICapabilities.Embeddings] = "Primary",
+        [AICapabilities.ChatCompletion] = "Primary",
+        [AICapabilities.ImageGeneration] = "Primary",
+        [AICapabilities.CodeGeneration] = "Fallback"  // Prefer Claude for code
+    },
+
+    // Channels: Which channels are enabled
+    Channels = new[]
+    {
+        new ChannelConfig { Type = ChannelType.CLI, Enabled = true },
+        new ChannelConfig { Type = ChannelType.REST, Enabled = true, Port = 8080 },
+        new ChannelConfig { Type = ChannelType.WebSocket, Enabled = true, Port = 8081 }
+    },
+
+    // Admin restrictions
+    Admin = new AdminConfig
+    {
+        MaxCostPerDayUsd = 100.0m,
+        AllowedCommands = new[] { "backup.*", "query.*", "status.*" },
+        RestrictedDomains = new[] { "security.credentials" },
+        RequireApprovalForCommands = new[] { "delete.*", "restore.*" }
+    }
+};
+```
+
+---
+
+**Related Tasks:**
+- Task 80 (Ultimate Data Protection): Integration with backup AI features
+- Existing AIAgents Plugin: To be deprecated and migrated
+- DataWarehouse.Shared NLP: To be deprecated and migrated
+- SDK IAIProvider: Foundation for provider support
+
+---
+
+**Knowledge Source Example (for other plugins):**
+
+```csharp
+// Example: DataProtectionPlugin exposing knowledge to Intelligence
+public class DataProtectionPlugin : DataProtectionPluginBase
+{
+    protected override KnowledgeDeclaration? GetKnowledgeDeclaration() => new()
+    {
+        DomainId = "data-protection",
+        DomainName = "Data Protection & Backup",
+        Description = "Backup, versioning, and restore operations",
+        Topics = new[] { "backups", "versions", "restore", "schedules", "destinations" },
+
+        Commands = new[]
+        {
+            new CommandDefinition
+            {
+                Id = "backup.create",
+                Name = "Create Backup",
+                Description = "Create a new backup of specified data",
+                Parameters = new[] { "source", "destination?", "strategy?" },
+                Examples = new[] { "backup my documents", "create full backup to S3" }
+            },
+            new CommandDefinition
+            {
+                Id = "backup.list",
+                Name = "List Backups",
+                Description = "List all available backups",
+                Parameters = new[] { "filter?", "limit?" },
+                Examples = new[] { "show recent backups", "list S3 backups from last week" }
+            },
+            new CommandDefinition
+            {
+                Id = "restore.execute",
+                Name = "Restore Data",
+                Description = "Restore data from a backup or version",
+                Parameters = new[] { "source", "target?", "point-in-time?" },
+                Examples = new[] { "restore yesterday's backup", "restore to 2pm yesterday" }
+            }
+        },
+
+        Queries = new[]
+        {
+            new QueryDefinition
+            {
+                Id = "backup.status",
+                Description = "Current backup status and health",
+                SampleQuestions = new[] { "Are my backups healthy?", "When was the last backup?" }
+            },
+            new QueryDefinition
+            {
+                Id = "restore.points",
+                Description = "Available restore points",
+                SampleQuestions = new[] { "What can I restore to?", "Show me recovery points" }
+            }
+        }
+    };
+}
+```
+
+---
+
 ### Summary: Active Storage Task Matrix
 
 | Task | Name | Category | Priority | Effort | Status |
@@ -5879,8 +6299,9 @@ var config = new DataProtectionConfig
 | 87 | Spatial AR Anchors | Spatial | P2 | Very High | [ ] |
 | 88 | Psychometric Indexing | Indexing | P2 | High | [ ] |
 | 89 | Forensic Watermarking | Security | P0 | High | [ ] |
+| 90 | Ultimate Intelligence | AI | P0 | Extreme | [ ] |
 
-**Total:** 20 Tasks, ~220 Sub-Tasks
+**Total:** 21 Tasks, ~290 Sub-Tasks
 
 ---
 
