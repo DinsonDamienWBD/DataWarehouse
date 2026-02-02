@@ -5280,35 +5280,285 @@ This creates a complete audit trail for every change, enabling compliance report
 
 ### CATEGORY D: Data Physics & Time
 
-#### Task 80: Infinite Versioning (Continuous Data Protection)
+#### Task 80: Ultimate Data Protection & Recovery
 **Priority:** P0
 **Effort:** Very High
 **Status:** [ ] Not Started
-**Plugin:** `DataWarehouse.Plugins.Recovery.CDP`
+**Plugin:** `DataWarehouse.Plugins.DataProtection`
 
-**Description:** Record every I/O operation enabling "Time Travel" recovery to any specific second, not just scheduled snapshots.
+**Description:** Unified, AI-native data protection plugin consolidating backup, versioning, and restore into a single, highly configurable, multi-instance system. Replaces and deprecates separate backup plugins (BackupPlugin, DifferentialBackupPlugin, SyntheticFullBackupPlugin, BackupVerificationPlugin). Users have complete freedom to enable/disable features, select backup strategies, configure schedules, choose any storage provider as destination, and leverage AI for autonomous protection management.
 
-**Sub-Tasks:**
+**Architecture Philosophy:**
+- **Single Plugin, Multiple Instances**: Users can create multiple protection profiles (e.g., "Critical-Hourly", "Archive-Monthly")
+- **Strategy Pattern**: Backup types are pluggable strategies, not separate plugins
+- **User Freedom**: Every feature is optional, configurable, and runtime-changeable
+- **AI-Native**: Leverages SDK's IAIProvider, IVectorStore, IKnowledgeGraph for intelligent management
+- **Extensible SDK**: New strategies can be added to the plugin without SDK changes (Level 1 extension)
+
+---
+
+**PHASE A: SDK Contracts & Base Classes**
 
 | # | Sub-Task | Description | Status |
 |---|----------|-------------|--------|
-| 80.1 | Write-Ahead Log | Append-only log of all write operations | [ ] |
-| 80.2 | Operation Journal | Record operation type, offset, length, data hash | [ ] |
-| 80.3 | Timestamp Index | Microsecond-precision timestamp indexing | [ ] |
-| 80.4 | Point-in-Time Recovery | Reconstruct object state at any timestamp | [ ] |
-| 80.5 | Journal Compaction | Merge old journal entries to save space | [ ] |
-| 80.6 | Retention Policies | Configurable retention (seconds/minutes/hours/days) | [ ] |
-| 80.7 | Time Travel API | Query historical state via timestamp parameter | [ ] |
-| 80.8 | Recovery Validation | Verify reconstructed data integrity | [ ] |
-| 80.9 | Continuous Backup Stream | Real-time replication of journal to remote | [ ] |
-| 80.10 | Storage Efficiency | Deduplication and compression of journal | [ ] |
+| **A1: Core Interfaces** |
+| 80.A1.1 | IDataProtectionProvider | Master interface with Backup, Versioning, Restore, Intelligence subsystems | [ ] |
+| 80.A1.2 | IBackupSubsystem | Interface for backup operations with strategy registry | [ ] |
+| 80.A1.3 | IBackupStrategy | Strategy interface for Full, Incremental, Differential, Continuous, Synthetic, BlockLevel | [ ] |
+| 80.A1.4 | IVersioningSubsystem | Interface for versioning with policy support | [ ] |
+| 80.A1.5 | IVersioningPolicy | Policy interface for Manual, Scheduled, EventBased, Continuous modes | [ ] |
+| 80.A1.6 | IRestoreOrchestrator | Interface for unified restore from any source | [ ] |
+| 80.A1.7 | IDataProtectionIntelligence | Interface for AI-powered management, NL queries, predictions | [ ] |
+| 80.A1.8 | IProtectionScheduler | Interface for scheduling with cron and complex rules | [ ] |
+| 80.A1.9 | IProtectionDestination | Interface for any storage provider as backup destination | [ ] |
+| **A2: Base Classes** |
+| 80.A2.1 | DataProtectionPluginBase | Base class with lifecycle, events, health, subsystem wiring | [ ] |
+| 80.A2.2 | BackupStrategyBase | Base class for backup strategies with common logic | [ ] |
+| 80.A2.3 | VersioningPolicyBase | Base class for versioning policies with retention logic | [ ] |
+| 80.A2.4 | DefaultRestoreOrchestrator | Default implementation understanding all backup types | [ ] |
+| 80.A2.5 | DefaultProtectionScheduler | Default scheduler with cron parsing and execution | [ ] |
+| **A3: Types & Models** |
+| 80.A3.1 | DataProtectionCapabilities | Flags enum for all capabilities (backup types, versioning modes, AI features) | [ ] |
+| 80.A3.2 | DataProtectionFeatures | Runtime-enabled features enum | [ ] |
+| 80.A3.3 | BackupStrategyType | Enum: Full, Incremental, Differential, Continuous, Synthetic, BlockLevel | [ ] |
+| 80.A3.4 | VersioningMode | Enum: Manual, Scheduled, EventBased, Continuous, Intelligent | [ ] |
+| 80.A3.5 | RestoreSource | Record with factory methods for backup/version/point-in-time sources | [ ] |
+| 80.A3.6 | Configuration Records | DataProtectionConfig, BackupConfig, VersioningConfig, IntelligenceConfig | [ ] |
+| 80.A3.7 | Result Types | BackupResult, RestoreResult, VerificationResult, VersionInfo | [ ] |
+| 80.A3.8 | Event Args | ProtectionOperationEventArgs, HealthEventArgs, IntelligenceDecisionEventArgs | [ ] |
+
+---
+
+**PHASE B: Plugin Core Implementation**
+
+| # | Sub-Task | Description | Status |
+|---|----------|-------------|--------|
+| **B1: Main Plugin** |
+| 80.B1.1 | DataProtectionPlugin | Main plugin extending DataProtectionPluginBase | [ ] |
+| 80.B1.2 | Configuration Loading | Load/save protection configuration with validation | [ ] |
+| 80.B1.3 | Subsystem Initialization | Lazy initialization of Backup, Versioning, Intelligence based on config | [ ] |
+| 80.B1.4 | Destination Registration | Register any IStorageProvider as protection destination | [ ] |
+| 80.B1.5 | Multi-Instance Support | Support multiple plugin instances with different profiles | [ ] |
+| 80.B1.6 | Message Bus Integration | Handle protection-related messages | [ ] |
+| **B2: Backup Subsystem** |
+| 80.B2.1 | BackupSubsystem | Implementation of IBackupSubsystem with strategy registry | [ ] |
+| 80.B2.2 | FullBackupStrategy | Complete backup of all data | [ ] |
+| 80.B2.3 | IncrementalBackupStrategy | Changes since last backup of any type | [ ] |
+| 80.B2.4 | DifferentialBackupStrategy | Changes since last full backup with bitmap tracking | [ ] |
+| 80.B2.5 | ContinuousBackupStrategy | Real-time file monitoring and immediate backup | [ ] |
+| 80.B2.6 | SyntheticFullStrategy | Create full backup by merging incrementals (no re-read of source) | [ ] |
+| 80.B2.7 | BlockLevelStrategy | Delta/block-level backup with deduplication | [ ] |
+| 80.B2.8 | Backup Chain Management | Track backup chains (Full→Incremental→...) | [ ] |
+| 80.B2.9 | Backup Verification | Verify backup integrity with configurable levels | [ ] |
+| 80.B2.10 | Backup Pruning | Automated cleanup based on retention policies | [ ] |
+
+---
+
+**PHASE C: Versioning Subsystem (Continuous Data Protection)**
+
+| # | Sub-Task | Description | Status |
+|---|----------|-------------|--------|
+| **C1: Core Versioning** |
+| 80.C1.1 | VersioningSubsystem | Implementation of IVersioningSubsystem | [ ] |
+| 80.C1.2 | ManualVersioningPolicy | User-triggered version creation only | [ ] |
+| 80.C1.3 | ScheduledVersioningPolicy | Versions at configured intervals | [ ] |
+| 80.C1.4 | EventVersioningPolicy | Version on save/commit/specific events | [ ] |
+| 80.C1.5 | ContinuousVersioningPolicy | Version every write operation (CDP) | [ ] |
+| 80.C1.6 | IntelligentVersioningPolicy | AI-decided versioning based on change significance | [ ] |
+| **C2: CDP Infrastructure (Time Travel)** |
+| 80.C2.1 | Write-Ahead Log (WAL) | Append-only log of all write operations | [ ] |
+| 80.C2.2 | Operation Journal | Record operation type, offset, length, data hash | [ ] |
+| 80.C2.3 | Timestamp Index | Microsecond-precision timestamp indexing for point-in-time | [ ] |
+| 80.C2.4 | Journal Compaction | Merge old journal entries to save space | [ ] |
+| 80.C2.5 | Tiered Retention | Keep seconds for 1 day, minutes for 7 days, hours for 30 days, etc. | [ ] |
+| **C3: Version Management** |
+| 80.C3.1 | Version Timeline | Visual/queryable timeline of all recovery points | [ ] |
+| 80.C3.2 | Version Comparison | Diff between any two versions | [ ] |
+| 80.C3.3 | Version Tagging | Named versions with metadata | [ ] |
+| 80.C3.4 | Version Search | Semantic search over version descriptions | [ ] |
+
+---
+
+**PHASE D: Restore Orchestrator**
+
+| # | Sub-Task | Description | Status |
+|---|----------|-------------|--------|
+| 80.D1 | RestoreOrchestrator | Unified restore from backup, version, or point-in-time | [ ] |
+| 80.D2 | Backup Chain Resolution | Resolve Full+Incrementals for complete restore | [ ] |
+| 80.D3 | Point-in-Time Recovery | Reconstruct state at any microsecond using CDP journal | [ ] |
+| 80.D4 | Granular Restore | Restore individual files/objects from any source | [ ] |
+| 80.D5 | Restore Planning | Preview what will be restored before execution | [ ] |
+| 80.D6 | Restore Validation | Verify restored data integrity | [ ] |
+| 80.D7 | Test Restore | Restore to temp location and verify without affecting production | [ ] |
+| 80.D8 | Cross-Destination Restore | Restore from any destination to any target | [ ] |
+
+---
+
+**PHASE E: Scheduling & Automation**
+
+| # | Sub-Task | Description | Status |
+|---|----------|-------------|--------|
+| 80.E1 | ProtectionScheduler | Cron-based scheduling with complex rules | [ ] |
+| 80.E2 | Schedule Persistence | Save/restore schedules across restarts | [ ] |
+| 80.E3 | Schedule Conditions | Run only if condition met (disk space, network, time window) | [ ] |
+| 80.E4 | Schedule Priorities | Handle concurrent schedules with priority ordering | [ ] |
+| 80.E5 | Missed Schedule Handling | Detect and optionally run missed backups | [ ] |
+| 80.E6 | Schedule History | Track execution history with success/failure | [ ] |
+| 80.E7 | On-Demand Trigger | Manually trigger any schedule immediately | [ ] |
+
+---
+
+**PHASE F: AI Intelligence Layer**
+
+| # | Sub-Task | Description | Status |
+|---|----------|-------------|--------|
+| **F1: Core Intelligence** |
+| 80.F1.1 | DataProtectionIntelligence | Implementation of IDataProtectionIntelligence | [ ] |
+| 80.F1.2 | Natural Language Processor | Answer questions using SDK's IAIProvider | [ ] |
+| 80.F1.3 | Command Parser | Parse NL commands like "backup to cloud now" | [ ] |
+| 80.F1.4 | Context Builder | Build protection context for AI queries | [ ] |
+| **F2: Semantic Search** |
+| 80.F2.1 | Backup Indexer | Index backups in SDK's IVectorStore | [ ] |
+| 80.F2.2 | Version Indexer | Index versions with semantic descriptions | [ ] |
+| 80.F2.3 | Semantic Search | Find backups matching NL queries | [ ] |
+| **F3: Knowledge Graph** |
+| 80.F3.1 | Backup Graph Builder | Model backup chains in SDK's IKnowledgeGraph | [ ] |
+| 80.F3.2 | Dependency Traversal | Find optimal restore path via graph traversal | [ ] |
+| 80.F3.3 | Impact Analysis | "What if destination X fails?" queries | [ ] |
+| **F4: Anomaly Detection & Prediction** |
+| 80.F4.1 | Backup Anomaly Detector | Detect unusual backup sizes/timings using SDK's AIMath | [ ] |
+| 80.F4.2 | Storage Predictor | Predict future storage needs | [ ] |
+| 80.F4.3 | Optimal Window Predictor | Suggest best backup windows based on activity | [ ] |
+| 80.F4.4 | Recommendation Engine | Generate actionable protection recommendations | [ ] |
+| **F5: Autonomous Management** |
+| 80.F5.1 | Autonomous Mode | AI decides when to backup based on change rate | [ ] |
+| 80.F5.2 | Auto-Restore Integration | Link with self-healing for automatic recovery | [ ] |
+| 80.F5.3 | Proactive Notifications | Alert on protection gaps, missed backups, anomalies | [ ] |
+
+---
+
+**PHASE G: Destinations & Integration**
+
+| # | Sub-Task | Description | Status |
+|---|----------|-------------|--------|
+| 80.G1 | Local Destination | Local filesystem as backup destination | [ ] |
+| 80.G2 | Cloud Destination | S3/Azure/GCS via storage providers | [ ] |
+| 80.G3 | Air-Gap Destination | Integration with Task 79's Mule system | [ ] |
+| 80.G4 | Multi-Destination | Replicate to multiple destinations for redundancy | [ ] |
+| 80.G5 | Destination Health | Monitor destination availability and auto-failover | [ ] |
+| 80.G6 | Tier Movement | Move old backups to cold/archive tiers | [ ] |
+
+---
+
+**PHASE H: Migration & Deprecation**
+
+| # | Sub-Task | Description | Status |
+|---|----------|-------------|--------|
+| 80.H1 | BackupPlugin Migration | Migrate existing BackupPlugin users to new plugin | [ ] |
+| 80.H2 | DifferentialBackupPlugin Migration | Absorb differential functionality | [ ] |
+| 80.H3 | SyntheticFullBackupPlugin Migration | Absorb synthetic full functionality | [ ] |
+| 80.H4 | BackupVerificationPlugin Migration | Absorb verification functionality | [ ] |
+| 80.H5 | Deprecation Notices | Mark old plugins as deprecated with migration guide | [ ] |
+| 80.H6 | Backward Compatibility | Support old configurations during transition | [ ] |
+
+---
 
 **SDK Requirements:**
-- `IContinuousDataProtection` interface
-- `CDPPluginBase` base class
-- `JournalEntry` class for operation records
-- `TimePoint` struct for microsecond timestamps
-- `RecoveryTarget` class for point-in-time specification
+
+**Interfaces (in DataWarehouse.SDK.Contracts):**
+- `IDataProtectionProvider` - Master interface for data protection
+- `IBackupSubsystem` - Backup operations subsystem
+- `IBackupStrategy` - Strategy interface for backup types
+- `IVersioningSubsystem` - Versioning operations subsystem
+- `IVersioningPolicy` - Policy interface for versioning modes
+- `IRestoreOrchestrator` - Unified restore operations
+- `IDataProtectionIntelligence` - AI-powered management
+- `IProtectionScheduler` - Scheduling operations
+- `IProtectionDestination` - Backup destination abstraction
+
+**Base Classes (in DataWarehouse.SDK.Contracts):**
+- `DataProtectionPluginBase` - Main plugin base class
+- `BackupStrategyBase` - Strategy base with common logic
+- `VersioningPolicyBase` - Policy base with retention logic
+- `DefaultRestoreOrchestrator` - Default restore implementation
+- `DefaultProtectionScheduler` - Default scheduler implementation
+
+**Types (in DataWarehouse.SDK.Primitives):**
+- `DataProtectionCapabilities` flags enum
+- `DataProtectionFeatures` flags enum
+- `BackupStrategyType` enum
+- `VersioningMode` enum
+- `RestoreSource` record
+- `BackupResult`, `RestoreResult`, `VersionInfo` records
+- `ProtectionHealthStatus`, `ProtectionMetrics` records
+- Configuration records: `DataProtectionConfig`, `BackupConfig`, `VersioningConfig`, `IntelligenceConfig`
+
+**Extensibility:**
+- Level 1 (Plugin-only): New strategies, policies, AI features - no SDK changes
+- Level 2 (Additive): New capability flags, optional interfaces - non-breaking SDK changes
+- Level 3 (Evolution): Interface default methods, versioned base classes - backward compatible
+
+---
+
+**Configuration Example:**
+
+```csharp
+var config = new DataProtectionConfig
+{
+    // Enable/disable main features
+    EnableBackup = true,
+    EnableVersioning = true,
+    EnableIntelligence = true,
+
+    // Backup: User selects strategies
+    Backup = new BackupConfig
+    {
+        EnabledStrategies = BackupStrategyType.Full | BackupStrategyType.Incremental,
+        Schedules = new[]
+        {
+            new ScheduleConfig { Name = "Daily", CronExpression = "0 2 * * *", BackupStrategy = BackupStrategyType.Incremental },
+            new ScheduleConfig { Name = "Weekly", CronExpression = "0 3 * * 0", BackupStrategy = BackupStrategyType.Full }
+        }
+    },
+
+    // Versioning: User selects mode
+    Versioning = new VersioningConfig
+    {
+        Mode = VersioningMode.Continuous,  // CDP - every write
+        Retention = new VersionRetentionConfig
+        {
+            KeepAllFor = TimeSpan.FromHours(24),
+            KeepHourlyFor = TimeSpan.FromDays(7),
+            KeepDailyFor = TimeSpan.FromDays(30)
+        }
+    },
+
+    // Destinations: Any storage provider
+    Destinations = new[]
+    {
+        new DestinationConfig { Name = "Local", StorageProviderId = "com.datawarehouse.storage.local", Path = @"D:\Backups" },
+        new DestinationConfig { Name = "S3", StorageProviderId = "com.datawarehouse.storage.s3", Bucket = "backups" },
+        new DestinationConfig { Name = "AirGap", StorageProviderId = "com.datawarehouse.transport.airgap", MuleId = "weekly-usb" }
+    },
+
+    // Intelligence: AI management
+    Intelligence = new IntelligenceConfig
+    {
+        Enabled = true,
+        AutonomousMode = true,
+        AutoRestoreOnCorruption = true
+    }
+};
+```
+
+---
+
+**Related Tasks:**
+- Task 79 (The Mule): Air-Gap destination integration
+- Existing BackupPlugin: To be deprecated and migrated
+- Existing DifferentialBackupPlugin: To be deprecated and migrated
+- Existing SyntheticFullBackupPlugin: To be deprecated and migrated
+- Existing BackupVerificationPlugin: To be deprecated and migrated
 
 ---
 
