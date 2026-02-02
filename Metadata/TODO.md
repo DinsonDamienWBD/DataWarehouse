@@ -6127,13 +6127,34 @@ var config = new DataProtectionConfig
 
 **PHASE L: Channel Implementations**
 
+> **Note:** The existing `DataWarehouse.Plugins.AIInterface` plugin already implements external channels (Slack, Teams, Discord, Alexa, Siri, ChatGPT, Claude MCP). This phase refactors AIInterface to route to Intelligence via KnowledgeObject instead of AIAgents.
+
 | # | Sub-Task | Description | Status |
 |---|----------|-------------|--------|
-| 90.L1 | CLIChannel | Command-line interface | [ ] |
-| 90.L2 | RESTChannel | REST API | [ ] |
-| 90.L3 | gRPCChannel | gRPC for services | [ ] |
-| 90.L4 | WebSocketChannel | Real-time bidirectional | [ ] |
-| 90.L5 | PluginChannel | Internal plugin channel | [ ] |
+| **L1: Internal Channels** |
+| 90.L1.1 | CLIChannel | Command-line interface | [ ] |
+| 90.L1.2 | RESTChannel | REST API | [ ] |
+| 90.L1.3 | gRPCChannel | gRPC for services | [ ] |
+| 90.L1.4 | WebSocketChannel | Real-time bidirectional | [ ] |
+| 90.L1.5 | PluginChannel | Internal plugin-to-Intelligence channel | [ ] |
+| **L2: AIInterface Plugin Refactor** |
+| 90.L2.1 | AIInterface → Intelligence Routing | Change routing from AIAgents to Intelligence plugin | [ ] |
+| 90.L2.2 | AIInterface KnowledgeObject Adapter | Convert channel requests to KnowledgeObject | [ ] |
+| 90.L2.3 | AIInterface Response Adapter | Convert KnowledgeObject responses to channel format | [ ] |
+| 90.L2.4 | AIInterface Knowledge Registration | Register channel status, capabilities, health | [ ] |
+| 90.L2.5 | Remove AIInterface → AIAgents Dependency | Remove direct/message dependency on AIAgents | [ ] |
+| **L3: External Chat Channels (via AIInterface)** |
+| 90.L3.1 | SlackChannel Refactor | Slack via KnowledgeObject | [ ] |
+| 90.L3.2 | TeamsChannel Refactor | Microsoft Teams via KnowledgeObject | [ ] |
+| 90.L3.3 | DiscordChannel Refactor | Discord via KnowledgeObject | [ ] |
+| **L4: Voice Channels (via AIInterface)** |
+| 90.L4.1 | AlexaChannel Refactor | Amazon Alexa via KnowledgeObject | [ ] |
+| 90.L4.2 | GoogleAssistantChannel Refactor | Google Assistant via KnowledgeObject | [ ] |
+| 90.L4.3 | SiriChannel Refactor | Apple Siri via KnowledgeObject | [ ] |
+| **L5: LLM Platform Channels (via AIInterface)** |
+| 90.L5.1 | ChatGPTPluginChannel Refactor | ChatGPT Plugin via KnowledgeObject | [ ] |
+| 90.L5.2 | ClaudeMCPChannel Refactor | Claude MCP via KnowledgeObject | [ ] |
+| 90.L5.3 | GenericWebhookChannel Refactor | Generic webhooks via KnowledgeObject | [ ] |
 
 ---
 
@@ -6383,6 +6404,7 @@ var config = new IntelligenceConfig
 **Related Tasks:**
 - Task 80 (Ultimate Data Protection): Primary knowledge source integration
 - Existing AIAgents Plugin: To be deprecated and migrated (Phase O)
+- Existing AIInterface Plugin: Refactored to route via Intelligence (Phase L) - NOT deprecated, channels reused
 - DataWarehouse.Shared: To be deprecated and removed (Phase Q)
 - DataWarehouse.Kernel: Refactored for KnowledgeObject routing (Phase P)
 - DataWarehouse.CLI: Refactored to use Intelligence via message bus (Phase Q)
@@ -6417,7 +6439,7 @@ var config = new IntelligenceConfig
 | 89 | Forensic Watermarking | Security | P0 | High | [ ] |
 | 90 | Ultimate Intelligence | AI | P0 | Extreme | [ ] |
 
-**Total:** 21 Tasks, ~420 Sub-Tasks
+**Total:** 21 Tasks, ~440 Sub-Tasks
 
 ---
 
