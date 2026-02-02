@@ -6,72 +6,7 @@ This document outlines the implementation plan for achieving full production rea
 
 ---
 
-## IMPLEMENTATION STRATEGY
-
-Before implementing any task:
-1. Read this TODO.md
-2. Read Metadata/CLAUDE.md
-3. Read Metadata/RULES.md
-4. Plan implementation according to the rules and style guidelines (minimize code duplication, maximize reuse)
-5. Implement according to the implementation plan
-6. Update Documentation (XML docs for all public entities - functions, variables, enums, classes, interfaces etc.)
-7. At each step, ensure full production readiness, no simulations, placeholders, mocks, simplifications or shortcuts
-8. Add Test Cases for each feature
-
----
-
-## COMMIT STRATEGY
-
-After completing each task:
-1. Verify the actual implemented code to see that the implementation is fully production ready without any simulations, placeholders, mocks, simplifications or shortcuts
-2. If the verification fails, continue with the implementation of this task, until the code reaches a level where it passes the verification.
-3. Only after it passes verification, update this TODO.md with completion status
-4. Commit changes and the updated TODO.md document with descriptive message
-5. Move to next task
-
-Do NOT wait for an entire phase to complete before committing.
-
----
-
-## NOTES
-
-- Follow the philosophy of code reuse: Leverage existing abstractions before creating new ones
-- Commit frequently to avoid losing work
-- Test each feature thoroughly before moving to the next
-- Document all security-related changes
-
----
-
-## CORE DESIGN PRINCIPLE: Maximum User Configurability & Freedom
-
-> **PHILOSOPHY:** DataWarehouse provides every capability imaginable in a fully configurable and selectable way.
-> Users have complete freedom to pick, choose, and apply features in whatever order they want, exactly as they need.
-
-### User Freedom Examples
-
-| Feature | User Options | Implementation Requirement |
-|---------|--------------|---------------------------|
-| **Encryption** | Always encrypted, at-rest only, transit-only, none, or use hardware encryption for specific stages | Must support per-operation encryption mode selection |
-| **Compression** | At rest, during transit, both, or none | Must support per-operation compression mode selection |
-| **WORM Retention** | 1 day, 1 year, 2 years, forever, device lifetime | Must support configurable retention periods |
-| **Cipher Selection** | AES, ChaCha20, Serpent, Twofish, FIPS-only, or custom | Must support user-selectable algorithms |
-| **Key Management** | Direct keys, envelope encryption, HSM-backed, or hybrid | Must support multiple key management modes |
-| **Transit Mode** | End-to-end same cipher, transcryption, no transit encryption | Must support all transit modes |
-| **Pipeline Order** | User-defined stage ordering | Must support runtime pipeline configuration |
-| **Storage Tier** | Hot, warm, cold, archive, or auto-tiering | Must support explicit tier selection |
-
-### Implementation Checklist for Plugins
-
-When implementing ANY plugin, verify:
-
-1. [ ] **Configurable Behavior**: Can users enable/disable the feature entirely?
-2. [ ] **Selectable Options**: Can users choose between multiple implementations/algorithms?
-3. [ ] **Customizable Parameters**: Can users tune numeric values (iterations, sizes, durations)?
-4. [ ] **Per-Operation Override**: Can users override defaults on a per-call basis?
-5. [ ] **Policy Integration**: Can administrators set organization-wide defaults while allowing user overrides?
-6. [ ] **No Forced Behavior**: Does the plugin avoid forcing any behavior the user didn't explicitly request?
-
-### Task: Review All Plugins for Configurability
+## Configurability Review Tasks
 
 | Task | Category | Description | Status |
 |------|----------|-------------|--------|
@@ -84,18 +19,6 @@ When implementing ANY plugin, verify:
 | CFG-7 | WORM | Review WORM plugins for configurable retention periods | [ ] |
 | CFG-8 | Governance | Review compliance plugins for configurable policy enforcement | [ ] |
 | CFG-9 | All Plugins | Comprehensive audit of all plugins for configurability gaps | [ ] |
-
----
-
-## Plugin Implementation Checklist
-
-For each plugin:
-1. [ ] Create plugin project in `Plugins/DataWarehouse.Plugins.{Name}/`
-2. [ ] Implement plugin class extending appropriate base class
-3. [ ] Add XML documentation for all public members
-4. [ ] Register plugin in solution file DataWarehouse.slnx
-5. [ ] Add unit tests
-6. [ ] Update this TODO.md with completion status
 
 ---
 
@@ -176,7 +99,7 @@ These features represent the next generation of data storage technology, positio
 ### CATEGORY G: Integration & Ecosystem
 
 #### Task 57: Plugin Marketplace & Certification
-**Priority:** P1
+**Priority:** P4 (Lowest)
 **Effort:** Medium
 **Status:** [ ] Not Started
 
@@ -201,48 +124,19 @@ These features represent the next generation of data storage technology, positio
 #### Task 59: Comprehensive Compliance Automation
 **Priority:** P0
 **Effort:** Very High
-**Status:** [x] Complete - All Frameworks Implemented (2026-02-01)
+**Status:** [~] Partially Complete - Refactors Pending
 
-**Description:** Automate compliance for all major regulatory frameworks.
+**Description:** Automate compliance for all major regulatory frameworks. Core compliance plugins in `DataWarehouse.Plugins.Compliance/` are PRODUCTION-READY. ComplianceAutomation plugins need refactoring.
 
-> **Implementation Note (2026-02-01):** All compliance frameworks now have production-ready plugin implementations:
->
-> 1. **Data-level compliance plugins** in `DataWarehouse.Plugins.Compliance/`:
->    - `GdprCompliancePlugin.cs`: Real PII detection (regex patterns), consent management, data subject rights, file-based persistence
->    - `HipaaCompliancePlugin.cs`: Real PHI detection (HIPAA 18 identifiers), authorization management, de-identification (Safe Harbor), audit logging
->    - `PciDssCompliancePlugin.cs`: Real PAN detection (Luhn algorithm), card tokenization, encryption verification
->
-> 2. **Framework compliance plugins** in `DataWarehouse.Plugins.ComplianceAutomation/`:
->    - `SoxCompliancePlugin.cs`: 24 controls across 6 domains (Financial Reporting, Internal Controls, Access, Change Mgmt, Data Integrity)
->    - `CcpaCompliancePlugin.cs`: 21 controls for California Consumer Privacy Act
->    - `LgpdCompliancePlugin.cs`: 43 controls for Brazil Lei Geral de Proteção de Dados
->    - `PipedaCompliancePlugin.cs`: 52 controls covering 10 Fair Information Principles
->    - `PdpaCompliancePlugin.cs`: 50 controls for Singapore Personal Data Protection Act
->    - `DoraCompliancePlugin.cs`: 64 controls for EU Digital Operational Resilience Act
->    - `Nis2CompliancePlugin.cs`: 47 controls for EU Network and Information Security Directive
->    - `TisaxCompliancePlugin.cs`: 45 controls for German automotive security (VDA ISA)
->    - `Iso27001CompliancePlugin.cs`: 93 controls across Annex A domains and ISMS clauses
-
-**Frameworks:**
+**Remaining Work (Needs Refactor):**
 
 | Framework | Region | Industry | Status |
 |-----------|--------|----------|--------|
-| GDPR | EU | All | [x] Compliance/ PRODUCTION-READY, [~] ComplianceAutomation/ needs refactor |
-| HIPAA | US | Healthcare | [x] Compliance/ PRODUCTION-READY, [~] ComplianceAutomation/ needs refactor |
-| PCI-DSS | Global | Financial | [x] Compliance/ PRODUCTION-READY, [~] ComplianceAutomation/ needs refactor |
-| SOX | US | Public companies | [x] ComplianceAutomation/ - 24 controls (2026-02-01) |
-| FedRAMP | US | Government | [x] Plugin exists |
-| CCPA/CPRA | California | All | [x] ComplianceAutomation/ - 21 controls (2026-02-01) |
-| LGPD | Brazil | All | [x] ComplianceAutomation/ - 43 controls (2026-02-01) |
-| PIPEDA | Canada | All | [x] ComplianceAutomation/ - 52 controls (2026-02-01) |
-| PDPA | Singapore | All | [x] ComplianceAutomation/ - 50 controls (2026-02-01) |
-| DORA | EU | Financial | [x] ComplianceAutomation/ - 64 controls (2026-02-01) |
-| NIS2 | EU | Critical infrastructure | [x] ComplianceAutomation/ - 47 controls (2026-02-01) |
-| TISAX | Germany | Automotive | [x] ComplianceAutomation/ - 45 controls (2026-02-01) |
-| ISO 27001 | Global | All | [x] ComplianceAutomation/ - 93 controls (2026-02-01) |
-| SOC 2 Type II | Global | All | [x] Plugin exists |
+| GDPR | EU | All | [~] ComplianceAutomation/ needs refactor |
+| HIPAA | US | Healthcare | [~] ComplianceAutomation/ needs refactor |
+| PCI-DSS | Global | Financial | [~] ComplianceAutomation/ needs refactor |
 
-**Additional DSR/Audit Components:**
+**Additional DSR/Audit Components (Pending):**
 
 | Component | Description | Status |
 |-----------|-------------|--------|
@@ -10659,8 +10553,7 @@ T99 (SDK) → T94 (Key Mgmt) → T93 (Encryption) → TamperProof (T3.4.2)
 |-------|------|------|-------------|--------------|--------|
 | **5.1** | T60 | AEDS Core Infrastructure | Active Enterprise Distribution System | T99, T90, T93 | [ ] |
 | **5.2** | T26-T31 | Critical Bug Fixes | Raft, S3 plugin fixes | None | [ ] |
-| **5.3** | T57 | Plugin Marketplace | Plugin certification system | T99 | [ ] |
-| **5.4** | T59 | Compliance Automation | Regulatory frameworks | T96 | [x] Complete |
+| **5.3** | T59 | Compliance Automation | Regulatory frameworks | T96 | [~] Partial |
 
 ---
 
@@ -10684,6 +10577,14 @@ T99 (SDK) → T94 (Key Mgmt) → T93 (Encryption) → TamperProof (T3.4.2)
 | Order | Task | Name | Description | Dependencies | Status |
 |-------|------|------|-------------|--------------|--------|
 | **7.1** | T108 | Plugin Deprecation & Cleanup | Remove 127+ deprecated plugins | All Ultimate plugins verified | [ ] |
+
+---
+
+### TIER 8: Future Roadmap (Lowest Priority)
+
+| Order | Task | Name | Description | Dependencies | Status |
+|-------|------|------|-------------|--------------|--------|
+| **8.1** | T57 | Plugin Marketplace | Plugin certification ecosystem | All Tier 1-7 tasks | [ ] |
 
 ---
 

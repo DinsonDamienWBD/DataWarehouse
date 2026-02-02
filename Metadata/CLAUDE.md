@@ -532,3 +532,191 @@ Plugins/
     ├── DataWarehouse.Plugins.{Category}.csproj
     └── {PluginName}Plugin.cs
 ```
+
+---
+
+## IMPLEMENTATION WORKFLOW
+
+### Before Starting Any Task
+
+1. Read `Metadata/TODO.md` for the task list
+2. Read this file (`Metadata/CLAUDE.md`) for architecture and style guidelines
+3. Read `Metadata/RULES.md` for the 12 Absolute Rules
+4. Plan implementation according to rules and style guidelines (minimize code duplication, maximize reuse)
+5. Implement with full production readiness (no simulations, placeholders, mocks, simplifications, or shortcuts)
+6. Add XML documentation for all public entities
+7. Add test cases for each feature
+8. Update TODO.md with completion status
+9. Commit with descriptive message
+
+### Commit Strategy
+
+1. Verify implemented code is fully production-ready
+2. If verification fails, continue implementation until it passes
+3. Only after passing verification, update TODO.md
+4. Commit changes with descriptive message referencing task ID
+5. Move to next task
+
+**Note:** Commit after each task. Do NOT wait for an entire phase to complete.
+
+### Production Readiness Checklist
+
+For each feature/plugin, verify:
+- [ ] Full error handling with try-catch blocks
+- [ ] Input validation for all public methods
+- [ ] Thread-safe operations where concurrency is possible
+- [ ] Resource disposal (IDisposable pattern)
+- [ ] Retry logic for transient failures
+- [ ] Graceful degradation when dependencies unavailable
+- [ ] XML documentation on ALL public APIs
+- [ ] Unit tests covering main functionality
+
+---
+
+## CORE DESIGN PRINCIPLE: Maximum User Configurability
+
+> **PHILOSOPHY:** DataWarehouse provides every capability in a fully configurable way.
+> Users have complete freedom to pick, choose, and apply features exactly as they need.
+
+### User Freedom Examples
+
+| Feature | User Options | Implementation Requirement |
+|---------|--------------|---------------------------|
+| **Encryption** | Always, at-rest only, transit-only, none, or hardware | Per-operation encryption mode selection |
+| **Compression** | At rest, during transit, both, or none | Per-operation compression mode selection |
+| **WORM Retention** | 1 day to forever | Configurable retention periods |
+| **Cipher Selection** | AES, ChaCha20, Serpent, Twofish, FIPS-only, custom | User-selectable algorithms |
+| **Key Management** | Direct keys, envelope encryption, HSM-backed, hybrid | Multiple key management modes |
+| **Pipeline Order** | User-defined stage ordering | Runtime pipeline configuration |
+
+### Plugin Configurability Checklist
+
+When implementing ANY plugin, verify:
+1. [ ] **Configurable Behavior**: Can users enable/disable the feature entirely?
+2. [ ] **Selectable Options**: Can users choose between multiple implementations/algorithms?
+3. [ ] **Customizable Parameters**: Can users tune numeric values?
+4. [ ] **Per-Operation Override**: Can users override defaults on a per-call basis?
+5. [ ] **Policy Integration**: Can administrators set organization-wide defaults?
+6. [ ] **No Forced Behavior**: Does the plugin avoid forcing unrequested behavior?
+
+---
+
+## PLUGIN IMPLEMENTATION CHECKLIST
+
+For each new plugin:
+1. [ ] Create plugin project in `Plugins/DataWarehouse.Plugins.{Name}/`
+2. [ ] Implement plugin class extending appropriate base class
+3. [ ] Add XML documentation for all public members
+4. [ ] Register plugin in solution file `DataWarehouse.slnx`
+5. [ ] Add unit tests
+6. [ ] Update TODO.md with completion status
+
+### Key Management Plugin Requirements
+
+For each new KEY MANAGEMENT plugin:
+- [ ] Extends `KeyStorePluginBase` (NOT `SecurityProviderPluginBase`)
+- [ ] Implements `LoadKeyFromStorageAsync()`
+- [ ] Implements `SaveKeyToStorageAsync()`
+- [ ] Implements `InitializeStorageAsync()`
+- [ ] Overrides `CacheExpiration` property
+- [ ] Overrides `KeySizeBytes` property
+- [ ] If HSM: Also implements `IEnvelopeKeyStore`
+- [ ] Does NOT duplicate caching logic
+- [ ] Does NOT duplicate initialization logic
+
+### Encryption Plugin Requirements
+
+For each new ENCRYPTION plugin:
+- [ ] Extends `EncryptionPluginBase` (NOT `PipelinePluginBase`)
+- [ ] Implements `EncryptCoreAsync()`
+- [ ] Implements `DecryptCoreAsync()`
+- [ ] Implements `GenerateIv()`
+- [ ] Overrides `KeySizeBytes`, `IvSizeBytes`, `TagSizeBytes`
+- [ ] Does NOT duplicate key management logic
+- [ ] Does NOT duplicate statistics tracking
+- [ ] Works with both `KeyManagementMode.Direct` and `KeyManagementMode.Envelope`
+
+---
+
+## INTER-PLUGIN COMMUNICATION RULES
+
+> **CRITICAL RULE:** Plugins ONLY reference the SDK. All inter-plugin communication uses the message bus.
+> If a dependency is unavailable, the feature MUST fail gracefully (fallback or clear error).
+
+### Dependency Symbols
+
+| Symbol | Meaning |
+|--------|---------|
+| **->** | Hard dependency (fails without it) |
+| **~>** | Soft dependency (graceful degradation) |
+| **[M]** | Communication via message bus |
+| **[K]** | Key/encryption related |
+| **[AI]** | AI/Intelligence related |
+
+### Message Bus Communication Pattern
+
+```csharp
+// CORRECT: Request via message bus with graceful fallback
+var response = await _messageBus.RequestAsync<EmbeddingResponse>(
+    topic: "intelligence.embeddings.generate",
+    request: new EmbeddingRequest { Content = content },
+    timeout: TimeSpan.FromSeconds(30),
+    ct: ct
+);
+
+if (!response.Success)
+{
+    // Graceful degradation
+    _logger.LogWarning("Intelligence plugin unavailable, using fallback");
+    return await FallbackMethodAsync(content, ct);
+}
+```
+
+### AI-Dependent Features
+
+Features requiring T90 (Universal Intelligence) MUST:
+1. Declare the dependency explicitly in documentation
+2. Use message bus to communicate
+3. Fail gracefully if unavailable
+4. Provide fallback behavior where possible
+
+---
+
+## ULTIMATE/UNIVERSAL PLUGIN CONSOLIDATION RULE
+
+> **CRITICAL RULE:** No task shall create a new standalone plugin if an Ultimate/Universal plugin exists for that category.
+> All new functionality MUST be implemented as strategies within the appropriate Ultimate plugin.
+
+### Quick Reference: Which Ultimate Plugin?
+
+| Feature Type | Ultimate Plugin | NOT Individual Plugin |
+|--------------|-----------------|----------------------|
+| Encryption | `UltimateEncryption` (T93) | ~~AesPlugin~~, ~~ChaCha20Plugin~~ |
+| Key Management | `UltimateKeyManagement` (T94) | ~~FileKeyStorePlugin~~, ~~VaultPlugin~~ |
+| Compression | `UltimateCompression` (T92) | ~~BrotliPlugin~~, ~~ZstdPlugin~~ |
+| Storage | `UltimateStorage` (T97) | ~~S3Storage~~, ~~LocalStorage~~ |
+| RAID | `UltimateRAID` (T91) | ~~StandardRaidPlugin~~, ~~ZfsRaidPlugin~~ |
+| Security | `UltimateSecurity` (T95) | ~~IntegrityPlugin~~, ~~WormPlugin~~ |
+| Compliance | `UltimateCompliance` (T96) | ~~GdprPlugin~~, ~~HipaaPlugin~~ |
+| Replication | `UltimateReplication` (T98) | ~~GeoReplicationPlugin~~ |
+| AI/Knowledge | `UniversalIntelligence` (T90) | ~~AIAgentsPlugin~~ |
+| Observability | `UniversalObservability` (T100) | ~~PrometheusPlugin~~ |
+| Interface | `UltimateInterface` (T109) | ~~RestInterfacePlugin~~ |
+
+### Strategy Pattern Implementation
+
+All Ultimate plugins use the Strategy Pattern for extensibility:
+
+```csharp
+public interface IEncryptionStrategy
+{
+    string AlgorithmId { get; }              // "aes-256-gcm", "chacha20-poly1305"
+    string DisplayName { get; }
+    EncryptionCapabilities Capabilities { get; }
+
+    Task<byte[]> EncryptAsync(byte[] data, EncryptionKey key, CancellationToken ct);
+    Task<byte[]> DecryptAsync(byte[] data, EncryptionKey key, CancellationToken ct);
+}
+```
+
+New algorithms are added as strategies, NOT as new plugins.
