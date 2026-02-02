@@ -6861,8 +6861,18 @@ var config = new UltimateRaidConfig
 | 96 | Ultimate Compliance | Governance | P0 | High | [ ] |
 | 97 | Ultimate Storage | Infrastructure | P0 | Very High | [ ] |
 | 98 | Ultimate Replication | Infrastructure | P0 | Very High | [ ] |
+| **99** | **Ultimate SDK** | **Foundation** | **P-1** | **Extreme** | [ ] |
+| 100 | Universal Observability | Monitoring | P1 | Very High | [ ] |
+| 101 | Universal Dashboards | Visualization | P1 | High | [ ] |
+| 102 | Ultimate Database Protocol | Data Access | P1 | High | [ ] |
+| 103 | Ultimate Database Storage | Data Storage | P1 | High | [ ] |
+| 104 | Ultimate Data Management | Data Lifecycle | P1 | High | [ ] |
+| 105 | Ultimate Resilience | Infrastructure | P1 | High | [ ] |
+| 106 | Ultimate Deployment | Operations | P1 | High | [ ] |
+| 107 | Ultimate Sustainability | Green Computing | P2 | Medium | [ ] |
+| 108 | Plugin Deprecation & Cleanup | Maintenance | P1 | Medium | [ ] |
 
-**Total:** 29 Tasks, ~760 Sub-Tasks
+**Total:** 39 Tasks, ~1200 Sub-Tasks
 
 ---
 
@@ -7613,15 +7623,1011 @@ public record ReplicationCapabilities
 
 ---
 
+## Task 99: Ultimate SDK (HIGHEST PRIORITY - Foundation for All)
+
+**Status:** [ ] Not Started
+**Priority:** P-1 (HIGHEST - Must Complete First)
+**Effort:** Extreme
+**Category:** Foundation
+
+> **CRITICAL: This task MUST be completed before any other Ultimate plugin implementation.**
+> All Ultimate plugins depend on SDK types, interfaces, and base classes defined here.
+
+### Overview
+
+Consolidate ALL SDK-related work from Tasks T5.0, T90-T98 into a single, highest-priority task. This includes:
+- Strategy pattern interfaces for all extensible plugins
+- Base classes for all plugin types
+- KnowledgeObject types for Universal Intelligence
+- Composable key management infrastructure
+- Common types, enums, and utilities
+
+### Dependencies
+
+All Ultimate plugin tasks (T90-T98) depend on this task:
+```
+T99 (Ultimate SDK)
+├── T90 (Universal Intelligence) - depends on KnowledgeObject types
+├── T91 (Ultimate RAID) - depends on IRaidStrategy, RaidPluginBase
+├── T92 (Ultimate Compression) - depends on ICompressionStrategy
+├── T93 (Ultimate Encryption) - depends on IEncryptionStrategy, EncryptionPluginBase
+├── T94 (Ultimate Key Management) - depends on IKeyStoreStrategy, KeyStorePluginBase
+├── T95 (Ultimate Security) - depends on ISecurityStrategy
+├── T96 (Ultimate Compliance) - depends on IComplianceStrategy
+├── T97 (Ultimate Storage) - depends on IStorageStrategy
+└── T98 (Ultimate Replication) - depends on IReplicationStrategy
+```
+
+### TamperProof Dependency
+
+> **CRITICAL:** T94 (Ultimate Key Management) MUST be fully implemented before TamperProof Storage can be completed.
+> TamperProof requires: composable key management, envelope encryption, per-object encryption metadata.
+
+```
+T99 (SDK) → T94 (Key Management) → TamperProof Storage (T3.4.2)
+```
+
+---
+
+### Phase A: Core Strategy Pattern Interfaces (Sub-Tasks A1-A20)
+
+| Sub-Task | Component | Location | Description | Status |
+|----------|-----------|----------|-------------|--------|
+| **A1: Compression** |
+| 99.A1.1 | `ICompressionStrategy` | SDK/Contracts/Compression/ | Strategy interface for compression algorithms | [ ] |
+| 99.A1.2 | `CompressionCharacteristics` | SDK/Contracts/Compression/ | Algorithm capabilities record | [ ] |
+| 99.A1.3 | `CompressionStrategyRegistry` | SDK/Services/ | Auto-discovery and registration | [ ] |
+| 99.A1.4 | `CompressionBenchmark` | SDK/Contracts/Compression/ | Performance profiling types | [ ] |
+| **A2: Encryption** |
+| 99.A2.1 | `IEncryptionStrategy` | SDK/Contracts/Encryption/ | Strategy interface for encryption algorithms | [ ] |
+| 99.A2.2 | `CipherCapabilities` | SDK/Contracts/Encryption/ | Cipher capabilities record | [ ] |
+| 99.A2.3 | `EncryptionStrategyRegistry` | SDK/Services/ | Auto-discovery and registration | [ ] |
+| 99.A2.4 | `SecurityLevel` enum | SDK/Contracts/Encryption/ | Standard, High, Military, QuantumSafe | [ ] |
+| **A3: Key Management (from T5.0.1)** |
+| 99.A3.1 | `KeyManagementMode` enum | SDK/Security/ | Direct vs Envelope key management | [ ] |
+| 99.A3.2 | `IEnvelopeKeyStore` interface | SDK/Security/ | WrapKeyAsync/UnwrapKeyAsync for HSM | [ ] |
+| 99.A3.3 | `EnvelopeHeader` class | SDK/Security/ | Serialize/deserialize wrapped DEK | [ ] |
+| 99.A3.4 | `EncryptionMetadata` record | SDK/Security/ | Full encryption config for manifest/header | [ ] |
+| 99.A3.5 | `KeyManagementConfig` record | SDK/Security/ | Per-user key management preferences | [ ] |
+| 99.A3.6 | `IKeyManagementConfigProvider` | SDK/Security/ | Resolve per-user/tenant preferences | [ ] |
+| 99.A3.7 | `IKeyStoreRegistry` interface | SDK/Security/ | Registry for key store resolution | [ ] |
+| 99.A3.8 | `DefaultKeyStoreRegistry` | SDK/Services/ | Default in-memory registry | [ ] |
+| 99.A3.9 | `EncryptionConfigMode` enum | SDK/Security/ | PerObject, Fixed, PolicyEnforced | [ ] |
+| 99.A3.10 | `IKeyStoreStrategy` | SDK/Contracts/KeyManagement/ | Strategy interface for key stores | [ ] |
+| **A4: Security** |
+| 99.A4.1 | `ISecurityStrategy` | SDK/Contracts/Security/ | Strategy interface for security domains | [ ] |
+| 99.A4.2 | `SecurityDomain` enum | SDK/Contracts/Security/ | AccessControl, Identity, ThreatDetection, etc. | [ ] |
+| 99.A4.3 | `SecurityContext` class | SDK/Contracts/Security/ | Context for security evaluation | [ ] |
+| 99.A4.4 | `SecurityDecision` record | SDK/Contracts/Security/ | Allow/Deny with reasoning | [ ] |
+| **A5: Compliance** |
+| 99.A5.1 | `IComplianceStrategy` | SDK/Contracts/Compliance/ | Strategy interface for compliance frameworks | [ ] |
+| 99.A5.2 | `ComplianceRequirements` | SDK/Contracts/Compliance/ | Controls, residency, retention | [ ] |
+| 99.A5.3 | `ComplianceControl` | SDK/Contracts/Compliance/ | Individual control definition | [ ] |
+| 99.A5.4 | `ComplianceViolation` | SDK/Contracts/Compliance/ | Violation with severity | [ ] |
+| **A6: Storage** |
+| 99.A6.1 | `IStorageStrategy` | SDK/Contracts/Storage/ | Strategy interface for storage backends | [ ] |
+| 99.A6.2 | `StorageCapabilities` | SDK/Contracts/Storage/ | Backend capabilities record | [ ] |
+| 99.A6.3 | `StorageTier` enum | SDK/Contracts/Storage/ | Hot, Warm, Cold, Archive, RAMDisk | [ ] |
+| **A7: Replication** |
+| 99.A7.1 | `IReplicationStrategy` | SDK/Contracts/Replication/ | Strategy interface for replication modes | [ ] |
+| 99.A7.2 | `ReplicationCapabilities` | SDK/Contracts/Replication/ | Capabilities record | [ ] |
+| 99.A7.3 | `ConsistencyModel` enum | SDK/Contracts/Replication/ | Strong, Eventual, Causal, etc. | [ ] |
+| 99.A7.4 | `VectorClock` class | SDK/Primitives/ | Vector clock implementation | [ ] |
+| 99.A7.5 | CRDT base types | SDK/Primitives/ | GCounter, PNCounter, GSet, ORSet, LWWMap | [ ] |
+| **A8: RAID** |
+| 99.A8.1 | `IRaidStrategy` | SDK/Contracts/RAID/ | Strategy interface for RAID levels | [ ] |
+| 99.A8.2 | `RaidCapabilities` | SDK/Contracts/RAID/ | Capabilities record | [ ] |
+| 99.A8.3 | `RaidLevel` comprehensive enum | SDK/Contracts/RAID/ | 50+ RAID levels | [ ] |
+| 99.A8.4 | `RaidHealth` types | SDK/Contracts/RAID/ | Health monitoring types | [ ] |
+
+---
+
+### Phase B: Base Classes (Sub-Tasks B1-B15)
+
+| Sub-Task | Component | Location | Description | Status |
+|----------|-----------|----------|-------------|--------|
+| **B1: Key Management Base (from T5.0.2)** |
+| 99.B1.1 | `KeyStorePluginBase` | SDK/Contracts/PluginBase.cs | Abstract base for all key stores | [ ] |
+| 99.B1.2 | ↳ Key caching infrastructure | Common | ConcurrentDictionary, expiration | [ ] |
+| 99.B1.3 | ↳ Thread-safe initialization | Common | EnsureInitializedAsync, SemaphoreSlim | [ ] |
+| 99.B1.4 | ↳ Security context validation | Common | ValidateAccess, ValidateAdminAccess | [ ] |
+| 99.B1.5 | ↳ Message bus handlers | Common | keystore.*.create/get/rotate | [ ] |
+| 99.B1.6 | ↳ Abstract storage methods | Abstract | LoadKey, SaveKey, Initialize | [ ] |
+| **B2: Encryption Base (from T5.0.3)** |
+| 99.B2.1 | `EncryptionPluginBase` | SDK/Contracts/PluginBase.cs | Abstract base for all encryption | [ ] |
+| 99.B2.2 | ↳ Key store resolution | Common | GetKeyStore from args/config/context | [ ] |
+| 99.B2.3 | ↳ Key management mode | Common | Direct vs Envelope support | [ ] |
+| 99.B2.4 | ↳ Envelope key handling | Common | GetKeyForEncryption/Decryption | [ ] |
+| 99.B2.5 | ↳ Statistics tracking | Common | Counts, bytes processed | [ ] |
+| 99.B2.6 | ↳ Key access logging | Common | Audit trail | [ ] |
+| 99.B2.7 | ↳ Abstract encrypt/decrypt | Abstract | EncryptCoreAsync, DecryptCoreAsync | [ ] |
+| **B3: Compression Base** |
+| 99.B3.1 | `CompressionPluginBase` | SDK/Contracts/PluginBase.cs | Abstract base for compression | [ ] |
+| 99.B3.2 | ↳ Strategy registration | Common | Auto-register strategies | [ ] |
+| 99.B3.3 | ↳ Content-aware selection | Common | Choose algorithm by content type | [ ] |
+| 99.B3.4 | ↳ Abstract compress/decompress | Abstract | CompressCoreAsync, DecompressCoreAsync | [ ] |
+| **B4: Security Base** |
+| 99.B4.1 | `SecurityPluginBase` | SDK/Contracts/PluginBase.cs | Abstract base for security | [ ] |
+| 99.B4.2 | ↳ Policy evaluation | Common | Evaluate security rules | [ ] |
+| 99.B4.3 | ↳ Audit logging | Common | Security audit trail | [ ] |
+| **B5: Compliance Base** |
+| 99.B5.1 | `CompliancePluginBase` | SDK/Contracts/PluginBase.cs | Abstract base for compliance | [ ] |
+| 99.B5.2 | ↳ Control assessment | Common | Evaluate compliance controls | [ ] |
+| 99.B5.3 | ↳ Evidence collection | Common | Collect compliance evidence | [ ] |
+| **B6: Storage Base** |
+| 99.B6.1 | `StorageStrategyPluginBase` | SDK/Contracts/PluginBase.cs | Abstract base for storage | [ ] |
+| 99.B6.2 | ↳ Health monitoring | Common | Connection health | [ ] |
+| 99.B6.3 | ↳ Metrics collection | Common | Latency, throughput | [ ] |
+| **B7: Replication Base** |
+| 99.B7.1 | `ReplicationPluginBase` | SDK/Contracts/PluginBase.cs | Abstract base for replication | [ ] |
+| 99.B7.2 | ↳ Conflict detection | Common | Detect conflicts | [ ] |
+| 99.B7.3 | ↳ Conflict resolution | Common | Resolve conflicts | [ ] |
+| **B8: RAID Base** |
+| 99.B8.1 | `RaidStrategyPluginBase` | SDK/Contracts/PluginBase.cs | Abstract base for RAID | [ ] |
+| 99.B8.2 | ↳ Stripe calculation | Common | Calculate stripe layout | [ ] |
+| 99.B8.3 | ↳ Health monitoring | Common | Disk health | [ ] |
+
+---
+
+### Phase C: KnowledgeObject System (from T90 Phase A)
+
+| Sub-Task | Component | Description | Status |
+|----------|-----------|-------------|--------|
+| **C1: Core Types (SDK/AI/Knowledge/)** |
+| 99.C1.1 | `KnowledgeObject` record | Universal envelope for all AI interactions | [ ] |
+| 99.C1.2 | `KnowledgeObjectType` enum | Registration, Query, Command, Event, etc. | [ ] |
+| 99.C1.3 | `KnowledgeRequest` record | Request payload | [ ] |
+| 99.C1.4 | `KnowledgeResponse` record | Response payload | [ ] |
+| 99.C1.5 | `KnowledgePayload` record | Typed payload container | [ ] |
+| 99.C1.6 | `KnowledgeCapability` record | Plugin capability descriptor | [ ] |
+| 99.C1.7 | `KnowledgeState` record | Plugin state snapshot | [ ] |
+| **C2: Temporal Knowledge** |
+| 99.C2.1 | `TemporalContext` record | Time-travel query context | [ ] |
+| 99.C2.2 | `TemporalQueryType` enum | AsOf, Between, Timeline | [ ] |
+| 99.C2.3 | `KnowledgeTimeline` class | Knowledge history | [ ] |
+| **C3: Knowledge Provenance** |
+| 99.C3.1 | `KnowledgeProvenance` record | Source, chain, trust | [ ] |
+| 99.C3.2 | `ProvenanceChain` class | Derivation chain | [ ] |
+| 99.C3.3 | `TrustScore` record | Trust calculation | [ ] |
+| **C4: Inference & Simulation** |
+| 99.C4.1 | `InferenceRule` class | Rule definition | [ ] |
+| 99.C4.2 | `SimulationContext` record | What-if parameters | [ ] |
+| 99.C4.3 | `SimulationResult` record | Projected outcomes | [ ] |
+
+---
+
+### Phase D: PluginBase Enhancement
+
+| Sub-Task | Component | Description | Status |
+|----------|-----------|-------------|--------|
+| 99.D1 | Add `GetRegistrationKnowledge()` | Virtual method for knowledge registration | [ ] |
+| 99.D2 | Add `HandleKnowledgeAsync()` | Virtual method for knowledge handling | [ ] |
+| 99.D3 | Auto-registration in lifecycle | Register on Initialize, unregister on Shutdown | [ ] |
+| 99.D4 | Message bus integration | Subscribe to knowledge topics | [ ] |
+| 99.D5 | Knowledge caching | Cache plugin knowledge for performance | [ ] |
+
+---
+
+### Phase E: Refactor Existing Plugins to Use New Base Classes
+
+> **Note:** This phase refactors existing plugins to use the new SDK base classes.
+> After this phase, all plugins benefit from common infrastructure.
+
+| Sub-Task | Plugins | Description | Status |
+|----------|---------|-------------|--------|
+| **E1: Key Management Plugins (from T5.0.4)** |
+| 99.E1.1 | `FileKeyStorePlugin` → `KeyStorePluginBase` | Remove duplicated caching/init | [ ] |
+| 99.E1.2 | `VaultKeyStorePlugin` → `KeyStorePluginBase` + `IEnvelopeKeyStore` | Add envelope support | [ ] |
+| 99.E1.3 | `KeyRotationPlugin` → `KeyStorePluginBase` (decorator) | Verify compatibility | [ ] |
+| 99.E1.4 | `SecretManagementPlugin` → Align with pattern | Ensure consistency | [ ] |
+| **E2: Encryption Plugins (from T5.0.5)** |
+| 99.E2.1 | `AesEncryptionPlugin` → `EncryptionPluginBase` | Remove key mgmt duplication | [ ] |
+| 99.E2.2 | `ChaCha20EncryptionPlugin` → `EncryptionPluginBase` | Remove key mgmt duplication | [ ] |
+| 99.E2.3 | `TwofishEncryptionPlugin` → `EncryptionPluginBase` | Remove key mgmt duplication | [ ] |
+| 99.E2.4 | `SerpentEncryptionPlugin` → `EncryptionPluginBase` | Remove key mgmt duplication | [ ] |
+| 99.E2.5 | `FipsEncryptionPlugin` → `EncryptionPluginBase` | Remove key mgmt duplication | [ ] |
+| 99.E2.6 | `ZeroKnowledgeEncryptionPlugin` → `EncryptionPluginBase` | Remove key mgmt duplication | [ ] |
+| **E3: Compression Plugins** |
+| 99.E3.1-6 | All 6 compression plugins | Refactor to use CompressionPluginBase | [ ] |
+| **E4: Storage Plugins** |
+| 99.E4.1-10 | All 10 storage plugins | Refactor to use StorageStrategyPluginBase | [ ] |
+| **E5: RAID Plugins** |
+| 99.E5.1-12 | All 12 RAID plugins | Refactor to use RaidStrategyPluginBase | [ ] |
+
+---
+
+### Phase F: Unit Tests
+
+| Sub-Task | Description | Status |
+|----------|-------------|--------|
+| 99.F1 | Strategy interface tests | Test all strategy contracts | [ ] |
+| 99.F2 | Base class tests | Test common functionality | [ ] |
+| 99.F3 | KnowledgeObject tests | Test serialization, routing | [ ] |
+| 99.F4 | Key management tests | Test Direct vs Envelope modes | [ ] |
+| 99.F5 | Integration tests | Test plugin-to-plugin communication | [ ] |
+
+---
+
+### Task 99 Summary
+
+| Phase | Description | Sub-Tasks | Dependencies |
+|-------|-------------|-----------|--------------|
+| A | Strategy Interfaces | 35+ | None |
+| B | Base Classes | 30+ | Phase A |
+| C | KnowledgeObject System | 15+ | Phase A |
+| D | PluginBase Enhancement | 5 | Phase C |
+| E | Refactor Existing Plugins | 30+ | Phase B |
+| F | Unit Tests | 5+ | Phase E |
+
+**Total: ~120 sub-tasks**
+
+**CRITICAL DEPENDENCY:** Task 94 (Ultimate Key Management) cannot start until Phase A3, B1, B2 are complete.
+
+---
+
+## Task 94: Ultimate Key Management Plugin (EXPANDED)
+
+> **NOTE:** This task now incorporates ALL composable key management tasks from T5.0, T5.1, T5.4.
+> These tasks were previously scattered and are now consolidated here.
+
+**Status:** [ ] Not Started
+**Priority:** P0 - Critical
+**Effort:** High
+**Category:** Security
+
+### CRITICAL DEPENDENCY: TamperProof Storage
+
+> **This task MUST be completed before TamperProof Storage (T3.4.2).**
+>
+> TamperProof requires:
+> - Composable key management (any encryption + any key store)
+> - Envelope encryption support (DEK wrapped by HSM KEK)
+> - EncryptionMetadata in manifest for deterministic decryption
+> - Per-object vs fixed config modes
+
+```
+Task 99 (SDK) → Task 94 (Key Management) → T3.4.2 (TamperProof Decrypt)
+```
+
+### Overview
+
+Consolidate all key management functionality into a single Ultimate Key Management plugin.
+
+**Plugins to Merge:**
+- DataWarehouse.Plugins.FileKeyStore
+- DataWarehouse.Plugins.VaultKeyStore
+- DataWarehouse.Plugins.KeyRotation
+- DataWarehouse.Plugins.SecretManagement
+
+**Tasks to Incorporate:**
+- T5.0.1 (SDK Key Management Types) → Moved to Task 99 Phase A3
+- T5.0.2 (KeyStorePluginBase) → Moved to Task 99 Phase B1
+- T5.0.4 (Refactor Key Management Plugins) → Moved to Task 99 Phase E1
+- T5.1 (Envelope Mode for ALL Encryption) → Incorporated here
+- T5.4 (Additional Key Management Plugins) → Incorporated here
+
+### Architecture: Composable Key Management
+
+```
+┌─────────────────────────────────────────────────────────────────────────────────────┐
+│                    COMPOSABLE KEY MANAGEMENT ARCHITECTURE                            │
+├─────────────────────────────────────────────────────────────────────────────────────┤
+│   ANY ENCRYPTION PLUGIN                                                              │
+│   ┌─────────────┐ ┌─────────────┐ ┌─────────────┐                                   │
+│   │ AES-256-GCM │ │ ChaCha20    │ │ Any Future  │                                   │
+│   │             │ │             │ │ Algorithm   │                                   │
+│   └──────┬──────┘ └──────┬──────┘ └──────┬──────┘                                   │
+│          └───────────────┴───────────────┘                                          │
+│                          │                                                           │
+│                          ▼                                                           │
+│          ┌───────────────────────────────┐                                          │
+│          │   UltimateKeyManagement       │                                          │
+│          │   Plugin (Orchestrator)       │                                          │
+│          └───────────────┬───────────────┘                                          │
+│                          │                                                           │
+│    KeyManagementMode:    │    Direct ──────► IKeyStore                              │
+│                          │    Envelope ────► IEnvelopeKeyStore (WrapKey/UnwrapKey)  │
+│                          │                                                           │
+│    ┌─────────────────────┴─────────────────────┐                                    │
+│    ▼                     ▼                     ▼                                    │
+│ ┌──────────────┐ ┌──────────────┐ ┌──────────────┐ ┌──────────────┐                │
+│ │ FileStrategy │ │ VaultStrategy│ │ Pkcs11Strat. │ │ TpmStrategy  │ ...            │
+│ │ (Local)      │ │ (HSM/Cloud)  │ │ (Generic HSM)│ │ (TPM 2.0)    │                │
+│ │              │ │ +Envelope    │ │ +Envelope    │ │              │                │
+│ └──────────────┘ └──────────────┘ └──────────────┘ └──────────────┘                │
+└─────────────────────────────────────────────────────────────────────────────────────┘
+```
+
+### Phase A: SDK Foundation (Depends on Task 99 Phase A3, B1)
+
+> **NOTE:** SDK types and base classes are now in Task 99. This phase depends on Task 99 completion.
+
+| Sub-Task | Description | Depends On | Status |
+|----------|-------------|------------|--------|
+| 94.A1 | Verify SDK types from Task 99 Phase A3 complete | T99.A3 | [ ] |
+| 94.A2 | Verify KeyStorePluginBase from Task 99 Phase B1 complete | T99.B1 | [ ] |
+| 94.A3 | Add IKeyStoreStrategy-specific extensions | T99.A3 | [ ] |
+| 94.A4 | Add key migration utilities | T99.B1 | [ ] |
+| 94.A5 | Unit tests for key management extensions | T94.A3-4 | [ ] |
+
+### Phase B: Core Plugin Implementation
+
+| Sub-Task | Description | Status |
+|----------|-------------|--------|
+| 94.B1 | Create DataWarehouse.Plugins.UltimateKeyManagement project | [ ] |
+| 94.B2 | Implement UltimateKeyManagementPlugin orchestrator | [ ] |
+| 94.B3 | Implement FileKeyStoreStrategy (local, DPAPI, CredManager, PBKDF2) | [ ] |
+| 94.B4 | Implement VaultKeyStoreStrategy (HashiCorp, Azure, AWS, GCP) + IEnvelopeKeyStore | [ ] |
+| 94.B5 | Implement AwsKmsStrategy | [ ] |
+| 94.B6 | Implement AzureKeyVaultStrategy | [ ] |
+| 94.B7 | Implement GcpKmsStrategy | [ ] |
+| 94.B8 | Implement HsmKeyStoreStrategy (PKCS#11 generic) + IEnvelopeKeyStore | [ ] |
+| 94.B9 | Implement strategy auto-discovery and registration | [ ] |
+| 94.B10 | Implement key rotation scheduler | [ ] |
+
+### Phase C: Advanced Key Stores (from T5.4)
+
+| Sub-Task | Description | Envelope Support | Status |
+|----------|-------------|------------------|--------|
+| **C1: Shamir Secret Sharing** |
+| 94.C1.1 | ShamirSecretKeyStoreStrategy | ❌ | [ ] |
+| 94.C1.2 | ↳ Key split generation (N shares) | | [ ] |
+| 94.C1.3 | ↳ Key reconstruction (M-of-N) | | [ ] |
+| 94.C1.4 | ↳ Share distribution to custodians | | [ ] |
+| 94.C1.5 | ↳ Share rotation without key change | | [ ] |
+| **C2: PKCS#11 HSM** |
+| 94.C2.1 | Pkcs11KeyStoreStrategy + IEnvelopeKeyStore | ✅ | [ ] |
+| 94.C2.2 | ↳ Token enumeration | | [ ] |
+| 94.C2.3 | ↳ Key operations (generate, import, wrap, unwrap) | | [ ] |
+| 94.C2.4 | ↳ Session management | | [ ] |
+| **C3: TPM 2.0** |
+| 94.C3.1 | TpmKeyStoreStrategy | ❌ | [ ] |
+| 94.C3.2 | ↳ Key sealing to PCR state | | [ ] |
+| 94.C3.3 | ↳ Key unsealing with attestation | | [ ] |
+| 94.C3.4 | ↳ TPM quote generation | | [ ] |
+| **C4: YubiKey/FIDO2** |
+| 94.C4.1 | YubikeyKeyStoreStrategy | ❌ | [ ] |
+| 94.C4.2 | ↳ PIV slot support | | [ ] |
+| 94.C4.3 | ↳ HMAC-SHA1 challenge-response | | [ ] |
+| 94.C4.4 | ↳ FIDO2 attestation | | [ ] |
+| **C5: Password Derived** |
+| 94.C5.1 | PasswordDerivedKeyStoreStrategy | ❌ | [ ] |
+| 94.C5.2 | ↳ Argon2id derivation | | [ ] |
+| 94.C5.3 | ↳ scrypt derivation | | [ ] |
+| 94.C5.4 | ↳ PBKDF2 derivation | | [ ] |
+| **C6: Multi-Party Computation** |
+| 94.C6.1 | MultiPartyKeyStoreStrategy + IEnvelopeKeyStore | ✅ | [ ] |
+| 94.C6.2 | ↳ Threshold signatures (t-of-n without reconstruction) | | [ ] |
+| 94.C6.3 | ↳ Distributed key generation | | [ ] |
+| 94.C6.4 | ↳ MPC protocols (Lindell, GG18, etc.) | | [ ] |
+
+### Phase D: Envelope Encryption Support (from T5.1)
+
+| Sub-Task | Description | Status |
+|----------|-------------|--------|
+| 94.D1 | Verify all IEnvelopeKeyStore implementations have WrapKey/UnwrapKey | [ ] |
+| 94.D2 | Envelope mode integration tests (all 6 encryption plugins) | [ ] |
+| 94.D3 | Envelope mode documentation and examples | [ ] |
+| 94.D4 | Envelope mode benchmarks (Direct vs Envelope) | [ ] |
+| 94.D5 | Key derivation hierarchy (master → derived keys) | [ ] |
+| 94.D6 | Zero-downtime key rotation | [ ] |
+| 94.D7 | Key escrow and split-key recovery | [ ] |
+| 94.D8 | Break-glass emergency key access | [ ] |
+
+### Phase E: TamperProof Integration
+
+> **CRITICAL:** This phase enables TamperProof storage encryption.
+
+| Sub-Task | Description | Status |
+|----------|-------------|--------|
+| 94.E1 | EncryptionMetadata in TamperProofManifest | [ ] |
+| 94.E2 | Write-time config resolution and storage | [ ] |
+| 94.E3 | Read-time config from manifest (ignore current prefs) | [ ] |
+| 94.E4 | PerObjectConfig mode implementation | [ ] |
+| 94.E5 | FixedConfig mode implementation | [ ] |
+| 94.E6 | PolicyEnforced mode implementation | [ ] |
+| 94.E7 | TamperProof encryption integration tests | [ ] |
+
+### Phase F: Migration & Cleanup
+
+| Sub-Task | Description | Status |
+|----------|-------------|--------|
+| 94.F1 | Update all plugin references to use UltimateKeyManagement | [ ] |
+| 94.F2 | Migrate existing key store configurations | [ ] |
+| 94.F3 | Deprecate individual key management plugins | [ ] |
+| 94.F4 | Create migration guide | [ ] |
+| 94.F5 | Update documentation and security guidelines | [ ] |
+
+---
+
+## Task 100: Universal Observability Plugin
+
+**Status:** [ ] Not Started
+**Priority:** P1 - High
+**Effort:** Very High
+**Category:** Monitoring
+
+### Overview
+
+Consolidate all 17 observability plugins into a single Universal Observability plugin.
+
+**Plugins to Merge:**
+- DataWarehouse.Plugins.Alerting
+- DataWarehouse.Plugins.AlertingOps
+- DataWarehouse.Plugins.DistributedTracing
+- DataWarehouse.Plugins.OpenTelemetry
+- DataWarehouse.Plugins.Prometheus
+- DataWarehouse.Plugins.Datadog
+- DataWarehouse.Plugins.Dynatrace
+- DataWarehouse.Plugins.Jaeger
+- DataWarehouse.Plugins.NewRelic
+- DataWarehouse.Plugins.SigNoz
+- DataWarehouse.Plugins.Splunk
+- DataWarehouse.Plugins.GrafanaLoki
+- DataWarehouse.Plugins.Logzio
+- DataWarehouse.Plugins.Netdata
+- DataWarehouse.Plugins.LogicMonitor
+- DataWarehouse.Plugins.VictoriaMetrics
+- DataWarehouse.Plugins.Zabbix
+
+### Architecture: Strategy Pattern for Observability Backends
+
+```csharp
+public interface IObservabilityStrategy
+{
+    string BackendId { get; }              // "prometheus", "datadog", "splunk"
+    string DisplayName { get; }
+    ObservabilityCapabilities Capabilities { get; }
+    ObservabilityDomain[] SupportedDomains { get; }  // Metrics, Logs, Traces, Alerts
+
+    Task PublishMetricsAsync(IEnumerable<Metric> metrics, CancellationToken ct);
+    Task PublishLogsAsync(IEnumerable<LogEntry> logs, CancellationToken ct);
+    Task PublishTracesAsync(IEnumerable<TraceSpan> spans, CancellationToken ct);
+    Task ConfigureAlertsAsync(AlertConfiguration config, CancellationToken ct);
+}
+
+public enum ObservabilityDomain { Metrics, Logs, Traces, Alerts, Profiling, Events }
+```
+
+### Phase A: SDK Foundation
+
+| Sub-Task | Description | Status |
+|----------|-------------|--------|
+| 100.A1 | Add IObservabilityStrategy interface to SDK | [ ] |
+| 100.A2 | Add ObservabilityCapabilities record | [ ] |
+| 100.A3 | Add common metric/log/trace types | [ ] |
+| 100.A4 | Add ObservabilityStrategyRegistry | [ ] |
+| 100.A5 | Add OpenTelemetry compatibility layer | [ ] |
+| 100.A6 | Unit tests for SDK observability infrastructure | [ ] |
+
+### Phase B: Core Plugin Implementation
+
+| Sub-Task | Description | Status |
+|----------|-------------|--------|
+| 100.B1 | Create DataWarehouse.Plugins.UniversalObservability project | [ ] |
+| 100.B2 | Implement UniversalObservabilityPlugin orchestrator | [ ] |
+| 100.B3 | Implement PrometheusStrategy | [ ] |
+| 100.B4 | Implement DatadogStrategy | [ ] |
+| 100.B5 | Implement DynatraceStrategy | [ ] |
+| 100.B6 | Implement JaegerStrategy | [ ] |
+| 100.B7 | Implement NewRelicStrategy | [ ] |
+| 100.B8 | Implement SplunkStrategy | [ ] |
+| 100.B9 | Implement GrafanaLokiStrategy | [ ] |
+| 100.B10 | Implement OpenTelemetryStrategy (collector) | [ ] |
+| 100.B11 | Implement VictoriaMetricsStrategy | [ ] |
+| 100.B12 | Implement ZabbixStrategy | [ ] |
+| 100.B13 | Implement SigNozStrategy | [ ] |
+| 100.B14 | Implement LogzioStrategy | [ ] |
+| 100.B15 | Implement NetdataStrategy | [ ] |
+| 100.B16 | Implement LogicMonitorStrategy | [ ] |
+| 100.B17 | Implement strategy auto-discovery | [ ] |
+
+### Phase C: Advanced Features
+
+| Sub-Task | Description | Status |
+|----------|-------------|--------|
+| 100.C1 | Multi-backend fan-out (send to multiple backends) | [ ] |
+| 100.C2 | Backend failover (switch on failure) | [ ] |
+| 100.C3 | Unified alerting rules across backends | [ ] |
+| 100.C4 | Cost-based backend selection | [ ] |
+| 100.C5 | Sampling and filtering | [ ] |
+| 100.C6 | Trace correlation across services | [ ] |
+| 100.C7 | Integration with Ultimate Intelligence for anomaly detection | [ ] |
+| 100.C8 | Custom dashboards via Universal Dashboards | [ ] |
+
+### Phase D: Migration & Cleanup
+
+| Sub-Task | Description | Status |
+|----------|-------------|--------|
+| 100.D1 | Update all references to use UniversalObservability | [ ] |
+| 100.D2 | Create migration guide | [ ] |
+| 100.D3 | Deprecate individual observability plugins | [ ] |
+| 100.D4 | Remove deprecated plugins | [ ] |
+| 100.D5 | Update documentation | [ ] |
+
+---
+
+## Task 101: Universal Dashboards Plugin
+
+**Status:** [ ] Not Started
+**Priority:** P1 - High
+**Effort:** High
+**Category:** Visualization
+
+### Overview
+
+Consolidate all 9 dashboard plugins into a single Universal Dashboards plugin.
+
+**Plugins to Merge:**
+- DataWarehouse.Plugins.Chronograf
+- DataWarehouse.Plugins.ApacheSuperset
+- DataWarehouse.Plugins.Geckoboard
+- DataWarehouse.Plugins.Kibana
+- DataWarehouse.Plugins.Metabase
+- DataWarehouse.Plugins.Perses
+- DataWarehouse.Plugins.PowerBI
+- DataWarehouse.Plugins.Redash
+- DataWarehouse.Plugins.Tableau
+
+### Architecture
+
+```csharp
+public interface IDashboardStrategy
+{
+    string PlatformId { get; }             // "grafana", "powerbi", "tableau"
+    DashboardCapabilities Capabilities { get; }
+
+    Task<Dashboard> CreateDashboardAsync(DashboardDefinition def, CancellationToken ct);
+    Task PublishDashboardAsync(Dashboard dashboard, CancellationToken ct);
+    Task<string> GetEmbedUrlAsync(string dashboardId, CancellationToken ct);
+}
+```
+
+### Phase A: SDK Foundation
+
+| Sub-Task | Description | Status |
+|----------|-------------|--------|
+| 101.A1 | Add IDashboardStrategy interface to SDK | [ ] |
+| 101.A2 | Add DashboardCapabilities record | [ ] |
+| 101.A3 | Add common dashboard/visualization types | [ ] |
+| 101.A4 | Unit tests | [ ] |
+
+### Phase B: Core Plugin Implementation
+
+| Sub-Task | Description | Status |
+|----------|-------------|--------|
+| 101.B1 | Create DataWarehouse.Plugins.UniversalDashboards project | [ ] |
+| 101.B2 | Implement UniversalDashboardsPlugin orchestrator | [ ] |
+| 101.B3 | Implement ChronografStrategy | [ ] |
+| 101.B4 | Implement ApacheSupersetStrategy | [ ] |
+| 101.B5 | Implement KibanaStrategy | [ ] |
+| 101.B6 | Implement MetabaseStrategy | [ ] |
+| 101.B7 | Implement PowerBIStrategy | [ ] |
+| 101.B8 | Implement TableauStrategy | [ ] |
+| 101.B9 | Implement RedashStrategy | [ ] |
+| 101.B10 | Implement GeckoboardStrategy | [ ] |
+| 101.B11 | Implement PersesStrategy | [ ] |
+
+### Phase C: Advanced Features
+
+| Sub-Task | Description | Status |
+|----------|-------------|--------|
+| 101.C1 | Cross-platform dashboard sync | [ ] |
+| 101.C2 | Dashboard templates library | [ ] |
+| 101.C3 | Automated dashboard generation from data | [ ] |
+| 101.C4 | Integration with Universal Observability | [ ] |
+
+### Phase D: Migration & Cleanup
+
+| Sub-Task | Description | Status |
+|----------|-------------|--------|
+| 101.D1 | Update all references | [ ] |
+| 101.D2 | Create migration guide | [ ] |
+| 101.D3 | Deprecate individual plugins | [ ] |
+| 101.D4 | Remove deprecated plugins | [ ] |
+| 101.D5 | Update documentation | [ ] |
+
+---
+
+## Task 102: Ultimate Database Protocol Plugin
+
+**Status:** [ ] Not Started
+**Priority:** P1 - High
+**Effort:** High
+**Category:** Data Access
+
+### Overview
+
+Consolidate all 8 database protocol plugins into a single Ultimate Database Protocol plugin.
+
+**Plugins to Merge:**
+- DataWarehouse.Plugins.AdoNetProvider
+- DataWarehouse.Plugins.JdbcBridge
+- DataWarehouse.Plugins.MySqlProtocol
+- DataWarehouse.Plugins.NoSqlProtocol
+- DataWarehouse.Plugins.OdbcDriver
+- DataWarehouse.Plugins.OracleTnsProtocol
+- DataWarehouse.Plugins.PostgresWireProtocol
+- DataWarehouse.Plugins.TdsProtocol
+
+### Architecture
+
+```csharp
+public interface IDatabaseProtocolStrategy
+{
+    string ProtocolId { get; }             // "postgres-wire", "tds", "mysql"
+    ProtocolCapabilities Capabilities { get; }
+
+    Task<IDbConnection> CreateConnectionAsync(ConnectionConfig config, CancellationToken ct);
+    Task<QueryResult> ExecuteAsync(string query, IDbConnection conn, CancellationToken ct);
+}
+```
+
+### Phase A: SDK Foundation
+
+| Sub-Task | Description | Status |
+|----------|-------------|--------|
+| 102.A1 | Add IDatabaseProtocolStrategy interface | [ ] |
+| 102.A2 | Add ProtocolCapabilities record | [ ] |
+| 102.A3 | Add common query/result types | [ ] |
+| 102.A4 | Unit tests | [ ] |
+
+### Phase B: Core Plugin Implementation
+
+| Sub-Task | Description | Status |
+|----------|-------------|--------|
+| 102.B1 | Create DataWarehouse.Plugins.UltimateDatabaseProtocol project | [ ] |
+| 102.B2 | Implement orchestrator | [ ] |
+| 102.B3 | Implement PostgresWireStrategy | [ ] |
+| 102.B4 | Implement TdsStrategy (SQL Server) | [ ] |
+| 102.B5 | Implement MySqlStrategy | [ ] |
+| 102.B6 | Implement OracleTnsStrategy | [ ] |
+| 102.B7 | Implement OdbcStrategy | [ ] |
+| 102.B8 | Implement JdbcBridgeStrategy | [ ] |
+| 102.B9 | Implement AdoNetStrategy | [ ] |
+| 102.B10 | Implement NoSqlStrategy | [ ] |
+
+### Phase C: Advanced Features
+
+| Sub-Task | Description | Status |
+|----------|-------------|--------|
+| 102.C1 | Connection pooling across protocols | [ ] |
+| 102.C2 | Query translation between protocols | [ ] |
+| 102.C3 | Schema mapping | [ ] |
+| 102.C4 | Performance monitoring | [ ] |
+
+### Phase D: Migration & Cleanup
+
+| Sub-Task | Description | Status |
+|----------|-------------|--------|
+| 102.D1-D5 | Standard migration tasks | [ ] |
+
+---
+
+## Task 103: Ultimate Database Storage Plugin
+
+**Status:** [ ] Not Started
+**Priority:** P1 - High
+**Effort:** High
+**Category:** Data Storage
+
+### Overview
+
+Consolidate all 4 database storage plugins into a single plugin.
+
+**Plugins to Merge:**
+- DataWarehouse.Plugins.RelationalDatabaseStorage
+- DataWarehouse.Plugins.NoSQLDatabaseStorage
+- DataWarehouse.Plugins.EmbeddedDatabaseStorage
+- DataWarehouse.Plugins.MetadataStorage
+
+### Phases
+
+| Phase | Sub-Tasks | Description |
+|-------|-----------|-------------|
+| A | A1-A4 | SDK Foundation |
+| B | B1-B6 | Core Implementation |
+| C | C1-C4 | Advanced Features |
+| D | D1-D5 | Migration & Cleanup |
+
+---
+
+## Task 104: Ultimate Data Management Plugin
+
+**Status:** [ ] Not Started
+**Priority:** P1 - High
+**Effort:** High
+**Category:** Data Lifecycle
+
+### Overview
+
+Consolidate all 7 data management plugins into a single plugin.
+
+**Plugins to Merge:**
+- DataWarehouse.Plugins.Deduplication
+- DataWarehouse.Plugins.GlobalDedup
+- DataWarehouse.Plugins.DataRetention
+- DataWarehouse.Plugins.Versioning
+- DataWarehouse.Plugins.Tiering
+- DataWarehouse.Plugins.PredictiveTiering
+- DataWarehouse.Plugins.Sharding
+
+### Architecture
+
+```csharp
+public interface IDataManagementStrategy
+{
+    string StrategyId { get; }
+    DataManagementDomain Domain { get; }  // Dedup, Retention, Versioning, Tiering, Sharding
+
+    Task ProcessAsync(DataManagementContext context, CancellationToken ct);
+}
+```
+
+### Phases
+
+| Phase | Sub-Tasks | Description |
+|-------|-----------|-------------|
+| A | A1-A6 | SDK Foundation |
+| B | B1-B9 | Core Implementation (Dedup, GlobalDedup, Retention, Versioning, Tiering, PredictiveTiering, Sharding strategies) |
+| C | C1-C6 | Advanced Features (cross-strategy optimization, ML-based tiering, content-aware dedup) |
+| D | D1-D5 | Migration & Cleanup |
+
+---
+
+## Task 105: Ultimate Resilience Plugin
+
+**Status:** [ ] Not Started
+**Priority:** P1 - High
+**Effort:** High
+**Category:** Infrastructure
+
+### Overview
+
+Consolidate all 7 resilience plugins into a single plugin.
+
+**Plugins to Merge:**
+- DataWarehouse.Plugins.LoadBalancer
+- DataWarehouse.Plugins.Resilience
+- DataWarehouse.Plugins.RetryPolicy
+- DataWarehouse.Plugins.DistributedTransactions
+- DataWarehouse.Plugins.HierarchicalQuorum
+- DataWarehouse.Plugins.Raft
+- DataWarehouse.Plugins.GeoDistributedConsensus
+
+### Architecture
+
+```csharp
+public interface IResilienceStrategy
+{
+    string StrategyId { get; }
+    ResilienceDomain Domain { get; }  // LoadBalancing, CircuitBreaker, Retry, Consensus
+
+    Task<ResilienceResult> ExecuteWithResilienceAsync<T>(Func<Task<T>> operation, CancellationToken ct);
+}
+```
+
+### Phases
+
+| Phase | Sub-Tasks | Description |
+|-------|-----------|-------------|
+| A | A1-A6 | SDK Foundation |
+| B | B1-B9 | Core Implementation (LoadBalancer, CircuitBreaker, RetryPolicy, Raft, Paxos, PBFT strategies) |
+| C | C1-C6 | Advanced Features (adaptive load balancing, consensus visualization, partition tolerance) |
+| D | D1-D5 | Migration & Cleanup |
+
+---
+
+## Task 106: Ultimate Deployment Plugin
+
+**Status:** [ ] Not Started
+**Priority:** P1 - High
+**Effort:** High
+**Category:** Operations
+
+### Overview
+
+Consolidate all 7 deployment plugins into a single plugin.
+
+**Plugins to Merge:**
+- DataWarehouse.Plugins.BlueGreenDeployment
+- DataWarehouse.Plugins.CanaryDeployment
+- DataWarehouse.Plugins.Docker
+- DataWarehouse.Plugins.K8sOperator
+- DataWarehouse.Plugins.Hypervisor
+- DataWarehouse.Plugins.ZeroDowntimeUpgrade
+- DataWarehouse.Plugins.HotReload
+
+### Architecture
+
+```csharp
+public interface IDeploymentStrategy
+{
+    string StrategyId { get; }
+    DeploymentCapabilities Capabilities { get; }
+
+    Task<DeploymentResult> DeployAsync(DeploymentPlan plan, CancellationToken ct);
+    Task<RollbackResult> RollbackAsync(string deploymentId, CancellationToken ct);
+}
+```
+
+### Phases
+
+| Phase | Sub-Tasks | Description |
+|-------|-----------|-------------|
+| A | A1-A5 | SDK Foundation |
+| B | B1-B9 | Core Implementation |
+| C | C1-C6 | Advanced Features (automated rollback, deployment metrics, feature flags) |
+| D | D1-D5 | Migration & Cleanup |
+
+---
+
+## Task 107: Ultimate Sustainability Plugin
+
+**Status:** [ ] Not Started
+**Priority:** P2 - Medium
+**Effort:** Medium
+**Category:** Green Computing
+
+### Overview
+
+Consolidate all 4 sustainability plugins into a single plugin.
+
+**Plugins to Merge:**
+- DataWarehouse.Plugins.BatteryAware
+- DataWarehouse.Plugins.CarbonAware
+- DataWarehouse.Plugins.CarbonAwareness
+- DataWarehouse.Plugins.SmartScheduling
+
+### Architecture
+
+```csharp
+public interface ISustainabilityStrategy
+{
+    string StrategyId { get; }
+    SustainabilityDomain Domain { get; }  // CarbonAware, BatteryAware, SmartScheduling
+
+    Task<SustainabilityScore> EvaluateAsync(WorkloadContext context, CancellationToken ct);
+    Task<ScheduleRecommendation> OptimizeScheduleAsync(Workload workload, CancellationToken ct);
+}
+```
+
+### Phases
+
+| Phase | Sub-Tasks | Description |
+|-------|-----------|-------------|
+| A | A1-A4 | SDK Foundation |
+| B | B1-B6 | Core Implementation |
+| C | C1-C4 | Advanced Features (carbon API integration, grid-aware scheduling, renewable energy tracking) |
+| D | D1-D5 | Migration & Cleanup |
+
+---
+
+## Task 108: Plugin Deprecation & Cleanup
+
+**Status:** [ ] Not Started
+**Priority:** P1 - High
+**Effort:** Medium
+**Category:** Maintenance
+
+### Overview
+
+Explicit task for deprecating and removing obsolete plugins after Ultimate/Universal consolidation.
+
+### Phase A: Deprecation Marking
+
+| Sub-Task | Description | Status |
+|----------|-------------|--------|
+| 108.A1 | Add [Obsolete] attributes to all merged plugins | [ ] |
+| 108.A2 | Add deprecation warnings in documentation | [ ] |
+| 108.A3 | Create deprecation timeline (3-6 months) | [ ] |
+| 108.A4 | Notify users of deprecation | [ ] |
+
+### Phase B: Remove from Solution (After Transition Period)
+
+| Sub-Task | Category | Plugins to Remove | Count | Status |
+|----------|----------|-------------------|-------|--------|
+| 108.B1 | Compression | BrotliCompression, DeflateCompression, GZipCompression, Lz4Compression, ZstdCompression, Compression | 6 | [ ] |
+| 108.B2 | Encryption | AesEncryption, ChaCha20Encryption, FipsEncryption, SerpentEncryption, TwofishEncryption, ZeroKnowledgeEncryption, QuantumSafe, Encryption | 8 | [ ] |
+| 108.B3 | Key Management | FileKeyStore, VaultKeyStore, KeyRotation, SecretManagement | 4 | [ ] |
+| 108.B4 | Security | AccessControl, IAM, MilitarySecurity, TamperProof, ThreatDetection, ZeroTrust, Integrity, EntropyAnalysis | 8 | [ ] |
+| 108.B5 | Compliance | Compliance, ComplianceAutomation, FedRampCompliance, Soc2Compliance, Governance | 5 | [ ] |
+| 108.B6 | Storage | LocalStorage, NetworkStorage, AzureBlobStorage, CloudStorage, GcsStorage, S3Storage, IpfsStorage, TapeLibrary, RAMDiskStorage, GrpcStorage | 10 | [ ] |
+| 108.B7 | Replication | CrdtReplication, CrossRegion, GeoReplication, MultiMaster, RealTimeSync, DeltaSyncVersioning, Federation, FederatedQuery | 8 | [ ] |
+| 108.B8 | RAID | AdvancedRaid, AutoRaid, EnhancedRaid, ErasureCoding, ExtendedRaid, NestedRaid, Raid, SelfHealingRaid, SharedRaidUtilities, StandardRaid, VendorSpecificRaid, ZfsRaid, AdaptiveEc, IsalEc | 14 | [ ] |
+| 108.B9 | Observability | Alerting, AlertingOps, DistributedTracing, OpenTelemetry, Prometheus, Datadog, Dynatrace, Jaeger, NewRelic, SigNoz, Splunk, GrafanaLoki, Logzio, Netdata, LogicMonitor, VictoriaMetrics, Zabbix | 17 | [ ] |
+| 108.B10 | Dashboards | Chronograf, ApacheSuperset, Geckoboard, Kibana, Metabase, Perses, PowerBI, Redash, Tableau | 9 | [ ] |
+| 108.B11 | Database Protocol | AdoNetProvider, JdbcBridge, MySqlProtocol, NoSqlProtocol, OdbcDriver, OracleTnsProtocol, PostgresWireProtocol, TdsProtocol | 8 | [ ] |
+| 108.B12 | Database Storage | RelationalDatabaseStorage, NoSQLDatabaseStorage, EmbeddedDatabaseStorage, MetadataStorage | 4 | [ ] |
+| 108.B13 | Data Management | Deduplication, GlobalDedup, DataRetention, Versioning, Tiering, PredictiveTiering, Sharding | 7 | [ ] |
+| 108.B14 | Resilience | LoadBalancer, Resilience, RetryPolicy, DistributedTransactions, HierarchicalQuorum, Raft, GeoDistributedConsensus | 7 | [ ] |
+| 108.B15 | Deployment | BlueGreenDeployment, CanaryDeployment, Docker, K8sOperator, Hypervisor, ZeroDowntimeUpgrade, HotReload | 7 | [ ] |
+| 108.B16 | Sustainability | BatteryAware, CarbonAware, CarbonAwareness, SmartScheduling | 4 | [ ] |
+| 108.B17 | AI | AIAgents (merged into Intelligence) | 1 | [ ] |
+
+### Phase C: File System Cleanup
+
+| Sub-Task | Description | Status |
+|----------|-------------|--------|
+| 108.C1 | Remove deprecated plugin folders from Plugins/ | [ ] |
+| 108.C2 | Remove deprecated project references from DataWarehouse.slnx | [ ] |
+| 108.C3 | Update Directory.Build.props if needed | [ ] |
+| 108.C4 | Clean NuGet cache of deprecated packages | [ ] |
+| 108.C5 | Archive deprecated code to separate branch for reference | [ ] |
+
+### Phase D: Verification
+
+| Sub-Task | Description | Status |
+|----------|-------------|--------|
+| 108.D1 | Verify solution builds without deprecated plugins | [ ] |
+| 108.D2 | Verify all tests pass | [ ] |
+| 108.D3 | Verify Ultimate plugins provide all functionality | [ ] |
+| 108.D4 | Update documentation to remove references | [ ] |
+| 108.D5 | Final cleanup commit | [ ] |
+
+### Summary
+
+| Phase | Plugins Removed | Status |
+|-------|-----------------|--------|
+| B1-B17 | 127 plugins | [ ] |
+
+---
+
 ## Ultimate Plugin Consolidation Summary
 
-### Tier 1: Implemented/Planned
+### Foundation (Must Complete First)
 
-| Task | Ultimate Plugin | Plugins Merged | Status |
-|------|-----------------|----------------|--------|
-| 80 | Ultimate Data Protection | 8 backup/recovery plugins | ✅ Complete |
-| 90 | Universal Intelligence | 5 AI plugins | 📋 Planned |
-| 91 | Ultimate RAID | 12 RAID plugins | 📋 Planned |
+| Task | Plugin | Description | Dependencies | Status |
+|------|--------|-------------|--------------|--------|
+| **99** | **Ultimate SDK** | All SDK types, interfaces, base classes | None | [ ] |
+
+### Tier 1: Core Consolidation (High Priority)
+
+| Task | Ultimate Plugin | Plugins Merged | Depends On | Status |
+|------|-----------------|----------------|------------|--------|
+| 80 | Ultimate Data Protection | 8 backup/recovery plugins | - | ✅ Complete |
+| 90 | Universal Intelligence | 5 AI plugins | T99 | 📋 Planned |
+| 91 | Ultimate RAID | 14 RAID plugins | T99 | 📋 Planned |
+| 92 | Ultimate Compression | 6 compression plugins | T99 | 📋 Planned |
+| 93 | Ultimate Encryption | 8 encryption plugins | T99, T94 | 📋 Planned |
+| 94 | Ultimate Key Management | 4 key plugins + T5.x | T99 | 📋 Planned |
+| 95 | Ultimate Security | 8 security plugins | T99 | 📋 Planned |
+| 96 | Ultimate Compliance | 5 compliance plugins | T99 | 📋 Planned |
+| 97 | Ultimate Storage | 10 storage plugins | T99 | 📋 Planned |
+| 98 | Ultimate Replication | 8 replication plugins | T99 | 📋 Planned |
+
+**Tier 1 Total: 76 plugins → 10 Ultimate plugins**
+
+### Tier 2: Extended Consolidation (Medium Priority)
+
+| Task | Ultimate Plugin | Plugins Merged | Depends On | Status |
+|------|-----------------|----------------|------------|--------|
+| 100 | Universal Observability | 17 monitoring plugins | T99 | 📋 Planned |
+| 101 | Universal Dashboards | 9 dashboard plugins | T99, T100 | 📋 Planned |
+| 102 | Ultimate Database Protocol | 8 protocol plugins | T99 | 📋 Planned |
+| 103 | Ultimate Database Storage | 4 DB storage plugins | T99 | 📋 Planned |
+| 104 | Ultimate Data Management | 7 data management plugins | T99 | 📋 Planned |
+| 105 | Ultimate Resilience | 7 resilience plugins | T99 | 📋 Planned |
+| 106 | Ultimate Deployment | 7 deployment plugins | T99 | 📋 Planned |
+| 107 | Ultimate Sustainability | 4 sustainability plugins | T99 | 📋 Planned |
+
+**Tier 2 Total: 63 plugins → 8 Ultimate plugins**
+
+### Cleanup Task
+
+| Task | Description | Depends On | Status |
+|------|-------------|------------|--------|
+| 108 | Plugin Deprecation & Cleanup | All Ultimate tasks | 📋 Planned |
+
+### Critical Dependency Chain
+
+```
+T99 (Ultimate SDK)
+ ├── T94 (Ultimate Key Management) ─────► TamperProof Storage (T3.4.2)
+ │                                         (CANNOT complete without T94)
+ ├── T93 (Ultimate Encryption) ──────────► Depends on T94
+ └── All other Ultimate tasks depend on T99
+```
 | 92 | Ultimate Compression | 6 compression plugins | 📋 Planned |
 | 93 | Ultimate Encryption | 8 encryption plugins | 📋 Planned |
 | 94 | Ultimate Key Management | 4 key plugins | 📋 Planned |
@@ -7630,30 +8636,36 @@ public record ReplicationCapabilities
 | 97 | Ultimate Storage | 10 storage plugins | 📋 Planned |
 | 98 | Ultimate Replication | 8 replication plugins | 📋 Planned |
 
-**Tier 1 Total: 74 plugins → 10 Ultimate plugins**
-
-### Tier 2: Future Consolidation
-
-| Future Task | Ultimate Plugin | Plugins to Merge | Count |
-|-------------|-----------------|------------------|-------|
-| TBD | Universal Observability | Alerting, Tracing, Prometheus, Datadog, etc. | 17 |
-| TBD | Universal Dashboards | Chronograf, Kibana, Grafana, etc. | 9 |
-| TBD | Ultimate Database Protocol | MySQL, Postgres, Oracle protocols | 8 |
-| TBD | Ultimate Database Storage | Relational, NoSQL, Embedded | 4 |
-| TBD | Ultimate Data Management | Dedup, Versioning, Tiering, Sharding | 7 |
-| TBD | Ultimate Resilience | LoadBalancer, CircuitBreaker, Raft | 7 |
-| TBD | Ultimate Deployment | Blue/Green, Canary, Docker, K8s | 7 |
-| TBD | Ultimate Sustainability | Carbon-aware, Battery-aware | 4 |
-
-**Tier 2 Total: 63 plugins → 8 Ultimate plugins**
-
 ### Consolidation Impact
 
-| Metric | Before | After (Tier 1) | After (All) |
-|--------|--------|----------------|-------------|
-| Total Plugins | 162 | 98 | ~38 |
-| Ultimate Plugins | 0 | 10 | 18 |
-| Complexity Reduction | - | 39% | 77% |
+| Metric | Before | After Consolidation |
+|--------|--------|---------------------|
+| Total Plugins | 162 | ~23 (Ultimate/Universal + standalone) |
+| Ultimate/Universal Plugins | 0 | 19 |
+| Plugins Removed | 0 | 139 |
+| SDK Types Added | - | ~120 interfaces/classes |
+| Complexity Reduction | - | **86%** |
+
+### Task Effort Summary
+
+| Task | Sub-Tasks | Effort |
+|------|-----------|--------|
+| T99 (Ultimate SDK) | ~120 | Extreme |
+| T90 (Universal Intelligence) | ~200 | Extreme |
+| T91 (Ultimate RAID) | ~120 | Extreme |
+| T92-T98 (Tier 1) | ~210 | High-Very High |
+| T100-T107 (Tier 2) | ~200 | High |
+| T108 (Cleanup) | ~30 | Medium |
+| **Total** | **~880** | - |
+
+### Execution Order
+
+1. **T99 (Ultimate SDK)** - FIRST (all others depend on this)
+2. **T94 (Ultimate Key Management)** - Enables TamperProof
+3. **T93 (Ultimate Encryption)** - Depends on T94
+4. **T90, T91, T92, T95-T98** - Can run in parallel after T99
+5. **T100-T107 (Tier 2)** - After Tier 1 complete
+6. **T108 (Cleanup)** - LAST (after all migrations verified)
 
 ---
 
