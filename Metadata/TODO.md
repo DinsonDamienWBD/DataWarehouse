@@ -6173,15 +6173,101 @@ var config = new DataProtectionConfig
 
 ---
 
-**PHASE O: Migration**
+**PHASE O: Legacy Migration**
 
 | # | Sub-Task | Description | Status |
 |---|----------|-------------|--------|
-| 90.O1 | AIAgentsPlugin Migration | Migrate existing users | [ ] |
-| 90.O2 | SharedNLP Migration | Migrate Shared NLP | [ ] |
-| 90.O3 | DataProtection Integration | Integrate with Task 80 | [ ] |
-| 90.O4 | Backward Compatibility | Support old configs | [ ] |
-| 90.O5 | Deprecation Notices | Mark old as deprecated | [ ] |
+| 90.O1 | AIAgentsPlugin Migration | Migrate existing AIAgents users | [ ] |
+| 90.O2 | SharedNLP Migration | Migrate Shared NLP features | [ ] |
+| 90.O3 | DataProtection Integration | Integrate with Task 80 AI features | [ ] |
+| 90.O4 | Backward Compatibility | Support old configs during transition | [ ] |
+| 90.O5 | Deprecation Notices | Mark old components as deprecated | [ ] |
+
+---
+
+**PHASE P: Ecosystem-Wide Refactor (All Projects)**
+
+> **Goal:** Every project in the ecosystem uses `KnowledgeObject` for AI interactions. No project implements AI internally - all route through Intelligence plugin via message bus.
+
+| # | Sub-Task | Description | Status |
+|---|----------|-------------|--------|
+| **P1: Kernel Refactor** |
+| 90.P1.1 | Kernel KnowledgeObject Integration | Add KnowledgeObject message handling to kernel | [ ] |
+| 90.P1.2 | Kernel Static Knowledge | Register kernel's own knowledge (system status, plugin list, etc.) | [ ] |
+| 90.P1.3 | Kernel AI Routing | Route all AI requests to Intelligence plugin via message bus | [ ] |
+| 90.P1.4 | Remove Kernel Internal AI | Remove any AI logic from kernel (delegate to Intelligence) | [ ] |
+| **P2: Plugin Knowledge Registration (All Plugins)** |
+| 90.P2.1 | Storage Plugins Knowledge | All storage plugins register: capabilities, status, metrics | [ ] |
+| 90.P2.2 | Compression Plugins Knowledge | Compression plugins register: algorithms, ratios, status | [ ] |
+| 90.P2.3 | Encryption Plugins Knowledge | Encryption plugins register: ciphers, key status, operations | [ ] |
+| 90.P2.4 | Compliance Plugins Knowledge | Compliance plugins register: frameworks, violations, reports | [ ] |
+| 90.P2.5 | Backup Plugins Knowledge | Backup plugins register: schedules, status, history | [ ] |
+| 90.P2.6 | Consensus Plugins Knowledge | Raft/Paxos plugins register: cluster status, leader, health | [ ] |
+| 90.P2.7 | Interface Plugins Knowledge | REST/gRPC/SQL plugins register: endpoints, schemas, stats | [ ] |
+| 90.P2.8 | Security Plugins Knowledge | Security plugins register: policies, access logs, threats | [ ] |
+| 90.P2.9 | All Other Plugins Knowledge | Remaining plugins register their domain knowledge | [ ] |
+| **P3: Plugin AI Removal** |
+| 90.P3.1 | Remove Plugin Internal AI | Remove any AI/NLP code from individual plugins | [ ] |
+| 90.P3.2 | Route Plugin AI to Intelligence | Plugins send KnowledgeObject queries instead of AI calls | [ ] |
+| 90.P3.3 | Plugin AI Response Handling | Plugins receive KnowledgeObject responses from Intelligence | [ ] |
+| **P4: Message Bus Enhancement** |
+| 90.P4.1 | KnowledgeObject Message Topic | Add dedicated topic for KnowledgeObject messages | [ ] |
+| 90.P4.2 | Knowledge Request/Response Pattern | Request-response pattern for knowledge queries | [ ] |
+| 90.P4.3 | Knowledge Event Pattern | Publish-subscribe for knowledge updates | [ ] |
+| 90.P4.4 | Knowledge Broadcast | Broadcast knowledge changes to interested plugins | [ ] |
+
+---
+
+**PHASE Q: DataWarehouse.Shared Deprecation**
+
+> **Goal:** Eliminate DataWarehouse.Shared entirely. All functionality moves to SDK (contracts/types) or Intelligence plugin (AI/NLP). CLI and GUI communicate via message bus only - no direct project references.
+
+| # | Sub-Task | Description | Status |
+|---|----------|-------------|--------|
+| **Q1: Shared Analysis** |
+| 90.Q1.1 | Inventory Shared Contents | Document all types/services in Shared | [ ] |
+| 90.Q1.2 | Categorize for Migration | SDK types vs Intelligence features vs redundant | [ ] |
+| 90.Q1.3 | Dependency Map | Which projects depend on Shared and how | [ ] |
+| **Q2: Move to SDK** |
+| 90.Q2.1 | Move Common Types to SDK | Move non-AI types to SDK.Primitives | [ ] |
+| 90.Q2.2 | Move Utilities to SDK | Move utilities to SDK.Utilities | [ ] |
+| 90.Q2.3 | Move Contracts to SDK | Move interfaces to SDK.Contracts | [ ] |
+| **Q3: Move to Intelligence** |
+| 90.Q3.1 | Move NLP to Intelligence | NaturalLanguageProcessor → Intelligence plugin | [ ] |
+| 90.Q3.2 | Move AI Services to Intelligence | Any AI services → Intelligence plugin | [ ] |
+| 90.Q3.3 | Move Semantic Search to Intelligence | Semantic search → Intelligence plugin | [ ] |
+| **Q4: CLI Refactor** |
+| 90.Q4.1 | Remove CLI → Shared Reference | Remove direct project reference | [ ] |
+| 90.Q4.2 | CLI KnowledgeObject Client | CLI sends KnowledgeObject via message bus | [ ] |
+| 90.Q4.3 | CLI NLP via Intelligence | CLI NLP commands route to Intelligence | [ ] |
+| 90.Q4.4 | CLI Response Formatting | Format KnowledgeObject responses for terminal | [ ] |
+| 90.Q4.5 | CLI Streaming Support | Stream long responses from Intelligence | [ ] |
+| **Q5: GUI Refactor** |
+| 90.Q5.1 | Remove GUI → Shared Reference | Remove direct project reference | [ ] |
+| 90.Q5.2 | GUI KnowledgeObject Client | GUI sends KnowledgeObject via message bus | [ ] |
+| 90.Q5.3 | GUI AI Chat Panel | Chat panel uses Intelligence plugin | [ ] |
+| 90.Q5.4 | GUI Response Rendering | Render KnowledgeObject responses in UI | [ ] |
+| 90.Q5.5 | GUI Streaming Support | Stream responses with progress indication | [ ] |
+| **Q6: Shared Removal** |
+| 90.Q6.1 | Verify No References | Ensure no project references Shared | [ ] |
+| 90.Q6.2 | Remove from Solution | Remove DataWarehouse.Shared from solution | [ ] |
+| 90.Q6.3 | Archive Shared Code | Archive for reference, do not delete history | [ ] |
+| 90.Q6.4 | Update Documentation | Update all docs referencing Shared | [ ] |
+
+---
+
+**PHASE R: Verification & Testing**
+
+| # | Sub-Task | Description | Status |
+|---|----------|-------------|--------|
+| 90.R1 | End-to-End Knowledge Flow Test | Test complete flow: Plugin → Bus → Intelligence → Response | [ ] |
+| 90.R2 | CLI AI Test Suite | Verify all CLI AI commands work via Intelligence | [ ] |
+| 90.R3 | GUI AI Test Suite | Verify all GUI AI features work via Intelligence | [ ] |
+| 90.R4 | Plugin Knowledge Test Suite | Verify all plugins register knowledge correctly | [ ] |
+| 90.R5 | Temporal Query Tests | Test time-travel queries across plugins | [ ] |
+| 90.R6 | Inference Engine Tests | Test knowledge inference correctness | [ ] |
+| 90.R7 | Performance Benchmark | Ensure no regression from direct calls to message bus | [ ] |
+| 90.R8 | Fallback Tests | Test behavior when Intelligence plugin unavailable | [ ] |
 
 ---
 
@@ -6296,8 +6382,12 @@ var config = new IntelligenceConfig
 
 **Related Tasks:**
 - Task 80 (Ultimate Data Protection): Primary knowledge source integration
-- Existing AIAgents Plugin: To be deprecated
-- DataWarehouse.Shared NLP: To be deprecated
+- Existing AIAgents Plugin: To be deprecated and migrated (Phase O)
+- DataWarehouse.Shared: To be deprecated and removed (Phase Q)
+- DataWarehouse.Kernel: Refactored for KnowledgeObject routing (Phase P)
+- DataWarehouse.CLI: Refactored to use Intelligence via message bus (Phase Q)
+- DataWarehouse.GUI: Refactored to use Intelligence via message bus (Phase Q)
+- All Plugins: Refactored to register knowledge and route AI via Intelligence (Phase P)
 
 ---
 
@@ -6327,7 +6417,7 @@ var config = new IntelligenceConfig
 | 89 | Forensic Watermarking | Security | P0 | High | [ ] |
 | 90 | Ultimate Intelligence | AI | P0 | Extreme | [ ] |
 
-**Total:** 21 Tasks, ~370 Sub-Tasks
+**Total:** 21 Tasks, ~420 Sub-Tasks
 
 ---
 
