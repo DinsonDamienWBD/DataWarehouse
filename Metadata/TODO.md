@@ -22,13 +22,476 @@ This document outlines the implementation plan for achieving full production rea
 
 ---
 
+## RELEASE PLAN: Phased Delivery Strategy
+
+> **PHILOSOPHY:** Ship working software early and often. Each release is a complete, usable product.
+
+### Release 1.0: Secure Tamper-Proof Storage (Target: 3 months)
+
+**Value Proposition:** "Storage that proves your data wasn't tampered with"
+
+| Priority | Task | Name | Core Deliverable |
+|----------|------|------|------------------|
+| 1 | T99 | Ultimate SDK | Foundation for all plugins |
+| 2 | T94 | Ultimate Key Management | Secure key storage and rotation |
+| 3 | T93 | Ultimate Encryption | AES-256-GCM, ChaCha20-Poly1305 |
+| 4 | T97 | Ultimate Storage | Local + S3 storage backends |
+| 5 | T92 | Ultimate Compression | Zstd, Brotli, LZ4 |
+| 6 | T1-T4 | TamperProof Storage | Immutable, verifiable storage |
+| 7 | T109 | Ultimate Interface | REST API for all operations |
+
+**Release 1.0 Deliverables:**
+- [ ] End-to-end encrypted storage with tamper detection
+- [ ] REST API with OpenAPI documentation
+- [ ] CLI tool for basic operations
+- [ ] Docker container for easy deployment
+- [ ] 80%+ test coverage on core paths
+
+---
+
+### Release 2.0: Enterprise Security & Compliance (Target: +3 months)
+
+**Value Proposition:** "Enterprise-grade security with compliance automation"
+
+| Priority | Task | Name | Core Deliverable |
+|----------|------|------|------------------|
+| 1 | T95 | Ultimate Access Control | RBAC, ABAC, Zero Trust |
+| 2 | T96 | Ultimate Compliance | GDPR, HIPAA, SOX frameworks |
+| 3 | T80 | Ultimate Data Protection | Backup, recovery, snapshots |
+| 4 | T100 | Universal Observability | Metrics, logging, tracing |
+| 5 | T90 | Universal Intelligence | AI-powered search and prediction |
+| 6 | T89 | Forensic Watermarking | Traitor tracing |
+
+**Release 2.0 Deliverables:**
+- [ ] Role-based and attribute-based access control
+- [ ] Compliance reporting for major frameworks
+- [ ] Automated backup with point-in-time recovery
+- [ ] AI-powered content search
+- [ ] Forensic watermarking for leak detection
+
+---
+
+### Release 3.0: Active Distribution & Advanced Features (Target: +6 months)
+
+**Value Proposition:** "Data that moves itself to where it's needed"
+
+| Priority | Task | Name | Core Deliverable |
+|----------|------|------|------------------|
+| 1 | T60 | AEDS Core | Active Enterprise Distribution System |
+| 2 | T98 | Ultimate Replication | Geo-replication, multi-master |
+| 3 | T104 | Ultimate Data Management | Tiering, branching, dedup |
+| 4 | T73-T79 | Advanced Security | Canary, steganography, air-gap |
+| 5 | T84-T88 | Active Storage | Generative compression, spatial anchors |
+
+**Release 3.0 Deliverables:**
+- [ ] Push-based content distribution (AEDS)
+- [ ] Cross-region replication with conflict resolution
+- [ ] Block-level tiering and data branching
+- [ ] Advanced security counter-measures
+- [ ] AI-powered generative compression
+
+---
+
+### Release Criteria Checklist
+
+Before ANY release:
+- [ ] All targeted tasks marked [x] Complete
+- [ ] 80%+ test coverage on core functionality
+- [ ] Zero critical/high security vulnerabilities
+- [ ] Performance benchmarks documented
+- [ ] API documentation complete
+- [ ] Docker image published
+- [ ] Migration guide from previous release
+
+---
+
+## MASTER TASK INDEX: Complete Prioritized Execution Order
+
+> **PURPOSE:** This section provides the AUTHORITATIVE, COMPLETE, and PRIORITIZED list of ALL tasks.
+> All implementations MUST follow this order to ensure dependencies are satisfied.
+>
+> **CRITICAL RULE:** No task shall create a new standalone plugin if an Ultimate/Universal plugin exists for that category.
+> All new functionality MUST be implemented as strategies within the appropriate Ultimate plugin.
+
+---
+
+### TIER 0: Foundation (MUST COMPLETE FIRST)
+
+> **No other work can begin until Tier 0 is complete.**
+
+| Order | Task | Name | Description | Dependencies | Status |
+|-------|------|------|-------------|--------------|--------|
+| **0.1** | **T99** | **Ultimate SDK** | All SDK types, interfaces, base classes for ALL Ultimate plugins | None | [ ] |
+
+**Task 99 Includes (consolidated from scattered tasks):**
+- T5.0.1 (SDK Key Management Types) → Now T99.A3
+- T5.0.2 (KeyStorePluginBase) → Now T99.B1
+- T5.0.3 (EncryptionPluginBase) → Now T99.B2
+- T90 Phase A (KnowledgeObject types) → Now T99.C
+- T91 Phase A (RAID SDK types) → Now T99.A8
+- T92 Phase A (Compression SDK types) → Now T99.A1
+- T93 Phase A (Encryption SDK types) → Now T99.A2
+- T94 Phase A (Key Management SDK types) → Now T99.A3
+- T95 Phase A (Security SDK types) → Now T99.A4
+- T96 Phase A (Compliance SDK types) → Now T99.A5
+- T97 Phase A (Storage SDK types) → Now T99.A6
+- T98 Phase A (Replication SDK types) → Now T99.A7
+
+---
+
+### TIER 1: Core Ultimate Plugins (Enables All Feature Work)
+
+> **Order within Tier 1 is CRITICAL due to dependencies.**
+
+| Order | Task | Name | Description | Dependencies | Status |
+|-------|------|------|-------------|--------------|--------|
+| **1.1** | **T94** | **Ultimate Key Management** | Composable key mgmt (Direct + Envelope modes) | T99 | [ ] |
+| **1.2** | **T93** | **Ultimate Encryption** | All encryption as strategies | T99, T94 | [ ] |
+| **1.3** | **T92** | **Ultimate Compression** | All compression as strategies | T99 | [ ] |
+| **1.4** | **T97** | **Ultimate Storage** | All storage backends as strategies | T99 | [ ] |
+| **1.5** | **T91** | **Ultimate RAID** | All RAID levels as strategies | T99 | [ ] |
+| **1.6** | **T95** | **Ultimate Access Control** | All access control features as strategies | T99 | [ ] |
+| **1.7** | **T96** | **Ultimate Compliance** | All compliance frameworks as strategies | T99 | [ ] |
+| **1.8** | **T98** | **Ultimate Replication** | All replication modes as strategies | T99 | [ ] |
+| **1.9** | **T90** | **Universal Intelligence** | Unified AI/knowledge layer | T99 | [ ] |
+
+**CRITICAL: TamperProof Dependency Chain:**
+```
+T99 (SDK) → T94 (Key Mgmt) → T93 (Encryption) → TamperProof (T3.4.2)
+```
+
+---
+
+### TIER 2: TamperProof Storage System
+
+> **Can begin after T94 + T93 are complete. Uses Ultimate plugins exclusively.**
+
+| Order | Task | Name | Description | Dependencies | Status |
+|-------|------|------|-------------|--------------|--------|
+| **2.1** | T1 | TamperProof Core Infrastructure | Interfaces and base classes | T99 | [x] Complete |
+| **2.2** | T2 | TamperProof Core Plugin | Main plugin implementation | T1 | [x] Complete |
+| **2.3** | T3 | TamperProof Read Pipeline | Read with verification | T2, **T94**, **T93** | [ ] |
+| **2.4** | T4 | TamperProof Recovery | Advanced recovery features | T3 | [ ] |
+| **2.5** | T5.1 | Envelope Mode Testing | Test envelope mode integration | T94, T93 | [ ] |
+
+**TamperProof Ultimate Plugin Usage:**
+| Feature | Ultimate Plugin to Use | NOT Individual Plugin |
+|---------|------------------------|----------------------|
+| Encryption | `UltimateEncryption` (T93) | ~~AesEncryptionPlugin~~, ~~ChaCha20Plugin~~ |
+| Key Management | `UltimateKeyManagement` (T94) | ~~FileKeyStorePlugin~~, ~~VaultKeyStorePlugin~~ |
+| Compression | `UltimateCompression` (T92) | ~~BrotliPlugin~~, ~~ZstdPlugin~~ |
+| Storage | `UltimateStorage` (T97) | ~~S3Storage~~, ~~LocalStorage~~ |
+| RAID | `UltimateRAID` (T91) | ~~StandardRaidPlugin~~, ~~ZfsRaidPlugin~~ |
+| Integrity | `UltimateAccessControl` (T95) | ~~IntegrityPlugin~~ |
+| WORM | `UltimateAccessControl` (T95) via WormStrategy | ~~Worm.SoftwarePlugin~~ |
+| Blockchain | `UltimateAccessControl` (T95) via BlockchainStrategy | ~~Blockchain.LocalPlugin~~ |
+
+---
+
+### TIER 3: Transit Encryption & Advanced Encryption (T5.x, T6.x)
+
+> **These tasks now use Ultimate plugins. No standalone plugin creation.**
+
+| Order | Task | Name | Description | Ultimate Plugin | Status |
+|-------|------|------|-------------|-----------------|--------|
+| **3.1** | T5.2 | Kyber Post-Quantum | ML-KEM implementation | Add as `KyberStrategy` in **T93 (UltimateEncryption)** | [ ] |
+| **3.2** | T5.3 | Chaff Padding | Traffic analysis protection | Add as `ChaffPaddingStrategy` in **T93** | [ ] |
+| **3.3** | T5.4.1 | Shamir Secret Sharing | M-of-N key splitting | Add as `ShamirStrategy` in **T94 (UltimateKeyManagement)** | [ ] |
+| **3.4** | T5.4.2 | PKCS#11 HSM | Generic HSM support | Add as `Pkcs11Strategy` in **T94** | [ ] |
+| **3.5** | T5.4.3 | TPM 2.0 | Hardware-bound keys | Add as `TpmStrategy` in **T94** | [ ] |
+| **3.6** | T5.4.4 | YubiKey/FIDO2 | Hardware tokens | Add as `YubikeyStrategy` in **T94** | [ ] |
+| **3.7** | T5.4.5 | Password-Derived | Argon2/scrypt | Add as `PasswordDerivedStrategy` in **T94** | [ ] |
+| **3.8** | T5.4.6 | Multi-Party Computation | MPC key management | Add as `MpcStrategy` in **T94** | [ ] |
+| **3.9** | T5.5 | Geo-Dispersed WORM | Cross-region WORM | Add as feature in **T98 (UltimateReplication)** | [ ] |
+| **3.10** | T5.6 | Geo-Distributed Sharding | Cross-continent shards | Add as feature in **T98** | [ ] |
+| **3.11** | T5.7-T5.9 | Extreme Compression | PAQ, ZPAQ, CMIX | Add as strategies in **T92 (UltimateCompression)** | [ ] |
+| **3.12** | T5.10-T5.11 | Database TDE | SQL TDE metadata | Add as feature in **T93** | [ ] |
+| **3.13** | T5.12-T5.16 | Compliance Reporting | SOC2, HIPAA reports | Add as feature in **T96 (UltimateCompliance)** | [ ] |
+
+**T6.x Transit Encryption - Uses Ultimate Plugins:**
+
+| Order | Task | Name | Description | Ultimate Plugin | Status |
+|-------|------|------|-------------|-----------------|--------|
+| **3.14** | T6.1 | Common Selection | Cipher presets | Feature in **T93** | [ ] |
+| **3.15** | T6.2 | User Configurable | Manual cipher selection | Feature in **T93** | [ ] |
+| **3.16** | T6.3 | Endpoint-Adaptive | Auto-select by capabilities | Feature in **T93** | [ ] |
+| **3.17** | T6.4 | Transcryption | Re-encrypt for transit | Add `TranscryptionStrategy` in **T93** | [ ] |
+
+---
+
+### TIER 4: Phase 5 - Active Storage Features
+
+> **CRITICAL: These tasks were designed before Ultimate plugins existed.**
+> **All SDK Requirements and Plugin specifications are now redirected to Ultimate plugins.**
+
+#### CATEGORY B: Advanced Security (Tasks 73-76)
+
+| Order | Task | Name | Original Plugin | NOW: Implement In | Status |
+|-------|------|------|-----------------|-------------------|--------|
+| **4.1** | T73 | Canary Objects | ~~DataWarehouse.Plugins.Security.Canary~~ | **T95 (UltimateAccessControl)** as `CanaryStrategy` | [ ] |
+| **4.2** | T74 | Steganographic Sharding | ~~DataWarehouse.Plugins.Obfuscation.Steganography~~ | **T95 (UltimateAccessControl)** as `SteganographyStrategy` | [ ] |
+| **4.3** | T75 | SMPC Vaults | ~~DataWarehouse.Plugins.Privacy.SMPC~~ | **T94 (UltimateKeyManagement)** as `SmpcVaultStrategy` | [ ] |
+| **4.4** | T76 | Digital Dead Drops | ~~DataWarehouse.Plugins.Sharing.Ephemeral~~ | **T95 (UltimateAccessControl)** as `EphemeralSharingStrategy` | [ ] |
+
+**SDK Requirements (from T73-T76) → Now in Task 99:**
+- `ICanaryProvider` → T99.A4 (Security interfaces)
+- `ISteganographyProvider` → T99.A4
+- `ISecureComputationProvider` → T99.A3 (Key Management interfaces)
+- `IEphemeralSharingProvider` → T99.A4
+
+#### CATEGORY C: Physics & Logistics (Tasks 77-79)
+
+| Order | Task | Name | Original Plugin | NOW: Implement In | Status |
+|-------|------|------|-----------------|-------------------|--------|
+| **4.5** | T77 | Sovereignty Geofencing | ~~DataWarehouse.Plugins.Governance.Geofencing~~ | **T96 (UltimateCompliance)** as `GeofencingStrategy` | [ ] |
+| **4.6** | T78 | Protocol Morphing | ~~DataWarehouse.Plugins.Transport.Adaptive~~ | **Standalone** (unique transport layer) | [ ] |
+| **4.7** | T79 | The Mule (Air-Gap Bridge) | ~~DataWarehouse.Plugins.Transport.AirGap~~ | **Standalone** (unique hardware integration) | [ ] |
+
+**Note:** T78 and T79 remain standalone due to their unique transport layer requirements that don't fit existing Ultimate plugin categories.
+
+#### CATEGORY D: Data Physics & Time (Tasks 80-81)
+
+| Order | Task | Name | Original Plugin | NOW: Implement In | Status |
+|-------|------|------|-----------------|-------------------|--------|
+| **4.8** | T80 | Ultimate Data Protection | `DataWarehouse.Plugins.DataProtection` | **Already Ultimate** (consolidates backup plugins) | [ ] |
+| **4.9** | T81 | Liquid Storage Tiers | ~~DataWarehouse.Plugins.Tiering.BlockLevel~~ | **T104 (UltimateDataManagement)** as `BlockLevelTieringStrategy` | [ ] |
+
+#### CATEGORY E: Collaboration (Tasks 82-83)
+
+| Order | Task | Name | Original Plugin | NOW: Implement In | Status |
+|-------|------|------|-----------------|-------------------|--------|
+| **4.10** | T82 | Data Branching (Git-for-Data) | ~~DataWarehouse.Plugins.VersionControl.Branching~~ | **T104 (UltimateDataManagement)** as `BranchingStrategy` | [ ] |
+| **4.11** | T83 | Data Marketplace | ~~DataWarehouse.Plugins.Commerce.Marketplace~~ | **Standalone** (unique commerce functionality) | [ ] |
+
+#### CATEGORY F: Generative & Probabilistic (Tasks 84-85)
+
+| Order | Task | Name | Original Plugin | NOW: Implement In | Status |
+|-------|------|------|-----------------|-------------------|--------|
+| **4.12** | T84 | Generative Compression | ~~DataWarehouse.Plugins.Storage.Generative~~ | **T92 (UltimateCompression)** as `GenerativeCompressionStrategy` | [ ] |
+| **4.13** | T85 | Probabilistic Storage | ~~DataWarehouse.Plugins.Storage.Probabilistic~~ | **SDK (T99)** primitives + **T104** `ProbabilisticStorageStrategy` | [ ] |
+
+#### CATEGORY G: The Immortal Layer (Task 86)
+
+| Order | Task | Name | Original Plugin | NOW: Implement In | Status |
+|-------|------|------|-----------------|-------------------|--------|
+| **4.14** | T86 | Self-Emulating Objects | ~~DataWarehouse.Plugins.Archival.SelfEmulation~~ | **Standalone** (unique WASM bundling) | [ ] |
+
+#### CATEGORY H: Spatial & Human Layer (Tasks 87-88)
+
+| Order | Task | Name | Original Plugin | NOW: Implement In | Status |
+|-------|------|------|-----------------|-------------------|--------|
+| **4.15** | T87 | Spatial AR Anchors | ~~DataWarehouse.Plugins.Spatial.ArAnchors~~ | **SDK (T99)** primitives + **T104** `SpatialAnchorStrategy` + client libs | [ ] |
+| **4.16** | T88 | Psychometric Indexing | ~~DataWarehouse.Plugins.Indexing.Psychometric~~ | **T90 (UniversalIntelligence)** as `PsychometricIndexingStrategy` | [ ] |
+
+#### CATEGORY I: The Traitor Layer (Task 89)
+
+| Order | Task | Name | Original Plugin | NOW: Implement In | Status |
+|-------|------|------|-----------------|-------------------|--------|
+| **4.17** | T89 | Forensic Watermarking | ~~DataWarehouse.Plugins.Security.Watermarking~~ | **T95 (UltimateAccessControl)** as `WatermarkingStrategy` | [ ] |
+
+---
+
+### TIER 5: Enterprise Systems
+
+| Order | Task | Name | Description | Dependencies | Status |
+|-------|------|------|-------------|--------------|--------|
+| **5.1** | T60 | AEDS Core Infrastructure | Active Enterprise Distribution System | T99, T90, T93 | [ ] |
+| **5.2** | T26-T31 | Critical Bug Fixes | Raft, S3 plugin fixes | None | [ ] |
+| **5.3** | T59 | Compliance Automation | Regulatory frameworks | T96 | [~] Partial |
+
+---
+
+### TIER 6: Tier 2 Ultimate Plugins (Observability, Dashboards, etc.)
+
+| Order | Task | Name | Description | Dependencies | Status |
+|-------|------|------|-------------|--------------|--------|
+| **6.1** | T100 | Universal Observability | 17 monitoring plugins consolidated | T99 | [ ] |
+| **6.2** | T101 | Universal Dashboards | 9 dashboard plugins consolidated | T99, T100 | [ ] |
+| **6.3** | T102 | Ultimate Database Protocol | 8 DB protocol plugins consolidated | T99 | [ ] |
+| **6.4** | T103 | Ultimate Database Storage | 4 DB storage plugins consolidated | T99 | [ ] |
+| **6.5** | T104 | Ultimate Data Management | 7 data lifecycle plugins consolidated | T99 | [ ] |
+| **6.6** | T105 | Ultimate Resilience | 7 resilience plugins consolidated | T99 | [ ] |
+| **6.7** | T106 | Ultimate Deployment | 7 deployment plugins consolidated | T99 | [ ] |
+| **6.8** | T107 | Ultimate Sustainability | 4 green computing plugins consolidated | T99 | [ ] |
+
+---
+
+### TIER 7: Cleanup & Deprecation
+
+| Order | Task | Name | Description | Dependencies | Status |
+|-------|------|------|-------------|--------------|--------|
+| **7.1** | T108 | Plugin Deprecation & Cleanup | Remove 127+ deprecated plugins | All Ultimate plugins verified | [ ] |
+
+---
+
+### TIER 8: Future Roadmap (Lowest Priority)
+
+| Order | Task | Name | Description | Dependencies | Status |
+|-------|------|------|-------------|--------------|--------|
+| **8.1** | T57 | Plugin Marketplace | Plugin certification ecosystem | All Tier 1-7 tasks | [ ] |
+
+---
+
+### Task Mapping: Original Plugin → Ultimate Plugin
+
+> **Reference guide for which Ultimate plugin implements each original plugin's functionality.**
+
+| Original Plugin | Ultimate Plugin | Strategy Name |
+|-----------------|-----------------|---------------|
+| **Compression (6 plugins)** |
+| `BrotliCompression` | T92 UltimateCompression | `BrotliStrategy` |
+| `DeflateCompression` | T92 UltimateCompression | `DeflateStrategy` |
+| `GZipCompression` | T92 UltimateCompression | `GZipStrategy` |
+| `Lz4Compression` | T92 UltimateCompression | `Lz4Strategy` |
+| `ZstdCompression` | T92 UltimateCompression | `ZstdStrategy` |
+| `Compression` (base) | T92 UltimateCompression | (base merged) |
+| **Encryption (8 plugins)** |
+| `AesEncryption` | T93 UltimateEncryption | `AesGcmStrategy` |
+| `ChaCha20Encryption` | T93 UltimateEncryption | `ChaCha20Strategy` |
+| `SerpentEncryption` | T93 UltimateEncryption | `SerpentStrategy` |
+| `TwofishEncryption` | T93 UltimateEncryption | `TwofishStrategy` |
+| `FipsEncryption` | T93 UltimateEncryption | `FipsStrategy` |
+| `ZeroKnowledgeEncryption` | T93 UltimateEncryption | `ZeroKnowledgeStrategy` |
+| `QuantumSafe` | T93 UltimateEncryption | `KyberStrategy`, `DilithiumStrategy` |
+| `Encryption` (base) | T93 UltimateEncryption | (base merged) |
+| **Key Management (4 plugins)** |
+| `FileKeyStore` | T94 UltimateKeyManagement | `FileKeyStoreStrategy` |
+| `VaultKeyStore` | T94 UltimateKeyManagement | `VaultKeyStoreStrategy` |
+| `KeyRotation` | T94 UltimateKeyManagement | `KeyRotationStrategy` |
+| `SecretManagement` | T94 UltimateKeyManagement | `SecretManagementStrategy` |
+| **Security (8 plugins)** |
+| `AccessControl` | T95 UltimateAccessControl | `RbacStrategy`, `AbacStrategy` |
+| `IAM` | T95 UltimateAccessControl | `IamStrategy` |
+| `MilitarySecurity` | T95 UltimateAccessControl | `MilitarySecurityStrategy` |
+| `TamperProof` | T95 UltimateAccessControl | `TamperProofStrategy` |
+| `ThreatDetection` | T95 UltimateAccessControl | `ThreatDetectionStrategy` |
+| `ZeroTrust` | T95 UltimateAccessControl | `ZeroTrustStrategy` |
+| `Integrity` | T95 UltimateAccessControl | `IntegrityStrategy` |
+| `EntropyAnalysis` | T95 UltimateAccessControl | `EntropyAnalysisStrategy` |
+| **Compliance (5 plugins)** |
+| `Compliance` | T96 UltimateCompliance | (orchestrator) |
+| `ComplianceAutomation` | T96 UltimateCompliance | (automation features) |
+| `FedRampCompliance` | T96 UltimateCompliance | `FedRampStrategy` |
+| `Soc2Compliance` | T96 UltimateCompliance | `Soc2Strategy` |
+| `Governance` | T96 UltimateCompliance | `GovernanceStrategy` |
+| **Storage (10 plugins)** |
+| `LocalStorage` | T97 UltimateStorage | `LocalFileStrategy` |
+| `NetworkStorage` | T97 UltimateStorage | `NetworkShareStrategy` |
+| `S3Storage` | T97 UltimateStorage | `S3Strategy` |
+| `AzureBlobStorage` | T97 UltimateStorage | `AzureBlobStrategy` |
+| `GcsStorage` | T97 UltimateStorage | `GcsStrategy` |
+| `CloudStorage` | T97 UltimateStorage | (generic cloud) |
+| `IpfsStorage` | T97 UltimateStorage | `IpfsStrategy` |
+| `TapeLibrary` | T97 UltimateStorage | `TapeLibraryStrategy` |
+| `RAMDiskStorage` | T97 UltimateStorage | `RamDiskStrategy` |
+| `GrpcStorage` | T97 UltimateStorage | `GrpcStorageStrategy` |
+| **Replication (8 plugins)** |
+| `CrdtReplication` | T98 UltimateReplication | `CrdtStrategy` |
+| `CrossRegion` | T98 UltimateReplication | `CrossRegionStrategy` |
+| `GeoReplication` | T98 UltimateReplication | `GeoReplicationStrategy` |
+| `MultiMaster` | T98 UltimateReplication | `MultiMasterStrategy` |
+| `RealTimeSync` | T98 UltimateReplication | `RealTimeSyncStrategy` |
+| `DeltaSyncVersioning` | T98 UltimateReplication | `DeltaSyncStrategy` |
+| `Federation` | T98 UltimateReplication | `FederationStrategy` |
+| `FederatedQuery` | T98 UltimateReplication | `FederatedQueryStrategy` |
+| **RAID (14 plugins)** |
+| `StandardRaid` | T91 UltimateRAID | `Raid0/1/5/6/10Strategy` |
+| `AdvancedRaid` | T91 UltimateRAID | `Raid50/60Strategy` |
+| `NestedRaid` | T91 UltimateRAID | `NestedRaidStrategy` |
+| `ZfsRaid` | T91 UltimateRAID | `RaidZ1/Z2/Z3Strategy` |
+| `SelfHealingRaid` | T91 UltimateRAID | `SelfHealingStrategy` |
+| `ErasureCoding` | T91 UltimateRAID | `ReedSolomonStrategy` |
+| `AutoRaid` | T91 UltimateRAID | `AutoRaidStrategy` |
+| `VendorSpecificRaid` | T91 UltimateRAID | `NetAppDpStrategy`, `SynologyShrStrategy` |
+| `ExtendedRaid` | T91 UltimateRAID | `Raid71/72Strategy`, `MatrixRaidStrategy` |
+| `EnhancedRaid` | T91 UltimateRAID | `DistributedHotSpareStrategy` |
+| `AdaptiveEc` | T91 UltimateRAID | `AdaptiveEcStrategy` |
+| `IsalEc` | T91 UltimateRAID | `IsalEcStrategy` |
+| `SharedRaidUtilities` | T91 UltimateRAID | (utilities merged) |
+| `Raid` (base) | T91 UltimateRAID | (base merged) |
+
+---
+
+### Standalone Plugins (Not Consolidated)
+
+> **These plugins remain standalone due to unique functionality that doesn't fit Ultimate plugin categories.**
+
+| Plugin | Reason | Dependencies |
+|--------|--------|--------------|
+| `Transport.Adaptive` (T78) | Unique transport layer protocol morphing | Uses T93 for encryption |
+| `Transport.AirGap` (T79) | Unique hardware USB/external storage integration | Uses T93, T94, T97 |
+| `Commerce.Marketplace` (T83) | Unique commerce/billing functionality | Uses T90 for AI |
+| ~~`Storage.Probabilistic` (T85)~~ | **Moved to SDK (T99) + T104** | SDK primitives + T104 `ProbabilisticStorageStrategy` |
+| `Archival.SelfEmulation` (T86) | Unique WASM bundling for format preservation | Uses T92 for compression |
+| ~~`Spatial.ArAnchors` (T87)~~ | **Moved to SDK (T99) + T104 + client libs** | SDK primitives + T104 `SpatialAnchorStrategy` |
+| `Blockchain.Local` | Unique blockchain anchoring | Used by T95 |
+| `Compute.Wasm` | Unique WASM compute-on-storage | Uses T97 |
+| `Transcoding.Media` | Unique media transcoding | Uses T92 |
+| `Virtualization.SqlOverObject` | Unique SQL-over-object virtualization | Uses T97 |
+| **`FuseDriver`** | **Linux FUSE filesystem driver - OS-specific** | Uses T97 |
+| **`WinFspDriver`** | **Windows WinFSP filesystem driver - OS-specific** | Uses T97 |
+| **`KubernetesCsi`** | **Kubernetes CSI driver - platform-specific** | Uses T97 |
+
+**IMPORTANT:** Even standalone plugins MUST use Ultimate plugins for their underlying functionality (encryption, storage, etc.) rather than directly referencing individual deprecated plugins.
+
+---
+
+### SDK Migrations (Moving Core Plugins to SDK)
+
+> **These plugins contain foundational functionality that belongs in the SDK, not as separate plugins.**
+
+| Plugin | SDK Location | Reason |
+|--------|--------------|--------|
+| `FilesystemCore` | `SDK.Primitives.Filesystem` | Core filesystem abstractions |
+| `HardwareAcceleration` | `SDK.Primitives.Hardware` | SIMD, GPU acceleration primitives |
+| `LowLatency` | `SDK.Primitives.Performance` | Performance optimization utilities |
+| `Metadata` | `SDK.Primitives.Metadata` | Core metadata management |
+| `ZeroConfig` | `SDK.Primitives.Configuration` | Auto-configuration utilities |
+
+**Implementation:** These migrations are part of T99 (Ultimate SDK) and should be completed before dependent plugins are built.
+
+---
+
+### Complete Task Count Summary
+
+| Tier | Tasks | Sub-Tasks | Status |
+|------|-------|-----------|--------|
+| Tier 0: Foundation | 1 | ~120 | [ ] |
+| Tier 1: Core Ultimate | 9 | ~400 | [ ] |
+| Tier 2: TamperProof | 5 | ~100 | [x] Partial |
+| Tier 3: Advanced Encryption | 17 | ~150 | [ ] |
+| Tier 4: Phase 5 Active Storage | 17 | ~180 | [ ] |
+| Tier 5: Enterprise | 4 | ~80 | [x] Partial |
+| Tier 6: Tier 2 Ultimate | 8 | ~200 | [ ] |
+| Tier 7: Cleanup | 1 | ~30 | [ ] |
+| **TOTAL** | **62** | **~1260** | - |
+
+---
+
+### Quick Reference: "What Ultimate Plugin Do I Use?"
+
+| I Want To... | Use This Ultimate Plugin | Task # |
+|--------------|--------------------------|--------|
+| Compress data | **UltimateCompression** | T92 |
+| Encrypt data | **UltimateEncryption** | T93 |
+| Manage keys | **UltimateKeyManagement** | T94 |
+| Store data | **UltimateStorage** | T97 |
+| Replicate data | **UltimateReplication** | T98 |
+| **Expose APIs** | **UltimateInterface** | **T109** |
+| Implement RAID | **UltimateRAID** | T91 |
+| Add access control features | **UltimateAccessControl** | T95 |
+| Add compliance | **UltimateCompliance** | T96 |
+| Add AI/intelligence | **UniversalIntelligence** | T90 |
+| Add monitoring | **UniversalObservability** | T100 |
+| Add dashboards | **UniversalDashboards** | T101 |
+| Add resilience | **UltimateResilience** | T105 |
+| Backup/restore | **UltimateDataProtection** | T80 |
+| Database access | **UltimateDatabaseProtocol** | T102 |
+| Data lifecycle | **UltimateDataManagement** | T104 |
+
+---
+
 ## PRODUCTION READINESS SPRINT (2026-01-25)
-
-### Overview
-
-This sprint addresses all CRITICAL and HIGH severity issues identified in the comprehensive code review. Each task must be verified as production-ready (no simulations, placeholders, mocks, or shortcuts) before being marked complete.
-
-### Phase 1: CRITICAL Issues (Must Fix Before ANY Deployment)
 
 #### Task 26: Fix Raft Consensus Plugin - Silent Exception Swallowing
 **File:** `Plugins/DataWarehouse.Plugins.Raft/RaftConsensusPlugin.cs`
@@ -58,8 +521,6 @@ This sprint addresses all CRITICAL and HIGH severity issues identified in the co
 
 ---
 
-### Phase 2: HIGH Issues (Must Fix Before Enterprise Deployment)
-
 #### Task 30: Fix S3 Storage Plugin - Fragile XML Parsing
 **File:** `Plugins/DataWarehouse.Plugins.S3Storage/S3StoragePlugin.cs:407-430`
 **Issue:** Using string.Split for XML parsing - S3 operations may fail on edge cases
@@ -88,16 +549,6 @@ This sprint addresses all CRITICAL and HIGH severity issues identified in the co
 
 ## GOD TIER FEATURES - Future-Proofing & Industry Leadership (2026-2027)
 
-### Overview
-
-These features represent the next generation of data storage technology, positioning DataWarehouse as the **undisputed leader** in enterprise, government, military, and hyperscale storage. Each feature is designed to be **industry-first** or **industry-only**, providing capabilities that no competitor can match.
-
-**Target:** Transform DataWarehouse from a storage platform into a **complete data operating system**.
-
----
-
-### CATEGORY G: Integration & Ecosystem
-
 #### Task 57: Plugin Marketplace & Certification
 **Priority:** P4 (Lowest)
 **Effort:** Medium
@@ -118,8 +569,6 @@ These features represent the next generation of data storage technology, positio
 | Usage Analytics | Telemetry for developers | [ ] |
 
 ---
-
-### CATEGORY H: Sustainability & Compliance
 
 #### Task 59: Comprehensive Compliance Automation
 **Priority:** P0
@@ -10634,472 +11083,7 @@ T99 (Ultimate SDK)
 
 ---
 
-## RELEASE PLAN: Phased Delivery Strategy
 
-> **PHILOSOPHY:** Ship working software early and often. Each release is a complete, usable product.
-
-### Release 1.0: Secure Tamper-Proof Storage (Target: 3 months)
-
-**Value Proposition:** "Storage that proves your data wasn't tampered with"
-
-| Priority | Task | Name | Core Deliverable |
-|----------|------|------|------------------|
-| 1 | T99 | Ultimate SDK | Foundation for all plugins |
-| 2 | T94 | Ultimate Key Management | Secure key storage and rotation |
-| 3 | T93 | Ultimate Encryption | AES-256-GCM, ChaCha20-Poly1305 |
-| 4 | T97 | Ultimate Storage | Local + S3 storage backends |
-| 5 | T92 | Ultimate Compression | Zstd, Brotli, LZ4 |
-| 6 | T1-T4 | TamperProof Storage | Immutable, verifiable storage |
-| 7 | T109 | Ultimate Interface | REST API for all operations |
-
-**Release 1.0 Deliverables:**
-- [ ] End-to-end encrypted storage with tamper detection
-- [ ] REST API with OpenAPI documentation
-- [ ] CLI tool for basic operations
-- [ ] Docker container for easy deployment
-- [ ] 80%+ test coverage on core paths
-
----
-
-### Release 2.0: Enterprise Security & Compliance (Target: +3 months)
-
-**Value Proposition:** "Enterprise-grade security with compliance automation"
-
-| Priority | Task | Name | Core Deliverable |
-|----------|------|------|------------------|
-| 1 | T95 | Ultimate Access Control | RBAC, ABAC, Zero Trust |
-| 2 | T96 | Ultimate Compliance | GDPR, HIPAA, SOX frameworks |
-| 3 | T80 | Ultimate Data Protection | Backup, recovery, snapshots |
-| 4 | T100 | Universal Observability | Metrics, logging, tracing |
-| 5 | T90 | Universal Intelligence | AI-powered search and prediction |
-| 6 | T89 | Forensic Watermarking | Traitor tracing |
-
-**Release 2.0 Deliverables:**
-- [ ] Role-based and attribute-based access control
-- [ ] Compliance reporting for major frameworks
-- [ ] Automated backup with point-in-time recovery
-- [ ] AI-powered content search
-- [ ] Forensic watermarking for leak detection
-
----
-
-### Release 3.0: Active Distribution & Advanced Features (Target: +6 months)
-
-**Value Proposition:** "Data that moves itself to where it's needed"
-
-| Priority | Task | Name | Core Deliverable |
-|----------|------|------|------------------|
-| 1 | T60 | AEDS Core | Active Enterprise Distribution System |
-| 2 | T98 | Ultimate Replication | Geo-replication, multi-master |
-| 3 | T104 | Ultimate Data Management | Tiering, branching, dedup |
-| 4 | T73-T79 | Advanced Security | Canary, steganography, air-gap |
-| 5 | T84-T88 | Active Storage | Generative compression, spatial anchors |
-
-**Release 3.0 Deliverables:**
-- [ ] Push-based content distribution (AEDS)
-- [ ] Cross-region replication with conflict resolution
-- [ ] Block-level tiering and data branching
-- [ ] Advanced security counter-measures
-- [ ] AI-powered generative compression
-
----
-
-### Release Criteria Checklist
-
-Before ANY release:
-- [ ] All targeted tasks marked [x] Complete
-- [ ] 80%+ test coverage on core functionality
-- [ ] Zero critical/high security vulnerabilities
-- [ ] Performance benchmarks documented
-- [ ] API documentation complete
-- [ ] Docker image published
-- [ ] Migration guide from previous release
-
----
-
-## MASTER TASK INDEX: Complete Prioritized Execution Order
-
-> **PURPOSE:** This section provides the AUTHORITATIVE, COMPLETE, and PRIORITIZED list of ALL tasks.
-> All implementations MUST follow this order to ensure dependencies are satisfied.
->
-> **CRITICAL RULE:** No task shall create a new standalone plugin if an Ultimate/Universal plugin exists for that category.
-> All new functionality MUST be implemented as strategies within the appropriate Ultimate plugin.
-
----
-
-### TIER 0: Foundation (MUST COMPLETE FIRST)
-
-> **No other work can begin until Tier 0 is complete.**
-
-| Order | Task | Name | Description | Dependencies | Status |
-|-------|------|------|-------------|--------------|--------|
-| **0.1** | **T99** | **Ultimate SDK** | All SDK types, interfaces, base classes for ALL Ultimate plugins | None | [ ] |
-
-**Task 99 Includes (consolidated from scattered tasks):**
-- T5.0.1 (SDK Key Management Types) → Now T99.A3
-- T5.0.2 (KeyStorePluginBase) → Now T99.B1
-- T5.0.3 (EncryptionPluginBase) → Now T99.B2
-- T90 Phase A (KnowledgeObject types) → Now T99.C
-- T91 Phase A (RAID SDK types) → Now T99.A8
-- T92 Phase A (Compression SDK types) → Now T99.A1
-- T93 Phase A (Encryption SDK types) → Now T99.A2
-- T94 Phase A (Key Management SDK types) → Now T99.A3
-- T95 Phase A (Security SDK types) → Now T99.A4
-- T96 Phase A (Compliance SDK types) → Now T99.A5
-- T97 Phase A (Storage SDK types) → Now T99.A6
-- T98 Phase A (Replication SDK types) → Now T99.A7
-
----
-
-### TIER 1: Core Ultimate Plugins (Enables All Feature Work)
-
-> **Order within Tier 1 is CRITICAL due to dependencies.**
-
-| Order | Task | Name | Description | Dependencies | Status |
-|-------|------|------|-------------|--------------|--------|
-| **1.1** | **T94** | **Ultimate Key Management** | Composable key mgmt (Direct + Envelope modes) | T99 | [ ] |
-| **1.2** | **T93** | **Ultimate Encryption** | All encryption as strategies | T99, T94 | [ ] |
-| **1.3** | **T92** | **Ultimate Compression** | All compression as strategies | T99 | [ ] |
-| **1.4** | **T97** | **Ultimate Storage** | All storage backends as strategies | T99 | [ ] |
-| **1.5** | **T91** | **Ultimate RAID** | All RAID levels as strategies | T99 | [ ] |
-| **1.6** | **T95** | **Ultimate Access Control** | All access control features as strategies | T99 | [ ] |
-| **1.7** | **T96** | **Ultimate Compliance** | All compliance frameworks as strategies | T99 | [ ] |
-| **1.8** | **T98** | **Ultimate Replication** | All replication modes as strategies | T99 | [ ] |
-| **1.9** | **T90** | **Universal Intelligence** | Unified AI/knowledge layer | T99 | [ ] |
-
-**CRITICAL: TamperProof Dependency Chain:**
-```
-T99 (SDK) → T94 (Key Mgmt) → T93 (Encryption) → TamperProof (T3.4.2)
-```
-
----
-
-### TIER 2: TamperProof Storage System
-
-> **Can begin after T94 + T93 are complete. Uses Ultimate plugins exclusively.**
-
-| Order | Task | Name | Description | Dependencies | Status |
-|-------|------|------|-------------|--------------|--------|
-| **2.1** | T1 | TamperProof Core Infrastructure | Interfaces and base classes | T99 | [x] Complete |
-| **2.2** | T2 | TamperProof Core Plugin | Main plugin implementation | T1 | [x] Complete |
-| **2.3** | T3 | TamperProof Read Pipeline | Read with verification | T2, **T94**, **T93** | [ ] |
-| **2.4** | T4 | TamperProof Recovery | Advanced recovery features | T3 | [ ] |
-| **2.5** | T5.1 | Envelope Mode Testing | Test envelope mode integration | T94, T93 | [ ] |
-
-**TamperProof Ultimate Plugin Usage:**
-| Feature | Ultimate Plugin to Use | NOT Individual Plugin |
-|---------|------------------------|----------------------|
-| Encryption | `UltimateEncryption` (T93) | ~~AesEncryptionPlugin~~, ~~ChaCha20Plugin~~ |
-| Key Management | `UltimateKeyManagement` (T94) | ~~FileKeyStorePlugin~~, ~~VaultKeyStorePlugin~~ |
-| Compression | `UltimateCompression` (T92) | ~~BrotliPlugin~~, ~~ZstdPlugin~~ |
-| Storage | `UltimateStorage` (T97) | ~~S3Storage~~, ~~LocalStorage~~ |
-| RAID | `UltimateRAID` (T91) | ~~StandardRaidPlugin~~, ~~ZfsRaidPlugin~~ |
-| Integrity | `UltimateAccessControl` (T95) | ~~IntegrityPlugin~~ |
-| WORM | `UltimateAccessControl` (T95) via WormStrategy | ~~Worm.SoftwarePlugin~~ |
-| Blockchain | `UltimateAccessControl` (T95) via BlockchainStrategy | ~~Blockchain.LocalPlugin~~ |
-
----
-
-### TIER 3: Transit Encryption & Advanced Encryption (T5.x, T6.x)
-
-> **These tasks now use Ultimate plugins. No standalone plugin creation.**
-
-| Order | Task | Name | Description | Ultimate Plugin | Status |
-|-------|------|------|-------------|-----------------|--------|
-| **3.1** | T5.2 | Kyber Post-Quantum | ML-KEM implementation | Add as `KyberStrategy` in **T93 (UltimateEncryption)** | [ ] |
-| **3.2** | T5.3 | Chaff Padding | Traffic analysis protection | Add as `ChaffPaddingStrategy` in **T93** | [ ] |
-| **3.3** | T5.4.1 | Shamir Secret Sharing | M-of-N key splitting | Add as `ShamirStrategy` in **T94 (UltimateKeyManagement)** | [ ] |
-| **3.4** | T5.4.2 | PKCS#11 HSM | Generic HSM support | Add as `Pkcs11Strategy` in **T94** | [ ] |
-| **3.5** | T5.4.3 | TPM 2.0 | Hardware-bound keys | Add as `TpmStrategy` in **T94** | [ ] |
-| **3.6** | T5.4.4 | YubiKey/FIDO2 | Hardware tokens | Add as `YubikeyStrategy` in **T94** | [ ] |
-| **3.7** | T5.4.5 | Password-Derived | Argon2/scrypt | Add as `PasswordDerivedStrategy` in **T94** | [ ] |
-| **3.8** | T5.4.6 | Multi-Party Computation | MPC key management | Add as `MpcStrategy` in **T94** | [ ] |
-| **3.9** | T5.5 | Geo-Dispersed WORM | Cross-region WORM | Add as feature in **T98 (UltimateReplication)** | [ ] |
-| **3.10** | T5.6 | Geo-Distributed Sharding | Cross-continent shards | Add as feature in **T98** | [ ] |
-| **3.11** | T5.7-T5.9 | Extreme Compression | PAQ, ZPAQ, CMIX | Add as strategies in **T92 (UltimateCompression)** | [ ] |
-| **3.12** | T5.10-T5.11 | Database TDE | SQL TDE metadata | Add as feature in **T93** | [ ] |
-| **3.13** | T5.12-T5.16 | Compliance Reporting | SOC2, HIPAA reports | Add as feature in **T96 (UltimateCompliance)** | [ ] |
-
-**T6.x Transit Encryption - Uses Ultimate Plugins:**
-
-| Order | Task | Name | Description | Ultimate Plugin | Status |
-|-------|------|------|-------------|-----------------|--------|
-| **3.14** | T6.1 | Common Selection | Cipher presets | Feature in **T93** | [ ] |
-| **3.15** | T6.2 | User Configurable | Manual cipher selection | Feature in **T93** | [ ] |
-| **3.16** | T6.3 | Endpoint-Adaptive | Auto-select by capabilities | Feature in **T93** | [ ] |
-| **3.17** | T6.4 | Transcryption | Re-encrypt for transit | Add `TranscryptionStrategy` in **T93** | [ ] |
-
----
-
-### TIER 4: Phase 5 - Active Storage Features
-
-> **CRITICAL: These tasks were designed before Ultimate plugins existed.**
-> **All SDK Requirements and Plugin specifications are now redirected to Ultimate plugins.**
-
-#### CATEGORY B: Advanced Security (Tasks 73-76)
-
-| Order | Task | Name | Original Plugin | NOW: Implement In | Status |
-|-------|------|------|-----------------|-------------------|--------|
-| **4.1** | T73 | Canary Objects | ~~DataWarehouse.Plugins.Security.Canary~~ | **T95 (UltimateAccessControl)** as `CanaryStrategy` | [ ] |
-| **4.2** | T74 | Steganographic Sharding | ~~DataWarehouse.Plugins.Obfuscation.Steganography~~ | **T95 (UltimateAccessControl)** as `SteganographyStrategy` | [ ] |
-| **4.3** | T75 | SMPC Vaults | ~~DataWarehouse.Plugins.Privacy.SMPC~~ | **T94 (UltimateKeyManagement)** as `SmpcVaultStrategy` | [ ] |
-| **4.4** | T76 | Digital Dead Drops | ~~DataWarehouse.Plugins.Sharing.Ephemeral~~ | **T95 (UltimateAccessControl)** as `EphemeralSharingStrategy` | [ ] |
-
-**SDK Requirements (from T73-T76) → Now in Task 99:**
-- `ICanaryProvider` → T99.A4 (Security interfaces)
-- `ISteganographyProvider` → T99.A4
-- `ISecureComputationProvider` → T99.A3 (Key Management interfaces)
-- `IEphemeralSharingProvider` → T99.A4
-
-#### CATEGORY C: Physics & Logistics (Tasks 77-79)
-
-| Order | Task | Name | Original Plugin | NOW: Implement In | Status |
-|-------|------|------|-----------------|-------------------|--------|
-| **4.5** | T77 | Sovereignty Geofencing | ~~DataWarehouse.Plugins.Governance.Geofencing~~ | **T96 (UltimateCompliance)** as `GeofencingStrategy` | [ ] |
-| **4.6** | T78 | Protocol Morphing | ~~DataWarehouse.Plugins.Transport.Adaptive~~ | **Standalone** (unique transport layer) | [ ] |
-| **4.7** | T79 | The Mule (Air-Gap Bridge) | ~~DataWarehouse.Plugins.Transport.AirGap~~ | **Standalone** (unique hardware integration) | [ ] |
-
-**Note:** T78 and T79 remain standalone due to their unique transport layer requirements that don't fit existing Ultimate plugin categories.
-
-#### CATEGORY D: Data Physics & Time (Tasks 80-81)
-
-| Order | Task | Name | Original Plugin | NOW: Implement In | Status |
-|-------|------|------|-----------------|-------------------|--------|
-| **4.8** | T80 | Ultimate Data Protection | `DataWarehouse.Plugins.DataProtection` | **Already Ultimate** (consolidates backup plugins) | [ ] |
-| **4.9** | T81 | Liquid Storage Tiers | ~~DataWarehouse.Plugins.Tiering.BlockLevel~~ | **T104 (UltimateDataManagement)** as `BlockLevelTieringStrategy` | [ ] |
-
-#### CATEGORY E: Collaboration (Tasks 82-83)
-
-| Order | Task | Name | Original Plugin | NOW: Implement In | Status |
-|-------|------|------|-----------------|-------------------|--------|
-| **4.10** | T82 | Data Branching (Git-for-Data) | ~~DataWarehouse.Plugins.VersionControl.Branching~~ | **T104 (UltimateDataManagement)** as `BranchingStrategy` | [ ] |
-| **4.11** | T83 | Data Marketplace | ~~DataWarehouse.Plugins.Commerce.Marketplace~~ | **Standalone** (unique commerce functionality) | [ ] |
-
-#### CATEGORY F: Generative & Probabilistic (Tasks 84-85)
-
-| Order | Task | Name | Original Plugin | NOW: Implement In | Status |
-|-------|------|------|-----------------|-------------------|--------|
-| **4.12** | T84 | Generative Compression | ~~DataWarehouse.Plugins.Storage.Generative~~ | **T92 (UltimateCompression)** as `GenerativeCompressionStrategy` | [ ] |
-| **4.13** | T85 | Probabilistic Storage | ~~DataWarehouse.Plugins.Storage.Probabilistic~~ | **SDK (T99)** primitives + **T104** `ProbabilisticStorageStrategy` | [ ] |
-
-#### CATEGORY G: The Immortal Layer (Task 86)
-
-| Order | Task | Name | Original Plugin | NOW: Implement In | Status |
-|-------|------|------|-----------------|-------------------|--------|
-| **4.14** | T86 | Self-Emulating Objects | ~~DataWarehouse.Plugins.Archival.SelfEmulation~~ | **Standalone** (unique WASM bundling) | [ ] |
-
-#### CATEGORY H: Spatial & Human Layer (Tasks 87-88)
-
-| Order | Task | Name | Original Plugin | NOW: Implement In | Status |
-|-------|------|------|-----------------|-------------------|--------|
-| **4.15** | T87 | Spatial AR Anchors | ~~DataWarehouse.Plugins.Spatial.ArAnchors~~ | **SDK (T99)** primitives + **T104** `SpatialAnchorStrategy` + client libs | [ ] |
-| **4.16** | T88 | Psychometric Indexing | ~~DataWarehouse.Plugins.Indexing.Psychometric~~ | **T90 (UniversalIntelligence)** as `PsychometricIndexingStrategy` | [ ] |
-
-#### CATEGORY I: The Traitor Layer (Task 89)
-
-| Order | Task | Name | Original Plugin | NOW: Implement In | Status |
-|-------|------|------|-----------------|-------------------|--------|
-| **4.17** | T89 | Forensic Watermarking | ~~DataWarehouse.Plugins.Security.Watermarking~~ | **T95 (UltimateAccessControl)** as `WatermarkingStrategy` | [ ] |
-
----
-
-### TIER 5: Enterprise Systems
-
-| Order | Task | Name | Description | Dependencies | Status |
-|-------|------|------|-------------|--------------|--------|
-| **5.1** | T60 | AEDS Core Infrastructure | Active Enterprise Distribution System | T99, T90, T93 | [ ] |
-| **5.2** | T26-T31 | Critical Bug Fixes | Raft, S3 plugin fixes | None | [ ] |
-| **5.3** | T59 | Compliance Automation | Regulatory frameworks | T96 | [~] Partial |
-
----
-
-### TIER 6: Tier 2 Ultimate Plugins (Observability, Dashboards, etc.)
-
-| Order | Task | Name | Description | Dependencies | Status |
-|-------|------|------|-------------|--------------|--------|
-| **6.1** | T100 | Universal Observability | 17 monitoring plugins consolidated | T99 | [ ] |
-| **6.2** | T101 | Universal Dashboards | 9 dashboard plugins consolidated | T99, T100 | [ ] |
-| **6.3** | T102 | Ultimate Database Protocol | 8 DB protocol plugins consolidated | T99 | [ ] |
-| **6.4** | T103 | Ultimate Database Storage | 4 DB storage plugins consolidated | T99 | [ ] |
-| **6.5** | T104 | Ultimate Data Management | 7 data lifecycle plugins consolidated | T99 | [ ] |
-| **6.6** | T105 | Ultimate Resilience | 7 resilience plugins consolidated | T99 | [ ] |
-| **6.7** | T106 | Ultimate Deployment | 7 deployment plugins consolidated | T99 | [ ] |
-| **6.8** | T107 | Ultimate Sustainability | 4 green computing plugins consolidated | T99 | [ ] |
-
----
-
-### TIER 7: Cleanup & Deprecation
-
-| Order | Task | Name | Description | Dependencies | Status |
-|-------|------|------|-------------|--------------|--------|
-| **7.1** | T108 | Plugin Deprecation & Cleanup | Remove 127+ deprecated plugins | All Ultimate plugins verified | [ ] |
-
----
-
-### TIER 8: Future Roadmap (Lowest Priority)
-
-| Order | Task | Name | Description | Dependencies | Status |
-|-------|------|------|-------------|--------------|--------|
-| **8.1** | T57 | Plugin Marketplace | Plugin certification ecosystem | All Tier 1-7 tasks | [ ] |
-
----
-
-### Task Mapping: Original Plugin → Ultimate Plugin
-
-> **Reference guide for which Ultimate plugin implements each original plugin's functionality.**
-
-| Original Plugin | Ultimate Plugin | Strategy Name |
-|-----------------|-----------------|---------------|
-| **Compression (6 plugins)** |
-| `BrotliCompression` | T92 UltimateCompression | `BrotliStrategy` |
-| `DeflateCompression` | T92 UltimateCompression | `DeflateStrategy` |
-| `GZipCompression` | T92 UltimateCompression | `GZipStrategy` |
-| `Lz4Compression` | T92 UltimateCompression | `Lz4Strategy` |
-| `ZstdCompression` | T92 UltimateCompression | `ZstdStrategy` |
-| `Compression` (base) | T92 UltimateCompression | (base merged) |
-| **Encryption (8 plugins)** |
-| `AesEncryption` | T93 UltimateEncryption | `AesGcmStrategy` |
-| `ChaCha20Encryption` | T93 UltimateEncryption | `ChaCha20Strategy` |
-| `SerpentEncryption` | T93 UltimateEncryption | `SerpentStrategy` |
-| `TwofishEncryption` | T93 UltimateEncryption | `TwofishStrategy` |
-| `FipsEncryption` | T93 UltimateEncryption | `FipsStrategy` |
-| `ZeroKnowledgeEncryption` | T93 UltimateEncryption | `ZeroKnowledgeStrategy` |
-| `QuantumSafe` | T93 UltimateEncryption | `KyberStrategy`, `DilithiumStrategy` |
-| `Encryption` (base) | T93 UltimateEncryption | (base merged) |
-| **Key Management (4 plugins)** |
-| `FileKeyStore` | T94 UltimateKeyManagement | `FileKeyStoreStrategy` |
-| `VaultKeyStore` | T94 UltimateKeyManagement | `VaultKeyStoreStrategy` |
-| `KeyRotation` | T94 UltimateKeyManagement | `KeyRotationStrategy` |
-| `SecretManagement` | T94 UltimateKeyManagement | `SecretManagementStrategy` |
-| **Security (8 plugins)** |
-| `AccessControl` | T95 UltimateAccessControl | `RbacStrategy`, `AbacStrategy` |
-| `IAM` | T95 UltimateAccessControl | `IamStrategy` |
-| `MilitarySecurity` | T95 UltimateAccessControl | `MilitarySecurityStrategy` |
-| `TamperProof` | T95 UltimateAccessControl | `TamperProofStrategy` |
-| `ThreatDetection` | T95 UltimateAccessControl | `ThreatDetectionStrategy` |
-| `ZeroTrust` | T95 UltimateAccessControl | `ZeroTrustStrategy` |
-| `Integrity` | T95 UltimateAccessControl | `IntegrityStrategy` |
-| `EntropyAnalysis` | T95 UltimateAccessControl | `EntropyAnalysisStrategy` |
-| **Compliance (5 plugins)** |
-| `Compliance` | T96 UltimateCompliance | (orchestrator) |
-| `ComplianceAutomation` | T96 UltimateCompliance | (automation features) |
-| `FedRampCompliance` | T96 UltimateCompliance | `FedRampStrategy` |
-| `Soc2Compliance` | T96 UltimateCompliance | `Soc2Strategy` |
-| `Governance` | T96 UltimateCompliance | `GovernanceStrategy` |
-| **Storage (10 plugins)** |
-| `LocalStorage` | T97 UltimateStorage | `LocalFileStrategy` |
-| `NetworkStorage` | T97 UltimateStorage | `NetworkShareStrategy` |
-| `S3Storage` | T97 UltimateStorage | `S3Strategy` |
-| `AzureBlobStorage` | T97 UltimateStorage | `AzureBlobStrategy` |
-| `GcsStorage` | T97 UltimateStorage | `GcsStrategy` |
-| `CloudStorage` | T97 UltimateStorage | (generic cloud) |
-| `IpfsStorage` | T97 UltimateStorage | `IpfsStrategy` |
-| `TapeLibrary` | T97 UltimateStorage | `TapeLibraryStrategy` |
-| `RAMDiskStorage` | T97 UltimateStorage | `RamDiskStrategy` |
-| `GrpcStorage` | T97 UltimateStorage | `GrpcStorageStrategy` |
-| **Replication (8 plugins)** |
-| `CrdtReplication` | T98 UltimateReplication | `CrdtStrategy` |
-| `CrossRegion` | T98 UltimateReplication | `CrossRegionStrategy` |
-| `GeoReplication` | T98 UltimateReplication | `GeoReplicationStrategy` |
-| `MultiMaster` | T98 UltimateReplication | `MultiMasterStrategy` |
-| `RealTimeSync` | T98 UltimateReplication | `RealTimeSyncStrategy` |
-| `DeltaSyncVersioning` | T98 UltimateReplication | `DeltaSyncStrategy` |
-| `Federation` | T98 UltimateReplication | `FederationStrategy` |
-| `FederatedQuery` | T98 UltimateReplication | `FederatedQueryStrategy` |
-| **RAID (14 plugins)** |
-| `StandardRaid` | T91 UltimateRAID | `Raid0/1/5/6/10Strategy` |
-| `AdvancedRaid` | T91 UltimateRAID | `Raid50/60Strategy` |
-| `NestedRaid` | T91 UltimateRAID | `NestedRaidStrategy` |
-| `ZfsRaid` | T91 UltimateRAID | `RaidZ1/Z2/Z3Strategy` |
-| `SelfHealingRaid` | T91 UltimateRAID | `SelfHealingStrategy` |
-| `ErasureCoding` | T91 UltimateRAID | `ReedSolomonStrategy` |
-| `AutoRaid` | T91 UltimateRAID | `AutoRaidStrategy` |
-| `VendorSpecificRaid` | T91 UltimateRAID | `NetAppDpStrategy`, `SynologyShrStrategy` |
-| `ExtendedRaid` | T91 UltimateRAID | `Raid71/72Strategy`, `MatrixRaidStrategy` |
-| `EnhancedRaid` | T91 UltimateRAID | `DistributedHotSpareStrategy` |
-| `AdaptiveEc` | T91 UltimateRAID | `AdaptiveEcStrategy` |
-| `IsalEc` | T91 UltimateRAID | `IsalEcStrategy` |
-| `SharedRaidUtilities` | T91 UltimateRAID | (utilities merged) |
-| `Raid` (base) | T91 UltimateRAID | (base merged) |
-
----
-
-### Standalone Plugins (Not Consolidated)
-
-> **These plugins remain standalone due to unique functionality that doesn't fit Ultimate plugin categories.**
-
-| Plugin | Reason | Dependencies |
-|--------|--------|--------------|
-| `Transport.Adaptive` (T78) | Unique transport layer protocol morphing | Uses T93 for encryption |
-| `Transport.AirGap` (T79) | Unique hardware USB/external storage integration | Uses T93, T94, T97 |
-| `Commerce.Marketplace` (T83) | Unique commerce/billing functionality | Uses T90 for AI |
-| ~~`Storage.Probabilistic` (T85)~~ | **Moved to SDK (T99) + T104** | SDK primitives + T104 `ProbabilisticStorageStrategy` |
-| `Archival.SelfEmulation` (T86) | Unique WASM bundling for format preservation | Uses T92 for compression |
-| ~~`Spatial.ArAnchors` (T87)~~ | **Moved to SDK (T99) + T104 + client libs** | SDK primitives + T104 `SpatialAnchorStrategy` |
-| `Blockchain.Local` | Unique blockchain anchoring | Used by T95 |
-| `Compute.Wasm` | Unique WASM compute-on-storage | Uses T97 |
-| `Transcoding.Media` | Unique media transcoding | Uses T92 |
-| `Virtualization.SqlOverObject` | Unique SQL-over-object virtualization | Uses T97 |
-| **`FuseDriver`** | **Linux FUSE filesystem driver - OS-specific** | Uses T97 |
-| **`WinFspDriver`** | **Windows WinFSP filesystem driver - OS-specific** | Uses T97 |
-| **`KubernetesCsi`** | **Kubernetes CSI driver - platform-specific** | Uses T97 |
-
-**IMPORTANT:** Even standalone plugins MUST use Ultimate plugins for their underlying functionality (encryption, storage, etc.) rather than directly referencing individual deprecated plugins.
-
----
-
-### SDK Migrations (Moving Core Plugins to SDK)
-
-> **These plugins contain foundational functionality that belongs in the SDK, not as separate plugins.**
-
-| Plugin | SDK Location | Reason |
-|--------|--------------|--------|
-| `FilesystemCore` | `SDK.Primitives.Filesystem` | Core filesystem abstractions |
-| `HardwareAcceleration` | `SDK.Primitives.Hardware` | SIMD, GPU acceleration primitives |
-| `LowLatency` | `SDK.Primitives.Performance` | Performance optimization utilities |
-| `Metadata` | `SDK.Primitives.Metadata` | Core metadata management |
-| `ZeroConfig` | `SDK.Primitives.Configuration` | Auto-configuration utilities |
-
-**Implementation:** These migrations are part of T99 (Ultimate SDK) and should be completed before dependent plugins are built.
-
----
-
-### Complete Task Count Summary
-
-| Tier | Tasks | Sub-Tasks | Status |
-|------|-------|-----------|--------|
-| Tier 0: Foundation | 1 | ~120 | [ ] |
-| Tier 1: Core Ultimate | 9 | ~400 | [ ] |
-| Tier 2: TamperProof | 5 | ~100 | [x] Partial |
-| Tier 3: Advanced Encryption | 17 | ~150 | [ ] |
-| Tier 4: Phase 5 Active Storage | 17 | ~180 | [ ] |
-| Tier 5: Enterprise | 4 | ~80 | [x] Partial |
-| Tier 6: Tier 2 Ultimate | 8 | ~200 | [ ] |
-| Tier 7: Cleanup | 1 | ~30 | [ ] |
-| **TOTAL** | **62** | **~1260** | - |
-
----
-
-### Quick Reference: "What Ultimate Plugin Do I Use?"
-
-| I Want To... | Use This Ultimate Plugin | Task # |
-|--------------|--------------------------|--------|
-| Compress data | **UltimateCompression** | T92 |
-| Encrypt data | **UltimateEncryption** | T93 |
-| Manage keys | **UltimateKeyManagement** | T94 |
-| Store data | **UltimateStorage** | T97 |
-| Replicate data | **UltimateReplication** | T98 |
-| **Expose APIs** | **UltimateInterface** | **T109** |
-| Implement RAID | **UltimateRAID** | T91 |
-| Add access control features | **UltimateAccessControl** | T95 |
-| Add compliance | **UltimateCompliance** | T96 |
-| Add AI/intelligence | **UniversalIntelligence** | T90 |
-| Add monitoring | **UniversalObservability** | T100 |
-| Add dashboards | **UniversalDashboards** | T101 |
-| Add resilience | **UltimateResilience** | T105 |
-| Backup/restore | **UltimateDataProtection** | T80 |
-| Database access | **UltimateDatabaseProtocol** | T102 |
-| Data lifecycle | **UltimateDataManagement** | T104 |
 
 ---
 

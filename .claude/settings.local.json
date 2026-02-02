@@ -93,7 +93,11 @@
       "Bash(for cat in CON PL NOT AC ACC PRO RET TL DBN DNC)",
       "Bash(Select-String -Pattern \"PipedaCompliancePlugin\" -Context 2,2)",
       "Bash(for cat in RM IH BC SC CRY AC HR VH)",
-      "Bash(do echo -n \"NIS2.$cat: \")"
+      "Bash(do echo -n \"NIS2.$cat: \")",
+      "Bash(Get-ChildItem -Path \"C:\\\\Temp\\\\DataWarehouse\\\\DataWarehouse\\\\Plugins\" -Directory)",
+      "Bash(Select-Object -ExpandProperty Name)",
+      "Bash(Sort-Object)",
+      "Bash(comm:*)"
     ]
   }
 }
