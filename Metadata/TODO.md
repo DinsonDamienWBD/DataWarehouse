@@ -324,11 +324,29 @@ T99 (SDK) → T94 (Key Mgmt) → T93 (Encryption) → TamperProof (T3.4.2)
 
 ---
 
-### TIER 8: Future Roadmap (Lowest Priority)
+### TIER 8: Quality Assurance & Security
 
 | Order | Task | Name | Description | Dependencies | Status |
 |-------|------|------|-------------|--------------|--------|
-| **8.1** | T57 | Plugin Marketplace | Plugin certification ecosystem | All Tier 1-7 tasks | [ ] |
+| **8.1** | T121 | Comprehensive Test Suite | Unit, integration, performance, security tests | All Tier 1-7 tasks | [ ] |
+| **8.2** | T122 | Security Penetration Test Plan | Threat modeling, OWASP Top 10, AI-assisted pentest | T121 | [ ] |
+
+---
+
+### TIER 9: Orchestration Plugins
+
+| Order | Task | Name | Description | Dependencies | Status |
+|-------|------|------|-------------|--------------|--------|
+| **9.1** | T123 | Air-Gap Convergence Orchestrator | Instance discovery, schema merge, federation | T79, T98, T109 | [ ] |
+| **9.2** | T124 | EHT Orchestrator | Maximum local processing workflow | T111, T79, T123 | [ ] |
+
+---
+
+### TIER 10: Future Roadmap (Lowest Priority)
+
+| Order | Task | Name | Description | Dependencies | Status |
+|-------|------|------|-------------|--------------|--------|
+| **10.1** | T57 | Plugin Marketplace | Plugin certification ecosystem | All Tier 1-9 tasks | [ ] |
 
 ---
 
@@ -464,7 +482,10 @@ T99 (SDK) → T94 (Key Mgmt) → T93 (Encryption) → TamperProof (T3.4.2)
 | Tier 5: Enterprise | 4 | ~80 | [x] Partial |
 | Tier 6: Tier 2 Ultimate | 8 | ~200 | [ ] |
 | Tier 7: Cleanup | 1 | ~30 | [ ] |
-| **TOTAL** | **62** | **~1260** | - |
+| Tier 8: QA & Security | 2 | ~50 | [ ] |
+| Tier 9: Orchestration | 2 | ~60 | [ ] |
+| Tier 10: Future Roadmap | 1 | ~20 | [ ] |
+| **TOTAL** | **67** | **~1,390** | - |
 
 ---
 
@@ -488,6 +509,10 @@ T99 (SDK) → T94 (Key Mgmt) → T93 (Encryption) → TamperProof (T3.4.2)
 | Backup/restore | **UltimateDataProtection** | T80 |
 | Database access | **UltimateDatabaseProtocol** | T102 |
 | Data lifecycle | **UltimateDataManagement** | T104 |
+| Parse/serialize data formats | **UltimateDataFormat** | T110 |
+| Run compute on data | **UltimateCompute** | T111 |
+| **Merge air-gapped instances** | **AirGapConvergenceOrchestrator** | **T123** |
+| **Max local processing workflow (EHT)** | **EhtOrchestrator** | **T124** |
 
 ---
 
@@ -5641,6 +5666,14 @@ This creates a complete audit trail for every change, enabling compliance report
 | 79.26 | Pocket Setup Wizard | Format Drive as Pocket DW utility | [ ] |
 | 79.27 | Instance ID Generator | Unique cryptographic instance identifiers | [ ] |
 | 79.28 | Portable Client Bundler | Include portable DW client on removable drive | [ ] |
+| **Instance Convergence Support (for T123/T124)** |
+| 79.29 | ⭐ Instance Detection Events | Publish `InstanceDetectedEvent` to message bus when Pocket Instance found | [ ] |
+| 79.30 | ⭐ Multi-Instance Arrival Tracking | Track multiple arriving instances for convergence workflow | [ ] |
+| 79.31 | ⭐ Instance Metadata Extraction | Extract schema, version, data statistics from detected instance | [ ] |
+| 79.32 | ⭐ Compatibility Verification | Verify instance version compatibility before convergence | [ ] |
+| 79.33 | ⭐ Processing Manifest Packaging | Include compute manifest (what was processed locally) in transport packages | [ ] |
+| 79.34 | ⭐ Cross-Platform Hardware Detection | Linux udev, macOS FSEvents, Windows WMI for hardware events | [ ] |
+| 79.35 | ⭐ Network-Attached Air-Gap Detection | Detect network drives configured as air-gap storage | [ ] |
 
 **SDK Requirements:**
 - `IAirGapTransport` interface
@@ -5649,6 +5682,8 @@ This creates a complete audit trail for every change, enabling compliance report
 - `DwPackage` class for encrypted transport packages
 - `PortableInstance` class for removable drive-based DW instances
 - `UsbSecurityPolicy` class for authentication rules
+- `InstanceDetectedEvent` event type for convergence workflows
+- `ProcessingManifest` class for EHT local-vs-deferred tracking
 
 ---
 
@@ -8838,6 +8873,20 @@ public record ReplicationCapabilities
 | 98.B12.8 | 🚀 EnergyAwareReplicationStrategy - Carbon-conscious replication | [ ] |
 | 98.B12.9 | 🚀 SatelliteReplicationStrategy - LEO satellite mesh sync | [ ] |
 | 98.B12.10 | 🚀 TimeTravelReplicationStrategy - Temporal replication queries | [ ] |
+| **B13: Air-Gap Instance Convergence (for T123/T124)** |
+| 98.B13.1 | ⭐ InstanceAutoDiscoveryStrategy - Detect arriving air-gapped instances | [ ] |
+| 98.B13.2 | ⭐ SchemaComparisonStrategy - Compare schemas across instances | [ ] |
+| 98.B13.3 | ⭐ SchemaConflictDetectionStrategy - Identify field/type conflicts | [ ] |
+| 98.B13.4 | ⭐ UnionSchemaMergeStrategy - Merge all unique fields into superset | [ ] |
+| 98.B13.5 | ⭐ StrictSchemaMergeStrategy - Require identical schemas | [ ] |
+| 98.B13.6 | ⭐ UserChoiceSchemaMergeStrategy - User decides per-conflict | [ ] |
+| 98.B13.7 | ⭐ MasterWinsDestructiveMergeStrategy - Master schema wins, discard conflicts | [ ] |
+| 98.B13.8 | ⭐ MasterWinsConstructiveMergeStrategy - Master wins, keep unique fields | [ ] |
+| 98.B13.9 | ⭐ TransactionalMergeStrategy - Atomic merge with rollback on failure | [ ] |
+| 98.B13.10 | ⭐ ZeroDataLossVerificationStrategy - Checksum verification post-merge | [ ] |
+| 98.B13.11 | ⭐ ResumableMergeStrategy - Resume interrupted merges | [ ] |
+| 98.B13.12 | ⭐ IncrementalSyncOnReturnStrategy - Delta sync when instance returns to field | [ ] |
+| 98.B13.13 | ⭐ ProvenanceTrackingMergeStrategy - Track which instance contributed what | [ ] |
 
 ### Phase C: Advanced Features (Sub-Tasks C1-C10)
 
@@ -10505,6 +10554,15 @@ public enum InterfaceProtocol { REST, gRPC, GraphQL, SQL, WebSocket, MQTT, AMQP,
 | 109.B10.4 | 🚀 ApiVersioningStrategy - Seamless version management | [ ] |
 | 109.B10.5 | 🚀 ChangelogGenerationStrategy - Auto changelog from diffs | [ ] |
 | 109.B10.6 | 🚀 BreakingChangeDetectionStrategy - Detects breaking changes | [ ] |
+| **B11: Air-Gap Convergence UI (for T123/T124)** |
+| 109.B11.1 | ⭐ InstanceArrivalNotificationStrategy - Notify user when air-gapped instance detected | [ ] |
+| 109.B11.2 | ⭐ ConvergenceChoiceDialogStrategy - "Keep Separate" vs "Merge" user decision | [ ] |
+| 109.B11.3 | ⭐ MergeStrategySelectionStrategy - UI for selecting merge strategy | [ ] |
+| 109.B11.4 | ⭐ MasterInstanceSelectionStrategy - UI for selecting master instance | [ ] |
+| 109.B11.5 | ⭐ SchemaConflictResolutionUIStrategy - Interactive per-field conflict resolution | [ ] |
+| 109.B11.6 | ⭐ MergePreviewStrategy - Show preview of merge outcome before execution | [ ] |
+| 109.B11.7 | ⭐ MergeProgressTrackingStrategy - Real-time progress during merge | [ ] |
+| 109.B11.8 | ⭐ MergeResultsSummaryStrategy - Post-merge summary and statistics | [ ] |
 
 ### Phase C: Advanced Features
 
@@ -10660,6 +10718,231 @@ public enum DataFormatFamily { Row, Column, Scientific, Binary, Hierarchical, Gr
 | 110.B10.6 | 🚀 ZeroCopyDeserializationStrategy - Memory-mapped access | [ ] |
 | 110.B10.7 | 🚀 VectorizedDeserializationStrategy - SIMD-accelerated parsing | [ ] |
 | 110.B10.8 | 🚀 InstanceProfileOptimizationStrategy - Deployment-time format tuning | [ ] |
+| **B11: AI/ML Model Formats** |
+| 110.B11.1 | ⭐ OnnxStrategy - Open Neural Network Exchange (.onnx) | [ ] |
+| 110.B11.2 | ⭐ SafeTensorsStrategy - Hugging Face secure format (.safetensors) | [ ] |
+| 110.B11.3 | ⭐ PyTorchCheckpointStrategy - PyTorch weights (.pt, .pth, .ckpt) | [ ] |
+| 110.B11.4 | ⭐ TensorFlowSavedModelStrategy - TF2 SavedModel format | [ ] |
+| 110.B11.5 | ⭐ TFRecordStrategy - TensorFlow training shards (.tfrecord) | [ ] |
+| 110.B11.6 | ⭐ TFLiteStrategy - TensorFlow Lite mobile (.tflite) | [ ] |
+| 110.B11.7 | ⭐ CoreMLStrategy - Apple Core ML (.mlmodel, .mlpackage) | [ ] |
+| 110.B11.8 | ⭐ GgufStrategy - llama.cpp quantized models (.gguf) | [ ] |
+| 110.B11.9 | ⭐ GgmlStrategy - Legacy llama format (.ggml) | [ ] |
+| 110.B11.10 | ⭐ SklearnPickleStrategy - Scikit-learn models (.pkl, .joblib) | [ ] |
+| 110.B11.11 | ⭐ MlflowModelStrategy - MLflow artifact format | [ ] |
+| 110.B11.12 | ⭐ KerasH5Strategy - Legacy Keras weights (.h5) | [ ] |
+| 110.B11.13 | ⭐ OpenVinoIrStrategy - Intel OpenVINO IR (.xml, .bin) | [ ] |
+| 110.B11.14 | ⭐ TensorRtEngineStrategy - NVIDIA TensorRT (.engine, .plan) | [ ] |
+| 110.B11.15 | ⭐ WebDatasetStrategy - Sharded training data (.tar) | [ ] |
+| 110.B11.16 | ⭐ HuggingFaceDatasetStrategy - HF datasets format | [ ] |
+| 110.B11.17 | ⭐ TorchScriptStrategy - TorchScript serialized (.pt) | [ ] |
+| 110.B11.18 | ⭐ TokenizerJsonStrategy - HF tokenizer.json format | [ ] |
+| **B12: Simulation & CFD Formats** |
+| 110.B12.1 | ⭐ OpenFoamStrategy - OpenFOAM native formats | [ ] |
+| 110.B12.2 | ⭐ VtkStrategy - VTK legacy/XML formats (.vtk, .vtu, .vtp, .vti) | [ ] |
+| 110.B12.3 | ⭐ PvdStrategy - ParaView data collection (.pvd) | [ ] |
+| 110.B12.4 | ⭐ CgnsStrategy - CFD General Notation System (.cgns) | [ ] |
+| 110.B12.5 | ⭐ ExodusStrategy - Exodus II FEA mesh (.exo, .e) | [ ] |
+| 110.B12.6 | ⭐ AdiosBpStrategy - ADIOS BP format (.bp) | [ ] |
+| 110.B12.7 | ⭐ OpenVdbStrategy - DreamWorks volumetric (.vdb) | [ ] |
+| 110.B12.8 | ⭐ XdmfStrategy - eXtensible Data Model (.xdmf, .xmf) | [ ] |
+| 110.B12.9 | ⭐ EnSightStrategy - EnSight Gold (.case) | [ ] |
+| 110.B12.10 | ⭐ TecplotStrategy - Tecplot binary/ASCII (.plt, .szplt) | [ ] |
+| 110.B12.11 | ⭐ AnsysStrategy - ANSYS results (.rst, .db) | [ ] |
+| 110.B12.12 | ⭐ AbaqusStrategy - Abaqus input/output (.inp, .odb) | [ ] |
+| 110.B12.13 | ⭐ LsDynaStrategy - LS-DYNA (.k, .d3plot) | [ ] |
+| 110.B12.14 | ⭐ NastranStrategy - NASTRAN (.bdf, .op2) | [ ] |
+| 110.B12.15 | ⭐ ComsolMphStrategy - COMSOL Multiphysics (.mph) | [ ] |
+| 110.B12.16 | ⭐ FluentStrategy - ANSYS Fluent (.cas, .dat) | [ ] |
+| 110.B12.17 | ⭐ GmshStrategy - Gmsh mesh format (.msh) | [ ] |
+| **B13: Weather & Climate Formats** |
+| 110.B13.1 | ⭐ GribStrategy - WMO GRIB edition 1 (.grb, .grib) | [ ] |
+| 110.B13.2 | ⭐ Grib2Strategy - WMO GRIB edition 2 (.grb2, .grib2) | [ ] |
+| 110.B13.3 | ⭐ BufrStrategy - WMO BUFR observations (.bufr) | [ ] |
+| 110.B13.4 | ⭐ WrfOutputStrategy - WRF model output (NetCDF-based) | [ ] |
+| 110.B13.5 | ⭐ NexradLevel2Strategy - NEXRAD Level II radar | [ ] |
+| 110.B13.6 | ⭐ NexradLevel3Strategy - NEXRAD Level III products | [ ] |
+| 110.B13.7 | ⭐ OdimH5Strategy - OPERA radar HDF5 (ODIM_H5) | [ ] |
+| 110.B13.8 | ⭐ Era5Strategy - ECMWF ERA5 reanalysis | [ ] |
+| **B14: CAD & Engineering Design Formats** |
+| 110.B14.1 | ⭐ StepStrategy - STEP AP203/AP214/AP242 (.stp, .step) | [ ] |
+| 110.B14.2 | ⭐ IgesStrategy - IGES exchange (.igs, .iges) | [ ] |
+| 110.B14.3 | ⭐ ParasolidStrategy - Siemens Parasolid (.x_t, .x_b) | [ ] |
+| 110.B14.4 | ⭐ AcisSatStrategy - ACIS SAT kernel (.sat, .sab) | [ ] |
+| 110.B14.5 | ⭐ JtStrategy - Siemens JT lightweight (.jt) | [ ] |
+| 110.B14.6 | ⭐ DwgStrategy - AutoCAD drawing (.dwg) | [ ] |
+| 110.B14.7 | ⭐ DxfStrategy - AutoCAD exchange (.dxf) | [ ] |
+| 110.B14.8 | ⭐ ThreeMfStrategy - 3D Manufacturing Format (.3mf) | [ ] |
+| 110.B14.9 | ⭐ SolidWorksStrategy - SolidWorks native (.sldprt, .sldasm) | [ ] |
+| 110.B14.10 | ⭐ CatiaStrategy - CATIA V5/V6 (.CATPart, .CATProduct) | [ ] |
+| 110.B14.11 | ⭐ StlStrategy - STL binary/ASCII (.stl) | [ ] |
+| **B15: EDA & PCB Design Formats** |
+| 110.B15.1 | ⭐ GerberStrategy - Gerber RS-274X/X2 (.gbr) | [ ] |
+| 110.B15.2 | ⭐ OdbPlusPlusStrategy - ODB++ database (.tgz) | [ ] |
+| 110.B15.3 | ⭐ Ipc2581Strategy - IPC-2581 DPMX (.xml) | [ ] |
+| 110.B15.4 | ⭐ KiCadStrategy - KiCAD native (.kicad_pcb, .kicad_sch) | [ ] |
+| 110.B15.5 | ⭐ EagleStrategy - Autodesk Eagle (.brd, .sch) | [ ] |
+| 110.B15.6 | ⭐ SpiceNetlistStrategy - SPICE circuit netlist (.sp, .cir) | [ ] |
+| 110.B15.7 | ⭐ VerilogStrategy - Verilog HDL (.v) | [ ] |
+| 110.B15.8 | ⭐ SystemVerilogStrategy - SystemVerilog (.sv) | [ ] |
+| 110.B15.9 | ⭐ VhdlStrategy - VHDL (.vhd, .vhdl) | [ ] |
+| 110.B15.10 | ⭐ LefDefStrategy - LEF/DEF physical design (.lef, .def) | [ ] |
+| 110.B15.11 | ⭐ LibertyStrategy - Synopsys Liberty timing (.lib) | [ ] |
+| 110.B15.12 | ⭐ GdsiiStrategy - GDSII IC layout (.gds) | [ ] |
+| 110.B15.13 | ⭐ OasisStrategy - OASIS IC layout (.oas) | [ ] |
+| **B16: Seismology & Geophysics Formats** |
+| 110.B16.1 | ⭐ SegyStrategy - SEG-Y seismic data (.sgy, .segy) | [ ] |
+| 110.B16.2 | ⭐ MiniSeedStrategy - miniSEED earthquake data (.mseed) | [ ] |
+| 110.B16.3 | ⭐ SacStrategy - Seismic Analysis Code (.sac) | [ ] |
+| 110.B16.4 | ⭐ QuakeMlStrategy - QuakeML event catalog (.xml) | [ ] |
+| 110.B16.5 | ⭐ StationXmlStrategy - FDSN StationXML (.xml) | [ ] |
+| **B17: Oil & Gas / Well Logging Formats** |
+| 110.B17.1 | ⭐ LasStrategy - LAS 2.0/3.0 well log (.las) | [ ] |
+| 110.B17.2 | ⭐ DlisStrategy - DLIS well log (.dlis) | [ ] |
+| 110.B17.3 | ⭐ WitsmlStrategy - WITSML wellsite data (.xml) | [ ] |
+| 110.B17.4 | ⭐ ProdmlStrategy - PRODML production data (.xml) | [ ] |
+| 110.B17.5 | ⭐ ResqmlStrategy - RESQML reservoir model (.epc) | [ ] |
+| **B18: Bioinformatics & Life Sciences Formats** |
+| 110.B18.1 | ⭐ FastaStrategy - FASTA sequences (.fa, .fasta) | [ ] |
+| 110.B18.2 | ⭐ FastqStrategy - FASTQ with quality (.fq, .fastq) | [ ] |
+| 110.B18.3 | ⭐ SamStrategy - Sequence Alignment Map (.sam) | [ ] |
+| 110.B18.4 | ⭐ BamStrategy - Binary Alignment Map (.bam) | [ ] |
+| 110.B18.5 | ⭐ CramStrategy - Compressed alignments (.cram) | [ ] |
+| 110.B18.6 | ⭐ VcfStrategy - Variant Call Format (.vcf) | [ ] |
+| 110.B18.7 | ⭐ BcfStrategy - Binary VCF (.bcf) | [ ] |
+| 110.B18.8 | ⭐ BedStrategy - Browser Extensible Data (.bed) | [ ] |
+| 110.B18.9 | ⭐ GffGtfStrategy - Gene annotations (.gff, .gtf) | [ ] |
+| 110.B18.10 | ⭐ BigWigStrategy - Indexed coverage (.bw, .bigwig) | [ ] |
+| 110.B18.11 | ⭐ GenBankStrategy - NCBI GenBank (.gb, .gbk) | [ ] |
+| 110.B18.12 | ⭐ PdbStrategy - Protein Data Bank legacy (.pdb) | [ ] |
+| 110.B18.13 | ⭐ MmCifStrategy - Macromolecular CIF (.cif, .mmcif) | [ ] |
+| 110.B18.14 | ⭐ SdfMolStrategy - Structure Data File (.sdf, .mol) | [ ] |
+| 110.B18.15 | ⭐ SmilesStrategy - SMILES notation (.smi) | [ ] |
+| 110.B18.16 | ⭐ MzMlStrategy - mzML mass spectrometry (.mzML) | [ ] |
+| 110.B18.17 | ⭐ DcdStrategy - DCD MD trajectory (.dcd) | [ ] |
+| 110.B18.18 | ⭐ XtcStrategy - GROMACS XTC trajectory (.xtc) | [ ] |
+| 110.B18.19 | ⭐ SbmlStrategy - Systems Biology ML (.sbml) | [ ] |
+| **B19: Astronomy & Space Extended Formats** |
+| 110.B19.1 | ⭐ AsdfStrategy - ASDF (FITS successor) (.asdf) | [ ] |
+| 110.B19.2 | ⭐ VoTableStrategy - Virtual Observatory Table (.xml) | [ ] |
+| 110.B19.3 | ⭐ Pds4Strategy - Planetary Data System v4 (.xml) | [ ] |
+| 110.B19.4 | ⭐ SpiceKernelStrategy - NAIF SPICE navigation | [ ] |
+| 110.B19.5 | ⭐ CcsdsPacketStrategy - CCSDS space telemetry (.pkt) | [ ] |
+| **B20: Nuclear & Particle Physics Formats** |
+| 110.B20.1 | ⭐ EndfStrategy - Evaluated Nuclear Data File (.endf) | [ ] |
+| 110.B20.2 | ⭐ AceStrategy - A Compact ENDF for MCNP (.ace) | [ ] |
+| 110.B20.3 | ⭐ NexusStrategy - NeXus neutron/X-ray/muon (.nxs) | [ ] |
+| 110.B20.4 | ⭐ GdmlStrategy - Geometry Description ML (.gdml) | [ ] |
+| **B21: Materials Science & Crystallography Formats** |
+| 110.B21.1 | ⭐ CifStrategy - Crystallographic Information File (.cif) | [ ] |
+| 110.B21.2 | ⭐ XyzAtomicStrategy - XYZ atomic coordinates (.xyz) | [ ] |
+| 110.B21.3 | ⭐ PoscarStrategy - VASP POSCAR/CONTCAR structure | [ ] |
+| 110.B21.4 | ⭐ Dm3Dm4Strategy - Gatan Digital Micrograph (.dm3, .dm4) | [ ] |
+| 110.B21.5 | ⭐ MrcStrategy - MRC cryo-EM maps (.mrc, .map) | [ ] |
+| **B22: Spectroscopy Formats** |
+| 110.B22.1 | ⭐ JcampDxStrategy - JCAMP-DX spectral data (.jdx, .dx) | [ ] |
+| 110.B22.2 | ⭐ BrukerNmrStrategy - Bruker NMR formats | [ ] |
+| 110.B22.3 | ⭐ SpcStrategy - Galactic SPC spectral (.spc) | [ ] |
+| **B23: BIM & Construction Formats** |
+| 110.B23.1 | ⭐ IfcStrategy - IFC 2x3/4/4.3 (.ifc) | [ ] |
+| 110.B23.2 | ⭐ CobieStrategy - COBie spreadsheet (.xlsx) | [ ] |
+| 110.B23.3 | ⭐ GbXmlStrategy - Green Building XML (.xml) | [ ] |
+| 110.B23.4 | ⭐ BcfStrategy - BIM Collaboration Format (.bcfzip) | [ ] |
+| 110.B23.5 | ⭐ CityGmlStrategy - CityGML urban models (.gml) | [ ] |
+| 110.B23.6 | ⭐ LandXmlStrategy - LandXML civil/survey (.xml) | [ ] |
+| **B24: Energy & Utilities Formats** |
+| 110.B24.1 | ⭐ CimRdfStrategy - CIM/RDF power grid model (.xml, .rdf) | [ ] |
+| 110.B24.2 | ⭐ CgmesStrategy - ENTSO-E CGMES profiles (.xml) | [ ] |
+| 110.B24.3 | ⭐ ComtradeStrategy - COMTRADE transient recording (.cfg, .dat) | [ ] |
+| 110.B24.4 | ⭐ GreenButtonStrategy - Green Button energy data (.xml) | [ ] |
+| 110.B24.5 | ⭐ Iec61850SclStrategy - SCL substation config (.scd, .icd) | [ ] |
+| **B25: ERP & Manufacturing Formats** |
+| 110.B25.1 | ⭐ SapIDocStrategy - SAP IDoc intermediate document | [ ] |
+| 110.B25.2 | ⭐ X12EdiStrategy - ANSI X12 EDI (.edi, .x12) | [ ] |
+| 110.B25.3 | ⭐ EdifactStrategy - UN/EDIFACT EDI (.edi) | [ ] |
+| 110.B25.4 | ⭐ MtConnectStrategy - MTConnect machine data (.xml) | [ ] |
+| 110.B25.5 | ⭐ QifStrategy - Quality Information Framework (.qif) | [ ] |
+| 110.B25.6 | ⭐ GcodeStrategy - G-code CNC programs (.nc, .gcode) | [ ] |
+| **B26: Healthcare Extended Formats** |
+| 110.B26.1 | ⭐ Hl7CdaStrategy - HL7 Clinical Document Architecture (.xml) | [ ] |
+| 110.B26.2 | ⭐ X12837Strategy - X12 837 healthcare claim (.edi) | [ ] |
+| 110.B26.3 | ⭐ X12835Strategy - X12 835 payment/remittance (.edi) | [ ] |
+| 110.B26.4 | ⭐ SnomedCtStrategy - SNOMED CT ontology (RF2) | [ ] |
+| 110.B26.5 | ⭐ OmopStrategy - OMOP CDM tables | [ ] |
+| **B27: Media Production Formats** |
+| 110.B27.1 | ⭐ OpenExrStrategy - OpenEXR HDR images (.exr) | [ ] |
+| 110.B27.2 | ⭐ UsdStrategy - Universal Scene Description (.usd, .usda, .usdc) | [ ] |
+| 110.B27.3 | ⭐ AlembicStrategy - Alembic cached geometry (.abc) | [ ] |
+| 110.B27.4 | ⭐ MaterialXStrategy - MaterialX shaders (.mtlx) | [ ] |
+| 110.B27.5 | ⭐ AafStrategy - Advanced Authoring Format (.aaf) | [ ] |
+| 110.B27.6 | ⭐ MxfStrategy - Material Exchange Format (.mxf) | [ ] |
+| 110.B27.7 | ⭐ DpxStrategy - Digital Picture Exchange (.dpx) | [ ] |
+| 110.B27.8 | ⭐ OtioStrategy - OpenTimelineIO (.otio) | [ ] |
+| **B28: Audio Production Formats** |
+| 110.B28.1 | ⭐ MusicXmlStrategy - Music notation interchange (.musicxml) | [ ] |
+| 110.B28.2 | ⭐ MidiStrategy - MIDI files (.mid, .midi) | [ ] |
+| 110.B28.3 | ⭐ BwfStrategy - Broadcast Wave Format (.wav) | [ ] |
+| **B29: Motion Capture & Animation Formats** |
+| 110.B29.1 | ⭐ BvhStrategy - BioVision Hierarchy (.bvh) | [ ] |
+| 110.B29.2 | ⭐ C3dStrategy - Coordinate 3D biomechanical (.c3d) | [ ] |
+| **B30: LiDAR & Point Cloud Formats** |
+| 110.B30.1 | ⭐ LasLazStrategy - LAS 1.4 / LAZ LiDAR (.las, .laz) | [ ] |
+| 110.B30.2 | ⭐ E57Strategy - ASTM E57 3D imaging (.e57) | [ ] |
+| 110.B30.3 | ⭐ PcdStrategy - Point Cloud Library (.pcd) | [ ] |
+| 110.B30.4 | ⭐ CopcStrategy - Cloud Optimized Point Cloud (.copc.laz) | [ ] |
+| **B31: Robotics Formats** |
+| 110.B31.1 | ⭐ UrdfStrategy - Unified Robot Description (.urdf) | [ ] |
+| 110.B31.2 | ⭐ SdfRobotStrategy - SDF Gazebo simulation (.sdf) | [ ] |
+| 110.B31.3 | ⭐ RosBagStrategy - ROS1/ROS2 bag files (.bag, .db3) | [ ] |
+| 110.B31.4 | ⭐ McapStrategy - MCAP container (.mcap) | [ ] |
+| **B32: Aerospace & Defense Formats** |
+| 110.B32.1 | ⭐ Arinc424Strategy - Navigation database | [ ] |
+| 110.B32.2 | ⭐ Irig106Ch10Strategy - IRIG 106 Chapter 10 (.ch10) | [ ] |
+| 110.B32.3 | ⭐ NitfStrategy - NITF imagery (.ntf, .nitf) | [ ] |
+| **B33: Agriculture Formats** |
+| 110.B33.1 | ⭐ IsoxmlStrategy - ISOBUS task data (.xml) | [ ] |
+| 110.B33.2 | ⭐ AdaptStrategy - ADAPT framework formats | [ ] |
+| **B34: Archaeology & Cultural Heritage Formats** |
+| 110.B34.1 | ⭐ CidocCrmStrategy - CIDOC-CRM ontology (.rdf, .ttl) | [ ] |
+| 110.B34.2 | ⭐ TeiStrategy - Text Encoding Initiative (.xml) | [ ] |
+| 110.B34.3 | ⭐ MetsStrategy - METS metadata (.xml) | [ ] |
+| **B35: Linguistics Formats** |
+| 110.B35.1 | ⭐ TextGridStrategy - Praat annotation (.TextGrid) | [ ] |
+| 110.B35.2 | ⭐ ElanStrategy - ELAN time-aligned annotation (.eaf) | [ ] |
+| 110.B35.3 | ⭐ ConllUStrategy - CoNLL-U Universal Dependencies (.conllu) | [ ] |
+| **B36: Neuroscience Formats** |
+| 110.B36.1 | ⭐ NiftiStrategy - NIfTI neuroimaging (.nii, .nii.gz) | [ ] |
+| 110.B36.2 | ⭐ BidsStrategy - Brain Imaging Data Structure | [ ] |
+| 110.B36.3 | ⭐ EdfStrategy - European Data Format EEG (.edf) | [ ] |
+| 110.B36.4 | ⭐ BrainVisionStrategy - BrainVision EEG (.vhdr, .vmrk, .eeg) | [ ] |
+| 110.B36.5 | ⭐ NwbStrategy - Neurodata Without Borders (.nwb) | [ ] |
+| **B37: Survey & Statistics Formats** |
+| 110.B37.1 | ⭐ SpssSavStrategy - SPSS data (.sav) | [ ] |
+| 110.B37.2 | ⭐ SasDataStrategy - SAS dataset (.sas7bdat) | [ ] |
+| 110.B37.3 | ⭐ StataDtaStrategy - Stata data (.dta) | [ ] |
+| 110.B37.4 | ⭐ RDataStrategy - R workspace (.RData, .rds) | [ ] |
+| **B38: Digital Forensics Formats** |
+| 110.B38.1 | ⭐ E01Strategy - EnCase evidence file (.e01) | [ ] |
+| 110.B38.2 | ⭐ Aff4Strategy - Advanced Forensic Format 4 (.aff4) | [ ] |
+| 110.B38.3 | ⭐ DdRawStrategy - Raw disk image (.dd, .raw, .img) | [ ] |
+| **B39: Navigation & GNSS Formats** |
+| 110.B39.1 | ⭐ RinexStrategy - RINEX 3.x/4 GNSS (.obs, .nav, .rnx) | [ ] |
+| 110.B39.2 | ⭐ Sp3Strategy - Precise orbits (.sp3) | [ ] |
+| 110.B39.3 | ⭐ Nmea0183Strategy - NMEA 0183 sentences | [ ] |
+| **B40: Quantum Computing Formats** |
+| 110.B40.1 | ⭐ OpenQasm3Strategy - OpenQASM 3.0 (.qasm) | [ ] |
+| 110.B40.2 | ⭐ QuilStrategy - Rigetti Quil (.quil) | [ ] |
+| 110.B40.3 | ⭐ QiskitQpyStrategy - Qiskit QPY circuit serialization | [ ] |
+| **B41: Non-Destructive Testing Formats** |
+| 110.B41.1 | ⭐ DicondeStrategy - DICONDE NDT imaging (.dcm) | [ ] |
+| 110.B41.2 | ⭐ NdeStrategy - Universal NDT format (.nde) | [ ] |
+| **B42: 🚀 ADDITIONAL INDUSTRY-FIRST Format Innovations** |
+| 110.B42.1 | 🚀 DomainAdaptiveFormatStrategy - Auto-optimize for detected domain | [ ] |
+| 110.B42.2 | 🚀 MultiModalFormatStrategy - Handle mixed data types in single object | [ ] |
+| 110.B42.3 | 🚀 FormatTranslationCacheStrategy - Cache cross-format translations | [ ] |
+| 110.B42.4 | 🚀 SchemaInferenceStrategy - Infer schema from content | [ ] |
+| 110.B42.5 | 🚀 FormatVersionMigrationStrategy - Auto-upgrade old format versions | [ ] |
+| 110.B42.6 | 🚀 PartialReadStrategy - Read only required fields/columns | [ ] |
 
 ### Phase C: Advanced Features
 
@@ -10826,6 +11109,231 @@ public enum IsolationLevel { Process, Container, MicroVM, Wasm, Hardware }
 | 111.D3 | Deprecate individual compute plugins | [ ] |
 | 111.D4 | Remove deprecated plugins after transition period | [ ] |
 | 111.D5 | Update documentation | [ ] |
+
+### Phase E: Adaptive Pipeline Compute (INDUSTRY-FIRST, User-Configurable)
+
+> **CONCEPT:** Process data ON-THE-FLY during Write/Read operations, with intelligent fallback
+> to data-at-rest processing when compute cannot keep up with data velocity.
+>
+> **CONFIGURABILITY:**
+> - **DISABLED (Default):** Standard data-at-rest compute only (existing T111 behavior)
+> - **ENABLED:** Activates full adaptive live/deferred hybrid system
+>
+> When enabled, the system automatically monitors data volume, velocity, processing hardware
+> capabilities, power requirements, and queue/pipeline conditions to dynamically route between:
+> - Live compute (process on-the-fly during write/read)
+> - Deferred compute (store raw, process when capacity available)
+> - Hybrid (do what you can live, queue the rest)
+
+```
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                    ADAPTIVE PIPELINE COMPUTE ARCHITECTURE                        │
+├─────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                  │
+│  CONFIGURATION: EnableLiveCompute = true/false (default: false)                 │
+│                                                                                  │
+│  When ENABLED, automatically activates:                                          │
+│  ┌─────────────────────────────────────────────────────────────────────────┐    │
+│  │                      ADAPTIVE ROUTING LOGIC                              │    │
+│  ├─────────────────────────────────────────────────────────────────────────┤    │
+│  │                                                                          │    │
+│  │  IF (compute_capacity > data_velocity * 1.2)                            │    │
+│  │      → LIVE COMPUTE: Process everything on-the-fly                       │    │
+│  │                                                                          │    │
+│  │  ELSE IF (compute_capacity > data_velocity * 0.5)                       │    │
+│  │      → PARTIAL: Do high-priority compute live, queue rest               │    │
+│  │                                                                          │    │
+│  │  ELSE IF (compute_capacity > data_velocity * 0.1)                       │    │
+│  │      → DEFERRED: Store raw, queue all compute for later                 │    │
+│  │                                                                          │    │
+│  │  ELSE                                                                    │    │
+│  │      → EMERGENCY: Just store raw, no compute queued                     │    │
+│  │                                                                          │    │
+│  └─────────────────────────────────────────────────────────────────────────┘    │
+│                                                                                  │
+│  Real-time monitoring factors:                                                   │
+│  • Data volume (bytes/sec incoming)                                             │
+│  • Data velocity (records/sec)                                                   │
+│  • Processing hardware capabilities (CPU, GPU, memory)                          │
+│  • Processing speed (operations/sec)                                            │
+│  • Power requirements/availability                                               │
+│  • Queue/pipeline backpressure                                                   │
+│  • SLA deadlines                                                                 │
+│                                                                                  │
+└─────────────────────────────────────────────────────────────────────────────────┘
+```
+
+#### SDK Foundation (Add to T99)
+
+| Sub-Task | Description | Status |
+|----------|-------------|--------|
+| 99.E1 | `IPipelineComputeStrategy` interface | [ ] |
+| 99.E2 | `PipelineComputeCapabilities` record | [ ] |
+| 99.E3 | `ThroughputMetrics` record (velocity, capacity, backpressure) | [ ] |
+| 99.E4 | `AdaptiveRouterConfig` configuration type | [ ] |
+| 99.E5 | `ComputeOutputMode` enum (Replace, Append, Both, Conditional) | [ ] |
+| 99.E6 | `PipelineComputeResult` record with processing status | [ ] |
+| 99.E7 | `IDeferredComputeQueue` interface for background processing | [ ] |
+| 99.E8 | `IComputeCapacityMonitor` interface | [ ] |
+
+```csharp
+/// <summary>
+/// Configuration for pipeline compute using MULTI-FLAG approach for maximum user freedom.
+/// Each flag is independent - users can combine them freely.
+/// All flags default to safe values (disabled/retain everything).
+/// </summary>
+public record PipelineComputeConfig
+{
+    // ═══════════════════════════════════════════════════════════════════════════
+    // CORE FLAGS - Independent, combinable settings
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    /// <summary>
+    /// Enable live compute during Write/Read pipelines.
+    /// When false (default), only data-at-rest compute via standard T111 APIs.
+    /// </summary>
+    public bool EnableLiveCompute { get; init; } = false;
+
+    /// <summary>
+    /// Allow fallback to deferred processing when live compute can't keep up.
+    /// When false + EnableLiveCompute=true: strict live-only (may drop/reject if overloaded).
+    /// When true + EnableLiveCompute=true: adaptive hybrid (queue what can't be processed live).
+    /// </summary>
+    public bool AllowDeferredFallback { get; init; } = true;
+
+    /// <summary>
+    /// Allow reducing compute fidelity under load (e.g., skip expensive ML, do basic aggregation).
+    /// When true, system can downgrade processing quality to maintain throughput.
+    /// </summary>
+    public bool AllowGracefulDegradation { get; init; } = false;
+
+    /// <summary>
+    /// Require verification of compute results before storing.
+    /// When true, results are checksummed and verified before commit.
+    /// </summary>
+    public bool RequireResultVerification { get; init; } = false;
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // COMBINATION MATRIX - What each flag combination means
+    // ═══════════════════════════════════════════════════════════════════════════
+    // EnableLive | AllowDeferred | AllowDegradation | Behavior
+    // -----------|---------------|------------------|----------------------------------
+    // false      | (ignored)     | (ignored)        | Data-at-rest only (standard T111)
+    // true       | true          | false            | Adaptive hybrid, full fidelity
+    // true       | true          | true             | Adaptive hybrid, may reduce fidelity
+    // true       | false         | false            | Strict live-only, reject if overloaded
+    // true       | false         | true             | Live-only with degraded quality
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    /// <summary>Output mode when live compute is enabled.</summary>
+    public ComputeOutputMode OutputMode { get; init; } = ComputeOutputMode.Both;
+
+    /// <summary>Adaptive routing thresholds.</summary>
+    public AdaptiveThresholds Thresholds { get; init; } = new();
+
+    /// <summary>Deferred processing SLA configuration.</summary>
+    public DeferredComputeConfig DeferredConfig { get; init; } = new();
+
+    /// <summary>Retention policy for raw and processed data.</summary>
+    public RetentionConfig Retention { get; init; } = new();
+}
+
+/// <summary>
+/// Retention configuration with "Retain Everything" as default to prevent data loss.
+/// User is warned about storage implications and prompted to configure appropriately.
+/// </summary>
+public record RetentionConfig
+{
+    /// <summary>Default: Retain EVERYTHING. User must explicitly configure to delete.</summary>
+    public RetentionPolicy RawDataRetention { get; init; } = RetentionPolicy.Forever;
+    public RetentionPolicy ProcessedDataRetention { get; init; } = RetentionPolicy.Forever;
+
+    /// <summary>Warn user about storage growth when using Retain Everything.</summary>
+    public bool WarnOnRetainEverything { get; init; } = true;
+}
+
+public enum ComputeOutputMode
+{
+    Replace,      // Store only processed results (WARNING: raw data lost)
+    Append,       // Store results as separate objects alongside raw
+    Both,         // Store raw + processed in same object (multi-part)
+    Conditional   // Decide based on compute result
+}
+```
+
+#### E1: Adaptive Router (Core Engine)
+
+| Sub-Task | Description | Status |
+|----------|-------------|--------|
+| 111.E1.1 | ⭐ AdaptivePipelineRouter - Core routing decision engine | [ ] |
+| 111.E1.2 | ⭐ ThroughputMonitor - Real-time velocity/capacity tracking | [ ] |
+| 111.E1.3 | ⭐ BackpressureDetector - Detect pipeline backup | [ ] |
+| 111.E1.4 | ⭐ CapacityPredictor - Predict future compute availability | [ ] |
+| 111.E1.5 | ⭐ AdaptiveThresholdTuner - Self-tune switching thresholds | [ ] |
+| 111.E1.6 | ⭐ ResourceMonitor - Track CPU, GPU, memory, power | [ ] |
+
+#### E2: Live Compute Strategies
+
+| Sub-Task | Description | Status |
+|----------|-------------|--------|
+| 111.E2.1 | ⭐ StreamingAggregationStrategy - Rolling aggregations during write | [ ] |
+| 111.E2.2 | ⭐ StreamingTransformStrategy - Transform data on-the-fly | [ ] |
+| 111.E2.3 | ⭐ StreamingFilterStrategy - Filter/sample during ingestion | [ ] |
+| 111.E2.4 | ⭐ StreamingMlInferenceStrategy - ML inference during write | [ ] |
+| 111.E2.5 | ⭐ StreamingAnomalyDetectionStrategy - Real-time anomaly flagging | [ ] |
+| 111.E2.6 | ⭐ StreamingFeatureExtractionStrategy - Extract features on ingest | [ ] |
+| 111.E2.7 | ⭐ StreamingCompressionStrategy - Domain-aware compression during write | [ ] |
+| 111.E2.8 | ⭐ StreamingValidationStrategy - Schema/quality validation on write | [ ] |
+
+#### E3: Deferred Compute Queue
+
+| Sub-Task | Description | Status |
+|----------|-------------|--------|
+| 111.E3.1 | ⭐ DeferredComputeQueue - Priority queue for background processing | [ ] |
+| 111.E3.2 | ⭐ QueuePersistence - Durable queue storage (survives restart) | [ ] |
+| 111.E3.3 | ⭐ QueuePrioritizer - Priority based on age, importance, cost | [ ] |
+| 111.E3.4 | ⭐ CapacityScavenger - Process queue when capacity available | [ ] |
+| 111.E3.5 | ⭐ DeadlineEnforcer - Ensure SLA completion times | [ ] |
+
+#### E4: Output Modes
+
+| Sub-Task | Description | Status |
+|----------|-------------|--------|
+| 111.E4.1 | ⭐ ReplaceOutputHandler - Store only processed results | [ ] |
+| 111.E4.2 | ⭐ AppendOutputHandler - Store results as separate objects | [ ] |
+| 111.E4.3 | ⭐ BothOutputHandler - Multi-part object with raw + processed | [ ] |
+| 111.E4.4 | ⭐ ConditionalOutputHandler - Dynamic decision based on result | [ ] |
+| 111.E4.5 | ⭐ CumulativeOutputHandler - Append to running aggregation | [ ] |
+
+#### E5: Domain-Specific Pipeline Strategies
+
+| Sub-Task | Description | Status |
+|----------|-------------|--------|
+| 111.E5.1 | ⭐ SensorDataPipelineStrategy - IoT sensor aggregation | [ ] |
+| 111.E5.2 | ⭐ TimeSeriesPipelineStrategy - Time series downsampling | [ ] |
+| 111.E5.3 | ⭐ LogPipelineStrategy - Log parsing and indexing | [ ] |
+| 111.E5.4 | ⭐ ImagePipelineStrategy - Thumbnail/feature extraction | [ ] |
+| 111.E5.5 | ⭐ VideoPipelineStrategy - Keyframe extraction, scene detection | [ ] |
+| 111.E5.6 | ⭐ GenomicsPipelineStrategy - Quality filtering, variant calling | [ ] |
+| 111.E5.7 | ⭐ TelemetryPipelineStrategy - Spacecraft/vehicle telemetry | [ ] |
+| 111.E5.8 | ⭐ FinancialTickPipelineStrategy - OHLCV aggregation | [ ] |
+| 111.E5.9 | ⭐ SeismicPipelineStrategy - Event detection, filtering | [ ] |
+| 111.E5.10 | ⭐ RadarPipelineStrategy - Weather/SAR preprocessing | [ ] |
+
+### Phase F: 🚀 INDUSTRY-FIRST Pipeline Compute Innovations
+
+| Sub-Task | Description | Status |
+|----------|-------------|--------|
+| 111.F1 | 🚀 PredictiveCapacityScalingStrategy - Predict load and pre-scale | [ ] |
+| 111.F2 | 🚀 EdgeLocalComputeStrategy - Process at edge before network transit | [ ] |
+| 111.F3 | 🚀 TieredComputeStrategy - Light compute at edge, heavy at center | [ ] |
+| 111.F4 | 🚀 ContentAwareRoutingStrategy - Route based on data characteristics | [ ] |
+| 111.F5 | 🚀 ComputeCostOptimizerStrategy - Minimize compute cost per result | [ ] |
+| 111.F6 | 🚀 GracefulDegradationStrategy - Reduce compute fidelity under load | [ ] |
+| 111.F7 | 🚀 MultiPathComputeStrategy - Parallel live + deferred for redundancy | [ ] |
+| 111.F8 | 🚀 ResultMergingStrategy - Merge partial live + deferred results | [ ] |
+| 111.F9 | 🚀 SLAGuaranteeStrategy - Guaranteed completion within SLA | [ ] |
+| 111.F10 | 🚀 EHTModeStrategy - Maximum local processing (Event Horizon Telescope mode) | [ ] |
 
 ---
 
@@ -11616,7 +12124,7 @@ Explicit task for deprecating and removing obsolete plugins after Ultimate/Unive
 
 ---
 
-## Task 110: Comprehensive Test Suite
+## Task 121: Comprehensive Test Suite
 
 **Status:** [ ] Not Started
 **Priority:** P0 - Critical (Required for Release 1.0)
@@ -11631,59 +12139,59 @@ Create comprehensive test coverage for all Ultimate plugins and SDK components.
 
 | Sub-Task | Description | Status |
 |----------|-------------|--------|
-| 110.A1 | Set up test project structure matching plugin structure | [ ] |
-| 110.A2 | Create test utilities and helpers (TestMessageBus, MockStorage) | [ ] |
-| 110.A3 | Set up integration test infrastructure with Docker | [ ] |
-| 110.A4 | Configure code coverage reporting (target: 80%+) | [ ] |
-| 110.A5 | Set up CI/CD pipeline for automated testing | [ ] |
+| 121.A1 | Set up test project structure matching plugin structure | [ ] |
+| 121.A2 | Create test utilities and helpers (TestMessageBus, MockStorage) | [ ] |
+| 121.A3 | Set up integration test infrastructure with Docker | [ ] |
+| 121.A4 | Configure code coverage reporting (target: 80%+) | [ ] |
+| 121.A5 | Set up CI/CD pipeline for automated testing | [ ] |
 
 ### Phase B: Unit Tests by Plugin
 
 | Sub-Task | Plugin | Test Focus | Status |
 |----------|--------|------------|--------|
-| 110.B1 | T99 SDK | Interfaces, base classes, utilities | [ ] |
-| 110.B2 | T94 Key Management | Key generation, rotation, envelope mode | [ ] |
-| 110.B3 | T93 Encryption | All cipher strategies, encrypt/decrypt roundtrip | [ ] |
-| 110.B4 | T92 Compression | All compression strategies, ratio verification | [ ] |
-| 110.B5 | T97 Storage | Local, S3, read/write/delete operations | [ ] |
-| 110.B6 | T95 Access Control | ACL, RBAC, ABAC, policy evaluation | [ ] |
-| 110.B7 | T96 Compliance | Framework validation, PII detection | [ ] |
-| 110.B8 | T90 Intelligence | Embedding generation, search, NLP | [ ] |
-| 110.B9 | T109 Interface | REST endpoints, request/response | [ ] |
-| 110.B10 | T1-T4 TamperProof | Integrity verification, manifest handling | [ ] |
+| 121.B1 | T99 SDK | Interfaces, base classes, utilities | [ ] |
+| 121.B2 | T94 Key Management | Key generation, rotation, envelope mode | [ ] |
+| 121.B3 | T93 Encryption | All cipher strategies, encrypt/decrypt roundtrip | [ ] |
+| 121.B4 | T92 Compression | All compression strategies, ratio verification | [ ] |
+| 121.B5 | T97 Storage | Local, S3, read/write/delete operations | [ ] |
+| 121.B6 | T95 Access Control | ACL, RBAC, ABAC, policy evaluation | [ ] |
+| 121.B7 | T96 Compliance | Framework validation, PII detection | [ ] |
+| 121.B8 | T90 Intelligence | Embedding generation, search, NLP | [ ] |
+| 121.B9 | T109 Interface | REST endpoints, request/response | [ ] |
+| 121.B10 | T1-T4 TamperProof | Integrity verification, manifest handling | [ ] |
 
 ### Phase C: Integration Tests
 
 | Sub-Task | Description | Status |
 |----------|-------------|--------|
-| 110.C1 | End-to-end: Store -> Encrypt -> Compress -> Write -> Read -> Decompress -> Decrypt -> Verify | [ ] |
-| 110.C2 | Multi-plugin: Storage + Encryption + Key rotation workflow | [ ] |
-| 110.C3 | API integration: REST API -> Plugin -> Storage -> Response | [ ] |
-| 110.C4 | Failure scenarios: Network failures, disk full, permission denied | [ ] |
-| 110.C5 | Concurrent access: Multi-threaded read/write tests | [ ] |
+| 121.C1 | End-to-end: Store -> Encrypt -> Compress -> Write -> Read -> Decompress -> Decrypt -> Verify | [ ] |
+| 121.C2 | Multi-plugin: Storage + Encryption + Key rotation workflow | [ ] |
+| 121.C3 | API integration: REST API -> Plugin -> Storage -> Response | [ ] |
+| 121.C4 | Failure scenarios: Network failures, disk full, permission denied | [ ] |
+| 121.C5 | Concurrent access: Multi-threaded read/write tests | [ ] |
 
 ### Phase D: Performance Tests
 
 | Sub-Task | Description | Target | Status |
 |----------|-------------|--------|--------|
-| 110.D1 | Throughput: MB/s for read/write operations | >100 MB/s | [ ] |
-| 110.D2 | Latency: P50/P95/P99 for API requests | <50ms P95 | [ ] |
-| 110.D3 | Memory: No memory leaks under sustained load | Stable | [ ] |
-| 110.D4 | Scalability: Performance with 1K, 10K, 100K objects | Linear | [ ] |
+| 121.D1 | Throughput: MB/s for read/write operations | >100 MB/s | [ ] |
+| 121.D2 | Latency: P50/P95/P99 for API requests | <50ms P95 | [ ] |
+| 121.D3 | Memory: No memory leaks under sustained load | Stable | [ ] |
+| 121.D4 | Scalability: Performance with 1K, 10K, 100K objects | Linear | [ ] |
 
 ### Phase E: Security Tests
 
 | Sub-Task | Description | Status |
 |----------|-------------|--------|
-| 110.E1 | Input validation: Fuzzing all public APIs | [ ] |
-| 110.E2 | Injection: SQL, command, path traversal tests | [ ] |
-| 110.E3 | Authentication: Token validation, session handling | [ ] |
-| 110.E4 | Encryption: Key handling, IV uniqueness, padding | [ ] |
-| 110.E5 | Secrets: No hardcoded credentials, secure storage | [ ] |
+| 121.E1 | Input validation: Fuzzing all public APIs | [ ] |
+| 121.E2 | Injection: SQL, command, path traversal tests | [ ] |
+| 121.E3 | Authentication: Token validation, session handling | [ ] |
+| 121.E4 | Encryption: Key handling, IV uniqueness, padding | [ ] |
+| 121.E5 | Secrets: No hardcoded credentials, secure storage | [ ] |
 
 ---
 
-## Task 111: Security Penetration Test Plan
+## Task 122: Security Penetration Test Plan
 
 **Status:** [ ] Not Started
 **Priority:** P1 - High (Required for Release 2.0)
@@ -11698,58 +12206,253 @@ Comprehensive penetration testing plan for DataWarehouse. Initial testing can be
 
 | Sub-Task | Description | Status |
 |----------|-------------|--------|
-| 111.A1 | Document attack surface (APIs, storage, network) | [ ] |
-| 111.A2 | Identify threat actors (insider, external, nation-state) | [ ] |
-| 111.A3 | Map data flows and trust boundaries | [ ] |
-| 111.A4 | Prioritize assets by sensitivity | [ ] |
-| 111.A5 | Create threat matrix (STRIDE methodology) | [ ] |
+| 122.A1 | Document attack surface (APIs, storage, network) | [ ] |
+| 122.A2 | Identify threat actors (insider, external, nation-state) | [ ] |
+| 122.A3 | Map data flows and trust boundaries | [ ] |
+| 122.A4 | Prioritize assets by sensitivity | [ ] |
+| 122.A5 | Create threat matrix (STRIDE methodology) | [ ] |
 
 ### Phase B: AI-Assisted Penetration Testing (Claude)
 
 | Sub-Task | Category | Test Focus | Status |
 |----------|----------|------------|--------|
-| 111.B1 | Authentication | Bypass, session hijacking, token forgery | [ ] |
-| 111.B2 | Authorization | Privilege escalation, IDOR, RBAC bypass | [ ] |
-| 111.B3 | Injection | SQL, NoSQL, command, LDAP, XPath | [ ] |
-| 111.B4 | Cryptography | Weak algorithms, key management, IV reuse | [ ] |
-| 111.B5 | API Security | Rate limiting, input validation, error disclosure | [ ] |
-| 111.B6 | Storage | Path traversal, symlink attacks, race conditions | [ ] |
-| 111.B7 | Network | TLS configuration, certificate validation | [ ] |
-| 111.B8 | Dependencies | Known CVEs in NuGet packages | [ ] |
+| 122.B1 | Authentication | Bypass, session hijacking, token forgery | [ ] |
+| 122.B2 | Authorization | Privilege escalation, IDOR, RBAC bypass | [ ] |
+| 122.B3 | Injection | SQL, NoSQL, command, LDAP, XPath | [ ] |
+| 122.B4 | Cryptography | Weak algorithms, key management, IV reuse | [ ] |
+| 122.B5 | API Security | Rate limiting, input validation, error disclosure | [ ] |
+| 122.B6 | Storage | Path traversal, symlink attacks, race conditions | [ ] |
+| 122.B7 | Network | TLS configuration, certificate validation | [ ] |
+| 122.B8 | Dependencies | Known CVEs in NuGet packages | [ ] |
 
 ### Phase C: OWASP Top 10 Verification
 
 | Sub-Task | OWASP Category | Status |
 |----------|----------------|--------|
-| 111.C1 | A01: Broken Access Control | [ ] |
-| 111.C2 | A02: Cryptographic Failures | [ ] |
-| 111.C3 | A03: Injection | [ ] |
-| 111.C4 | A04: Insecure Design | [ ] |
-| 111.C5 | A05: Security Misconfiguration | [ ] |
-| 111.C6 | A06: Vulnerable Components | [ ] |
-| 111.C7 | A07: Authentication Failures | [ ] |
-| 111.C8 | A08: Software/Data Integrity Failures | [ ] |
-| 111.C9 | A09: Security Logging Failures | [ ] |
-| 111.C10 | A10: Server-Side Request Forgery | [ ] |
+| 122.C1 | A01: Broken Access Control | [ ] |
+| 122.C2 | A02: Cryptographic Failures | [ ] |
+| 122.C3 | A03: Injection | [ ] |
+| 122.C4 | A04: Insecure Design | [ ] |
+| 122.C5 | A05: Security Misconfiguration | [ ] |
+| 122.C6 | A06: Vulnerable Components | [ ] |
+| 122.C7 | A07: Authentication Failures | [ ] |
+| 122.C8 | A08: Software/Data Integrity Failures | [ ] |
+| 122.C9 | A09: Security Logging Failures | [ ] |
+| 122.C10 | A10: Server-Side Request Forgery | [ ] |
 
 ### Phase D: Documentation & Remediation
 
 | Sub-Task | Description | Status |
 |----------|-------------|--------|
-| 111.D1 | Document all findings with severity ratings | [ ] |
-| 111.D2 | Create remediation plan with priorities | [ ] |
-| 111.D3 | Implement fixes for critical/high findings | [ ] |
-| 111.D4 | Re-test after remediation | [ ] |
-| 111.D5 | Generate security report for stakeholders | [ ] |
+| 122.D1 | Document all findings with severity ratings | [ ] |
+| 122.D2 | Create remediation plan with priorities | [ ] |
+| 122.D3 | Implement fixes for critical/high findings | [ ] |
+| 122.D4 | Re-test after remediation | [ ] |
+| 122.D5 | Generate security report for stakeholders | [ ] |
 
 ### Phase E: Future - Professional Pentest (When Budget Allows)
 
 | Sub-Task | Description | Status |
 |----------|-------------|--------|
-| 111.E1 | Engage certified pentesting firm (CREST/OSCP) | [ ] |
-| 111.E2 | Provide access and documentation | [ ] |
-| 111.E3 | Review findings and remediate | [ ] |
-| 111.E4 | Obtain attestation letter | [ ] |
+| 122.E1 | Engage certified pentesting firm (CREST/OSCP) | [ ] |
+| 122.E2 | Provide access and documentation | [ ] |
+| 122.E3 | Review findings and remediate | [ ] |
+| 122.E4 | Obtain attestation letter | [ ] |
+
+---
+
+## Task 123: Air-Gap Convergence Orchestrator
+
+**Status:** [ ] Not Started
+**Priority:** P1 - High
+**Effort:** High
+**Category:** Orchestration
+**Implements In:** Standalone plugin `DataWarehouse.Plugins.AirGapConvergence`
+
+### Overview
+
+Orchestrates the convergence of multiple air-gapped DataWarehouse instances when they arrive at a central location. This is a **reusable system** that can be used standalone or as part of larger workflows (e.g., EHT mode).
+
+**Core Capabilities:**
+- Auto-discovery of connected air-gapped instances
+- Schema comparison and conflict detection
+- User choice: keep instances separate (federated) or merge into single instance
+- Zero-data-loss merge guarantees with transactional rollback
+- Multiple merge strategies (user-configurable)
+
+**Orchestrates via Message Bus:**
+- T79 (Air-Gap Bridge) - Hardware detection, instance packaging
+- T98 (Replication) - Schema merge, federation protocol
+- T109 (Interface) - User choice UI, conflict resolution dialogs
+
+### Phase A: SDK Foundation
+
+| Sub-Task | Description | Status |
+|----------|-------------|--------|
+| 123.A1 | `IInstanceConvergenceOrchestrator` interface | [ ] |
+| 123.A2 | `ConvergenceMode` enum (KeepSeparate, MergeIntoNew, MergeIntoMaster) | [ ] |
+| 123.A3 | `SchemaMergeStrategy` enum (Union, Strict, UserChoice, MasterWins) | [ ] |
+| 123.A4 | `MasterWinsMode` enum (Destructive, Constructive) | [ ] |
+| 123.A5 | `ConvergenceResult` record with merge statistics | [ ] |
+| 123.A6 | `InstanceDiscoveryEvent` for detected instances | [ ] |
+
+### Phase B: Core Orchestrator Implementation
+
+| Sub-Task | Description | Status |
+|----------|-------------|--------|
+| **B1: Orchestrator Core** |
+| 123.B1.1 | Create DataWarehouse.Plugins.AirGapConvergence project | [ ] |
+| 123.B1.2 | Implement AirGapConvergencePlugin orchestrator | [ ] |
+| 123.B1.3 | Message bus integration for T79/T98/T109 coordination | [ ] |
+| **B2: Instance Discovery Workflow** |
+| 123.B2.1 | Subscribe to T79 instance detection events | [ ] |
+| 123.B2.2 | Instance compatibility verification | [ ] |
+| 123.B2.3 | Version compatibility matrix | [ ] |
+| 123.B2.4 | Present discovered instances to user via T109 | [ ] |
+| **B3: Convergence Decision Workflow** |
+| 123.B3.1 | User choice dialog: Keep Separate vs Merge | [ ] |
+| 123.B3.2 | Master instance selection (if MasterWins strategy) | [ ] |
+| 123.B3.3 | Merge strategy selection UI | [ ] |
+| 123.B3.4 | Preview merge outcome before execution | [ ] |
+| **B4: Merge Execution (via T98)** |
+| 123.B4.1 | Transactional merge with rollback capability | [ ] |
+| 123.B4.2 | Zero-data-loss guarantees via checksums | [ ] |
+| 123.B4.3 | Progress tracking and resumable merge | [ ] |
+| 123.B4.4 | Post-merge verification | [ ] |
+| **B5: Schema Merge Strategies** |
+| 123.B5.1 | ⭐ UnionSchemaStrategy - Merge all unique fields from all instances | [ ] |
+| 123.B5.2 | ⭐ StrictSchemaStrategy - Require identical schemas, reject mismatches | [ ] |
+| 123.B5.3 | ⭐ UserChoiceSchemaStrategy - Present conflicts, let user decide per field | [ ] |
+| 123.B5.4 | ⭐ MasterWinsDestructiveStrategy - Master schema wins, discard conflicts | [ ] |
+| 123.B5.5 | ⭐ MasterWinsConstructiveStrategy - Master schema wins, keep unique fields | [ ] |
+| **B6: Federation Mode (Keep Separate)** |
+| 123.B6.1 | Register instances as federated members | [ ] |
+| 123.B6.2 | Cross-instance query routing | [ ] |
+| 123.B6.3 | Unified view across federated instances | [ ] |
+
+### Phase C: 🚀 INDUSTRY-FIRST Convergence Innovations
+
+| Sub-Task | Description | Status |
+|----------|-------------|--------|
+| 123.C1 | 🚀 AiAssistedConflictResolutionStrategy - AI suggests best merge for conflicts | [ ] |
+| 123.C2 | 🚀 SemanticSchemaMatchingStrategy - Match fields by meaning, not just name | [ ] |
+| 123.C3 | 🚀 IncrementalConvergenceStrategy - Sync deltas on repeated arrivals | [ ] |
+| 123.C4 | 🚀 ProvenancePreservingMergeStrategy - Full lineage tracking post-merge | [ ] |
+
+---
+
+## Task 124: EHT (Extremely High Throughput) Orchestrator
+
+**Status:** [ ] Not Started
+**Priority:** P1 - High
+**Effort:** Very High
+**Category:** Orchestration
+**Implements In:** Standalone plugin `DataWarehouse.Plugins.EhtOrchestrator`
+
+### Overview
+
+Orchestrates the complete EHT workflow: maximum local processing before physical transport, followed by efficient convergence at the destination. Named after the Event Horizon Telescope project which pioneered this "ship HDDs faster than network" approach.
+
+**EHT Workflow:**
+1. **Local Processing** - Maximum compute reduction at source (via T111 EHTModeStrategy)
+2. **Air-Gap Transport** - Encrypted packaging for physical transport (via T79)
+3. **Arrival & Convergence** - Instance discovery and merge (via T123)
+4. **Final Processing** - Correlation/analysis requiring all data (via T111)
+
+**Orchestrates via Message Bus:**
+- T111 (Compute) - EHTModeStrategy for local processing optimization
+- T79 (Air-Gap Bridge) - Transport packaging and logistics
+- T123 (Air-Gap Convergence) - Instance merging at destination
+- T98 (Replication) - Final data unification
+
+### Phase A: SDK Foundation
+
+| Sub-Task | Description | Status |
+|----------|-------------|--------|
+| 124.A1 | `IEhtOrchestrator` interface | [ ] |
+| 124.A2 | `EhtWorkflowStage` enum (LocalProcess, Package, Transport, Arrive, Converge, FinalProcess) | [ ] |
+| 124.A3 | `EhtConfiguration` record with stage-specific settings | [ ] |
+| 124.A4 | `EhtProgress` record for workflow tracking | [ ] |
+| 124.A5 | `EhtManifest` for tracking what processing was done locally vs deferred | [ ] |
+
+### Phase B: Core Orchestrator Implementation
+
+| Sub-Task | Description | Status |
+|----------|-------------|--------|
+| **B1: Orchestrator Core** |
+| 124.B1.1 | Create DataWarehouse.Plugins.EhtOrchestrator project | [ ] |
+| 124.B1.2 | Implement EhtOrchestratorPlugin | [ ] |
+| 124.B1.3 | Workflow state machine | [ ] |
+| 124.B1.4 | Message bus integration for all dependent plugins | [ ] |
+| **B2: Local Processing Stage** |
+| 124.B2.1 | Activate T111 EHTModeStrategy for maximum local compute | [ ] |
+| 124.B2.2 | Track processing manifest (what was computed locally) | [ ] |
+| 124.B2.3 | Data reduction metrics (original size vs processed) | [ ] |
+| 124.B2.4 | Deferred processing queue for destination | [ ] |
+| **B3: Packaging Stage** |
+| 124.B3.1 | Request T79 to create transport package | [ ] |
+| 124.B3.2 | Include processing manifest in package | [ ] |
+| 124.B3.3 | Integrity verification before transport | [ ] |
+| **B4: Arrival & Convergence Stage** |
+| 124.B4.1 | Delegate to T123 (Air-Gap Convergence) for instance handling | [ ] |
+| 124.B4.2 | Coordinate multi-instance arrival sequencing | [ ] |
+| 124.B4.3 | Handle partial arrivals (some instances still in transit) | [ ] |
+| **B5: Final Processing Stage** |
+| 124.B5.1 | Execute deferred processing from manifest | [ ] |
+| 124.B5.2 | Cross-instance correlation (e.g., EHT black hole imaging) | [ ] |
+| 124.B5.3 | Final result assembly | [ ] |
+
+### Phase C: 🚀 INDUSTRY-FIRST EHT Innovations
+
+| Sub-Task | Description | Status |
+|----------|-------------|--------|
+| 124.C1 | 🚀 OptimalProcessingPartitionStrategy - AI decides what to process locally vs defer | [ ] |
+| 124.C2 | 🚀 TransportTimeEstimatorStrategy - Estimate physical transport time for planning | [ ] |
+| 124.C3 | 🚀 ParallelArrivalMergeStrategy - Start merging as instances arrive | [ ] |
+| 124.C4 | 🚀 NetworkFallbackStrategy - Use network for small deltas if available | [ ] |
+| 124.C5 | 🚀 ProcessingCostOptimizerStrategy - Balance local vs destination compute costs | [ ] |
+
+### EHT Workflow Diagram
+
+```
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                           EHT ORCHESTRATOR WORKFLOW                              │
+├─────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                  │
+│  SITE A                TRANSPORT              HQ (DESTINATION)                  │
+│  ══════                ═════════              ════════════════                  │
+│                                                                                  │
+│  ┌──────────────┐                                                               │
+│  │ Raw Data     │                                                               │
+│  │ 350 TB       │                                                               │
+│  └──────┬───────┘                                                               │
+│         │                                                                        │
+│         ▼                                                                        │
+│  ┌──────────────┐      ┌──────────────┐                                         │
+│  │ T111 EHT     │      │              │                                         │
+│  │ Local Process├─────►│ T79 Package  │                                         │
+│  │ (100x reduce)│      │ + Encrypt    │                                         │
+│  └──────────────┘      └──────┬───────┘                                         │
+│                               │                                                  │
+│         ┌─────────────────────┘                                                  │
+│         │  Physical Transport (HDDs, USB, etc.)                                 │
+│         ▼                                                                        │
+│                        ┌──────────────┐      ┌──────────────┐                   │
+│                        │ T79 Detect   │      │ T123 Air-Gap │                   │
+│                        │ Arrival      ├─────►│ Convergence  │                   │
+│                        └──────────────┘      └──────┬───────┘                   │
+│                                                     │                            │
+│                                                     ▼                            │
+│                                              ┌──────────────┐                    │
+│                                              │ T111 Final   │                    │
+│                                              │ Processing   │                    │
+│                                              │ (Correlation)│                    │
+│                                              └──────────────┘                    │
+│                                                                                  │
+│  T124 EHT Orchestrator coordinates entire workflow via message bus              │
+│                                                                                  │
+└─────────────────────────────────────────────────────────────────────────────────┘
+```
 
 ---
 
@@ -12068,8 +12771,8 @@ T99 (Ultimate SDK)
 | T107 (Ultimate Sustainability) | ~50 | Medium | 40+ green computing strategies |
 | T108 (Cleanup) | ~30 | Medium | Plugin removal |
 | **T109 (Ultimate Interface)** | **~85** | **Very High** | **50+ API protocols** |
-| **T110 (Ultimate Data Format)** | **~85** | **Very High** | **70+ data formats** |
-| **T111 (Ultimate Compute)** | **~90** | **Very High** | **60+ compute runtimes** |
+| **T110 (Ultimate Data Format)** | **~250** | **Extreme** | **230+ data formats (ALL industries)** |
+| **T111 (Ultimate Compute)** | **~140** | **Very High** | **60+ runtimes + Adaptive Pipeline Compute** |
 | **T112 (Ultimate Storage Processing)** | **~55** | **High** | **45+ processing strategies** |
 | **T113 (Ultimate Streaming)** | **~95** | **Very High** | **75+ streaming protocols** |
 | **T118 (Ultimate Media)** | **~100** | **Very High** | **80+ media formats** |
@@ -12098,17 +12801,19 @@ T99 (Ultimate SDK)
 | Deployment | 55 strategies | 8 innovations | 63 |
 | Sustainability | 35 strategies | 8 innovations | 43 |
 | Interface/API | 45 protocols | 10 innovations | 55 |
-| **Data Format** | **60 formats** | **8 innovations** | **68** |
-| **Compute** | **55 runtimes** | **8 innovations** | **63** |
+| **Data Format** | **220+ formats** | **14 innovations** | **234** |
+| **Compute** | **55 runtimes + 35 pipeline** | **18 innovations** | **108** |
 | **Storage Processing** | **40 strategies** | **6 innovations** | **46** |
 | **Streaming** | **65 protocols** | **8 innovations** | **73** |
 | **Media** | **70 formats** | **8 innovations** | **78** |
 | **Content Distribution** | **50 strategies** | **7 innovations** | **57** |
 | **Gaming Services** | **55 services** | **8 innovations** | **63** |
-| **Totals** | **1,300+** | **175+** | **1,475+** |
+| **Orchestration** | **55 sub-tasks** | **9 innovations** | **64** |
+| **QA & Security** | **50 sub-tasks** | **0 innovations** | **50** |
+| **Totals** | **1,620+** | **200+** | **1,820+** |
 
 > **"The First and Only":** DataWarehouse will support MORE algorithms, protocols, and
-> features than ANY other data platform in existence, plus 175+ industry-first innovations
+> features than ANY other data platform in existence, plus 200+ industry-first innovations
 > that no competitor offers.
 
 ---
