@@ -94,4 +94,23 @@
     -->
   </ItemGroup>
 
+  <!-- Industry-First Strategies: Blockchain -->
+  <ItemGroup>
+    <!--
+      Stellar SDK for StellarAnchorsStrategy.
+    -->
+    <PackageReference Include="stellar-dotnet-sdk" Version="7.0.0" />
+    <!--
+      Nethereum for SmartContractKeyStrategy (Ethereum).
+      Note: Nethereum depends on Portable.BouncyCastle which conflicts with BouncyCastle.Cryptography.
+      We use Aliases to disambiguate the assemblies.
+    -->
+    <PackageReference Include="Nethereum.Web3" Version="4.26.0" />
+    <!--
+      Override the transitive Portable.BouncyCastle with an aliased version.
+      This allows both BouncyCastle.Cryptography and Portable.BouncyCastle to coexist.
+    -->
+    <PackageReference Include="Portable.BouncyCastle" Version="1.8.2" Aliases="PortableBC" />
+  </ItemGroup>
+
 </Project>
