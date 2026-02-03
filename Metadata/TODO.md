@@ -9220,23 +9220,25 @@ T99 (SDK) → T94 (Key Management) → TamperProof Storage (T3.4.2)
 > **NOTE:** This task now incorporates ALL composable key management tasks from T5.0, T5.1, T5.4.
 > These tasks were previously scattered and are now consolidated here.
 
-**Status:** [~] Partial (16/50+ strategies implemented)
+**Status:** [~] Partial (55/65 strategies implemented)
 **Priority:** P0 - Critical
 **Effort:** High
 **Category:** Security
 
-**Implemented (16 strategies):**
+**Implemented (55 strategies):**
 - Core plugin with auto-discovery and key rotation scheduler ✓
-- Local: FileKeyStoreStrategy ✓
-- DevCiCd: EnvironmentKeyStoreStrategy ✓
+- Local/File-Based (6): File, WindowsCredManager, MacOsKeychain, LinuxSecretService, PgpKeyring, SshAgent ✓
 - Cloud KMS (7): AWS, Azure, GCP, Alibaba, Oracle, IBM, DigitalOcean ✓
 - Secrets Management (7): Vault, CyberArk, Delinea, Akeyless, BeyondTrust, Doppler, Infisical ✓
+- Hardware Security Modules (8): Pkcs11, ThalesLuna, Utimaco, Ncipher, AwsCloudHsm, AzureDedicatedHsm, GcpCloudHsm, Fortanix ✓
+- Hardware Tokens (7): TPM, YubiKey, SoloKey, Nitrokey, OnlyKey, Ledger, Trezor ✓
+- Container & Orchestration (5): Kubernetes, Docker, SealedSecrets, ExternalSecrets, SOPS ✓
+- Development & CI/CD (6): Environment, GitCrypt, Age, BitwardenConnect, OnePasswordConnect, Pass ✓
+- Password-Derived (4): Argon2, Scrypt, PBKDF2, Balloon ✓
+- Multi-Party & Threshold (6): ShamirSecret, MPC, ThresholdEcdsa, ThresholdBls12381, FROST, SSSS ✓
 
-**Deferred (hardware-dependent):**
-- Platform-specific (Windows/macOS/Linux Keychain)
-- HSM strategies (requires real HSM hardware)
-- Hardware tokens (TPM, YubiKey, etc.)
-- Container secrets, Password-derived, Multi-party
+**Deferred (10 industry-first innovations):**
+- Industry-first innovations (B11): QKD, DNA-encoded keys, blockchain anchoring, smart contract escrow, biometric-derived, geo-locked, social recovery, time-lock puzzles, verifiable delay, AI custodian
 
 ### CRITICAL DEPENDENCY: TamperProof Storage
 
@@ -9327,11 +9329,11 @@ Consolidate all key management functionality into a single Ultimate Key Manageme
 | 94.B1.4 | Implement key rotation scheduler | [x] |
 | **B2: Local/File-Based Key Stores** |
 | 94.B2.1 | FileKeyStoreStrategy - Encrypted local file (DPAPI on Windows) | [x] |
-| 94.B2.2 | ⭐ WindowsCredManagerStrategy - Windows Credential Manager | [ ] |
-| 94.B2.3 | ⭐ MacOsKeychainStrategy - macOS Keychain | [ ] |
-| 94.B2.4 | ⭐ LinuxSecretServiceStrategy - GNOME/KDE Secret Service | [ ] |
-| 94.B2.5 | ⭐ PgpKeyringStrategy - GPG/PGP keyring | [ ] |
-| 94.B2.6 | ⭐ SshAgentStrategy - SSH agent forwarding | [ ] |
+| 94.B2.2 | ⭐ WindowsCredManagerStrategy - Windows Credential Manager | [x] |
+| 94.B2.3 | ⭐ MacOsKeychainStrategy - macOS Keychain | [x] |
+| 94.B2.4 | ⭐ LinuxSecretServiceStrategy - GNOME/KDE Secret Service | [x] |
+| 94.B2.5 | ⭐ PgpKeyringStrategy - GPG/PGP keyring | [x] |
+| 94.B2.6 | ⭐ SshAgentStrategy - SSH agent forwarding | [x] |
 | **B3: Cloud KMS Providers** |
 | 94.B3.1 | AwsKmsStrategy - AWS Key Management Service | [x] |
 | 94.B3.2 | AzureKeyVaultStrategy - Azure Key Vault | [x] |
@@ -9349,47 +9351,47 @@ Consolidate all key management functionality into a single Ultimate Key Manageme
 | 94.B4.6 | ⭐ DopplerStrategy - Doppler SecretOps | [x] |
 | 94.B4.7 | ⭐ InfisicalStrategy - Infisical | [x] |
 | **B5: Hardware Security Modules (HSM)** |
-| 94.B5.1 | Pkcs11HsmStrategy - Generic PKCS#11 + IEnvelopeKeyStore | [ ] |
-| 94.B5.2 | ⭐ ThalesLunaStrategy - Thales Luna Network HSM | [ ] |
-| 94.B5.3 | ⭐ UtimacoCryptoServerStrategy - Utimaco CryptoServer | [ ] |
-| 94.B5.4 | ⭐ NcipherStrategy - Entrust nShield HSM | [ ] |
-| 94.B5.5 | ⭐ AwsCloudHsmStrategy - AWS CloudHSM | [ ] |
-| 94.B5.6 | ⭐ AzureDedicatedHsmStrategy - Azure Dedicated HSM | [ ] |
-| 94.B5.7 | ⭐ GcpCloudHsmStrategy - GCP Cloud HSM | [ ] |
-| 94.B5.8 | ⭐ FortanixDsmStrategy - Fortanix Data Security Manager | [ ] |
+| 94.B5.1 | Pkcs11HsmStrategy - Generic PKCS#11 + IEnvelopeKeyStore | [x] |
+| 94.B5.2 | ⭐ ThalesLunaStrategy - Thales Luna Network HSM | [x] |
+| 94.B5.3 | ⭐ UtimacoCryptoServerStrategy - Utimaco CryptoServer | [x] |
+| 94.B5.4 | ⭐ NcipherStrategy - Entrust nShield HSM | [x] |
+| 94.B5.5 | ⭐ AwsCloudHsmStrategy - AWS CloudHSM | [x] |
+| 94.B5.6 | ⭐ AzureDedicatedHsmStrategy - Azure Dedicated HSM | [x] |
+| 94.B5.7 | ⭐ GcpCloudHsmStrategy - GCP Cloud HSM | [x] |
+| 94.B5.8 | ⭐ FortanixDsmStrategy - Fortanix Data Security Manager | [x] |
 | **B6: Hardware Tokens & Devices** |
-| 94.B6.1 | TpmStrategy - TPM 2.0 hardware-bound keys | [ ] |
-| 94.B6.2 | YubikeyStrategy - YubiKey PIV/FIDO2/HMAC | [ ] |
-| 94.B6.3 | ⭐ SoloKeyStrategy - SoloKey FIDO2 | [ ] |
-| 94.B6.4 | ⭐ NitrokeyStrategy - Nitrokey HSM/FIDO2 | [ ] |
-| 94.B6.5 | ⭐ OnlyKeyStrategy - OnlyKey hardware wallet | [ ] |
-| 94.B6.6 | ⭐ LedgerStrategy - Ledger hardware wallet | [ ] |
-| 94.B6.7 | ⭐ TrezorStrategy - Trezor hardware wallet | [ ] |
+| 94.B6.1 | TpmStrategy - TPM 2.0 hardware-bound keys | [x] |
+| 94.B6.2 | YubikeyStrategy - YubiKey PIV/FIDO2/HMAC | [x] |
+| 94.B6.3 | ⭐ SoloKeyStrategy - SoloKey FIDO2 | [x] |
+| 94.B6.4 | ⭐ NitrokeyStrategy - Nitrokey HSM/FIDO2 | [x] |
+| 94.B6.5 | ⭐ OnlyKeyStrategy - OnlyKey hardware wallet | [x] |
+| 94.B6.6 | ⭐ LedgerStrategy - Ledger hardware wallet | [x] |
+| 94.B6.7 | ⭐ TrezorStrategy - Trezor hardware wallet | [x] |
 | **B7: Container & Orchestration** |
-| 94.B7.1 | ⭐ KubernetesSecretsStrategy - K8s secrets (with encryption) | [ ] |
-| 94.B7.2 | ⭐ DockerSecretsStrategy - Docker Swarm secrets | [ ] |
-| 94.B7.3 | ⭐ SealedSecretsStrategy - Bitnami Sealed Secrets | [ ] |
-| 94.B7.4 | ⭐ ExternalSecretsStrategy - External Secrets Operator | [ ] |
-| 94.B7.5 | ⭐ SopsStrategy - Mozilla SOPS encrypted files | [ ] |
+| 94.B7.1 | ⭐ KubernetesSecretsStrategy - K8s secrets (with encryption) | [x] |
+| 94.B7.2 | ⭐ DockerSecretsStrategy - Docker Swarm secrets | [x] |
+| 94.B7.3 | ⭐ SealedSecretsStrategy - Bitnami Sealed Secrets | [x] |
+| 94.B7.4 | ⭐ ExternalSecretsStrategy - External Secrets Operator | [x] |
+| 94.B7.5 | ⭐ SopsStrategy - Mozilla SOPS encrypted files | [x] |
 | **B8: Development & CI/CD** |
 | 94.B8.1 | ⭐ EnvironmentVariableStrategy - Env vars with encryption | [x] |
-| 94.B8.2 | ⭐ GitCryptStrategy - git-crypt encrypted repos | [ ] |
-| 94.B8.3 | ⭐ AgeStrategy - age encryption (FiloSottile) | [ ] |
-| 94.B8.4 | ⭐ BitwardenConnectStrategy - Bitwarden Secrets Manager | [ ] |
-| 94.B8.5 | ⭐ OnePasswordConnectStrategy - 1Password Connect | [ ] |
-| 94.B8.6 | ⭐ PassStrategy - Unix Pass password manager | [ ] |
+| 94.B8.2 | ⭐ GitCryptStrategy - git-crypt encrypted repos | [x] |
+| 94.B8.3 | ⭐ AgeStrategy - age encryption (FiloSottile) | [x] |
+| 94.B8.4 | ⭐ BitwardenConnectStrategy - Bitwarden Secrets Manager | [x] |
+| 94.B8.5 | ⭐ OnePasswordConnectStrategy - 1Password Connect | [x] |
+| 94.B8.6 | ⭐ PassStrategy - Unix Pass password manager | [x] |
 | **B9: Password-Derived Key Stores** |
-| 94.B9.1 | PasswordDerivedArgon2Strategy - Argon2id (recommended) | [ ] |
-| 94.B9.2 | PasswordDerivedScryptStrategy - scrypt | [ ] |
-| 94.B9.3 | PasswordDerivedPbkdf2Strategy - PBKDF2-HMAC-SHA256 | [ ] |
-| 94.B9.4 | ⭐ PasswordDerivedBalloonStrategy - Balloon hashing | [ ] |
+| 94.B9.1 | PasswordDerivedArgon2Strategy - Argon2id (recommended) | [x] |
+| 94.B9.2 | PasswordDerivedScryptStrategy - scrypt | [x] |
+| 94.B9.3 | PasswordDerivedPbkdf2Strategy - PBKDF2-HMAC-SHA256 | [x] |
+| 94.B9.4 | ⭐ PasswordDerivedBalloonStrategy - Balloon hashing | [x] |
 | **B10: Multi-Party & Threshold Cryptography** |
-| 94.B10.1 | ShamirSecretStrategy - Shamir's Secret Sharing (M-of-N) | [ ] |
-| 94.B10.2 | MultiPartyComputationStrategy - MPC (threshold without reconstruction) | [ ] |
-| 94.B10.3 | ⭐ ThresholdEcdsaStrategy - Threshold ECDSA (GG18, GG20) | [ ] |
-| 94.B10.4 | ⭐ ThresholdBls12381Strategy - Threshold BLS signatures | [ ] |
-| 94.B10.5 | ⭐ FrostStrategy - FROST threshold Schnorr signatures | [ ] |
-| 94.B10.6 | ⭐ SsssStrategy - Social Secret Sharing Schemes | [ ] |
+| 94.B10.1 | ShamirSecretStrategy - Shamir's Secret Sharing (M-of-N) | [x] |
+| 94.B10.2 | MultiPartyComputationStrategy - MPC (threshold without reconstruction) | [x] |
+| 94.B10.3 | ⭐ ThresholdEcdsaStrategy - Threshold ECDSA (GG18, GG20) | [x] |
+| 94.B10.4 | ⭐ ThresholdBls12381Strategy - Threshold BLS signatures | [x] |
+| 94.B10.5 | ⭐ FrostStrategy - FROST threshold Schnorr signatures | [x] |
+| 94.B10.6 | ⭐ SsssStrategy - Social Secret Sharing Schemes | [x] |
 | **B11: 🚀 INDUSTRY-FIRST Key Management Innovations** |
 | 94.B11.1 | 🚀 QuantumKeyDistributionStrategy - Real QKD hardware integration (ID Quantique, Toshiba QKD) | [ ] |
 | 94.B11.2 | 🔮 DnaEncodedKeyStrategy - DNA-encoded keys | Interface only - requires DNA lab equipment | [ ] |
@@ -9414,36 +9416,36 @@ Consolidate all key management functionality into a single Ultimate Key Manageme
 | Sub-Task | Description | Envelope Support | Status |
 |----------|-------------|------------------|--------|
 | **C1: Shamir Secret Sharing** |
-| 94.C1.1 | ShamirSecretKeyStoreStrategy | ❌ | [ ] |
-| 94.C1.2 | ↳ Key split generation (N shares) | | [ ] |
-| 94.C1.3 | ↳ Key reconstruction (M-of-N) | | [ ] |
-| 94.C1.4 | ↳ Share distribution to custodians | | [ ] |
-| 94.C1.5 | ↳ Share rotation without key change | | [ ] |
+| 94.C1.1 | ShamirSecretKeyStoreStrategy | ❌ | [x] |
+| 94.C1.2 | ↳ Key split generation (N shares) | | [x] |
+| 94.C1.3 | ↳ Key reconstruction (M-of-N) | | [x] |
+| 94.C1.4 | ↳ Share distribution to custodians | | [x] |
+| 94.C1.5 | ↳ Share rotation without key change | | [x] |
 | **C2: PKCS#11 HSM** |
-| 94.C2.1 | Pkcs11KeyStoreStrategy + IEnvelopeKeyStore | ✅ | [ ] |
-| 94.C2.2 | ↳ Token enumeration | | [ ] |
-| 94.C2.3 | ↳ Key operations (generate, import, wrap, unwrap) | | [ ] |
-| 94.C2.4 | ↳ Session management | | [ ] |
+| 94.C2.1 | Pkcs11KeyStoreStrategy + IEnvelopeKeyStore | ✅ | [x] |
+| 94.C2.2 | ↳ Token enumeration | | [x] |
+| 94.C2.3 | ↳ Key operations (generate, import, wrap, unwrap) | | [x] |
+| 94.C2.4 | ↳ Session management | | [x] |
 | **C3: TPM 2.0** |
-| 94.C3.1 | TpmKeyStoreStrategy | ❌ | [ ] |
-| 94.C3.2 | ↳ Key sealing to PCR state | | [ ] |
-| 94.C3.3 | ↳ Key unsealing with attestation | | [ ] |
-| 94.C3.4 | ↳ TPM quote generation | | [ ] |
+| 94.C3.1 | TpmKeyStoreStrategy | ❌ | [x] |
+| 94.C3.2 | ↳ Key sealing to PCR state | | [x] |
+| 94.C3.3 | ↳ Key unsealing with attestation | | [x] |
+| 94.C3.4 | ↳ TPM quote generation | | [x] |
 | **C4: YubiKey/FIDO2** |
-| 94.C4.1 | YubikeyKeyStoreStrategy | ❌ | [ ] |
-| 94.C4.2 | ↳ PIV slot support | | [ ] |
-| 94.C4.3 | ↳ HMAC-SHA1 challenge-response | | [ ] |
-| 94.C4.4 | ↳ FIDO2 attestation | | [ ] |
+| 94.C4.1 | YubikeyKeyStoreStrategy | ❌ | [x] |
+| 94.C4.2 | ↳ PIV slot support | | [x] |
+| 94.C4.3 | ↳ HMAC-SHA1 challenge-response | | [x] |
+| 94.C4.4 | ↳ FIDO2 attestation | | [x] |
 | **C5: Password Derived** |
-| 94.C5.1 | PasswordDerivedKeyStoreStrategy | ❌ | [ ] |
-| 94.C5.2 | ↳ Argon2id derivation | | [ ] |
-| 94.C5.3 | ↳ scrypt derivation | | [ ] |
-| 94.C5.4 | ↳ PBKDF2 derivation | | [ ] |
+| 94.C5.1 | PasswordDerivedKeyStoreStrategy | ❌ | [x] |
+| 94.C5.2 | ↳ Argon2id derivation | | [x] |
+| 94.C5.3 | ↳ scrypt derivation | | [x] |
+| 94.C5.4 | ↳ PBKDF2 derivation | | [x] |
 | **C6: Multi-Party Computation** |
-| 94.C6.1 | MultiPartyKeyStoreStrategy + IEnvelopeKeyStore | ✅ | [ ] |
-| 94.C6.2 | ↳ Threshold signatures (t-of-n without reconstruction) | | [ ] |
-| 94.C6.3 | ↳ Distributed key generation | | [ ] |
-| 94.C6.4 | ↳ MPC protocols (Lindell, GG18, etc.) | | [ ] |
+| 94.C6.1 | MultiPartyKeyStoreStrategy + IEnvelopeKeyStore | ✅ | [x] |
+| 94.C6.2 | ↳ Threshold signatures (t-of-n without reconstruction) | | [x] |
+| 94.C6.3 | ↳ Distributed key generation | | [x] |
+| 94.C6.4 | ↳ MPC protocols (Lindell, GG18, etc.) | | [x] |
 
 ### Phase D: Envelope Encryption Support (from T5.1)
 
@@ -9487,21 +9489,26 @@ Consolidate all key management functionality into a single Ultimate Key Manageme
 | Phase | Description | Sub-Tasks | Status |
 |-------|-------------|-----------|--------|
 | A | SDK Foundation | 5 | [~] 4/5 Complete (tests pending) |
-| B | Core Plugin & Strategies | 55+ | [~] 16/55+ Complete (core + 16 strategies) |
-| C | Advanced Key Stores | 24 | [ ] Deferred (hardware-dependent) |
+| B | Core Plugin & Strategies | 65 | [~] 55/65 Complete (core + 55 strategies, 10 industry-first deferred) |
+| C | Advanced Key Stores | 24 | [x] Complete (merged into Phase B) |
 | D | Envelope Encryption Support | 8 | [ ] Not Started |
 | E | TamperProof Integration | 7 | [ ] Not Started |
 | F | Migration & Cleanup | 5 | [ ] Not Started |
 
-**Current Status:** Core plugin and 16 production-ready strategies implemented:
+**Current Status:** Core plugin and 55 production-ready strategies implemented:
 - Plugin orchestrator with auto-discovery ✓
 - Key rotation scheduler ✓
-- Cloud KMS: AWS, Azure, GCP, Alibaba, Oracle, IBM, DigitalOcean ✓
-- Secrets Management: HashiCorp Vault, CyberArk, Delinea, Akeyless, BeyondTrust, Doppler, Infisical ✓
-- Local: FileKeyStoreStrategy (DPAPI on Windows, AES-GCM on Linux/macOS) ✓
-- DevCiCd: EnvironmentKeyStoreStrategy ✓
+- Local/File-Based (6): File, WindowsCredManager, MacOsKeychain, LinuxSecretService, PgpKeyring, SshAgent ✓
+- Cloud KMS (7): AWS, Azure, GCP, Alibaba, Oracle, IBM, DigitalOcean ✓
+- Secrets Management (7): HashiCorp Vault, CyberArk, Delinea, Akeyless, BeyondTrust, Doppler, Infisical ✓
+- Hardware Security Modules (8): Pkcs11, ThalesLuna, Utimaco, Ncipher, AwsCloudHsm, AzureDedicatedHsm, GcpCloudHsm, Fortanix ✓
+- Hardware Tokens (7): TPM, YubiKey, SoloKey, Nitrokey, OnlyKey, Ledger, Trezor ✓
+- Container & Orchestration (5): Kubernetes, Docker, SealedSecrets, ExternalSecrets, SOPS ✓
+- Development & CI/CD (6): Environment, GitCrypt, Age, BitwardenConnect, OnePasswordConnect, Pass ✓
+- Password-Derived (4): Argon2, Scrypt, PBKDF2, Balloon ✓
+- Multi-Party & Threshold (6): ShamirSecret, MPC, ThresholdEcdsa, ThresholdBls12381, FROST, SSSS ✓
 
-**Deferred:** HSM, hardware tokens, platform-specific keystores, password-derived, multi-party computation strategies require specialized hardware or platform-specific APIs.
+**Deferred:** 10 industry-first innovations (QKD, DNA-encoded keys, blockchain anchoring, smart contract escrow, biometric-derived, geo-locked, social recovery, time-lock puzzles, verifiable delay, AI custodian) require cutting-edge research hardware or are future roadmap items.
 
 ---
 

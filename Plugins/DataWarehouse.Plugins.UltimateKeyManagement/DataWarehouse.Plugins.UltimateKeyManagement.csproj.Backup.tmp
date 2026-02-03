@@ -1,0 +1,62 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RootNamespace>DataWarehouse.Plugins.UltimateKeyManagement</RootNamespace>
+    <Description>Ultimate Key Management orchestrator with auto-discovery, strategy registry, and key rotation scheduling</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\DataWarehouse.SDK\DataWarehouse.SDK.csproj" />
+  </ItemGroup>
+
+  <!-- Common HTTP/JSON packages for REST API-based strategies -->
+  <ItemGroup>
+    <PackageReference Include="Azure.Identity" Version="1.17.1" />
+    <PackageReference Include="System.Net.Http.Json" Version="9.0.*" />
+  </ItemGroup>
+
+  <!-- PKCS#11 Interop for HSM hardware security module integration -->
+  <ItemGroup>
+    <PackageReference Include="Pkcs11Interop" Version="5.1.2" />
+  </ItemGroup>
+
+  <!-- Platform-specific keychain strategies -->
+  <ItemGroup>
+    <!-- BouncyCastle for PGP keyring support -->
+    <PackageReference Include="BouncyCastle.Cryptography" Version="2.5.1" />
+    <!-- SSH.NET for SSH agent integration -->
+    <PackageReference Include="SSH.NET" Version="2024.2.0" />
+  </ItemGroup>
+
+  <!-- AWS SDK for CloudHSM V2 management and HSM operations -->
+  <ItemGroup>
+    <PackageReference Include="AWSSDK.CloudHSMV2" Version="4.0.*" />
+  </ItemGroup>
+
+  <!-- Azure SDK for Managed HSM / Dedicated HSM key operations -->
+  <ItemGroup>
+    <PackageReference Include="Azure.Security.KeyVault.Keys" Version="4.7.*" />
+  </ItemGroup>
+
+  <!-- Google Cloud SDK for Cloud HSM (Cloud KMS with HSM protection) -->
+  <ItemGroup>
+    <PackageReference Include="Google.Cloud.Kms.V1" Version="3.10.*" />
+  </ItemGroup>
+
+  <!-- Hardware Token Strategies -->
+  <ItemGroup>
+    <!-- TPM 2.0 support via Microsoft.TSS (Microsoft TPM 2.0 Library) -->
+    <PackageReference Include="Microsoft.TSS" Version="2.1.1" />
+    <!-- YubiKey support via official Yubico SDK -->
+    <PackageReference Include="Yubico.YubiKey" Version="1.12.*" />
+    <!-- FIDO2/WebAuthn support for SoloKey and other FIDO2 devices -->
+    <PackageReference Include="Fido2.Models" Version="3.0.*" />
+    <PackageReference Include="Fido2" Version="3.0.*" />
+    <!-- HID communication for hardware wallets (Ledger, Trezor, OnlyKey) -->
+    <PackageReference Include="HidSharp" Version="2.1.*" />
+  </ItemGroup>
+
+</Project>
