@@ -99,7 +99,15 @@
       "Bash(Sort-Object)",
       "Bash(comm:*)",
       "Bash(Select-String -Pattern \"KnowledgeObject|error\" -Context 2)",
-      "Bash(dotnet build-server:*)"
+      "Bash(dotnet build-server:*)",
+      "Bash(dotnet run:*)",
+      "Bash(cmd /c \"dir C:\\\\Temp\\\\DataWarehouse\\\\DataWarehouse\\\\Plugins\\\\DataWarehouse.Plugins.UltimateKeyManagement\")",
+      "Bash(cmd /c \"if exist C:\\\\Temp\\\\DataWarehouse\\\\DataWarehouse\\\\Plugins\\\\DataWarehouse.Plugins.UltimateKeyManagement \\(echo EXISTS\\) else \\(echo NOT EXISTS\\)\")",
+      "Bash(cmd /c \"if exist C:\\\\Temp\\\\DataWarehouse\\\\DataWarehouse\\\\Plugins\\\\DataWarehouse.Plugins.UltimateKeyManagement\\\\Strategies\\\\Hardware \\(dir /b C:\\\\Temp\\\\DataWarehouse\\\\DataWarehouse\\\\Plugins\\\\DataWarehouse.Plugins.UltimateKeyManagement\\\\Strategies\\\\Hardware\\) else \\(echo NOT EXISTS\\)\")",
+      "Bash(cmd /c \"mkdir C:\\\\Temp\\\\DataWarehouse\\\\DataWarehouse\\\\Plugins\\\\DataWarehouse.Plugins.UltimateKeyManagement\\\\Strategies\\\\Hardware\")",
+      "Bash(dotnet search:*)",
+      "Bash(dotnet package search:*)",
+      "Bash(dotnet tool run ildasm:*)"
     ]
   }
 }

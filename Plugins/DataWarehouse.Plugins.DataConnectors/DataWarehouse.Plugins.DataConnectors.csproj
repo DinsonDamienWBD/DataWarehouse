@@ -13,6 +13,9 @@
   <ItemGroup>
     <!-- PostgreSQL driver -->
     <PackageReference Include="AWSSDK.Core" Version="4.0.3.12" />
+    <PackageReference Include="Azure.Identity" Version="1.17.1" />
+    <PackageReference Include="BouncyCastle.Cryptography" Version="2.6.2" />
+    <PackageReference Include="Net.IBM.Data.Db2" Version="9.0.0.400" />
     <PackageReference Include="Npgsql" Version="10.0.1" />
     <!-- Kafka client -->
     <PackageReference Include="Confluent.Kafka" Version="2.13.0" />
@@ -29,19 +32,18 @@
     <!-- SQL Server client -->
     <PackageReference Include="Microsoft.Data.SqlClient" Version="6.1.4" />
     <!-- SQLite client -->
-    <PackageReference Include="Microsoft.Data.Sqlite" Version="9.0.2" />
+    <PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.2" />
     <!-- Cassandra client -->
     <PackageReference Include="CassandraCSharpDriver" Version="3.22.0" />
     <!-- RabbitMQ client -->
     <PackageReference Include="RabbitMQ.Client" Version="7.2.0" />
     <!-- Apache Pulsar client -->
-    <PackageReference Include="DotPulsar" Version="5.1.1" />
+    <PackageReference Include="DotPulsar" Version="5.1.2" />
     <!-- NATS client -->
     <PackageReference Include="NATS.Net" Version="2.7.2-preview.2" />
     <!-- Oracle client -->
     <PackageReference Include="Oracle.ManagedDataAccess.Core" Version="23.26.100" />
     <!-- IBM DB2 client for Mainframe -->
-    <PackageReference Include="IBM.Data.DB2.Core" Version="3.1.0.600" />
     <!-- AWS SDK for S3 -->
     <PackageReference Include="AWSSDK.S3" Version="4.0.18.1" />
     <!-- Polly for resilience and transient fault handling -->

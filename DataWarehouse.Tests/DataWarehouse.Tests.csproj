@@ -11,7 +11,10 @@
   <ItemGroup>
     <PackageReference Include="AWSSDK.BedrockAgentRuntime" Version="4.0.8.8" />
     <PackageReference Include="AWSSDK.Core" Version="4.0.3.12" />
+    <PackageReference Include="Azure.Identity" Version="1.17.1" />
+    <PackageReference Include="Microsoft.Data.SqlClient" Version="6.1.4" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.0.1" />
+    <PackageReference Include="Npgsql" Version="10.0.1" />
     <PackageReference Include="xunit.runner.visualstudio" Version="3.1.5">
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
       <PrivateAssets>all</PrivateAssets>
