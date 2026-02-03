@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RootNamespace>DataWarehouse.Plugins.UltimateKeyManagement</RootNamespace>
+    <Description>Ultimate Key Management orchestrator with auto-discovery, strategy registry, and key rotation scheduling</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\DataWarehouse.SDK\DataWarehouse.SDK.csproj" />
+  </ItemGroup>
+
+  <!-- Common HTTP/JSON packages for REST API-based strategies -->
+  <ItemGroup>
+    <PackageReference Include="System.Net.Http.Json" Version="9.0.*" />
+  </ItemGroup>
+
+</Project>

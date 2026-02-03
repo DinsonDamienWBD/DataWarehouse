@@ -163,6 +163,7 @@
     <Project Path="Plugins/DataWarehouse.Plugins.Tiering/DataWarehouse.Plugins.Tiering.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.Transcoding.Media/DataWarehouse.Plugins.Transcoding.Media.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.TwofishEncryption/DataWarehouse.Plugins.TwofishEncryption.csproj" />
+    <Project Path="Plugins/DataWarehouse.Plugins.UltimateKeyManagement/DataWarehouse.Plugins.UltimateKeyManagement.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.VaultKeyStore/DataWarehouse.Plugins.VaultKeyStore.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.VendorSpecificRaid/DataWarehouse.Plugins.VendorSpecificRaid.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.Versioning/DataWarehouse.Plugins.Versioning.csproj" />
