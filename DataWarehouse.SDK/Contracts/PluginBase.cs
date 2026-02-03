@@ -1,8 +1,10 @@
-﻿using DataWarehouse.SDK.Governance;
+﻿using DataWarehouse.SDK.AI;
+using DataWarehouse.SDK.Governance;
 using DataWarehouse.SDK.Primitives;
 using DataWarehouse.SDK.Security;
 using DataWarehouse.SDK.Utilities;
 using System;
+using System.Collections.Concurrent;
 
 namespace DataWarehouse.SDK.Contracts
 {
@@ -14,6 +16,18 @@ namespace DataWarehouse.SDK.Contracts
     /// </summary>
     public abstract class PluginBase : IPlugin
     {
+        /// <summary>
+        /// Knowledge cache for performance optimization.
+        /// Maps knowledge topic to cached KnowledgeObject.
+        /// </summary>
+        private readonly ConcurrentDictionary<string, KnowledgeObject> _knowledgeCache = new();
+
+        /// <summary>
+        /// Message bus reference for knowledge communication.
+        /// Set during initialization via InitializeAsync.
+        /// </summary>
+        protected IMessageBus? MessageBus { get; private set; }
+
         /// <summary>
         /// Unique Plugin ID - must be set by derived classes.
         /// Use a stable identifier like "com.company.plugin.name" for consistency.
@@ -172,6 +186,188 @@ namespace DataWarehouse.SDK.Contracts
                 ["SupportsStreaming"] = false
             };
         }
+
+        #region Knowledge Integration (Task 99.D)
+
+        /// <summary>
+        /// Gets the registration knowledge object for this plugin.
+        /// Override to provide plugin-specific knowledge for registration with Universal Intelligence.
+        /// </summary>
+        /// <returns>Knowledge object describing plugin capabilities, or null if not applicable.</returns>
+        /// <remarks>
+        /// This method is called during plugin initialization to register the plugin's knowledge
+        /// with the Universal Intelligence system (T90). The default implementation returns null.
+        /// Plugins should override this to expose their capabilities for AI-driven operations.
+        /// </remarks>
+        public virtual KnowledgeObject? GetRegistrationKnowledge()
+        {
+            // Default: No knowledge to register
+            // Plugins override this to provide their specific knowledge
+            return null;
+        }
+
+        /// <summary>
+        /// Handles incoming knowledge requests from the Universal Intelligence system.
+        /// Override to respond to knowledge queries about plugin capabilities.
+        /// </summary>
+        /// <param name="knowledge">Knowledge request object.</param>
+        /// <param name="ct">Cancellation token.</param>
+        /// <returns>Task representing the async operation.</returns>
+        /// <remarks>
+        /// This method is called when the Universal Intelligence system queries plugin knowledge.
+        /// The default implementation logs the request and returns immediately.
+        /// Plugins should override this to provide dynamic knowledge responses.
+        /// </remarks>
+        public virtual Task HandleKnowledgeAsync(KnowledgeObject knowledge, CancellationToken ct = default)
+        {
+            // Default: No-op
+            // Plugins override this to handle specific knowledge requests
+            return Task.CompletedTask;
+        }
+
+        /// <summary>
+        /// Auto-registers plugin knowledge with Universal Intelligence during initialization.
+        /// Called automatically by InitializeAsync if MessageBus is available.
+        /// </summary>
+        /// <param name="ct">Cancellation token.</param>
+        /// <returns>Task representing the async operation.</returns>
+        /// <remarks>
+        /// This method checks if the plugin has knowledge to register via GetRegistrationKnowledge(),
+        /// and if so, publishes it to the "intelligence.knowledge.register" topic.
+        /// Gracefully handles the case where Universal Intelligence is not available.
+        /// </remarks>
+        protected virtual async Task RegisterKnowledgeAsync(CancellationToken ct = default)
+        {
+            if (MessageBus == null)
+            {
+                // MessageBus not available - skip registration
+                return;
+            }
+
+            var knowledge = GetRegistrationKnowledge();
+            if (knowledge == null)
+            {
+                // No knowledge to register
+                return;
+            }
+
+            try
+            {
+                // Publish knowledge registration to Universal Intelligence
+                var message = new PluginMessage
+                {
+                    Type = "intelligence.knowledge.register",
+                    Payload = new Dictionary<string, object>
+                    {
+                        ["Knowledge"] = knowledge,
+                        ["PluginId"] = Id,
+                        ["PluginName"] = Name,
+                        ["Timestamp"] = DateTimeOffset.UtcNow
+                    }
+                };
+
+                await MessageBus.PublishAsync("intelligence.knowledge.register", message, ct);
+
+                // Cache the registered knowledge
+                _knowledgeCache[knowledge.Topic] = knowledge;
+            }
+            catch (Exception)
+            {
+                // Graceful degradation: Universal Intelligence not available
+                // This is not a fatal error - plugin can still function without knowledge registration
+            }
+        }
+
+        /// <summary>
+        /// Subscribes to knowledge request messages from Universal Intelligence.
+        /// Called automatically by InitializeAsync if MessageBus is available.
+        /// </summary>
+        /// <param name="ct">Cancellation token.</param>
+        /// <returns>Subscription token for cleanup, or null if subscription failed.</returns>
+        /// <remarks>
+        /// This method subscribes to the "intelligence.knowledge.request" topic to handle
+        /// incoming knowledge queries. The subscription is stored for cleanup during shutdown.
+        /// </remarks>
+        protected virtual IDisposable? SubscribeToKnowledgeRequests(CancellationToken ct = default)
+        {
+            if (MessageBus == null)
+            {
+                return null;
+            }
+
+            try
+            {
+                // Subscribe to knowledge requests
+                return MessageBus.Subscribe($"intelligence.knowledge.request.{Id}", async (message) =>
+                {
+                    if (message.Payload.TryGetValue("Knowledge", out var knowledgeObj) && knowledgeObj is KnowledgeObject knowledge)
+                    {
+                        await HandleKnowledgeAsync(knowledge, ct);
+                    }
+                });
+            }
+            catch (Exception)
+            {
+                // Graceful degradation: Unable to subscribe
+                return null;
+            }
+        }
+
+        /// <summary>
+        /// Sets the message bus reference for knowledge communication.
+        /// Should be called during plugin initialization.
+        /// </summary>
+        /// <param name="messageBus">Message bus instance.</param>
+        /// <remarks>
+        /// This method is typically called by the plugin host/kernel during initialization.
+        /// Once set, the message bus is used for knowledge registration and communication.
+        /// </remarks>
+        protected virtual void SetMessageBus(IMessageBus? messageBus)
+        {
+            MessageBus = messageBus;
+        }
+
+        /// <summary>
+        /// Gets cached knowledge object by topic.
+        /// </summary>
+        /// <param name="topic">Knowledge topic.</param>
+        /// <returns>Cached knowledge object, or null if not found.</returns>
+        /// <remarks>
+        /// This method provides fast access to previously registered or received knowledge objects.
+        /// The cache is maintained in-memory for performance.
+        /// </remarks>
+        protected KnowledgeObject? GetCachedKnowledge(string topic)
+        {
+            _knowledgeCache.TryGetValue(topic, out var knowledge);
+            return knowledge;
+        }
+
+        /// <summary>
+        /// Caches a knowledge object for later retrieval.
+        /// </summary>
+        /// <param name="topic">Knowledge topic.</param>
+        /// <param name="knowledge">Knowledge object to cache.</param>
+        /// <remarks>
+        /// This method stores knowledge objects in the in-memory cache for fast access.
+        /// Useful for caching frequently accessed knowledge or query results.
+        /// </remarks>
+        protected void CacheKnowledge(string topic, KnowledgeObject knowledge)
+        {
+            _knowledgeCache[topic] = knowledge;
+        }
+
+        /// <summary>
+        /// Clears all cached knowledge objects.
+        /// </summary>
+        /// <remarks>
+        /// This method clears the knowledge cache. Typically called during shutdown or reset operations.
+        /// </remarks>
+        protected void ClearKnowledgeCache()
+        {
+            _knowledgeCache.Clear();
+        }
+
+        #endregion
     }
 
     /// <summary>
@@ -1473,7 +1669,7 @@ namespace DataWarehouse.SDK.Contracts
     /// Extends SecurityProviderPluginBase with ACL management.
     /// AI-native: Supports intelligent permission suggestions.
     /// </summary>
-    public abstract class AccessControlPluginBase : SecurityProviderPluginBase, Security.IAccessControl
+    public abstract class AccessControlPluginBase : SecurityProviderPluginBase, IAccessControl
     {
         public abstract void SetPermissions(string resource, string subject, Permission allow, Permission deny);
         public abstract bool HasAccess(string resource, string subject, Permission requested);
@@ -1535,7 +1731,7 @@ namespace DataWarehouse.SDK.Contracts
     /// Provides common caching, initialization, and validation logic.
     /// All key management plugins MUST extend this class.
     /// </summary>
-    public abstract class KeyStorePluginBase : SecurityProviderPluginBase, Security.IKeyStore
+    public abstract class KeyStorePluginBase : SecurityProviderPluginBase, IKeyStore
     {
         #region Cache Infrastructure
 
@@ -1626,14 +1822,14 @@ namespace DataWarehouse.SDK.Contracts
         }
 
         /// <inheritdoc/>
-        public virtual async Task<byte[]> GetKeyAsync(string keyId, Security.ISecurityContext context)
+        public virtual async Task<byte[]> GetKeyAsync(string keyId, ISecurityContext context)
         {
             ValidateAccess(context);
             return await GetKeyInternalAsync(keyId, context);
         }
 
         /// <inheritdoc/>
-        public virtual async Task<byte[]> CreateKeyAsync(string keyId, Security.ISecurityContext context)
+        public virtual async Task<byte[]> CreateKeyAsync(string keyId, ISecurityContext context)
         {
             ValidateAdminAccess(context);
             await EnsureInitializedAsync();
@@ -1660,7 +1856,7 @@ namespace DataWarehouse.SDK.Contracts
 
         #region Internal Key Operations
 
-        private async Task<byte[]> GetKeyInternalAsync(string keyId, Security.ISecurityContext? context)
+        private async Task<byte[]> GetKeyInternalAsync(string keyId, ISecurityContext? context)
         {
             await EnsureInitializedAsync();
 
@@ -1777,7 +1973,7 @@ namespace DataWarehouse.SDK.Contracts
         /// <summary>
         /// Validates that the caller has access to key operations.
         /// </summary>
-        protected virtual void ValidateAccess(Security.ISecurityContext context)
+        protected virtual void ValidateAccess(ISecurityContext context)
         {
             if (context == null)
                 throw new ArgumentNullException(nameof(context));
@@ -1789,7 +1985,7 @@ namespace DataWarehouse.SDK.Contracts
         /// <summary>
         /// Validates that the caller has admin access for key creation.
         /// </summary>
-        protected virtual void ValidateAdminAccess(Security.ISecurityContext context)
+        protected virtual void ValidateAdminAccess(ISecurityContext context)
         {
             ValidateAccess(context);
 
@@ -1825,7 +2021,7 @@ namespace DataWarehouse.SDK.Contracts
         /// <summary>
         /// Called when a key is accessed. Override for custom logging/auditing.
         /// </summary>
-        protected virtual void OnKeyAccessed(string keyId, Security.ISecurityContext? context, bool fromCache)
+        protected virtual void OnKeyAccessed(string keyId, ISecurityContext? context, bool fromCache)
         {
             // Default: no-op. Override for audit logging.
         }
@@ -1833,7 +2029,7 @@ namespace DataWarehouse.SDK.Contracts
         /// <summary>
         /// Called when a key is created. Override for custom logging/auditing.
         /// </summary>
-        protected virtual void OnKeyCreated(string keyId, Security.ISecurityContext context)
+        protected virtual void OnKeyCreated(string keyId, ISecurityContext context)
         {
             // Default: no-op. Override for audit logging.
         }
@@ -1932,17 +2128,17 @@ namespace DataWarehouse.SDK.Contracts
         /// <summary>
         /// Default key store (fallback when no user preference or explicit override).
         /// </summary>
-        protected Security.IKeyStore? DefaultKeyStore;
+        protected IKeyStore? DefaultKeyStore;
 
         /// <summary>
         /// Default key management mode.
         /// </summary>
-        protected Security.KeyManagementMode DefaultKeyManagementMode = Security.KeyManagementMode.Direct;
+        protected KeyManagementMode DefaultKeyManagementMode = KeyManagementMode.Direct;
 
         /// <summary>
         /// Default envelope key store for Envelope mode.
         /// </summary>
-        protected Security.IEnvelopeKeyStore? DefaultEnvelopeKeyStore;
+        protected IEnvelopeKeyStore? DefaultEnvelopeKeyStore;
 
         /// <summary>
         /// Default KEK key ID for Envelope mode.
@@ -1952,12 +2148,12 @@ namespace DataWarehouse.SDK.Contracts
         /// <summary>
         /// Per-user configuration provider (optional, for multi-tenant).
         /// </summary>
-        protected Security.IKeyManagementConfigProvider? ConfigProvider;
+        protected IKeyManagementConfigProvider? ConfigProvider;
 
         /// <summary>
         /// Key store registry for resolving plugin IDs.
         /// </summary>
-        protected Security.IKeyStoreRegistry? KeyStoreRegistry;
+        protected IKeyStoreRegistry? KeyStoreRegistry;
 
         #endregion
 
@@ -2029,9 +2225,9 @@ namespace DataWarehouse.SDK.Contracts
         /// Resolves key management configuration for this operation.
         /// Priority: 1. Explicit args, 2. User preferences, 3. Plugin defaults
         /// </summary>
-        protected virtual async Task<Security.ResolvedKeyManagementConfig> ResolveConfigAsync(
+        protected virtual async Task<ResolvedKeyManagementConfig> ResolveConfigAsync(
             Dictionary<string, object> args,
-            Security.ISecurityContext context)
+            ISecurityContext context)
         {
             // 1. Check for explicit overrides in args
             if (TryGetConfigFromArgs(args, out var argsConfig))
@@ -2046,7 +2242,7 @@ namespace DataWarehouse.SDK.Contracts
             }
 
             // 3. Fall back to plugin defaults
-            return new Security.ResolvedKeyManagementConfig
+            return new ResolvedKeyManagementConfig
             {
                 Mode = DefaultKeyManagementMode,
                 KeyStore = DefaultKeyStore,
@@ -2058,7 +2254,7 @@ namespace DataWarehouse.SDK.Contracts
         /// <summary>
         /// Attempts to extract configuration from operation arguments.
         /// </summary>
-        protected virtual bool TryGetConfigFromArgs(Dictionary<string, object> args, out Security.ResolvedKeyManagementConfig config)
+        protected virtual bool TryGetConfigFromArgs(Dictionary<string, object> args, out ResolvedKeyManagementConfig config)
         {
             config = default!;
 
@@ -2068,20 +2264,20 @@ namespace DataWarehouse.SDK.Contracts
 
             var mode = modeObj switch
             {
-                Security.KeyManagementMode m => m,
-                string s when Enum.TryParse<Security.KeyManagementMode>(s, true, out var parsed) => parsed,
-                _ => Security.KeyManagementMode.Direct
+                KeyManagementMode m => m,
+                string s when Enum.TryParse<KeyManagementMode>(s, true, out var parsed) => parsed,
+                _ => KeyManagementMode.Direct
             };
 
             // Resolve key store from args
-            Security.IKeyStore? keyStore = null;
-            Security.IEnvelopeKeyStore? envelopeKeyStore = null;
+            IKeyStore? keyStore = null;
+            IEnvelopeKeyStore? envelopeKeyStore = null;
             string? keyStorePluginId = null;
             string? envelopeKeyStorePluginId = null;
             string? kekKeyId = null;
             string? keyId = null;
 
-            if (args.TryGetValue("keyStore", out var ksObj) && ksObj is Security.IKeyStore ks)
+            if (args.TryGetValue("keyStore", out var ksObj) && ksObj is IKeyStore ks)
                 keyStore = ks;
             else if (args.TryGetValue("keyStorePluginId", out var kspObj) && kspObj is string ksp)
             {
@@ -2089,7 +2285,7 @@ namespace DataWarehouse.SDK.Contracts
                 keyStore = KeyStoreRegistry?.GetKeyStore(ksp);
             }
 
-            if (args.TryGetValue("envelopeKeyStore", out var eksObj) && eksObj is Security.IEnvelopeKeyStore eks)
+            if (args.TryGetValue("envelopeKeyStore", out var eksObj) && eksObj is IEnvelopeKeyStore eks)
                 envelopeKeyStore = eks;
             else if (args.TryGetValue("envelopeKeyStorePluginId", out var ekspObj) && ekspObj is string eksp)
             {
@@ -2103,7 +2299,7 @@ namespace DataWarehouse.SDK.Contracts
             if (args.TryGetValue("keyId", out var kidObj) && kidObj is string kid)
                 keyId = kid;
 
-            config = new Security.ResolvedKeyManagementConfig
+            config = new ResolvedKeyManagementConfig
             {
                 Mode = mode,
                 KeyStore = keyStore ?? DefaultKeyStore,
@@ -2120,9 +2316,9 @@ namespace DataWarehouse.SDK.Contracts
         /// <summary>
         /// Resolves configuration from user preferences.
         /// </summary>
-        protected virtual Security.ResolvedKeyManagementConfig ResolveFromUserConfig(Security.KeyManagementConfig userConfig)
+        protected virtual ResolvedKeyManagementConfig ResolveFromUserConfig(KeyManagementConfig userConfig)
         {
-            return new Security.ResolvedKeyManagementConfig
+            return new ResolvedKeyManagementConfig
             {
                 Mode = userConfig.Mode,
                 KeyStore = userConfig.KeyStore ?? KeyStoreRegistry?.GetKeyStore(userConfig.KeyStorePluginId),
@@ -2143,11 +2339,11 @@ namespace DataWarehouse.SDK.Contracts
         /// For Direct mode: retrieves key from key store.
         /// For Envelope mode: generates random DEK, wraps with KEK.
         /// </summary>
-        protected virtual async Task<(byte[] key, string keyId, Security.EnvelopeHeader? envelope)> GetKeyForEncryptionAsync(
-            Security.ResolvedKeyManagementConfig config,
-            Security.ISecurityContext context)
+        protected virtual async Task<(byte[] key, string keyId, EnvelopeHeader? envelope)> GetKeyForEncryptionAsync(
+            ResolvedKeyManagementConfig config,
+            ISecurityContext context)
         {
-            if (config.Mode == Security.KeyManagementMode.Envelope)
+            if (config.Mode == KeyManagementMode.Envelope)
             {
                 return await GetEnvelopeKeyForEncryptionAsync(config, context);
             }
@@ -2160,9 +2356,9 @@ namespace DataWarehouse.SDK.Contracts
         /// <summary>
         /// Gets a key for Direct mode encryption.
         /// </summary>
-        protected virtual async Task<(byte[] key, string keyId, Security.EnvelopeHeader? envelope)> GetDirectKeyForEncryptionAsync(
-            Security.ResolvedKeyManagementConfig config,
-            Security.ISecurityContext context)
+        protected virtual async Task<(byte[] key, string keyId, EnvelopeHeader? envelope)> GetDirectKeyForEncryptionAsync(
+            ResolvedKeyManagementConfig config,
+            ISecurityContext context)
         {
             if (config.KeyStore == null)
                 throw new InvalidOperationException("No key store configured for Direct mode encryption.");
@@ -2180,9 +2376,9 @@ namespace DataWarehouse.SDK.Contracts
         /// Gets a key for Envelope mode encryption.
         /// Generates a random DEK and wraps it with the KEK.
         /// </summary>
-        protected virtual async Task<(byte[] key, string keyId, Security.EnvelopeHeader? envelope)> GetEnvelopeKeyForEncryptionAsync(
-            Security.ResolvedKeyManagementConfig config,
-            Security.ISecurityContext context)
+        protected virtual async Task<(byte[] key, string keyId, EnvelopeHeader? envelope)> GetEnvelopeKeyForEncryptionAsync(
+            ResolvedKeyManagementConfig config,
+            ISecurityContext context)
         {
             if (config.EnvelopeKeyStore == null)
                 throw new InvalidOperationException("No envelope key store configured for Envelope mode encryption.");
@@ -2200,7 +2396,7 @@ namespace DataWarehouse.SDK.Contracts
             var iv = GenerateIv();
 
             // Create envelope header
-            var envelope = new Security.EnvelopeHeader
+            var envelope = new EnvelopeHeader
             {
                 KekId = config.KekKeyId,
                 KeyStorePluginId = config.EnvelopeKeyStorePluginId ?? "",
@@ -2222,10 +2418,10 @@ namespace DataWarehouse.SDK.Contracts
         /// Gets a key for decryption based on stored metadata.
         /// </summary>
         protected virtual async Task<byte[]> GetKeyForDecryptionAsync(
-            Security.EnvelopeHeader? envelope,
+            EnvelopeHeader? envelope,
             string? keyId,
-            Security.ResolvedKeyManagementConfig config,
-            Security.ISecurityContext context)
+            ResolvedKeyManagementConfig config,
+            ISecurityContext context)
         {
             if (envelope != null)
             {
@@ -2265,10 +2461,10 @@ namespace DataWarehouse.SDK.Contracts
         /// <summary>
         /// Gets the security context from operation arguments.
         /// </summary>
-        protected virtual Security.ISecurityContext GetSecurityContext(Dictionary<string, object> args, IKernelContext context)
+        protected virtual ISecurityContext GetSecurityContext(Dictionary<string, object> args, IKernelContext context)
         {
             // Check for explicit security context in args
-            if (args.TryGetValue("securityContext", out var ctxObj) && ctxObj is Security.ISecurityContext secCtx)
+            if (args.TryGetValue("securityContext", out var ctxObj) && ctxObj is ISecurityContext secCtx)
                 return secCtx;
 
             // Try to get from kernel context
@@ -2281,7 +2477,7 @@ namespace DataWarehouse.SDK.Contracts
         /// <summary>
         /// Default security context for when none is provided.
         /// </summary>
-        protected class DefaultSecurityContext : Security.ISecurityContext
+        protected class DefaultSecurityContext : ISecurityContext
         {
             public string UserId => "system";
             public string? TenantId => null;
@@ -2310,14 +2506,14 @@ namespace DataWarehouse.SDK.Contracts
                 var iv = envelope?.Iv ?? GenerateIv();
 
                 // Create encryption metadata for storage
-                var metadata = new Security.EncryptionMetadata
+                var metadata = new EncryptionMetadata
                 {
                     EncryptionPluginId = Id,
                     KeyMode = config.Mode,
-                    KeyId = config.Mode == Security.KeyManagementMode.Direct ? keyId : null,
+                    KeyId = config.Mode == KeyManagementMode.Direct ? keyId : null,
                     WrappedDek = envelope?.WrappedDek,
                     KekId = envelope?.KekId,
-                    KeyStorePluginId = config.Mode == Security.KeyManagementMode.Direct
+                    KeyStorePluginId = config.Mode == KeyManagementMode.Direct
                         ? config.KeyStorePluginId
                         : config.EnvelopeKeyStorePluginId,
                     AlgorithmParams = new Dictionary<string, object>
@@ -2356,15 +2552,15 @@ namespace DataWarehouse.SDK.Contracts
             var securityContext = GetSecurityContext(args, context);
 
             // Try to get encryption metadata from args (from manifest or header)
-            Security.EnvelopeHeader? envelope = null;
+            EnvelopeHeader? envelope = null;
             string? keyId = null;
             byte[]? iv = null;
 
-            if (args.TryGetValue("encryptionMetadata", out var metaObj) && metaObj is Security.EncryptionMetadata metadata)
+            if (args.TryGetValue("encryptionMetadata", out var metaObj) && metaObj is EncryptionMetadata metadata)
             {
                 // Use metadata from manifest
-                envelope = metadata.KeyMode == Security.KeyManagementMode.Envelope
-                    ? new Security.EnvelopeHeader
+                envelope = metadata.KeyMode == KeyManagementMode.Envelope
+                    ? new EnvelopeHeader
                     {
                         KekId = metadata.KekId ?? "",
                         KeyStorePluginId = metadata.KeyStorePluginId ?? "",
@@ -2374,19 +2570,21 @@ namespace DataWarehouse.SDK.Contracts
                 keyId = metadata.KeyId;
 
                 if (metadata.AlgorithmParams.TryGetValue("iv", out var ivObj) && ivObj is string ivStr)
+                {
                     iv = Convert.FromBase64String(ivStr);
+                }
             }
             else
             {
                 // Check for envelope header in stream
-                if (await Security.EnvelopeHeader.IsEnvelopeEncryptedAsync(stored))
+                if (await EnvelopeHeader.IsEnvelopeEncryptedAsync(stored))
                 {
                     // Read and parse envelope header
                     var headerBuffer = new byte[4096]; // Reasonable max header size
                     var bytesRead = await stored.ReadAsync(headerBuffer, 0, headerBuffer.Length);
                     stored.Position = 0;
 
-                    if (Security.EnvelopeHeader.TryDeserialize(headerBuffer, out envelope, out var headerLength))
+                    if (EnvelopeHeader.TryDeserialize(headerBuffer, out envelope, out var headerLength))
                     {
                         // Skip header for decryption
                         stored.Position = headerLength;
@@ -2513,7 +2711,7 @@ namespace DataWarehouse.SDK.Contracts
         /// <summary>
         /// Configures the default key store for Direct mode.
         /// </summary>
-        public virtual void SetDefaultKeyStore(Security.IKeyStore keyStore)
+        public virtual void SetDefaultKeyStore(IKeyStore keyStore)
         {
             DefaultKeyStore = keyStore ?? throw new ArgumentNullException(nameof(keyStore));
         }
@@ -2521,7 +2719,7 @@ namespace DataWarehouse.SDK.Contracts
         /// <summary>
         /// Configures the default envelope key store for Envelope mode.
         /// </summary>
-        public virtual void SetDefaultEnvelopeKeyStore(Security.IEnvelopeKeyStore envelopeKeyStore, string kekKeyId)
+        public virtual void SetDefaultEnvelopeKeyStore(IEnvelopeKeyStore envelopeKeyStore, string kekKeyId)
         {
             DefaultEnvelopeKeyStore = envelopeKeyStore ?? throw new ArgumentNullException(nameof(envelopeKeyStore));
             DefaultKekKeyId = kekKeyId ?? throw new ArgumentNullException(nameof(kekKeyId));
@@ -2530,7 +2728,7 @@ namespace DataWarehouse.SDK.Contracts
         /// <summary>
         /// Sets the default key management mode.
         /// </summary>
-        public virtual void SetDefaultMode(Security.KeyManagementMode mode)
+        public virtual void SetDefaultMode(KeyManagementMode mode)
         {
             DefaultKeyManagementMode = mode;
         }
@@ -2538,7 +2736,7 @@ namespace DataWarehouse.SDK.Contracts
         /// <summary>
         /// Sets the per-user configuration provider.
         /// </summary>
-        public virtual void SetConfigProvider(Security.IKeyManagementConfigProvider provider)
+        public virtual void SetConfigProvider(IKeyManagementConfigProvider provider)
         {
             ConfigProvider = provider;
         }
@@ -2546,7 +2744,7 @@ namespace DataWarehouse.SDK.Contracts
         /// <summary>
         /// Sets the key store registry.
         /// </summary>
-        public virtual void SetKeyStoreRegistry(Security.IKeyStoreRegistry registry)
+        public virtual void SetKeyStoreRegistry(IKeyStoreRegistry registry)
         {
             KeyStoreRegistry = registry;
         }
@@ -2625,51 +2823,51 @@ namespace DataWarehouse.SDK.Contracts
         public override PluginCategory Category => PluginCategory.OrchestrationProvider;
 
         public abstract Task<ContainerInfo> CreateContainerAsync(
-            Security.ISecurityContext context,
+            ISecurityContext context,
             string containerId,
             ContainerOptions? options = null,
             CancellationToken ct = default);
 
         public abstract Task<ContainerInfo?> GetContainerAsync(
-            Security.ISecurityContext context,
+            ISecurityContext context,
             string containerId,
             CancellationToken ct = default);
 
         public abstract IAsyncEnumerable<ContainerInfo> ListContainersAsync(
-            Security.ISecurityContext context,
+            ISecurityContext context,
             CancellationToken ct = default);
 
         public abstract Task DeleteContainerAsync(
-            Security.ISecurityContext context,
+            ISecurityContext context,
             string containerId,
             CancellationToken ct = default);
 
         public abstract Task GrantAccessAsync(
-            Security.ISecurityContext ownerContext,
+            ISecurityContext ownerContext,
             string containerId,
             string targetUserId,
             ContainerAccessLevel level,
             CancellationToken ct = default);
 
         public abstract Task RevokeAccessAsync(
-            Security.ISecurityContext ownerContext,
+            ISecurityContext ownerContext,
             string containerId,
             string targetUserId,
             CancellationToken ct = default);
 
         public abstract Task<ContainerAccessLevel> GetAccessLevelAsync(
-            Security.ISecurityContext context,
+            ISecurityContext context,
             string containerId,
             string? userId = null,
             CancellationToken ct = default);
 
         public abstract IAsyncEnumerable<ContainerAccessEntry> ListAccessAsync(
-            Security.ISecurityContext context,
+            ISecurityContext context,
             string containerId,
             CancellationToken ct = default);
 
         public virtual Task<ContainerQuota> GetQuotaAsync(
-            Security.ISecurityContext context,
+            ISecurityContext context,
             string containerId,
             CancellationToken ct = default)
         {
@@ -2677,7 +2875,7 @@ namespace DataWarehouse.SDK.Contracts
         }
 
         public virtual Task SetQuotaAsync(
-            Security.ISecurityContext adminContext,
+            ISecurityContext adminContext,
             string containerId,
             ContainerQuota quota,
             CancellationToken ct = default)

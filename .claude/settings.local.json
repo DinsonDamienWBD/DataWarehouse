@@ -97,7 +97,9 @@
       "Bash(Get-ChildItem -Path \"C:\\\\Temp\\\\DataWarehouse\\\\DataWarehouse\\\\Plugins\" -Directory)",
       "Bash(Select-Object -ExpandProperty Name)",
       "Bash(Sort-Object)",
-      "Bash(comm:*)"
+      "Bash(comm:*)",
+      "Bash(Select-String -Pattern \"KnowledgeObject|error\" -Context 2)",
+      "Bash(dotnet build-server:*)"
     ]
   }
 }

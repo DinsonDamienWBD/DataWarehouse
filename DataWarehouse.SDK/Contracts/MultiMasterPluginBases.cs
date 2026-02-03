@@ -22,7 +22,7 @@ namespace DataWarehouse.SDK.Contracts
     /// with configurable consistency levels and conflict resolution strategies.
     /// Derived classes implement region-specific transport and storage mechanisms.
     /// </summary>
-    public abstract class MultiMasterReplicationPluginBase : FeaturePluginBase, Replication.IMultiMasterReplication
+    public abstract class MultiMasterReplicationPluginBase : FeaturePluginBase, DataWarehouse.SDK.Replication.IMultiMasterReplication
     {
         /// <summary>
         /// Gets the local region identifier.
