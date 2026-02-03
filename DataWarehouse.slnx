@@ -75,7 +75,6 @@
     <Project Path="Plugins/DataWarehouse.Plugins.FederatedQuery/DataWarehouse.Plugins.FederatedQuery.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.Federation/DataWarehouse.Plugins.Federation.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.FedRampCompliance/DataWarehouse.Plugins.FedRampCompliance.csproj" />
-    <Project Path="Plugins/DataWarehouse.Plugins.FileKeyStore/DataWarehouse.Plugins.FileKeyStore.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.FilesystemCore/DataWarehouse.Plugins.FilesystemCore.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.FipsEncryption/DataWarehouse.Plugins.FipsEncryption.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.FuseDriver/DataWarehouse.Plugins.FuseDriver.csproj" />
@@ -101,7 +100,6 @@
     <Project Path="Plugins/DataWarehouse.Plugins.Jaeger/DataWarehouse.Plugins.Jaeger.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.JdbcBridge/DataWarehouse.Plugins.JdbcBridge.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.K8sOperator/DataWarehouse.Plugins.K8sOperator.csproj" />
-    <Project Path="Plugins/DataWarehouse.Plugins.KeyRotation/DataWarehouse.Plugins.KeyRotation.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.Kibana/DataWarehouse.Plugins.Kibana.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.KubernetesCsi/DataWarehouse.Plugins.KubernetesCsi.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.LoadBalancer/DataWarehouse.Plugins.LoadBalancer.csproj" />
@@ -143,7 +141,6 @@
     <Project Path="Plugins/DataWarehouse.Plugins.S3Storage/DataWarehouse.Plugins.S3Storage.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.SchemaRegistry/DataWarehouse.Plugins.SchemaRegistry.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.Search/DataWarehouse.Plugins.Search.csproj" />
-    <Project Path="Plugins/DataWarehouse.Plugins.SecretManagement/DataWarehouse.Plugins.SecretManagement.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.SelfHealingRaid/DataWarehouse.Plugins.SelfHealingRaid.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.SerpentEncryption/DataWarehouse.Plugins.SerpentEncryption.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.Sharding/DataWarehouse.Plugins.Sharding.csproj" />
@@ -164,7 +161,6 @@
     <Project Path="Plugins/DataWarehouse.Plugins.Transcoding.Media/DataWarehouse.Plugins.Transcoding.Media.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.TwofishEncryption/DataWarehouse.Plugins.TwofishEncryption.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.UltimateKeyManagement/DataWarehouse.Plugins.UltimateKeyManagement.csproj" />
-    <Project Path="Plugins/DataWarehouse.Plugins.VaultKeyStore/DataWarehouse.Plugins.VaultKeyStore.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.VendorSpecificRaid/DataWarehouse.Plugins.VendorSpecificRaid.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.Versioning/DataWarehouse.Plugins.Versioning.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.Virtualization.SqlOverObject/DataWarehouse.Plugins.Virtualization.SqlOverObject.csproj" />
