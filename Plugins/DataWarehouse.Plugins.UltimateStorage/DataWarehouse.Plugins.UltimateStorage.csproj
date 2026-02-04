@@ -66,6 +66,9 @@
 
     <!-- Memcached -->
     <PackageReference Include="EnyimMemcachedCore" Version="2.7.*" />
+
+    <!-- FoundationDB -->
+    <PackageReference Include="FoundationDB.Client" Version="7.3.2" />
   </ItemGroup>
 
   <!-- Remote Storage Protocols -->
