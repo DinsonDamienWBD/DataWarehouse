@@ -212,10 +212,10 @@ T99 (SDK) → T94 (Key Mgmt) → T93 (Encryption) → TamperProof (T3.4.2)
 
 | Order | Task | Name | Description | Ultimate Plugin | Status |
 |-------|------|------|-------------|-----------------|--------|
-| **3.14** | T6.1 | Common Selection | Cipher presets | Feature in **T93** | [ ] |
-| **3.15** | T6.2 | User Configurable | Manual cipher selection | Feature in **T93** | [ ] |
-| **3.16** | T6.3 | Endpoint-Adaptive | Auto-select by capabilities | Feature in **T93** | [ ] |
-| **3.17** | T6.4 | Transcryption | Re-encrypt for transit | Add `TranscryptionStrategy` in **T93** | [ ] |
+| **3.14** | T6.1 | Common Selection | Cipher presets | Feature in **T93** | [x] |
+| **3.15** | T6.2 | User Configurable | Manual cipher selection | Feature in **T93** | [x] |
+| **3.16** | T6.3 | Endpoint-Adaptive | Auto-select by capabilities | Feature in **T93** | [x] |
+| **3.17** | T6.4 | Transcryption | Re-encrypt for transit | Add `TranscryptionStrategy` in **T93** | [x] |
 
 ---
 
@@ -2221,10 +2221,10 @@ public record OrphanedWormRecord
 
 | Task | Description | Base Class | Dependencies | Status |
 |------|-------------|------------|--------------|--------|
-| T4.24 | Implement historical/educational ciphers (NOT for production) | `PipelinePluginBase` | T4.23 | [ ] |
-| T4.24.1 | ↳ Caesar/ROT13 (educational only) | `PipelinePluginBase` | T4.24 | [ ] |
-| T4.24.2 | ↳ XOR cipher (educational only) | `PipelinePluginBase` | T4.24 | [ ] |
-| T4.24.3 | ↳ Vigenère cipher (educational only) | `PipelinePluginBase` | T4.24 | [ ] |
+| T4.24 | Implement historical/educational ciphers (NOT for production) | `PipelinePluginBase` | T4.23 | [x] |
+| T4.24.1 | ↳ Caesar/ROT13 (educational only) | `PipelinePluginBase` | T4.24 | [x] |
+| T4.24.2 | ↳ XOR cipher (educational only) | `PipelinePluginBase` | T4.24 | [x] |
+| T4.24.3 | ↳ Vigenère cipher (educational only) | `PipelinePluginBase` | T4.24 | [x] |
 | T4.25 | Implement legacy ciphers (compatibility only) | `EncryptionPluginBase` | T5.0, T4.24 | [x] |
 | T4.25.1 | ↳ DES (56-bit, legacy) | `EncryptionPluginBase` | T4.25 | [x] |
 | T4.25.2 | ↳ 3DES/Triple-DES (112/168-bit, legacy) | `EncryptionPluginBase` | T4.25 | [x] |
@@ -2236,15 +2236,15 @@ public record OrphanedWormRecord
 | T4.26.3 | ↳ AES-256-CBC (for compatibility) | `EncryptionPluginBase` | T4.26 | [x] |
 | T4.26.4 | ↳ AES-256-CTR (counter mode) | `EncryptionPluginBase` | T4.26 | [x] |
 | T4.26.5 | ↳ AES-NI hardware acceleration detection | - | T4.26 | [x] |
-| T4.27 | Implement asymmetric/public-key encryption | `EncryptionPluginBase` | T5.0, T4.26 | [ ] |
-| T4.27.1 | ↳ RSA-2048 | `EncryptionPluginBase` | T4.27 | [ ] |
-| T4.27.2 | ↳ RSA-4096 | `EncryptionPluginBase` | T4.27 | [ ] |
-| T4.27.3 | ↳ ECDH/ECDSA (Elliptic Curve) | `EncryptionPluginBase` | T4.27 | [ ] |
+| T4.27 | Implement asymmetric/public-key encryption | `EncryptionPluginBase` | T5.0, T4.26 | [x] |
+| T4.27.1 | ↳ RSA-2048 | `EncryptionPluginBase` | T4.27 | [x] |
+| T4.27.2 | ↳ RSA-4096 | `EncryptionPluginBase` | T4.27 | [x] |
+| T4.27.3 | ↳ ECDH/ECDSA (Elliptic Curve) | `EncryptionPluginBase` | T4.27 | [x] |
 | T4.28 | Implement post-quantum cryptography | `EncryptionPluginBase` | T5.0, T4.27 | [x] |
 | T4.28.1 | ↳ ML-KEM (Kyber, NIST PQC standard) | `EncryptionPluginBase` | T4.28 | [x] |
 | T4.28.2 | ↳ ML-DSA (Dilithium, signatures) | `EncryptionPluginBase` | T4.28 | [x] |
 | T4.29 | Implement special-purpose encryption | `EncryptionPluginBase` | T5.0, T4.28 | [x] |
-| T4.29.1 | ↳ One-Time Pad (OTP) | `EncryptionPluginBase` | T4.29 | [ ] |
+| T4.29.1 | ↳ One-Time Pad (OTP) | `EncryptionPluginBase` | T4.29 | [x] |
 | T4.29.2 | ↳ XTS-AES (disk encryption mode) | `EncryptionPluginBase` | T4.29 | [x] |
 
 **Encryption Algorithm Reference:**
@@ -2256,19 +2256,19 @@ public record OrphanedWormRecord
 | Serpent | Symmetric | 256-bit | `EncryptionPluginBase` | ✅ Supported | ✅ Implemented | Very Strong | High security |
 | FIPS | Symmetric | Various | `EncryptionPluginBase` | ✅ Supported | ✅ Implemented | Certified | Government compliance |
 | ZeroKnowledge | Symmetric | 256-bit | `EncryptionPluginBase` | ✅ Supported | ✅ Implemented | Strong | Client-side + ZK proofs |
-| Caesar/ROT13 | Substitution | None | `PipelinePluginBase` | ❌ N/A | [ ] Pending | ❌ None | Educational only |
-| XOR | Stream | Variable | `PipelinePluginBase` | ❌ N/A | [ ] Pending | ❌ Weak | Educational only |
-| Vigenère | Substitution | Variable | `PipelinePluginBase` | ❌ N/A | [ ] Pending | ❌ Weak | Educational only |
-| DES | Symmetric | 56-bit | `EncryptionPluginBase` | ✅ Supported | [ ] Pending | ❌ Broken | Legacy compatibility |
-| 3DES | Symmetric | 112/168-bit | `EncryptionPluginBase` | ✅ Supported | [ ] Pending | ⚠️ Weak | Legacy compatibility |
-| RC4 | Stream | 40-2048-bit | `EncryptionPluginBase` | ✅ Supported | [ ] Pending | ❌ Broken | Legacy (WEP) |
-| Blowfish | Symmetric | 32-448-bit | `EncryptionPluginBase` | ✅ Supported | [ ] Pending | ⚠️ Aging | Legacy compatibility |
-| AES-128-GCM | Symmetric | 128-bit | `EncryptionPluginBase` | ✅ Supported | [ ] Pending | Strong | Performance-critical |
-| AES-192-GCM | Symmetric | 192-bit | `EncryptionPluginBase` | ✅ Supported | [ ] Pending | Strong | Middle ground |
-| RSA-2048 | Asymmetric | 2048-bit | `EncryptionPluginBase` | ✅ Supported | [ ] Pending | Strong | Key exchange |
-| RSA-4096 | Asymmetric | 4096-bit | `EncryptionPluginBase` | ✅ Supported | [ ] Pending | Very Strong | High security |
-| ML-KEM (Kyber) | Post-Quantum | Various | `EncryptionPluginBase` | ✅ Supported | [ ] Pending | Quantum-Safe | Future-proof |
-| One-Time Pad | Perfect | ≥ Message | `EncryptionPluginBase` | ✅ Supported | [ ] Pending | Perfect | Theoretical max |
+| Caesar/ROT13 | Substitution | None | `PipelinePluginBase` | ❌ N/A | [x] Complete | ❌ None | Educational only |
+| XOR | Stream | Variable | `PipelinePluginBase` | ❌ N/A | [x] Complete | ❌ Weak | Educational only |
+| Vigenère | Substitution | Variable | `PipelinePluginBase` | ❌ N/A | [x] Complete | ❌ Weak | Educational only |
+| DES | Symmetric | 56-bit | `EncryptionPluginBase` | ✅ Supported | [x] Complete | ❌ Broken | Legacy compatibility |
+| 3DES | Symmetric | 112/168-bit | `EncryptionPluginBase` | ✅ Supported | [x] Complete | ⚠️ Weak | Legacy compatibility |
+| RC4 | Stream | 40-2048-bit | `EncryptionPluginBase` | ✅ Supported | [x] Complete | ❌ Broken | Legacy (WEP) |
+| Blowfish | Symmetric | 32-448-bit | `EncryptionPluginBase` | ✅ Supported | [x] Complete | ⚠️ Aging | Legacy compatibility |
+| AES-128-GCM | Symmetric | 128-bit | `EncryptionPluginBase` | ✅ Supported | [x] Complete | Strong | Performance-critical |
+| AES-192-GCM | Symmetric | 192-bit | `EncryptionPluginBase` | ✅ Supported | [x] Complete | Strong | Middle ground |
+| RSA-2048 | Asymmetric | 2048-bit | `EncryptionPluginBase` | ✅ Supported | [x] Complete | Strong | Key exchange |
+| RSA-4096 | Asymmetric | 4096-bit | `EncryptionPluginBase` | ✅ Supported | [x] Complete | Very Strong | High security |
+| ML-KEM (Kyber) | Post-Quantum | Various | `EncryptionPluginBase` | ✅ Supported | [x] Complete | Quantum-Safe | Future-proof |
+| One-Time Pad | Perfect | ≥ Message | `EncryptionPluginBase` | ✅ Supported | [x] Complete | Perfect | Theoretical max |
 
 ---
 
@@ -2688,16 +2688,16 @@ PluginBase (SDK)
 
 | Task | Component | Location | Description | Status |
 |------|-----------|----------|-------------|--------|
-| T5.0.1 | SDK Key Management Types | DataWarehouse.SDK/Security/ | Shared types for key management | [ ] |
-| T5.0.1.1 | `KeyManagementMode` enum | IKeyStore.cs | `Direct` (key from IKeyStore) vs `Envelope` (DEK wrapped by HSM KEK) | [ ] |
-| T5.0.1.2 | `IEnvelopeKeyStore` interface | IKeyStore.cs | Extends IKeyStore with `WrapKeyAsync`/`UnwrapKeyAsync` | [ ] |
-| T5.0.1.3 | `EnvelopeHeader` class | EnvelopeHeader.cs | Serialize/deserialize envelope header: WrappedDEK, KekId, etc. | [ ] |
-| T5.0.1.4 | `EncryptionMetadata` record | EncryptionMetadata.cs | Full metadata: plugin ID, mode, key IDs, algorithm params | [ ] |
-| T5.0.1.5 | `KeyManagementConfig` record | KeyManagementConfig.cs | Per-user configuration: mode, key store, KEK ID, etc. | [ ] |
-| T5.0.1.6 | `IKeyManagementConfigProvider` interface | IKeyManagementConfigProvider.cs | Resolve per-user/per-tenant key management preferences | [ ] |
-| T5.0.1.7 | `IKeyStoreRegistry` interface | IKeyStoreRegistry.cs | Registry for resolving plugin IDs to key store instances | [ ] |
-| T5.0.1.8 | `DefaultKeyStoreRegistry` implementation | DefaultKeyStoreRegistry.cs | Default in-memory implementation of IKeyStoreRegistry | [ ] |
-| T5.0.1.9 | `EncryptionConfigMode` enum | EncryptionConfigMode.cs | Per-object vs fixed vs policy-enforced configuration | [ ] |
+| T5.0.1 | SDK Key Management Types | DataWarehouse.SDK/Security/ | Shared types for key management | [x] |
+| T5.0.1.1 | `KeyManagementMode` enum | IKeyStore.cs | `Direct` (key from IKeyStore) vs `Envelope` (DEK wrapped by HSM KEK) | [x] |
+| T5.0.1.2 | `IEnvelopeKeyStore` interface | IKeyStore.cs | Extends IKeyStore with `WrapKeyAsync`/`UnwrapKeyAsync` | [x] |
+| T5.0.1.3 | `EnvelopeHeader` class | EnvelopeHeader.cs | Serialize/deserialize envelope header: WrappedDEK, KekId, etc. | [x] |
+| T5.0.1.4 | `EncryptionMetadata` record | EncryptionMetadata.cs | Full metadata: plugin ID, mode, key IDs, algorithm params | [x] |
+| T5.0.1.5 | `KeyManagementConfig` record | KeyManagementConfig.cs | Per-user configuration: mode, key store, KEK ID, etc. | [x] |
+| T5.0.1.6 | `IKeyManagementConfigProvider` interface | IKeyManagementConfigProvider.cs | Resolve per-user/per-tenant key management preferences | [x] |
+| T5.0.1.7 | `IKeyStoreRegistry` interface | IKeyStoreRegistry.cs | Registry for resolving plugin IDs to key store instances | [x] |
+| T5.0.1.8 | `DefaultKeyStoreRegistry` implementation | DefaultKeyStoreRegistry.cs | Default in-memory implementation of IKeyStoreRegistry | [x] |
+| T5.0.1.9 | `EncryptionConfigMode` enum | EncryptionConfigMode.cs | Per-object vs fixed vs policy-enforced configuration | [x] |
 
 **KeyManagementMode Enum:**
 ```csharp
@@ -2783,12 +2783,12 @@ public enum EncryptionConfigMode
 
 | Task | Component | Location | Description | Status |
 |------|-----------|----------|-------------|--------|
-| T5.0.2 | `KeyStorePluginBase` | SDK/Contracts/PluginBase.cs | Abstract base for all key management plugins | [ ] |
-| T5.0.2.1 | ↳ Key caching infrastructure | Common | `ConcurrentDictionary<string, CachedKey>`, cache expiration | [ ] |
-| T5.0.2.2 | ↳ Initialization pattern | Common | `EnsureInitializedAsync()`, thread-safe init with `SemaphoreSlim` | [ ] |
-| T5.0.2.3 | ↳ Security context validation | Common | `ValidateAccess()`, `ValidateAdminAccess()` | [ ] |
-| T5.0.2.4 | ↳ Standard message handling | Common | `keystore.*.create`, `keystore.*.get`, `keystore.*.rotate` | [ ] |
-| T5.0.2.5 | ↳ Abstract storage methods | Abstract | `LoadKeyFromStorageAsync()`, `SaveKeyToStorageAsync()` | [ ] |
+| T5.0.2 | `KeyStorePluginBase` | SDK/Contracts/PluginBase.cs | Abstract base for all key management plugins | [x] |
+| T5.0.2.1 | ↳ Key caching infrastructure | Common | `ConcurrentDictionary<string, CachedKey>`, cache expiration | [x] |
+| T5.0.2.2 | ↳ Initialization pattern | Common | `EnsureInitializedAsync()`, thread-safe init with `SemaphoreSlim` | [x] |
+| T5.0.2.3 | ↳ Security context validation | Common | `ValidateAccess()`, `ValidateAdminAccess()` | [x] |
+| T5.0.2.4 | ↳ Standard message handling | Common | `keystore.*.create`, `keystore.*.get`, `keystore.*.rotate` | [x] |
+| T5.0.2.5 | ↳ Abstract storage methods | Abstract | `LoadKeyFromStorageAsync()`, `SaveKeyToStorageAsync()` | [x] |
 
 **KeyStorePluginBase Design:**
 ```csharp
@@ -2835,14 +2835,14 @@ public abstract class KeyStorePluginBase : SecurityProviderPluginBase, IKeyStore
 
 | Task | Component | Location | Description | Status |
 |------|-----------|----------|-------------|--------|
-| T5.0.3 | `EncryptionPluginBase` | SDK/Contracts/PluginBase.cs | Abstract base for all encryption plugins | [ ] |
-| T5.0.3.1 | ↳ Key store resolution | Common | `GetKeyStore()` from args, config, or kernel context | [ ] |
-| T5.0.3.2 | ↳ Security context resolution | Common | `GetSecurityContext()` from args or config | [ ] |
-| T5.0.3.3 | ↳ Key management mode support | Common | `KeyManagementMode` property, Direct vs Envelope | [ ] |
-| T5.0.3.4 | ↳ Envelope key handling | Common | `GetKeyForEncryption()`, `GetKeyForDecryption()` with envelope support | [ ] |
-| T5.0.3.5 | ↳ Statistics tracking | Common | Encryption/decryption counts, bytes processed | [ ] |
-| T5.0.3.6 | ↳ Key access logging | Common | Audit trail for key usage | [ ] |
-| T5.0.3.7 | ↳ Abstract encrypt/decrypt | Abstract | `EncryptCoreAsync()`, `DecryptCoreAsync()` | [ ] |
+| T5.0.3 | `EncryptionPluginBase` | SDK/Contracts/PluginBase.cs | Abstract base for all encryption plugins | [x] |
+| T5.0.3.1 | ↳ Key store resolution | Common | `GetKeyStore()` from args, config, or kernel context | [x] |
+| T5.0.3.2 | ↳ Security context resolution | Common | `GetSecurityContext()` from args or config | [x] |
+| T5.0.3.3 | ↳ Key management mode support | Common | `KeyManagementMode` property, Direct vs Envelope | [x] |
+| T5.0.3.4 | ↳ Envelope key handling | Common | `GetKeyForEncryption()`, `GetKeyForDecryption()` with envelope support | [x] |
+| T5.0.3.5 | ↳ Statistics tracking | Common | Encryption/decryption counts, bytes processed | [x] |
+| T5.0.3.6 | ↳ Key access logging | Common | Audit trail for key usage | [x] |
+| T5.0.3.7 | ↳ Abstract encrypt/decrypt | Abstract | `EncryptCoreAsync()`, `DecryptCoreAsync()` | [x] |
 
 **EncryptionPluginBase Design (Per-User Configuration):**
 ```csharp
@@ -3174,8 +3174,8 @@ public interface IKeyStoreRegistry
 | T5.0.4 | Refactor key management plugins | - | - | Migrate to KeyStorePluginBase | [x] |
 | T5.0.4.1 | `FileKeyStorePlugin` | `SecurityProviderPluginBase` | `KeyStorePluginBase` | Remove duplicated caching/init, implement abstract storage methods | [x] |
 | T5.0.4.2 | `VaultKeyStorePlugin` | `SecurityProviderPluginBase` | `KeyStorePluginBase` + `IEnvelopeKeyStore` | Remove duplicated caching/init, implement abstract storage methods, add IEnvelopeKeyStore | [x] |
-| T5.0.4.3 | `KeyRotationPlugin` | Custom | `KeyStorePluginBase` (decorator) | Verify compatibility with base class pattern | [ ] |
-| T5.0.4.4 | `SecretManagementPlugin` | Custom | Verify/Align | Ensure consistent with KeyStorePluginBase pattern | [ ] |
+| T5.0.4.3 | `KeyRotationPlugin` | Custom | `KeyStorePluginBase` (decorator) | Verify compatibility with base class pattern | [x] |
+| T5.0.4.4 | `SecretManagementPlugin` | Custom | Verify/Align | Ensure consistent with KeyStorePluginBase pattern | [x] |
 
 **FileKeyStorePlugin Refactoring:**
 ```csharp
@@ -3330,12 +3330,12 @@ For each new ENCRYPTION plugin:
 | Task | Description | Dependencies | Status |
 |------|-------------|--------------|--------|
 | **T5.0** | **SDK Base Classes and Plugin Refactoring** | None | [ ] |
-| T5.0.1 | SDK Key Management Types (enums, interfaces, classes incl. EncryptionConfigMode) | - | [ ] |
-| T5.0.2 | `KeyStorePluginBase` abstract class | T5.0.1 | [ ] |
-| T5.0.3 | `EncryptionPluginBase` abstract class | T5.0.1 | [ ] |
-| T5.0.4 | Refactor existing key management plugins (4 plugins) | T5.0.2 | [ ] |
-| T5.0.5 | Refactor existing encryption plugins (6 plugins) | T5.0.3 | [ ] |
-| T5.0.6 | Document requirements for new plugins | T5.0.4, T5.0.5 | [ ] |
+| T5.0.1 | SDK Key Management Types (enums, interfaces, classes incl. EncryptionConfigMode) | - | [x] |
+| T5.0.2 | `KeyStorePluginBase` abstract class | T5.0.1 | [x] |
+| T5.0.3 | `EncryptionPluginBase` abstract class | T5.0.1 | [x] |
+| T5.0.4 | Refactor existing key management plugins (4 plugins) | T5.0.2 | [x] |
+| T5.0.5 | Refactor existing encryption plugins (6 plugins) | T5.0.3 | [x] |
+| T5.0.6 | Document requirements for new plugins | T5.0.4, T5.0.5 | [x] |
 
 **Benefits of T5.0:**
 - ✅ Eliminates ~500+ lines of duplicated code across plugins
@@ -3413,34 +3413,34 @@ For each new ENCRYPTION plugin:
 |--------|------------|------------------|----------|--------|
 | `FileKeyStorePlugin` | `KeyStorePluginBase` | ❌ No | DPAPI, CredentialManager, Database, PBKDF2 4-tier | ✅ COMPLETE T5.0.4.1 |
 | `VaultKeyStorePlugin` | `KeyStorePluginBase` + `IEnvelopeKeyStore` | ✅ Yes | HashiCorp, Azure, AWS KMS + WrapKey/UnwrapKey | ✅ COMPLETE T5.0.4.2 |
-| `KeyRotationPlugin` | `KeyStorePluginBase` (decorator) | Passthrough | Wraps any IKeyStore, adds rotation/versioning/audit | ⏳ Pending T5.0.4.3 |
-| `SecretManagementPlugin` | `KeyStorePluginBase` | ❌ No | Secure secret storage with access control | ⏳ Pending T5.0.4.4 |
+| `KeyRotationPlugin` | `KeyStorePluginBase` (decorator) | Passthrough | Wraps any IKeyStore, adds rotation/versioning/audit | ✅ COMPLETE T5.0.4.3 |
+| `SecretManagementPlugin` | `KeyStorePluginBase` | ❌ No | Secure secret storage with access control | ✅ COMPLETE T5.0.4.4 |
 
 **New Key Management Plugins (T5.4) - MUST Extend KeyStorePluginBase:**
 
 | Task | Component | Base Class | Description | Status |
 |------|-----------|------------|-------------|--------|
 | T5.4 | Additional key management plugins | - | More options for composable key management | [ ] |
-| T5.4.1 | `ShamirSecretKeyStorePlugin` | `KeyStorePluginBase` | M-of-N key splitting (Shamir's Secret Sharing) | [ ] |
-| T5.4.1.1 | ↳ Key split generation | - | Split key into N shares | [ ] |
-| T5.4.1.2 | ↳ Key reconstruction | - | Reconstruct from M shares | [ ] |
-| T5.4.1.3 | ↳ Share distribution | - | Securely distribute shares to custodians | [ ] |
-| T5.4.1.4 | ↳ Share rotation | - | Rotate shares without changing key | [ ] |
-| T5.4.2 | `Pkcs11KeyStorePlugin` | `KeyStorePluginBase` + `IEnvelopeKeyStore` | PKCS#11 HSM interface (generic HSM support) | [ ] |
-| T5.4.2.1 | ↳ Token enumeration | - | List available PKCS#11 tokens | [ ] |
-| T5.4.2.2 | ↳ Key operations | - | Generate, import, wrap, unwrap via PKCS#11 | [ ] |
-| T5.4.3 | `TpmKeyStorePlugin` | `KeyStorePluginBase` | TPM 2.0 hardware security | [ ] |
-| T5.4.3.1 | ↳ TPM key sealing | - | Seal keys to PCR state | [ ] |
-| T5.4.3.2 | ↳ TPM key unsealing | - | Unseal with attestation | [ ] |
-| T5.4.4 | `YubikeyKeyStorePlugin` | `KeyStorePluginBase` | YubiKey/FIDO2 hardware tokens | [ ] |
-| T5.4.4.1 | ↳ PIV slot support | - | Use PIV slots for key storage | [ ] |
-| T5.4.4.2 | ↳ Challenge-response | - | HMAC-SHA1 challenge-response | [ ] |
-| T5.4.5 | `PasswordDerivedKeyStorePlugin` | `KeyStorePluginBase` | Argon2id/scrypt key derivation | [ ] |
-| T5.4.5.1 | ↳ Argon2id derivation | - | Memory-hard KDF | [ ] |
-| T5.4.5.2 | ↳ scrypt derivation | - | Alternative memory-hard KDF | [ ] |
-| T5.4.6 | `MultiPartyKeyStorePlugin` | `KeyStorePluginBase` + `IEnvelopeKeyStore` | Multi-party computation (MPC) key management | [ ] |
-| T5.4.6.1 | ↳ Threshold signatures | - | t-of-n signing without key reconstruction | [ ] |
-| T5.4.6.2 | ↳ Distributed key generation | - | Generate keys without single point of failure | [ ] |
+| T5.4.1 | `ShamirSecretKeyStorePlugin` | `KeyStorePluginBase` | M-of-N key splitting (Shamir's Secret Sharing) | [x] |
+| T5.4.1.1 | ↳ Key split generation | - | Split key into N shares | [x] |
+| T5.4.1.2 | ↳ Key reconstruction | - | Reconstruct from M shares | [x] |
+| T5.4.1.3 | ↳ Share distribution | - | Securely distribute shares to custodians | [x] |
+| T5.4.1.4 | ↳ Share rotation | - | Rotate shares without changing key | [x] |
+| T5.4.2 | `Pkcs11KeyStorePlugin` | `KeyStorePluginBase` + `IEnvelopeKeyStore` | PKCS#11 HSM interface (generic HSM support) | [x] |
+| T5.4.2.1 | ↳ Token enumeration | - | List available PKCS#11 tokens | [x] |
+| T5.4.2.2 | ↳ Key operations | - | Generate, import, wrap, unwrap via PKCS#11 | [x] |
+| T5.4.3 | `TpmKeyStorePlugin` | `KeyStorePluginBase` | TPM 2.0 hardware security | [x] |
+| T5.4.3.1 | ↳ TPM key sealing | - | Seal keys to PCR state | [x] |
+| T5.4.3.2 | ↳ TPM key unsealing | - | Unseal with attestation | [x] |
+| T5.4.4 | `YubikeyKeyStorePlugin` | `KeyStorePluginBase` | YubiKey/FIDO2 hardware tokens | [x] |
+| T5.4.4.1 | ↳ PIV slot support | - | Use PIV slots for key storage | [x] |
+| T5.4.4.2 | ↳ Challenge-response | - | HMAC-SHA1 challenge-response | [x] |
+| T5.4.5 | `PasswordDerivedKeyStorePlugin` | `KeyStorePluginBase` | Argon2id/scrypt key derivation | [x] |
+| T5.4.5.1 | ↳ Argon2id derivation | - | Memory-hard KDF | [x] |
+| T5.4.5.2 | ↳ scrypt derivation | - | Alternative memory-hard KDF | [x] |
+| T5.4.6 | `MultiPartyKeyStorePlugin` | `KeyStorePluginBase` + `IEnvelopeKeyStore` | Multi-party computation (MPC) key management | [x] |
+| T5.4.6.1 | ↳ Threshold signatures | - | t-of-n signing without key reconstruction | [x] |
+| T5.4.6.2 | ↳ Distributed key generation | - | Generate keys without single point of failure | [x] |
 
 **Key Management Plugin Reference:**
 | Plugin | Base Class | IEnvelopeKeyStore | Security Level | Use Case |
@@ -3865,9 +3865,9 @@ public abstract class CipherPresetProviderPluginBase : FeaturePluginBase, ICommo
 
 | Task | Plugin | Description | Status |
 |------|--------|-------------|--------|
-| T6.1.3.1 | `DefaultCipherPresetPlugin` | Standard presets (Fast, Balanced, Secure, Maximum, FipsOnly) | [ ] |
-| T6.1.3.2 | `EnterpriseCipherPresetPlugin` | Enterprise-specific presets with compliance mappings | [ ] |
-| T6.1.3.3 | `GovernmentCipherPresetPlugin` | Government/military presets (ITAR, Classified, TopSecret) | [ ] |
+| T6.1.3.1 | `DefaultCipherPresetPlugin` | Standard presets (Fast, Balanced, Secure, Maximum, FipsOnly) | [x] |
+| T6.1.3.2 | `EnterpriseCipherPresetPlugin` | Enterprise-specific presets with compliance mappings | [x] |
+| T6.1.3.3 | `GovernmentCipherPresetPlugin` | Government/military presets (ITAR, Classified, TopSecret) | [x] |
 
 #### T6.1.4: Usage Example
 
@@ -4798,16 +4798,16 @@ public abstract class TranscryptionServicePluginBase : FeaturePluginBase, ITrans
 
 | Task | Plugin | Base Class | Description | Status |
 |------|--------|------------|-------------|--------|
-| T6.2.1 | `DesktopEndpointCapabilitiesPlugin` | `EndpointCapabilitiesProviderPluginBase` | Detects capabilities of desktop endpoints (Windows, macOS, Linux) | [ ] |
-| T6.2.2 | `MobileEndpointCapabilitiesPlugin` | `EndpointCapabilitiesProviderPluginBase` | Detects capabilities of mobile endpoints (iOS, Android) | [ ] |
-| T6.2.3 | `IoTEndpointCapabilitiesPlugin` | `EndpointCapabilitiesProviderPluginBase` | Detects capabilities of IoT/embedded devices | [ ] |
-| T6.2.4 | `BrowserEndpointCapabilitiesPlugin` | `EndpointCapabilitiesProviderPluginBase` | Detects capabilities of browser-based clients (WebCrypto) | [ ] |
-| T6.2.5 | `DefaultCipherNegotiatorPlugin` | `CipherNegotiatorPluginBase` | Default negotiation: balance security vs performance | [ ] |
-| T6.2.6 | `SecurityFirstNegotiatorPlugin` | `CipherNegotiatorPluginBase` | Always prefer strongest cipher endpoint can handle | [ ] |
-| T6.2.7 | `PerformanceFirstNegotiatorPlugin` | `CipherNegotiatorPluginBase` | Prefer fastest cipher meeting minimum security | [ ] |
-| T6.2.8 | `PolicyDrivenNegotiatorPlugin` | `CipherNegotiatorPluginBase` | Negotiation based on data classification policies | [ ] |
-| T6.2.9 | `DefaultTranscryptionPlugin` | `TranscryptionServicePluginBase` | Default in-memory transcryption service | [ ] |
-| T6.2.10 | `StreamingTranscryptionPlugin` | `TranscryptionServicePluginBase` | Optimized for large files with chunked processing | [ ] |
+| T6.2.1 | `DesktopEndpointCapabilitiesPlugin` | `EndpointCapabilitiesProviderPluginBase` | Detects capabilities of desktop endpoints (Windows, macOS, Linux) | [x] |
+| T6.2.2 | `MobileEndpointCapabilitiesPlugin` | `EndpointCapabilitiesProviderPluginBase` | Detects capabilities of mobile endpoints (iOS, Android) | [x] |
+| T6.2.3 | `IoTEndpointCapabilitiesPlugin` | `EndpointCapabilitiesProviderPluginBase` | Detects capabilities of IoT/embedded devices | [x] |
+| T6.2.4 | `BrowserEndpointCapabilitiesPlugin` | `EndpointCapabilitiesProviderPluginBase` | Detects capabilities of browser-based clients (WebCrypto) | [x] |
+| T6.2.5 | `DefaultCipherNegotiatorPlugin` | `CipherNegotiatorPluginBase` | Default negotiation: balance security vs performance | [x] |
+| T6.2.6 | `SecurityFirstNegotiatorPlugin` | `CipherNegotiatorPluginBase` | Always prefer strongest cipher endpoint can handle | [x] |
+| T6.2.7 | `PerformanceFirstNegotiatorPlugin` | `CipherNegotiatorPluginBase` | Prefer fastest cipher meeting minimum security | [x] |
+| T6.2.8 | `PolicyDrivenNegotiatorPlugin` | `CipherNegotiatorPluginBase` | Negotiation based on data classification policies | [x] |
+| T6.2.9 | `DefaultTranscryptionPlugin` | `TranscryptionServicePluginBase` | Default in-memory transcryption service | [x] |
+| T6.2.10 | `StreamingTranscryptionPlugin` | `TranscryptionServicePluginBase` | Optimized for large files with chunked processing | [x] |
 
 ---
 
@@ -4815,11 +4815,11 @@ public abstract class TranscryptionServicePluginBase : FeaturePluginBase, ITrans
 
 | Task | Policy | Description | Status |
 |------|--------|-------------|--------|
-| T6.3.1 | `DefaultTransitPolicy` | Standard policy: AES-256-GCM or ChaCha20-Poly1305, negotiation allowed | [ ] |
-| T6.3.2 | `GovernmentTransitPolicy` | FIPS-only ciphers, minimum 256-bit, no negotiation below Secret classification | [ ] |
-| T6.3.3 | `HighPerformanceTransitPolicy` | Prefer ChaCha20, allow 128-bit for Public data | [ ] |
-| T6.3.4 | `MaximumSecurityTransitPolicy` | End-to-end only, no transcryption, Serpent/Twofish only | [ ] |
-| T6.3.5 | `MobileOptimizedPolicy` | Prefer ChaCha20 (no AES-NI on mobile), reduced KDF iterations | [ ] |
+| T6.3.1 | `DefaultTransitPolicy` | Standard policy: AES-256-GCM or ChaCha20-Poly1305, negotiation allowed | [x] |
+| T6.3.2 | `GovernmentTransitPolicy` | FIPS-only ciphers, minimum 256-bit, no negotiation below Secret classification | [x] |
+| T6.3.3 | `HighPerformanceTransitPolicy` | Prefer ChaCha20, allow 128-bit for Public data | [x] |
+| T6.3.4 | `MaximumSecurityTransitPolicy` | End-to-end only, no transcryption, Serpent/Twofish only | [x] |
+| T6.3.5 | `MobileOptimizedPolicy` | Prefer ChaCha20 (no AES-NI on mobile), reduced KDF iterations | [x] |
 
 ---
 
@@ -4880,17 +4880,17 @@ public class TransitEncryptionConfiguration
 
 | Task | Component | Type | Description | Dependencies | Status |
 |------|-----------|------|-------------|--------------|--------|
-| T6.0.1 | SDK Interfaces | Interface | Core transit encryption interfaces | None | [ ] |
-| T6.0.2 | Transcryption Interface | Interface | Secure cipher-to-cipher conversion | T6.0.1 | [ ] |
-| T6.0.3 | Transit Stage Interface | Interface | Pipeline stage for transit handling | T6.0.1, T6.0.2 | [ ] |
-| T6.1.1 | `EndpointCapabilitiesProviderPluginBase` | Abstract Base | Detect endpoint crypto capabilities | T6.0.1 | [ ] |
-| T6.1.2 | `CipherNegotiatorPluginBase` | Abstract Base | Select optimal transit cipher | T6.0.1 | [ ] |
-| T6.1.3 | `TranscryptionServicePluginBase` | Abstract Base | In-memory cipher conversion | T6.0.2 | [ ] |
-| T6.2.1-4 | Endpoint Capability Plugins | Plugin | Platform-specific detection | T6.1.1 | [ ] |
-| T6.2.5-8 | Cipher Negotiator Plugins | Plugin | Different negotiation strategies | T6.1.2 | [ ] |
-| T6.2.9-10 | Transcryption Plugins | Plugin | Default and streaming transcryption | T6.1.3 | [ ] |
-| T6.3.1-5 | Transit Policies | Config | Pre-built security policies | T6.0.1 | [ ] |
-| T6.4 | Configuration | Config | Global transit encryption settings | All | [ ] |
+| T6.0.1 | SDK Interfaces | Interface | Core transit encryption interfaces | None | [x] |
+| T6.0.2 | Transcryption Interface | Interface | Secure cipher-to-cipher conversion | T6.0.1 | [x] |
+| T6.0.3 | Transit Stage Interface | Interface | Pipeline stage for transit handling | T6.0.1, T6.0.2 | [x] |
+| T6.1.1 | `EndpointCapabilitiesProviderPluginBase` | Abstract Base | Detect endpoint crypto capabilities | T6.0.1 | [x] |
+| T6.1.2 | `CipherNegotiatorPluginBase` | Abstract Base | Select optimal transit cipher | T6.0.1 | [x] |
+| T6.1.3 | `TranscryptionServicePluginBase` | Abstract Base | In-memory cipher conversion | T6.0.2 | [x] |
+| T6.2.1-4 | Endpoint Capability Plugins | Plugin | Platform-specific detection | T6.1.1 | [x] |
+| T6.2.5-8 | Cipher Negotiator Plugins | Plugin | Different negotiation strategies | T6.1.2 | [x] |
+| T6.2.9-10 | Transcryption Plugins | Plugin | Default and streaming transcryption | T6.1.3 | [x] |
+| T6.3.1-5 | Transit Policies | Config | Pre-built security policies | T6.0.1 | [x] |
+| T6.4 | Configuration | Config | Global transit encryption settings | All | [x] |
 
 ---
 
