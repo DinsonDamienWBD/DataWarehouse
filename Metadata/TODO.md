@@ -474,10 +474,10 @@ T99 (SDK) → T94 (Key Mgmt) → T93 (Encryption) → TamperProof (T3.4.2)
 
 | Tier | Tasks | Sub-Tasks | Status |
 |------|-------|-----------|--------|
-| Tier 0: Foundation | 1 | ~120 | [ ] |
-| Tier 1: Core Ultimate | 9 | ~400 | [ ] |
+| Tier 0: Foundation | 1 | ~120 | [x] Partial |
+| Tier 1: Core Ultimate | 9 | ~400 | [x] Partial (T93, T94 complete) |
 | Tier 2: TamperProof | 5 | ~100 | [x] Partial |
-| Tier 3: Advanced Encryption | 17 | ~150 | [ ] |
+| Tier 3: Advanced Encryption | 17 | ~150 | [x] Partial (11/17 complete) |
 | Tier 4: Phase 5 Active Storage | 17 | ~180 | [ ] |
 | Tier 5: Enterprise | 4 | ~80 | [x] Partial |
 | Tier 6: Tier 2 Ultimate | 8 | ~200 | [ ] |
