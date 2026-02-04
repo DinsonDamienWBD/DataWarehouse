@@ -23,7 +23,6 @@
     <Project Path="Plugins/DataWarehouse.Plugins.AdaptiveEc/DataWarehouse.Plugins.AdaptiveEc.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.AdoNetProvider/DataWarehouse.Plugins.AdoNetProvider.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.AdvancedRaid/DataWarehouse.Plugins.AdvancedRaid.csproj" />
-    <!-- AesEncryption deprecated - replaced by UltimateEncryption -->
     <Project Path="Plugins/DataWarehouse.Plugins.AIAgents/DataWarehouse.Plugins.AIAgents.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.AIInterface/DataWarehouse.Plugins.AIInterface.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.AirGappedBackup/DataWarehouse.Plugins.AirGappedBackup.csproj" />
@@ -42,19 +41,18 @@
     <Project Path="Plugins/DataWarehouse.Plugins.BrotliCompression/DataWarehouse.Plugins.BrotliCompression.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.CanaryDeployment/DataWarehouse.Plugins.CanaryDeployment.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.CarbonAwareness/DataWarehouse.Plugins.CarbonAwareness.csproj" />
-    <!-- ChaCha20Encryption deprecated - replaced by UltimateEncryption -->
     <Project Path="Plugins/DataWarehouse.Plugins.Chronograf/DataWarehouse.Plugins.Chronograf.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.CloudStorage/DataWarehouse.Plugins.CloudStorage.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.Compliance/DataWarehouse.Plugins.Compliance.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.ComplianceAutomation/DataWarehouse.Plugins.ComplianceAutomation.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.Compression/DataWarehouse.Plugins.Compression.csproj" />
-    <Project Path="Plugins/DataWarehouse.Plugins.ContentProcessing/DataWarehouse.Plugins.ContentProcessing.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.Compute.Wasm/DataWarehouse.Plugins.Compute.Wasm.csproj" />
+    <Project Path="Plugins/DataWarehouse.Plugins.ContentProcessing/DataWarehouse.Plugins.ContentProcessing.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.CrashRecovery/DataWarehouse.Plugins.CrashRecovery.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.CrdtReplication/DataWarehouse.Plugins.CrdtReplication.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.CrossRegion/DataWarehouse.Plugins.CrossRegion.csproj" />
-    <Project Path="Plugins/DataWarehouse.Plugins.DataConnectors/DataWarehouse.Plugins.DataConnectors.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.DatabaseImport/DataWarehouse.Plugins.DatabaseImport.csproj" />
+    <Project Path="Plugins/DataWarehouse.Plugins.DataConnectors/DataWarehouse.Plugins.DataConnectors.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.Datadog/DataWarehouse.Plugins.Datadog.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.DataRetention/DataWarehouse.Plugins.DataRetention.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.Deduplication/DataWarehouse.Plugins.Deduplication.csproj" />
@@ -66,7 +64,6 @@
     <Project Path="Plugins/DataWarehouse.Plugins.Docker/DataWarehouse.Plugins.Docker.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.Dynatrace/DataWarehouse.Plugins.Dynatrace.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.EmbeddedDatabaseStorage/DataWarehouse.Plugins.EmbeddedDatabaseStorage.csproj" />
-    <!-- Encryption deprecated - replaced by UltimateEncryption -->
     <Project Path="Plugins/DataWarehouse.Plugins.EnhancedRaid/DataWarehouse.Plugins.EnhancedRaid.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.EntropyAnalysis/DataWarehouse.Plugins.EntropyAnalysis.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.ErasureCoding/DataWarehouse.Plugins.ErasureCoding.csproj" />
@@ -76,7 +73,6 @@
     <Project Path="Plugins/DataWarehouse.Plugins.Federation/DataWarehouse.Plugins.Federation.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.FedRampCompliance/DataWarehouse.Plugins.FedRampCompliance.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.FilesystemCore/DataWarehouse.Plugins.FilesystemCore.csproj" />
-    <!-- FipsEncryption deprecated - replaced by UltimateEncryption -->
     <Project Path="Plugins/DataWarehouse.Plugins.FuseDriver/DataWarehouse.Plugins.FuseDriver.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.GcsStorage/DataWarehouse.Plugins.GcsStorage.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.Geckoboard/DataWarehouse.Plugins.Geckoboard.csproj" />
@@ -91,8 +87,8 @@
     <Project Path="Plugins/DataWarehouse.Plugins.GZipCompression/DataWarehouse.Plugins.GZipCompression.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.HardwareAcceleration/DataWarehouse.Plugins.HardwareAcceleration.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.HierarchicalQuorum/DataWarehouse.Plugins.HierarchicalQuorum.csproj" />
-    <Project Path="Plugins/DataWarehouse.Plugins.Hypervisor/DataWarehouse.Plugins.Hypervisor.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.HotReload/DataWarehouse.Plugins.HotReload.csproj" />
+    <Project Path="Plugins/DataWarehouse.Plugins.Hypervisor/DataWarehouse.Plugins.Hypervisor.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.IAM/DataWarehouse.Plugins.IAM.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.Integrity/DataWarehouse.Plugins.Integrity.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.IpfsStorage/DataWarehouse.Plugins.IpfsStorage.csproj" />
@@ -105,13 +101,13 @@
     <Project Path="Plugins/DataWarehouse.Plugins.LoadBalancer/DataWarehouse.Plugins.LoadBalancer.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.LocalStorage/DataWarehouse.Plugins.LocalStorage.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.LogicMonitor/DataWarehouse.Plugins.LogicMonitor.csproj" />
-    <Project Path="Plugins/DataWarehouse.Plugins.LowLatency/DataWarehouse.Plugins.LowLatency.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.Logzio/DataWarehouse.Plugins.Logzio.csproj" />
+    <Project Path="Plugins/DataWarehouse.Plugins.LowLatency/DataWarehouse.Plugins.LowLatency.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.Lz4Compression/DataWarehouse.Plugins.Lz4Compression.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.Metabase/DataWarehouse.Plugins.Metabase.csproj" />
-    <Project Path="Plugins/DataWarehouse.Plugins.MilitarySecurity/DataWarehouse.Plugins.MilitarySecurity.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.Metadata/DataWarehouse.Plugins.Metadata.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.MetadataStorage/DataWarehouse.Plugins.MetadataStorage.csproj" />
+    <Project Path="Plugins/DataWarehouse.Plugins.MilitarySecurity/DataWarehouse.Plugins.MilitarySecurity.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.MultiMaster/DataWarehouse.Plugins.MultiMaster.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.MySqlProtocol/DataWarehouse.Plugins.MySqlProtocol.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.NestedRaid/DataWarehouse.Plugins.NestedRaid.csproj" />
@@ -128,7 +124,6 @@
     <Project Path="Plugins/DataWarehouse.Plugins.PowerBI/DataWarehouse.Plugins.PowerBI.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.PredictiveTiering/DataWarehouse.Plugins.PredictiveTiering.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.Prometheus/DataWarehouse.Plugins.Prometheus.csproj" />
-    <!-- QuantumSafe deprecated - replaced by UltimateEncryption -->
     <Project Path="Plugins/DataWarehouse.Plugins.Raft/DataWarehouse.Plugins.Raft.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.Raid/DataWarehouse.Plugins.Raid.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.RAMDiskStorage/DataWarehouse.Plugins.RAMDiskStorage.csproj" />
@@ -142,7 +137,6 @@
     <Project Path="Plugins/DataWarehouse.Plugins.SchemaRegistry/DataWarehouse.Plugins.SchemaRegistry.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.Search/DataWarehouse.Plugins.Search.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.SelfHealingRaid/DataWarehouse.Plugins.SelfHealingRaid.csproj" />
-    <!-- SerpentEncryption deprecated - replaced by UltimateEncryption -->
     <Project Path="Plugins/DataWarehouse.Plugins.Sharding/DataWarehouse.Plugins.Sharding.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.SharedRaidUtilities/DataWarehouse.Plugins.SharedRaidUtilities.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.SigNoz/DataWarehouse.Plugins.SigNoz.csproj" />
@@ -154,27 +148,26 @@
     <Project Path="Plugins/DataWarehouse.Plugins.StandardRaid/DataWarehouse.Plugins.StandardRaid.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.SyntheticFullBackup/DataWarehouse.Plugins.SyntheticFullBackup.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.Tableau/DataWarehouse.Plugins.Tableau.csproj" />
+    <Project Path="Plugins/DataWarehouse.Plugins.TamperProof/DataWarehouse.Plugins.TamperProof.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.TapeLibrary/DataWarehouse.Plugins.TapeLibrary.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.TdsProtocol/DataWarehouse.Plugins.TdsProtocol.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.ThreatDetection/DataWarehouse.Plugins.ThreatDetection.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.Tiering/DataWarehouse.Plugins.Tiering.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.Transcoding.Media/DataWarehouse.Plugins.Transcoding.Media.csproj" />
-    <!-- TwofishEncryption deprecated - replaced by UltimateEncryption -->
     <Project Path="Plugins/DataWarehouse.Plugins.UltimateEncryption/DataWarehouse.Plugins.UltimateEncryption.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.UltimateKeyManagement/DataWarehouse.Plugins.UltimateKeyManagement.csproj" />
+    <Project Path="Plugins/DataWarehouse.Plugins.UltimateStorage/DataWarehouse.Plugins.UltimateStorage.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.VendorSpecificRaid/DataWarehouse.Plugins.VendorSpecificRaid.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.Versioning/DataWarehouse.Plugins.Versioning.csproj" />
-    <Project Path="Plugins/DataWarehouse.Plugins.Virtualization.SqlOverObject/DataWarehouse.Plugins.Virtualization.SqlOverObject.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.VictoriaMetrics/DataWarehouse.Plugins.VictoriaMetrics.csproj" />
+    <Project Path="Plugins/DataWarehouse.Plugins.Virtualization.SqlOverObject/DataWarehouse.Plugins.Virtualization.SqlOverObject.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.WinFspDriver/DataWarehouse.Plugins.WinFspDriver.csproj">
       <Platform Solution="Debug|*" Project="x64" />
     </Project>
-    <Project Path="Plugins/DataWarehouse.Plugins.TamperProof/DataWarehouse.Plugins.TamperProof.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.Worm.Software/DataWarehouse.Plugins.Worm.Software.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.Zabbix/DataWarehouse.Plugins.Zabbix.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.ZeroConfig/DataWarehouse.Plugins.ZeroConfig.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.ZeroDowntimeUpgrade/DataWarehouse.Plugins.ZeroDowntimeUpgrade.csproj" />
-    <!-- ZeroKnowledgeEncryption deprecated - replaced by UltimateEncryption -->
     <Project Path="Plugins/DataWarehouse.Plugins.ZeroTrust/DataWarehouse.Plugins.ZeroTrust.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.ZfsRaid/DataWarehouse.Plugins.ZfsRaid.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.ZstdCompression/DataWarehouse.Plugins.ZstdCompression.csproj" />

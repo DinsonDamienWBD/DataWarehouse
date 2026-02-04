@@ -18,7 +18,7 @@
 
   <ItemGroup>
     <!-- Core cryptography -->
-    <PackageReference Include="BouncyCastle.Cryptography" Version="2.5.1" />
+    <PackageReference Include="BouncyCastle.Cryptography" Version="2.6.2" />
 
     <!-- Argon2 for key derivation -->
     <PackageReference Include="Konscious.Security.Cryptography.Argon2" Version="1.3.1" />

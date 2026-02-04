@@ -22,7 +22,7 @@
     <!-- Snowflake driver -->
     <PackageReference Include="Snowflake.Data" Version="5.3.0" />
     <!-- Redis client -->
-    <PackageReference Include="StackExchange.Redis" Version="2.10.1" />
+    <PackageReference Include="StackExchange.Redis" Version="2.10.14" />
     <!-- Google BigQuery client -->
     <PackageReference Include="Google.Cloud.BigQuery.V2" Version="3.11.0" />
     <!-- MySQL client -->
@@ -45,7 +45,7 @@
     <PackageReference Include="Oracle.ManagedDataAccess.Core" Version="23.26.100" />
     <!-- IBM DB2 client for Mainframe -->
     <!-- AWS SDK for S3 -->
-    <PackageReference Include="AWSSDK.S3" Version="4.0.18.1" />
+    <PackageReference Include="AWSSDK.S3" Version="4.0.18.2" />
     <!-- Polly for resilience and transient fault handling -->
     <PackageReference Include="Polly" Version="8.6.5" />
     <!-- Azure Storage Blobs -->

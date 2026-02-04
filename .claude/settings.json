@@ -129,7 +129,9 @@
       "Bash(Get-ChildItem -Path \"C:\\\\Temp\\\\DataWarehouse\\\\DataWarehouse\\\\Plugins\\\\DataWarehouse.Plugins.UltimateStorage\" -Recurse -Filter \"*.cs\")",
       "Bash(Where-Object { $_FullName -notmatch \"\\\\obj\\\\\" -and $_FullName -notmatch \"\\\\bin\\\\\" })",
       "Bash(Select-Object -ExpandProperty FullName)",
-      "Bash(Select-String -Pattern \"SmbStrategy\" -Context 2,2)"
+      "Bash(Select-String -Pattern \"SmbStrategy\" -Context 2,2)",
+      "Bash(dotnet*)",
+      "Edit(*)"
     ]
   }
 }

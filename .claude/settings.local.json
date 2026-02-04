@@ -126,7 +126,20 @@
       "Bash(Get-ChildItem -Path \"C:\\\\Temp\\\\DataWarehouse\\\\DataWarehouse\\\\Plugins\\\\DataWarehouse.Plugins.UltimateStorage\" -Recurse -Filter \"*.cs\")",
       "Bash(Where-Object { $_FullName -notmatch \"\\\\obj\\\\\" -and $_FullName -notmatch \"\\\\bin\\\\\" })",
       "Bash(Select-Object -ExpandProperty FullName)",
-      "Bash(Select-String -Pattern \"SmbStrategy\" -Context 2,2)"
+      "Bash(Select-String -Pattern \"SmbStrategy\" -Context 2,2)",
+      "Bash(if not exist \"C:\\\\Temp\\\\DataWarehouse\\\\DataWarehouse\\\\Plugins\\\\DataWarehouse.Plugins.UltimateStorage\\\\Strategies\\\\S3Compatible\" mkdir \"C:\\\\Temp\\\\DataWarehouse\\\\DataWarehouse\\\\Plugins\\\\DataWarehouse.Plugins.UltimateStorage\\\\Strategies\\\\S3Compatible\")",
+      "Bash(dotnet*)",
+      "Edit(*)",
+      "Bash(Select-String -Pattern \"FtpStrategy\" -Context 2,2)",
+      "Bash(powershell:*)",
+      "Bash(Select-String \"error\")",
+      "Bash(Select-String -Pattern \"LinodeObjectStorageStrategy\")",
+      "Bash(Select-String -Pattern \"SeaweedFs|error\")",
+      "Bash(Select-Object -Last 30)",
+      "Bash(Select-String -Pattern \"error|Build succeeded|Build FAILED\" -Context 0,2)",
+      "Bash(Select-String -Pattern \"AlibabaOss\" -Context 2,2)",
+      "Bash(Select-String -Pattern \"SwarmStrategy\" -Context 0,2)",
+      "Bash(Select-String -Pattern \"error|warning CS|Build succeeded|Build FAILED\")"
     ]
   }
 }

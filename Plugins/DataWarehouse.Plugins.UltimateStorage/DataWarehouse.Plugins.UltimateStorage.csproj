@@ -21,23 +21,30 @@
     <PackageReference Include="AWSSDK.S3" Version="4.0.*" />
 
     <!-- Azure Blob Storage -->
-    <PackageReference Include="Azure.Storage.Blobs" Version="12.26.*" />
+    <PackageReference Include="Azure.Storage.Blobs" Version="12.27.0" />
     <PackageReference Include="Azure.Identity" Version="1.17.1" />
 
     <!-- Google Cloud Storage -->
     <PackageReference Include="Google.Cloud.Storage.V1" Version="4.14.*" />
 
     <!-- MinIO (S3-compatible) -->
-    <PackageReference Include="Minio" Version="6.0.*" />
+    <PackageReference Include="Minio" Version="7.0.0" />
 
     <!-- Alibaba Cloud OSS -->
     <PackageReference Include="Aliyun.OSS.SDK.NetCore" Version="2.14.*" />
+
+    <!-- Tencent Cloud COS -->
+    <PackageReference Include="Tencent.QCloud.Cos.Sdk" Version="5.4.*" />
+
+    <!-- Oracle Cloud Infrastructure Object Storage -->
+    <PackageReference Include="OCI.DotNetSDK.Objectstorage" Version="127.0.0" />
+    <PackageReference Include="OCI.DotNetSDK.Common" Version="127.0.0" />
   </ItemGroup>
 
   <!-- Database Storage -->
   <ItemGroup>
     <!-- MongoDB -->
-    <PackageReference Include="MongoDB.Driver" Version="2.30.*" />
+    <PackageReference Include="MongoDB.Driver" Version="3.6.0" />
     <PackageReference Include="MongoDB.Driver.GridFS" Version="2.30.*" />
 
     <!-- PostgreSQL (large objects) -->
@@ -48,6 +55,9 @@
   <ItemGroup>
     <!-- IPFS HTTP Client -->
     <PackageReference Include="Ipfs.Http.Client" Version="0.33.*" />
+
+    <!-- BitTorrent Client -->
+    <PackageReference Include="MonoTorrent" Version="3.0.*" />
   </ItemGroup>
 
   <!-- Network Storage -->
@@ -59,16 +69,16 @@
     <PackageReference Include="FluentFTP" Version="53.*" />
 
     <!-- SFTP/SCP support -->
-    <PackageReference Include="SSH.NET" Version="2024.*" />
+    <PackageReference Include="SSH.NET" Version="2025.1.0" />
   </ItemGroup>
 
   <!-- Object Storage & Key-Value Stores -->
   <ItemGroup>
     <!-- Redis -->
-    <PackageReference Include="StackExchange.Redis" Version="2.9.*" />
+    <PackageReference Include="StackExchange.Redis" Version="2.10.14" />
 
     <!-- Memcached -->
-    <PackageReference Include="EnyimMemcachedCore" Version="2.7.*" />
+    <PackageReference Include="EnyimMemcachedCore" Version="3.4.5" />
 
     <!-- FoundationDB -->
     <PackageReference Include="FoundationDB.Client" Version="7.3.2" />
@@ -77,8 +87,8 @@
   <!-- Remote Storage Protocols -->
   <ItemGroup>
     <!-- gRPC Client -->
-    <PackageReference Include="Grpc.Net.Client" Version="2.71.*" />
-    <PackageReference Include="Google.Protobuf" Version="3.29.*" />
+    <PackageReference Include="Grpc.Net.Client" Version="2.76.0" />
+    <PackageReference Include="Google.Protobuf" Version="3.33.5" />
   </ItemGroup>
 
 </Project>
