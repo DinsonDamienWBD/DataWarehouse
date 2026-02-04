@@ -3380,9 +3380,9 @@ For each new ENCRYPTION plugin:
 **Remaining T5.1 Tasks (Post-T5.0):**
 | Task | Component | Description | Status |
 |------|-----------|-------------|--------|
-| T5.1.1 | Google Cloud KMS backend | Add to `VaultKeyStorePlugin` (config exists, impl partial) | [ ] |
+| T5.1.1 | Google Cloud KMS backend | Implemented as `GcpKmsStrategy` in **T94 (UltimateKeyManagement)** | [x] |
 | T5.1.2 | Envelope mode integration tests | Test all 6 plugins with envelope mode | [ ] |
-| T5.1.3 | Envelope mode documentation | Usage examples, configuration guide | [ ] |
+| T5.1.3 | Envelope mode documentation | `Documentation/EnvelopeDocumentation.md` in T94 | [x] |
 | T5.1.4 | Envelope mode benchmarks | Compare Direct vs Envelope performance | [ ] |
 
 ---
@@ -3391,7 +3391,7 @@ For each new ENCRYPTION plugin:
 
 | Task | Component | Description | Status |
 |------|-----------|-------------|--------|
-| T5.2 | `KyberEncryptionPlugin` | Post-quantum cryptography (NIST PQC ML-KEM), **MUST use IKeyStore** | [ ] |
+| T5.2 | ML-KEM (Kyber) | Implemented as `MlKem512/768/1024Strategy` in **T93 (UltimateEncryption)** | [x] |
 | T5.3 | `ChaffPaddingPlugin` | Traffic analysis protection via dummy writes | [ ] |
 
 ---
