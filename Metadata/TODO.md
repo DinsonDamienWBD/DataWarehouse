@@ -230,7 +230,7 @@ T99 (SDK) → T94 (Key Mgmt) → T93 (Encryption) → TamperProof (T3.4.2)
 |-------|------|------|-----------------|-------------------|--------|
 | **4.1** | T73 | Canary Objects | ~~DataWarehouse.Plugins.Security.Canary~~ | **T95 (UltimateAccessControl)** as `CanaryStrategy` | [ ] |
 | **4.2** | T74 | Steganographic Sharding | ~~DataWarehouse.Plugins.Obfuscation.Steganography~~ | **T95 (UltimateAccessControl)** as `SteganographyStrategy` | [ ] |
-| **4.3** | T75 | SMPC Vaults | ~~DataWarehouse.Plugins.Privacy.SMPC~~ | **T94 (UltimateKeyManagement)** as `SmpcVaultStrategy` | [ ] |
+| **4.3** | T75 | SMPC Vaults | ~~DataWarehouse.Plugins.Privacy.SMPC~~ | **T94 (UltimateKeyManagement)** as `SmpcVaultStrategy` | [x] |
 | **4.4** | T76 | Digital Dead Drops | ~~DataWarehouse.Plugins.Sharing.Ephemeral~~ | **T95 (UltimateAccessControl)** as `EphemeralSharingStrategy` | [ ] |
 
 **SDK Requirements (from T73-T76) → Now in Task 99:**
