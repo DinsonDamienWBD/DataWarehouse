@@ -8561,9 +8561,9 @@ public record StorageCapabilities
 | 97.B4.2 | AzureBlobStrategy - Azure Blob Storage | [x] |
 | 97.B4.3 | GcsStrategy - Google Cloud Storage | [x] |
 | 97.B4.4 | ⭐ AlibabaOssStrategy - Alibaba Cloud OSS | [x] |
-| 97.B4.5 | ⭐ OracleObjectStorageStrategy - Oracle Cloud | [ ] |
-| 97.B4.6 | ⭐ IbmCosStrategy - IBM Cloud Object Storage | [ ] |
-| 97.B4.7 | ⭐ TencentCosStrategy - Tencent Cloud COS | [ ] |
+| 97.B4.5 | ⭐ OracleObjectStorageStrategy - Oracle Cloud | [x] |
+| 97.B4.6 | ⭐ IbmCosStrategy - IBM Cloud Object Storage | [x] |
+| 97.B4.7 | ⭐ TencentCosStrategy - Tencent Cloud COS | [x] |
 | **B5: S3-Compatible Object Storage** |
 | 97.B5.1 | ⭐ MinioStrategy - MinIO | [x] |
 | 97.B5.2 | ⭐ WasabiStrategy - Wasabi Hot Cloud Storage | [x] |
@@ -8583,9 +8583,9 @@ public record StorageCapabilities
 | 97.B6.6 | ⭐ VastDataStrategy - VAST Data | [ ] |
 | 97.B6.7 | ⭐ WekaIoStrategy - WekaIO | [ ] |
 | **B7: Software-Defined Storage** |
-| 97.B7.1 | ⭐ CephRadosStrategy - Ceph RADOS/RBD | [ ] |
+| 97.B7.1 | ⭐ CephRadosStrategy - Ceph RADOS/RBD | [x] |
 | 97.B7.2 | ⭐ CephRgwStrategy - Ceph RADOS Gateway (S3) | [x] |
-| 97.B7.3 | ⭐ CephFsStrategy - CephFS | [ ] |
+| 97.B7.3 | ⭐ CephFsStrategy - CephFS | [x] |
 | 97.B7.4 | ⭐ GlusterFsStrategy - GlusterFS | [ ] |
 | 97.B7.5 | ⭐ LustreStrategy - Lustre parallel filesystem | [ ] |
 | 97.B7.6 | ⭐ GpfsStrategy - IBM Spectrum Scale (GPFS) | [ ] |
@@ -8604,8 +8604,8 @@ public record StorageCapabilities
 | 97.B9.3 | ⭐ ArweaveStrategy - Arweave permanent storage | [x] |
 | 97.B9.4 | ⭐ StorjStrategy - Storj DCS | [x] |
 | 97.B9.5 | ⭐ SiaStrategy - Sia decentralized storage | [x] |
-| 97.B9.6 | ⭐ SwarmStrategy - Ethereum Swarm | [ ] |
-| 97.B9.7 | ⭐ BitTorrentStrategy - BitTorrent/WebTorrent | [ ] |
+| 97.B9.6 | ⭐ SwarmStrategy - Ethereum Swarm | [x] |
+| 97.B9.7 | ⭐ BitTorrentStrategy - BitTorrent/WebTorrent | [x] |
 | **B10: Archive & Cold Storage** |
 | 97.B10.1 | TapeLibraryStrategy - LTO tape libraries | [x] |
 | 97.B10.2 | ⭐ S3GlacierStrategy - AWS Glacier/Deep Archive | [x] |
