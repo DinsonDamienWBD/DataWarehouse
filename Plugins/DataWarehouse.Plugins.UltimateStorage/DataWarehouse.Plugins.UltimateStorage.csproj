@@ -54,6 +54,9 @@
 
     <!-- FTP support -->
     <PackageReference Include="FluentFTP" Version="53.*" />
+
+    <!-- SFTP/SCP support -->
+    <PackageReference Include="SSH.NET" Version="2024.*" />
   </ItemGroup>
 
   <!-- Object Storage & Key-Value Stores -->
