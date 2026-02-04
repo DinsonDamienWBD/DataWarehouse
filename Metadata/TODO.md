@@ -8586,10 +8586,10 @@ public record StorageCapabilities
 | 97.B7.1 | ⭐ CephRadosStrategy - Ceph RADOS/RBD | [x] |
 | 97.B7.2 | ⭐ CephRgwStrategy - Ceph RADOS Gateway (S3) | [x] |
 | 97.B7.3 | ⭐ CephFsStrategy - CephFS | [x] |
-| 97.B7.4 | ⭐ GlusterFsStrategy - GlusterFS | [ ] |
-| 97.B7.5 | ⭐ LustreStrategy - Lustre parallel filesystem | [ ] |
-| 97.B7.6 | ⭐ GpfsStrategy - IBM Spectrum Scale (GPFS) | [ ] |
-| 97.B7.7 | ⭐ BeeGfsStrategy - BeeGFS parallel filesystem | [ ] |
+| 97.B7.4 | ⭐ GlusterFsStrategy - GlusterFS | [x] |
+| 97.B7.5 | ⭐ LustreStrategy - Lustre parallel filesystem | [x] |
+| 97.B7.6 | ⭐ GpfsStrategy - IBM Spectrum Scale (GPFS) | [x] |
+| 97.B7.7 | ⭐ BeeGfsStrategy - BeeGFS parallel filesystem | [x] |
 | 97.B7.8 | ⭐ MoosefsStrategy - MooseFS | [ ] |
 | 97.B7.9 | ⭐ LizardfsStrategy - LizardFS | [ ] |
 | 97.B7.10 | ⭐ SeaweedfsStrategy - SeaweedFS | [x] |
