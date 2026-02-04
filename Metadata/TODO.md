@@ -7006,6 +7006,21 @@ var config = new IntelligenceConfig
 - DataWarehouse.GUI: Refactored to use Intelligence via message bus (Phase Q)
 - All Plugins: Refactored to register knowledge and route AI via Intelligence (Phase P)
 
+**PHASE X: : Edge-Native Learning (Data Gravity Architecture)
+> **Goal: Move the Model to the Data, not Data to the Model. Enable "Instance on a Stick" to train and evolve AI models locally using Compute-on-Data without egress costs or privacy risks.**
+90.X1	Universal Inference Engine (WASI-NN)	
+90.X1.1	Implement OnnxInferenceStrategy for running standard .onnx models via WASM	[ ]
+90.X1.2	Implement GgufInferenceStrategy for running quantized LLMs (Llama/Mistral) locally	[ ]
+90.X1.3	Create StreamInferencePipeline: Pipes read-stream directly into model input (Zero-Copy)	[ ]
+90.X2	Auto-ML "Agent Loop" (Self-Generating AI)	
+90.X2.1	Implement SchemaExtractionService: Extracts metadata/schema/100-row-sample (No PII)	[ ]
+90.X2.2	Implement AgentCodeRequest: Prompts external AI (Gemini/Claude) to generate training code based only on schema	[ ]
+90.X2.3	Implement JitCompilerStrategy: Compiles Agent-generated Python/Rust code into Wasm/Container on the fly	[ ]
+90.X3	Training Lifecycle Management	
+90.X3.1	Implement TrainingCheckpointStrategy: Auto-saves model weights every N minutes (Power-loss protection)	[ ]
+90.X3.2	Implement ModelVersioningHook: Auto-commits improved models to UltimateVersioning with lineage	[ ]
+90.X3.3	Implement ResourceGovernor: Throttles training based on Battery/Heat/CPU (Crucial for "Stick" hardware)	[ ]
+
 ---
 
 ### CATEGORY K: Storage Reliability & Performance
