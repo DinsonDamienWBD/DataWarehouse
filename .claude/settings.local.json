@@ -1,6 +1,20 @@
 {
   "permissions": {
     "allow": [
+      "Bash",
+      "Read",
+      "Edit",
+      "Write",
+      "WebFetch",
+      "Grep",
+      "Glob",
+      "LS",
+      "MultiEdit",
+      "NotebookRead",
+      "NotebookEdit",
+      "TodoRead",
+      "TodoWrite",
+      "WebSearch",
       "Bash(curl:*)",
       "Skill(hud)",
       "WebFetch(domain:raw.githubusercontent.com)",
@@ -107,7 +121,12 @@
       "Bash(cmd /c \"mkdir C:\\\\Temp\\\\DataWarehouse\\\\DataWarehouse\\\\Plugins\\\\DataWarehouse.Plugins.UltimateKeyManagement\\\\Strategies\\\\Hardware\")",
       "Bash(dotnet search:*)",
       "Bash(dotnet package search:*)",
-      "Bash(dotnet tool run ildasm:*)"
+      "Bash(dotnet tool run ildasm:*)",
+      "Bash(dotnet tool run lspcli:*)",
+      "Bash(Get-ChildItem -Path \"C:\\\\Temp\\\\DataWarehouse\\\\DataWarehouse\\\\Plugins\\\\DataWarehouse.Plugins.UltimateStorage\" -Recurse -Filter \"*.cs\")",
+      "Bash(Where-Object { $_FullName -notmatch \"\\\\obj\\\\\" -and $_FullName -notmatch \"\\\\bin\\\\\" })",
+      "Bash(Select-Object -ExpandProperty FullName)",
+      "Bash(Select-String -Pattern \"SmbStrategy\" -Context 2,2)"
     ]
   }
 }

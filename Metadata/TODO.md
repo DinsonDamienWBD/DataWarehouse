@@ -7021,6 +7021,21 @@ var config = new IntelligenceConfig
 90.X3.2	Implement ModelVersioningHook: Auto-commits improved models to UltimateVersioning with lineage	[ ]
 90.X3.3	Implement ResourceGovernor: Throttles training based on Battery/Heat/CPU (Crucial for "Stick" hardware)	[ ]
 
+Feature: Edge-Native Auto-ML Loop
+Workflow Description:
+Trigger: User asks, "Analyze trends in Sales_2025.csv and predict 2026."
+Sanitization: System extracts column types and a statistically significant anonymous sample.
+Consultation: System sends this metadata to the configured Provider (e.g., Gemini) with the prompt: "Write a training script (Rust/Python) to predict 'Amount' based on this schema."
+Sandboxing: The returned script is compiled/containerized locally.
+Execution: The script runs via UltimateCompute. It iterates over the full local dataset (TB scale) without network access.
+Persistence: The resulting model file (sales_model_v1.onnx) is saved to the warehouse.
+Checkpointing: Utilizing Snapshot plugin, the training state is saved to disk every 10 mins. If the device reboots, training resumes automatically.
+
+Benefits:
+Zero Egress: 10TB of data stays local; only 5KB of code travels.
+Privacy: External AI sees the structure of the data, never the values.
+Context: The model is trained on the actual full-resolution data, not a down-sampled export.
+
 ---
 
 ### CATEGORY K: Storage Reliability & Performance
