@@ -3420,7 +3420,7 @@ For each new ENCRYPTION plugin:
 
 | Task | Component | Base Class | Description | Status |
 |------|-----------|------------|-------------|--------|
-| T5.4 | Additional key management plugins | - | More options for composable key management | [ ] |
+| T5.4 | Additional key management plugins | - | More options for composable key management | [x] |
 | T5.4.1 | `ShamirSecretKeyStorePlugin` | `KeyStorePluginBase` | M-of-N key splitting (Shamir's Secret Sharing) | [x] |
 | T5.4.1.1 | ↳ Key split generation | - | Split key into N shares | [x] |
 | T5.4.1.2 | ↳ Key reconstruction | - | Reconstruct from M shares | [x] |
