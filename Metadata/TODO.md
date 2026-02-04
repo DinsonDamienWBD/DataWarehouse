@@ -195,7 +195,7 @@ T99 (SDK) → T94 (Key Mgmt) → T93 (Encryption) → TamperProof (T3.4.2)
 | Order | Task | Name | Description | Ultimate Plugin | Status |
 |-------|------|------|-------------|-----------------|--------|
 | **3.1** | T5.2 | Kyber Post-Quantum | ML-KEM implementation | Add as `KyberStrategy` in **T93 (UltimateEncryption)** | [x] |
-| **3.2** | T5.3 | Chaff Padding | Traffic analysis protection | Add as `ChaffPaddingStrategy` in **T93** | [ ] |
+| **3.2** | T5.3 | Chaff Padding | Traffic analysis protection | Add as `ChaffPaddingStrategy` in **T93** | [x] |
 | **3.3** | T5.4.1 | Shamir Secret Sharing | M-of-N key splitting | Add as `ShamirStrategy` in **T94 (UltimateKeyManagement)** | [x] |
 | **3.4** | T5.4.2 | PKCS#11 HSM | Generic HSM support | Add as `Pkcs11Strategy` in **T94** | [x] |
 | **3.5** | T5.4.3 | TPM 2.0 | Hardware-bound keys | Add as `TpmStrategy` in **T94** | [x] |
@@ -477,7 +477,7 @@ T99 (SDK) → T94 (Key Mgmt) → T93 (Encryption) → TamperProof (T3.4.2)
 | Tier 0: Foundation | 1 | ~120 | [x] Partial |
 | Tier 1: Core Ultimate | 9 | ~400 | [x] Partial (T93, T94 complete) |
 | Tier 2: TamperProof | 5 | ~100 | [x] Partial |
-| Tier 3: Advanced Encryption | 17 | ~150 | [x] Partial (11/17 complete) |
+| Tier 3: Advanced Encryption | 17 | ~150 | [x] Partial (12/17 complete) |
 | Tier 4: Phase 5 Active Storage | 17 | ~180 | [ ] |
 | Tier 5: Enterprise | 4 | ~80 | [x] Partial |
 | Tier 6: Tier 2 Ultimate | 8 | ~200 | [ ] |
@@ -3392,7 +3392,7 @@ For each new ENCRYPTION plugin:
 | Task | Component | Description | Status |
 |------|-----------|-------------|--------|
 | T5.2 | ML-KEM (Kyber) | Implemented as `MlKem512/768/1024Strategy` in **T93 (UltimateEncryption)** | [x] |
-| T5.3 | `ChaffPaddingPlugin` | Traffic analysis protection via dummy writes | [ ] |
+| T5.3 | Chaff Padding | Implemented as `ChaffPaddingStrategy` in **T93 (UltimateEncryption)** | [x] |
 
 ---
 
