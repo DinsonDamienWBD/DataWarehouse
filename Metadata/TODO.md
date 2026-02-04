@@ -148,7 +148,7 @@ Before ANY release:
 | **1.1** | **T94** | **Ultimate Key Management** | Composable key mgmt (Direct + Envelope modes) | T99 | [x] Complete |
 | **1.2** | **T93** | **Ultimate Encryption** | All encryption as strategies | T99, T94 | [x] Complete |
 | **1.3** | **T92** | **Ultimate Compression** | All compression as strategies | T99 | [ ] |
-| **1.4** | **T97** | **Ultimate Storage** | All storage backends as strategies | T99 | [~] 31/80+ strategies |
+| **1.4** | **T97** | **Ultimate Storage** | All storage backends as strategies | T99 | [~] 35/80+ strategies |
 | **1.5** | **T91** | **Ultimate RAID** | All RAID levels as strategies | T99 | [ ] |
 | **1.6** | **T95** | **Ultimate Access Control** | All access control features as strategies | T99 | [ ] |
 | **1.7** | **T96** | **Ultimate Compliance** | All compliance frameworks as strategies | T99 | [ ] |
@@ -8572,7 +8572,7 @@ public record StorageCapabilities
 | 97.B5.5 | ⭐ DigitalOceanSpacesStrategy - DO Spaces | [x] |
 | 97.B5.6 | ⭐ LinodeObjectStorageStrategy - Linode | [x] |
 | 97.B5.7 | ⭐ VultrObjectStorageStrategy - Vultr | [x] |
-| 97.B5.8 | ⭐ ScalewayObjectStorageStrategy - Scaleway | [ ] |
+| 97.B5.8 | ⭐ ScalewayObjectStorageStrategy - Scaleway | [x] |
 | 97.B5.9 | ⭐ OvhObjectStorageStrategy - OVH Cloud | [ ] |
 | **B6: Enterprise Storage Systems** |
 | 97.B6.1 | ⭐ NetAppOntapStrategy - NetApp ONTAP | [ ] |
@@ -8593,7 +8593,7 @@ public record StorageCapabilities
 | 97.B7.8 | ⭐ MoosefsStrategy - MooseFS | [ ] |
 | 97.B7.9 | ⭐ LizardfsStrategy - LizardFS | [ ] |
 | 97.B7.10 | ⭐ SeaweedfsStrategy - SeaweedFS | [x] |
-| 97.B7.11 | ⭐ JuicefsStrategy - JuiceFS | [ ] |
+| 97.B7.11 | ⭐ JuicefsStrategy - JuiceFS | [x] |
 | **B8: OpenStack & Open Source** |
 | 97.B8.1 | ⭐ SwiftStrategy - OpenStack Swift | [x] |
 | 97.B8.2 | ⭐ CinderStrategy - OpenStack Cinder | [ ] |
@@ -8610,7 +8610,7 @@ public record StorageCapabilities
 | 97.B10.1 | TapeLibraryStrategy - LTO tape libraries | [x] |
 | 97.B10.2 | ⭐ S3GlacierStrategy - AWS Glacier/Deep Archive | [x] |
 | 97.B10.3 | ⭐ AzureArchiveStrategy - Azure Archive Storage | [x] |
-| 97.B10.4 | ⭐ GcsArchiveStrategy - GCS Archive class | [ ] |
+| 97.B10.4 | ⭐ GcsArchiveStrategy - GCS Archive class | [x] |
 | 97.B10.5 | ⭐ OdaStrategy - Oracle Digital Assistant (optical) | [ ] |
 | 97.B10.6 | ⭐ BluRayJukeboxStrategy - Blu-ray archive jukeboxes | [ ] |
 | **B11: Specialized Storage** |
@@ -8618,7 +8618,7 @@ public record StorageCapabilities
 | 97.B11.2 | ⭐ RestStorageStrategy - Generic REST backend | [x] |
 | 97.B11.3 | ⭐ MemcachedStrategy - Memcached as storage | [x] |
 | 97.B11.4 | ⭐ RedisStrategy - Redis as storage | [x] |
-| 97.B11.5 | ⭐ FoundationDbStrategy - FoundationDB | [ ] |
+| 97.B11.5 | ⭐ FoundationDbStrategy - FoundationDB | [x] |
 | 97.B11.6 | ⭐ TikvStrategy - TiKV distributed KV | [ ] |
 | **B12: 🔮 FUTURE ROADMAP - Hardware Integration Interfaces** |
 | 97.B12.1 | 🔮 DnaDriveStrategy - DNA-based storage | Interface only - requires DNA synthesis hardware (Twist Bioscience) | [ ] |
