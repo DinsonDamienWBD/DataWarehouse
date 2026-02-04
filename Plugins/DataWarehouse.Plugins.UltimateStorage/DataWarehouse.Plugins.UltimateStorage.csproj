@@ -29,6 +29,9 @@
 
     <!-- MinIO (S3-compatible) -->
     <PackageReference Include="Minio" Version="6.0.*" />
+
+    <!-- Alibaba Cloud OSS -->
+    <PackageReference Include="Aliyun.OSS.SDK.NetCore" Version="2.14.*" />
   </ItemGroup>
 
   <!-- Database Storage -->

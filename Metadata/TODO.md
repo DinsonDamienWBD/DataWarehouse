@@ -8560,7 +8560,7 @@ public record StorageCapabilities
 | 97.B4.1 | S3Strategy - AWS S3 (and S3-compatible) | [x] |
 | 97.B4.2 | AzureBlobStrategy - Azure Blob Storage | [x] |
 | 97.B4.3 | GcsStrategy - Google Cloud Storage | [x] |
-| 97.B4.4 | ⭐ AlibabaOssStrategy - Alibaba Cloud OSS | [ ] |
+| 97.B4.4 | ⭐ AlibabaOssStrategy - Alibaba Cloud OSS | [x] |
 | 97.B4.5 | ⭐ OracleObjectStorageStrategy - Oracle Cloud | [ ] |
 | 97.B4.6 | ⭐ IbmCosStrategy - IBM Cloud Object Storage | [ ] |
 | 97.B4.7 | ⭐ TencentCosStrategy - Tencent Cloud COS | [ ] |
@@ -8573,7 +8573,7 @@ public record StorageCapabilities
 | 97.B5.6 | ⭐ LinodeObjectStorageStrategy - Linode | [x] |
 | 97.B5.7 | ⭐ VultrObjectStorageStrategy - Vultr | [x] |
 | 97.B5.8 | ⭐ ScalewayObjectStorageStrategy - Scaleway | [x] |
-| 97.B5.9 | ⭐ OvhObjectStorageStrategy - OVH Cloud | [ ] |
+| 97.B5.9 | ⭐ OvhObjectStorageStrategy - OVH Cloud | [x] |
 | **B6: Enterprise Storage Systems** |
 | 97.B6.1 | ⭐ NetAppOntapStrategy - NetApp ONTAP | [ ] |
 | 97.B6.2 | ⭐ DellEcsStrategy - Dell EMC ECS | [ ] |
@@ -8603,7 +8603,7 @@ public record StorageCapabilities
 | 97.B9.2 | ⭐ FilecoinStrategy - Filecoin | [x] |
 | 97.B9.3 | ⭐ ArweaveStrategy - Arweave permanent storage | [x] |
 | 97.B9.4 | ⭐ StorjStrategy - Storj DCS | [x] |
-| 97.B9.5 | ⭐ SiaStrategy - Sia decentralized storage | [ ] |
+| 97.B9.5 | ⭐ SiaStrategy - Sia decentralized storage | [x] |
 | 97.B9.6 | ⭐ SwarmStrategy - Ethereum Swarm | [ ] |
 | 97.B9.7 | ⭐ BitTorrentStrategy - BitTorrent/WebTorrent | [ ] |
 | **B10: Archive & Cold Storage** |
@@ -8619,7 +8619,7 @@ public record StorageCapabilities
 | 97.B11.3 | ⭐ MemcachedStrategy - Memcached as storage | [x] |
 | 97.B11.4 | ⭐ RedisStrategy - Redis as storage | [x] |
 | 97.B11.5 | ⭐ FoundationDbStrategy - FoundationDB | [x] |
-| 97.B11.6 | ⭐ TikvStrategy - TiKV distributed KV | [ ] |
+| 97.B11.6 | ⭐ TikvStrategy - TiKV distributed KV | [x] |
 | **B12: 🔮 FUTURE ROADMAP - Hardware Integration Interfaces** |
 | 97.B12.1 | 🔮 DnaDriveStrategy - DNA-based storage | Interface only - requires DNA synthesis hardware (Twist Bioscience) | [ ] |
 | 97.B12.2 | 🔮 HolographicStrategy - Holographic storage | Interface only - requires holographic media hardware | [ ] |
