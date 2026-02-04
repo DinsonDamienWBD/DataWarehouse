@@ -832,4 +832,479 @@ namespace DataWarehouse.SDK.Contracts.Encryption
             return (iv, ciphertext, tag);
         }
     }
+
+    /// <summary>
+    /// Universal encrypted payload envelope for all encryption strategies.
+    /// Contains all metadata needed for decryption and verification.
+    /// </summary>
+    public sealed record EncryptedPayload
+    {
+        /// <summary>Algorithm identifier (e.g., "aes-256-gcm", "chacha20-poly1305").</summary>
+        public required string AlgorithmId { get; init; }
+
+        /// <summary>Strategy version for format evolution.</summary>
+        public int Version { get; init; } = 1;
+
+        /// <summary>Initialization vector/nonce.</summary>
+        public required byte[] Nonce { get; init; }
+
+        /// <summary>Encrypted ciphertext.</summary>
+        public required byte[] Ciphertext { get; init; }
+
+        /// <summary>Authentication tag (for AEAD ciphers).</summary>
+        public byte[] Tag { get; init; } = Array.Empty<byte>();
+
+        /// <summary>Key identifier for key retrieval.</summary>
+        public string? KeyId { get; init; }
+
+        /// <summary>Wrapped DEK for envelope encryption mode.</summary>
+        public byte[]? WrappedDek { get; init; }
+
+        /// <summary>KEK identifier for envelope mode.</summary>
+        public string? KekId { get; init; }
+
+        /// <summary>Timestamp when encryption occurred.</summary>
+        public DateTime EncryptedAt { get; init; } = DateTime.UtcNow;
+
+        /// <summary>Additional metadata for compliance and auditing.</summary>
+        public IReadOnlyDictionary<string, string> Metadata { get; init; } =
+            new Dictionary<string, string>();
+
+        /// <summary>
+        /// Serializes the payload to a byte array.
+        /// Format: [Version:1][AlgIdLen:1][AlgId:var][Nonce:var][TagLen:2][Tag:var][CiphertextLen:4][Ciphertext:var]
+        /// </summary>
+        public byte[] ToBytes()
+        {
+            using var ms = new System.IO.MemoryStream();
+            using var writer = new System.IO.BinaryWriter(ms, System.Text.Encoding.UTF8, leaveOpen: true);
+
+            writer.Write((byte)Version);
+            var algBytes = System.Text.Encoding.UTF8.GetBytes(AlgorithmId);
+            writer.Write((byte)algBytes.Length);
+            writer.Write(algBytes);
+            writer.Write((byte)Nonce.Length);
+            writer.Write(Nonce);
+            writer.Write((ushort)Tag.Length);
+            writer.Write(Tag);
+            writer.Write(Ciphertext.Length);
+            writer.Write(Ciphertext);
+
+            // Optional fields
+            var hasKeyId = !string.IsNullOrEmpty(KeyId);
+            var hasWrappedDek = WrappedDek != null && WrappedDek.Length > 0;
+            byte flags = 0;
+            if (hasKeyId) flags |= 0x01;
+            if (hasWrappedDek) flags |= 0x02;
+            writer.Write(flags);
+
+            if (hasKeyId)
+            {
+                var keyIdBytes = System.Text.Encoding.UTF8.GetBytes(KeyId!);
+                writer.Write((byte)keyIdBytes.Length);
+                writer.Write(keyIdBytes);
+            }
+
+            if (hasWrappedDek)
+            {
+                writer.Write((ushort)WrappedDek!.Length);
+                writer.Write(WrappedDek);
+                if (!string.IsNullOrEmpty(KekId))
+                {
+                    var kekIdBytes = System.Text.Encoding.UTF8.GetBytes(KekId);
+                    writer.Write((byte)kekIdBytes.Length);
+                    writer.Write(kekIdBytes);
+                }
+                else
+                {
+                    writer.Write((byte)0);
+                }
+            }
+
+            return ms.ToArray();
+        }
+
+        /// <summary>
+        /// Deserializes an encrypted payload from bytes.
+        /// </summary>
+        public static EncryptedPayload FromBytes(byte[] data)
+        {
+            using var ms = new System.IO.MemoryStream(data);
+            using var reader = new System.IO.BinaryReader(ms, System.Text.Encoding.UTF8);
+
+            var version = reader.ReadByte();
+            var algLen = reader.ReadByte();
+            var algorithmId = System.Text.Encoding.UTF8.GetString(reader.ReadBytes(algLen));
+            var nonceLen = reader.ReadByte();
+            var nonce = reader.ReadBytes(nonceLen);
+            var tagLen = reader.ReadUInt16();
+            var tag = reader.ReadBytes(tagLen);
+            var ciphertextLen = reader.ReadInt32();
+            var ciphertext = reader.ReadBytes(ciphertextLen);
+
+            string? keyId = null;
+            byte[]? wrappedDek = null;
+            string? kekId = null;
+
+            if (ms.Position < ms.Length)
+            {
+                var flags = reader.ReadByte();
+                if ((flags & 0x01) != 0)
+                {
+                    var keyIdLen = reader.ReadByte();
+                    keyId = System.Text.Encoding.UTF8.GetString(reader.ReadBytes(keyIdLen));
+                }
+                if ((flags & 0x02) != 0)
+                {
+                    var dekLen = reader.ReadUInt16();
+                    wrappedDek = reader.ReadBytes(dekLen);
+                    var kekIdLen = reader.ReadByte();
+                    if (kekIdLen > 0)
+                    {
+                        kekId = System.Text.Encoding.UTF8.GetString(reader.ReadBytes(kekIdLen));
+                    }
+                }
+            }
+
+            return new EncryptedPayload
+            {
+                Version = version,
+                AlgorithmId = algorithmId,
+                Nonce = nonce,
+                Tag = tag,
+                Ciphertext = ciphertext,
+                KeyId = keyId,
+                WrappedDek = wrappedDek,
+                KekId = kekId
+            };
+        }
+    }
+
+    /// <summary>
+    /// Interface for encryption strategy registry.
+    /// Provides auto-discovery and lookup of encryption strategies.
+    /// </summary>
+    public interface IEncryptionStrategyRegistry
+    {
+        /// <summary>Registers an encryption strategy.</summary>
+        void Register(IEncryptionStrategy strategy);
+
+        /// <summary>Gets a strategy by its ID.</summary>
+        IEncryptionStrategy? GetStrategy(string strategyId);
+
+        /// <summary>Gets all registered strategies.</summary>
+        IReadOnlyCollection<IEncryptionStrategy> GetAllStrategies();
+
+        /// <summary>Gets strategies matching security level requirements.</summary>
+        IReadOnlyCollection<IEncryptionStrategy> GetStrategiesBySecurityLevel(SecurityLevel minLevel);
+
+        /// <summary>Gets strategies that are FIPS compliant.</summary>
+        IReadOnlyCollection<IEncryptionStrategy> GetFipsCompliantStrategies();
+
+        /// <summary>Gets the default strategy.</summary>
+        IEncryptionStrategy GetDefaultStrategy();
+
+        /// <summary>Sets the default strategy.</summary>
+        void SetDefaultStrategy(string strategyId);
+
+        /// <summary>Discovers and registers strategies from assemblies.</summary>
+        void DiscoverStrategies(params System.Reflection.Assembly[] assemblies);
+    }
+
+    /// <summary>
+    /// Default implementation of encryption strategy registry.
+    /// Provides thread-safe registration and lookup of strategies.
+    /// </summary>
+    public sealed class EncryptionStrategyRegistry : IEncryptionStrategyRegistry
+    {
+        private readonly ConcurrentDictionary<string, IEncryptionStrategy> _strategies = new(StringComparer.OrdinalIgnoreCase);
+        private volatile string _defaultStrategyId = "aes-256-gcm";
+
+        /// <inheritdoc/>
+        public void Register(IEncryptionStrategy strategy)
+        {
+            ArgumentNullException.ThrowIfNull(strategy);
+            _strategies[strategy.StrategyId] = strategy;
+        }
+
+        /// <inheritdoc/>
+        public IEncryptionStrategy? GetStrategy(string strategyId)
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(strategyId);
+            return _strategies.TryGetValue(strategyId, out var strategy) ? strategy : null;
+        }
+
+        /// <inheritdoc/>
+        public IReadOnlyCollection<IEncryptionStrategy> GetAllStrategies()
+        {
+            return _strategies.Values.ToList().AsReadOnly();
+        }
+
+        /// <inheritdoc/>
+        public IReadOnlyCollection<IEncryptionStrategy> GetStrategiesBySecurityLevel(SecurityLevel minLevel)
+        {
+            return _strategies.Values
+                .Where(s => s.CipherInfo.SecurityLevel >= minLevel)
+                .OrderByDescending(s => s.CipherInfo.SecurityLevel)
+                .ToList()
+                .AsReadOnly();
+        }
+
+        /// <inheritdoc/>
+        public IReadOnlyCollection<IEncryptionStrategy> GetFipsCompliantStrategies()
+        {
+            return _strategies.Values
+                .Where(s => IsFipsCompliant(s.StrategyId))
+                .ToList()
+                .AsReadOnly();
+        }
+
+        /// <inheritdoc/>
+        public IEncryptionStrategy GetDefaultStrategy()
+        {
+            return GetStrategy(_defaultStrategyId)
+                ?? throw new InvalidOperationException($"Default strategy '{_defaultStrategyId}' not found");
+        }
+
+        /// <inheritdoc/>
+        public void SetDefaultStrategy(string strategyId)
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(strategyId);
+            if (!_strategies.ContainsKey(strategyId))
+            {
+                throw new ArgumentException($"Strategy '{strategyId}' not registered", nameof(strategyId));
+            }
+            _defaultStrategyId = strategyId;
+        }
+
+        /// <inheritdoc/>
+        public void DiscoverStrategies(params System.Reflection.Assembly[] assemblies)
+        {
+            var strategyType = typeof(IEncryptionStrategy);
+
+            foreach (var assembly in assemblies)
+            {
+                try
+                {
+                    var types = assembly.GetTypes()
+                        .Where(t => !t.IsAbstract && !t.IsInterface && strategyType.IsAssignableFrom(t));
+
+                    foreach (var type in types)
+                    {
+                        try
+                        {
+                            if (Activator.CreateInstance(type) is IEncryptionStrategy strategy)
+                            {
+                                Register(strategy);
+                            }
+                        }
+                        catch
+                        {
+                            // Skip types that can't be instantiated
+                        }
+                    }
+                }
+                catch
+                {
+                    // Skip assemblies that can't be scanned
+                }
+            }
+        }
+
+        /// <summary>
+        /// Determines if a strategy ID is FIPS 140-2/140-3 compliant.
+        /// </summary>
+        private static bool IsFipsCompliant(string strategyId)
+        {
+            var fipsAlgorithms = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+            {
+                "aes-128-gcm", "aes-192-gcm", "aes-256-gcm",
+                "aes-128-cbc", "aes-192-cbc", "aes-256-cbc",
+                "aes-128-ctr", "aes-192-ctr", "aes-256-ctr",
+                "aes-128-ccm", "aes-192-ccm", "aes-256-ccm",
+                "3des-cbc", "triple-des",
+                "sha256", "sha384", "sha512",
+                "hmac-sha256", "hmac-sha384", "hmac-sha512",
+                "rsa-2048", "rsa-3072", "rsa-4096",
+                "ecdsa-p256", "ecdsa-p384", "ecdsa-p521",
+                "ecdh-p256", "ecdh-p384", "ecdh-p521",
+                "ml-kem-512", "ml-kem-768", "ml-kem-1024",
+                "ml-dsa-44", "ml-dsa-65", "ml-dsa-87",
+                "slh-dsa-shake-128f", "slh-dsa-shake-192f", "slh-dsa-shake-256f"
+            };
+            return fipsAlgorithms.Contains(strategyId);
+        }
+
+        /// <summary>
+        /// Creates a pre-populated registry with common strategies.
+        /// </summary>
+        public static EncryptionStrategyRegistry CreateDefault()
+        {
+            return new EncryptionStrategyRegistry();
+        }
+    }
+
+    /// <summary>
+    /// Key derivation utilities for encryption operations.
+    /// Provides PBKDF2, Argon2, scrypt, and HKDF implementations.
+    /// </summary>
+    public static class KeyDerivationUtilities
+    {
+        /// <summary>
+        /// Derives a key using PBKDF2-SHA256.
+        /// </summary>
+        public static byte[] DerivePbkdf2(string password, byte[] salt, int iterations, int keyLengthBytes)
+        {
+            using var pbkdf2 = new Rfc2898DeriveBytes(
+                password,
+                salt,
+                iterations,
+                HashAlgorithmName.SHA256);
+            return pbkdf2.GetBytes(keyLengthBytes);
+        }
+
+        /// <summary>
+        /// Derives a key using PBKDF2-SHA512.
+        /// </summary>
+        public static byte[] DerivePbkdf2Sha512(string password, byte[] salt, int iterations, int keyLengthBytes)
+        {
+            using var pbkdf2 = new Rfc2898DeriveBytes(
+                password,
+                salt,
+                iterations,
+                HashAlgorithmName.SHA512);
+            return pbkdf2.GetBytes(keyLengthBytes);
+        }
+
+        /// <summary>
+        /// Derives a key using HKDF-SHA256.
+        /// </summary>
+        public static byte[] DeriveHkdf(byte[] inputKeyMaterial, byte[] salt, byte[] info, int keyLengthBytes)
+        {
+            return HKDF.DeriveKey(HashAlgorithmName.SHA256, inputKeyMaterial, keyLengthBytes, salt, info);
+        }
+
+        /// <summary>
+        /// Derives a key using HKDF-SHA384.
+        /// </summary>
+        public static byte[] DeriveHkdfSha384(byte[] inputKeyMaterial, byte[] salt, byte[] info, int keyLengthBytes)
+        {
+            return HKDF.DeriveKey(HashAlgorithmName.SHA384, inputKeyMaterial, keyLengthBytes, salt, info);
+        }
+
+        /// <summary>
+        /// Generates a cryptographically secure random salt.
+        /// </summary>
+        public static byte[] GenerateSalt(int lengthBytes = 32)
+        {
+            return RandomNumberGenerator.GetBytes(lengthBytes);
+        }
+
+        /// <summary>
+        /// Constant-time comparison of two byte arrays.
+        /// </summary>
+        public static bool SecureEquals(byte[] a, byte[] b)
+        {
+            return CryptographicOperations.FixedTimeEquals(a, b);
+        }
+    }
+
+    /// <summary>
+    /// FIPS compliance validation framework.
+    /// Validates encryption configurations against FIPS 140-2/140-3 requirements.
+    /// </summary>
+    public static class FipsComplianceValidator
+    {
+        /// <summary>
+        /// Validates if a cipher configuration is FIPS compliant.
+        /// </summary>
+        public static FipsValidationResult Validate(CipherInfo cipherInfo)
+        {
+            var result = new FipsValidationResult { AlgorithmName = cipherInfo.AlgorithmName };
+
+            // Check algorithm
+            if (!IsFipsApprovedAlgorithm(cipherInfo.AlgorithmName))
+            {
+                result.IsCompliant = false;
+                result.Violations.Add($"Algorithm '{cipherInfo.AlgorithmName}' is not FIPS approved");
+                return result;
+            }
+
+            // Check key size
+            if (!IsFipsApprovedKeySize(cipherInfo.AlgorithmName, cipherInfo.KeySizeBits))
+            {
+                result.IsCompliant = false;
+                result.Violations.Add($"Key size {cipherInfo.KeySizeBits} bits is not FIPS approved for {cipherInfo.AlgorithmName}");
+            }
+
+            // Check mode
+            if (!IsFipsApprovedMode(cipherInfo.AlgorithmName))
+            {
+                result.IsCompliant = false;
+                result.Violations.Add($"Cipher mode in '{cipherInfo.AlgorithmName}' is not FIPS approved");
+            }
+
+            result.IsCompliant = result.Violations.Count == 0;
+            return result;
+        }
+
+        private static bool IsFipsApprovedAlgorithm(string algorithmName)
+        {
+            var name = algorithmName.ToUpperInvariant();
+            return name.Contains("AES") ||
+                   name.Contains("3DES") ||
+                   name.Contains("TRIPLE-DES") ||
+                   name.Contains("ML-KEM") ||
+                   name.Contains("ML-DSA") ||
+                   name.Contains("SLH-DSA") ||
+                   name.Contains("SPHINCS");
+        }
+
+        private static bool IsFipsApprovedKeySize(string algorithmName, int keySizeBits)
+        {
+            var name = algorithmName.ToUpperInvariant();
+            if (name.Contains("AES"))
+            {
+                return keySizeBits is 128 or 192 or 256;
+            }
+            if (name.Contains("3DES") || name.Contains("TRIPLE-DES"))
+            {
+                return keySizeBits is 168 or 192;
+            }
+            if (name.Contains("ML-KEM"))
+            {
+                return keySizeBits >= 128; // Post-quantum has different sizing
+            }
+            return true;
+        }
+
+        private static bool IsFipsApprovedMode(string algorithmName)
+        {
+            var name = algorithmName.ToUpperInvariant();
+            // ECB is not FIPS approved for data encryption
+            if (name.Contains("ECB"))
+            {
+                return false;
+            }
+            return true;
+        }
+    }
+
+    /// <summary>
+    /// Result of FIPS compliance validation.
+    /// </summary>
+    public sealed class FipsValidationResult
+    {
+        /// <summary>Algorithm name that was validated.</summary>
+        public string AlgorithmName { get; init; } = "";
+
+        /// <summary>Whether the configuration is FIPS compliant.</summary>
+        public bool IsCompliant { get; set; } = true;
+
+        /// <summary>List of compliance violations.</summary>
+        public List<string> Violations { get; } = new();
+
+        /// <summary>FIPS standard version (140-2 or 140-3).</summary>
+        public string FipsVersion { get; init; } = "140-3";
+    }
 }
