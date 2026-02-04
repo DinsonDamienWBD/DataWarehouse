@@ -148,7 +148,7 @@ Before ANY release:
 | **1.1** | **T94** | **Ultimate Key Management** | Composable key mgmt (Direct + Envelope modes) | T99 | [x] Complete |
 | **1.2** | **T93** | **Ultimate Encryption** | All encryption as strategies | T99, T94 | [x] Complete |
 | **1.3** | **T92** | **Ultimate Compression** | All compression as strategies | T99 | [ ] |
-| **1.4** | **T97** | **Ultimate Storage** | All storage backends as strategies | T99 | [~] 27/80+ strategies |
+| **1.4** | **T97** | **Ultimate Storage** | All storage backends as strategies | T99 | [~] 31/80+ strategies |
 | **1.5** | **T91** | **Ultimate RAID** | All RAID levels as strategies | T99 | [ ] |
 | **1.6** | **T95** | **Ultimate Access Control** | All access control features as strategies | T99 | [ ] |
 | **1.7** | **T96** | **Ultimate Compliance** | All compliance frameworks as strategies | T99 | [ ] |
@@ -8571,7 +8571,7 @@ public record StorageCapabilities
 | 97.B5.4 | ⭐ CloudflareR2Strategy - Cloudflare R2 | [x] |
 | 97.B5.5 | ⭐ DigitalOceanSpacesStrategy - DO Spaces | [x] |
 | 97.B5.6 | ⭐ LinodeObjectStorageStrategy - Linode | [x] |
-| 97.B5.7 | ⭐ VultrObjectStorageStrategy - Vultr | [ ] |
+| 97.B5.7 | ⭐ VultrObjectStorageStrategy - Vultr | [x] |
 | 97.B5.8 | ⭐ ScalewayObjectStorageStrategy - Scaleway | [ ] |
 | 97.B5.9 | ⭐ OvhObjectStorageStrategy - OVH Cloud | [ ] |
 | **B6: Enterprise Storage Systems** |
@@ -8592,7 +8592,7 @@ public record StorageCapabilities
 | 97.B7.7 | ⭐ BeeGfsStrategy - BeeGFS parallel filesystem | [ ] |
 | 97.B7.8 | ⭐ MoosefsStrategy - MooseFS | [ ] |
 | 97.B7.9 | ⭐ LizardfsStrategy - LizardFS | [ ] |
-| 97.B7.10 | ⭐ SeaweedfsStrategy - SeaweedFS | [ ] |
+| 97.B7.10 | ⭐ SeaweedfsStrategy - SeaweedFS | [x] |
 | 97.B7.11 | ⭐ JuicefsStrategy - JuiceFS | [ ] |
 | **B8: OpenStack & Open Source** |
 | 97.B8.1 | ⭐ SwiftStrategy - OpenStack Swift | [x] |
@@ -8601,7 +8601,7 @@ public record StorageCapabilities
 | **B9: Decentralized & Content-Addressed** |
 | 97.B9.1 | IpfsStrategy - IPFS | [x] |
 | 97.B9.2 | ⭐ FilecoinStrategy - Filecoin | [x] |
-| 97.B9.3 | ⭐ ArweaveStrategy - Arweave permanent storage | [ ] |
+| 97.B9.3 | ⭐ ArweaveStrategy - Arweave permanent storage | [x] |
 | 97.B9.4 | ⭐ StorjStrategy - Storj DCS | [x] |
 | 97.B9.5 | ⭐ SiaStrategy - Sia decentralized storage | [ ] |
 | 97.B9.6 | ⭐ SwarmStrategy - Ethereum Swarm | [ ] |
@@ -8609,7 +8609,7 @@ public record StorageCapabilities
 | **B10: Archive & Cold Storage** |
 | 97.B10.1 | TapeLibraryStrategy - LTO tape libraries | [x] |
 | 97.B10.2 | ⭐ S3GlacierStrategy - AWS Glacier/Deep Archive | [x] |
-| 97.B10.3 | ⭐ AzureArchiveStrategy - Azure Archive Storage | [ ] |
+| 97.B10.3 | ⭐ AzureArchiveStrategy - Azure Archive Storage | [x] |
 | 97.B10.4 | ⭐ GcsArchiveStrategy - GCS Archive class | [ ] |
 | 97.B10.5 | ⭐ OdaStrategy - Oracle Digital Assistant (optical) | [ ] |
 | 97.B10.6 | ⭐ BluRayJukeboxStrategy - Blu-ray archive jukeboxes | [ ] |
