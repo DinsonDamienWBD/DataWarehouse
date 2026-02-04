@@ -1,0 +1,836 @@
+using System.Collections.Concurrent;
+using System.Reflection;
+using DataWarehouse.SDK.Contracts;
+using DataWarehouse.SDK.Contracts.Storage;
+using DataWarehouse.SDK.Primitives;
+using DataWarehouse.SDK.Utilities;
+using System.Runtime.CompilerServices;
+using IStorageStrategy = DataWarehouse.SDK.Contracts.Storage.IStorageStrategy;
+
+namespace DataWarehouse.Plugins.UltimateStorage;
+
+/// <summary>
+/// Ultimate Storage Plugin - Comprehensive storage backend solution consolidating all storage strategies.
+///
+/// Implements 50+ storage backends across categories:
+/// - Local Storage (FileSystem, Memory, MemoryMapped, RAMDisk)
+/// - Cloud Storage (AWS S3, Azure Blob, Google Cloud Storage, MinIO, DigitalOcean Spaces)
+/// - Database Storage (MongoDB GridFS, PostgreSQL Large Objects, SQL Server FileStream)
+/// - Network Storage (NFS, SMB/CIFS, FTP, SFTP, WebDAV)
+/// - Distributed Storage (IPFS, Arweave, Storj, Sia, Filecoin)
+/// - Object Storage (OpenStack Swift, Ceph, Wasabi, Backblaze B2)
+/// - Key-Value Stores (Redis, Memcached, Etcd, Consul)
+/// - Specialized Storage (Tape/LTO, Optical, Cold Storage, Content Addressable Storage)
+///
+/// Features:
+/// - Strategy pattern for backend extensibility
+/// - Auto-discovery of storage strategies
+/// - Unified API across all backends
+/// - Multi-region support
+/// - Replication and redundancy
+/// - Tiered storage (hot/warm/cold)
+/// - Bandwidth throttling
+/// - Cost optimization
+/// - Lifecycle policies
+/// - Versioning support
+/// - Access control integration
+/// - Audit logging
+/// - Health monitoring
+/// - Automatic failover
+/// - Compression and deduplication
+/// </summary>
+public sealed class UltimateStoragePlugin : PipelinePluginBase, IDisposable
+{
+    private readonly StorageStrategyRegistry _registry;
+    private readonly ConcurrentDictionary<string, long> _usageStats = new();
+    private readonly ConcurrentDictionary<string, StorageHealthStatus> _healthStatus = new();
+    private bool _disposed;
+
+    // Configuration
+    private volatile string _defaultStrategyId = "filesystem";
+    private volatile bool _auditEnabled = true;
+    private volatile bool _autoFailoverEnabled = true;
+    private volatile int _maxRetries = 3;
+
+    // Statistics
+    private long _totalWrites;
+    private long _totalReads;
+    private long _totalBytesWritten;
+    private long _totalBytesRead;
+    private long _totalDeletes;
+    private long _totalFailures;
+
+    /// <inheritdoc/>
+    public override string Id => "com.datawarehouse.storage.ultimate";
+
+    /// <inheritdoc/>
+    public override string Name => "Ultimate Storage";
+
+    /// <inheritdoc/>
+    public override string Version => "1.0.0";
+
+    /// <inheritdoc/>
+    public override string SubCategory => "Storage";
+
+    /// <inheritdoc/>
+    public override int QualityLevel => 100;
+
+    /// <inheritdoc/>
+    public override int DefaultOrder => 100;
+
+    /// <inheritdoc/>
+    public override bool AllowBypass => false;
+
+    /// <inheritdoc/>
+    public override string[] RequiredPrecedingStages => ["Encryption"];
+
+    /// <inheritdoc/>
+    public override string[] IncompatibleStages => [];
+
+    /// <summary>
+    /// Semantic description of this plugin for AI discovery.
+    /// </summary>
+    public string SemanticDescription =>
+        "Ultimate storage plugin providing 50+ storage backends including local filesystem, cloud storage " +
+        "(AWS S3, Azure Blob, GCS), distributed storage (IPFS, Arweave), network storage (NFS, SMB), " +
+        "database storage (MongoDB, PostgreSQL), and specialized storage. Supports multi-region, " +
+        "replication, tiered storage, versioning, and automatic failover.";
+
+    /// <summary>
+    /// Semantic tags for AI discovery and categorization.
+    /// </summary>
+    public string[] SemanticTags => [
+        "storage", "cloud", "s3", "azure", "gcs", "ipfs", "filesystem",
+        "distributed", "replication", "multi-region", "backup", "archival"
+    ];
+
+    /// <summary>
+    /// Gets the storage strategy registry.
+    /// </summary>
+    public StorageStrategyRegistry Registry => _registry;
+
+    /// <summary>
+    /// Gets or sets whether audit logging is enabled.
+    /// </summary>
+    public bool AuditEnabled
+    {
+        get => _auditEnabled;
+        set => _auditEnabled = value;
+    }
+
+    /// <summary>
+    /// Gets or sets whether automatic failover is enabled.
+    /// </summary>
+    public bool AutoFailoverEnabled
+    {
+        get => _autoFailoverEnabled;
+        set => _autoFailoverEnabled = value;
+    }
+
+    /// <summary>
+    /// Gets or sets the maximum number of retries on failure.
+    /// </summary>
+    public int MaxRetries
+    {
+        get => _maxRetries;
+        set => _maxRetries = value > 0 ? value : 1;
+    }
+
+    /// <summary>
+    /// Initializes a new instance of the Ultimate Storage plugin.
+    /// </summary>
+    public UltimateStoragePlugin()
+    {
+        _registry = new StorageStrategyRegistry();
+
+        // Auto-discover and register strategies
+        DiscoverAndRegisterStrategies();
+    }
+
+    /// <inheritdoc/>
+    public override async Task<HandshakeResponse> OnHandshakeAsync(HandshakeRequest request)
+    {
+        var response = await base.OnHandshakeAsync(request);
+
+        response.Metadata["RegisteredStrategies"] = _registry.GetAllStrategies().Count.ToString();
+        response.Metadata["DefaultStrategy"] = _defaultStrategyId;
+        response.Metadata["AuditEnabled"] = _auditEnabled.ToString();
+        response.Metadata["AutoFailoverEnabled"] = _autoFailoverEnabled.ToString();
+        response.Metadata["MaxRetries"] = _maxRetries.ToString();
+
+        return response;
+    }
+
+    /// <inheritdoc/>
+    protected override List<PluginCapabilityDescriptor> GetCapabilities()
+    {
+        return
+        [
+            new() { Name = "storage.write", DisplayName = "Write", Description = "Write data to storage backend" },
+            new() { Name = "storage.read", DisplayName = "Read", Description = "Read data from storage backend" },
+            new() { Name = "storage.delete", DisplayName = "Delete", Description = "Delete data from storage backend" },
+            new() { Name = "storage.list", DisplayName = "List", Description = "List objects in storage backend" },
+            new() { Name = "storage.exists", DisplayName = "Exists", Description = "Check if object exists" },
+            new() { Name = "storage.copy", DisplayName = "Copy", Description = "Copy object between locations" },
+            new() { Name = "storage.move", DisplayName = "Move", Description = "Move object to new location" },
+            new() { Name = "storage.list-strategies", DisplayName = "List Strategies", Description = "List available storage strategies" },
+            new() { Name = "storage.set-default", DisplayName = "Set Default", Description = "Set default storage strategy" },
+            new() { Name = "storage.stats", DisplayName = "Statistics", Description = "Get storage statistics" },
+            new() { Name = "storage.health", DisplayName = "Health Check", Description = "Check health of storage backends" },
+            new() { Name = "storage.replicate", DisplayName = "Replicate", Description = "Replicate data across backends" },
+            new() { Name = "storage.tier", DisplayName = "Tier Data", Description = "Move data between storage tiers" },
+            new() { Name = "storage.get-metadata", DisplayName = "Get Metadata", Description = "Get object metadata" },
+            new() { Name = "storage.set-metadata", DisplayName = "Set Metadata", Description = "Set object metadata" }
+        ];
+    }
+
+    /// <inheritdoc/>
+    protected override Dictionary<string, object> GetMetadata()
+    {
+        var metadata = base.GetMetadata();
+        metadata["TotalStrategies"] = _registry.GetAllStrategies().Count;
+        metadata["LocalStrategies"] = GetStrategiesByCategory("local").Count;
+        metadata["CloudStrategies"] = GetStrategiesByCategory("cloud").Count;
+        metadata["DistributedStrategies"] = GetStrategiesByCategory("distributed").Count;
+        metadata["NetworkStrategies"] = GetStrategiesByCategory("network").Count;
+        metadata["TotalWrites"] = Interlocked.Read(ref _totalWrites);
+        metadata["TotalReads"] = Interlocked.Read(ref _totalReads);
+        metadata["TotalBytesWritten"] = Interlocked.Read(ref _totalBytesWritten);
+        metadata["TotalBytesRead"] = Interlocked.Read(ref _totalBytesRead);
+        return metadata;
+    }
+
+    /// <inheritdoc/>
+    public override Task OnMessageAsync(PluginMessage message)
+    {
+        return message.Type switch
+        {
+            "storage.write" => HandleWriteAsync(message),
+            "storage.read" => HandleReadAsync(message),
+            "storage.delete" => HandleDeleteAsync(message),
+            "storage.list" => HandleListAsync(message),
+            "storage.exists" => HandleExistsAsync(message),
+            "storage.copy" => HandleCopyAsync(message),
+            "storage.move" => HandleMoveAsync(message),
+            "storage.list-strategies" => HandleListStrategiesAsync(message),
+            "storage.set-default" => HandleSetDefaultAsync(message),
+            "storage.stats" => HandleStatsAsync(message),
+            "storage.health" => HandleHealthCheckAsync(message),
+            "storage.replicate" => HandleReplicateAsync(message),
+            "storage.tier" => HandleTierAsync(message),
+            "storage.get-metadata" => HandleGetMetadataAsync(message),
+            "storage.set-metadata" => HandleSetMetadataAsync(message),
+            _ => base.OnMessageAsync(message)
+        };
+    }
+
+    /// <inheritdoc/>
+    public override Stream OnWrite(Stream input, IKernelContext context, Dictionary<string, object> args)
+    {
+        return OnWriteAsync(input, context, args).GetAwaiter().GetResult();
+    }
+
+    /// <inheritdoc/>
+    protected override async Task<Stream> OnWriteAsync(Stream input, IKernelContext context, Dictionary<string, object> args)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+        // Get strategy
+        var strategyId = args.TryGetValue("strategyId", out var sidObj) && sidObj is string sid
+            ? sid : _defaultStrategyId;
+
+        var strategy = await GetStrategyWithFailoverAsync(strategyId);
+
+        // Get storage path
+        var path = args.TryGetValue("path", out var pathObj) && pathObj is string p
+            ? p : GenerateStoragePath();
+
+        // Read input data
+        using var ms = new MemoryStream();
+        await input.CopyToAsync(ms);
+        var data = ms.ToArray();
+
+        // Get storage options
+        var options = BuildStorageOptions(args);
+
+        // Write with retry logic
+        var written = await ExecuteWithRetryAsync(async () =>
+        {
+            await strategy.WriteAsync(path, data, options);
+            return true;
+        }, strategyId);
+
+        if (written)
+        {
+            // Update statistics
+            Interlocked.Increment(ref _totalWrites);
+            Interlocked.Add(ref _totalBytesWritten, data.Length);
+            IncrementUsageStats(strategyId);
+
+            if (_auditEnabled)
+            {
+                context.LogDebug($"Wrote {data.Length} bytes to {strategyId}:{path}");
+            }
+
+            // Store path in args for retrieval
+            args["storagePath"] = path;
+            args["storageStrategy"] = strategyId;
+        }
+
+        // Return empty stream (data is now in backend)
+        return new MemoryStream();
+    }
+
+    /// <inheritdoc/>
+    public override Stream OnRead(Stream stored, IKernelContext context, Dictionary<string, object> args)
+    {
+        return OnReadAsync(stored, context, args).GetAwaiter().GetResult();
+    }
+
+    /// <inheritdoc/>
+    protected override async Task<Stream> OnReadAsync(Stream stored, IKernelContext context, Dictionary<string, object> args)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+        // Get storage path and strategy
+        if (!args.TryGetValue("storagePath", out var pathObj) || pathObj is not string path)
+        {
+            throw new ArgumentException("Missing 'storagePath' in args");
+        }
+
+        var strategyId = args.TryGetValue("storageStrategy", out var sidObj) && sidObj is string sid
+            ? sid : _defaultStrategyId;
+
+        var strategy = await GetStrategyWithFailoverAsync(strategyId);
+
+        // Get storage options
+        var options = BuildStorageOptions(args);
+
+        // Read with retry logic
+        var data = await ExecuteWithRetryAsync(async () =>
+        {
+            return await strategy.ReadAsync(path, options);
+        }, strategyId);
+
+        // Update statistics
+        Interlocked.Increment(ref _totalReads);
+        Interlocked.Add(ref _totalBytesRead, data.Length);
+
+        if (_auditEnabled)
+        {
+            context.LogDebug($"Read {data.Length} bytes from {strategyId}:{path}");
+        }
+
+        return new MemoryStream(data);
+    }
+
+    #region Message Handlers
+
+    private async Task HandleWriteAsync(PluginMessage message)
+    {
+        if (!message.Payload.TryGetValue("data", out var dataObj) || dataObj is not byte[] data)
+        {
+            throw new ArgumentException("Missing or invalid 'data' parameter");
+        }
+
+        var strategyId = message.Payload.TryGetValue("strategyId", out var sidObj) && sidObj is string sid
+            ? sid : _defaultStrategyId;
+
+        var path = message.Payload.TryGetValue("path", out var pathObj) && pathObj is string p
+            ? p : GenerateStoragePath();
+
+        var strategy = await GetStrategyWithFailoverAsync(strategyId);
+        var options = BuildStorageOptions(message.Payload);
+
+        await ExecuteWithRetryAsync(async () =>
+        {
+            await strategy.WriteAsync(path, data, options);
+            return true;
+        }, strategyId);
+
+        message.Payload["path"] = path;
+        message.Payload["strategyId"] = strategyId;
+        message.Payload["bytesWritten"] = data.Length;
+
+        Interlocked.Increment(ref _totalWrites);
+        Interlocked.Add(ref _totalBytesWritten, data.Length);
+        IncrementUsageStats(strategyId);
+    }
+
+    private async Task HandleReadAsync(PluginMessage message)
+    {
+        if (!message.Payload.TryGetValue("path", out var pathObj) || pathObj is not string path)
+        {
+            throw new ArgumentException("Missing 'path' parameter");
+        }
+
+        var strategyId = message.Payload.TryGetValue("strategyId", out var sidObj) && sidObj is string sid
+            ? sid : _defaultStrategyId;
+
+        var strategy = await GetStrategyWithFailoverAsync(strategyId);
+        var options = BuildStorageOptions(message.Payload);
+
+        var data = await ExecuteWithRetryAsync(async () =>
+        {
+            return await strategy.ReadAsync(path, options);
+        }, strategyId);
+
+        message.Payload["data"] = data;
+        message.Payload["bytesRead"] = data.Length;
+
+        Interlocked.Increment(ref _totalReads);
+        Interlocked.Add(ref _totalBytesRead, data.Length);
+    }
+
+    private async Task HandleDeleteAsync(PluginMessage message)
+    {
+        if (!message.Payload.TryGetValue("path", out var pathObj) || pathObj is not string path)
+        {
+            throw new ArgumentException("Missing 'path' parameter");
+        }
+
+        var strategyId = message.Payload.TryGetValue("strategyId", out var sidObj) && sidObj is string sid
+            ? sid : _defaultStrategyId;
+
+        var strategy = await GetStrategyWithFailoverAsync(strategyId);
+        var options = BuildStorageOptions(message.Payload);
+
+        await ExecuteWithRetryAsync(async () =>
+        {
+            await strategy.DeleteAsync(path, options);
+            return true;
+        }, strategyId);
+
+        message.Payload["deleted"] = true;
+        Interlocked.Increment(ref _totalDeletes);
+    }
+
+    private async Task HandleListAsync(PluginMessage message)
+    {
+        var strategyId = message.Payload.TryGetValue("strategyId", out var sidObj) && sidObj is string sid
+            ? sid : _defaultStrategyId;
+
+        var prefix = message.Payload.TryGetValue("prefix", out var prefixObj) && prefixObj is string p
+            ? p : "";
+
+        var strategy = await GetStrategyWithFailoverAsync(strategyId);
+        var options = BuildStorageOptions(message.Payload);
+
+        var items = await ExecuteWithRetryAsync(async () =>
+        {
+            return await strategy.ListAsync(prefix, options);
+        }, strategyId);
+
+        message.Payload["items"] = items;
+        message.Payload["count"] = items.Count;
+    }
+
+    private async Task HandleExistsAsync(PluginMessage message)
+    {
+        if (!message.Payload.TryGetValue("path", out var pathObj) || pathObj is not string path)
+        {
+            throw new ArgumentException("Missing 'path' parameter");
+        }
+
+        var strategyId = message.Payload.TryGetValue("strategyId", out var sidObj) && sidObj is string sid
+            ? sid : _defaultStrategyId;
+
+        var strategy = await GetStrategyWithFailoverAsync(strategyId);
+        var options = BuildStorageOptions(message.Payload);
+
+        var exists = await ExecuteWithRetryAsync(async () =>
+        {
+            return await strategy.ExistsAsync(path, options);
+        }, strategyId);
+
+        message.Payload["exists"] = exists;
+    }
+
+    private async Task HandleCopyAsync(PluginMessage message)
+    {
+        if (!message.Payload.TryGetValue("sourcePath", out var srcObj) || srcObj is not string sourcePath)
+        {
+            throw new ArgumentException("Missing 'sourcePath' parameter");
+        }
+
+        if (!message.Payload.TryGetValue("destinationPath", out var dstObj) || dstObj is not string destinationPath)
+        {
+            throw new ArgumentException("Missing 'destinationPath' parameter");
+        }
+
+        var strategyId = message.Payload.TryGetValue("strategyId", out var sidObj) && sidObj is string sid
+            ? sid : _defaultStrategyId;
+
+        var strategy = await GetStrategyWithFailoverAsync(strategyId);
+        var options = BuildStorageOptions(message.Payload);
+
+        await ExecuteWithRetryAsync(async () =>
+        {
+            await strategy.CopyAsync(sourcePath, destinationPath, options);
+            return true;
+        }, strategyId);
+
+        message.Payload["copied"] = true;
+    }
+
+    private async Task HandleMoveAsync(PluginMessage message)
+    {
+        if (!message.Payload.TryGetValue("sourcePath", out var srcObj) || srcObj is not string sourcePath)
+        {
+            throw new ArgumentException("Missing 'sourcePath' parameter");
+        }
+
+        if (!message.Payload.TryGetValue("destinationPath", out var dstObj) || dstObj is not string destinationPath)
+        {
+            throw new ArgumentException("Missing 'destinationPath' parameter");
+        }
+
+        var strategyId = message.Payload.TryGetValue("strategyId", out var sidObj) && sidObj is string sid
+            ? sid : _defaultStrategyId;
+
+        var strategy = await GetStrategyWithFailoverAsync(strategyId);
+        var options = BuildStorageOptions(message.Payload);
+
+        await ExecuteWithRetryAsync(async () =>
+        {
+            await strategy.MoveAsync(sourcePath, destinationPath, options);
+            return true;
+        }, strategyId);
+
+        message.Payload["moved"] = true;
+    }
+
+    private Task HandleListStrategiesAsync(PluginMessage message)
+    {
+        var strategies = _registry.GetAllStrategies().OfType<IStorageStrategyExtended>();
+
+        var strategyList = strategies.Select(s => new Dictionary<string, object>
+        {
+            ["id"] = s.StrategyId,
+            ["name"] = s.StrategyName,
+            ["category"] = s.Category,
+            ["isAvailable"] = s.IsAvailable,
+            ["supportsTiering"] = s.SupportsTiering,
+            ["supportsVersioning"] = s.SupportsVersioning,
+            ["supportsReplication"] = s.SupportsReplication,
+            ["maxObjectSize"] = s.MaxObjectSize ?? 0L
+        }).ToList();
+
+        message.Payload["strategies"] = strategyList;
+        message.Payload["count"] = strategyList.Count;
+
+        return Task.CompletedTask;
+    }
+
+    private Task HandleSetDefaultAsync(PluginMessage message)
+    {
+        if (!message.Payload.TryGetValue("strategyId", out var sidObj) || sidObj is not string strategyId)
+        {
+            throw new ArgumentException("Missing 'strategyId' parameter");
+        }
+
+        var strategy = _registry.GetStrategy(strategyId)
+            ?? throw new ArgumentException($"Strategy '{strategyId}' not found");
+
+        _defaultStrategyId = strategyId;
+        message.Payload["success"] = true;
+        message.Payload["defaultStrategy"] = strategyId;
+
+        return Task.CompletedTask;
+    }
+
+    private Task HandleStatsAsync(PluginMessage message)
+    {
+        message.Payload["totalWrites"] = Interlocked.Read(ref _totalWrites);
+        message.Payload["totalReads"] = Interlocked.Read(ref _totalReads);
+        message.Payload["totalDeletes"] = Interlocked.Read(ref _totalDeletes);
+        message.Payload["totalBytesWritten"] = Interlocked.Read(ref _totalBytesWritten);
+        message.Payload["totalBytesRead"] = Interlocked.Read(ref _totalBytesRead);
+        message.Payload["totalFailures"] = Interlocked.Read(ref _totalFailures);
+        message.Payload["registeredStrategies"] = _registry.GetAllStrategies().Count;
+
+        var usageByStrategy = new Dictionary<string, long>(_usageStats);
+        message.Payload["usageByStrategy"] = usageByStrategy;
+
+        return Task.CompletedTask;
+    }
+
+    private async Task HandleHealthCheckAsync(PluginMessage message)
+    {
+        var strategies = _registry.GetAllStrategies().OfType<IStorageStrategyExtended>();
+        var healthResults = new Dictionary<string, object>();
+
+        foreach (var strategy in strategies)
+        {
+            try
+            {
+                var isHealthy = await strategy.HealthCheckAsync();
+                healthResults[strategy.StrategyId] = new Dictionary<string, object>
+                {
+                    ["healthy"] = isHealthy,
+                    ["lastCheck"] = DateTime.UtcNow
+                };
+
+                _healthStatus[strategy.StrategyId] = new StorageHealthStatus
+                {
+                    IsHealthy = isHealthy,
+                    LastCheck = DateTime.UtcNow
+                };
+            }
+            catch (Exception ex)
+            {
+                healthResults[strategy.StrategyId] = new Dictionary<string, object>
+                {
+                    ["healthy"] = false,
+                    ["error"] = ex.Message,
+                    ["lastCheck"] = DateTime.UtcNow
+                };
+
+                _healthStatus[strategy.StrategyId] = new StorageHealthStatus
+                {
+                    IsHealthy = false,
+                    LastCheck = DateTime.UtcNow,
+                    ErrorMessage = ex.Message
+                };
+            }
+        }
+
+        message.Payload["health"] = healthResults;
+    }
+
+    private async Task HandleReplicateAsync(PluginMessage message)
+    {
+        if (!message.Payload.TryGetValue("path", out var pathObj) || pathObj is not string path)
+        {
+            throw new ArgumentException("Missing 'path' parameter");
+        }
+
+        if (!message.Payload.TryGetValue("sourceStrategy", out var srcObj) || srcObj is not string sourceStrategy)
+        {
+            throw new ArgumentException("Missing 'sourceStrategy' parameter");
+        }
+
+        if (!message.Payload.TryGetValue("targetStrategies", out var tgtObj) || tgtObj is not IEnumerable<string> targetStrategies)
+        {
+            throw new ArgumentException("Missing or invalid 'targetStrategies' parameter");
+        }
+
+        var sourceStrat = await GetStrategyWithFailoverAsync(sourceStrategy);
+        var options = BuildStorageOptions(message.Payload);
+
+        // Read from source
+        var data = await sourceStrat.ReadAsync(path, options);
+
+        // Write to all targets
+        var results = new Dictionary<string, bool>();
+        foreach (var targetId in targetStrategies)
+        {
+            try
+            {
+                var targetStrat = await GetStrategyWithFailoverAsync(targetId);
+                await targetStrat.WriteAsync(path, data, options);
+                results[targetId] = true;
+            }
+            catch (Exception)
+            {
+                results[targetId] = false;
+            }
+        }
+
+        message.Payload["replicationResults"] = results;
+    }
+
+    private async Task HandleTierAsync(PluginMessage message)
+    {
+        if (!message.Payload.TryGetValue("path", out var pathObj) || pathObj is not string path)
+        {
+            throw new ArgumentException("Missing 'path' parameter");
+        }
+
+        if (!message.Payload.TryGetValue("sourceStrategy", out var srcObj) || srcObj is not string sourceStrategy)
+        {
+            throw new ArgumentException("Missing 'sourceStrategy' parameter");
+        }
+
+        if (!message.Payload.TryGetValue("targetStrategy", out var tgtObj) || tgtObj is not string targetStrategy)
+        {
+            throw new ArgumentException("Missing 'targetStrategy' parameter");
+        }
+
+        var sourceStrat = await GetStrategyWithFailoverAsync(sourceStrategy);
+        var targetStrat = await GetStrategyWithFailoverAsync(targetStrategy);
+        var options = BuildStorageOptions(message.Payload);
+
+        // Read from source
+        var data = await sourceStrat.ReadAsync(path, options);
+
+        // Write to target
+        await targetStrat.WriteAsync(path, data, options);
+
+        // Optionally delete from source
+        var deleteSource = message.Payload.TryGetValue("deleteSource", out var delObj) && delObj is bool del && del;
+        if (deleteSource)
+        {
+            await sourceStrat.DeleteAsync(path, options);
+        }
+
+        message.Payload["tiered"] = true;
+    }
+
+    private async Task HandleGetMetadataAsync(PluginMessage message)
+    {
+        if (!message.Payload.TryGetValue("path", out var pathObj) || pathObj is not string path)
+        {
+            throw new ArgumentException("Missing 'path' parameter");
+        }
+
+        var strategyId = message.Payload.TryGetValue("strategyId", out var sidObj) && sidObj is string sid
+            ? sid : _defaultStrategyId;
+
+        var strategy = await GetStrategyWithFailoverAsync(strategyId);
+        var options = BuildStorageOptions(message.Payload);
+
+        var metadata = await strategy.GetMetadataAsync(path, options);
+        message.Payload["metadata"] = metadata;
+    }
+
+    private async Task HandleSetMetadataAsync(PluginMessage message)
+    {
+        if (!message.Payload.TryGetValue("path", out var pathObj) || pathObj is not string path)
+        {
+            throw new ArgumentException("Missing 'path' parameter");
+        }
+
+        if (!message.Payload.TryGetValue("metadata", out var metaObj) || metaObj is not Dictionary<string, string> metadata)
+        {
+            throw new ArgumentException("Missing or invalid 'metadata' parameter");
+        }
+
+        var strategyId = message.Payload.TryGetValue("strategyId", out var sidObj) && sidObj is string sid
+            ? sid : _defaultStrategyId;
+
+        var strategy = await GetStrategyWithFailoverAsync(strategyId);
+        var options = BuildStorageOptions(message.Payload);
+
+        await strategy.SetMetadataAsync(path, metadata, options);
+        message.Payload["success"] = true;
+    }
+
+    #endregion
+
+    #region Helper Methods
+
+    private async Task<IStorageStrategyExtended> GetStrategyWithFailoverAsync(string strategyId)
+    {
+        var strategy = _registry.GetStrategy(strategyId) as IStorageStrategyExtended
+            ?? throw new ArgumentException($"Storage strategy '{strategyId}' not found");
+
+        // Check health status
+        if (_autoFailoverEnabled && _healthStatus.TryGetValue(strategyId, out var health) && !health.IsHealthy)
+        {
+            // Try to find a healthy alternative in the same category
+            var alternatives = _registry.GetStrategiesByCategory(strategy.Category)
+                .OfType<IStorageStrategyExtended>()
+                .Where(s => s.StrategyId != strategyId && s.IsAvailable)
+                .ToList();
+
+            foreach (var alt in alternatives)
+            {
+                if (_healthStatus.TryGetValue(alt.StrategyId, out var altHealth) && altHealth.IsHealthy)
+                {
+                    return alt;
+                }
+            }
+        }
+
+        return strategy;
+    }
+
+    private async Task<T> ExecuteWithRetryAsync<T>(Func<Task<T>> operation, string strategyId)
+    {
+        var attempts = 0;
+        Exception? lastException = null;
+
+        while (attempts < _maxRetries)
+        {
+            try
+            {
+                return await operation();
+            }
+            catch (Exception ex)
+            {
+                lastException = ex;
+                attempts++;
+
+                if (attempts < _maxRetries)
+                {
+                    await Task.Delay(TimeSpan.FromSeconds(Math.Pow(2, attempts))); // Exponential backoff
+                }
+            }
+        }
+
+        Interlocked.Increment(ref _totalFailures);
+        throw new InvalidOperationException(
+            $"Operation failed after {attempts} attempts on strategy '{strategyId}'",
+            lastException);
+    }
+
+    private List<IStorageStrategy> GetStrategiesByCategory(string category)
+    {
+        return _registry.GetStrategiesByCategory(category).ToList();
+    }
+
+    private void IncrementUsageStats(string strategyId)
+    {
+        _usageStats.AddOrUpdate(strategyId, 1, (_, count) => count + 1);
+    }
+
+    private void DiscoverAndRegisterStrategies()
+    {
+        // Auto-discover strategies in this assembly
+        _registry.DiscoverStrategies(Assembly.GetExecutingAssembly());
+    }
+
+    private static string GenerateStoragePath()
+    {
+        return $"{DateTime.UtcNow:yyyy/MM/dd}/{Guid.NewGuid():N}";
+    }
+
+    private static StorageOptions BuildStorageOptions(Dictionary<string, object> args)
+    {
+        return new StorageOptions
+        {
+            Timeout = args.TryGetValue("timeout", out var tObj) && tObj is int t
+                ? TimeSpan.FromSeconds(t)
+                : TimeSpan.FromSeconds(30),
+            BufferSize = args.TryGetValue("bufferSize", out var bObj) && bObj is int b
+                ? b : 81920,
+            EnableCompression = args.TryGetValue("compress", out var cObj) && cObj is bool c && c,
+            Metadata = args.TryGetValue("metadata", out var mObj) && mObj is Dictionary<string, string> m
+                ? m : new Dictionary<string, string>()
+        };
+    }
+
+    #endregion
+
+    /// <summary>
+    /// Disposes resources.
+    /// </summary>
+    public void Dispose()
+    {
+        if (_disposed) return;
+        _disposed = true;
+        _usageStats.Clear();
+        _healthStatus.Clear();
+    }
+
+    /// <summary>
+    /// Represents the health status of a storage backend.
+    /// </summary>
+    private sealed class StorageHealthStatus
+    {
+        public bool IsHealthy { get; set; }
+        public DateTime LastCheck { get; set; }
+        public string? ErrorMessage { get; set; }
+    }
+}

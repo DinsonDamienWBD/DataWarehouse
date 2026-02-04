@@ -1,0 +1,65 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RootNamespace>DataWarehouse.Plugins.UltimateStorage</RootNamespace>
+    <Description>Ultimate Storage Plugin - Comprehensive storage backend strategies including local, cloud (AWS S3, Azure Blob, GCS), network (NFS, SMB), and specialized storage (IPFS, Arweave)</Description>
+    <Authors>DataWarehouse</Authors>
+    <Company>DataWarehouse</Company>
+    <Product>DataWarehouse Ultimate Storage</Product>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\DataWarehouse.SDK\DataWarehouse.SDK.csproj" />
+  </ItemGroup>
+
+  <!-- Cloud Storage Providers -->
+  <ItemGroup>
+    <!-- AWS S3 -->
+    <PackageReference Include="AWSSDK.S3" Version="4.0.*" />
+
+    <!-- Azure Blob Storage -->
+    <PackageReference Include="Azure.Storage.Blobs" Version="12.26.*" />
+    <PackageReference Include="Azure.Identity" Version="1.17.1" />
+
+    <!-- Google Cloud Storage -->
+    <PackageReference Include="Google.Cloud.Storage.V1" Version="4.14.*" />
+
+    <!-- MinIO (S3-compatible) -->
+    <PackageReference Include="Minio" Version="6.0.*" />
+  </ItemGroup>
+
+  <!-- Database Storage -->
+  <ItemGroup>
+    <!-- MongoDB -->
+    <PackageReference Include="MongoDB.Driver" Version="2.30.*" />
+    <PackageReference Include="MongoDB.Driver.GridFS" Version="2.30.*" />
+
+    <!-- PostgreSQL (large objects) -->
+    <PackageReference Include="Npgsql" Version="10.*" />
+  </ItemGroup>
+
+  <!-- Distributed & Decentralized Storage -->
+  <ItemGroup>
+    <!-- IPFS HTTP Client -->
+    <PackageReference Include="Ipfs.Http.Client" Version="0.33.*" />
+  </ItemGroup>
+
+  <!-- Network Storage -->
+  <ItemGroup>
+    <!-- SMB/CIFS support -->
+    <PackageReference Include="SMBLibrary" Version="1.5.*" />
+
+    <!-- FTP support -->
+    <PackageReference Include="FluentFTP" Version="53.*" />
+  </ItemGroup>
+
+  <!-- Object Storage & Key-Value Stores -->
+  <ItemGroup>
+    <!-- Redis -->
+    <PackageReference Include="StackExchange.Redis" Version="2.9.*" />
+  </ItemGroup>
+
+</Project>
