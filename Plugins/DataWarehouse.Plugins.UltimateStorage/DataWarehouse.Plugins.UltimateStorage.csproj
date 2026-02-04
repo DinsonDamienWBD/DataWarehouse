@@ -60,6 +60,9 @@
   <ItemGroup>
     <!-- Redis -->
     <PackageReference Include="StackExchange.Redis" Version="2.9.*" />
+
+    <!-- Memcached -->
+    <PackageReference Include="EnyimMemcachedCore" Version="2.7.*" />
   </ItemGroup>
 
 </Project>
