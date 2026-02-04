@@ -8590,14 +8590,14 @@ public record StorageCapabilities
 | 97.B7.5 | ⭐ LustreStrategy - Lustre parallel filesystem | [x] |
 | 97.B7.6 | ⭐ GpfsStrategy - IBM Spectrum Scale (GPFS) | [x] |
 | 97.B7.7 | ⭐ BeeGfsStrategy - BeeGFS parallel filesystem | [x] |
-| 97.B7.8 | ⭐ MoosefsStrategy - MooseFS | [ ] |
-| 97.B7.9 | ⭐ LizardfsStrategy - LizardFS | [ ] |
+| 97.B7.8 | ⭐ MoosefsStrategy - MooseFS | [x] |
+| 97.B7.9 | ⭐ LizardfsStrategy - LizardFS | [x] |
 | 97.B7.10 | ⭐ SeaweedfsStrategy - SeaweedFS | [x] |
 | 97.B7.11 | ⭐ JuicefsStrategy - JuiceFS | [x] |
 | **B8: OpenStack & Open Source** |
 | 97.B8.1 | ⭐ SwiftStrategy - OpenStack Swift | [x] |
-| 97.B8.2 | ⭐ CinderStrategy - OpenStack Cinder | [ ] |
-| 97.B8.3 | ⭐ ManilaStrategy - OpenStack Manila | [ ] |
+| 97.B8.2 | ⭐ CinderStrategy - OpenStack Cinder | [x] |
+| 97.B8.3 | ⭐ ManilaStrategy - OpenStack Manila | [x] |
 | **B9: Decentralized & Content-Addressed** |
 | 97.B9.1 | IpfsStrategy - IPFS | [x] |
 | 97.B9.2 | ⭐ FilecoinStrategy - Filecoin | [x] |
