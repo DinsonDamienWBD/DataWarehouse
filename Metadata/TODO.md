@@ -205,7 +205,7 @@ T99 (SDK) → T94 (Key Mgmt) → T93 (Encryption) → TamperProof (T3.4.2)
 | **3.9** | T5.5 | Geo-Dispersed WORM | Cross-region WORM | Add as feature in **T98 (UltimateReplication)** | [ ] |
 | **3.10** | T5.6 | Geo-Distributed Sharding | Cross-continent shards | Add as feature in **T98** | [ ] |
 | **3.11** | T5.7-T5.9 | Extreme Compression | PAQ, ZPAQ, CMIX | Add as strategies in **T92 (UltimateCompression)** | [ ] |
-| **3.12** | T5.10-T5.11 | Database TDE | SQL TDE metadata | Add as feature in **T93** | [ ] |
+| **3.12** | T5.10-T5.11 | Database TDE | SQL TDE metadata | T5.10 in **T94**, T5.11 via IEnvelopeKeyStore | [x] |
 | **3.13** | T5.12-T5.16 | Compliance Reporting | SOC2, HIPAA reports | Add as feature in **T96 (UltimateCompliance)** | [ ] |
 
 **T6.x Transit Encryption - Uses Ultimate Plugins:**
@@ -477,7 +477,7 @@ T99 (SDK) → T94 (Key Mgmt) → T93 (Encryption) → TamperProof (T3.4.2)
 | Tier 0: Foundation | 1 | ~120 | [x] Partial |
 | Tier 1: Core Ultimate | 9 | ~400 | [x] Partial (T93, T94 complete) |
 | Tier 2: TamperProof | 5 | ~100 | [x] Partial |
-| Tier 3: Advanced Encryption | 17 | ~150 | [x] Partial (12/17 complete) |
+| Tier 3: Advanced Encryption | 17 | ~150 | [x] Partial (13/17 complete) |
 | Tier 4: Phase 5 Active Storage | 17 | ~180 | [ ] |
 | Tier 5: Enterprise | 4 | ~80 | [x] Partial |
 | Tier 6: Tier 2 Ultimate | 8 | ~200 | [ ] |
@@ -3549,8 +3549,8 @@ ENVELOPE MODE (T5.1):       [Mode:1][WrappedDekLen:2][WrappedDEK:var][KekIdLen:1
 
 | Task | Component | Description | Status |
 |------|-----------|-------------|--------|
-| T5.10 | `SqlTdeMetadataPlugin` | SQL TDE (Transparent Data Encryption) metadata import/export | [ ] |
-| T5.11 | `DatabaseEncryptionKeyPlugin` | DEK/KEK management for imported encrypted databases | [ ] |
+| T5.10 | `SqlTdeMetadataStrategy` | Implemented in **T94 (UltimateKeyManagement)** - SQL TDE metadata import/export | [x] |
+| T5.11 | DEK/KEK Management | Implemented via `IEnvelopeKeyStore` in **T94** (WrapKeyAsync/UnwrapKeyAsync) | [x] |
 
 **Goal:** Audit-ready documentation and compliance
 
