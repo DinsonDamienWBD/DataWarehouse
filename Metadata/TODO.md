@@ -8552,7 +8552,7 @@ public record StorageCapabilities
 | 97.B3.3 | ⭐ WebDavStrategy - WebDAV | [x] |
 | 97.B3.4 | ⭐ SftpStrategy - SFTP/SCP | [x] |
 | 97.B3.5 | ⭐ FtpStrategy - FTP/FTPS | [x] |
-| 97.B3.6 | ⭐ Afp Strategy - Apple Filing Protocol (legacy) | [ ] |
+| 97.B3.6 | ⭐ AfpStrategy - Apple Filing Protocol (legacy) | [x] |
 | 97.B3.7 | ⭐ IscsStrategy - iSCSI block storage | [ ] |
 | 97.B3.8 | ⭐ FcStrategy - Fibre Channel | [ ] |
 | 97.B3.9 | ⭐ NvmeofStrategy - NVMe over Fabrics | [ ] |
@@ -8579,9 +8579,9 @@ public record StorageCapabilities
 | 97.B6.2 | ⭐ DellEcsStrategy - Dell EMC ECS | [x] |
 | 97.B6.3 | ⭐ DellPowerScaleStrategy - Dell EMC PowerScale/Isilon | [x] |
 | 97.B6.4 | ⭐ HpeStoreOnceStrategy - HPE StoreOnce | [x] |
-| 97.B6.5 | ⭐ PureStorageStrategy - Pure Storage FlashBlade | [ ] |
-| 97.B6.6 | ⭐ VastDataStrategy - VAST Data | [ ] |
-| 97.B6.7 | ⭐ WekaIoStrategy - WekaIO | [ ] |
+| 97.B6.5 | ⭐ PureStorageStrategy - Pure Storage FlashBlade | [x] |
+| 97.B6.6 | ⭐ VastDataStrategy - VAST Data | [x] |
+| 97.B6.7 | ⭐ WekaIoStrategy - WekaIO | [x] |
 | **B7: Software-Defined Storage** |
 | 97.B7.1 | ⭐ CephRadosStrategy - Ceph RADOS/RBD | [x] |
 | 97.B7.2 | ⭐ CephRgwStrategy - Ceph RADOS Gateway (S3) | [x] |
