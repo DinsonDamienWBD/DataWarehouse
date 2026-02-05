@@ -8,6 +8,7 @@ using System.Threading.Tasks;
 using DataWarehouse.SDK.Connectors;
 using Microsoft.Extensions.Logging;
 using Npgsql;
+using ConnectionState = System.Data.ConnectionState;
 
 namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Database;
 
@@ -64,8 +65,8 @@ public sealed class PostgreSqlConnectionStrategy : DatabaseConnectionStrategyBas
             {
                 ["Provider"] = "Npgsql",
                 ["ServerVersion"] = connection.ServerVersion,
-                ["Database"] = connection.Database,
-                ["Host"] = connection.Host,
+                ["Database"] = connection.Database!,
+                ["Host"] = connection.Host!,
                 ["Port"] = connection.Port,
                 ["State"] = connection.State.ToString()
             };

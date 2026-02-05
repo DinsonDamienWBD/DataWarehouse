@@ -8,6 +8,7 @@ using System.Threading.Tasks;
 using DataWarehouse.SDK.Connectors;
 using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.Logging;
+using ConnectionState = System.Data.ConnectionState;
 
 namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Database;
 
@@ -63,8 +64,8 @@ public sealed class SqlServerConnectionStrategy : DatabaseConnectionStrategyBase
             {
                 ["Provider"] = "Microsoft.Data.SqlClient",
                 ["ServerVersion"] = connection.ServerVersion,
-                ["Database"] = connection.Database,
-                ["DataSource"] = connection.DataSource,
+                ["Database"] = connection.Database!,
+                ["DataSource"] = connection.DataSource!,
                 ["State"] = connection.State.ToString(),
                 ["WorkstationId"] = connection.WorkstationId
             };

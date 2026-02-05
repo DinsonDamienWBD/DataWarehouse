@@ -206,23 +206,23 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.CrossCutting
     /// </summary>
     /// <param name="MinSize">Minimum number of connections to keep alive in the pool.</param>
     /// <param name="MaxSize">Maximum number of concurrent connections allowed.</param>
-    /// <param name="IdleTimeout">Duration after which an idle connection is evicted.</param>
-    /// <param name="HealthCheckInterval">Interval between health check sweeps for pooled connections.</param>
+    /// <param name="IdleTimeoutValue">Duration after which an idle connection is evicted.</param>
+    /// <param name="HealthCheckIntervalValue">Interval between health check sweeps for pooled connections.</param>
     public sealed record PoolConfiguration(
         int MinSize = 2,
         int MaxSize = 20,
-        TimeSpan? IdleTimeout = null,
-        TimeSpan? HealthCheckInterval = null)
+        TimeSpan? IdleTimeoutValue = null,
+        TimeSpan? HealthCheckIntervalValue = null)
     {
         /// <summary>
         /// Effective idle timeout, defaulting to 5 minutes.
         /// </summary>
-        public TimeSpan IdleTimeout { get; } = IdleTimeout ?? TimeSpan.FromMinutes(5);
+        public TimeSpan IdleTimeout { get; } = IdleTimeoutValue ?? TimeSpan.FromMinutes(5);
 
         /// <summary>
         /// Effective health check interval, defaulting to 60 seconds.
         /// </summary>
-        public TimeSpan HealthCheckInterval { get; } = HealthCheckInterval ?? TimeSpan.FromSeconds(60);
+        public TimeSpan HealthCheckInterval { get; } = HealthCheckIntervalValue ?? TimeSpan.FromSeconds(60);
     }
 
     /// <summary>

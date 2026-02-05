@@ -8,6 +8,7 @@ using System.Threading.Tasks;
 using DataWarehouse.SDK.Connectors;
 using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.Logging;
+using ConnectionState = System.Data.ConnectionState;
 
 namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Database;
 
@@ -63,7 +64,7 @@ public sealed class SqliteConnectionStrategy : DatabaseConnectionStrategyBase
             {
                 ["Provider"] = "Microsoft.Data.Sqlite",
                 ["ServerVersion"] = connection.ServerVersion,
-                ["DataSource"] = connection.DataSource,
+                ["DataSource"] = connection.DataSource!,
                 ["State"] = connection.State.ToString()
             };
 

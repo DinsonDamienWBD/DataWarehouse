@@ -237,8 +237,8 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Innovations
             if (!string.IsNullOrEmpty(certPath))
             {
                 var clientCert = string.IsNullOrEmpty(certPassword)
-                    ? new X509Certificate2(certPath)
-                    : new X509Certificate2(certPath, certPassword);
+                    ? X509CertificateLoader.LoadCertificateFromFile(certPath)
+                    : X509CertificateLoader.LoadPkcs12FromFile(certPath, certPassword);
 
                 sslOptions.ClientCertificates = new X509CertificateCollection { clientCert };
             }

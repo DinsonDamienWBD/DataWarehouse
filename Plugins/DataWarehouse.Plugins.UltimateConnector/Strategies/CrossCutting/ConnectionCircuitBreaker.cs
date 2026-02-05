@@ -209,15 +209,15 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.CrossCutting
     /// Configuration for a per-endpoint circuit breaker.
     /// </summary>
     /// <param name="FailureThreshold">Number of consecutive failures to trip the circuit.</param>
-    /// <param name="RecoveryTimeout">Duration the circuit stays open before transitioning to HalfOpen.</param>
+    /// <param name="RecoveryTimeoutValue">Duration the circuit stays open before transitioning to HalfOpen.</param>
     public sealed record CircuitBreakerConfiguration(
         int FailureThreshold = 5,
-        TimeSpan? RecoveryTimeout = null)
+        TimeSpan? RecoveryTimeoutValue = null)
     {
         /// <summary>
         /// Effective recovery timeout, defaulting to 30 seconds.
         /// </summary>
-        public TimeSpan RecoveryTimeout { get; } = RecoveryTimeout ?? TimeSpan.FromSeconds(30);
+        public TimeSpan RecoveryTimeout { get; } = RecoveryTimeoutValue ?? TimeSpan.FromSeconds(30);
     }
 
     /// <summary>
