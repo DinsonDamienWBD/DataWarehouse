@@ -8575,10 +8575,10 @@ public record StorageCapabilities
 | 97.B5.8 | ⭐ ScalewayObjectStorageStrategy - Scaleway | [x] |
 | 97.B5.9 | ⭐ OvhObjectStorageStrategy - OVH Cloud | [x] |
 | **B6: Enterprise Storage Systems** |
-| 97.B6.1 | ⭐ NetAppOntapStrategy - NetApp ONTAP | [ ] |
-| 97.B6.2 | ⭐ DellEcsStrategy - Dell EMC ECS | [ ] |
-| 97.B6.3 | ⭐ DellPowerScaleStrategy - Dell EMC PowerScale/Isilon | [ ] |
-| 97.B6.4 | ⭐ HpeStoreOnceStrategy - HPE StoreOnce | [ ] |
+| 97.B6.1 | ⭐ NetAppOntapStrategy - NetApp ONTAP | [x] |
+| 97.B6.2 | ⭐ DellEcsStrategy - Dell EMC ECS | [x] |
+| 97.B6.3 | ⭐ DellPowerScaleStrategy - Dell EMC PowerScale/Isilon | [x] |
+| 97.B6.4 | ⭐ HpeStoreOnceStrategy - HPE StoreOnce | [x] |
 | 97.B6.5 | ⭐ PureStorageStrategy - Pure Storage FlashBlade | [ ] |
 | 97.B6.6 | ⭐ VastDataStrategy - VAST Data | [ ] |
 | 97.B6.7 | ⭐ WekaIoStrategy - WekaIO | [ ] |
