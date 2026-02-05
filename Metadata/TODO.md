@@ -12675,11 +12675,11 @@ public record ConnectionStrategyCapabilities
 
 | Sub-Task | Description | Status |
 |----------|-------------|--------|
-| 125.A1 | Expand `ConnectorCategory` enum — add IoT, Healthcare, Blockchain, FileSystem, Industrial, Protocol, DevOps, Observability, Dashboard | [ ] |
+| 125.A1 | Expand `ConnectorCategory` enum — add IoT, Healthcare, Blockchain, FileSystem, Industrial, Protocol, DevOps, Observability, Dashboard, AI | [ ] |
 | 125.A2 | Add `IConnectionStrategy` interface to SDK | [ ] |
 | 125.A3 | Add `ConnectionStrategyCapabilities` record | [ ] |
 | 125.A4 | Add `ConnectionStrategyBase` abstract class with retry, metrics, health | [ ] |
-| 125.A5 | Add category-specific strategy bases: `DatabaseConnectionStrategyBase`, `MessagingConnectionStrategyBase`, `SaaSConnectionStrategyBase`, `IoTConnectionStrategyBase`, `LegacyConnectionStrategyBase`, `HealthcareConnectionStrategyBase`, `BlockchainConnectionStrategyBase`, `ObservabilityConnectionStrategyBase`, `DashboardConnectionStrategyBase` | [ ] |
+| 125.A5 | Add category-specific strategy bases: `DatabaseConnectionStrategyBase`, `MessagingConnectionStrategyBase`, `SaaSConnectionStrategyBase`, `IoTConnectionStrategyBase`, `LegacyConnectionStrategyBase`, `HealthcareConnectionStrategyBase`, `BlockchainConnectionStrategyBase`, `ObservabilityConnectionStrategyBase`, `DashboardConnectionStrategyBase`, `AiConnectionStrategyBase` | [ ] |
 | 125.A6 | Add `ConnectionPool` infrastructure — pool manager, pool config, connection leasing, eviction | [ ] |
 | 125.A7 | Add `ConnectionHealth` monitoring — health checks, liveness probes, connection scoring | [ ] |
 | 125.A8 | Refactor existing `IDataConnector` / `DataConnectorPluginBase` to work with new `IConnectionStrategy` | [ ] |
@@ -13063,11 +13063,57 @@ public record ConnectionStrategyCapabilities
 | 125.S6.1 | AwsQuickSightConnectionStrategy — AWS QuickSight API (dashboards + embedding) | [ ] |
 | 125.S6.2 | GoogleLookerStudioConnectionStrategy — Google Looker Studio / Data Studio API | [ ] |
 
-> **NOTE:** AI/ML platform connectors (LLM providers, vector databases, ML platforms, inference servers,
-> speech/vision AI) belong in T90 (UniversalIntelligence), NOT in T125. T90 owns AI semantics and
-> manages its own AI connections. The 12 LLM providers already implemented in DataWarehouse.Plugins.AIAgents
-> will be absorbed into T90. T125 provides the generic connection infrastructure (pooling, health, retry)
-> that T90 can optionally leverage via message bus for its AI connections.
+### Phase T: AI & Machine Learning Platform Connectors
+
+> **Architectural Principle:** T125 owns ALL connection lifecycle — including AI connections.
+> T90 (UniversalIntelligence) owns AI **semantics** (model selection, prompt routing, token counting).
+> T90 requests connections from T125 via message bus, same as T97 requests storage connections.
+> The 12 LLM providers already implemented in DataWarehouse.Plugins.AIAgents have their
+> connection logic extracted here; T90 keeps the AI-specific logic.
+
+| Sub-Task | Description | Status |
+|----------|-------------|--------|
+| **T1: LLM Provider Connectors (extract from AIAgents plugin)** |
+| 125.T1.1 | OpenAiConnectionStrategy — OpenAI API (GPT-4o, o1, o3, DALL-E, Whisper) via HttpClient | [ ] |
+| 125.T1.2 | AnthropicConnectionStrategy — Anthropic Claude API (Claude 4, Claude 3 family) via HttpClient | [ ] |
+| 125.T1.3 | AzureOpenAiConnectionStrategy — Azure OpenAI Service with regional endpoints + API versioning | [ ] |
+| 125.T1.4 | GoogleGeminiConnectionStrategy — Google Gemini (2.0 Flash, 1.5 Pro/Flash) via REST | [ ] |
+| 125.T1.5 | AwsBedrockConnectionStrategy — AWS Bedrock multi-model (Claude, Llama, Titan) via AWSSDK | [ ] |
+| 125.T1.6 | MistralConnectionStrategy — Mistral AI (Mistral Large, Mixtral) via REST | [ ] |
+| 125.T1.7 | CohereConnectionStrategy — Cohere (Command-R, embeddings) via REST | [ ] |
+| 125.T1.8 | GroqConnectionStrategy — Groq inference (ultra-fast Llama-3, Mixtral) via REST | [ ] |
+| 125.T1.9 | OllamaConnectionStrategy — Local Ollama instance for self-hosted models | [ ] |
+| 125.T1.10 | HuggingFaceConnectionStrategy — Hugging Face Inference API + Hub | [ ] |
+| 125.T1.11 | TogetherAiConnectionStrategy — Together AI open-source model hosting | [ ] |
+| 125.T1.12 | PerplexityConnectionStrategy — Perplexity Sonar (search-augmented generation) | [ ] |
+| **T2: Vector Database Connectors** |
+| 125.T2.1 | PineconeConnectionStrategy — Pinecone vector DB via Pinecone .NET SDK | [ ] |
+| 125.T2.2 | WeaviateConnectionStrategy — Weaviate via REST/GraphQL | [ ] |
+| 125.T2.3 | ChromaConnectionStrategy — Chroma DB via REST API | [ ] |
+| 125.T2.4 | QdrantConnectionStrategy — Qdrant via gRPC/REST | [ ] |
+| 125.T2.5 | MilvusConnectionStrategy — Milvus via gRPC (Zilliz Cloud compatible) | [ ] |
+| 125.T2.6 | ⭐ PgVectorConnectionStrategy — PostgreSQL pgvector extension (reuses B2.2 connection) | [ ] |
+| **T3: ML Platform & Experiment Tracking** |
+| 125.T3.1 | MlFlowConnectionStrategy — MLflow Tracking Server REST API | [ ] |
+| 125.T3.2 | WeightsAndBiasesConnectionStrategy — Weights & Biases (W&B) REST API | [ ] |
+| 125.T3.3 | AwsSageMakerConnectionStrategy — AWS SageMaker endpoints via AWSSDK | [ ] |
+| 125.T3.4 | VertexAiConnectionStrategy — Google Vertex AI via Google.Cloud.AIPlatform | [ ] |
+| 125.T3.5 | AzureMlConnectionStrategy — Azure Machine Learning REST API | [ ] |
+| 125.T3.6 | KubeflowConnectionStrategy — Kubeflow Pipelines REST API | [ ] |
+| **T4: Self-Hosted Inference Servers** |
+| 125.T4.1 | VllmConnectionStrategy — vLLM OpenAI-compatible endpoint | [ ] |
+| 125.T4.2 | TgiConnectionStrategy — Hugging Face Text Generation Inference via REST | [ ] |
+| 125.T4.3 | TritonConnectionStrategy — NVIDIA Triton Inference Server via gRPC/REST | [ ] |
+| 125.T4.4 | LlamaCppConnectionStrategy — llama.cpp server via REST | [ ] |
+| **T5: Speech & Vision AI** |
+| 125.T5.1 | ElevenLabsConnectionStrategy — ElevenLabs TTS/Voice API | [ ] |
+| 125.T5.2 | DeepgramConnectionStrategy — Deepgram speech-to-text via WebSocket/REST | [ ] |
+| 125.T5.3 | StabilityAiConnectionStrategy — Stability AI (Stable Diffusion) via REST | [ ] |
+| 125.T5.4 | WhisperConnectionStrategy — OpenAI Whisper API / local server | [ ] |
+| **T6: AI Observability & Development** |
+| 125.T6.1 | LangSmithConnectionStrategy — LangSmith tracing and evaluation API | [ ] |
+| 125.T6.2 | LlamaIndexConnectionStrategy — LlamaIndex managed service API | [ ] |
+| 125.T6.3 | HeliconeConnectionStrategy — Helicone AI proxy for LLM observability | [ ] |
 
 ### Phase P: Advanced Cross-Cutting Features
 
@@ -13114,7 +13160,8 @@ public record ConnectionStrategyCapabilities
 | O | Innovations | 0 | 17 | 17 |
 | R | Observability & Monitoring | 30 | 0 | 30 |
 | S | Dashboard & BI Platforms | 18 | 0 | 18 |
-| **Totals** | | **219** | **19** | **238** |
+| T | AI & ML Platforms | 35 | 0 | 35 |
+| **Totals** | | **254** | **19** | **273** |
 
 ---
 
@@ -13452,7 +13499,7 @@ T99 (Ultimate SDK)
 | T106 (Ultimate Deployment) | ~80 | High | 65+ deployment strategies |
 | T107 (Ultimate Sustainability) | ~50 | Medium | 40+ green computing strategies |
 | T108 (Cleanup) | ~30 | Medium | Plugin removal |
-| **T125 (Ultimate Connector)** | **~250** | **Extreme** | **238 connection strategies (19 industry-first)** |
+| **T125 (Ultimate Connector)** | **~285** | **Extreme** | **273 connection strategies (19 industry-first)** |
 | **T109 (Ultimate Interface)** | **~85** | **Very High** | **50+ API protocols** |
 | **T110 (Ultimate Data Format)** | **~250** | **Extreme** | **230+ data formats (ALL industries)** |
 | **T111 (Ultimate Compute)** | **~140** | **Very High** | **60+ runtimes + Adaptive Pipeline Compute** |
@@ -13483,7 +13530,7 @@ T99 (Ultimate SDK)
 | Resilience | 60 patterns | 8 innovations | 68 |
 | Deployment | 55 strategies | 8 innovations | 63 |
 | Sustainability | 35 strategies | 8 innovations | 43 |
-| Connectors | 219 connections | 19 innovations | 238 |
+| Connectors | 254 connections | 19 innovations | 273 |
 | Interface/API | 45 protocols | 10 innovations | 55 |
 | **Data Format** | **220+ formats** | **14 innovations** | **234** |
 | **Compute** | **55 runtimes + 35 pipeline** | **18 innovations** | **108** |
