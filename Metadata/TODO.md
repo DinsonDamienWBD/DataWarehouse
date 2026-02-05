@@ -153,6 +153,7 @@ Before ANY release:
 | **1.6** | **T95** | **Ultimate Access Control** | All access control features as strategies | T99 | [ ] |
 | **1.7** | **T96** | **Ultimate Compliance** | All compliance frameworks as strategies | T99 | [ ] |
 | **1.8** | **T98** | **Ultimate Replication** | All replication modes as strategies | T99 | [ ] |
+| **1.8.1** | **T126** | **Pipeline Orchestrator** | Multi-level pipeline policy engine (kernel) | T99 | [ ] |
 | **1.9** | **T90** | **Universal Intelligence** | Unified AI/knowledge layer | T99 | [ ] |
 
 **CRITICAL: TamperProof Dependency Chain:**
@@ -13231,6 +13232,110 @@ public record ConnectionStrategyCapabilities
 | P | Cross-Cutting Features | 10 + 4 interceptor | 0 | 14 |
 | **Totals (T125 strategies)** | | **254** | **27** | **281** |
 | **+ T90 intelligence features** | | — | **7** | **(7 in T90)** |
+
+---
+
+## T126: Pipeline Orchestrator — Multi-Level Policy Engine
+
+**Priority:** P0 — Critical (Kernel Infrastructure)
+**Effort:** High
+**Type:** Kernel Enhancement (NOT a plugin)
+**Dependencies:** T99 (SDK Foundation)
+
+> **VISION:** Every data operation (read/write/migrate) passes through a universal pipeline orchestrator.
+> Pipeline behavior is configurable at 4 cascading levels: Instance → UserGroup → User → Operation.
+> Each level inherits from its parent and can override specific settings.
+> When settings change, existing data can be migrated in the background.
+
+### Phase A: SDK Contract Enhancements
+
+| Sub-Task | Description | Status |
+|----------|-------------|--------|
+| 126.A1 | Add `PolicyLevel` enum to SDK (Instance, UserGroup, User, Operation) | [ ] |
+| 126.A2 | Add `PipelinePolicy` class — multi-level config with nullable stage overrides and inheritance | [ ] |
+| 126.A3 | Add `PipelineStagePolicy` class — per-stage config (algorithm, parameters, enabled, allow-child-override) | [ ] |
+| 126.A4 | Add `IPipelineConfigProvider` interface — resolve effective config for a given user/group/operation | [ ] |
+| 126.A5 | Add `MigrationBehavior` enum (KeepExisting, MigrateInBackground, MigrateOnNextAccess) | [ ] |
+| 126.A6 | Enhance `PipelineConfig` (per-blob metadata) with `ExecutedStages` snapshot list, `PolicyId`, `PolicyVersion`, `WrittenAt` | [ ] |
+| 126.A7 | Add `PipelineStageSnapshot` record — records exact plugin/strategy/params that ran per stage | [ ] |
+| 126.A8 | Add `IPipelineMigrationEngine` interface — background re-processing of blobs when policy changes | [ ] |
+
+### Phase B: Kernel Pipeline Orchestrator Enhancement
+
+| Sub-Task | Description | Status |
+|----------|-------------|--------|
+| 126.B1 | Implement `PipelineConfigResolver` — walks Instance→Group→User→Operation chain, first non-null wins per stage | [ ] |
+| 126.B2 | Enhance `DefaultPipelineOrchestrator` to accept `PipelinePolicy` and resolve per-operation config | [ ] |
+| 126.B3 | Universal enforcement — ALL operations (including RAW read/write) route through pipeline, no bypass | [ ] |
+| 126.B4 | Pipeline stage snapshot recording — after each stage executes, record exact plugin/strategy/params to manifest | [ ] |
+| 126.B5 | Reverse pipeline resolution — on read, use per-blob `PipelineStageSnapshot[]` to reconstruct exact reverse pipeline | [ ] |
+| 126.B6 | Policy version tracking — each policy change increments version, stored per-blob for migration detection | [ ] |
+
+### Phase C: Multi-Level Configuration Management
+
+| Sub-Task | Description | Status |
+|----------|-------------|--------|
+| 126.C1 | Instance-level policy CRUD — admin can set/get/update instance-wide pipeline policy | [ ] |
+| 126.C2 | Instance immutability mode — "set once, never change" flag for high-security deployments | [ ] |
+| 126.C3 | UserGroup-level policy CRUD — group admins can set pipeline policy per group | [ ] |
+| 126.C4 | User-level policy CRUD — individual users can set their own pipeline preferences (if group allows) | [ ] |
+| 126.C5 | Operation-level overrides — per-call pipeline parameters in write/read requests | [ ] |
+| 126.C6 | Policy inheritance rules — clear semantics for which fields cascade and which are terminal | [ ] |
+| 126.C7 | `AllowChildOverride` enforcement — parent policy can lock specific stages to prevent child overrides | [ ] |
+| 126.C8 | Effective policy visualization — API to show the resolved pipeline for a given user/group/operation | [ ] |
+
+### Phase D: Migration Engine
+
+| Sub-Task | Description | Status |
+|----------|-------------|--------|
+| 126.D1 | Background migration job — query blobs with stale `PolicyVersion`, re-process in batches | [ ] |
+| 126.D2 | Lazy migration (MigrateOnNextAccess) — detect stale version on read, re-write with current policy | [ ] |
+| 126.D3 | Migration throttling — configurable rate limits to prevent I/O storms during bulk re-processing | [ ] |
+| 126.D4 | Migration progress tracking — percentage complete, ETA, blobs remaining per scope | [ ] |
+| 126.D5 | Migration rollback — ability to abort and revert to previous policy version | [ ] |
+| 126.D6 | Cross-algorithm migration — handle decrypt-with-old→encrypt-with-new, decompress-with-old→compress-with-new | [ ] |
+| 126.D7 | Partial migration support — migrate only blobs matching certain criteria (age, size, tier, tag) | [ ] |
+
+### Phase E: Integration with Ultimate Plugins
+
+| Sub-Task | Description | Status |
+|----------|-------------|--------|
+| 126.E1 | Integration with UltimateEncryption (T93) — orchestrator selects encryption strategy per resolved policy | [ ] |
+| 126.E2 | Integration with UltimateCompression (T92) — orchestrator selects compression strategy per resolved policy | [ ] |
+| 126.E3 | Integration with UltimateStorage (T97) — orchestrator selects storage backend per resolved policy | [ ] |
+| 126.E4 | Integration with UltimateRAID (T91) — orchestrator applies RAID/erasure-coding per resolved policy | [ ] |
+| 126.E5 | Integration with UltimateKeyManagement (T94) — per-user/per-group key selection via orchestrator | [ ] |
+| 126.E6 | Integration with UltimateAccessControl (T95) — enforce ACL checks before pipeline execution | [ ] |
+| 126.E7 | Integration with UltimateCompliance (T96) — compliance rules can mandate minimum pipeline stages | [ ] |
+
+### Phase F: Eligible Feature Scope
+
+> These features can be controlled at Instance/UserGroup/User/Operation level via the pipeline policy:
+
+| Sub-Task | Description | Status |
+|----------|-------------|--------|
+| 126.F1 | Encryption algorithm selection (AES-256-GCM, ChaCha20, etc.) per level | [ ] |
+| 126.F2 | Compression algorithm selection (Zstd, LZ4, Brotli, etc.) per level | [ ] |
+| 126.F3 | Pipeline stage ordering (compress→encrypt vs encrypt→compress) per level | [ ] |
+| 126.F4 | RAID/sharding mode (RAID-5, RAID-6, erasure coding) per level | [ ] |
+| 126.F5 | Deduplication mode (block-level, file-level, off) per level | [ ] |
+| 126.F6 | Integrity checking (SHA-256, Blake3, CRC32, off) per level | [ ] |
+| 126.F7 | Tiering policy (hot/warm/cold thresholds) per level | [ ] |
+| 126.F8 | Replication mode (sync, async, geo, off) per level | [ ] |
+| 126.F9 | Retention/WORM policy per level | [ ] |
+| 126.F10 | Audit logging granularity per level | [ ] |
+
+### Summary
+
+| Phase | Items | Description |
+|-------|-------|-------------|
+| A | 8 | SDK contract enhancements |
+| B | 6 | Kernel orchestrator enhancement |
+| C | 8 | Multi-level configuration management |
+| D | 7 | Migration engine |
+| E | 7 | Ultimate plugin integration |
+| F | 10 | Eligible feature scope |
+| **Total** | **46** | |
 
 ---
 
