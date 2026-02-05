@@ -513,6 +513,7 @@ T99 (SDK) → T94 (Key Mgmt) → T93 (Encryption) → TamperProof (T3.4.2)
 | Run compute on data | **UltimateCompute** | T111 |
 | **Merge air-gapped instances** | **AirGapConvergenceOrchestrator** | **T123** |
 | **Max local processing workflow (EHT)** | **EhtOrchestrator** | **T124** |
+| Connect to external systems | **UltimateConnector** | T125 |
 
 ---
 
@@ -8668,33 +8669,38 @@ public record StorageCapabilities
 | D4 | Remove deprecated plugins after transition period | [x] |
 | D5 | Update documentation and storage guidelines | [x] |
 
-### Phase E: Additional Plugin Migrations
+### Phase E: Additional Plugin Migrations → SUPERSEDED BY T125
+
+> **NOTE:** Phase E connector/import strategies are being moved to T125 (UltimateConnector).
+> Connections are a cross-cutting concern — not a storage concern. The strategies below were
+> implemented in UltimateStorage but architecturally belong in UltimateConnector. Phase E3
+> (ExabyteScale) remains in T97 as it is storage-specific sharding/indexing.
 
 | Sub-Task | Description | Status |
 |----------|-------------|--------|
-| **E1: DataConnectors Plugin Migration** |
-| 97.E1.1 | Migrate DataConnectors Plugin | Absorb DataWarehouse.Plugins.DataConnectors | [x] |
-| 97.E1.2 | OdbcConnectorStrategy | Generic ODBC data source connections | [x] |
-| 97.E1.3 | JdbcConnectorStrategy | JDBC data source connections | [x] |
-| 97.E1.4 | RestApiConnectorStrategy | REST API data ingestion | [x] |
-| 97.E1.5 | GraphQlConnectorStrategy | GraphQL data source connections | [x] |
-| 97.E1.6 | GrpcConnectorStrategy | gRPC data source connections | [x] |
-| 97.E1.7 | WebhookConnectorStrategy | Webhook-based data ingestion | [x] |
-| 97.E1.8 | ⭐ KafkaConnectorStrategy | Apache Kafka stream ingestion | [x] |
-| 97.E1.9 | ⭐ PulsarConnectorStrategy | Apache Pulsar stream ingestion | [x] |
-| 97.E1.10 | ⭐ NatsConnectorStrategy | NATS messaging ingestion | [x] |
-| **E2: DatabaseImport Plugin Migration** |
-| 97.E2.1 | Migrate DatabaseImport Plugin | Absorb DataWarehouse.Plugins.DatabaseImport | [x] |
-| 97.E2.2 | SqlServerImportStrategy | SQL Server bulk import | [x] |
-| 97.E2.3 | PostgresImportStrategy | PostgreSQL bulk import | [x] |
-| 97.E2.4 | MySqlImportStrategy | MySQL bulk import | [x] |
-| 97.E2.5 | OracleImportStrategy | Oracle bulk import | [x] |
-| 97.E2.6 | ⭐ MongoImportStrategy | MongoDB import | [x] |
-| 97.E2.7 | ⭐ CassandraImportStrategy | Cassandra import | [x] |
-| 97.E2.8 | ⭐ SnowflakeImportStrategy | Snowflake import | [x] |
-| 97.E2.9 | ⭐ BigQueryImportStrategy | BigQuery import | [x] |
-| 97.E2.10 | ⭐ DatabricksImportStrategy | Databricks import | [x] |
-| **E3: ExabyteScale Plugin Migration** |
+| **E1: DataConnectors Plugin Migration → T125** |
+| 97.E1.1 | Migrate DataConnectors Plugin | → T125 UltimateConnector | [~] Moving to T125 |
+| 97.E1.2 | OdbcConnectorStrategy | → T125.I1.1 | [~] Moving to T125 |
+| 97.E1.3 | JdbcConnectorStrategy | → T125.I1.2 | [~] Moving to T125 |
+| 97.E1.4 | RestApiConnectorStrategy | → T125.I2.1 | [~] Moving to T125 |
+| 97.E1.5 | GraphQlConnectorStrategy | → T125.I2.2 | [~] Moving to T125 |
+| 97.E1.6 | GrpcConnectorStrategy | → T125.I2.3 | [~] Moving to T125 |
+| 97.E1.7 | WebhookConnectorStrategy | → T125.I3.3 | [~] Moving to T125 |
+| 97.E1.8 | ⭐ KafkaConnectorStrategy | → T125.G2.1 | [~] Moving to T125 |
+| 97.E1.9 | ⭐ PulsarConnectorStrategy | → T125.G2.2 | [~] Moving to T125 |
+| 97.E1.10 | ⭐ NatsConnectorStrategy | → T125.G2.3 | [~] Moving to T125 |
+| **E2: DatabaseImport Plugin Migration → T125** |
+| 97.E2.1 | Migrate DatabaseImport Plugin | → T125 UltimateConnector | [~] Moving to T125 |
+| 97.E2.2 | SqlServerImportStrategy | → T125.B2.1 | [~] Moving to T125 |
+| 97.E2.3 | PostgresImportStrategy | → T125.B2.2 | [~] Moving to T125 |
+| 97.E2.4 | MySqlImportStrategy | → T125.B2.3 | [~] Moving to T125 |
+| 97.E2.5 | OracleImportStrategy | → T125.B2.4 | [~] Moving to T125 |
+| 97.E2.6 | ⭐ MongoImportStrategy | → T125.C1.1 | [~] Moving to T125 |
+| 97.E2.7 | ⭐ CassandraImportStrategy | → T125.C3.1 | [~] Moving to T125 |
+| 97.E2.8 | ⭐ SnowflakeImportStrategy | → T125.E1 | [~] Moving to T125 |
+| 97.E2.9 | ⭐ BigQueryImportStrategy | → T125.E2 | [~] Moving to T125 |
+| 97.E2.10 | ⭐ DatabricksImportStrategy | → T125.E4 | [~] Moving to T125 |
+| **E3: ExabyteScale Plugin Migration (remains in T97 — storage-specific)** |
 | 97.E3.1 | Migrate ExabyteScale Plugin | Absorb DataWarehouse.Plugins.ExabyteScale | [x] |
 | 97.E3.2 | ExascaleShardingStrategy | Exabyte-scale sharding | [x] |
 | 97.E3.3 | ExascaleIndexingStrategy | Distributed indexing for exabytes | [x] |
@@ -12232,7 +12238,7 @@ Explicit task for deprecating and removing obsolete plugins after Ultimate/Unive
 | 108.B18 | **Backup/Recovery** | Backup, BackupVerification, DifferentialBackup, SyntheticFullBackup, AirGappedBackup, BreakGlassRecovery, CrashRecovery, Snapshot | 8 | [ ] Awaiting T80 UltimateDataProtection |
 | 108.B19 | **Interface** | RestInterface, GrpcInterface, GraphQlApi, SqlInterface | 4 | [ ] Awaiting T109 UltimateInterface |
 | 108.B20 | **Logging/Audit** | AccessLog, AuditLogging | 2 | [ ] Awaiting T100 UniversalObservability |
-| 108.B21 | **Data Connectors** | DataConnectors, DatabaseImport, ExabyteScale | 3 | [x] Deleted (UltimateStorage T97 Phase E migrated) |
+| 108.B21 | **Data Connectors** | DataConnectors, DatabaseImport, ExabyteScale | 3 | [x] Deleted → T125 UltimateConnector (was T97 Phase E, now superseded) |
 | 108.B22 | **Intelligence** | Search, ContentProcessing, AccessPrediction | 3 | [ ] Awaiting T90 UniversalIntelligence |
 | 108.B23 | **Compliance** | Worm.Software | 1 | [ ] Awaiting T96 UltimateCompliance |
 
@@ -12603,6 +12609,504 @@ Orchestrates the complete EHT workflow: maximum local processing before physical
 
 ---
 
+## Task 125: Ultimate Connector Plugin
+
+**Status:** [ ] Not Started
+**Priority:** P1 - High
+**Effort:** Very High
+**Category:** Connectivity
+**Implements In:** `DataWarehouse.Plugins.UltimateConnector`
+
+### Overview
+
+Consolidate all external system connectivity into a single Ultimate Connector plugin using the Strategy Pattern.
+Provides a **unified connection layer** for any plugin that needs to communicate with external systems —
+databases, cloud services, SaaS platforms, message brokers, IoT devices, legacy mainframes, and more.
+
+> **Architectural Rationale:** Just as UltimateEncryption handles algorithms but not key management (T94),
+> UltimateStorage (T97) handles data persistence but not connections. A "connection" is a cross-cutting
+> concern — storage, replication, observability, and intelligence plugins all need connections to external
+> systems. UltimateConnector owns the connection lifecycle; other plugins consume connections via the
+> SDK's ConnectionRegistry or message bus.
+
+**Key Design Principles:**
+- **One plugin, all connections** — strategy pattern for 180+ external systems
+- **Connection lifecycle ownership** — connect, pool, health-check, reconnect, disconnect
+- **Cross-plugin consumption** — any plugin requests connections via SDK registry or message bus
+- **No data semantics** — UltimateConnector establishes connections; what flows through them is the consumer's concern
+
+**Supersedes:**
+- T97 Phase E (DataConnectors, DatabaseImport, ExabyteScale migrations) → Connector strategies move to T125
+- T108.B21 (DataConnectors cleanup) → Now references T125
+
+### Architecture: Strategy Pattern for Connection Extensibility
+
+```csharp
+public interface IConnectionStrategy
+{
+    string StrategyId { get; }                         // "postgresql", "kafka", "salesforce"
+    string DisplayName { get; }                        // "PostgreSQL 16+"
+    ConnectorCategory Category { get; }                // Database, Messaging, SaaS, IoT...
+    ConnectionStrategyCapabilities Capabilities { get; }
+
+    Task<IConnectionHandle> ConnectAsync(ConnectionConfig config, CancellationToken ct);
+    Task<bool> TestConnectionAsync(IConnectionHandle handle, CancellationToken ct);
+    Task DisconnectAsync(IConnectionHandle handle, CancellationToken ct);
+    Task<ConnectionHealth> GetHealthAsync(IConnectionHandle handle, CancellationToken ct);
+}
+
+public record ConnectionStrategyCapabilities
+{
+    public bool SupportsRead { get; init; }
+    public bool SupportsWrite { get; init; }
+    public bool SupportsSchema { get; init; }
+    public bool SupportsTransactions { get; init; }
+    public bool SupportsStreaming { get; init; }
+    public bool SupportsCdc { get; init; }           // Change Data Capture
+    public bool SupportsBulkOperations { get; init; }
+    public bool SupportsConnectionPooling { get; init; }
+    public bool SupportsEncryptedTransport { get; init; }
+    public int MaxConcurrentConnections { get; init; }
+    public string[] SupportedAuthMethods { get; init; }
+}
+```
+
+### Phase A: SDK Foundation
+
+| Sub-Task | Description | Status |
+|----------|-------------|--------|
+| 125.A1 | Expand `ConnectorCategory` enum — add IoT, Healthcare, Blockchain, FileSystem, Industrial, Protocol, DevOps, Observability, Dashboard | [ ] |
+| 125.A2 | Add `IConnectionStrategy` interface to SDK | [ ] |
+| 125.A3 | Add `ConnectionStrategyCapabilities` record | [ ] |
+| 125.A4 | Add `ConnectionStrategyBase` abstract class with retry, metrics, health | [ ] |
+| 125.A5 | Add category-specific strategy bases: `DatabaseConnectionStrategyBase`, `MessagingConnectionStrategyBase`, `SaaSConnectionStrategyBase`, `IoTConnectionStrategyBase`, `LegacyConnectionStrategyBase`, `HealthcareConnectionStrategyBase`, `BlockchainConnectionStrategyBase`, `ObservabilityConnectionStrategyBase`, `DashboardConnectionStrategyBase` | [ ] |
+| 125.A6 | Add `ConnectionPool` infrastructure — pool manager, pool config, connection leasing, eviction | [ ] |
+| 125.A7 | Add `ConnectionHealth` monitoring — health checks, liveness probes, connection scoring | [ ] |
+| 125.A8 | Refactor existing `IDataConnector` / `DataConnectorPluginBase` to work with new `IConnectionStrategy` | [ ] |
+| 125.A9 | Add connection message bus topics (`connector.connect`, `connector.disconnect`, `connector.health`, `connector.pool.get`) | [ ] |
+| 125.A10 | Unit tests for SDK connector infrastructure | [ ] |
+
+### Phase B: Plugin Setup & Relational Database Connectors
+
+| Sub-Task | Description | Status |
+|----------|-------------|--------|
+| **B1: Project Setup** |
+| 125.B1.1 | Create `DataWarehouse.Plugins.UltimateConnector` project | [ ] |
+| 125.B1.2 | Implement `UltimateConnectorPlugin` orchestrator with strategy auto-discovery | [ ] |
+| 125.B1.3 | Implement `ConnectionStrategyRegistry` for runtime registration | [ ] |
+| 125.B1.4 | Implement connection pool manager | [ ] |
+| **B2: Relational SQL Databases** |
+| 125.B2.1 | SqlServerConnectionStrategy — SQL Server 2016+ via Microsoft.Data.SqlClient | [ ] |
+| 125.B2.2 | PostgreSqlConnectionStrategy — PostgreSQL 12+ via Npgsql | [ ] |
+| 125.B2.3 | MySqlConnectionStrategy — MySQL 8.0+ / MariaDB 10.5+ via MySqlConnector | [ ] |
+| 125.B2.4 | OracleConnectionStrategy — Oracle 19c+ via Oracle.ManagedDataAccess | [ ] |
+| 125.B2.5 | SqliteConnectionStrategy — SQLite 3.x via Microsoft.Data.Sqlite | [ ] |
+| 125.B2.6 | Db2ConnectionStrategy — IBM DB2 11+ via IBM.Data.Db2 | [ ] |
+| 125.B2.7 | CockroachDbConnectionStrategy — CockroachDB via PostgreSQL wire protocol | [ ] |
+| 125.B2.8 | TiDbConnectionStrategy — TiDB via MySQL wire protocol | [ ] |
+| 125.B2.9 | YugabyteDbConnectionStrategy — YugabyteDB via PostgreSQL wire protocol | [ ] |
+| 125.B2.10 | SingleStoreConnectionStrategy — SingleStore (MemSQL) via MySQL protocol | [ ] |
+| 125.B2.11 | VitessConnectionStrategy — Vitess (YouTube-scale MySQL) | [ ] |
+| 125.B2.12 | ⭐ AlloyDbConnectionStrategy — Google AlloyDB (PostgreSQL-compatible) | [ ] |
+
+### Phase C: NoSQL Database Connectors
+
+| Sub-Task | Description | Status |
+|----------|-------------|--------|
+| **C1: Document Stores** |
+| 125.C1.1 | MongoDbConnectionStrategy — MongoDB 6+ via MongoDB.Driver | [ ] |
+| 125.C1.2 | CouchDbConnectionStrategy — Apache CouchDB via HTTP API | [ ] |
+| 125.C1.3 | CouchbaseConnectionStrategy — Couchbase 7+ via Couchbase .NET SDK | [ ] |
+| 125.C1.4 | RavenDbConnectionStrategy — RavenDB via RavenDB.Client | [ ] |
+| **C2: Key-Value Stores** |
+| 125.C2.1 | RedisConnectionStrategy — Redis 7+ / Valkey via StackExchange.Redis | [ ] |
+| 125.C2.2 | DynamoDbConnectionStrategy — Amazon DynamoDB via AWSSDK.DynamoDBv2 | [ ] |
+| 125.C2.3 | CosmosDbConnectionStrategy — Azure Cosmos DB via Azure.Cosmos | [ ] |
+| 125.C2.4 | FoundationDbConnectionStrategy — Apple FoundationDB via native bindings | [ ] |
+| **C3: Wide-Column Stores** |
+| 125.C3.1 | CassandraConnectionStrategy — Apache Cassandra 4+ via CassandraCSharpDriver | [ ] |
+| 125.C3.2 | ScyllaDbConnectionStrategy — ScyllaDB via Cassandra protocol | [ ] |
+| 125.C3.3 | HBaseConnectionStrategy — Apache HBase via Thrift/REST API | [ ] |
+| 125.C3.4 | BigtableConnectionStrategy — Google Cloud Bigtable via Bigtable.V2 SDK | [ ] |
+
+### Phase D: Specialized Database Connectors
+
+| Sub-Task | Description | Status |
+|----------|-------------|--------|
+| **D1: Graph Databases** |
+| 125.D1.1 | Neo4jConnectionStrategy — Neo4j 5+ via Neo4j.Driver (Bolt protocol) | [ ] |
+| 125.D1.2 | ArangoDbConnectionStrategy — ArangoDB via ArangoDBNetStandard | [ ] |
+| 125.D1.3 | JanusGraphConnectionStrategy — JanusGraph via Gremlin.Net | [ ] |
+| 125.D1.4 | NeptuneConnectionStrategy — Amazon Neptune via Gremlin/SPARQL | [ ] |
+| 125.D1.5 | TigerGraphConnectionStrategy — TigerGraph via REST/GSQL | [ ] |
+| 125.D1.6 | DgraphConnectionStrategy — Dgraph via gRPC/GraphQL | [ ] |
+| **D2: Time-Series Databases** |
+| 125.D2.1 | InfluxDbConnectionStrategy — InfluxDB 2.x/3.x via InfluxDB.Client | [ ] |
+| 125.D2.2 | TimescaleDbConnectionStrategy — TimescaleDB via PostgreSQL protocol | [ ] |
+| 125.D2.3 | QuestDbConnectionStrategy — QuestDB via PostgreSQL wire / ILP | [ ] |
+| 125.D2.4 | TDengineConnectionStrategy — TDengine via native client | [ ] |
+| 125.D2.5 | CrateDbConnectionStrategy — CrateDB via PostgreSQL wire protocol | [ ] |
+| 125.D2.6 | VictoriaMetricsConnectionStrategy — VictoriaMetrics via Prometheus remote write | [ ] |
+| **D3: Search & Analytics Engines** |
+| 125.D3.1 | ElasticsearchConnectionStrategy — Elasticsearch 8+ via Elastic.Clients.Elasticsearch | [ ] |
+| 125.D3.2 | OpenSearchConnectionStrategy — OpenSearch via OpenSearch.Client | [ ] |
+| 125.D3.3 | SolrConnectionStrategy — Apache Solr via SolrNet | [ ] |
+| 125.D3.4 | MeilisearchConnectionStrategy — Meilisearch via Meilisearch .NET SDK | [ ] |
+| 125.D3.5 | TypesenseConnectionStrategy — Typesense via Typesense .NET | [ ] |
+| 125.D3.6 | ⭐ AlgoliaConnectionStrategy — Algolia Search via Algolia .NET SDK | [ ] |
+
+### Phase E: Cloud Data Warehouse Connectors
+
+| Sub-Task | Description | Status |
+|----------|-------------|--------|
+| 125.E1 | SnowflakeConnectionStrategy — Snowflake via Snowflake.Data | [ ] |
+| 125.E2 | BigQueryConnectionStrategy — Google BigQuery via Google.Cloud.BigQuery.V2 | [ ] |
+| 125.E3 | RedshiftConnectionStrategy — Amazon Redshift via Npgsql (PG protocol) | [ ] |
+| 125.E4 | DatabricksConnectionStrategy — Databricks via REST API / Spark Connect | [ ] |
+| 125.E5 | ClickHouseConnectionStrategy — ClickHouse via ClickHouse.Client | [ ] |
+| 125.E6 | ApacheDruidConnectionStrategy — Apache Druid via REST/SQL | [ ] |
+| 125.E7 | ApachePinotConnectionStrategy — Apache Pinot via REST/SQL | [ ] |
+| 125.E8 | DuckDbConnectionStrategy — DuckDB embedded analytics via DuckDB.NET | [ ] |
+| 125.E9 | StarRocksConnectionStrategy — StarRocks via MySQL protocol | [ ] |
+| 125.E10 | FireboltConnectionStrategy — Firebolt via REST API | [ ] |
+
+### Phase F: Cloud Platform Service Connectors
+
+| Sub-Task | Description | Status |
+|----------|-------------|--------|
+| **F1: Amazon Web Services (AWS)** |
+| 125.F1.1 | AwsS3ConnectionStrategy — S3 buckets via AWSSDK.S3 | [ ] |
+| 125.F1.2 | AwsDynamoDbConnectionStrategy — DynamoDB tables via AWSSDK.DynamoDBv2 | [ ] |
+| 125.F1.3 | AwsSqsConnectionStrategy — SQS queues via AWSSDK.SQS | [ ] |
+| 125.F1.4 | AwsSnsConnectionStrategy — SNS topics via AWSSDK.SimpleNotificationService | [ ] |
+| 125.F1.5 | AwsKinesisConnectionStrategy — Kinesis streams via AWSSDK.Kinesis | [ ] |
+| 125.F1.6 | AwsLambdaConnectionStrategy — Lambda invocation via AWSSDK.Lambda | [ ] |
+| 125.F1.7 | AwsEventBridgeConnectionStrategy — EventBridge via AWSSDK.EventBridge | [ ] |
+| 125.F1.8 | AwsSecretsManagerConnectionStrategy — Secrets Manager via AWSSDK.SecretsManager | [ ] |
+| **F2: Microsoft Azure** |
+| 125.F2.1 | AzureBlobConnectionStrategy — Blob Storage via Azure.Storage.Blobs | [ ] |
+| 125.F2.2 | AzureCosmosDbConnectionStrategy — Cosmos DB via Azure.Cosmos | [ ] |
+| 125.F2.3 | AzureServiceBusConnectionStrategy — Service Bus via Azure.Messaging.ServiceBus | [ ] |
+| 125.F2.4 | AzureEventHubsConnectionStrategy — Event Hubs via Azure.Messaging.EventHubs | [ ] |
+| 125.F2.5 | AzureFunctionsConnectionStrategy — Functions invocation via HTTP triggers | [ ] |
+| 125.F2.6 | AzureEventGridConnectionStrategy — Event Grid via Azure.Messaging.EventGrid | [ ] |
+| 125.F2.7 | AzureSynapseConnectionStrategy — Synapse Analytics via SQL endpoint | [ ] |
+| 125.F2.8 | AzureDataLakeConnectionStrategy — Data Lake Gen2 via Azure.Storage.Files.DataLake | [ ] |
+| **F3: Google Cloud Platform (GCP)** |
+| 125.F3.1 | GcpCloudStorageConnectionStrategy — Cloud Storage via Google.Cloud.Storage.V1 | [ ] |
+| 125.F3.2 | GcpFirestoreConnectionStrategy — Firestore via Google.Cloud.Firestore | [ ] |
+| 125.F3.3 | GcpPubSubConnectionStrategy — Pub/Sub via Google.Cloud.PubSub.V1 | [ ] |
+| 125.F3.4 | GcpBigQueryConnectionStrategy — BigQuery via Google.Cloud.BigQuery.V2 | [ ] |
+| 125.F3.5 | GcpCloudFunctionsConnectionStrategy — Cloud Functions via HTTP triggers | [ ] |
+| 125.F3.6 | GcpSpannerConnectionStrategy — Cloud Spanner via Google.Cloud.Spanner.Data | [ ] |
+| 125.F3.7 | GcpBigtableConnectionStrategy — Cloud Bigtable via Google.Cloud.Bigtable.V2 | [ ] |
+| 125.F3.8 | GcpDataflowConnectionStrategy — Dataflow jobs via REST API | [ ] |
+
+### Phase G: Message Broker & Event Streaming Connectors
+
+| Sub-Task | Description | Status |
+|----------|-------------|--------|
+| **G1: Traditional Message Brokers** |
+| 125.G1.1 | RabbitMqConnectionStrategy — RabbitMQ 3.12+ via RabbitMQ.Client | [ ] |
+| 125.G1.2 | ActiveMqConnectionStrategy — ActiveMQ Artemis via Apache.NMS.AMQP | [ ] |
+| 125.G1.3 | ZeroMqConnectionStrategy — ZeroMQ via NetMQ | [ ] |
+| 125.G1.4 | IbmMqConnectionStrategy — IBM MQ via IBM.XMS.NETStandard | [ ] |
+| 125.G1.5 | TibcoEmsConnectionStrategy — TIBCO EMS via TIBCO.EMS.NETCore | [ ] |
+| **G2: Event Streaming Platforms** |
+| 125.G2.1 | KafkaConnectionStrategy — Apache Kafka via Confluent.Kafka | [ ] |
+| 125.G2.2 | PulsarConnectionStrategy — Apache Pulsar via DotPulsar | [ ] |
+| 125.G2.3 | NatsConnectionStrategy — NATS / JetStream via NATS.Net.V2 | [ ] |
+| 125.G2.4 | RedisStreamsConnectionStrategy — Redis Streams via StackExchange.Redis | [ ] |
+| 125.G2.5 | ⭐ RedpandaConnectionStrategy — Redpanda (Kafka-compatible, zero JVM) | [ ] |
+| **G3: Cloud Messaging** |
+| 125.G3.1 | AwsKinesisStreamConnectionStrategy — Kinesis Data Streams with KCL | [ ] |
+| 125.G3.2 | AzureEventHubStreamConnectionStrategy — Event Hubs with processor | [ ] |
+| 125.G3.3 | GcpPubSubStreamConnectionStrategy — Pub/Sub with exactly-once delivery | [ ] |
+| 125.G3.4 | ⭐ ConfluentCloudConnectionStrategy — Confluent Cloud managed Kafka | [ ] |
+
+### Phase H: SaaS & Enterprise System Connectors
+
+| Sub-Task | Description | Status |
+|----------|-------------|--------|
+| **H1: CRM / ERP Systems** |
+| 125.H1.1 | SalesforceConnectionStrategy — Salesforce via REST/Bulk API 2.0 + OAuth 2.0 | [ ] |
+| 125.H1.2 | HubSpotConnectionStrategy — HubSpot via HubSpot API v3 + OAuth | [ ] |
+| 125.H1.3 | DynamicsCrmConnectionStrategy — Microsoft Dynamics 365 via Dataverse Web API | [ ] |
+| 125.H1.4 | SapConnectionStrategy — SAP S/4HANA via OData / RFC / BAPI | [ ] |
+| 125.H1.5 | OracleEbsConnectionStrategy — Oracle E-Business Suite via REST/SOAP | [ ] |
+| 125.H1.6 | WorkdayConnectionStrategy — Workday via SOAP / REST / RaaS | [ ] |
+| 125.H1.7 | NetSuiteConnectionStrategy — NetSuite via SuiteTalk REST/SOAP | [ ] |
+| 125.H1.8 | ServiceNowConnectionStrategy — ServiceNow via Table API / REST | [ ] |
+| **H2: Collaboration & Productivity** |
+| 125.H2.1 | JiraConnectionStrategy — Jira Cloud/Server via REST API v3 | [ ] |
+| 125.H2.2 | ConfluenceConnectionStrategy — Confluence via REST API v2 | [ ] |
+| 125.H2.3 | SlackConnectionStrategy — Slack via Web API + Events API | [ ] |
+| 125.H2.4 | TeamsConnectionStrategy — Microsoft Teams via Graph API | [ ] |
+| 125.H2.5 | AsanaConnectionStrategy — Asana via REST API | [ ] |
+| 125.H2.6 | NotionConnectionStrategy — Notion via Notion API | [ ] |
+| 125.H2.7 | AirtableConnectionStrategy — Airtable via Airtable Web API | [ ] |
+| **H3: Commerce & Financial** |
+| 125.H3.1 | ShopifyConnectionStrategy — Shopify via Admin REST/GraphQL API | [ ] |
+| 125.H3.2 | StripeConnectionStrategy — Stripe via Stripe .NET SDK | [ ] |
+| 125.H3.3 | SquareConnectionStrategy — Square via Square .NET SDK | [ ] |
+| 125.H3.4 | PayPalConnectionStrategy — PayPal via REST API v2 | [ ] |
+| 125.H3.5 | QuickBooksConnectionStrategy — QuickBooks Online via Intuit SDK | [ ] |
+| 125.H3.6 | XeroConnectionStrategy — Xero via Xero .NET SDK | [ ] |
+| **H4: DevOps & Source Control** |
+| 125.H4.1 | GitHubConnectionStrategy — GitHub via Octokit.NET / REST API | [ ] |
+| 125.H4.2 | GitLabConnectionStrategy — GitLab via REST API v4 | [ ] |
+| 125.H4.3 | JenkinsConnectionStrategy — Jenkins via REST API | [ ] |
+
+### Phase I: Protocol Connectors (Transport-Agnostic)
+
+| Sub-Task | Description | Status |
+|----------|-------------|--------|
+| **I1: Database Access Protocols** |
+| 125.I1.1 | OdbcConnectionStrategy — Generic ODBC via System.Data.Odbc | [ ] |
+| 125.I1.2 | JdbcBridgeConnectionStrategy — JDBC bridge via IKVM or Thrift wrapper | [ ] |
+| 125.I1.3 | AdoNetConnectionStrategy — Generic ADO.NET via DbProviderFactory | [ ] |
+| **I2: API Protocols** |
+| 125.I2.1 | RestApiConnectionStrategy — Generic REST API (any endpoint, configurable auth) | [ ] |
+| 125.I2.2 | GraphQlConnectionStrategy — Generic GraphQL via introspection + query builder | [ ] |
+| 125.I2.3 | GrpcConnectionStrategy — Generic gRPC via Grpc.Net.Client + reflection | [ ] |
+| 125.I2.4 | ODataConnectionStrategy — OData v4 via Microsoft.OData.Client | [ ] |
+| 125.I2.5 | SoapConnectionStrategy — SOAP/WSDL via WCF Client or HttpClient | [ ] |
+| **I3: Real-Time Protocols** |
+| 125.I3.1 | WebSocketConnectionStrategy — WebSocket via System.Net.WebSockets | [ ] |
+| 125.I3.2 | ServerSentEventsConnectionStrategy — SSE via HttpClient streaming | [ ] |
+| 125.I3.3 | WebHookConnectionStrategy — Webhook receiver with validation | [ ] |
+| **I4: File Transfer Protocols** |
+| 125.I4.1 | FtpSftpConnectionStrategy — FTP/SFTP via SSH.NET + FluentFTP | [ ] |
+| 125.I4.2 | WebDavConnectionStrategy — WebDAV via HttpClient / WebDavClient | [ ] |
+| 125.I4.3 | ScpConnectionStrategy — SCP via SSH.NET | [ ] |
+| **I5: Directory & Identity Protocols** |
+| 125.I5.1 | LdapConnectionStrategy — LDAP / Active Directory via System.DirectoryServices.Protocols | [ ] |
+| 125.I5.2 | ScimConnectionStrategy — SCIM 2.0 provisioning via REST | [ ] |
+
+### Phase J: IoT & Industrial Connectors
+
+| Sub-Task | Description | Status |
+|----------|-------------|--------|
+| **J1: IoT Protocols** |
+| 125.J1.1 | MqttConnectionStrategy — MQTT 5.0 via MQTTnet | [ ] |
+| 125.J1.2 | CoapConnectionStrategy — CoAP via CoAP.NET | [ ] |
+| 125.J1.3 | AmqpConnectionStrategy — AMQP 1.0 via AmqpNetLite | [ ] |
+| 125.J1.4 | LoRaWanConnectionStrategy — LoRaWAN via TTN/ChirpStack REST API | [ ] |
+| 125.J1.5 | ZigbeeConnectionStrategy — Zigbee via serial bridge / ZigBee2MQTT | [ ] |
+| **J2: Industrial Protocols** |
+| 125.J2.1 | OpcUaConnectionStrategy — OPC-UA via OPCFoundation .NET Standard | [ ] |
+| 125.J2.2 | ModbusConnectionStrategy — Modbus TCP/RTU via NModbus4 | [ ] |
+| 125.J2.3 | BacNetConnectionStrategy — BACnet via BACnet.Core | [ ] |
+| 125.J2.4 | ProfinetConnectionStrategy — PROFINET IO via raw sockets | [ ] |
+| 125.J2.5 | EtherCatConnectionStrategy — EtherCAT via SOEM .NET wrapper | [ ] |
+| **J3: Edge Computing** |
+| 125.J3.1 | AzureIoTEdgeConnectionStrategy — Azure IoT Edge/Hub via Azure.Devices.Client | [ ] |
+| 125.J3.2 | AwsGreengrassConnectionStrategy — AWS Greengrass via MQTT/IPC | [ ] |
+
+### Phase K: Legacy & Mainframe Connectors
+
+| Sub-Task | Description | Status |
+|----------|-------------|--------|
+| **K1: IBM Mainframe** |
+| 125.K1.1 | Tn3270ConnectionStrategy — 3270 terminal emulation via Open3270 | [ ] |
+| 125.K1.2 | CicsConnectionStrategy — CICS Transaction Server via CICS Transaction Gateway (CTG) | [ ] |
+| 125.K1.3 | ImsConnectionStrategy — IMS via IMS Connect TCP/IP | [ ] |
+| **K2: IBM Midrange** |
+| 125.K2.1 | As400ConnectionStrategy — AS/400 (iSeries) via CWBX (Client Access) | [ ] |
+| 125.K2.2 | Db2For400ConnectionStrategy — DB2 for i via ODBC/DRDA | [ ] |
+| 125.K2.3 | DataQueueConnectionStrategy — AS/400 Data Queues via CWBX | [ ] |
+| **K3: Data Exchange Protocols** |
+| 125.K3.1 | EdiX12ConnectionStrategy — EDI X12 (ANSI ASC X12) parsing and generation | [ ] |
+| 125.K3.2 | EdifactConnectionStrategy — UN/EDIFACT parsing and generation | [ ] |
+| 125.K3.3 | SwiftConnectionStrategy — SWIFT MT/MX financial messaging | [ ] |
+
+### Phase L: Healthcare Connectors
+
+| Sub-Task | Description | Status |
+|----------|-------------|--------|
+| **L1: Clinical Data Exchange** |
+| 125.L1.1 | Hl7V2ConnectionStrategy — HL7 v2.x via MLLP (Minimum Lower Layer Protocol) | [ ] |
+| 125.L1.2 | FhirR4ConnectionStrategy — FHIR R4 via Hl7.Fhir.R4 SDK (REST + SMART on FHIR) | [ ] |
+| 125.L1.3 | DicomConnectionStrategy — DICOM via fo-dicom (medical imaging transfer) | [ ] |
+| 125.L1.4 | CdaConnectionStrategy — CDA R2 (Clinical Document Architecture) via XML | [ ] |
+| **L2: Healthcare Administrative** |
+| 125.L2.1 | X12HealthcareConnectionStrategy — X12 837/835/270/271 claim transactions | [ ] |
+| 125.L2.2 | NcpdpConnectionStrategy — NCPDP SCRIPT (pharmacy ePrescribing) | [ ] |
+
+### Phase M: Blockchain & Web3 Connectors
+
+| Sub-Task | Description | Status |
+|----------|-------------|--------|
+| **M1: Public Blockchains** |
+| 125.M1.1 | EthereumConnectionStrategy — Ethereum via JSON-RPC / Nethereum | [ ] |
+| 125.M1.2 | SolanaConnectionStrategy — Solana via JSON-RPC / Solnet | [ ] |
+| 125.M1.3 | PolkadotConnectionStrategy — Polkadot via Substrate RPC | [ ] |
+| 125.M1.4 | BitcoinConnectionStrategy — Bitcoin via JSON-RPC (bitcoind) | [ ] |
+| **M2: Enterprise Blockchains** |
+| 125.M2.1 | HyperledgerFabricConnectionStrategy — Hyperledger Fabric via Fabric Gateway SDK | [ ] |
+| 125.M2.2 | R3CordaConnectionStrategy — R3 Corda via Corda RPC | [ ] |
+| 125.M2.3 | QuorumConnectionStrategy — Quorum (Ethereum-compatible private) | [ ] |
+| **M3: Web3 Protocols** |
+| 125.M3.1 | IpfsConnectionStrategy — IPFS via HTTP Gateway / Kubo RPC | [ ] |
+| 125.M3.2 | TheGraphConnectionStrategy — The Graph protocol via GraphQL subgraphs | [ ] |
+
+### Phase N: File System & Object Store Connectors
+
+| Sub-Task | Description | Status |
+|----------|-------------|--------|
+| 125.N1 | MinioConnectionStrategy — MinIO via S3-compatible API (AWSSDK.S3) | [ ] |
+| 125.N2 | CephConnectionStrategy — Ceph via RADOS Gateway (S3/Swift API) | [ ] |
+| 125.N3 | HdfsConnectionStrategy — Apache HDFS via WebHDFS REST API | [ ] |
+| 125.N4 | NfsConnectionStrategy — NFS v4.1 via System.IO with mount points | [ ] |
+| 125.N5 | SmbCifsConnectionStrategy — SMB/CIFS via SMBLibrary | [ ] |
+| 125.N6 | GlusterFsConnectionStrategy — GlusterFS via libgfapi bindings | [ ] |
+| 125.N7 | LustreConnectionStrategy — Lustre via POSIX with Lustre-specific attrs | [ ] |
+
+### Phase O: INDUSTRY-FIRST Connection Innovations
+
+> **Production-ready innovations** — not sci-fi, but genuinely novel capabilities
+> using real, standardized technologies.
+
+| Sub-Task | Description | Status |
+|----------|-------------|--------|
+| 125.O1 | **UniversalCdcEngineStrategy** — Zero-config Change Data Capture that auto-detects the optimal capture method (WAL/binlog parsing for PostgreSQL/MySQL, CT for SQL Server, oplog tailing for MongoDB, Debezium-compatible) for ANY connected database. No manual connector-per-DB config — detects DB type and self-configures. | [ ] |
+| 125.O2 | **AdaptiveProtocolNegotiationStrategy** — Single endpoint that auto-negotiates the optimal wire protocol (REST, gRPC, GraphQL, WebSocket, or raw TCP) based on payload size, latency requirements, server capabilities, and network conditions. Dynamically switches protocols mid-session if conditions change. | [ ] |
+| 125.O3 | **ZeroTrustConnectionMeshStrategy** — Every connection established through mutual TLS with continuous re-authentication, behavioral anomaly detection, and automatic revocation. Not just handshake-time auth — continuous verification throughout the connection lifetime using NIST 800-207 principles. | [ ] |
+| 125.O4 | **FederatedMultiSourceQueryStrategy** — Execute a single query that transparently JOINs across heterogeneous data sources (e.g., PostgreSQL LEFT JOIN MongoDB LEFT JOIN S3 CSV). Apache Calcite-inspired distributed query planning with cost-based optimization, predicate pushdown, and join reordering across sources. | [ ] |
+| 125.O5 | **SelfHealingConnectionPoolStrategy** — Connection pools with ML-based predictive analytics: pre-warm connections before demand spikes (using historical patterns), auto-scale pool sizes, detect and drain degraded connections before they fail, and route around unhealthy endpoints with weighted scoring. | [ ] |
+| 125.O6 | **QuantumSafeConnectionStrategy** — Post-quantum cryptographic connection security using NIST-standardized algorithms: ML-KEM (Kyber) for key exchange, ML-DSA (Dilithium) for connection authentication. Hybrid mode with X25519+ML-KEM for backwards compatibility. Production-ready per NIST FIPS 203/204 (finalized August 2024). | [ ] |
+| 125.O7 | **DataSovereigntyRouterStrategy** — Jurisdiction-aware connection routing that enforces data residency rules (GDPR Art. 44-49, China PIPL, Russia FZ-152, India DPDP). Maintains a ruleset of data classification to permitted jurisdictions, refuses cross-border transfers that violate policy, and can route through compliant relay nodes. | [ ] |
+| 125.O8 | **TimeTravelQueryStrategy** — Connect to point-in-time database snapshots using native temporal features: SQL Server Temporal Tables, PostgreSQL pg_time_travel, Oracle Flashback, MySQL InnoDB History. Query historical data as if it were current — no manual snapshot management. | [ ] |
+| 125.O9 | **ConnectionTelemetryFabricStrategy** — Full OpenTelemetry integration built into every connection: distributed traces across connection hops, per-query latency histograms, connection pool utilization metrics, slow-query auto-detection, and health score computation. Zero-config observability for every connection. | [ ] |
+| 125.O10 | **SchemaEvolutionTrackerStrategy** — Automatic detection of schema changes across connected sources. Monitors DDL changes (column adds/drops/renames, type changes), generates migration suggestions, emits schema-change events on the message bus, and can auto-adapt queries to accommodate non-breaking changes. | [ ] |
+| 125.O11 | **ConnectionDigitalTwinStrategy** — Virtual replicas of production connections that mirror real connection behavior (latency, throughput, error rates) for safe testing. Record/replay connection traffic, simulate failure scenarios, and validate queries against a twin before touching production. | [ ] |
+| 125.O12 | **PredictiveFailoverStrategy** — ML-driven connection failure prediction that detects degradation patterns (increasing latency, rising error rates, resource exhaustion) and proactively fails over to healthy replicas BEFORE the connection actually fails. Learns from historical failure patterns per connection type. | [ ] |
+
+### Phase R: Observability & Monitoring Platform Connectors
+
+> These platforms were previously implemented as standalone dashboard/observability plugins.
+> UltimateConnector provides the **outbound connection layer** so T100 (UniversalObservability)
+> can push metrics, logs, and traces to these platforms via message bus.
+
+| Sub-Task | Description | Status |
+|----------|-------------|--------|
+| **R1: Metrics Platforms** |
+| 125.R1.1 | PrometheusConnectionStrategy — Prometheus remote write/read API | [ ] |
+| 125.R1.2 | VictoriaMetricsNativeConnectionStrategy — VictoriaMetrics native ingestion API | [ ] |
+| 125.R1.3 | MimirConnectionStrategy — Grafana Mimir via remote write | [ ] |
+| 125.R1.4 | ThanosConnectionStrategy — Thanos receiver/sidecar | [ ] |
+| 125.R1.5 | CortexConnectionStrategy — Cortex ingestion API | [ ] |
+| **R2: Log Aggregation Platforms** |
+| 125.R2.1 | GrafanaLokiConnectionStrategy — Loki push API (protobuf/JSON) | [ ] |
+| 125.R2.2 | ElasticsearchLoggingConnectionStrategy — Elasticsearch bulk API for log ingestion | [ ] |
+| 125.R2.3 | OpenSearchLoggingConnectionStrategy — OpenSearch bulk API for log ingestion | [ ] |
+| 125.R2.4 | FluentdConnectionStrategy — Fluentd forward protocol | [ ] |
+| 125.R2.5 | SplunkHecConnectionStrategy — Splunk HTTP Event Collector | [ ] |
+| **R3: Distributed Tracing Platforms** |
+| 125.R3.1 | JaegerConnectionStrategy — Jaeger agent (UDP/gRPC) + Collector API | [ ] |
+| 125.R3.2 | ZipkinConnectionStrategy — Zipkin HTTP/gRPC collector | [ ] |
+| 125.R3.3 | TempoConnectionStrategy — Grafana Tempo via OTLP/Jaeger protocols | [ ] |
+| 125.R3.4 | OpenTelemetryCollectorConnectionStrategy — OTLP exporter (gRPC/HTTP) | [ ] |
+| **R4: Commercial APM & Observability Platforms** |
+| 125.R4.1 | DatadogConnectionStrategy — Datadog agent API + DogStatsD | [ ] |
+| 125.R4.2 | DynatraceConnectionStrategy — Dynatrace OneAgent API + metrics ingestion v2 | [ ] |
+| 125.R4.3 | NewRelicConnectionStrategy — New Relic telemetry API (metrics/logs/traces) | [ ] |
+| 125.R4.4 | AppDynamicsConnectionStrategy — AppDynamics controller REST API | [ ] |
+| 125.R4.5 | InstanaConnectionStrategy — IBM Instana agent API | [ ] |
+| **R5: Unified Observability Platforms** |
+| 125.R5.1 | SigNozConnectionStrategy — SigNoz OTLP endpoint + query API | [ ] |
+| 125.R5.2 | HoneycombConnectionStrategy — Honeycomb.io events API | [ ] |
+| **R6: Infrastructure Monitoring** |
+| 125.R6.1 | ZabbixConnectionStrategy — Zabbix sender protocol + trapper items | [ ] |
+| 125.R6.2 | NetdataConnectionStrategy — Netdata streaming + REST API | [ ] |
+| 125.R6.3 | LogicMonitorConnectionStrategy — LogicMonitor REST API v3 | [ ] |
+| 125.R6.4 | LogzioConnectionStrategy — Logz.io bulk log shipper + metrics API | [ ] |
+| 125.R6.5 | NagiosConnectionStrategy — Nagios NSCA passive checks | [ ] |
+| **R7: Cloud-Native Observability** |
+| 125.R7.1 | AwsCloudWatchConnectionStrategy — CloudWatch PutMetricData + Logs API | [ ] |
+| 125.R7.2 | AzureMonitorConnectionStrategy — Azure Monitor data ingestion API | [ ] |
+| 125.R7.3 | GcpCloudMonitoringConnectionStrategy — GCP Cloud Monitoring API v3 | [ ] |
+
+### Phase S: Dashboard & Business Intelligence Platform Connectors
+
+> Previously implemented dashboard integrations need outbound connections for
+> dashboard provisioning, data push, and embedded analytics via T101 (UniversalDashboards).
+
+| Sub-Task | Description | Status |
+|----------|-------------|--------|
+| **S1: Open Source BI Platforms** |
+| 125.S1.1 | GrafanaConnectionStrategy — Grafana HTTP API (dashboard provisioning, data source config) | [ ] |
+| 125.S1.2 | MetabaseConnectionStrategy — Metabase REST API (questions, dashboards, collections) | [ ] |
+| 125.S1.3 | ApacheSupersetConnectionStrategy — Apache Superset REST API v1 | [ ] |
+| 125.S1.4 | RedashConnectionStrategy — Redash API (queries, dashboards, visualizations) | [ ] |
+| **S2: Time-Series & Infrastructure Dashboards** |
+| 125.S2.1 | ChronografConnectionStrategy — Chronograf API (InfluxDB ecosystem) | [ ] |
+| 125.S2.2 | PersesConnectionStrategy — Perses dashboard API (Prometheus-native) | [ ] |
+| **S3: Log & Search Visualization** |
+| 125.S3.1 | KibanaConnectionStrategy — Kibana saved objects API + dashboard import/export | [ ] |
+| 125.S3.2 | OpenSearchDashboardsConnectionStrategy — OpenSearch Dashboards API | [ ] |
+| **S4: Commercial BI Platforms** |
+| 125.S4.1 | PowerBIConnectionStrategy — Power BI REST API + Push Datasets + Embedding | [ ] |
+| 125.S4.2 | TableauConnectionStrategy — Tableau Server/Cloud REST API + Hyper API | [ ] |
+| 125.S4.3 | LookerConnectionStrategy — Looker API 4.0 (dashboards, looks, explores) | [ ] |
+| 125.S4.4 | QlikConnectionStrategy — Qlik Sense Engine API + REST API | [ ] |
+| 125.S4.5 | ThoughtSpotConnectionStrategy — ThoughtSpot REST API v2 (search analytics) | [ ] |
+| **S5: Lightweight & Embedded Analytics** |
+| 125.S5.1 | GeckoboardConnectionStrategy — Geckoboard datasets push API | [ ] |
+| 125.S5.2 | DataboxConnectionStrategy — Databox push API (KPI dashboards) | [ ] |
+| **S6: Cloud-Native Dashboards** |
+| 125.S6.1 | AwsQuickSightConnectionStrategy — AWS QuickSight API (dashboards + embedding) | [ ] |
+| 125.S6.2 | GoogleLookerStudioConnectionStrategy — Google Looker Studio / Data Studio API | [ ] |
+
+### Phase P: Advanced Cross-Cutting Features
+
+| Sub-Task | Description | Status |
+|----------|-------------|--------|
+| 125.P1 | Connection pool manager with per-strategy pool configuration | [ ] |
+| 125.P2 | Credential management integration via T94 (UltimateKeyManagement) message bus | [ ] |
+| 125.P3 | Connection encryption via T93 (UltimateEncryption) for sensitive wire data | [ ] |
+| 125.P4 | Audit logging for all connection lifecycle events | [ ] |
+| 125.P5 | Rate limiting per connection strategy (configurable) | [ ] |
+| 125.P6 | Circuit breaker per connection endpoint | [ ] |
+| 125.P7 | Bulk connection testing (health-check all active connections) | [ ] |
+| 125.P8 | Connection metrics dashboard integration via T100 (UniversalObservability) | [ ] |
+| 125.P9 | Automatic reconnection with exponential backoff and jitter | [ ] |
+| 125.P10 | Connection tagging and grouping (by environment, tenant, region) | [ ] |
+
+### Phase Q: Migration & Cleanup
+
+| Sub-Task | Description | Status |
+|----------|-------------|--------|
+| 125.Q1 | Supersede T97 Phase E — move connector strategies from UltimateStorage to UltimateConnector | [ ] |
+| 125.Q2 | Update T108.B21 to reference T125 | [x] Updated in this commit |
+| 125.Q3 | Update SDK `IDataConnector` / base classes to align with `IConnectionStrategy` | [ ] |
+| 125.Q4 | Update all inter-plugin dependency documentation | [ ] |
+| 125.Q5 | Create connector configuration guide | [ ] |
+
+### Strategy Count Summary
+
+| Phase | Category | Standard | Industry-First | Total |
+|-------|----------|----------|----------------|-------|
+| B | Relational Databases | 12 | 0 | 12 |
+| C | NoSQL Databases | 12 | 0 | 12 |
+| D | Specialized Databases | 18 | 0 | 18 |
+| E | Cloud Data Warehouses | 10 | 0 | 10 |
+| F | Cloud Platform Services | 24 | 0 | 24 |
+| G | Message Brokers / Streaming | 12 | 2 | 14 |
+| H | SaaS & Enterprise | 24 | 0 | 24 |
+| I | Protocol Connectors | 16 | 0 | 16 |
+| J | IoT & Industrial | 12 | 0 | 12 |
+| K | Legacy & Mainframe | 9 | 0 | 9 |
+| L | Healthcare | 6 | 0 | 6 |
+| M | Blockchain & Web3 | 9 | 0 | 9 |
+| N | File Systems & Object Stores | 7 | 0 | 7 |
+| O | Innovations | 0 | 12 | 12 |
+| R | Observability & Monitoring | 30 | 0 | 30 |
+| S | Dashboard & BI Platforms | 18 | 0 | 18 |
+| **Totals** | | **219** | **14** | **233** |
+
+---
+
 ## COMPREHENSIVE INTER-PLUGIN DEPENDENCY MATRIX
 
 > **CRITICAL RULE:** Plugins ONLY reference the SDK. All inter-plugin communication uses the message bus.
@@ -12772,6 +13276,26 @@ Orchestrates the complete EHT workflow: maximum local processing before physical
 
 ---
 
+### T125 (Ultimate Connector) Dependencies
+
+| Plugin | Depends On | Type | Communication | Fallback |
+|--------|-----------|------|---------------|----------|
+| T125 Ultimate Connector | T99 SDK | → Hard | Direct (SDK ref) | None - required |
+| T125 Ultimate Connector | T94 Key Management | ⇢ Soft 📨 🔑 | `keystore.get` (credential retrieval) | Local credential config |
+| T125 Ultimate Connector | T93 Encryption | ⇢ Soft 📨 🔒 | `encryption.encrypt` (wire encryption) | TLS-only |
+| T125 Ultimate Connector | T95 Security | ⇢ Soft 📨 🔑 | `security.auth.verify` (connection auth) | Direct auth |
+| T125 Ultimate Connector | T100 Observability | ⇢ Soft 📨 | `metrics.publish` (connection metrics) | No metrics |
+| T125 Ultimate Connector | T90 Intelligence | ⇢ Soft 📨 🧠 | `intelligence.predict.access` (predictive pooling) | Static pool config |
+
+**Plugins that consume T125 connections:**
+| Consumer Plugin | Message Topic | Purpose |
+|----------------|---------------|---------|
+| T97 Ultimate Storage | `connector.pool.get` | Get connections for storage backends |
+| T98 Ultimate Replication | `connector.pool.get` | Get connections for replication targets |
+| T100 Universal Observability | `connector.pool.get` | Get connections for monitoring endpoints |
+| T109 Ultimate Interface | `connector.pool.get` | Get connections for external API backends |
+| T90 Universal Intelligence | `connector.pool.get` | Get connections for AI provider endpoints |
+
 ### T109 (Ultimate Interface) Dependencies
 
 | This Plugin | Depends On | Dependency Type | Communication | Fallback |
@@ -12917,6 +13441,7 @@ T99 (Ultimate SDK)
 | T106 (Ultimate Deployment) | ~80 | High | 65+ deployment strategies |
 | T107 (Ultimate Sustainability) | ~50 | Medium | 40+ green computing strategies |
 | T108 (Cleanup) | ~30 | Medium | Plugin removal |
+| **T125 (Ultimate Connector)** | **~245** | **Extreme** | **233 connection strategies (14 industry-first)** |
 | **T109 (Ultimate Interface)** | **~85** | **Very High** | **50+ API protocols** |
 | **T110 (Ultimate Data Format)** | **~250** | **Extreme** | **230+ data formats (ALL industries)** |
 | **T111 (Ultimate Compute)** | **~140** | **Very High** | **60+ runtimes + Adaptive Pipeline Compute** |
@@ -12947,6 +13472,7 @@ T99 (Ultimate SDK)
 | Resilience | 60 patterns | 8 innovations | 68 |
 | Deployment | 55 strategies | 8 innovations | 63 |
 | Sustainability | 35 strategies | 8 innovations | 43 |
+| Connectors | 219 connections | 14 innovations | 233 |
 | Interface/API | 45 protocols | 10 innovations | 55 |
 | **Data Format** | **220+ formats** | **14 innovations** | **234** |
 | **Compute** | **55 runtimes + 35 pipeline** | **18 innovations** | **108** |
@@ -12969,6 +13495,6 @@ T99 (Ultimate SDK)
 
 ---
 
-*Document updated: 2026-02-03*
+*Document updated: 2026-02-05*
 *Master Task Index added for complete execution order*
 *Next review: 2026-02-15*

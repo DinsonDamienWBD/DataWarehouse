@@ -700,6 +700,7 @@ Features requiring T90 (Universal Intelligence) MUST:
 | Compliance | `UltimateCompliance` (T96) | ~~GdprPlugin~~, ~~HipaaPlugin~~ |
 | Replication | `UltimateReplication` (T98) | ~~GeoReplicationPlugin~~ |
 | AI/Knowledge | `UniversalIntelligence` (T90) | ~~AIAgentsPlugin~~ |
+| Connectors | `UltimateConnector` (T125) | ~~DataConnectors~~, ~~DatabaseImport~~ |
 | Observability | `UniversalObservability` (T100) | ~~PrometheusPlugin~~ |
 | Interface | `UltimateInterface` (T109) | ~~RestInterfacePlugin~~ |
 
