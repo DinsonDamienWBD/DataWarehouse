@@ -1,0 +1,217 @@
+using System;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.Net.Sockets;
+using System.Threading;
+using System.Threading.Tasks;
+using DataWarehouse.SDK.Connectors;
+using Microsoft.Extensions.Logging;
+
+namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Database;
+
+/// <summary>
+/// TiDB connection strategy using TCP connectivity check.
+/// Provides connection validation via TCP socket to TiDB MySQL-compatible server.
+/// Note: Full query operations require MySqlConnector NuGet package.
+/// </summary>
+public sealed class TiDbConnectionStrategy : DatabaseConnectionStrategyBase
+{
+    private const int DefaultTiDbPort = 4000;
+
+    /// <inheritdoc/>
+    public override string StrategyId => "tidb";
+
+    /// <inheritdoc/>
+    public override string DisplayName => "TiDB";
+
+    /// <inheritdoc/>
+    public override ConnectionStrategyCapabilities Capabilities => new();
+
+    /// <inheritdoc/>
+    public override string SemanticDescription =>
+        "TiDB distributed SQL database connection. MySQL-compatible distributed HTAP (Hybrid Transactional/Analytical " +
+        "Processing) database with horizontal scalability, strong consistency, and high availability. Supports distributed " +
+        "transactions, real-time analytics, and automatic failover. Ideal for cloud-native applications.";
+
+    /// <inheritdoc/>
+    public override string[] Tags =>
+    [
+        "tidb", "mysql-compatible", "distributed", "htap", "cloud-native",
+        "scalable", "analytics", "transactional", "database", "pingcap"
+    ];
+
+    /// <summary>
+    /// Initializes a new instance of <see cref="TiDbConnectionStrategy"/>.
+    /// </summary>
+    /// <param name="logger">Optional logger for diagnostics.</param>
+    public TiDbConnectionStrategy(ILogger? logger = null) : base(logger) { }
+
+    /// <inheritdoc/>
+    protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct)
+    {
+        var connectionString = config.ConnectionString;
+        if (string.IsNullOrWhiteSpace(connectionString))
+            throw new ArgumentException("Connection string is required for TiDB connection.");
+
+        var (host, port) = ParseConnectionString(connectionString);
+
+        using var tcpClient = new TcpClient();
+        await tcpClient.ConnectAsync(host, port, ct);
+
+        var connectionInfo = new Dictionary<string, object>
+        {
+            ["Provider"] = "TCP/TiDB",
+            ["Host"] = host,
+            ["Port"] = port,
+            ["ConnectionString"] = connectionString,
+            ["State"] = "Connected"
+        };
+
+        var mockConnection = new TiDbTcpConnection(host, port, connectionString);
+        return new DefaultConnectionHandle(mockConnection, connectionInfo);
+    }
+
+    /// <inheritdoc/>
+    protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct)
+    {
+        try
+        {
+            var mockConnection = handle.GetConnection<TiDbTcpConnection>();
+            using var tcpClient = new TcpClient();
+            await tcpClient.ConnectAsync(mockConnection.Host, mockConnection.Port, ct);
+            return true;
+        }
+        catch { return false; }
+    }
+
+    /// <inheritdoc/>
+    protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct)
+    {
+        if (handle is DefaultConnectionHandle defaultHandle) defaultHandle.MarkDisconnected();
+        return Task.CompletedTask;
+    }
+
+    /// <inheritdoc/>
+    protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct)
+    {
+        var sw = Stopwatch.StartNew();
+
+        try
+        {
+            var mockConnection = handle.GetConnection<TiDbTcpConnection>();
+            using var tcpClient = new TcpClient();
+            await tcpClient.ConnectAsync(mockConnection.Host, mockConnection.Port, ct);
+            sw.Stop();
+
+            return new ConnectionHealth(true, $"TiDB TCP connection active - {mockConnection.Host}:{mockConnection.Port}", sw.Elapsed, DateTimeOffset.UtcNow);
+        }
+        catch (Exception ex)
+        {
+            sw.Stop();
+            return new ConnectionHealth(false, $"TCP health check failed: {ex.Message}", sw.Elapsed, DateTimeOffset.UtcNow);
+        }
+    }
+
+    /// <inheritdoc/>
+    public override Task<IReadOnlyList<Dictionary<string, object?>>> ExecuteQueryAsync(
+        IConnectionHandle handle, string query, Dictionary<string, object?>? parameters = null, CancellationToken ct = default)
+    {
+        throw new NotImplementedException(
+            "Query execution requires MySqlConnector NuGet package (TiDB is MySQL wire-compatible). " +
+            "This strategy only provides TCP connectivity validation. " +
+            "Install the MySqlConnector package to enable full database operations.");
+    }
+
+    /// <inheritdoc/>
+    public override Task<int> ExecuteNonQueryAsync(
+        IConnectionHandle handle, string command, Dictionary<string, object?>? parameters = null, CancellationToken ct = default)
+    {
+        throw new NotImplementedException(
+            "Non-query execution requires MySqlConnector NuGet package (TiDB is MySQL wire-compatible). " +
+            "This strategy only provides TCP connectivity validation. " +
+            "Install the MySqlConnector package to enable full database operations.");
+    }
+
+    /// <inheritdoc/>
+    public override Task<IReadOnlyList<DataSchema>> GetSchemaAsync(IConnectionHandle handle, CancellationToken ct = default)
+    {
+        throw new NotImplementedException(
+            "Schema retrieval requires MySqlConnector NuGet package (TiDB is MySQL wire-compatible). " +
+            "This strategy only provides TCP connectivity validation. " +
+            "Install the MySqlConnector package to enable full database operations.");
+    }
+
+    /// <inheritdoc/>
+    public override Task<(bool IsValid, string[] Errors)> ValidateConfigAsync(ConnectionConfig config, CancellationToken ct = default)
+    {
+        var errors = new List<string>();
+
+        if (string.IsNullOrWhiteSpace(config.ConnectionString))
+        {
+            errors.Add("ConnectionString is required for TiDB connection.");
+        }
+        else
+        {
+            try
+            {
+                var (host, port) = ParseConnectionString(config.ConnectionString);
+                if (string.IsNullOrWhiteSpace(host)) errors.Add("Host/Server is required.");
+                if (port <= 0 || port > 65535) errors.Add("Port must be between 1 and 65535.");
+            }
+            catch (Exception ex) { errors.Add($"Invalid connection string: {ex.Message}"); }
+        }
+
+        if (config.Timeout <= TimeSpan.Zero) errors.Add("Timeout must be positive.");
+        if (config.MaxRetries < 0) errors.Add("MaxRetries must be non-negative.");
+
+        return Task.FromResult((errors.Count == 0, errors.ToArray()));
+    }
+
+    private static (string Host, int Port) ParseConnectionString(string connectionString)
+    {
+        var parts = connectionString.Split(';', StringSplitOptions.RemoveEmptyEntries);
+        string? host = null;
+        int port = DefaultTiDbPort;
+
+        foreach (var part in parts)
+        {
+            var keyValue = part.Split('=', 2, StringSplitOptions.TrimEntries);
+            if (keyValue.Length != 2) continue;
+
+            var key = keyValue[0].ToLowerInvariant();
+            var value = keyValue[1];
+
+            switch (key)
+            {
+                case "server":
+                case "host":
+                case "data source":
+                    host = value;
+                    break;
+                case "port":
+                    if (int.TryParse(value, out var parsedPort))
+                        port = parsedPort;
+                    break;
+            }
+        }
+
+        if (string.IsNullOrWhiteSpace(host))
+            throw new ArgumentException("Host/Server not found in connection string.");
+
+        return (host, port);
+    }
+
+    private sealed class TiDbTcpConnection
+    {
+        public string Host { get; }
+        public int Port { get; }
+        public string ConnectionString { get; }
+
+        public TiDbTcpConnection(string host, int port, string connectionString)
+        {
+            Host = host;
+            Port = port;
+            ConnectionString = connectionString;
+        }
+    }
+}

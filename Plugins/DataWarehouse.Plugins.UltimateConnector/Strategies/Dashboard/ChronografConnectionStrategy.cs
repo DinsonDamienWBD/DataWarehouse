@@ -1,0 +1,16 @@
+using System;using System.Collections.Generic;using System.Net.Http;using System.Text;using System.Text.Json;using System.Threading;using System.Threading.Tasks;using DataWarehouse.SDK.Connectors;using Microsoft.Extensions.Logging;
+
+namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Dashboard;
+
+/// <summary>Chronograf connection strategy. HTTP to port 8888. InfluxDB visualization layer.</summary>
+public sealed class ChronografConnectionStrategy : DashboardConnectionStrategyBase
+{
+    public override string StrategyId => "chronograf";public override string DisplayName => "Chronograf";public override ConnectionStrategyCapabilities Capabilities => new();public override string SemanticDescription => "Chronograf time-series visualization. Part of TICK stack. InfluxDB-focused dashboards.";public override string[] Tags => ["chronograf", "influxdb", "time-series", "tick-stack", "visualization"];
+    public ChronografConnectionStrategy(ILogger? logger = null) : base(logger) { }
+    protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct){var baseUrl = config.ConnectionString?.TrimEnd('/') ?? "http://localhost:8888";var httpClient = new HttpClient { BaseAddress = new Uri(baseUrl), Timeout = config.Timeout };return new DefaultConnectionHandle(httpClient, new Dictionary<string, object> { ["Provider"] = "Chronograf", ["BaseUrl"] = baseUrl });}
+    protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct){try { var response = await handle.GetConnection<HttpClient>().GetAsync("/chronograf/v1/sources", ct); return response.IsSuccessStatusCode; } catch { return false; }}
+    protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct){handle.GetConnection<HttpClient>().Dispose();if (handle is DefaultConnectionHandle defaultHandle) defaultHandle.MarkDisconnected();return Task.CompletedTask;}
+    protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct){var sw = System.Diagnostics.Stopwatch.StartNew();try { var response = await handle.GetConnection<HttpClient>().GetAsync("/chronograf/v1/sources", ct); sw.Stop(); return new ConnectionHealth(response.IsSuccessStatusCode, "Chronograf ready", sw.Elapsed, DateTimeOffset.UtcNow); }catch (Exception ex) { sw.Stop(); return new ConnectionHealth(false, ex.Message, sw.Elapsed, DateTimeOffset.UtcNow); }}
+    public override async Task<string> ProvisionDashboardAsync(IConnectionHandle handle, string dashboardDefinition, CancellationToken ct = default){var httpClient = handle.GetConnection<HttpClient>();var content = new StringContent(dashboardDefinition, Encoding.UTF8, "application/json");var response = await httpClient.PostAsync("/chronograf/v1/dashboards", content, ct);response.EnsureSuccessStatusCode();var result = await response.Content.ReadAsStringAsync(ct);var json = JsonDocument.Parse(result);return json.RootElement.GetProperty("id").GetString() ?? "";}
+    public override Task PushDataAsync(IConnectionHandle handle, string datasetId, IReadOnlyList<Dictionary<string, object?>> data, CancellationToken ct = default) => throw new NotSupportedException("Chronograf visualizes data from InfluxDB.");
+}

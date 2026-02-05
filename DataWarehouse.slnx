@@ -137,6 +137,7 @@
     <Project Path="Plugins/DataWarehouse.Plugins.ThreatDetection/DataWarehouse.Plugins.ThreatDetection.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.Tiering/DataWarehouse.Plugins.Tiering.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.Transcoding.Media/DataWarehouse.Plugins.Transcoding.Media.csproj" />
+    <Project Path="Plugins/DataWarehouse.Plugins.UltimateConnector/DataWarehouse.Plugins.UltimateConnector.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.UltimateEncryption/DataWarehouse.Plugins.UltimateEncryption.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.UltimateKeyManagement/DataWarehouse.Plugins.UltimateKeyManagement.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.UltimateStorage/DataWarehouse.Plugins.UltimateStorage.csproj" />

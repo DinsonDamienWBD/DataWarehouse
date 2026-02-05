@@ -1,0 +1,17 @@
+using System;using System.Collections.Generic;using System.Net.Http;using System.Net.Http.Headers;using System.Text;using System.Text.Json;using System.Threading;using System.Threading.Tasks;using DataWarehouse.SDK.Connectors;using Microsoft.Extensions.Logging;
+
+namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Observability;
+
+/// <summary>Logz.io connection strategy. HTTPS to listener.logz.io. Cloud observability platform built on ELK stack.</summary>
+public sealed class LogzioConnectionStrategy : ObservabilityConnectionStrategyBase
+{
+    public override string StrategyId => "logzio";public override string DisplayName => "Logz.io";public override ConnectionStrategyCapabilities Capabilities => new();public override string SemanticDescription => "Logz.io cloud observability. Managed ELK, Prometheus, and Jaeger as a service.";public override string[] Tags => ["logzio", "commercial", "saas", "elk", "observability"];
+    public LogzioConnectionStrategy(ILogger? logger = null) : base(logger) { }
+    protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct){var baseUrl = config.ConnectionString?.TrimEnd('/') ?? "https://listener.logz.io";var httpClient = new HttpClient { BaseAddress = new Uri(baseUrl), Timeout = config.Timeout };if (config.Properties.TryGetValue("Token", out var token)){httpClient.DefaultRequestHeaders.Add("Authorization", $"Bearer {token}");}return new DefaultConnectionHandle(httpClient, new Dictionary<string, object> { ["Provider"] = "Logzio", ["BaseUrl"] = baseUrl });}
+    protected override Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct) => Task.FromResult(true);
+    protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct){handle.GetConnection<HttpClient>().Dispose();if (handle is DefaultConnectionHandle defaultHandle) defaultHandle.MarkDisconnected();return Task.CompletedTask;}
+    protected override Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct) => Task.FromResult(new ConnectionHealth(true, "Logzio configured", TimeSpan.Zero, DateTimeOffset.UtcNow));
+    public override async Task PushMetricsAsync(IConnectionHandle handle, IReadOnlyList<Dictionary<string, object>> metrics, CancellationToken ct = default){var json = JsonSerializer.Serialize(metrics);var content = new StringContent(json, Encoding.UTF8, "application/json");var response = await handle.GetConnection<HttpClient>().PostAsync(":8053", content, ct);response.EnsureSuccessStatusCode();}
+    public override async Task PushLogsAsync(IConnectionHandle handle, IReadOnlyList<Dictionary<string, object>> logs, CancellationToken ct = default){var json = JsonSerializer.Serialize(logs);var content = new StringContent(json, Encoding.UTF8, "application/json");var response = await handle.GetConnection<HttpClient>().PostAsync(":8071", content, ct);response.EnsureSuccessStatusCode();}
+    public override async Task PushTracesAsync(IConnectionHandle handle, IReadOnlyList<Dictionary<string, object>> traces, CancellationToken ct = default){var json = JsonSerializer.Serialize(traces);var content = new StringContent(json, Encoding.UTF8, "application/json");var response = await handle.GetConnection<HttpClient>().PostAsync(":9411/api/v2/spans", content, ct);response.EnsureSuccessStatusCode();}
+}

@@ -1,0 +1,16 @@
+using System;using System.Collections.Generic;using System.Net.Http;using System.Net.Http.Headers;using System.Text;using System.Text.Json;using System.Threading;using System.Threading.Tasks;using DataWarehouse.SDK.Connectors;using Microsoft.Extensions.Logging;
+
+namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Dashboard;
+
+/// <summary>Databox dashboard. HTTPS to push.databox.com. Mobile-first KPI dashboards.</summary>
+public sealed class DataboxConnectionStrategy : DashboardConnectionStrategyBase
+{
+    public override string StrategyId => "databox";public override string DisplayName => "Databox";public override ConnectionStrategyCapabilities Capabilities => new();public override string SemanticDescription => "Databox mobile-first KPI dashboards. Push metrics from any source.";public override string[] Tags => ["databox", "commercial", "kpi", "mobile", "push-api"];
+    public DataboxConnectionStrategy(ILogger? logger = null) : base(logger) { }
+    protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct){var httpClient = new HttpClient { BaseAddress = new Uri("https://push.databox.com"), Timeout = config.Timeout };if (config.Properties.TryGetValue("Token", out var token)){httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Basic", Convert.ToBase64String(Encoding.UTF8.GetBytes($"{token}:")));}return new DefaultConnectionHandle(httpClient, new Dictionary<string, object> { ["Provider"] = "Databox" });}
+    protected override Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct) => Task.FromResult(true);
+    protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct){handle.GetConnection<HttpClient>().Dispose();if (handle is DefaultConnectionHandle defaultHandle) defaultHandle.MarkDisconnected();return Task.CompletedTask;}
+    protected override Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct) => Task.FromResult(new ConnectionHealth(true, "Databox configured", TimeSpan.Zero, DateTimeOffset.UtcNow));
+    public override Task<string> ProvisionDashboardAsync(IConnectionHandle handle, string dashboardDefinition, CancellationToken ct = default) => Task.FromResult("databox-uses-web-ui");
+    public override async Task PushDataAsync(IConnectionHandle handle, string datasetId, IReadOnlyList<Dictionary<string, object?>> data, CancellationToken ct = default){var json = JsonSerializer.Serialize(new { data });var content = new StringContent(json, Encoding.UTF8, "application/json");var response = await handle.GetConnection<HttpClient>().PostAsync("/", content, ct);response.EnsureSuccessStatusCode();}
+}

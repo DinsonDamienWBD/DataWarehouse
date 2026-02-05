@@ -13038,16 +13038,10 @@ public record ConnectionStrategyCapabilities
 | 125.O15 | **SemanticTrafficCompressionStrategy** — AI-aware compression that understands payload semantics: skips already-compressed binary blobs, applies delta compression to structured data, uses dictionary encoding for repeated schemas, and selects optimal algorithm per content type. Soft dependency on T92 UltimateCompression via message bus. | [ ] |
 | 125.O16 | **IntentBasedServiceDiscoveryStrategy** — Replace IP:port with semantic intent: `connect("read-replica PostgreSQL in EU-WEST with <50ms latency")`. Queries the service mesh, peer health metrics, and connection telemetry to resolve intent to the optimal endpoint. Functions as a smart load balancer for data in transit. | [ ] |
 | 125.O17 | **AutomatedApiHealingStrategy** — Detects when remote APIs change (new versions, deprecated endpoints, modified schemas, changed auth requirements) and automatically adapts connection behavior. Combines schema evolution tracking (O10) with LLM-based code generation to produce updated API calls without manual intervention. | [ ] |
-| 125.O18 | ⭐ **ZeroDayConnectorGeneratorStrategy** ("Docu-Synthesis") — Feed an API documentation URL (Swagger/OpenAPI spec, HTML docs) to the Native Intelligence (T90 via message bus); the AI agent reads the spec and auto-generates a fully functional C# `IConnectionStrategy` implementation running in a safe WASM sandbox (T111). When Stripe/Shopify/any SaaS releases a new API version, the system reads the new docs and hot-swaps the connector strategy in real-time — no firmware update needed. Industry First: Self-generating connectors from documentation. | [ ] |
-| 125.O19 | ⭐ **SemanticSchemaAlignmentStrategy** ("Entity Resolver") — AI-driven data profiling that scans *actual data* (not just column names) across heterogeneous systems to discover semantic equivalences (SAP `KUNNR` = Salesforce `AccountID` = internal `Client_UUID`). Auto-builds a Unified Virtual Schema enabling `SELECT * FROM Customers` that transparently JOINs SAP billing data with Salesforce contacts, handling all ID translations. Uses embeddings (T90 via message bus) for fuzzy entity matching. Industry First: Cross-system semantic entity resolution. | [ ] |
-| 125.O20 | ⭐ **UniversalQueryTranspilationStrategy** ("Time-Travel Query Transpilation") — User writes standard SQL; the AI translates to the native query language of ANY connected system. SQL → MongoDB `find()`/aggregation, SQL → Neo4j Cypher, SQL → InfluxQL/Flux, SQL → CICS transaction sequences for mainframes (Cat K), SQL → HL7 FHIR queries (Cat L), SQL → GraphQL mutations (Cat I). Context-aware compilation uses schema metadata and system capabilities. Soft dependency on T90. Industry First: Universal SQL-to-anything transpilation. | [ ] |
-| 125.O21 | ⭐ **LegacyBehavioralModelingStrategy** ("Ghost in the Shell") — For mainframes (Cat K) and healthcare systems (Cat L): the connector "watches" legitimate traffic to learn the system's behavioral rhythm — which screens follow which, error code semantics, field validation rules. Uses Vision AI (T90 via message bus) or text analysis to read green-screen terminal output and exposes it as a clean REST/GraphQL API. For healthcare, statistically detects "impossible" vitals or mismatched patient records that violate learned HL7 message patterns, blocking data corruption before it enters the warehouse. Industry First: AI-powered legacy system behavioral modeling. | [ ] |
-| 125.O22 | ⭐ **SmartQuotaTradingStrategy** ("Quota Trading") — AI learns the reset cycles, burst limits, and rate patterns of every external API. When the Salesforce connector is exhausting its quota but the Slack connector is idle, the system reprioritizes traffic and intelligently batches requests. For Cloud Platforms (Cat F), predicts cost: "Running this BigQuery query now costs $50; waiting 2 hours for spot-instance rates drops it to $5." Combines quota prediction, cost arbitrage, and cross-connector traffic optimization. Industry First: AI-driven inter-connector quota arbitrage. | [ ] |
-| 125.O23 | ⭐ **ChameleonProtocolEmulatorStrategy** ("Reverse Integration") — Instead of connecting TO legacy systems, the connector IMPERSONATES them. Opens a socket and bit-perfectly mimics legacy wire protocols (SQL Server 2000 TDS, Oracle Net8, MySQL 3.x). A 20-year-old ERP that only talks to ancient SQL Server thinks it's saving to its old database, but the connector intercepts the traffic, converts to modern format, and stores in the DataWarehouse. Industry First: Zero-code migration for "un-migratable" legacy tech via protocol impersonation. | [ ] |
-| 125.O24 | ⭐ **BgpAwareGeopoliticalRoutingStrategy** ("Digital Sovereignty Routing") — Routes data based on digital sovereignty laws, not just network speed. Inspects BGP (Border Gateway Protocol) paths in real-time. Rule: "Sync this data to HQ, but DROP PACKET immediately if the route hops through Server Farm X or Country Y." Enforces GDPR Art. 44-49 / ITAR at the packet level. Complements O7 (jurisdiction-aware connection routing) with physical network path enforcement. Industry First: Physical-location-aware packet routing for compliance. | [ ] |
-| 125.O25 | ⭐ **ApiArchaeologistStrategy** ("Undocumented Endpoint Discovery") — Launches a "Safe Fuzzing" AI agent against target APIs to discover hidden capabilities the vendor forgot to document. Gently probes for hidden fields in JSON responses, tries widely known undocumented parameters (`?debug=true`, `?limit=10000`, custom headers). Discovers "the docs say limit is 100, but with this specific header I get 500 records at once." All probing is non-destructive (GET/HEAD only, respects rate limits). Industry First: Automated optimization via "Red Teaming" external APIs. | [ ] |
-| 125.O26 | ⭐ **ProbabilisticDataBufferingStrategy** ("Quantum Data Buffering") — On slow connections (Satellite/3G), uses Native Intelligence (T90 via message bus) to generate high-fidelity predictions of what the data WILL look like (based on historical trends). Serves "Probabilistic Data" to the UI immediately with confidence-interval tags. As real data trickles in, the system "collapses the wave function," replacing predicted values with actual values only where they differ. Confidence thresholds are configurable. Industry First: "Negative Latency" UI experiences for field engineers. | [ ] |
-| 125.O27 | ⭐ **BatteryConsciousHandshakeStrategy** ("Energy-Aware ETL") — Negotiates data transfer protocols based on physical hardware energy state. Queries the hardware HAL: Battery >50% → high-speed, high-CPU compression (ZSTD-19); Battery 10-50% → balanced mode; Battery <10% → "Low Energy Mode" disabling compression (saves CPU), throttling network speed to reduce heat, syncing only "Critical"-tagged rows. For "Instance on a Stick" scenarios where killing the battery means corrupting the file. Industry First: Hardware-energy-aware ETL protocols. | [ ] |
+| 125.O18 | ⭐ **ChameleonProtocolEmulatorStrategy** ("Reverse Integration") — Instead of connecting TO legacy systems, the connector IMPERSONATES them. Opens a socket and bit-perfectly mimics legacy wire protocols (SQL Server 2000 TDS, Oracle Net8, MySQL 3.x). A 20-year-old ERP that only talks to ancient SQL Server thinks it's saving to its old database, but the connector intercepts the traffic, converts to modern format, and stores in the DataWarehouse. Industry First: Zero-code migration for "un-migratable" legacy tech via protocol impersonation. | [ ] |
+| 125.O19 | ⭐ **BgpAwareGeopoliticalRoutingStrategy** ("Digital Sovereignty Routing") — Routes data based on digital sovereignty laws, not just network speed. Inspects BGP (Border Gateway Protocol) paths in real-time. Rule: "Sync this data to HQ, but DROP PACKET immediately if the route hops through Server Farm X or Country Y." Enforces GDPR Art. 44-49 / ITAR at the packet level. Complements O7 (jurisdiction-aware connection routing) with physical network path enforcement. Industry First: Physical-location-aware packet routing for compliance. | [ ] |
+| 125.O20 | ⭐ **BatteryConsciousHandshakeStrategy** ("Energy-Aware ETL") — Negotiates data transfer protocols based on physical hardware energy state. Queries the hardware HAL: Battery >50% → high-speed, high-CPU compression (ZSTD-19); Battery 10-50% → balanced mode; Battery <10% → "Low Energy Mode" disabling compression (saves CPU), throttling network speed to reduce heat, syncing only "Critical"-tagged rows. For "Instance on a Stick" scenarios where killing the battery means corrupting the file. Industry First: Hardware-energy-aware ETL protocols. | [ ] |
+|          | **7 intelligence features relocated to T90 (UniversalIntelligence) →** See T90.INT1–T90.INT7 in the T90 Dependencies section. T125 provides the Connection Interceptor Pipeline (Phase P, P11-P14) as the "socket" where T90 plugs in. | |
 
 ### Phase R: Observability & Monitoring Platform Connectors
 
@@ -13191,6 +13185,11 @@ public record ConnectionStrategyCapabilities
 | 125.P8 | Connection metrics dashboard integration via T100 (UniversalObservability) | [ ] |
 | 125.P9 | Automatic reconnection with exponential backoff and jitter | [ ] |
 | 125.P10 | Connection tagging and grouping (by environment, tenant, region) | [ ] |
+| **P11-P14: Connection Interceptor Pipeline** ("Intelligence Socket") | | |
+| 125.P11 | `IConnectionInterceptor` interface — hooks: OnBeforeRequest, OnAfterResponse, OnSchemaDiscovered, OnError, OnConnectionEstablished. Priority property for ordering. | [ ] |
+| 125.P12 | `ConnectionInterceptorPipeline` — chains interceptors in priority order, thread-safe registration, executes hooks sequentially | [ ] |
+| 125.P13 | `MessageBusInterceptorBridge` — publishes interceptor events to message bus topics (`connector.interceptor.before-request`, `.after-response`, `.on-schema`, `.on-error`). This is the "socket" where T90 plugs in intelligence. | [ ] |
+| 125.P14 | `InterceptorContext` records — BeforeRequestContext, AfterResponseContext, SchemaDiscoveryContext, ErrorContext, ConnectionEstablishedContext | [ ] |
 
 ### Phase Q: Migration & Cleanup
 
@@ -13219,11 +13218,14 @@ public record ConnectionStrategyCapabilities
 | L | Healthcare | 6 | 0 | 6 |
 | M | Blockchain & Web3 | 9 | 0 | 9 |
 | N | File Systems & Object Stores | 7 | 0 | 7 |
-| O | Innovations | 0 | 27 | 27 |
-| R | Observability & Monitoring | 30 | 0 | 30 |
-| S | Dashboard & BI Platforms | 18 | 0 | 18 |
+| O | Innovations (T125-owned) | 17 | 3 | 20 |
+| O | Innovations (→ T90 Intelligence) | — | (7 moved) | — |
+| R | Observability & Monitoring | 29 | 0 | 29 |
+| S | Dashboard & BI Platforms | 17 | 0 | 17 |
 | T | AI & ML Platforms | 35 | 0 | 35 |
-| **Totals** | | **254** | **29** | **283** |
+| P | Cross-Cutting Features | 10 + 4 interceptor | 0 | 14 |
+| **Totals (T125 strategies)** | | **254** | **22** | **276** |
+| **+ T90 intelligence features** | | — | **7** | **(7 in T90)** |
 
 ---
 
@@ -13252,6 +13254,24 @@ public record ConnectionStrategyCapabilities
 | T90 Universal Intelligence | T99 SDK | → Hard | Direct (SDK ref) | None - required |
 | T90 Universal Intelligence | T97 Storage | ⇢ Soft 📨 | `storage.read/write` | In-memory only |
 | T90 Universal Intelligence | T94 Key Management | ⇢ Soft 📨 🔑 | `keystore.get` | Unencrypted knowledge |
+| T90 Universal Intelligence | T125 Connector | ⇢ Soft 📨 | `connector.interceptor.*` | Direct connections (no intelligence augmentation) |
+
+#### T90 Intelligence Features (relocated from T125 Phase O)
+
+> **Architectural Decision:** These features were originally proposed as T125 connection innovations
+> but are fundamentally **intelligence/AI features** that belong in T90. T125 provides the
+> Connection Interceptor Pipeline (P11-P14) as the "socket" — T90 plugs intelligence into it.
+> These features intercept and transform connection I/O via the message bus, NOT as connection strategies.
+
+| Sub-Task | Description | Status |
+|----------|-------------|--------|
+| T90.INT1 | ⭐ **ZeroDayConnectorGeneratorStrategy** ("Docu-Synthesis") — AI reads API documentation (Swagger/OpenAPI spec, HTML docs) and auto-generates a fully functional `IConnectionStrategy` implementation in a WASM sandbox (T111). Hot-swaps connectors when vendors release new API versions. Plugs into T125 via `connector.interceptor.on-schema`. Industry First: Self-generating connectors from documentation. | [ ] |
+| T90.INT2 | ⭐ **SemanticSchemaAlignmentStrategy** ("Entity Resolver") — AI-driven data profiling that scans actual data across heterogeneous systems to discover semantic equivalences (SAP `KUNNR` = Salesforce `AccountID` = internal `Client_UUID`). Auto-builds Unified Virtual Schema. Uses embeddings for fuzzy entity matching. Plugs into T125 via `connector.interceptor.on-schema`. Industry First: Cross-system semantic entity resolution. | [ ] |
+| T90.INT3 | ⭐ **UniversalQueryTranspilationStrategy** ("Time-Travel Query Transpilation") — AI translates standard SQL to the native query language of ANY connected system (SQL → MongoDB aggregation, SQL → Neo4j Cypher, SQL → InfluxQL/Flux, SQL → CICS transactions, SQL → HL7 FHIR, SQL → GraphQL). Plugs into T125 via `connector.interceptor.before-request`. Industry First: Universal SQL-to-anything transpilation. | [ ] |
+| T90.INT4 | ⭐ **LegacyBehavioralModelingStrategy** ("Ghost in the Shell") — For mainframes and healthcare systems: AI "watches" legitimate traffic to learn system behavioral rhythm, exposes it as clean REST/GraphQL API. Vision AI reads green-screen output. Detects "impossible" data patterns. Plugs into T125 via `connector.interceptor.after-response`. Industry First: AI-powered legacy system behavioral modeling. | [ ] |
+| T90.INT5 | ⭐ **SmartQuotaTradingStrategy** ("Quota Trading") — AI learns reset cycles, burst limits, rate patterns of every external API. Cross-connector traffic optimization and cost prediction. Plugs into T125 via `connector.interceptor.before-request` for rate-aware scheduling. Industry First: AI-driven inter-connector quota arbitrage. | [ ] |
+| T90.INT6 | ⭐ **ApiArchaeologistStrategy** ("Undocumented Endpoint Discovery") — AI-powered "Safe Fuzzing" that discovers hidden API capabilities (undocumented fields, parameters, higher limits). Non-destructive probing (GET/HEAD only). Plugs into T125 via `connector.interceptor.after-response` for discovery. Industry First: Automated API optimization via safe red-teaming. | [ ] |
+| T90.INT7 | ⭐ **ProbabilisticDataBufferingStrategy** ("Quantum Data Buffering") — On slow connections, AI generates high-fidelity predictions of incoming data (based on historical trends). Serves "Probabilistic Data" with confidence-interval tags. Replaces predicted values with actuals as they arrive. Plugs into T125 via `connector.interceptor.after-response`. Industry First: "Negative Latency" UX for field engineers. | [ ] |
 
 ---
 
