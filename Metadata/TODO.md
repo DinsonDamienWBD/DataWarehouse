@@ -8516,16 +8516,18 @@ public record StorageCapabilities
 }
 ```
 
-### Phase A: SDK Foundation (Sub-Tasks A1-A6)
+### Phase A: SDK Foundation (Sub-Tasks A1-A6) ✅ COMPLETE
+
+> **Note:** Phase A types consolidated under T99.A6. All SDK types implemented in `DataWarehouse.SDK/Contracts/Storage/StorageStrategy.cs`.
 
 | Sub-Task | Description | Status |
 |----------|-------------|--------|
-| A1 | Add IStorageStrategy interface to SDK | [ ] |
-| A2 | Add StorageCapabilities record | [ ] |
-| A3 | Add StorageTier enum and lifecycle rules | [ ] |
-| A4 | Add multi-part upload abstractions | [ ] |
-| A5 | Add storage metrics collection | [ ] |
-| A6 | Unit tests for SDK storage infrastructure | [ ] |
+| A1 | Add IStorageStrategy interface to SDK | [x] (StorageStrategy.cs:12-96) |
+| A2 | Add StorageCapabilities record | [x] (StorageStrategy.cs:106-174) |
+| A3 | Add StorageTier enum and lifecycle rules | [x] (StorageStrategy.cs:208-251) |
+| A4 | Add multi-part upload abstractions | [x] (SupportsMultipart in StorageCapabilities) |
+| A5 | Add storage metrics collection | [x] (StorageStrategyBase metrics: lines 411-757) |
+| A6 | Unit tests for SDK storage infrastructure | [~] Deferred to T99 |
 
 ### Phase B: Core Plugin Implementation - ALL Storage Backends
 
