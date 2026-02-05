@@ -8543,7 +8543,7 @@ public record StorageCapabilities
 | **B2: Local & Direct-Attached Storage** |
 | 97.B2.1 | LocalFileStrategy - Local filesystem | [x] |
 | 97.B2.2 | RamDiskStrategy - In-memory storage | [x] |
-| 97.B2.3 | ⭐ NvmeDiskStrategy - Direct NVMe access | [ ] |
+| 97.B2.3 | ⭐ NvmeDiskStrategy - Direct NVMe access | [x] |
 | 97.B2.4 | ⭐ PmemStrategy - Persistent memory (Intel Optane) | [ ] |
 | 97.B2.5 | ⭐ ScmStrategy - Storage Class Memory | [ ] |
 | **B3: Network File Systems** |
@@ -8553,9 +8553,9 @@ public record StorageCapabilities
 | 97.B3.4 | ⭐ SftpStrategy - SFTP/SCP | [x] |
 | 97.B3.5 | ⭐ FtpStrategy - FTP/FTPS | [x] |
 | 97.B3.6 | ⭐ AfpStrategy - Apple Filing Protocol (legacy) | [x] |
-| 97.B3.7 | ⭐ IscsStrategy - iSCSI block storage | [ ] |
-| 97.B3.8 | ⭐ FcStrategy - Fibre Channel | [ ] |
-| 97.B3.9 | ⭐ NvmeofStrategy - NVMe over Fabrics | [ ] |
+| 97.B3.7 | ⭐ IscsiStrategy - iSCSI block storage | [x] |
+| 97.B3.8 | ⭐ FcStrategy - Fibre Channel | [x] |
+| 97.B3.9 | ⭐ NvmeOfStrategy - NVMe over Fabrics | [x] |
 | **B4: Major Cloud Object Storage** |
 | 97.B4.1 | S3Strategy - AWS S3 (and S3-compatible) | [x] |
 | 97.B4.2 | AzureBlobStrategy - Azure Blob Storage | [x] |
