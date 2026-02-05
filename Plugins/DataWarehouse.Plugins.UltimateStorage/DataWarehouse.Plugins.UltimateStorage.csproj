@@ -91,4 +91,19 @@
     <PackageReference Include="Google.Protobuf" Version="3.33.5" />
   </ItemGroup>
 
+  <!-- Data Connectors (Phase E) -->
+  <ItemGroup>
+    <!-- ODBC/Database Connectors -->
+    <PackageReference Include="System.Data.Odbc" Version="10.*" />
+    <PackageReference Include="System.Data.SqlClient" Version="4.9.*" />
+    <PackageReference Include="MySql.Data" Version="9.2.*" />
+    <PackageReference Include="Oracle.ManagedDataAccess.Core" Version="23.8.*" />
+
+    <!-- Kafka & Streaming -->
+    <PackageReference Include="Confluent.Kafka" Version="2.8.*" />
+
+    <!-- Additional Dependencies -->
+    <PackageReference Include="System.Linq.Async" Version="7.*" />
+  </ItemGroup>
+
 </Project>
