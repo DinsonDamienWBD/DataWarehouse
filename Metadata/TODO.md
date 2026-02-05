@@ -8544,8 +8544,8 @@ public record StorageCapabilities
 | 97.B2.1 | LocalFileStrategy - Local filesystem | [x] |
 | 97.B2.2 | RamDiskStrategy - In-memory storage | [x] |
 | 97.B2.3 | ⭐ NvmeDiskStrategy - Direct NVMe access | [x] |
-| 97.B2.4 | ⭐ PmemStrategy - Persistent memory (Intel Optane) | [ ] |
-| 97.B2.5 | ⭐ ScmStrategy - Storage Class Memory | [ ] |
+| 97.B2.4 | ⭐ PmemStrategy - Persistent memory (Intel Optane) | [x] |
+| 97.B2.5 | ⭐ ScmStrategy - Storage Class Memory | [x] |
 | **B3: Network File Systems** |
 | 97.B3.1 | SmbStrategy - SMB/CIFS (Windows shares) | [x] |
 | 97.B3.2 | NfsStrategy - NFS v3/v4.x | [x] |
@@ -8611,8 +8611,8 @@ public record StorageCapabilities
 | 97.B10.2 | ⭐ S3GlacierStrategy - AWS Glacier/Deep Archive | [x] |
 | 97.B10.3 | ⭐ AzureArchiveStrategy - Azure Archive Storage | [x] |
 | 97.B10.4 | ⭐ GcsArchiveStrategy - GCS Archive class | [x] |
-| 97.B10.5 | ⭐ OdaStrategy - Oracle Digital Assistant (optical) | [ ] |
-| 97.B10.6 | ⭐ BluRayJukeboxStrategy - Blu-ray archive jukeboxes | [ ] |
+| 97.B10.5 | ⭐ OdaStrategy - Optical Disc Archive | [x] |
+| 97.B10.6 | ⭐ BluRayJukeboxStrategy - Blu-ray archive jukeboxes | [x] |
 | **B11: Specialized Storage** |
 | 97.B11.1 | GrpcStorageStrategy - Remote gRPC | [x] |
 | 97.B11.2 | ⭐ RestStorageStrategy - Generic REST backend | [x] |

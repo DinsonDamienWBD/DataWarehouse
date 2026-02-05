@@ -209,7 +209,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Archive
                 }
 
                 // Update catalog
-                await _catalog!.AddEntryAsync(new CatalogEntry
+                await _catalog!.AddEntryAsync(new TapeCatalogEntry
                 {
                     Key = key,
                     TapeBarcode = targetTape.Barcode,
@@ -527,7 +527,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Archive
             };
         }
 
-        private async Task<Stream> RetrieveViaLtfsAsync(CatalogEntry entry, CancellationToken ct)
+        private async Task<Stream> RetrieveViaLtfsAsync(TapeCatalogEntry entry, CancellationToken ct)
         {
             var filePath = Path.Combine(_ltfsMountPoint, entry.Key);
 
@@ -600,7 +600,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Archive
             };
         }
 
-        private async Task<Stream> RetrieveViaRawTapeAsync(CatalogEntry entry, CancellationToken ct)
+        private async Task<Stream> RetrieveViaRawTapeAsync(TapeCatalogEntry entry, CancellationToken ct)
         {
             if (_tapeHandle == IntPtr.Zero)
             {
@@ -1167,7 +1167,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Archive
             return string.Empty;
         }
 
-        private string GenerateETag(CatalogEntry entry)
+        private string GenerateETag(TapeCatalogEntry entry)
         {
             var hash = HashCode.Combine(entry.TapeBarcode, entry.Key, entry.StoredAt.Ticks, entry.Size);
             return hash.ToString("x");
@@ -1321,7 +1321,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Archive
     /// <summary>
     /// Catalog entry for an object stored on tape.
     /// </summary>
-    public class CatalogEntry
+    public class TapeCatalogEntry
     {
         public string Key { get; set; } = string.Empty;
         public string TapeBarcode { get; set; } = string.Empty;
@@ -1338,7 +1338,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Archive
     public class TapeCatalog
     {
         private readonly string _catalogFilePath;
-        private readonly ConcurrentDictionary<string, CatalogEntry> _entries = new();
+        private readonly ConcurrentDictionary<string, TapeCatalogEntry> _entries = new();
         private readonly SemaphoreSlim _saveLock = new(1, 1);
 
         private TapeCatalog(string catalogPath)
@@ -1353,7 +1353,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Archive
             if (File.Exists(catalog._catalogFilePath))
             {
                 var json = await File.ReadAllTextAsync(catalog._catalogFilePath, ct);
-                var entries = JsonSerializer.Deserialize<List<CatalogEntry>>(json) ?? new List<CatalogEntry>();
+                var entries = JsonSerializer.Deserialize<List<TapeCatalogEntry>>(json) ?? new List<TapeCatalogEntry>();
 
                 foreach (var entry in entries)
                 {
@@ -1364,7 +1364,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Archive
             return catalog;
         }
 
-        public Task AddEntryAsync(CatalogEntry entry, CancellationToken ct)
+        public Task AddEntryAsync(TapeCatalogEntry entry, CancellationToken ct)
         {
             _entries[entry.Key] = entry;
             return SaveAsync(ct);
@@ -1376,13 +1376,13 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Archive
             return SaveAsync(ct);
         }
 
-        public Task<CatalogEntry?> GetEntryAsync(string key, CancellationToken ct)
+        public Task<TapeCatalogEntry?> GetEntryAsync(string key, CancellationToken ct)
         {
             _entries.TryGetValue(key, out var entry);
             return Task.FromResult(entry);
         }
 
-        public Task<List<CatalogEntry>> ListEntriesAsync(string? prefix, CancellationToken ct)
+        public Task<List<TapeCatalogEntry>> ListEntriesAsync(string? prefix, CancellationToken ct)
         {
             var entries = string.IsNullOrEmpty(prefix)
                 ? _entries.Values.ToList()
