@@ -12981,6 +12981,11 @@ public record ConnectionStrategyCapabilities
 | 125.O10 | **SchemaEvolutionTrackerStrategy** — Automatic detection of schema changes across connected sources. Monitors DDL changes (column adds/drops/renames, type changes), generates migration suggestions, emits schema-change events on the message bus, and can auto-adapt queries to accommodate non-breaking changes. | [ ] |
 | 125.O11 | **ConnectionDigitalTwinStrategy** — Virtual replicas of production connections that mirror real connection behavior (latency, throughput, error rates) for safe testing. Record/replay connection traffic, simulate failure scenarios, and validate queries against a twin before touching production. | [ ] |
 | 125.O12 | **PredictiveFailoverStrategy** — ML-driven connection failure prediction that detects degradation patterns (increasing latency, rising error rates, resource exhaustion) and proactively fails over to healthy replicas BEFORE the connection actually fails. Learns from historical failure patterns per connection type. | [ ] |
+| 125.O13 | **NeuralProtocolTranslationStrategy** ("Babel Fish") — Uses a small LLM (via T90 message bus) to translate requests on-the-fly between incompatible API formats (REST↔SOAP, GraphQL↔SQL, legacy COBOL copybooks↔JSON). No manual wrappers needed — the AI understands the source and target schemas and generates the translation. Soft dependency on T90 Universal Intelligence. | [ ] |
+| 125.O14 | **PredictiveMultipathingStrategy** ("Waze for Packets") — Monitors jitter, latency, and packet loss across all available network interfaces simultaneously. Uses a time-series LSTM model to predict degradation and preemptively moves data streams to healthier interfaces. Supports Multipath TCP (RFC 8684) for stream splitting across networks. | [ ] |
+| 125.O15 | **SemanticTrafficCompressionStrategy** — AI-aware compression that understands payload semantics: skips already-compressed binary blobs, applies delta compression to structured data, uses dictionary encoding for repeated schemas, and selects optimal algorithm per content type. Soft dependency on T92 UltimateCompression via message bus. | [ ] |
+| 125.O16 | **IntentBasedServiceDiscoveryStrategy** — Replace IP:port with semantic intent: `connect("read-replica PostgreSQL in EU-WEST with <50ms latency")`. Queries the service mesh, peer health metrics, and connection telemetry to resolve intent to the optimal endpoint. Functions as a smart load balancer for data in transit. | [ ] |
+| 125.O17 | **AutomatedApiHealingStrategy** — Detects when remote APIs change (new versions, deprecated endpoints, modified schemas, changed auth requirements) and automatically adapts connection behavior. Combines schema evolution tracking (O10) with LLM-based code generation to produce updated API calls without manual intervention. | [ ] |
 
 ### Phase R: Observability & Monitoring Platform Connectors
 
@@ -13058,6 +13063,12 @@ public record ConnectionStrategyCapabilities
 | 125.S6.1 | AwsQuickSightConnectionStrategy — AWS QuickSight API (dashboards + embedding) | [ ] |
 | 125.S6.2 | GoogleLookerStudioConnectionStrategy — Google Looker Studio / Data Studio API | [ ] |
 
+> **NOTE:** AI/ML platform connectors (LLM providers, vector databases, ML platforms, inference servers,
+> speech/vision AI) belong in T90 (UniversalIntelligence), NOT in T125. T90 owns AI semantics and
+> manages its own AI connections. The 12 LLM providers already implemented in DataWarehouse.Plugins.AIAgents
+> will be absorbed into T90. T125 provides the generic connection infrastructure (pooling, health, retry)
+> that T90 can optionally leverage via message bus for its AI connections.
+
 ### Phase P: Advanced Cross-Cutting Features
 
 | Sub-Task | Description | Status |
@@ -13100,10 +13111,10 @@ public record ConnectionStrategyCapabilities
 | L | Healthcare | 6 | 0 | 6 |
 | M | Blockchain & Web3 | 9 | 0 | 9 |
 | N | File Systems & Object Stores | 7 | 0 | 7 |
-| O | Innovations | 0 | 12 | 12 |
+| O | Innovations | 0 | 17 | 17 |
 | R | Observability & Monitoring | 30 | 0 | 30 |
 | S | Dashboard & BI Platforms | 18 | 0 | 18 |
-| **Totals** | | **219** | **14** | **233** |
+| **Totals** | | **219** | **19** | **238** |
 
 ---
 
@@ -13441,7 +13452,7 @@ T99 (Ultimate SDK)
 | T106 (Ultimate Deployment) | ~80 | High | 65+ deployment strategies |
 | T107 (Ultimate Sustainability) | ~50 | Medium | 40+ green computing strategies |
 | T108 (Cleanup) | ~30 | Medium | Plugin removal |
-| **T125 (Ultimate Connector)** | **~245** | **Extreme** | **233 connection strategies (14 industry-first)** |
+| **T125 (Ultimate Connector)** | **~250** | **Extreme** | **238 connection strategies (19 industry-first)** |
 | **T109 (Ultimate Interface)** | **~85** | **Very High** | **50+ API protocols** |
 | **T110 (Ultimate Data Format)** | **~250** | **Extreme** | **230+ data formats (ALL industries)** |
 | **T111 (Ultimate Compute)** | **~140** | **Very High** | **60+ runtimes + Adaptive Pipeline Compute** |
@@ -13472,7 +13483,7 @@ T99 (Ultimate SDK)
 | Resilience | 60 patterns | 8 innovations | 68 |
 | Deployment | 55 strategies | 8 innovations | 63 |
 | Sustainability | 35 strategies | 8 innovations | 43 |
-| Connectors | 219 connections | 14 innovations | 233 |
+| Connectors | 219 connections | 19 innovations | 238 |
 | Interface/API | 45 protocols | 10 innovations | 55 |
 | **Data Format** | **220+ formats** | **14 innovations** | **234** |
 | **Compute** | **55 runtimes + 35 pipeline** | **18 innovations** | **108** |
