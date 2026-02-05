@@ -148,7 +148,7 @@ Before ANY release:
 | **1.1** | **T94** | **Ultimate Key Management** | Composable key mgmt (Direct + Envelope modes) | T99 | [x] Complete |
 | **1.2** | **T93** | **Ultimate Encryption** | All encryption as strategies | T99, T94 | [x] Complete |
 | **1.3** | **T92** | **Ultimate Compression** | All compression as strategies | T99 | [ ] |
-| **1.4** | **T97** | **Ultimate Storage** | All storage backends as strategies | T99 | [~] 35/80+ strategies |
+| **1.4** | **T97** | **Ultimate Storage** | All storage backends as strategies | T99 | [x] 129 strategies |
 | **1.5** | **T91** | **Ultimate RAID** | All RAID levels as strategies | T99 | [ ] |
 | **1.6** | **T95** | **Ultimate Access Control** | All access control features as strategies | T99 | [ ] |
 | **1.7** | **T96** | **Ultimate Compliance** | All compliance frameworks as strategies | T99 | [ ] |
@@ -8679,27 +8679,27 @@ public record StorageCapabilities
 | Sub-Task | Description | Status |
 |----------|-------------|--------|
 | **E1: DataConnectors Plugin Migration → T125** |
-| 97.E1.1 | Migrate DataConnectors Plugin | → T125 UltimateConnector | [~] Moving to T125 |
-| 97.E1.2 | OdbcConnectorStrategy | → T125.I1.1 | [~] Moving to T125 |
-| 97.E1.3 | JdbcConnectorStrategy | → T125.I1.2 | [~] Moving to T125 |
-| 97.E1.4 | RestApiConnectorStrategy | → T125.I2.1 | [~] Moving to T125 |
-| 97.E1.5 | GraphQlConnectorStrategy | → T125.I2.2 | [~] Moving to T125 |
-| 97.E1.6 | GrpcConnectorStrategy | → T125.I2.3 | [~] Moving to T125 |
-| 97.E1.7 | WebhookConnectorStrategy | → T125.I3.3 | [~] Moving to T125 |
-| 97.E1.8 | ⭐ KafkaConnectorStrategy | → T125.G2.1 | [~] Moving to T125 |
-| 97.E1.9 | ⭐ PulsarConnectorStrategy | → T125.G2.2 | [~] Moving to T125 |
-| 97.E1.10 | ⭐ NatsConnectorStrategy | → T125.G2.3 | [~] Moving to T125 |
+| 97.E1.1 | Migrate DataConnectors Plugin | → T125 UltimateConnector | [x] Superseded by T125 |
+| 97.E1.2 | OdbcConnectorStrategy | → T125.I1.1 | [x] Superseded by T125 |
+| 97.E1.3 | JdbcConnectorStrategy | → T125.I1.2 | [x] Superseded by T125 |
+| 97.E1.4 | RestApiConnectorStrategy | → T125.I2.1 | [x] Superseded by T125 |
+| 97.E1.5 | GraphQlConnectorStrategy | → T125.I2.2 | [x] Superseded by T125 |
+| 97.E1.6 | GrpcConnectorStrategy | → T125.I2.3 | [x] Superseded by T125 |
+| 97.E1.7 | WebhookConnectorStrategy | → T125.I3.3 | [x] Superseded by T125 |
+| 97.E1.8 | ⭐ KafkaConnectorStrategy | → T125.G2.1 | [x] Superseded by T125 |
+| 97.E1.9 | ⭐ PulsarConnectorStrategy | → T125.G2.2 | [x] Superseded by T125 |
+| 97.E1.10 | ⭐ NatsConnectorStrategy | → T125.G2.3 | [x] Superseded by T125 |
 | **E2: DatabaseImport Plugin Migration → T125** |
-| 97.E2.1 | Migrate DatabaseImport Plugin | → T125 UltimateConnector | [~] Moving to T125 |
-| 97.E2.2 | SqlServerImportStrategy | → T125.B2.1 | [~] Moving to T125 |
-| 97.E2.3 | PostgresImportStrategy | → T125.B2.2 | [~] Moving to T125 |
-| 97.E2.4 | MySqlImportStrategy | → T125.B2.3 | [~] Moving to T125 |
-| 97.E2.5 | OracleImportStrategy | → T125.B2.4 | [~] Moving to T125 |
-| 97.E2.6 | ⭐ MongoImportStrategy | → T125.C1.1 | [~] Moving to T125 |
-| 97.E2.7 | ⭐ CassandraImportStrategy | → T125.C3.1 | [~] Moving to T125 |
-| 97.E2.8 | ⭐ SnowflakeImportStrategy | → T125.E1 | [~] Moving to T125 |
-| 97.E2.9 | ⭐ BigQueryImportStrategy | → T125.E2 | [~] Moving to T125 |
-| 97.E2.10 | ⭐ DatabricksImportStrategy | → T125.E4 | [~] Moving to T125 |
+| 97.E2.1 | Migrate DatabaseImport Plugin | → T125 UltimateConnector | [x] Superseded by T125 |
+| 97.E2.2 | SqlServerImportStrategy | → T125.B2.1 | [x] Superseded by T125 |
+| 97.E2.3 | PostgresImportStrategy | → T125.B2.2 | [x] Superseded by T125 |
+| 97.E2.4 | MySqlImportStrategy | → T125.B2.3 | [x] Superseded by T125 |
+| 97.E2.5 | OracleImportStrategy | → T125.B2.4 | [x] Superseded by T125 |
+| 97.E2.6 | ⭐ MongoImportStrategy | → T125.C1.1 | [x] Superseded by T125 |
+| 97.E2.7 | ⭐ CassandraImportStrategy | → T125.C3.1 | [x] Superseded by T125 |
+| 97.E2.8 | ⭐ SnowflakeImportStrategy | → T125.E1 | [x] Superseded by T125 |
+| 97.E2.9 | ⭐ BigQueryImportStrategy | → T125.E2 | [x] Superseded by T125 |
+| 97.E2.10 | ⭐ DatabricksImportStrategy | → T125.E4 | [x] Superseded by T125 |
 | **E3: ExabyteScale Plugin Migration (remains in T97 — storage-specific)** |
 | 97.E3.1 | Migrate ExabyteScale Plugin | Absorb DataWarehouse.Plugins.ExabyteScale | [x] |
 | 97.E3.2 | ExascaleShardingStrategy | Exabyte-scale sharding | [x] |
