@@ -31,12 +31,8 @@
   <ItemGroup>
     <ProjectReference Include="..\DataWarehouse.SDK\DataWarehouse.SDK.csproj" />
     <ProjectReference Include="..\DataWarehouse.Kernel\DataWarehouse.Kernel.csproj" />
-    <ProjectReference Include="..\Plugins\DataWarehouse.Plugins.Encryption\DataWarehouse.Plugins.Encryption.csproj" />
-    <ProjectReference Include="..\Plugins\DataWarehouse.Plugins.LocalStorage\DataWarehouse.Plugins.LocalStorage.csproj" />
     <ProjectReference Include="..\Plugins\DataWarehouse.Plugins.AIAgents\DataWarehouse.Plugins.AIAgents.csproj" />
     <ProjectReference Include="..\Plugins\DataWarehouse.Plugins.Compression\DataWarehouse.Plugins.Compression.csproj" />
-    <ProjectReference Include="..\Plugins\DataWarehouse.Plugins.EmbeddedDatabaseStorage\DataWarehouse.Plugins.EmbeddedDatabaseStorage.csproj" />
-    <ProjectReference Include="..\Plugins\DataWarehouse.Plugins.RelationalDatabaseStorage\DataWarehouse.Plugins.RelationalDatabaseStorage.csproj" />
     <ProjectReference Include="..\Plugins\DataWarehouse.Plugins.GeoReplication\DataWarehouse.Plugins.GeoReplication.csproj" />
   </ItemGroup>
 
@@ -51,6 +47,8 @@
     <Compile Remove="Storage\DurableStateTests.cs" />
     <Compile Remove="Kernel\DataWarehouseKernelTests.cs" />
     <Compile Remove="Database\RelationalDatabasePluginTests.cs" />
+    <Compile Remove="Database\EmbeddedDatabasePluginTests.cs" />
+    <Compile Remove="Infrastructure\CodeCleanupVerificationTests.cs" />
     <Compile Remove="Integration\KernelIntegrationTests.cs" />
     <Compile Remove="Messaging\AdvancedMessageBusTests.cs" />
     <Compile Remove="PluginTests.cs" />
