@@ -2810,6 +2810,86 @@ namespace DataWarehouse.SDK.Contracts
 
     #endregion
 
+    #region Compression Plugin Base
+
+    /// <summary>
+    /// Abstract base class for all compression plugins with configurable algorithm selection.
+    /// Supports per-user, per-operation configuration for maximum flexibility.
+    /// All compression pipeline plugins MUST extend this class.
+    /// </summary>
+    public abstract class CompressionPluginBase : PipelinePluginBase
+    {
+        /// <summary>SubCategory is always "Compression".</summary>
+        public override string SubCategory => "Compression";
+
+        /// <summary>Default pipeline order (runs before encryption).</summary>
+        public override int DefaultOrder => 50;
+
+        /// <summary>Whether bypass is allowed based on content analysis.</summary>
+        public override bool AllowBypass => true;
+
+        // --- Compression-specific abstract properties ---
+
+        /// <summary>The compression algorithm identifier (e.g., "Zstd", "LZ4", "Brotli").</summary>
+        protected abstract string AlgorithmId { get; }
+
+        /// <summary>Whether this algorithm supports streaming compression.</summary>
+        protected abstract bool SupportsStreaming { get; }
+
+        /// <summary>Whether this algorithm supports parallel compression.</summary>
+        protected virtual bool SupportsParallel => false;
+
+        /// <summary>Typical compression ratio (0.0-1.0, lower = better compression).</summary>
+        protected virtual double TypicalRatio => 0.5;
+
+        // --- Statistics ---
+        protected readonly object StatsLock = new();
+        protected long CompressionCount;
+        protected long DecompressionCount;
+        protected long TotalBytesCompressed;
+        protected long TotalBytesDecompressed;
+
+        // --- Entropy-based bypass ---
+
+        /// <summary>Maximum entropy (0-8) to attempt compression. Above this, bypass.</summary>
+        protected virtual double MaxEntropy => 7.8;
+
+        /// <summary>
+        /// Calculates Shannon entropy of data sample.
+        /// Used to decide whether compression is worthwhile.
+        /// </summary>
+        protected static double CalculateEntropy(ReadOnlySpan<byte> data)
+        {
+            if (data.Length == 0) return 0;
+            Span<int> freq = stackalloc int[256];
+            freq.Clear();
+            foreach (var b in data) freq[b]++;
+            double entropy = 0.0, len = data.Length;
+            for (int i = 0; i < 256; i++)
+            {
+                if (freq[i] == 0) continue;
+                double p = freq[i] / len;
+                entropy -= p * Math.Log2(p);
+            }
+            return entropy;
+        }
+
+        protected override Dictionary<string, object> GetMetadata()
+        {
+            var metadata = base.GetMetadata();
+            metadata["AlgorithmId"] = AlgorithmId;
+            metadata["SupportsStreaming"] = SupportsStreaming;
+            metadata["SupportsParallel"] = SupportsParallel;
+            metadata["TypicalRatio"] = TypicalRatio;
+            metadata["MaxEntropy"] = MaxEntropy;
+            metadata["CompressionCount"] = CompressionCount;
+            metadata["DecompressionCount"] = DecompressionCount;
+            return metadata;
+        }
+    }
+
+    #endregion
+
     /// <summary>
     /// Abstract base class for container/partition manager plugins.
     /// Provides storage-agnostic partition management.

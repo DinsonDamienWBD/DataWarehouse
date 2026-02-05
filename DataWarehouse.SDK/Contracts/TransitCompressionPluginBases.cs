@@ -31,7 +31,7 @@ namespace DataWarehouse.SDK.Contracts
     /// - Statistics collection
     /// </para>
     /// </remarks>
-    public abstract class TransitCompressionPluginBase : PluginBase, ITransitCompression
+    public abstract class TransitCompressionPluginBase : PipelinePluginBase, ITransitCompression
     {
         private long _totalCompressions;
         private long _totalDecompressions;
@@ -39,10 +39,52 @@ namespace DataWarehouse.SDK.Contracts
         private long _totalBytesDecompressed;
         private long _skippedIncompressible;
 
+        /// <summary>SubCategory is always "TransitCompression".</summary>
+        public override string SubCategory => "TransitCompression";
+
+        /// <summary>Default pipeline order (transit compression runs before transit encryption).</summary>
+        public override int DefaultOrder => 250;
+
+        /// <summary>Whether bypass is allowed.</summary>
+        public override bool AllowBypass => true;
+
+        #region IDataTransformation Bridge (OnWrite/OnRead)
+
         /// <summary>
-        /// Gets the plugin category (always DataTransformationProvider).
+        /// Bridge: delegates to CompressForTransitAsync for pipeline integration.
         /// </summary>
-        public override PluginCategory Category => PluginCategory.DataTransformationProvider;
+        public override Stream OnWrite(Stream input, IKernelContext context, Dictionary<string, object> args)
+        {
+            using var ms = new System.IO.MemoryStream();
+            input.CopyTo(ms);
+            var data = ms.ToArray();
+            var options = new TransitCompressionOptions();
+            var result = CompressForTransitAsync(data, options).GetAwaiter().GetResult();
+            return new System.IO.MemoryStream(result.CompressedData);
+        }
+
+        /// <summary>
+        /// Bridge: delegates to DecompressFromTransitAsync for pipeline integration.
+        /// </summary>
+        public override Stream OnRead(Stream stored, IKernelContext context, Dictionary<string, object> args)
+        {
+            using var ms = new System.IO.MemoryStream();
+            stored.CopyTo(ms);
+            var data = ms.ToArray();
+            var metadata = new TransitCompressionMetadata
+            {
+                AlgorithmName = "auto",
+                IsCompressed = true,
+                OriginalSize = data.Length
+            };
+            // Use metadata from args if available
+            if (args.TryGetValue("transitCompressionMetadata", out var metaObj) && metaObj is TransitCompressionMetadata meta)
+                metadata = meta;
+            var result = DecompressFromTransitAsync(data, metadata).GetAwaiter().GetResult();
+            return new System.IO.MemoryStream(result.Data);
+        }
+
+        #endregion
 
         #region Pre-defined Transit Compression Policies
 

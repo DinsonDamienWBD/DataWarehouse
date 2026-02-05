@@ -245,7 +245,7 @@ namespace DataWarehouse.SDK.Contracts
     /// - Capability advertisement
     /// </para>
     /// </remarks>
-    public abstract class TransitEncryptionPluginBase : PluginBase, ITransitEncryption
+    public abstract class TransitEncryptionPluginBase : PipelinePluginBase, ITransitEncryption
     {
         /// <summary>
         /// Key store for encryption key retrieval.
@@ -259,10 +259,65 @@ namespace DataWarehouse.SDK.Contracts
         /// </summary>
         protected ICommonCipherPresets? PresetProvider { get; set; }
 
+        /// <summary>SubCategory is always "TransitEncryption".</summary>
+        public override string SubCategory => "TransitEncryption";
+
+        /// <summary>Default pipeline order (transit runs after at-rest stages).</summary>
+        public override int DefaultOrder => 300;
+
+        /// <summary>Whether bypass is allowed.</summary>
+        public override bool AllowBypass => true;
+
+        #region IDataTransformation Bridge (OnWrite/OnRead)
+
         /// <summary>
-        /// Gets the plugin category (always SecurityProvider).
+        /// Bridge: delegates to EncryptForTransitAsync for pipeline integration.
         /// </summary>
-        public override PluginCategory Category => PluginCategory.SecurityProvider;
+        public override Stream OnWrite(Stream input, IKernelContext context, Dictionary<string, object> args)
+        {
+            using var ms = new System.IO.MemoryStream();
+            input.CopyTo(ms);
+            var data = ms.ToArray();
+            var options = new TransitEncryptionOptions();
+            // Extract security context from args if available
+            ISecurityContext secCtx = args.TryGetValue("securityContext", out var ctxObj) && ctxObj is ISecurityContext sc
+                ? sc
+                : new DefaultTransitSecurityContext();
+            var result = EncryptForTransitAsync(data, options, secCtx).GetAwaiter().GetResult();
+            return new System.IO.MemoryStream(result.Ciphertext);
+        }
+
+        /// <summary>
+        /// Bridge: delegates to DecryptFromTransitAsync for pipeline integration.
+        /// </summary>
+        public override Stream OnRead(Stream stored, IKernelContext context, Dictionary<string, object> args)
+        {
+            using var ms = new System.IO.MemoryStream();
+            stored.CopyTo(ms);
+            var data = ms.ToArray();
+            var metadata = new Dictionary<string, object>();
+            // Extract encryption metadata from args if available
+            if (args.TryGetValue("transitEncryptionMetadata", out var metaObj) && metaObj is Dictionary<string, object> meta)
+                metadata = meta;
+            ISecurityContext secCtx = args.TryGetValue("securityContext", out var ctxObj2) && ctxObj2 is ISecurityContext sc2
+                ? sc2
+                : new DefaultTransitSecurityContext();
+            var result = DecryptFromTransitAsync(data, metadata, secCtx).GetAwaiter().GetResult();
+            return new System.IO.MemoryStream(result.Plaintext);
+        }
+
+        /// <summary>
+        /// Default security context for pipeline bridge when none is provided.
+        /// </summary>
+        private sealed class DefaultTransitSecurityContext : ISecurityContext
+        {
+            public string UserId => "system";
+            public string? TenantId => null;
+            public IEnumerable<string> Roles => new[] { "system" };
+            public bool IsSystemAdmin => true;
+        }
+
+        #endregion
 
         /// <inheritdoc/>
         public virtual async Task<TransitEncryptionResult> EncryptForTransitAsync(
