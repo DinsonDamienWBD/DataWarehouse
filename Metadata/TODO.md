@@ -7010,18 +7010,33 @@ var config = new IntelligenceConfig
 
 **PHASE X: : Edge-Native Learning (Data Gravity Architecture)
 > **Goal: Move the Model to the Data, not Data to the Model. Enable "Instance on a Stick" to train and evolve AI models locally using Compute-on-Data without egress costs or privacy risks.**
-90.X1	Universal Inference Engine (WASI-NN)	
-90.X1.1	Implement OnnxInferenceStrategy for running standard .onnx models via WASM	[ ]
-90.X1.2	Implement GgufInferenceStrategy for running quantized LLMs (Llama/Mistral) locally	[ ]
-90.X1.3	Create StreamInferencePipeline: Pipes read-stream directly into model input (Zero-Copy)	[ ]
-90.X2	Auto-ML "Agent Loop" (Self-Generating AI)	
-90.X2.1	Implement SchemaExtractionService: Extracts metadata/schema/100-row-sample (No PII)	[ ]
-90.X2.2	Implement AgentCodeRequest: Prompts external AI (Gemini/Claude) to generate training code based only on schema	[ ]
-90.X2.3	Implement JitCompilerStrategy: Compiles Agent-generated Python/Rust code into Wasm/Container on the fly	[ ]
-90.X3	Training Lifecycle Management	
-90.X3.1	Implement TrainingCheckpointStrategy: Auto-saves model weights every N minutes (Power-loss protection)	[ ]
-90.X3.2	Implement ModelVersioningHook: Auto-commits improved models to UltimateVersioning with lineage	[ ]
-90.X3.3	Implement ResourceGovernor: Throttles training based on Battery/Heat/CPU (Crucial for "Stick" hardware)	[ ]
+90.X1	WASI Core Runtime (Foundation for all WASM execution)
+90.X1.1	Implement WasiRuntimeHost — embeds Wasmtime/WasmEdge in the kernel for WASM module loading, instantiation, and sandboxed execution	[ ]
+90.X1.2	Implement WasiCapabilityBroker — grants/revokes WASI capabilities (filesystem, network, clock, random) per-module based on security policy	[ ]
+90.X1.3	Implement WasiDataBridge — maps DW storage API to WASI filesystem interface so WASM modules can read/write DW data through standard file I/O	[ ]
+90.X1.4	Implement WasiResourceLimiter — enforces memory, CPU, and execution time limits per WASM module to prevent resource exhaustion	[ ]
+90.X2	WASI-NN Inference Runtime (ML-specific WASI extension)
+90.X2.1	Implement WasiNnBackendRegistry — registers ML backends (ONNX Runtime, TensorFlow Lite, PyTorch) as WASI-NN graph execution providers	[ ]
+90.X2.2	Implement WasiNnGpuBridge — maps WASI-NN compute requests to host GPU via CUDA/ROCm/Metal, with automatic fallback to CPU	[ ]
+90.X2.3	Implement WasiNnModelCache — caches loaded models in shared memory across WASM instances, with LRU eviction and memory pressure awareness	[ ]
+90.X3	Container Execution Runtime (For full ML workloads and unsupported languages)
+90.X3.1	Implement ContainerRuntimeHost — manages OCI container lifecycle (pull, create, start, stop, destroy) using containerd/Firecracker micro-VMs	[ ]
+90.X3.2	Implement ContainerImageBuilder — builds minimal container images on-the-fly from user code + detected dependencies (Python, R, Julia, etc.)	[ ]
+90.X3.3	Implement ContainerGpuPassthrough — configures GPU passthrough for training workloads via NVIDIA Container Toolkit / AMD ROCm	[ ]
+90.X3.4	Implement ContainerDataMount — mounts DW storage as a FUSE filesystem inside containers so user code accesses data through standard file paths	[ ]
+90.X3.5	Implement ContainerResourceGovernor — enforces CPU, memory, GPU, network, and storage quotas per container with cgroup integration	[ ]
+90.X4	Universal Inference Engine (WASI-NN)
+90.X4.1	Implement OnnxInferenceStrategy for running standard .onnx models via WASM	[ ]
+90.X4.2	Implement GgufInferenceStrategy for running quantized LLMs (Llama/Mistral) locally	[ ]
+90.X4.3	Create StreamInferencePipeline: Pipes read-stream directly into model input (Zero-Copy)	[ ]
+90.X5	Auto-ML "Agent Loop" (Self-Generating AI)
+90.X5.1	Implement SchemaExtractionService: Extracts metadata/schema/100-row-sample (No PII)	[ ]
+90.X5.2	Implement AgentCodeRequest: Prompts external AI (Gemini/Claude) to generate training code based only on schema	[ ]
+90.X5.3	Implement JitCompilerStrategy: Compiles Agent-generated Python/Rust code into Wasm/Container on the fly	[ ]
+90.X6	Training Lifecycle Management
+90.X6.1	Implement TrainingCheckpointStrategy: Auto-saves model weights every N minutes (Power-loss protection)	[ ]
+90.X6.2	Implement ModelVersioningHook: Auto-commits improved models to UltimateVersioning with lineage	[ ]
+90.X6.3	Implement ResourceGovernor: Throttles training based on Battery/Heat/CPU (Crucial for "Stick" hardware)	[ ]
 
 Feature: Edge-Native Auto-ML Loop
 Workflow Description:

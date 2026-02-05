@@ -96,6 +96,172 @@ public sealed class EnhancedPipelineOrchestrator : IPipelineOrchestrator
     }
 
     /// <summary>
+    /// Executes the transit pipeline for data being sent over the network.
+    /// Transit pipeline order: TransitCompress → TransitEncrypt
+    /// </summary>
+    /// <param name="input">Input stream to be transit-processed.</param>
+    /// <param name="context">Pipeline context for configuration resolution.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>Processed stream ready for network transmission.</returns>
+    public async Task<Stream> ExecuteTransitWritePipelineAsync(
+        Stream input,
+        PipelineContext context,
+        CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(input);
+        ArgumentNullException.ThrowIfNull(context);
+
+        ct.ThrowIfCancellationRequested();
+
+        var securityContext = context.SecurityContext ?? AnonymousSecurityContext.Instance;
+
+        // Resolve effective policy for transit stages
+        var effectivePolicy = await _configProvider.ResolveEffectivePolicyAsync(
+            userId: securityContext.UserId,
+            groupId: securityContext.TenantId,
+            operationId: context.Parameters.TryGetValue("OperationId", out var opId) ? opId?.ToString() : null,
+            ct: ct);
+
+        // Filter for transit-specific stages
+        var transitStages = effectivePolicy.Stages
+            .Where(s => (s.Enabled ?? true) &&
+                       (s.StageType.Equals("TransitCompression", StringComparison.OrdinalIgnoreCase) ||
+                        s.StageType.Equals("TransitEncryption", StringComparison.OrdinalIgnoreCase)))
+            .OrderBy(s => s.Order ?? 100)
+            .ToList();
+
+        _logger?.LogDebug("Executing transit write pipeline with {Count} stages", transitStages.Count);
+
+        var currentStream = input;
+        var intermediateStreams = new List<Stream>();
+
+        try
+        {
+            foreach (var stagePolicy in transitStages)
+            {
+                ct.ThrowIfCancellationRequested();
+
+                var stage = FindStage(stagePolicy);
+                if (stage == null)
+                {
+                    _logger?.LogWarning("Transit stage plugin not found: {StageType}", stagePolicy.StageType);
+                    continue;
+                }
+
+                if (currentStream.CanSeek)
+                    currentStream.Position = 0;
+
+                var previousStream = currentStream;
+                var kernelContext = context.KernelContext ?? CreateDefaultKernelContext();
+
+                currentStream = stage.OnWrite(currentStream, kernelContext, stagePolicy.Parameters ?? new Dictionary<string, object>());
+
+                if (previousStream != input && !intermediateStreams.Contains(previousStream))
+                    intermediateStreams.Add(previousStream);
+            }
+
+            if (currentStream.CanSeek)
+                currentStream.Position = 0;
+
+            context.IntermediateStreams = intermediateStreams;
+            return currentStream;
+        }
+        catch (Exception ex)
+        {
+            foreach (var stream in intermediateStreams)
+            {
+                try { stream.Dispose(); } catch { /* Ignore disposal errors */ }
+            }
+
+            _logger?.LogError(ex, "Transit write pipeline execution failed");
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// Executes the reverse transit pipeline for data received from the network.
+    /// Transit pipeline order: TransitDecrypt → TransitDecompress
+    /// </summary>
+    /// <param name="input">Input stream received from network.</param>
+    /// <param name="context">Pipeline context for configuration resolution.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>Deprocessed stream ready for storage or use.</returns>
+    public async Task<Stream> ExecuteTransitReadPipelineAsync(
+        Stream input,
+        PipelineContext context,
+        CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(input);
+        ArgumentNullException.ThrowIfNull(context);
+
+        ct.ThrowIfCancellationRequested();
+
+        var securityContext = context.SecurityContext ?? AnonymousSecurityContext.Instance;
+
+        // Resolve effective policy for transit stages
+        var effectivePolicy = await _configProvider.ResolveEffectivePolicyAsync(
+            userId: securityContext.UserId,
+            groupId: securityContext.TenantId,
+            operationId: context.Parameters.TryGetValue("OperationId", out var opId) ? opId?.ToString() : null,
+            ct: ct);
+
+        // Filter for transit-specific stages and reverse order
+        var transitStages = effectivePolicy.Stages
+            .Where(s => (s.Enabled ?? true) &&
+                       (s.StageType.Equals("TransitCompression", StringComparison.OrdinalIgnoreCase) ||
+                        s.StageType.Equals("TransitEncryption", StringComparison.OrdinalIgnoreCase)))
+            .OrderByDescending(s => s.Order ?? 100)
+            .ToList();
+
+        _logger?.LogDebug("Executing transit read pipeline with {Count} stages (reversed)", transitStages.Count);
+
+        var currentStream = input;
+        var intermediateStreams = new List<Stream>();
+
+        try
+        {
+            foreach (var stagePolicy in transitStages)
+            {
+                ct.ThrowIfCancellationRequested();
+
+                var stage = FindStage(stagePolicy);
+                if (stage == null)
+                {
+                    _logger?.LogWarning("Transit stage plugin not found: {StageType}", stagePolicy.StageType);
+                    continue;
+                }
+
+                if (currentStream.CanSeek)
+                    currentStream.Position = 0;
+
+                var previousStream = currentStream;
+                var kernelContext = context.KernelContext ?? CreateDefaultKernelContext();
+
+                currentStream = stage.OnRead(currentStream, kernelContext, stagePolicy.Parameters ?? new Dictionary<string, object>());
+
+                if (previousStream != input && !intermediateStreams.Contains(previousStream))
+                    intermediateStreams.Add(previousStream);
+            }
+
+            if (currentStream.CanSeek)
+                currentStream.Position = 0;
+
+            context.IntermediateStreams = intermediateStreams;
+            return currentStream;
+        }
+        catch (Exception ex)
+        {
+            foreach (var stream in intermediateStreams)
+            {
+                try { stream.Dispose(); } catch { /* Ignore disposal errors */ }
+            }
+
+            _logger?.LogError(ex, "Transit read pipeline execution failed");
+            throw;
+        }
+    }
+
+    /// <summary>
     /// Executes the write pipeline (user data → storage).
     /// B3: Universal enforcement — ALL operations route through pipeline.
     /// B4: Records PipelineStageSnapshot after each stage execution.

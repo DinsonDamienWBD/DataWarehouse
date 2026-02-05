@@ -186,6 +186,76 @@ namespace DataWarehouse.Kernel.Pipeline
         }
 
         /// <summary>
+        /// E8: Transit Encryption integration.
+        /// Resolves the transit encryption strategy from the pipeline policy.
+        /// Looks up TransitEncryptionPluginBase-derived plugins matching the strategy name.
+        /// </summary>
+        /// <param name="stagePolicy">The stage policy configuration.</param>
+        /// <param name="context">The kernel context for plugin discovery.</param>
+        /// <returns>The resolved data transformation plugin, or null if not found/enabled.</returns>
+        public IDataTransformation? ResolveTransitEncryptionStage(PipelineStagePolicy stagePolicy, IKernelContext? context)
+        {
+            if (stagePolicy.Enabled == false)
+                return null;
+
+            if (context == null)
+                return null;
+
+            var cacheKey = $"transitencryption:{stagePolicy.PluginId}:{stagePolicy.StrategyName}";
+            if (_resolvedStageCache.TryGetValue(cacheKey, out var cached))
+                return cached;
+
+            var plugins = context.GetPlugins<IDataTransformation>();
+            var transitEncryptionPlugin = plugins.FirstOrDefault(p =>
+                p.SubCategory.Equals("TransitEncryption", StringComparison.OrdinalIgnoreCase) &&
+                (string.IsNullOrEmpty(stagePolicy.PluginId) || p.Id == stagePolicy.PluginId));
+
+            if (transitEncryptionPlugin == null)
+            {
+                context.LogWarning($"Transit Encryption plugin not found for stage policy: {stagePolicy.PluginId ?? "default"}");
+                return null;
+            }
+
+            _resolvedStageCache[cacheKey] = transitEncryptionPlugin;
+            return transitEncryptionPlugin;
+        }
+
+        /// <summary>
+        /// E9: Transit Compression integration.
+        /// Resolves the transit compression strategy from the pipeline policy.
+        /// Looks up transit compression strategies from UltimateCompression plugin.
+        /// </summary>
+        /// <param name="stagePolicy">The stage policy configuration.</param>
+        /// <param name="context">The kernel context for plugin discovery.</param>
+        /// <returns>The resolved data transformation plugin, or null if not found/enabled.</returns>
+        public IDataTransformation? ResolveTransitCompressionStage(PipelineStagePolicy stagePolicy, IKernelContext? context)
+        {
+            if (stagePolicy.Enabled == false)
+                return null;
+
+            if (context == null)
+                return null;
+
+            var cacheKey = $"transitcompression:{stagePolicy.PluginId}:{stagePolicy.StrategyName}";
+            if (_resolvedStageCache.TryGetValue(cacheKey, out var cached))
+                return cached;
+
+            var plugins = context.GetPlugins<IDataTransformation>();
+            var transitCompressionPlugin = plugins.FirstOrDefault(p =>
+                p.SubCategory.Equals("TransitCompression", StringComparison.OrdinalIgnoreCase) &&
+                (string.IsNullOrEmpty(stagePolicy.PluginId) || p.Id == stagePolicy.PluginId));
+
+            if (transitCompressionPlugin == null)
+            {
+                context.LogWarning($"Transit Compression plugin not found for stage policy: {stagePolicy.PluginId ?? "default"}");
+                return null;
+            }
+
+            _resolvedStageCache[cacheKey] = transitCompressionPlugin;
+            return transitCompressionPlugin;
+        }
+
+        /// <summary>
         /// Validates access permissions before pipeline execution.
         /// Enforce ACL checks before pipeline execution.
         /// </summary>
@@ -257,6 +327,8 @@ namespace DataWarehouse.Kernel.Pipeline
                 "storage" => ResolveStorageStage(stagePolicy, context),
                 "raid" or "erasurecoding" => ResolveRaidStage(stagePolicy, context),
                 "keymanagement" => ResolveKeyManagementStage(stagePolicy, context),
+                "transitencryption" => ResolveTransitEncryptionStage(stagePolicy, context),
+                "transitcompression" => ResolveTransitCompressionStage(stagePolicy, context),
                 _ => null // Unknown stage type, skip
             };
         }

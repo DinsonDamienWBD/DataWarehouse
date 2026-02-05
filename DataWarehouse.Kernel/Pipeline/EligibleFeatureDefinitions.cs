@@ -343,6 +343,57 @@ namespace DataWarehouse.Kernel.Pipeline
         };
 
         /// <summary>
+        /// F11: Transit Encryption per level.
+        /// Configure data-in-transit encryption algorithm and mode.
+        /// </summary>
+        public static readonly EligibleFeature TransitEncryption = new()
+        {
+            FeatureId = "transit-encryption",
+            StageType = "TransitEncryption",
+            DisplayName = "Transit Encryption",
+            Description = "Configure data-in-transit encryption algorithm and mode (AES-GCM, ChaCha20-Poly1305, Serpent-GCM, etc.) per policy level. Operates independently from at-rest encryption.",
+            DefaultStrategyName = "AES-256-GCM",
+            ValidStrategies = [
+                "AES-256-GCM", "AES-128-GCM", "ChaCha20-Poly1305", "XChaCha20-Poly1305",
+                "AES-256-CBC-HMAC", "Serpent-256-GCM", "Compound-AES-Serpent", "TLS-Bridge"
+            ],
+            SupportsDisable = true,
+            MinimumPolicyLevel = PolicyLevel.Instance,
+            DefaultParameters = new Dictionary<string, object>
+            {
+                ["mode"] = "AlwaysEncrypt",
+                ["allow_negotiation"] = true,
+                ["minimum_security_level"] = "Standard"
+            }
+        };
+
+        /// <summary>
+        /// F12: Transit Compression per level.
+        /// Configure data-in-transit compression algorithm, level, and mode.
+        /// </summary>
+        public static readonly EligibleFeature TransitCompression = new()
+        {
+            FeatureId = "transit-compression",
+            StageType = "TransitCompression",
+            DisplayName = "Transit Compression",
+            Description = "Configure data-in-transit compression algorithm, level, and mode per policy level. Applied before transit encryption for optimal ratio.",
+            DefaultStrategyName = "Zstd-Transit",
+            ValidStrategies = [
+                "Zstd-Transit", "LZ4-Transit", "Brotli-Transit", "Snappy-Transit",
+                "GZip-Transit", "Deflate-Transit", "Adaptive-Transit", "None"
+            ],
+            SupportsDisable = true,
+            MinimumPolicyLevel = PolicyLevel.Instance,
+            DefaultParameters = new Dictionary<string, object>
+            {
+                ["mode"] = "BeforeEncryption",
+                ["priority"] = "Balanced",
+                ["minimum_size_bytes"] = 256,
+                ["maximum_entropy"] = 7.5
+            }
+        };
+
+        /// <summary>
         /// Gets all eligible features.
         /// </summary>
         /// <returns>Read-only list of all defined features.</returns>
@@ -356,7 +407,9 @@ namespace DataWarehouse.Kernel.Pipeline
             TieringPolicy,
             ReplicationMode,
             RetentionPolicy,
-            AuditLogging
+            AuditLogging,
+            TransitEncryption,
+            TransitCompression
         ];
 
         /// <summary>
