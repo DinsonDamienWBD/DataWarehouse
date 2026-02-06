@@ -154,7 +154,8 @@ Before ANY release:
 | **1.7** | **T96** | **Ultimate Compliance** | All compliance frameworks as strategies | T99 | [x] 4 core strategies |
 | **1.8** | **T98** | **Ultimate Replication** | All replication modes as strategies | T99 | [ ] |
 | **1.8.1** | **T126** | **Pipeline Orchestrator** | Multi-level pipeline policy engine (kernel) | T99 | [ ] |
-| **1.9** | **T90** | **Universal Intelligence** | Unified AI/knowledge layer | T99 | [ ] |
+| **1.8.2** | **T127** | **Intelligence Integration Framework** | All Ultimate plugins auto-leverage Intelligence | T99, T90 | [ ] |
+| **1.9** | **T90** | **Universal Intelligence** | Unified AI/knowledge layer | T99 | [x] Core implemented |
 
 **CRITICAL: TamperProof Dependency Chain:**
 ```
@@ -10329,6 +10330,64 @@ public interface IDataManagementStrategy
 | 104.B8.6 | 🚀 ComplianceAwareLifecycleStrategy - Auto-comply with regulations | [ ] |
 | 104.B8.7 | 🚀 CostAwareDataPlacementStrategy - Optimize for cost | [ ] |
 | 104.B8.8 | 🚀 CarbonAwareDataManagementStrategy - Green data practices | [ ] |
+| **B9: Caching Strategies** |
+| 104.B9.1 | InMemoryCacheStrategy - L1 in-process cache | [ ] |
+| 104.B9.2 | DistributedCacheStrategy - Redis/Memcached integration | [ ] |
+| 104.B9.3 | ⭐ HybridCacheStrategy - L1 + L2 layered cache | [ ] |
+| 104.B9.4 | ⭐ WriteThruCacheStrategy - Synchronous write-through | [ ] |
+| 104.B9.5 | ⭐ WriteBehindCacheStrategy - Async write-behind | [ ] |
+| 104.B9.6 | ⭐ ReadThroughCacheStrategy - Cache-aside pattern | [ ] |
+| 104.B9.7 | ⭐ PredictiveCacheStrategy - AI-driven prefetch | [ ] |
+| 104.B9.8 | ⭐ GeoDistributedCacheStrategy - Edge caching | [ ] |
+| **B10: Indexing Strategies** |
+| 104.B10.1 | FullTextIndexStrategy - Wraps existing FullTextIndexPlugin | [ ] |
+| 104.B10.2 | MetadataIndexStrategy - Structured metadata index | [ ] |
+| 104.B10.3 | ⭐ SemanticIndexStrategy - AI embedding-based indexing | [ ] |
+| 104.B10.4 | ⭐ SpatialIndexStrategy - Geo-spatial indexing (R-tree) | [ ] |
+| 104.B10.5 | ⭐ TemporalIndexStrategy - Time-series indexing | [ ] |
+| 104.B10.6 | ⭐ GraphIndexStrategy - Relationship indexing | [ ] |
+| 104.B10.7 | ⭐ CompositeIndexStrategy - Multi-field compound indexes | [ ] |
+| **B11: 🚀 Fan Out Write Orchestration** |
+| 104.B11.1 | 🚀 WriteFanOutOrchestrator - Parallel write to multiple destinations | [ ] |
+| 104.B11.2 | 🚀 PrimaryStorageDestination - Main blob storage write | [ ] |
+| 104.B11.3 | 🚀 MetadataStorageDestination - Metadata DB write | [ ] |
+| 104.B11.4 | 🚀 TextIndexDestination - Full-text index write | [ ] |
+| 104.B11.5 | 🚀 VectorStoreDestination - Embedding storage write (via T90) | [ ] |
+| 104.B11.6 | 🚀 CacheDestination - Cache layer write | [ ] |
+| 104.B11.7 | 🚀 FanOutStagePolicy - 4-tier hierarchy policy for fan out | [ ] |
+
+### Fan Out Orchestration Architecture
+
+The Fan Out Write pattern enables parallel writes to multiple destinations:
+
+```
+WRITE Request
+     │
+     ▼
+┌─────────────────────────────────────┐
+│     WriteFanOutOrchestrator         │ ← Configured via 4-tier hierarchy
+│  (T104 UltimateDataManagement)      │    Instance → UserGroup → User → Op
+└─────────────────────────────────────┘
+     │
+     ├──► Primary Storage (T97) ────────► Required
+     ├──► Metadata Storage (T104) ──────► Configurable (on/off)
+     ├──► Full-Text Index (T104) ───────► Configurable (on/off)
+     ├──► Vector Store (T90) ───────────► Configurable (on/off), requires Intelligence
+     └──► Cache Layer (T104) ───────────► Configurable (on/off)
+```
+
+**Policy Configuration (FanOutStagePolicy):**
+```csharp
+public class FanOutStagePolicy : StagePolicy
+{
+    public bool EnableMetadataStorage { get; set; } = true;
+    public bool EnableFullTextIndex { get; set; } = true;
+    public bool EnableVectorIndex { get; set; } = true;  // Requires T90
+    public bool EnableCaching { get; set; } = true;
+    public bool AllowChildOverride { get; set; } = true;
+    public TimeSpan NonRequiredTimeout { get; set; } = TimeSpan.FromSeconds(30);
+}
+```
 
 ### Phase C-D
 
@@ -13443,6 +13502,192 @@ public record ConnectionStrategyCapabilities
 | E | 7 | Ultimate plugin integration |
 | F | 10 | Eligible feature scope |
 | **Total** | **46** | |
+
+---
+
+## T127: Universal Intelligence Integration Framework
+
+**Priority:** P0 — Critical (SDK Architecture Enhancement)
+**Effort:** Very High
+**Type:** SDK Foundation Enhancement
+**Dependencies:** T99 (SDK Foundation), T90 (Universal Intelligence)
+
+> **VISION:** ALL Ultimate plugins can automatically leverage Intelligence (T90) when available.
+> The SDK provides abstract base classes that enable automatic Intelligence plug-in.
+> If Intelligence plugin is enabled → plugins gain AI capabilities automatically.
+> If Intelligence plugin is disabled/missing → plugins work normally without AI.
+> CLI, GUI, and services can extend these base classes and automatically become AI-conversational interfaces.
+
+### Core Principles
+
+1. **SDK Base Classes Are Intelligence-Aware**: All plugin base classes in SDK have built-in hooks for Intelligence
+2. **Automatic Detection**: If T90 (UltimateIntelligence) is loaded and enabled, it's automatically available
+3. **Zero Plugin References**: Plugins NEVER reference each other; all Intelligence communication via message bus
+4. **Graceful Degradation**: Every AI-enhanced feature has a non-AI fallback
+5. **Uniform Pattern**: Same integration pattern across ALL Ultimate plugins
+
+### Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                        SDK Intelligence-Aware Base Classes                   │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                              │
+│  IntelligenceAwarePluginBase (abstract)                                      │
+│    │                                                                         │
+│    ├── IntelligenceAwareConnectorPluginBase ──► UltimateConnector (T125)    │
+│    ├── IntelligenceAwareInterfacePluginBase ──► UltimateInterface (T109)    │
+│    ├── IntelligenceAwareEncryptionPluginBase ─► UltimateEncryption (T93)    │
+│    ├── IntelligenceAwareCompressionPluginBase► UltimateCompression (T92)    │
+│    ├── IntelligenceAwareKeyMgmtPluginBase ───► UltimateKeyMgmt (T94)        │
+│    ├── IntelligenceAwareStoragePluginBase ───► UltimateStorage (T97)        │
+│    ├── IntelligenceAwareAccessCtrlPluginBase ► UltimateAccessControl (T95)  │
+│    ├── IntelligenceAwareCompliancePluginBase ► UltimateCompliance (T96)     │
+│    ├── IntelligenceAwareDataMgmtPluginBase ──► UltimateDataMgmt (T104)      │
+│    └── ... (all Ultimate plugins)                                            │
+│                                                                              │
+│  Automatic Intelligence Detection:                                           │
+│    - OnStartAsync() checks if T90 is available via message bus discovery    │
+│    - Sets IsIntelligenceAvailable = true/false                              │
+│    - Subscribes to intelligence.capability.* topics                          │
+│                                                                              │
+│  CLI/GUI/Services:                                                           │
+│    - Can extend IntelligenceAwareInterfacePluginBase directly               │
+│    - Or extend UltimateInterface                                             │
+│    - Automatically become conversational AI interfaces when T90 enabled     │
+│                                                                              │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+### Phase A: SDK Base Class Enhancements
+
+| Sub-Task | Description | Status |
+|----------|-------------|--------|
+| **A1: Core Intelligence Integration** |
+| 127.A1.1 | Add `IIntelligenceAware` interface to SDK | [ ] |
+| 127.A1.2 | Add `IntelligenceAwarePluginBase` abstract class with auto-detection | [ ] |
+| 127.A1.3 | Add `IntelligenceContext` for passing AI context through operations | [ ] |
+| 127.A1.4 | Add `IntelligenceCapabilities` flags (Embeddings, NLP, Prediction, Classification, etc.) | [ ] |
+| 127.A1.5 | Add message bus topics: `intelligence.available`, `intelligence.capability.*` | [ ] |
+| **A2: Connector Base Class** |
+| 127.A2.1 | Create `IntelligenceAwareConnectorPluginBase` extending FeaturePluginBase | [ ] |
+| 127.A2.2 | Add `OnBeforeRequestAsync` hook for AI request transformation | [ ] |
+| 127.A2.3 | Add `OnAfterResponseAsync` hook for AI response analysis | [ ] |
+| 127.A2.4 | Add `OnSchemaDiscoveryAsync` hook for AI schema alignment | [ ] |
+| 127.A2.5 | Update `ConnectionStrategyBase` to support IntelligenceContext | [ ] |
+| **A3: Interface Base Class** |
+| 127.A3.1 | Create `IntelligenceAwareInterfacePluginBase` extending InterfacePluginBase | [ ] |
+| 127.A3.2 | Add `OnUserInputAsync` hook for NLP parsing | [ ] |
+| 127.A3.3 | Add `OnConversationAsync` hook for AI agent conversation | [ ] |
+| 127.A3.4 | Add `GetIntentAsync` hook for intent classification | [ ] |
+| 127.A3.5 | Add automatic conversation mode when Intelligence available | [ ] |
+| **A4: Encryption Base Class Enhancement** |
+| 127.A4.1 | Enhance `EncryptionPluginBase` to implement `IIntelligenceAware` | [ ] |
+| 127.A4.2 | Add `OnCipherSelectionAsync` hook for AI-recommended cipher selection | [ ] |
+| 127.A4.3 | Add `OnAnomalyDetectionAsync` hook for encryption pattern anomalies | [ ] |
+| 127.A4.4 | Add `GetThreatAssessmentAsync` for AI-driven threat analysis | [ ] |
+| **A5: Compression Base Class Enhancement** |
+| 127.A5.1 | Enhance `PipelinePluginBase` (compression) to implement `IIntelligenceAware` | [ ] |
+| 127.A5.2 | Add `OnAlgorithmSelectionAsync` hook for AI-recommended algorithm | [ ] |
+| 127.A5.3 | Add `OnContentAnalysisAsync` hook for semantic content classification | [ ] |
+| 127.A5.4 | Add `PredictCompressionRatioAsync` for AI ratio prediction | [ ] |
+| **A6: Key Management Base Class Enhancement** |
+| 127.A6.1 | Enhance `KeyStorePluginBase` to implement `IIntelligenceAware` | [ ] |
+| 127.A6.2 | Add `OnKeyUsagePatternAsync` hook for anomaly detection | [ ] |
+| 127.A6.3 | Add `PredictKeyRotationAsync` for AI-driven rotation scheduling | [ ] |
+| 127.A6.4 | Add `GetCompromiseRiskAsync` for AI threat assessment | [ ] |
+| **A7: Storage Base Class Enhancement** |
+| 127.A7.1 | Enhance `StorageProviderPluginBase` to implement `IIntelligenceAware` | [ ] |
+| 127.A7.2 | Add `OnTierSelectionAsync` hook for AI-driven tiering | [ ] |
+| 127.A7.3 | Add `PredictAccessPatternAsync` for AI access prediction | [ ] |
+| 127.A7.4 | Add `OnDataClassificationAsync` for content classification | [ ] |
+| **A8: Access Control Base Class Enhancement** |
+| 127.A8.1 | Enhance `AccessControlPluginBase` to implement `IIntelligenceAware` | [ ] |
+| 127.A8.2 | Add `OnBehaviorAnalysisAsync` hook for UEBA | [ ] |
+| 127.A8.3 | Add `PredictThreatAsync` for AI threat prediction | [ ] |
+| 127.A8.4 | Add `OnAnomalousAccessAsync` for unusual access detection | [ ] |
+| **A9: Compliance Base Class Enhancement** |
+| 127.A9.1 | Enhance `ComplianceProviderPluginBase` to implement `IIntelligenceAware` | [ ] |
+| 127.A9.2 | Add `OnPiiDetectionAsync` hook for AI PII discovery | [ ] |
+| 127.A9.3 | Add `ClassifyDataAsync` for sensitivity classification | [ ] |
+| 127.A9.4 | Add `GenerateAuditSummaryAsync` for AI audit narratives | [ ] |
+| **A10: Data Management Base Class Enhancement** |
+| 127.A10.1 | Enhance `DataManagementPluginBase` to implement `IIntelligenceAware` | [ ] |
+| 127.A10.2 | Add `OnSemanticDeduplicationAsync` hook for AI dedup | [ ] |
+| 127.A10.3 | Add `PredictDataLifecycleAsync` for AI lifecycle prediction | [ ] |
+| 127.A10.4 | Add `OnContentIndexingAsync` for semantic indexing | [ ] |
+
+### Phase B: Intelligence Auto-Discovery Protocol
+
+| Sub-Task | Description | Status |
+|----------|-------------|--------|
+| 127.B1 | Implement `IntelligenceDiscoveryService` in SDK | [ ] |
+| 127.B2 | Add message bus topic `intelligence.discover` for capability discovery | [ ] |
+| 127.B3 | Add `IntelligenceCapabilityResponse` with supported features | [ ] |
+| 127.B4 | Implement capability caching to avoid repeated discovery calls | [ ] |
+| 127.B5 | Add graceful timeout (500ms) for discovery - assume unavailable if no response | [ ] |
+| 127.B6 | Add `IsIntelligenceAvailable` property to all enhanced base classes | [ ] |
+| 127.B7 | Add `GetIntelligenceCapabilitiesAsync` method to all enhanced base classes | [ ] |
+
+### Phase C: CLI/GUI Intelligence Integration
+
+| Sub-Task | Description | Status |
+|----------|-------------|--------|
+| **C1: Conversational Interface** |
+| 127.C1.1 | When Intelligence available, CLI accepts natural language commands | [ ] |
+| 127.C1.2 | "Upload this file" → `PUT /blobs` with AI-parsed parameters | [ ] |
+| 127.C1.3 | "Find documents about Q4 sales" → semantic search | [ ] |
+| 127.C1.4 | "Encrypt everything with military-grade" → selects AES-256-GCM | [ ] |
+| 127.C1.5 | Conversation history for context-aware follow-ups | [ ] |
+| **C2: AI Agent Mode** |
+| 127.C2.1 | CLI can spawn AI agents for complex tasks | [ ] |
+| 127.C2.2 | "Organize my files" → AI agent analyzes and restructures | [ ] |
+| 127.C2.3 | "Optimize storage costs" → AI agent runs tiering analysis | [ ] |
+| 127.C2.4 | "Check for compliance issues" → AI agent runs audit | [ ] |
+| **C3: GUI Intelligence** |
+| 127.C3.1 | Chat panel in GUI for AI interaction | [ ] |
+| 127.C3.2 | AI-powered search suggestions | [ ] |
+| 127.C3.3 | Smart recommendations ("This file looks like PII, encrypt?") | [ ] |
+| 127.C3.4 | Natural language filter builder | [ ] |
+
+### Phase D: Update Existing Ultimate Plugins
+
+| Sub-Task | Description | Status |
+|----------|-------------|--------|
+| 127.D1 | Update UltimateEncryption (T93) to extend enhanced base class | [ ] |
+| 127.D2 | Update UltimateCompression (T92) to extend enhanced base class | [ ] |
+| 127.D3 | Update UltimateKeyManagement (T94) to extend enhanced base class | [ ] |
+| 127.D4 | Update UltimateStorage (T97) to extend enhanced base class | [ ] |
+| 127.D5 | Update UltimateAccessControl (T95) to extend enhanced base class | [ ] |
+| 127.D6 | Update UltimateCompliance (T96) to extend enhanced base class | [ ] |
+| 127.D7 | Update UltimateConnector (T125) to extend enhanced base class | [ ] |
+| 127.D8 | Update UltimateIntelligence (T90) to publish capabilities | [ ] |
+| 127.D9 | Create UltimateInterface (T109) with enhanced base class | [ ] |
+| 127.D10 | Create UltimateDataManagement (T104) with enhanced base class | [ ] |
+
+### AI Capabilities Per Plugin
+
+| Plugin | AI Capability When Intelligence Available | Fallback Without Intelligence |
+|--------|-------------------------------------------|------------------------------|
+| **T92 Compression** | AI-recommended algorithm based on content type | Entropy-based selection |
+| **T93 Encryption** | AI threat assessment, cipher recommendation | Default cipher selection |
+| **T94 Key Management** | Anomaly detection, rotation prediction | Scheduled rotation |
+| **T95 Access Control** | UEBA, behavioral analysis, threat prediction | Rule-based access |
+| **T96 Compliance** | PII detection, classification, audit narratives | Pattern-based detection |
+| **T97 Storage** | Predictive tiering, access pattern analysis | Rule-based tiering |
+| **T104 Data Management** | Semantic dedup, content classification | Hash-based dedup |
+| **T109 Interface** | NLP commands, conversational UI, intent parsing | Traditional CLI/API |
+| **T125 Connector** | Schema alignment, query transpilation, traffic compression | Direct connections |
+
+### Summary
+
+| Phase | Items | Description |
+|-------|-------|-------------|
+| A | 40 | SDK base class enhancements (10 plugin categories × 4 hooks each) |
+| B | 7 | Intelligence auto-discovery protocol |
+| C | 13 | CLI/GUI intelligence integration |
+| D | 10 | Update existing Ultimate plugins |
+| **Total** | **70** | |
 
 ---
 

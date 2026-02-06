@@ -1192,3 +1192,110 @@ _ = Task.Run(async () =>
 - Bandwidth usage monitoring and reporting
 - Node reputation and selection preferences
 - Advanced erasure coding configuration
+
+---
+
+## Task 126 Phase D: Pipeline Migration Engine Implementation
+
+**Date:** 2026-02-06
+
+**File Created:** `DataWarehouse.Kernel/Pipeline/PipelineMigrationEngine.cs` (588 lines)
+
+**Implementation Details:**
+- Created production-ready pipeline migration engine implementing IPipelineMigrationEngine interface
+- Handles background re-processing of blobs when pipeline policies change
+- Supports lazy migration, throttling, progress tracking, and rollback
+
+**Key Requirements Implemented (T126.D1-D7):**
+
+1. **D1: Background Migration Job**
+   - StartMigrationAsync creates background task for batch blob re-processing
+   - Queries blobs with stale PolicyVersion via BlobEnumerator delegate
+   - Processes blobs in parallel using SemaphoreSlim (default: 4 workers)
+   - Applies MigrationFilter for partial migration (container, owner, tier, tags, date, size)
+
+2. **D2: Lazy Migration (MigrateOnNextAccess)**
+   - MigrateOnAccessAsync performs inline migration during read operations
+   - Reverses current stages to recover original data
+   - Applies new policy stages to re-process data
+   - Returns migrated stream for immediate use
+   - Called by EnhancedPipelineOrchestrator when blob has stale policy version
+
+3. **D3: Throttling**
+   - MaxBlobsPerSecond via SemaphoreSlim with rate limiting
+   - Release semaphore after 1 second delay to maintain rate
+   - Configurable parallelism (default: 4 concurrent workers)
+   - Prevents overwhelming storage layer during migration
+
+4. **D4: Progress Tracking**
+   - MigrationJob exposes ProcessedBlobs, FailedBlobs, ProgressPercent
+   - Thread-safe counters via Interlocked.Increment
+   - Separate counters in MigrationJobState: _processedBlobsCounter, _failedBlobsCounter
+   - GetMigrationStatusAsync returns current job state
+
+5. **D5: Cancellation and Rollback**
+   - CancelMigrationAsync sets job status to RollingBack
+   - Tracks ProcessedManifestIds list for rollback
+   - RollbackBlobAsync reads with new pipeline, writes with old pipeline
+   - Reverses each migrated blob to restore original state
+   - Sets status to Cancelled after rollback completes
+
+6. **D6: Cross-Algorithm Migration**
+   - Reads data using OLD pipeline stages from PipelineStageSnapshot[]
+   - Writes using NEW policy stages from PipelinePolicy
+   - Reverses stages in order: decrypt-with-old, decompress-with-old
+   - Applies new stages: compress-with-new, encrypt-with-new
+   - Handles algorithm changes transparently (e.g., AES-256 to ChaCha20)
+
+7. **D7: Partial Migration with MigrationFilter**
+   - Filter by ContainerId, OwnerId, StorageTier
+   - Filter by RequiredTags (dictionary match)
+   - Filter by CreatedAfter/CreatedBefore date range
+   - Filter by MaxSizeBytes
+   - Enumeration applies filter before processing
+
+**Architecture Patterns:**
+
+1. **Delegate-Based Blob Access**
+   - BlobEnumerator: Query blobs from storage layer
+   - BlobReader: Read blob with current pipeline config
+   - BlobWriter: Write blob with new pipeline config
+   - Allows migration engine to work without direct storage dependency
+
+2. **State Management**
+   - MigrationJobState tracks internal state (cts, counters, background task)
+   - MigrationJob is public-facing status (exposed via GetMigrationStatusAsync)
+   - ConcurrentDictionary stores jobs for thread-safe access
+
+3. **Thread Safety**
+   - Interlocked.Increment for counters (ProcessedBlobs, FailedBlobs)
+   - Lock on ProcessedManifestIds list during rollback
+   - CancellationTokenSource per job for safe cancellation
+
+**Compilation Issues Resolved:**
+
+1. **StorageIntent Properties**
+   - Issue: Attempted to use AccessPattern and TtlSeconds properties (do not exist)
+   - Fix: Changed to StorageIntent.Standard static preset
+   - StorageIntent has Compression, Availability, Security properties only
+
+2. **Interlocked.Increment with Properties**
+   - Issue: Cannot pass property as ref parameter to Interlocked.Increment
+   - Fix: Added _processedBlobsCounter and _failedBlobsCounter fields to MigrationJobState
+   - Update property after Interlocked operation: jobState.Job.ProcessedBlobs = processedCount
+
+**Key Design Decisions:**
+
+1. **Delegated Storage Access** - Engine does not directly access storage, uses injected delegates
+2. **Snapshot-Based Reversal** - Each blob stores PipelineStageSnapshot[] for accurate reverse processing
+3. **Parallel Processing with Throttling** - Semaphore limits workers, rate limiter controls throughput
+4. **Rollback Tracking** - ProcessedManifestIds list enables selective rollback
+5. **Two Migration Modes** - Background (batch) and Lazy (on-demand)
+
+**Verification:**
+- Build succeeded: DataWarehouse.Kernel.csproj compiled with 0 errors
+- Time Elapsed: 00:00:01.30
+- No new warnings introduced
+- All abstract methods from IPipelineMigrationEngine implemented
+- Thread-safe counter updates verified
+

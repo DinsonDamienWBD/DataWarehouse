@@ -139,7 +139,21 @@
       "Bash(Select-String -Pattern \"error|Build succeeded|Build FAILED\" -Context 0,2)",
       "Bash(Select-String -Pattern \"AlibabaOss\" -Context 2,2)",
       "Bash(Select-String -Pattern \"SwarmStrategy\" -Context 0,2)",
-      "Bash(Select-String -Pattern \"error|warning CS|Build succeeded|Build FAILED\")"
+      "Bash(Select-String -Pattern \"error|warning CS|Build succeeded|Build FAILED\")",
+      "Bash(Select-String -Pattern \"error|Build succeeded|Build FAILED\")",
+      "Bash(Select-String -Pattern \"error|success|warning CS8625\")",
+      "Bash(Select-Object -Last 20)",
+      "Bash(Select-String \"GlusterFs|Build succeeded|Build FAILED\")",
+      "Bash(if not exist \"C:\\\\Temp\\\\DataWarehouse\\\\DataWarehouse\\\\Plugins\\\\DataWarehouse.Plugins.UltimateStorage\\\\Strategies\\\\Enterprise\" mkdir \"C:\\\\Temp\\\\DataWarehouse\\\\DataWarehouse\\\\Plugins\\\\DataWarehouse.Plugins.UltimateStorage\\\\Strategies\\\\Enterprise\")",
+      "Bash(if not exist \"C:\\\\Temp\\\\DataWarehouse\\\\DataWarehouse\\\\Plugins\\\\DataWarehouse.Plugins.UltimateStorage\\\\Strategies\\\\Innovation\" mkdir \"C:\\\\Temp\\\\DataWarehouse\\\\DataWarehouse\\\\Plugins\\\\DataWarehouse.Plugins.UltimateStorage\\\\Strategies\\\\Innovation\")",
+      "Bash(select-string -Pattern \"error CS|Build succeeded|Warning|Error\")",
+      "Bash(select-string -notmatch \"warning\")",
+      "Bash(for dir in */)",
+      "Bash(while read d)",
+      "Bash(cmd /c \"for /D %d in \\(Plugins\\\\DataWarehouse.Plugins.UltimateStorage\\\\Strategies\\\\*\\) do @echo %d\")",
+      "Bash(Select-String -Pattern \"LzmaStrategy|Lzma2Strategy|error CS\")",
+      "Bash(Select-String -Pattern \"SevenZipStrategy|RarStrategy|ZipStrategy|XzStrategy|error CS\")",
+      "Bash(tree:*)"
     ]
   }
 }
