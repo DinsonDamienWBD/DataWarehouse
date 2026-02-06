@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RootNamespace>DataWarehouse.Plugins.UltimateCompliance</RootNamespace>
+    <Description>Ultimate Compliance plugin providing data sovereignty geofencing, GDPR, HIPAA, and SOX compliance checking and enforcement</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\DataWarehouse.SDK\DataWarehouse.SDK.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- MaxMind GeoIP for location detection -->
+    <PackageReference Include="MaxMind.GeoIP2" Version="5.3.*" />
+  </ItemGroup>
+
+</Project>

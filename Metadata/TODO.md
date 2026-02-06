@@ -150,8 +150,8 @@ Before ANY release:
 | **1.3** | **T92** | **Ultimate Compression** | All compression as strategies | T99 | [x] 58 strategies |
 | **1.4** | **T97** | **Ultimate Storage** | All storage backends as strategies | T99 | [x] 129 strategies |
 | **1.5** | **T91** | **Ultimate RAID** | All RAID levels as strategies | T99 | [ ] |
-| **1.6** | **T95** | **Ultimate Access Control** | All access control features as strategies | T99 | [ ] |
-| **1.7** | **T96** | **Ultimate Compliance** | All compliance frameworks as strategies | T99 | [ ] |
+| **1.6** | **T95** | **Ultimate Access Control** | All access control features as strategies | T99 | [x] 7 core strategies |
+| **1.7** | **T96** | **Ultimate Compliance** | All compliance frameworks as strategies | T99 | [x] 4 core strategies |
 | **1.8** | **T98** | **Ultimate Replication** | All replication modes as strategies | T99 | [ ] |
 | **1.8.1** | **T126** | **Pipeline Orchestrator** | Multi-level pipeline policy engine (kernel) | T99 | [ ] |
 | **1.9** | **T90** | **Universal Intelligence** | Unified AI/knowledge layer | T99 | [ ] |
@@ -229,10 +229,10 @@ T99 (SDK) → T94 (Key Mgmt) → T93 (Encryption) → TamperProof (T3.4.2)
 
 | Order | Task | Name | Original Plugin | NOW: Implement In | Status |
 |-------|------|------|-----------------|-------------------|--------|
-| **4.1** | T73 | Canary Objects | ~~DataWarehouse.Plugins.Security.Canary~~ | **T95 (UltimateAccessControl)** as `CanaryStrategy` | [ ] |
-| **4.2** | T74 | Steganographic Sharding | ~~DataWarehouse.Plugins.Obfuscation.Steganography~~ | **T95 (UltimateAccessControl)** as `SteganographyStrategy` | [ ] |
+| **4.1** | T73 | Canary Objects | ~~DataWarehouse.Plugins.Security.Canary~~ | **T95 (UltimateAccessControl)** as `CanaryStrategy` | [x] |
+| **4.2** | T74 | Steganographic Sharding | ~~DataWarehouse.Plugins.Obfuscation.Steganography~~ | **T95 (UltimateAccessControl)** as `SteganographyStrategy` | [x] |
 | **4.3** | T75 | SMPC Vaults | ~~DataWarehouse.Plugins.Privacy.SMPC~~ | **T94 (UltimateKeyManagement)** as `SmpcVaultStrategy` | [x] |
-| **4.4** | T76 | Digital Dead Drops | ~~DataWarehouse.Plugins.Sharing.Ephemeral~~ | **T95 (UltimateAccessControl)** as `EphemeralSharingStrategy` | [ ] |
+| **4.4** | T76 | Digital Dead Drops | ~~DataWarehouse.Plugins.Sharing.Ephemeral~~ | **T95 (UltimateAccessControl)** as `EphemeralSharingStrategy` | [x] |
 
 **SDK Requirements (from T73-T76) → Now in Task 99:**
 - `ICanaryProvider` → T99.A4 (Security interfaces)
@@ -244,7 +244,7 @@ T99 (SDK) → T94 (Key Mgmt) → T93 (Encryption) → TamperProof (T3.4.2)
 
 | Order | Task | Name | Original Plugin | NOW: Implement In | Status |
 |-------|------|------|-----------------|-------------------|--------|
-| **4.5** | T77 | Sovereignty Geofencing | ~~DataWarehouse.Plugins.Governance.Geofencing~~ | **T96 (UltimateCompliance)** as `GeofencingStrategy` | [ ] |
+| **4.5** | T77 | Sovereignty Geofencing | ~~DataWarehouse.Plugins.Governance.Geofencing~~ | **T96 (UltimateCompliance)** as `GeofencingStrategy` | [x] |
 | **4.6** | T78 | Protocol Morphing | ~~DataWarehouse.Plugins.Transport.Adaptive~~ | **Standalone** (unique transport layer) | [ ] |
 | **4.7** | T79 | The Mule (Air-Gap Bridge) | ~~DataWarehouse.Plugins.Transport.AirGap~~ | **Standalone** (unique hardware integration) | [ ] |
 
@@ -268,7 +268,7 @@ T99 (SDK) → T94 (Key Mgmt) → T93 (Encryption) → TamperProof (T3.4.2)
 
 | Order | Task | Name | Original Plugin | NOW: Implement In | Status |
 |-------|------|------|-----------------|-------------------|--------|
-| **4.12** | T84 | Generative Compression | ~~DataWarehouse.Plugins.Storage.Generative~~ | **T92 (UltimateCompression)** as `GenerativeCompressionStrategy` | [ ] |
+| **4.12** | T84 | Generative Compression | ~~DataWarehouse.Plugins.Storage.Generative~~ | **T92 (UltimateCompression)** as `GenerativeCompressionStrategy` | [x] |
 | **4.13** | T85 | Probabilistic Storage | ~~DataWarehouse.Plugins.Storage.Probabilistic~~ | **SDK (T99)** primitives + **T104** `ProbabilisticStorageStrategy` | [ ] |
 
 #### CATEGORY G: The Immortal Layer (Task 86)
@@ -288,7 +288,7 @@ T99 (SDK) → T94 (Key Mgmt) → T93 (Encryption) → TamperProof (T3.4.2)
 
 | Order | Task | Name | Original Plugin | NOW: Implement In | Status |
 |-------|------|------|-----------------|-------------------|--------|
-| **4.17** | T89 | Forensic Watermarking | ~~DataWarehouse.Plugins.Security.Watermarking~~ | **T95 (UltimateAccessControl)** as `WatermarkingStrategy` | [ ] |
+| **4.17** | T89 | Forensic Watermarking | ~~DataWarehouse.Plugins.Security.Watermarking~~ | **T95 (UltimateAccessControl)** as `WatermarkingStrategy` | [x] |
 
 ---
 
