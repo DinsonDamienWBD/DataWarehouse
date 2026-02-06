@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using System.Reflection;
+using DataWarehouse.SDK.AI;
 using DataWarehouse.SDK.Connectors;
 using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Primitives;
@@ -79,6 +80,62 @@ public sealed class UltimateConnectorPlugin : FeaturePluginBase
     public ConnectionStrategyRegistry Registry => _registry;
 
     /// <summary>
+    /// Declares all capabilities provided by this plugin.
+    /// Includes main plugin capability and auto-generated strategy capabilities.
+    /// </summary>
+    protected override IReadOnlyList<RegisteredCapability> DeclaredCapabilities
+    {
+        get
+        {
+            var capabilities = new List<RegisteredCapability>
+            {
+                // Main plugin capability
+                new()
+                {
+                    CapabilityId = $"{Id}.connector",
+                    DisplayName = "Ultimate Connector",
+                    Description = SemanticDescription,
+                    Category = SDK.Contracts.CapabilityCategory.Connector,
+                    PluginId = Id,
+                    PluginName = Name,
+                    PluginVersion = Version,
+                    Tags = [..SemanticTags]
+                }
+            };
+
+            // Add strategy-based capabilities
+            foreach (var strategy in _registry.GetAll())
+            {
+                var tags = new List<string> { "connector", "integration", strategy.Category.ToString().ToLowerInvariant() };
+                tags.AddRange(strategy.Tags);
+
+                // Add feature-specific tags
+                if (strategy.Capabilities.SupportsPooling)
+                    tags.Add("pooling");
+                if (strategy.Capabilities.SupportsStreaming)
+                    tags.Add("streaming");
+                if (strategy.Capabilities.SupportsTransactions)
+                    tags.Add("transactions");
+
+                capabilities.Add(new()
+                {
+                    CapabilityId = $"{Id}.{strategy.StrategyId.ToLowerInvariant().Replace(".", "-").Replace(" ", "-")}",
+                    DisplayName = strategy.DisplayName,
+                    Description = strategy.SemanticDescription,
+                    Category = SDK.Contracts.CapabilityCategory.Connector,
+                    SubCategory = strategy.Category.ToString(),
+                    PluginId = Id,
+                    PluginName = Name,
+                    PluginVersion = Version,
+                    Tags = [..tags]
+                });
+            }
+
+            return capabilities.AsReadOnly();
+        }
+    }
+
+    /// <summary>
     /// Initializes a new instance of the Ultimate Connector plugin.
     /// </summary>
     public UltimateConnectorPlugin()
@@ -121,6 +178,63 @@ public sealed class UltimateConnectorPlugin : FeaturePluginBase
         response.Metadata["SemanticDescription"] = SemanticDescription;
 
         return Task.FromResult(response);
+    }
+
+    /// <inheritdoc/>
+    protected override IReadOnlyList<KnowledgeObject> GetStaticKnowledge()
+    {
+        var strategies = _registry.GetAll();
+        var categoryCounts = strategies
+            .GroupBy(s => s.Category)
+            .ToDictionary(g => g.Key.ToString(), g => g.Count());
+
+        var poolingCount = strategies.Count(s => s.Capabilities.SupportsPooling);
+        var streamingCount = strategies.Count(s => s.Capabilities.SupportsStreaming);
+        var transactionCount = strategies.Count(s => s.Capabilities.SupportsTransactions);
+
+        return new List<KnowledgeObject>
+        {
+            new()
+            {
+                Id = $"{Id}:overview",
+                Topic = "connector",
+                SourcePluginId = Id,
+                SourcePluginName = Name,
+                KnowledgeType = "capability",
+                Description = "Ultimate Connector Overview",
+                Payload = new Dictionary<string, object>
+                {
+                    ["description"] = SemanticDescription,
+                    ["totalStrategies"] = strategies.Count,
+                    ["categories"] = categoryCounts,
+                    ["features"] = new Dictionary<string, object>
+                    {
+                        ["poolingSupport"] = poolingCount,
+                        ["streamingSupport"] = streamingCount,
+                        ["transactionSupport"] = transactionCount
+                    },
+                    ["categoryBreakdown"] = new Dictionary<string, object>
+                    {
+                        ["database"] = categoryCounts.GetValueOrDefault("Database", 0),
+                        ["nosql"] = categoryCounts.GetValueOrDefault("NoSql", 0),
+                        ["messaging"] = categoryCounts.GetValueOrDefault("Messaging", 0),
+                        ["saas"] = categoryCounts.GetValueOrDefault("SaaS", 0),
+                        ["iot"] = categoryCounts.GetValueOrDefault("IoT", 0),
+                        ["healthcare"] = categoryCounts.GetValueOrDefault("Healthcare", 0),
+                        ["blockchain"] = categoryCounts.GetValueOrDefault("Blockchain", 0),
+                        ["ai"] = categoryCounts.GetValueOrDefault("AI", 0),
+                        ["cloudWarehouse"] = categoryCounts.GetValueOrDefault("CloudWarehouse", 0),
+                        ["cloudPlatform"] = categoryCounts.GetValueOrDefault("CloudPlatform", 0),
+                        ["protocol"] = categoryCounts.GetValueOrDefault("Protocol", 0),
+                        ["legacy"] = categoryCounts.GetValueOrDefault("Legacy", 0),
+                        ["fileSystem"] = categoryCounts.GetValueOrDefault("FileSystem", 0),
+                        ["observability"] = categoryCounts.GetValueOrDefault("Observability", 0),
+                        ["dashboard"] = categoryCounts.GetValueOrDefault("Dashboard", 0)
+                    }
+                },
+                Tags = SemanticTags
+            }
+        }.AsReadOnly();
     }
 
     /// <inheritdoc/>

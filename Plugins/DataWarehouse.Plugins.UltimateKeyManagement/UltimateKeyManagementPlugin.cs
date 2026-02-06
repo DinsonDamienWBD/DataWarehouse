@@ -5,6 +5,7 @@ using System.Linq;
 using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
+using DataWarehouse.SDK.AI;
 using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Primitives;
 using DataWarehouse.SDK.Security;
@@ -27,6 +28,57 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement
         public override string Name => "Ultimate Key Management";
         public override string Version => "1.0.0";
         public override PluginCategory Category => PluginCategory.FeatureProvider;
+
+        protected override IReadOnlyList<RegisteredCapability> DeclaredCapabilities
+        {
+            get
+            {
+                var capabilities = new List<RegisteredCapability>
+                {
+                    new()
+                    {
+                        CapabilityId = "key-management",
+                        PluginId = Id,
+                        PluginName = Name,
+                        PluginVersion = Version,
+                        DisplayName = "Ultimate Key Management",
+                        Description = "Comprehensive key management system with multiple storage strategies, envelope encryption, key rotation, and HSM support",
+                        Category = SDK.Contracts.CapabilityCategory.Security,
+                        Tags = ["keymanagement", "security", "encryption", "rotation", "hsm", "envelope"]
+                    }
+                };
+
+                foreach (var (id, strategy) in _strategies)
+                {
+                    var caps = strategy.Capabilities;
+                    var tags = new List<string> { "keystore", "security" };
+
+                    if (caps.SupportsEnvelope)
+                        tags.Add("envelope");
+                    if (caps.SupportsRotation)
+                        tags.Add("rotation");
+                    if (caps.SupportsHsm)
+                        tags.Add("hsm");
+
+                    capabilities.Add(new RegisteredCapability
+                    {
+                        CapabilityId = $"keystore-{id.Replace(".", "-").Replace(" ", "-").ToLowerInvariant()}",
+                        PluginId = Id,
+                        PluginName = Name,
+                        PluginVersion = Version,
+                        DisplayName = $"Key Store: {id}",
+                        Description = $"Key storage strategy supporting: " +
+                                    $"Envelope={caps.SupportsEnvelope}, " +
+                                    $"Rotation={caps.SupportsRotation}, " +
+                                    $"HSM={caps.SupportsHsm}",
+                        Category = SDK.Contracts.CapabilityCategory.Security,
+                        Tags = tags.ToArray()
+                    });
+                }
+
+                return capabilities.AsReadOnly();
+            }
+        }
 
         public override async Task StartAsync(CancellationToken ct)
         {
@@ -359,6 +411,42 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement
             metadata["RegisteredKeyStores"] = _keyStores.Count;
             metadata["RegisteredEnvelopeKeyStores"] = _envelopeKeyStores.Count;
             return metadata;
+        }
+
+        protected override IReadOnlyList<KnowledgeObject> GetStaticKnowledge()
+        {
+            var strategyIds = _strategies.Keys.ToList();
+            var envelopeCount = _strategies.Values.Count(s => s.Capabilities.SupportsEnvelope);
+            var rotationCount = _strategies.Values.Count(s => s.Capabilities.SupportsRotation);
+            var hsmCount = _strategies.Values.Count(s => s.Capabilities.SupportsHsm);
+
+            return new List<KnowledgeObject>
+            {
+                new()
+                {
+                    Id = $"{Id}:overview",
+                    Topic = "key-management",
+                    SourcePluginId = Id,
+                    SourcePluginName = Name,
+                    KnowledgeType = "capability",
+                    Description = $"Ultimate Key Management Plugin provides comprehensive key storage and management with {_strategies.Count} registered strategies. " +
+                              $"Supports envelope encryption ({envelopeCount} strategies), automatic key rotation ({rotationCount} strategies), " +
+                              $"and Hardware Security Module integration ({hsmCount} strategies). " +
+                              $"Auto-discovery: {_config.AutoDiscoverStrategies}, Rotation enabled: {_config.EnableKeyRotation}. " +
+                              $"Registered strategies: {string.Join(", ", strategyIds)}",
+                    Tags = ["keymanagement", "security", "encryption", "rotation", "hsm", "envelope", "keystore"],
+                    Payload = new Dictionary<string, object>
+                    {
+                        ["strategyCount"] = _strategies.Count,
+                        ["envelopeCount"] = envelopeCount,
+                        ["rotationCount"] = rotationCount,
+                        ["hsmCount"] = hsmCount,
+                        ["autoDiscoveryEnabled"] = _config.AutoDiscoverStrategies,
+                        ["rotationEnabled"] = _config.EnableKeyRotation,
+                        ["strategies"] = strategyIds
+                    }
+                }
+            };
         }
 
         public override Task<HandshakeResponse> OnHandshakeAsync(HandshakeRequest request)

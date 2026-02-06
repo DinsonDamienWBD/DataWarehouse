@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using DataWarehouse.SDK.AI;
 using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Contracts.Compression;
 using DataWarehouse.SDK.Primitives;
@@ -28,6 +29,12 @@ namespace DataWarehouse.Plugins.UltimateCompression
     {
         private readonly ConcurrentDictionary<string, ICompressionStrategy> _strategies = new(StringComparer.OrdinalIgnoreCase);
         private ICompressionStrategy? _activeStrategy;
+
+        // Statistics tracking
+        private long _totalCompressions;
+        private long _totalDecompressions;
+        private long _totalBytesCompressed;
+        private long _totalBytesDecompressed;
 
         /// <inheritdoc/>
         public override string Id => "com.datawarehouse.compression.ultimate";
@@ -203,6 +210,104 @@ namespace DataWarehouse.Plugins.UltimateCompression
                 entropy -= p * Math.Log2(p);
             }
             return entropy;
+        }
+
+        /// <inheritdoc/>
+        protected override IReadOnlyList<SDK.Contracts.RegisteredCapability> DeclaredCapabilities
+        {
+            get
+            {
+                var capabilities = new List<SDK.Contracts.RegisteredCapability>();
+
+                capabilities.Add(new SDK.Contracts.RegisteredCapability
+                {
+                    CapabilityId = $"{Id}.compress",
+                    DisplayName = $"{Name} - Compress",
+                    Description = "Compress data",
+                    Category = SDK.Contracts.CapabilityCategory.Compression,
+                    PluginId = Id,
+                    PluginName = Name,
+                    PluginVersion = Version,
+                    Tags = new[] { "compression", "data-transformation" }
+                });
+
+                capabilities.Add(new SDK.Contracts.RegisteredCapability
+                {
+                    CapabilityId = $"{Id}.decompress",
+                    DisplayName = $"{Name} - Decompress",
+                    Description = "Decompress data",
+                    Category = SDK.Contracts.CapabilityCategory.Compression,
+                    PluginId = Id,
+                    PluginName = Name,
+                    PluginVersion = Version,
+                    Tags = new[] { "compression", "data-transformation" }
+                });
+
+                foreach (var kvp in _strategies)
+                {
+                    var strategy = kvp.Value;
+                    var chars = strategy.Characteristics;
+                    var tags = new List<string> { "compression", "strategy", chars.AlgorithmName.ToLowerInvariant() };
+                    if (chars.SupportsStreaming) tags.Add("streaming");
+                    if (chars.SupportsParallelCompression) tags.Add("parallel");
+
+                    capabilities.Add(new SDK.Contracts.RegisteredCapability
+                    {
+                        CapabilityId = $"{Id}.strategy.{chars.AlgorithmName.ToLowerInvariant()}",
+                        DisplayName = $"{chars.AlgorithmName} - {strategy.Level}",
+                        Description = $"{chars.AlgorithmName} compression at {strategy.Level} level",
+                        Category = SDK.Contracts.CapabilityCategory.Compression,
+                        SubCategory = chars.AlgorithmName,
+                        PluginId = Id,
+                        PluginName = Name,
+                        PluginVersion = Version,
+                        Tags = tags.ToArray(),
+                        Priority = chars.SupportsStreaming ? 60 : 50,
+                        Metadata = new Dictionary<string, object>
+                        {
+                            ["algorithm"] = chars.AlgorithmName,
+                            ["supportsStreaming"] = chars.SupportsStreaming,
+                            ["supportsParallelCompression"] = chars.SupportsParallelCompression,
+                            ["compressionRatio"] = chars.TypicalCompressionRatio,
+                            ["compressionSpeed"] = chars.CompressionSpeed,
+                            ["decompressionSpeed"] = chars.DecompressionSpeed
+                        },
+                        SemanticDescription = $"Compress using {chars.AlgorithmName} algorithm"
+                    });
+                }
+
+                return capabilities;
+            }
+        }
+
+        /// <inheritdoc/>
+        protected override IReadOnlyList<SDK.AI.KnowledgeObject> GetStaticKnowledge()
+        {
+            var knowledge = new List<SDK.AI.KnowledgeObject>(base.GetStaticKnowledge());
+
+            var strategies = _strategies.Values.ToList();
+            if (strategies.Any())
+            {
+                knowledge.Add(new SDK.AI.KnowledgeObject
+                {
+                    Id = $"{Id}.strategies",
+                    Topic = "compression.strategies",
+                    SourcePluginId = Id,
+                    SourcePluginName = Name,
+                    KnowledgeType = "capability",
+                    Description = $"{strategies.Count} compression strategies available",
+                    Payload = new Dictionary<string, object>
+                    {
+                        ["count"] = strategies.Count,
+                        ["algorithms"] = strategies.Select(s => s.Characteristics.AlgorithmName).Distinct().ToArray(),
+                        ["streamingCount"] = strategies.Count(s => s.Characteristics.SupportsStreaming),
+                        ["parallelCount"] = strategies.Count(s => s.Characteristics.SupportsParallelCompression)
+                    },
+                    Tags = new[] { "compression", "strategies", "summary" }
+                });
+            }
+
+            return knowledge;
         }
 
         /// <inheritdoc/>

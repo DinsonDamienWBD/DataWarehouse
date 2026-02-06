@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using System.Reflection;
 using System.Runtime.Intrinsics.X86;
 using System.Security.Cryptography;
+using DataWarehouse.SDK.AI;
 using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Contracts.Encryption;
 using DataWarehouse.SDK.Primitives;
@@ -147,6 +148,9 @@ public sealed class UltimateEncryptionPlugin : PipelinePluginBase, IDisposable
     {
         var response = await base.OnHandshakeAsync(request);
 
+        // Register knowledge and capabilities
+        await RegisterAllKnowledgeAsync();
+
         response.Metadata["RegisteredStrategies"] = _registry.GetAllStrategies().Count.ToString();
         response.Metadata["AesNiAvailable"] = _aesNiAvailable.ToString();
         response.Metadata["Avx2Available"] = _avx2Available.ToString();
@@ -172,6 +176,101 @@ public sealed class UltimateEncryptionPlugin : PipelinePluginBase, IDisposable
             new() { Name = "encryption.reencrypt", DisplayName = "Re-encrypt", Description = "Re-encrypt data with a different algorithm" },
             new() { Name = "encryption.generate-key", DisplayName = "Generate Key", Description = "Generate encryption key" }
         ];
+    }
+
+    /// <inheritdoc/>
+    protected override IReadOnlyList<SDK.Contracts.RegisteredCapability> DeclaredCapabilities
+    {
+        get
+        {
+            var capabilities = new List<SDK.Contracts.RegisteredCapability>();
+
+            // Add base encryption capability
+            capabilities.Add(new SDK.Contracts.RegisteredCapability
+            {
+                CapabilityId = $"{Id}.encrypt",
+                DisplayName = $"{Name} - Encrypt",
+                Description = "Encrypt data",
+                Category = SDK.Contracts.CapabilityCategory.Encryption,
+                PluginId = Id,
+                PluginName = Name,
+                PluginVersion = Version,
+                Tags = new[] { "encryption", "security", "crypto" }
+            });
+
+            capabilities.Add(new SDK.Contracts.RegisteredCapability
+            {
+                CapabilityId = $"{Id}.decrypt",
+                DisplayName = $"{Name} - Decrypt",
+                Description = "Decrypt data",
+                Category = SDK.Contracts.CapabilityCategory.Encryption,
+                PluginId = Id,
+                PluginName = Name,
+                PluginVersion = Version,
+                Tags = new[] { "encryption", "security", "crypto" }
+            });
+
+            // Auto-generate capabilities from strategy registry
+            foreach (var strategy in _registry.GetAllStrategies())
+            {
+                var tags = new List<string> { "encryption", "strategy" };
+                tags.Add(strategy.CipherInfo.SecurityLevel.ToString().ToLowerInvariant());
+                if (strategy.CipherInfo.Capabilities.IsAuthenticated) tags.Add("aead");
+                if (strategy.CipherInfo.Capabilities.IsStreamable) tags.Add("streaming");
+                if (strategy.CipherInfo.Capabilities.IsHardwareAcceleratable) tags.Add("hardware-accelerated");
+
+                capabilities.Add(new SDK.Contracts.RegisteredCapability
+                {
+                    CapabilityId = $"{Id}.strategy.{strategy.StrategyId}",
+                    DisplayName = strategy.StrategyName,
+                    Description = $"{strategy.CipherInfo.AlgorithmName} ({strategy.CipherInfo.KeySizeBits}-bit)",
+                    Category = SDK.Contracts.CapabilityCategory.Encryption,
+                    SubCategory = strategy.CipherInfo.SecurityLevel.ToString(),
+                    PluginId = Id,
+                    PluginName = Name,
+                    PluginVersion = Version,
+                    Tags = tags.ToArray(),
+                    Priority = (int)strategy.CipherInfo.SecurityLevel * 10,
+                    Metadata = new Dictionary<string, object>
+                    {
+                        ["algorithm"] = strategy.CipherInfo.AlgorithmName,
+                        ["keySizeBits"] = strategy.CipherInfo.KeySizeBits,
+                        ["isAuthenticated"] = strategy.CipherInfo.Capabilities.IsAuthenticated,
+                        ["securityLevel"] = strategy.CipherInfo.SecurityLevel.ToString()
+                    },
+                    SemanticDescription = $"Encrypt using {strategy.CipherInfo.AlgorithmName} with {strategy.CipherInfo.KeySizeBits}-bit key"
+                });
+            }
+
+            return capabilities;
+        }
+    }
+
+    /// <inheritdoc/>
+    protected override IReadOnlyList<SDK.AI.KnowledgeObject> GetStaticKnowledge()
+    {
+        var knowledge = new List<SDK.AI.KnowledgeObject>(base.GetStaticKnowledge());
+
+        var strategies = _registry.GetAllStrategies();
+        knowledge.Add(new SDK.AI.KnowledgeObject
+        {
+            Id = $"{Id}.strategies",
+            Topic = "encryption.strategies",
+            SourcePluginId = Id,
+            SourcePluginName = Name,
+            KnowledgeType = "capability",
+            Description = $"{strategies.Count} encryption strategies available",
+            Payload = new Dictionary<string, object>
+            {
+                ["count"] = strategies.Count,
+                ["algorithms"] = strategies.Select(s => s.CipherInfo.AlgorithmName).Distinct().ToArray(),
+                ["aeadCount"] = strategies.Count(s => s.CipherInfo.Capabilities.IsAuthenticated),
+                ["hardwareAccelerated"] = strategies.Count(s => s.CipherInfo.Capabilities.IsHardwareAcceleratable)
+            },
+            Tags = new[] { "encryption", "strategies", "summary" }
+        });
+
+        return knowledge;
     }
 
     /// <inheritdoc/>
@@ -685,6 +784,59 @@ public sealed class UltimateEncryptionPlugin : PipelinePluginBase, IDisposable
         }
 
         return await keyStore.GetKeyAsync(keyId, securityContext);
+    }
+
+    #endregion
+
+    #region Knowledge & Capability Registry Integration
+
+    /// <inheritdoc/>
+    protected override Dictionary<string, object> GetConfigurationState()
+    {
+        return new Dictionary<string, object>
+        {
+            ["fipsMode"] = _fipsMode,
+            ["auditEnabled"] = _auditEnabled,
+            ["defaultStrategy"] = _defaultStrategyId,
+            ["aesNiAvailable"] = _aesNiAvailable,
+            ["avx2Available"] = _avx2Available,
+            ["registeredStrategies"] = _registry.GetAllStrategies().Count
+        };
+    }
+
+    /// <inheritdoc/>
+    protected override KnowledgeObject? BuildStatisticsKnowledge()
+    {
+        return new KnowledgeObject
+        {
+            Id = $"{Id}.statistics.{Guid.NewGuid():N}",
+            Topic = "plugin.statistics",
+            SourcePluginId = Id,
+            SourcePluginName = Name,
+            KnowledgeType = "metric",
+            Description = $"Usage statistics for {Name}",
+            Payload = new Dictionary<string, object>
+            {
+                ["totalEncryptions"] = Interlocked.Read(ref _totalEncryptions),
+                ["totalDecryptions"] = Interlocked.Read(ref _totalDecryptions),
+                ["totalBytesEncrypted"] = Interlocked.Read(ref _totalBytesEncrypted),
+                ["totalBytesDecrypted"] = Interlocked.Read(ref _totalBytesDecrypted),
+                ["registeredStrategies"] = _registry.GetAllStrategies().Count,
+                ["fipsCompliantStrategies"] = _registry.GetFipsCompliantStrategies().Count,
+                ["usageByStrategy"] = new Dictionary<string, long>(_usageStats)
+            },
+            Tags = new[] { "statistics", "encryption", "usage" }
+        };
+    }
+
+    /// <inheritdoc/>
+    protected override string[] GetCapabilityTags(PluginCapabilityDescriptor capability)
+    {
+        var tags = base.GetCapabilityTags(capability).ToList();
+        tags.Add("encryption");
+        if (_fipsMode) tags.Add("fips-mode-active");
+        if (_aesNiAvailable) tags.Add("hardware-accelerated");
+        return tags.ToArray();
     }
 
     #endregion

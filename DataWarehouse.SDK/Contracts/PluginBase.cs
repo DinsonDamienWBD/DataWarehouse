@@ -1,10 +1,14 @@
 ﻿using DataWarehouse.SDK.AI;
+using KnowledgeLakeNS = DataWarehouse.SDK.AI.Knowledge;
+using DataWarehouse.SDK.Contracts.Compression;
+using DataWarehouse.SDK.Contracts.Encryption;
 using DataWarehouse.SDK.Governance;
 using DataWarehouse.SDK.Primitives;
 using DataWarehouse.SDK.Security;
 using DataWarehouse.SDK.Utilities;
 using System;
 using System.Collections.Concurrent;
+using System.Linq;
 
 namespace DataWarehouse.SDK.Contracts
 {
@@ -21,6 +25,42 @@ namespace DataWarehouse.SDK.Contracts
         /// Maps knowledge topic to cached KnowledgeObject.
         /// </summary>
         private readonly ConcurrentDictionary<string, KnowledgeObject> _knowledgeCache = new();
+
+        /// <summary>
+        /// Capability registry reference for capability registration.
+        /// Set during initialization.
+        /// </summary>
+        protected IPluginCapabilityRegistry? CapabilityRegistry { get; private set; }
+
+        /// <summary>
+        /// Knowledge lake reference (injected by kernel).
+        /// </summary>
+        protected KnowledgeLakeNS.IKnowledgeLake? KnowledgeLake { get; private set; }
+
+        /// <summary>
+        /// List of registered capability IDs for cleanup.
+        /// </summary>
+        private readonly List<string> _registeredCapabilityIds = new();
+
+        /// <summary>
+        /// Track registered knowledge IDs for cleanup.
+        /// </summary>
+        private readonly List<string> _registeredKnowledgeIds = new();
+
+        /// <summary>
+        /// Knowledge subscription handles for cleanup.
+        /// </summary>
+        private readonly List<IDisposable> _knowledgeSubscriptions = new();
+
+        /// <summary>
+        /// Whether knowledge has been registered.
+        /// </summary>
+        private bool _knowledgeRegistered;
+
+        /// <summary>
+        /// Lock for knowledge registration.
+        /// </summary>
+        private readonly object _knowledgeRegistrationLock = new();
 
         /// <summary>
         /// Message bus reference for knowledge communication.
@@ -133,9 +173,12 @@ namespace DataWarehouse.SDK.Contracts
         /// <summary>
         /// Default handshake implementation. Override to provide custom initialization.
         /// </summary>
-        public virtual Task<HandshakeResponse> OnHandshakeAsync(HandshakeRequest request)
+        public virtual async Task<HandshakeResponse> OnHandshakeAsync(HandshakeRequest request)
         {
-            return Task.FromResult(new HandshakeResponse
+            // Auto-register capabilities and knowledge
+            await RegisterWithSystemAsync();
+
+            return new HandshakeResponse
             {
                 PluginId = Id,
                 Name = Name,
@@ -146,7 +189,7 @@ namespace DataWarehouse.SDK.Contracts
                 Capabilities = GetCapabilities(),
                 Dependencies = GetDependencies(),
                 Metadata = GetMetadata()
-            });
+            };
         }
 
         /// <summary>
@@ -157,6 +200,13 @@ namespace DataWarehouse.SDK.Contracts
             // Default: log and ignore
             return Task.CompletedTask;
         }
+
+        /// <summary>
+        /// Capabilities provided by this plugin. Override to declare your capabilities.
+        /// These are automatically registered with the central Capability Registry on handshake.
+        /// For strategy-based plugins, this is auto-generated from the strategy registry.
+        /// </summary>
+        protected virtual IReadOnlyList<RegisteredCapability> DeclaredCapabilities => Array.Empty<RegisteredCapability>();
 
         /// <summary>
         /// Override to provide plugin capabilities for AI agents.
@@ -187,7 +237,17 @@ namespace DataWarehouse.SDK.Contracts
             };
         }
 
-        #region Knowledge Integration (Task 99.D)
+        #region Knowledge and Capability Integration
+
+        /// <summary>
+        /// Sets the capability registry reference for capability registration.
+        /// Called by the kernel during plugin initialization.
+        /// </summary>
+        /// <param name="registry">Capability registry instance.</param>
+        public virtual void SetCapabilityRegistry(IPluginCapabilityRegistry? registry)
+        {
+            CapabilityRegistry = registry;
+        }
 
         /// <summary>
         /// Gets the registration knowledge object for this plugin.
@@ -196,64 +256,337 @@ namespace DataWarehouse.SDK.Contracts
         /// <returns>Knowledge object describing plugin capabilities, or null if not applicable.</returns>
         /// <remarks>
         /// This method is called during plugin initialization to register the plugin's knowledge
-        /// with the Universal Intelligence system (T90). The default implementation returns null.
-        /// Plugins should override this to expose their capabilities for AI-driven operations.
+        /// with the Universal Intelligence system (T90). The default implementation builds
+        /// knowledge from GetCapabilities() and GetCapabilityRegistrations().
+        /// Plugins can override to provide additional custom knowledge.
         /// </remarks>
         public virtual KnowledgeObject? GetRegistrationKnowledge()
         {
-            // Default: No knowledge to register
-            // Plugins override this to provide their specific knowledge
+            // Build knowledge from capabilities
+            var capabilities = GetCapabilities();
+            var capabilityRegistrations = GetCapabilityRegistrations();
+
+            if (capabilities.Count == 0 && capabilityRegistrations.Count == 0)
+            {
+                return null;
+            }
+
+            var operations = capabilities.Select(c => c.Name ?? c.CapabilityId).ToArray();
+            var constraints = new Dictionary<string, object>
+            {
+                ["category"] = Category.ToString(),
+                ["version"] = Version,
+                ["capabilityCount"] = capabilities.Count + capabilityRegistrations.Count
+            };
+
+            // Add strategy information if this is a strategy-based plugin
+            var strategyInfo = GetStrategyKnowledge();
+            if (strategyInfo != null)
+            {
+                constraints["strategies"] = strategyInfo;
+            }
+
+            // Add configuration state
+            var configState = GetConfigurationState();
+            if (configState.Count > 0)
+            {
+                constraints["configuration"] = configState;
+            }
+
+            return KnowledgeObject.CreateCapabilityKnowledge(
+                Id,
+                Name,
+                operations,
+                constraints,
+                GetDependencies()?.Select(d => d.RequiredInterface).ToArray()
+            );
+        }
+
+        /// <summary>
+        /// Gets strategy-specific knowledge for strategy-based plugins.
+        /// Override in strategy-based plugins to expose available strategies.
+        /// </summary>
+        /// <returns>Dictionary with strategy information, or null if not a strategy-based plugin.</returns>
+        protected virtual Dictionary<string, object>? GetStrategyKnowledge()
+        {
+            // Default: no strategy knowledge
+            // Override in strategy-based plugins (encryption, compression, etc.)
             return null;
+        }
+
+        /// <summary>
+        /// Gets current configuration state for knowledge reporting.
+        /// Override to expose configuration that should be queryable.
+        /// </summary>
+        /// <returns>Dictionary with configuration key-value pairs.</returns>
+        protected virtual Dictionary<string, object> GetConfigurationState()
+        {
+            // Default: empty configuration
+            // Override to expose config like "fipsMode: true", "defaultAlgorithm: aes-256-gcm"
+            return new Dictionary<string, object>();
+        }
+
+        /// <summary>
+        /// Gets detailed capability registrations for the central registry.
+        /// Override to provide rich capability metadata beyond basic GetCapabilities().
+        /// </summary>
+        /// <returns>List of capabilities to register.</returns>
+        protected virtual List<RegisteredCapability> GetCapabilityRegistrations()
+        {
+            // Default: convert basic capabilities to registered capabilities
+            var basicCapabilities = GetCapabilities();
+            var category = MapPluginCategoryToCapabilityCategory(Category);
+
+            return basicCapabilities.Select(c => new RegisteredCapability
+            {
+                CapabilityId = $"{Id}.{c.Name ?? c.CapabilityId}",
+                DisplayName = c.DisplayName ?? c.Name ?? c.CapabilityId,
+                Description = c.Description,
+                Category = category,
+                PluginId = Id,
+                PluginName = Name,
+                PluginVersion = Version,
+                ParameterSchema = c.ParameterSchemaJson,
+                Tags = GetCapabilityTags(c),
+                Metadata = c.Parameters ?? new Dictionary<string, object>()
+            }).ToList();
+        }
+
+        /// <summary>
+        /// Maps PluginCategory to CapabilityCategory.
+        /// </summary>
+        private static CapabilityCategory MapPluginCategoryToCapabilityCategory(PluginCategory pluginCategory)
+        {
+            return pluginCategory switch
+            {
+                PluginCategory.StorageProvider => CapabilityCategory.Storage,
+                PluginCategory.SecurityProvider => CapabilityCategory.Security,
+                PluginCategory.DataTransformationProvider => CapabilityCategory.Pipeline,
+                PluginCategory.MetadataIndexingProvider => CapabilityCategory.Metadata,
+                PluginCategory.AIProvider => CapabilityCategory.AI,
+                PluginCategory.GovernanceProvider => CapabilityCategory.Governance,
+                _ => CapabilityCategory.Custom
+            };
+        }
+
+        /// <summary>
+        /// Gets tags for a capability descriptor.
+        /// Override to provide custom tagging logic.
+        /// </summary>
+        protected virtual string[] GetCapabilityTags(PluginCapabilityDescriptor capability)
+        {
+            var tags = new List<string> { Category.ToString().ToLowerInvariant() };
+
+            if (capability.RequiresApproval)
+                tags.Add("requires-approval");
+
+            return tags.ToArray();
         }
 
         /// <summary>
         /// Handles incoming knowledge requests from the Universal Intelligence system.
         /// Override to respond to knowledge queries about plugin capabilities.
         /// </summary>
-        /// <param name="knowledge">Knowledge request object.</param>
+        /// <param name="request">Knowledge request object.</param>
         /// <param name="ct">Cancellation token.</param>
-        /// <returns>Task representing the async operation.</returns>
+        /// <returns>Knowledge response with matching knowledge objects.</returns>
         /// <remarks>
         /// This method is called when the Universal Intelligence system queries plugin knowledge.
-        /// The default implementation logs the request and returns immediately.
-        /// Plugins should override this to provide dynamic knowledge responses.
+        /// The default implementation handles standard query types.
+        /// Plugins should override to provide dynamic knowledge responses.
         /// </remarks>
-        public virtual Task HandleKnowledgeAsync(KnowledgeObject knowledge, CancellationToken ct = default)
+        public virtual Task<KnowledgeResponse> HandleKnowledgeQueryAsync(KnowledgeRequest request, CancellationToken ct = default)
         {
-            // Default: No-op
-            // Plugins override this to handle specific knowledge requests
-            return Task.CompletedTask;
+            var results = new List<KnowledgeObject>();
+
+            // Handle standard query topics
+            var topic = request.Topic.ToLowerInvariant();
+
+            if (topic == "plugin.capabilities" || topic == "capabilities")
+            {
+                var knowledge = GetRegistrationKnowledge();
+                if (knowledge != null)
+                {
+                    results.Add(knowledge);
+                }
+            }
+            else if (topic == "plugin.strategies" || topic == "strategies")
+            {
+                var strategyKnowledge = BuildStrategyListKnowledge(request.QueryParameters);
+                if (strategyKnowledge != null)
+                {
+                    results.Add(strategyKnowledge);
+                }
+            }
+            else if (topic == "plugin.configuration" || topic == "configuration")
+            {
+                var configKnowledge = BuildConfigurationKnowledge();
+                results.Add(configKnowledge);
+            }
+            else if (topic == "plugin.statistics" || topic == "statistics")
+            {
+                var statsKnowledge = BuildStatisticsKnowledge();
+                if (statsKnowledge != null)
+                {
+                    results.Add(statsKnowledge);
+                }
+            }
+
+            // Allow derived classes to add custom knowledge
+            var customResults = HandleCustomKnowledgeQuery(topic, request.QueryParameters, ct);
+            results.AddRange(customResults);
+
+            return Task.FromResult(new KnowledgeResponse
+            {
+                RequestId = request.RequestId,
+                Success = true,
+                Results = results.ToArray()
+            });
+        }
+
+        /// <summary>
+        /// Handles custom knowledge queries not covered by standard topics.
+        /// Override to support plugin-specific query types.
+        /// </summary>
+        /// <param name="topic">Query topic.</param>
+        /// <param name="parameters">Query parameters.</param>
+        /// <param name="ct">Cancellation token.</param>
+        /// <returns>List of matching knowledge objects.</returns>
+        protected virtual IEnumerable<KnowledgeObject> HandleCustomKnowledgeQuery(
+            string topic,
+            Dictionary<string, object>? parameters,
+            CancellationToken ct)
+        {
+            return Enumerable.Empty<KnowledgeObject>();
+        }
+
+        /// <summary>
+        /// Builds knowledge object listing available strategies.
+        /// Override in strategy-based plugins.
+        /// </summary>
+        protected virtual KnowledgeObject? BuildStrategyListKnowledge(Dictionary<string, object>? filters)
+        {
+            var strategyInfo = GetStrategyKnowledge();
+            if (strategyInfo == null)
+            {
+                return null;
+            }
+
+            return new KnowledgeObject
+            {
+                Id = $"{Id}.strategies.{Guid.NewGuid():N}",
+                Topic = "plugin.strategies",
+                SourcePluginId = Id,
+                SourcePluginName = Name,
+                KnowledgeType = "capability",
+                Description = $"Available strategies for {Name}",
+                Payload = strategyInfo,
+                Tags = new[] { "strategies", Category.ToString().ToLowerInvariant() }
+            };
+        }
+
+        /// <summary>
+        /// Builds knowledge object with current configuration.
+        /// </summary>
+        protected virtual KnowledgeObject BuildConfigurationKnowledge()
+        {
+            return new KnowledgeObject
+            {
+                Id = $"{Id}.configuration.{Guid.NewGuid():N}",
+                Topic = "plugin.configuration",
+                SourcePluginId = Id,
+                SourcePluginName = Name,
+                KnowledgeType = "metric",
+                Description = $"Current configuration for {Name}",
+                Payload = GetConfigurationState(),
+                Tags = new[] { "configuration", Category.ToString().ToLowerInvariant() }
+            };
+        }
+
+        /// <summary>
+        /// Builds knowledge object with plugin statistics.
+        /// Override to provide plugin-specific statistics.
+        /// </summary>
+        protected virtual KnowledgeObject? BuildStatisticsKnowledge()
+        {
+            // Default: no statistics
+            // Override in plugins that track usage statistics
+            return null;
+        }
+
+        /// <summary>
+        /// Registers all plugin knowledge and capabilities.
+        /// Called automatically during InitializeAsync.
+        /// </summary>
+        /// <param name="ct">Cancellation token.</param>
+        protected virtual async Task RegisterAllKnowledgeAsync(CancellationToken ct = default)
+        {
+            lock (_knowledgeRegistrationLock)
+            {
+                if (_knowledgeRegistered)
+                    return;
+                _knowledgeRegistered = true;
+            }
+
+            // Register capabilities with central registry
+            await RegisterCapabilitiesAsync(ct);
+
+            // Register knowledge with Universal Intelligence
+            await RegisterKnowledgeAsync(ct);
+
+            // Subscribe to knowledge queries
+            SubscribeToKnowledgeRequests(ct);
+        }
+
+        /// <summary>
+        /// Registers capabilities with the central capability registry.
+        /// </summary>
+        protected virtual async Task RegisterCapabilitiesAsync(CancellationToken ct = default)
+        {
+            if (CapabilityRegistry == null)
+            {
+                return;
+            }
+
+            try
+            {
+                var capabilities = GetCapabilityRegistrations();
+                foreach (var capability in capabilities)
+                {
+                    if (await CapabilityRegistry.RegisterAsync(capability, ct))
+                    {
+                        _registeredCapabilityIds.Add(capability.CapabilityId);
+                    }
+                }
+            }
+            catch (Exception)
+            {
+                // Graceful degradation: capability registration failed
+                // Plugin can still function without registry
+            }
         }
 
         /// <summary>
         /// Auto-registers plugin knowledge with Universal Intelligence during initialization.
-        /// Called automatically by InitializeAsync if MessageBus is available.
+        /// Called automatically by RegisterAllKnowledgeAsync.
         /// </summary>
         /// <param name="ct">Cancellation token.</param>
         /// <returns>Task representing the async operation.</returns>
-        /// <remarks>
-        /// This method checks if the plugin has knowledge to register via GetRegistrationKnowledge(),
-        /// and if so, publishes it to the "intelligence.knowledge.register" topic.
-        /// Gracefully handles the case where Universal Intelligence is not available.
-        /// </remarks>
         protected virtual async Task RegisterKnowledgeAsync(CancellationToken ct = default)
         {
             if (MessageBus == null)
             {
-                // MessageBus not available - skip registration
                 return;
             }
 
             var knowledge = GetRegistrationKnowledge();
             if (knowledge == null)
             {
-                // No knowledge to register
                 return;
             }
 
             try
             {
-                // Publish knowledge registration to Universal Intelligence
                 var message = new PluginMessage
                 {
                     Type = "intelligence.knowledge.register",
@@ -274,42 +607,76 @@ namespace DataWarehouse.SDK.Contracts
             catch (Exception)
             {
                 // Graceful degradation: Universal Intelligence not available
-                // This is not a fatal error - plugin can still function without knowledge registration
             }
         }
 
         /// <summary>
         /// Subscribes to knowledge request messages from Universal Intelligence.
-        /// Called automatically by InitializeAsync if MessageBus is available.
+        /// Called automatically by RegisterAllKnowledgeAsync.
         /// </summary>
         /// <param name="ct">Cancellation token.</param>
-        /// <returns>Subscription token for cleanup, or null if subscription failed.</returns>
-        /// <remarks>
-        /// This method subscribes to the "intelligence.knowledge.request" topic to handle
-        /// incoming knowledge queries. The subscription is stored for cleanup during shutdown.
-        /// </remarks>
-        protected virtual IDisposable? SubscribeToKnowledgeRequests(CancellationToken ct = default)
+        protected virtual void SubscribeToKnowledgeRequests(CancellationToken ct = default)
         {
             if (MessageBus == null)
             {
-                return null;
+                return;
             }
 
             try
             {
-                // Subscribe to knowledge requests
-                return MessageBus.Subscribe($"intelligence.knowledge.request.{Id}", async (message) =>
+                // Subscribe to direct knowledge requests
+                var directSub = MessageBus.Subscribe($"intelligence.knowledge.request.{Id}", async (message) =>
                 {
-                    if (message.Payload.TryGetValue("Knowledge", out var knowledgeObj) && knowledgeObj is KnowledgeObject knowledge)
+                    if (message.Payload.TryGetValue("Request", out var reqObj) && reqObj is KnowledgeRequest request)
                     {
-                        await HandleKnowledgeAsync(knowledge, ct);
+                        var response = await HandleKnowledgeQueryAsync(request, ct);
+
+                        // Publish response
+                        var responseMessage = new PluginMessage
+                        {
+                            Type = "intelligence.knowledge.response",
+                            CorrelationId = message.CorrelationId,
+                            Payload = new Dictionary<string, object>
+                            {
+                                ["Response"] = response,
+                                ["PluginId"] = Id
+                            }
+                        };
+
+                        await MessageBus.PublishAsync($"intelligence.knowledge.response.{message.CorrelationId}", responseMessage, ct);
                     }
                 });
+                _knowledgeSubscriptions.Add(directSub);
+
+                // Subscribe to broadcast knowledge queries
+                var broadcastSub = MessageBus.Subscribe("intelligence.knowledge.query.broadcast", async (message) =>
+                {
+                    if (message.Payload.TryGetValue("Request", out var reqObj) && reqObj is KnowledgeRequest request)
+                    {
+                        var response = await HandleKnowledgeQueryAsync(request, ct);
+
+                        if (response.Results.Length > 0)
+                        {
+                            var responseMessage = new PluginMessage
+                            {
+                                Type = "intelligence.knowledge.response",
+                                CorrelationId = message.CorrelationId,
+                                Payload = new Dictionary<string, object>
+                                {
+                                    ["Response"] = response,
+                                    ["PluginId"] = Id
+                                }
+                            };
+
+                            await MessageBus.PublishAsync($"intelligence.knowledge.response.{message.CorrelationId}", responseMessage, ct);
+                        }
+                    }
+                });
+                _knowledgeSubscriptions.Add(broadcastSub);
             }
             catch (Exception)
             {
                 // Graceful degradation: Unable to subscribe
-                return null;
             }
         }
 
@@ -318,13 +685,168 @@ namespace DataWarehouse.SDK.Contracts
         /// Should be called during plugin initialization.
         /// </summary>
         /// <param name="messageBus">Message bus instance.</param>
-        /// <remarks>
-        /// This method is typically called by the plugin host/kernel during initialization.
-        /// Once set, the message bus is used for knowledge registration and communication.
-        /// </remarks>
-        protected virtual void SetMessageBus(IMessageBus? messageBus)
+        public virtual void SetMessageBus(IMessageBus? messageBus)
         {
             MessageBus = messageBus;
+        }
+
+        /// <summary>
+        /// Injects kernel services. Called by kernel during plugin initialization.
+        /// </summary>
+        public virtual void InjectKernelServices(
+            IMessageBus? messageBus,
+            IPluginCapabilityRegistry? capabilityRegistry,
+            KnowledgeLakeNS.IKnowledgeLake? knowledgeLake)
+        {
+            MessageBus = messageBus;
+            CapabilityRegistry = capabilityRegistry;
+            KnowledgeLake = knowledgeLake;
+        }
+
+        /// <summary>
+        /// Gets static knowledge to register at load time.
+        /// Override to provide plugin-specific knowledge.
+        /// </summary>
+        protected virtual IReadOnlyList<KnowledgeObject> GetStaticKnowledge()
+        {
+            // Default: Generate basic capability knowledge
+            var knowledge = new List<KnowledgeObject>();
+
+            // Add plugin capability summary
+            var capabilities = DeclaredCapabilities;
+            if (capabilities.Count > 0)
+            {
+                knowledge.Add(KnowledgeObject.CreateCapabilityKnowledge(
+                    Id,
+                    Name,
+                    capabilities.Select(c => c.CapabilityId).ToArray(),
+                    new Dictionary<string, object>
+                    {
+                        ["category"] = Category.ToString(),
+                        ["version"] = Version,
+                        ["capabilityCount"] = capabilities.Count
+                    }
+                ));
+            }
+
+            return knowledge;
+        }
+
+        /// <summary>
+        /// Handles dynamic knowledge queries at runtime for the new knowledge lake system.
+        /// Override to respond to specific query topics.
+        /// </summary>
+        protected virtual Task<IReadOnlyList<KnowledgeObject>> HandleDynamicKnowledgeQueryAsync(
+            KnowledgeRequest request,
+            CancellationToken ct = default)
+        {
+            // Default: No dynamic knowledge
+            return Task.FromResult<IReadOnlyList<KnowledgeObject>>(Array.Empty<KnowledgeObject>());
+        }
+
+        /// <summary>
+        /// Registers capabilities and knowledge with the system.
+        /// Called automatically during handshake.
+        /// </summary>
+        protected virtual async Task RegisterWithSystemAsync(CancellationToken ct = default)
+        {
+            // Register capabilities
+            await RegisterCapabilitiesAsync(ct);
+
+            // Register static knowledge
+            await RegisterStaticKnowledgeAsync(ct);
+
+            // Subscribe to knowledge queries
+            SubscribeToKnowledgeQueries(ct);
+        }
+
+        /// <summary>
+        /// Registers static knowledge with the knowledge lake.
+        /// </summary>
+        private async Task RegisterStaticKnowledgeAsync(CancellationToken ct)
+        {
+            if (KnowledgeLake == null) return;
+
+            try
+            {
+                var knowledge = GetStaticKnowledge();
+                foreach (var k in knowledge)
+                {
+                    await KnowledgeLake.StoreAsync(k, isStatic: true, ct: ct);
+                    _registeredKnowledgeIds.Add(k.Id);
+                }
+            }
+            catch
+            {
+                // Graceful degradation
+            }
+        }
+
+        /// <summary>
+        /// Subscribes to knowledge query messages.
+        /// </summary>
+        private void SubscribeToKnowledgeQueries(CancellationToken ct)
+        {
+            if (MessageBus == null) return;
+
+            try
+            {
+                // Subscribe to direct queries
+                var sub = MessageBus.Subscribe($"knowledge.query.{Id}", async (message) =>
+                {
+                    if (message.Payload.TryGetValue("Request", out var reqObj) && reqObj is KnowledgeRequest request)
+                    {
+                        var results = await HandleDynamicKnowledgeQueryAsync(request, ct);
+
+                        if (results.Count > 0 && MessageBus != null)
+                        {
+                            var response = new PluginMessage
+                            {
+                                Type = "knowledge.response",
+                                CorrelationId = message.CorrelationId,
+                                Payload = new Dictionary<string, object>
+                                {
+                                    ["Results"] = results,
+                                    ["PluginId"] = Id
+                                }
+                            };
+                            await MessageBus.PublishAsync($"knowledge.response.{message.CorrelationId}", response, ct);
+                        }
+                    }
+                });
+                _knowledgeSubscriptions.Add(sub);
+            }
+            catch
+            {
+                // Graceful degradation
+            }
+        }
+
+        /// <summary>
+        /// Unregisters from the system. Called during shutdown.
+        /// </summary>
+        protected virtual async Task UnregisterFromSystemAsync(CancellationToken ct = default)
+        {
+            // Dispose subscriptions
+            foreach (var sub in _knowledgeSubscriptions)
+            {
+                try { sub.Dispose(); } catch { }
+            }
+            _knowledgeSubscriptions.Clear();
+
+            // Unregister capabilities
+            if (CapabilityRegistry != null)
+            {
+                await CapabilityRegistry.UnregisterPluginAsync(Id, ct);
+            }
+            _registeredCapabilityIds.Clear();
+
+            // Remove knowledge
+            if (KnowledgeLake != null)
+            {
+                await KnowledgeLake.RemoveByPluginAsync(Id, ct);
+            }
+            _registeredKnowledgeIds.Clear();
         }
 
         /// <summary>
@@ -332,10 +854,6 @@ namespace DataWarehouse.SDK.Contracts
         /// </summary>
         /// <param name="topic">Knowledge topic.</param>
         /// <returns>Cached knowledge object, or null if not found.</returns>
-        /// <remarks>
-        /// This method provides fast access to previously registered or received knowledge objects.
-        /// The cache is maintained in-memory for performance.
-        /// </remarks>
         protected KnowledgeObject? GetCachedKnowledge(string topic)
         {
             _knowledgeCache.TryGetValue(topic, out var knowledge);
@@ -347,10 +865,6 @@ namespace DataWarehouse.SDK.Contracts
         /// </summary>
         /// <param name="topic">Knowledge topic.</param>
         /// <param name="knowledge">Knowledge object to cache.</param>
-        /// <remarks>
-        /// This method stores knowledge objects in the in-memory cache for fast access.
-        /// Useful for caching frequently accessed knowledge or query results.
-        /// </remarks>
         protected void CacheKnowledge(string topic, KnowledgeObject knowledge)
         {
             _knowledgeCache[topic] = knowledge;
@@ -359,12 +873,74 @@ namespace DataWarehouse.SDK.Contracts
         /// <summary>
         /// Clears all cached knowledge objects.
         /// </summary>
-        /// <remarks>
-        /// This method clears the knowledge cache. Typically called during shutdown or reset operations.
-        /// </remarks>
         protected void ClearKnowledgeCache()
         {
             _knowledgeCache.Clear();
+        }
+
+        /// <summary>
+        /// Cleans up knowledge and capability registrations.
+        /// Called during plugin shutdown.
+        /// </summary>
+        protected virtual async Task UnregisterKnowledgeAsync(CancellationToken ct = default)
+        {
+            // Dispose knowledge subscriptions
+            foreach (var sub in _knowledgeSubscriptions)
+            {
+                sub.Dispose();
+            }
+            _knowledgeSubscriptions.Clear();
+
+            // Unregister capabilities
+            if (CapabilityRegistry != null)
+            {
+                await CapabilityRegistry.UnregisterPluginAsync(Id, ct);
+            }
+            _registeredCapabilityIds.Clear();
+
+            // Clear knowledge cache
+            ClearKnowledgeCache();
+            _knowledgeRegistered = false;
+        }
+
+        /// <summary>
+        /// Converts basic capability descriptors to registered capabilities.
+        /// Used when DeclaredCapabilities is not overridden.
+        /// </summary>
+        protected RegisteredCapability ToRegisteredCapability(PluginCapabilityDescriptor descriptor)
+        {
+            return new RegisteredCapability
+            {
+                CapabilityId = $"{Id}.{descriptor.Name ?? descriptor.CapabilityId}",
+                DisplayName = descriptor.DisplayName ?? descriptor.Name ?? descriptor.CapabilityId,
+                Description = descriptor.Description,
+                Category = MapToCapabilityCategory(Category),
+                PluginId = Id,
+                PluginName = Name,
+                PluginVersion = Version,
+                ParameterSchema = descriptor.ParameterSchemaJson,
+                Tags = GetDefaultTags(),
+                Metadata = descriptor.Parameters ?? new Dictionary<string, object>()
+            };
+        }
+
+        private CapabilityCategory MapToCapabilityCategory(PluginCategory category)
+        {
+            return category switch
+            {
+                PluginCategory.StorageProvider => CapabilityCategory.Storage,
+                PluginCategory.SecurityProvider => CapabilityCategory.Security,
+                PluginCategory.DataTransformationProvider => CapabilityCategory.Pipeline,
+                PluginCategory.MetadataIndexingProvider => CapabilityCategory.Metadata,
+                PluginCategory.AIProvider => CapabilityCategory.AI,
+                PluginCategory.GovernanceProvider => CapabilityCategory.Governance,
+                _ => CapabilityCategory.Custom
+            };
+        }
+
+        protected virtual string[] GetDefaultTags()
+        {
+            return new[] { Category.ToString().ToLowerInvariant(), "plugin" };
         }
 
         #endregion
@@ -2751,6 +3327,121 @@ namespace DataWarehouse.SDK.Contracts
 
         #endregion
 
+        #region Strategy Registry Support
+
+        /// <summary>
+        /// Strategy registry for this encryption plugin.
+        /// Override to provide access to the strategy registry.
+        /// </summary>
+        protected virtual IEncryptionStrategyRegistry? StrategyRegistry => null;
+
+        /// <inheritdoc/>
+        protected override IReadOnlyList<RegisteredCapability> DeclaredCapabilities
+        {
+            get
+            {
+                var capabilities = new List<RegisteredCapability>();
+
+                // Add base encryption capability
+                capabilities.Add(new RegisteredCapability
+                {
+                    CapabilityId = $"{Id}.encrypt",
+                    DisplayName = $"{Name} - Encrypt",
+                    Description = "Encrypt data",
+                    Category = CapabilityCategory.Encryption,
+                    PluginId = Id,
+                    PluginName = Name,
+                    PluginVersion = Version,
+                    Tags = GetEncryptionTags()
+                });
+
+                capabilities.Add(new RegisteredCapability
+                {
+                    CapabilityId = $"{Id}.decrypt",
+                    DisplayName = $"{Name} - Decrypt",
+                    Description = "Decrypt data",
+                    Category = CapabilityCategory.Encryption,
+                    PluginId = Id,
+                    PluginName = Name,
+                    PluginVersion = Version,
+                    Tags = GetEncryptionTags()
+                });
+
+                // Auto-generate capabilities from strategy registry
+                var registry = StrategyRegistry;
+                if (registry != null)
+                {
+                    foreach (var strategy in registry.GetAllStrategies())
+                    {
+                        var tags = new List<string> { "encryption", "strategy" };
+                        tags.Add(strategy.CipherInfo.SecurityLevel.ToString().ToLowerInvariant());
+                        if (strategy.CipherInfo.Capabilities.IsAuthenticated) tags.Add("aead");
+                        if (strategy.CipherInfo.Capabilities.IsStreamable) tags.Add("streaming");
+                        if (strategy.CipherInfo.Capabilities.IsHardwareAcceleratable) tags.Add("hardware-accelerated");
+
+                        capabilities.Add(new RegisteredCapability
+                        {
+                            CapabilityId = $"{Id}.strategy.{strategy.StrategyId}",
+                            DisplayName = strategy.StrategyName,
+                            Description = $"{strategy.CipherInfo.AlgorithmName} ({strategy.CipherInfo.KeySizeBits}-bit)",
+                            Category = CapabilityCategory.Encryption,
+                            SubCategory = strategy.CipherInfo.SecurityLevel.ToString(),
+                            PluginId = Id,
+                            PluginName = Name,
+                            PluginVersion = Version,
+                            Tags = tags.ToArray(),
+                            Priority = (int)strategy.CipherInfo.SecurityLevel * 10,
+                            Metadata = new Dictionary<string, object>
+                            {
+                                ["algorithm"] = strategy.CipherInfo.AlgorithmName,
+                                ["keySizeBits"] = strategy.CipherInfo.KeySizeBits,
+                                ["isAuthenticated"] = strategy.CipherInfo.Capabilities.IsAuthenticated,
+                                ["securityLevel"] = strategy.CipherInfo.SecurityLevel.ToString()
+                            },
+                            SemanticDescription = $"Encrypt using {strategy.CipherInfo.AlgorithmName} with {strategy.CipherInfo.KeySizeBits}-bit key"
+                        });
+                    }
+                }
+
+                return capabilities;
+            }
+        }
+
+        protected virtual string[] GetEncryptionTags() => new[] { "encryption", "security", "crypto" };
+
+        /// <inheritdoc/>
+        protected override IReadOnlyList<KnowledgeObject> GetStaticKnowledge()
+        {
+            var knowledge = new List<KnowledgeObject>(base.GetStaticKnowledge());
+
+            var registry = StrategyRegistry;
+            if (registry != null)
+            {
+                var strategies = registry.GetAllStrategies();
+                knowledge.Add(new KnowledgeObject
+                {
+                    Id = $"{Id}.strategies",
+                    Topic = "encryption.strategies",
+                    SourcePluginId = Id,
+                    SourcePluginName = Name,
+                    KnowledgeType = "capability",
+                    Description = $"{strategies.Count} encryption strategies available",
+                    Payload = new Dictionary<string, object>
+                    {
+                        ["count"] = strategies.Count,
+                        ["algorithms"] = strategies.Select(s => s.CipherInfo.AlgorithmName).Distinct().ToArray(),
+                        ["aeadCount"] = strategies.Count(s => s.CipherInfo.Capabilities.IsAuthenticated),
+                        ["hardwareAccelerated"] = strategies.Count(s => s.CipherInfo.Capabilities.IsHardwareAcceleratable)
+                    },
+                    Tags = new[] { "encryption", "strategies", "summary" }
+                });
+            }
+
+            return knowledge;
+        }
+
+        #endregion
+
         #region Metadata
 
         public override string SubCategory => "Encryption";
@@ -2873,6 +3564,117 @@ namespace DataWarehouse.SDK.Contracts
             }
             return entropy;
         }
+
+        #region Strategy Registry Support
+
+        /// <summary>
+        /// Gets all compression strategies registered with this plugin.
+        /// Override to provide access to compression strategies.
+        /// </summary>
+        protected virtual IEnumerable<Compression.ICompressionStrategy>? GetAllStrategies() => null;
+
+        /// <inheritdoc/>
+        protected override IReadOnlyList<RegisteredCapability> DeclaredCapabilities
+        {
+            get
+            {
+                var capabilities = new List<RegisteredCapability>();
+
+                capabilities.Add(new RegisteredCapability
+                {
+                    CapabilityId = $"{Id}.compress",
+                    DisplayName = $"{Name} - Compress",
+                    Description = "Compress data",
+                    Category = CapabilityCategory.Compression,
+                    PluginId = Id,
+                    PluginName = Name,
+                    PluginVersion = Version,
+                    Tags = new[] { "compression", "data-transformation" }
+                });
+
+                capabilities.Add(new RegisteredCapability
+                {
+                    CapabilityId = $"{Id}.decompress",
+                    DisplayName = $"{Name} - Decompress",
+                    Description = "Decompress data",
+                    Category = CapabilityCategory.Compression,
+                    PluginId = Id,
+                    PluginName = Name,
+                    PluginVersion = Version,
+                    Tags = new[] { "compression", "data-transformation" }
+                });
+
+                var strategies = GetAllStrategies();
+                if (strategies != null)
+                {
+                    foreach (var strategy in strategies)
+                    {
+                        var chars = strategy.Characteristics;
+                        var tags = new List<string> { "compression", "strategy", chars.AlgorithmName.ToLowerInvariant() };
+                        if (chars.SupportsStreaming) tags.Add("streaming");
+                        if (chars.SupportsParallelCompression) tags.Add("parallel");
+
+                        capabilities.Add(new RegisteredCapability
+                        {
+                            CapabilityId = $"{Id}.strategy.{chars.AlgorithmName.ToLowerInvariant()}",
+                            DisplayName = $"{chars.AlgorithmName} - {strategy.Level}",
+                            Description = $"{chars.AlgorithmName} compression at {strategy.Level} level",
+                            Category = CapabilityCategory.Compression,
+                            SubCategory = chars.AlgorithmName,
+                            PluginId = Id,
+                            PluginName = Name,
+                            PluginVersion = Version,
+                            Tags = tags.ToArray(),
+                            Priority = chars.SupportsStreaming ? 60 : 50,
+                            Metadata = new Dictionary<string, object>
+                            {
+                                ["algorithm"] = chars.AlgorithmName,
+                                ["supportsStreaming"] = chars.SupportsStreaming,
+                                ["supportsParallelCompression"] = chars.SupportsParallelCompression,
+                                ["compressionRatio"] = chars.TypicalCompressionRatio,
+                                ["compressionSpeed"] = chars.CompressionSpeed,
+                                ["decompressionSpeed"] = chars.DecompressionSpeed
+                            },
+                            SemanticDescription = $"Compress using {chars.AlgorithmName} algorithm"
+                        });
+                    }
+                }
+
+                return capabilities;
+            }
+        }
+
+        /// <inheritdoc/>
+        protected override IReadOnlyList<KnowledgeObject> GetStaticKnowledge()
+        {
+            var knowledge = new List<KnowledgeObject>(base.GetStaticKnowledge());
+
+            var strategies = GetAllStrategies()?.ToList();
+            if (strategies != null && strategies.Any())
+            {
+                knowledge.Add(new KnowledgeObject
+                {
+                    Id = $"{Id}.strategies",
+                    Topic = "compression.strategies",
+                    SourcePluginId = Id,
+                    SourcePluginName = Name,
+                    KnowledgeType = "capability",
+                    Description = $"{strategies.Count} compression strategies available",
+                    Payload = new Dictionary<string, object>
+                    {
+                        ["count"] = strategies.Count,
+                        ["algorithms"] = strategies.Select(s => s.Characteristics.AlgorithmName).Distinct().ToArray(),
+                        ["streamingCount"] = strategies.Count(s => s.Characteristics.SupportsStreaming),
+                        ["parallelCount"] = strategies.Count(s => s.Characteristics.SupportsParallelCompression)
+                    },
+                    Tags = new[] { "compression", "strategies", "summary" }
+                });
+            }
+
+            return knowledge;
+        }
+
+        #endregion
 
         protected override Dictionary<string, object> GetMetadata()
         {

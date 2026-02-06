@@ -156,6 +156,16 @@ namespace DataWarehouse.SDK.Contracts
         // Configuration
         public const string ConfigChanged = "config.changed";
         public const string ConfigReload = "config.reload";
+
+        // Knowledge and Capability topics
+        public const string KnowledgeRegister = "knowledge.register";
+        public const string KnowledgeQuery = "knowledge.query";
+        public const string KnowledgeResponse = "knowledge.response";
+        public const string KnowledgeUpdate = "knowledge.update";
+        public const string CapabilityRegister = "capability.register";
+        public const string CapabilityUnregister = "capability.unregister";
+        public const string CapabilityQuery = "capability.query";
+        public const string CapabilityChanged = "capability.changed";
     }
 
     /// <summary>

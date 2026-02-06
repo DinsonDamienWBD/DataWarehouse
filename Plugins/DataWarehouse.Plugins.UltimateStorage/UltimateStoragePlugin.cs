@@ -6,6 +6,7 @@ using DataWarehouse.SDK.Primitives;
 using DataWarehouse.SDK.Utilities;
 using System.Runtime.CompilerServices;
 using IStorageStrategy = DataWarehouse.SDK.Contracts.Storage.IStorageStrategy;
+using DataWarehouse.SDK.AI;
 
 namespace DataWarehouse.Plugins.UltimateStorage;
 
@@ -109,6 +110,56 @@ public sealed class UltimateStoragePlugin : PipelinePluginBase, IDisposable
     /// </summary>
     public StorageStrategyRegistry Registry => _registry;
 
+    /// <inheritdoc/>
+    protected override IReadOnlyList<RegisteredCapability> DeclaredCapabilities
+    {
+        get
+        {
+            var capabilities = new List<RegisteredCapability>
+            {
+                // Main plugin capability
+                new()
+                {
+                    CapabilityId = "storage",
+                    DisplayName = "Ultimate Storage",
+                    Description = SemanticDescription,
+                    Category = SDK.Contracts.CapabilityCategory.Storage,
+                    PluginId = Id,
+                    PluginName = Name,
+                    PluginVersion = Version,
+                    Tags = SemanticTags
+                }
+            };
+
+            // Add strategy-based capabilities
+            foreach (var strategy in _registry.GetAllStrategies().OfType<IStorageStrategyExtended>())
+            {
+                var tags = new List<string> { "storage", GetStrategyCategory(strategy.StrategyId).ToLower() };
+
+                // Add feature tags
+                if (strategy.SupportsTiering) tags.Add("tiering");
+                if (strategy.SupportsVersioning) tags.Add("versioning");
+                if (strategy.SupportsReplication) tags.Add("replication");
+
+                capabilities.Add(new()
+                {
+                    CapabilityId = $"storage.{strategy.StrategyId}",
+                    DisplayName = strategy.StrategyName,
+                    Description = $"{GetStrategyCategory(strategy.StrategyId)} storage: {strategy.StrategyName}",
+                    Category = SDK.Contracts.CapabilityCategory.Storage,
+                    SubCategory = GetStrategyCategory(strategy.StrategyId),
+                    PluginId = Id,
+                    PluginName = Name,
+                    PluginVersion = Version,
+                    Tags = tags.ToArray(),
+                    IsAvailable = strategy.IsAvailable
+                });
+            }
+
+            return capabilities.AsReadOnly();
+        }
+    }
+
     /// <summary>
     /// Gets or sets whether audit logging is enabled.
     /// </summary>
@@ -198,6 +249,60 @@ public sealed class UltimateStoragePlugin : PipelinePluginBase, IDisposable
         metadata["TotalBytesWritten"] = Interlocked.Read(ref _totalBytesWritten);
         metadata["TotalBytesRead"] = Interlocked.Read(ref _totalBytesRead);
         return metadata;
+    }
+
+    /// <inheritdoc/>
+    protected override IReadOnlyList<KnowledgeObject> GetStaticKnowledge()
+    {
+        var strategies = _registry.GetAllStrategies().OfType<IStorageStrategyExtended>().ToList();
+
+        var localStrategies = strategies.Count(s => GetStrategyCategory(s.StrategyId).Equals("local", StringComparison.OrdinalIgnoreCase));
+        var cloudStrategies = strategies.Count(s => GetStrategyCategory(s.StrategyId).Equals("cloud", StringComparison.OrdinalIgnoreCase));
+        var distributedStrategies = strategies.Count(s => GetStrategyCategory(s.StrategyId).Equals("distributed", StringComparison.OrdinalIgnoreCase));
+        var networkStrategies = strategies.Count(s => GetStrategyCategory(s.StrategyId).Equals("network", StringComparison.OrdinalIgnoreCase));
+        var databaseStrategies = strategies.Count(s => GetStrategyCategory(s.StrategyId).Equals("database", StringComparison.OrdinalIgnoreCase));
+        var specializedStrategies = strategies.Count(s => GetStrategyCategory(s.StrategyId).Equals("specialized", StringComparison.OrdinalIgnoreCase));
+
+        var tieringSupport = strategies.Count(s => s.SupportsTiering);
+        var versioningSupport = strategies.Count(s => s.SupportsVersioning);
+        var replicationSupport = strategies.Count(s => s.SupportsReplication);
+
+        return new List<KnowledgeObject>
+        {
+            new()
+            {
+                Id = $"{Id}:overview",
+                Topic = "plugin.capabilities",
+                SourcePluginId = Id,
+                SourcePluginName = Name,
+                KnowledgeType = "capability",
+                Description = SemanticDescription,
+                Payload = new Dictionary<string, object>
+                {
+                    ["totalStrategies"] = strategies.Count,
+                    ["categories"] = new Dictionary<string, object>
+                    {
+                        ["local"] = localStrategies,
+                        ["cloud"] = cloudStrategies,
+                        ["distributed"] = distributedStrategies,
+                        ["network"] = networkStrategies,
+                        ["database"] = databaseStrategies,
+                        ["specialized"] = specializedStrategies
+                    },
+                    ["features"] = new Dictionary<string, object>
+                    {
+                        ["tieringSupport"] = tieringSupport,
+                        ["versioningSupport"] = versioningSupport,
+                        ["replicationSupport"] = replicationSupport
+                    },
+                    ["availableStrategies"] = strategies
+                        .Where(s => s.IsAvailable)
+                        .Select(s => s.StrategyId)
+                        .ToArray()
+                },
+                Tags = SemanticTags
+            }
+        }.AsReadOnly();
     }
 
     /// <inheritdoc/>
@@ -778,6 +883,36 @@ public sealed class UltimateStoragePlugin : PipelinePluginBase, IDisposable
     private List<IStorageStrategy> GetStrategiesByCategory(string category)
     {
         return _registry.GetStrategiesByCategory(category).ToList();
+    }
+
+    private static string GetStrategyCategory(string strategyId)
+    {
+        var id = strategyId.ToLowerInvariant();
+
+        if (id.Contains("s3") || id.Contains("azure") || id.Contains("gcs") || id.Contains("cloud") ||
+            id.Contains("blob") || id.Contains("bucket") || id.Contains("minio") || id.Contains("spaces"))
+            return "cloud";
+
+        if (id.Contains("ipfs") || id.Contains("arweave") || id.Contains("storj") || id.Contains("sia") ||
+            id.Contains("filecoin") || id.Contains("swarm"))
+            return "distributed";
+
+        if (id.Contains("nfs") || id.Contains("smb") || id.Contains("cifs") || id.Contains("ftp") ||
+            id.Contains("sftp") || id.Contains("webdav"))
+            return "network";
+
+        if (id.Contains("mongo") || id.Contains("postgres") || id.Contains("sql") || id.Contains("redis") ||
+            id.Contains("database") || id.Contains("gridfs"))
+            return "database";
+
+        if (id.Contains("file") || id.Contains("disk") || id.Contains("local") || id.Contains("memory") ||
+            id.Contains("ram"))
+            return "local";
+
+        if (id.Contains("tape") || id.Contains("lto") || id.Contains("optical") || id.Contains("cold"))
+            return "specialized";
+
+        return "other";
     }
 
     private void IncrementUsageStats(string strategyId)
