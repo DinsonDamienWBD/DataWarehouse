@@ -1,5 +1,4 @@
 ﻿using DataWarehouse.SDK.AI;
-using KnowledgeLakeNS = DataWarehouse.SDK.AI.Knowledge;
 using DataWarehouse.SDK.Contracts.Compression;
 using DataWarehouse.SDK.Contracts.Encryption;
 using DataWarehouse.SDK.Governance;
@@ -35,7 +34,7 @@ namespace DataWarehouse.SDK.Contracts
         /// <summary>
         /// Knowledge lake reference (injected by kernel).
         /// </summary>
-        protected KnowledgeLakeNS.IKnowledgeLake? KnowledgeLake { get; private set; }
+        protected IKnowledgeLake? KnowledgeLake { get; private set; }
 
         /// <summary>
         /// List of registered capability IDs for cleanup.
@@ -696,7 +695,7 @@ namespace DataWarehouse.SDK.Contracts
         public virtual void InjectKernelServices(
             IMessageBus? messageBus,
             IPluginCapabilityRegistry? capabilityRegistry,
-            KnowledgeLakeNS.IKnowledgeLake? knowledgeLake)
+            IKnowledgeLake? knowledgeLake)
         {
             MessageBus = messageBus;
             CapabilityRegistry = capabilityRegistry;

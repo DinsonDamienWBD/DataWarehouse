@@ -9153,6 +9153,36 @@ T99 (SDK) → T94 (Key Management) → TamperProof Storage (T3.4.2)
 | 99.D3 | Auto-registration in lifecycle | Register on Initialize, unregister on Shutdown | [x] |
 | 99.D4 | Message bus integration | Subscribe to knowledge topics | [x] |
 | 99.D5 | Knowledge caching | Cache plugin knowledge for performance | [x] |
+| **D6: Knowledge Lake + Capability Registry System** |
+| 99.D6.1 | `IPluginCapabilityRegistry` | Central registry interface with 25 capability categories | [x] |
+| 99.D6.2 | `RegisteredCapability` record | Capability descriptor with metadata, tags, dependencies | [x] |
+| 99.D6.3 | `IKnowledgeLake` | Knowledge storage interface with TTL and indexing | [x] |
+| 99.D6.4 | `KnowledgeEntry` record | Knowledge entry with topic, content, expiration | [x] |
+| 99.D6.5 | Message topics for knowledge/capability | Added to `IMessageBus.MessageTopics` | [x] |
+| 99.D6.6 | `PluginCapabilityRegistry` (Kernel) | Thread-safe implementation indexed by category/plugin/tags | [x] |
+| 99.D6.7 | `KnowledgeLake` (Kernel) | TTL-based storage with automatic cleanup | [x] |
+| 99.D6.8 | `DeclaredCapabilities` property | Virtual property for automatic capability registration | [x] |
+| 99.D6.9 | `GetStaticKnowledge()` method | Virtual method for load-time knowledge contribution | [x] |
+| 99.D6.10 | `InjectKernelServices()` method | Kernel injects MessageBus, CapabilityRegistry, KnowledgeLake | [x] |
+| 99.D6.11 | Auto-registration in `OnHandshakeAsync` | Automatic registration via `RegisterWithSystemAsync()` | [x] |
+| 99.D6.12 | Strategy auto-generation | EncryptionPluginBase/CompressionPluginBase auto-generate from strategies | [x] |
+| 99.D6.13 | Ultimate plugin integration | UltimateEncryption/Compression/KeyMgmt/Storage/Connector updated | [x] |
+| 99.D6.14 | Kernel InMemoryStorage | Built-in storage follows same pattern for self-sufficiency | [x] |
+
+---
+
+### Phase D.7: Thin Client Wrappers (Future)
+
+> **Note:** CLI/GUI/other clients will be thin wrappers over the Knowledge Lake + Capability Registry.
+> Commands dynamically expand/contract as plugins load/unload.
+
+| Sub-Task | Component | Description | Status |
+|----------|-----------|-------------|--------|
+| 99.D7.1 | CLI Capability Browser | List capabilities from registry | [ ] |
+| 99.D7.2 | CLI Knowledge Query | Query knowledge lake via CLI | [ ] |
+| 99.D7.3 | GUI Capability Explorer | Visual capability browser | [ ] |
+| 99.D7.4 | GUI Knowledge Dashboard | Knowledge lake visualization | [ ] |
+| 99.D7.5 | Dynamic Command Generation | CLI commands from capability registry | [ ] |
 
 ---
 
