@@ -51,10 +51,8 @@ public sealed class PrimaryStorageDestination : WriteDestinationPluginBase
 
         if (_messageBus == null)
         {
-            // Simulate storage write
-            await Task.Delay(5, ct);
             sw.Stop();
-            return SuccessResult(sw.Elapsed);
+            return FailureResult("Message bus unavailable - primary storage write requires T97 connection", sw.Elapsed);
         }
 
         try
@@ -92,11 +90,6 @@ public sealed class PrimaryStorageDestination : WriteDestinationPluginBase
         }
     }
 
-    private sealed class StorageWriteResponse
-    {
-        public bool Success { get; init; }
-        public string? ErrorMessage { get; init; }
-    }
 }
 
 /// <summary>
@@ -143,10 +136,8 @@ public sealed class MetadataStorageDestination : WriteDestinationPluginBase
 
         if (_messageBus == null)
         {
-            // Simulate metadata write
-            await Task.Delay(2, ct);
             sw.Stop();
-            return SuccessResult(sw.Elapsed);
+            return FailureResult("Message bus unavailable - metadata storage write requires T97 connection", sw.Elapsed);
         }
 
         try
@@ -192,12 +183,6 @@ public sealed class MetadataStorageDestination : WriteDestinationPluginBase
             sw.Stop();
             return FailureResult(ex.Message, sw.Elapsed);
         }
-    }
-
-    private sealed class MetadataWriteResponse
-    {
-        public bool Success { get; init; }
-        public string? ErrorMessage { get; init; }
     }
 }
 
@@ -395,11 +380,6 @@ public sealed class VectorStoreDestination : WriteDestinationPluginBase
         {
             return null;
         }
-    }
-
-    private sealed class EmbeddingResponse
-    {
-        public float[]? Embedding { get; init; }
     }
 }
 

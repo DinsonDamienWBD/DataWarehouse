@@ -100,11 +100,9 @@ public sealed class BlockchainAnchorDestination : WriteDestinationPluginBase
                 return FailureResult(msgResponse?.ErrorMessage ?? "Blockchain anchor failed", sw.Elapsed);
             }
 
-            // Fallback: Local anchor (for testing/development)
-            var localAnchor = await CreateLocalAnchorAsync(anchorData, ct);
+            // No fallback - blockchain anchoring requires proper backend for tamper-proof guarantee
             sw.Stop();
-
-            return SuccessResult(sw.Elapsed);
+            return FailureResult("Message bus unavailable - blockchain anchoring requires T95 connection for tamper-proof integrity", sw.Elapsed);
         }
         catch (Exception ex)
         {
@@ -137,20 +135,6 @@ public sealed class BlockchainAnchorDestination : WriteDestinationPluginBase
         return Convert.ToHexString(hash);
     }
 
-    private static Task<LocalAnchor> CreateLocalAnchorAsync(BlockchainAnchorData data, CancellationToken ct)
-    {
-        // Create a local anchor record (for development/testing)
-        var anchor = new LocalAnchor
-        {
-            AnchorId = Guid.NewGuid().ToString("N"),
-            ObjectId = data.ObjectId,
-            ContentHash = data.ContentHash,
-            Timestamp = data.Timestamp
-        };
-
-        return Task.FromResult(anchor);
-    }
-
     private sealed class BlockchainAnchorData
     {
         public string ObjectId { get; init; } = "";
@@ -158,22 +142,6 @@ public sealed class BlockchainAnchorDestination : WriteDestinationPluginBase
         public DateTimeOffset Timestamp { get; init; }
         public long Size { get; init; }
         public string ContentType { get; init; } = "";
-    }
-
-    private sealed class BlockchainAnchorResponse
-    {
-        public bool Success { get; init; }
-        public string? TransactionId { get; init; }
-        public long? BlockNumber { get; init; }
-        public string? ErrorMessage { get; init; }
-    }
-
-    private sealed class LocalAnchor
-    {
-        public string AnchorId { get; init; } = "";
-        public string ObjectId { get; init; } = "";
-        public string ContentHash { get; init; } = "";
-        public DateTimeOffset Timestamp { get; init; }
     }
 }
 
@@ -277,9 +245,9 @@ public sealed class WormStorageDestination : WriteDestinationPluginBase
                 return FailureResult(msgResponse?.ErrorMessage ?? "WORM finalization failed", sw.Elapsed);
             }
 
-            // Fallback: Local WORM marker (for testing)
+            // No fallback - WORM finalization requires proper WORM storage for tamper-proof integrity
             sw.Stop();
-            return SuccessResult(sw.Elapsed);
+            return FailureResult("Message bus unavailable - WORM finalization requires T95 connection for immutable storage", sw.Elapsed);
         }
         catch (Exception ex)
         {

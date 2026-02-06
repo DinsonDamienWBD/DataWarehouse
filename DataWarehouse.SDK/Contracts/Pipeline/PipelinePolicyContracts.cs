@@ -2950,3 +2950,74 @@ public class FederationStagePolicy : PipelineStagePolicy
     /// </summary>
     public bool? CacheFederatedResults { get; init; }
 }
+
+/// <summary>
+/// Fan-Out Write stage policy for T104 orchestration.
+/// Controls parallel writes to multiple destinations.
+/// Inherits Enabled, PluginId, StrategyName, AllowChildOverride from base.
+/// </summary>
+public class FanOutStagePolicy : PipelineStagePolicy
+{
+    /// <summary>Fixed stage type for fan-out.</summary>
+    public override string StageType { get; init; } = "FanOut";
+
+    /// <summary>
+    /// Whether to enable metadata storage destination.
+    /// Null = inherit from parent.
+    /// </summary>
+    public bool? EnableMetadataStorage { get; init; }
+
+    /// <summary>
+    /// Whether to enable full-text indexing destination.
+    /// Null = inherit from parent.
+    /// </summary>
+    public bool? EnableFullTextIndex { get; init; }
+
+    /// <summary>
+    /// Whether to enable vector/semantic indexing destination.
+    /// Null = inherit from parent.
+    /// </summary>
+    public bool? EnableVectorIndex { get; init; }
+
+    /// <summary>
+    /// Whether to enable cache layer destination.
+    /// Null = inherit from parent.
+    /// </summary>
+    public bool? EnableCaching { get; init; }
+
+    /// <summary>
+    /// Timeout for optional (non-required) destinations.
+    /// Null = inherit from parent.
+    /// </summary>
+    public TimeSpan? OptionalDestinationTimeout { get; init; }
+
+    /// <summary>
+    /// Whether to wait for all destinations or just required ones.
+    /// Null = inherit from parent.
+    /// </summary>
+    public bool? WaitForAllDestinations { get; init; }
+
+    /// <summary>
+    /// Content processing types to enable.
+    /// Null = inherit from parent.
+    /// </summary>
+    public List<string>? EnabledProcessingTypes { get; init; }
+
+    /// <summary>
+    /// Cache TTL for content metadata.
+    /// Null = inherit from parent.
+    /// </summary>
+    public TimeSpan? CacheTTL { get; init; }
+
+    /// <summary>
+    /// Cache strategy to use: "inmemory", "hybrid", "writethru", "writebehind".
+    /// Null = inherit from parent.
+    /// </summary>
+    public string? CacheStrategy { get; init; }
+
+    /// <summary>
+    /// Indexing strategy to use: "fulltext", "metadata", "semantic", "all".
+    /// Null = inherit from parent.
+    /// </summary>
+    public string? IndexingStrategy { get; init; }
+}

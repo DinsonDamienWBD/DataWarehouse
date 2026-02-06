@@ -5,6 +5,9 @@ using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 
+// Explicit alias to resolve ambiguity with other StorageTier definitions in the SDK
+using StorageTier = DataWarehouse.SDK.Primitives.StorageTier;
+
 namespace DataWarehouse.SDK.Contracts.IntelligenceAware
 {
     // ================================================================================

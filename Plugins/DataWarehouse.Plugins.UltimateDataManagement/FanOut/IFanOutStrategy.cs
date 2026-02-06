@@ -166,6 +166,10 @@ public abstract class FanOutStrategyBase : IFanOutStrategy
         IReadOnlyDictionary<WriteDestinationType, IWriteDestination> destinations,
         CancellationToken ct = default)
     {
+        ArgumentException.ThrowIfNullOrWhiteSpace(objectId);
+        ArgumentNullException.ThrowIfNull(content);
+        ArgumentNullException.ThrowIfNull(destinations);
+
         var sw = System.Diagnostics.Stopwatch.StartNew();
         var results = new Dictionary<WriteDestinationType, WriteDestinationResult>();
 
