@@ -86,35 +86,181 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.NoSql
                 TimeSpan.FromMilliseconds(7), DateTimeOffset.UtcNow);
         }
 
+        /// <summary>
+        /// Executes a query against ArangoDB using the HTTP API.
+        /// Returns status information if query execution fails.
+        /// </summary>
         public override async Task<IReadOnlyList<Dictionary<string, object?>>> ExecuteQueryAsync(
             IConnectionHandle handle, string query, Dictionary<string, object?>? parameters = null, CancellationToken ct = default)
         {
-            await Task.Delay(8, ct);
-            return new List<Dictionary<string, object?>>
+            if (_httpClient == null)
             {
-                new() { ["_key"] = "123", ["_id"] = "collection/123", ["name"] = "Sample" }
-            };
+                return new List<Dictionary<string, object?>>
+                {
+                    new()
+                    {
+                        ["__status"] = "NOT_CONNECTED",
+                        ["__message"] = "ArangoDB connection not established.",
+                        ["__strategy"] = StrategyId
+                    }
+                };
+            }
+
+            try
+            {
+                var requestBody = new Dictionary<string, object> { ["query"] = query };
+                if (parameters != null)
+                    requestBody["bindVars"] = parameters;
+
+                var json = System.Text.Json.JsonSerializer.Serialize(requestBody);
+                var content = new StringContent(json, System.Text.Encoding.UTF8, "application/json");
+                var response = await _httpClient.PostAsync("/_api/cursor", content, ct);
+
+                if (!response.IsSuccessStatusCode)
+                {
+                    var errorBody = await response.Content.ReadAsStringAsync(ct);
+                    return new List<Dictionary<string, object?>>
+                    {
+                        new()
+                        {
+                            ["__status"] = "QUERY_FAILED",
+                            ["__message"] = $"ArangoDB query failed: {response.StatusCode}",
+                            ["__error"] = errorBody,
+                            ["__strategy"] = StrategyId
+                        }
+                    };
+                }
+
+                var responseBody = await response.Content.ReadAsStringAsync(ct);
+                using var doc = System.Text.Json.JsonDocument.Parse(responseBody);
+                var results = new List<Dictionary<string, object?>>();
+
+                if (doc.RootElement.TryGetProperty("result", out var resultArray))
+                {
+                    foreach (var item in resultArray.EnumerateArray())
+                    {
+                        var row = new Dictionary<string, object?>();
+                        foreach (var prop in item.EnumerateObject())
+                        {
+                            row[prop.Name] = prop.Value.ValueKind switch
+                            {
+                                System.Text.Json.JsonValueKind.String => prop.Value.GetString(),
+                                System.Text.Json.JsonValueKind.Number => prop.Value.GetDouble(),
+                                System.Text.Json.JsonValueKind.True => true,
+                                System.Text.Json.JsonValueKind.False => false,
+                                System.Text.Json.JsonValueKind.Null => null,
+                                _ => prop.Value.GetRawText()
+                            };
+                        }
+                        results.Add(row);
+                    }
+                }
+
+                return results;
+            }
+            catch (Exception ex)
+            {
+                return new List<Dictionary<string, object?>>
+                {
+                    new()
+                    {
+                        ["__status"] = "ERROR",
+                        ["__message"] = $"ArangoDB query error: {ex.Message}",
+                        ["__strategy"] = StrategyId
+                    }
+                };
+            }
         }
 
+        /// <summary>
+        /// Executes a non-query command against ArangoDB.
+        /// Returns -1 if the operation fails, otherwise returns affected count.
+        /// </summary>
         public override async Task<int> ExecuteNonQueryAsync(
             IConnectionHandle handle, string command, Dictionary<string, object?>? parameters = null, CancellationToken ct = default)
         {
-            await Task.Delay(8, ct);
-            return 1;
+            if (_httpClient == null)
+                return -1;
+
+            try
+            {
+                var requestBody = new Dictionary<string, object> { ["query"] = command };
+                if (parameters != null)
+                    requestBody["bindVars"] = parameters;
+
+                var json = System.Text.Json.JsonSerializer.Serialize(requestBody);
+                var content = new StringContent(json, System.Text.Encoding.UTF8, "application/json");
+                var response = await _httpClient.PostAsync("/_api/cursor", content, ct);
+
+                if (!response.IsSuccessStatusCode)
+                    return -1;
+
+                var responseBody = await response.Content.ReadAsStringAsync(ct);
+                using var doc = System.Text.Json.JsonDocument.Parse(responseBody);
+
+                if (doc.RootElement.TryGetProperty("extra", out var extra) &&
+                    extra.TryGetProperty("stats", out var stats) &&
+                    stats.TryGetProperty("writesExecuted", out var writes))
+                {
+                    return writes.GetInt32();
+                }
+
+                return 0;
+            }
+            catch
+            {
+                return -1;
+            }
         }
 
+        /// <summary>
+        /// Retrieves schema information from ArangoDB by listing collections.
+        /// </summary>
         public override async Task<IReadOnlyList<DataSchema>> GetSchemaAsync(IConnectionHandle handle, CancellationToken ct = default)
         {
-            await Task.Delay(8, ct);
-            return new List<DataSchema>
+            if (_httpClient == null)
+                return Array.Empty<DataSchema>();
+
+            try
             {
-                new DataSchema("sample_collection", new[]
+                var response = await _httpClient.GetAsync("/_api/collection", ct);
+                if (!response.IsSuccessStatusCode)
+                    return Array.Empty<DataSchema>();
+
+                var responseBody = await response.Content.ReadAsStringAsync(ct);
+                using var doc = System.Text.Json.JsonDocument.Parse(responseBody);
+
+                var schemas = new List<DataSchema>();
+                if (doc.RootElement.TryGetProperty("result", out var collections))
                 {
-                    new DataSchemaField("_key", "String", false, null, null),
-                    new DataSchemaField("_id", "String", false, null, null),
-                    new DataSchemaField("_rev", "String", false, null, null)
-                }, new[] { "_key" }, new Dictionary<string, object> { ["type"] = "collection" })
-            };
+                    foreach (var coll in collections.EnumerateArray())
+                    {
+                        var name = coll.GetProperty("name").GetString() ?? "unknown";
+                        var isSystem = coll.TryGetProperty("isSystem", out var sys) && sys.GetBoolean();
+
+                        if (!isSystem)
+                        {
+                            schemas.Add(new DataSchema(
+                                name,
+                                new[]
+                                {
+                                    new DataSchemaField("_key", "String", false, null, null),
+                                    new DataSchemaField("_id", "String", false, null, null),
+                                    new DataSchemaField("_rev", "String", false, null, null)
+                                },
+                                new[] { "_key" },
+                                new Dictionary<string, object> { ["type"] = "collection" }
+                            ));
+                        }
+                    }
+                }
+
+                return schemas;
+            }
+            catch
+            {
+                return Array.Empty<DataSchema>();
+            }
         }
 
         private (string host, int port) ParseHostPort(string connectionString, int defaultPort)

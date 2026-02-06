@@ -5,6 +5,7 @@ using System.Security.Cryptography;
 using DataWarehouse.SDK.AI;
 using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Contracts.Encryption;
+using DataWarehouse.SDK.Contracts.IntelligenceAware;
 using DataWarehouse.SDK.Primitives;
 using DataWarehouse.SDK.Security;
 using DataWarehouse.SDK.Utilities;
@@ -37,8 +38,10 @@ namespace DataWarehouse.Plugins.UltimateEncryption;
 /// - Streaming encryption
 /// - Audit logging
 /// - Algorithm agility (re-encryption)
+/// - Intelligence-aware cipher recommendations
+/// - Threat assessment integration
 /// </summary>
-public sealed class UltimateEncryptionPlugin : PipelinePluginBase, IDisposable
+public sealed class UltimateEncryptionPlugin : IntelligenceAwareEncryptionPluginBase, IDisposable
 {
     private readonly EncryptionStrategyRegistry _registry;
     private readonly ConcurrentDictionary<string, long> _usageStats = new();
@@ -86,6 +89,9 @@ public sealed class UltimateEncryptionPlugin : PipelinePluginBase, IDisposable
 
     /// <inheritdoc/>
     public override string[] IncompatibleStages => [];
+
+    /// <inheritdoc/>
+    public override string Algorithm => _defaultStrategyId;
 
     /// <summary>
     /// Semantic description of this plugin for AI discovery.
@@ -837,6 +843,149 @@ public sealed class UltimateEncryptionPlugin : PipelinePluginBase, IDisposable
         if (_fipsMode) tags.Add("fips-mode-active");
         if (_aesNiAvailable) tags.Add("hardware-accelerated");
         return tags.ToArray();
+    }
+
+    #endregion
+
+    #region Intelligence Integration
+
+    /// <summary>
+    /// Called when Intelligence becomes available - register encryption capabilities.
+    /// </summary>
+    protected override async Task OnStartWithIntelligenceAsync(CancellationToken ct)
+    {
+        await base.OnStartWithIntelligenceAsync(ct);
+
+        // Register encryption capabilities with Intelligence
+        if (MessageBus != null)
+        {
+            var strategies = _registry.GetAllStrategies();
+            var algorithms = strategies.Select(s => s.CipherInfo.AlgorithmName).Distinct().ToArray();
+            var aeadCount = strategies.Count(s => s.CipherInfo.Capabilities.IsAuthenticated);
+
+            await MessageBus.PublishAsync(IntelligenceTopics.QueryCapability, new PluginMessage
+            {
+                Type = "capability.register",
+                Source = Id,
+                Payload = new Dictionary<string, object>
+                {
+                    ["pluginId"] = Id,
+                    ["pluginName"] = Name,
+                    ["pluginType"] = "encryption",
+                    ["capabilities"] = new Dictionary<string, object>
+                    {
+                        ["strategyCount"] = strategies.Count,
+                        ["algorithms"] = algorithms,
+                        ["aeadCount"] = aeadCount,
+                        ["fipsCompliantCount"] = _registry.GetFipsCompliantStrategies().Count,
+                        ["postQuantumCount"] = GetStrategiesByPrefix("ml-").Count + GetStrategiesByPrefix("slh-").Count,
+                        ["hardwareAccelerated"] = _aesNiAvailable,
+                        ["supportsCipherRecommendation"] = true,
+                        ["supportsThreatAssessment"] = true
+                    },
+                    ["semanticDescription"] = SemanticDescription,
+                    ["tags"] = SemanticTags
+                }
+            }, ct);
+
+            // Subscribe to cipher recommendation requests
+            SubscribeToCipherRecommendationRequests();
+        }
+    }
+
+    /// <summary>
+    /// Subscribes to Intelligence cipher recommendation requests.
+    /// </summary>
+    private void SubscribeToCipherRecommendationRequests()
+    {
+        if (MessageBus == null) return;
+
+        MessageBus.Subscribe(IntelligenceTopics.RequestCipherRecommendation, async msg =>
+        {
+            if (msg.Payload.TryGetValue("contentType", out var ctObj) && ctObj is string contentType &&
+                msg.Payload.TryGetValue("contentSize", out var csObj) && csObj is long contentSize)
+            {
+                var recommendation = RecommendCipherStrategy(contentType, contentSize, msg.Payload);
+
+                await MessageBus.PublishAsync(IntelligenceTopics.RequestCipherRecommendationResponse, new PluginMessage
+                {
+                    Type = "cipher-recommendation.response",
+                    CorrelationId = msg.CorrelationId,
+                    Source = Id,
+                    Payload = new Dictionary<string, object>
+                    {
+                        ["success"] = true,
+                        ["algorithm"] = recommendation.Algorithm,
+                        ["keySize"] = recommendation.KeySize,
+                        ["mode"] = recommendation.Mode,
+                        ["reasoning"] = recommendation.Reasoning,
+                        ["confidence"] = recommendation.Confidence,
+                        ["performanceImpact"] = recommendation.PerformanceImpact
+                    }
+                });
+            }
+        });
+    }
+
+    /// <summary>
+    /// Recommends a cipher strategy based on content characteristics.
+    /// </summary>
+    private (string Algorithm, int KeySize, string Mode, string Reasoning, double Confidence, string PerformanceImpact)
+        RecommendCipherStrategy(string contentType, long contentSize, Dictionary<string, object> context)
+    {
+        // Check FIPS requirements
+        var requiresFips = context.TryGetValue("requiresFips", out var fipsObj) && fipsObj is true;
+        var securityLevel = context.TryGetValue("securityLevel", out var slObj) && slObj is string sl ? sl : "Standard";
+
+        // Post-quantum for high security
+        if (securityLevel == "PostQuantum" || securityLevel == "Maximum")
+        {
+            return ("ML-KEM-1024", 256, "Hybrid-AES-GCM",
+                "Post-quantum hybrid encryption recommended for maximum security against quantum threats",
+                0.95, "High");
+        }
+
+        // Large files: prefer streaming-capable ciphers
+        if (contentSize > 100 * 1024 * 1024) // > 100MB
+        {
+            return ("AES-256-GCM", 256, "GCM",
+                "AES-256-GCM recommended for large files due to streaming capability and hardware acceleration",
+                0.90, "Low");
+        }
+
+        // FIPS compliance
+        if (requiresFips || _fipsMode)
+        {
+            return ("AES-256-GCM", 256, "GCM",
+                "AES-256-GCM is FIPS 140-2/3 compliant and provides authenticated encryption",
+                0.95, "Low");
+        }
+
+        // Sensitive content types
+        if (contentType.Contains("medical") || contentType.Contains("health"))
+        {
+            return ("AES-256-GCM", 256, "GCM",
+                "AES-256-GCM recommended for healthcare data - HIPAA compliant",
+                0.92, "Low");
+        }
+
+        if (contentType.Contains("financial") || contentType.Contains("payment"))
+        {
+            return ("AES-256-GCM", 256, "GCM",
+                "AES-256-GCM recommended for financial data - PCI-DSS compliant",
+                0.92, "Low");
+        }
+
+        // Default recommendation
+        return ("AES-256-GCM", 256, "GCM",
+            "AES-256-GCM provides strong authenticated encryption with hardware acceleration",
+            0.88, "Low");
+    }
+
+    /// <inheritdoc/>
+    protected override Task OnStartCoreAsync(CancellationToken ct)
+    {
+        return Task.CompletedTask;
     }
 
     #endregion

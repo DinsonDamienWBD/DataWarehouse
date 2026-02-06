@@ -27,9 +27,23 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SpecializedDb
         protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct) { var client = handle.GetConnection<TcpClient>(); await Task.Delay(3, ct); return client.Connected; }
         protected override async Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct) { if (_tcpClient != null) { _tcpClient.Close(); _tcpClient.Dispose(); _tcpClient = null; } await Task.CompletedTask; }
         protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct) { var isHealthy = await TestCoreAsync(handle, ct); return new ConnectionHealth(isHealthy, isHealthy ? "FoundationDB healthy" : "FoundationDB unhealthy", TimeSpan.FromMilliseconds(3), DateTimeOffset.UtcNow); }
-        public override async Task<IReadOnlyList<Dictionary<string, object?>>> ExecuteQueryAsync(IConnectionHandle handle, string query, Dictionary<string, object?>? parameters = null, CancellationToken ct = default) { await Task.Delay(3, ct); return new List<Dictionary<string, object?>> { new() { ["key"] = "k1", ["value"] = "v1" } }; }
-        public override async Task<int> ExecuteNonQueryAsync(IConnectionHandle handle, string command, Dictionary<string, object?>? parameters = null, CancellationToken ct = default) { await Task.Delay(3, ct); return 1; }
-        public override async Task<IReadOnlyList<DataSchema>> GetSchemaAsync(IConnectionHandle handle, CancellationToken ct = default) { await Task.Delay(3, ct); return new List<DataSchema> { new DataSchema("keyspace", new[] { new DataSchemaField("key", "Bytes", false, null, null) }, new[] { "key" }, new Dictionary<string, object> { ["type"] = "keyspace" }) }; }
+        public override Task<IReadOnlyList<Dictionary<string, object?>>> ExecuteQueryAsync(IConnectionHandle handle, string query, Dictionary<string, object?>? parameters = null, CancellationToken ct = default)
+        {
+            // FoundationDB is a low-level key-value store requiring native client library
+            // For production use, integrate with FoundationDB C# client (foundationdb-dotnet-client)
+            // This connector provides TCP connectivity; operations require native driver
+            return Task.FromResult<IReadOnlyList<Dictionary<string, object?>>>(new List<Dictionary<string, object?>>());
+        }
+        public override Task<int> ExecuteNonQueryAsync(IConnectionHandle handle, string command, Dictionary<string, object?>? parameters = null, CancellationToken ct = default)
+        {
+            // FoundationDB is a low-level key-value store requiring native client library
+            return Task.FromResult(0);
+        }
+        public override Task<IReadOnlyList<DataSchema>> GetSchemaAsync(IConnectionHandle handle, CancellationToken ct = default)
+        {
+            // FoundationDB is schema-less key-value store; returns minimal schema info
+            return Task.FromResult<IReadOnlyList<DataSchema>>(new List<DataSchema> { new DataSchema("keyspace", new[] { new DataSchemaField("key", "Bytes", false, null, null), new DataSchemaField("value", "Bytes", true, null, null) }, new[] { "key" }, new Dictionary<string, object> { ["type"] = "keyspace", ["note"] = "FoundationDB requires native client for operations" }) });
+        }
         private (string host, int port) ParseHostPort(string connectionString, int defaultPort) { var parts = connectionString.Split(':'); return (parts[0], parts.Length > 1 && int.TryParse(parts[1], out var p) ? p : defaultPort); }
     }
 }

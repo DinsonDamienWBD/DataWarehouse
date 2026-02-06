@@ -450,28 +450,27 @@ public sealed class {pluginName}Plugin : {baseClass}
     private string GenerateStorageImplementation()
     {
         return @"
+    private readonly Dictionary<string, byte[]> _storage = new();
+
     public Task SaveAsync(string key, byte[] data, CancellationToken cancellationToken = default)
     {
-        // TODO: Implement storage save
-        throw new NotImplementedException();
+        _storage[key] = data;
+        return Task.CompletedTask;
     }
 
     public Task<byte[]?> LoadAsync(string key, CancellationToken cancellationToken = default)
     {
-        // TODO: Implement storage load
-        throw new NotImplementedException();
+        return Task.FromResult(_storage.TryGetValue(key, out var data) ? data : null);
     }
 
     public Task<bool> DeleteAsync(string key, CancellationToken cancellationToken = default)
     {
-        // TODO: Implement storage delete
-        throw new NotImplementedException();
+        return Task.FromResult(_storage.Remove(key));
     }
 
     public Task<bool> ExistsAsync(string key, CancellationToken cancellationToken = default)
     {
-        // TODO: Implement storage exists check
-        throw new NotImplementedException();
+        return Task.FromResult(_storage.ContainsKey(key));
     }";
     }
 
@@ -500,14 +499,20 @@ public sealed class {pluginName}Plugin : {baseClass}
         return @"
     public Task<string> GenerateAsync(string prompt, CancellationToken cancellationToken = default)
     {
-        // TODO: Implement AI generation
-        throw new NotImplementedException();
+        // Simple echo implementation - replace with actual AI service integration
+        return Task.FromResult($""Echo: {prompt}"");
     }
 
     public Task<float[]> EmbedAsync(string text, CancellationToken cancellationToken = default)
     {
-        // TODO: Implement text embedding
-        throw new NotImplementedException();
+        // Simple hash-based embedding - replace with actual embedding service
+        var hash = text.GetHashCode();
+        var embedding = new float[384]; // Common embedding dimension
+        for (int i = 0; i < embedding.Length; i++)
+        {
+            embedding[i] = (float)((hash + i) % 1000) / 1000f;
+        }
+        return Task.FromResult(embedding);
     }";
     }
 

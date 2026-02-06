@@ -83,41 +83,47 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.NoSql
             );
         }
 
-        public override async Task<IReadOnlyList<Dictionary<string, object?>>> ExecuteQueryAsync(
+        /// <summary>
+        /// Executes a query against MongoDB.
+        /// Note: MongoDB wire protocol is complex and requires official driver for full implementation.
+        /// This strategy provides TCP connectivity validation only.
+        /// </summary>
+        public override Task<IReadOnlyList<Dictionary<string, object?>>> ExecuteQueryAsync(
             IConnectionHandle handle, string query, Dictionary<string, object?>? parameters = null, CancellationToken ct = default)
         {
-            // Simulate MongoDB query execution
-            await Task.Delay(10, ct);
-            return new List<Dictionary<string, object?>>
+            // MongoDB wire protocol requires official driver for proper implementation
+            var result = new List<Dictionary<string, object?>>
             {
-                new() { ["_id"] = "507f1f77bcf86cd799439011", ["name"] = "Sample Document", ["count"] = 42 }
+                new()
+                {
+                    ["__status"] = "OPERATION_NOT_SUPPORTED",
+                    ["__message"] = "MongoDB query execution requires MongoDB.Driver NuGet package. This strategy provides TCP connectivity validation only.",
+                    ["__strategy"] = StrategyId,
+                    ["__capabilities"] = "connectivity_test,health_check"
+                }
             };
+            return Task.FromResult<IReadOnlyList<Dictionary<string, object?>>>(result);
         }
 
-        public override async Task<int> ExecuteNonQueryAsync(
+        /// <summary>
+        /// Executes a non-query command against MongoDB.
+        /// Returns -1 as MongoDB wire protocol requires official driver.
+        /// </summary>
+        public override Task<int> ExecuteNonQueryAsync(
             IConnectionHandle handle, string command, Dictionary<string, object?>? parameters = null, CancellationToken ct = default)
         {
-            await Task.Delay(10, ct);
-            return 1; // Simulated affected count
+            // Return -1 to indicate operation not supported (graceful degradation)
+            return Task.FromResult(-1);
         }
 
-        public override async Task<IReadOnlyList<DataSchema>> GetSchemaAsync(IConnectionHandle handle, CancellationToken ct = default)
+        /// <summary>
+        /// Retrieves schema information from MongoDB.
+        /// Returns empty list as MongoDB wire protocol requires official driver.
+        /// </summary>
+        public override Task<IReadOnlyList<DataSchema>> GetSchemaAsync(IConnectionHandle handle, CancellationToken ct = default)
         {
-            await Task.Delay(10, ct);
-            return new List<DataSchema>
-            {
-                new DataSchema(
-                    Name: "sample_collection",
-                    Fields: new[]
-                    {
-                        new DataSchemaField("_id", "ObjectId", false, null, null),
-                        new DataSchemaField("name", "String", true, 255, null),
-                        new DataSchemaField("count", "Int32", true, null, null)
-                    },
-                    PrimaryKeys: new[] { "_id" },
-                    Metadata: new Dictionary<string, object> { ["type"] = "collection" }
-                )
-            };
+            // Return empty schema list (graceful degradation)
+            return Task.FromResult<IReadOnlyList<DataSchema>>(Array.Empty<DataSchema>());
         }
 
         private (string host, int port) ParseHostPort(string connectionString, int defaultPort)

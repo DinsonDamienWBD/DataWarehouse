@@ -1,5 +1,6 @@
 using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Security;
+using Microsoft.Data.SqlClient;
 using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
 using System.Text;
@@ -344,13 +345,92 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Database
 
         private async Task<TdeCertificateMetadata> ImportCertificateFromSqlServerAsync(string certificateName, CancellationToken cancellationToken)
         {
-            // Placeholder for SQL Server integration
-            // Full implementation would use ADO.NET to query:
-            // SELECT name, thumbprint, subject, issuer, expiry_date, pvt_key_encryption_type
-            // FROM sys.certificates
-            // WHERE name = @certificateName
+            if (string.IsNullOrEmpty(_config.SqlConnectionString))
+            {
+                throw new InvalidOperationException("SQL connection string is required for SQL Server import.");
+            }
 
-            throw new NotImplementedException("SQL Server direct import is not yet implemented. Use file-based import with BACKUP CERTIFICATE.");
+            using var connection = new Microsoft.Data.SqlClient.SqlConnection(_config.SqlConnectionString);
+            await connection.OpenAsync(cancellationToken);
+
+            // Query sys.certificates for certificate metadata
+            const string query = @"
+                SELECT
+                    c.name,
+                    c.thumbprint,
+                    c.subject,
+                    c.issuer,
+                    c.expiry_date,
+                    c.start_date,
+                    c.pvt_key_encryption_type_desc,
+                    c.pvt_key_last_backup_date,
+                    c.certificate_id
+                FROM sys.certificates c
+                WHERE c.name = @CertificateName";
+
+            using var command = new Microsoft.Data.SqlClient.SqlCommand(query, connection);
+            command.Parameters.AddWithValue("@CertificateName", certificateName);
+
+            using var reader = await command.ExecuteReaderAsync(cancellationToken);
+
+            if (!await reader.ReadAsync(cancellationToken))
+            {
+                throw new KeyNotFoundException($"Certificate '{certificateName}' not found in SQL Server sys.certificates.");
+            }
+
+            // Extract certificate metadata from SQL Server
+            var thumbprint = reader["thumbprint"] as byte[];
+            var thumbprintHex = thumbprint != null ? BitConverter.ToString(thumbprint).Replace("-", "") : "";
+
+            var metadata = new TdeCertificateMetadata
+            {
+                CertificateId = certificateName,
+                Thumbprint = thumbprintHex,
+                Subject = reader["subject"] as string ?? "",
+                Issuer = reader["issuer"] as string ?? "",
+                SerialNumber = thumbprintHex, // SQL Server doesn't expose serial number, use thumbprint
+                CreatedAt = reader["start_date"] is DateTime startDate ? startDate : DateTime.UtcNow,
+                ExpiresAt = reader["expiry_date"] is DateTime expiryDate ? expiryDate : null,
+                SignatureAlgorithm = "Unknown", // Not exposed in sys.certificates
+                KeyAlgorithm = "RSA", // TDE certificates are typically RSA
+                KeySize = 2048, // Standard TDE key size
+                HasPrivateKey = !string.IsNullOrEmpty(reader["pvt_key_encryption_type_desc"] as string),
+                PrivateKeyEncrypted = true, // Private keys in SQL Server are always encrypted
+                ImportedAt = DateTime.UtcNow,
+                ImportSource = $"SQL Server: {connection.DataSource}/{connection.Database}",
+                IsValid = true,
+                Version = 1
+            };
+
+            // Close the first reader before executing the second query
+            reader.Close();
+
+            // Query for database mappings (which databases use this certificate)
+            const string dbQuery = @"
+                SELECT
+                    DB_NAME(dek.database_id) as database_name
+                FROM sys.dm_database_encryption_keys dek
+                INNER JOIN sys.certificates c ON dek.encryptor_thumbprint = c.thumbprint
+                WHERE c.name = @CertificateName";
+
+            using var dbCommand = new Microsoft.Data.SqlClient.SqlCommand(dbQuery, connection);
+            dbCommand.Parameters.AddWithValue("@CertificateName", certificateName);
+
+            var databases = new List<string>();
+            using var dbReader = await dbCommand.ExecuteReaderAsync(cancellationToken);
+
+            while (await dbReader.ReadAsync(cancellationToken))
+            {
+                var dbName = dbReader["database_name"] as string;
+                if (!string.IsNullOrEmpty(dbName))
+                {
+                    databases.Add(dbName);
+                }
+            }
+
+            metadata.DatabaseMappings = databases.Count > 0 ? databases.ToArray() : null;
+
+            return metadata;
         }
 
         private async Task ExportCertificateToFileAsync(string keyId, TdeCertificateMetadata metadata, CancellationToken cancellationToken)

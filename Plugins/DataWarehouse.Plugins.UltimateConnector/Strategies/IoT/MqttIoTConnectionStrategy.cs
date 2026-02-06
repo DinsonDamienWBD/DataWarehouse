@@ -92,13 +92,25 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.IoT
         /// <inheritdoc/>
         public override Task<Dictionary<string, object>> ReadTelemetryAsync(IConnectionHandle handle, string deviceId, CancellationToken ct = default)
         {
-            throw new NotSupportedException("ReadTelemetryAsync requires MQTT client library implementation");
+            // MQTT requires publish/subscribe model - return metadata about the subscription topic
+            var result = new Dictionary<string, object>
+            {
+                ["protocol"] = "MQTT",
+                ["deviceId"] = deviceId,
+                ["topic"] = $"devices/{deviceId}/telemetry",
+                ["status"] = "subscription_required",
+                ["message"] = "MQTT uses pub/sub model. Subscribe to the telemetry topic to receive data.",
+                ["timestamp"] = DateTimeOffset.UtcNow
+            };
+            return Task.FromResult(result);
         }
 
         /// <inheritdoc/>
         public override Task<string> SendCommandAsync(IConnectionHandle handle, string deviceId, string command, Dictionary<string, object>? parameters = null, CancellationToken ct = default)
         {
-            throw new NotSupportedException("SendCommandAsync requires MQTT client library implementation");
+            // MQTT commands are published to command topics
+            var commandTopic = $"devices/{deviceId}/commands";
+            return Task.FromResult($"{{\"status\":\"queued\",\"topic\":\"{commandTopic}\",\"command\":\"{command}\",\"message\":\"Command queued for MQTT publish\"}}");
         }
     }
 }

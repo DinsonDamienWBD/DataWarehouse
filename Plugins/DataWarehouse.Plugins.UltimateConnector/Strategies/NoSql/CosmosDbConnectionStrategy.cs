@@ -76,35 +76,47 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.NoSql
                 TimeSpan.FromMilliseconds(12), DateTimeOffset.UtcNow);
         }
 
-        public override async Task<IReadOnlyList<Dictionary<string, object?>>> ExecuteQueryAsync(
+        /// <summary>
+        /// Executes a SQL query against Cosmos DB.
+        /// Note: Full Cosmos DB SQL API requires proper authentication signing.
+        /// This strategy provides basic HTTP connectivity.
+        /// </summary>
+        public override Task<IReadOnlyList<Dictionary<string, object?>>> ExecuteQueryAsync(
             IConnectionHandle handle, string query, Dictionary<string, object?>? parameters = null, CancellationToken ct = default)
         {
-            await Task.Delay(12, ct);
-            return new List<Dictionary<string, object?>>
+            // Cosmos DB requires complex authentication header signing for queries
+            var result = new List<Dictionary<string, object?>>
             {
-                new() { ["id"] = "doc-123", ["_etag"] = "abc123", ["data"] = "Sample document" }
+                new()
+                {
+                    ["__status"] = "OPERATION_NOT_SUPPORTED",
+                    ["__message"] = "Cosmos DB query execution requires Microsoft.Azure.Cosmos SDK for proper authentication. This strategy provides HTTP connectivity validation only.",
+                    ["__strategy"] = StrategyId,
+                    ["__capabilities"] = "connectivity_test,health_check"
+                }
             };
+            return Task.FromResult<IReadOnlyList<Dictionary<string, object?>>>(result);
         }
 
-        public override async Task<int> ExecuteNonQueryAsync(
+        /// <summary>
+        /// Executes a non-query command against Cosmos DB.
+        /// Returns -1 as Cosmos DB requires SDK for proper authentication.
+        /// </summary>
+        public override Task<int> ExecuteNonQueryAsync(
             IConnectionHandle handle, string command, Dictionary<string, object?>? parameters = null, CancellationToken ct = default)
         {
-            await Task.Delay(12, ct);
-            return 1;
+            // Return -1 to indicate operation not supported (graceful degradation)
+            return Task.FromResult(-1);
         }
 
-        public override async Task<IReadOnlyList<DataSchema>> GetSchemaAsync(IConnectionHandle handle, CancellationToken ct = default)
+        /// <summary>
+        /// Retrieves schema information from Cosmos DB.
+        /// Returns empty list as Cosmos DB requires SDK for proper authentication.
+        /// </summary>
+        public override Task<IReadOnlyList<DataSchema>> GetSchemaAsync(IConnectionHandle handle, CancellationToken ct = default)
         {
-            await Task.Delay(12, ct);
-            return new List<DataSchema>
-            {
-                new DataSchema("sample_collection", new[]
-                {
-                    new DataSchemaField("id", "String", false, null, null),
-                    new DataSchemaField("_etag", "String", false, null, null),
-                    new DataSchemaField("_ts", "Int64", false, null, null)
-                }, new[] { "id" }, new Dictionary<string, object> { ["type"] = "collection" })
-            };
+            // Return empty schema list (graceful degradation)
+            return Task.FromResult<IReadOnlyList<DataSchema>>(Array.Empty<DataSchema>());
         }
     }
 }

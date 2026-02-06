@@ -162,7 +162,7 @@ public class WasmComputePlugin : WasmFunctionPluginBase
     #region Module Storage (70.2)
 
     /// <inheritdoc />
-    protected override Task StoreModuleAsync(string functionId, byte[] wasmBytes, CancellationToken ct)
+    protected override async Task StoreModuleAsync(string functionId, byte[] wasmBytes, CancellationToken ct)
     {
         var module = ParseWasmModule(wasmBytes, functionId);
         _modules[functionId] = module;
@@ -174,17 +174,35 @@ public class WasmComputePlugin : WasmFunctionPluginBase
             _versionHistory[functionId] = history;
         }
 
+        var versionId = Guid.NewGuid().ToString("N");
         history.Add(new FunctionVersion
         {
-            VersionId = Guid.NewGuid().ToString("N"),
+            VersionId = versionId,
             FunctionId = functionId,
             DeployedAt = DateTime.UtcNow,
             ModuleHash = ComputeModuleHash(wasmBytes),
             SizeBytes = wasmBytes.Length
         });
 
-        LogInfo($"Stored WASM module {functionId}, size: {wasmBytes.Length} bytes");
-        return Task.CompletedTask;
+        // Persist version to kernel storage for rollback capability
+        if (_kernelContext?.Storage != null)
+        {
+            var versionPath = $"wasm/functions/{functionId}/versions/{versionId}.wasm";
+            try
+            {
+                await _kernelContext.Storage.SaveAsync(versionPath, wasmBytes);
+                LogInfo($"Stored WASM module {functionId} version {versionId}, size: {wasmBytes.Length} bytes");
+            }
+            catch (Exception ex)
+            {
+                LogWarning($"Failed to persist version {versionId} to storage: {ex.Message}");
+                // Continue anyway - in-memory version is still available
+            }
+        }
+        else
+        {
+            LogInfo($"Stored WASM module {functionId} (in-memory only), size: {wasmBytes.Length} bytes");
+        }
     }
 
     /// <inheritdoc />
@@ -948,10 +966,47 @@ public class WasmComputePlugin : WasmFunctionPluginBase
                 ?? throw new KeyNotFoundException($"Version {versionId} not found");
         }
 
-        // For rollback, we'd need to have stored the actual bytes
-        // In a real implementation, versions would be stored with their bytes
-        throw new NotImplementedException(
-            "Rollback requires persisted version storage - implement with kernel storage service");
+        // Use kernel storage service to retrieve the persisted version
+        if (_kernelContext?.Storage == null)
+        {
+            throw new InvalidOperationException("Storage service not available for version rollback");
+        }
+
+        // Construct storage path for versioned module
+        var versionPath = $"wasm/functions/{functionId}/versions/{targetVersion.VersionId}.wasm";
+
+        try
+        {
+            // Load the version bytes from storage
+            var versionBytes = await _kernelContext.Storage.LoadBytesAsync(versionPath);
+            if (versionBytes == null)
+            {
+                throw new InvalidOperationException(
+                    $"Version {targetVersion.VersionId} bytes not found in storage. " +
+                    "Version history exists but module bytes were not persisted.");
+            }
+
+            // Get current metadata
+            var currentMetadata = await GetFunctionAsync(functionId, ct);
+            if (currentMetadata == null)
+            {
+                throw new KeyNotFoundException($"Function {functionId} not found");
+            }
+
+            // Hot reload with the versioned bytes
+            var rolledBackMetadata = await HotReloadFunctionAsync(functionId, versionBytes, ct);
+
+            LogInfo($"Rolled back function {functionId} to version {targetVersion.VersionId} " +
+                   $"(deployed at {targetVersion.DeployedAt:yyyy-MM-dd HH:mm:ss} UTC)");
+
+            return rolledBackMetadata;
+        }
+        catch (Exception ex) when (ex is not InvalidOperationException && ex is not KeyNotFoundException)
+        {
+            throw new InvalidOperationException(
+                $"Failed to rollback function {functionId} to version {targetVersion.VersionId}: {ex.Message}",
+                ex);
+        }
     }
 
     /// <summary>

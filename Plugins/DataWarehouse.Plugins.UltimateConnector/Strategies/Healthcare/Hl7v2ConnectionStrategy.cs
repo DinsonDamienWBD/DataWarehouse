@@ -29,7 +29,49 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Healthcare
         protected override Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct) => Task.FromResult(handle.GetConnection<TcpClient>().Connected);
         protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct) { handle.GetConnection<TcpClient>().Close(); return Task.CompletedTask; }
         protected override Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct) => Task.FromResult(new ConnectionHealth(handle.GetConnection<TcpClient>().Connected, "HL7 server", TimeSpan.Zero, DateTimeOffset.UtcNow));
-        public override Task<(bool IsValid, string[] Errors)> ValidateHl7Async(IConnectionHandle handle, string hl7Message, CancellationToken ct = default) => throw new NotSupportedException("Requires HL7 parser");
-        public override Task<string> QueryFhirAsync(IConnectionHandle handle, string resourceType, string? query = null, CancellationToken ct = default) => throw new NotSupportedException("Use FHIR strategy for FHIR queries");
+        public override Task<(bool IsValid, string[] Errors)> ValidateHl7Async(IConnectionHandle handle, string hl7Message, CancellationToken ct = default)
+        {
+            var errors = new List<string>();
+
+            // Basic HL7 v2 structure validation
+            if (string.IsNullOrWhiteSpace(hl7Message))
+            {
+                errors.Add("HL7 message cannot be empty");
+                return Task.FromResult((false, errors.ToArray()));
+            }
+
+            var segments = hl7Message.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
+
+            if (segments.Length == 0 || !segments[0].StartsWith("MSH"))
+            {
+                errors.Add("HL7 message must start with MSH segment");
+            }
+            else
+            {
+                var mshFields = segments[0].Split('|');
+                if (mshFields.Length < 12)
+                {
+                    errors.Add("MSH segment must have at least 12 fields");
+                }
+                if (mshFields.Length > 1 && mshFields[1].Length != 4)
+                {
+                    errors.Add("MSH-2 (encoding characters) must be exactly 4 characters");
+                }
+            }
+
+            // Check for required segments based on message type
+            if (!segments.Any(s => s.StartsWith("PID")))
+            {
+                errors.Add("Warning: PID segment is typically required");
+            }
+
+            return Task.FromResult((errors.Count == 0, errors.ToArray()));
+        }
+
+        public override Task<string> QueryFhirAsync(IConnectionHandle handle, string resourceType, string? query = null, CancellationToken ct = default)
+        {
+            // HL7 v2 does not support FHIR queries - provide guidance
+            return Task.FromResult("{\"error\":\"HL7 v2 uses MLLP messaging, not FHIR REST. Use FhirR4ConnectionStrategy for FHIR queries.\"}");
+        }
     }
 }

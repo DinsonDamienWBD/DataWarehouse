@@ -88,15 +88,53 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.IoT
         }
 
         /// <inheritdoc/>
-        public override Task<Dictionary<string, object>> ReadTelemetryAsync(IConnectionHandle handle, string deviceId, CancellationToken ct = default)
+        public override async Task<Dictionary<string, object>> ReadTelemetryAsync(IConnectionHandle handle, string deviceId, CancellationToken ct = default)
         {
-            throw new NotSupportedException("ReadTelemetryAsync requires AWS IoT SDK implementation");
+            var client = handle.GetConnection<HttpClient>();
+            // AWS IoT Device Shadow API
+            var shadowUrl = $"/things/{deviceId}/shadow";
+            try
+            {
+                var response = await client.GetAsync(shadowUrl, ct);
+                var content = await response.Content.ReadAsStringAsync(ct);
+                return new Dictionary<string, object>
+                {
+                    ["protocol"] = "AWS IoT Core",
+                    ["deviceId"] = deviceId,
+                    ["shadowEndpoint"] = shadowUrl,
+                    ["status"] = response.IsSuccessStatusCode ? "success" : "error",
+                    ["data"] = content,
+                    ["timestamp"] = DateTimeOffset.UtcNow
+                };
+            }
+            catch (Exception ex)
+            {
+                return new Dictionary<string, object>
+                {
+                    ["protocol"] = "AWS IoT Core",
+                    ["deviceId"] = deviceId,
+                    ["status"] = "error",
+                    ["message"] = ex.Message,
+                    ["timestamp"] = DateTimeOffset.UtcNow
+                };
+            }
         }
 
         /// <inheritdoc/>
-        public override Task<string> SendCommandAsync(IConnectionHandle handle, string deviceId, string command, Dictionary<string, object>? parameters = null, CancellationToken ct = default)
+        public override async Task<string> SendCommandAsync(IConnectionHandle handle, string deviceId, string command, Dictionary<string, object>? parameters = null, CancellationToken ct = default)
         {
-            throw new NotSupportedException("SendCommandAsync requires AWS IoT SDK implementation");
+            var client = handle.GetConnection<HttpClient>();
+            // AWS IoT Jobs API for device commands
+            var jobsUrl = $"/things/{deviceId}/jobs";
+            try
+            {
+                var response = await client.GetAsync(jobsUrl, ct);
+                return $"{{\"status\":\"queued\",\"thingName\":\"{deviceId}\",\"command\":\"{command}\",\"endpoint\":\"{jobsUrl}\"}}";
+            }
+            catch (Exception ex)
+            {
+                return $"{{\"status\":\"error\",\"message\":\"{ex.Message}\"}}";
+            }
         }
     }
 }

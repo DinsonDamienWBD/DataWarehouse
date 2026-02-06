@@ -127,7 +127,7 @@ public sealed record ConfigurationRequirement
 /// Capabilities flags for intelligence strategies.
 /// </summary>
 [Flags]
-public enum IntelligenceCapabilities
+public enum IntelligenceCapabilities : long
 {
     None = 0,
 

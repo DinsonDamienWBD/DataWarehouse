@@ -29,7 +29,11 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Healthcare
         protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct) { var response = await handle.GetConnection<HttpClient>().GetAsync("/metadata", ct); return response.IsSuccessStatusCode; }
         protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct) { handle.GetConnection<HttpClient>().Dispose(); return Task.CompletedTask; }
         protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct) { var sw = System.Diagnostics.Stopwatch.StartNew(); var isHealthy = await TestCoreAsync(handle, ct); sw.Stop(); return new ConnectionHealth(isHealthy, "FHIR R4 server", sw.Elapsed, DateTimeOffset.UtcNow); }
-        public override Task<(bool IsValid, string[] Errors)> ValidateHl7Async(IConnectionHandle handle, string hl7Message, CancellationToken ct = default) => throw new NotSupportedException("Use HL7 strategy for HL7 validation");
+        public override Task<(bool IsValid, string[] Errors)> ValidateHl7Async(IConnectionHandle handle, string hl7Message, CancellationToken ct = default)
+        {
+            // FHIR R4 does not use HL7 v2 format - provide guidance
+            return Task.FromResult((false, new[] { "FHIR R4 uses JSON/XML format, not HL7 v2. Use Hl7v2ConnectionStrategy for HL7 validation." }));
+        }
         public override async Task<string> QueryFhirAsync(IConnectionHandle handle, string resourceType, string? query = null, CancellationToken ct = default)
         {
             var client = handle.GetConnection<HttpClient>();

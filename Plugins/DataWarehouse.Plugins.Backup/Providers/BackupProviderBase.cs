@@ -311,13 +311,23 @@ public abstract class BackupProviderBase : IBackupProvider, IAsyncDisposable
     }
 
     /// <summary>
-    /// Gets the state path for this provider. Must be overridden by derived classes
-    /// that use state persistence.
+    /// Gets the state path for this provider. Can be overridden by derived classes
+    /// to customize the state directory location.
     /// </summary>
     /// <returns>The state path directory.</returns>
     protected virtual string GetStatePath()
     {
-        throw new NotImplementedException("Derived class must override GetStatePath() to use state persistence methods.");
+        // Default implementation: use a standard path based on provider ID
+        var baseStatePath = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "DataWarehouse",
+            "Backup",
+            ProviderId);
+
+        // Ensure directory exists
+        Directory.CreateDirectory(baseStatePath);
+
+        return baseStatePath;
     }
 
     /// <summary>

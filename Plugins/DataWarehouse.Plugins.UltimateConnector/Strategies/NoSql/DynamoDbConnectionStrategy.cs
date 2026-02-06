@@ -74,35 +74,46 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.NoSql
                 TimeSpan.FromMilliseconds(15), DateTimeOffset.UtcNow);
         }
 
-        public override async Task<IReadOnlyList<Dictionary<string, object?>>> ExecuteQueryAsync(
+        /// <summary>
+        /// Executes a query against DynamoDB.
+        /// Note: DynamoDB requires AWS Signature V4 authentication which is complex to implement without SDK.
+        /// </summary>
+        public override Task<IReadOnlyList<Dictionary<string, object?>>> ExecuteQueryAsync(
             IConnectionHandle handle, string query, Dictionary<string, object?>? parameters = null, CancellationToken ct = default)
         {
-            await Task.Delay(15, ct);
-            return new List<Dictionary<string, object?>>
+            // DynamoDB requires AWS Signature V4 for all requests
+            var result = new List<Dictionary<string, object?>>
             {
-                new() { ["PK"] = "USER#123", ["SK"] = "PROFILE", ["name"] = "John Doe" }
+                new()
+                {
+                    ["__status"] = "OPERATION_NOT_SUPPORTED",
+                    ["__message"] = "DynamoDB query execution requires AWSSDK.DynamoDBv2 for proper AWS Signature V4 authentication. This strategy provides HTTP connectivity validation only.",
+                    ["__strategy"] = StrategyId,
+                    ["__capabilities"] = "connectivity_test,health_check"
+                }
             };
+            return Task.FromResult<IReadOnlyList<Dictionary<string, object?>>>(result);
         }
 
-        public override async Task<int> ExecuteNonQueryAsync(
+        /// <summary>
+        /// Executes a non-query command against DynamoDB.
+        /// Returns -1 as DynamoDB requires AWS SDK for proper authentication.
+        /// </summary>
+        public override Task<int> ExecuteNonQueryAsync(
             IConnectionHandle handle, string command, Dictionary<string, object?>? parameters = null, CancellationToken ct = default)
         {
-            await Task.Delay(15, ct);
-            return 1;
+            // Return -1 to indicate operation not supported (graceful degradation)
+            return Task.FromResult(-1);
         }
 
-        public override async Task<IReadOnlyList<DataSchema>> GetSchemaAsync(IConnectionHandle handle, CancellationToken ct = default)
+        /// <summary>
+        /// Retrieves schema information from DynamoDB.
+        /// Returns empty list as DynamoDB requires AWS SDK for proper authentication.
+        /// </summary>
+        public override Task<IReadOnlyList<DataSchema>> GetSchemaAsync(IConnectionHandle handle, CancellationToken ct = default)
         {
-            await Task.Delay(15, ct);
-            return new List<DataSchema>
-            {
-                new DataSchema("sample_table", new[]
-                {
-                    new DataSchemaField("PK", "String", false, null, null),
-                    new DataSchemaField("SK", "String", false, null, null),
-                    new DataSchemaField("attributes", "Map", true, null, null)
-                }, new[] { "PK", "SK" }, new Dictionary<string, object> { ["type"] = "table" })
-            };
+            // Return empty schema list (graceful degradation)
+            return Task.FromResult<IReadOnlyList<DataSchema>>(Array.Empty<DataSchema>());
         }
     }
 }

@@ -2,6 +2,7 @@ using DataWarehouse.SDK.Primitives;
 using DataWarehouse.SDK.Utilities;
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -423,6 +424,73 @@ namespace DataWarehouse.SDK.Contracts.IntelligenceAware
         public abstract string Algorithm { get; }
 
         /// <summary>
+        /// Gets the plugin category.
+        /// </summary>
+        public override PluginCategory Category => PluginCategory.SecurityProvider;
+
+        /// <summary>
+        /// Gets the plugin sub-category.
+        /// </summary>
+        public virtual string SubCategory => "Encryption";
+
+        /// <summary>
+        /// Gets the quality level of this plugin (0-100).
+        /// </summary>
+        public virtual int QualityLevel => 50;
+
+        /// <summary>
+        /// Gets the default execution order in the pipeline.
+        /// </summary>
+        public virtual int DefaultOrder => 90;
+
+        /// <summary>
+        /// Gets whether this stage can be bypassed.
+        /// </summary>
+        public virtual bool AllowBypass => false;
+
+        /// <summary>
+        /// Gets stages that must precede this one.
+        /// </summary>
+        public virtual string[] RequiredPrecedingStages => Array.Empty<string>();
+
+        /// <summary>
+        /// Gets stages that are incompatible with this one.
+        /// </summary>
+        public virtual string[] IncompatibleStages => Array.Empty<string>();
+
+        /// <summary>
+        /// Transform data during write operations (e.g., encrypt).
+        /// </summary>
+        public virtual Stream OnWrite(Stream input, IKernelContext context, Dictionary<string, object> args)
+        {
+            return OnWriteAsync(input, context, args).GetAwaiter().GetResult();
+        }
+
+        /// <summary>
+        /// Transform data during read operations (e.g., decrypt).
+        /// </summary>
+        public virtual Stream OnRead(Stream stored, IKernelContext context, Dictionary<string, object> args)
+        {
+            return OnReadAsync(stored, context, args).GetAwaiter().GetResult();
+        }
+
+        /// <summary>
+        /// Async version of OnWrite. Override this for proper async support.
+        /// </summary>
+        protected virtual Task<Stream> OnWriteAsync(Stream input, IKernelContext context, Dictionary<string, object> args)
+        {
+            return Task.FromResult(input);
+        }
+
+        /// <summary>
+        /// Async version of OnRead. Override this for proper async support.
+        /// </summary>
+        protected virtual Task<Stream> OnReadAsync(Stream stored, IKernelContext context, Dictionary<string, object> args)
+        {
+            return Task.FromResult(stored);
+        }
+
+        /// <summary>
         /// Gets a cipher recommendation based on content analysis.
         /// </summary>
         /// <param name="contentType">Type of content being encrypted.</param>
@@ -522,6 +590,86 @@ namespace DataWarehouse.SDK.Contracts.IntelligenceAware
             return null;
         }
 
+        /// <summary>
+        /// Detects anomalous encryption patterns that may indicate security issues.
+        /// </summary>
+        /// <remarks>
+        /// <para>
+        /// This hook analyzes encryption operations for anomalies such as:
+        /// </para>
+        /// <list type="bullet">
+        ///   <item>Unusual encryption frequency or volume</item>
+        ///   <item>Atypical cipher usage patterns</item>
+        ///   <item>Potential key reuse issues</item>
+        ///   <item>Suspicious timing or sequencing</item>
+        /// </list>
+        /// </remarks>
+        /// <param name="operationMetrics">Metrics about the encryption operation.</param>
+        /// <param name="historicalPatterns">Optional historical pattern data for comparison.</param>
+        /// <param name="context">Intelligence context for the operation.</param>
+        /// <param name="ct">Cancellation token.</param>
+        /// <returns>Anomaly detection result with findings and recommendations, or null if unavailable.</returns>
+        protected async Task<EncryptionAnomalyResult?> OnAnomalyDetectionAsync(
+            EncryptionOperationMetrics operationMetrics,
+            EncryptionPatternHistory? historicalPatterns = null,
+            IntelligenceContext? context = null,
+            CancellationToken ct = default)
+        {
+            if (!HasCapability(IntelligenceCapabilities.AnomalyDetection))
+                return null;
+
+            var payload = new Dictionary<string, object>
+            {
+                ["operationMetrics"] = new Dictionary<string, object>
+                {
+                    ["algorithm"] = operationMetrics.Algorithm,
+                    ["keySize"] = operationMetrics.KeySize,
+                    ["dataSize"] = operationMetrics.DataSize,
+                    ["operationType"] = operationMetrics.OperationType,
+                    ["timestamp"] = operationMetrics.Timestamp.ToString("O"),
+                    ["duration"] = operationMetrics.Duration.TotalMilliseconds,
+                    ["sourceId"] = operationMetrics.SourceId ?? string.Empty
+                },
+                ["pluginId"] = Id,
+                ["algorithm"] = Algorithm,
+                ["contextId"] = context?.ContextId ?? Guid.NewGuid().ToString("N")
+            };
+
+            if (historicalPatterns != null)
+            {
+                payload["historicalPatterns"] = new Dictionary<string, object>
+                {
+                    ["averageOperationsPerHour"] = historicalPatterns.AverageOperationsPerHour,
+                    ["typicalDataSizeRange"] = new[] { historicalPatterns.TypicalMinDataSize, historicalPatterns.TypicalMaxDataSize },
+                    ["commonAlgorithms"] = historicalPatterns.CommonAlgorithms,
+                    ["baselineEstablishedAt"] = historicalPatterns.BaselineEstablishedAt.ToString("O")
+                };
+            }
+
+            var response = await SendIntelligenceRequestAsync(
+                IntelligenceTopics.RequestAnomalyDetection,
+                payload,
+                context?.Timeout,
+                ct);
+
+            if (response?.Success == true && response.Payload is Dictionary<string, object> result)
+            {
+                return new EncryptionAnomalyResult
+                {
+                    IsAnomaly = result.TryGetValue("isAnomaly", out var ia) && ia is true,
+                    AnomalyScore = result.TryGetValue("anomalyScore", out var ascore) && ascore is double score ? score : 0.0,
+                    AnomalyType = result.TryGetValue("anomalyType", out var atype) && atype is string anomalyType ? anomalyType : null,
+                    Description = result.TryGetValue("description", out var desc) && desc is string description ? description : null,
+                    Severity = result.TryGetValue("severity", out var sev) && sev is string severity ? severity : "Low",
+                    Recommendations = result.TryGetValue("recommendations", out var recs) && recs is string[] recommendations ? recommendations : Array.Empty<string>(),
+                    ShouldAlert = result.TryGetValue("shouldAlert", out var alert) && alert is true,
+                    ShouldBlock = result.TryGetValue("shouldBlock", out var block) && block is true
+                };
+            }
+
+            return null;
+        }
+
         /// <inheritdoc/>
         protected override Dictionary<string, object> GetMetadata()
         {
@@ -530,6 +678,7 @@ namespace DataWarehouse.SDK.Contracts.IntelligenceAware
             metadata["Algorithm"] = Algorithm;
             metadata["SupportsCipherRecommendation"] = HasCapability(IntelligenceCapabilities.CipherRecommendation);
             metadata["SupportsThreatAssessment"] = HasCapability(IntelligenceCapabilities.ThreatAssessment);
+            metadata["SupportsAnomalyDetection"] = HasCapability(IntelligenceCapabilities.AnomalyDetection);
             return metadata;
         }
     }
@@ -548,6 +697,73 @@ namespace DataWarehouse.SDK.Contracts.IntelligenceAware
         /// Gets the primary compression algorithm.
         /// </summary>
         public abstract string CompressionAlgorithm { get; }
+
+        /// <summary>
+        /// Gets the plugin category.
+        /// </summary>
+        public override PluginCategory Category => PluginCategory.DataTransformationProvider;
+
+        /// <summary>
+        /// Gets the plugin sub-category.
+        /// </summary>
+        public virtual string SubCategory => "Compression";
+
+        /// <summary>
+        /// Gets the quality level of this plugin (0-100).
+        /// </summary>
+        public virtual int QualityLevel => 50;
+
+        /// <summary>
+        /// Gets the default execution order in the pipeline.
+        /// </summary>
+        public virtual int DefaultOrder => 50;
+
+        /// <summary>
+        /// Gets whether this stage can be bypassed.
+        /// </summary>
+        public virtual bool AllowBypass => false;
+
+        /// <summary>
+        /// Gets stages that must precede this one.
+        /// </summary>
+        public virtual string[] RequiredPrecedingStages => Array.Empty<string>();
+
+        /// <summary>
+        /// Gets stages that are incompatible with this one.
+        /// </summary>
+        public virtual string[] IncompatibleStages => Array.Empty<string>();
+
+        /// <summary>
+        /// Transform data during write operations (e.g., compress).
+        /// </summary>
+        public virtual Stream OnWrite(Stream input, IKernelContext context, Dictionary<string, object> args)
+        {
+            return OnWriteAsync(input, context, args).GetAwaiter().GetResult();
+        }
+
+        /// <summary>
+        /// Transform data during read operations (e.g., decompress).
+        /// </summary>
+        public virtual Stream OnRead(Stream stored, IKernelContext context, Dictionary<string, object> args)
+        {
+            return OnReadAsync(stored, context, args).GetAwaiter().GetResult();
+        }
+
+        /// <summary>
+        /// Async version of OnWrite. Override this for proper async support.
+        /// </summary>
+        protected virtual Task<Stream> OnWriteAsync(Stream input, IKernelContext context, Dictionary<string, object> args)
+        {
+            return Task.FromResult(input);
+        }
+
+        /// <summary>
+        /// Async version of OnRead. Override this for proper async support.
+        /// </summary>
+        protected virtual Task<Stream> OnReadAsync(Stream stored, IKernelContext context, Dictionary<string, object> args)
+        {
+            return Task.FromResult(stored);
+        }
 
         /// <summary>
         /// Gets a compression recommendation based on content analysis.
@@ -600,6 +816,114 @@ namespace DataWarehouse.SDK.Contracts.IntelligenceAware
             return null;
         }
 
+        /// <summary>
+        /// Analyzes content semantically before compression to optimize strategy.
+        /// </summary>
+        /// <remarks>
+        /// <para>
+        /// This hook enables AI-powered content analysis to:
+        /// </para>
+        /// <list type="bullet">
+        ///   <item>Identify content type and structure for optimal compression</item>
+        ///   <item>Detect already-compressed or incompressible content</item>
+        ///   <item>Classify content sensitivity for compliance</item>
+        ///   <item>Recommend pre-processing steps (e.g., delta encoding for similar content)</item>
+        /// </list>
+        /// </remarks>
+        /// <param name="content">The content to analyze (or a representative sample).</param>
+        /// <param name="contentMetadata">Optional metadata about the content.</param>
+        /// <param name="context">Intelligence context for the operation.</param>
+        /// <param name="ct">Cancellation token.</param>
+        /// <returns>Content analysis result with classification and recommendations, or null if unavailable.</returns>
+        protected async Task<ContentAnalysisResult?> OnContentAnalysisAsync(
+            byte[] content,
+            ContentMetadata? contentMetadata = null,
+            IntelligenceContext? context = null,
+            CancellationToken ct = default)
+        {
+            if (!HasCapability(IntelligenceCapabilities.Classification))
+                return null;
+
+            // Use a sample for large content to reduce latency
+            var sampleSize = Math.Min(content.Length, 8192);
+            var sample = content.Length > sampleSize ? content.Take(sampleSize).ToArray() : content;
+
+            var payload = new Dictionary<string, object>
+            {
+                ["sampleHash"] = Convert.ToBase64String(System.Security.Cryptography.SHA256.HashData(sample)),
+                ["contentSize"] = content.Length,
+                ["sampleSize"] = sampleSize,
+                ["pluginId"] = Id,
+                ["algorithm"] = CompressionAlgorithm,
+                ["contextId"] = context?.ContextId ?? Guid.NewGuid().ToString("N")
+            };
+
+            // Add entropy estimation (helps detect already-compressed content)
+            payload["entropyEstimate"] = EstimateEntropy(sample);
+
+            if (contentMetadata != null)
+            {
+                payload["metadata"] = new Dictionary<string, object>
+                {
+                    ["fileName"] = contentMetadata.FileName ?? string.Empty,
+                    ["mimeType"] = contentMetadata.MimeType ?? string.Empty,
+                    ["createdAt"] = contentMetadata.CreatedAt?.ToString("O") ?? string.Empty,
+                    ["tags"] = contentMetadata.Tags ?? Array.Empty<string>()
+                };
+            }
+
+            var response = await SendIntelligenceRequestAsync(
+                IntelligenceTopics.RequestClassification,
+                payload,
+                context?.Timeout,
+                ct);
+
+            if (response?.Success == true && response.Payload is Dictionary<string, object> result)
+            {
+                return new ContentAnalysisResult
+                {
+                    ContentType = result.TryGetValue("contentType", out var ct2) && ct2 is string contentType ? contentType : "unknown",
+                    IsCompressible = result.TryGetValue("isCompressible", out var ic) ? ic is not false : true,
+                    IsAlreadyCompressed = result.TryGetValue("isAlreadyCompressed", out var iac) && iac is true,
+                    EstimatedCompressionRatio = result.TryGetValue("estimatedCompressionRatio", out var ecr) && ecr is double ratio ? ratio : 1.0,
+                    RecommendedAlgorithm = result.TryGetValue("recommendedAlgorithm", out var ra) && ra is string algo ? algo : null,
+                    RecommendedLevel = result.TryGetValue("recommendedLevel", out var rl) && rl is int level ? level : 6,
+                    PreProcessingSteps = result.TryGetValue("preProcessingSteps", out var pps) && pps is string[] steps ? steps : Array.Empty<string>(),
+                    SensitivityLevel = result.TryGetValue("sensitivityLevel", out var sl) && sl is string sensitivity ? sensitivity : "Normal",
+                    Confidence = result.TryGetValue("confidence", out var conf) && conf is double confidence ? confidence : 0.5
+                };
+            }
+
+            return null;
+        }
+
+        /// <summary>
+        /// Estimates the entropy of a data sample (0.0 = no entropy, 8.0 = max entropy).
+        /// High entropy typically indicates already-compressed or encrypted content.
+        /// </summary>
+        private static double EstimateEntropy(byte[] data)
+        {
+            if (data.Length == 0) return 0.0;
+
+            var frequencies = new int[256];
+            foreach (var b in data)
+                frequencies[b]++;
+
+            double entropy = 0.0;
+            double length = data.Length;
+
+            foreach (var freq in frequencies)
+            {
+                if (freq > 0)
+                {
+                    double probability = freq / length;
+                    entropy -= probability * Math.Log2(probability);
+                }
+            }
+
+            return entropy;
+        }
+
         /// <inheritdoc/>
         protected override Dictionary<string, object> GetMetadata()
         {
@@ -607,6 +931,7 @@ namespace DataWarehouse.SDK.Contracts.IntelligenceAware
             metadata["CompressionType"] = "IntelligenceAware";
             metadata["CompressionAlgorithm"] = CompressionAlgorithm;
             metadata["SupportsCompressionRecommendation"] = HasCapability(IntelligenceCapabilities.CompressionRecommendation);
+            metadata["SupportsContentAnalysis"] = HasCapability(IntelligenceCapabilities.Classification);
             return metadata;
         }
     }
@@ -625,6 +950,73 @@ namespace DataWarehouse.SDK.Contracts.IntelligenceAware
         /// Gets the storage scheme (e.g., "file", "s3", "azure").
         /// </summary>
         public abstract string StorageScheme { get; }
+
+        /// <summary>
+        /// Gets the plugin category.
+        /// </summary>
+        public override PluginCategory Category => PluginCategory.StorageProvider;
+
+        /// <summary>
+        /// Gets the plugin sub-category.
+        /// </summary>
+        public virtual string SubCategory => "Storage";
+
+        /// <summary>
+        /// Gets the quality level of this plugin (0-100).
+        /// </summary>
+        public virtual int QualityLevel => 50;
+
+        /// <summary>
+        /// Gets the default execution order in the pipeline.
+        /// </summary>
+        public virtual int DefaultOrder => 100;
+
+        /// <summary>
+        /// Gets whether this stage can be bypassed.
+        /// </summary>
+        public virtual bool AllowBypass => false;
+
+        /// <summary>
+        /// Gets stages that must precede this one.
+        /// </summary>
+        public virtual string[] RequiredPrecedingStages => Array.Empty<string>();
+
+        /// <summary>
+        /// Gets stages that are incompatible with this one.
+        /// </summary>
+        public virtual string[] IncompatibleStages => Array.Empty<string>();
+
+        /// <summary>
+        /// Transform data during write operations.
+        /// </summary>
+        public virtual Stream OnWrite(Stream input, IKernelContext context, Dictionary<string, object> args)
+        {
+            return OnWriteAsync(input, context, args).GetAwaiter().GetResult();
+        }
+
+        /// <summary>
+        /// Transform data during read operations.
+        /// </summary>
+        public virtual Stream OnRead(Stream stored, IKernelContext context, Dictionary<string, object> args)
+        {
+            return OnReadAsync(stored, context, args).GetAwaiter().GetResult();
+        }
+
+        /// <summary>
+        /// Async version of OnWrite. Override this for proper async support.
+        /// </summary>
+        protected virtual Task<Stream> OnWriteAsync(Stream input, IKernelContext context, Dictionary<string, object> args)
+        {
+            return Task.FromResult(input);
+        }
+
+        /// <summary>
+        /// Async version of OnRead. Override this for proper async support.
+        /// </summary>
+        protected virtual Task<Stream> OnReadAsync(Stream stored, IKernelContext context, Dictionary<string, object> args)
+        {
+            return Task.FromResult(stored);
+        }
 
         /// <summary>
         /// Gets a storage tier recommendation based on access patterns.
@@ -733,6 +1125,83 @@ namespace DataWarehouse.SDK.Contracts.IntelligenceAware
             return null;
         }
 
+        /// <summary>
+        /// Classifies data content for compliance, sensitivity, and governance.
+        /// </summary>
+        /// <remarks>
+        /// <para>
+        /// This hook enables AI-powered content classification for:
+        /// </para>
+        /// <list type="bullet">
+        ///   <item>Data sensitivity level determination (Public, Internal, Confidential, Restricted)</item>
+        ///   <item>Regulatory compliance tagging (GDPR, HIPAA, PCI-DSS, etc.)</item>
+        ///   <item>Content category identification for governance policies</item>
+        ///   <item>Retention and lifecycle policy recommendations</item>
+        /// </list>
+        /// </remarks>
+        /// <param name="objectId">The object identifier.</param>
+        /// <param name="content">Optional content sample for analysis.</param>
+        /// <param name="existingMetadata">Existing object metadata.</param>
+        /// <param name="context">Intelligence context for the operation.</param>
+        /// <param name="ct">Cancellation token.</param>
+        /// <returns>Data classification result with tags and recommendations, or null if unavailable.</returns>
+        protected async Task<DataClassificationResult?> OnDataClassificationAsync(
+            string objectId,
+            byte[]? content = null,
+            Dictionary<string, object>? existingMetadata = null,
+            IntelligenceContext? context = null,
+            CancellationToken ct = default)
+        {
+            if (!HasCapability(IntelligenceCapabilities.SensitivityClassification) &&
+                !HasCapability(IntelligenceCapabilities.ComplianceClassification))
+                return null;
+
+            var payload = new Dictionary<string, object>
+            {
+                ["objectId"] = objectId,
+                ["storageScheme"] = StorageScheme,
+                ["pluginId"] = Id,
+                ["contextId"] = context?.ContextId ?? Guid.NewGuid().ToString("N")
+            };
+
+            if (content != null)
+            {
+                // Use sample hash for large content
+                var sampleSize = Math.Min(content.Length, 4096);
+                var sample = content.Length > sampleSize ? content.Take(sampleSize).ToArray() : content;
+                payload["sampleHash"] = Convert.ToBase64String(System.Security.Cryptography.SHA256.HashData(sample));
+                payload["contentSize"] = content.Length;
+            }
+
+            if (existingMetadata != null)
+                payload["existingMetadata"] = existingMetadata;
+
+            var response = await SendIntelligenceRequestAsync(
+                "intelligence.request.data-classification",
+                payload,
+                context?.Timeout,
+                ct);
+
+            if (response?.Success == true && response.Payload is Dictionary<string, object> result)
+            {
+                return new DataClassificationResult
+                {
+                    SensitivityLevel = result.TryGetValue("sensitivityLevel", out var sl) && sl is string sensitivity ? sensitivity : "Normal",
+                    ComplianceFrameworks = result.TryGetValue("complianceFrameworks", out var cf) && cf is string[] frameworks ? frameworks : Array.Empty<string>(),
+                    Categories = result.TryGetValue("categories", out var cats) && cats is string[] categories ? categories : Array.Empty<string>(),
+                    Tags = result.TryGetValue("tags", out var tags) && tags is string[] tagArray ? tagArray : Array.Empty<string>(),
+                    ContainsPII = result.TryGetValue("containsPII", out var pii) && pii is true,
+                    PIITypes = result.TryGetValue("piiTypes", out var piiTypes) && piiTypes is string[] types ? types : Array.Empty<string>(),
+                    RetentionPolicy = result.TryGetValue("retentionPolicy", out var rp) && rp is string policy ? policy : null,
+                    EncryptionRequired = result.TryGetValue("encryptionRequired", out var er) && er is true,
+                    Confidence = result.TryGetValue("confidence", out var conf) && conf is double confidence ? confidence : 0.5,
+                    Reasoning = result.TryGetValue("reasoning", out var r) && r is string reason ? reason : null
+                };
+            }
+
+            return null;
+        }
+
         /// <inheritdoc/>
         protected override Dictionary<string, object> GetMetadata()
         {
@@ -741,6 +1210,8 @@ namespace DataWarehouse.SDK.Contracts.IntelligenceAware
             metadata["StorageScheme"] = StorageScheme;
             metadata["SupportsTieringRecommendation"] = HasCapability(IntelligenceCapabilities.TieringRecommendation);
             metadata["SupportsAccessPrediction"] = HasCapability(IntelligenceCapabilities.AccessPatternPrediction);
+            metadata["SupportsDataClassification"] = HasCapability(IntelligenceCapabilities.SensitivityClassification) ||
+                                                      HasCapability(IntelligenceCapabilities.ComplianceClassification);
             return metadata;
         }
     }
@@ -755,6 +1226,73 @@ namespace DataWarehouse.SDK.Contracts.IntelligenceAware
     /// </summary>
     public abstract class IntelligenceAwareAccessControlPluginBase : IntelligenceAwarePluginBase
     {
+        /// <summary>
+        /// Gets the plugin category.
+        /// </summary>
+        public override PluginCategory Category => PluginCategory.SecurityProvider;
+
+        /// <summary>
+        /// Gets the plugin sub-category.
+        /// </summary>
+        public virtual string SubCategory => "AccessControl";
+
+        /// <summary>
+        /// Gets the quality level of this plugin (0-100).
+        /// </summary>
+        public virtual int QualityLevel => 50;
+
+        /// <summary>
+        /// Gets the default execution order in the pipeline.
+        /// </summary>
+        public virtual int DefaultOrder => 100;
+
+        /// <summary>
+        /// Gets whether this stage can be bypassed.
+        /// </summary>
+        public virtual bool AllowBypass => false;
+
+        /// <summary>
+        /// Gets stages that must precede this one.
+        /// </summary>
+        public virtual string[] RequiredPrecedingStages => Array.Empty<string>();
+
+        /// <summary>
+        /// Gets stages that are incompatible with this one.
+        /// </summary>
+        public virtual string[] IncompatibleStages => Array.Empty<string>();
+
+        /// <summary>
+        /// Transform data during write operations.
+        /// </summary>
+        public virtual Stream OnWrite(Stream input, IKernelContext context, Dictionary<string, object> args)
+        {
+            return OnWriteAsync(input, context, args).GetAwaiter().GetResult();
+        }
+
+        /// <summary>
+        /// Transform data during read operations.
+        /// </summary>
+        public virtual Stream OnRead(Stream stored, IKernelContext context, Dictionary<string, object> args)
+        {
+            return OnReadAsync(stored, context, args).GetAwaiter().GetResult();
+        }
+
+        /// <summary>
+        /// Async version of OnWrite. Override this for proper async support.
+        /// </summary>
+        protected virtual Task<Stream> OnWriteAsync(Stream input, IKernelContext context, Dictionary<string, object> args)
+        {
+            return Task.FromResult(input);
+        }
+
+        /// <summary>
+        /// Async version of OnRead. Override this for proper async support.
+        /// </summary>
+        protected virtual Task<Stream> OnReadAsync(Stream stored, IKernelContext context, Dictionary<string, object> args)
+        {
+            return Task.FromResult(stored);
+        }
+
         /// <summary>
         /// Analyzes user behavior for anomalies.
         /// </summary>
@@ -852,6 +1390,89 @@ namespace DataWarehouse.SDK.Contracts.IntelligenceAware
             return null;
         }
 
+        /// <summary>
+        /// Predicts potential security threats based on current context and historical patterns.
+        /// </summary>
+        /// <remarks>
+        /// <para>
+        /// This hook enables AI-powered threat prediction for:
+        /// </para>
+        /// <list type="bullet">
+        ///   <item>Proactive threat identification before attacks occur</item>
+        ///   <item>Risk scoring for access requests</item>
+        ///   <item>Attack vector prediction based on patterns</item>
+        ///   <item>Adaptive security policy recommendations</item>
+        /// </list>
+        /// </remarks>
+        /// <param name="threatContext">Context information for threat analysis.</param>
+        /// <param name="historicalThreats">Optional historical threat data.</param>
+        /// <param name="context">Intelligence context for the operation.</param>
+        /// <param name="ct">Cancellation token.</param>
+        /// <returns>Threat prediction with risk assessment and recommendations, or null if unavailable.</returns>
+        protected async Task<ThreatPredictionResult?> PredictThreatAsync(
+            ThreatAnalysisContext threatContext,
+            ThreatHistoryData[]? historicalThreats = null,
+            IntelligenceContext? context = null,
+            CancellationToken ct = default)
+        {
+            if (!HasCapability(IntelligenceCapabilities.ThreatAssessment))
+                return null;
+
+            var payload = new Dictionary<string, object>
+            {
+                ["threatContext"] = new Dictionary<string, object>
+                {
+                    ["userId"] = threatContext.UserId ?? string.Empty,
+                    ["resourceId"] = threatContext.ResourceId ?? string.Empty,
+                    ["actionType"] = threatContext.ActionType ?? string.Empty,
+                    ["sourceIp"] = threatContext.SourceIp ?? string.Empty,
+                    ["userAgent"] = threatContext.UserAgent ?? string.Empty,
+                    ["timestamp"] = threatContext.Timestamp.ToString("O"),
+                    ["geoLocation"] = threatContext.GeoLocation ?? string.Empty,
+                    ["deviceFingerprint"] = threatContext.DeviceFingerprint ?? string.Empty
+                },
+                ["pluginId"] = Id,
+                ["contextId"] = context?.ContextId ?? Guid.NewGuid().ToString("N")
+            };
+
+            if (historicalThreats != null && historicalThreats.Length > 0)
+            {
+                payload["historicalThreats"] = historicalThreats.Select(t => new Dictionary<string, object>
+                {
+                    ["threatType"] = t.ThreatType,
+                    ["severity"] = t.Severity,
+                    ["timestamp"] = t.Timestamp.ToString("O"),
+                    ["wasBlocked"] = t.WasBlocked,
+                    ["sourceIp"] = t.SourceIp ?? string.Empty
+                }).ToArray();
+            }
+
+            var response = await SendIntelligenceRequestAsync(
+                IntelligenceTopics.RequestThreatAssessment,
+                payload,
+                context?.Timeout,
+                ct);
+
+            if (response?.Success == true && response.Payload is Dictionary<string, object> result)
+            {
+                return new ThreatPredictionResult
+                {
+                    ThreatLevel = result.TryGetValue("threatLevel", out var tl) && tl is string level ? level : "Low",
+                    RiskScore = result.TryGetValue("riskScore", out var rs) && rs is double score ? score : 0.0,
+                    PredictedThreats = result.TryGetValue("predictedThreats", out var pt) && pt is PredictedThreat[] threats ? threats : Array.Empty<PredictedThreat>(),
+                    AttackVectors = result.TryGetValue("attackVectors", out var av) && av is string[] vectors ? vectors : Array.Empty<string>(),
+                    MitigationRecommendations = result.TryGetValue("mitigationRecommendations", out var mr) && mr is string[] mitigations ? mitigations : Array.Empty<string>(),
+                    ShouldBlock = result.TryGetValue("shouldBlock", out var sb) && sb is true,
+                    ShouldAlert = result.TryGetValue("shouldAlert", out var sa) && sa is true,
+                    RequiresAdditionalAuthentication = result.TryGetValue("requiresAdditionalAuth", out var raa) && raa is true,
+                    Confidence = result.TryGetValue("confidence", out var conf) && conf is double confidence ? confidence : 0.5,
+                    ExpiresAt = result.TryGetValue("expiresAt", out var exp) && exp is string expStr && DateTimeOffset.TryParse(expStr, out var expDate) ? expDate : null
+                };
+            }
+
+            return null;
+        }
+
         /// <inheritdoc/>
         protected override Dictionary<string, object> GetMetadata()
         {
@@ -859,6 +1480,7 @@ namespace DataWarehouse.SDK.Contracts.IntelligenceAware
             metadata["AccessControlType"] = "IntelligenceAware";
             metadata["SupportsBehaviorAnalytics"] = HasCapability(IntelligenceCapabilities.BehaviorAnalytics);
             metadata["SupportsAccessRecommendation"] = HasCapability(IntelligenceCapabilities.AccessControlRecommendation);
+            metadata["SupportsThreatPrediction"] = HasCapability(IntelligenceCapabilities.ThreatAssessment);
             return metadata;
         }
     }
@@ -873,6 +1495,73 @@ namespace DataWarehouse.SDK.Contracts.IntelligenceAware
     /// </summary>
     public abstract class IntelligenceAwareCompliancePluginBase : IntelligenceAwarePluginBase
     {
+        /// <summary>
+        /// Gets the plugin category.
+        /// </summary>
+        public override PluginCategory Category => PluginCategory.GovernanceProvider;
+
+        /// <summary>
+        /// Gets the plugin sub-category.
+        /// </summary>
+        public virtual string SubCategory => "Compliance";
+
+        /// <summary>
+        /// Gets the quality level of this plugin (0-100).
+        /// </summary>
+        public virtual int QualityLevel => 50;
+
+        /// <summary>
+        /// Gets the default execution order in the pipeline.
+        /// </summary>
+        public virtual int DefaultOrder => 100;
+
+        /// <summary>
+        /// Gets whether this stage can be bypassed.
+        /// </summary>
+        public virtual bool AllowBypass => false;
+
+        /// <summary>
+        /// Gets stages that must precede this one.
+        /// </summary>
+        public virtual string[] RequiredPrecedingStages => Array.Empty<string>();
+
+        /// <summary>
+        /// Gets stages that are incompatible with this one.
+        /// </summary>
+        public virtual string[] IncompatibleStages => Array.Empty<string>();
+
+        /// <summary>
+        /// Transform data during write operations.
+        /// </summary>
+        public virtual Stream OnWrite(Stream input, IKernelContext context, Dictionary<string, object> args)
+        {
+            return OnWriteAsync(input, context, args).GetAwaiter().GetResult();
+        }
+
+        /// <summary>
+        /// Transform data during read operations.
+        /// </summary>
+        public virtual Stream OnRead(Stream stored, IKernelContext context, Dictionary<string, object> args)
+        {
+            return OnReadAsync(stored, context, args).GetAwaiter().GetResult();
+        }
+
+        /// <summary>
+        /// Async version of OnWrite. Override this for proper async support.
+        /// </summary>
+        protected virtual Task<Stream> OnWriteAsync(Stream input, IKernelContext context, Dictionary<string, object> args)
+        {
+            return Task.FromResult(input);
+        }
+
+        /// <summary>
+        /// Async version of OnRead. Override this for proper async support.
+        /// </summary>
+        protected virtual Task<Stream> OnReadAsync(Stream stored, IKernelContext context, Dictionary<string, object> args)
+        {
+            return Task.FromResult(stored);
+        }
+
         /// <summary>
         /// Gets compliance classification for content.
         /// </summary>
@@ -966,6 +1655,97 @@ namespace DataWarehouse.SDK.Contracts.IntelligenceAware
             return null;
         }
 
+        /// <summary>
+        /// Generates an AI-powered audit summary narrative from audit log entries.
+        /// </summary>
+        /// <remarks>
+        /// <para>
+        /// This hook enables AI-powered audit narrative generation for:
+        /// </para>
+        /// <list type="bullet">
+        ///   <item>Executive-level compliance summaries</item>
+        ///   <item>Incident timeline reconstruction</item>
+        ///   <item>Regulatory report generation</item>
+        ///   <item>Trend analysis and anomaly highlighting</item>
+        /// </list>
+        /// </remarks>
+        /// <param name="auditEntries">The audit log entries to summarize.</param>
+        /// <param name="summaryOptions">Options for summary generation.</param>
+        /// <param name="context">Intelligence context for the operation.</param>
+        /// <param name="ct">Cancellation token.</param>
+        /// <returns>Generated audit summary with narrative and insights, or null if unavailable.</returns>
+        protected async Task<AuditSummaryResult?> GenerateAuditSummaryAsync(
+            AuditLogEntry[] auditEntries,
+            AuditSummaryOptions? summaryOptions = null,
+            IntelligenceContext? context = null,
+            CancellationToken ct = default)
+        {
+            if (!HasCapability(IntelligenceCapabilities.Summarization))
+                return null;
+
+            if (auditEntries == null || auditEntries.Length == 0)
+                return new AuditSummaryResult { Summary = "No audit entries to summarize.", EntryCount = 0 };
+
+            var payload = new Dictionary<string, object>
+            {
+                ["auditEntries"] = auditEntries.Select(e => new Dictionary<string, object>
+                {
+                    ["timestamp"] = e.Timestamp.ToString("O"),
+                    ["action"] = e.Action,
+                    ["userId"] = e.UserId ?? string.Empty,
+                    ["resourceId"] = e.ResourceId ?? string.Empty,
+                    ["outcome"] = e.Outcome,
+                    ["details"] = e.Details ?? string.Empty,
+                    ["severity"] = e.Severity ?? "Info",
+                    ["sourceIp"] = e.SourceIp ?? string.Empty
+                }).ToArray(),
+                ["entryCount"] = auditEntries.Length,
+                ["pluginId"] = Id,
+                ["contextId"] = context?.ContextId ?? Guid.NewGuid().ToString("N")
+            };
+
+            if (summaryOptions != null)
+            {
+                payload["options"] = new Dictionary<string, object>
+                {
+                    ["format"] = summaryOptions.Format ?? "Narrative",
+                    ["audience"] = summaryOptions.Audience ?? "Technical",
+                    ["maxLength"] = summaryOptions.MaxLength ?? 2000,
+                    ["includeRecommendations"] = summaryOptions.IncludeRecommendations,
+                    ["highlightAnomalies"] = summaryOptions.HighlightAnomalies,
+                    ["complianceFramework"] = summaryOptions.ComplianceFramework ?? string.Empty
+                };
+            }
+
+            var response = await SendIntelligenceRequestAsync(
+                IntelligenceTopics.RequestSummarization,
+                payload,
+                context?.Timeout,
+                ct);
+
+            if (response?.Success == true && response.Payload is Dictionary<string, object> result)
+            {
+                return new AuditSummaryResult
+                {
+                    Summary = result.TryGetValue("summary", out var sum) && sum is string summary ? summary : string.Empty,
+                    EntryCount = auditEntries.Length,
+                    TimeRange = new AuditTimeRange
+                    {
+                        Start = auditEntries.Min(e => e.Timestamp),
+                        End = auditEntries.Max(e => e.Timestamp)
+                    },
+                    KeyFindings = result.TryGetValue("keyFindings", out var kf) && kf is string[] findings ? findings : Array.Empty<string>(),
+                    AnomaliesDetected = result.TryGetValue("anomaliesDetected", out var ad) && ad is AuditAnomaly[] anomalies ? anomalies : Array.Empty<AuditAnomaly>(),
+                    Recommendations = result.TryGetValue("recommendations", out var recs) && recs is string[] recommendations ? recommendations : Array.Empty<string>(),
+                    RiskLevel = result.TryGetValue("riskLevel", out var rl) && rl is string risk ? risk : "Low",
+                    ComplianceStatus = result.TryGetValue("complianceStatus", out var cs) && cs is string status ? status : "Unknown",
+                    GeneratedAt = DateTimeOffset.UtcNow
+                };
+            }
+
+            return null;
+        }
+
         /// <inheritdoc/>
         protected override Dictionary<string, object> GetMetadata()
         {
@@ -974,6 +1754,7 @@ namespace DataWarehouse.SDK.Contracts.IntelligenceAware
             metadata["SupportsPIIDetection"] = HasCapability(IntelligenceCapabilities.PIIDetection);
             metadata["SupportsComplianceClassification"] = HasCapability(IntelligenceCapabilities.ComplianceClassification);
             metadata["SupportsSensitivityClassification"] = HasCapability(IntelligenceCapabilities.SensitivityClassification);
+            metadata["SupportsAuditSummaryGeneration"] = HasCapability(IntelligenceCapabilities.Summarization);
             return metadata;
         }
     }
@@ -1090,6 +1871,111 @@ namespace DataWarehouse.SDK.Contracts.IntelligenceAware
             return null;
         }
 
+        /// <summary>
+        /// Performs semantic content indexing for enhanced search and discovery.
+        /// </summary>
+        /// <remarks>
+        /// <para>
+        /// This hook enables AI-powered content indexing for:
+        /// </para>
+        /// <list type="bullet">
+        ///   <item>Semantic embedding generation for vector search</item>
+        ///   <item>Automatic keyword and topic extraction</item>
+        ///   <item>Entity recognition and relationship mapping</item>
+        ///   <item>Content summarization for previews</item>
+        /// </list>
+        /// </remarks>
+        /// <param name="contentId">The content identifier.</param>
+        /// <param name="content">The content to index (text or bytes).</param>
+        /// <param name="existingMetadata">Existing metadata to enhance.</param>
+        /// <param name="indexOptions">Options for indexing behavior.</param>
+        /// <param name="context">Intelligence context for the operation.</param>
+        /// <param name="ct">Cancellation token.</param>
+        /// <returns>Indexing result with semantic data, or null if unavailable.</returns>
+        protected async Task<ContentIndexingResult?> OnContentIndexingAsync(
+            string contentId,
+            object content,
+            Dictionary<string, object>? existingMetadata = null,
+            ContentIndexingOptions? indexOptions = null,
+            IntelligenceContext? context = null,
+            CancellationToken ct = default)
+        {
+            // Require at least embeddings or keyword extraction capability
+            if (!HasCapability(IntelligenceCapabilities.Embeddings) &&
+                !HasCapability(IntelligenceCapabilities.KeywordExtraction))
+                return null;
+
+            // Prepare content for indexing
+            string textContent;
+            if (content is string s)
+            {
+                textContent = s;
+            }
+            else if (content is byte[] bytes)
+            {
+                // For binary content, we'll send a hash and size; actual content analysis
+                // would require content extraction (not done here)
+                textContent = $"[Binary content: {bytes.Length} bytes, SHA256: {Convert.ToBase64String(System.Security.Cryptography.SHA256.HashData(bytes))}]";
+            }
+            else
+            {
+                textContent = content?.ToString() ?? string.Empty;
+            }
+
+            var payload = new Dictionary<string, object>
+            {
+                ["contentId"] = contentId,
+                ["content"] = textContent.Length > 10000 ? textContent.Substring(0, 10000) : textContent, // Limit content size
+                ["contentLength"] = textContent.Length,
+                ["pluginId"] = Id,
+                ["contextId"] = context?.ContextId ?? Guid.NewGuid().ToString("N")
+            };
+
+            if (existingMetadata != null)
+                payload["existingMetadata"] = existingMetadata;
+
+            if (indexOptions != null)
+            {
+                payload["options"] = new Dictionary<string, object>
+                {
+                    ["generateEmbedding"] = indexOptions.GenerateEmbedding,
+                    ["extractKeywords"] = indexOptions.ExtractKeywords,
+                    ["extractEntities"] = indexOptions.ExtractEntities,
+                    ["generateSummary"] = indexOptions.GenerateSummary,
+                    ["maxKeywords"] = indexOptions.MaxKeywords,
+                    ["maxEntities"] = indexOptions.MaxEntities,
+                    ["summaryMaxLength"] = indexOptions.SummaryMaxLength
+                };
+            }
+
+            var response = await SendIntelligenceRequestAsync(
+                "intelligence.request.content-indexing",
+                payload,
+                context?.Timeout,
+                ct);
+
+            if (response?.Success == true && response.Payload is Dictionary<string, object> result)
+            {
+                return new ContentIndexingResult
+                {
+                    ContentId = contentId,
+                    Embedding = result.TryGetValue("embedding", out var emb) && emb is float[] embedding ? embedding : null,
+                    EmbeddingModel = result.TryGetValue("embeddingModel", out var em) && em is string model ? model : null,
+                    Keywords = result.TryGetValue("keywords", out var kw) && kw is KeywordInfo[] keywords ? keywords : Array.Empty<KeywordInfo>(),
+                    Entities = result.TryGetValue("entities", out var ent) && ent is IndexedEntity[] entities ? entities : Array.Empty<IndexedEntity>(),
+                    Topics = result.TryGetValue("topics", out var top) && top is string[] topics ? topics : Array.Empty<string>(),
+                    Summary = result.TryGetValue("summary", out var sum) && sum is string summary ? summary : null,
+                    Language = result.TryGetValue("language", out var lang) && lang is string language ? language : null,
+                    Sentiment = result.TryGetValue("sentiment", out var sent) && sent is string sentiment ? sentiment : null,
+                    SentimentScore = result.TryGetValue("sentimentScore", out var ss) && ss is double sentScore ? sentScore : null,
+                    Confidence = result.TryGetValue("confidence", out var conf) && conf is double confidence ? confidence : 0.5,
+                    IndexedAt = DateTimeOffset.UtcNow
+                };
+            }
+
+            return null;
+        }
+
         /// <inheritdoc/>
         protected override Dictionary<string, object> GetMetadata()
         {
@@ -1097,6 +1983,323 @@ namespace DataWarehouse.SDK.Contracts.IntelligenceAware
             metadata["DataManagementType"] = "IntelligenceAware";
             metadata["SupportsSemanticDeduplication"] = HasCapability(IntelligenceCapabilities.SemanticDeduplication);
             metadata["SupportsLifecyclePrediction"] = HasCapability(IntelligenceCapabilities.DataLifecyclePrediction);
+            metadata["SupportsContentIndexing"] = HasCapability(IntelligenceCapabilities.Embeddings) ||
+                                                   HasCapability(IntelligenceCapabilities.KeywordExtraction);
+            return metadata;
+        }
+    }
+
+    #endregion
+
+    #region Key Management Plugin Base
+
+    /// <summary>
+    /// Intelligence-aware base class for key management plugins.
+    /// Provides hooks for AI-powered key usage pattern analysis, rotation prediction,
+    /// and compromise risk assessment.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Key management plugins can leverage Intelligence for:
+    /// </para>
+    /// <list type="bullet">
+    ///   <item>Anomalous key usage pattern detection</item>
+    ///   <item>Predictive key rotation scheduling based on usage patterns</item>
+    ///   <item>AI-driven compromise risk assessment</item>
+    ///   <item>Intelligent key lifecycle management</item>
+    /// </list>
+    /// </remarks>
+    public abstract class IntelligenceAwareKeyManagementPluginBase : IntelligenceAwarePluginBase
+    {
+        /// <summary>
+        /// Gets the key store type (e.g., "file", "vault", "hsm", "kms").
+        /// </summary>
+        public abstract string KeyStoreType { get; }
+
+        /// <summary>
+        /// Gets whether this key store supports Hardware Security Module (HSM) operations.
+        /// </summary>
+        public virtual bool SupportsHsm => false;
+
+        /// <summary>
+        /// Analyzes key usage patterns for anomalies.
+        /// </summary>
+        /// <remarks>
+        /// <para>
+        /// This hook detects anomalous key usage patterns such as:
+        /// </para>
+        /// <list type="bullet">
+        ///   <item>Unusual access frequency or timing</item>
+        ///   <item>Access from unexpected sources</item>
+        ///   <item>Bulk key operations that may indicate exfiltration</item>
+        ///   <item>Keys accessed outside normal business hours</item>
+        /// </list>
+        /// </remarks>
+        /// <param name="keyId">The key identifier being analyzed.</param>
+        /// <param name="usageEvents">Recent usage events for the key.</param>
+        /// <param name="baselineProfile">Optional baseline usage profile for comparison.</param>
+        /// <param name="context">Intelligence context for the operation.</param>
+        /// <param name="ct">Cancellation token.</param>
+        /// <returns>Usage pattern analysis result, or null if unavailable.</returns>
+        protected async Task<KeyUsagePatternResult?> OnKeyUsagePatternAsync(
+            string keyId,
+            KeyUsageEvent[] usageEvents,
+            KeyUsageProfile? baselineProfile = null,
+            IntelligenceContext? context = null,
+            CancellationToken ct = default)
+        {
+            if (!HasCapability(IntelligenceCapabilities.AnomalyDetection))
+                return null;
+
+            var payload = new Dictionary<string, object>
+            {
+                ["keyId"] = keyId,
+                ["keyStoreType"] = KeyStoreType,
+                ["usageEvents"] = usageEvents.Select(e => new Dictionary<string, object>
+                {
+                    ["timestamp"] = e.Timestamp.ToString("O"),
+                    ["operation"] = e.Operation,
+                    ["userId"] = e.UserId ?? string.Empty,
+                    ["sourceIp"] = e.SourceIp ?? string.Empty,
+                    ["success"] = e.Success,
+                    ["duration"] = e.Duration.TotalMilliseconds
+                }).ToArray(),
+                ["eventCount"] = usageEvents.Length,
+                ["pluginId"] = Id,
+                ["contextId"] = context?.ContextId ?? Guid.NewGuid().ToString("N")
+            };
+
+            if (baselineProfile != null)
+            {
+                payload["baseline"] = new Dictionary<string, object>
+                {
+                    ["averageDailyUsage"] = baselineProfile.AverageDailyUsage,
+                    ["typicalHours"] = baselineProfile.TypicalHours,
+                    ["commonOperations"] = baselineProfile.CommonOperations,
+                    ["knownSources"] = baselineProfile.KnownSources,
+                    ["baselineCreatedAt"] = baselineProfile.BaselineCreatedAt.ToString("O")
+                };
+            }
+
+            var response = await SendIntelligenceRequestAsync(
+                IntelligenceTopics.RequestAnomalyDetection,
+                payload,
+                context?.Timeout,
+                ct);
+
+            if (response?.Success == true && response.Payload is Dictionary<string, object> result)
+            {
+                return new KeyUsagePatternResult
+                {
+                    KeyId = keyId,
+                    IsAnomaly = result.TryGetValue("isAnomaly", out var ia) && ia is true,
+                    AnomalyScore = result.TryGetValue("anomalyScore", out var ascore) && ascore is double score ? score : 0.0,
+                    AnomalyTypes = result.TryGetValue("anomalyTypes", out var at) && at is string[] types ? types : Array.Empty<string>(),
+                    RiskLevel = result.TryGetValue("riskLevel", out var rl) && rl is string risk ? risk : "Low",
+                    Findings = result.TryGetValue("findings", out var f) && f is string[] findings ? findings : Array.Empty<string>(),
+                    Recommendations = result.TryGetValue("recommendations", out var r) && r is string[] recs ? recs : Array.Empty<string>(),
+                    ShouldRotate = result.TryGetValue("shouldRotate", out var sr) && sr is true,
+                    ShouldRevoke = result.TryGetValue("shouldRevoke", out var srev) && srev is true,
+                    ShouldAlert = result.TryGetValue("shouldAlert", out var sa) && sa is true,
+                    AnalyzedAt = DateTimeOffset.UtcNow
+                };
+            }
+
+            return null;
+        }
+
+        /// <summary>
+        /// Predicts optimal key rotation timing based on usage patterns and security best practices.
+        /// </summary>
+        /// <remarks>
+        /// <para>
+        /// This hook enables AI-driven rotation scheduling based on:
+        /// </para>
+        /// <list type="bullet">
+        ///   <item>Key age and compliance requirements</item>
+        ///   <item>Usage frequency and patterns</item>
+        ///   <item>Risk factors and threat landscape</item>
+        ///   <item>Business impact considerations</item>
+        /// </list>
+        /// </remarks>
+        /// <param name="keyId">The key identifier.</param>
+        /// <param name="keyMetadata">Metadata about the key.</param>
+        /// <param name="usageHistory">Historical usage data.</param>
+        /// <param name="complianceRequirements">Applicable compliance requirements.</param>
+        /// <param name="context">Intelligence context for the operation.</param>
+        /// <param name="ct">Cancellation token.</param>
+        /// <returns>Rotation prediction with recommended timing, or null if unavailable.</returns>
+        protected async Task<KeyRotationPrediction?> PredictKeyRotationAsync(
+            string keyId,
+            KeyRotationMetadata keyMetadata,
+            KeyUsageHistorySummary? usageHistory = null,
+            string[]? complianceRequirements = null,
+            IntelligenceContext? context = null,
+            CancellationToken ct = default)
+        {
+            if (!HasCapability(IntelligenceCapabilities.Prediction))
+                return null;
+
+            var payload = new Dictionary<string, object>
+            {
+                ["keyId"] = keyId,
+                ["keyStoreType"] = KeyStoreType,
+                ["keyMetadata"] = new Dictionary<string, object>
+                {
+                    ["createdAt"] = keyMetadata.CreatedAt.ToString("O"),
+                    ["lastRotatedAt"] = keyMetadata.LastRotatedAt?.ToString("O") ?? string.Empty,
+                    ["keySize"] = keyMetadata.KeySize,
+                    ["algorithm"] = keyMetadata.Algorithm ?? string.Empty,
+                    ["rotationCount"] = keyMetadata.RotationCount,
+                    ["isActive"] = keyMetadata.IsActive
+                },
+                ["pluginId"] = Id,
+                ["contextId"] = context?.ContextId ?? Guid.NewGuid().ToString("N")
+            };
+
+            if (usageHistory != null)
+            {
+                payload["usageHistory"] = new Dictionary<string, object>
+                {
+                    ["totalOperations"] = usageHistory.TotalOperations,
+                    ["uniqueUsers"] = usageHistory.UniqueUsers,
+                    ["peakUsageHour"] = usageHistory.PeakUsageHour,
+                    ["averageDailyOperations"] = usageHistory.AverageDailyOperations,
+                    ["lastUsedAt"] = usageHistory.LastUsedAt?.ToString("O") ?? string.Empty
+                };
+            }
+
+            if (complianceRequirements != null)
+                payload["complianceRequirements"] = complianceRequirements;
+
+            var response = await SendIntelligenceRequestAsync(
+                IntelligenceTopics.RequestPrediction,
+                payload,
+                context?.Timeout,
+                ct);
+
+            if (response?.Success == true && response.Payload is Dictionary<string, object> result)
+            {
+                return new KeyRotationPrediction
+                {
+                    KeyId = keyId,
+                    ShouldRotate = result.TryGetValue("shouldRotate", out var sr) && sr is true,
+                    RecommendedRotationDate = result.TryGetValue("recommendedRotationDate", out var rrd) && rrd is string dateStr && DateTimeOffset.TryParse(dateStr, out var date) ? date : null,
+                    UrgencyLevel = result.TryGetValue("urgencyLevel", out var ul) && ul is string urgency ? urgency : "Normal",
+                    RiskIfDelayed = result.TryGetValue("riskIfDelayed", out var rid) && rid is double risk ? risk : 0.0,
+                    Reasoning = result.TryGetValue("reasoning", out var r) && r is string reason ? reason : null,
+                    ComplianceDrivers = result.TryGetValue("complianceDrivers", out var cd) && cd is string[] drivers ? drivers : Array.Empty<string>(),
+                    OptimalRotationWindow = result.TryGetValue("optimalRotationWindow", out var orw) && orw is string window ? window : null,
+                    EstimatedDowntime = result.TryGetValue("estimatedDowntime", out var ed) && ed is string downtime && TimeSpan.TryParse(downtime, out var dt) ? dt : null,
+                    Confidence = result.TryGetValue("confidence", out var conf) && conf is double confidence ? confidence : 0.5,
+                    PredictedAt = DateTimeOffset.UtcNow
+                };
+            }
+
+            return null;
+        }
+
+        /// <summary>
+        /// Assesses the risk of key compromise based on various signals.
+        /// </summary>
+        /// <remarks>
+        /// <para>
+        /// This hook provides AI-driven threat assessment for keys:
+        /// </para>
+        /// <list type="bullet">
+        ///   <item>Exposure risk from access patterns</item>
+        ///   <item>Threat intelligence correlation</item>
+        ///   <item>Infrastructure vulnerability assessment</item>
+        ///   <item>Historical incident correlation</item>
+        /// </list>
+        /// </remarks>
+        /// <param name="keyId">The key identifier.</param>
+        /// <param name="riskFactors">Known risk factors to consider.</param>
+        /// <param name="threatIntelligence">Optional threat intelligence data.</param>
+        /// <param name="context">Intelligence context for the operation.</param>
+        /// <param name="ct">Cancellation token.</param>
+        /// <returns>Compromise risk assessment, or null if unavailable.</returns>
+        protected async Task<KeyCompromiseRiskResult?> GetCompromiseRiskAsync(
+            string keyId,
+            KeyRiskFactors riskFactors,
+            ThreatIntelligenceData[]? threatIntelligence = null,
+            IntelligenceContext? context = null,
+            CancellationToken ct = default)
+        {
+            if (!HasCapability(IntelligenceCapabilities.ThreatAssessment))
+                return null;
+
+            var payload = new Dictionary<string, object>
+            {
+                ["keyId"] = keyId,
+                ["keyStoreType"] = KeyStoreType,
+                ["supportsHsm"] = SupportsHsm,
+                ["riskFactors"] = new Dictionary<string, object>
+                {
+                    ["keyAge"] = riskFactors.KeyAge.TotalDays,
+                    ["accessCount"] = riskFactors.AccessCount,
+                    ["uniqueAccessors"] = riskFactors.UniqueAccessors,
+                    ["hasExternalAccess"] = riskFactors.HasExternalAccess,
+                    ["isStoredInHsm"] = riskFactors.IsStoredInHsm,
+                    ["hasBeenExported"] = riskFactors.HasBeenExported,
+                    ["lastAuditedAt"] = riskFactors.LastAuditedAt?.ToString("O") ?? string.Empty,
+                    ["complianceViolations"] = riskFactors.ComplianceViolations
+                },
+                ["pluginId"] = Id,
+                ["contextId"] = context?.ContextId ?? Guid.NewGuid().ToString("N")
+            };
+
+            if (threatIntelligence != null && threatIntelligence.Length > 0)
+            {
+                payload["threatIntelligence"] = threatIntelligence.Select(ti => new Dictionary<string, object>
+                {
+                    ["source"] = ti.Source,
+                    ["threatType"] = ti.ThreatType,
+                    ["severity"] = ti.Severity,
+                    ["reportedAt"] = ti.ReportedAt.ToString("O"),
+                    ["indicators"] = ti.Indicators
+                }).ToArray();
+            }
+
+            var response = await SendIntelligenceRequestAsync(
+                IntelligenceTopics.RequestThreatAssessment,
+                payload,
+                context?.Timeout,
+                ct);
+
+            if (response?.Success == true && response.Payload is Dictionary<string, object> result)
+            {
+                return new KeyCompromiseRiskResult
+                {
+                    KeyId = keyId,
+                    RiskLevel = result.TryGetValue("riskLevel", out var rl) && rl is string level ? level : "Low",
+                    RiskScore = result.TryGetValue("riskScore", out var rs) && rs is double score ? score : 0.0,
+                    CompromiseIndicators = result.TryGetValue("compromiseIndicators", out var ci) && ci is CompromiseIndicator[] indicators ? indicators : Array.Empty<CompromiseIndicator>(),
+                    VulnerabilityFactors = result.TryGetValue("vulnerabilityFactors", out var vf) && vf is string[] factors ? factors : Array.Empty<string>(),
+                    ThreatActors = result.TryGetValue("threatActors", out var ta) && ta is string[] actors ? actors : Array.Empty<string>(),
+                    ImmediateActions = result.TryGetValue("immediateActions", out var ia) && ia is string[] actions ? actions : Array.Empty<string>(),
+                    LongTermRecommendations = result.TryGetValue("longTermRecommendations", out var ltr) && ltr is string[] recs ? recs : Array.Empty<string>(),
+                    ShouldRevokeImmediately = result.TryGetValue("shouldRevokeImmediately", out var sri) && sri is true,
+                    ShouldNotifySecurityTeam = result.TryGetValue("shouldNotifySecurityTeam", out var snst) && snst is true,
+                    Confidence = result.TryGetValue("confidence", out var conf) && conf is double confidence ? confidence : 0.5,
+                    AssessedAt = DateTimeOffset.UtcNow,
+                    ValidUntil = result.TryGetValue("validUntil", out var vu) && vu is string vuStr && DateTimeOffset.TryParse(vuStr, out var vuDate) ? vuDate : DateTimeOffset.UtcNow.AddHours(1)
+                };
+            }
+
+            return null;
+        }
+
+        /// <inheritdoc/>
+        protected override Dictionary<string, object> GetMetadata()
+        {
+            var metadata = base.GetMetadata();
+            metadata["KeyManagementType"] = "IntelligenceAware";
+            metadata["KeyStoreType"] = KeyStoreType;
+            metadata["SupportsHsm"] = SupportsHsm;
+            metadata["SupportsUsagePatternAnalysis"] = HasCapability(IntelligenceCapabilities.AnomalyDetection);
+            metadata["SupportsRotationPrediction"] = HasCapability(IntelligenceCapabilities.Prediction);
+            metadata["SupportsCompromiseRiskAssessment"] = HasCapability(IntelligenceCapabilities.ThreatAssessment);
             return metadata;
         }
     }
@@ -1404,6 +2607,635 @@ namespace DataWarehouse.SDK.Contracts.IntelligenceAware
         public TimeSpan? RetentionPeriod { get; init; }
         public double Confidence { get; init; }
         public string? Reasoning { get; init; }
+    }
+
+    #endregion
+
+    #region Encryption Anomaly Detection Types
+
+    /// <summary>
+    /// Metrics for an encryption operation used in anomaly detection.
+    /// </summary>
+    public sealed class EncryptionOperationMetrics
+    {
+        /// <summary>The encryption algorithm used.</summary>
+        public string Algorithm { get; init; } = string.Empty;
+
+        /// <summary>The key size in bits.</summary>
+        public int KeySize { get; init; }
+
+        /// <summary>The size of the data being encrypted in bytes.</summary>
+        public long DataSize { get; init; }
+
+        /// <summary>The type of operation (encrypt/decrypt).</summary>
+        public string OperationType { get; init; } = "encrypt";
+
+        /// <summary>When the operation occurred.</summary>
+        public DateTimeOffset Timestamp { get; init; } = DateTimeOffset.UtcNow;
+
+        /// <summary>How long the operation took.</summary>
+        public TimeSpan Duration { get; init; }
+
+        /// <summary>Optional source identifier for the operation.</summary>
+        public string? SourceId { get; init; }
+    }
+
+    /// <summary>
+    /// Historical patterns for encryption operations used as baseline for anomaly detection.
+    /// </summary>
+    public sealed class EncryptionPatternHistory
+    {
+        /// <summary>Average number of operations per hour in normal conditions.</summary>
+        public double AverageOperationsPerHour { get; init; }
+
+        /// <summary>Typical minimum data size for operations.</summary>
+        public long TypicalMinDataSize { get; init; }
+
+        /// <summary>Typical maximum data size for operations.</summary>
+        public long TypicalMaxDataSize { get; init; }
+
+        /// <summary>List of commonly used algorithms.</summary>
+        public string[] CommonAlgorithms { get; init; } = Array.Empty<string>();
+
+        /// <summary>When the baseline was established.</summary>
+        public DateTimeOffset BaselineEstablishedAt { get; init; }
+    }
+
+    /// <summary>
+    /// Result of encryption anomaly detection.
+    /// </summary>
+    public sealed class EncryptionAnomalyResult
+    {
+        /// <summary>Whether an anomaly was detected.</summary>
+        public bool IsAnomaly { get; init; }
+
+        /// <summary>Anomaly score (0.0-1.0).</summary>
+        public double AnomalyScore { get; init; }
+
+        /// <summary>Type of anomaly detected (e.g., "UnusualVolume", "UnusualAlgorithm").</summary>
+        public string? AnomalyType { get; init; }
+
+        /// <summary>Human-readable description of the anomaly.</summary>
+        public string? Description { get; init; }
+
+        /// <summary>Severity level of the anomaly.</summary>
+        public string Severity { get; init; } = "Low";
+
+        /// <summary>Recommended actions to address the anomaly.</summary>
+        public string[] Recommendations { get; init; } = Array.Empty<string>();
+
+        /// <summary>Whether an alert should be raised.</summary>
+        public bool ShouldAlert { get; init; }
+
+        /// <summary>Whether the operation should be blocked.</summary>
+        public bool ShouldBlock { get; init; }
+    }
+
+    #endregion
+
+    #region Content Analysis Types
+
+    /// <summary>
+    /// Metadata about content being analyzed for compression or other processing.
+    /// </summary>
+    public sealed class ContentMetadata
+    {
+        /// <summary>Original file name if applicable.</summary>
+        public string? FileName { get; init; }
+
+        /// <summary>MIME type of the content.</summary>
+        public string? MimeType { get; init; }
+
+        /// <summary>When the content was created.</summary>
+        public DateTimeOffset? CreatedAt { get; init; }
+
+        /// <summary>Tags associated with the content.</summary>
+        public string[]? Tags { get; init; }
+
+        /// <summary>Additional custom metadata.</summary>
+        public Dictionary<string, object>? CustomMetadata { get; init; }
+    }
+
+    /// <summary>
+    /// Result of AI-powered content analysis for compression optimization.
+    /// </summary>
+    public sealed class ContentAnalysisResult
+    {
+        /// <summary>Detected content type (e.g., "text", "binary", "image").</summary>
+        public string ContentType { get; init; } = "unknown";
+
+        /// <summary>Whether the content is compressible.</summary>
+        public bool IsCompressible { get; init; } = true;
+
+        /// <summary>Whether the content appears to be already compressed.</summary>
+        public bool IsAlreadyCompressed { get; init; }
+
+        /// <summary>Estimated compression ratio achievable.</summary>
+        public double EstimatedCompressionRatio { get; init; } = 1.0;
+
+        /// <summary>Recommended compression algorithm.</summary>
+        public string? RecommendedAlgorithm { get; init; }
+
+        /// <summary>Recommended compression level.</summary>
+        public int RecommendedLevel { get; init; } = 6;
+
+        /// <summary>Pre-processing steps recommended.</summary>
+        public string[] PreProcessingSteps { get; init; } = Array.Empty<string>();
+
+        /// <summary>Sensitivity level of the content.</summary>
+        public string SensitivityLevel { get; init; } = "Normal";
+
+        /// <summary>Confidence in the analysis (0.0-1.0).</summary>
+        public double Confidence { get; init; }
+    }
+
+    #endregion
+
+    #region Data Classification Types
+
+    /// <summary>
+    /// Result of AI-powered data classification for storage and governance.
+    /// </summary>
+    public sealed class DataClassificationResult
+    {
+        /// <summary>Sensitivity level (Public, Internal, Confidential, Restricted).</summary>
+        public string SensitivityLevel { get; init; } = "Normal";
+
+        /// <summary>Applicable compliance frameworks.</summary>
+        public string[] ComplianceFrameworks { get; init; } = Array.Empty<string>();
+
+        /// <summary>Content categories.</summary>
+        public string[] Categories { get; init; } = Array.Empty<string>();
+
+        /// <summary>Classification tags.</summary>
+        public string[] Tags { get; init; } = Array.Empty<string>();
+
+        /// <summary>Whether PII was detected.</summary>
+        public bool ContainsPII { get; init; }
+
+        /// <summary>Types of PII detected.</summary>
+        public string[] PIITypes { get; init; } = Array.Empty<string>();
+
+        /// <summary>Recommended retention policy.</summary>
+        public string? RetentionPolicy { get; init; }
+
+        /// <summary>Whether encryption is required.</summary>
+        public bool EncryptionRequired { get; init; }
+
+        /// <summary>Confidence in the classification.</summary>
+        public double Confidence { get; init; }
+
+        /// <summary>Reasoning for the classification.</summary>
+        public string? Reasoning { get; init; }
+    }
+
+    #endregion
+
+    #region Audit Types
+
+    /// <summary>
+    /// An anomaly detected during compliance audit.
+    /// </summary>
+    public sealed class AuditAnomaly
+    {
+        /// <summary>Type of anomaly detected.</summary>
+        public string Type { get; init; } = string.Empty;
+
+        /// <summary>Description of the anomaly.</summary>
+        public string Description { get; init; } = string.Empty;
+
+        /// <summary>Severity level.</summary>
+        public string Severity { get; init; } = "Low";
+
+        /// <summary>Affected resources.</summary>
+        public string[] AffectedResources { get; init; } = Array.Empty<string>();
+
+        /// <summary>Recommended remediation steps.</summary>
+        public string[] RemediationSteps { get; init; } = Array.Empty<string>();
+    }
+
+    /// <summary>An audit log entry for compliance analysis.</summary>
+    public sealed class AuditLogEntry
+    {
+        /// <summary>When the event occurred.</summary>
+        public DateTimeOffset Timestamp { get; init; }
+        /// <summary>The action performed.</summary>
+        public string Action { get; init; } = string.Empty;
+        /// <summary>User who performed the action.</summary>
+        public string? UserId { get; init; }
+        /// <summary>Resource affected by the action.</summary>
+        public string? ResourceId { get; init; }
+        /// <summary>Outcome of the action (Success/Failure).</summary>
+        public string Outcome { get; init; } = "Success";
+        /// <summary>Additional details about the action.</summary>
+        public string? Details { get; init; }
+        /// <summary>Severity level of the event.</summary>
+        public string? Severity { get; init; }
+        /// <summary>Source IP address.</summary>
+        public string? SourceIp { get; init; }
+    }
+
+    /// <summary>Options for audit summary generation.</summary>
+    public sealed class AuditSummaryOptions
+    {
+        /// <summary>Output format (Narrative, Bullet, Table).</summary>
+        public string? Format { get; init; }
+        /// <summary>Target audience (Technical, Executive, Compliance).</summary>
+        public string? Audience { get; init; }
+        /// <summary>Maximum length of the summary.</summary>
+        public int? MaxLength { get; init; }
+        /// <summary>Whether to include recommendations.</summary>
+        public bool IncludeRecommendations { get; init; } = true;
+        /// <summary>Whether to highlight anomalies.</summary>
+        public bool HighlightAnomalies { get; init; } = true;
+        /// <summary>Compliance framework to focus on.</summary>
+        public string? ComplianceFramework { get; init; }
+    }
+
+    /// <summary>Result of AI-generated audit summary.</summary>
+    public sealed class AuditSummaryResult
+    {
+        /// <summary>The generated summary narrative.</summary>
+        public string Summary { get; init; } = string.Empty;
+        /// <summary>Number of entries summarized.</summary>
+        public int EntryCount { get; init; }
+        /// <summary>Time range covered by the summary.</summary>
+        public AuditTimeRange? TimeRange { get; init; }
+        /// <summary>Key findings from the audit.</summary>
+        public string[] KeyFindings { get; init; } = Array.Empty<string>();
+        /// <summary>Anomalies detected in the audit data.</summary>
+        public AuditAnomaly[] AnomaliesDetected { get; init; } = Array.Empty<AuditAnomaly>();
+        /// <summary>Recommended actions based on the audit.</summary>
+        public string[] Recommendations { get; init; } = Array.Empty<string>();
+        /// <summary>Overall risk level assessment.</summary>
+        public string RiskLevel { get; init; } = "Low";
+        /// <summary>Compliance status summary.</summary>
+        public string ComplianceStatus { get; init; } = "Unknown";
+        /// <summary>When the summary was generated.</summary>
+        public DateTimeOffset GeneratedAt { get; init; }
+    }
+
+    /// <summary>Time range for audit summary.</summary>
+    public sealed class AuditTimeRange
+    {
+        /// <summary>Start of the time range.</summary>
+        public DateTimeOffset Start { get; init; }
+        /// <summary>End of the time range.</summary>
+        public DateTimeOffset End { get; init; }
+    }
+
+    #endregion
+
+    #region Threat Prediction Types
+
+    /// <summary>Context for threat analysis.</summary>
+    public sealed class ThreatAnalysisContext
+    {
+        /// <summary>User identifier.</summary>
+        public string? UserId { get; init; }
+        /// <summary>Resource being accessed.</summary>
+        public string? ResourceId { get; init; }
+        /// <summary>Action being performed.</summary>
+        public string? ActionType { get; init; }
+        /// <summary>Source IP address.</summary>
+        public string? SourceIp { get; init; }
+        /// <summary>User agent string.</summary>
+        public string? UserAgent { get; init; }
+        /// <summary>When the action is occurring.</summary>
+        public DateTimeOffset Timestamp { get; init; } = DateTimeOffset.UtcNow;
+        /// <summary>Geographic location.</summary>
+        public string? GeoLocation { get; init; }
+        /// <summary>Device fingerprint.</summary>
+        public string? DeviceFingerprint { get; init; }
+    }
+
+    /// <summary>Historical threat data.</summary>
+    public sealed class ThreatHistoryData
+    {
+        /// <summary>Type of threat.</summary>
+        public string ThreatType { get; init; } = string.Empty;
+        /// <summary>Severity level.</summary>
+        public string Severity { get; init; } = "Low";
+        /// <summary>When the threat was detected.</summary>
+        public DateTimeOffset Timestamp { get; init; }
+        /// <summary>Whether the threat was blocked.</summary>
+        public bool WasBlocked { get; init; }
+        /// <summary>Source IP of the threat.</summary>
+        public string? SourceIp { get; init; }
+    }
+
+    /// <summary>A predicted threat.</summary>
+    public sealed class PredictedThreat
+    {
+        /// <summary>Type of predicted threat.</summary>
+        public string ThreatType { get; init; } = string.Empty;
+        /// <summary>Probability of the threat (0.0-1.0).</summary>
+        public double Probability { get; init; }
+        /// <summary>Potential impact.</summary>
+        public string Impact { get; init; } = "Low";
+        /// <summary>Description of the threat.</summary>
+        public string? Description { get; init; }
+    }
+
+    /// <summary>Result of threat prediction.</summary>
+    public sealed class ThreatPredictionResult
+    {
+        /// <summary>Overall threat level.</summary>
+        public string ThreatLevel { get; init; } = "Low";
+        /// <summary>Risk score (0.0-1.0).</summary>
+        public double RiskScore { get; init; }
+        /// <summary>Predicted threats.</summary>
+        public PredictedThreat[] PredictedThreats { get; init; } = Array.Empty<PredictedThreat>();
+        /// <summary>Potential attack vectors.</summary>
+        public string[] AttackVectors { get; init; } = Array.Empty<string>();
+        /// <summary>Mitigation recommendations.</summary>
+        public string[] MitigationRecommendations { get; init; } = Array.Empty<string>();
+        /// <summary>Whether to block the action.</summary>
+        public bool ShouldBlock { get; init; }
+        /// <summary>Whether to raise an alert.</summary>
+        public bool ShouldAlert { get; init; }
+        /// <summary>Whether additional authentication is required.</summary>
+        public bool RequiresAdditionalAuthentication { get; init; }
+        /// <summary>Confidence in the prediction.</summary>
+        public double Confidence { get; init; }
+        /// <summary>When the prediction expires.</summary>
+        public DateTimeOffset? ExpiresAt { get; init; }
+    }
+
+    #endregion
+
+    #region Content Indexing Types
+
+    /// <summary>Options for content indexing.</summary>
+    public sealed class ContentIndexingOptions
+    {
+        /// <summary>Whether to generate embeddings.</summary>
+        public bool GenerateEmbedding { get; init; } = true;
+        /// <summary>Whether to extract keywords.</summary>
+        public bool ExtractKeywords { get; init; } = true;
+        /// <summary>Whether to extract entities.</summary>
+        public bool ExtractEntities { get; init; } = true;
+        /// <summary>Whether to generate a summary.</summary>
+        public bool GenerateSummary { get; init; } = true;
+        /// <summary>Maximum number of keywords to extract.</summary>
+        public int MaxKeywords { get; init; } = 20;
+        /// <summary>Maximum number of entities to extract.</summary>
+        public int MaxEntities { get; init; } = 50;
+        /// <summary>Maximum length of the summary.</summary>
+        public int SummaryMaxLength { get; init; } = 500;
+    }
+
+    /// <summary>Result of content indexing.</summary>
+    public sealed class ContentIndexingResult
+    {
+        /// <summary>The content identifier.</summary>
+        public string ContentId { get; init; } = string.Empty;
+        /// <summary>Generated embedding vector.</summary>
+        public float[]? Embedding { get; init; }
+        /// <summary>Model used for embedding generation.</summary>
+        public string? EmbeddingModel { get; init; }
+        /// <summary>Extracted keywords with relevance scores.</summary>
+        public KeywordInfo[] Keywords { get; init; } = Array.Empty<KeywordInfo>();
+        /// <summary>Extracted entities.</summary>
+        public IndexedEntity[] Entities { get; init; } = Array.Empty<IndexedEntity>();
+        /// <summary>Detected topics.</summary>
+        public string[] Topics { get; init; } = Array.Empty<string>();
+        /// <summary>Generated summary.</summary>
+        public string? Summary { get; init; }
+        /// <summary>Detected language.</summary>
+        public string? Language { get; init; }
+        /// <summary>Detected sentiment.</summary>
+        public string? Sentiment { get; init; }
+        /// <summary>Sentiment score (-1.0 to 1.0).</summary>
+        public double? SentimentScore { get; init; }
+        /// <summary>Confidence in the indexing results.</summary>
+        public double Confidence { get; init; }
+        /// <summary>When the content was indexed.</summary>
+        public DateTimeOffset IndexedAt { get; init; }
+    }
+
+    /// <summary>Information about an extracted keyword.</summary>
+    public sealed class KeywordInfo
+    {
+        /// <summary>The keyword.</summary>
+        public string Keyword { get; init; } = string.Empty;
+        /// <summary>Relevance score (0.0-1.0).</summary>
+        public double Relevance { get; init; }
+        /// <summary>Number of occurrences.</summary>
+        public int Count { get; init; }
+    }
+
+    /// <summary>An entity extracted during indexing.</summary>
+    public sealed class IndexedEntity
+    {
+        /// <summary>The entity text.</summary>
+        public string Text { get; init; } = string.Empty;
+        /// <summary>Entity type.</summary>
+        public string Type { get; init; } = string.Empty;
+        /// <summary>Confidence score.</summary>
+        public double Confidence { get; init; }
+    }
+
+    #endregion
+
+    #region Key Management Types
+
+    /// <summary>A key usage event for pattern analysis.</summary>
+    public sealed class KeyUsageEvent
+    {
+        /// <summary>When the event occurred.</summary>
+        public DateTimeOffset Timestamp { get; init; }
+        /// <summary>Operation performed (GetKey, CreateKey, DeleteKey).</summary>
+        public string Operation { get; init; } = string.Empty;
+        /// <summary>User who performed the operation.</summary>
+        public string? UserId { get; init; }
+        /// <summary>Source IP address.</summary>
+        public string? SourceIp { get; init; }
+        /// <summary>Whether the operation succeeded.</summary>
+        public bool Success { get; init; }
+        /// <summary>Duration of the operation.</summary>
+        public TimeSpan Duration { get; init; }
+    }
+
+    /// <summary>Baseline profile for key usage patterns.</summary>
+    public sealed class KeyUsageProfile
+    {
+        /// <summary>Average daily usage count.</summary>
+        public double AverageDailyUsage { get; init; }
+        /// <summary>Typical hours when key is used (0-23).</summary>
+        public int[] TypicalHours { get; init; } = Array.Empty<int>();
+        /// <summary>Common operations performed.</summary>
+        public string[] CommonOperations { get; init; } = Array.Empty<string>();
+        /// <summary>Known source IPs/ranges.</summary>
+        public string[] KnownSources { get; init; } = Array.Empty<string>();
+        /// <summary>When the baseline was created.</summary>
+        public DateTimeOffset BaselineCreatedAt { get; init; }
+    }
+
+    /// <summary>Result of key usage pattern analysis.</summary>
+    public sealed class KeyUsagePatternResult
+    {
+        /// <summary>The key identifier.</summary>
+        public string KeyId { get; init; } = string.Empty;
+        /// <summary>Whether an anomaly was detected.</summary>
+        public bool IsAnomaly { get; init; }
+        /// <summary>Anomaly score (0.0-1.0).</summary>
+        public double AnomalyScore { get; init; }
+        /// <summary>Types of anomalies detected.</summary>
+        public string[] AnomalyTypes { get; init; } = Array.Empty<string>();
+        /// <summary>Risk level assessment.</summary>
+        public string RiskLevel { get; init; } = "Low";
+        /// <summary>Detailed findings.</summary>
+        public string[] Findings { get; init; } = Array.Empty<string>();
+        /// <summary>Recommended actions.</summary>
+        public string[] Recommendations { get; init; } = Array.Empty<string>();
+        /// <summary>Whether key should be rotated.</summary>
+        public bool ShouldRotate { get; init; }
+        /// <summary>Whether key should be revoked.</summary>
+        public bool ShouldRevoke { get; init; }
+        /// <summary>Whether an alert should be raised.</summary>
+        public bool ShouldAlert { get; init; }
+        /// <summary>When the analysis was performed.</summary>
+        public DateTimeOffset AnalyzedAt { get; init; }
+    }
+
+    /// <summary>Metadata for key rotation prediction.</summary>
+    public sealed class KeyRotationMetadata
+    {
+        /// <summary>When the key was created.</summary>
+        public DateTimeOffset CreatedAt { get; init; }
+        /// <summary>When the key was last rotated.</summary>
+        public DateTimeOffset? LastRotatedAt { get; init; }
+        /// <summary>Key size in bits.</summary>
+        public int KeySize { get; init; }
+        /// <summary>Encryption algorithm.</summary>
+        public string? Algorithm { get; init; }
+        /// <summary>Number of times the key has been rotated.</summary>
+        public int RotationCount { get; init; }
+        /// <summary>Whether the key is currently active.</summary>
+        public bool IsActive { get; init; }
+    }
+
+    /// <summary>Historical usage summary for rotation prediction.</summary>
+    public sealed class KeyUsageHistorySummary
+    {
+        /// <summary>Total number of operations.</summary>
+        public long TotalOperations { get; init; }
+        /// <summary>Number of unique users.</summary>
+        public int UniqueUsers { get; init; }
+        /// <summary>Hour with peak usage (0-23).</summary>
+        public int PeakUsageHour { get; init; }
+        /// <summary>Average daily operations.</summary>
+        public double AverageDailyOperations { get; init; }
+        /// <summary>When the key was last used.</summary>
+        public DateTimeOffset? LastUsedAt { get; init; }
+    }
+
+    /// <summary>Prediction for key rotation timing.</summary>
+    public sealed class KeyRotationPrediction
+    {
+        /// <summary>The key identifier.</summary>
+        public string KeyId { get; init; } = string.Empty;
+        /// <summary>Whether rotation is recommended.</summary>
+        public bool ShouldRotate { get; init; }
+        /// <summary>Recommended date for rotation.</summary>
+        public DateTimeOffset? RecommendedRotationDate { get; init; }
+        /// <summary>Urgency level (Low, Normal, High, Critical).</summary>
+        public string UrgencyLevel { get; init; } = "Normal";
+        /// <summary>Risk score if rotation is delayed (0.0-1.0).</summary>
+        public double RiskIfDelayed { get; init; }
+        /// <summary>Reasoning for the recommendation.</summary>
+        public string? Reasoning { get; init; }
+        /// <summary>Compliance requirements driving the recommendation.</summary>
+        public string[] ComplianceDrivers { get; init; } = Array.Empty<string>();
+        /// <summary>Optimal time window for rotation.</summary>
+        public string? OptimalRotationWindow { get; init; }
+        /// <summary>Estimated downtime for rotation.</summary>
+        public TimeSpan? EstimatedDowntime { get; init; }
+        /// <summary>Confidence in the prediction.</summary>
+        public double Confidence { get; init; }
+        /// <summary>When the prediction was made.</summary>
+        public DateTimeOffset PredictedAt { get; init; }
+    }
+
+    /// <summary>Risk factors for key compromise assessment.</summary>
+    public sealed class KeyRiskFactors
+    {
+        /// <summary>Age of the key.</summary>
+        public TimeSpan KeyAge { get; init; }
+        /// <summary>Total access count.</summary>
+        public long AccessCount { get; init; }
+        /// <summary>Number of unique accessors.</summary>
+        public int UniqueAccessors { get; init; }
+        /// <summary>Whether the key has external access.</summary>
+        public bool HasExternalAccess { get; init; }
+        /// <summary>Whether the key is stored in HSM.</summary>
+        public bool IsStoredInHsm { get; init; }
+        /// <summary>Whether the key has been exported.</summary>
+        public bool HasBeenExported { get; init; }
+        /// <summary>When the key was last audited.</summary>
+        public DateTimeOffset? LastAuditedAt { get; init; }
+        /// <summary>Known compliance violations.</summary>
+        public int ComplianceViolations { get; init; }
+    }
+
+    /// <summary>Threat intelligence data for risk assessment.</summary>
+    public sealed class ThreatIntelligenceData
+    {
+        /// <summary>Source of the intelligence.</summary>
+        public string Source { get; init; } = string.Empty;
+        /// <summary>Type of threat.</summary>
+        public string ThreatType { get; init; } = string.Empty;
+        /// <summary>Severity level.</summary>
+        public string Severity { get; init; } = "Low";
+        /// <summary>When the threat was reported.</summary>
+        public DateTimeOffset ReportedAt { get; init; }
+        /// <summary>Indicators of compromise.</summary>
+        public string[] Indicators { get; init; } = Array.Empty<string>();
+    }
+
+    /// <summary>An indicator of potential compromise.</summary>
+    public sealed class CompromiseIndicator
+    {
+        /// <summary>Type of indicator.</summary>
+        public string Type { get; init; } = string.Empty;
+        /// <summary>Description of the indicator.</summary>
+        public string Description { get; init; } = string.Empty;
+        /// <summary>Severity level.</summary>
+        public string Severity { get; init; } = "Low";
+        /// <summary>When the indicator was detected.</summary>
+        public DateTimeOffset DetectedAt { get; init; }
+    }
+
+    /// <summary>Result of key compromise risk assessment.</summary>
+    public sealed class KeyCompromiseRiskResult
+    {
+        /// <summary>The key identifier.</summary>
+        public string KeyId { get; init; } = string.Empty;
+        /// <summary>Overall risk level.</summary>
+        public string RiskLevel { get; init; } = "Low";
+        /// <summary>Risk score (0.0-1.0).</summary>
+        public double RiskScore { get; init; }
+        /// <summary>Detected compromise indicators.</summary>
+        public CompromiseIndicator[] CompromiseIndicators { get; init; } = Array.Empty<CompromiseIndicator>();
+        /// <summary>Vulnerability factors identified.</summary>
+        public string[] VulnerabilityFactors { get; init; } = Array.Empty<string>();
+        /// <summary>Potential threat actors.</summary>
+        public string[] ThreatActors { get; init; } = Array.Empty<string>();
+        /// <summary>Immediate actions to take.</summary>
+        public string[] ImmediateActions { get; init; } = Array.Empty<string>();
+        /// <summary>Long-term recommendations.</summary>
+        public string[] LongTermRecommendations { get; init; } = Array.Empty<string>();
+        /// <summary>Whether to revoke the key immediately.</summary>
+        public bool ShouldRevokeImmediately { get; init; }
+        /// <summary>Whether to notify the security team.</summary>
+        public bool ShouldNotifySecurityTeam { get; init; }
+        /// <summary>Confidence in the assessment.</summary>
+        public double Confidence { get; init; }
+        /// <summary>When the assessment was performed.</summary>
+        public DateTimeOffset AssessedAt { get; init; }
+        /// <summary>How long the assessment is valid.</summary>
+        public DateTimeOffset ValidUntil { get; init; }
     }
 
     #endregion

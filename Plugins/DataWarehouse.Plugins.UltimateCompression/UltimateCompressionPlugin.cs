@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using DataWarehouse.SDK.AI;
 using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Contracts.Compression;
+using DataWarehouse.SDK.Contracts.IntelligenceAware;
 using DataWarehouse.SDK.Primitives;
 using DataWarehouse.SDK.Utilities;
 
@@ -11,6 +12,7 @@ namespace DataWarehouse.Plugins.UltimateCompression
     /// Ultimate Compression plugin that consolidates 50+ compression algorithms as strategies.
     /// Provides automatic content-aware algorithm selection, parallel compression,
     /// and real-time benchmarking for optimal compression across all workloads.
+    /// Intelligence-aware for AI-powered compression recommendations.
     /// </summary>
     /// <remarks>
     /// Supported algorithm families:
@@ -25,7 +27,7 @@ namespace DataWarehouse.Plugins.UltimateCompression
     ///   <item>Emerging: Density, Lizard, Oodle, Zling, Gipfeli</item>
     /// </list>
     /// </remarks>
-    public sealed class UltimateCompressionPlugin : PipelinePluginBase
+    public sealed class UltimateCompressionPlugin : IntelligenceAwareCompressionPluginBase
     {
         private readonly ConcurrentDictionary<string, ICompressionStrategy> _strategies = new(StringComparer.OrdinalIgnoreCase);
         private ICompressionStrategy? _activeStrategy;
@@ -57,6 +59,9 @@ namespace DataWarehouse.Plugins.UltimateCompression
 
         /// <inheritdoc/>
         public override int QualityLevel => 95;
+
+        /// <inheritdoc/>
+        public override string CompressionAlgorithm => _activeStrategy?.Characteristics.AlgorithmName ?? "Zstd";
 
         /// <summary>
         /// Registers a compression strategy with the plugin.
@@ -328,5 +333,147 @@ namespace DataWarehouse.Plugins.UltimateCompression
 
             return base.OnMessageAsync(message);
         }
+
+        #region Intelligence Integration
+
+        /// <summary>
+        /// Semantic description for AI discovery.
+        /// </summary>
+        public string SemanticDescription =>
+            "Ultimate compression plugin providing 50+ compression algorithms. " +
+            "Supports automatic content-aware algorithm selection, parallel compression, " +
+            "and real-time benchmarking for optimal compression across all workloads.";
+
+        /// <summary>
+        /// Semantic tags for AI discovery.
+        /// </summary>
+        public string[] SemanticTags => new[]
+        {
+            "compression", "lz4", "zstd", "brotli", "gzip", "deflate",
+            "streaming", "parallel", "content-aware"
+        };
+
+        /// <summary>
+        /// Called when Intelligence becomes available - register compression capabilities.
+        /// </summary>
+        protected override async Task OnStartWithIntelligenceAsync(CancellationToken ct)
+        {
+            await base.OnStartWithIntelligenceAsync(ct);
+
+            // Register compression capabilities with Intelligence
+            if (MessageBus != null)
+            {
+                var strategies = _strategies.Values.ToList();
+
+                await MessageBus.PublishAsync(IntelligenceTopics.QueryCapability, new PluginMessage
+                {
+                    Type = "capability.register",
+                    Source = Id,
+                    Payload = new Dictionary<string, object>
+                    {
+                        ["pluginId"] = Id,
+                        ["pluginName"] = Name,
+                        ["pluginType"] = "compression",
+                        ["capabilities"] = new Dictionary<string, object>
+                        {
+                            ["strategyCount"] = strategies.Count,
+                            ["algorithms"] = strategies.Select(s => s.Characteristics.AlgorithmName).Distinct().ToArray(),
+                            ["streamingCount"] = strategies.Count(s => s.Characteristics.SupportsStreaming),
+                            ["parallelCount"] = strategies.Count(s => s.Characteristics.SupportsParallelCompression),
+                            ["supportsCompressionRecommendation"] = true
+                        },
+                        ["semanticDescription"] = SemanticDescription,
+                        ["tags"] = SemanticTags
+                    }
+                }, ct);
+
+                // Subscribe to compression recommendation requests
+                SubscribeToCompressionRecommendationRequests();
+            }
+        }
+
+        /// <summary>
+        /// Subscribes to Intelligence compression recommendation requests.
+        /// </summary>
+        private void SubscribeToCompressionRecommendationRequests()
+        {
+            if (MessageBus == null) return;
+
+            MessageBus.Subscribe(IntelligenceTopics.RequestCompressionRecommendation, async msg =>
+            {
+                if (msg.Payload.TryGetValue("contentType", out var ctObj) && ctObj is string contentType &&
+                    msg.Payload.TryGetValue("contentSize", out var csObj) && csObj is long contentSize)
+                {
+                    var preferSpeed = msg.Payload.TryGetValue("preferSpeed", out var psObj) && psObj is true;
+                    var recommendation = RecommendCompressionStrategy(contentType, contentSize, preferSpeed);
+
+                    await MessageBus.PublishAsync(IntelligenceTopics.RequestCompressionRecommendationResponse, new PluginMessage
+                    {
+                        Type = "compression-recommendation.response",
+                        CorrelationId = msg.CorrelationId,
+                        Source = Id,
+                        Payload = new Dictionary<string, object>
+                        {
+                            ["success"] = true,
+                            ["algorithm"] = recommendation.Algorithm,
+                            ["compressionLevel"] = recommendation.Level,
+                            ["estimatedRatio"] = recommendation.EstimatedRatio,
+                            ["reasoning"] = recommendation.Reasoning,
+                            ["isAlreadyCompressed"] = recommendation.IsAlreadyCompressed,
+                            ["shouldSkip"] = recommendation.ShouldSkip
+                        }
+                    });
+                }
+            });
+        }
+
+        /// <summary>
+        /// Recommends a compression strategy based on content characteristics.
+        /// </summary>
+        private (string Algorithm, int Level, double EstimatedRatio, string Reasoning, bool IsAlreadyCompressed, bool ShouldSkip)
+            RecommendCompressionStrategy(string contentType, long contentSize, bool preferSpeed)
+        {
+            // Check for already-compressed formats
+            var compressedTypes = new[] { "image/jpeg", "image/png", "image/gif", "video/", "audio/", "application/zip", "application/x-gzip", "application/x-7z" };
+            if (compressedTypes.Any(t => contentType.Contains(t, StringComparison.OrdinalIgnoreCase)))
+            {
+                return ("None", 0, 1.0, "Content is already compressed - skipping to avoid expansion", true, true);
+            }
+
+            // Very small files: skip compression
+            if (contentSize < 100)
+            {
+                return ("None", 0, 1.0, "File too small for effective compression", false, true);
+            }
+
+            // Speed preference
+            if (preferSpeed)
+            {
+                return ("LZ4", 1, 0.6, "LZ4 selected for maximum speed with acceptable compression ratio", false, false);
+            }
+
+            // Text/JSON: high compression with Brotli
+            if (contentType.Contains("text") || contentType.Contains("json") || contentType.Contains("xml"))
+            {
+                return ("Brotli", 6, 0.3, "Brotli selected for excellent text/structured data compression", false, false);
+            }
+
+            // Large files: balanced Zstd
+            if (contentSize > 10 * 1024 * 1024) // > 10MB
+            {
+                return ("Zstd", 3, 0.45, "Zstd selected for large files - good speed/ratio balance", false, false);
+            }
+
+            // Default: Zstd at medium level
+            return ("Zstd", 3, 0.5, "Zstd selected as balanced general-purpose algorithm", false, false);
+        }
+
+        /// <inheritdoc/>
+        protected override Task OnStartCoreAsync(CancellationToken ct)
+        {
+            return Task.CompletedTask;
+        }
+
+        #endregion
     }
 }

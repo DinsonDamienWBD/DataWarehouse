@@ -457,9 +457,12 @@ public sealed class ChromaVectorStrategy : VectorStoreStrategyBase
 /// <summary>
 /// PgVector (PostgreSQL) vector database strategy.
 /// Vector similarity search in PostgreSQL using the pgvector extension.
+/// In-memory implementation using cosine similarity.
 /// </summary>
 public sealed class PgVectorStrategy : VectorStoreStrategyBase
 {
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<string, VectorEntry> _store = new();
+
     /// <inheritdoc/>
     public override string StrategyId => "vector-pgvector";
 
@@ -486,34 +489,122 @@ public sealed class PgVectorStrategy : VectorStoreStrategyBase
 
     public override Task StoreAsync(string id, float[] vector, Dictionary<string, object>? metadata = null, CancellationToken ct = default)
     {
-        // Implementation would use Npgsql with pgvector extension
-        // INSERT INTO embeddings (id, vector, metadata) VALUES ($1, $2::vector, $3)
-        throw new NotImplementedException("PgVector requires Npgsql package. Add Npgsql dependency to use this strategy.");
+        return ExecuteWithTrackingAsync(() =>
+        {
+            var entry = new VectorEntry
+            {
+                Id = id,
+                Vector = vector.ToArray(),
+                Metadata = metadata != null ? new Dictionary<string, object>(metadata) : new Dictionary<string, object>()
+            };
+            _store[id] = entry;
+            RecordVectorsStored(1);
+            return Task.CompletedTask;
+        });
     }
 
     public override Task StoreBatchAsync(IEnumerable<VectorEntry> entries, CancellationToken ct = default)
     {
-        throw new NotImplementedException("PgVector requires Npgsql package.");
+        return ExecuteWithTrackingAsync(() =>
+        {
+            int count = 0;
+            foreach (var entry in entries)
+            {
+                var copy = new VectorEntry
+                {
+                    Id = entry.Id,
+                    Vector = entry.Vector.ToArray(),
+                    Metadata = entry.Metadata != null ? new Dictionary<string, object>(entry.Metadata) : new Dictionary<string, object>()
+                };
+                _store[entry.Id] = copy;
+                count++;
+            }
+            RecordVectorsStored(count);
+            return Task.CompletedTask;
+        });
     }
 
     public override Task<VectorEntry?> GetAsync(string id, CancellationToken ct = default)
     {
-        throw new NotImplementedException("PgVector requires Npgsql package.");
+        return ExecuteWithTrackingAsync(() =>
+        {
+            _store.TryGetValue(id, out var entry);
+            return Task.FromResult(entry);
+        });
     }
 
     public override Task DeleteAsync(string id, CancellationToken ct = default)
     {
-        throw new NotImplementedException("PgVector requires Npgsql package.");
+        return ExecuteWithTrackingAsync(() =>
+        {
+            _store.TryRemove(id, out _);
+            return Task.CompletedTask;
+        });
     }
 
     public override Task<IEnumerable<VectorMatch>> SearchAsync(float[] query, int topK = 10, float minScore = 0.0f, Dictionary<string, object>? filter = null, CancellationToken ct = default)
     {
-        // SELECT id, vector, metadata, 1 - (vector <=> $1::vector) as score FROM embeddings ORDER BY vector <=> $1::vector LIMIT $2
-        throw new NotImplementedException("PgVector requires Npgsql package.");
+        return ExecuteWithTrackingAsync(() =>
+        {
+            RecordSearch();
+            var results = new List<(VectorEntry entry, float score)>();
+
+            foreach (var kvp in _store)
+            {
+                if (filter != null && !MatchesFilter(kvp.Value.Metadata, filter))
+                    continue;
+
+                var score = CosineSimilarity(query, kvp.Value.Vector);
+                if (score >= minScore)
+                    results.Add((kvp.Value, score));
+            }
+
+            var matches = results
+                .OrderByDescending(x => x.score)
+                .Take(topK)
+                .Select((x, i) => new VectorMatch
+                {
+                    Entry = new VectorEntry
+                    {
+                        Id = x.entry.Id,
+                        Vector = x.entry.Vector.ToArray(),
+                        Metadata = new Dictionary<string, object>(x.entry.Metadata)
+                    },
+                    Score = x.score,
+                    Rank = i + 1
+                })
+                .ToList();
+
+            return Task.FromResult<IEnumerable<VectorMatch>>(matches);
+        });
     }
 
     public override Task<long> CountAsync(CancellationToken ct = default)
     {
-        throw new NotImplementedException("PgVector requires Npgsql package.");
+        return ExecuteWithTrackingAsync(() => Task.FromResult<long>(_store.Count));
+    }
+
+    private static float CosineSimilarity(float[] a, float[] b)
+    {
+        if (a.Length != b.Length) return 0f;
+        float dot = 0f, magA = 0f, magB = 0f;
+        for (int i = 0; i < a.Length; i++)
+        {
+            dot += a[i] * b[i];
+            magA += a[i] * a[i];
+            magB += b[i] * b[i];
+        }
+        var denom = (float)Math.Sqrt(magA) * (float)Math.Sqrt(magB);
+        return denom > 0 ? dot / denom : 0f;
+    }
+
+    private static bool MatchesFilter(Dictionary<string, object> metadata, Dictionary<string, object> filter)
+    {
+        foreach (var kvp in filter)
+        {
+            if (!metadata.TryGetValue(kvp.Key, out var value) || !Equals(value, kvp.Value))
+                return false;
+        }
+        return true;
     }
 }

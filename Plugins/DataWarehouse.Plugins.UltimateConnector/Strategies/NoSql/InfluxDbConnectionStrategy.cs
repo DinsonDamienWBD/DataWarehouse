@@ -82,35 +82,163 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.NoSql
                 TimeSpan.FromMilliseconds(5), DateTimeOffset.UtcNow);
         }
 
+        /// <summary>
+        /// Executes a Flux or InfluxQL query against InfluxDB using the REST API.
+        /// </summary>
         public override async Task<IReadOnlyList<Dictionary<string, object?>>> ExecuteQueryAsync(
             IConnectionHandle handle, string query, Dictionary<string, object?>? parameters = null, CancellationToken ct = default)
         {
-            await Task.Delay(6, ct);
-            return new List<Dictionary<string, object?>>
+            if (_httpClient == null)
             {
-                new() { ["time"] = DateTimeOffset.UtcNow, ["measurement"] = "cpu", ["value"] = 42.5 }
-            };
+                return new List<Dictionary<string, object?>>
+                {
+                    new()
+                    {
+                        ["__status"] = "NOT_CONNECTED",
+                        ["__message"] = "InfluxDB connection not established.",
+                        ["__strategy"] = StrategyId
+                    }
+                };
+            }
+
+            try
+            {
+                var org = parameters?.GetValueOrDefault("org")?.ToString() ?? "default";
+                var content = new StringContent(query, System.Text.Encoding.UTF8, "application/vnd.flux");
+                var response = await _httpClient.PostAsync($"/api/v2/query?org={org}", content, ct);
+
+                if (!response.IsSuccessStatusCode)
+                {
+                    var errorBody = await response.Content.ReadAsStringAsync(ct);
+                    return new List<Dictionary<string, object?>>
+                    {
+                        new()
+                        {
+                            ["__status"] = "QUERY_FAILED",
+                            ["__message"] = $"InfluxDB query failed: {response.StatusCode}",
+                            ["__error"] = errorBody,
+                            ["__strategy"] = StrategyId
+                        }
+                    };
+                }
+
+                // InfluxDB returns CSV-formatted data for Flux queries
+                var responseBody = await response.Content.ReadAsStringAsync(ct);
+                var results = new List<Dictionary<string, object?>>();
+
+                var lines = responseBody.Split('\n', StringSplitOptions.RemoveEmptyEntries);
+                if (lines.Length > 0)
+                {
+                    string[]? headers = null;
+                    foreach (var line in lines)
+                    {
+                        if (line.StartsWith("#") || string.IsNullOrWhiteSpace(line))
+                            continue;
+
+                        var values = line.Split(',');
+                        if (headers == null)
+                        {
+                            headers = values;
+                            continue;
+                        }
+
+                        var row = new Dictionary<string, object?>();
+                        for (int i = 0; i < Math.Min(headers.Length, values.Length); i++)
+                        {
+                            row[headers[i]] = values[i];
+                        }
+                        results.Add(row);
+                    }
+                }
+
+                return results;
+            }
+            catch (Exception ex)
+            {
+                return new List<Dictionary<string, object?>>
+                {
+                    new()
+                    {
+                        ["__status"] = "ERROR",
+                        ["__message"] = $"InfluxDB query error: {ex.Message}",
+                        ["__strategy"] = StrategyId
+                    }
+                };
+            }
         }
 
+        /// <summary>
+        /// Writes data points to InfluxDB using Line Protocol.
+        /// </summary>
         public override async Task<int> ExecuteNonQueryAsync(
             IConnectionHandle handle, string command, Dictionary<string, object?>? parameters = null, CancellationToken ct = default)
         {
-            await Task.Delay(6, ct);
-            return 1;
+            if (_httpClient == null)
+                return -1;
+
+            try
+            {
+                var bucket = parameters?.GetValueOrDefault("bucket")?.ToString() ?? "default";
+                var org = parameters?.GetValueOrDefault("org")?.ToString() ?? "default";
+
+                var content = new StringContent(command, System.Text.Encoding.UTF8, "text/plain");
+                var response = await _httpClient.PostAsync($"/api/v2/write?bucket={bucket}&org={org}", content, ct);
+
+                return response.IsSuccessStatusCode ? 1 : -1;
+            }
+            catch
+            {
+                return -1;
+            }
         }
 
+        /// <summary>
+        /// Retrieves schema information from InfluxDB by listing buckets.
+        /// </summary>
         public override async Task<IReadOnlyList<DataSchema>> GetSchemaAsync(IConnectionHandle handle, CancellationToken ct = default)
         {
-            await Task.Delay(6, ct);
-            return new List<DataSchema>
+            if (_httpClient == null)
+                return Array.Empty<DataSchema>();
+
+            try
             {
-                new DataSchema("cpu_measurement", new[]
+                var response = await _httpClient.GetAsync("/api/v2/buckets", ct);
+                if (!response.IsSuccessStatusCode)
+                    return Array.Empty<DataSchema>();
+
+                var responseBody = await response.Content.ReadAsStringAsync(ct);
+                using var doc = System.Text.Json.JsonDocument.Parse(responseBody);
+
+                var schemas = new List<DataSchema>();
+                if (doc.RootElement.TryGetProperty("buckets", out var buckets))
                 {
-                    new DataSchemaField("time", "Timestamp", false, null, null),
-                    new DataSchemaField("value", "Float64", true, null, null),
-                    new DataSchemaField("tags", "Map", true, null, null)
-                }, new[] { "time" }, new Dictionary<string, object> { ["type"] = "measurement" })
-            };
+                    foreach (var bucket in buckets.EnumerateArray())
+                    {
+                        var name = bucket.GetProperty("name").GetString() ?? "unknown";
+                        if (name.StartsWith("_"))
+                            continue; // Skip system buckets
+
+                        schemas.Add(new DataSchema(
+                            name,
+                            new[]
+                            {
+                                new DataSchemaField("_time", "Timestamp", false, null, null),
+                                new DataSchemaField("_measurement", "String", false, null, null),
+                                new DataSchemaField("_field", "String", false, null, null),
+                                new DataSchemaField("_value", "Float64", true, null, null)
+                            },
+                            new[] { "_time", "_measurement", "_field" },
+                            new Dictionary<string, object> { ["type"] = "bucket" }
+                        ));
+                    }
+                }
+
+                return schemas;
+            }
+            catch
+            {
+                return Array.Empty<DataSchema>();
+            }
         }
 
         private (string host, int port) ParseHostPort(string connectionString, int defaultPort)

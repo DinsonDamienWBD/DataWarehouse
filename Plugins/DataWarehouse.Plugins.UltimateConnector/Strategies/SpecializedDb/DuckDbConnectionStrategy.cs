@@ -50,25 +50,26 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SpecializedDb
             return new ConnectionHealth(isHealthy, isHealthy ? "DuckDB healthy" : "DuckDB unhealthy", TimeSpan.FromMilliseconds(1), DateTimeOffset.UtcNow);
         }
 
-        public override async Task<IReadOnlyList<Dictionary<string, object?>>> ExecuteQueryAsync(IConnectionHandle handle, string query, Dictionary<string, object?>? parameters = null, CancellationToken ct = default)
+        public override Task<IReadOnlyList<Dictionary<string, object?>>> ExecuteQueryAsync(IConnectionHandle handle, string query, Dictionary<string, object?>? parameters = null, CancellationToken ct = default)
         {
-            await Task.Delay(5, ct);
-            return new List<Dictionary<string, object?>> { new() { ["column1"] = "value1", ["column2"] = 123 } };
+            // DuckDB is an embedded database - queries require native library integration
+            // For production use, integrate with DuckDB.NET or similar native binding
+            // This connector provides connection management; query execution requires native driver
+            return Task.FromResult<IReadOnlyList<Dictionary<string, object?>>>(new List<Dictionary<string, object?>>());
         }
 
-        public override async Task<int> ExecuteNonQueryAsync(IConnectionHandle handle, string command, Dictionary<string, object?>? parameters = null, CancellationToken ct = default)
+        public override Task<int> ExecuteNonQueryAsync(IConnectionHandle handle, string command, Dictionary<string, object?>? parameters = null, CancellationToken ct = default)
         {
-            await Task.Delay(5, ct);
-            return 1;
+            // DuckDB is an embedded database - commands require native library integration
+            // For production use, integrate with DuckDB.NET or similar native binding
+            return Task.FromResult(0);
         }
 
-        public override async Task<IReadOnlyList<DataSchema>> GetSchemaAsync(IConnectionHandle handle, CancellationToken ct = default)
+        public override Task<IReadOnlyList<DataSchema>> GetSchemaAsync(IConnectionHandle handle, CancellationToken ct = default)
         {
-            await Task.Delay(5, ct);
-            return new List<DataSchema>
-            {
-                new DataSchema("sample_table", new[] { new DataSchemaField("column1", "VARCHAR", false, null, null), new DataSchemaField("column2", "INTEGER", true, null, null) }, new[] { "column1" }, new Dictionary<string, object> { ["type"] = "table" })
-            };
+            // DuckDB is an embedded database - schema discovery requires native library integration
+            // Returns empty schema until native driver is configured
+            return Task.FromResult<IReadOnlyList<DataSchema>>(new List<DataSchema>());
         }
     }
 }

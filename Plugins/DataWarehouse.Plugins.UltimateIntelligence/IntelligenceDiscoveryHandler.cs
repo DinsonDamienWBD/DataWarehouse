@@ -2,6 +2,9 @@ using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Contracts.IntelligenceAware;
 using DataWarehouse.SDK.Utilities;
 
+// Use SDK's IntelligenceCapabilities for discovery protocol (has all required flags)
+using SdkCapabilities = DataWarehouse.SDK.Contracts.IntelligenceAware.IntelligenceCapabilities;
+
 namespace DataWarehouse.Plugins.UltimateIntelligence;
 
 /// <summary>
@@ -91,11 +94,11 @@ public sealed class IntelligenceDiscoveryHandler : IDisposable
         // If specific capabilities were requested, filter
         if (message.Payload.TryGetValue("requestedCapabilities", out var reqCaps))
         {
-            var requested = IntelligenceCapabilities.None;
-            if (reqCaps is IntelligenceCapabilities ic)
+            var requested = SdkCapabilities.None;
+            if (reqCaps is SdkCapabilities ic)
                 requested = ic;
             else if (reqCaps is long longVal)
-                requested = (IntelligenceCapabilities)longVal;
+                requested = (SdkCapabilities)longVal;
 
             // Check if all requested capabilities are available
             var hasAll = (response.Capabilities & requested) == requested;
@@ -236,9 +239,9 @@ public sealed class IntelligenceDiscoveryHandler : IDisposable
     /// <summary>
     /// Aggregates capabilities from all available strategies into SDK IntelligenceCapabilities.
     /// </summary>
-    private IntelligenceCapabilities GetAggregateCapabilities()
+    private SdkCapabilities GetAggregateCapabilities()
     {
-        var caps = IntelligenceCapabilities.None;
+        var caps = SdkCapabilities.None;
 
         foreach (var strategy in _plugin.GetRegisteredStrategyIds().Select(id => _plugin.GetStrategy(id)).Where(s => s?.IsAvailable == true))
         {
@@ -246,63 +249,63 @@ public sealed class IntelligenceDiscoveryHandler : IDisposable
 
             // Map plugin IntelligenceCapabilities to SDK IntelligenceCapabilities
             // AI Provider capabilities
-            if (strategyCaps.HasFlag(Plugins.UltimateIntelligence.IntelligenceCapabilities.TextCompletion))
-                caps |= IntelligenceCapabilities.TextCompletion;
-            if (strategyCaps.HasFlag(Plugins.UltimateIntelligence.IntelligenceCapabilities.ChatCompletion))
-                caps |= IntelligenceCapabilities.Conversation;
-            if (strategyCaps.HasFlag(Plugins.UltimateIntelligence.IntelligenceCapabilities.Streaming))
-                caps |= IntelligenceCapabilities.Streaming;
-            if (strategyCaps.HasFlag(Plugins.UltimateIntelligence.IntelligenceCapabilities.Embeddings))
-                caps |= IntelligenceCapabilities.Embeddings;
-            if (strategyCaps.HasFlag(Plugins.UltimateIntelligence.IntelligenceCapabilities.ImageGeneration))
-                caps |= IntelligenceCapabilities.ContentGeneration;
-            if (strategyCaps.HasFlag(Plugins.UltimateIntelligence.IntelligenceCapabilities.ImageAnalysis))
-                caps |= IntelligenceCapabilities.ImageAnalysis;
-            if (strategyCaps.HasFlag(Plugins.UltimateIntelligence.IntelligenceCapabilities.FunctionCalling))
-                caps |= IntelligenceCapabilities.FunctionCalling;
-            if (strategyCaps.HasFlag(Plugins.UltimateIntelligence.IntelligenceCapabilities.CodeGeneration))
-                caps |= IntelligenceCapabilities.CodeGeneration;
+            if (strategyCaps.HasFlag(IntelligenceCapabilities.TextCompletion))
+                caps |= SdkCapabilities.TextCompletion;
+            if (strategyCaps.HasFlag(IntelligenceCapabilities.ChatCompletion))
+                caps |= SdkCapabilities.Conversation;
+            if (strategyCaps.HasFlag(IntelligenceCapabilities.Streaming))
+                caps |= SdkCapabilities.Streaming;
+            if (strategyCaps.HasFlag(IntelligenceCapabilities.Embeddings))
+                caps |= SdkCapabilities.Embeddings;
+            if (strategyCaps.HasFlag(IntelligenceCapabilities.ImageGeneration))
+                caps |= SdkCapabilities.ContentGeneration;
+            if (strategyCaps.HasFlag(IntelligenceCapabilities.ImageAnalysis))
+                caps |= SdkCapabilities.ImageAnalysis;
+            if (strategyCaps.HasFlag(IntelligenceCapabilities.FunctionCalling))
+                caps |= SdkCapabilities.FunctionCalling;
+            if (strategyCaps.HasFlag(IntelligenceCapabilities.CodeGeneration))
+                caps |= SdkCapabilities.CodeGeneration;
 
             // Feature capabilities
-            if (strategyCaps.HasFlag(Plugins.UltimateIntelligence.IntelligenceCapabilities.SemanticSearch))
-                caps |= IntelligenceCapabilities.SemanticSearch;
-            if (strategyCaps.HasFlag(Plugins.UltimateIntelligence.IntelligenceCapabilities.Classification))
-                caps |= IntelligenceCapabilities.Classification;
-            if (strategyCaps.HasFlag(Plugins.UltimateIntelligence.IntelligenceCapabilities.AnomalyDetection))
-                caps |= IntelligenceCapabilities.AnomalyDetection;
-            if (strategyCaps.HasFlag(Plugins.UltimateIntelligence.IntelligenceCapabilities.Prediction))
-                caps |= IntelligenceCapabilities.Prediction;
-            if (strategyCaps.HasFlag(Plugins.UltimateIntelligence.IntelligenceCapabilities.Clustering))
-                caps |= IntelligenceCapabilities.Clustering;
-            if (strategyCaps.HasFlag(Plugins.UltimateIntelligence.IntelligenceCapabilities.Summarization))
-                caps |= IntelligenceCapabilities.Summarization;
+            if (strategyCaps.HasFlag(IntelligenceCapabilities.SemanticSearch))
+                caps |= SdkCapabilities.SemanticSearch;
+            if (strategyCaps.HasFlag(IntelligenceCapabilities.Classification))
+                caps |= SdkCapabilities.Classification;
+            if (strategyCaps.HasFlag(IntelligenceCapabilities.AnomalyDetection))
+                caps |= SdkCapabilities.AnomalyDetection;
+            if (strategyCaps.HasFlag(IntelligenceCapabilities.Prediction))
+                caps |= SdkCapabilities.Prediction;
+            if (strategyCaps.HasFlag(IntelligenceCapabilities.Clustering))
+                caps |= SdkCapabilities.Clustering;
+            if (strategyCaps.HasFlag(IntelligenceCapabilities.Summarization))
+                caps |= SdkCapabilities.Summarization;
 
             // Vector store capabilities
-            if (strategyCaps.HasFlag(Plugins.UltimateIntelligence.IntelligenceCapabilities.VectorStorage))
-                caps |= IntelligenceCapabilities.SemanticSearch;
-            if (strategyCaps.HasFlag(Plugins.UltimateIntelligence.IntelligenceCapabilities.VectorSearch))
-                caps |= IntelligenceCapabilities.SemanticSearch;
+            if (strategyCaps.HasFlag(IntelligenceCapabilities.VectorStorage))
+                caps |= SdkCapabilities.SemanticSearch;
+            if (strategyCaps.HasFlag(IntelligenceCapabilities.VectorSearch))
+                caps |= SdkCapabilities.SemanticSearch;
         }
 
         // Add common capabilities that are always available when we have strategies
-        if (caps != IntelligenceCapabilities.None)
+        if (caps != SdkCapabilities.None)
         {
             // If we have embeddings, we can do many things
-            if (caps.HasFlag(IntelligenceCapabilities.Embeddings))
+            if (caps.HasFlag(SdkCapabilities.Embeddings))
             {
-                caps |= IntelligenceCapabilities.SimilarityScoring;
-                caps |= IntelligenceCapabilities.Clustering;
+                caps |= SdkCapabilities.SimilarityScoring;
+                caps |= SdkCapabilities.Clustering;
             }
 
             // If we have conversation, we can do NLP
-            if (caps.HasFlag(IntelligenceCapabilities.Conversation) || caps.HasFlag(IntelligenceCapabilities.TextCompletion))
+            if (caps.HasFlag(SdkCapabilities.Conversation) || caps.HasFlag(SdkCapabilities.TextCompletion))
             {
-                caps |= IntelligenceCapabilities.NLP;
-                caps |= IntelligenceCapabilities.IntentRecognition;
-                caps |= IntelligenceCapabilities.EntityExtraction;
-                caps |= IntelligenceCapabilities.KeywordExtraction;
-                caps |= IntelligenceCapabilities.SentimentAnalysis;
-                caps |= IntelligenceCapabilities.QuestionAnswering;
+                caps |= SdkCapabilities.NLP;
+                caps |= SdkCapabilities.IntentRecognition;
+                caps |= SdkCapabilities.EntityExtraction;
+                caps |= SdkCapabilities.KeywordExtraction;
+                caps |= SdkCapabilities.SentimentAnalysis;
+                caps |= SdkCapabilities.QuestionAnswering;
             }
         }
 

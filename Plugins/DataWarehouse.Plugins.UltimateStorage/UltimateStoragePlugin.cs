@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using System.Reflection;
 using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Contracts.Storage;
+using DataWarehouse.SDK.Contracts.IntelligenceAware;
 using DataWarehouse.SDK.Primitives;
 using DataWarehouse.SDK.Utilities;
 using System.Runtime.CompilerServices;
@@ -40,7 +41,7 @@ namespace DataWarehouse.Plugins.UltimateStorage;
 /// - Automatic failover
 /// - Compression and deduplication
 /// </summary>
-public sealed class UltimateStoragePlugin : PipelinePluginBase, IDataTerminal, IDisposable
+public sealed class UltimateStoragePlugin : IntelligenceAwareStoragePluginBase, IDataTerminal, IDisposable
 {
     private readonly StorageStrategyRegistry _registry;
     private readonly ConcurrentDictionary<string, long> _usageStats = new();
@@ -75,6 +76,9 @@ public sealed class UltimateStoragePlugin : PipelinePluginBase, IDataTerminal, I
 
     /// <inheritdoc/>
     public override int QualityLevel => 100;
+
+    /// <inheritdoc/>
+    public override string StorageScheme => _defaultStrategyId;
 
     #region IDataTerminal Implementation
 
@@ -1096,6 +1100,137 @@ public sealed class UltimateStoragePlugin : PipelinePluginBase, IDataTerminal, I
             Metadata = args.TryGetValue("metadata", out var mObj) && mObj is Dictionary<string, string> m
                 ? m : new Dictionary<string, string>()
         };
+    }
+
+    #endregion
+
+    #region Intelligence Integration
+
+    /// <summary>
+    /// Called when Intelligence becomes available - register storage capabilities.
+    /// </summary>
+    protected override async Task OnStartWithIntelligenceAsync(CancellationToken ct)
+    {
+        await base.OnStartWithIntelligenceAsync(ct);
+
+        // Register storage capabilities with Intelligence
+        if (MessageBus != null)
+        {
+            var strategies = _registry.GetAllStrategies().OfType<IStorageStrategyExtended>().ToList();
+            var tieringSupport = strategies.Count(s => s.SupportsTiering);
+            var versioningSupport = strategies.Count(s => s.SupportsVersioning);
+            var replicationSupport = strategies.Count(s => s.SupportsReplication);
+
+            await MessageBus.PublishAsync(IntelligenceTopics.QueryCapability, new PluginMessage
+            {
+                Type = "capability.register",
+                Source = Id,
+                Payload = new Dictionary<string, object>
+                {
+                    ["pluginId"] = Id,
+                    ["pluginName"] = Name,
+                    ["pluginType"] = "storage",
+                    ["capabilities"] = new Dictionary<string, object>
+                    {
+                        ["strategyCount"] = strategies.Count,
+                        ["tieringSupport"] = tieringSupport,
+                        ["versioningSupport"] = versioningSupport,
+                        ["replicationSupport"] = replicationSupport,
+                        ["supportsTieringRecommendation"] = true,
+                        ["supportsAccessPrediction"] = true,
+                        ["localStrategies"] = GetStrategiesByCategory("local").Count,
+                        ["cloudStrategies"] = GetStrategiesByCategory("cloud").Count,
+                        ["distributedStrategies"] = GetStrategiesByCategory("distributed").Count
+                    },
+                    ["semanticDescription"] = SemanticDescription,
+                    ["tags"] = SemanticTags
+                }
+            }, ct);
+
+            // Subscribe to tiering recommendation requests
+            SubscribeToTieringRequests();
+        }
+    }
+
+    /// <summary>
+    /// Subscribes to storage tiering recommendation requests from Intelligence.
+    /// </summary>
+    private void SubscribeToTieringRequests()
+    {
+        if (MessageBus == null) return;
+
+        MessageBus.Subscribe(IntelligenceTopics.RequestTieringRecommendation, async msg =>
+        {
+            if (msg.Payload.TryGetValue("objectId", out var oidObj) && oidObj is string objectId)
+            {
+                var recommendation = RecommendStorageTier(objectId, msg.Payload);
+
+                await MessageBus.PublishAsync(IntelligenceTopics.RequestTieringRecommendationResponse, new PluginMessage
+                {
+                    Type = "tiering-recommendation.response",
+                    CorrelationId = msg.CorrelationId,
+                    Source = Id,
+                    Payload = new Dictionary<string, object>
+                    {
+                        ["success"] = true,
+                        ["objectId"] = objectId,
+                        ["recommendedTier"] = recommendation.RecommendedTier.ToString(),
+                        ["currentTier"] = recommendation.CurrentTier.ToString(),
+                        ["confidence"] = recommendation.Confidence,
+                        ["predictedAccessFrequency"] = recommendation.AccessFrequency,
+                        ["estimatedCostSavings"] = recommendation.CostSavings,
+                        ["reasoning"] = recommendation.Reasoning
+                    }
+                });
+            }
+        });
+    }
+
+    /// <summary>
+    /// Recommends a storage tier based on access patterns.
+    /// </summary>
+    private (SDK.Contracts.StorageTier RecommendedTier, SDK.Contracts.StorageTier CurrentTier, double Confidence, string AccessFrequency, decimal CostSavings, string Reasoning)
+        RecommendStorageTier(string objectId, Dictionary<string, object> context)
+    {
+        var currentTier = SDK.Contracts.StorageTier.Hot;
+        if (context.TryGetValue("currentTier", out var ctObj) && ctObj is string ct)
+        {
+            Enum.TryParse<SDK.Contracts.StorageTier>(ct, true, out currentTier);
+        }
+
+        var lastAccessDays = context.TryGetValue("daysSinceLastAccess", out var laObj) && laObj is int la ? la : 0;
+        var accessCount30Days = context.TryGetValue("accessCount30Days", out var acObj) && acObj is int ac ? ac : 0;
+
+        // Very old data with no access: recommend Archive
+        if (lastAccessDays > 365 && accessCount30Days == 0)
+        {
+            return (SDK.Contracts.StorageTier.Archive, currentTier, 0.95, "Rare",
+                50.0m, "Data unused for over 1 year - archive tier recommended for cost savings");
+        }
+
+        // Infrequent access: recommend Cold
+        if (lastAccessDays > 90 || accessCount30Days < 5)
+        {
+            return (SDK.Contracts.StorageTier.Cold, currentTier, 0.88, "Infrequent",
+                30.0m, "Low access frequency - cold storage recommended");
+        }
+
+        // Moderate access: recommend Warm
+        if (accessCount30Days < 50)
+        {
+            return (SDK.Contracts.StorageTier.Warm, currentTier, 0.82, "Moderate",
+                15.0m, "Moderate access pattern - warm storage suitable");
+        }
+
+        // Frequent access: stay in Hot
+        return (SDK.Contracts.StorageTier.Hot, currentTier, 0.90, "Frequent",
+            0.0m, "High access frequency - hot storage recommended for performance");
+    }
+
+    /// <inheritdoc/>
+    protected override Task OnStartCoreAsync(CancellationToken ct)
+    {
+        return Task.CompletedTask;
     }
 
     #endregion

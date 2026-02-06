@@ -57,23 +57,72 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SpecializedDb
 
         public override async Task<IReadOnlyList<Dictionary<string, object?>>> ExecuteQueryAsync(IConnectionHandle handle, string query, Dictionary<string, object?>? parameters = null, CancellationToken ct = default)
         {
-            await Task.Delay(7, ct);
-            return new List<Dictionary<string, object?>> { new() { ["timestamp"] = DateTimeOffset.UtcNow, ["metric"] = 42 } };
+            if (_httpClient == null) return new List<Dictionary<string, object?>>();
+            try
+            {
+                var requestBody = System.Text.Json.JsonSerializer.Serialize(new { sql = query });
+                var content = new StringContent(requestBody, System.Text.Encoding.UTF8, "application/json");
+                var response = await _httpClient.PostAsync("/query/sql", content, ct);
+                if (!response.IsSuccessStatusCode) return new List<Dictionary<string, object?>>();
+                var json = await response.Content.ReadAsStringAsync(ct);
+                using var doc = System.Text.Json.JsonDocument.Parse(json);
+                var results = new List<Dictionary<string, object?>>();
+                if (doc.RootElement.TryGetProperty("resultTable", out var table) && table.TryGetProperty("rows", out var rows) && table.TryGetProperty("dataSchema", out var schema))
+                {
+                    var columns = new List<string>();
+                    if (schema.TryGetProperty("columnNames", out var cols))
+                        foreach (var col in cols.EnumerateArray()) columns.Add(col.GetString() ?? "col");
+                    foreach (var row in rows.EnumerateArray())
+                    {
+                        var dict = new Dictionary<string, object?>();
+                        var i = 0;
+                        foreach (var val in row.EnumerateArray())
+                        {
+                            if (i < columns.Count) dict[columns[i]] = val.ValueKind == System.Text.Json.JsonValueKind.Null ? null : val.ToString();
+                            i++;
+                        }
+                        results.Add(dict);
+                    }
+                }
+                return results;
+            }
+            catch { return new List<Dictionary<string, object?>>(); }
         }
 
         public override async Task<int> ExecuteNonQueryAsync(IConnectionHandle handle, string command, Dictionary<string, object?>? parameters = null, CancellationToken ct = default)
         {
-            await Task.Delay(7, ct);
-            return 1;
+            if (_httpClient == null) return 0;
+            try
+            {
+                var requestBody = System.Text.Json.JsonSerializer.Serialize(new { sql = command });
+                var content = new StringContent(requestBody, System.Text.Encoding.UTF8, "application/json");
+                var response = await _httpClient.PostAsync("/query/sql", content, ct);
+                return response.IsSuccessStatusCode ? 1 : 0;
+            }
+            catch { return 0; }
         }
 
         public override async Task<IReadOnlyList<DataSchema>> GetSchemaAsync(IConnectionHandle handle, CancellationToken ct = default)
         {
-            await Task.Delay(7, ct);
-            return new List<DataSchema>
+            if (_httpClient == null) return new List<DataSchema>();
+            try
             {
-                new DataSchema("sample_table", new[] { new DataSchemaField("timestamp", "Long", false, null, null) }, new[] { "timestamp" }, new Dictionary<string, object> { ["type"] = "realtime" })
-            };
+                var response = await _httpClient.GetAsync("/tables", ct);
+                if (!response.IsSuccessStatusCode) return new List<DataSchema>();
+                var json = await response.Content.ReadAsStringAsync(ct);
+                using var doc = System.Text.Json.JsonDocument.Parse(json);
+                var schemas = new List<DataSchema>();
+                if (doc.RootElement.TryGetProperty("tables", out var tables))
+                {
+                    foreach (var tbl in tables.EnumerateArray())
+                    {
+                        var name = tbl.GetString() ?? "table";
+                        schemas.Add(new DataSchema(name, new[] { new DataSchemaField("timestamp", "Long", false, null, null) }, new[] { "timestamp" }, new Dictionary<string, object> { ["type"] = "realtime" }));
+                    }
+                }
+                return schemas;
+            }
+            catch { return new List<DataSchema>(); }
         }
 
         private (string host, int port) ParseHostPort(string connectionString, int defaultPort)

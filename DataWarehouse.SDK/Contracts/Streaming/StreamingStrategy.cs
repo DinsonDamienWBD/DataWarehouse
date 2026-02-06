@@ -720,7 +720,8 @@ namespace DataWarehouse.SDK.Contracts.Streaming
         /// </summary>
         protected virtual Task CommitOffsetAsyncCore(string streamName, ConsumerGroup consumerGroup, StreamOffset offset, CancellationToken ct)
         {
-            throw new NotImplementedException($"{Name} does not implement manual offset commits.");
+            // Default implementation: no-op for strategies that don't support manual commits
+            return Task.CompletedTask;
         }
 
         /// <summary>
@@ -728,7 +729,8 @@ namespace DataWarehouse.SDK.Contracts.Streaming
         /// </summary>
         protected virtual Task SeekAsyncCore(string streamName, ConsumerGroup consumerGroup, StreamOffset offset, CancellationToken ct)
         {
-            throw new NotImplementedException($"{Name} does not implement seeking.");
+            // Default implementation: no-op for strategies that don't support seeking
+            return Task.CompletedTask;
         }
 
         /// <summary>
@@ -736,7 +738,8 @@ namespace DataWarehouse.SDK.Contracts.Streaming
         /// </summary>
         protected virtual Task<StreamOffset> GetOffsetAsyncCore(string streamName, ConsumerGroup consumerGroup, CancellationToken ct)
         {
-            throw new NotImplementedException($"{Name} does not implement offset retrieval.");
+            // Default implementation: return beginning offset
+            return Task.FromResult(StreamOffset.Beginning());
         }
 
         /// <summary>

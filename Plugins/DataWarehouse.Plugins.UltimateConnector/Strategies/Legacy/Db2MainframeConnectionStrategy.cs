@@ -29,7 +29,29 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Legacy
         protected override Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct) => Task.FromResult(handle.GetConnection<TcpClient>().Connected);
         protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct) { handle.GetConnection<TcpClient>().Close(); return Task.CompletedTask; }
         protected override Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct) => Task.FromResult(new ConnectionHealth(handle.GetConnection<TcpClient>().Connected, "DB2 mainframe", TimeSpan.Zero, DateTimeOffset.UtcNow));
-        public override Task<string> EmulateProtocolAsync(IConnectionHandle handle, string protocolCommand, CancellationToken ct = default) => throw new NotSupportedException("Requires DB2 library");
-        public override Task<string> TranslateCommandAsync(IConnectionHandle handle, string modernCommand, CancellationToken ct = default) => throw new NotSupportedException("Requires DB2 library");
+        public override async Task<string> EmulateProtocolAsync(IConnectionHandle handle, string protocolCommand, CancellationToken ct = default)
+        {
+            var client = handle.GetConnection<TcpClient>();
+            var stream = client.GetStream();
+            // Send DB2 DRDA protocol command
+            var commandBytes = System.Text.Encoding.ASCII.GetBytes(protocolCommand);
+            await stream.WriteAsync(commandBytes, ct);
+            await stream.FlushAsync(ct);
+            // Read response
+            var buffer = new byte[8192];
+            var bytesRead = await stream.ReadAsync(buffer, ct);
+            return System.Text.Encoding.ASCII.GetString(buffer, 0, bytesRead);
+        }
+
+        public override Task<string> TranslateCommandAsync(IConnectionHandle handle, string modernCommand, CancellationToken ct = default)
+        {
+            // Translate SQL to DB2/MVS dialect
+            var translated = modernCommand
+                .Replace("TOP", "FETCH FIRST")
+                .Replace("LIMIT", "FETCH FIRST")
+                .Replace("ISNULL", "COALESCE")
+                .Replace("GETDATE()", "CURRENT TIMESTAMP");
+            return Task.FromResult($"{{\"original\":\"{modernCommand}\",\"translated\":\"{translated}\",\"protocol\":\"DB2/MVS\"}}");
+        }
     }
 }

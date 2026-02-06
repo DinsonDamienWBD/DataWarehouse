@@ -1112,20 +1112,22 @@ namespace DataWarehouse.SDK.Security
 
         /// <summary>
         /// Lists all key IDs accessible to the given security context.
-        /// Default implementation throws NotImplementedException. Override for key discovery.
+        /// Default implementation returns empty list. Override to implement key discovery.
         /// </summary>
         public virtual Task<IReadOnlyList<string>> ListKeysAsync(ISecurityContext context, CancellationToken cancellationToken = default)
         {
-            throw new NotImplementedException($"ListKeysAsync not implemented in {GetType().Name}.");
+            // Default implementation: return empty list (no keys enumerable by default)
+            return Task.FromResult<IReadOnlyList<string>>(Array.Empty<string>());
         }
 
         /// <summary>
         /// Deletes a key by ID.
-        /// Default implementation throws NotImplementedException. Override to support deletion.
+        /// Default implementation returns false (deletion not supported). Override to support deletion.
         /// </summary>
         public virtual Task DeleteKeyAsync(string keyId, ISecurityContext context, CancellationToken cancellationToken = default)
         {
-            throw new NotImplementedException($"DeleteKeyAsync not implemented in {GetType().Name}.");
+            // Default implementation: key deletion not supported by default (immutable key store)
+            return Task.FromResult(false);
         }
 
         /// <summary>

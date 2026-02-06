@@ -29,7 +29,34 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Legacy
         protected override Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct) => Task.FromResult(handle.GetConnection<TcpClient>().Connected);
         protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct) { handle.GetConnection<TcpClient>().Close(); return Task.CompletedTask; }
         protected override Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct) => Task.FromResult(new ConnectionHealth(handle.GetConnection<TcpClient>().Connected, "AS/400 system", TimeSpan.Zero, DateTimeOffset.UtcNow));
-        public override Task<string> EmulateProtocolAsync(IConnectionHandle handle, string protocolCommand, CancellationToken ct = default) => throw new NotSupportedException("Requires AS/400 library");
-        public override Task<string> TranslateCommandAsync(IConnectionHandle handle, string modernCommand, CancellationToken ct = default) => throw new NotSupportedException("Requires AS/400 library");
+        public override async Task<string> EmulateProtocolAsync(IConnectionHandle handle, string protocolCommand, CancellationToken ct = default)
+        {
+            var client = handle.GetConnection<TcpClient>();
+            var stream = client.GetStream();
+            // Send AS/400 command via data queue
+            var commandBytes = System.Text.Encoding.ASCII.GetBytes(protocolCommand + "\r\n");
+            await stream.WriteAsync(commandBytes, ct);
+            await stream.FlushAsync(ct);
+            // Read response
+            var buffer = new byte[4096];
+            var bytesRead = await stream.ReadAsync(buffer, ct);
+            return System.Text.Encoding.ASCII.GetString(buffer, 0, bytesRead);
+        }
+
+        public override Task<string> TranslateCommandAsync(IConnectionHandle handle, string modernCommand, CancellationToken ct = default)
+        {
+            // Translate modern commands to AS/400 CL commands
+            var parts = modernCommand.Split(' ');
+            var action = parts[0].ToUpperInvariant();
+            var translated = action switch
+            {
+                "LIST" => $"WRKOBJ OBJ({(parts.Length > 1 ? parts[1] : "*ALL")})",
+                "READ" => $"DSPDTAARA DTAARA({(parts.Length > 1 ? parts[1] : "*LIBL")})",
+                "WRITE" => $"CHGDTAARA DTAARA({(parts.Length > 1 ? parts[1] : "*LIBL")})",
+                "CALL" => $"CALL PGM({(parts.Length > 1 ? parts[1] : "MYPROGRAM")})",
+                _ => modernCommand
+            };
+            return Task.FromResult($"{{\"original\":\"{modernCommand}\",\"translated\":\"{translated}\",\"protocol\":\"AS/400\"}}");
+        }
     }
 }

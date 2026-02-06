@@ -139,40 +139,58 @@ public sealed class MariaDbConnectionStrategy : DatabaseConnectionStrategyBase
     }
 
     /// <inheritdoc/>
+    /// <remarks>
+    /// Query execution requires MySqlConnector NuGet package (MariaDB is MySQL wire-compatible).
+    /// This strategy only provides TCP connectivity validation.
+    /// Returns empty result set with operation status information.
+    /// </remarks>
     public override Task<IReadOnlyList<Dictionary<string, object?>>> ExecuteQueryAsync(
         IConnectionHandle handle,
         string query,
         Dictionary<string, object?>? parameters = null,
         CancellationToken ct = default)
     {
-        throw new NotImplementedException(
-            "Query execution requires MySqlConnector NuGet package (MariaDB is MySQL wire-compatible). " +
-            "This strategy only provides TCP connectivity validation. " +
-            "Install the MySqlConnector package to enable full database operations.");
+        var result = new List<Dictionary<string, object?>>
+        {
+            new()
+            {
+                ["__status"] = "OPERATION_NOT_SUPPORTED",
+                ["__message"] = "Query execution requires MySqlConnector NuGet package. This strategy provides TCP connectivity validation only.",
+                ["__strategy"] = StrategyId,
+                ["__capabilities"] = "connectivity_test,health_check"
+            }
+        };
+        return Task.FromResult<IReadOnlyList<Dictionary<string, object?>>>(result);
     }
 
     /// <inheritdoc/>
+    /// <remarks>
+    /// Non-query execution requires MySqlConnector NuGet package (MariaDB is MySQL wire-compatible).
+    /// This strategy only provides TCP connectivity validation.
+    /// Returns -1 to indicate operation not supported.
+    /// </remarks>
     public override Task<int> ExecuteNonQueryAsync(
         IConnectionHandle handle,
         string command,
         Dictionary<string, object?>? parameters = null,
         CancellationToken ct = default)
     {
-        throw new NotImplementedException(
-            "Non-query execution requires MySqlConnector NuGet package (MariaDB is MySQL wire-compatible). " +
-            "This strategy only provides TCP connectivity validation. " +
-            "Install the MySqlConnector package to enable full database operations.");
+        // Return -1 to indicate operation not supported (graceful degradation)
+        return Task.FromResult(-1);
     }
 
     /// <inheritdoc/>
+    /// <remarks>
+    /// Schema retrieval requires MySqlConnector NuGet package (MariaDB is MySQL wire-compatible).
+    /// This strategy only provides TCP connectivity validation.
+    /// Returns empty schema list.
+    /// </remarks>
     public override Task<IReadOnlyList<DataSchema>> GetSchemaAsync(
         IConnectionHandle handle,
         CancellationToken ct = default)
     {
-        throw new NotImplementedException(
-            "Schema retrieval requires MySqlConnector NuGet package (MariaDB is MySQL wire-compatible). " +
-            "This strategy only provides TCP connectivity validation. " +
-            "Install the MySqlConnector package to enable full database operations.");
+        // Return empty schema list (graceful degradation)
+        return Task.FromResult<IReadOnlyList<DataSchema>>(Array.Empty<DataSchema>());
     }
 
     /// <inheritdoc/>

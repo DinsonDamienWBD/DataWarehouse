@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
@@ -89,32 +90,69 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SpecializedDb
         public override async Task<IReadOnlyList<Dictionary<string, object?>>> ExecuteQueryAsync(
             IConnectionHandle handle, string query, Dictionary<string, object?>? parameters = null, CancellationToken ct = default)
         {
-            await Task.Delay(5, ct);
-            return new List<Dictionary<string, object?>>
+            if (_httpClient == null) return new List<Dictionary<string, object?>>();
+            try
             {
-                new() { ["column1"] = "value1", ["column2"] = 123, ["column3"] = DateTime.UtcNow }
-            };
+                var encodedQuery = Uri.EscapeDataString(query + " FORMAT JSONEachRow");
+                var response = await _httpClient.GetAsync($"/?query={encodedQuery}", ct);
+                if (!response.IsSuccessStatusCode) return new List<Dictionary<string, object?>>();
+                var json = await response.Content.ReadAsStringAsync(ct);
+                var results = new List<Dictionary<string, object?>>();
+                foreach (var line in json.Split('\n', StringSplitOptions.RemoveEmptyEntries))
+                {
+                    try
+                    {
+                        var row = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, object?>>(line);
+                        if (row != null) results.Add(row);
+                    }
+                    catch { }
+                }
+                return results;
+            }
+            catch { return new List<Dictionary<string, object?>>(); }
         }
 
         public override async Task<int> ExecuteNonQueryAsync(
             IConnectionHandle handle, string command, Dictionary<string, object?>? parameters = null, CancellationToken ct = default)
         {
-            await Task.Delay(5, ct);
-            return 1;
+            if (_httpClient == null) return 0;
+            try
+            {
+                var content = new StringContent(command, System.Text.Encoding.UTF8, "text/plain");
+                var response = await _httpClient.PostAsync("/", content, ct);
+                return response.IsSuccessStatusCode ? 1 : 0;
+            }
+            catch { return 0; }
         }
 
         public override async Task<IReadOnlyList<DataSchema>> GetSchemaAsync(IConnectionHandle handle, CancellationToken ct = default)
         {
-            await Task.Delay(5, ct);
-            return new List<DataSchema>
+            if (_httpClient == null) return new List<DataSchema>();
+            try
             {
-                new DataSchema("sample_table", new[]
+                var query = Uri.EscapeDataString("SELECT database, table, name, type FROM system.columns FORMAT JSONEachRow");
+                var response = await _httpClient.GetAsync($"/?query={query}", ct);
+                if (!response.IsSuccessStatusCode) return new List<DataSchema>();
+                var json = await response.Content.ReadAsStringAsync(ct);
+                var tableColumns = new Dictionary<string, List<DataSchemaField>>();
+                foreach (var line in json.Split('\n', StringSplitOptions.RemoveEmptyEntries))
                 {
-                    new DataSchemaField("column1", "String", false, null, null),
-                    new DataSchemaField("column2", "UInt64", true, null, null),
-                    new DataSchemaField("column3", "DateTime", true, null, null)
-                }, new[] { "column1" }, new Dictionary<string, object> { ["engine"] = "MergeTree" })
-            };
+                    try
+                    {
+                        using var doc = System.Text.Json.JsonDocument.Parse(line);
+                        var db = doc.RootElement.TryGetProperty("database", out var d) ? d.GetString() : "default";
+                        var tbl = doc.RootElement.TryGetProperty("table", out var t) ? t.GetString() : "table";
+                        var col = doc.RootElement.TryGetProperty("name", out var n) ? n.GetString() : "col";
+                        var typ = doc.RootElement.TryGetProperty("type", out var tp) ? tp.GetString() : "String";
+                        var key = $"{db}.{tbl}";
+                        if (!tableColumns.ContainsKey(key)) tableColumns[key] = new List<DataSchemaField>();
+                        tableColumns[key].Add(new DataSchemaField(col ?? "col", typ ?? "String", true, null, null));
+                    }
+                    catch { }
+                }
+                return tableColumns.Select(kv => new DataSchema(kv.Key, kv.Value.ToArray(), kv.Value.Count > 0 ? new[] { kv.Value[0].Name } : Array.Empty<string>(), new Dictionary<string, object> { ["engine"] = "MergeTree" })).ToList();
+            }
+            catch { return new List<DataSchema>(); }
         }
 
         private (string host, int port) ParseHostPort(string connectionString, int defaultPort)

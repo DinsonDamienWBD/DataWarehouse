@@ -86,34 +86,177 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.NoSql
                 TimeSpan.FromMilliseconds(10), DateTimeOffset.UtcNow);
         }
 
+        /// <summary>
+        /// Executes an N1QL query against Couchbase using the REST API.
+        /// </summary>
         public override async Task<IReadOnlyList<Dictionary<string, object?>>> ExecuteQueryAsync(
             IConnectionHandle handle, string query, Dictionary<string, object?>? parameters = null, CancellationToken ct = default)
         {
-            await Task.Delay(10, ct);
-            return new List<Dictionary<string, object?>>
+            if (_httpClient == null)
             {
-                new() { ["id"] = "doc::123", ["type"] = "document", ["value"] = "sample" }
-            };
+                return new List<Dictionary<string, object?>>
+                {
+                    new()
+                    {
+                        ["__status"] = "NOT_CONNECTED",
+                        ["__message"] = "Couchbase connection not established.",
+                        ["__strategy"] = StrategyId
+                    }
+                };
+            }
+
+            try
+            {
+                // Couchbase N1QL query endpoint
+                var requestBody = new Dictionary<string, object> { ["statement"] = query };
+                if (parameters != null)
+                {
+                    foreach (var (key, value) in parameters)
+                        requestBody[$"${key}"] = value ?? "";
+                }
+
+                var json = System.Text.Json.JsonSerializer.Serialize(requestBody);
+                var content = new StringContent(json, System.Text.Encoding.UTF8, "application/json");
+                var response = await _httpClient.PostAsync("/query/service", content, ct);
+
+                if (!response.IsSuccessStatusCode)
+                {
+                    var errorBody = await response.Content.ReadAsStringAsync(ct);
+                    return new List<Dictionary<string, object?>>
+                    {
+                        new()
+                        {
+                            ["__status"] = "QUERY_FAILED",
+                            ["__message"] = $"Couchbase query failed: {response.StatusCode}",
+                            ["__error"] = errorBody,
+                            ["__strategy"] = StrategyId
+                        }
+                    };
+                }
+
+                var responseBody = await response.Content.ReadAsStringAsync(ct);
+                using var doc = System.Text.Json.JsonDocument.Parse(responseBody);
+                var results = new List<Dictionary<string, object?>>();
+
+                if (doc.RootElement.TryGetProperty("results", out var resultArray))
+                {
+                    foreach (var item in resultArray.EnumerateArray())
+                    {
+                        var row = new Dictionary<string, object?>();
+                        foreach (var prop in item.EnumerateObject())
+                        {
+                            row[prop.Name] = prop.Value.ValueKind switch
+                            {
+                                System.Text.Json.JsonValueKind.String => prop.Value.GetString(),
+                                System.Text.Json.JsonValueKind.Number => prop.Value.GetDouble(),
+                                System.Text.Json.JsonValueKind.True => true,
+                                System.Text.Json.JsonValueKind.False => false,
+                                System.Text.Json.JsonValueKind.Null => null,
+                                _ => prop.Value.GetRawText()
+                            };
+                        }
+                        results.Add(row);
+                    }
+                }
+
+                return results;
+            }
+            catch (Exception ex)
+            {
+                return new List<Dictionary<string, object?>>
+                {
+                    new()
+                    {
+                        ["__status"] = "ERROR",
+                        ["__message"] = $"Couchbase query error: {ex.Message}",
+                        ["__strategy"] = StrategyId
+                    }
+                };
+            }
         }
 
+        /// <summary>
+        /// Executes a non-query N1QL command against Couchbase.
+        /// </summary>
         public override async Task<int> ExecuteNonQueryAsync(
             IConnectionHandle handle, string command, Dictionary<string, object?>? parameters = null, CancellationToken ct = default)
         {
-            await Task.Delay(10, ct);
-            return 1;
+            if (_httpClient == null)
+                return -1;
+
+            try
+            {
+                var requestBody = new Dictionary<string, object> { ["statement"] = command };
+                if (parameters != null)
+                {
+                    foreach (var (key, value) in parameters)
+                        requestBody[$"${key}"] = value ?? "";
+                }
+
+                var json = System.Text.Json.JsonSerializer.Serialize(requestBody);
+                var content = new StringContent(json, System.Text.Encoding.UTF8, "application/json");
+                var response = await _httpClient.PostAsync("/query/service", content, ct);
+
+                if (!response.IsSuccessStatusCode)
+                    return -1;
+
+                var responseBody = await response.Content.ReadAsStringAsync(ct);
+                using var doc = System.Text.Json.JsonDocument.Parse(responseBody);
+
+                if (doc.RootElement.TryGetProperty("metrics", out var metrics) &&
+                    metrics.TryGetProperty("mutationCount", out var mutations))
+                {
+                    return mutations.GetInt32();
+                }
+
+                return 0;
+            }
+            catch
+            {
+                return -1;
+            }
         }
 
+        /// <summary>
+        /// Retrieves schema information from Couchbase by listing buckets.
+        /// </summary>
         public override async Task<IReadOnlyList<DataSchema>> GetSchemaAsync(IConnectionHandle handle, CancellationToken ct = default)
         {
-            await Task.Delay(10, ct);
-            return new List<DataSchema>
+            if (_httpClient == null)
+                return Array.Empty<DataSchema>();
+
+            try
             {
-                new DataSchema("default_bucket", new[]
+                var response = await _httpClient.GetAsync("/pools/default/buckets", ct);
+                if (!response.IsSuccessStatusCode)
+                    return Array.Empty<DataSchema>();
+
+                var responseBody = await response.Content.ReadAsStringAsync(ct);
+                using var doc = System.Text.Json.JsonDocument.Parse(responseBody);
+
+                var schemas = new List<DataSchema>();
+                foreach (var bucket in doc.RootElement.EnumerateArray())
                 {
-                    new DataSchemaField("id", "String", false, null, null),
-                    new DataSchemaField("type", "String", true, null, null)
-                }, new[] { "id" }, new Dictionary<string, object> { ["type"] = "bucket" })
-            };
+                    var name = bucket.GetProperty("name").GetString() ?? "unknown";
+                    schemas.Add(new DataSchema(
+                        name,
+                        new[]
+                        {
+                            new DataSchemaField("id", "String", false, null, null),
+                            new DataSchemaField("type", "String", true, null, null),
+                            new DataSchemaField("_cas", "UInt64", false, null, null)
+                        },
+                        new[] { "id" },
+                        new Dictionary<string, object> { ["type"] = "bucket" }
+                    ));
+                }
+
+                return schemas;
+            }
+            catch
+            {
+                return Array.Empty<DataSchema>();
+            }
         }
 
         private (string host, int port) ParseHostPort(string connectionString, int defaultPort)

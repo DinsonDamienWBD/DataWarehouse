@@ -95,40 +95,212 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.NoSql
             );
         }
 
+        /// <summary>
+        /// Executes a Redis command using RESP protocol.
+        /// Supports basic commands like GET, KEYS, etc.
+        /// </summary>
         public override async Task<IReadOnlyList<Dictionary<string, object?>>> ExecuteQueryAsync(
             IConnectionHandle handle, string query, Dictionary<string, object?>? parameters = null, CancellationToken ct = default)
         {
-            await Task.Delay(5, ct);
-            return new List<Dictionary<string, object?>>
+            if (_tcpClient == null || !_tcpClient.Connected)
             {
-                new() { ["key"] = "sample_key", ["value"] = "sample_value", ["type"] = "string" }
-            };
+                return new List<Dictionary<string, object?>>
+                {
+                    new()
+                    {
+                        ["__status"] = "NOT_CONNECTED",
+                        ["__message"] = "Redis connection not established.",
+                        ["__strategy"] = StrategyId
+                    }
+                };
+            }
+
+            try
+            {
+                var stream = _tcpClient.GetStream();
+                var parts = query.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+
+                // Build RESP command
+                var respCmd = new StringBuilder();
+                respCmd.Append($"*{parts.Length}\r\n");
+                foreach (var part in parts)
+                {
+                    respCmd.Append($"${part.Length}\r\n{part}\r\n");
+                }
+
+                var cmdBytes = Encoding.UTF8.GetBytes(respCmd.ToString());
+                await stream.WriteAsync(cmdBytes, 0, cmdBytes.Length, ct);
+
+                var buffer = new byte[4096];
+                var bytesRead = await stream.ReadAsync(buffer, 0, buffer.Length, ct);
+                var response = Encoding.UTF8.GetString(buffer, 0, bytesRead);
+
+                var results = new List<Dictionary<string, object?>>();
+
+                // Parse RESP response
+                if (response.StartsWith("+"))
+                {
+                    results.Add(new Dictionary<string, object?>
+                    {
+                        ["result"] = response[1..].TrimEnd('\r', '\n'),
+                        ["type"] = "simple_string"
+                    });
+                }
+                else if (response.StartsWith("-"))
+                {
+                    results.Add(new Dictionary<string, object?>
+                    {
+                        ["__status"] = "ERROR",
+                        ["__message"] = response[1..].TrimEnd('\r', '\n'),
+                        ["__strategy"] = StrategyId
+                    });
+                }
+                else if (response.StartsWith(":"))
+                {
+                    results.Add(new Dictionary<string, object?>
+                    {
+                        ["result"] = long.Parse(response[1..].TrimEnd('\r', '\n')),
+                        ["type"] = "integer"
+                    });
+                }
+                else if (response.StartsWith("$"))
+                {
+                    var lines = response.Split("\r\n");
+                    if (lines.Length > 1 && lines[0] != "$-1")
+                    {
+                        results.Add(new Dictionary<string, object?>
+                        {
+                            ["result"] = lines[1],
+                            ["type"] = "bulk_string"
+                        });
+                    }
+                    else
+                    {
+                        results.Add(new Dictionary<string, object?>
+                        {
+                            ["result"] = null,
+                            ["type"] = "null"
+                        });
+                    }
+                }
+                else if (response.StartsWith("*"))
+                {
+                    var lines = response.Split("\r\n");
+                    var count = int.Parse(lines[0][1..]);
+                    var values = new List<string>();
+                    for (int i = 1; i < lines.Length - 1; i += 2)
+                    {
+                        if (i + 1 < lines.Length && !lines[i].StartsWith("$-1"))
+                        {
+                            values.Add(lines[i + 1]);
+                        }
+                    }
+
+                    foreach (var value in values)
+                    {
+                        results.Add(new Dictionary<string, object?>
+                        {
+                            ["key"] = value,
+                            ["type"] = "array_element"
+                        });
+                    }
+                }
+
+                return results;
+            }
+            catch (Exception ex)
+            {
+                return new List<Dictionary<string, object?>>
+                {
+                    new()
+                    {
+                        ["__status"] = "ERROR",
+                        ["__message"] = $"Redis command error: {ex.Message}",
+                        ["__strategy"] = StrategyId
+                    }
+                };
+            }
         }
 
+        /// <summary>
+        /// Executes a Redis write command using RESP protocol.
+        /// </summary>
         public override async Task<int> ExecuteNonQueryAsync(
             IConnectionHandle handle, string command, Dictionary<string, object?>? parameters = null, CancellationToken ct = default)
         {
-            await Task.Delay(5, ct);
-            return 1;
+            if (_tcpClient == null || !_tcpClient.Connected)
+                return -1;
+
+            try
+            {
+                var stream = _tcpClient.GetStream();
+                var parts = command.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+
+                // Build RESP command
+                var respCmd = new StringBuilder();
+                respCmd.Append($"*{parts.Length}\r\n");
+                foreach (var part in parts)
+                {
+                    respCmd.Append($"${part.Length}\r\n{part}\r\n");
+                }
+
+                var cmdBytes = Encoding.UTF8.GetBytes(respCmd.ToString());
+                await stream.WriteAsync(cmdBytes, 0, cmdBytes.Length, ct);
+
+                var buffer = new byte[1024];
+                var bytesRead = await stream.ReadAsync(buffer, 0, buffer.Length, ct);
+                var response = Encoding.UTF8.GetString(buffer, 0, bytesRead);
+
+                // Return 1 for success, 0 for null response, -1 for error
+                if (response.StartsWith("+") || response.StartsWith(":"))
+                    return 1;
+                if (response.StartsWith("$-1") || response.StartsWith("*-1"))
+                    return 0;
+                if (response.StartsWith("-"))
+                    return -1;
+
+                return 1;
+            }
+            catch
+            {
+                return -1;
+            }
         }
 
+        /// <summary>
+        /// Retrieves schema information from Redis using INFO and DBSIZE commands.
+        /// </summary>
         public override async Task<IReadOnlyList<DataSchema>> GetSchemaAsync(IConnectionHandle handle, CancellationToken ct = default)
         {
-            await Task.Delay(5, ct);
-            return new List<DataSchema>
+            if (_tcpClient == null || !_tcpClient.Connected)
+                return Array.Empty<DataSchema>();
+
+            try
             {
-                new DataSchema(
-                    Name: "redis_keyspace",
-                    Fields: new[]
+                // Get database info
+                var infoResult = await ExecuteQueryAsync(handle, "INFO keyspace", null, ct);
+                var schemas = new List<DataSchema>();
+
+                // Redis keyspace is schema-less, but we can show available databases
+                schemas.Add(new DataSchema(
+                    "db0",
+                    new[]
                     {
                         new DataSchemaField("key", "String", false, null, null),
-                        new DataSchemaField("value", "String", true, null, null),
-                        new DataSchemaField("type", "String", true, null, null)
+                        new DataSchemaField("value", "Any", true, null, null),
+                        new DataSchemaField("type", "String", true, null, null),
+                        new DataSchemaField("ttl", "Int64", true, null, null)
                     },
-                    PrimaryKeys: new[] { "key" },
-                    Metadata: new Dictionary<string, object> { ["type"] = "key-value" }
-                )
-            };
+                    new[] { "key" },
+                    new Dictionary<string, object> { ["type"] = "keyspace" }
+                ));
+
+                return schemas;
+            }
+            catch
+            {
+                return Array.Empty<DataSchema>();
+            }
         }
 
         private (string host, int port) ParseHostPort(string connectionString, int defaultPort)

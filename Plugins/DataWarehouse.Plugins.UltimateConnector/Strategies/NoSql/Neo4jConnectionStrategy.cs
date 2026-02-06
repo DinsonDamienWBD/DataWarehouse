@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Net.Http;
 using System.Net.Sockets;
 using System.Threading;
@@ -98,34 +99,202 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.NoSql
                 TimeSpan.FromMilliseconds(8), DateTimeOffset.UtcNow);
         }
 
+        /// <summary>
+        /// Executes a Cypher query against Neo4j using the HTTP API.
+        /// </summary>
         public override async Task<IReadOnlyList<Dictionary<string, object?>>> ExecuteQueryAsync(
             IConnectionHandle handle, string query, Dictionary<string, object?>? parameters = null, CancellationToken ct = default)
         {
-            await Task.Delay(10, ct);
-            return new List<Dictionary<string, object?>>
+            if (_httpClient == null)
             {
-                new() { ["n.id"] = 1, ["n.name"] = "Node1", ["n.label"] = "Person" }
-            };
+                return new List<Dictionary<string, object?>>
+                {
+                    new()
+                    {
+                        ["__status"] = "NOT_CONNECTED",
+                        ["__message"] = "Neo4j connection not established.",
+                        ["__strategy"] = StrategyId
+                    }
+                };
+            }
+
+            try
+            {
+                var requestBody = new Dictionary<string, object>
+                {
+                    ["statements"] = new[]
+                    {
+                        new Dictionary<string, object>
+                        {
+                            ["statement"] = query,
+                            ["parameters"] = parameters ?? new Dictionary<string, object?>()
+                        }
+                    }
+                };
+
+                var json = System.Text.Json.JsonSerializer.Serialize(requestBody);
+                var content = new StringContent(json, System.Text.Encoding.UTF8, "application/json");
+                var response = await _httpClient.PostAsync("/db/neo4j/tx/commit", content, ct);
+
+                if (!response.IsSuccessStatusCode)
+                {
+                    var errorBody = await response.Content.ReadAsStringAsync(ct);
+                    return new List<Dictionary<string, object?>>
+                    {
+                        new()
+                        {
+                            ["__status"] = "QUERY_FAILED",
+                            ["__message"] = $"Neo4j query failed: {response.StatusCode}",
+                            ["__error"] = errorBody,
+                            ["__strategy"] = StrategyId
+                        }
+                    };
+                }
+
+                var responseBody = await response.Content.ReadAsStringAsync(ct);
+                using var doc = System.Text.Json.JsonDocument.Parse(responseBody);
+                var results = new List<Dictionary<string, object?>>();
+
+                if (doc.RootElement.TryGetProperty("results", out var resultsArray))
+                {
+                    foreach (var result in resultsArray.EnumerateArray())
+                    {
+                        if (result.TryGetProperty("columns", out var columns) &&
+                            result.TryGetProperty("data", out var data))
+                        {
+                            var columnNames = columns.EnumerateArray().Select(c => c.GetString() ?? "").ToArray();
+                            foreach (var dataRow in data.EnumerateArray())
+                            {
+                                if (dataRow.TryGetProperty("row", out var row))
+                                {
+                                    var dict = new Dictionary<string, object?>();
+                                    var values = row.EnumerateArray().ToArray();
+                                    for (int i = 0; i < Math.Min(columnNames.Length, values.Length); i++)
+                                    {
+                                        dict[columnNames[i]] = values[i].ValueKind switch
+                                        {
+                                            System.Text.Json.JsonValueKind.String => values[i].GetString(),
+                                            System.Text.Json.JsonValueKind.Number => values[i].GetDouble(),
+                                            System.Text.Json.JsonValueKind.True => true,
+                                            System.Text.Json.JsonValueKind.False => false,
+                                            System.Text.Json.JsonValueKind.Null => null,
+                                            _ => values[i].GetRawText()
+                                        };
+                                    }
+                                    results.Add(dict);
+                                }
+                            }
+                        }
+                    }
+                }
+
+                return results;
+            }
+            catch (Exception ex)
+            {
+                return new List<Dictionary<string, object?>>
+                {
+                    new()
+                    {
+                        ["__status"] = "ERROR",
+                        ["__message"] = $"Neo4j query error: {ex.Message}",
+                        ["__strategy"] = StrategyId
+                    }
+                };
+            }
         }
 
+        /// <summary>
+        /// Executes a Cypher write command against Neo4j.
+        /// </summary>
         public override async Task<int> ExecuteNonQueryAsync(
             IConnectionHandle handle, string command, Dictionary<string, object?>? parameters = null, CancellationToken ct = default)
         {
-            await Task.Delay(10, ct);
-            return 1;
+            if (_httpClient == null)
+                return -1;
+
+            try
+            {
+                var requestBody = new Dictionary<string, object>
+                {
+                    ["statements"] = new[]
+                    {
+                        new Dictionary<string, object>
+                        {
+                            ["statement"] = command,
+                            ["parameters"] = parameters ?? new Dictionary<string, object?>()
+                        }
+                    }
+                };
+
+                var json = System.Text.Json.JsonSerializer.Serialize(requestBody);
+                var content = new StringContent(json, System.Text.Encoding.UTF8, "application/json");
+                var response = await _httpClient.PostAsync("/db/neo4j/tx/commit", content, ct);
+
+                if (!response.IsSuccessStatusCode)
+                    return -1;
+
+                var responseBody = await response.Content.ReadAsStringAsync(ct);
+                using var doc = System.Text.Json.JsonDocument.Parse(responseBody);
+
+                if (doc.RootElement.TryGetProperty("results", out var results) &&
+                    results.GetArrayLength() > 0)
+                {
+                    var firstResult = results[0];
+                    if (firstResult.TryGetProperty("stats", out var stats) &&
+                        stats.TryGetProperty("nodes_created", out var nodesCreated))
+                    {
+                        return nodesCreated.GetInt32();
+                    }
+                }
+
+                return 0;
+            }
+            catch
+            {
+                return -1;
+            }
         }
 
+        /// <summary>
+        /// Retrieves schema information from Neo4j by listing labels and their properties.
+        /// </summary>
         public override async Task<IReadOnlyList<DataSchema>> GetSchemaAsync(IConnectionHandle handle, CancellationToken ct = default)
         {
-            await Task.Delay(10, ct);
-            return new List<DataSchema>
+            if (_httpClient == null)
+                return Array.Empty<DataSchema>();
+
+            try
             {
-                new DataSchema("Person", new[]
+                // Query for all labels
+                var labelsResult = await ExecuteQueryAsync(handle, "CALL db.labels()", null, ct);
+                var schemas = new List<DataSchema>();
+
+                foreach (var row in labelsResult)
                 {
-                    new DataSchemaField("id", "Integer", false, null, null),
-                    new DataSchemaField("name", "String", true, null, null)
-                }, new[] { "id" }, new Dictionary<string, object> { ["type"] = "node_label" })
-            };
+                    if (row.TryGetValue("__status", out _))
+                        continue; // Skip error responses
+
+                    var labelName = row.Values.FirstOrDefault()?.ToString() ?? "Unknown";
+
+                    schemas.Add(new DataSchema(
+                        labelName,
+                        new[]
+                        {
+                            new DataSchemaField("id", "Integer", false, null, null),
+                            new DataSchemaField("properties", "Map", true, null, null)
+                        },
+                        new[] { "id" },
+                        new Dictionary<string, object> { ["type"] = "node_label" }
+                    ));
+                }
+
+                return schemas.Count > 0 ? schemas : Array.Empty<DataSchema>();
+            }
+            catch
+            {
+                return Array.Empty<DataSchema>();
+            }
         }
 
         private (string host, int port) ParseHostPort(string connectionString, int defaultPort)

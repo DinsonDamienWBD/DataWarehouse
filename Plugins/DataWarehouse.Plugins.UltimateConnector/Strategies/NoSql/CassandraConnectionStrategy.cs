@@ -74,35 +74,47 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.NoSql
                 TimeSpan.FromMilliseconds(8), DateTimeOffset.UtcNow);
         }
 
-        public override async Task<IReadOnlyList<Dictionary<string, object?>>> ExecuteQueryAsync(
+        /// <summary>
+        /// Executes a CQL query against Cassandra.
+        /// Note: Full CQL protocol implementation requires DataStax driver.
+        /// This strategy provides TCP connectivity validation only.
+        /// </summary>
+        public override Task<IReadOnlyList<Dictionary<string, object?>>> ExecuteQueryAsync(
             IConnectionHandle handle, string query, Dictionary<string, object?>? parameters = null, CancellationToken ct = default)
         {
-            await Task.Delay(10, ct);
-            return new List<Dictionary<string, object?>>
+            // Cassandra CQL binary protocol requires native driver for full implementation
+            var result = new List<Dictionary<string, object?>>
             {
-                new() { ["id"] = Guid.NewGuid(), ["column1"] = "value1", ["column2"] = 123 }
+                new()
+                {
+                    ["__status"] = "OPERATION_NOT_SUPPORTED",
+                    ["__message"] = "CQL query execution requires DataStax C# Driver. This strategy provides TCP connectivity validation only.",
+                    ["__strategy"] = StrategyId,
+                    ["__capabilities"] = "connectivity_test,health_check"
+                }
             };
+            return Task.FromResult<IReadOnlyList<Dictionary<string, object?>>>(result);
         }
 
-        public override async Task<int> ExecuteNonQueryAsync(
+        /// <summary>
+        /// Executes a non-query CQL command against Cassandra.
+        /// Returns -1 as CQL protocol requires native driver.
+        /// </summary>
+        public override Task<int> ExecuteNonQueryAsync(
             IConnectionHandle handle, string command, Dictionary<string, object?>? parameters = null, CancellationToken ct = default)
         {
-            await Task.Delay(10, ct);
-            return 1;
+            // Return -1 to indicate operation not supported (graceful degradation)
+            return Task.FromResult(-1);
         }
 
-        public override async Task<IReadOnlyList<DataSchema>> GetSchemaAsync(IConnectionHandle handle, CancellationToken ct = default)
+        /// <summary>
+        /// Retrieves schema information from Cassandra.
+        /// Returns empty list as CQL protocol requires native driver.
+        /// </summary>
+        public override Task<IReadOnlyList<DataSchema>> GetSchemaAsync(IConnectionHandle handle, CancellationToken ct = default)
         {
-            await Task.Delay(10, ct);
-            return new List<DataSchema>
-            {
-                new DataSchema("sample_table", new[]
-                {
-                    new DataSchemaField("id", "UUID", false, null, null),
-                    new DataSchemaField("column1", "Text", true, null, null),
-                    new DataSchemaField("column2", "Int", true, null, null)
-                }, new[] { "id" }, new Dictionary<string, object> { ["type"] = "table" })
-            };
+            // Return empty schema list (graceful degradation)
+            return Task.FromResult<IReadOnlyList<DataSchema>>(Array.Empty<DataSchema>());
         }
 
         private (string host, int port) ParseHostPort(string connectionString, int defaultPort)

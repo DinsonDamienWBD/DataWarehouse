@@ -82,32 +82,65 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SpecializedDb
         public override async Task<IReadOnlyList<Dictionary<string, object?>>> ExecuteQueryAsync(
             IConnectionHandle handle, string query, Dictionary<string, object?>? parameters = null, CancellationToken ct = default)
         {
-            await Task.Delay(8, ct);
-            return new List<Dictionary<string, object?>>
+            if (_httpClient == null) return new List<Dictionary<string, object?>>();
+            try
             {
-                new() { ["timestamp"] = DateTimeOffset.UtcNow, ["dimension"] = "value", ["metric"] = 42.5 }
-            };
+                var requestBody = System.Text.Json.JsonSerializer.Serialize(new { query });
+                var content = new StringContent(requestBody, System.Text.Encoding.UTF8, "application/json");
+                var response = await _httpClient.PostAsync("/druid/v2/sql", content, ct);
+                if (!response.IsSuccessStatusCode)
+                    return new List<Dictionary<string, object?>>();
+                var json = await response.Content.ReadAsStringAsync(ct);
+                var results = System.Text.Json.JsonSerializer.Deserialize<List<Dictionary<string, object?>>>(json);
+                return results ?? new List<Dictionary<string, object?>>();
+            }
+            catch
+            {
+                return new List<Dictionary<string, object?>>();
+            }
         }
 
         public override async Task<int> ExecuteNonQueryAsync(
             IConnectionHandle handle, string command, Dictionary<string, object?>? parameters = null, CancellationToken ct = default)
         {
-            await Task.Delay(8, ct);
-            return 1;
+            if (_httpClient == null) return 0;
+            try
+            {
+                var requestBody = System.Text.Json.JsonSerializer.Serialize(new { query = command });
+                var content = new StringContent(requestBody, System.Text.Encoding.UTF8, "application/json");
+                var response = await _httpClient.PostAsync("/druid/v2/sql", content, ct);
+                return response.IsSuccessStatusCode ? 1 : 0;
+            }
+            catch
+            {
+                return 0;
+            }
         }
 
         public override async Task<IReadOnlyList<DataSchema>> GetSchemaAsync(IConnectionHandle handle, CancellationToken ct = default)
         {
-            await Task.Delay(8, ct);
-            return new List<DataSchema>
+            if (_httpClient == null) return new List<DataSchema>();
+            try
             {
-                new DataSchema("sample_datasource", new[]
+                var response = await _httpClient.GetAsync("/druid/v2/datasources", ct);
+                if (!response.IsSuccessStatusCode)
+                    return new List<DataSchema>();
+                var json = await response.Content.ReadAsStringAsync(ct);
+                var datasources = System.Text.Json.JsonSerializer.Deserialize<string[]>(json) ?? Array.Empty<string>();
+                var schemas = new List<DataSchema>();
+                foreach (var ds in datasources)
                 {
-                    new DataSchemaField("__time", "Timestamp", false, null, null),
-                    new DataSchemaField("dimension", "String", true, null, null),
-                    new DataSchemaField("metric", "Float", true, null, null)
-                }, new[] { "__time" }, new Dictionary<string, object> { ["type"] = "datasource" })
-            };
+                    schemas.Add(new DataSchema(ds, new[]
+                    {
+                        new DataSchemaField("__time", "Timestamp", false, null, null)
+                    }, new[] { "__time" }, new Dictionary<string, object> { ["type"] = "datasource" }));
+                }
+                return schemas;
+            }
+            catch
+            {
+                return new List<DataSchema>();
+            }
         }
 
         private (string host, int port) ParseHostPort(string connectionString, int defaultPort)

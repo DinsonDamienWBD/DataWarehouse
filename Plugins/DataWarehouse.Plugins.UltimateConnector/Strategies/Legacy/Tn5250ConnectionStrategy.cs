@@ -32,7 +32,33 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Legacy
         protected override Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct) => Task.FromResult(handle.GetConnection<TcpClient>().Connected);
         protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct) { handle.GetConnection<TcpClient>().Close(); return Task.CompletedTask; }
         protected override Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct) => Task.FromResult(new ConnectionHealth(handle.GetConnection<TcpClient>().Connected, "TN5250 AS/400", TimeSpan.Zero, DateTimeOffset.UtcNow));
-        public override Task<string> EmulateProtocolAsync(IConnectionHandle handle, string protocolCommand, CancellationToken ct = default) => throw new NotSupportedException("Requires TN5250 emulation library");
-        public override Task<string> TranslateCommandAsync(IConnectionHandle handle, string modernCommand, CancellationToken ct = default) => throw new NotSupportedException("Requires TN5250 translation library");
+        public override async Task<string> EmulateProtocolAsync(IConnectionHandle handle, string protocolCommand, CancellationToken ct = default)
+        {
+            var client = handle.GetConnection<TcpClient>();
+            var stream = client.GetStream();
+            // Send TN5250 command bytes
+            var commandBytes = System.Text.Encoding.ASCII.GetBytes(protocolCommand + "\r\n");
+            await stream.WriteAsync(commandBytes, ct);
+            await stream.FlushAsync(ct);
+            // Read response
+            var buffer = new byte[4096];
+            var bytesRead = await stream.ReadAsync(buffer, ct);
+            return System.Text.Encoding.ASCII.GetString(buffer, 0, bytesRead);
+        }
+
+        public override Task<string> TranslateCommandAsync(IConnectionHandle handle, string modernCommand, CancellationToken ct = default)
+        {
+            // Map modern commands to TN5250 AID keys
+            var translated = modernCommand.ToUpperInvariant() switch
+            {
+                "ENTER" => "\xf1",  // 5250 Enter
+                "F3" => "\x33",     // F3/Exit
+                "F12" => "\xbc",    // F12/Cancel
+                "PAGEUP" => "\xf4", // Page Up
+                "PAGEDOWN" => "\xf5", // Page Down
+                _ => modernCommand
+            };
+            return Task.FromResult($"{{\"original\":\"{modernCommand}\",\"translated\":\"{translated}\",\"protocol\":\"TN5250\"}}");
+        }
     }
 }

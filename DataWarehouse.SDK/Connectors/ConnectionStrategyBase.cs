@@ -1,3 +1,4 @@
+using DataWarehouse.SDK.Contracts.IntelligenceAware;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -9,9 +10,20 @@ namespace DataWarehouse.SDK.Connectors
 {
     /// <summary>
     /// Abstract base class implementing <see cref="IConnectionStrategy"/> with retry logic,
-    /// connection metrics, and optional logging. Concrete strategies should derive from this
-    /// class and implement the protected Core methods.
+    /// connection metrics, optional logging, and Intelligence context support.
+    /// Concrete strategies should derive from this class and implement the protected Core methods.
     /// </summary>
+    /// <remarks>
+    /// <para>
+    /// This base class now supports <see cref="IntelligenceContext"/> for AI-enhanced connection operations:
+    /// </para>
+    /// <list type="bullet">
+    ///   <item>Connection optimization based on AI analysis</item>
+    ///   <item>Predictive failure detection</item>
+    ///   <item>Intelligent retry strategies</item>
+    ///   <item>AI-assisted health monitoring</item>
+    /// </list>
+    /// </remarks>
     public abstract class ConnectionStrategyBase : IConnectionStrategy
     {
         private readonly ILogger? _logger;
@@ -76,10 +88,46 @@ namespace DataWarehouse.SDK.Connectors
         /// <inheritdoc/>
         public async Task<IConnectionHandle> ConnectAsync(ConnectionConfig config, CancellationToken ct = default)
         {
+            return await ConnectAsync(config, null, ct);
+        }
+
+        /// <summary>
+        /// Establishes a connection with optional Intelligence context for AI-enhanced operations.
+        /// </summary>
+        /// <param name="config">Connection configuration.</param>
+        /// <param name="intelligenceContext">Optional Intelligence context for AI-enhanced connection behavior.</param>
+        /// <param name="ct">Cancellation token.</param>
+        /// <returns>A connection handle representing the established connection.</returns>
+        /// <exception cref="InvalidOperationException">Thrown when all connection attempts fail.</exception>
+        /// <remarks>
+        /// <para>
+        /// When an <see cref="IntelligenceContext"/> is provided, the connection strategy can:
+        /// </para>
+        /// <list type="bullet">
+        ///   <item>Use AI to predict optimal connection parameters</item>
+        ///   <item>Adjust retry behavior based on failure pattern analysis</item>
+        ///   <item>Log enhanced diagnostics for AI training</item>
+        ///   <item>Apply intelligent circuit-breaking</item>
+        /// </list>
+        /// <para>
+        /// If Intelligence is unavailable or the context is null, standard connection behavior is used.
+        /// </para>
+        /// </remarks>
+        public async Task<IConnectionHandle> ConnectAsync(
+            ConnectionConfig config,
+            IntelligenceContext? intelligenceContext,
+            CancellationToken ct = default)
+        {
             ArgumentNullException.ThrowIfNull(config);
 
             var maxRetries = config.MaxRetries;
             Exception? lastException = null;
+
+            // Notify derived classes of Intelligence context availability
+            if (intelligenceContext != null)
+            {
+                await OnIntelligenceContextAvailableAsync(intelligenceContext, ct);
+            }
 
             for (int attempt = 0; attempt <= maxRetries; attempt++)
             {
@@ -87,8 +135,9 @@ namespace DataWarehouse.SDK.Connectors
 
                 if (attempt > 0)
                 {
-                    // Exponential backoff: 200ms, 400ms, 800ms, ...
-                    var delay = TimeSpan.FromMilliseconds(200 * Math.Pow(2, attempt - 1));
+                    // Calculate delay - can be overridden for intelligent backoff
+                    var delay = await CalculateRetryDelayAsync(attempt, maxRetries, lastException, intelligenceContext, ct);
+
                     _logger?.LogWarning(
                         "Connection attempt {Attempt}/{MaxRetries} for strategy {StrategyId} failed. Retrying in {Delay}ms...",
                         attempt, maxRetries, StrategyId, delay.TotalMilliseconds);
@@ -100,7 +149,7 @@ namespace DataWarehouse.SDK.Connectors
 
                 try
                 {
-                    var handle = await ConnectCoreAsync(config, ct);
+                    var handle = await ConnectCoreAsync(config, intelligenceContext, ct);
                     sw.Stop();
 
                     Interlocked.Increment(ref _successfulConnections);
@@ -109,6 +158,12 @@ namespace DataWarehouse.SDK.Connectors
                     _logger?.LogInformation(
                         "Connected via strategy {StrategyId} in {ElapsedMs}ms (attempt {Attempt})",
                         StrategyId, sw.ElapsedMilliseconds, attempt + 1);
+
+                    // Record success metrics for Intelligence if available
+                    if (intelligenceContext != null)
+                    {
+                        await OnConnectionSuccessAsync(handle, sw.Elapsed, attempt, intelligenceContext, ct);
+                    }
 
                     return handle;
                 }
@@ -121,6 +176,18 @@ namespace DataWarehouse.SDK.Connectors
                     _logger?.LogWarning(ex,
                         "Connection attempt {Attempt}/{MaxRetries} failed for strategy {StrategyId}",
                         attempt + 1, maxRetries + 1, StrategyId);
+
+                    // Allow Intelligence-aware decision on whether to continue retrying
+                    if (intelligenceContext != null)
+                    {
+                        var shouldContinue = await OnConnectionFailureAsync(ex, attempt, maxRetries, intelligenceContext, ct);
+                        if (!shouldContinue)
+                        {
+                            throw new InvalidOperationException(
+                                $"Connection aborted by Intelligence decision for strategy '{StrategyId}'. " +
+                                $"Error: {ex.Message}", ex);
+                        }
+                    }
                 }
                 catch (Exception ex)
                 {
@@ -236,6 +303,34 @@ namespace DataWarehouse.SDK.Connectors
         protected abstract Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct);
 
         /// <summary>
+        /// Core connection logic with Intelligence context support.
+        /// Override in derived classes to leverage AI-enhanced connection behavior.
+        /// </summary>
+        /// <param name="config">Connection configuration.</param>
+        /// <param name="intelligenceContext">Optional Intelligence context for AI-enhanced operations.</param>
+        /// <param name="ct">Cancellation token.</param>
+        /// <returns>A connection handle for the established connection.</returns>
+        /// <remarks>
+        /// <para>
+        /// Default implementation delegates to <see cref="ConnectCoreAsync(ConnectionConfig, CancellationToken)"/>.
+        /// Override to implement Intelligence-aware connection logic such as:
+        /// </para>
+        /// <list type="bullet">
+        ///   <item>Using AI to optimize connection parameters</item>
+        ///   <item>Predictive pre-warming of connections</item>
+        ///   <item>Intelligent endpoint selection</item>
+        /// </list>
+        /// </remarks>
+        protected virtual Task<IConnectionHandle> ConnectCoreAsync(
+            ConnectionConfig config,
+            IntelligenceContext? intelligenceContext,
+            CancellationToken ct)
+        {
+            // Default: delegate to the non-Intelligence-aware version
+            return ConnectCoreAsync(config, ct);
+        }
+
+        /// <summary>
         /// Core connection test logic. Implement in derived classes to test an active connection.
         /// </summary>
         /// <param name="handle">The connection handle to test.</param>
@@ -279,6 +374,85 @@ namespace DataWarehouse.SDK.Connectors
             {
                 return defaultValue;
             }
+        }
+
+        // ========================================
+        // Intelligence Hooks for Derived Classes
+        // ========================================
+
+        /// <summary>
+        /// Called when an Intelligence context is available for connection operations.
+        /// Override to initialize Intelligence-aware features.
+        /// </summary>
+        /// <param name="context">The Intelligence context.</param>
+        /// <param name="ct">Cancellation token.</param>
+        protected virtual Task OnIntelligenceContextAvailableAsync(
+            IntelligenceContext context,
+            CancellationToken ct)
+        {
+            return Task.CompletedTask;
+        }
+
+        /// <summary>
+        /// Called on successful connection to record metrics for Intelligence learning.
+        /// Override to provide connection telemetry for AI analysis.
+        /// </summary>
+        /// <param name="handle">The established connection handle.</param>
+        /// <param name="connectionTime">Time taken to establish the connection.</param>
+        /// <param name="attemptNumber">The attempt number (0-based).</param>
+        /// <param name="context">The Intelligence context.</param>
+        /// <param name="ct">Cancellation token.</param>
+        protected virtual Task OnConnectionSuccessAsync(
+            IConnectionHandle handle,
+            TimeSpan connectionTime,
+            int attemptNumber,
+            IntelligenceContext context,
+            CancellationToken ct)
+        {
+            return Task.CompletedTask;
+        }
+
+        /// <summary>
+        /// Called on connection failure to allow Intelligence-informed retry decisions.
+        /// Override to implement AI-driven retry logic.
+        /// </summary>
+        /// <param name="exception">The exception that caused the failure.</param>
+        /// <param name="attemptNumber">The attempt number (0-based).</param>
+        /// <param name="maxRetries">Maximum number of retries allowed.</param>
+        /// <param name="context">The Intelligence context.</param>
+        /// <param name="ct">Cancellation token.</param>
+        /// <returns>True if retries should continue; false to abort.</returns>
+        protected virtual Task<bool> OnConnectionFailureAsync(
+            Exception exception,
+            int attemptNumber,
+            int maxRetries,
+            IntelligenceContext context,
+            CancellationToken ct)
+        {
+            // Default: continue with standard retry behavior
+            return Task.FromResult(true);
+        }
+
+        /// <summary>
+        /// Calculates retry delay, optionally using Intelligence for adaptive backoff.
+        /// Override to implement AI-driven backoff strategies.
+        /// </summary>
+        /// <param name="attemptNumber">The attempt number (1-based for this method).</param>
+        /// <param name="maxRetries">Maximum number of retries allowed.</param>
+        /// <param name="lastException">The exception from the last attempt.</param>
+        /// <param name="context">Optional Intelligence context.</param>
+        /// <param name="ct">Cancellation token.</param>
+        /// <returns>The delay before the next retry attempt.</returns>
+        protected virtual Task<TimeSpan> CalculateRetryDelayAsync(
+            int attemptNumber,
+            int maxRetries,
+            Exception? lastException,
+            IntelligenceContext? context,
+            CancellationToken ct)
+        {
+            // Default: exponential backoff (200ms, 400ms, 800ms, ...)
+            var delay = TimeSpan.FromMilliseconds(200 * Math.Pow(2, attemptNumber - 1));
+            return Task.FromResult(delay);
         }
 
         /// <summary>

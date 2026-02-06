@@ -28,9 +28,64 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SpecializedDb
         protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct) { if (_httpClient == null) return false; try { var response = await _httpClient.GetAsync("/ignite?cmd=version", ct); return response.IsSuccessStatusCode; } catch { return false; } }
         protected override async Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct) { _httpClient?.Dispose(); _httpClient = null; await Task.CompletedTask; }
         protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct) { var isHealthy = await TestCoreAsync(handle, ct); return new ConnectionHealth(isHealthy, isHealthy ? "Ignite healthy" : "Ignite unhealthy", TimeSpan.FromMilliseconds(8), DateTimeOffset.UtcNow); }
-        public override async Task<IReadOnlyList<Dictionary<string, object?>>> ExecuteQueryAsync(IConnectionHandle handle, string query, Dictionary<string, object?>? parameters = null, CancellationToken ct = default) { await Task.Delay(8, ct); return new List<Dictionary<string, object?>> { new() { ["id"] = 1, ["value"] = "data" } }; }
-        public override async Task<int> ExecuteNonQueryAsync(IConnectionHandle handle, string command, Dictionary<string, object?>? parameters = null, CancellationToken ct = default) { await Task.Delay(8, ct); return 1; }
-        public override async Task<IReadOnlyList<DataSchema>> GetSchemaAsync(IConnectionHandle handle, CancellationToken ct = default) { await Task.Delay(8, ct); return new List<DataSchema> { new DataSchema("cache", new[] { new DataSchemaField("id", "Integer", false, null, null) }, new[] { "id" }, new Dictionary<string, object> { ["type"] = "cache" }) }; }
+        public override async Task<IReadOnlyList<Dictionary<string, object?>>> ExecuteQueryAsync(IConnectionHandle handle, string query, Dictionary<string, object?>? parameters = null, CancellationToken ct = default)
+        {
+            if (_httpClient == null) return new List<Dictionary<string, object?>>();
+            try
+            {
+                var encodedQuery = Uri.EscapeDataString(query);
+                var response = await _httpClient.GetAsync($"/ignite?cmd=qryfldexe&pageSize=1000&qry={encodedQuery}", ct);
+                if (!response.IsSuccessStatusCode) return new List<Dictionary<string, object?>>();
+                var json = await response.Content.ReadAsStringAsync(ct);
+                using var doc = System.Text.Json.JsonDocument.Parse(json);
+                var results = new List<Dictionary<string, object?>>();
+                if (doc.RootElement.TryGetProperty("response", out var resp) && resp.TryGetProperty("items", out var items))
+                {
+                    foreach (var item in items.EnumerateArray())
+                    {
+                        var row = new Dictionary<string, object?>();
+                        foreach (var prop in item.EnumerateObject())
+                            row[prop.Name] = prop.Value.ValueKind == System.Text.Json.JsonValueKind.Null ? null : prop.Value.ToString();
+                        results.Add(row);
+                    }
+                }
+                return results;
+            }
+            catch { return new List<Dictionary<string, object?>>(); }
+        }
+        public override async Task<int> ExecuteNonQueryAsync(IConnectionHandle handle, string command, Dictionary<string, object?>? parameters = null, CancellationToken ct = default)
+        {
+            if (_httpClient == null) return 0;
+            try
+            {
+                var encodedCmd = Uri.EscapeDataString(command);
+                var response = await _httpClient.GetAsync($"/ignite?cmd=qryfldexe&qry={encodedCmd}", ct);
+                return response.IsSuccessStatusCode ? 1 : 0;
+            }
+            catch { return 0; }
+        }
+        public override async Task<IReadOnlyList<DataSchema>> GetSchemaAsync(IConnectionHandle handle, CancellationToken ct = default)
+        {
+            if (_httpClient == null) return new List<DataSchema>();
+            try
+            {
+                var response = await _httpClient.GetAsync("/ignite?cmd=top&attr=true", ct);
+                if (!response.IsSuccessStatusCode) return new List<DataSchema>();
+                var json = await response.Content.ReadAsStringAsync(ct);
+                using var doc = System.Text.Json.JsonDocument.Parse(json);
+                var schemas = new List<DataSchema>();
+                if (doc.RootElement.TryGetProperty("response", out var resp))
+                {
+                    foreach (var cache in resp.EnumerateArray())
+                    {
+                        var name = cache.TryGetProperty("cacheName", out var cn) ? cn.GetString() ?? "cache" : "cache";
+                        schemas.Add(new DataSchema(name, new[] { new DataSchemaField("key", "Object", false, null, null), new DataSchemaField("value", "Object", true, null, null) }, new[] { "key" }, new Dictionary<string, object> { ["type"] = "cache" }));
+                    }
+                }
+                return schemas.Count > 0 ? schemas : new List<DataSchema> { new DataSchema("default", new[] { new DataSchemaField("key", "Object", false, null, null) }, new[] { "key" }, new Dictionary<string, object> { ["type"] = "cache" }) };
+            }
+            catch { return new List<DataSchema>(); }
+        }
         private (string host, int port) ParseHostPort(string connectionString, int defaultPort) { var clean = connectionString.Replace("http://", "").Split('/')[0]; var parts = clean.Split(':'); return (parts[0], parts.Length > 1 && int.TryParse(parts[1], out var p) ? p : defaultPort); }
     }
 }

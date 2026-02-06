@@ -754,25 +754,25 @@ public sealed class FuseDriverPlugin : FeaturePluginBase, IDisposable
             {
                 Name = "FuseMount",
                 Description = "Mount DataWarehouse storage as a FUSE filesystem",
-                Category = CapabilityCategory.Storage
+                Category = SDK.Primitives.CapabilityCategory.Storage
             },
             new PluginCapabilityDescriptor
             {
                 Name = "PosixSemantics",
                 Description = "Full POSIX filesystem semantics support",
-                Category = CapabilityCategory.Storage
+                Category = SDK.Primitives.CapabilityCategory.Storage
             },
             new PluginCapabilityDescriptor
             {
                 Name = "ExtendedAttributes",
                 Description = "Extended attribute (xattr) support for file metadata",
-                Category = CapabilityCategory.Metadata
+                Category = SDK.Primitives.CapabilityCategory.Metadata
             },
             new PluginCapabilityDescriptor
             {
                 Name = "AccessControlLists",
                 Description = "POSIX and NFSv4 ACL support for fine-grained permissions",
-                Category = CapabilityCategory.Security
+                Category = SDK.Primitives.CapabilityCategory.Security
             }
         };
     }

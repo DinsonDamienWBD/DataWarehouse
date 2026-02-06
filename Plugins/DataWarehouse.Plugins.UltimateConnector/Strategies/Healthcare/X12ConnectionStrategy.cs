@@ -28,7 +28,63 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Healthcare
         protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct) { var response = await handle.GetConnection<HttpClient>().GetAsync("/", ct); return response.IsSuccessStatusCode; }
         protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct) { handle.GetConnection<HttpClient>().Dispose(); return Task.CompletedTask; }
         protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct) { var sw = System.Diagnostics.Stopwatch.StartNew(); var isHealthy = await TestCoreAsync(handle, ct); sw.Stop(); return new ConnectionHealth(isHealthy, "X12 endpoint", sw.Elapsed, DateTimeOffset.UtcNow); }
-        public override Task<(bool IsValid, string[] Errors)> ValidateHl7Async(IConnectionHandle handle, string hl7Message, CancellationToken ct = default) => throw new NotSupportedException("X12 does not use HL7 format");
-        public override Task<string> QueryFhirAsync(IConnectionHandle handle, string resourceType, string? query = null, CancellationToken ct = default) => throw new NotSupportedException("X12 does not use FHIR");
+        public override Task<(bool IsValid, string[] Errors)> ValidateHl7Async(IConnectionHandle handle, string hl7Message, CancellationToken ct = default)
+        {
+            var errors = new List<string>();
+
+            // X12 EDI format validation
+            if (string.IsNullOrWhiteSpace(hl7Message))
+            {
+                errors.Add("X12 document cannot be empty");
+                return Task.FromResult((false, errors.ToArray()));
+            }
+
+            // Basic X12 structure validation
+            if (!hl7Message.Contains("ISA*"))
+            {
+                errors.Add("X12 document must contain ISA interchange header");
+            }
+
+            if (!hl7Message.Contains("IEA*"))
+            {
+                errors.Add("X12 document must contain IEA interchange trailer");
+            }
+
+            if (!hl7Message.Contains("GS*") || !hl7Message.Contains("GE*"))
+            {
+                errors.Add("Warning: X12 document should contain GS/GE functional group envelope");
+            }
+
+            // Check for common healthcare transaction sets
+            var hasHealthcareTxn = hl7Message.Contains("ST*837") || // Claims
+                                   hl7Message.Contains("ST*835") || // Remittance
+                                   hl7Message.Contains("ST*270") || // Eligibility Inquiry
+                                   hl7Message.Contains("ST*271") || // Eligibility Response
+                                   hl7Message.Contains("ST*276") || // Claim Status Inquiry
+                                   hl7Message.Contains("ST*277");   // Claim Status Response
+
+            if (!hasHealthcareTxn)
+            {
+                errors.Add("Note: Document does not contain standard healthcare transaction sets (837/835/270/271/276/277)");
+            }
+
+            return Task.FromResult((errors.Count == 0, errors.ToArray()));
+        }
+
+        public override async Task<string> QueryFhirAsync(IConnectionHandle handle, string resourceType, string? query = null, CancellationToken ct = default)
+        {
+            var client = handle.GetConnection<HttpClient>();
+            // X12 can be queried via clearinghouse APIs
+            var url = string.IsNullOrEmpty(query) ? $"/x12/{resourceType}" : $"/x12/{resourceType}?{query}";
+            try
+            {
+                var response = await client.GetAsync(url, ct);
+                return await response.Content.ReadAsStringAsync(ct);
+            }
+            catch (Exception ex)
+            {
+                return $"{{\"error\":\"{ex.Message}\"}}";
+            }
+        }
     }
 }

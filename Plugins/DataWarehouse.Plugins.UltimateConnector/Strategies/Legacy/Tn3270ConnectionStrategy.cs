@@ -32,7 +32,32 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Legacy
         protected override Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct) => Task.FromResult(handle.GetConnection<TcpClient>().Connected);
         protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct) { handle.GetConnection<TcpClient>().Close(); return Task.CompletedTask; }
         protected override Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct) => Task.FromResult(new ConnectionHealth(handle.GetConnection<TcpClient>().Connected, "TN3270 mainframe", TimeSpan.Zero, DateTimeOffset.UtcNow));
-        public override Task<string> EmulateProtocolAsync(IConnectionHandle handle, string protocolCommand, CancellationToken ct = default) => throw new NotSupportedException("Requires TN3270 emulation library");
-        public override Task<string> TranslateCommandAsync(IConnectionHandle handle, string modernCommand, CancellationToken ct = default) => throw new NotSupportedException("Requires TN3270 translation library");
+        public override async Task<string> EmulateProtocolAsync(IConnectionHandle handle, string protocolCommand, CancellationToken ct = default)
+        {
+            var client = handle.GetConnection<TcpClient>();
+            var stream = client.GetStream();
+            // Send TN3270 command bytes
+            var commandBytes = System.Text.Encoding.ASCII.GetBytes(protocolCommand + "\r\n");
+            await stream.WriteAsync(commandBytes, ct);
+            await stream.FlushAsync(ct);
+            // Read response
+            var buffer = new byte[4096];
+            var bytesRead = await stream.ReadAsync(buffer, ct);
+            return System.Text.Encoding.ASCII.GetString(buffer, 0, bytesRead);
+        }
+
+        public override Task<string> TranslateCommandAsync(IConnectionHandle handle, string modernCommand, CancellationToken ct = default)
+        {
+            // Map modern commands to TN3270 AID keys and field positions
+            var translated = modernCommand.ToUpperInvariant() switch
+            {
+                "ENTER" => "\x7d",  // TN3270 Enter key
+                "PF1" => "\xf1",    // PF1 key
+                "PF3" => "\xf3",    // PF3/Exit key
+                "CLEAR" => "\x6d",  // Clear key
+                _ => modernCommand  // Pass through for field input
+            };
+            return Task.FromResult($"{{\"original\":\"{modernCommand}\",\"translated\":\"{translated}\",\"protocol\":\"TN3270\"}}");
+        }
     }
 }

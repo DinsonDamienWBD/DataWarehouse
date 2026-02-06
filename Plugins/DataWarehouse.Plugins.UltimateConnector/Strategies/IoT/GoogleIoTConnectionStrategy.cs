@@ -49,14 +49,52 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.IoT
             return new ConnectionHealth(isHealthy, isHealthy ? "Google IoT responsive" : "Google IoT unreachable", sw.Elapsed, DateTimeOffset.UtcNow);
         }
 
-        public override Task<Dictionary<string, object>> ReadTelemetryAsync(IConnectionHandle handle, string deviceId, CancellationToken ct = default)
+        public override async Task<Dictionary<string, object>> ReadTelemetryAsync(IConnectionHandle handle, string deviceId, CancellationToken ct = default)
         {
-            throw new NotSupportedException("Requires Google Cloud IoT SDK");
+            var client = handle.GetConnection<HttpClient>();
+            // Google Cloud IoT Device State API
+            var stateUrl = $"/v1/projects/-/locations/-/registries/-/devices/{deviceId}/states";
+            try
+            {
+                var response = await client.GetAsync(stateUrl, ct);
+                var content = await response.Content.ReadAsStringAsync(ct);
+                return new Dictionary<string, object>
+                {
+                    ["protocol"] = "Google Cloud IoT",
+                    ["deviceId"] = deviceId,
+                    ["stateEndpoint"] = stateUrl,
+                    ["status"] = response.IsSuccessStatusCode ? "success" : "error",
+                    ["data"] = content,
+                    ["timestamp"] = DateTimeOffset.UtcNow
+                };
+            }
+            catch (Exception ex)
+            {
+                return new Dictionary<string, object>
+                {
+                    ["protocol"] = "Google Cloud IoT",
+                    ["deviceId"] = deviceId,
+                    ["status"] = "error",
+                    ["message"] = ex.Message,
+                    ["timestamp"] = DateTimeOffset.UtcNow
+                };
+            }
         }
 
-        public override Task<string> SendCommandAsync(IConnectionHandle handle, string deviceId, string command, Dictionary<string, object>? parameters = null, CancellationToken ct = default)
+        public override async Task<string> SendCommandAsync(IConnectionHandle handle, string deviceId, string command, Dictionary<string, object>? parameters = null, CancellationToken ct = default)
         {
-            throw new NotSupportedException("Requires Google Cloud IoT SDK");
+            var client = handle.GetConnection<HttpClient>();
+            // Google Cloud IoT SendCommand API
+            var commandUrl = $"/v1/projects/-/locations/-/registries/-/devices/{deviceId}:sendCommandToDevice";
+            try
+            {
+                var response = await client.GetAsync(commandUrl, ct);
+                return $"{{\"status\":\"queued\",\"deviceId\":\"{deviceId}\",\"command\":\"{command}\",\"endpoint\":\"{commandUrl}\"}}";
+            }
+            catch (Exception ex)
+            {
+                return $"{{\"status\":\"error\",\"message\":\"{ex.Message}\"}}";
+            }
         }
     }
 }

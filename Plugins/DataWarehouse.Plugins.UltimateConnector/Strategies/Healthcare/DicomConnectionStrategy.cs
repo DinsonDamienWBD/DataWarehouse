@@ -29,7 +29,16 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Healthcare
         protected override Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct) => Task.FromResult(handle.GetConnection<TcpClient>().Connected);
         protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct) { handle.GetConnection<TcpClient>().Close(); return Task.CompletedTask; }
         protected override Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct) => Task.FromResult(new ConnectionHealth(handle.GetConnection<TcpClient>().Connected, "DICOM server", TimeSpan.Zero, DateTimeOffset.UtcNow));
-        public override Task<(bool IsValid, string[] Errors)> ValidateHl7Async(IConnectionHandle handle, string hl7Message, CancellationToken ct = default) => throw new NotSupportedException("DICOM does not use HL7");
-        public override Task<string> QueryFhirAsync(IConnectionHandle handle, string resourceType, string? query = null, CancellationToken ct = default) => throw new NotSupportedException("DICOM does not use FHIR");
+        public override Task<(bool IsValid, string[] Errors)> ValidateHl7Async(IConnectionHandle handle, string hl7Message, CancellationToken ct = default)
+        {
+            // DICOM uses its own protocol
+            return Task.FromResult((false, new[] { "DICOM uses DICOM protocol for medical imaging, not HL7 v2. Use Hl7v2ConnectionStrategy for HL7 validation." }));
+        }
+
+        public override Task<string> QueryFhirAsync(IConnectionHandle handle, string resourceType, string? query = null, CancellationToken ct = default)
+        {
+            // DICOM uses C-FIND, not FHIR
+            return Task.FromResult("{\"error\":\"DICOM uses C-FIND/C-MOVE/C-GET for queries. For FHIR ImagingStudy resources, use FhirR4ConnectionStrategy.\"}");
+        }
     }
 }

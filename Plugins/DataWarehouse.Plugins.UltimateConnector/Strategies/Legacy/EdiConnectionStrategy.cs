@@ -28,7 +28,27 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Legacy
         protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct) { var response = await handle.GetConnection<HttpClient>().GetAsync("/", ct); return response.IsSuccessStatusCode; }
         protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct) { handle.GetConnection<HttpClient>().Dispose(); return Task.CompletedTask; }
         protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct) { var sw = System.Diagnostics.Stopwatch.StartNew(); var isHealthy = await TestCoreAsync(handle, ct); sw.Stop(); return new ConnectionHealth(isHealthy, "EDI endpoint", sw.Elapsed, DateTimeOffset.UtcNow); }
-        public override Task<string> EmulateProtocolAsync(IConnectionHandle handle, string protocolCommand, CancellationToken ct = default) => throw new NotSupportedException("Requires EDI parser");
-        public override Task<string> TranslateCommandAsync(IConnectionHandle handle, string modernCommand, CancellationToken ct = default) => throw new NotSupportedException("Requires EDI parser");
+        public override async Task<string> EmulateProtocolAsync(IConnectionHandle handle, string protocolCommand, CancellationToken ct = default)
+        {
+            var client = handle.GetConnection<HttpClient>();
+            // Send EDI document via AS2/HTTP
+            var content = new StringContent(protocolCommand, System.Text.Encoding.ASCII, "application/edi-x12");
+            var response = await client.PostAsync("/edi/submit", content, ct);
+            return await response.Content.ReadAsStringAsync(ct);
+        }
+
+        public override Task<string> TranslateCommandAsync(IConnectionHandle handle, string modernCommand, CancellationToken ct = default)
+        {
+            // Translate JSON to EDI X12 format placeholder
+            var segments = new System.Text.StringBuilder();
+            segments.AppendLine($"ISA*00*          *00*          *ZZ*SENDER         *ZZ*RECEIVER       *{DateTime.Now:yyMMdd}*{DateTime.Now:HHmm}*U*00401*000000001*0*P*:~");
+            segments.AppendLine($"GS*PO*SENDER*RECEIVER*{DateTime.Now:yyyyMMdd}*{DateTime.Now:HHmm}*1*X*004010~");
+            segments.AppendLine($"ST*850*0001~");
+            segments.AppendLine($"BEG*00*NE*{modernCommand}*{DateTime.Now:yyyyMMdd}~");
+            segments.AppendLine("SE*4*0001~");
+            segments.AppendLine("GE*1*1~");
+            segments.AppendLine("IEA*1*000000001~");
+            return Task.FromResult($"{{\"original\":\"{modernCommand}\",\"translated\":\"{segments}\",\"protocol\":\"X12\"}}");
+        }
     }
 }

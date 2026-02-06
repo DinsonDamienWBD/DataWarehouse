@@ -7,6 +7,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using DataWarehouse.SDK.AI;
 using DataWarehouse.SDK.Contracts;
+using DataWarehouse.SDK.Contracts.IntelligenceAware;
 using DataWarehouse.SDK.Primitives;
 using DataWarehouse.SDK.Utilities;
 
@@ -14,6 +15,7 @@ namespace DataWarehouse.Plugins.UltimateAccessControl
 {
     /// <summary>
     /// Ultimate Access Control plugin providing comprehensive security strategies.
+    /// Intelligence-aware for UEBA (User and Entity Behavior Analytics) and anomaly detection.
     /// </summary>
     /// <remarks>
     /// <para>
@@ -28,13 +30,13 @@ namespace DataWarehouse.Plugins.UltimateAccessControl
     /// - Steganography: Hide data within carrier files
     /// - Ephemeral Sharing: Time-limited, self-destructing shares
     /// - Watermarking: Forensic tracing for leak detection
+    /// - Intelligence-aware behavior analysis
     /// </para>
     /// </remarks>
-    public sealed class UltimateAccessControlPlugin : FeaturePluginBase, IDisposable
+    public sealed class UltimateAccessControlPlugin : IntelligenceAwareAccessControlPluginBase, IDisposable
     {
         private readonly ConcurrentDictionary<string, IAccessControlStrategy> _strategies = new();
         private IAccessControlStrategy? _defaultStrategy;
-        private IMessageBus? _messageBus;
         private bool _initialized;
         private bool _disposed;
 
@@ -46,9 +48,6 @@ namespace DataWarehouse.Plugins.UltimateAccessControl
 
         /// <inheritdoc/>
         public override string Version => "1.0.0";
-
-        /// <inheritdoc/>
-        public override PluginCategory Category => PluginCategory.FeatureProvider;
 
         /// <summary>
         /// Gets all registered strategies.
@@ -100,6 +99,9 @@ namespace DataWarehouse.Plugins.UltimateAccessControl
         /// <inheritdoc/>
         public override async Task StartAsync(CancellationToken ct)
         {
+            // Subscribe to Intelligence topics first (from base class)
+            await base.StartAsync(ct);
+
             if (_initialized)
                 return;
 
@@ -116,6 +118,135 @@ namespace DataWarehouse.Plugins.UltimateAccessControl
             }
 
             _initialized = true;
+        }
+
+        /// <summary>
+        /// Called when Intelligence becomes available - register access control capabilities.
+        /// </summary>
+        protected override async Task OnStartWithIntelligenceAsync(CancellationToken ct)
+        {
+            await base.OnStartWithIntelligenceAsync(ct);
+
+            // Register access control capabilities with Intelligence
+            if (MessageBus != null)
+            {
+                var strategyIds = _strategies.Keys.ToList();
+
+                await MessageBus.PublishAsync(IntelligenceTopics.QueryCapability, new PluginMessage
+                {
+                    Type = "capability.register",
+                    Source = Id,
+                    Payload = new Dictionary<string, object>
+                    {
+                        ["pluginId"] = Id,
+                        ["pluginName"] = Name,
+                        ["pluginType"] = "accesscontrol",
+                        ["capabilities"] = new Dictionary<string, object>
+                        {
+                            ["strategyCount"] = _strategies.Count,
+                            ["strategies"] = strategyIds,
+                            ["supportsBehaviorAnalysis"] = true,
+                            ["supportsAnomalyDetection"] = true,
+                            ["supportsRBAC"] = _strategies.ContainsKey("rbac"),
+                            ["supportsABAC"] = _strategies.ContainsKey("abac"),
+                            ["supportsZeroTrust"] = _strategies.ContainsKey("zerotrust")
+                        },
+                        ["semanticDescription"] = $"Ultimate Access Control with {_strategies.Count} strategies including RBAC, ABAC, Zero Trust, " +
+                            "Canary detection, Steganography, Ephemeral Sharing, and Watermarking.",
+                        ["tags"] = new[] { "accesscontrol", "security", "rbac", "abac", "zerotrust", "ueba" }
+                    }
+                }, ct);
+
+                // Subscribe to behavior analysis requests
+                SubscribeToBehaviorAnalysisRequests();
+            }
+        }
+
+        /// <summary>
+        /// Subscribes to behavior analysis requests from Intelligence.
+        /// </summary>
+        private void SubscribeToBehaviorAnalysisRequests()
+        {
+            if (MessageBus == null) return;
+
+            MessageBus.Subscribe(IntelligenceTopics.RequestBehaviorAnalysis, async msg =>
+            {
+                if (msg.Payload.TryGetValue("userId", out var uidObj) && uidObj is string userId)
+                {
+                    var analysis = AnalyzeUserBehavior(userId, msg.Payload);
+
+                    await MessageBus.PublishAsync(IntelligenceTopics.RequestBehaviorAnalysisResponse, new PluginMessage
+                    {
+                        Type = "behavior-analysis.response",
+                        CorrelationId = msg.CorrelationId,
+                        Source = Id,
+                        Payload = new Dictionary<string, object>
+                        {
+                            ["success"] = true,
+                            ["userId"] = userId,
+                            ["riskScore"] = analysis.RiskScore,
+                            ["isAnomaly"] = analysis.IsAnomaly,
+                            ["anomalyTypes"] = analysis.AnomalyTypes,
+                            ["recommendations"] = analysis.Recommendations
+                        }
+                    });
+                }
+            });
+        }
+
+        /// <summary>
+        /// Analyzes user behavior for anomalies.
+        /// </summary>
+        private (double RiskScore, bool IsAnomaly, string[] AnomalyTypes, string[] Recommendations)
+            AnalyzeUserBehavior(string userId, Dictionary<string, object> context)
+        {
+            var anomalyTypes = new List<string>();
+            var recommendations = new List<string>();
+            var riskScore = 0.0;
+
+            // Check for unusual access time
+            if (context.TryGetValue("accessHour", out var ahObj) && ahObj is int hour)
+            {
+                if (hour < 6 || hour > 22) // Outside business hours
+                {
+                    anomalyTypes.Add("unusual-access-time");
+                    riskScore += 0.2;
+                    recommendations.Add("Verify access during off-hours is authorized");
+                }
+            }
+
+            // Check for unusual location
+            if (context.TryGetValue("isNewLocation", out var nlObj) && nlObj is true)
+            {
+                anomalyTypes.Add("new-location");
+                riskScore += 0.15;
+                recommendations.Add("Confirm user is accessing from authorized location");
+            }
+
+            // Check for unusual volume
+            if (context.TryGetValue("accessCount24h", out var acObj) && acObj is int accessCount && accessCount > 1000)
+            {
+                anomalyTypes.Add("high-volume-access");
+                riskScore += 0.3;
+                recommendations.Add("Investigate high volume of access requests");
+            }
+
+            // Check for sensitive resource access
+            if (context.TryGetValue("accessingSensitive", out var asObj) && asObj is true)
+            {
+                riskScore += 0.15;
+                recommendations.Add("Log sensitive resource access for audit");
+            }
+
+            var isAnomaly = riskScore >= 0.3 || anomalyTypes.Count >= 2;
+
+            return (riskScore, isAnomaly, anomalyTypes.ToArray(), recommendations.ToArray());
+        }
+
+        /// <inheritdoc/>
+        protected override Task OnStartCoreAsync(CancellationToken ct)
+        {
+            return Task.CompletedTask;
         }
 
         /// <inheritdoc/>
@@ -317,7 +448,6 @@ namespace DataWarehouse.Plugins.UltimateAccessControl
                 request.Config.TryGetValue("MessageBus", out var mbObj) &&
                 mbObj is IMessageBus messageBus)
             {
-                _messageBus = messageBus;
                 SetMessageBus(messageBus);
             }
 

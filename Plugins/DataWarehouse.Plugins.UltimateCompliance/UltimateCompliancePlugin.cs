@@ -7,6 +7,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using DataWarehouse.SDK.AI;
 using DataWarehouse.SDK.Contracts;
+using DataWarehouse.SDK.Contracts.IntelligenceAware;
 using DataWarehouse.SDK.Primitives;
 using DataWarehouse.SDK.Utilities;
 
@@ -14,6 +15,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance
 {
     /// <summary>
     /// Ultimate Compliance plugin providing comprehensive compliance checking and enforcement.
+    /// Intelligence-aware for PII detection, compliance classification, and sensitivity assessment.
     /// </summary>
     /// <remarks>
     /// <para>
@@ -30,12 +32,13 @@ namespace DataWarehouse.Plugins.UltimateCompliance
     /// - Audit trail generation
     /// - Policy-based configuration
     /// - Real-time compliance verification
+    /// - Intelligence-aware PII detection
+    /// - AI-powered sensitivity classification
     /// </para>
     /// </remarks>
-    public sealed class UltimateCompliancePlugin : FeaturePluginBase, IDisposable
+    public sealed class UltimateCompliancePlugin : IntelligenceAwareCompliancePluginBase, IDisposable
     {
         private readonly ConcurrentDictionary<string, IComplianceStrategy> _strategies = new();
-        private IMessageBus? _messageBus;
         private bool _initialized;
         private bool _disposed;
 
@@ -47,9 +50,6 @@ namespace DataWarehouse.Plugins.UltimateCompliance
 
         /// <inheritdoc/>
         public override string Version => "1.0.0";
-
-        /// <inheritdoc/>
-        public override PluginCategory Category => PluginCategory.FeatureProvider;
 
         /// <summary>
         /// Gets all registered compliance strategies.
@@ -135,11 +135,130 @@ namespace DataWarehouse.Plugins.UltimateCompliance
         /// <inheritdoc/>
         public override async Task StartAsync(CancellationToken ct)
         {
+            // Call base to set up Intelligence awareness
+            await base.StartAsync(ct);
+
             if (_initialized)
                 return;
 
             await DiscoverAndRegisterStrategiesAsync(ct);
             _initialized = true;
+        }
+
+        /// <summary>
+        /// Called when Intelligence becomes available - register compliance capabilities.
+        /// </summary>
+        protected override async Task OnStartWithIntelligenceAsync(CancellationToken ct)
+        {
+            await base.OnStartWithIntelligenceAsync(ct);
+
+            // Register compliance capabilities with Intelligence
+            if (MessageBus != null)
+            {
+                var strategyIds = _strategies.Keys.ToList();
+                var frameworks = _strategies.Values.Select(s => s.Framework).Distinct().ToList();
+
+                await MessageBus.PublishAsync(IntelligenceTopics.QueryCapability, new PluginMessage
+                {
+                    Type = "capability.register",
+                    Source = Id,
+                    Payload = new Dictionary<string, object>
+                    {
+                        ["pluginId"] = Id,
+                        ["pluginName"] = Name,
+                        ["pluginType"] = "compliance",
+                        ["capabilities"] = new Dictionary<string, object>
+                        {
+                            ["strategyCount"] = _strategies.Count,
+                            ["frameworks"] = frameworks,
+                            ["supportsPIIDetection"] = true,
+                            ["supportsComplianceClassification"] = true,
+                            ["supportsSensitivityClassification"] = true,
+                            ["supportsGDPR"] = frameworks.Contains("GDPR"),
+                            ["supportsHIPAA"] = frameworks.Contains("HIPAA"),
+                            ["supportsSOX"] = frameworks.Contains("SOX")
+                        },
+                        ["semanticDescription"] = $"Ultimate Compliance with {_strategies.Count} strategies covering: {string.Join(", ", frameworks)}. " +
+                            "Includes GDPR, HIPAA, SOX, and Geofencing compliance checking with PII detection.",
+                        ["tags"] = new[] { "compliance", "gdpr", "hipaa", "sox", "pii", "sensitivity" }
+                    }
+                }, ct);
+
+                // Subscribe to PII detection requests
+                SubscribeToPIIDetectionRequests();
+            }
+        }
+
+        /// <summary>
+        /// Subscribes to PII detection requests from Intelligence.
+        /// </summary>
+        private void SubscribeToPIIDetectionRequests()
+        {
+            if (MessageBus == null) return;
+
+            MessageBus.Subscribe(IntelligenceTopics.RequestPIIDetection, async msg =>
+            {
+                if (msg.Payload.TryGetValue("text", out var textObj) && textObj is string text)
+                {
+                    var detection = DetectPII(text);
+
+                    await MessageBus.PublishAsync(IntelligenceTopics.RequestPIIDetectionResponse, new PluginMessage
+                    {
+                        Type = "pii-detection.response",
+                        CorrelationId = msg.CorrelationId,
+                        Source = Id,
+                        Payload = new Dictionary<string, object>
+                        {
+                            ["success"] = true,
+                            ["containsPII"] = detection.ContainsPII,
+                            ["piiItems"] = detection.Items.Select(i => new Dictionary<string, object>
+                            {
+                                ["type"] = i.Type,
+                                ["confidence"] = i.Confidence,
+                                ["startIndex"] = i.StartIndex,
+                                ["endIndex"] = i.EndIndex
+                            }).ToArray()
+                        }
+                    });
+                }
+            });
+        }
+
+        /// <summary>
+        /// Detects PII in text using pattern matching.
+        /// </summary>
+        private (bool ContainsPII, List<(string Type, double Confidence, int StartIndex, int EndIndex)> Items)
+            DetectPII(string text)
+        {
+            var items = new List<(string Type, double Confidence, int StartIndex, int EndIndex)>();
+
+            // Simple regex-based PII detection patterns
+            var patterns = new Dictionary<string, string>
+            {
+                ["EMAIL"] = @"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b",
+                ["SSN"] = @"\b\d{3}-\d{2}-\d{4}\b",
+                ["PHONE"] = @"\b\d{3}[-.]?\d{3}[-.]?\d{4}\b",
+                ["CREDIT_CARD"] = @"\b\d{4}[-\s]?\d{4}[-\s]?\d{4}[-\s]?\d{4}\b",
+                ["IP_ADDRESS"] = @"\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b"
+            };
+
+            foreach (var (piiType, pattern) in patterns)
+            {
+                var regex = new System.Text.RegularExpressions.Regex(pattern, System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+                var matches = regex.Matches(text);
+                foreach (System.Text.RegularExpressions.Match match in matches)
+                {
+                    items.Add((piiType, 0.95, match.Index, match.Index + match.Length));
+                }
+            }
+
+            return (items.Count > 0, items);
+        }
+
+        /// <inheritdoc/>
+        protected override Task OnStartCoreAsync(CancellationToken ct)
+        {
+            return Task.CompletedTask;
         }
 
         /// <inheritdoc/>
@@ -347,7 +466,6 @@ namespace DataWarehouse.Plugins.UltimateCompliance
                 request.Config.TryGetValue("MessageBus", out var mbObj) &&
                 mbObj is IMessageBus messageBus)
             {
-                _messageBus = messageBus;
                 SetMessageBus(messageBus);
             }
 

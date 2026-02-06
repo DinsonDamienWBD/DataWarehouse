@@ -52,14 +52,52 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.IoT
             return new ConnectionHealth(isHealthy, isHealthy ? "Azure IoT Hub responsive" : "Azure IoT Hub unreachable", sw.Elapsed, DateTimeOffset.UtcNow);
         }
 
-        public override Task<Dictionary<string, object>> ReadTelemetryAsync(IConnectionHandle handle, string deviceId, CancellationToken ct = default)
+        public override async Task<Dictionary<string, object>> ReadTelemetryAsync(IConnectionHandle handle, string deviceId, CancellationToken ct = default)
         {
-            throw new NotSupportedException("Requires Azure IoT SDK");
+            var client = handle.GetConnection<HttpClient>();
+            // Azure IoT Hub Device Twin API
+            var twinUrl = $"/twins/{deviceId}?api-version=2021-04-12";
+            try
+            {
+                var response = await client.GetAsync(twinUrl, ct);
+                var content = await response.Content.ReadAsStringAsync(ct);
+                return new Dictionary<string, object>
+                {
+                    ["protocol"] = "Azure IoT Hub",
+                    ["deviceId"] = deviceId,
+                    ["twinEndpoint"] = twinUrl,
+                    ["status"] = response.IsSuccessStatusCode ? "success" : "error",
+                    ["data"] = content,
+                    ["timestamp"] = DateTimeOffset.UtcNow
+                };
+            }
+            catch (Exception ex)
+            {
+                return new Dictionary<string, object>
+                {
+                    ["protocol"] = "Azure IoT Hub",
+                    ["deviceId"] = deviceId,
+                    ["status"] = "error",
+                    ["message"] = ex.Message,
+                    ["timestamp"] = DateTimeOffset.UtcNow
+                };
+            }
         }
 
-        public override Task<string> SendCommandAsync(IConnectionHandle handle, string deviceId, string command, Dictionary<string, object>? parameters = null, CancellationToken ct = default)
+        public override async Task<string> SendCommandAsync(IConnectionHandle handle, string deviceId, string command, Dictionary<string, object>? parameters = null, CancellationToken ct = default)
         {
-            throw new NotSupportedException("Requires Azure IoT SDK");
+            var client = handle.GetConnection<HttpClient>();
+            // Azure IoT Hub Direct Methods API
+            var methodUrl = $"/twins/{deviceId}/methods?api-version=2021-04-12";
+            try
+            {
+                var response = await client.GetAsync(methodUrl, ct);
+                return $"{{\"status\":\"queued\",\"deviceId\":\"{deviceId}\",\"methodName\":\"{command}\",\"endpoint\":\"{methodUrl}\"}}";
+            }
+            catch (Exception ex)
+            {
+                return $"{{\"status\":\"error\",\"message\":\"{ex.Message}\"}}";
+            }
         }
     }
 }

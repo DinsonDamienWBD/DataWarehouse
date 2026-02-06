@@ -7,13 +7,18 @@ using System.Threading;
 using System.Threading.Tasks;
 using DataWarehouse.SDK.AI;
 using DataWarehouse.SDK.Contracts;
+using DataWarehouse.SDK.Contracts.IntelligenceAware;
 using DataWarehouse.SDK.Primitives;
 using DataWarehouse.SDK.Security;
 using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateKeyManagement
 {
-    public class UltimateKeyManagementPlugin : FeaturePluginBase, IKeyStoreRegistry, IDisposable
+    /// <summary>
+    /// Ultimate Key Management plugin with Intelligence integration for key rotation prediction
+    /// and security recommendations.
+    /// </summary>
+    public class UltimateKeyManagementPlugin : FeaturePluginBase, IKeyStoreRegistry, IIntelligenceAware, IDisposable
     {
         private readonly ConcurrentDictionary<string, IKeyStore> _keyStores = new();
         private readonly ConcurrentDictionary<string, IEnvelopeKeyStore> _envelopeKeyStores = new();
@@ -24,10 +29,21 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement
         private bool _initialized;
         private bool _disposed;
 
+        // Intelligence integration
+        private volatile bool _isIntelligenceAvailable;
+        private IntelligenceCapabilities _availableCapabilities = IntelligenceCapabilities.None;
+        private readonly List<IDisposable> _intelligenceSubscriptions = new();
+
         public override string Id => "com.datawarehouse.keymanagement.ultimate";
         public override string Name => "Ultimate Key Management";
         public override string Version => "1.0.0";
         public override PluginCategory Category => PluginCategory.FeatureProvider;
+
+        /// <inheritdoc/>
+        public bool IsIntelligenceAvailable => _isIntelligenceAvailable;
+
+        /// <inheritdoc/>
+        public IntelligenceCapabilities AvailableCapabilities => _availableCapabilities;
 
         protected override IReadOnlyList<RegisteredCapability> DeclaredCapabilities
         {
@@ -105,13 +121,188 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement
                 _rotationScheduler.Start();
             }
 
+            // Discover Intelligence and register capabilities
+            await DiscoverIntelligenceAsync(ct);
+            await RegisterKeyManagementCapabilitiesAsync(ct);
+
             _initialized = true;
 
             await PublishEventAsync("keymanagement.started", new Dictionary<string, object>
             {
                 ["strategiesRegistered"] = _strategies.Count,
-                ["rotationEnabled"] = _config.EnableKeyRotation
+                ["rotationEnabled"] = _config.EnableKeyRotation,
+                ["intelligenceAvailable"] = _isIntelligenceAvailable
             });
+        }
+
+        /// <inheritdoc/>
+        public async Task<bool> DiscoverIntelligenceAsync(CancellationToken ct = default)
+        {
+            if (_messageBus == null)
+            {
+                _isIntelligenceAvailable = false;
+                return false;
+            }
+
+            try
+            {
+                // Subscribe to Intelligence broadcasts
+                var availableSub = _messageBus.Subscribe(IntelligenceTopics.Available, msg =>
+                {
+                    _isIntelligenceAvailable = true;
+                    if (msg.Payload.TryGetValue("capabilities", out var capObj) && capObj is long caps)
+                    {
+                        _availableCapabilities = (IntelligenceCapabilities)caps;
+                    }
+                    return Task.CompletedTask;
+                });
+                _intelligenceSubscriptions.Add(availableSub);
+
+                var unavailableSub = _messageBus.Subscribe(IntelligenceTopics.Unavailable, _ =>
+                {
+                    _isIntelligenceAvailable = false;
+                    _availableCapabilities = IntelligenceCapabilities.None;
+                    return Task.CompletedTask;
+                });
+                _intelligenceSubscriptions.Add(unavailableSub);
+
+                // Send discovery request
+                var correlationId = Guid.NewGuid().ToString("N");
+                await _messageBus.PublishAsync(IntelligenceTopics.Discover, new PluginMessage
+                {
+                    Type = "intelligence.discover.request",
+                    CorrelationId = correlationId,
+                    Source = Id,
+                    Payload = new Dictionary<string, object>
+                    {
+                        ["requestorId"] = Id,
+                        ["requestorName"] = Name
+                    }
+                }, ct);
+
+                // Wait briefly for response
+                await Task.Delay(500, ct);
+                return _isIntelligenceAvailable;
+            }
+            catch
+            {
+                _isIntelligenceAvailable = false;
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// Registers key management capabilities with Intelligence.
+        /// </summary>
+        private async Task RegisterKeyManagementCapabilitiesAsync(CancellationToken ct)
+        {
+            if (_messageBus == null) return;
+
+            var envelopeCount = _strategies.Values.Count(s => s.Capabilities.SupportsEnvelope);
+            var rotationCount = _strategies.Values.Count(s => s.Capabilities.SupportsRotation);
+            var hsmCount = _strategies.Values.Count(s => s.Capabilities.SupportsHsm);
+
+            await _messageBus.PublishAsync(IntelligenceTopics.QueryCapability, new PluginMessage
+            {
+                Type = "capability.register",
+                Source = Id,
+                Payload = new Dictionary<string, object>
+                {
+                    ["pluginId"] = Id,
+                    ["pluginName"] = Name,
+                    ["pluginType"] = "keymanagement",
+                    ["capabilities"] = new Dictionary<string, object>
+                    {
+                        ["strategyCount"] = _strategies.Count,
+                        ["envelopeCount"] = envelopeCount,
+                        ["rotationCount"] = rotationCount,
+                        ["hsmCount"] = hsmCount,
+                        ["supportsKeyRotationPrediction"] = true,
+                        ["supportsEnvelopeEncryption"] = envelopeCount > 0,
+                        ["supportsHsm"] = hsmCount > 0
+                    },
+                    ["semanticDescription"] = $"Ultimate Key Management Plugin with {_strategies.Count} key storage strategies. " +
+                        $"Supports envelope encryption ({envelopeCount}), key rotation ({rotationCount}), HSM ({hsmCount}).",
+                    ["tags"] = new[] { "keymanagement", "security", "encryption", "rotation", "hsm", "envelope" }
+                }
+            }, ct);
+
+            // Subscribe to key rotation prediction requests
+            SubscribeToKeyRotationRequests();
+        }
+
+        /// <summary>
+        /// Subscribes to key rotation prediction requests from Intelligence.
+        /// </summary>
+        private void SubscribeToKeyRotationRequests()
+        {
+            if (_messageBus == null) return;
+
+            _messageBus.Subscribe("intelligence.request.key-rotation-prediction", async msg =>
+            {
+                if (msg.Payload.TryGetValue("keyId", out var kidObj) && kidObj is string keyId)
+                {
+                    var prediction = PredictKeyRotation(keyId, msg.Payload);
+
+                    await _messageBus.PublishAsync("intelligence.request.key-rotation-prediction.response", new PluginMessage
+                    {
+                        Type = "key-rotation-prediction.response",
+                        CorrelationId = msg.CorrelationId,
+                        Source = Id,
+                        Payload = new Dictionary<string, object>
+                        {
+                            ["success"] = true,
+                            ["keyId"] = keyId,
+                            ["shouldRotate"] = prediction.ShouldRotate,
+                            ["recommendedRotationDate"] = prediction.RecommendedDate,
+                            ["reasoning"] = prediction.Reasoning,
+                            ["confidence"] = prediction.Confidence
+                        }
+                    });
+                }
+            });
+        }
+
+        /// <summary>
+        /// Predicts whether a key should be rotated.
+        /// </summary>
+        private (bool ShouldRotate, DateTimeOffset RecommendedDate, string Reasoning, double Confidence)
+            PredictKeyRotation(string keyId, Dictionary<string, object> context)
+        {
+            // Get key age if provided
+            var keyAge = context.TryGetValue("keyAgeInDays", out var ageObj) && ageObj is int age ? age : 0;
+            var usageCount = context.TryGetValue("usageCount", out var ucObj) && ucObj is long uc ? uc : 0L;
+            var isHighSecurity = context.TryGetValue("securityLevel", out var slObj) && slObj is string sl && sl == "High";
+
+            // High security keys: rotate every 30 days
+            if (isHighSecurity && keyAge > 30)
+            {
+                return (true, DateTimeOffset.UtcNow.AddDays(1),
+                    "High security key exceeds 30-day rotation policy",
+                    0.95);
+            }
+
+            // High usage: recommend rotation
+            if (usageCount > 1000000)
+            {
+                return (true, DateTimeOffset.UtcNow.AddDays(7),
+                    "Key has been used extensively - rotation recommended",
+                    0.85);
+            }
+
+            // Standard 90-day policy
+            if (keyAge > 90)
+            {
+                return (true, DateTimeOffset.UtcNow.AddDays(7),
+                    "Key exceeds 90-day standard rotation policy",
+                    0.90);
+            }
+
+            // Calculate next recommended rotation
+            var daysUntilRotation = Math.Max(1, 90 - keyAge);
+            return (false, DateTimeOffset.UtcNow.AddDays(daysUntilRotation),
+                $"Key is within policy. Next rotation in {daysUntilRotation} days.",
+                0.88);
         }
 
         public override async Task StopAsync()
