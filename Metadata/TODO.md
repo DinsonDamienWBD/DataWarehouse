@@ -147,7 +147,7 @@ Before ANY release:
 |-------|------|------|-------------|--------------|--------|
 | **1.1** | **T94** | **Ultimate Key Management** | Composable key mgmt (Direct + Envelope modes) | T99 | [x] Complete |
 | **1.2** | **T93** | **Ultimate Encryption** | All encryption as strategies | T99, T94 | [x] Complete |
-| **1.3** | **T92** | **Ultimate Compression** | All compression as strategies | T99 | [ ] |
+| **1.3** | **T92** | **Ultimate Compression** | All compression as strategies | T99 | [x] 58 strategies |
 | **1.4** | **T97** | **Ultimate Storage** | All storage backends as strategies | T99 | [x] 129 strategies |
 | **1.5** | **T91** | **Ultimate RAID** | All RAID levels as strategies | T99 | [ ] |
 | **1.6** | **T95** | **Ultimate Access Control** | All access control features as strategies | T99 | [ ] |
@@ -205,7 +205,7 @@ T99 (SDK) → T94 (Key Mgmt) → T93 (Encryption) → TamperProof (T3.4.2)
 | **3.8** | T5.4.6 | Multi-Party Computation | MPC key management | Add as `MpcStrategy` in **T94** | [x] |
 | **3.9** | T5.5 | Geo-Dispersed WORM | Cross-region WORM | Add as feature in **T98 (UltimateReplication)** | [ ] |
 | **3.10** | T5.6 | Geo-Distributed Sharding | Cross-continent shards | Add as feature in **T98** | [ ] |
-| **3.11** | T5.7-T5.9 | Extreme Compression | PAQ, ZPAQ, CMIX | Add as strategies in **T92 (UltimateCompression)** | [ ] |
+| **3.11** | T5.7-T5.9 | Extreme Compression | PAQ, ZPAQ, CMIX | Add as strategies in **T92 (UltimateCompression)** | [x] |
 | **3.12** | T5.10-T5.11 | Database TDE | SQL TDE metadata | T5.10 in **T94**, T5.11 via IEnvelopeKeyStore | [x] |
 | **3.13** | T5.12-T5.16 | Compliance Reporting | SOC2, HIPAA reports | Add as feature in **T96 (UltimateCompliance)** | [ ] |
 
@@ -262,7 +262,7 @@ T99 (SDK) → T94 (Key Mgmt) → T93 (Encryption) → TamperProof (T3.4.2)
 | Order | Task | Name | Original Plugin | NOW: Implement In | Status |
 |-------|------|------|-----------------|-------------------|--------|
 | **4.10** | T82 | Data Branching (Git-for-Data) | ~~DataWarehouse.Plugins.VersionControl.Branching~~ | **T104 (UltimateDataManagement)** as `BranchingStrategy` | [ ] |
-| **4.11** | T83 | Data Marketplace | ~~DataWarehouse.Plugins.Commerce.Marketplace~~ | **Standalone** (unique commerce functionality) | [ ] |
+| **4.11** | T83 | Data Marketplace | ~~DataWarehouse.Plugins.Commerce.Marketplace~~ | **Standalone** `DataWarehouse.Plugins.DataMarketplace` (commerce/billing is unique domain, no Ultimate match) | [ ] |
 
 #### CATEGORY F: Generative & Probabilistic (Tasks 84-85)
 
@@ -7516,7 +7516,7 @@ var config = new UltimateRaidConfig
 | 72 | Auto-Transcoding Pipeline | Computational | P1 | High | [x] |
 | 73 | Canary Objects | Security | P0 | Medium | [ ] |
 | 74 | Steganographic Sharding | Security | P1 | Very High | [ ] |
-| 75 | SMPC Vaults | Security | P1 | Very High | [ ] |
+| 75 | SMPC Vaults | Security | P1 | Very High | [x] SmpcVaultStrategy in T94 |
 | 76 | Digital Dead Drops | Security | P1 | Medium | [ ] |
 | 77 | Sovereignty Geofencing | Governance | P0 | High | [ ] |
 | 78 | Protocol Morphing | Transport | P1 | High | [ ] |
