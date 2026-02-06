@@ -127,6 +127,7 @@ public sealed class PipelineConfigResolver : IPipelineConfigProvider
                 Level = policy.Level,
                 ScopeId = policy.ScopeId,
                 Stages = policy.Stages,
+                Terminals = policy.Terminals,
                 StageOrder = policy.StageOrder,
                 Version = existing.Version + 1,
                 UpdatedAt = DateTimeOffset.UtcNow,
@@ -275,6 +276,23 @@ public sealed class PipelineConfigResolver : IPipelineConfigProvider
             }
         }
 
+        // Merge Terminals: same pattern as Stages
+        var allTerminalTypes = policyChain
+            .Where(p => p != null)
+            .SelectMany(p => p!.Terminals.Select(t => t.TerminalType))
+            .Distinct()
+            .ToList();
+
+        var mergedTerminals = new List<TerminalStagePolicy>();
+        foreach (var terminalType in allTerminalTypes)
+        {
+            var mergedTerminal = MergeTerminal(terminalType, policyChain);
+            if (mergedTerminal != null)
+            {
+                mergedTerminals.Add(mergedTerminal);
+            }
+        }
+
         // Use the highest level policy as the base
         var basePolicy = policyChain.FirstOrDefault(p => p != null)!;
 
@@ -285,6 +303,7 @@ public sealed class PipelineConfigResolver : IPipelineConfigProvider
             Level = PolicyLevel.Operation, // Effective policy is at the most specific level
             ScopeId = "merged",
             Stages = mergedStages,
+            Terminals = mergedTerminals,
             StageOrder = stageOrder,
             Version = basePolicy.Version,
             UpdatedAt = DateTimeOffset.UtcNow,
@@ -292,6 +311,109 @@ public sealed class PipelineConfigResolver : IPipelineConfigProvider
             MigrationBehavior = basePolicy.MigrationBehavior,
             IsImmutable = false,
             Description = "Merged effective policy from hierarchy"
+        };
+    }
+
+    /// <summary>
+    /// Merges a single terminal across the policy hierarchy.
+    /// Walks from Operation → User → UserGroup → Instance, taking first non-null value for each field.
+    /// Enforces AllowChildOverride: if a parent locks a terminal, child levels cannot override it.
+    /// </summary>
+    private TerminalStagePolicy? MergeTerminal(string terminalType, List<PipelinePolicy?> policyChain)
+    {
+        // Check if any parent level has locked this terminal (AllowChildOverride = false)
+        var lockedAtLevel = -1;
+        for (int i = 0; i < policyChain.Count; i++)
+        {
+            var policy = policyChain[i];
+            if (policy == null) continue;
+
+            var terminal = policy.Terminals.FirstOrDefault(t => t.TerminalType == terminalType);
+            if (terminal != null && !terminal.AllowChildOverride)
+            {
+                lockedAtLevel = i;
+                break;
+            }
+        }
+
+        // If locked, only consider policies up to and including the lock level
+        var effectivePolicyChain = lockedAtLevel >= 0
+            ? policyChain.Take(lockedAtLevel + 1).ToList()
+            : policyChain;
+
+        // Merge fields from Operation → Instance (reverse walk)
+        string? pluginId = null;
+        string? strategyName = null;
+        SDK.Contracts.StorageTier? storageTier = null;
+        bool? enabled = null;
+        Dictionary<string, object>? parameters = null;
+        TerminalExecutionMode? executionMode = null;
+        bool? failureIsCritical = null;
+        int? priority = null;
+        TimeSpan? timeout = null;
+        string? storagePathPattern = null;
+        TimeSpan? retentionPeriod = null;
+        bool? enableVersioning = null;
+        bool allowChildOverride = true;
+
+        for (int i = effectivePolicyChain.Count - 1; i >= 0; i--)
+        {
+            var policy = effectivePolicyChain[i];
+            if (policy == null) continue;
+
+            var terminal = policy.Terminals.FirstOrDefault(t => t.TerminalType == terminalType);
+            if (terminal == null) continue;
+
+            // First non-null wins for each field
+            pluginId ??= terminal.PluginId;
+            strategyName ??= terminal.StrategyName;
+            storageTier ??= terminal.StorageTier;
+            enabled ??= terminal.Enabled;
+            executionMode ??= terminal.ExecutionMode;
+            failureIsCritical ??= terminal.FailureIsCritical;
+            priority ??= terminal.Priority;
+            timeout ??= terminal.Timeout;
+            storagePathPattern ??= terminal.StoragePathPattern;
+            retentionPeriod ??= terminal.RetentionPeriod;
+            enableVersioning ??= terminal.EnableVersioning;
+
+            // Merge parameters (child overrides parent for same keys)
+            if (terminal.Parameters != null)
+            {
+                parameters ??= new Dictionary<string, object>();
+                foreach (var kvp in terminal.Parameters)
+                {
+                    parameters.TryAdd(kvp.Key, kvp.Value);
+                }
+            }
+
+            // Track AllowChildOverride from the most parent level that defines it
+            allowChildOverride = terminal.AllowChildOverride;
+        }
+
+        // If no policy defined this terminal, return null
+        if (pluginId == null && strategyName == null && enabled == null)
+        {
+            return null;
+        }
+
+        // Apply defaults for non-specified values
+        return new TerminalStagePolicy
+        {
+            TerminalType = terminalType,
+            PluginId = pluginId,
+            StrategyName = strategyName,
+            StorageTier = storageTier,
+            Enabled = enabled ?? true,
+            Parameters = parameters,
+            ExecutionMode = executionMode ?? TerminalExecutionMode.Parallel,
+            FailureIsCritical = failureIsCritical ?? (terminalType == "primary" || terminalType == "metadata"),
+            Priority = priority ?? 100,
+            Timeout = timeout,
+            StoragePathPattern = storagePathPattern,
+            RetentionPeriod = retentionPeriod,
+            EnableVersioning = enableVersioning,
+            AllowChildOverride = allowChildOverride
         };
     }
 

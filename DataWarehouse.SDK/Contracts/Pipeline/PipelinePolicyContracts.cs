@@ -30,15 +30,16 @@ public enum MigrationBehavior
 }
 
 /// <summary>
-/// Per-stage policy configuration. Each stage (encryption, compression, RAID, etc.)
-/// can be individually configured at any policy level.
+/// Base class for all policy components (stages, terminals, future policy types).
+/// Contains common properties for hierarchical policy resolution:
+/// - Enabled: Whether the component is active
+/// - PluginId/StrategyName: Which plugin/strategy to use
+/// - Parameters: Configuration parameters
+/// - AllowChildOverride: Whether child levels can override this configuration
 /// </summary>
-public class PipelineStagePolicy
+public abstract class PolicyComponentBase
 {
-    /// <summary>Stage type identifier (e.g., "Encryption", "Compression", "RAID").</summary>
-    public string StageType { get; init; } = string.Empty;
-
-    /// <summary>Whether this stage is enabled. Null = inherit from parent level.</summary>
+    /// <summary>Whether this component is enabled. Null = inherit from parent level.</summary>
     public bool? Enabled { get; init; }
 
     /// <summary>Specific plugin ID to use. Null = inherit from parent or auto-select.</summary>
@@ -47,18 +48,294 @@ public class PipelineStagePolicy
     /// <summary>Specific strategy/algorithm name within the plugin. Null = inherit or auto-select.</summary>
     public string? StrategyName { get; init; }
 
-    /// <summary>Execution order override. Null = inherit from parent.</summary>
-    public int? Order { get; init; }
-
-    /// <summary>Stage-specific parameters (e.g., compression level, key rotation interval).</summary>
+    /// <summary>Component-specific parameters. Merged with parent parameters (child values override).</summary>
     public Dictionary<string, object>? Parameters { get; init; }
 
     /// <summary>
-    /// If true, child levels (UserGroup/User/Operation) can override this stage's settings.
+    /// If true, child levels (UserGroup/User/Operation) can override this component's settings.
     /// If false, this level's settings are locked and cannot be changed by descendants.
     /// Default is true (allow overrides).
     /// </summary>
     public bool AllowChildOverride { get; init; } = true;
+
+    /// <summary>
+    /// Timeout for this component's operations. Null = inherit from parent or use default.
+    /// </summary>
+    public TimeSpan? Timeout { get; init; }
+
+    /// <summary>
+    /// Priority order for execution or fallback selection.
+    /// Lower numbers execute first. Null = inherit from parent.
+    /// </summary>
+    public int? Priority { get; init; }
+}
+
+/// <summary>
+/// Per-stage policy configuration. Each stage (encryption, compression, RAID, etc.)
+/// can be individually configured at any policy level.
+/// Inherits common properties from PolicyComponentBase.
+/// For type-safe configuration, use the specific derived classes (CompressionStagePolicy, etc.)
+/// </summary>
+public class PipelineStagePolicy : PolicyComponentBase
+{
+    /// <summary>Stage type identifier (e.g., "Encryption", "Compression", "RAID").</summary>
+    public virtual string StageType { get; init; } = string.Empty;
+
+    /// <summary>Execution order override within the pipeline. Null = inherit from parent.</summary>
+    public int? Order { get; init; }
+}
+
+/// <summary>
+/// Compression stage policy with type-safe compression-specific settings.
+/// Inherits Enabled, PluginId, StrategyName, AllowChildOverride from base.
+/// </summary>
+public class CompressionStagePolicy : PipelineStagePolicy
+{
+    /// <summary>Fixed stage type for compression.</summary>
+    public override string StageType { get; init; } = "Compression";
+
+    /// <summary>
+    /// Compression level (0-9 or algorithm-specific).
+    /// Higher = better compression, slower. Null = inherit or use default.
+    /// </summary>
+    public int? CompressionLevel { get; init; }
+
+    /// <summary>
+    /// Minimum data size in bytes to apply compression.
+    /// Data smaller than this is stored uncompressed. Null = inherit or compress all.
+    /// </summary>
+    public long? MinSizeToCompress { get; init; }
+
+    /// <summary>
+    /// Content types that should NOT be compressed (already compressed formats).
+    /// Example: ["image/jpeg", "video/mp4", "application/zip"]
+    /// Null = inherit from parent.
+    /// </summary>
+    public List<string>? ExcludeContentTypes { get; init; }
+
+    /// <summary>
+    /// Whether to use dictionary-based compression for better ratios on similar data.
+    /// Null = inherit from parent.
+    /// </summary>
+    public bool? UseDictionary { get; init; }
+
+    /// <summary>
+    /// Memory budget for compression in MB. Higher = potentially better compression.
+    /// Null = inherit or use default.
+    /// </summary>
+    public int? MemoryBudgetMB { get; init; }
+}
+
+/// <summary>
+/// Encryption stage policy with type-safe encryption-specific settings.
+/// Inherits Enabled, PluginId, StrategyName, AllowChildOverride from base.
+/// </summary>
+public class EncryptionStagePolicy : PipelineStagePolicy
+{
+    /// <summary>Fixed stage type for encryption.</summary>
+    public override string StageType { get; init; } = "Encryption";
+
+    /// <summary>
+    /// Key identifier for encryption. Null = inherit or use default key.
+    /// </summary>
+    public string? KeyId { get; init; }
+
+    /// <summary>
+    /// Key version to use. Null = use latest version.
+    /// </summary>
+    public int? KeyVersion { get; init; }
+
+    /// <summary>
+    /// Encryption algorithm override. Null = inherit or use strategy default.
+    /// Examples: "AES-256-GCM", "ChaCha20-Poly1305"
+    /// </summary>
+    public string? Algorithm { get; init; }
+
+    /// <summary>
+    /// Key rotation interval. Null = inherit or use default.
+    /// </summary>
+    public TimeSpan? KeyRotationInterval { get; init; }
+
+    /// <summary>
+    /// Whether to use envelope encryption (encrypt data key with master key).
+    /// Null = inherit from parent.
+    /// </summary>
+    public bool? UseEnvelopeEncryption { get; init; }
+
+    /// <summary>
+    /// HSM slot/key identifier for hardware-backed encryption.
+    /// Null = use software encryption.
+    /// </summary>
+    public string? HsmKeyId { get; init; }
+
+    /// <summary>
+    /// Whether to include authentication tag (AEAD). Default true for GCM modes.
+    /// Null = inherit from parent.
+    /// </summary>
+    public bool? IncludeAuthTag { get; init; }
+}
+
+/// <summary>
+/// RAID stage policy for data redundancy and striping.
+/// Inherits Enabled, PluginId, StrategyName, AllowChildOverride from base.
+/// </summary>
+public class RaidStagePolicy : PipelineStagePolicy
+{
+    /// <summary>Fixed stage type for RAID.</summary>
+    public override string StageType { get; init; } = "RAID";
+
+    /// <summary>
+    /// RAID level (0=striping, 1=mirroring, 5=parity, 6=double parity, etc.).
+    /// Null = inherit from parent.
+    /// </summary>
+    public int? RaidLevel { get; init; }
+
+    /// <summary>
+    /// Number of data chunks for striping. Null = inherit or auto-calculate.
+    /// </summary>
+    public int? DataChunks { get; init; }
+
+    /// <summary>
+    /// Number of parity chunks. Null = inherit based on RAID level.
+    /// </summary>
+    public int? ParityChunks { get; init; }
+
+    /// <summary>
+    /// Chunk size in bytes. Null = inherit or use default.
+    /// </summary>
+    public int? ChunkSizeBytes { get; init; }
+
+    /// <summary>
+    /// Target storage backends for chunk distribution.
+    /// Null = inherit or use all available backends.
+    /// </summary>
+    public List<string>? TargetBackends { get; init; }
+
+    /// <summary>
+    /// Whether to verify chunks on read (detect corruption).
+    /// Null = inherit from parent.
+    /// </summary>
+    public bool? VerifyOnRead { get; init; }
+
+    /// <summary>
+    /// Whether to auto-repair corrupted chunks from parity.
+    /// Null = inherit from parent.
+    /// </summary>
+    public bool? AutoRepair { get; init; }
+}
+
+/// <summary>
+/// Integrity/checksum stage policy for data verification.
+/// Inherits Enabled, PluginId, StrategyName, AllowChildOverride from base.
+/// </summary>
+public class IntegrityStagePolicy : PipelineStagePolicy
+{
+    /// <summary>Fixed stage type for integrity.</summary>
+    public override string StageType { get; init; } = "Integrity";
+
+    /// <summary>
+    /// Hash algorithm for integrity verification.
+    /// Examples: "SHA256", "SHA512", "BLAKE3", "XXH3"
+    /// Null = inherit from parent.
+    /// </summary>
+    public string? HashAlgorithm { get; init; }
+
+    /// <summary>
+    /// Whether to verify integrity on every read.
+    /// Null = inherit from parent.
+    /// </summary>
+    public bool? VerifyOnRead { get; init; }
+
+    /// <summary>
+    /// Whether to fail the operation if integrity check fails.
+    /// If false, logs warning but continues. Null = inherit from parent.
+    /// </summary>
+    public bool? FailOnMismatch { get; init; }
+
+    /// <summary>
+    /// Whether to store hash in manifest (default) or alongside data.
+    /// Null = inherit from parent.
+    /// </summary>
+    public bool? StoreHashInManifest { get; init; }
+}
+
+/// <summary>
+/// Deduplication stage policy for eliminating duplicate data.
+/// Inherits Enabled, PluginId, StrategyName, AllowChildOverride from base.
+/// </summary>
+public class DeduplicationStagePolicy : PipelineStagePolicy
+{
+    /// <summary>Fixed stage type for deduplication.</summary>
+    public override string StageType { get; init; } = "Deduplication";
+
+    /// <summary>
+    /// Deduplication scope: "global" (cross-tenant), "tenant", "user", "blob".
+    /// Null = inherit from parent.
+    /// </summary>
+    public string? Scope { get; init; }
+
+    /// <summary>
+    /// Chunking algorithm: "fixed", "variable", "content-defined".
+    /// Null = inherit from parent.
+    /// </summary>
+    public string? ChunkingAlgorithm { get; init; }
+
+    /// <summary>
+    /// Target chunk size in bytes (for variable chunking, this is average).
+    /// Null = inherit from parent.
+    /// </summary>
+    public int? ChunkSizeBytes { get; init; }
+
+    /// <summary>
+    /// Minimum chunk size in bytes (for variable chunking).
+    /// Null = inherit from parent.
+    /// </summary>
+    public int? MinChunkSizeBytes { get; init; }
+
+    /// <summary>
+    /// Maximum chunk size in bytes (for variable chunking).
+    /// Null = inherit from parent.
+    /// </summary>
+    public int? MaxChunkSizeBytes { get; init; }
+
+    /// <summary>
+    /// Whether to use inline dedup (during write) vs background.
+    /// Null = inherit from parent.
+    /// </summary>
+    public bool? InlineDedup { get; init; }
+}
+
+/// <summary>
+/// Transit encryption stage policy for data in transit.
+/// Inherits Enabled, PluginId, StrategyName, AllowChildOverride from base.
+/// </summary>
+public class TransitEncryptionStagePolicy : PipelineStagePolicy
+{
+    /// <summary>Fixed stage type for transit encryption.</summary>
+    public override string StageType { get; init; } = "TransitEncryption";
+
+    /// <summary>
+    /// TLS version requirement. Examples: "1.2", "1.3".
+    /// Null = inherit from parent.
+    /// </summary>
+    public string? MinTlsVersion { get; init; }
+
+    /// <summary>
+    /// Allowed cipher suites. Null = use secure defaults.
+    /// </summary>
+    public List<string>? AllowedCipherSuites { get; init; }
+
+    /// <summary>
+    /// Whether to require mutual TLS (client certificates).
+    /// Null = inherit from parent.
+    /// </summary>
+    public bool? RequireMutualTls { get; init; }
+
+    /// <summary>
+    /// Certificate thumbprint to use for this connection.
+    /// Null = use default certificate.
+    /// </summary>
+    public string? CertificateThumbprint { get; init; }
 }
 
 /// <summary>
@@ -87,6 +364,12 @@ public class PipelinePolicy
 
     /// <summary>Per-stage policy overrides at this level. Only non-null stages are overridden.</summary>
     public List<PipelineStagePolicy> Stages { get; init; } = new();
+
+    /// <summary>
+    /// Terminal stage configurations for fan-out storage.
+    /// Each terminal receives the final processed (compressed/encrypted) stream.
+    /// </summary>
+    public List<TerminalStagePolicy> Terminals { get; init; } = new();
 
     /// <summary>
     /// Overall pipeline stage ordering override. Null = inherit from parent.
@@ -331,4 +614,71 @@ public class MigrationFilter
 
     /// <summary>Maximum blob size in bytes.</summary>
     public long? MaxSizeBytes { get; init; }
+}
+
+/// <summary>
+/// Configuration for a terminal stage in the pipeline.
+/// Inherits common properties from PolicyComponentBase.
+/// Nullable properties indicate "inherit from parent level".
+/// </summary>
+public class TerminalStagePolicy : PolicyComponentBase
+{
+    /// <summary>
+    /// Terminal type identifier (e.g., "primary", "metadata", "worm", "replica", "index").
+    /// </summary>
+    public string TerminalType { get; init; } = string.Empty;
+
+    /// <summary>
+    /// Storage tier for this terminal. Determines hot/warm/cold/archive placement.
+    /// If null, inherit from parent or auto-select based on strategy.
+    /// </summary>
+    public Contracts.StorageTier? StorageTier { get; init; }
+
+    /// <summary>
+    /// Execution mode: Parallel (fan-out) or Sequential. Null = inherit from parent.
+    /// </summary>
+    public TerminalExecutionMode? ExecutionMode { get; init; }
+
+    /// <summary>
+    /// Whether failure of this terminal fails the entire write operation.
+    /// Critical terminals (like primary) should be true.
+    /// Non-critical (like search index) can be false for best-effort.
+    /// Null = inherit from parent (default: true for primary/metadata, false for others).
+    /// </summary>
+    public bool? FailureIsCritical { get; init; }
+
+    /// <summary>
+    /// Storage path pattern for this terminal. Supports placeholders:
+    /// {blobId}, {userId}, {date}, {year}, {month}, {day}, {tier}
+    /// If null, inherit from parent or use default path pattern.
+    /// Example: "/data/{tier}/{year}/{month}/{blobId}"
+    /// </summary>
+    public string? StoragePathPattern { get; init; }
+
+    /// <summary>
+    /// Retention policy for data stored in this terminal.
+    /// Null = inherit from parent or no explicit retention.
+    /// </summary>
+    public TimeSpan? RetentionPeriod { get; init; }
+
+    /// <summary>
+    /// Whether to enable versioning for this terminal (if supported by backend).
+    /// Null = inherit from parent or use backend default.
+    /// </summary>
+    public bool? EnableVersioning { get; init; }
+}
+
+/// <summary>
+/// Execution mode for terminal stages.
+/// </summary>
+public enum TerminalExecutionMode
+{
+    /// <summary>Execute in parallel with other terminals (fan-out).</summary>
+    Parallel = 0,
+
+    /// <summary>Execute sequentially in priority order.</summary>
+    Sequential = 1,
+
+    /// <summary>Execute after all parallel terminals complete.</summary>
+    AfterParallel = 2
 }

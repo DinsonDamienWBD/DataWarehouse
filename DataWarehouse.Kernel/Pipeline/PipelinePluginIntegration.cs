@@ -12,6 +12,7 @@ namespace DataWarehouse.Kernel.Pipeline
     public class PipelinePluginIntegration
     {
         private readonly ConcurrentDictionary<string, IDataTransformation> _resolvedStageCache = new();
+        private readonly ConcurrentDictionary<string, IDataTerminal> _terminalCache = new();
 
         /// <summary>
         /// Resolves the encryption strategy from the pipeline policy.
@@ -339,6 +340,78 @@ namespace DataWarehouse.Kernel.Pipeline
         public void ClearCache()
         {
             _resolvedStageCache.Clear();
+            _terminalCache.Clear();
+        }
+
+        /// <summary>
+        /// Resolves a terminal plugin based on the terminal policy.
+        /// </summary>
+        public async Task<IDataTerminal?> ResolveTerminalAsync(
+            TerminalStagePolicy policy,
+            IKernelContext? kernelContext,
+            CancellationToken ct = default)
+        {
+            // Try to resolve by terminal type from cached terminals
+            if (_terminalCache.TryGetValue(policy.TerminalType, out var cachedTerminal))
+                return cachedTerminal;
+
+            if (kernelContext == null)
+                return null;
+
+            // Try to resolve from available IDataTerminal plugins
+            var terminals = kernelContext.GetPlugins<IDataTerminal>();
+
+            // First, try to match by explicit plugin ID
+            if (!string.IsNullOrEmpty(policy.PluginId))
+            {
+                var terminal = terminals.FirstOrDefault(t =>
+                    (t as IPlugin)?.Id == policy.PluginId);
+                if (terminal != null)
+                {
+                    _terminalCache[policy.TerminalType] = terminal;
+                    return terminal;
+                }
+            }
+
+            // Try to match by terminal type
+            var matchedTerminal = terminals.FirstOrDefault(t =>
+                t.TerminalId == policy.TerminalType ||
+                (string.IsNullOrEmpty(policy.TerminalType) && t.TerminalId == "primary"));
+
+            if (matchedTerminal != null)
+            {
+                _terminalCache[policy.TerminalType] = matchedTerminal;
+                return matchedTerminal;
+            }
+
+            // Fallback: use the first available terminal for "primary" type
+            if (policy.TerminalType == "primary" || string.IsNullOrEmpty(policy.TerminalType))
+            {
+                var firstTerminal = terminals.FirstOrDefault();
+                if (firstTerminal != null)
+                {
+                    _terminalCache[policy.TerminalType] = firstTerminal;
+                    return firstTerminal;
+                }
+            }
+
+            return await Task.FromResult<IDataTerminal?>(null);
+        }
+
+        /// <summary>
+        /// Registers a terminal explicitly for a terminal type.
+        /// </summary>
+        public void RegisterTerminal(string terminalType, IDataTerminal terminal)
+        {
+            _terminalCache[terminalType] = terminal;
+        }
+
+        /// <summary>
+        /// Gets all registered terminals.
+        /// </summary>
+        public IReadOnlyDictionary<string, IDataTerminal> GetRegisteredTerminals()
+        {
+            return new Dictionary<string, IDataTerminal>(_terminalCache);
         }
     }
 }

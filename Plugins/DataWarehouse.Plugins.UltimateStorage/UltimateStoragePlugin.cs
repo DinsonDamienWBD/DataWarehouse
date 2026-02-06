@@ -40,7 +40,7 @@ namespace DataWarehouse.Plugins.UltimateStorage;
 /// - Automatic failover
 /// - Compression and deduplication
 /// </summary>
-public sealed class UltimateStoragePlugin : PipelinePluginBase, IDisposable
+public sealed class UltimateStoragePlugin : PipelinePluginBase, IDataTerminal, IDisposable
 {
     private readonly StorageStrategyRegistry _registry;
     private readonly ConcurrentDictionary<string, long> _usageStats = new();
@@ -75,6 +75,158 @@ public sealed class UltimateStoragePlugin : PipelinePluginBase, IDisposable
 
     /// <inheritdoc/>
     public override int QualityLevel => 100;
+
+    #region IDataTerminal Implementation
+
+    /// <summary>
+    /// Terminal ID for this storage plugin.
+    /// </summary>
+    public string TerminalId => _defaultStrategyId ?? Id;
+
+    /// <summary>
+    /// Terminal capabilities based on the default strategy.
+    /// </summary>
+    public TerminalCapabilities Capabilities => new()
+    {
+        Tier = GetDefaultStorageTier(),
+        SupportsVersioning = HasVersioningStrategy(),
+        SupportsWorm = HasWormStrategy(),
+        IsContentAddressable = HasContentAddressableStrategy(),
+        SupportsParallelWrite = true,
+        SupportsStreaming = true,
+        MaxObjectSize = GetMaxObjectSize()
+    };
+
+    /// <summary>
+    /// Write data to storage terminal.
+    /// </summary>
+    public async Task WriteAsync(Stream input, TerminalContext context, CancellationToken ct = default)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+        var strategyId = context.Parameters.TryGetValue("strategyId", out var sid) && sid is string s
+            ? s
+            : _defaultStrategyId;
+
+        var strategy = await GetStrategyWithFailoverAsync(strategyId);
+        if (strategy == null)
+            throw new InvalidOperationException($"No storage strategy available for '{strategyId}'");
+
+        // Read stream to bytes
+        byte[] data;
+        using (var ms = new MemoryStream())
+        {
+            await input.CopyToAsync(ms, ct);
+            data = ms.ToArray();
+        }
+
+        // Build storage options from context
+        var options = BuildStorageOptionsFromContext(context);
+
+        // Write to storage
+        await strategy.WriteAsync(context.StoragePath, data, options);
+
+        // Update statistics
+        Interlocked.Increment(ref _totalWrites);
+        Interlocked.Add(ref _totalBytesWritten, data.Length);
+        IncrementUsageStats(strategyId ?? _defaultStrategyId);
+
+        // Log event
+        if (_auditEnabled && context.KernelContext != null)
+        {
+            context.KernelContext.LogDebug(
+                $"[Terminal] Wrote {data.Length} bytes to {strategyId}:{context.StoragePath} (BlobId: {context.BlobId})");
+        }
+    }
+
+    /// <summary>
+    /// Read data from storage terminal.
+    /// </summary>
+    public async Task<Stream> ReadAsync(TerminalContext context, CancellationToken ct = default)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+        var strategyId = context.Parameters.TryGetValue("strategyId", out var sid) && sid is string s
+            ? s
+            : _defaultStrategyId;
+
+        var strategy = await GetStrategyWithFailoverAsync(strategyId);
+        if (strategy == null)
+            throw new InvalidOperationException($"No storage strategy available for '{strategyId}'");
+
+        var options = BuildStorageOptionsFromContext(context);
+        var data = await strategy.ReadAsync(context.StoragePath, options);
+
+        // Update statistics
+        Interlocked.Increment(ref _totalReads);
+        Interlocked.Add(ref _totalBytesRead, data.Length);
+
+        // Log event
+        if (_auditEnabled && context.KernelContext != null)
+        {
+            context.KernelContext.LogDebug(
+                $"[Terminal] Read {data.Length} bytes from {strategyId}:{context.StoragePath} (BlobId: {context.BlobId})");
+        }
+
+        return new MemoryStream(data);
+    }
+
+    /// <summary>
+    /// Delete data from storage terminal.
+    /// </summary>
+    public async Task<bool> DeleteAsync(TerminalContext context, CancellationToken ct = default)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+        var strategyId = context.Parameters.TryGetValue("strategyId", out var sid) && sid is string s
+            ? s
+            : _defaultStrategyId;
+
+        var strategy = await GetStrategyWithFailoverAsync(strategyId);
+        if (strategy == null)
+            return false;
+
+        try
+        {
+            var options = BuildStorageOptionsFromContext(context);
+            await strategy.DeleteAsync(context.StoragePath, options);
+
+            Interlocked.Increment(ref _totalDeletes);
+
+            if (_auditEnabled && context.KernelContext != null)
+            {
+                context.KernelContext.LogDebug(
+                    $"[Terminal] Deleted {strategyId}:{context.StoragePath} (BlobId: {context.BlobId})");
+            }
+
+            return true;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Check if data exists in storage terminal.
+    /// </summary>
+    public async Task<bool> ExistsAsync(TerminalContext context, CancellationToken ct = default)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+        var strategyId = context.Parameters.TryGetValue("strategyId", out var sid) && sid is string s
+            ? s
+            : _defaultStrategyId;
+
+        var strategy = await GetStrategyWithFailoverAsync(strategyId);
+        if (strategy == null)
+            return false;
+
+        var options = BuildStorageOptionsFromContext(context);
+        return await strategy.ExistsAsync(context.StoragePath, options);
+    }
+
+    #endregion
 
     /// <inheritdoc/>
     public override int DefaultOrder => 100;
@@ -944,6 +1096,92 @@ public sealed class UltimateStoragePlugin : PipelinePluginBase, IDisposable
             Metadata = args.TryGetValue("metadata", out var mObj) && mObj is Dictionary<string, string> m
                 ? m : new Dictionary<string, string>()
         };
+    }
+
+    #endregion
+
+    #region Terminal Helper Methods
+
+    private SDK.Contracts.StorageTier GetDefaultStorageTier()
+    {
+        // Determine tier based on default strategy type
+        if (_defaultStrategyId?.Contains("Memory", StringComparison.OrdinalIgnoreCase) == true)
+            return SDK.Contracts.StorageTier.Memory;
+        if (_defaultStrategyId?.Contains("Archive", StringComparison.OrdinalIgnoreCase) == true)
+            return SDK.Contracts.StorageTier.Archive;
+        if (_defaultStrategyId?.Contains("Cold", StringComparison.OrdinalIgnoreCase) == true ||
+            _defaultStrategyId?.Contains("Glacier", StringComparison.OrdinalIgnoreCase) == true)
+            return SDK.Contracts.StorageTier.Cold;
+        if (_defaultStrategyId?.Contains("Infrequent", StringComparison.OrdinalIgnoreCase) == true)
+            return SDK.Contracts.StorageTier.Warm;
+        return SDK.Contracts.StorageTier.Hot;
+    }
+
+    private bool HasVersioningStrategy()
+    {
+        return _registry.GetAllStrategies()
+            .OfType<IStorageStrategyExtended>()
+            .Any(s => s.SupportsVersioning);
+    }
+
+    private bool HasWormStrategy()
+    {
+        return _registry.GetAllStrategies()
+            .OfType<IStorageStrategyExtended>()
+            .Any(s => s.GetType().Name.Contains("Worm", StringComparison.OrdinalIgnoreCase) ||
+                     s.GetType().Name.Contains("Immutable", StringComparison.OrdinalIgnoreCase));
+    }
+
+    private bool HasContentAddressableStrategy()
+    {
+        return _registry.GetAllStrategies()
+            .OfType<IStorageStrategyExtended>()
+            .Any(s => s.GetType().Name.Contains("CAS", StringComparison.OrdinalIgnoreCase) ||
+                     s.GetType().Name.Contains("ContentAddressable", StringComparison.OrdinalIgnoreCase));
+    }
+
+    private long? GetMaxObjectSize()
+    {
+        // Return the max across all strategies, or null if unlimited
+        var maxSizes = _registry.GetAllStrategies()
+            .OfType<IStorageStrategyExtended>()
+            .Where(s => s.MaxObjectSize.HasValue)
+            .Select(s => s.MaxObjectSize!.Value)
+            .ToList();
+
+        return maxSizes.Count > 0 ? maxSizes.Max() : null;
+    }
+
+    private StorageOptions BuildStorageOptionsFromContext(TerminalContext context)
+    {
+        var options = new StorageOptions();
+
+        if (context.Parameters.TryGetValue("timeout", out var tObj) && tObj is int t)
+            options.Timeout = TimeSpan.FromSeconds(t);
+
+        if (context.Parameters.TryGetValue("bufferSize", out var bObj) && bObj is int b)
+            options.BufferSize = b;
+
+        if (context.Parameters.TryGetValue("compress", out var cObj) && cObj is bool c)
+            options.EnableCompression = c;
+
+        // Merge content type and tags into metadata
+        if (context.ContentType != null)
+        {
+            options.Metadata ??= new Dictionary<string, string>();
+            options.Metadata["ContentType"] = context.ContentType;
+        }
+
+        if (context.Tags != null)
+        {
+            options.Metadata ??= new Dictionary<string, string>();
+            foreach (var tag in context.Tags)
+            {
+                options.Metadata[tag.Key] = tag.Value;
+            }
+        }
+
+        return options;
     }
 
     #endregion

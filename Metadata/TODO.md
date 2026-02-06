@@ -9171,6 +9171,68 @@ T99 (SDK) → T94 (Key Management) → TamperProof Storage (T3.4.2)
 
 ---
 
+### Phase D.8: Pipeline Infrastructure - Storage as Terminal Stage + Transaction Rollback
+
+> **Note:** Makes the pipeline 100% production-ready with unified orchestration.
+> Storage is now a first-class pipeline terminal, enabling fan-out patterns.
+> All operations are transactional with automatic rollback on failure.
+
+| Sub-Task | Component | Description | Status |
+|----------|-----------|-------------|--------|
+| **D8.1: Terminal Stage Contracts** |
+| 99.D8.1.1 | `IDataTerminal` interface | Terminal stage contract for storage sinks (fan-out capable) | [x] |
+| 99.D8.1.2 | `TerminalContext` record | Context for terminal operations (BlobId, StoragePath, Parameters) | [x] |
+| 99.D8.1.3 | `TerminalCapabilities` record | Tier, versioning, WORM, content-addressable capabilities | [x] |
+| 99.D8.1.4 | `StorageTier` enum | Hot/Warm/Cold/Archive/Memory tier classification | [x] |
+| 99.D8.1.5 | `TerminalResult` record | Result of terminal write with duration, bytes, path, ETag | [x] |
+| 99.D8.1.6 | `PipelineStorageResult` record | Aggregate result with all terminal results, success status | [x] |
+| **D8.2: Terminal Policy Hierarchy** |
+| 99.D8.2.1 | `TerminalStagePolicy` | Terminal config with TerminalType, StorageTier, ExecutionMode | [x] |
+| 99.D8.2.2 | Nullable properties | Enabled?, Priority?, FailureIsCritical? for inheritance | [x] |
+| 99.D8.2.3 | `AllowChildOverride` | Instance can lock terminal config from child override | [x] |
+| 99.D8.2.4 | `TerminalExecutionMode` | Parallel (fan-out), Sequential, AfterParallel modes | [x] |
+| 99.D8.2.5 | StoragePathPattern | Path template with {blobId}, {userId}, {tier} placeholders | [x] |
+| 99.D8.2.6 | RetentionPeriod, EnableVersioning | Terminal-specific settings | [x] |
+| **D8.3: Policy Base Class Refactor** |
+| 99.D8.3.1 | `PolicyComponentBase` abstract | Base class with Enabled, PluginId, StrategyName, AllowChildOverride | [x] |
+| 99.D8.3.2 | `PipelineStagePolicy : PolicyComponentBase` | Stage inherits common properties | [x] |
+| 99.D8.3.3 | `TerminalStagePolicy : PolicyComponentBase` | Terminal inherits common properties | [x] |
+| 99.D8.3.4 | Future policies inherit automatically | Base provides Timeout, Priority, Parameters | [x] |
+| **D8.4: Typed Stage Policies** |
+| 99.D8.4.1 | `CompressionStagePolicy` | CompressionLevel, MinSizeToCompress, ExcludeContentTypes | [x] |
+| 99.D8.4.2 | `EncryptionStagePolicy` | KeyId, Algorithm, KeyRotationInterval, UseEnvelope, HsmKeyId | [x] |
+| 99.D8.4.3 | `RaidStagePolicy` | RaidLevel, DataChunks, ParityChunks, ChunkSize, AutoRepair | [x] |
+| 99.D8.4.4 | `IntegrityStagePolicy` | HashAlgorithm, VerifyOnRead, FailOnMismatch | [x] |
+| 99.D8.4.5 | `DeduplicationStagePolicy` | Scope, ChunkingAlgorithm, ChunkSize, InlineDedup | [x] |
+| 99.D8.4.6 | `TransitEncryptionStagePolicy` | MinTlsVersion, CipherSuites, RequireMutualTls | [x] |
+| **D8.5: Pipeline Transaction Rollback** |
+| 99.D8.5.1 | `IRollbackable` interface | SupportsRollback, RollbackAsync() for stages | [x] |
+| 99.D8.5.2 | `RollbackContext` record | TransactionId, BlobId, CapturedState for rollback | [x] |
+| 99.D8.5.3 | `IPipelineTransaction` interface | Transaction coordinator tracking stages/terminals | [x] |
+| 99.D8.5.4 | `PipelineTransaction` impl | RecordStageExecution, CommitAsync, RollbackAsync | [x] |
+| 99.D8.5.5 | `ExecutedStageInfo` record | Stage execution details for potential rollback | [x] |
+| 99.D8.5.6 | `ExecutedTerminalInfo` record | Terminal write details for rollback (delete) | [x] |
+| 99.D8.5.7 | `RollbackResult` record | Success, StagesRolledBack, TerminalsRolledBack, Attempts | [x] |
+| 99.D8.5.8 | `IPipelineTransactionFactory` | Factory for creating transactions | [x] |
+| **D8.6: Orchestrator Integration** |
+| 99.D8.6.1 | `ExecuteWritePipelineWithStorageAsync` | Unified pipeline execution with terminal fan-out | [x] |
+| 99.D8.6.2 | `ExecuteTerminalsAsync` | Fan-out to parallel/sequential terminals | [x] |
+| 99.D8.6.3 | Transaction tracking | RecordStageExecution/RecordTerminalExecution during pipeline | [x] |
+| 99.D8.6.4 | Critical failure rollback | Automatic rollback when critical terminal fails | [x] |
+| 99.D8.6.5 | `PipelineTransactionException` | Exception with terminal results for diagnostics | [x] |
+| **D8.7: Config Resolver Terminal Merging** |
+| 99.D8.7.1 | `MergeTerminal()` method | Terminal policy merging with AllowChildOverride enforcement | [x] |
+| 99.D8.7.2 | Terminals in `MergePolicies()` | Include terminals in effective policy resolution | [x] |
+| 99.D8.7.3 | Terminals in `SetPolicyAsync()` | Preserve terminals when updating policy | [x] |
+| **D8.8: Storage Plugin Terminal Interface** |
+| 99.D8.8.1 | `UltimateStoragePlugin : IDataTerminal` | Storage plugin implements terminal interface | [x] |
+| 99.D8.8.2 | `WriteAsync(TerminalContext)` | Terminal-style write operation | [x] |
+| 99.D8.8.3 | `ReadAsync(TerminalContext)` | Terminal-style read operation | [x] |
+| 99.D8.8.4 | `DeleteAsync(TerminalContext)` | Delete for rollback support | [x] |
+| 99.D8.8.5 | `TerminalCapabilities` | Dynamic capabilities from registered strategies | [x] |
+
+---
+
 ### Phase D.7: Thin Client Wrappers (Future)
 
 > **Note:** CLI/GUI/other clients will be thin wrappers over the Knowledge Lake + Capability Registry.

@@ -26,6 +26,8 @@ public sealed class EnhancedPipelineOrchestrator : IPipelineOrchestrator
     private readonly IPipelineMigrationEngine? _migrationEngine;
     private readonly DefaultMessageBus? _messageBus;
     private readonly ILogger? _logger;
+    private readonly PipelinePluginIntegration? _pluginIntegration;
+    private readonly IPipelineTransactionFactory? _transactionFactory;
     private readonly ConcurrentDictionary<string, IDataTransformation> _registeredStages = new();
 
     /// <summary>
@@ -35,16 +37,22 @@ public sealed class EnhancedPipelineOrchestrator : IPipelineOrchestrator
     /// <param name="migrationEngine">Optional migration engine for handling policy version changes.</param>
     /// <param name="messageBus">Optional message bus for publishing pipeline events.</param>
     /// <param name="logger">Optional logger for diagnostic output.</param>
+    /// <param name="pluginIntegration">Optional plugin integration for terminal resolution.</param>
+    /// <param name="transactionFactory">Optional transaction factory for rollback support.</param>
     public EnhancedPipelineOrchestrator(
         IPipelineConfigProvider configProvider,
         IPipelineMigrationEngine? migrationEngine = null,
         DefaultMessageBus? messageBus = null,
-        ILogger? logger = null)
+        ILogger? logger = null,
+        PipelinePluginIntegration? pluginIntegration = null,
+        IPipelineTransactionFactory? transactionFactory = null)
     {
         _configProvider = configProvider ?? throw new ArgumentNullException(nameof(configProvider));
         _migrationEngine = migrationEngine;
         _messageBus = messageBus;
         _logger = logger;
+        _pluginIntegration = pluginIntegration;
+        _transactionFactory = transactionFactory;
     }
 
     /// <summary>
@@ -699,6 +707,395 @@ public sealed class EnhancedPipelineOrchestrator : IPipelineOrchestrator
     }
 
     /// <summary>
+    /// Executes the full write pipeline including terminal stages (storage).
+    /// This is the unified entry point that handles: Transform → Compress → Encrypt → Store
+    /// Uses transactions with automatic rollback on critical failures.
+    /// </summary>
+    public async Task<PipelineStorageResult> ExecuteWritePipelineWithStorageAsync(
+        Stream input,
+        PipelineContext context,
+        CancellationToken ct = default)
+    {
+        var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+
+        // Create transaction for unified rollback
+        var blobId = context.Parameters.TryGetValue("BlobId", out var blobIdValue) ? blobIdValue?.ToString() : null;
+        var transaction = _transactionFactory?.Create(
+            transactionId: context.Parameters.TryGetValue("TransactionId", out var txId) ? txId?.ToString() : null,
+            blobId: blobId,
+            kernelContext: context.KernelContext);
+
+        try
+        {
+            // Phase 1: Execute transformation stages (compress, encrypt) with transaction tracking
+            var transformedStream = await ExecuteWritePipelineWithTransactionAsync(input, context, transaction, ct);
+
+            // Phase 2: Execute terminal stages (storage fan-out) with transaction tracking
+            var effectivePolicy = await ResolveEffectivePolicyAsync(context, ct);
+            var terminalResults = await ExecuteTerminalsWithTransactionAsync(
+                transformedStream, effectivePolicy, context, transaction, ct);
+
+            // Check if any critical terminal failed
+            var criticalFailure = terminalResults.FirstOrDefault(r =>
+                !r.Success && IsCriticalTerminal(r.TerminalType));
+
+            if (criticalFailure != null)
+            {
+                // Critical terminal failed - rollback everything
+                if (transaction != null)
+                {
+                    transaction.MarkFailed(criticalFailure.Exception);
+                    var rollbackResult = await transaction.RollbackAsync(ct);
+
+                    _logger?.LogWarning(
+                        "Pipeline transaction rolled back due to critical terminal failure: {TerminalType}. Rollback success: {Success}",
+                        criticalFailure.TerminalType, rollbackResult.Success);
+                }
+
+                throw new PipelineTransactionException(
+                    $"Critical terminal '{criticalFailure.TerminalType}' failed: {criticalFailure.ErrorMessage}",
+                    criticalFailure.Exception,
+                    terminalResults);
+            }
+
+            // All critical operations succeeded - commit transaction
+            if (transaction != null)
+            {
+                await transaction.CommitAsync(ct);
+            }
+
+            stopwatch.Stop();
+
+            return new PipelineStorageResult
+            {
+                TerminalResults = terminalResults,
+                TotalDuration = stopwatch.Elapsed,
+                Manifest = context.Manifest,
+                TransactionId = transaction?.TransactionId
+            };
+        }
+        catch (PipelineTransactionException)
+        {
+            throw; // Already handled
+        }
+        catch (Exception ex)
+        {
+            // Unexpected failure - rollback
+            if (transaction != null)
+            {
+                transaction.MarkFailed(ex);
+                await transaction.RollbackAsync(ct);
+            }
+            throw;
+        }
+        finally
+        {
+            if (transaction != null)
+            {
+                await transaction.DisposeAsync();
+            }
+        }
+    }
+
+    /// <summary>
+    /// Executes write pipeline stages with transaction tracking for rollback support.
+    /// </summary>
+    private async Task<Stream> ExecuteWritePipelineWithTransactionAsync(
+        Stream input,
+        PipelineContext context,
+        IPipelineTransaction? transaction,
+        CancellationToken ct)
+    {
+        ArgumentNullException.ThrowIfNull(input);
+        ArgumentNullException.ThrowIfNull(context);
+
+        ct.ThrowIfCancellationRequested();
+
+        var securityContext = context.SecurityContext ?? AnonymousSecurityContext.Instance;
+        var effectivePolicy = await ResolveEffectivePolicyAsync(context, ct);
+
+        // Get ordered stages from policy (exclude terminal stages)
+        var orderedStages = effectivePolicy.Stages
+            .Where(s => s.Enabled ?? true)
+            .Where(s => !IsTerminalStageType(s.StageType))
+            .OrderBy(s => s.Order ?? 100)
+            .ToList();
+
+        _logger?.LogInformation(
+            "Executing write pipeline with {Count} stages (Transaction: {TxId})",
+            orderedStages.Count, transaction?.TransactionId ?? "none");
+
+        var currentStream = input;
+        var intermediateStreams = new List<Stream>();
+
+        try
+        {
+            int order = 0;
+            foreach (var stagePolicy in orderedStages)
+            {
+                ct.ThrowIfCancellationRequested();
+
+                var stage = FindStage(stagePolicy);
+                if (stage == null)
+                {
+                    _logger?.LogWarning("Stage {StageType} not found, skipping", stagePolicy.StageType);
+                    continue;
+                }
+
+                var stageParams = stagePolicy.Parameters ?? new Dictionary<string, object>();
+                var previousStream = currentStream;
+
+                // Execute the stage
+                currentStream = stage.OnWrite(currentStream, context.KernelContext!, stageParams);
+
+                // Track intermediate stream for cleanup
+                if (previousStream != input && previousStream != currentStream)
+                {
+                    intermediateStreams.Add(previousStream);
+                }
+
+                // Record to transaction for potential rollback
+                if (transaction != null)
+                {
+                    var supportsRollback = stage is IRollbackable rollbackable && rollbackable.SupportsRollback;
+
+                    transaction.RecordStageExecution(new ExecutedStageInfo
+                    {
+                        StageType = stagePolicy.StageType,
+                        PluginId = stagePolicy.PluginId ?? stage.GetType().Name,
+                        StrategyName = stagePolicy.StrategyName ?? "default",
+                        StageInstance = stage,
+                        SupportsRollback = supportsRollback,
+                        Parameters = new Dictionary<string, object>(stageParams),
+                        Order = order++,
+                        ExecutedAt = DateTimeOffset.UtcNow
+                    });
+                }
+
+                // Record snapshot for manifest
+                var snapshot = new PipelineStageSnapshot
+                {
+                    StageType = stagePolicy.StageType,
+                    PluginId = stagePolicy.PluginId ?? GetPluginId(stage),
+                    StrategyName = stagePolicy.StrategyName ?? GetStrategyName(stage),
+                    Order = stagePolicy.Order ?? 100,
+                    Parameters = stageParams,
+                    ExecutedAt = DateTimeOffset.UtcNow,
+                    PluginVersion = GetPluginVersion(stage)
+                };
+
+                context.ExecutedStages.Add(stagePolicy.StageType);
+
+                if (context.Manifest?.Pipeline != null)
+                {
+                    context.Manifest.Pipeline.ExecutedStages ??= new List<PipelineStageSnapshot>();
+                    context.Manifest.Pipeline.ExecutedStages.Add(snapshot);
+                }
+            }
+
+            // Store intermediate streams in context for caller cleanup
+            context.IntermediateStreams = intermediateStreams;
+
+            return currentStream;
+        }
+        catch
+        {
+            // Cleanup intermediate streams on failure
+            foreach (var stream in intermediateStreams)
+            {
+                try { stream.Dispose(); } catch { }
+            }
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// Executes terminal stages with transaction tracking for rollback support.
+    /// </summary>
+    private async Task<List<TerminalResult>> ExecuteTerminalsWithTransactionAsync(
+        Stream input,
+        PipelinePolicy policy,
+        PipelineContext context,
+        IPipelineTransaction? transaction,
+        CancellationToken ct)
+    {
+        var terminals = policy.Terminals ?? new List<TerminalStagePolicy>();
+
+        if (terminals.Count == 0)
+        {
+            terminals = new List<TerminalStagePolicy>
+            {
+                new() { TerminalType = "primary", Enabled = true, FailureIsCritical = true }
+            };
+        }
+
+        var enabledTerminals = terminals.Where(t => t.Enabled ?? true).ToList();
+        if (enabledTerminals.Count == 0)
+            return new List<TerminalResult>();
+
+        // Buffer input for fan-out
+        byte[] data;
+        using (var buffer = new MemoryStream())
+        {
+            await input.CopyToAsync(buffer, ct);
+            data = buffer.ToArray();
+        }
+
+        var results = new List<TerminalResult>();
+
+        // Execute parallel terminals
+        var parallelTerminals = enabledTerminals
+            .Where(t => (t.ExecutionMode ?? TerminalExecutionMode.Parallel) == TerminalExecutionMode.Parallel)
+            .ToList();
+
+        if (parallelTerminals.Count > 0)
+        {
+            var parallelTasks = parallelTerminals.Select(tp =>
+                ExecuteSingleTerminalWithTransactionAsync(data, tp, context, transaction, ct));
+            var parallelResults = await Task.WhenAll(parallelTasks);
+            results.AddRange(parallelResults);
+        }
+
+        // Execute sequential terminals
+        var sequentialTerminals = enabledTerminals
+            .Where(t => (t.ExecutionMode ?? TerminalExecutionMode.Parallel) == TerminalExecutionMode.Sequential)
+            .OrderBy(t => t.Priority ?? 100)
+            .ToList();
+
+        foreach (var tp in sequentialTerminals)
+        {
+            var result = await ExecuteSingleTerminalWithTransactionAsync(data, tp, context, transaction, ct);
+            results.Add(result);
+
+            if (!result.Success && (tp.FailureIsCritical ?? true))
+                break;
+        }
+
+        // Execute after-parallel terminals
+        var afterParallelTerminals = enabledTerminals
+            .Where(t => (t.ExecutionMode ?? TerminalExecutionMode.Parallel) == TerminalExecutionMode.AfterParallel)
+            .OrderBy(t => t.Priority ?? 100)
+            .ToList();
+
+        foreach (var tp in afterParallelTerminals)
+        {
+            var result = await ExecuteSingleTerminalWithTransactionAsync(data, tp, context, transaction, ct);
+            results.Add(result);
+
+            if (!result.Success && (tp.FailureIsCritical ?? true))
+                break;
+        }
+
+        return results;
+    }
+
+    /// <summary>
+    /// Executes a single terminal with transaction tracking.
+    /// </summary>
+    private async Task<TerminalResult> ExecuteSingleTerminalWithTransactionAsync(
+        byte[] data,
+        TerminalStagePolicy terminalPolicy,
+        PipelineContext context,
+        IPipelineTransaction? transaction,
+        CancellationToken ct)
+    {
+        var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+
+        try
+        {
+            var terminal = await ResolveTerminalAsync(terminalPolicy, context, ct);
+            if (terminal == null)
+            {
+                return new TerminalResult
+                {
+                    TerminalId = terminalPolicy.PluginId ?? "unknown",
+                    TerminalType = terminalPolicy.TerminalType,
+                    Success = false,
+                    ErrorMessage = $"Could not resolve terminal for type '{terminalPolicy.TerminalType}'",
+                    Duration = stopwatch.Elapsed
+                };
+            }
+
+            var terminalContext = BuildTerminalContext(context, terminalPolicy, data.Length);
+
+            using var stream = new MemoryStream(data);
+            await terminal.WriteAsync(stream, terminalContext, ct);
+
+            stopwatch.Stop();
+
+            // Record to transaction for potential rollback
+            if (transaction != null)
+            {
+                transaction.RecordTerminalExecution(new ExecutedTerminalInfo
+                {
+                    TerminalType = terminalPolicy.TerminalType,
+                    TerminalId = terminal.TerminalId,
+                    TerminalInstance = terminal,
+                    StoragePath = terminalContext.StoragePath,
+                    BlobId = terminalContext.BlobId,
+                    SupportsRollback = true,
+                    ExecutedAt = DateTimeOffset.UtcNow
+                });
+            }
+
+            return new TerminalResult
+            {
+                TerminalId = terminal.TerminalId,
+                TerminalType = terminalPolicy.TerminalType,
+                Success = true,
+                Duration = stopwatch.Elapsed,
+                BytesWritten = data.Length,
+                StoragePath = terminalContext.StoragePath
+            };
+        }
+        catch (Exception ex)
+        {
+            stopwatch.Stop();
+            return new TerminalResult
+            {
+                TerminalId = terminalPolicy.PluginId ?? "unknown",
+                TerminalType = terminalPolicy.TerminalType,
+                Success = false,
+                ErrorMessage = ex.Message,
+                Exception = ex,
+                Duration = stopwatch.Elapsed
+            };
+        }
+    }
+
+    /// <summary>
+    /// Determines if a terminal type is critical (must succeed for pipeline to succeed).
+    /// </summary>
+    private static bool IsCriticalTerminal(string terminalType) =>
+        terminalType == "primary" || terminalType == "metadata";
+
+    /// <summary>
+    /// Determines if a stage type is a terminal stage (storage).
+    /// </summary>
+    private static bool IsTerminalStageType(string stageType) =>
+        stageType.Equals("Storage", StringComparison.OrdinalIgnoreCase) ||
+        stageType.Equals("Terminal", StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// Executes the full read pipeline from storage through reverse transformation.
+    /// </summary>
+    public async Task<Stream> ExecuteReadPipelineWithStorageAsync(
+        TerminalContext terminalContext,
+        PipelineContext pipelineContext,
+        CancellationToken ct = default)
+    {
+        // Phase 1: Read from terminal (storage)
+        var terminal = await ResolveReadTerminalAsync(pipelineContext, ct);
+        if (terminal == null)
+            throw new InvalidOperationException("No terminal available for read operation");
+
+        var storedStream = await terminal.ReadAsync(terminalContext, ct);
+
+        // Phase 2: Execute reverse transformation (decrypt, decompress)
+        return await ExecuteReadPipelineAsync(storedStream, pipelineContext, ct);
+    }
+
+    /// <summary>
     /// Validates a proposed pipeline configuration.
     /// Returns errors if stages are incompatible or missing dependencies.
     /// </summary>
@@ -940,5 +1337,321 @@ public sealed class EnhancedPipelineOrchestrator : IPipelineOrchestrator
             => Task.FromResult(false);
         public Task<IReadOnlyList<StorageItemInfo>> ListAsync(string prefix, int limit = 100, int offset = 0, CancellationToken ct = default)
             => Task.FromResult<IReadOnlyList<StorageItemInfo>>(Array.Empty<StorageItemInfo>());
+    }
+
+    // Terminal execution methods
+
+    private async Task<List<TerminalResult>> ExecuteTerminalsAsync(
+        Stream input,
+        PipelinePolicy policy,
+        PipelineContext context,
+        CancellationToken ct)
+    {
+        var terminals = policy.Terminals ?? new List<TerminalStagePolicy>();
+
+        // If no terminals configured, use default primary terminal
+        if (terminals.Count == 0)
+        {
+            terminals = new List<TerminalStagePolicy>
+            {
+                new() { TerminalType = "primary", Enabled = true, FailureIsCritical = true }
+            };
+        }
+
+        var enabledTerminals = terminals.Where(t => t.Enabled ?? true).ToList();
+        if (enabledTerminals.Count == 0)
+            return new List<TerminalResult>();
+
+        // Buffer the input for fan-out (each terminal needs a copy)
+        byte[] data;
+        using (var buffer = new MemoryStream())
+        {
+            await input.CopyToAsync(buffer, ct);
+            data = buffer.ToArray();
+        }
+
+        var results = new List<TerminalResult>();
+
+        // Group by execution mode
+        var parallelTerminals = enabledTerminals
+            .Where(t => (t.ExecutionMode ?? TerminalExecutionMode.Parallel) == TerminalExecutionMode.Parallel)
+            .OrderBy(t => t.Priority ?? 100)
+            .ToList();
+
+        var sequentialTerminals = enabledTerminals
+            .Where(t => (t.ExecutionMode ?? TerminalExecutionMode.Parallel) == TerminalExecutionMode.Sequential)
+            .OrderBy(t => t.Priority ?? 100)
+            .ToList();
+
+        var afterParallelTerminals = enabledTerminals
+            .Where(t => (t.ExecutionMode ?? TerminalExecutionMode.Parallel) == TerminalExecutionMode.AfterParallel)
+            .OrderBy(t => t.Priority ?? 100)
+            .ToList();
+
+        // Execute parallel terminals concurrently
+        if (parallelTerminals.Count > 0)
+        {
+            var parallelTasks = parallelTerminals.Select(tp =>
+                ExecuteSingleTerminalAsync(data, tp, context, ct));
+            var parallelResults = await Task.WhenAll(parallelTasks);
+            results.AddRange(parallelResults);
+
+            // Check if any critical parallel terminal failed
+            var criticalFailure = results.FirstOrDefault(r => !r.Success &&
+                (parallelTerminals.First(t => t.TerminalType == r.TerminalType).FailureIsCritical ?? true));
+            if (criticalFailure != null)
+            {
+                // Don't continue if critical terminal failed
+                return results;
+            }
+        }
+
+        // Execute sequential terminals in order
+        foreach (var tp in sequentialTerminals)
+        {
+            var result = await ExecuteSingleTerminalAsync(data, tp, context, ct);
+            results.Add(result);
+
+            if (!result.Success && (tp.FailureIsCritical ?? true))
+            {
+                // Stop on critical failure
+                break;
+            }
+        }
+
+        // Execute after-parallel terminals
+        foreach (var tp in afterParallelTerminals)
+        {
+            var result = await ExecuteSingleTerminalAsync(data, tp, context, ct);
+            results.Add(result);
+
+            if (!result.Success && (tp.FailureIsCritical ?? true))
+                break;
+        }
+
+        return results;
+    }
+
+    private async Task<TerminalResult> ExecuteSingleTerminalAsync(
+        byte[] data,
+        TerminalStagePolicy terminalPolicy,
+        PipelineContext context,
+        CancellationToken ct)
+    {
+        var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+
+        try
+        {
+            var terminal = await ResolveTerminalAsync(terminalPolicy, context, ct);
+            if (terminal == null)
+            {
+                return new TerminalResult
+                {
+                    TerminalId = terminalPolicy.PluginId ?? "unknown",
+                    TerminalType = terminalPolicy.TerminalType,
+                    Success = false,
+                    ErrorMessage = $"Could not resolve terminal for type '{terminalPolicy.TerminalType}'",
+                    Duration = stopwatch.Elapsed
+                };
+            }
+
+            var terminalContext = BuildTerminalContext(context, terminalPolicy, data.Length);
+
+            using var stream = new MemoryStream(data);
+
+            // Apply timeout if specified
+            using var timeoutCts = terminalPolicy.Timeout.HasValue
+                ? new CancellationTokenSource(terminalPolicy.Timeout.Value)
+                : null;
+            using var linkedCts = timeoutCts != null
+                ? CancellationTokenSource.CreateLinkedTokenSource(ct, timeoutCts.Token)
+                : null;
+            var effectiveCt = linkedCts?.Token ?? ct;
+
+            await terminal.WriteAsync(stream, terminalContext, effectiveCt);
+
+            stopwatch.Stop();
+
+            // Publish success event
+            await PublishTerminalEventAsync("pipeline.terminal.write.complete", terminalPolicy.TerminalType,
+                terminal.TerminalId, data.Length, stopwatch.Elapsed, null);
+
+            return new TerminalResult
+            {
+                TerminalId = terminal.TerminalId,
+                TerminalType = terminalPolicy.TerminalType,
+                Success = true,
+                Duration = stopwatch.Elapsed,
+                BytesWritten = data.Length,
+                StoragePath = terminalContext.StoragePath
+            };
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            throw; // Re-throw if external cancellation
+        }
+        catch (Exception ex)
+        {
+            stopwatch.Stop();
+
+            await PublishTerminalEventAsync("pipeline.terminal.write.error", terminalPolicy.TerminalType,
+                terminalPolicy.PluginId ?? "unknown", data.Length, stopwatch.Elapsed, ex.Message);
+
+            return new TerminalResult
+            {
+                TerminalId = terminalPolicy.PluginId ?? "unknown",
+                TerminalType = terminalPolicy.TerminalType,
+                Success = false,
+                ErrorMessage = ex.Message,
+                Exception = ex,
+                Duration = stopwatch.Elapsed
+            };
+        }
+    }
+
+    private async Task<IDataTerminal?> ResolveTerminalAsync(
+        TerminalStagePolicy policy,
+        PipelineContext context,
+        CancellationToken ct)
+    {
+        // Try to resolve from plugin integration
+        if (_pluginIntegration != null)
+        {
+            return await _pluginIntegration.ResolveTerminalAsync(policy, context.KernelContext, ct);
+        }
+
+        // Fallback: try to get from kernel context
+        if (context.KernelContext != null && !string.IsNullOrEmpty(policy.PluginId))
+        {
+            var plugin = context.KernelContext.GetPlugin<IDataTerminal>();
+            if (plugin != null && plugin.TerminalId == policy.TerminalType)
+                return plugin;
+        }
+
+        return null;
+    }
+
+    private async Task<IDataTerminal?> ResolveReadTerminalAsync(
+        PipelineContext context,
+        CancellationToken ct)
+    {
+        var policy = await ResolveEffectivePolicyAsync(context, ct);
+        var terminals = policy.Terminals ?? new List<TerminalStagePolicy>();
+
+        // Prefer primary terminal for reads, then fall back by priority
+        var primaryPolicy = terminals.FirstOrDefault(t => t.TerminalType == "primary" && (t.Enabled ?? true))
+            ?? terminals.Where(t => t.Enabled ?? true).OrderBy(t => t.Priority ?? 100).FirstOrDefault();
+
+        if (primaryPolicy == null)
+        {
+            // Default to primary terminal type
+            primaryPolicy = new TerminalStagePolicy { TerminalType = "primary" };
+        }
+
+        return await ResolveTerminalAsync(primaryPolicy, context, ct);
+    }
+
+    private async Task<PipelinePolicy> ResolveEffectivePolicyAsync(
+        PipelineContext context,
+        CancellationToken ct)
+    {
+        var securityContext = context.SecurityContext ?? AnonymousSecurityContext.Instance;
+
+        return await _configProvider.ResolveEffectivePolicyAsync(
+            userId: securityContext.UserId,
+            groupId: securityContext.TenantId,
+            operationId: context.Parameters.TryGetValue("OperationId", out var opId) ? opId?.ToString() : null,
+            ct: ct);
+    }
+
+    private TerminalContext BuildTerminalContext(
+        PipelineContext pipelineContext,
+        TerminalStagePolicy terminalPolicy,
+        long contentLength)
+    {
+        var parameters = new Dictionary<string, object>(terminalPolicy.Parameters ?? new());
+
+        // Add strategy name if specified
+        if (!string.IsNullOrEmpty(terminalPolicy.StrategyName))
+        {
+            parameters["strategyId"] = terminalPolicy.StrategyName;
+        }
+
+        // Extract BlobId and StoragePath from parameters or generate defaults
+        var blobId = pipelineContext.Parameters.TryGetValue("BlobId", out var bid) && bid is string bStr
+            ? bStr
+            : Guid.NewGuid().ToString("N");
+
+        var storagePath = pipelineContext.Parameters.TryGetValue("StoragePath", out var sp) && sp is string spStr
+            ? spStr
+            : $"data/{DateTime.UtcNow:yyyy/MM/dd}/{Guid.NewGuid():N}";
+
+        return new TerminalContext
+        {
+            BlobId = blobId,
+            StoragePath = storagePath,
+            Parameters = parameters,
+            KernelContext = pipelineContext.KernelContext,
+            Manifest = pipelineContext.Manifest,
+            ContentLength = contentLength
+        };
+    }
+
+    private async Task PublishTerminalEventAsync(
+        string eventType,
+        string terminalType,
+        string terminalId,
+        long bytes,
+        TimeSpan duration,
+        string? error)
+    {
+        if (_messageBus == null)
+            return;
+
+        try
+        {
+            var payload = new Dictionary<string, object>
+            {
+                ["terminalType"] = terminalType,
+                ["terminalId"] = terminalId,
+                ["bytesWritten"] = bytes,
+                ["durationMs"] = duration.TotalMilliseconds,
+                ["timestamp"] = DateTime.UtcNow
+            };
+
+            if (error != null)
+                payload["error"] = error;
+
+            await _messageBus.PublishAsync(eventType, new PluginMessage
+            {
+                Type = eventType,
+                Payload = payload
+            });
+        }
+        catch
+        {
+            // Ignore event publishing errors
+        }
+    }
+}
+
+/// <summary>
+/// Exception thrown when a pipeline transaction fails due to critical terminal failure.
+/// Contains all terminal results for diagnostic purposes.
+/// </summary>
+public class PipelineTransactionException : Exception
+{
+    /// <summary>
+    /// Results from all terminals (both successful and failed).
+    /// </summary>
+    public IReadOnlyList<TerminalResult> TerminalResults { get; }
+
+    /// <summary>
+    /// Creates a new pipeline transaction exception.
+    /// </summary>
+    public PipelineTransactionException(string message, Exception? inner, List<TerminalResult> results)
+        : base(message, inner)
+    {
+        TerminalResults = results.AsReadOnly();
     }
 }
