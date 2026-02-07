@@ -2,6 +2,8 @@
 // Licensed under the Apache License, Version 2.0.
 
 using System.Collections.Concurrent;
+using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 using DataWarehouse.Plugins.AIAgents.Capabilities;
 using DataWarehouse.Plugins.AIAgents.Models;
@@ -128,7 +130,7 @@ public sealed class UserProviderRegistry : IDisposable
             Name = providerName,
             ProviderType = normalizedType,
             DisplayName = options?.DisplayName ?? $"{providerType} ({providerName})",
-            ApiKey = apiKey, // TODO: Encrypt at rest
+            ApiKey = EncryptApiKey(apiKey),
             Endpoint = options?.Endpoint,
             DefaultModel = options?.DefaultModel,
             OrganizationId = options?.OrganizationId,
@@ -240,7 +242,7 @@ public sealed class UserProviderRegistry : IDisposable
         var updated = existing with
         {
             DisplayName = updates.DisplayName ?? existing.DisplayName,
-            ApiKey = updates.ApiKey ?? existing.ApiKey,
+            ApiKey = updates.ApiKey != null ? EncryptApiKey(updates.ApiKey) : existing.ApiKey,
             Endpoint = updates.Endpoint ?? existing.Endpoint,
             DefaultModel = updates.DefaultModel ?? existing.DefaultModel,
             OrganizationId = updates.OrganizationId ?? existing.OrganizationId,
@@ -398,7 +400,8 @@ public sealed class UserProviderRegistry : IDisposable
 
         // TODO: Implement actual validation by calling provider health endpoint
         // For now, just check if API key is present for non-local providers
-        if (provider.ProviderType != "ollama" && string.IsNullOrEmpty(provider.ApiKey))
+        var decryptedApiKey = DecryptApiKey(provider.ApiKey);
+        if (provider.ProviderType != "ollama" && string.IsNullOrEmpty(decryptedApiKey))
         {
             return new ProviderValidationResult
             {
@@ -545,6 +548,61 @@ public sealed class UserProviderRegistry : IDisposable
         private readonly Action _unsubscribe;
         public Unsubscriber(Action unsubscribe) => _unsubscribe = unsubscribe;
         public void Dispose() => _unsubscribe();
+    }
+
+    /// <summary>
+    /// Encrypts an API key using DPAPI for secure storage.
+    /// </summary>
+    /// <param name="apiKey">The API key to encrypt.</param>
+    /// <returns>Base64-encoded encrypted API key, or null if input is null.</returns>
+    private static string? EncryptApiKey(string? apiKey)
+    {
+        if (string.IsNullOrEmpty(apiKey))
+            return apiKey;
+
+        try
+        {
+            var bytes = Encoding.UTF8.GetBytes(apiKey);
+            var encrypted = ProtectedData.Protect(bytes, null, DataProtectionScope.CurrentUser);
+            return Convert.ToBase64String(encrypted);
+        }
+        catch (CryptographicException ex)
+        {
+            // Log the error but don't expose the key
+            Console.Error.WriteLine($"[AIAgents] Failed to encrypt API key: {ex.Message}");
+            throw new InvalidOperationException("Failed to encrypt API key for secure storage.", ex);
+        }
+    }
+
+    /// <summary>
+    /// Decrypts an API key that was encrypted using DPAPI.
+    /// </summary>
+    /// <param name="encryptedApiKey">The encrypted API key.</param>
+    /// <returns>Decrypted API key, or null if input is null.</returns>
+    private static string? DecryptApiKey(string? encryptedApiKey)
+    {
+        if (string.IsNullOrEmpty(encryptedApiKey))
+            return encryptedApiKey;
+
+        try
+        {
+            var encrypted = Convert.FromBase64String(encryptedApiKey);
+            var bytes = ProtectedData.Unprotect(encrypted, null, DataProtectionScope.CurrentUser);
+            return Encoding.UTF8.GetString(bytes);
+        }
+        catch (CryptographicException ex)
+        {
+            // Log the error but don't expose the key
+            Console.Error.WriteLine($"[AIAgents] Failed to decrypt API key: {ex.Message}");
+            throw new InvalidOperationException("Failed to decrypt API key. The key may have been encrypted on a different machine or user account.", ex);
+        }
+        catch (FormatException)
+        {
+            // This might be an unencrypted key from an older version
+            // In production, you'd want to handle migration properly
+            Console.Error.WriteLine("[AIAgents] Warning: API key is not properly encrypted.");
+            return encryptedApiKey;
+        }
     }
 }
 

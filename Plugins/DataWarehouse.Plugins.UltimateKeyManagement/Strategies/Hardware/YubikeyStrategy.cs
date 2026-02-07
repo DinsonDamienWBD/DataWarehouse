@@ -27,6 +27,11 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Hardware
     /// Keys are either stored in PIV slots (where private keys never leave the device)
     /// or derived using HMAC-SHA1 challenge-response (deterministic based on secret).
     ///
+    /// HMAC-SHA1 Usage Note:
+    /// HMAC-SHA1 is used here due to YubiKey hardware limitations - the OTP applet only supports
+    /// HMAC-SHA1 challenge-response. This is a hardware protocol constraint, not a software choice.
+    /// For security-critical applications, prefer PIV slots with RSA/ECC keys instead of HMAC-SHA1 derivation.
+    ///
     /// Requirements:
     /// - YubiKey 4, 5, or newer
     /// - PIV applet for certificate operations

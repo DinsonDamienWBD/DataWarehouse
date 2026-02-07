@@ -255,6 +255,8 @@ public sealed class GeoDistributedConsensusPlugin : ConsensusPluginBase
         };
         _raftNodes[_nodeId] = selfNode;
 
+        Console.WriteLine($"[GeoDistributedConsensus] WARNING: Using localhost endpoint pattern. Configure explicit endpoints for production. Node: {_nodeId}");
+
         // Register self as a datacenter node
         RegisterNode(new DatacenterNode
         {

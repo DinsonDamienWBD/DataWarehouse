@@ -111,7 +111,12 @@ public sealed class ContinuousBackupProvider :
         if (_processingTask != null)
         {
             try { await _processingTask; }
-            catch (OperationCanceledException) { }
+            catch (OperationCanceledException ex)
+            {
+                System.Diagnostics.Trace.TraceInformation(
+                    "[ContinuousBackupProvider] Processing task cancelled during shutdown: {0}",
+                    ex.Message);
+            }
         }
 
         _cts?.Dispose();

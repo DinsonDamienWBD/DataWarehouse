@@ -296,7 +296,10 @@ public sealed class FuseFileSystem : IDisposable
         var node = handle.Node;
         var toWrite = (int)Math.Min(size, buffer.Length);
 
-        _writeLock.Wait();
+        if (!_writeLock.Wait(TimeSpan.FromSeconds(30)))
+        {
+            return -FuseErrno.EIO; // Timeout acquiring lock
+        }
         try
         {
             // Handle append mode
@@ -771,7 +774,10 @@ public sealed class FuseFileSystem : IDisposable
             return -FuseErrno.EINVAL;
         }
 
-        _writeLock.Wait();
+        if (!_writeLock.Wait(TimeSpan.FromSeconds(30)))
+        {
+            return -FuseErrno.EIO; // Timeout acquiring lock
+        }
         try
         {
             if (size == 0)
@@ -1230,7 +1236,10 @@ public sealed class FuseFileSystem : IDisposable
             return -FuseErrno.EINVAL;
         }
 
-        _writeLock.Wait();
+        if (!_writeLock.Wait(TimeSpan.FromSeconds(30)))
+        {
+            return -FuseErrno.EIO; // Timeout acquiring lock
+        }
         try
         {
             // Handle punch hole - deallocate space

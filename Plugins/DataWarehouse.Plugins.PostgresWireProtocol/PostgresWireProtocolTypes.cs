@@ -152,6 +152,7 @@ public static class PgProtocolConstants
     public const string SqlStateInternalError = "XX000";
     public const string SqlStateDataException = "22000";
     public const string SqlStateInsufficientPrivilege = "42501";
+    public const string SqlStateInvalidPassword = "28P01";
 }
 
 /// <summary>

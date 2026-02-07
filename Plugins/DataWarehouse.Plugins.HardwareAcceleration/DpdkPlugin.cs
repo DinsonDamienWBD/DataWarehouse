@@ -269,42 +269,48 @@ public class DpdkPlugin : FeaturePluginBase
             };
         }
 
-        return await Task.Run(() =>
+        DpdkInitResult? earlyReturn = null;
+        lock (_lock)
         {
-            lock (_lock)
+            if (_ealInitialized)
             {
-                if (_ealInitialized)
+                earlyReturn = new DpdkInitResult
                 {
-                    return new DpdkInitResult
-                    {
-                        Success = true,
-                        Message = "EAL already initialized",
-                        ProcessType = "primary"
-                    };
-                }
-
-                try
-                {
-                    // Try native initialization first
-                    if (_nativeDpdkAvailable)
-                    {
-                        return InitializeEalNative(args);
-                    }
-
-                    // Fall back to shell-based initialization check
-                    return InitializeEalShell(args);
-                }
-                catch (Exception ex)
-                {
-                    return new DpdkInitResult
-                    {
-                        Success = false,
-                        Message = $"EAL initialization failed: {ex.Message}",
-                        ErrorCode = -1
-                    };
-                }
+                    Success = true,
+                    Message = "EAL already initialized",
+                    ProcessType = "primary"
+                };
             }
-        }, cancellationToken);
+        }
+
+        if (earlyReturn != null)
+        {
+            return earlyReturn;
+        }
+
+        return await Task.Run(async () =>
+        {
+            try
+            {
+                // Try native initialization first
+                if (_nativeDpdkAvailable)
+                {
+                    return InitializeEalNative(args);
+                }
+
+                // Fall back to shell-based initialization check
+                return await InitializeEalShellAsync(args, cancellationToken).ConfigureAwait(false);
+            }
+            catch (Exception ex)
+            {
+                return new DpdkInitResult
+                {
+                    Success = false,
+                    Message = $"EAL initialization failed: {ex.Message}",
+                    ErrorCode = -1
+                };
+            }
+        }, cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -858,11 +864,11 @@ public class DpdkPlugin : FeaturePluginBase
         }
     }
 
-    private DpdkInitResult InitializeEalShell(string[] args)
+    private async Task<DpdkInitResult> InitializeEalShellAsync(string[] args, CancellationToken cancellationToken)
     {
         // Shell-based initialization just validates the environment
         // Actual EAL init requires native calls
-        var hugepages = GetHugepageInfoAsync(CancellationToken.None).Result;
+        var hugepages = await GetHugepageInfoAsync(cancellationToken).ConfigureAwait(false);
 
         if (!hugepages.IsConfigured)
         {

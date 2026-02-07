@@ -59,7 +59,9 @@ public sealed class AesCtrStrategy : EncryptionStrategyBase
         using (var aes = System.Security.Cryptography.Aes.Create())
         {
             aes.Key = encKey;
-            aes.Mode = CipherMode.ECB; // Use ECB for single-block encryption
+            // SECURITY NOTE: ECB mode is intentionally used here as a building block for CTR mode.
+            // This is cryptographically safe because each block uses a unique counter value.
+            aes.Mode = CipherMode.ECB;
             aes.Padding = PaddingMode.None;
 
             using var encryptor = aes.CreateEncryptor();
@@ -154,6 +156,8 @@ public sealed class AesCtrStrategy : EncryptionStrategyBase
         using (var aes = System.Security.Cryptography.Aes.Create())
         {
             aes.Key = encKey;
+            // SECURITY NOTE: ECB mode is intentionally used here as a building block for CTR mode.
+            // This is cryptographically safe because each block uses a unique counter value.
             aes.Mode = CipherMode.ECB;
             aes.Padding = PaddingMode.None;
 
@@ -260,10 +264,14 @@ public sealed class AesXtsStrategy : EncryptionStrategyBase
         using (var aes2 = System.Security.Cryptography.Aes.Create())
         {
             aes1.Key = key1;
+            // SECURITY NOTE: ECB mode is intentionally used here as a building block for XTS mode.
+            // This is cryptographically safe because each block uses a unique tweak value.
             aes1.Mode = CipherMode.ECB;
             aes1.Padding = PaddingMode.None;
 
             aes2.Key = key2;
+            // SECURITY NOTE: ECB mode is intentionally used here as a building block for XTS mode.
+            // This is cryptographically safe because each block uses a unique tweak value.
             aes2.Mode = CipherMode.ECB;
             aes2.Padding = PaddingMode.None;
 
@@ -360,10 +368,14 @@ public sealed class AesXtsStrategy : EncryptionStrategyBase
         using (var aes2 = System.Security.Cryptography.Aes.Create())
         {
             aes1.Key = key1;
+            // SECURITY NOTE: ECB mode is intentionally used here as a building block for XTS mode.
+            // This is cryptographically safe because each block uses a unique tweak value.
             aes1.Mode = CipherMode.ECB;
             aes1.Padding = PaddingMode.None;
 
             aes2.Key = key2;
+            // SECURITY NOTE: ECB mode is intentionally used here as a building block for XTS mode.
+            // This is cryptographically safe because each block uses a unique tweak value.
             aes2.Mode = CipherMode.ECB;
             aes2.Padding = PaddingMode.None;
 

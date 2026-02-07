@@ -249,7 +249,9 @@ public sealed class ChaffPaddingStrategy : EncryptionStrategyBase
     {
         using var aes = System.Security.Cryptography.Aes.Create();
         aes.Key = key;
-        aes.Mode = CipherMode.ECB; // CTR mode uses ECB for counter encryption
+        // SECURITY NOTE: ECB mode is intentionally used here as a building block for CTR mode.
+        // This is cryptographically safe because each block uses a unique counter value.
+        aes.Mode = CipherMode.ECB;
         aes.Padding = PaddingMode.None;
 
         var ciphertext = new byte[plaintext.Length];

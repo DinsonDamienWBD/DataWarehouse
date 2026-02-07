@@ -423,21 +423,21 @@ public sealed class RedisScriptManager
     private readonly ConcurrentDictionary<string, string> _scripts = new();
 
     /// <summary>
-    /// Loads a script and returns its SHA1 hash.
+    /// Loads a script and returns its SHA256 hash.
     /// </summary>
     /// <param name="script">The Lua script source.</param>
-    /// <returns>The SHA1 hash of the script.</returns>
+    /// <returns>The SHA256 hash of the script.</returns>
     public string Load(string script)
     {
-        var sha = ComputeSha1(script);
+        var sha = ComputeSha256(script);
         _scripts[sha] = script;
         return sha;
     }
 
     /// <summary>
-    /// Checks if a script exists by SHA1 hash.
+    /// Checks if a script exists by SHA256 hash.
     /// </summary>
-    /// <param name="sha">The SHA1 hash.</param>
+    /// <param name="sha">The SHA256 hash.</param>
     /// <returns>True if the script exists.</returns>
     public bool Exists(string sha)
     {
@@ -463,13 +463,17 @@ public sealed class RedisScriptManager
     }
 
     /// <summary>
-    /// Computes SHA1 hash for script caching.
+    /// Computes SHA256 hash for script caching.
     /// </summary>
-    public static string ComputeSha1(string script)
+    /// <remarks>
+    /// Uses SHA256 instead of SHA1 for better security.
+    /// Note: Redis server uses SHA1 internally for EVALSHA, but this is used for client-side cache keys.
+    /// </remarks>
+    public static string ComputeSha256(string script)
     {
-        using var sha1 = System.Security.Cryptography.SHA1.Create();
+        using var sha256 = System.Security.Cryptography.SHA256.Create();
         var bytes = System.Text.Encoding.UTF8.GetBytes(script);
-        var hash = sha1.ComputeHash(bytes);
+        var hash = sha256.ComputeHash(bytes);
         return Convert.ToHexString(hash).ToLowerInvariant();
     }
 }

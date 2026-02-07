@@ -2691,6 +2691,7 @@ public enum MatrixRaidLevel
 public enum ChecksumAlgorithm
 {
     CRC32,
+    [Obsolete("MD5 is cryptographically weak. Use SHA256 instead.")]
     MD5,
     SHA256,
     SHA512,

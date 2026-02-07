@@ -264,6 +264,8 @@ public sealed class OdbcConnectionHandle : IDisposable
             ConnectedAt = DateTime.UtcNow;
             IsDead = false;
 
+            Console.WriteLine("[OdbcConnectionHandle] WARNING: Using default localhost connection. Configure DSN explicitly for production.");
+
             return SqlReturn.Success;
         }
         catch (Exception ex)
@@ -498,6 +500,11 @@ public sealed class OdbcConnectionHandle : IDisposable
         // Set defaults
         ServerName ??= "localhost";
         DatabaseName ??= "datawarehouse";
+
+        if (ServerName == "localhost")
+        {
+            Console.WriteLine("[OdbcConnectionHandle] WARNING: Using default localhost server. Configure connection string for production.");
+        }
     }
 
     /// <summary>

@@ -1090,10 +1090,10 @@ public sealed class JaegerPlugin : TelemetryPluginBase
 /// </summary>
 /// <param name="ServiceName">The service name to report to Jaeger.</param>
 /// <param name="ServiceVersion">The service version to report.</param>
-/// <param name="AgentHost">The Jaeger agent host for UDP transport.</param>
+/// <param name="AgentHost">The Jaeger agent host for UDP transport. WARNING: Default is localhost (development only).</param>
 /// <param name="AgentCompactPort">The port for compact Thrift protocol.</param>
 /// <param name="AgentBinaryPort">The port for binary Thrift protocol.</param>
-/// <param name="CollectorEndpoint">The collector endpoint for HTTP transport.</param>
+/// <param name="CollectorEndpoint">The collector endpoint for HTTP transport. WARNING: Default is localhost (development only).</param>
 /// <param name="Transport">The transport type to use.</param>
 /// <param name="SamplingType">The sampling strategy type.</param>
 /// <param name="SamplingParam">The sampling parameter (rate for probabilistic, traces/sec for rate limiting).</param>

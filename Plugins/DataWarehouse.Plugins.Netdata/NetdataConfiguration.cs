@@ -8,11 +8,13 @@ namespace DataWarehouse.Plugins.Netdata
         /// <summary>
         /// Gets or sets the Netdata base URL for HTTP API.
         /// </summary>
+        /// <remarks>WARNING: Default value is for development only. Configure for production.</remarks>
         public string NetdataUrl { get; set; } = "http://localhost:19999";
 
         /// <summary>
         /// Gets or sets the StatsD host for metric submission.
         /// </summary>
+        /// <remarks>WARNING: Default value is for development only. Configure for production.</remarks>
         public string StatsdHost { get; set; } = "localhost";
 
         /// <summary>

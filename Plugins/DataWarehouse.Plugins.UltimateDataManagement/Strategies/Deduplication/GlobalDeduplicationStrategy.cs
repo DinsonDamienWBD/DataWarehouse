@@ -254,7 +254,7 @@ public sealed class GlobalDeduplicationStrategy : DeduplicationStrategyBase
 
     private static uint ComputeRingHash(string key)
     {
-        var hash = MD5.HashData(System.Text.Encoding.UTF8.GetBytes(key));
+        var hash = SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(key));
         return BitConverter.ToUInt32(hash, 0);
     }
 

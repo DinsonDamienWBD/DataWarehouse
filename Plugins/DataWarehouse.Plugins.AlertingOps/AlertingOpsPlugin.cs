@@ -1366,6 +1366,8 @@ public sealed class AlertingOpsPlugin : OperationsPluginBase
             Enabled = false,
             CreatedAt = DateTime.UtcNow
         };
+
+        Console.WriteLine("[AlertingOpsPlugin] WARNING: Using default localhost endpoint for Alertmanager. Configure explicitly for production.");
     }
 
     private bool IsSilenced(AlertRuleDefinition rule, Dictionary<string, string> labels)

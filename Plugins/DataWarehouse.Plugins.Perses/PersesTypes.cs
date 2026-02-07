@@ -12,6 +12,7 @@ namespace DataWarehouse.Plugins.Perses
         /// <summary>
         /// Gets or sets the base URL for the Perses API.
         /// </summary>
+        /// <remarks>WARNING: Default value is for development only. Configure for production.</remarks>
         public string PersesUrl { get; set; } = "http://localhost:8080";
 
         /// <summary>

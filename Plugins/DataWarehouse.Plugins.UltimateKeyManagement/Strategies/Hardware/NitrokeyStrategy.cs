@@ -103,7 +103,10 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Hardware
 
         private void InitializePkcs11()
         {
-            _sessionLock.Wait();
+            if (!_sessionLock.Wait(TimeSpan.FromSeconds(30)))
+            {
+                throw new TimeoutException("Timeout waiting for session lock during PKCS#11 initialization");
+            }
             try
             {
                 // Get platform-specific library path
@@ -749,23 +752,30 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Hardware
 
             _disposed = true;
 
-            _sessionLock.Wait();
-            try
+            if (_sessionLock.Wait(TimeSpan.FromSeconds(5)))
             {
-                if (_session != null)
+                try
                 {
-                    if (_loggedIn)
+                    if (_session != null)
                     {
-                        try { _session.Logout(); } catch { }
+                        if (_loggedIn)
+                        {
+                            try { _session.Logout(); } catch { }
+                        }
+                        _session.Dispose();
                     }
-                    _session.Dispose();
-                }
 
-                _pkcs11Library?.Dispose();
+                    _pkcs11Library?.Dispose();
+                }
+                finally
+                {
+                    _sessionLock.Release();
+                    _sessionLock.Dispose();
+                }
             }
-            finally
+            else
             {
-                _sessionLock.Release();
+                // Timeout - force disposal
                 _sessionLock.Dispose();
             }
 

@@ -12,6 +12,7 @@ namespace DataWarehouse.Plugins.GrafanaLoki
         /// <summary>
         /// Gets or sets the Loki Push API endpoint URL (e.g., http://localhost:3100).
         /// </summary>
+        /// <remarks>WARNING: Default value is for development only. Configure for production.</remarks>
         public string LokiUrl { get; set; } = "http://localhost:3100";
 
         /// <summary>

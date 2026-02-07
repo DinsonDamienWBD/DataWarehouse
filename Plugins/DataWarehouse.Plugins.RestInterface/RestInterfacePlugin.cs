@@ -177,7 +177,12 @@ public sealed class RestInterfacePlugin : InterfacePluginBase
 
         if (_serverTask != null)
         {
-            try { await _serverTask; } catch (OperationCanceledException) { }
+            try { await _serverTask; }
+            catch (OperationCanceledException ex)
+            {
+                // Expected during shutdown
+                Console.WriteLine($"[RestInterfacePlugin] Server task cancelled during shutdown: {ex.Message}");
+            }
         }
 
         _listener?.Close();

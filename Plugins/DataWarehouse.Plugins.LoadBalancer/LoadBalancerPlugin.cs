@@ -1365,8 +1365,8 @@ namespace DataWarehouse.Plugins.LoadBalancer
 
         private static uint ComputeHash(string key)
         {
-            using var md5 = MD5.Create();
-            var bytes = md5.ComputeHash(Encoding.UTF8.GetBytes(key));
+            using var sha256 = SHA256.Create();
+            var bytes = sha256.ComputeHash(Encoding.UTF8.GetBytes(key));
             return BitConverter.ToUInt32(bytes, 0);
         }
     }
@@ -1973,8 +1973,8 @@ namespace DataWarehouse.Plugins.LoadBalancer
             if (string.IsNullOrEmpty(request.ClientIp))
                 return SelectRoundRobin(backends);
 
-            using var md5 = MD5.Create();
-            var hash = BitConverter.ToUInt32(md5.ComputeHash(Encoding.UTF8.GetBytes(request.ClientIp)), 0);
+            using var sha256 = SHA256.Create();
+            var hash = BitConverter.ToUInt32(sha256.ComputeHash(Encoding.UTF8.GetBytes(request.ClientIp)), 0);
             var index = (int)(hash % backends.Count);
             return backends[index];
         }

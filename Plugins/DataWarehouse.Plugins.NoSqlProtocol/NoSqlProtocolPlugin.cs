@@ -222,13 +222,19 @@ public sealed class NoSqlProtocolPlugin : InterfacePluginBase, IDisposable
         if (_mongoAcceptTask != null)
         {
             try { await _mongoAcceptTask; }
-            catch (OperationCanceledException) { }
+            catch (OperationCanceledException ex)
+            {
+                Console.WriteLine($"[NoSqlProtocolPlugin] MongoDB accept task cancelled during shutdown: {ex.Message}");
+            }
         }
 
         if (_redisAcceptTask != null)
         {
             try { await _redisAcceptTask; }
-            catch (OperationCanceledException) { }
+            catch (OperationCanceledException ex)
+            {
+                Console.WriteLine($"[NoSqlProtocolPlugin] Redis accept task cancelled during shutdown: {ex.Message}");
+            }
         }
 
         Console.WriteLine("[NoSqlProtocol] Stopped");

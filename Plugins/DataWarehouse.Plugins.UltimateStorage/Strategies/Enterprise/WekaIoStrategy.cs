@@ -969,7 +969,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Enterprise
                 await Task.Delay(delay, ct);
 
                 // Recreate request for retry (requests can't be reused)
-                request = CloneHttpRequestMessage(request);
+                request = await CloneHttpRequestMessageAsync(request, ct).ConfigureAwait(false);
             }
 
             if (lastException != null)
@@ -981,7 +981,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Enterprise
             return response!;
         }
 
-        private HttpRequestMessage CloneHttpRequestMessage(HttpRequestMessage request)
+        private async Task<HttpRequestMessage> CloneHttpRequestMessageAsync(HttpRequestMessage request, CancellationToken cancellationToken = default)
         {
             var clone = new HttpRequestMessage(request.Method, request.RequestUri);
 
@@ -993,7 +993,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Enterprise
             if (request.Content != null)
             {
                 var ms = new MemoryStream();
-                request.Content.CopyToAsync(ms).Wait();
+                await request.Content.CopyToAsync(ms, cancellationToken).ConfigureAwait(false);
                 ms.Position = 0;
                 clone.Content = new StreamContent(ms);
 

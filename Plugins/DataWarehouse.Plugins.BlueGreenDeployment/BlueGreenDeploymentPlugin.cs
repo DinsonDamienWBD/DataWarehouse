@@ -148,7 +148,12 @@ public sealed class BlueGreenDeploymentPlugin : OperationsPluginBase
 
         if (_monitoringTask != null)
         {
-            try { await _monitoringTask; } catch (OperationCanceledException) { }
+            try { await _monitoringTask; }
+            catch (OperationCanceledException ex)
+            {
+                // Expected during shutdown
+                Console.WriteLine($"[BlueGreenDeploymentPlugin] Monitoring task cancelled during shutdown: {ex.Message}");
+            }
         }
 
         _cts?.Dispose();

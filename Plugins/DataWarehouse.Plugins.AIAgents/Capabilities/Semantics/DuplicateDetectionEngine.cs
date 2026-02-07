@@ -487,7 +487,7 @@ public sealed class DuplicateDetectionEngine
     private ulong ComputeWordHash(string word)
     {
         var bytes = Encoding.UTF8.GetBytes(word);
-        var hashBytes = MD5.HashData(bytes);
+        var hashBytes = SHA256.HashData(bytes);
         return BitConverter.ToUInt64(hashBytes, 0);
     }
 

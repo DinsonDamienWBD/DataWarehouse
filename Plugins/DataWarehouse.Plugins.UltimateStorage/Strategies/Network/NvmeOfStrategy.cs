@@ -954,8 +954,8 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
         private string GenerateETag(string key, DateTime modified)
         {
             var input = $"{key}:{modified.Ticks}";
-            using var md5 = MD5.Create();
-            var hashBytes = md5.ComputeHash(Encoding.UTF8.GetBytes(input));
+            using var sha256 = SHA256.Create();
+            var hashBytes = sha256.ComputeHash(Encoding.UTF8.GetBytes(input));
             return BitConverter.ToString(hashBytes).Replace("-", "").ToLowerInvariant();
         }
 

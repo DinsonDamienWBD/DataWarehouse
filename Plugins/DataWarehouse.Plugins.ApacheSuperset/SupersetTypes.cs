@@ -12,6 +12,7 @@ namespace DataWarehouse.Plugins.ApacheSuperset
         /// <summary>
         /// Gets or sets the Superset server URL.
         /// </summary>
+        /// <remarks>WARNING: Default value is for development only. Configure for production.</remarks>
         public string SupersetUrl { get; set; } = "http://localhost:8088";
 
         /// <summary>

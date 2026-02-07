@@ -1202,6 +1202,8 @@ namespace DataWarehouse.Plugins.Raft
                 var actualPort = ((IPEndPoint)_listener.LocalEndpoint).Port;
                 _nodeEndpoint = $"127.0.0.1:{actualPort}";
 
+                Console.WriteLine($"[Raft] WARNING: Using 127.0.0.1 endpoint. Configure external address for production. Node: {_nodeId}");
+
                 _ = AcceptConnectionsAsync(_cts!.Token);
             }
             catch (Exception ex)

@@ -12,6 +12,7 @@ namespace DataWarehouse.Plugins.Kibana
         /// <summary>
         /// Gets or sets the Elasticsearch URL (e.g., "http://localhost:9200").
         /// </summary>
+        /// <remarks>WARNING: Default value is for development only. Configure for production.</remarks>
         public string ElasticsearchUrl { get; set; } = "http://localhost:9200";
 
         /// <summary>

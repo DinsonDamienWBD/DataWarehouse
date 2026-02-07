@@ -598,15 +598,22 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Hardware
 
             _disposed = true;
 
-            _tpmLock.Wait();
-            try
+            if (_tpmLock.Wait(TimeSpan.FromSeconds(5)))
             {
-                _tpm?.Dispose();
-                _tpmDevice?.Dispose();
+                try
+                {
+                    _tpm?.Dispose();
+                    _tpmDevice?.Dispose();
+                }
+                finally
+                {
+                    _tpmLock.Release();
+                    _tpmLock.Dispose();
+                }
             }
-            finally
+            else
             {
-                _tpmLock.Release();
+                // Timeout - force disposal
                 _tpmLock.Dispose();
             }
 

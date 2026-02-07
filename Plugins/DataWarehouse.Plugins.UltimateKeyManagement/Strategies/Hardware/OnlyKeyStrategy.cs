@@ -21,6 +21,11 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Hardware
     /// - Challenge-response for key derivation
     /// - Secure communication via HID
     ///
+    /// HMAC-SHA1 Usage Note:
+    /// HMAC-SHA1 is used for challenge-response due to OnlyKey firmware protocol limitations.
+    /// This is a hardware constraint, not a software design choice. For enhanced security,
+    /// derived keys are extended using HKDF-SHA256.
+    ///
     /// Communication Protocol:
     /// Uses OnlyKey's proprietary HID protocol with encrypted payloads.
     /// Message format: [type][slot][data...]
@@ -621,14 +626,21 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Hardware
 
             _disposed = true;
 
-            _deviceLock.Wait();
-            try
+            if (_deviceLock.Wait(TimeSpan.FromSeconds(5)))
             {
-                _stream?.Dispose();
+                try
+                {
+                    _stream?.Dispose();
+                }
+                finally
+                {
+                    _deviceLock.Release();
+                    _deviceLock.Dispose();
+                }
             }
-            finally
+            else
             {
-                _deviceLock.Release();
+                // Timeout - force disposal
                 _deviceLock.Dispose();
             }
 

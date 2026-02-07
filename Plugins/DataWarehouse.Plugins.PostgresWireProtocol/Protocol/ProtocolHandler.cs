@@ -91,7 +91,8 @@ public sealed class ProtocolHandler
         if (startup.IsSslRequest)
         {
             // Decline SSL (send 'N')
-            // TODO: Implement SSL support
+            Console.WriteLine("[PostgresWireProtocol] WARNING: SSL/TLS is not implemented. Connection is NOT encrypted.");
+            Console.WriteLine("[PostgresWireProtocol] This is a security risk. Do not use in production without implementing SSL/TLS.");
             await _writer.WriteByteAsync((byte)'N', ct);
 
             // Read actual startup message
@@ -160,8 +161,18 @@ public sealed class ProtocolHandler
                 throw new InvalidOperationException("Expected password message");
             }
 
-            // TODO: Validate password hash
-            // For now, accept any password
+            // Validate password hash
+            var receivedHash = Encoding.UTF8.GetString(passwordMsg.Body).TrimEnd('\0');
+            if (!ValidatePasswordHash(receivedHash, _state.Username, salt))
+            {
+                await _writer.WriteErrorResponseAsync(
+                    PgProtocolConstants.SeverityFatal,
+                    PgProtocolConstants.SqlStateInvalidPassword,
+                    "password authentication failed for user \"" + _state.Username + "\"",
+                    ct: ct);
+                throw new UnauthorizedAccessException("Invalid credentials");
+            }
+
             await _writer.WriteAuthenticationAsync(PgProtocolConstants.AuthOk, ct);
             return;
         }
@@ -590,5 +601,60 @@ public sealed class ProtocolHandler
         var value = (data[offset] << 24) | (data[offset + 1] << 16) | (data[offset + 2] << 8) | data[offset + 3];
         offset += 4;
         return value;
+    }
+
+    /// <summary>
+    /// Validates a PostgreSQL MD5 password hash.
+    /// </summary>
+    /// <param name="receivedHash">The hash received from the client (format: "md5" + hex(md5(md5(password + username) + salt))).</param>
+    /// <param name="username">The username.</param>
+    /// <param name="salt">The 4-byte salt sent to the client.</param>
+    /// <returns>True if the hash is valid.</returns>
+    private bool ValidatePasswordHash(string receivedHash, string username, byte[] salt)
+    {
+        // PostgreSQL MD5 authentication format:
+        // 1. Client computes: md5(password + username) -> gets a hex string
+        // 2. Client then computes: md5(hex_string_from_step1 + salt) -> gets another hex string
+        // 3. Client sends: "md5" + hex_string_from_step2
+
+        if (!receivedHash.StartsWith("md5", StringComparison.OrdinalIgnoreCase))
+            return false;
+
+        var hashPart = receivedHash.Substring(3);
+
+        // Retrieve the stored password hash for the user
+        var storedPasswordHash = GetStoredPasswordHash(username);
+        if (storedPasswordHash == null)
+            return false;
+
+        // Compute expected hash: md5(stored_hash + salt)
+        using var md5 = MD5.Create();
+        var saltedInput = Encoding.UTF8.GetBytes(storedPasswordHash).Concat(salt).ToArray();
+        var computedHash = md5.ComputeHash(saltedInput);
+        var expectedHash = BitConverter.ToString(computedHash).Replace("-", "").ToLowerInvariant();
+
+        return string.Equals(hashPart, expectedHash, StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>
+    /// Retrieves the stored password hash for a user.
+    /// In production, this should query a secure user database with properly hashed passwords.
+    /// </summary>
+    /// <param name="username">The username.</param>
+    /// <returns>The stored password hash (md5(password + username) as hex string), or null if user not found.</returns>
+    private string? GetStoredPasswordHash(string username)
+    {
+        // TODO: Implement actual user database lookup with PBKDF2 or bcrypt hashed passwords
+        // This is a placeholder that demonstrates the structure
+        // In production:
+        // 1. Query your user database
+        // 2. Use a proper password hashing library (PBKDF2, bcrypt, Argon2)
+        // 3. Store salts and hashed passwords separately
+        // 4. Never store plaintext passwords
+
+        // For now, return null to reject all authentication attempts
+        // Remove this when implementing actual user database
+        Console.Error.WriteLine($"[PostgresWireProtocol] WARNING: User authentication database not implemented. Rejecting login for user '{username}'.");
+        return null;
     }
 }

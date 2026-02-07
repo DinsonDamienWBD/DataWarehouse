@@ -46,9 +46,9 @@ public sealed class OracleTnsProtocolConfig
     public string[] EncryptionAlgorithms { get; set; } = new[] { "AES256", "AES192", "AES128" };
 
     /// <summary>
-    /// Data integrity algorithms: "SHA256", "SHA1", "MD5".
+    /// Data integrity algorithms: "SHA256", "SHA1".
     /// </summary>
-    /// <value>Default: SHA256 for highest security.</value>
+    /// <value>Default: SHA256 for highest security. MD5 removed due to collision vulnerabilities.</value>
     public string[] IntegrityAlgorithms { get; set; } = new[] { "SHA256", "SHA1" };
 
     /// <summary>

@@ -69,6 +69,7 @@ public sealed class GraphQlApiPlugin : InterfacePluginBase
     private CancellationTokenSource? _cts;
     private Task? _serverTask;
     private int _port = 4000;
+    private string _bindAddress = "http://+"; // Configurable: "http://+" for all interfaces, "http://localhost" for localhost only
 
     private IKernelStorageService? _storage;
     private IKernelContext? _context;
@@ -108,6 +109,11 @@ public sealed class GraphQlApiPlugin : InterfacePluginBase
             _port = port;
         }
 
+        if (request.Config?.TryGetValue("bindAddress", out var bindObj) == true && bindObj is string bindAddr)
+        {
+            _bindAddress = bindAddr;
+        }
+
         if (request.Config?.TryGetValue("kernelStorage", out var storageObj) == true && storageObj is IKernelStorageService storage)
         {
             _storage = storage;
@@ -136,7 +142,7 @@ public sealed class GraphQlApiPlugin : InterfacePluginBase
 
         try
         {
-            _listener.Prefixes.Add($"http://+:{_port}/");
+            _listener.Prefixes.Add($"{_bindAddress}:{_port}/");
             _listener.Start();
         }
         catch (HttpListenerException)
@@ -144,6 +150,7 @@ public sealed class GraphQlApiPlugin : InterfacePluginBase
             _listener.Prefixes.Clear();
             _listener.Prefixes.Add($"http://localhost:{_port}/");
             _listener.Start();
+            Console.WriteLine("[GraphQlApiPlugin] WARNING: Binding to localhost only. Configure bindAddress for production access.");
         }
 
         _isRunning = true;
@@ -163,7 +170,12 @@ public sealed class GraphQlApiPlugin : InterfacePluginBase
 
         if (_serverTask != null)
         {
-            try { await _serverTask; } catch (OperationCanceledException) { }
+            try { await _serverTask; }
+            catch (OperationCanceledException ex)
+            {
+                // Expected during shutdown
+                Console.WriteLine($"[GraphQlApiPlugin] Server task cancelled during shutdown: {ex.Message}");
+            }
         }
 
         // Close all subscriptions

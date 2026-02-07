@@ -13,6 +13,7 @@ namespace DataWarehouse.Plugins.Chronograf
         /// <summary>
         /// Gets or sets the InfluxDB server URL.
         /// </summary>
+        /// <remarks>WARNING: Default value is for development only. Configure for production.</remarks>
         public string InfluxDbUrl { get; set; } = "http://localhost:8086";
 
         /// <summary>

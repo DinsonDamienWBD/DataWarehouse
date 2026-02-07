@@ -208,7 +208,12 @@ public sealed class SqlInterfacePlugin : InterfacePluginBase
 
         if (_serverTask != null)
         {
-            try { await _serverTask; } catch (OperationCanceledException) { }
+            try { await _serverTask; }
+            catch (OperationCanceledException ex)
+            {
+                // Expected during shutdown
+                Console.WriteLine($"[SqlInterfacePlugin] Server task cancelled during shutdown: {ex.Message}");
+            }
         }
     }
 

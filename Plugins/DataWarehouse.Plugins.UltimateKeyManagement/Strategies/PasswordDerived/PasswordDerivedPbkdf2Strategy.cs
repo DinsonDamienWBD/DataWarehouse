@@ -79,7 +79,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.PasswordDerived
                     "SHA256" or "SHA-256" => HashAlgorithmName.SHA256,
                     "SHA384" or "SHA-384" => HashAlgorithmName.SHA384,
                     "SHA512" or "SHA-512" => HashAlgorithmName.SHA512,
-                    "SHA1" or "SHA-1" => HashAlgorithmName.SHA1, // Not recommended
+                    "SHA1" or "SHA-1" => HandleDeprecatedSHA1(),
                     _ => HashAlgorithmName.SHA256
                 };
             }
@@ -368,6 +368,18 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.PasswordDerived
 
             var json = JsonSerializer.Serialize(file, new JsonSerializerOptions { WriteIndented = true });
             await File.WriteAllTextAsync(storagePath, json);
+        }
+
+        /// <summary>
+        /// Handles deprecated SHA1 configuration with warning.
+        /// </summary>
+        [Obsolete("SHA1 is deprecated for PBKDF2 due to collision vulnerabilities. Use SHA256 or SHA512 instead.", false)]
+        private static HashAlgorithmName HandleDeprecatedSHA1()
+        {
+            System.Diagnostics.Trace.TraceWarning(
+                "WARNING: PBKDF2-SHA1 is deprecated due to collision vulnerabilities. " +
+                "Please migrate to SHA256 or SHA512 for better security.");
+            return HashAlgorithmName.SHA1;
         }
 
         public override void Dispose()

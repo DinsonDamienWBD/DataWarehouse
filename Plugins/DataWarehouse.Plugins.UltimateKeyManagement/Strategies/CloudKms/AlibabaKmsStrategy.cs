@@ -342,6 +342,14 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.CloudKms
             return request;
         }
 
+        /// <summary>
+        /// Calculates signature using HMAC-SHA1 for Alibaba Cloud API authentication.
+        /// </summary>
+        /// <remarks>
+        /// HMAC-SHA1 is required by Alibaba Cloud KMS API v1.0 protocol.
+        /// This is a cloud provider API constraint, not a software design choice.
+        /// The KMS service itself uses stronger algorithms for actual key operations.
+        /// </remarks>
         private string CalculateSignature(string stringToSign)
         {
             var key = Encoding.UTF8.GetBytes($"{_config.AccessKeySecret}&");

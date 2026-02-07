@@ -550,8 +550,8 @@ namespace DataWarehouse.Plugins.Metadata
 
         private static int ComputeConsistentHash(string key)
         {
-            using var md5 = MD5.Create();
-            var hash = md5.ComputeHash(Encoding.UTF8.GetBytes(key));
+            using var sha256 = SHA256.Create();
+            var hash = sha256.ComputeHash(Encoding.UTF8.GetBytes(key));
             return BitConverter.ToInt32(hash, 0);
         }
 

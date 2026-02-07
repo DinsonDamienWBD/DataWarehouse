@@ -1693,16 +1693,16 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
 
         private string ComputeETag(byte[] content)
         {
-            using var md5 = MD5.Create();
-            var hash = md5.ComputeHash(content);
+            using var sha256 = SHA256.Create();
+            var hash = sha256.ComputeHash(content);
             return Convert.ToHexString(hash).ToLower();
         }
 
         private string ComputeFileETag(string filePath)
         {
-            using var md5 = MD5.Create();
+            using var sha256 = SHA256.Create();
             using var stream = File.OpenRead(filePath);
-            var hash = md5.ComputeHash(stream);
+            var hash = sha256.ComputeHash(stream);
             return Convert.ToHexString(hash).ToLower();
         }
 

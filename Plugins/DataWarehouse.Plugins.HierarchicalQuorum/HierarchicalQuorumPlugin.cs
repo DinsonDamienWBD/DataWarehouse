@@ -2320,7 +2320,7 @@ public sealed class HierarchicalQuorumPlugin : ConsensusPluginBase
         {
             var nodeId = payload.GetValueOrDefault("nodeId")?.ToString() ?? Guid.NewGuid().ToString("N")[..12];
             var zoneId = payload.GetValueOrDefault("zoneId")?.ToString() ?? _zoneId;
-            var endpoint = payload.GetValueOrDefault("endpoint")?.ToString() ?? $"localhost:{5200 + new Random().Next(100)}";
+            var endpoint = payload.GetValueOrDefault("endpoint")?.ToString() ?? $"localhost:{5200 + RandomNumberGenerator.GetInt32(100)}";
             var weight = Convert.ToInt32(payload.GetValueOrDefault("weight") ?? 100);
 
             // Get region from zone

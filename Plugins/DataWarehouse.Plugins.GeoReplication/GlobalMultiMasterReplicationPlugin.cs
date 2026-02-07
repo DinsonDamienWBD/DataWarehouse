@@ -231,8 +231,14 @@ namespace DataWarehouse.Plugins.GeoReplication
             {
                 await Task.WhenAll(tasks).WaitAsync(TimeSpan.FromSeconds(10));
             }
-            catch (OperationCanceledException) { }
-            catch (TimeoutException) { }
+            catch (OperationCanceledException ex)
+            {
+                Console.WriteLine($"[GlobalMultiMasterReplicationPlugin] Background tasks cancelled during shutdown: {ex.Message}");
+            }
+            catch (TimeoutException ex)
+            {
+                Console.WriteLine($"[GlobalMultiMasterReplicationPlugin] Background tasks timed out during shutdown: {ex.Message}");
+            }
 
             _cts?.Dispose();
             _cts = null;

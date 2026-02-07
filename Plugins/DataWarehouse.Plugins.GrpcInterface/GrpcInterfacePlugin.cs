@@ -201,7 +201,12 @@ public sealed class GrpcInterfacePlugin : InterfacePluginBase
 
         if (_serverTask != null)
         {
-            try { await _serverTask; } catch (OperationCanceledException) { }
+            try { await _serverTask; }
+            catch (OperationCanceledException ex)
+            {
+                // Expected during shutdown
+                Console.WriteLine($"[GrpcInterfacePlugin] Server task cancelled during shutdown: {ex.Message}");
+            }
         }
     }
 

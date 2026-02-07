@@ -52,6 +52,11 @@ public sealed class MessageWriter
     /// <summary>
     /// Writes an MD5 authentication request.
     /// </summary>
+    /// <remarks>
+    /// DEPRECATED: MD5 authentication is deprecated due to collision vulnerabilities.
+    /// PostgreSQL recommends using SCRAM-SHA-256 authentication instead.
+    /// This method is provided for legacy client compatibility only.
+    /// </remarks>
     public async Task WriteAuthenticationMD5Async(byte[] salt, CancellationToken ct = default)
     {
         var body = new byte[8];

@@ -476,6 +476,8 @@ public sealed class Ff3Strategy : EncryptionStrategyBase
     {
         using var aes = System.Security.Cryptography.Aes.Create();
         aes.Key = key;
+        // SECURITY NOTE: ECB mode required for FF1/FF3-1 FPE standard implementation (NIST SP 800-38G).
+        // This is cryptographically safe as it's part of the standardized FPE construction.
         aes.Mode = CipherMode.ECB;
         aes.Padding = PaddingMode.None;
 

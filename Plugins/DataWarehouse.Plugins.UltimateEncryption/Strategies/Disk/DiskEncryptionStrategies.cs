@@ -113,6 +113,8 @@ public sealed class XtsAes256Strategy : EncryptionStrategyBase
 
         using var aesKey2 = System.Security.Cryptography.Aes.Create();
         aesKey2.Key = key2;
+        // SECURITY NOTE: ECB mode is intentionally used here as a building block for XTS mode.
+        // This is cryptographically safe because each block uses a unique tweak value.
         aesKey2.Mode = CipherMode.ECB;
         aesKey2.Padding = PaddingMode.None;
 
@@ -128,6 +130,8 @@ public sealed class XtsAes256Strategy : EncryptionStrategyBase
 
         using var aesKey1 = System.Security.Cryptography.Aes.Create();
         aesKey1.Key = key1;
+        // SECURITY NOTE: ECB mode is intentionally used here as a building block for XTS mode.
+        // This is cryptographically safe because each block uses a unique tweak value.
         aesKey1.Mode = CipherMode.ECB;
         aesKey1.Padding = PaddingMode.None;
 
@@ -195,6 +199,8 @@ public sealed class XtsAes256Strategy : EncryptionStrategyBase
 
         using var aesKey2 = System.Security.Cryptography.Aes.Create();
         aesKey2.Key = key2;
+        // SECURITY NOTE: ECB mode is intentionally used here as a building block for XTS mode.
+        // This is cryptographically safe because each block uses a unique tweak value.
         aesKey2.Mode = CipherMode.ECB;
         aesKey2.Padding = PaddingMode.None;
 
@@ -209,6 +215,8 @@ public sealed class XtsAes256Strategy : EncryptionStrategyBase
 
         using var aesKey1 = System.Security.Cryptography.Aes.Create();
         aesKey1.Key = key1;
+        // SECURITY NOTE: ECB mode is intentionally used here as a building block for XTS mode.
+        // This is cryptographically safe because each block uses a unique tweak value.
         aesKey1.Mode = CipherMode.ECB;
         aesKey1.Padding = PaddingMode.None;
 
@@ -476,6 +484,8 @@ public sealed class AdiantumStrategy : EncryptionStrategyBase
     {
         using var aes = System.Security.Cryptography.Aes.Create();
         aes.Key = key;
+        // SECURITY NOTE: ECB mode is intentionally used here as a building block for Adiantum mode.
+        // This is cryptographically safe because it operates on hash values with unique nonces.
         aes.Mode = CipherMode.ECB;
         aes.Padding = PaddingMode.None;
 
@@ -499,6 +509,8 @@ public sealed class AdiantumStrategy : EncryptionStrategyBase
     {
         using var aes = System.Security.Cryptography.Aes.Create();
         aes.Key = key;
+        // SECURITY NOTE: ECB mode is intentionally used here as a building block for Adiantum mode.
+        // This is cryptographically safe because it operates on hash values with unique nonces.
         aes.Mode = CipherMode.ECB;
         aes.Padding = PaddingMode.None;
 
@@ -635,6 +647,8 @@ public sealed class EssivStrategy : EncryptionStrategyBase
 
         using var aes = System.Security.Cryptography.Aes.Create();
         aes.Key = salt;
+        // SECURITY NOTE: ECB mode is intentionally used here as a building block for ESSIV mode.
+        // This is cryptographically safe because it encrypts unique sector numbers.
         aes.Mode = CipherMode.ECB;
         aes.Padding = PaddingMode.None;
 

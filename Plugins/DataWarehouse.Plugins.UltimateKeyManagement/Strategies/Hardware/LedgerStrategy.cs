@@ -721,14 +721,21 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Hardware
 
             _disposed = true;
 
-            _deviceLock.Wait();
-            try
+            if (_deviceLock.Wait(TimeSpan.FromSeconds(5)))
             {
-                _stream?.Dispose();
+                try
+                {
+                    _stream?.Dispose();
+                }
+                finally
+                {
+                    _deviceLock.Release();
+                    _deviceLock.Dispose();
+                }
             }
-            finally
+            else
             {
-                _deviceLock.Release();
+                // Timeout - force disposal
                 _deviceLock.Dispose();
             }
 

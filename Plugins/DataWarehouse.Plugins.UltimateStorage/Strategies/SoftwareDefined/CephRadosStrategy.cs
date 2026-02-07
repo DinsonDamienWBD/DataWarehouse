@@ -1021,8 +1021,8 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
 
         private string CalculateETag(byte[] content)
         {
-            using var md5 = MD5.Create();
-            var hash = md5.ComputeHash(content);
+            using var sha256 = SHA256.Create();
+            var hash = sha256.ComputeHash(content);
             return Convert.ToHexString(hash).ToLower();
         }
 

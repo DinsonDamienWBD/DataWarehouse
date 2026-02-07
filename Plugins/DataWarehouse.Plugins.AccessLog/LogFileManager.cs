@@ -196,15 +196,24 @@ public sealed class LogFileManager : IDisposable
         if (_disposed)
             return;
 
-        _writeLock.Wait();
-        try
+        // Use WaitAsync with a reasonable timeout to avoid deadlocks
+        if (_writeLock.Wait(TimeSpan.FromSeconds(5)))
         {
-            CloseAllWritersAsync().GetAwaiter().GetResult();
-            _disposed = true;
+            try
+            {
+                CloseAllWritersAsync().GetAwaiter().GetResult();
+                _disposed = true;
+            }
+            finally
+            {
+                _writeLock.Release();
+                _writeLock.Dispose();
+            }
         }
-        finally
+        else
         {
-            _writeLock.Release();
+            // Timeout - force disposal
+            _disposed = true;
             _writeLock.Dispose();
         }
     }

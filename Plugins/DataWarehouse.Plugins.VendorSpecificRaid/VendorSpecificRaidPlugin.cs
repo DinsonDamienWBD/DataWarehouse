@@ -110,7 +110,7 @@ namespace DataWarehouse.Plugins.VendorSpecificRaid
             if (_config.Level == RaidLevel.RAID_7 && _config.EnableWriteCache)
             {
                 _cacheFlushTimer = new Timer(
-                    _ => FlushWriteCacheAsync().Wait(),
+                    async _ => await FlushWriteCacheAsync().ConfigureAwait(false),
                     null,
                     _config.CacheFlushInterval,
                     _config.CacheFlushInterval);

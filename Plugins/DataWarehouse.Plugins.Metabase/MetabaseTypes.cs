@@ -12,6 +12,7 @@ namespace DataWarehouse.Plugins.Metabase
         /// <summary>
         /// Gets or sets the Metabase server URL.
         /// </summary>
+        /// <remarks>WARNING: Default value is for development only. Configure for production.</remarks>
         public string MetabaseUrl { get; set; } = "http://localhost:3000";
 
         /// <summary>

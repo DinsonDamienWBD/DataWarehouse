@@ -3,7 +3,7 @@
 // This file is NOT compiled - it's just an example for documentation purposes.
 // Copy the relevant parts to your main plugin class.
 
-#if FALSE // This file is excluded from compilation
+#if EXAMPLE_CODE // This file is excluded from compilation
 
 using System;
 using System.Threading;

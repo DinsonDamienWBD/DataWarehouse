@@ -1253,15 +1253,15 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
         }
 
         /// <summary>
-        /// Computes MD5 ETag for a file.
+        /// Computes SHA256 ETag for a file.
         /// </summary>
         private string ComputeFileETag(string filePath)
         {
             try
             {
-                using var md5 = MD5.Create();
+                using var sha256 = SHA256.Create();
                 using var stream = File.OpenRead(filePath);
-                var hash = md5.ComputeHash(stream);
+                var hash = sha256.ComputeHash(stream);
                 return Convert.ToHexString(hash).ToLower();
             }
             catch

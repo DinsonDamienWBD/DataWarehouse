@@ -77,6 +77,11 @@ public sealed class KubernetesClientImpl : IKubernetesClient, IDisposable
             ? $"https://{Environment.GetEnvironmentVariable("KUBERNETES_SERVICE_HOST")}:{Environment.GetEnvironmentVariable("KUBERNETES_SERVICE_PORT")}"
             : "https://localhost:6443";
 
+        if (Environment.GetEnvironmentVariable("KUBERNETES_SERVICE_HOST") == null)
+        {
+            Console.WriteLine("[KubernetesClient] WARNING: Using default localhost endpoint. Configure KUBERNETES_SERVICE_HOST for production.");
+        }
+
         var handler = new HttpClientHandler
         {
             ServerCertificateCustomValidationCallback =
