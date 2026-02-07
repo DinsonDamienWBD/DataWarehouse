@@ -17,7 +17,16 @@ public enum IntelligenceStrategyCategory
     KnowledgeGraph,
 
     /// <summary>Feature strategy (higher-level AI features).</summary>
-    Feature
+    Feature,
+
+    /// <summary>Long-Term Memory (LTM) strategy for persistent memory across sessions.</summary>
+    LongTermMemory,
+
+    /// <summary>Large Tabular Model strategy for structured data AI.</summary>
+    TabularModel,
+
+    /// <summary>AI Agent strategy for autonomous task execution.</summary>
+    Agent
 }
 
 /// <summary>
@@ -162,10 +171,39 @@ public enum IntelligenceCapabilities : long
     Clustering = 1 << 21,
     Summarization = 1 << 22,
 
+    // Long-Term Memory capabilities
+    MemoryStorage = 1 << 23,
+    MemoryRetrieval = 1 << 24,
+    MemoryConsolidation = 1 << 25,
+    EpisodicMemory = 1 << 26,
+    SemanticMemory = 1 << 27,
+    WorkingMemory = 1 << 28,
+    MemoryDecay = 1 << 29,
+    HierarchicalMemory = 1 << 30,
+
+    // Large Tabular Model capabilities
+    TabularClassification = 1L << 31,
+    TabularRegression = 1L << 32,
+    TabularGeneration = 1L << 33,
+    FeatureEngineering = 1L << 34,
+    MissingValueImputation = 1L << 35,
+    AnomalyDetectionTabular = 1L << 36,
+    TimeSeriesForecasting = 1L << 37,
+
+    // Agent capabilities
+    TaskPlanning = 1L << 38,
+    ToolUse = 1L << 39,
+    ReasoningChain = 1L << 40,
+    SelfReflection = 1L << 41,
+    MultiAgentCollaboration = 1L << 42,
+
     // Common capability groups
     AllAIProvider = TextCompletion | ChatCompletion | Streaming | Embeddings | FunctionCalling,
     AllVectorStore = VectorStorage | VectorSearch | MetadataFiltering | BatchOperations,
-    AllKnowledgeGraph = NodeManagement | EdgeManagement | GraphTraversal | GraphQueries | PathFinding
+    AllKnowledgeGraph = NodeManagement | EdgeManagement | GraphTraversal | GraphQueries | PathFinding,
+    AllLongTermMemory = MemoryStorage | MemoryRetrieval | MemoryConsolidation | EpisodicMemory | SemanticMemory,
+    AllTabularModel = TabularClassification | TabularRegression | FeatureEngineering | MissingValueImputation,
+    AllAgent = TaskPlanning | ToolUse | ReasoningChain | SelfReflection
 }
 
 /// <summary>
@@ -221,6 +259,24 @@ public sealed class IntelligenceStatistics
 
     /// <summary>Total graph edges created.</summary>
     public long TotalEdgesCreated { get; set; }
+
+    /// <summary>Total memories stored (for LTM).</summary>
+    public long TotalMemoriesStored { get; set; }
+
+    /// <summary>Total memories retrieved (for LTM).</summary>
+    public long TotalMemoriesRetrieved { get; set; }
+
+    /// <summary>Total memory consolidations performed (for LTM).</summary>
+    public long TotalConsolidations { get; set; }
+
+    /// <summary>Total tabular predictions made.</summary>
+    public long TotalTabularPredictions { get; set; }
+
+    /// <summary>Total rows processed by tabular models.</summary>
+    public long TotalRowsProcessed { get; set; }
+
+    /// <summary>Total agent tasks executed.</summary>
+    public long TotalAgentTasks { get; set; }
 
     /// <summary>Average operation latency in milliseconds.</summary>
     public double AverageLatencyMs { get; set; }

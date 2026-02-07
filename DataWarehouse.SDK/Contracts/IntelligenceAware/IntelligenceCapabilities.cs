@@ -378,6 +378,120 @@ namespace DataWarehouse.SDK.Contracts.IntelligenceAware
         ProtocolTranslation = 1L << 51,
 
         // ========================================
+        // Memory Capabilities (bits 52-55)
+        // ========================================
+
+        /// <summary>
+        /// Store memories in long-term memory systems.
+        /// Enables persistent memory across sessions.
+        /// </summary>
+        MemoryStorage = 1L << 52,
+
+        /// <summary>
+        /// Retrieve memories from long-term storage.
+        /// Supports semantic memory recall.
+        /// </summary>
+        MemoryRetrieval = 1L << 53,
+
+        /// <summary>
+        /// Consolidate memories for optimization.
+        /// Merges and organizes memory for efficiency.
+        /// </summary>
+        MemoryConsolidation = 1L << 54,
+
+        /// <summary>
+        /// Hierarchical memory management (working, short-term, long-term).
+        /// Multi-tier memory architecture.
+        /// </summary>
+        HierarchicalMemory = 1L << 55,
+
+        /// <summary>
+        /// Working memory for session-scoped information.
+        /// Fast, temporary memory access.
+        /// </summary>
+        WorkingMemory = 1L << 56,
+
+        /// <summary>
+        /// Episodic memory with temporal context.
+        /// Event-based memory retrieval.
+        /// </summary>
+        EpisodicMemory = 1L << 57,
+
+        /// <summary>
+        /// Semantic memory for facts and knowledge.
+        /// Fact-based memory storage.
+        /// </summary>
+        SemanticMemory = 1L << 58,
+
+        /// <summary>
+        /// Memory decay and forgetting mechanisms.
+        /// Time-based memory importance adjustment.
+        /// </summary>
+        MemoryDecay = 1L << 59,
+
+        // ========================================
+        // Tabular Model Capabilities (bits 60-62)
+        // ========================================
+
+        /// <summary>
+        /// Tabular classification tasks.
+        /// Predict categorical outcomes from structured data.
+        /// </summary>
+        TabularClassification = 1L << 60,
+
+        /// <summary>
+        /// Tabular regression tasks.
+        /// Predict continuous values from structured data.
+        /// </summary>
+        TabularRegression = 1L << 61,
+
+        /// <summary>
+        /// Feature engineering for tabular data.
+        /// Automatic feature extraction and transformation.
+        /// </summary>
+        FeatureEngineering = 1L << 62,
+
+        /// <summary>
+        /// Missing value imputation for tabular data.
+        /// Handle missing data intelligently.
+        /// </summary>
+        MissingValueImputation = 1L << 63,
+
+        // ========================================
+        // Agent Capabilities (bits 64-69)
+        // ========================================
+
+        /// <summary>
+        /// Task planning and decomposition.
+        /// Break complex tasks into subtasks.
+        /// </summary>
+        TaskPlanning = 1L << 64,
+
+        /// <summary>
+        /// Tool and function use by agents.
+        /// Execute external tools and APIs.
+        /// </summary>
+        ToolUse = 1L << 65,
+
+        /// <summary>
+        /// Reasoning chain generation.
+        /// Explain thought process step-by-step.
+        /// </summary>
+        ReasoningChain = 1L << 66,
+
+        /// <summary>
+        /// Self-reflection and learning.
+        /// Improve behavior based on feedback.
+        /// </summary>
+        SelfReflection = 1L << 67,
+
+        /// <summary>
+        /// Multi-agent collaboration.
+        /// Coordinate multiple agents for complex tasks.
+        /// </summary>
+        MultiAgentCollaboration = 1L << 68,
+
+        // ========================================
         // Capability Groups
         // ========================================
 
@@ -419,6 +533,22 @@ namespace DataWarehouse.SDK.Contracts.IntelligenceAware
         /// <summary>
         /// All connector integration capabilities.
         /// </summary>
-        AllConnector = RequestTransformation | ResponseTransformation | SchemaMapping | ProtocolTranslation
+        AllConnector = RequestTransformation | ResponseTransformation | SchemaMapping | ProtocolTranslation,
+
+        /// <summary>
+        /// All memory-related capabilities.
+        /// </summary>
+        AllMemory = MemoryStorage | MemoryRetrieval | MemoryConsolidation | HierarchicalMemory |
+                    WorkingMemory | EpisodicMemory | SemanticMemory | MemoryDecay,
+
+        /// <summary>
+        /// All tabular model capabilities.
+        /// </summary>
+        AllTabular = TabularClassification | TabularRegression | FeatureEngineering | MissingValueImputation,
+
+        /// <summary>
+        /// All agent capabilities.
+        /// </summary>
+        AllAgent = TaskPlanning | ToolUse | ReasoningChain | SelfReflection | MultiAgentCollaboration
     }
 }

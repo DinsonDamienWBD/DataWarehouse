@@ -881,6 +881,435 @@ namespace DataWarehouse.SDK.Contracts.IntelligenceAware
         }
 
         // ========================================
+        // Long-Term Memory Helper Methods
+        // ========================================
+
+        /// <summary>
+        /// Stores content in long-term memory via Intelligence.
+        /// </summary>
+        /// <param name="content">The content to store.</param>
+        /// <param name="metadata">Optional metadata for the memory.</param>
+        /// <param name="ct">Cancellation token.</param>
+        /// <returns>Memory ID if successful, null otherwise.</returns>
+        protected async Task<string?> StoreMemoryAsync(
+            string content,
+            Dictionary<string, object>? metadata = null,
+            CancellationToken ct = default)
+        {
+            if (!HasCapability(IntelligenceCapabilities.MemoryStorage))
+                return null;
+
+            var payload = new Dictionary<string, object>
+            {
+                ["content"] = content,
+                ["contextId"] = Guid.NewGuid().ToString("N")
+            };
+
+            if (metadata != null)
+                payload["metadata"] = metadata;
+
+            var response = await SendIntelligenceRequestAsync(
+                IntelligenceTopics.MemoryStore,
+                payload,
+                timeout: null,
+                ct);
+
+            if (response?.Success == true && response.Payload is Dictionary<string, object> result)
+            {
+                if (result.TryGetValue("memoryId", out var memoryId) && memoryId is string id)
+                    return id;
+            }
+
+            return null;
+        }
+
+        /// <summary>
+        /// Recalls memories from long-term storage via Intelligence.
+        /// </summary>
+        /// <param name="query">The query to search for.</param>
+        /// <param name="topK">Maximum number of memories to retrieve.</param>
+        /// <param name="ct">Cancellation token.</param>
+        /// <returns>Retrieved memories, or null if unavailable.</returns>
+        protected async Task<RetrievedMemory[]?> RecallMemoriesAsync(
+            string query,
+            int topK = 5,
+            CancellationToken ct = default)
+        {
+            if (!HasCapability(IntelligenceCapabilities.MemoryRetrieval))
+                return null;
+
+            var payload = new Dictionary<string, object>
+            {
+                ["query"] = query,
+                ["topK"] = topK,
+                ["contextId"] = Guid.NewGuid().ToString("N")
+            };
+
+            var response = await SendIntelligenceRequestAsync(
+                IntelligenceTopics.MemoryRecall,
+                payload,
+                timeout: null,
+                ct);
+
+            if (response?.Success == true && response.Payload is Dictionary<string, object> result)
+            {
+                if (result.TryGetValue("memories", out var memories) && memories is RetrievedMemory[] retrieved)
+                    return retrieved;
+            }
+
+            return null;
+        }
+
+        /// <summary>
+        /// Triggers memory consolidation via Intelligence.
+        /// </summary>
+        /// <param name="ct">Cancellation token.</param>
+        /// <returns>True if consolidation was triggered successfully.</returns>
+        protected async Task<bool> ConsolidateMemoriesAsync(CancellationToken ct = default)
+        {
+            if (!HasCapability(IntelligenceCapabilities.MemoryConsolidation))
+                return false;
+
+            var payload = new Dictionary<string, object>
+            {
+                ["contextId"] = Guid.NewGuid().ToString("N")
+            };
+
+            var response = await SendIntelligenceRequestAsync(
+                IntelligenceTopics.MemoryConsolidate,
+                payload,
+                timeout: null,
+                ct);
+
+            return response?.Success == true;
+        }
+
+        // ========================================
+        // Tabular Model Helper Methods
+        // ========================================
+
+        /// <summary>
+        /// Makes a prediction using a tabular model via Intelligence.
+        /// </summary>
+        /// <param name="row">The input row data.</param>
+        /// <param name="modelId">The model identifier.</param>
+        /// <param name="ct">Cancellation token.</param>
+        /// <returns>Prediction result, or null if unavailable.</returns>
+        protected async Task<TabularPrediction?> PredictTabularAsync(
+            object[] row,
+            string modelId,
+            CancellationToken ct = default)
+        {
+            if (!HasCapability(IntelligenceCapabilities.TabularClassification) &&
+                !HasCapability(IntelligenceCapabilities.TabularRegression))
+                return null;
+
+            var payload = new Dictionary<string, object>
+            {
+                ["row"] = row,
+                ["modelId"] = modelId,
+                ["contextId"] = Guid.NewGuid().ToString("N")
+            };
+
+            var response = await SendIntelligenceRequestAsync(
+                IntelligenceTopics.TabularPredict,
+                payload,
+                timeout: null,
+                ct);
+
+            if (response?.Success == true && response.Payload is Dictionary<string, object> result)
+            {
+                if (result.TryGetValue("prediction", out var prediction) && prediction is TabularPrediction pred)
+                    return pred;
+            }
+
+            return null;
+        }
+
+        /// <summary>
+        /// Trains a tabular model via Intelligence.
+        /// </summary>
+        /// <param name="data">Training data.</param>
+        /// <param name="targetColumn">Target column name.</param>
+        /// <param name="modelId">Model identifier.</param>
+        /// <param name="ct">Cancellation token.</param>
+        /// <returns>True if training was initiated successfully.</returns>
+        protected async Task<bool> TrainTabularModelAsync(
+            object data,
+            string targetColumn,
+            string modelId,
+            CancellationToken ct = default)
+        {
+            if (!HasCapability(IntelligenceCapabilities.TabularClassification) &&
+                !HasCapability(IntelligenceCapabilities.TabularRegression))
+                return false;
+
+            var payload = new Dictionary<string, object>
+            {
+                ["data"] = data,
+                ["targetColumn"] = targetColumn,
+                ["modelId"] = modelId,
+                ["contextId"] = Guid.NewGuid().ToString("N")
+            };
+
+            var response = await SendIntelligenceRequestAsync(
+                IntelligenceTopics.TabularTrain,
+                payload,
+                timeout: null,
+                ct);
+
+            return response?.Success == true;
+        }
+
+        /// <summary>
+        /// Explains a tabular model prediction via Intelligence.
+        /// </summary>
+        /// <param name="row">The input row data.</param>
+        /// <param name="modelId">The model identifier.</param>
+        /// <param name="ct">Cancellation token.</param>
+        /// <returns>Explanation with feature importance, or null if unavailable.</returns>
+        protected async Task<TabularPrediction?> ExplainTabularPredictionAsync(
+            object[] row,
+            string modelId,
+            CancellationToken ct = default)
+        {
+            if (!HasCapability(IntelligenceCapabilities.TabularClassification) &&
+                !HasCapability(IntelligenceCapabilities.TabularRegression))
+                return null;
+
+            var payload = new Dictionary<string, object>
+            {
+                ["row"] = row,
+                ["modelId"] = modelId,
+                ["contextId"] = Guid.NewGuid().ToString("N")
+            };
+
+            var response = await SendIntelligenceRequestAsync(
+                IntelligenceTopics.TabularExplain,
+                payload,
+                timeout: null,
+                ct);
+
+            if (response?.Success == true && response.Payload is Dictionary<string, object> result)
+            {
+                if (result.TryGetValue("explanation", out var explanation) && explanation is TabularPrediction pred)
+                    return pred;
+            }
+
+            return null;
+        }
+
+        // ========================================
+        // Agent Helper Methods
+        // ========================================
+
+        /// <summary>
+        /// Executes a task using an AI agent via Intelligence.
+        /// </summary>
+        /// <param name="task">The task description.</param>
+        /// <param name="agentType">Type of agent to use (e.g., "react", "autogpt").</param>
+        /// <param name="context">Optional agent context with tools and constraints.</param>
+        /// <param name="ct">Cancellation token.</param>
+        /// <returns>Agent execution result, or null if unavailable.</returns>
+        protected async Task<AgentExecutionResult?> ExecuteAgentTaskAsync(
+            string task,
+            string agentType = "react",
+            object? context = null,
+            CancellationToken ct = default)
+        {
+            if (!HasCapability(IntelligenceCapabilities.TaskPlanning) &&
+                !HasCapability(IntelligenceCapabilities.ToolUse))
+                return null;
+
+            var payload = new Dictionary<string, object>
+            {
+                ["task"] = task,
+                ["agentType"] = agentType,
+                ["contextId"] = Guid.NewGuid().ToString("N")
+            };
+
+            if (context != null)
+                payload["context"] = context;
+
+            var response = await SendIntelligenceRequestAsync(
+                IntelligenceTopics.AgentExecute,
+                payload,
+                timeout: TimeSpan.FromMinutes(5),
+                ct);
+
+            if (response?.Success == true && response.Payload is Dictionary<string, object> result)
+            {
+                if (result.TryGetValue("result", out var execResult) && execResult is AgentExecutionResult agentResult)
+                    return agentResult;
+            }
+
+            return null;
+        }
+
+        /// <summary>
+        /// Registers a tool for agent use via Intelligence.
+        /// </summary>
+        /// <param name="toolDefinition">The tool definition.</param>
+        /// <param name="ct">Cancellation token.</param>
+        /// <returns>True if registration was successful.</returns>
+        protected async Task<bool> RegisterAgentToolAsync(
+            object toolDefinition,
+            CancellationToken ct = default)
+        {
+            if (!HasCapability(IntelligenceCapabilities.ToolUse))
+                return false;
+
+            var payload = new Dictionary<string, object>
+            {
+                ["tool"] = toolDefinition,
+                ["contextId"] = Guid.NewGuid().ToString("N")
+            };
+
+            var response = await SendIntelligenceRequestAsync(
+                IntelligenceTopics.AgentRegisterTool,
+                payload,
+                timeout: null,
+                ct);
+
+            return response?.Success == true;
+        }
+
+        /// <summary>
+        /// Gets the current state of an agent via Intelligence.
+        /// </summary>
+        /// <param name="agentId">The agent identifier.</param>
+        /// <param name="ct">Cancellation token.</param>
+        /// <returns>Agent state, or null if unavailable.</returns>
+        protected async Task<object?> GetAgentStateAsync(
+            string agentId,
+            CancellationToken ct = default)
+        {
+            if (!HasCapability(IntelligenceCapabilities.TaskPlanning))
+                return null;
+
+            var payload = new Dictionary<string, object>
+            {
+                ["agentId"] = agentId,
+                ["contextId"] = Guid.NewGuid().ToString("N")
+            };
+
+            var response = await SendIntelligenceRequestAsync(
+                IntelligenceTopics.AgentState,
+                payload,
+                timeout: null,
+                ct);
+
+            if (response?.Success == true && response.Payload is Dictionary<string, object> result)
+            {
+                return result.TryGetValue("state", out var state) ? state : null;
+            }
+
+            return null;
+        }
+
+        // ========================================
+        // Evolving Intelligence Helper Methods
+        // ========================================
+
+        /// <summary>
+        /// Records a learning interaction to improve the Intelligence system.
+        /// </summary>
+        /// <param name="query">The original query.</param>
+        /// <param name="response">The generated response.</param>
+        /// <param name="feedback">User feedback (e.g., "positive", "negative", rating).</param>
+        /// <param name="ct">Cancellation token.</param>
+        /// <returns>True if learning was recorded successfully.</returns>
+        protected async Task<bool> LearnFromInteractionAsync(
+            string query,
+            string response,
+            string feedback,
+            CancellationToken ct = default)
+        {
+            if (!HasCapability(IntelligenceCapabilities.SelfReflection))
+                return false;
+
+            var payload = new Dictionary<string, object>
+            {
+                ["query"] = query,
+                ["response"] = response,
+                ["feedback"] = feedback,
+                ["contextId"] = Guid.NewGuid().ToString("N"),
+                ["timestamp"] = DateTimeOffset.UtcNow
+            };
+
+            var response_msg = await SendIntelligenceRequestAsync(
+                IntelligenceTopics.EvolutionLearn,
+                payload,
+                timeout: null,
+                ct);
+
+            return response_msg?.Success == true;
+        }
+
+        /// <summary>
+        /// Gets the expertise score for a specific domain.
+        /// </summary>
+        /// <param name="domain">The domain to query (e.g., "classification", "embeddings").</param>
+        /// <param name="ct">Cancellation token.</param>
+        /// <returns>Expertise score (0.0-1.0), or null if unavailable.</returns>
+        protected async Task<double?> GetExpertiseScoreAsync(
+            string domain,
+            CancellationToken ct = default)
+        {
+            if (!HasCapability(IntelligenceCapabilities.SelfReflection))
+                return null;
+
+            var payload = new Dictionary<string, object>
+            {
+                ["domain"] = domain,
+                ["contextId"] = Guid.NewGuid().ToString("N")
+            };
+
+            var response = await SendIntelligenceRequestAsync(
+                IntelligenceTopics.EvolutionExpertise,
+                payload,
+                timeout: null,
+                ct);
+
+            if (response?.Success == true && response.Payload is Dictionary<string, object> result)
+            {
+                if (result.TryGetValue("expertiseScore", out var score) && score is double expertiseScore)
+                    return expertiseScore;
+            }
+
+            return null;
+        }
+
+        /// <summary>
+        /// Triggers adaptive behavior adjustment via Intelligence.
+        /// </summary>
+        /// <param name="performanceMetrics">Performance metrics to guide adaptation.</param>
+        /// <param name="ct">Cancellation token.</param>
+        /// <returns>True if adaptation was triggered successfully.</returns>
+        protected async Task<bool> AdaptIntelligenceBehaviorAsync(
+            Dictionary<string, object> performanceMetrics,
+            CancellationToken ct = default)
+        {
+            if (!HasCapability(IntelligenceCapabilities.SelfReflection))
+                return false;
+
+            var payload = new Dictionary<string, object>
+            {
+                ["metrics"] = performanceMetrics,
+                ["contextId"] = Guid.NewGuid().ToString("N"),
+                ["timestamp"] = DateTimeOffset.UtcNow
+            };
+
+            var response = await SendIntelligenceRequestAsync(
+                IntelligenceTopics.EvolutionAdapt,
+                payload,
+                timeout: null,
+                ct);
+
+            return response?.Success == true;
+        }
+
+        // ========================================
         // Metadata Override
         // ========================================
 
@@ -1028,5 +1457,74 @@ namespace DataWarehouse.SDK.Contracts.IntelligenceAware
 
         /// <summary>Additional metadata about the result.</summary>
         public Dictionary<string, object> Metadata { get; init; } = new();
+    }
+
+    /// <summary>
+    /// Retrieved memory with relevance score.
+    /// </summary>
+    public sealed class RetrievedMemory
+    {
+        /// <summary>Memory ID.</summary>
+        public string Id { get; init; } = string.Empty;
+
+        /// <summary>Memory content.</summary>
+        public string Content { get; init; } = string.Empty;
+
+        /// <summary>Relevance score (0.0-1.0).</summary>
+        public float RelevanceScore { get; init; }
+
+        /// <summary>When the memory was created.</summary>
+        public DateTime CreatedAt { get; init; }
+
+        /// <summary>Optional metadata.</summary>
+        public Dictionary<string, object>? Metadata { get; init; }
+    }
+
+    /// <summary>
+    /// Result of a tabular model prediction.
+    /// </summary>
+    public sealed class TabularPrediction
+    {
+        /// <summary>Predicted value or class label.</summary>
+        public object? PredictedValue { get; init; }
+
+        /// <summary>Confidence score (0.0-1.0).</summary>
+        public double Confidence { get; init; }
+
+        /// <summary>Class probabilities for classification tasks.</summary>
+        public Dictionary<string, double>? ClassProbabilities { get; init; }
+
+        /// <summary>Feature importance values for this prediction.</summary>
+        public Dictionary<string, double>? FeatureImportance { get; init; }
+
+        /// <summary>Additional metadata.</summary>
+        public Dictionary<string, object> Metadata { get; init; } = new();
+    }
+
+    /// <summary>
+    /// Result of agent task execution.
+    /// </summary>
+    public sealed class AgentExecutionResult
+    {
+        /// <summary>Whether the task was completed successfully.</summary>
+        public bool Success { get; init; }
+
+        /// <summary>Final result or output.</summary>
+        public string Result { get; init; } = string.Empty;
+
+        /// <summary>Number of steps/iterations taken.</summary>
+        public int StepsTaken { get; init; }
+
+        /// <summary>Reasoning chain or thought process.</summary>
+        public List<string> ReasoningChain { get; init; } = new();
+
+        /// <summary>Total tokens consumed.</summary>
+        public int TokensConsumed { get; init; }
+
+        /// <summary>Execution duration in milliseconds.</summary>
+        public long DurationMs { get; init; }
+
+        /// <summary>Error message if failed.</summary>
+        public string? Error { get; init; }
     }
 }

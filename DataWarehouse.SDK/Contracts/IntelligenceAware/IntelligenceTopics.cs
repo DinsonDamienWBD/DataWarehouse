@@ -408,5 +408,141 @@ namespace DataWarehouse.SDK.Contracts.IntelligenceAware
         /// Pattern for subscribing to all connector integration topics.
         /// </summary>
         public const string AllConnectorPattern = "intelligence.connector.*";
+
+        // ========================================
+        // Long-Term Memory Topics
+        // ========================================
+
+        /// <summary>
+        /// Request topic for storing a memory.
+        /// </summary>
+        public const string MemoryStore = "intelligence.memory.store";
+
+        /// <summary>
+        /// Response topic for memory store requests.
+        /// </summary>
+        public const string MemoryStoreResponse = "intelligence.memory.store.response";
+
+        /// <summary>
+        /// Request topic for recalling memories.
+        /// </summary>
+        public const string MemoryRecall = "intelligence.memory.recall";
+
+        /// <summary>
+        /// Response topic for memory recall requests.
+        /// </summary>
+        public const string MemoryRecallResponse = "intelligence.memory.recall.response";
+
+        /// <summary>
+        /// Request topic for memory consolidation.
+        /// </summary>
+        public const string MemoryConsolidate = "intelligence.memory.consolidate";
+
+        /// <summary>
+        /// Response topic for memory consolidation requests.
+        /// </summary>
+        public const string MemoryConsolidateResponse = "intelligence.memory.consolidate.response";
+
+        // ========================================
+        // Tabular Model Topics
+        // ========================================
+
+        /// <summary>
+        /// Request topic for training a tabular model.
+        /// </summary>
+        public const string TabularTrain = "intelligence.tabular.train";
+
+        /// <summary>
+        /// Response topic for tabular training requests.
+        /// </summary>
+        public const string TabularTrainResponse = "intelligence.tabular.train.response";
+
+        /// <summary>
+        /// Request topic for tabular model predictions.
+        /// </summary>
+        public const string TabularPredict = "intelligence.tabular.predict";
+
+        /// <summary>
+        /// Response topic for tabular prediction requests.
+        /// </summary>
+        public const string TabularPredictResponse = "intelligence.tabular.predict.response";
+
+        /// <summary>
+        /// Request topic for tabular model explanations.
+        /// </summary>
+        public const string TabularExplain = "intelligence.tabular.explain";
+
+        /// <summary>
+        /// Response topic for tabular explanation requests.
+        /// </summary>
+        public const string TabularExplainResponse = "intelligence.tabular.explain.response";
+
+        // ========================================
+        // AI Agent Topics
+        // ========================================
+
+        /// <summary>
+        /// Request topic for executing an agent task.
+        /// </summary>
+        public const string AgentExecute = "intelligence.agent.execute";
+
+        /// <summary>
+        /// Response topic for agent execution requests.
+        /// </summary>
+        public const string AgentExecuteResponse = "intelligence.agent.execute.response";
+
+        /// <summary>
+        /// Request topic for registering a tool with an agent.
+        /// </summary>
+        public const string AgentRegisterTool = "intelligence.agent.register-tool";
+
+        /// <summary>
+        /// Response topic for agent tool registration requests.
+        /// </summary>
+        public const string AgentRegisterToolResponse = "intelligence.agent.register-tool.response";
+
+        /// <summary>
+        /// Request topic for getting agent state.
+        /// </summary>
+        public const string AgentState = "intelligence.agent.state";
+
+        /// <summary>
+        /// Response topic for agent state requests.
+        /// </summary>
+        public const string AgentStateResponse = "intelligence.agent.state.response";
+
+        // ========================================
+        // Evolving Intelligence Topics
+        // ========================================
+
+        /// <summary>
+        /// Request topic for recording learning interactions.
+        /// </summary>
+        public const string EvolutionLearn = "intelligence.evolution.learn";
+
+        /// <summary>
+        /// Response topic for learning requests.
+        /// </summary>
+        public const string EvolutionLearnResponse = "intelligence.evolution.learn.response";
+
+        /// <summary>
+        /// Request topic for getting expertise scores.
+        /// </summary>
+        public const string EvolutionExpertise = "intelligence.evolution.expertise";
+
+        /// <summary>
+        /// Response topic for expertise requests.
+        /// </summary>
+        public const string EvolutionExpertiseResponse = "intelligence.evolution.expertise.response";
+
+        /// <summary>
+        /// Request topic for triggering adaptive behavior.
+        /// </summary>
+        public const string EvolutionAdapt = "intelligence.evolution.adapt";
+
+        /// <summary>
+        /// Response topic for adaptation requests.
+        /// </summary>
+        public const string EvolutionAdaptResponse = "intelligence.evolution.adapt.response";
     }
 }
