@@ -36,7 +36,12 @@ public enum DataManagementCategory
     /// <summary>
     /// Data lifecycle management strategies.
     /// </summary>
-    Lifecycle
+    Lifecycle,
+
+    /// <summary>
+    /// Data versioning strategies for version control and history.
+    /// </summary>
+    Versioning
 }
 
 /// <summary>
