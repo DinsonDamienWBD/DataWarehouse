@@ -1,0 +1,28 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RootNamespace>DataWarehouse.Plugins.UltimateRAID</RootNamespace>
+    <Description>Ultimate RAID Plugin - Comprehensive RAID strategies including standard levels (0-6, 10), nested RAID, advanced RAID, vendor-specific implementations, and software-defined RAID with hardware acceleration</Description>
+    <Authors>DataWarehouse</Authors>
+    <Company>DataWarehouse</Company>
+    <Product>DataWarehouse Ultimate RAID</Product>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\DataWarehouse.SDK\DataWarehouse.SDK.csproj" />
+  </ItemGroup>
+
+  <!-- SMART Monitoring (Windows only) -->
+  <ItemGroup Condition="$([MSBuild]::IsOSPlatform('Windows'))">
+    <PackageReference Include="System.Management" Version="10.0.*" />
+  </ItemGroup>
+
+  <!-- Temporarily exclude old strategy implementations that need migration -->
+  <ItemGroup>
+    <Compile Remove="Strategies\**\*.cs" />
+  </ItemGroup>
+
+</Project>
