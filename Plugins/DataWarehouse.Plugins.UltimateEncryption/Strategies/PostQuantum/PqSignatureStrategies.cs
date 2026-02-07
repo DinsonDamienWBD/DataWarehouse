@@ -10,17 +10,11 @@ using Org.BouncyCastle.Security;
 using Org.BouncyCastle.Pqc.Crypto.Crystals.Dilithium;
 using Org.BouncyCastle.Pqc.Crypto.SphincsPlus;
 
-// Stub types for Falcon - BouncyCastle 2.5.1 includes Falcon, but provide aliases if needed
-namespace Org.BouncyCastle.Pqc.Crypto.Falcon
-{
-    // Note: BouncyCastle 2.5.1 may already have Falcon support.
-    // These stubs are here as fallback in case the exact API differs.
-    using global::Org.BouncyCastle.Pqc.Crypto.Falcon;
-}
+// Note: Falcon is not yet available in BouncyCastle 2.6.2
+// The FalconStrategy throws NotSupportedException until library support is added
 
 namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.PostQuantum
 {
-    using Org.BouncyCastle.Pqc.Crypto.Falcon;
 
     /// <summary>
     /// ML-DSA (NIST FIPS 204) digital signature strategy - Dilithium lattice-based signatures.
@@ -337,25 +331,24 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.PostQuantum
     /// <summary>
     /// Falcon digital signature strategy - Lattice-based signatures with compact keys.
     ///
-    /// Security Level: NIST Level 5
-    /// Algorithm: Falcon-1024
+    /// Status: NOT AVAILABLE - BouncyCastle 2.6.2 does not include Falcon support.
+    /// This strategy throws NotSupportedException until Falcon is added to BouncyCastle.
     ///
-    /// Advantages:
+    /// When available, Falcon provides:
+    /// - Security Level: NIST Level 5
+    /// - Algorithm: Falcon-1024
     /// - Smallest signature + public key size among NIST PQC finalists
     /// - Fast verification
     /// - Based on NTRU lattices
     ///
-    /// Disadvantages:
-    /// - Slower signing than ML-DSA
-    /// - More complex implementation
-    /// - Requires floating-point arithmetic
-    ///
-    /// Use Case: Bandwidth-constrained environments requiring quantum-safe signatures (IoT, embedded systems).
-    /// Note: This implementation uses stub types as BouncyCastle 2.5.1 may not have full Falcon support.
+    /// Alternative: Use ML-DSA (Dilithium) or SLH-DSA (SPHINCS+) which are available.
     /// </summary>
     public sealed class FalconStrategy : EncryptionStrategyBase
     {
-        private readonly SecureRandom _secureRandom;
+        private const string UnavailableMessage =
+            "Falcon-1024 is not yet supported. BouncyCastle 2.6.2 does not include Falcon. " +
+            "Use 'ml-dsa-65' (Dilithium) or 'slh-dsa-shake-128f' (SPHINCS+) as alternatives. " +
+            "Falcon support will be added when available in BouncyCastle.";
 
         /// <inheritdoc/>
         public override CipherInfo CipherInfo => new()
@@ -364,7 +357,7 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.PostQuantum
             KeySizeBits = 0,
             BlockSizeBytes = 0,
             IvSizeBytes = 0,
-            TagSizeBytes = 1330, // Falcon-1024 average signature size
+            TagSizeBytes = 1330,
             Capabilities = new CipherCapabilities
             {
                 IsAuthenticated = true,
@@ -380,10 +373,9 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.PostQuantum
                 ["Algorithm"] = "Falcon-1024",
                 ["Type"] = "Signature",
                 ["NistLevel"] = 5,
-                ["PublicKeySize"] = 1793,
-                ["PrivateKeySize"] = 2305,
-                ["SignatureSize"] = 1330,
-                ["Note"] = "Stub implementation - BouncyCastle 2.5.1 may not have full Falcon support"
+                ["Status"] = "UNAVAILABLE",
+                ["Reason"] = "Awaiting BouncyCastle Falcon support",
+                ["Alternative"] = "Use ml-dsa-65 or slh-dsa-shake-128f"
             }
         };
 
@@ -391,74 +383,38 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.PostQuantum
         public override string StrategyId => "falcon-1024";
 
         /// <inheritdoc/>
-        public override string StrategyName => "Falcon-1024 Signature";
-
-        public FalconStrategy()
-        {
-            _secureRandom = new SecureRandom();
-        }
+        public override string StrategyName => "Falcon-1024 Signature (UNAVAILABLE)";
 
         /// <summary>
-        /// Signs the data using Falcon (stub implementation).
-        /// Note: This is a placeholder. Full Falcon support requires BouncyCastle update or custom implementation.
+        /// Not supported - throws NotSupportedException.
         /// </summary>
-        protected override async Task<byte[]> EncryptCoreAsync(
+        protected override Task<byte[]> EncryptCoreAsync(
             byte[] plaintext,
             byte[] key,
             byte[]? associatedData,
             CancellationToken cancellationToken)
         {
-            return await Task.Run(() =>
-            {
-                // TODO: Replace with actual Falcon implementation when available
-                // For now, return data with a placeholder signature
-                using var ms = new System.IO.MemoryStream();
-                using var writer = new System.IO.BinaryWriter(ms);
-
-                var stubSignature = new byte[1330];
-                RandomNumberGenerator.Fill(stubSignature);
-
-                writer.Write(stubSignature.Length);
-                writer.Write(stubSignature);
-                writer.Write(plaintext);
-
-                return ms.ToArray();
-            }, cancellationToken);
+            throw new NotSupportedException(UnavailableMessage);
         }
 
         /// <summary>
-        /// Verifies Falcon signature and returns data (stub implementation).
+        /// Not supported - throws NotSupportedException.
         /// </summary>
-        protected override async Task<byte[]> DecryptCoreAsync(
+        protected override Task<byte[]> DecryptCoreAsync(
             byte[] ciphertext,
             byte[] key,
             byte[]? associatedData,
             CancellationToken cancellationToken)
         {
-            return await Task.Run(() =>
-            {
-                using var ms = new System.IO.MemoryStream(ciphertext);
-                using var reader = new System.IO.BinaryReader(ms);
-
-                var signatureLength = reader.ReadInt32();
-                var signature = reader.ReadBytes(signatureLength);
-                var data = reader.ReadBytes((int)(ms.Length - ms.Position));
-
-                // TODO: Replace with actual Falcon verification when available
-                // For now, just return the data (no verification)
-                return data;
-            }, cancellationToken);
+            throw new NotSupportedException(UnavailableMessage);
         }
 
         /// <summary>
-        /// Generates a Falcon key pair (stub implementation).
+        /// Not supported - throws NotSupportedException.
         /// </summary>
         public override byte[] GenerateKey()
         {
-            // TODO: Replace with actual Falcon key generation when available
-            var stubKey = new byte[2305];
-            RandomNumberGenerator.Fill(stubKey);
-            return stubKey;
+            throw new NotSupportedException(UnavailableMessage);
         }
     }
 }

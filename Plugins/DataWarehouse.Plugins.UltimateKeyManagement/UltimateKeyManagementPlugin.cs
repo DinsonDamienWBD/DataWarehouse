@@ -18,7 +18,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement
     /// Ultimate Key Management plugin with Intelligence integration for key rotation prediction
     /// and security recommendations.
     /// </summary>
-    public class UltimateKeyManagementPlugin : FeaturePluginBase, IKeyStoreRegistry, IIntelligenceAware, IDisposable
+    public class UltimateKeyManagementPlugin : IntelligenceAwareKeyManagementPluginBase, IKeyStoreRegistry, IDisposable
     {
         private readonly ConcurrentDictionary<string, IKeyStore> _keyStores = new();
         private readonly ConcurrentDictionary<string, IEnvelopeKeyStore> _envelopeKeyStores = new();
@@ -29,21 +29,13 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement
         private bool _initialized;
         private bool _disposed;
 
-        // Intelligence integration
-        private volatile bool _isIntelligenceAvailable;
-        private IntelligenceCapabilities _availableCapabilities = IntelligenceCapabilities.None;
-        private readonly List<IDisposable> _intelligenceSubscriptions = new();
-
         public override string Id => "com.datawarehouse.keymanagement.ultimate";
         public override string Name => "Ultimate Key Management";
         public override string Version => "1.0.0";
         public override PluginCategory Category => PluginCategory.FeatureProvider;
 
         /// <inheritdoc/>
-        public bool IsIntelligenceAvailable => _isIntelligenceAvailable;
-
-        /// <inheritdoc/>
-        public IntelligenceCapabilities AvailableCapabilities => _availableCapabilities;
+        public override string KeyStoreType => "ultimate-multi-strategy";
 
         protected override IReadOnlyList<RegisteredCapability> DeclaredCapabilities
         {
@@ -96,7 +88,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement
             }
         }
 
-        public override async Task StartAsync(CancellationToken ct)
+        protected override async Task OnStartCoreAsync(CancellationToken ct)
         {
             if (_initialized)
                 return;
@@ -121,75 +113,28 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement
                 _rotationScheduler.Start();
             }
 
-            // Discover Intelligence and register capabilities
-            await DiscoverIntelligenceAsync(ct);
-            await RegisterKeyManagementCapabilitiesAsync(ct);
-
             _initialized = true;
 
             await PublishEventAsync("keymanagement.started", new Dictionary<string, object>
             {
                 ["strategiesRegistered"] = _strategies.Count,
                 ["rotationEnabled"] = _config.EnableKeyRotation,
-                ["intelligenceAvailable"] = _isIntelligenceAvailable
+                ["intelligenceAvailable"] = IsIntelligenceAvailable
             });
         }
 
-        /// <inheritdoc/>
-        public async Task<bool> DiscoverIntelligenceAsync(CancellationToken ct = default)
+        protected override async Task OnStartWithIntelligenceAsync(CancellationToken ct)
         {
-            if (_messageBus == null)
-            {
-                _isIntelligenceAvailable = false;
-                return false;
-            }
-
-            try
-            {
-                // Subscribe to Intelligence broadcasts
-                var availableSub = _messageBus.Subscribe(IntelligenceTopics.Available, msg =>
-                {
-                    _isIntelligenceAvailable = true;
-                    if (msg.Payload.TryGetValue("capabilities", out var capObj) && capObj is long caps)
-                    {
-                        _availableCapabilities = (IntelligenceCapabilities)caps;
-                    }
-                    return Task.CompletedTask;
-                });
-                _intelligenceSubscriptions.Add(availableSub);
-
-                var unavailableSub = _messageBus.Subscribe(IntelligenceTopics.Unavailable, _ =>
-                {
-                    _isIntelligenceAvailable = false;
-                    _availableCapabilities = IntelligenceCapabilities.None;
-                    return Task.CompletedTask;
-                });
-                _intelligenceSubscriptions.Add(unavailableSub);
-
-                // Send discovery request
-                var correlationId = Guid.NewGuid().ToString("N");
-                await _messageBus.PublishAsync(IntelligenceTopics.Discover, new PluginMessage
-                {
-                    Type = "intelligence.discover.request",
-                    CorrelationId = correlationId,
-                    Source = Id,
-                    Payload = new Dictionary<string, object>
-                    {
-                        ["requestorId"] = Id,
-                        ["requestorName"] = Name
-                    }
-                }, ct);
-
-                // Wait briefly for response
-                await Task.Delay(500, ct);
-                return _isIntelligenceAvailable;
-            }
-            catch
-            {
-                _isIntelligenceAvailable = false;
-                return false;
-            }
+            // Register key management capabilities with Intelligence
+            await RegisterKeyManagementCapabilitiesAsync(ct);
         }
+
+        protected override Task OnStartWithoutIntelligenceAsync(CancellationToken ct)
+        {
+            // Key management works without Intelligence, but with reduced capabilities
+            return Task.CompletedTask;
+        }
+
 
         /// <summary>
         /// Registers key management capabilities with Intelligence.
@@ -305,7 +250,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement
                 0.88);
         }
 
-        public override async Task StopAsync()
+        protected override async Task OnStopCoreAsync()
         {
             if (!_initialized)
                 return;

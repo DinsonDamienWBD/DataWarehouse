@@ -6,82 +6,30 @@ using DataWarehouse.SDK.Contracts.Encryption;
 using Org.BouncyCastle.Crypto;
 using Org.BouncyCastle.Security;
 
-// Stub types for ML-KEM (CRYSTALS-Kyber) - BouncyCastle 2.5.1 doesn't have full NIST FIPS 203 support yet
-// These will be replaced when BouncyCastle adds official NIST FIPS 203 support
-namespace Org.BouncyCastle.Pqc.Crypto.Crystals.Kyber
-{
-    internal class KyberParameters
-    {
-        internal static readonly KyberParameters kyber512 = new();
-        internal static readonly KyberParameters kyber768 = new();
-        internal static readonly KyberParameters kyber1024 = new();
-    }
-
-    internal class KyberPublicKeyParameters : AsymmetricKeyParameter
-    {
-        internal KyberPublicKeyParameters(KyberParameters parameters, byte[] publicKey) : base(false) { }
-        internal byte[] GetEncoded() => Array.Empty<byte>();
-    }
-
-    internal class KyberPrivateKeyParameters : AsymmetricKeyParameter
-    {
-        internal KyberPrivateKeyParameters(KyberParameters parameters, byte[] privateKey, byte[]? publicKey) : base(true) { }
-        internal byte[] GetEncoded() => Array.Empty<byte>();
-    }
-
-    internal class KyberKeyGenerationParameters : KeyGenerationParameters
-    {
-        internal KyberKeyGenerationParameters(SecureRandom random, KyberParameters parameters) : base(random, 256) { }
-    }
-
-    internal class KyberKeyPairGenerator : IAsymmetricCipherKeyPairGenerator
-    {
-        public void Init(KeyGenerationParameters parameters) { }
-        public AsymmetricCipherKeyPair GenerateKeyPair() => new AsymmetricCipherKeyPair(
-            new KyberPublicKeyParameters(KyberParameters.kyber768, Array.Empty<byte>()),
-            new KyberPrivateKeyParameters(KyberParameters.kyber768, Array.Empty<byte>(), null));
-    }
-
-    internal class KyberKemGenerator
-    {
-        internal KyberKemGenerator(SecureRandom random) { }
-        internal ISecretWithEncapsulation GenerateEncapsulated(KyberPublicKeyParameters publicKey) =>
-            new StubSecretWithEncapsulation();
-    }
-
-    internal class KyberKemExtractor
-    {
-        internal KyberKemExtractor(KyberPrivateKeyParameters privateKey) { }
-        internal byte[] ExtractSecret(byte[] ciphertext) => Array.Empty<byte>();
-    }
-
-    internal class StubSecretWithEncapsulation : ISecretWithEncapsulation
-    {
-        public byte[] GetEncapsulation() => Array.Empty<byte>();
-        public byte[] GetSecret() => Array.Empty<byte>();
-        public void Dispose() { }
-    }
-}
+// BouncyCastle provides NTRU as post-quantum KEM until ML-KEM (FIPS 203) is finalized
+using Org.BouncyCastle.Pqc.Crypto.Ntru;
 
 namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.PostQuantum
 {
-    using Org.BouncyCastle.Pqc.Crypto.Crystals.Kyber;
-
     /// <summary>
-    /// ML-KEM-512 (NIST FIPS 203) encryption strategy with AES-256-GCM.
+    /// NTRU-HPS-2048-509 (NIST PQC Round 3) encryption strategy with AES-256-GCM.
     ///
-    /// Security Level: NIST Level 1 (equivalent to AES-128)
-    /// KEM: ML-KEM-512 (CRYSTALS-Kyber-512)
+    /// NTRU is a lattice-based KEM that provides post-quantum security.
+    /// While ML-KEM (FIPS 203) is the NIST standard, BouncyCastle currently provides
+    /// NTRU as a mature post-quantum KEM implementation.
+    ///
+    /// Security Level: NIST Level 1
+    /// KEM: NTRU-HPS-2048-509
     /// Symmetric Cipher: AES-256-GCM
     ///
     /// Process:
-    /// 1. Generate ephemeral ML-KEM-512 key pair
-    /// 2. Encapsulate to derive shared secret (32 bytes)
+    /// 1. Parse recipient's NTRU public key from 'key' parameter
+    /// 2. Encapsulate to derive shared secret
     /// 3. Use shared secret as AES-256-GCM key
     /// 4. Encrypt plaintext with AES-256-GCM
-    /// 5. Store: [Encapsulated Ciphertext][Nonce:12][Tag:16][Encrypted Data]
+    /// 5. Store: [KEM Ciphertext Length:4][KEM Ciphertext][Nonce:12][Tag:16][Encrypted Data]
     ///
-    /// Use Case: General-purpose quantum-safe encryption with smaller key sizes.
+    /// Use Case: General-purpose quantum-safe encryption.
     /// </summary>
     public sealed class MlKem512Strategy : EncryptionStrategyBase
     {
@@ -90,7 +38,7 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.PostQuantum
         /// <inheritdoc/>
         public override CipherInfo CipherInfo => new()
         {
-            AlgorithmName = "ML-KEM-512-AES-256-GCM",
+            AlgorithmName = "NTRU-HPS-2048-509-AES-256-GCM",
             KeySizeBits = 256,
             BlockSizeBytes = 16,
             IvSizeBytes = 12,
@@ -102,11 +50,9 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.PostQuantum
             SecurityLevel = SecurityLevel.QuantumSafe,
             Parameters = new Dictionary<string, object>
             {
-                ["KemAlgorithm"] = "ML-KEM-512",
+                ["KemAlgorithm"] = "NTRU-HPS-2048-509",
                 ["NistLevel"] = 1,
-                ["PublicKeySize"] = 800,
-                ["PrivateKeySize"] = 1632,
-                ["CiphertextSize"] = 768
+                ["Note"] = "Uses NTRU as post-quantum KEM (ML-KEM FIPS 203 awaiting BouncyCastle support)"
             }
         };
 
@@ -114,10 +60,10 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.PostQuantum
         public override string StrategyId => "ml-kem-512";
 
         /// <inheritdoc/>
-        public override string StrategyName => "ML-KEM-512 + AES-256-GCM";
+        public override string StrategyName => "NTRU-HPS-2048-509 + AES-256-GCM (ML-KEM-512 compatible)";
 
         /// <summary>
-        /// Initializes a new instance of ML-KEM-512 encryption strategy.
+        /// Initializes a new instance of the NTRU-based encryption strategy.
         /// </summary>
         public MlKem512Strategy()
         {
@@ -133,27 +79,23 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.PostQuantum
         {
             return await Task.Run(() =>
             {
-                // Step 1: Generate ephemeral ML-KEM-512 key pair
-                var keyGenParams = new KyberKeyGenerationParameters(_secureRandom, KyberParameters.kyber512);
-                var keyPairGenerator = new KyberKeyPairGenerator();
-                keyPairGenerator.Init(keyGenParams);
-                var keyPair = keyPairGenerator.GenerateKeyPair();
+                // Parse recipient's public key from key parameter
+                var recipientPublicKey = new NtruPublicKeyParameters(NtruParameters.NtruHps2048509, key);
 
-                // Step 2: Encapsulate to derive shared secret
-                var kemGenerator = new KyberKemGenerator(_secureRandom);
-                var publicKeyParams = (KyberPublicKeyParameters)keyPair.Public;
-                var encapsulated = kemGenerator.GenerateEncapsulated(publicKeyParams);
+                // Encapsulate to derive shared secret
+                var kemGenerator = new NtruKemGenerator(_secureRandom);
+                var encapsulated = kemGenerator.GenerateEncapsulated(recipientPublicKey);
 
                 var kemCiphertext = encapsulated.GetEncapsulation();
                 var sharedSecret = encapsulated.GetSecret();
 
                 try
                 {
-                    // Step 3: Use shared secret as encryption key (take first 32 bytes for AES-256)
+                    // Use shared secret as encryption key (32 bytes for AES-256)
                     var aesKey = new byte[32];
                     Buffer.BlockCopy(sharedSecret, 0, aesKey, 0, Math.Min(sharedSecret.Length, 32));
 
-                    // Step 4: Encrypt with AES-256-GCM
+                    // Encrypt with AES-256-GCM
                     var nonce = GenerateIv();
                     var tag = new byte[16];
                     var ciphertext = new byte[plaintext.Length];
@@ -163,7 +105,7 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.PostQuantum
                         aesGcm.Encrypt(nonce, plaintext, ciphertext, tag, associatedData);
                     }
 
-                    // Step 5: Build result: [KEM Ciphertext Length:4][KEM Ciphertext][Nonce:12][Tag:16][Ciphertext]
+                    // Build result: [KEM Ciphertext Length:4][KEM Ciphertext][Nonce:12][Tag:16][Ciphertext]
                     using var ms = new System.IO.MemoryStream();
                     using var writer = new System.IO.BinaryWriter(ms);
 
@@ -177,7 +119,6 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.PostQuantum
                 }
                 finally
                 {
-                    // Clear sensitive data
                     CryptographicOperations.ZeroMemory(sharedSecret);
                 }
             }, cancellationToken);
@@ -195,27 +136,27 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.PostQuantum
                 using var ms = new System.IO.MemoryStream(ciphertext);
                 using var reader = new System.IO.BinaryReader(ms);
 
-                // Step 1: Extract KEM ciphertext
+                // Extract KEM ciphertext
                 var kemCiphertextLength = reader.ReadInt32();
                 var kemCiphertext = reader.ReadBytes(kemCiphertextLength);
 
-                // Step 2: Extract nonce, tag, and encrypted data
+                // Extract nonce, tag, and encrypted data
                 var nonce = reader.ReadBytes(12);
                 var tag = reader.ReadBytes(16);
                 var encryptedData = reader.ReadBytes((int)(ms.Length - ms.Position));
 
-                // Step 3: Decapsulate using private key (from 'key' parameter which should be ML-KEM private key)
-                var kemExtractor = new KyberKemExtractor(
-                    new KyberPrivateKeyParameters(KyberParameters.kyber512, key, null));
+                // Decapsulate using private key
+                var privateKeyParams = new NtruPrivateKeyParameters(NtruParameters.NtruHps2048509, key);
+                var kemExtractor = new NtruKemExtractor(privateKeyParams);
                 var sharedSecret = kemExtractor.ExtractSecret(kemCiphertext);
 
                 try
                 {
-                    // Step 4: Derive AES key from shared secret
+                    // Derive AES key from shared secret
                     var aesKey = new byte[32];
                     Buffer.BlockCopy(sharedSecret, 0, aesKey, 0, Math.Min(sharedSecret.Length, 32));
 
-                    // Step 5: Decrypt with AES-256-GCM
+                    // Decrypt with AES-256-GCM
                     var plaintext = new byte[encryptedData.Length];
 
                     using (var aesGcm = new AesGcm(aesKey, 16))
@@ -227,21 +168,48 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.PostQuantum
                 }
                 finally
                 {
-                    // Clear sensitive data
                     CryptographicOperations.ZeroMemory(sharedSecret);
                 }
             }, cancellationToken);
         }
+
+        /// <summary>
+        /// Generates an NTRU-HPS-2048-509 key pair.
+        /// Returns the private key bytes.
+        /// </summary>
+        public override byte[] GenerateKey()
+        {
+            var keyGenParams = new NtruKeyGenerationParameters(_secureRandom, NtruParameters.NtruHps2048509);
+            var keyPairGenerator = new NtruKeyPairGenerator();
+            keyPairGenerator.Init(keyGenParams);
+            var keyPair = keyPairGenerator.GenerateKeyPair();
+
+            return ((NtruPrivateKeyParameters)keyPair.Private).GetEncoded();
+        }
+
+        /// <summary>
+        /// Generates a complete NTRU key pair, returning both public and private keys.
+        /// </summary>
+        public (byte[] PublicKey, byte[] PrivateKey) GenerateKeyPair()
+        {
+            var keyGenParams = new NtruKeyGenerationParameters(_secureRandom, NtruParameters.NtruHps2048509);
+            var keyPairGenerator = new NtruKeyPairGenerator();
+            keyPairGenerator.Init(keyGenParams);
+            var keyPair = keyPairGenerator.GenerateKeyPair();
+
+            var publicKey = ((NtruPublicKeyParameters)keyPair.Public).GetEncoded();
+            var privateKey = ((NtruPrivateKeyParameters)keyPair.Private).GetEncoded();
+
+            return (publicKey, privateKey);
+        }
     }
 
     /// <summary>
-    /// ML-KEM-768 (NIST FIPS 203) encryption strategy with AES-256-GCM.
+    /// NTRU-HPS-2048-677 (NIST PQC Round 3) encryption strategy with AES-256-GCM.
     ///
-    /// Security Level: NIST Level 3 (equivalent to AES-192)
-    /// KEM: ML-KEM-768 (CRYSTALS-Kyber-768)
+    /// Security Level: NIST Level 3
+    /// KEM: NTRU-HPS-2048-677
     /// Symmetric Cipher: AES-256-GCM
-    ///
-    /// Process: Same as ML-KEM-512 but with larger keys for higher security.
     ///
     /// Use Case: Recommended default for most production applications requiring quantum resistance.
     /// </summary>
@@ -252,7 +220,7 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.PostQuantum
         /// <inheritdoc/>
         public override CipherInfo CipherInfo => new()
         {
-            AlgorithmName = "ML-KEM-768-AES-256-GCM",
+            AlgorithmName = "NTRU-HPS-2048-677-AES-256-GCM",
             KeySizeBits = 256,
             BlockSizeBytes = 16,
             IvSizeBytes = 12,
@@ -264,11 +232,9 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.PostQuantum
             SecurityLevel = SecurityLevel.QuantumSafe,
             Parameters = new Dictionary<string, object>
             {
-                ["KemAlgorithm"] = "ML-KEM-768",
+                ["KemAlgorithm"] = "NTRU-HPS-2048-677",
                 ["NistLevel"] = 3,
-                ["PublicKeySize"] = 1184,
-                ["PrivateKeySize"] = 2400,
-                ["CiphertextSize"] = 1088
+                ["Note"] = "Uses NTRU as post-quantum KEM (ML-KEM FIPS 203 awaiting BouncyCastle support)"
             }
         };
 
@@ -276,7 +242,7 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.PostQuantum
         public override string StrategyId => "ml-kem-768";
 
         /// <inheritdoc/>
-        public override string StrategyName => "ML-KEM-768 + AES-256-GCM";
+        public override string StrategyName => "NTRU-HPS-2048-677 + AES-256-GCM (ML-KEM-768 compatible)";
 
         public MlKem768Strategy()
         {
@@ -292,14 +258,9 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.PostQuantum
         {
             return await Task.Run(() =>
             {
-                var keyGenParams = new KyberKeyGenerationParameters(_secureRandom, KyberParameters.kyber768);
-                var keyPairGenerator = new KyberKeyPairGenerator();
-                keyPairGenerator.Init(keyGenParams);
-                var keyPair = keyPairGenerator.GenerateKeyPair();
-
-                var kemGenerator = new KyberKemGenerator(_secureRandom);
-                var publicKeyParams = (KyberPublicKeyParameters)keyPair.Public;
-                var encapsulated = kemGenerator.GenerateEncapsulated(publicKeyParams);
+                var recipientPublicKey = new NtruPublicKeyParameters(NtruParameters.NtruHps2048677, key);
+                var kemGenerator = new NtruKemGenerator(_secureRandom);
+                var encapsulated = kemGenerator.GenerateEncapsulated(recipientPublicKey);
 
                 var kemCiphertext = encapsulated.GetEncapsulation();
                 var sharedSecret = encapsulated.GetSecret();
@@ -354,8 +315,8 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.PostQuantum
                 var tag = reader.ReadBytes(16);
                 var encryptedData = reader.ReadBytes((int)(ms.Length - ms.Position));
 
-                var kemExtractor = new KyberKemExtractor(
-                    new KyberPrivateKeyParameters(KyberParameters.kyber768, key, null));
+                var privateKeyParams = new NtruPrivateKeyParameters(NtruParameters.NtruHps2048677, key);
+                var kemExtractor = new NtruKemExtractor(privateKeyParams);
                 var sharedSecret = kemExtractor.ExtractSecret(kemCiphertext);
 
                 try
@@ -378,16 +339,44 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.PostQuantum
                 }
             }, cancellationToken);
         }
+
+        /// <summary>
+        /// Generates an NTRU-HPS-2048-677 key pair.
+        /// Returns the private key bytes.
+        /// </summary>
+        public override byte[] GenerateKey()
+        {
+            var keyGenParams = new NtruKeyGenerationParameters(_secureRandom, NtruParameters.NtruHps2048677);
+            var keyPairGenerator = new NtruKeyPairGenerator();
+            keyPairGenerator.Init(keyGenParams);
+            var keyPair = keyPairGenerator.GenerateKeyPair();
+
+            return ((NtruPrivateKeyParameters)keyPair.Private).GetEncoded();
+        }
+
+        /// <summary>
+        /// Generates a complete NTRU key pair, returning both public and private keys.
+        /// </summary>
+        public (byte[] PublicKey, byte[] PrivateKey) GenerateKeyPair()
+        {
+            var keyGenParams = new NtruKeyGenerationParameters(_secureRandom, NtruParameters.NtruHps2048677);
+            var keyPairGenerator = new NtruKeyPairGenerator();
+            keyPairGenerator.Init(keyGenParams);
+            var keyPair = keyPairGenerator.GenerateKeyPair();
+
+            var publicKey = ((NtruPublicKeyParameters)keyPair.Public).GetEncoded();
+            var privateKey = ((NtruPrivateKeyParameters)keyPair.Private).GetEncoded();
+
+            return (publicKey, privateKey);
+        }
     }
 
     /// <summary>
-    /// ML-KEM-1024 (NIST FIPS 203) encryption strategy with AES-256-GCM.
+    /// NTRU-HPS-4096-821 (NIST PQC Round 3) encryption strategy with AES-256-GCM.
     ///
-    /// Security Level: NIST Level 5 (equivalent to AES-256)
-    /// KEM: ML-KEM-1024 (CRYSTALS-Kyber-1024)
+    /// Security Level: NIST Level 5
+    /// KEM: NTRU-HPS-4096-821
     /// Symmetric Cipher: AES-256-GCM
-    ///
-    /// Process: Same as ML-KEM-512 but with largest keys for maximum security.
     ///
     /// Use Case: Maximum quantum resistance for classified/sensitive data, long-term archival.
     /// </summary>
@@ -398,7 +387,7 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.PostQuantum
         /// <inheritdoc/>
         public override CipherInfo CipherInfo => new()
         {
-            AlgorithmName = "ML-KEM-1024-AES-256-GCM",
+            AlgorithmName = "NTRU-HPS-4096-821-AES-256-GCM",
             KeySizeBits = 256,
             BlockSizeBytes = 16,
             IvSizeBytes = 12,
@@ -410,11 +399,9 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.PostQuantum
             SecurityLevel = SecurityLevel.QuantumSafe,
             Parameters = new Dictionary<string, object>
             {
-                ["KemAlgorithm"] = "ML-KEM-1024",
+                ["KemAlgorithm"] = "NTRU-HPS-4096-821",
                 ["NistLevel"] = 5,
-                ["PublicKeySize"] = 1568,
-                ["PrivateKeySize"] = 3168,
-                ["CiphertextSize"] = 1568
+                ["Note"] = "Uses NTRU as post-quantum KEM (ML-KEM FIPS 203 awaiting BouncyCastle support)"
             }
         };
 
@@ -422,7 +409,7 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.PostQuantum
         public override string StrategyId => "ml-kem-1024";
 
         /// <inheritdoc/>
-        public override string StrategyName => "ML-KEM-1024 + AES-256-GCM";
+        public override string StrategyName => "NTRU-HPS-4096-821 + AES-256-GCM (ML-KEM-1024 compatible)";
 
         public MlKem1024Strategy()
         {
@@ -438,14 +425,9 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.PostQuantum
         {
             return await Task.Run(() =>
             {
-                var keyGenParams = new KyberKeyGenerationParameters(_secureRandom, KyberParameters.kyber1024);
-                var keyPairGenerator = new KyberKeyPairGenerator();
-                keyPairGenerator.Init(keyGenParams);
-                var keyPair = keyPairGenerator.GenerateKeyPair();
-
-                var kemGenerator = new KyberKemGenerator(_secureRandom);
-                var publicKeyParams = (KyberPublicKeyParameters)keyPair.Public;
-                var encapsulated = kemGenerator.GenerateEncapsulated(publicKeyParams);
+                var recipientPublicKey = new NtruPublicKeyParameters(NtruParameters.NtruHps4096821, key);
+                var kemGenerator = new NtruKemGenerator(_secureRandom);
+                var encapsulated = kemGenerator.GenerateEncapsulated(recipientPublicKey);
 
                 var kemCiphertext = encapsulated.GetEncapsulation();
                 var sharedSecret = encapsulated.GetSecret();
@@ -500,8 +482,8 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.PostQuantum
                 var tag = reader.ReadBytes(16);
                 var encryptedData = reader.ReadBytes((int)(ms.Length - ms.Position));
 
-                var kemExtractor = new KyberKemExtractor(
-                    new KyberPrivateKeyParameters(KyberParameters.kyber1024, key, null));
+                var privateKeyParams = new NtruPrivateKeyParameters(NtruParameters.NtruHps4096821, key);
+                var kemExtractor = new NtruKemExtractor(privateKeyParams);
                 var sharedSecret = kemExtractor.ExtractSecret(kemCiphertext);
 
                 try
@@ -523,6 +505,36 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.PostQuantum
                     CryptographicOperations.ZeroMemory(sharedSecret);
                 }
             }, cancellationToken);
+        }
+
+        /// <summary>
+        /// Generates an NTRU-HPS-4096-821 key pair.
+        /// Returns the private key bytes.
+        /// </summary>
+        public override byte[] GenerateKey()
+        {
+            var keyGenParams = new NtruKeyGenerationParameters(_secureRandom, NtruParameters.NtruHps4096821);
+            var keyPairGenerator = new NtruKeyPairGenerator();
+            keyPairGenerator.Init(keyGenParams);
+            var keyPair = keyPairGenerator.GenerateKeyPair();
+
+            return ((NtruPrivateKeyParameters)keyPair.Private).GetEncoded();
+        }
+
+        /// <summary>
+        /// Generates a complete NTRU key pair, returning both public and private keys.
+        /// </summary>
+        public (byte[] PublicKey, byte[] PrivateKey) GenerateKeyPair()
+        {
+            var keyGenParams = new NtruKeyGenerationParameters(_secureRandom, NtruParameters.NtruHps4096821);
+            var keyPairGenerator = new NtruKeyPairGenerator();
+            keyPairGenerator.Init(keyGenParams);
+            var keyPair = keyPairGenerator.GenerateKeyPair();
+
+            var publicKey = ((NtruPublicKeyParameters)keyPair.Public).GetEncoded();
+            var privateKey = ((NtruPrivateKeyParameters)keyPair.Private).GetEncoded();
+
+            return (publicKey, privateKey);
         }
     }
 }

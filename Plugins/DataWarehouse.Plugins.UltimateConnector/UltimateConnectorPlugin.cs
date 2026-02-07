@@ -3,6 +3,7 @@ using System.Reflection;
 using DataWarehouse.SDK.AI;
 using DataWarehouse.SDK.Connectors;
 using DataWarehouse.SDK.Contracts;
+using DataWarehouse.SDK.Contracts.IntelligenceAware;
 using DataWarehouse.SDK.Primitives;
 using DataWarehouse.SDK.Utilities;
 
@@ -37,8 +38,9 @@ namespace DataWarehouse.Plugins.UltimateConnector;
 /// - Connection health monitoring
 /// - Connection metrics and statistics
 /// - Semantic descriptions for AI discovery
+/// - Intelligence-aware connection optimization
 /// </summary>
-public sealed class UltimateConnectorPlugin : FeaturePluginBase
+public sealed class UltimateConnectorPlugin : IntelligenceAwareConnectorPluginBase
 {
     private readonly ConnectionStrategyRegistry _registry;
     private readonly ConcurrentDictionary<string, long> _usageStats = new();
@@ -55,6 +57,9 @@ public sealed class UltimateConnectorPlugin : FeaturePluginBase
 
     /// <inheritdoc/>
     public override PluginCategory Category => PluginCategory.FeatureProvider;
+
+    /// <inheritdoc/>
+    public override string Protocol => "universal-multi-protocol";
 
     /// <summary>
     /// Semantic description of this plugin for AI discovery.
@@ -144,7 +149,7 @@ public sealed class UltimateConnectorPlugin : FeaturePluginBase
     }
 
     /// <inheritdoc/>
-    public override async Task StartAsync(CancellationToken ct)
+    protected override async Task OnStartCoreAsync(CancellationToken ct)
     {
         if (_initialized) return;
 
@@ -162,7 +167,21 @@ public sealed class UltimateConnectorPlugin : FeaturePluginBase
     }
 
     /// <inheritdoc/>
-    public override Task StopAsync()
+    protected override async Task OnStartWithIntelligenceAsync(CancellationToken ct)
+    {
+        // Register connector capabilities with Intelligence for enhanced connection optimization
+        await RegisterConnectorCapabilitiesAsync(ct);
+    }
+
+    /// <inheritdoc/>
+    protected override Task OnStartWithoutIntelligenceAsync(CancellationToken ct)
+    {
+        // Connector works without Intelligence, but with reduced optimization capabilities
+        return Task.CompletedTask;
+    }
+
+    /// <inheritdoc/>
+    protected override Task OnStopCoreAsync()
     {
         _usageStats.Clear();
         _initialized = false;
@@ -371,6 +390,42 @@ public sealed class UltimateConnectorPlugin : FeaturePluginBase
     #endregion
 
     #region Internal Helpers
+
+    /// <summary>
+    /// Registers connector capabilities with Intelligence for enhanced optimization.
+    /// </summary>
+    private async Task RegisterConnectorCapabilitiesAsync(CancellationToken ct)
+    {
+        if (MessageBus == null) return;
+
+        var strategies = _registry.GetAll();
+        var categoryCounts = strategies
+            .GroupBy(s => s.Category)
+            .ToDictionary(g => g.Key.ToString(), g => g.Count());
+
+        await MessageBus.PublishAsync(IntelligenceTopics.QueryCapability, new PluginMessage
+        {
+            Type = "capability.register",
+            Source = Id,
+            Payload = new Dictionary<string, object>
+            {
+                ["pluginId"] = Id,
+                ["pluginName"] = Name,
+                ["pluginType"] = "connector",
+                ["capabilities"] = new Dictionary<string, object>
+                {
+                    ["strategyCount"] = strategies.Count,
+                    ["categories"] = categoryCounts,
+                    ["supportsConnectionOptimization"] = true,
+                    ["supportsSchemaDiscovery"] = true,
+                    ["supportsQueryOptimization"] = true,
+                    ["supportsAnomalyDetection"] = true
+                },
+                ["semanticDescription"] = SemanticDescription,
+                ["tags"] = SemanticTags
+            }
+        }, ct);
+    }
 
     private async Task PublishStrategyRegisteredAsync(IConnectionStrategy strategy)
     {

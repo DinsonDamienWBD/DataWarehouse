@@ -1299,3 +1299,183 @@ _ = Task.Run(async () =>
 - All abstract methods from IPipelineMigrationEngine implemented
 - Thread-safe counter updates verified
 
+
+## Task 127 Phase D: UltimateDataManagement Plugin Implementation
+
+**Date:** 2026-02-07
+
+**File Created:** Plugins/DataWarehouse.Plugins.UltimateDataManagement/UltimateDataManagementPlugin.cs (645 lines)
+
+**Summary:**
+- Created comprehensive data management orchestration plugin extending IntelligenceAwarePluginBase
+- Auto-discovers and registers 74 data management strategies across 9 categories via reflection
+- Provides unified API for data lifecycle management operations
+- Intelligence-aware for AI-enhanced data management recommendations
+
+**Strategy Breakdown:**
+- AiEnhanced: 8 strategies
+- Caching: 8 strategies
+- Deduplication: 10 strategies
+- Indexing: 7 strategies
+- Lifecycle: 6 strategies
+- Retention: 8 strategies
+- Sharding: 10 strategies
+- Tiering: 10 strategies
+- Versioning: 7 strategies
+Total: 74 strategies
+
+**Build Result:**
+- Compiled successfully with 0 errors
+- DLL size: 1.4MB
+- Time: 00:00:09.06
+
+
+## Task 127 Phase D (D3, D7): Plugin Intelligence-Aware Migration
+
+**Date:** 2026-02-07
+
+**Files Modified:**
+- Plugins/DataWarehouse.Plugins.UltimateKeyManagement/UltimateKeyManagementPlugin.cs
+- Plugins/DataWarehouse.Plugins.UltimateConnector/UltimateConnectorPlugin.cs
+
+**Summary:**
+- Migrated UltimateKeyManagement plugin from manual IIntelligenceAware implementation to IntelligenceAwareKeyManagementPluginBase
+- Migrated UltimateConnector plugin from FeaturePluginBase to IntelligenceAwareConnectorPluginBase
+- Removed duplicated Intelligence discovery and subscription code
+- Implemented proper lifecycle hooks for Intelligence-aware initialization
+
+**UltimateKeyManagement Changes (T127.D3):**
+
+1. **Class Declaration**
+   - Changed from: `FeaturePluginBase, IKeyStoreRegistry, IIntelligenceAware, IDisposable`
+   - Changed to: `IntelligenceAwareKeyManagementPluginBase, IKeyStoreRegistry, IDisposable`
+
+2. **Removed Manual Intelligence Fields**
+   - Removed `_isIntelligenceAvailable` (use base class property)
+   - Removed `_availableCapabilities` (use base class property)
+   - Removed `_intelligenceSubscriptions` (base class handles subscriptions)
+   - Removed manual `IIntelligenceAware` properties (base class provides)
+
+3. **Added Required Override**
+   - Added `public override string KeyStoreType => "ultimate-multi-strategy"`
+   - Required by IntelligenceAwareKeyManagementPluginBase for key management classification
+
+4. **Replaced StartAsync with Lifecycle Hooks**
+   - `OnStartCoreAsync`: Common initialization (strategy discovery, rotation scheduler)
+   - `OnStartWithIntelligenceAsync`: Intelligence-available initialization (register capabilities)
+   - `OnStartWithoutIntelligenceAsync`: Fallback mode (no action needed)
+   - Base class calls appropriate hooks after Intelligence discovery
+
+5. **Replaced StopAsync with OnStopCoreAsync**
+   - Moved cleanup logic to `OnStopCoreAsync`
+   - Base class handles Intelligence subscription cleanup
+
+6. **Removed Manual Discovery Method**
+   - Deleted entire `DiscoverIntelligenceAsync` method (138 lines removed)
+   - Base class provides automatic discovery with caching and subscription management
+
+**UltimateConnector Changes (T127.D7):**
+
+1. **Class Declaration**
+   - Changed from: `FeaturePluginBase`
+   - Changed to: `IntelligenceAwareConnectorPluginBase`
+
+2. **Added Required Override**
+   - Added `public override string Protocol => "universal-multi-protocol"`
+   - Required by IntelligenceAwareConnectorPluginBase for connector classification
+
+3. **Added Using Statement**
+   - Added `using DataWarehouse.SDK.Contracts.IntelligenceAware`
+   - Provides access to IntelligenceTopics for capability registration
+
+4. **Replaced StartAsync with Lifecycle Hooks**
+   - `OnStartCoreAsync`: Strategy auto-discovery and registration events
+   - `OnStartWithIntelligenceAsync`: Register connector capabilities with Intelligence
+   - `OnStartWithoutIntelligenceAsync`: Fallback mode (no action needed)
+
+5. **Replaced StopAsync with OnStopCoreAsync**
+   - Moved cleanup logic to `OnStopCoreAsync`
+   - Clears usage stats and sets initialized flag
+
+6. **Added RegisterConnectorCapabilitiesAsync Method**
+   - Publishes connector capabilities to Intelligence via message bus
+   - Includes strategy count, category breakdown, optimization support flags
+   - Uses IntelligenceTopics.QueryCapability topic
+   - Enables AI-enhanced connection optimization
+
+**Key Benefits:**
+
+1. **Reduced Code Duplication**
+   - UltimateKeyManagement: Removed ~200 lines of manual Intelligence integration
+   - UltimateConnector: Added ~30 lines for Intelligence capabilities
+   - Base classes handle common patterns (discovery, subscriptions, caching)
+
+2. **Consistent Behavior**
+   - All Intelligence-aware plugins now follow same initialization sequence
+   - Automatic capability caching with 60-second TTL
+   - Standard subscription management to Intelligence topics
+
+3. **Cleaner Lifecycle**
+   - Clear separation: OnStartCore (always), OnStartWithIntelligence (when available), OnStartWithoutIntelligence (fallback)
+   - Base class manages Intelligence state transitions
+   - Plugins focus on domain-specific logic
+
+4. **Proper Abstract Implementation**
+   - IntelligenceAwareKeyManagementPluginBase provides KeyStoreType for classification
+   - IntelligenceAwareConnectorPluginBase provides Protocol for routing
+   - Specialized base classes enable domain-specific Intelligence features
+
+**Intelligence Integration Pattern:**
+
+```csharp
+// Base class handles:
+- Discovery via IntelligenceTopics.Discover
+- Subscription to Available/Unavailable/CapabilitiesChanged topics
+- Capability caching with TTL
+- Response correlation and timeout handling
+
+// Derived plugin implements:
+OnStartWithIntelligenceAsync:
+    - Register domain-specific capabilities
+    - Subscribe to domain-specific request topics
+    - Enable AI-enhanced features
+
+OnStartWithoutIntelligenceAsync:
+    - Enable fallback behavior
+    - Log degraded mode
+```
+
+**Capability Registration Examples:**
+
+UltimateKeyManagement:
+```csharp
+capabilities["supportsKeyRotationPrediction"] = true
+capabilities["supportsEnvelopeEncryption"] = true
+capabilities["supportsHsm"] = true
+```
+
+UltimateConnector:
+```csharp
+capabilities["supportsConnectionOptimization"] = true
+capabilities["supportsSchemaDiscovery"] = true
+capabilities["supportsQueryOptimization"] = true
+capabilities["supportsAnomalyDetection"] = true
+```
+
+**Build Verification:**
+- UltimateKeyManagement: 0 errors, 30 warnings (pre-existing)
+- UltimateConnector: 0 errors, 25 warnings (pre-existing)
+- Both plugins build successfully with Intelligence-aware base classes
+
+**Pattern Followed:**
+- Referenced IntelligenceAwareKeyManagementPluginBase documentation and pattern
+- Similar to ZeroKnowledgeEncryptionPlugin -> EncryptionPluginBase refactoring
+- Maintains backward compatibility with existing strategy registration
+- No breaking changes to public API
+
+**Next Steps:**
+- Test Intelligence capability registration with Universal Intelligence plugin
+- Verify key rotation prediction requests are handled correctly
+- Verify connector optimization requests are handled correctly
+- Add integration tests for Intelligence-enhanced features
+

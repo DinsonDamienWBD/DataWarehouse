@@ -7,6 +7,9 @@ using System.Collections.Generic;
 using System.Security.Cryptography;
 using System.Threading;
 using System.Threading.Tasks;
+using Org.BouncyCastle.Crypto.Engines;
+using Org.BouncyCastle.Crypto.Modes;
+using Org.BouncyCastle.Crypto.Parameters;
 
 namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.Transit;
 
@@ -137,8 +140,7 @@ public sealed class SerpentGcmTransitStrategy : TransitEncryptionPluginBase
     }
 
     /// <summary>
-    /// Encrypts data using Serpent-256 in GCM mode.
-    /// Simplified implementation - production code should use BouncyCastle or dedicated library.
+    /// Encrypts data using Serpent-256 in GCM mode using BouncyCastle.
     /// </summary>
     private static void EncryptSerpentGcm(
         byte[] plaintext,
@@ -148,25 +150,28 @@ public sealed class SerpentGcmTransitStrategy : TransitEncryptionPluginBase
         byte[] ciphertext,
         byte[] tag)
     {
-        // This is a placeholder for demonstration purposes
-        // Real implementation would use:
-        // 1. BouncyCastle's SerpentEngine
-        // 2. GCMBlockCipher wrapper
-        // 3. Proper initialization and processing
+        // Use BouncyCastle's SerpentEngine with GCM mode
+        var serpentEngine = new SerpentEngine();
+        var gcmCipher = new GcmBlockCipher(serpentEngine);
 
-        // For now, use AES-GCM as fallback with warning
-        // (Production code MUST implement proper Serpent-GCM)
-        using var aesGcm = new AesGcm(key, TagSize);
-        aesGcm.Encrypt(nonce, plaintext, ciphertext, tag, aad);
+        // Initialize for encryption with 128-bit tag
+        var keyParams = new KeyParameter(key);
+        var gcmParams = new AeadParameters(keyParams, TagSize * 8, nonce, aad);
+        gcmCipher.Init(true, gcmParams);
 
-        // In production, this would be:
-        // var cipher = new SerpentEngine();
-        // var gcm = new GcmBlockCipher(cipher);
-        // ... proper GCM mode encryption
+        // Process all input data
+        var outputBuffer = new byte[gcmCipher.GetOutputSize(plaintext.Length)];
+        var len = gcmCipher.ProcessBytes(plaintext, 0, plaintext.Length, outputBuffer, 0);
+        len += gcmCipher.DoFinal(outputBuffer, len);
+
+        // Extract ciphertext and tag from output
+        // GCM output is: [ciphertext][tag]
+        Buffer.BlockCopy(outputBuffer, 0, ciphertext, 0, plaintext.Length);
+        Buffer.BlockCopy(outputBuffer, plaintext.Length, tag, 0, TagSize);
     }
 
     /// <summary>
-    /// Decrypts data using Serpent-256 in GCM mode.
+    /// Decrypts data using Serpent-256 in GCM mode using BouncyCastle.
     /// </summary>
     private static void DecryptSerpentGcm(
         byte[] ciphertext,
@@ -176,17 +181,28 @@ public sealed class SerpentGcmTransitStrategy : TransitEncryptionPluginBase
         byte[]? aad,
         byte[] plaintext)
     {
-        // This is a placeholder for demonstration purposes
-        // Real implementation would use BouncyCastle's Serpent cipher
+        // Use BouncyCastle's SerpentEngine with GCM mode
+        var serpentEngine = new SerpentEngine();
+        var gcmCipher = new GcmBlockCipher(serpentEngine);
 
-        // For now, use AES-GCM as fallback
-        using var aesGcm = new AesGcm(key, TagSize);
-        aesGcm.Decrypt(nonce, ciphertext, tag, plaintext, aad);
+        // Initialize for decryption with 128-bit tag
+        var keyParams = new KeyParameter(key);
+        var gcmParams = new AeadParameters(keyParams, TagSize * 8, nonce, aad);
+        gcmCipher.Init(false, gcmParams);
 
-        // In production, this would be:
-        // var cipher = new SerpentEngine();
-        // var gcm = new GcmBlockCipher(cipher);
-        // ... proper GCM mode decryption with authentication
+        // Combine ciphertext and tag for decryption
+        // GCM expects: [ciphertext][tag]
+        var inputBuffer = new byte[ciphertext.Length + tag.Length];
+        Buffer.BlockCopy(ciphertext, 0, inputBuffer, 0, ciphertext.Length);
+        Buffer.BlockCopy(tag, 0, inputBuffer, ciphertext.Length, tag.Length);
+
+        // Process and verify
+        var outputBuffer = new byte[gcmCipher.GetOutputSize(inputBuffer.Length)];
+        var len = gcmCipher.ProcessBytes(inputBuffer, 0, inputBuffer.Length, outputBuffer, 0);
+        len += gcmCipher.DoFinal(outputBuffer, len); // This verifies the tag and throws if invalid
+
+        // Copy plaintext
+        Buffer.BlockCopy(outputBuffer, 0, plaintext, 0, plaintext.Length);
     }
 
     /// <inheritdoc/>

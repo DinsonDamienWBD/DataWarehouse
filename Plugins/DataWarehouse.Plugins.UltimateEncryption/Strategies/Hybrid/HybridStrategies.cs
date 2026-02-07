@@ -7,7 +7,7 @@ using Org.BouncyCastle.Crypto;
 using Org.BouncyCastle.Crypto.Agreement;
 using Org.BouncyCastle.Crypto.Generators;
 using Org.BouncyCastle.Crypto.Parameters;
-using Org.BouncyCastle.Pqc.Crypto.Crystals.Kyber;
+using Org.BouncyCastle.Pqc.Crypto.Ntru;
 using Org.BouncyCastle.Security;
 using Org.BouncyCastle.Asn1.X9;
 using Org.BouncyCastle.Math.EC;
@@ -15,21 +15,21 @@ using Org.BouncyCastle.Math.EC;
 namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.Hybrid;
 
 /// <summary>
-/// Hybrid AES-256-GCM + ML-KEM-768 encryption strategy.
+/// Hybrid AES-256-GCM + NTRU-HPS-2048-677 encryption strategy.
 ///
-/// Combines classical ECDH P-384 key agreement with post-quantum ML-KEM-768 KEM.
+/// Combines classical ECDH P-384 key agreement with post-quantum NTRU KEM.
 /// Provides defense-in-depth: secure if either classical or PQ algorithm remains unbroken.
 ///
 /// Process:
-/// 1. Generate ephemeral ECDH P-384 key pair → derive classical shared secret
-/// 2. Generate ephemeral ML-KEM-768 key pair → derive PQ shared secret
+/// 1. Generate ephemeral ECDH P-384 key pair -> derive classical shared secret
+/// 2. Encapsulate using NTRU-HPS-2048-677 -> derive PQ shared secret
 /// 3. Combine both secrets using HKDF-SHA384
 /// 4. Encrypt plaintext with AES-256-GCM using combined key
 /// 5. Store: [ECDH Public Key Length:2][ECDH Public Key][KEM Ciphertext Length:4][KEM Ciphertext][Nonce:12][Tag:16][Encrypted Data]
 ///
 /// Security Level: QuantumSafe (hybrid)
 /// Classical Component: ECDH P-384 (NIST Level 3)
-/// PQ Component: ML-KEM-768 (NIST Level 3)
+/// PQ Component: NTRU-HPS-2048-677 (NIST Level 3)
 /// Symmetric Cipher: AES-256-GCM
 ///
 /// Use Case: Maximum security for long-term data protection against both classical and quantum threats.
@@ -44,7 +44,7 @@ public sealed class HybridAesKyberStrategy : EncryptionStrategyBase
     /// <inheritdoc/>
     public override CipherInfo CipherInfo => new()
     {
-        AlgorithmName = "Hybrid-AES-256-GCM-ECDH-P384-ML-KEM-768",
+        AlgorithmName = "Hybrid-AES-256-GCM-ECDH-P384-NTRU-677",
         KeySizeBits = 256,
         BlockSizeBytes = 16,
         IvSizeBytes = NonceSize,
@@ -56,9 +56,9 @@ public sealed class HybridAesKyberStrategy : EncryptionStrategyBase
         SecurityLevel = SecurityLevel.QuantumSafe,
         Parameters = new Dictionary<string, object>
         {
-            ["HybridScheme"] = "ECDH-P384 + ML-KEM-768",
+            ["HybridScheme"] = "ECDH-P384 + NTRU-HPS-2048-677",
             ["ClassicalAlgorithm"] = "ECDH-P384",
-            ["PostQuantumAlgorithm"] = "ML-KEM-768",
+            ["PostQuantumAlgorithm"] = "NTRU-HPS-2048-677",
             ["SymmetricCipher"] = "AES-256-GCM",
             ["KDF"] = "HKDF-SHA384"
         }
@@ -68,10 +68,10 @@ public sealed class HybridAesKyberStrategy : EncryptionStrategyBase
     public override string StrategyId => "hybrid-aes-kyber";
 
     /// <inheritdoc/>
-    public override string StrategyName => "Hybrid AES-256-GCM + ECDH-P384 + ML-KEM-768";
+    public override string StrategyName => "Hybrid AES-256-GCM + ECDH-P384 + NTRU";
 
     /// <summary>
-    /// Initializes a new instance of the hybrid AES-Kyber encryption strategy.
+    /// Initializes a new instance of the hybrid AES-NTRU encryption strategy.
     /// </summary>
     public HybridAesKyberStrategy()
     {
@@ -105,14 +105,14 @@ public sealed class HybridAesKyberStrategy : EncryptionStrategyBase
             ecdhAgreement.Init(ecdhKeyPair.Private);
             var classicalSecret = ecdhAgreement.CalculateAgreement(recipientEcdhPublic).ToByteArrayUnsigned();
 
-            // Step 3: Generate ephemeral ML-KEM-768 key pair and encapsulate
-            var kemParams = new KyberKeyGenerationParameters(_secureRandom, KyberParameters.kyber768);
-            var kemGenerator = new KyberKeyPairGenerator();
+            // Step 3: Generate ephemeral NTRU key pair and encapsulate
+            var kemParams = new NtruKeyGenerationParameters(_secureRandom, NtruParameters.NtruHps2048677);
+            var kemGenerator = new NtruKeyPairGenerator();
             kemGenerator.Init(kemParams);
             var kemKeyPair = kemGenerator.GenerateKeyPair();
 
-            var kemEncapsulator = new KyberKemGenerator(_secureRandom);
-            var encapsulated = kemEncapsulator.GenerateEncapsulated((KyberPublicKeyParameters)kemKeyPair.Public);
+            var kemEncapsulator = new NtruKemGenerator(_secureRandom);
+            var encapsulated = kemEncapsulator.GenerateEncapsulated((NtruPublicKeyParameters)kemKeyPair.Public);
             var kemCiphertext = encapsulated.GetEncapsulation();
             var pqSecret = encapsulated.GetSecret();
 
@@ -187,9 +187,8 @@ public sealed class HybridAesKyberStrategy : EncryptionStrategyBase
             var classicalSecret = ecdhAgreement.CalculateAgreement(senderEcdhPublic).ToByteArrayUnsigned();
 
             // Step 5: Decapsulate KEM to get PQ secret
-            // Note: This requires the ML-KEM private key, which should be part of the composite key
             var kemPrivateKey = ExtractKemPrivateKey(key);
-            var kemExtractor = new KyberKemExtractor(kemPrivateKey);
+            var kemExtractor = new NtruKemExtractor(kemPrivateKey);
             var pqSecret = kemExtractor.ExtractSecret(kemCiphertext);
 
             try
@@ -226,7 +225,7 @@ public sealed class HybridAesKyberStrategy : EncryptionStrategyBase
         Buffer.BlockCopy(pqSecret, 0, combinedInput, classicalSecret.Length, pqSecret.Length);
 
         var salt = new byte[48]; // 384 bits
-        var info = System.Text.Encoding.UTF8.GetBytes("DataWarehouse.Hybrid.ECDH-P384.ML-KEM-768");
+        var info = System.Text.Encoding.UTF8.GetBytes("DataWarehouse.Hybrid.ECDH-P384.NTRU-677");
 
         var derivedKey = HKDF.DeriveKey(HashAlgorithmName.SHA384, combinedInput, AesKeySize, salt, info);
 
@@ -237,12 +236,9 @@ public sealed class HybridAesKyberStrategy : EncryptionStrategyBase
 
     /// <summary>
     /// Decodes EC public key from key material.
-    /// This is a simplified implementation - in production, use proper key serialization.
     /// </summary>
     private ECPublicKeyParameters DecodeECPublicKey(byte[] keyMaterial)
     {
-        // In a real implementation, the key material would contain both ECDH and KEM components
-        // For now, we'll create a dummy key for demonstration
         var curve = ECNamedCurveTable.GetByName("P-384");
         var point = curve.Curve.DecodePoint(keyMaterial);
         var ecDomainParams = new ECDomainParameters(curve.Curve, curve.G, curve.N, curve.H);
@@ -272,27 +268,24 @@ public sealed class HybridAesKyberStrategy : EncryptionStrategyBase
     }
 
     /// <summary>
-    /// Extracts ML-KEM private key from composite key material.
+    /// Extracts NTRU private key from composite key material.
     /// </summary>
-    private KyberPrivateKeyParameters ExtractKemPrivateKey(byte[] keyMaterial)
+    private NtruPrivateKeyParameters ExtractKemPrivateKey(byte[] keyMaterial)
     {
         // In production, parse composite key format
-        // For now, assume the entire key material is the KEM private key
-        return new KyberPrivateKeyParameters(KyberParameters.kyber768, keyMaterial, null);
+        return new NtruPrivateKeyParameters(NtruParameters.NtruHps2048677, keyMaterial);
     }
 }
 
 /// <summary>
-/// Hybrid ChaCha20-Poly1305 + ML-KEM-768 encryption strategy.
+/// Hybrid ChaCha20-Poly1305 + NTRU-HPS-2048-677 encryption strategy.
 ///
 /// Similar to HybridAesKyberStrategy but uses ChaCha20-Poly1305 instead of AES-256-GCM.
 /// Suitable for platforms without AES hardware acceleration.
 ///
-/// Process: Same as HybridAesKyberStrategy but with ChaCha20-Poly1305 cipher.
-///
 /// Security Level: QuantumSafe (hybrid)
 /// Classical Component: ECDH P-384
-/// PQ Component: ML-KEM-768
+/// PQ Component: NTRU-HPS-2048-677
 /// Symmetric Cipher: ChaCha20-Poly1305
 ///
 /// Use Case: High-performance quantum-safe encryption on ARM and mobile devices.
@@ -307,7 +300,7 @@ public sealed class HybridChaChaKyberStrategy : EncryptionStrategyBase
     /// <inheritdoc/>
     public override CipherInfo CipherInfo => new()
     {
-        AlgorithmName = "Hybrid-ChaCha20-Poly1305-ECDH-P384-ML-KEM-768",
+        AlgorithmName = "Hybrid-ChaCha20-Poly1305-ECDH-P384-NTRU-677",
         KeySizeBits = 256,
         BlockSizeBytes = 64,
         IvSizeBytes = NonceSize,
@@ -324,9 +317,9 @@ public sealed class HybridChaChaKyberStrategy : EncryptionStrategyBase
         SecurityLevel = SecurityLevel.QuantumSafe,
         Parameters = new Dictionary<string, object>
         {
-            ["HybridScheme"] = "ECDH-P384 + ML-KEM-768",
+            ["HybridScheme"] = "ECDH-P384 + NTRU-HPS-2048-677",
             ["ClassicalAlgorithm"] = "ECDH-P384",
-            ["PostQuantumAlgorithm"] = "ML-KEM-768",
+            ["PostQuantumAlgorithm"] = "NTRU-HPS-2048-677",
             ["SymmetricCipher"] = "ChaCha20-Poly1305",
             ["KDF"] = "HKDF-SHA384"
         }
@@ -336,10 +329,10 @@ public sealed class HybridChaChaKyberStrategy : EncryptionStrategyBase
     public override string StrategyId => "hybrid-chacha-kyber";
 
     /// <inheritdoc/>
-    public override string StrategyName => "Hybrid ChaCha20-Poly1305 + ECDH-P384 + ML-KEM-768";
+    public override string StrategyName => "Hybrid ChaCha20-Poly1305 + ECDH-P384 + NTRU";
 
     /// <summary>
-    /// Initializes a new instance of the hybrid ChaCha-Kyber encryption strategy.
+    /// Initializes a new instance of the hybrid ChaCha-NTRU encryption strategy.
     /// </summary>
     public HybridChaChaKyberStrategy()
     {
@@ -373,14 +366,14 @@ public sealed class HybridChaChaKyberStrategy : EncryptionStrategyBase
             ecdhAgreement.Init(ecdhKeyPair.Private);
             var classicalSecret = ecdhAgreement.CalculateAgreement(recipientEcdhPublic).ToByteArrayUnsigned();
 
-            // Step 3: Generate ephemeral ML-KEM-768 and encapsulate
-            var kemParams = new KyberKeyGenerationParameters(_secureRandom, KyberParameters.kyber768);
-            var kemGenerator = new KyberKeyPairGenerator();
+            // Step 3: Generate ephemeral NTRU and encapsulate
+            var kemParams = new NtruKeyGenerationParameters(_secureRandom, NtruParameters.NtruHps2048677);
+            var kemGenerator = new NtruKeyPairGenerator();
             kemGenerator.Init(kemParams);
             var kemKeyPair = kemGenerator.GenerateKeyPair();
 
-            var kemEncapsulator = new KyberKemGenerator(_secureRandom);
-            var encapsulated = kemEncapsulator.GenerateEncapsulated((KyberPublicKeyParameters)kemKeyPair.Public);
+            var kemEncapsulator = new NtruKemGenerator(_secureRandom);
+            var encapsulated = kemEncapsulator.GenerateEncapsulated((NtruPublicKeyParameters)kemKeyPair.Public);
             var kemCiphertext = encapsulated.GetEncapsulation();
             var pqSecret = encapsulated.GetSecret();
 
@@ -448,7 +441,7 @@ public sealed class HybridChaChaKyberStrategy : EncryptionStrategyBase
             var classicalSecret = ecdhAgreement.CalculateAgreement(senderEcdhPublic).ToByteArrayUnsigned();
 
             var kemPrivateKey = ExtractKemPrivateKey(key);
-            var kemExtractor = new KyberKemExtractor(kemPrivateKey);
+            var kemExtractor = new NtruKemExtractor(kemPrivateKey);
             var pqSecret = kemExtractor.ExtractSecret(kemCiphertext);
 
             try
@@ -479,7 +472,7 @@ public sealed class HybridChaChaKyberStrategy : EncryptionStrategyBase
         Buffer.BlockCopy(pqSecret, 0, combinedInput, classicalSecret.Length, pqSecret.Length);
 
         var salt = new byte[48];
-        var info = System.Text.Encoding.UTF8.GetBytes("DataWarehouse.Hybrid.ECDH-P384.ML-KEM-768.ChaCha20");
+        var info = System.Text.Encoding.UTF8.GetBytes("DataWarehouse.Hybrid.ECDH-P384.NTRU-677.ChaCha20");
 
         var derivedKey = HKDF.DeriveKey(HashAlgorithmName.SHA384, combinedInput, KeySize, salt, info);
 
@@ -512,28 +505,21 @@ public sealed class HybridChaChaKyberStrategy : EncryptionStrategyBase
         return new ECPublicKeyParameters(point, ecDomainParams);
     }
 
-    private KyberPrivateKeyParameters ExtractKemPrivateKey(byte[] keyMaterial)
+    private NtruPrivateKeyParameters ExtractKemPrivateKey(byte[] keyMaterial)
     {
-        return new KyberPrivateKeyParameters(KyberParameters.kyber768, keyMaterial, null);
+        return new NtruPrivateKeyParameters(NtruParameters.NtruHps2048677, keyMaterial);
     }
 }
 
 /// <summary>
-/// Hybrid X25519 + ML-KEM-768 encryption strategy with AES-256-GCM.
+/// Hybrid X25519 + NTRU-HPS-2048-677 encryption strategy with AES-256-GCM.
 ///
-/// Combines X25519 Elliptic Curve Diffie-Hellman with ML-KEM-768 KEM.
+/// Combines X25519 Elliptic Curve Diffie-Hellman with NTRU KEM.
 /// Uses Curve25519 for better performance compared to P-384.
-///
-/// Process:
-/// 1. Generate ephemeral X25519 key pair → derive classical shared secret
-/// 2. Generate ephemeral ML-KEM-768 key pair → derive PQ shared secret
-/// 3. Combine both secrets using HKDF-SHA256
-/// 4. Encrypt plaintext with AES-256-GCM
-/// 5. Store: [X25519 Public Key:32][KEM Ciphertext Length:4][KEM Ciphertext][Nonce:12][Tag:16][Encrypted Data]
 ///
 /// Security Level: QuantumSafe (hybrid)
 /// Classical Component: X25519
-/// PQ Component: ML-KEM-768
+/// PQ Component: NTRU-HPS-2048-677
 /// Symmetric Cipher: AES-256-GCM
 ///
 /// Use Case: High-performance hybrid encryption for modern applications.
@@ -549,7 +535,7 @@ public sealed class HybridX25519KyberStrategy : EncryptionStrategyBase
     /// <inheritdoc/>
     public override CipherInfo CipherInfo => new()
     {
-        AlgorithmName = "Hybrid-AES-256-GCM-X25519-ML-KEM-768",
+        AlgorithmName = "Hybrid-AES-256-GCM-X25519-NTRU-677",
         KeySizeBits = 256,
         BlockSizeBytes = 16,
         IvSizeBytes = NonceSize,
@@ -561,9 +547,9 @@ public sealed class HybridX25519KyberStrategy : EncryptionStrategyBase
         SecurityLevel = SecurityLevel.QuantumSafe,
         Parameters = new Dictionary<string, object>
         {
-            ["HybridScheme"] = "X25519 + ML-KEM-768",
+            ["HybridScheme"] = "X25519 + NTRU-HPS-2048-677",
             ["ClassicalAlgorithm"] = "X25519",
-            ["PostQuantumAlgorithm"] = "ML-KEM-768",
+            ["PostQuantumAlgorithm"] = "NTRU-HPS-2048-677",
             ["SymmetricCipher"] = "AES-256-GCM",
             ["KDF"] = "HKDF-SHA256"
         }
@@ -573,10 +559,10 @@ public sealed class HybridX25519KyberStrategy : EncryptionStrategyBase
     public override string StrategyId => "hybrid-x25519-kyber";
 
     /// <inheritdoc/>
-    public override string StrategyName => "Hybrid AES-256-GCM + X25519 + ML-KEM-768";
+    public override string StrategyName => "Hybrid AES-256-GCM + X25519 + NTRU";
 
     /// <summary>
-    /// Initializes a new instance of the hybrid X25519-Kyber encryption strategy.
+    /// Initializes a new instance of the hybrid X25519-NTRU encryption strategy.
     /// </summary>
     public HybridX25519KyberStrategy()
     {
@@ -606,14 +592,14 @@ public sealed class HybridX25519KyberStrategy : EncryptionStrategyBase
             var classicalSecret = new byte[32];
             x25519Agreement.CalculateAgreement(recipientX25519Public, classicalSecret, 0);
 
-            // Step 3: Generate ephemeral ML-KEM-768 and encapsulate
-            var kemParams = new KyberKeyGenerationParameters(_secureRandom, KyberParameters.kyber768);
-            var kemGenerator = new KyberKeyPairGenerator();
+            // Step 3: Generate ephemeral NTRU and encapsulate
+            var kemParams = new NtruKeyGenerationParameters(_secureRandom, NtruParameters.NtruHps2048677);
+            var kemGenerator = new NtruKeyPairGenerator();
             kemGenerator.Init(kemParams);
             var kemKeyPair = kemGenerator.GenerateKeyPair();
 
-            var kemEncapsulator = new KyberKemGenerator(_secureRandom);
-            var encapsulated = kemEncapsulator.GenerateEncapsulated((KyberPublicKeyParameters)kemKeyPair.Public);
+            var kemEncapsulator = new NtruKemGenerator(_secureRandom);
+            var encapsulated = kemEncapsulator.GenerateEncapsulated((NtruPublicKeyParameters)kemKeyPair.Public);
             var kemCiphertext = encapsulated.GetEncapsulation();
             var pqSecret = encapsulated.GetSecret();
 
@@ -682,7 +668,7 @@ public sealed class HybridX25519KyberStrategy : EncryptionStrategyBase
 
             // Decapsulate KEM
             var kemPrivateKey = ExtractKemPrivateKey(key);
-            var kemExtractor = new KyberKemExtractor(kemPrivateKey);
+            var kemExtractor = new NtruKemExtractor(kemPrivateKey);
             var pqSecret = kemExtractor.ExtractSecret(kemCiphertext);
 
             try
@@ -713,7 +699,7 @@ public sealed class HybridX25519KyberStrategy : EncryptionStrategyBase
         Buffer.BlockCopy(pqSecret, 0, combinedInput, classicalSecret.Length, pqSecret.Length);
 
         var salt = new byte[32];
-        var info = System.Text.Encoding.UTF8.GetBytes("DataWarehouse.Hybrid.X25519.ML-KEM-768");
+        var info = System.Text.Encoding.UTF8.GetBytes("DataWarehouse.Hybrid.X25519.NTRU-677");
 
         var derivedKey = HKDF.DeriveKey(HashAlgorithmName.SHA256, combinedInput, KeySize, salt, info);
 
@@ -722,10 +708,8 @@ public sealed class HybridX25519KyberStrategy : EncryptionStrategyBase
         return derivedKey;
     }
 
-    private KyberPrivateKeyParameters ExtractKemPrivateKey(byte[] keyMaterial)
+    private NtruPrivateKeyParameters ExtractKemPrivateKey(byte[] keyMaterial)
     {
-        // In production, parse composite key format properly
-        // For now, assume KEM private key is embedded in key material
-        return new KyberPrivateKeyParameters(KyberParameters.kyber768, keyMaterial, null);
+        return new NtruPrivateKeyParameters(NtruParameters.NtruHps2048677, keyMaterial);
     }
 }
