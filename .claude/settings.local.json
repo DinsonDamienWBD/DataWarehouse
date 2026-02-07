@@ -153,7 +153,13 @@
       "Bash(cmd /c \"for /D %d in \\(Plugins\\\\DataWarehouse.Plugins.UltimateStorage\\\\Strategies\\\\*\\) do @echo %d\")",
       "Bash(Select-String -Pattern \"LzmaStrategy|Lzma2Strategy|error CS\")",
       "Bash(Select-String -Pattern \"SevenZipStrategy|RarStrategy|ZipStrategy|XzStrategy|error CS\")",
-      "Bash(tree:*)"
+      "Bash(tree:*)",
+      "Bash(for proj in Plugins/DataWarehouse.Plugins.Ultimate*/DataWarehouse.Plugins.Ultimate*.csproj)",
+      "Bash(do dotnet build:*)",
+      "Bash(for proj in Plugins/DataWarehouse.Plugins.Ultimate*/DataWarehouse.Plugins.*.csproj)",
+      "Bash(do echo \"Building $proj...\")",
+      "Bash(if not exist \"C:\\\\Temp\\\\DataWarehouse\\\\DataWarehouse\\\\Plugins\\\\DataWarehouse.Plugins.UltimateDataManagement\\\\Strategies\\\\Versioning\" mkdir \"C:\\\\Temp\\\\DataWarehouse\\\\DataWarehouse\\\\Plugins\\\\DataWarehouse.Plugins.UltimateDataManagement\\\\Strategies\\\\Versioning\")",
+      "Bash(if not exist \"C:\\\\Temp\\\\DataWarehouse\\\\DataWarehouse\\\\Plugins\\\\DataWarehouse.Plugins.UltimateDataManagement\\\\Strategies\\\\Lifecycle\" mkdir \"C:\\\\Temp\\\\DataWarehouse\\\\DataWarehouse\\\\Plugins\\\\DataWarehouse.Plugins.UltimateDataManagement\\\\Strategies\\\\Lifecycle\")"
     ]
   }
 }
