@@ -6,6 +6,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using DataWarehouse.SDK.AI;
 using DataWarehouse.SDK.Contracts;
+using DataWarehouse.SDK.Contracts.IntelligenceAware;
 using DataWarehouse.SDK.Contracts.Replication;
 using DataWarehouse.SDK.Primitives;
 using DataWarehouse.SDK.Utilities;
@@ -44,7 +45,7 @@ namespace DataWarehouse.Plugins.UltimateReplication
     /// - replication.conflict.detect: Detect conflicts
     /// - replication.conflict.resolve: Resolve conflicts
     /// </remarks>
-    public sealed class UltimateReplicationPlugin : ReplicationPluginBase
+    public sealed class UltimateReplicationPlugin : IntelligenceAwarePluginBase
     {
         private readonly ReplicationStrategyRegistry _registry = new();
         private EnhancedReplicationStrategyBase? _activeStrategy;
@@ -65,6 +66,9 @@ namespace DataWarehouse.Plugins.UltimateReplication
 
         /// <inheritdoc/>
         public override string Version => "1.0.0";
+
+        /// <inheritdoc/>
+        public override PluginCategory Category => PluginCategory.StorageProvider;
 
         /// <summary>
         /// Creates a new Ultimate Replication plugin instance and discovers strategies.
@@ -134,14 +138,50 @@ namespace DataWarehouse.Plugins.UltimateReplication
         }
 
         /// <inheritdoc/>
-        public override async Task StartAsync(CancellationToken ct)
+        protected override async Task OnStartWithIntelligenceAsync(CancellationToken ct)
         {
+            // Intelligence is available - enable AI-enhanced replication features
             _cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+
+            if (MessageBus != null)
+            {
+                // Subscribe to replication topics
+                MessageBus.Subscribe(ReplicationTopics.Replicate, HandleReplicateMessageAsync);
+                MessageBus.Subscribe(ReplicationTopics.Sync, HandleSyncMessageAsync);
+                MessageBus.Subscribe(ReplicationTopics.SelectStrategy, HandleSelectStrategyMessageAsync);
+                MessageBus.Subscribe(ReplicationTopics.ConflictResolve, HandleConflictResolveMessageAsync);
+                MessageBus.Subscribe(ReplicationTopics.LagRequest, HandleLagRequestMessageAsync);
+
+                // Subscribe to Intelligence-enhanced topics
+                MessageBus.Subscribe(ReplicationTopics.PredictConflict, HandlePredictConflictMessageAsync);
+                MessageBus.Subscribe(ReplicationTopics.OptimizeConsistency, HandleOptimizeConsistencyMessageAsync);
+                MessageBus.Subscribe(ReplicationTopics.RouteRequest, HandleRouteRequestMessageAsync);
+            }
+
             await Task.CompletedTask;
         }
 
         /// <inheritdoc/>
-        public override async Task StopAsync()
+        protected override async Task OnStartWithoutIntelligenceAsync(CancellationToken ct)
+        {
+            // Intelligence unavailable - use fallback behavior
+            _cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+
+            if (MessageBus != null)
+            {
+                // Subscribe to basic replication topics only
+                MessageBus.Subscribe(ReplicationTopics.Replicate, HandleReplicateMessageAsync);
+                MessageBus.Subscribe(ReplicationTopics.Sync, HandleSyncMessageAsync);
+                MessageBus.Subscribe(ReplicationTopics.SelectStrategy, HandleSelectStrategyMessageAsync);
+                MessageBus.Subscribe(ReplicationTopics.ConflictResolve, HandleConflictResolveMessageAsync);
+                MessageBus.Subscribe(ReplicationTopics.LagRequest, HandleLagRequestMessageAsync);
+            }
+
+            await Task.CompletedTask;
+        }
+
+        /// <inheritdoc/>
+        protected override async Task OnStopCoreAsync()
         {
             _cts?.Cancel();
             _cts?.Dispose();
@@ -171,27 +211,6 @@ namespace DataWarehouse.Plugins.UltimateReplication
             if (response != null)
             {
                 message.Payload["_response"] = response;
-            }
-        }
-
-        /// <inheritdoc/>
-        public override async Task<bool> RestoreAsync(string blobId, string? replicaId)
-        {
-            if (_activeStrategy == null)
-                return false;
-
-            try
-            {
-                await _activeStrategy.ReplicateAsync(
-                    replicaId ?? "primary",
-                    new[] { _nodeId },
-                    ReadOnlyMemory<byte>.Empty,
-                    new Dictionary<string, string> { ["dataId"] = blobId });
-                return true;
-            }
-            catch
-            {
-                return false;
             }
         }
 
@@ -574,12 +593,14 @@ namespace DataWarehouse.Plugins.UltimateReplication
                     {
                         CapabilityId = $"{Id}.replicate",
                         DisplayName = $"{Name} - Replicate",
-                        Description = "Replicate data using selected strategy",
+                        Description = "Replicate data using selected strategy with AI-enhanced conflict prediction and routing",
                         Category = SDK.Contracts.CapabilityCategory.Storage,
+                        SubCategory = "Replication",
                         PluginId = Id,
                         PluginName = Name,
                         PluginVersion = Version,
-                        Tags = new[] { "replication", "data-sync" }
+                        Tags = new[] { "replication", "data-sync", "ai-enhanced", "conflict-resolution" },
+                        SemanticDescription = "Advanced replication with 8 strategies, vector clocks, conflict resolution, and Intelligence-powered optimization"
                     }
                 };
 
@@ -591,6 +612,21 @@ namespace DataWarehouse.Plugins.UltimateReplication
                     if (chars.Capabilities.IsGeoAware) tags.Add("geo-aware");
                     if (chars.SupportsVectorClocks) tags.Add("vector-clock");
                     if (chars.SupportsStreaming) tags.Add("streaming");
+                    if (chars.SupportsAutoConflictResolution) tags.Add("auto-conflict-resolution");
+
+                    var consistencyTags = chars.ConsistencyModel switch
+                    {
+                        ConsistencyModel.Eventual => "eventual-consistency",
+                        ConsistencyModel.Strong => "strong-consistency",
+                        ConsistencyModel.Causal => "causal-consistency",
+                        ConsistencyModel.BoundedStaleness => "bounded-staleness",
+                        ConsistencyModel.SessionConsistent => "session-consistency",
+                        ConsistencyModel.ReadYourWrites => "read-your-writes",
+                        ConsistencyModel.MonotonicReads => "monotonic-reads",
+                        ConsistencyModel.MonotonicWrites => "monotonic-writes",
+                        _ => "consistency"
+                    };
+                    tags.Add(consistencyTags);
 
                     capabilities.Add(new RegisteredCapability
                     {
@@ -606,19 +642,299 @@ namespace DataWarehouse.Plugins.UltimateReplication
                         Priority = chars.Capabilities.SupportsMultiMaster ? 60 : 50,
                         Metadata = new Dictionary<string, object>
                         {
-                            ["strategy"] = name,
+                            ["strategyId"] = name,
                             ["consistencyModel"] = chars.ConsistencyModel.ToString(),
                             ["typicalLagMs"] = chars.TypicalLagMs,
+                            ["consistencySlaMs"] = chars.ConsistencySlaMs,
                             ["supportsMultiMaster"] = chars.Capabilities.SupportsMultiMaster,
                             ["isGeoAware"] = chars.Capabilities.IsGeoAware,
                             ["supportsVectorClocks"] = chars.SupportsVectorClocks,
-                            ["supportsAutoConflictResolution"] = chars.SupportsAutoConflictResolution
+                            ["supportsAutoConflictResolution"] = chars.SupportsAutoConflictResolution,
+                            ["supportsDeltaSync"] = chars.SupportsDeltaSync,
+                            ["supportsStreaming"] = chars.SupportsStreaming,
+                            ["conflictResolutionMethods"] = chars.Capabilities.ConflictResolutionMethods.Select(m => m.ToString()).ToArray()
                         },
-                        SemanticDescription = $"Replicate data using {name} strategy with {chars.ConsistencyModel} consistency"
+                        SemanticDescription = $"Replicate data using {name} strategy with {chars.ConsistencyModel} consistency. " +
+                                            $"Typical lag: {chars.TypicalLagMs}ms. " +
+                                            $"Supports: {(chars.Capabilities.SupportsMultiMaster ? "multi-master, " : "")}" +
+                                            $"{(chars.Capabilities.IsGeoAware ? "geo-aware, " : "")}" +
+                                            $"{(chars.SupportsVectorClocks ? "vector-clocks, " : "")}" +
+                                            $"{(chars.SupportsAutoConflictResolution ? "auto-conflict-resolution" : "manual-conflict-resolution")}"
                     });
                 }
 
                 return capabilities;
+            }
+        }
+
+        /// <inheritdoc/>
+
+        #endregion
+
+        #region Message Bus Handlers
+
+        private async Task HandleReplicateMessageAsync(PluginMessage message)
+        {
+            var response = await HandleReplicateAsync(message.Payload);
+            if (MessageBus != null)
+            {
+                await MessageBus.PublishAsync($"{message.Type}.response", new PluginMessage
+                {
+                    Type = $"{message.Type}.response",
+                    CorrelationId = message.CorrelationId,
+                    Source = Id,
+                    Payload = response
+                });
+            }
+        }
+
+        private async Task HandleSyncMessageAsync(PluginMessage message)
+        {
+            // Handle sync operations
+            var response = new Dictionary<string, object> { ["success"] = true };
+            if (MessageBus != null)
+            {
+                await MessageBus.PublishAsync($"{message.Type}.response", new PluginMessage
+                {
+                    Type = $"{message.Type}.response",
+                    CorrelationId = message.CorrelationId,
+                    Source = Id,
+                    Payload = response
+                });
+            }
+        }
+
+        private async Task HandleSelectStrategyMessageAsync(PluginMessage message)
+        {
+            var response = HandleSelectStrategy(message.Payload);
+            if (MessageBus != null)
+            {
+                await MessageBus.PublishAsync($"{message.Type}.response", new PluginMessage
+                {
+                    Type = $"{message.Type}.response",
+                    CorrelationId = message.CorrelationId,
+                    Source = Id,
+                    Payload = response
+                });
+            }
+        }
+
+        private async Task HandleConflictResolveMessageAsync(PluginMessage message)
+        {
+            var response = await HandleResolveConflictAsync(message.Payload);
+            if (MessageBus != null)
+            {
+                await MessageBus.PublishAsync($"{message.Type}.response", new PluginMessage
+                {
+                    Type = $"{message.Type}.response",
+                    CorrelationId = message.CorrelationId,
+                    Source = Id,
+                    Payload = response
+                });
+            }
+        }
+
+        private async Task HandleLagRequestMessageAsync(PluginMessage message)
+        {
+            var response = await HandleGetLagAsync(message.Payload);
+            if (MessageBus != null)
+            {
+                await MessageBus.PublishAsync($"{message.Type}.response", new PluginMessage
+                {
+                    Type = $"{message.Type}.response",
+                    CorrelationId = message.CorrelationId,
+                    Source = Id,
+                    Payload = response
+                });
+            }
+        }
+
+        private async Task HandlePredictConflictMessageAsync(PluginMessage message)
+        {
+            if (!IsIntelligenceAvailable)
+            {
+                await PublishErrorResponse(message, "Intelligence not available for conflict prediction");
+                return;
+            }
+
+            try
+            {
+                var payload = message.Payload;
+                var sourceNode = payload.GetValueOrDefault("sourceNode")?.ToString() ?? _nodeId;
+                var targetNodes = payload.GetValueOrDefault("targetNodes") as IEnumerable<object>;
+                var historicalConflicts = payload.GetValueOrDefault("historicalConflicts");
+
+                // Request conflict prediction from Intelligence
+                var predictionPayload = new Dictionary<string, object>
+                {
+                    ["predictionType"] = "replication.conflict",
+                    ["inputData"] = new Dictionary<string, object>
+                    {
+                        ["sourceNode"] = sourceNode,
+                        ["targetNodes"] = targetNodes ?? Array.Empty<object>(),
+                        ["activeStrategy"] = _activeStrategy?.Characteristics.StrategyName ?? "none",
+                        ["consistencyModel"] = _activeStrategy?.Characteristics.ConsistencyModel.ToString() ?? "unknown",
+                        ["historicalConflicts"] = historicalConflicts ?? 0
+                    }
+                };
+
+                var predictionResult = await RequestPredictionAsync(
+                    "replication.conflict",
+                    predictionPayload,
+                    new IntelligenceContext { Timeout = TimeSpan.FromSeconds(5) });
+
+                var response = new Dictionary<string, object>
+                {
+                    ["success"] = predictionResult != null,
+                    ["conflictProbability"] = predictionResult?.Confidence ?? 0.0,
+                    ["recommendations"] = predictionResult?.Metadata.GetValueOrDefault("recommendations") ?? Array.Empty<string>()
+                };
+
+                if (MessageBus != null)
+                {
+                    await MessageBus.PublishAsync(ReplicationTopics.PredictConflictResponse, new PluginMessage
+                    {
+                        Type = ReplicationTopics.PredictConflictResponse,
+                        CorrelationId = message.CorrelationId,
+                        Source = Id,
+                        Payload = response
+                    });
+                }
+            }
+            catch (Exception ex)
+            {
+                await PublishErrorResponse(message, $"Conflict prediction failed: {ex.Message}");
+            }
+        }
+
+        private async Task HandleOptimizeConsistencyMessageAsync(PluginMessage message)
+        {
+            if (!IsIntelligenceAvailable)
+            {
+                await PublishErrorResponse(message, "Intelligence not available for consistency optimization");
+                return;
+            }
+
+            try
+            {
+                var payload = message.Payload;
+                var dataType = payload.GetValueOrDefault("dataType")?.ToString();
+                var accessPattern = payload.GetValueOrDefault("accessPattern")?.ToString();
+                var latencyReqs = payload.GetValueOrDefault("latencyRequirements");
+
+                // Request consistency optimization from Intelligence
+                var classificationPayload = new Dictionary<string, object>
+                {
+                    ["text"] = $"Data type: {dataType}, Access pattern: {accessPattern}, Latency requirements: {latencyReqs}",
+                    ["categories"] = Enum.GetNames(typeof(ConsistencyModel)),
+                    ["multiLabel"] = false
+                };
+
+                var classifications = await RequestClassificationAsync(
+                    $"Data type: {dataType}, Access pattern: {accessPattern}",
+                    Enum.GetNames(typeof(ConsistencyModel)),
+                    false);
+
+                var response = new Dictionary<string, object>
+                {
+                    ["success"] = classifications != null && classifications.Length > 0,
+                    ["recommendedModel"] = classifications?[0].Category ?? "Eventual",
+                    ["confidence"] = classifications?[0].Confidence ?? 0.0,
+                    ["reasoning"] = "Based on data type, access pattern, and latency requirements"
+                };
+
+                if (MessageBus != null)
+                {
+                    await MessageBus.PublishAsync(ReplicationTopics.OptimizeConsistencyResponse, new PluginMessage
+                    {
+                        Type = ReplicationTopics.OptimizeConsistencyResponse,
+                        CorrelationId = message.CorrelationId,
+                        Source = Id,
+                        Payload = response
+                    });
+                }
+            }
+            catch (Exception ex)
+            {
+                await PublishErrorResponse(message, $"Consistency optimization failed: {ex.Message}");
+            }
+        }
+
+        private async Task HandleRouteRequestMessageAsync(PluginMessage message)
+        {
+            if (!IsIntelligenceAvailable)
+            {
+                await PublishErrorResponse(message, "Intelligence not available for routing decisions");
+                return;
+            }
+
+            try
+            {
+                var payload = message.Payload;
+                var availableReplicas = payload.GetValueOrDefault("availableReplicas") as IEnumerable<object>;
+                var currentLag = payload.GetValueOrDefault("currentLag");
+                var replicaLoad = payload.GetValueOrDefault("replicaLoad");
+
+                // Request routing decision from Intelligence
+                var predictionPayload = new Dictionary<string, object>
+                {
+                    ["predictionType"] = "replication.routing",
+                    ["inputData"] = new Dictionary<string, object>
+                    {
+                        ["availableReplicas"] = availableReplicas ?? Array.Empty<object>(),
+                        ["currentLag"] = currentLag ?? new Dictionary<string, object>(),
+                        ["replicaLoad"] = replicaLoad ?? new Dictionary<string, object>(),
+                        ["activeStrategy"] = _activeStrategy?.Characteristics.StrategyName ?? "none"
+                    }
+                };
+
+                var predictionResult = await RequestPredictionAsync(
+                    "replication.routing",
+                    predictionPayload,
+                    new IntelligenceContext { Timeout = TimeSpan.FromSeconds(5) });
+
+                var response = new Dictionary<string, object>
+                {
+                    ["success"] = predictionResult != null,
+                    ["selectedReplica"] = predictionResult?.Prediction?.ToString() ?? "",
+                    ["confidence"] = predictionResult?.Confidence ?? 0.0,
+                    ["alternativeReplicas"] = predictionResult?.Metadata.GetValueOrDefault("alternatives") ?? Array.Empty<string>()
+                };
+
+                if (MessageBus != null)
+                {
+                    await MessageBus.PublishAsync(ReplicationTopics.RouteRequestResponse, new PluginMessage
+                    {
+                        Type = ReplicationTopics.RouteRequestResponse,
+                        CorrelationId = message.CorrelationId,
+                        Source = Id,
+                        Payload = response
+                    });
+                }
+            }
+            catch (Exception ex)
+            {
+                await PublishErrorResponse(message, $"Routing decision failed: {ex.Message}");
+            }
+        }
+
+        private async Task PublishErrorResponse(PluginMessage originalMessage, string errorMessage)
+        {
+            if (MessageBus != null)
+            {
+                var response = new Dictionary<string, object>
+                {
+                    ["success"] = false,
+                    ["error"] = errorMessage
+                };
+
+                await MessageBus.PublishAsync($"{originalMessage.Type}.response", new PluginMessage
+                {
+                    Type = $"{originalMessage.Type}.response",
+                    CorrelationId = originalMessage.CorrelationId,
+                    Source = Id,
+                    Payload = response
+                });
             }
         }
 

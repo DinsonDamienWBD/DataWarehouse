@@ -1,6 +1,9 @@
 using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
+using DataWarehouse.SDK.Contracts;
+using DataWarehouse.SDK.Contracts.IntelligenceAware;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateRAID;
 
@@ -45,6 +48,9 @@ public abstract class RaidStrategyBase : IRaidStrategy, IDisposable
     protected long _rebuildCompletedBlocks;
     protected DateTime _rebuildStartTime;
     protected readonly object _rebuildLock = new();
+
+    // Intelligence integration
+    protected IMessageBus? _messageBus;
 
     #endregion
 
@@ -665,6 +671,208 @@ public abstract class RaidStrategyBase : IRaidStrategy, IDisposable
 
     #endregion
 
+    #region Intelligence Integration
+
+    /// <summary>
+    /// Sets the message bus for Intelligence integration.
+    /// </summary>
+    /// <param name="messageBus">The message bus instance.</param>
+    public void SetMessageBus(IMessageBus? messageBus)
+    {
+        _messageBus = messageBus;
+    }
+
+    /// <summary>
+    /// Requests disk failure prediction from Intelligence.
+    /// </summary>
+    /// <param name="diskIndex">Index of the disk to analyze.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>Failure prediction result, or null if Intelligence unavailable.</returns>
+    protected async Task<DiskFailurePrediction?> RequestFailurePredictionAsync(int diskIndex, CancellationToken ct = default)
+    {
+        if (_messageBus == null || diskIndex < 0 || diskIndex >= _disks.Count)
+            return null;
+
+        var disk = _disks[diskIndex];
+        var smartData = disk.SmartData;
+        var ioStats = disk.DiskIO.GetStatistics();
+
+        var correlationId = Guid.NewGuid().ToString("N");
+        var tcs = new TaskCompletionSource<DiskFailurePrediction?>();
+
+        // Subscribe to response
+        using var subscription = _messageBus.Subscribe(RaidTopics.PredictFailureResponse, msg =>
+        {
+            if (msg.CorrelationId == correlationId)
+            {
+                var prediction = new DiskFailurePrediction
+                {
+                    DiskIndex = diskIndex,
+                    FailureProbability = msg.Payload.TryGetValue("failureProbability", out var fp) && fp is double prob ? prob : 0.0,
+                    Confidence = msg.Payload.TryGetValue("confidence", out var conf) && conf is double c ? c : 0.0
+                };
+
+                if (msg.Payload.TryGetValue("estimatedTimeToFailure", out var ttf) && ttf is TimeSpan timespan)
+                {
+                    prediction.EstimatedTimeToFailure = timespan;
+                }
+
+                tcs.TrySetResult(prediction);
+            }
+            return Task.CompletedTask;
+        });
+
+        // Send request
+        var request = new PluginMessage
+        {
+            Type = RaidTopics.PredictFailure,
+            CorrelationId = correlationId,
+            Source = "raid-strategy",
+            Payload = new Dictionary<string, object>
+            {
+                ["strategyId"] = StrategyId,
+                ["diskIndex"] = diskIndex,
+                ["diskId"] = disk.DiskId,
+                ["smartData"] = smartData ?? new SmartAttributes(),
+                ["readErrors"] = ioStats.ReadErrors,
+                ["writeErrors"] = ioStats.WriteErrors,
+                ["temperature"] = smartData?.Temperature ?? 0
+            }
+        };
+
+        await _messageBus.PublishAsync(RaidTopics.PredictFailure, request, ct);
+
+        // Wait for response with timeout
+        using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        cts.CancelAfter(TimeSpan.FromSeconds(10));
+
+        try
+        {
+            return await tcs.Task.WaitAsync(cts.Token);
+        }
+        catch (OperationCanceledException)
+        {
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Requests optimal RAID level recommendation from Intelligence.
+    /// </summary>
+    /// <param name="workloadProfile">Workload characteristics.</param>
+    /// <param name="priorityGoal">Primary optimization goal.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>RAID level recommendation, or null if Intelligence unavailable.</returns>
+    protected async Task<RaidLevelRecommendation?> RequestOptimalRaidLevelAsync(
+        string workloadProfile,
+        string priorityGoal = "balanced",
+        CancellationToken ct = default)
+    {
+        if (_messageBus == null)
+            return null;
+
+        var correlationId = Guid.NewGuid().ToString("N");
+        var tcs = new TaskCompletionSource<RaidLevelRecommendation?>();
+
+        // Subscribe to response
+        using var subscription = _messageBus.Subscribe(RaidTopics.OptimizeLevelResponse, msg =>
+        {
+            if (msg.CorrelationId == correlationId)
+            {
+                var recommendation = new RaidLevelRecommendation
+                {
+                    RecommendedStrategyId = msg.Payload.TryGetValue("recommendedLevel", out var level) && level is string s ? s : "",
+                    Confidence = msg.Payload.TryGetValue("confidence", out var conf) && conf is double c ? c : 0.0
+                };
+
+                if (msg.Payload.TryGetValue("reasoning", out var reasoning) && reasoning is string reason)
+                {
+                    recommendation.Reasoning = reason;
+                }
+
+                tcs.TrySetResult(recommendation);
+            }
+            return Task.CompletedTask;
+        });
+
+        // Send request
+        var request = new PluginMessage
+        {
+            Type = RaidTopics.OptimizeLevel,
+            CorrelationId = correlationId,
+            Source = "raid-strategy",
+            Payload = new Dictionary<string, object>
+            {
+                ["workloadProfile"] = workloadProfile,
+                ["availableDisks"] = _disks.Count,
+                ["priorityGoal"] = priorityGoal,
+                ["currentStrategy"] = StrategyId
+            }
+        };
+
+        await _messageBus.PublishAsync(RaidTopics.OptimizeLevel, request, ct);
+
+        // Wait for response with timeout
+        using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        cts.CancelAfter(TimeSpan.FromSeconds(10));
+
+        try
+        {
+            return await tcs.Task.WaitAsync(cts.Token);
+        }
+        catch (OperationCanceledException)
+        {
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Reports health data to Intelligence for learning and pattern recognition.
+    /// </summary>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>True if report was sent successfully.</returns>
+    protected async Task<bool> ReportHealthToIntelligenceAsync(CancellationToken ct = default)
+    {
+        if (_messageBus == null)
+            return false;
+
+        try
+        {
+            var health = await GetHealthStatusAsync(ct);
+            var stats = await GetStatisticsAsync(ct);
+
+            var report = new PluginMessage
+            {
+                Type = RaidTopics.ReportHealth,
+                Source = "raid-strategy",
+                Payload = new Dictionary<string, object>
+                {
+                    ["strategyId"] = StrategyId,
+                    ["timestamp"] = DateTime.UtcNow,
+                    ["state"] = health.State.ToString(),
+                    ["healthyDisks"] = health.HealthyDisks,
+                    ["failedDisks"] = health.FailedDisks,
+                    ["rebuildingDisks"] = health.RebuildingDisks,
+                    ["totalReads"] = stats.TotalReads,
+                    ["totalWrites"] = stats.TotalWrites,
+                    ["readLatency"] = stats.AverageReadLatencyMs,
+                    ["writeLatency"] = stats.AverageWriteLatencyMs,
+                    ["readThroughput"] = stats.ReadThroughputMBps,
+                    ["writeThroughput"] = stats.WriteThroughputMBps
+                }
+            };
+
+            await _messageBus.PublishAsync(RaidTopics.ReportHealth, report, ct);
+            return true;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    #endregion
+
     #region IDisposable
 
     /// <inheritdoc/>
@@ -679,4 +887,58 @@ public abstract class RaidStrategyBase : IRaidStrategy, IDisposable
     }
 
     #endregion
+}
+
+/// <summary>
+/// Result of disk failure prediction.
+/// </summary>
+public sealed class DiskFailurePrediction
+{
+    /// <summary>Index of the disk being analyzed.</summary>
+    public int DiskIndex { get; set; }
+
+    /// <summary>Probability of failure (0.0-1.0).</summary>
+    public double FailureProbability { get; set; }
+
+    /// <summary>Prediction confidence (0.0-1.0).</summary>
+    public double Confidence { get; set; }
+
+    /// <summary>Estimated time until failure.</summary>
+    public TimeSpan? EstimatedTimeToFailure { get; set; }
+
+    /// <summary>Additional recommendations.</summary>
+    public List<string> Recommendations { get; set; } = new();
+}
+
+/// <summary>
+/// Result of RAID level recommendation.
+/// </summary>
+public sealed class RaidLevelRecommendation
+{
+    /// <summary>Recommended RAID strategy ID.</summary>
+    public string RecommendedStrategyId { get; set; } = string.Empty;
+
+    /// <summary>Recommendation confidence (0.0-1.0).</summary>
+    public double Confidence { get; set; }
+
+    /// <summary>Explanation for recommendation.</summary>
+    public string? Reasoning { get; set; }
+
+    /// <summary>Alternative recommendations.</summary>
+    public List<AlternativeRecommendation> Alternatives { get; set; } = new();
+}
+
+/// <summary>
+/// Alternative RAID level recommendation.
+/// </summary>
+public sealed class AlternativeRecommendation
+{
+    /// <summary>Strategy ID.</summary>
+    public string StrategyId { get; set; } = string.Empty;
+
+    /// <summary>Confidence score.</summary>
+    public double Confidence { get; set; }
+
+    /// <summary>Brief explanation.</summary>
+    public string? Reasoning { get; set; }
 }

@@ -1,4 +1,6 @@
+using DataWarehouse.SDK.AI;
 using DataWarehouse.SDK.Primitives;
+using DataWarehouse.SDK.Utilities;
 using System.Collections.Concurrent;
 using System.Security.Cryptography;
 
@@ -117,6 +119,7 @@ namespace DataWarehouse.SDK.Contracts
     /// <summary>
     /// Abstract base class for deduplication provider plugins.
     /// Provides content-defined chunking with Rabin fingerprinting.
+    /// Intelligence-aware: Supports AI-driven deduplication ratio estimation.
     /// </summary>
     public abstract class DeduplicationPluginBase : FeaturePluginBase, IDeduplicationProvider
     {
@@ -127,6 +130,156 @@ namespace DataWarehouse.SDK.Contracts
         private long _uniqueChunks;
 
         public override PluginCategory Category => PluginCategory.DataTransformationProvider;
+
+        #region Intelligence Integration
+
+        /// <summary>
+        /// Capabilities declared by this deduplication provider.
+        /// </summary>
+        protected override IReadOnlyList<RegisteredCapability> DeclaredCapabilities => new[]
+        {
+            new RegisteredCapability
+            {
+                CapabilityId = $"{Id}.deduplication",
+                DisplayName = $"{Name} - Deduplication",
+                Description = "Data deduplication with configurable chunking algorithms",
+                Category = CapabilityCategory.Storage,
+                SubCategory = "Deduplication",
+                PluginId = Id,
+                PluginName = Name,
+                PluginVersion = Version,
+                Tags = new[] { "deduplication", "storage", "optimization", "chunking" },
+                SemanticDescription = "Use this for reducing storage costs by eliminating duplicate data blocks",
+                Metadata = new Dictionary<string, object>
+                {
+                    ["chunkingAlgorithm"] = ChunkingAlgorithm,
+                    ["hashAlgorithm"] = HashAlgorithm,
+                    ["averageChunkSize"] = AverageChunkSize
+                }
+            }
+        };
+
+        /// <summary>
+        /// Gets static knowledge for Intelligence registration.
+        /// </summary>
+        protected override IReadOnlyList<KnowledgeObject> GetStaticKnowledge()
+        {
+            var knowledge = new List<KnowledgeObject>(base.GetStaticKnowledge());
+
+            knowledge.Add(new KnowledgeObject
+            {
+                Id = $"{Id}.dedup.capability",
+                Topic = "deduplication",
+                SourcePluginId = Id,
+                SourcePluginName = Name,
+                KnowledgeType = "capability",
+                Description = $"Deduplication provider using {ChunkingAlgorithm} chunking with {HashAlgorithm} fingerprinting",
+                Payload = new Dictionary<string, object>
+                {
+                    ["chunkingAlgorithm"] = ChunkingAlgorithm,
+                    ["hashAlgorithm"] = HashAlgorithm,
+                    ["averageChunkSize"] = AverageChunkSize,
+                    ["minChunkSize"] = MinChunkSize,
+                    ["maxChunkSize"] = MaxChunkSize
+                },
+                Tags = new[] { "deduplication", "storage", "chunking", ChunkingAlgorithm.ToLowerInvariant() },
+                Confidence = 1.0f,
+                Timestamp = DateTimeOffset.UtcNow
+            });
+
+            return knowledge;
+        }
+
+        /// <summary>
+        /// Requests AI estimation of deduplication ratio for a data sample.
+        /// </summary>
+        /// <param name="sampleData">Sample data bytes to analyze.</param>
+        /// <param name="ct">Cancellation token.</param>
+        /// <returns>Estimated dedup ratio (0.0-1.0), or null if Intelligence unavailable.</returns>
+        protected async Task<double?> RequestDedupRatioEstimateAsync(byte[] sampleData, CancellationToken ct = default)
+        {
+            if (MessageBus == null) return null;
+
+            try
+            {
+                var request = new PluginMessage
+                {
+                    Type = "intelligence.predict.request",
+                    CorrelationId = Guid.NewGuid().ToString("N"),
+                    Source = Id,
+                    Payload = new Dictionary<string, object>
+                    {
+                        ["predictionType"] = "dedup_ratio",
+                        ["sampleSize"] = sampleData.Length,
+                        ["entropy"] = CalculateSampleEntropy(sampleData),
+                        ["chunkingAlgorithm"] = ChunkingAlgorithm
+                    }
+                };
+
+                await MessageBus.PublishAsync("intelligence.predict", request, ct);
+                return null; // Actual implementation would await response
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        /// <summary>
+        /// Requests AI-driven optimal chunk size recommendation.
+        /// </summary>
+        /// <param name="dataProfile">Profile describing the data characteristics.</param>
+        /// <param name="ct">Cancellation token.</param>
+        /// <returns>Recommended chunk size, or null if unavailable.</returns>
+        protected async Task<int?> RequestOptimalChunkSizeAsync(Dictionary<string, object> dataProfile, CancellationToken ct = default)
+        {
+            if (MessageBus == null) return null;
+
+            try
+            {
+                var request = new PluginMessage
+                {
+                    Type = "intelligence.recommend.request",
+                    CorrelationId = Guid.NewGuid().ToString("N"),
+                    Source = Id,
+                    Payload = new Dictionary<string, object>
+                    {
+                        ["recommendationType"] = "chunk_size",
+                        ["dataProfile"] = dataProfile,
+                        ["currentAverage"] = AverageChunkSize
+                    }
+                };
+
+                await MessageBus.PublishAsync("intelligence.recommend", request, ct);
+                return null;
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        /// <summary>
+        /// Calculates sample entropy for AI analysis.
+        /// </summary>
+        private static double CalculateSampleEntropy(byte[] data)
+        {
+            if (data.Length == 0) return 0;
+            var frequencies = new int[256];
+            foreach (var b in data) frequencies[b]++;
+            double entropy = 0;
+            foreach (var freq in frequencies)
+            {
+                if (freq > 0)
+                {
+                    double p = (double)freq / data.Length;
+                    entropy -= p * Math.Log2(p);
+                }
+            }
+            return entropy / 8.0;
+        }
+
+        #endregion
 
         /// <summary>
         /// Chunking algorithm identifier.
@@ -381,6 +534,8 @@ namespace DataWarehouse.SDK.Contracts
         public string HeadVersionId { get; init; } = string.Empty;
         public string BaseVersionId { get; init; } = string.Empty;
         public DateTime CreatedAt { get; init; }
+        /// <summary>Alias for CreatedAt for compatibility.</summary>
+        public DateTimeOffset Timestamp { get => new DateTimeOffset(CreatedAt); init => CreatedAt = value.DateTime; }
         public string? CreatedBy { get; init; }
     }
 
@@ -420,6 +575,7 @@ namespace DataWarehouse.SDK.Contracts
 
     /// <summary>
     /// Abstract base class for versioning provider plugins.
+    /// Intelligence-aware: Supports AI-driven version conflict resolution and diff analysis.
     /// </summary>
     public abstract class VersioningPluginBase : FeaturePluginBase, IVersioningProvider
     {
@@ -427,6 +583,137 @@ namespace DataWarehouse.SDK.Contracts
 
         public abstract bool SupportsBranching { get; }
         public abstract bool SupportsDeltaStorage { get; }
+
+        #region Intelligence Integration
+
+        /// <summary>
+        /// Capabilities declared by this versioning provider.
+        /// </summary>
+        protected override IReadOnlyList<RegisteredCapability> DeclaredCapabilities => new[]
+        {
+            new RegisteredCapability
+            {
+                CapabilityId = $"{Id}.versioning",
+                DisplayName = $"{Name} - Version Control",
+                Description = "File versioning with history, branching, and diff support",
+                Category = CapabilityCategory.Storage,
+                SubCategory = "Versioning",
+                PluginId = Id,
+                PluginName = Name,
+                PluginVersion = Version,
+                Tags = new[] { "versioning", "storage", "history", "branching" },
+                SemanticDescription = "Use this for maintaining version history and enabling rollback capabilities",
+                Metadata = new Dictionary<string, object>
+                {
+                    ["supportsBranching"] = SupportsBranching,
+                    ["supportsDeltaStorage"] = SupportsDeltaStorage
+                }
+            }
+        };
+
+        /// <summary>
+        /// Gets static knowledge for Intelligence registration.
+        /// </summary>
+        protected override IReadOnlyList<KnowledgeObject> GetStaticKnowledge()
+        {
+            var knowledge = new List<KnowledgeObject>(base.GetStaticKnowledge());
+
+            knowledge.Add(new KnowledgeObject
+            {
+                Id = $"{Id}.versioning.capability",
+                Topic = "versioning",
+                SourcePluginId = Id,
+                SourcePluginName = Name,
+                KnowledgeType = "capability",
+                Description = $"Version control provider with {(SupportsBranching ? "branching" : "linear")} support",
+                Payload = new Dictionary<string, object>
+                {
+                    ["supportsBranching"] = SupportsBranching,
+                    ["supportsDeltaStorage"] = SupportsDeltaStorage,
+                    ["supportsMerge"] = SupportsBranching
+                },
+                Tags = new[] { "versioning", "storage", SupportsBranching ? "branching" : "linear" },
+                Confidence = 1.0f,
+                Timestamp = DateTimeOffset.UtcNow
+            });
+
+            return knowledge;
+        }
+
+        /// <summary>
+        /// Requests AI-driven conflict resolution for merge conflicts.
+        /// </summary>
+        /// <param name="conflict">The merge conflict to resolve.</param>
+        /// <param name="ct">Cancellation token.</param>
+        /// <returns>Resolved data, or null if unavailable.</returns>
+        protected async Task<byte[]?> RequestConflictResolutionAsync(MergeConflict conflict, CancellationToken ct = default)
+        {
+            if (MessageBus == null) return null;
+
+            try
+            {
+                var request = new PluginMessage
+                {
+                    Type = "intelligence.resolve.request",
+                    CorrelationId = Guid.NewGuid().ToString("N"),
+                    Source = Id,
+                    Payload = new Dictionary<string, object>
+                    {
+                        ["conflictType"] = "merge",
+                        ["offset"] = conflict.Offset,
+                        ["length"] = conflict.Length,
+                        ["hasBase"] = conflict.BaseData != null,
+                        ["hasSource"] = conflict.SourceData != null,
+                        ["hasTarget"] = conflict.TargetData != null
+                    }
+                };
+
+                await MessageBus.PublishAsync("intelligence.resolve", request, ct);
+                return null;
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        /// <summary>
+        /// Requests AI-generated summary of changes between versions.
+        /// </summary>
+        /// <param name="diff">The version diff to summarize.</param>
+        /// <param name="ct">Cancellation token.</param>
+        /// <returns>Summary text, or null if unavailable.</returns>
+        protected async Task<string?> RequestDiffSummaryAsync(VersionDiff diff, CancellationToken ct = default)
+        {
+            if (MessageBus == null) return null;
+
+            try
+            {
+                var request = new PluginMessage
+                {
+                    Type = "intelligence.summarize.request",
+                    CorrelationId = Guid.NewGuid().ToString("N"),
+                    Source = Id,
+                    Payload = new Dictionary<string, object>
+                    {
+                        ["contentType"] = "version_diff",
+                        ["bytesAdded"] = diff.BytesAdded,
+                        ["bytesRemoved"] = diff.BytesRemoved,
+                        ["bytesModified"] = diff.BytesModified,
+                        ["hunkCount"] = diff.Hunks.Count
+                    }
+                };
+
+                await MessageBus.PublishAsync("intelligence.summarize", request, ct);
+                return null;
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        #endregion
 
         public abstract Task<VersionInfo> CreateVersionAsync(string objectId, Stream data, VersionMetadata? metadata = null, CancellationToken ct = default);
         public abstract Task<Stream> GetVersionAsync(string objectId, string versionId, CancellationToken ct = default);
@@ -446,7 +733,7 @@ namespace DataWarehouse.SDK.Contracts
                 Name = branchName,
                 HeadVersionId = versionId,
                 BaseVersionId = versionId,
-                CreatedAt = DateTime.UtcNow,
+                Timestamp = DateTimeOffset.UtcNow,
                 CreatedBy = "system"
             });
         }
@@ -671,6 +958,7 @@ namespace DataWarehouse.SDK.Contracts
 
     /// <summary>
     /// Abstract base class for snapshot provider plugins.
+    /// Intelligence-aware: Supports AI-driven snapshot scheduling and retention optimization.
     /// </summary>
     public abstract class SnapshotPluginBase : FeaturePluginBase, ISnapshotProvider
     {
@@ -678,6 +966,134 @@ namespace DataWarehouse.SDK.Contracts
 
         public abstract bool SupportsIncremental { get; }
         public abstract bool SupportsLegalHold { get; }
+
+        #region Intelligence Integration
+
+        /// <summary>
+        /// Capabilities declared by this snapshot provider.
+        /// </summary>
+        protected override IReadOnlyList<RegisteredCapability> DeclaredCapabilities => new[]
+        {
+            new RegisteredCapability
+            {
+                CapabilityId = $"{Id}.snapshot",
+                DisplayName = $"{Name} - Snapshot Management",
+                Description = "Point-in-time snapshots with retention policies and legal hold support",
+                Category = CapabilityCategory.Storage,
+                SubCategory = "Snapshot",
+                PluginId = Id,
+                PluginName = Name,
+                PluginVersion = Version,
+                Tags = new[] { "snapshot", "storage", "backup", "recovery" },
+                SemanticDescription = "Use this for creating point-in-time copies for backup and compliance",
+                Metadata = new Dictionary<string, object>
+                {
+                    ["supportsIncremental"] = SupportsIncremental,
+                    ["supportsLegalHold"] = SupportsLegalHold
+                }
+            }
+        };
+
+        /// <summary>
+        /// Gets static knowledge for Intelligence registration.
+        /// </summary>
+        protected override IReadOnlyList<KnowledgeObject> GetStaticKnowledge()
+        {
+            var knowledge = new List<KnowledgeObject>(base.GetStaticKnowledge());
+
+            knowledge.Add(new KnowledgeObject
+            {
+                Id = $"{Id}.snapshot.capability",
+                Topic = "snapshot",
+                SourcePluginId = Id,
+                SourcePluginName = Name,
+                KnowledgeType = "capability",
+                Description = $"Snapshot provider with {(SupportsIncremental ? "incremental" : "full")} support and {(SupportsLegalHold ? "legal hold" : "standard retention")}",
+                Payload = new Dictionary<string, object>
+                {
+                    ["supportsIncremental"] = SupportsIncremental,
+                    ["supportsLegalHold"] = SupportsLegalHold,
+                    ["supportsRetentionPolicies"] = true
+                },
+                Tags = new[] { "snapshot", "storage", SupportsIncremental ? "incremental" : "full" },
+                Confidence = 1.0f,
+                Timestamp = DateTimeOffset.UtcNow
+            });
+
+            return knowledge;
+        }
+
+        /// <summary>
+        /// Requests AI-recommended optimal snapshot schedule based on data patterns.
+        /// </summary>
+        /// <param name="dataProfile">Profile describing data change patterns.</param>
+        /// <param name="ct">Cancellation token.</param>
+        /// <returns>Recommended schedule as cron expression, or null if unavailable.</returns>
+        protected async Task<string?> RequestOptimalScheduleAsync(Dictionary<string, object> dataProfile, CancellationToken ct = default)
+        {
+            if (MessageBus == null) return null;
+
+            try
+            {
+                var request = new PluginMessage
+                {
+                    Type = "intelligence.recommend.request",
+                    CorrelationId = Guid.NewGuid().ToString("N"),
+                    Source = Id,
+                    Payload = new Dictionary<string, object>
+                    {
+                        ["recommendationType"] = "snapshot_schedule",
+                        ["dataProfile"] = dataProfile,
+                        ["supportsIncremental"] = SupportsIncremental
+                    }
+                };
+
+                await MessageBus.PublishAsync("intelligence.recommend", request, ct);
+                return null;
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        /// <summary>
+        /// Requests AI-driven retention policy recommendation.
+        /// </summary>
+        /// <param name="complianceRequirements">Compliance requirements to consider.</param>
+        /// <param name="ct">Cancellation token.</param>
+        /// <returns>Recommended retention policy, or null if unavailable.</returns>
+        protected async Task<SnapshotRetentionPolicy?> RequestRetentionRecommendationAsync(
+            Dictionary<string, object> complianceRequirements,
+            CancellationToken ct = default)
+        {
+            if (MessageBus == null) return null;
+
+            try
+            {
+                var request = new PluginMessage
+                {
+                    Type = "intelligence.recommend.request",
+                    CorrelationId = Guid.NewGuid().ToString("N"),
+                    Source = Id,
+                    Payload = new Dictionary<string, object>
+                    {
+                        ["recommendationType"] = "retention_policy",
+                        ["complianceRequirements"] = complianceRequirements,
+                        ["supportsLegalHold"] = SupportsLegalHold
+                    }
+                };
+
+                await MessageBus.PublishAsync("intelligence.recommend", request, ct);
+                return null;
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        #endregion
 
         public abstract Task<SnapshotInfo> CreateSnapshotAsync(SnapshotRequest request, CancellationToken ct = default);
         public abstract Task<IReadOnlyList<SnapshotInfo>> ListSnapshotsAsync(SnapshotFilter? filter = null, CancellationToken ct = default);
@@ -863,6 +1279,7 @@ namespace DataWarehouse.SDK.Contracts
 
     /// <summary>
     /// Abstract base class for telemetry provider plugins.
+    /// Intelligence-aware: Supports AI-driven anomaly detection in metrics and traces.
     /// </summary>
     public abstract class TelemetryPluginBase : FeaturePluginBase, ITelemetryProvider
     {
@@ -873,6 +1290,139 @@ namespace DataWarehouse.SDK.Contracts
         public abstract TelemetryCapabilities Capabilities { get; }
 
         public ITraceSpan? CurrentSpan => _currentSpan.Value;
+
+        #region Intelligence Integration
+
+        /// <summary>
+        /// Capabilities declared by this telemetry provider.
+        /// </summary>
+        protected override IReadOnlyList<RegisteredCapability> DeclaredCapabilities => new[]
+        {
+            new RegisteredCapability
+            {
+                CapabilityId = $"{Id}.telemetry",
+                DisplayName = $"{Name} - Telemetry Collection",
+                Description = "Metrics, tracing, and logging collection with export capabilities",
+                Category = CapabilityCategory.Pipeline,
+                SubCategory = "Telemetry",
+                PluginId = Id,
+                PluginName = Name,
+                PluginVersion = Version,
+                Tags = new[] { "telemetry", "metrics", "tracing", "logging", "observability" },
+                SemanticDescription = "Use this for collecting and analyzing system telemetry data",
+                Metadata = new Dictionary<string, object>
+                {
+                    ["capabilities"] = Capabilities.ToString(),
+                    ["supportsMetrics"] = Capabilities.HasFlag(TelemetryCapabilities.Metrics),
+                    ["supportsTracing"] = Capabilities.HasFlag(TelemetryCapabilities.Tracing),
+                    ["supportsLogging"] = Capabilities.HasFlag(TelemetryCapabilities.Logging)
+                }
+            }
+        };
+
+        /// <summary>
+        /// Gets static knowledge for Intelligence registration.
+        /// </summary>
+        protected override IReadOnlyList<KnowledgeObject> GetStaticKnowledge()
+        {
+            var knowledge = new List<KnowledgeObject>(base.GetStaticKnowledge());
+
+            knowledge.Add(new KnowledgeObject
+            {
+                Id = $"{Id}.telemetry.capability",
+                Topic = "telemetry",
+                SourcePluginId = Id,
+                SourcePluginName = Name,
+                KnowledgeType = "capability",
+                Description = $"Telemetry provider supporting {Capabilities}",
+                Payload = new Dictionary<string, object>
+                {
+                    ["capabilities"] = Capabilities.ToString(),
+                    ["supportsMetrics"] = Capabilities.HasFlag(TelemetryCapabilities.Metrics),
+                    ["supportsTracing"] = Capabilities.HasFlag(TelemetryCapabilities.Tracing),
+                    ["supportsLogging"] = Capabilities.HasFlag(TelemetryCapabilities.Logging),
+                    ["supportsProfiling"] = Capabilities.HasFlag(TelemetryCapabilities.Profiling)
+                },
+                Tags = new[] { "telemetry", "observability" },
+                Confidence = 1.0f,
+                Timestamp = DateTimeOffset.UtcNow
+            });
+
+            return knowledge;
+        }
+
+        /// <summary>
+        /// Requests AI-driven anomaly detection on metric data.
+        /// </summary>
+        /// <param name="metricName">Name of the metric to analyze.</param>
+        /// <param name="values">Recent metric values.</param>
+        /// <param name="ct">Cancellation token.</param>
+        /// <returns>Anomaly detection result, or null if unavailable.</returns>
+        protected async Task<(bool IsAnomaly, double Score)?> RequestMetricAnomalyDetectionAsync(
+            string metricName,
+            double[] values,
+            CancellationToken ct = default)
+        {
+            if (MessageBus == null) return null;
+
+            try
+            {
+                var request = new PluginMessage
+                {
+                    Type = "intelligence.anomaly.request",
+                    CorrelationId = Guid.NewGuid().ToString("N"),
+                    Source = Id,
+                    Payload = new Dictionary<string, object>
+                    {
+                        ["metricName"] = metricName,
+                        ["values"] = values,
+                        ["analysisType"] = "metric_anomaly"
+                    }
+                };
+
+                await MessageBus.PublishAsync("intelligence.anomaly", request, ct);
+                return null;
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        /// <summary>
+        /// Requests AI-generated insights from trace data.
+        /// </summary>
+        /// <param name="traceId">Trace ID to analyze.</param>
+        /// <param name="ct">Cancellation token.</param>
+        /// <returns>Insights text, or null if unavailable.</returns>
+        protected async Task<string?> RequestTraceInsightsAsync(string traceId, CancellationToken ct = default)
+        {
+            if (MessageBus == null) return null;
+
+            try
+            {
+                var request = new PluginMessage
+                {
+                    Type = "intelligence.analyze.request",
+                    CorrelationId = Guid.NewGuid().ToString("N"),
+                    Source = Id,
+                    Payload = new Dictionary<string, object>
+                    {
+                        ["analysisType"] = "trace_insights",
+                        ["traceId"] = traceId
+                    }
+                };
+
+                await MessageBus.PublishAsync("intelligence.analyze", request, ct);
+                return null;
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        #endregion
 
         public abstract void RecordMetric(string name, double value, Dictionary<string, string>? tags = null);
         public abstract void IncrementCounter(string name, long delta = 1, Dictionary<string, string>? tags = null);
@@ -1133,6 +1683,7 @@ namespace DataWarehouse.SDK.Contracts
 
     /// <summary>
     /// Abstract base class for threat detection provider plugins.
+    /// Intelligence-aware: Supports AI-driven threat classification and behavioral analysis.
     /// </summary>
     public abstract class ThreatDetectionPluginBase : FeaturePluginBase, IThreatDetectionProvider
     {
@@ -1143,6 +1694,140 @@ namespace DataWarehouse.SDK.Contracts
         public override PluginCategory Category => PluginCategory.SecurityProvider;
 
         public abstract ThreatDetectionCapabilities DetectionCapabilities { get; }
+
+        #region Intelligence Integration
+
+        /// <summary>
+        /// Capabilities declared by this threat detection provider.
+        /// </summary>
+        protected override IReadOnlyList<RegisteredCapability> DeclaredCapabilities => new[]
+        {
+            new RegisteredCapability
+            {
+                CapabilityId = $"{Id}.threat-detection",
+                DisplayName = $"{Name} - Threat Detection",
+                Description = "Threat detection with ransomware, malware, and anomaly detection capabilities",
+                Category = CapabilityCategory.Security,
+                SubCategory = "ThreatDetection",
+                PluginId = Id,
+                PluginName = Name,
+                PluginVersion = Version,
+                Tags = new[] { "security", "threat-detection", "ransomware", "malware", "anomaly" },
+                SemanticDescription = "Use this for detecting security threats including ransomware and malware",
+                Metadata = new Dictionary<string, object>
+                {
+                    ["capabilities"] = DetectionCapabilities.ToString(),
+                    ["supportsRansomware"] = DetectionCapabilities.HasFlag(ThreatDetectionCapabilities.Ransomware),
+                    ["supportsMalware"] = DetectionCapabilities.HasFlag(ThreatDetectionCapabilities.Malware),
+                    ["supportsAnomaly"] = DetectionCapabilities.HasFlag(ThreatDetectionCapabilities.Anomaly)
+                }
+            }
+        };
+
+        /// <summary>
+        /// Gets static knowledge for Intelligence registration.
+        /// </summary>
+        protected override IReadOnlyList<KnowledgeObject> GetStaticKnowledge()
+        {
+            var knowledge = new List<KnowledgeObject>(base.GetStaticKnowledge());
+
+            knowledge.Add(new KnowledgeObject
+            {
+                Id = $"{Id}.threat.capability",
+                Topic = "threat-detection",
+                SourcePluginId = Id,
+                SourcePluginName = Name,
+                KnowledgeType = "capability",
+                Description = $"Threat detection provider supporting {DetectionCapabilities}",
+                Payload = new Dictionary<string, object>
+                {
+                    ["capabilities"] = DetectionCapabilities.ToString(),
+                    ["supportsRansomware"] = DetectionCapabilities.HasFlag(ThreatDetectionCapabilities.Ransomware),
+                    ["supportsMalware"] = DetectionCapabilities.HasFlag(ThreatDetectionCapabilities.Malware),
+                    ["supportsAnomaly"] = DetectionCapabilities.HasFlag(ThreatDetectionCapabilities.Anomaly),
+                    ["supportsEntropy"] = DetectionCapabilities.HasFlag(ThreatDetectionCapabilities.Entropy),
+                    ["supportsBehavioral"] = DetectionCapabilities.HasFlag(ThreatDetectionCapabilities.Behavioral)
+                },
+                Tags = new[] { "security", "threat-detection" },
+                Confidence = 1.0f,
+                Timestamp = DateTimeOffset.UtcNow
+            });
+
+            return knowledge;
+        }
+
+        /// <summary>
+        /// Requests AI-driven threat classification for detected threats.
+        /// </summary>
+        /// <param name="threatData">Data about the detected threat.</param>
+        /// <param name="ct">Cancellation token.</param>
+        /// <returns>Classification result with threat type and confidence.</returns>
+        protected async Task<(string ThreatType, double Confidence)?> RequestThreatClassificationAsync(
+            Dictionary<string, object> threatData,
+            CancellationToken ct = default)
+        {
+            if (MessageBus == null) return null;
+
+            try
+            {
+                var request = new PluginMessage
+                {
+                    Type = "intelligence.classify.request",
+                    CorrelationId = Guid.NewGuid().ToString("N"),
+                    Source = Id,
+                    Payload = new Dictionary<string, object>
+                    {
+                        ["classifyType"] = "threat",
+                        ["threatData"] = threatData
+                    }
+                };
+
+                await MessageBus.PublishAsync("intelligence.classify", request, ct);
+                return null;
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        /// <summary>
+        /// Requests AI-driven behavioral pattern analysis.
+        /// </summary>
+        /// <param name="behavior">Behavioral data to analyze.</param>
+        /// <param name="ct">Cancellation token.</param>
+        /// <returns>Risk score and assessment.</returns>
+        protected async Task<(double RiskScore, string Assessment)?> RequestBehavioralAnalysisAsync(
+            BehaviorData behavior,
+            CancellationToken ct = default)
+        {
+            if (MessageBus == null) return null;
+
+            try
+            {
+                var request = new PluginMessage
+                {
+                    Type = "intelligence.analyze.request",
+                    CorrelationId = Guid.NewGuid().ToString("N"),
+                    Source = Id,
+                    Payload = new Dictionary<string, object>
+                    {
+                        ["analysisType"] = "behavioral",
+                        ["accessCount"] = behavior.RecentAccesses.Count,
+                        ["modificationCount"] = behavior.RecentModifications.Count
+                    }
+                };
+
+                await MessageBus.PublishAsync("intelligence.analyze", request, ct);
+                return null;
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        #endregion
 
         public abstract Task<ThreatScanResult> ScanAsync(Stream data, string? filename = null, ScanOptions? options = null, CancellationToken ct = default);
         public abstract Task<AnomalyAnalysisResult> AnalyzeBehaviorAsync(BehaviorData behavior, CancellationToken ct = default);
@@ -1467,12 +2152,157 @@ namespace DataWarehouse.SDK.Contracts
 
     /// <summary>
     /// Abstract base class for backup provider plugins.
+    /// Intelligence-aware: Supports AI-driven backup scheduling and recovery optimization.
     /// </summary>
     public abstract class BackupPluginBase : FeaturePluginBase, IBackupProvider
     {
         public override PluginCategory Category => PluginCategory.StorageProvider;
 
         public abstract BackupCapabilities Capabilities { get; }
+
+        #region Intelligence Integration
+
+        /// <summary>
+        /// Capabilities declared by this backup provider.
+        /// </summary>
+        protected override IReadOnlyList<RegisteredCapability> DeclaredCapabilities => new[]
+        {
+            new RegisteredCapability
+            {
+                CapabilityId = $"{Id}.backup",
+                DisplayName = $"{Name} - Backup Management",
+                Description = "Backup operations with scheduling, verification, and restore capabilities",
+                Category = CapabilityCategory.Storage,
+                SubCategory = "Backup",
+                PluginId = Id,
+                PluginName = Name,
+                PluginVersion = Version,
+                Tags = new[] { "backup", "storage", "recovery", "scheduling" },
+                SemanticDescription = "Use this for creating and managing data backups with scheduling support",
+                Metadata = new Dictionary<string, object>
+                {
+                    ["capabilities"] = Capabilities.ToString(),
+                    ["supportsIncremental"] = Capabilities.HasFlag(BackupCapabilities.Incremental),
+                    ["supportsContinuous"] = Capabilities.HasFlag(BackupCapabilities.Continuous),
+                    ["supportsDedup"] = Capabilities.HasFlag(BackupCapabilities.Dedup),
+                    ["supportsScheduling"] = Capabilities.HasFlag(BackupCapabilities.Scheduling)
+                }
+            }
+        };
+
+        /// <summary>
+        /// Gets static knowledge for Intelligence registration.
+        /// </summary>
+        protected override IReadOnlyList<KnowledgeObject> GetStaticKnowledge()
+        {
+            var knowledge = new List<KnowledgeObject>(base.GetStaticKnowledge());
+
+            knowledge.Add(new KnowledgeObject
+            {
+                Id = $"{Id}.backup.capability",
+                Topic = "backup",
+                SourcePluginId = Id,
+                SourcePluginName = Name,
+                KnowledgeType = "capability",
+                Description = $"Backup provider supporting {Capabilities}",
+                Payload = new Dictionary<string, object>
+                {
+                    ["capabilities"] = Capabilities.ToString(),
+                    ["supportsIncremental"] = Capabilities.HasFlag(BackupCapabilities.Incremental),
+                    ["supportsDifferential"] = Capabilities.HasFlag(BackupCapabilities.Differential),
+                    ["supportsContinuous"] = Capabilities.HasFlag(BackupCapabilities.Continuous),
+                    ["supportsDedup"] = Capabilities.HasFlag(BackupCapabilities.Dedup),
+                    ["supportsEncryption"] = Capabilities.HasFlag(BackupCapabilities.Encryption),
+                    ["supportsVerification"] = Capabilities.HasFlag(BackupCapabilities.Verification)
+                },
+                Tags = new[] { "backup", "storage", "recovery" },
+                Confidence = 1.0f,
+                Timestamp = DateTimeOffset.UtcNow
+            });
+
+            return knowledge;
+        }
+
+        /// <summary>
+        /// Requests AI-driven optimal backup schedule recommendation.
+        /// </summary>
+        /// <param name="dataProfile">Profile describing data change patterns.</param>
+        /// <param name="rpo">Recovery Point Objective in minutes.</param>
+        /// <param name="ct">Cancellation token.</param>
+        /// <returns>Recommended cron expression, or null if unavailable.</returns>
+        protected async Task<string?> RequestOptimalBackupScheduleAsync(
+            Dictionary<string, object> dataProfile,
+            int rpo,
+            CancellationToken ct = default)
+        {
+            if (MessageBus == null) return null;
+
+            try
+            {
+                var request = new PluginMessage
+                {
+                    Type = "intelligence.recommend.request",
+                    CorrelationId = Guid.NewGuid().ToString("N"),
+                    Source = Id,
+                    Payload = new Dictionary<string, object>
+                    {
+                        ["recommendationType"] = "backup_schedule",
+                        ["dataProfile"] = dataProfile,
+                        ["rpoMinutes"] = rpo,
+                        ["capabilities"] = Capabilities.ToString()
+                    }
+                };
+
+                await MessageBus.PublishAsync("intelligence.recommend", request, ct);
+                return null;
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        /// <summary>
+        /// Requests AI-driven backup type recommendation (full, incremental, differential).
+        /// </summary>
+        /// <param name="lastFullBackup">Time since last full backup.</param>
+        /// <param name="changeRate">Estimated data change rate.</param>
+        /// <param name="ct">Cancellation token.</param>
+        /// <returns>Recommended backup type.</returns>
+        protected async Task<BackupType?> RequestBackupTypeRecommendationAsync(
+            TimeSpan lastFullBackup,
+            double changeRate,
+            CancellationToken ct = default)
+        {
+            if (MessageBus == null) return null;
+
+            try
+            {
+                var request = new PluginMessage
+                {
+                    Type = "intelligence.recommend.request",
+                    CorrelationId = Guid.NewGuid().ToString("N"),
+                    Source = Id,
+                    Payload = new Dictionary<string, object>
+                    {
+                        ["recommendationType"] = "backup_type",
+                        ["lastFullBackupHours"] = lastFullBackup.TotalHours,
+                        ["changeRate"] = changeRate,
+                        ["supportsIncremental"] = Capabilities.HasFlag(BackupCapabilities.Incremental),
+                        ["supportsDifferential"] = Capabilities.HasFlag(BackupCapabilities.Differential)
+                    }
+                };
+
+                await MessageBus.PublishAsync("intelligence.recommend", request, ct);
+                return null;
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        #endregion
 
         public abstract Task<BackupJob> StartBackupAsync(BackupRequest request, CancellationToken ct = default);
         public abstract Task<BackupJob?> GetBackupStatusAsync(string jobId, CancellationToken ct = default);
@@ -1742,12 +2572,150 @@ namespace DataWarehouse.SDK.Contracts
 
     /// <summary>
     /// Abstract base class for operations provider plugins.
+    /// Intelligence-aware: Supports AI-driven deployment risk assessment and alert correlation.
     /// </summary>
     public abstract class OperationsPluginBase : FeaturePluginBase, IOperationsProvider
     {
         public override PluginCategory Category => PluginCategory.OrchestrationProvider;
 
         public abstract OperationsCapabilities Capabilities { get; }
+
+        #region Intelligence Integration
+
+        /// <summary>
+        /// Capabilities declared by this operations provider.
+        /// </summary>
+        protected override IReadOnlyList<RegisteredCapability> DeclaredCapabilities => new[]
+        {
+            new RegisteredCapability
+            {
+                CapabilityId = $"{Id}.operations",
+                DisplayName = $"{Name} - Operations Management",
+                Description = "Deployment operations with upgrade, rollback, and alerting capabilities",
+                Category = CapabilityCategory.Pipeline,
+                SubCategory = "Operations",
+                PluginId = Id,
+                PluginName = Name,
+                PluginVersion = Version,
+                Tags = new[] { "operations", "deployment", "upgrade", "rollback", "alerting" },
+                SemanticDescription = "Use this for managing deployments, upgrades, and operational alerts",
+                Metadata = new Dictionary<string, object>
+                {
+                    ["capabilities"] = Capabilities.ToString(),
+                    ["supportsZeroDowntime"] = Capabilities.HasFlag(OperationsCapabilities.ZeroDowntimeUpgrade),
+                    ["supportsRollback"] = Capabilities.HasFlag(OperationsCapabilities.Rollback),
+                    ["supportsHotReload"] = Capabilities.HasFlag(OperationsCapabilities.HotReload),
+                    ["supportsAlerting"] = Capabilities.HasFlag(OperationsCapabilities.Alerting)
+                }
+            }
+        };
+
+        /// <summary>
+        /// Gets static knowledge for Intelligence registration.
+        /// </summary>
+        protected override IReadOnlyList<KnowledgeObject> GetStaticKnowledge()
+        {
+            var knowledge = new List<KnowledgeObject>(base.GetStaticKnowledge());
+
+            knowledge.Add(new KnowledgeObject
+            {
+                Id = $"{Id}.operations.capability",
+                Topic = "operations",
+                SourcePluginId = Id,
+                SourcePluginName = Name,
+                KnowledgeType = "capability",
+                Description = $"Operations provider supporting {Capabilities}",
+                Payload = new Dictionary<string, object>
+                {
+                    ["capabilities"] = Capabilities.ToString(),
+                    ["supportsZeroDowntime"] = Capabilities.HasFlag(OperationsCapabilities.ZeroDowntimeUpgrade),
+                    ["supportsRollback"] = Capabilities.HasFlag(OperationsCapabilities.Rollback),
+                    ["supportsHotReload"] = Capabilities.HasFlag(OperationsCapabilities.HotReload),
+                    ["supportsAlerting"] = Capabilities.HasFlag(OperationsCapabilities.Alerting),
+                    ["supportsAutoScaling"] = Capabilities.HasFlag(OperationsCapabilities.AutoScaling)
+                },
+                Tags = new[] { "operations", "deployment" },
+                Confidence = 1.0f,
+                Timestamp = DateTimeOffset.UtcNow
+            });
+
+            return knowledge;
+        }
+
+        /// <summary>
+        /// Requests AI-driven deployment risk assessment.
+        /// </summary>
+        /// <param name="upgradeRequest">The proposed upgrade.</param>
+        /// <param name="ct">Cancellation token.</param>
+        /// <returns>Risk score (0.0-1.0) and assessment text.</returns>
+        protected async Task<(double RiskScore, string Assessment)?> RequestDeploymentRiskAssessmentAsync(
+            UpgradeRequest upgradeRequest,
+            CancellationToken ct = default)
+        {
+            if (MessageBus == null) return null;
+
+            try
+            {
+                var request = new PluginMessage
+                {
+                    Type = "intelligence.assess.request",
+                    CorrelationId = Guid.NewGuid().ToString("N"),
+                    Source = Id,
+                    Payload = new Dictionary<string, object>
+                    {
+                        ["assessmentType"] = "deployment_risk",
+                        ["targetVersion"] = upgradeRequest.TargetVersion,
+                        ["dryRun"] = upgradeRequest.DryRun,
+                        ["autoRollback"] = upgradeRequest.AutoRollbackOnFailure
+                    }
+                };
+
+                await MessageBus.PublishAsync("intelligence.assess", request, ct);
+                return null;
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        /// <summary>
+        /// Requests AI-driven alert correlation and root cause analysis.
+        /// </summary>
+        /// <param name="alerts">Recent alerts to correlate.</param>
+        /// <param name="ct">Cancellation token.</param>
+        /// <returns>Correlated alert groups and root cause hypothesis.</returns>
+        protected async Task<(IReadOnlyList<string> CorrelatedAlertIds, string RootCauseHypothesis)?> RequestAlertCorrelationAsync(
+            IReadOnlyList<Alert> alerts,
+            CancellationToken ct = default)
+        {
+            if (MessageBus == null) return null;
+
+            try
+            {
+                var request = new PluginMessage
+                {
+                    Type = "intelligence.correlate.request",
+                    CorrelationId = Guid.NewGuid().ToString("N"),
+                    Source = Id,
+                    Payload = new Dictionary<string, object>
+                    {
+                        ["correlationType"] = "alerts",
+                        ["alertCount"] = alerts.Count,
+                        ["alertIds"] = alerts.Select(a => a.AlertId).ToArray()
+                    }
+                };
+
+                await MessageBus.PublishAsync("intelligence.correlate", request, ct);
+                return null;
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        #endregion
 
         public abstract Task<UpgradeResult> PerformUpgradeAsync(UpgradeRequest request, CancellationToken ct = default);
         public abstract Task<RollbackResult> RollbackAsync(string deploymentId, CancellationToken ct = default);

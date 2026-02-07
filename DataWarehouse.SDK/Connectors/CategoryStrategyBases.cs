@@ -1,3 +1,5 @@
+using DataWarehouse.SDK.AI;
+using DataWarehouse.SDK.Contracts;
 using System;
 using System.Collections.Generic;
 using System.Threading;
@@ -21,6 +23,17 @@ namespace DataWarehouse.SDK.Connectors
         /// </summary>
         /// <param name="logger">Optional logger.</param>
         protected DatabaseConnectionStrategyBase(ILogger? logger = null) : base(logger) { }
+
+        /// <inheritdoc/>
+        protected override string GetConnectorCategory() => "Database";
+
+        /// <inheritdoc/>
+        protected override Dictionary<string, object> GetConnectionCapabilities() => new()
+        {
+            ["supportsTransactions"] = true,
+            ["supportsQueryExecution"] = true,
+            ["supportsSchemaDiscovery"] = true
+        };
 
         /// <summary>
         /// Executes a query and returns the results as a list of dictionaries.
@@ -76,6 +89,17 @@ namespace DataWarehouse.SDK.Connectors
         /// <param name="logger">Optional logger.</param>
         protected MessagingConnectionStrategyBase(ILogger? logger = null) : base(logger) { }
 
+        /// <inheritdoc/>
+        protected override string GetConnectorCategory() => "Messaging";
+
+        /// <inheritdoc/>
+        protected override Dictionary<string, object> GetConnectionCapabilities() => new()
+        {
+            ["supportsPublish"] = true,
+            ["supportsSubscribe"] = true,
+            ["supportsTopics"] = true
+        };
+
         /// <summary>
         /// Publishes a message to a topic or queue.
         /// </summary>
@@ -124,6 +148,17 @@ namespace DataWarehouse.SDK.Connectors
         /// </summary>
         /// <param name="logger">Optional logger.</param>
         protected SaaSConnectionStrategyBase(ILogger? logger = null) : base(logger) { }
+
+        /// <inheritdoc/>
+        protected override string GetConnectorCategory() => "SaaS";
+
+        /// <inheritdoc/>
+        protected override Dictionary<string, object> GetConnectionCapabilities() => new()
+        {
+            ["supportsOAuth"] = true,
+            ["supportsTokenRefresh"] = true,
+            ["supportsApiCalls"] = true
+        };
 
         /// <summary>
         /// Ensures a valid access token is available, refreshing if necessary.
@@ -203,6 +238,17 @@ namespace DataWarehouse.SDK.Connectors
         /// <param name="logger">Optional logger.</param>
         protected IoTConnectionStrategyBase(ILogger? logger = null) : base(logger) { }
 
+        /// <inheritdoc/>
+        protected override string GetConnectorCategory() => "IoT";
+
+        /// <inheritdoc/>
+        protected override Dictionary<string, object> GetConnectionCapabilities() => new()
+        {
+            ["supportsTelemetry"] = true,
+            ["supportsCommands"] = true,
+            ["supportsDeviceManagement"] = true
+        };
+
         /// <summary>
         /// Reads telemetry data from a device or device group.
         /// </summary>
@@ -248,6 +294,17 @@ namespace DataWarehouse.SDK.Connectors
         /// <param name="logger">Optional logger.</param>
         protected LegacyConnectionStrategyBase(ILogger? logger = null) : base(logger) { }
 
+        /// <inheritdoc/>
+        protected override string GetConnectorCategory() => "Legacy";
+
+        /// <inheritdoc/>
+        protected override Dictionary<string, object> GetConnectionCapabilities() => new()
+        {
+            ["supportsProtocolEmulation"] = true,
+            ["supportsCommandTranslation"] = true,
+            ["supportsMainframe"] = true
+        };
+
         /// <summary>
         /// Emulates a legacy protocol interaction (e.g., 3270 terminal, AS/400 5250).
         /// </summary>
@@ -287,6 +344,17 @@ namespace DataWarehouse.SDK.Connectors
         /// </summary>
         /// <param name="logger">Optional logger.</param>
         protected HealthcareConnectionStrategyBase(ILogger? logger = null) : base(logger) { }
+
+        /// <inheritdoc/>
+        protected override string GetConnectorCategory() => "Healthcare";
+
+        /// <inheritdoc/>
+        protected override Dictionary<string, object> GetConnectionCapabilities() => new()
+        {
+            ["supportsHL7"] = true,
+            ["supportsFHIR"] = true,
+            ["supportsDICOM"] = true
+        };
 
         /// <summary>
         /// Validates an HL7 message for structural and semantic correctness.
@@ -330,6 +398,17 @@ namespace DataWarehouse.SDK.Connectors
         /// <param name="logger">Optional logger.</param>
         protected BlockchainConnectionStrategyBase(ILogger? logger = null) : base(logger) { }
 
+        /// <inheritdoc/>
+        protected override string GetConnectorCategory() => "Blockchain";
+
+        /// <inheritdoc/>
+        protected override Dictionary<string, object> GetConnectionCapabilities() => new()
+        {
+            ["supportsBlockRetrieval"] = true,
+            ["supportsTransactionSubmission"] = true,
+            ["supportsDLT"] = true
+        };
+
         /// <summary>
         /// Retrieves a block by its hash or number.
         /// </summary>
@@ -369,6 +448,17 @@ namespace DataWarehouse.SDK.Connectors
         /// </summary>
         /// <param name="logger">Optional logger.</param>
         protected ObservabilityConnectionStrategyBase(ILogger? logger = null) : base(logger) { }
+
+        /// <inheritdoc/>
+        protected override string GetConnectorCategory() => "Observability";
+
+        /// <inheritdoc/>
+        protected override Dictionary<string, object> GetConnectionCapabilities() => new()
+        {
+            ["supportsMetrics"] = true,
+            ["supportsLogs"] = true,
+            ["supportsTraces"] = true
+        };
 
         /// <summary>
         /// Pushes metric data points to the observability platform.
@@ -419,6 +509,17 @@ namespace DataWarehouse.SDK.Connectors
         /// <param name="logger">Optional logger.</param>
         protected DashboardConnectionStrategyBase(ILogger? logger = null) : base(logger) { }
 
+        /// <inheritdoc/>
+        protected override string GetConnectorCategory() => "Dashboard";
+
+        /// <inheritdoc/>
+        protected override Dictionary<string, object> GetConnectionCapabilities() => new()
+        {
+            ["supportsDashboardProvisioning"] = true,
+            ["supportsDataPush"] = true,
+            ["supportsBI"] = true
+        };
+
         /// <summary>
         /// Provisions or updates a dashboard definition on the platform.
         /// </summary>
@@ -459,6 +560,17 @@ namespace DataWarehouse.SDK.Connectors
         /// </summary>
         /// <param name="logger">Optional logger.</param>
         protected AiConnectionStrategyBase(ILogger? logger = null) : base(logger) { }
+
+        /// <inheritdoc/>
+        protected override string GetConnectorCategory() => "AI";
+
+        /// <inheritdoc/>
+        protected override Dictionary<string, object> GetConnectionCapabilities() => new()
+        {
+            ["supportsLLM"] = true,
+            ["supportsStreaming"] = true,
+            ["supportsInference"] = true
+        };
 
         /// <summary>
         /// Sends a request to the AI platform and returns the complete response.

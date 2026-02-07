@@ -1,3 +1,5 @@
+using DataWarehouse.SDK.AI;
+using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Contracts.IntelligenceAware;
 using System;
 using System.Collections.Generic;
@@ -27,6 +29,103 @@ namespace DataWarehouse.SDK.Connectors
     public abstract class ConnectionStrategyBase : IConnectionStrategy
     {
         private readonly ILogger? _logger;
+
+        #region Intelligence Integration
+
+        /// <summary>
+        /// Gets the message bus for Intelligence communication.
+        /// </summary>
+        protected IMessageBus? MessageBus { get; private set; }
+
+        /// <summary>
+        /// Configures Intelligence integration for this connection strategy.
+        /// </summary>
+        /// <param name="messageBus">Optional message bus for Intelligence communication.</param>
+        public virtual void ConfigureIntelligence(IMessageBus? messageBus)
+        {
+            MessageBus = messageBus;
+        }
+
+        /// <summary>
+        /// Gets a value indicating whether Intelligence integration is available.
+        /// </summary>
+        protected bool IsIntelligenceAvailable => MessageBus != null;
+
+        /// <summary>
+        /// Gets static knowledge about this connection strategy for Intelligence registration.
+        /// </summary>
+        /// <returns>A KnowledgeObject describing this connector's capabilities.</returns>
+        public virtual KnowledgeObject GetStrategyKnowledge()
+        {
+            return new KnowledgeObject
+            {
+                Id = $"connector.{StrategyId}",
+                Topic = "connector." + GetConnectorCategory().ToLowerInvariant(),
+                SourcePluginId = "sdk.connector",
+                SourcePluginName = DisplayName,
+                KnowledgeType = "capability",
+                Description = $"{DisplayName} connector for {GetConnectorCategory()} systems",
+                Payload = new Dictionary<string, object>
+                {
+                    ["strategyId"] = StrategyId,
+                    ["category"] = GetConnectorCategory(),
+                    ["capabilities"] = GetConnectionCapabilities()
+                },
+                Tags = new[] { "connector", GetConnectorCategory().ToLowerInvariant(), "strategy" }
+            };
+        }
+
+        /// <summary>
+        /// Gets the registered capability for this connection strategy.
+        /// </summary>
+        /// <returns>A RegisteredCapability describing this connector.</returns>
+        public virtual RegisteredCapability GetStrategyCapability()
+        {
+            return new RegisteredCapability
+            {
+                CapabilityId = $"connector.{StrategyId}",
+                DisplayName = DisplayName,
+                Description = $"{DisplayName} connection strategy",
+                Category = CapabilityCategory.Connector,
+                SubCategory = GetConnectorCategory(),
+                PluginId = "sdk.connector",
+                PluginName = DisplayName,
+                PluginVersion = "1.0.0",
+                Tags = new[] { "connector", GetConnectorCategory().ToLowerInvariant() },
+                SemanticDescription = $"Use {DisplayName} to connect to {GetConnectorCategory()} systems"
+            };
+        }
+
+        /// <summary>
+        /// Gets the connector category name for this strategy.
+        /// Override in derived classes for category-specific strategies.
+        /// </summary>
+        /// <returns>Category name string.</returns>
+        protected virtual string GetConnectorCategory() => Category.ToString();
+
+        /// <summary>
+        /// Gets additional capabilities specific to this connection strategy.
+        /// Override in derived classes to provide detailed capability information.
+        /// </summary>
+        /// <returns>Dictionary of capability metadata.</returns>
+        protected virtual Dictionary<string, object> GetConnectionCapabilities() => new();
+
+        /// <summary>
+        /// Requests connection optimization suggestions from Intelligence.
+        /// </summary>
+        /// <param name="ct">Cancellation token.</param>
+        /// <returns>Optimization suggestions if available, null otherwise.</returns>
+        protected async Task<object?> RequestConnectionOptimizationAsync(CancellationToken ct = default)
+        {
+            if (!IsIntelligenceAvailable) return null;
+
+            // Send request to Intelligence for connection optimization
+            // This is a placeholder for future AI-enhanced optimization
+            await Task.CompletedTask;
+            return null;
+        }
+
+        #endregion
 
         // Connection metrics
         private long _totalConnections;

@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using DataWarehouse.SDK.AI;
+using DataWarehouse.SDK.Contracts.IntelligenceAware;
 using DataWarehouse.SDK.Primitives;
 using MMConsistencyLevel = DataWarehouse.SDK.Replication.ConsistencyLevel;
 using MMConflictResolution = DataWarehouse.SDK.Replication.ConflictResolution;
@@ -22,8 +24,84 @@ namespace DataWarehouse.SDK.Contracts
     /// with configurable consistency levels and conflict resolution strategies.
     /// Derived classes implement region-specific transport and storage mechanisms.
     /// </summary>
-    public abstract class MultiMasterReplicationPluginBase : FeaturePluginBase, DataWarehouse.SDK.Replication.IMultiMasterReplication
+    public abstract class MultiMasterReplicationPluginBase : FeaturePluginBase, DataWarehouse.SDK.Replication.IMultiMasterReplication, IIntelligenceAware
     {
+        #region Intelligence Socket
+
+        public bool IsIntelligenceAvailable { get; protected set; }
+        public IntelligenceCapabilities AvailableCapabilities { get; protected set; }
+
+        public virtual async Task<bool> DiscoverIntelligenceAsync(CancellationToken ct = default)
+        {
+            if (MessageBus == null) { IsIntelligenceAvailable = false; return false; }
+            IsIntelligenceAvailable = false;
+            return IsIntelligenceAvailable;
+        }
+
+        protected override IReadOnlyList<RegisteredCapability> DeclaredCapabilities => new[]
+        {
+            new RegisteredCapability
+            {
+                CapabilityId = $"{Id}.multimaster",
+                DisplayName = $"{Name} - Multi-Master Replication",
+                Description = $"Multi-master replication from {LocalRegion} to {ConnectedRegions.Count} regions",
+                Category = CapabilityCategory.Storage,
+                SubCategory = "Replication",
+                PluginId = Id,
+                PluginName = Name,
+                PluginVersion = Version,
+                Tags = new[] { "multi-master", "replication", "distributed", LocalRegion },
+                SemanticDescription = "Use for multi-master distributed data replication"
+            }
+        };
+
+        protected virtual IReadOnlyList<KnowledgeObject> GetStaticKnowledge()
+        {
+            return new[]
+            {
+                new KnowledgeObject
+                {
+                    Id = $"{Id}.multimaster.capability",
+                    Topic = "replication.multimaster",
+                    SourcePluginId = Id,
+                    SourcePluginName = Name,
+                    KnowledgeType = "capability",
+                    Description = $"Multi-master replication, LocalRegion: {LocalRegion}, Regions: {ConnectedRegions.Count}",
+                    Payload = new Dictionary<string, object>
+                    {
+                        ["localRegion"] = LocalRegion,
+                        ["connectedRegions"] = ConnectedRegions.ToArray(),
+                        ["defaultConsistency"] = DefaultConsistency.ToString(),
+                        ["defaultConflictResolution"] = DefaultConflictResolution.ToString()
+                    },
+                    Tags = new[] { "multi-master", "replication" }
+                }
+            };
+        }
+
+        /// <summary>
+        /// Requests AI-assisted conflict prediction.
+        /// </summary>
+        protected virtual async Task<ConflictPrediction?> RequestConflictPredictionAsync(string key, CancellationToken ct = default)
+        {
+            if (!IsIntelligenceAvailable || MessageBus == null) return null;
+            await Task.CompletedTask;
+            return null;
+        }
+
+        /// <summary>
+        /// Requests AI-assisted replication optimization.
+        /// </summary>
+        protected virtual async Task<ReplicationOptimizationHint?> RequestReplicationOptimizationAsync(string[] targetRegions, CancellationToken ct = default)
+        {
+            if (!IsIntelligenceAvailable || MessageBus == null) return null;
+            await Task.CompletedTask;
+            return null;
+        }
+
+        #endregion
+
+
         /// <summary>
         /// Gets the local region identifier.
         /// Must be unique across all participating regions.
@@ -394,4 +472,24 @@ namespace DataWarehouse.SDK.Contracts
         /// </summary>
         public override PluginCategory Category => PluginCategory.StorageProvider;
     }
+
+    #region Stub Types for Multi-Master Intelligence Integration
+
+    /// <summary>Stub type for conflict prediction from AI.</summary>
+    public record ConflictPrediction(
+        string Key,
+        double ConflictProbability,
+        string[] PotentialConflictingRegions,
+        string RecommendedAction,
+        double ConfidenceScore);
+
+    /// <summary>Stub type for replication optimization hints from AI.</summary>
+    public record ReplicationOptimizationHint(
+        string[] OptimalReplicationOrder,
+        string RecommendedConsistencyLevel,
+        int? SuggestedBatchSize,
+        TimeSpan? RecommendedDelay,
+        double ConfidenceScore);
+
+    #endregion
 }

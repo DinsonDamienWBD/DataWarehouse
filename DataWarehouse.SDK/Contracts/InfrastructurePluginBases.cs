@@ -1,6 +1,9 @@
+using DataWarehouse.SDK.AI;
+using DataWarehouse.SDK.Contracts.IntelligenceAware;
 using DataWarehouse.SDK.Primitives;
 using System.Collections.Concurrent;
 using System.Security.Claims;
+using System.Threading;
 
 namespace DataWarehouse.SDK.Contracts
 {
@@ -11,8 +14,71 @@ namespace DataWarehouse.SDK.Contracts
     /// Provides common infrastructure for implementing IHealthCheck with
     /// automatic registration, caching, and component health aggregation.
     /// </summary>
-    public abstract class HealthProviderPluginBase : FeaturePluginBase, IHealthCheck
+    public abstract class HealthProviderPluginBase : FeaturePluginBase, IHealthCheck, IIntelligenceAware
     {
+        #region Intelligence Socket
+
+        public bool IsIntelligenceAvailable { get; protected set; }
+        public IntelligenceCapabilities AvailableCapabilities { get; protected set; }
+
+        public virtual async Task<bool> DiscoverIntelligenceAsync(CancellationToken ct = default)
+        {
+            if (MessageBus == null) { IsIntelligenceAvailable = false; return false; }
+            IsIntelligenceAvailable = false;
+            return IsIntelligenceAvailable;
+        }
+
+        protected override IReadOnlyList<RegisteredCapability> DeclaredCapabilities => new[]
+        {
+            new RegisteredCapability
+            {
+                CapabilityId = $"{Id}.health",
+                DisplayName = $"{Name} - Health Provider",
+                Description = "Health check and monitoring capabilities",
+                Category = CapabilityCategory.Infrastructure,
+                SubCategory = "Monitoring",
+                PluginId = Id,
+                PluginName = Name,
+                PluginVersion = Version,
+                Tags = new[] { "health", "monitoring", "diagnostics" },
+                SemanticDescription = "Use for health monitoring and diagnostics"
+            }
+        };
+
+        protected virtual IReadOnlyList<KnowledgeObject> GetStaticKnowledge()
+        {
+            return new[]
+            {
+                new KnowledgeObject
+                {
+                    Id = $"{Id}.health.capability",
+                    Topic = "infrastructure.health",
+                    SourcePluginId = Id,
+                    SourcePluginName = Name,
+                    KnowledgeType = "capability",
+                    Description = $"Health provider with {_registeredChecks.Count} registered checks",
+                    Payload = new Dictionary<string, object>
+                    {
+                        ["registeredChecks"] = _registeredChecks.Count,
+                        ["cacheDurationSeconds"] = CacheDuration.TotalSeconds
+                    },
+                    Tags = new[] { "health", "monitoring" }
+                }
+            };
+        }
+
+        /// <summary>
+        /// Requests AI-assisted health prediction.
+        /// </summary>
+        protected virtual async Task<HealthPrediction?> RequestHealthPredictionAsync(CancellationToken ct = default)
+        {
+            if (!IsIntelligenceAvailable || MessageBus == null) return null;
+            await Task.CompletedTask;
+            return null;
+        }
+
+        #endregion
+
         private readonly ConcurrentDictionary<string, IHealthCheck> _registeredChecks = new();
         private readonly ConcurrentDictionary<string, HealthCheckResult> _cachedResults = new();
         private readonly SemaphoreSlim _checkLock = new(1, 1);
@@ -182,8 +248,72 @@ namespace DataWarehouse.SDK.Contracts
     /// Abstract base class for rate limiter plugins.
     /// Provides common token bucket implementation with configurable policies.
     /// </summary>
-    public abstract class RateLimiterPluginBase : FeaturePluginBase, IRateLimiter
+    public abstract class RateLimiterPluginBase : FeaturePluginBase, IRateLimiter, IIntelligenceAware
     {
+        #region Intelligence Socket
+
+        public bool IsIntelligenceAvailable { get; protected set; }
+        public IntelligenceCapabilities AvailableCapabilities { get; protected set; }
+
+        public virtual async Task<bool> DiscoverIntelligenceAsync(CancellationToken ct = default)
+        {
+            if (MessageBus == null) { IsIntelligenceAvailable = false; return false; }
+            IsIntelligenceAvailable = false;
+            return IsIntelligenceAvailable;
+        }
+
+        protected override IReadOnlyList<RegisteredCapability> DeclaredCapabilities => new[]
+        {
+            new RegisteredCapability
+            {
+                CapabilityId = $"{Id}.ratelimit",
+                DisplayName = $"{Name} - Rate Limiter",
+                Description = "Token bucket rate limiting for traffic control",
+                Category = CapabilityCategory.Infrastructure,
+                SubCategory = "RateLimiting",
+                PluginId = Id,
+                PluginName = Name,
+                PluginVersion = Version,
+                Tags = new[] { "rate-limit", "throttling", "traffic-control" },
+                SemanticDescription = "Use for rate limiting and traffic control"
+            }
+        };
+
+        protected virtual IReadOnlyList<KnowledgeObject> GetStaticKnowledge()
+        {
+            return new[]
+            {
+                new KnowledgeObject
+                {
+                    Id = $"{Id}.ratelimit.capability",
+                    Topic = "infrastructure.ratelimit",
+                    SourcePluginId = Id,
+                    SourcePluginName = Name,
+                    KnowledgeType = "capability",
+                    Description = $"Rate limiter with {_buckets.Count} active buckets",
+                    Payload = new Dictionary<string, object>
+                    {
+                        ["algorithm"] = "TokenBucket",
+                        ["defaultPermitsPerWindow"] = DefaultConfig.PermitsPerWindow,
+                        ["activeBuckets"] = _buckets.Count
+                    },
+                    Tags = new[] { "rate-limit", "throttling" }
+                }
+            };
+        }
+
+        /// <summary>
+        /// Requests AI-assisted rate limit optimization.
+        /// </summary>
+        protected virtual async Task<RateLimitOptimization?> RequestRateLimitOptimizationAsync(string key, CancellationToken ct = default)
+        {
+            if (!IsIntelligenceAvailable || MessageBus == null) return null;
+            await Task.CompletedTask;
+            return null;
+        }
+
+        #endregion
+
         private readonly ConcurrentDictionary<string, RateLimitBucket> _buckets = new();
         private readonly Timer? _cleanupTimer;
 
@@ -383,8 +513,71 @@ namespace DataWarehouse.SDK.Contracts
     /// Abstract base class for circuit breaker plugins implementing the resilience policy pattern.
     /// Provides automatic failure detection, circuit opening/closing, and statistics tracking.
     /// </summary>
-    public abstract class CircuitBreakerPluginBase : FeaturePluginBase, IResiliencePolicy
+    public abstract class CircuitBreakerPluginBase : FeaturePluginBase, IResiliencePolicy, IIntelligenceAware
     {
+        #region Intelligence Socket
+
+        public bool IsIntelligenceAvailable { get; protected set; }
+        public IntelligenceCapabilities AvailableCapabilities { get; protected set; }
+
+        public virtual async Task<bool> DiscoverIntelligenceAsync(CancellationToken ct = default)
+        {
+            if (MessageBus == null) { IsIntelligenceAvailable = false; return false; }
+            IsIntelligenceAvailable = false;
+            return IsIntelligenceAvailable;
+        }
+
+        protected override IReadOnlyList<RegisteredCapability> DeclaredCapabilities => new[]
+        {
+            new RegisteredCapability
+            {
+                CapabilityId = $"{Id}.circuit-breaker",
+                DisplayName = $"{Name} - Circuit Breaker",
+                Description = "Circuit breaker resilience pattern implementation",
+                Category = CapabilityCategory.Infrastructure,
+                SubCategory = "Resilience",
+                PluginId = Id,
+                PluginName = Name,
+                PluginVersion = Version,
+                Tags = new[] { "circuit-breaker", "resilience", "fault-tolerance" },
+                SemanticDescription = "Use for circuit breaker resilience pattern"
+            }
+        };
+
+        protected virtual IReadOnlyList<KnowledgeObject> GetStaticKnowledge()
+        {
+            return new[]
+            {
+                new KnowledgeObject
+                {
+                    Id = $"{Id}.circuit-breaker.capability",
+                    Topic = "infrastructure.resilience.circuit-breaker",
+                    SourcePluginId = Id,
+                    SourcePluginName = Name,
+                    KnowledgeType = "capability",
+                    Description = $"Circuit breaker, PolicyId: {PolicyId}, State: {State}",
+                    Payload = new Dictionary<string, object>
+                    {
+                        ["policyId"] = PolicyId,
+                        ["currentState"] = State.ToString()
+                    },
+                    Tags = new[] { "circuit-breaker", "resilience" }
+                }
+            };
+        }
+
+        /// <summary>
+        /// Requests AI-assisted circuit breaker optimization.
+        /// </summary>
+        protected virtual async Task<CircuitBreakerOptimization?> RequestCircuitBreakerOptimizationAsync(ResilienceStatistics stats, CancellationToken ct = default)
+        {
+            if (!IsIntelligenceAvailable || MessageBus == null) return null;
+            await Task.CompletedTask;
+            return null;
+        }
+
+        #endregion
+
         private readonly object _stateLock = new();
         private CircuitState _state = CircuitState.Closed;
         private DateTime _lastStateChange = DateTime.UtcNow;
@@ -756,8 +949,71 @@ namespace DataWarehouse.SDK.Contracts
     /// Abstract base class for transaction manager plugins.
     /// Provides common infrastructure for distributed transaction coordination.
     /// </summary>
-    public abstract class TransactionManagerPluginBase : FeaturePluginBase, ITransactionManager
+    public abstract class TransactionManagerPluginBase : FeaturePluginBase, ITransactionManager, IIntelligenceAware
     {
+        #region Intelligence Socket
+
+        public bool IsIntelligenceAvailable { get; protected set; }
+        public IntelligenceCapabilities AvailableCapabilities { get; protected set; }
+
+        public virtual async Task<bool> DiscoverIntelligenceAsync(CancellationToken ct = default)
+        {
+            if (MessageBus == null) { IsIntelligenceAvailable = false; return false; }
+            IsIntelligenceAvailable = false;
+            return IsIntelligenceAvailable;
+        }
+
+        protected override IReadOnlyList<RegisteredCapability> DeclaredCapabilities => new[]
+        {
+            new RegisteredCapability
+            {
+                CapabilityId = $"{Id}.transactions",
+                DisplayName = $"{Name} - Transaction Manager",
+                Description = "Distributed transaction coordination",
+                Category = CapabilityCategory.Infrastructure,
+                SubCategory = "Transactions",
+                PluginId = Id,
+                PluginName = Name,
+                PluginVersion = Version,
+                Tags = new[] { "transactions", "coordination", "distributed" },
+                SemanticDescription = "Use for distributed transaction management"
+            }
+        };
+
+        protected virtual IReadOnlyList<KnowledgeObject> GetStaticKnowledge()
+        {
+            return new[]
+            {
+                new KnowledgeObject
+                {
+                    Id = $"{Id}.transactions.capability",
+                    Topic = "infrastructure.transactions",
+                    SourcePluginId = Id,
+                    SourcePluginName = Name,
+                    KnowledgeType = "capability",
+                    Description = $"Transaction manager with {_activeTransactions.Count} active transactions",
+                    Payload = new Dictionary<string, object>
+                    {
+                        ["activeTransactions"] = _activeTransactions.Count,
+                        ["defaultTimeoutSeconds"] = DefaultTimeout.TotalSeconds
+                    },
+                    Tags = new[] { "transactions", "coordination" }
+                }
+            };
+        }
+
+        /// <summary>
+        /// Requests AI-assisted transaction optimization.
+        /// </summary>
+        protected virtual async Task<TransactionOptimization?> RequestTransactionOptimizationAsync(CancellationToken ct = default)
+        {
+            if (!IsIntelligenceAvailable || MessageBus == null) return null;
+            await Task.CompletedTask;
+            return null;
+        }
+
+        #endregion
+
         private readonly AsyncLocal<TransactionScopeImpl?> _ambientTransaction = new();
         private readonly ConcurrentDictionary<string, TransactionScopeImpl> _activeTransactions = new();
         private readonly Timer? _timeoutTimer;
@@ -1188,8 +1444,73 @@ namespace DataWarehouse.SDK.Contracts
     /// Abstract base class for RAID provider plugins.
     /// Provides common RAID functionality including parity calculation and rebuild logic.
     /// </summary>
-    public abstract class RaidProviderPluginBase : FeaturePluginBase, IRaidProvider
+    public abstract class RaidProviderPluginBase : FeaturePluginBase, IRaidProvider, IIntelligenceAware
     {
+        #region Intelligence Socket
+
+        public bool IsIntelligenceAvailable { get; protected set; }
+        public IntelligenceCapabilities AvailableCapabilities { get; protected set; }
+
+        public virtual async Task<bool> DiscoverIntelligenceAsync(CancellationToken ct = default)
+        {
+            if (MessageBus == null) { IsIntelligenceAvailable = false; return false; }
+            IsIntelligenceAvailable = false;
+            return IsIntelligenceAvailable;
+        }
+
+        protected override IReadOnlyList<RegisteredCapability> DeclaredCapabilities => new[]
+        {
+            new RegisteredCapability
+            {
+                CapabilityId = $"{Id}.raid",
+                DisplayName = $"{Name} - RAID Provider",
+                Description = $"{Level} storage with {FaultTolerance} drive fault tolerance",
+                Category = CapabilityCategory.Storage,
+                SubCategory = "RAID",
+                PluginId = Id,
+                PluginName = Name,
+                PluginVersion = Version,
+                Tags = new[] { "raid", Level.ToString().ToLowerInvariant(), "redundancy" },
+                SemanticDescription = "Use for RAID-protected storage"
+            }
+        };
+
+        protected virtual IReadOnlyList<KnowledgeObject> GetStaticKnowledge()
+        {
+            return new[]
+            {
+                new KnowledgeObject
+                {
+                    Id = $"{Id}.raid.capability",
+                    Topic = "storage.raid",
+                    SourcePluginId = Id,
+                    SourcePluginName = Name,
+                    KnowledgeType = "capability",
+                    Description = $"RAID {Level}, {ProviderCount} providers, {FaultTolerance} fault tolerance",
+                    Payload = new Dictionary<string, object>
+                    {
+                        ["level"] = Level.ToString(),
+                        ["providerCount"] = ProviderCount,
+                        ["faultTolerance"] = FaultTolerance,
+                        ["arrayStatus"] = ArrayStatus.ToString()
+                    },
+                    Tags = new[] { "raid", "redundancy" }
+                }
+            };
+        }
+
+        /// <summary>
+        /// Requests AI-assisted RAID optimization.
+        /// </summary>
+        protected virtual async Task<RaidOptimizationHint?> RequestRaidOptimizationAsync(CancellationToken ct = default)
+        {
+            if (!IsIntelligenceAvailable || MessageBus == null) return null;
+            await Task.CompletedTask;
+            return null;
+        }
+
+        #endregion
+
         /// <summary>
         /// Current RAID level. Must be set by derived classes.
         /// </summary>
@@ -1412,8 +1733,73 @@ namespace DataWarehouse.SDK.Contracts
     /// Abstract base class for erasure coding provider plugins.
     /// Provides common Reed-Solomon encoding/decoding infrastructure.
     /// </summary>
-    public abstract class ErasureCodingPluginBase : FeaturePluginBase, IErasureCodingProvider
+    public abstract class ErasureCodingPluginBase : FeaturePluginBase, IErasureCodingProvider, IIntelligenceAware
     {
+        #region Intelligence Socket
+
+        public bool IsIntelligenceAvailable { get; protected set; }
+        public IntelligenceCapabilities AvailableCapabilities { get; protected set; }
+
+        public virtual async Task<bool> DiscoverIntelligenceAsync(CancellationToken ct = default)
+        {
+            if (MessageBus == null) { IsIntelligenceAvailable = false; return false; }
+            IsIntelligenceAvailable = false;
+            return IsIntelligenceAvailable;
+        }
+
+        protected override IReadOnlyList<RegisteredCapability> DeclaredCapabilities => new[]
+        {
+            new RegisteredCapability
+            {
+                CapabilityId = $"{Id}.erasure-coding",
+                DisplayName = $"{Name} - Erasure Coding",
+                Description = $"Reed-Solomon {DataShardCount}+{ParityShardCount} erasure coding",
+                Category = CapabilityCategory.Storage,
+                SubCategory = "ErasureCoding",
+                PluginId = Id,
+                PluginName = Name,
+                PluginVersion = Version,
+                Tags = new[] { "erasure-coding", "reed-solomon", "redundancy" },
+                SemanticDescription = "Use for space-efficient erasure-coded storage"
+            }
+        };
+
+        protected virtual IReadOnlyList<KnowledgeObject> GetStaticKnowledge()
+        {
+            return new[]
+            {
+                new KnowledgeObject
+                {
+                    Id = $"{Id}.erasure-coding.capability",
+                    Topic = "storage.erasure-coding",
+                    SourcePluginId = Id,
+                    SourcePluginName = Name,
+                    KnowledgeType = "capability",
+                    Description = $"Erasure coding {DataShardCount}+{ParityShardCount}, efficiency: {(double)DataShardCount / TotalShardCount:P0}",
+                    Payload = new Dictionary<string, object>
+                    {
+                        ["dataShards"] = DataShardCount,
+                        ["parityShards"] = ParityShardCount,
+                        ["storageEfficiency"] = (double)DataShardCount / TotalShardCount,
+                        ["faultTolerance"] = ParityShardCount
+                    },
+                    Tags = new[] { "erasure-coding", "redundancy" }
+                }
+            };
+        }
+
+        /// <summary>
+        /// Requests AI-assisted erasure coding optimization.
+        /// </summary>
+        protected virtual async Task<ErasureCodingOptimization?> RequestErasureCodingOptimizationAsync(long dataSize, CancellationToken ct = default)
+        {
+            if (!IsIntelligenceAvailable || MessageBus == null) return null;
+            await Task.CompletedTask;
+            return null;
+        }
+
+        #endregion
+
         /// <summary>
         /// Number of data shards.
         /// </summary>
@@ -1687,8 +2073,70 @@ namespace DataWarehouse.SDK.Contracts
     /// <summary>
     /// Abstract base class for compliance provider plugins.
     /// </summary>
-    public abstract class ComplianceProviderPluginBase : FeaturePluginBase, IComplianceProvider
+    public abstract class ComplianceProviderPluginBase : FeaturePluginBase, IComplianceProvider, IIntelligenceAware
     {
+        #region Intelligence Socket
+
+        public bool IsIntelligenceAvailable { get; protected set; }
+        public IntelligenceCapabilities AvailableCapabilities { get; protected set; }
+
+        public virtual async Task<bool> DiscoverIntelligenceAsync(CancellationToken ct = default)
+        {
+            if (MessageBus == null) { IsIntelligenceAvailable = false; return false; }
+            IsIntelligenceAvailable = false;
+            return IsIntelligenceAvailable;
+        }
+
+        protected override IReadOnlyList<RegisteredCapability> DeclaredCapabilities => new[]
+        {
+            new RegisteredCapability
+            {
+                CapabilityId = $"{Id}.compliance",
+                DisplayName = $"{Name} - Compliance Provider",
+                Description = $"Regulatory compliance for {string.Join(", ", SupportedFrameworks)}",
+                Category = CapabilityCategory.Compliance,
+                SubCategory = "Regulatory",
+                PluginId = Id,
+                PluginName = Name,
+                PluginVersion = Version,
+                Tags = SupportedFrameworks.Select(f => f.ToLowerInvariant()).Concat(new[] { "compliance", "regulatory" }).ToArray(),
+                SemanticDescription = "Use for regulatory compliance validation"
+            }
+        };
+
+        protected virtual IReadOnlyList<KnowledgeObject> GetStaticKnowledge()
+        {
+            return new[]
+            {
+                new KnowledgeObject
+                {
+                    Id = $"{Id}.compliance.capability",
+                    Topic = "compliance.regulatory",
+                    SourcePluginId = Id,
+                    SourcePluginName = Name,
+                    KnowledgeType = "capability",
+                    Description = $"Compliance provider for {string.Join(", ", SupportedFrameworks)}",
+                    Payload = new Dictionary<string, object>
+                    {
+                        ["supportedFrameworks"] = SupportedFrameworks.ToArray()
+                    },
+                    Tags = new[] { "compliance", "regulatory" }
+                }
+            };
+        }
+
+        /// <summary>
+        /// Requests AI-assisted compliance recommendation.
+        /// </summary>
+        protected virtual async Task<ComplianceRecommendation?> RequestComplianceRecommendationAsync(string framework, CancellationToken ct = default)
+        {
+            if (!IsIntelligenceAvailable || MessageBus == null) return null;
+            await Task.CompletedTask;
+            return null;
+        }
+
+        #endregion
+
         public abstract IReadOnlyList<string> SupportedFrameworks { get; }
 
         public abstract Task<ComplianceValidationResult> ValidateAsync(
@@ -1857,8 +2305,70 @@ namespace DataWarehouse.SDK.Contracts
     /// <summary>
     /// Abstract base class for IAM provider plugins.
     /// </summary>
-    public abstract class IAMProviderPluginBase : FeaturePluginBase, IIAMProvider
+    public abstract class IAMProviderPluginBase : FeaturePluginBase, IIAMProvider, IIntelligenceAware
     {
+        #region Intelligence Socket
+
+        public bool IsIntelligenceAvailable { get; protected set; }
+        public IntelligenceCapabilities AvailableCapabilities { get; protected set; }
+
+        public virtual async Task<bool> DiscoverIntelligenceAsync(CancellationToken ct = default)
+        {
+            if (MessageBus == null) { IsIntelligenceAvailable = false; return false; }
+            IsIntelligenceAvailable = false;
+            return IsIntelligenceAvailable;
+        }
+
+        protected override IReadOnlyList<RegisteredCapability> DeclaredCapabilities => new[]
+        {
+            new RegisteredCapability
+            {
+                CapabilityId = $"{Id}.iam",
+                DisplayName = $"{Name} - IAM Provider",
+                Description = "Identity and Access Management capabilities",
+                Category = CapabilityCategory.Security,
+                SubCategory = "IAM",
+                PluginId = Id,
+                PluginName = Name,
+                PluginVersion = Version,
+                Tags = new[] { "iam", "authentication", "authorization", "identity" },
+                SemanticDescription = "Use for identity and access management"
+            }
+        };
+
+        protected virtual IReadOnlyList<KnowledgeObject> GetStaticKnowledge()
+        {
+            return new[]
+            {
+                new KnowledgeObject
+                {
+                    Id = $"{Id}.iam.capability",
+                    Topic = "security.iam",
+                    SourcePluginId = Id,
+                    SourcePluginName = Name,
+                    KnowledgeType = "capability",
+                    Description = $"IAM provider with auth methods: {string.Join(", ", SupportedAuthMethods)}",
+                    Payload = new Dictionary<string, object>
+                    {
+                        ["supportedAuthMethods"] = SupportedAuthMethods.ToArray()
+                    },
+                    Tags = new[] { "iam", "authentication", "authorization" }
+                }
+            };
+        }
+
+        /// <summary>
+        /// Requests AI-assisted authentication threat detection.
+        /// </summary>
+        protected virtual async Task<AuthThreatDetection?> RequestAuthThreatDetectionAsync(AuthenticationRequest request, CancellationToken ct = default)
+        {
+            if (!IsIntelligenceAvailable || MessageBus == null) return null;
+            await Task.CompletedTask;
+            return null;
+        }
+
+        #endregion
+
         public abstract IReadOnlyList<string> SupportedAuthMethods { get; }
 
         public abstract Task<AuthenticationResult> AuthenticateAsync(
@@ -2073,6 +2583,70 @@ namespace DataWarehouse.SDK.Contracts
         Corruption,
         Missing
     }
+
+    #endregion
+
+    #region Stub Types for Infrastructure Intelligence Integration
+
+    /// <summary>Stub type for health prediction from AI.</summary>
+    public record HealthPrediction(
+        HealthStatus PredictedStatus,
+        TimeSpan TimeToIssue,
+        string[] PotentialProblems,
+        double ConfidenceScore);
+
+    /// <summary>Stub type for rate limit optimization from AI.</summary>
+    public record RateLimitOptimization(
+        int RecommendedPermitsPerWindow,
+        TimeSpan RecommendedWindow,
+        int RecommendedBurstLimit,
+        string Rationale,
+        double ConfidenceScore);
+
+    /// <summary>Stub type for circuit breaker optimization from AI.</summary>
+    public record CircuitBreakerOptimization(
+        int RecommendedFailureThreshold,
+        TimeSpan RecommendedBreakDuration,
+        int RecommendedMaxRetries,
+        string Rationale,
+        double ConfidenceScore);
+
+    /// <summary>Stub type for transaction optimization from AI.</summary>
+    public record TransactionOptimization(
+        TimeSpan RecommendedTimeout,
+        int RecommendedBatchSize,
+        string Rationale,
+        double ConfidenceScore);
+
+    /// <summary>Stub type for RAID optimization from AI.</summary>
+    public record RaidOptimizationHint(
+        bool ShouldRebuild,
+        int[] ProvidersToCheck,
+        string RecommendedAction,
+        double ConfidenceScore);
+
+    /// <summary>Stub type for erasure coding optimization from AI.</summary>
+    public record ErasureCodingOptimization(
+        int RecommendedDataShards,
+        int RecommendedParityShards,
+        string Rationale,
+        double ConfidenceScore);
+
+    /// <summary>Stub type for compliance recommendation from AI.</summary>
+    public record ComplianceRecommendation(
+        string Framework,
+        string[] RecommendedControls,
+        string[] Gaps,
+        string Rationale,
+        double ConfidenceScore);
+
+    /// <summary>Stub type for authentication threat detection from AI.</summary>
+    public record AuthThreatDetection(
+        bool IsThreat,
+        string ThreatType,
+        string[] Indicators,
+        string RecommendedAction,
+        double ConfidenceScore);
 
     #endregion
 }

@@ -1,7 +1,10 @@
+using DataWarehouse.SDK.AI;
+using DataWarehouse.SDK.Contracts.IntelligenceAware;
 using DataWarehouse.SDK.Security;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace DataWarehouse.SDK.Contracts
@@ -15,8 +18,83 @@ namespace DataWarehouse.SDK.Contracts
     /// Derived classes must implement subject label resolution and validation logic specific to their environment.
     /// Reference: Bell-LaPadula Model (1973), DoD 5200.28-STD.
     /// </summary>
-    public abstract class MandatoryAccessControlPluginBase : SecurityProviderPluginBase, IMandatoryAccessControl
+    public abstract class MandatoryAccessControlPluginBase : SecurityProviderPluginBase, IMandatoryAccessControl, IIntelligenceAware
     {
+        #region Intelligence Socket
+
+        public bool IsIntelligenceAvailable { get; protected set; }
+        public IntelligenceCapabilities AvailableCapabilities { get; protected set; }
+
+        public virtual async Task<bool> DiscoverIntelligenceAsync(CancellationToken ct = default)
+        {
+            if (MessageBus == null) { IsIntelligenceAvailable = false; return false; }
+            IsIntelligenceAvailable = false;
+            return IsIntelligenceAvailable;
+        }
+
+        protected override IReadOnlyList<RegisteredCapability> DeclaredCapabilities => new[]
+        {
+            new RegisteredCapability
+            {
+                CapabilityId = $"{Id}.mac",
+                DisplayName = $"{Name} - Mandatory Access Control",
+                Description = "Bell-LaPadula MAC implementation for multi-level security",
+                Category = CapabilityCategory.Security,
+                SubCategory = "AccessControl",
+                PluginId = Id,
+                PluginName = Name,
+                PluginVersion = Version,
+                Tags = new[] { "mac", "bell-lapadula", "security", "mls" },
+                SemanticDescription = "Use for mandatory access control with Bell-LaPadula model"
+            }
+        };
+
+        protected virtual IReadOnlyList<KnowledgeObject> GetStaticKnowledge()
+        {
+            return new[]
+            {
+                new KnowledgeObject
+                {
+                    Id = $"{Id}.mac.capability",
+                    Topic = "security.mac",
+                    SourcePluginId = Id,
+                    SourcePluginName = Name,
+                    KnowledgeType = "capability",
+                    Description = "Mandatory Access Control with Bell-LaPadula model",
+                    Payload = new Dictionary<string, object>
+                    {
+                        ["model"] = "Bell-LaPadula",
+                        ["simpleSecurityProperty"] = true,
+                        ["starProperty"] = true
+                    },
+                    Tags = new[] { "mac", "security", "mls" }
+                }
+            };
+        }
+
+        /// <summary>
+        /// Requests AI-assisted threat prediction for access patterns.
+        /// </summary>
+        protected virtual async Task<AccessThreatPrediction?> RequestThreatPredictionAsync(string subjectId, SecurityLabel objectLabel, CancellationToken ct = default)
+        {
+            if (!IsIntelligenceAvailable || MessageBus == null) return null;
+            await Task.CompletedTask;
+            return null;
+        }
+
+        /// <summary>
+        /// Requests AI-assisted anomaly detection for access attempts.
+        /// </summary>
+        protected virtual async Task<AccessAnomalyDetection?> RequestAnomalyDetectionAsync(string subjectId, AccessPattern pattern, CancellationToken ct = default)
+        {
+            if (!IsIntelligenceAvailable || MessageBus == null) return null;
+            await Task.CompletedTask;
+            return null;
+        }
+
+        #endregion
+
+
         /// <summary>
         /// Checks if subject can read object under Bell-LaPadula Simple Security Property (no read up).
         /// Default implementation enforces:
@@ -124,8 +202,74 @@ namespace DataWarehouse.SDK.Contracts
     /// Derived classes must implement the actual downgrade/sanitization logic appropriate for their domain.
     /// Reference: TCSEC (Orange Book), Common Criteria, DoDI 8500.01.
     /// </summary>
-    public abstract class MultiLevelSecurityPluginBase : SecurityProviderPluginBase, IMultiLevelSecurity
+    public abstract class MultiLevelSecurityPluginBase : SecurityProviderPluginBase, IMultiLevelSecurity, IIntelligenceAware
     {
+        #region Intelligence Socket
+
+        public bool IsIntelligenceAvailable { get; protected set; }
+        public IntelligenceCapabilities AvailableCapabilities { get; protected set; }
+
+        public virtual async Task<bool> DiscoverIntelligenceAsync(CancellationToken ct = default)
+        {
+            if (MessageBus == null) { IsIntelligenceAvailable = false; return false; }
+            IsIntelligenceAvailable = false;
+            return IsIntelligenceAvailable;
+        }
+
+        protected override IReadOnlyList<RegisteredCapability> DeclaredCapabilities => new[]
+        {
+            new RegisteredCapability
+            {
+                CapabilityId = $"{Id}.mls",
+                DisplayName = $"{Name} - Multi-Level Security",
+                Description = "Multi-level security with trusted downgrade and sanitization",
+                Category = CapabilityCategory.Security,
+                SubCategory = "Classification",
+                PluginId = Id,
+                PluginName = Name,
+                PluginVersion = Version,
+                Tags = new[] { "mls", "classification", "security", "downgrade" },
+                SemanticDescription = "Use for multi-level classified data handling"
+            }
+        };
+
+        protected virtual IReadOnlyList<KnowledgeObject> GetStaticKnowledge()
+        {
+            return new[]
+            {
+                new KnowledgeObject
+                {
+                    Id = $"{Id}.mls.capability",
+                    Topic = "security.mls",
+                    SourcePluginId = Id,
+                    SourcePluginName = Name,
+                    KnowledgeType = "capability",
+                    Description = $"Multi-level security, SystemHigh: {SystemHighLevel}",
+                    Payload = new Dictionary<string, object>
+                    {
+                        ["systemHighLevel"] = SystemHighLevel.ToString(),
+                        ["supportedLevels"] = SupportedLevels.Select(l => l.ToString()).ToArray(),
+                        ["supportsDowngrade"] = true,
+                        ["supportsSanitization"] = true
+                    },
+                    Tags = new[] { "mls", "classification", "security" }
+                }
+            };
+        }
+
+        /// <summary>
+        /// Requests AI-assisted security level recommendation for data.
+        /// </summary>
+        protected virtual async Task<SecurityLevelRecommendation?> RequestSecurityLevelAsync(byte[] data, CancellationToken ct = default)
+        {
+            if (!IsIntelligenceAvailable || MessageBus == null) return null;
+            await Task.CompletedTask;
+            return null;
+        }
+
+        #endregion
+
+
         /// <summary>
         /// Gets all classification levels this system is accredited to handle.
         /// Must be defined by derived class based on system accreditation documentation.
@@ -213,8 +357,72 @@ namespace DataWarehouse.SDK.Contracts
     /// Critical for nuclear command and control, cryptographic operations, and classification changes.
     /// Reference: DoD Directive 5210.41, NIST SP 800-53 AC-5 (Separation of Duties).
     /// </summary>
-    public abstract class TwoPersonIntegrityPluginBase : SecurityProviderPluginBase, ITwoPersonIntegrity
+    public abstract class TwoPersonIntegrityPluginBase : SecurityProviderPluginBase, ITwoPersonIntegrity, IIntelligenceAware
     {
+        #region Intelligence Socket
+
+        public bool IsIntelligenceAvailable { get; protected set; }
+        public IntelligenceCapabilities AvailableCapabilities { get; protected set; }
+
+        public virtual async Task<bool> DiscoverIntelligenceAsync(CancellationToken ct = default)
+        {
+            if (MessageBus == null) { IsIntelligenceAvailable = false; return false; }
+            IsIntelligenceAvailable = false;
+            return IsIntelligenceAvailable;
+        }
+
+        protected override IReadOnlyList<RegisteredCapability> DeclaredCapabilities => new[]
+        {
+            new RegisteredCapability
+            {
+                CapabilityId = $"{Id}.tpi",
+                DisplayName = $"{Name} - Two-Person Integrity",
+                Description = "Dual-authorization operations for critical actions",
+                Category = CapabilityCategory.Security,
+                SubCategory = "Authorization",
+                PluginId = Id,
+                PluginName = Name,
+                PluginVersion = Version,
+                Tags = new[] { "tpi", "dual-auth", "security", "separation-of-duties" },
+                SemanticDescription = "Use for operations requiring two-person authorization"
+            }
+        };
+
+        protected virtual IReadOnlyList<KnowledgeObject> GetStaticKnowledge()
+        {
+            return new[]
+            {
+                new KnowledgeObject
+                {
+                    Id = $"{Id}.tpi.capability",
+                    Topic = "security.tpi",
+                    SourcePluginId = Id,
+                    SourcePluginName = Name,
+                    KnowledgeType = "capability",
+                    Description = "Two-person integrity for dual-authorization",
+                    Payload = new Dictionary<string, object>
+                    {
+                        ["defaultExpiration"] = TimeSpan.FromHours(24).TotalHours,
+                        ["requiresDifferentPrincipals"] = true
+                    },
+                    Tags = new[] { "tpi", "dual-auth", "security" }
+                }
+            };
+        }
+
+        /// <summary>
+        /// Requests AI-assisted authorization pattern analysis.
+        /// </summary>
+        protected virtual async Task<AuthorizationPatternAnalysis?> RequestPatternAnalysisAsync(string initiatorId, string operationType, CancellationToken ct = default)
+        {
+            if (!IsIntelligenceAvailable || MessageBus == null) return null;
+            await Task.CompletedTask;
+            return null;
+        }
+
+        #endregion
+
+
         /// <summary>
         /// In-memory cache of pending operations awaiting authorization.
         /// For production use, this should be backed by persistent storage to survive restarts.
@@ -388,8 +596,72 @@ namespace DataWarehouse.SDK.Contracts
     /// - Physical media: Coordinate with destruction facility
     /// Reference: DoD 5220.22-M (deprecated but still used), NIST SP 800-88 Rev 1.
     /// </summary>
-    public abstract class SecureDestructionPluginBase : SecurityProviderPluginBase, ISecureDestruction
+    public abstract class SecureDestructionPluginBase : SecurityProviderPluginBase, ISecureDestruction, IIntelligenceAware
     {
+        #region Intelligence Socket
+
+        public bool IsIntelligenceAvailable { get; protected set; }
+        public IntelligenceCapabilities AvailableCapabilities { get; protected set; }
+
+        public virtual async Task<bool> DiscoverIntelligenceAsync(CancellationToken ct = default)
+        {
+            if (MessageBus == null) { IsIntelligenceAvailable = false; return false; }
+            IsIntelligenceAvailable = false;
+            return IsIntelligenceAvailable;
+        }
+
+        protected override IReadOnlyList<RegisteredCapability> DeclaredCapabilities => new[]
+        {
+            new RegisteredCapability
+            {
+                CapabilityId = $"{Id}.destruction",
+                DisplayName = $"{Name} - Secure Destruction",
+                Description = "NIST 800-88 compliant secure data destruction",
+                Category = CapabilityCategory.Security,
+                SubCategory = "Destruction",
+                PluginId = Id,
+                PluginName = Name,
+                PluginVersion = Version,
+                Tags = new[] { "destruction", "sanitization", "nist-800-88", "security" },
+                SemanticDescription = "Use for certified secure data destruction"
+            }
+        };
+
+        protected virtual IReadOnlyList<KnowledgeObject> GetStaticKnowledge()
+        {
+            return new[]
+            {
+                new KnowledgeObject
+                {
+                    Id = $"{Id}.destruction.capability",
+                    Topic = "security.destruction",
+                    SourcePluginId = Id,
+                    SourcePluginName = Name,
+                    KnowledgeType = "capability",
+                    Description = "Secure destruction per NIST 800-88",
+                    Payload = new Dictionary<string, object>
+                    {
+                        ["certifiedDestruction"] = true,
+                        ["auditTrail"] = true
+                    },
+                    Tags = new[] { "destruction", "sanitization", "security" }
+                }
+            };
+        }
+
+        /// <summary>
+        /// Requests AI-assisted destruction verification confidence.
+        /// </summary>
+        protected virtual async Task<DestructionVerificationConfidence?> RequestVerificationConfidenceAsync(string resourceId, DestructionMethod method, CancellationToken ct = default)
+        {
+            if (!IsIntelligenceAvailable || MessageBus == null) return null;
+            await Task.CompletedTask;
+            return null;
+        }
+
+        #endregion
+
+
         /// <summary>
         /// Performs the actual data overwrite or destruction process.
         /// Derived classes must implement method-appropriate destruction:
@@ -468,4 +740,49 @@ namespace DataWarehouse.SDK.Contracts
             return certificate != null;
         }
     }
+
+    #region Stub Types for Military Security Intelligence Integration
+
+    /// <summary>Stub type for access threat predictions from AI.</summary>
+    public record AccessThreatPrediction(
+        string ThreatLevel,
+        string[] PotentialThreats,
+        string RecommendedAction,
+        double ConfidenceScore);
+
+    /// <summary>Stub type for access anomaly detection from AI.</summary>
+    public record AccessAnomalyDetection(
+        bool IsAnomaly,
+        string AnomalyType,
+        string Description,
+        double ConfidenceScore);
+
+    /// <summary>Stub type for access pattern analysis.</summary>
+    public record AccessPattern(
+        string SubjectId,
+        DateTimeOffset[] AccessTimes,
+        SecurityLabel[] AccessedLabels);
+
+    /// <summary>Stub type for security level recommendation from AI.</summary>
+    public record SecurityLevelRecommendation(
+        ClassificationLevel RecommendedLevel,
+        string[] DetectedKeywords,
+        string Rationale,
+        double ConfidenceScore);
+
+    /// <summary>Stub type for authorization pattern analysis from AI.</summary>
+    public record AuthorizationPatternAnalysis(
+        bool IsNormalPattern,
+        string[] RiskFactors,
+        string Recommendation,
+        double ConfidenceScore);
+
+    /// <summary>Stub type for destruction verification confidence from AI.</summary>
+    public record DestructionVerificationConfidence(
+        bool IsVerified,
+        double ConfidenceScore,
+        string[] VerificationSteps,
+        string Recommendation);
+
+    #endregion
 }

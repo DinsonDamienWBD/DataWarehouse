@@ -1,3 +1,5 @@
+using DataWarehouse.SDK.AI;
+using DataWarehouse.SDK.Utilities;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -726,5 +728,166 @@ namespace DataWarehouse.SDK.Contracts.Compute
             string objectId,
             PipelineComputeContext context,
             CancellationToken ct = default);
+
+        #region Intelligence Integration
+
+        /// <summary>
+        /// Message bus reference for Intelligence communication.
+        /// </summary>
+        protected IMessageBus? MessageBus { get; private set; }
+
+        /// <summary>
+        /// Configures Intelligence integration for this strategy.
+        /// Called by the plugin to enable AI-enhanced features.
+        /// </summary>
+        public virtual void ConfigureIntelligence(IMessageBus? messageBus)
+        {
+            MessageBus = messageBus;
+        }
+
+        /// <summary>
+        /// Whether Intelligence is available for this strategy.
+        /// </summary>
+        protected bool IsIntelligenceAvailable => MessageBus != null;
+
+        /// <summary>
+        /// Gets static knowledge about this strategy for AI discovery.
+        /// Override to provide strategy-specific knowledge.
+        /// </summary>
+        public virtual KnowledgeObject GetStrategyKnowledge()
+        {
+            return new KnowledgeObject
+            {
+                Id = $"strategy.{StrategyId}",
+                Topic = $"{GetKnowledgeTopic()}",
+                SourcePluginId = "sdk.strategy",
+                SourcePluginName = DisplayName,
+                KnowledgeType = "capability",
+                Description = GetStrategyDescription(),
+                Payload = GetKnowledgePayload(),
+                Tags = GetKnowledgeTags()
+            };
+        }
+
+        /// <summary>
+        /// Gets the registered capability for this strategy.
+        /// </summary>
+        public virtual RegisteredCapability GetStrategyCapability()
+        {
+            return new RegisteredCapability
+            {
+                CapabilityId = $"strategy.{StrategyId}",
+                DisplayName = DisplayName,
+                Description = GetStrategyDescription(),
+                Category = GetCapabilityCategory(),
+                PluginId = "sdk.strategy",
+                PluginName = DisplayName,
+                PluginVersion = "1.0.0",
+                Tags = GetKnowledgeTags(),
+                Metadata = GetCapabilityMetadata(),
+                SemanticDescription = GetSemanticDescription()
+            };
+        }
+
+        /// <summary>
+        /// Gets the knowledge topic for this strategy type.
+        /// </summary>
+        protected virtual string GetKnowledgeTopic() => "compute";
+
+        /// <summary>
+        /// Gets the capability category for this strategy type.
+        /// </summary>
+        protected virtual CapabilityCategory GetCapabilityCategory() => CapabilityCategory.Compute;
+
+        /// <summary>
+        /// Gets a description for this strategy.
+        /// </summary>
+        protected virtual string GetStrategyDescription() =>
+            $"{DisplayName} pipeline compute strategy with {Capabilities.ComputeIntensity:P0} compute intensity";
+
+        /// <summary>
+        /// Gets the knowledge payload for this strategy.
+        /// </summary>
+        protected virtual Dictionary<string, object> GetKnowledgePayload() => new()
+        {
+            ["supportsStreaming"] = Capabilities.SupportsStreaming,
+            ["supportsParallelization"] = Capabilities.SupportsParallelization,
+            ["supportsGpuAcceleration"] = Capabilities.SupportsGpuAcceleration,
+            ["supportsDistributed"] = Capabilities.SupportsDistributed,
+            ["computeIntensity"] = Capabilities.ComputeIntensity,
+            ["memoryPerGb"] = Capabilities.MemoryPerGb,
+            ["supportsCompressedInput"] = Capabilities.SupportsCompressedInput,
+            ["supportsIncrementalOutput"] = Capabilities.SupportsIncrementalOutput
+        };
+
+        /// <summary>
+        /// Gets tags for this strategy.
+        /// </summary>
+        protected virtual string[] GetKnowledgeTags()
+        {
+            var tags = new List<string> { "strategy", "compute", "pipeline" };
+            if (Capabilities.SupportsGpuAcceleration) tags.Add("gpu");
+            if (Capabilities.SupportsDistributed) tags.Add("distributed");
+            if (Capabilities.SupportsStreaming) tags.Add("streaming");
+            return tags.ToArray();
+        }
+
+        /// <summary>
+        /// Gets capability metadata for this strategy.
+        /// </summary>
+        protected virtual Dictionary<string, object> GetCapabilityMetadata() => new()
+        {
+            ["computeIntensity"] = Capabilities.ComputeIntensity,
+            ["supportsGpu"] = Capabilities.SupportsGpuAcceleration
+        };
+
+        /// <summary>
+        /// Gets the semantic description for AI-driven discovery.
+        /// </summary>
+        protected virtual string GetSemanticDescription() =>
+            $"Use {DisplayName} for pipeline compute with {Capabilities.ComputeIntensity:P0} intensity{(Capabilities.SupportsGpuAcceleration ? " and GPU acceleration" : "")}";
+
+        /// <summary>
+        /// Requests an AI recommendation for optimal compute configuration.
+        /// </summary>
+        /// <param name="dataVelocity">Current data velocity in bytes per second.</param>
+        /// <param name="availableResources">Available compute resources.</param>
+        /// <param name="latencyRequirement">Maximum acceptable latency in milliseconds.</param>
+        /// <param name="cancellationToken">Cancellation token.</param>
+        /// <returns>Recommended compute configuration, or null if Intelligence unavailable.</returns>
+        protected async Task<Dictionary<string, object>?> RequestComputeRecommendationAsync(
+            double dataVelocity,
+            ComputeResources availableResources,
+            int? latencyRequirement = null,
+            CancellationToken cancellationToken = default)
+        {
+            if (!IsIntelligenceAvailable || MessageBus == null)
+                return null;
+
+            var request = new Dictionary<string, object>
+            {
+                ["requestType"] = "compute_recommendation",
+                ["strategyId"] = StrategyId,
+                ["dataVelocity"] = dataVelocity,
+                ["availableCpuCores"] = availableResources.AvailableCpuCores,
+                ["availableMemoryBytes"] = availableResources.AvailableMemoryBytes,
+                ["gpuAvailable"] = availableResources.GpuAvailability ?? 0,
+                ["latencyRequirement"] = latencyRequirement ?? -1,
+                ["computeIntensity"] = Capabilities.ComputeIntensity
+            };
+
+            var message = new PluginMessage
+            {
+                MessageId = Guid.NewGuid().ToString(),
+                SourcePluginId = StrategyId,
+                MessageType = "intelligence.request",
+                Payload = request
+            };
+
+            var response = await MessageBus.SendAsync(MessageTopics.AIQuery, message, cancellationToken);
+            return response.Success ? response.Payload as Dictionary<string, object> : null;
+        }
+
+        #endregion
     }
 }

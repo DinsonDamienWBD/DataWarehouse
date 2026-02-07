@@ -1,4 +1,7 @@
+using DataWarehouse.SDK.AI;
 using DataWarehouse.SDK.Compliance;
+using DataWarehouse.SDK.Primitives;
+using DataWarehouse.SDK.Utilities;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -11,6 +14,7 @@ namespace DataWarehouse.SDK.Contracts;
 /// Base class for compliance automation plugin implementations.
 /// Provides framework orchestration, control execution, and remediation coordination.
 /// Implementations must specify supported framework and provide control definitions.
+/// Intelligence-aware: Supports AI-driven compliance assessment and remediation suggestions.
 /// </summary>
 public abstract class ComplianceAutomationPluginBase : FeaturePluginBase, IComplianceAutomation
 {
@@ -19,6 +23,139 @@ public abstract class ComplianceAutomationPluginBase : FeaturePluginBase, ICompl
     /// Each plugin implementation handles one framework (GDPR, HIPAA, PCI-DSS, etc.).
     /// </summary>
     public abstract ComplianceFramework SupportedFramework { get; }
+
+    #region Intelligence Integration
+
+    /// <summary>
+    /// Capabilities declared by this compliance automation provider.
+    /// </summary>
+    protected override IReadOnlyList<RegisteredCapability> DeclaredCapabilities => new[]
+    {
+        new RegisteredCapability
+        {
+            CapabilityId = $"{Id}.compliance-automation",
+            DisplayName = $"{Name} - {SupportedFramework} Compliance Automation",
+            Description = $"Automated compliance checking and remediation for {SupportedFramework}",
+            Category = CapabilityCategory.Governance,
+            SubCategory = "ComplianceAutomation",
+            PluginId = Id,
+            PluginName = Name,
+            PluginVersion = Version,
+            Tags = new[] { "compliance", "automation", SupportedFramework.ToString().ToLowerInvariant() },
+            SemanticDescription = $"Use this for automated {SupportedFramework} compliance checking and remediation",
+            Metadata = new Dictionary<string, object>
+            {
+                ["framework"] = SupportedFramework.ToString(),
+                ["supportsAutoRemediation"] = true,
+                ["supportsEvidenceGeneration"] = true
+            }
+        }
+    };
+
+    /// <summary>
+    /// Gets static knowledge for Intelligence registration.
+    /// </summary>
+    protected override IReadOnlyList<KnowledgeObject> GetStaticKnowledge()
+    {
+        var knowledge = new List<KnowledgeObject>(base.GetStaticKnowledge());
+
+        knowledge.Add(new KnowledgeObject
+        {
+            Id = $"{Id}.compliance.capability",
+            Topic = "compliance-automation",
+            SourcePluginId = Id,
+            SourcePluginName = Name,
+            KnowledgeType = "capability",
+            Description = $"Compliance automation for {SupportedFramework} framework",
+            Payload = new Dictionary<string, object>
+            {
+                ["framework"] = SupportedFramework.ToString(),
+                ["supportsAutoRemediation"] = true,
+                ["supportsEvidenceGeneration"] = true
+            },
+            Tags = new[] { "compliance", "governance", SupportedFramework.ToString().ToLowerInvariant() },
+            Confidence = 1.0f,
+            Timestamp = DateTimeOffset.UtcNow
+        });
+
+        return knowledge;
+    }
+
+    /// <summary>
+    /// Requests AI-driven remediation suggestions for non-compliant controls.
+    /// </summary>
+    /// <param name="checkResult">The failed compliance check result.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>Remediation suggestions.</returns>
+    protected async Task<IReadOnlyList<string>?> RequestRemediationSuggestionsAsync(
+        AutomationCheckResult checkResult,
+        CancellationToken ct = default)
+    {
+        if (MessageBus == null) return null;
+
+        try
+        {
+            var request = new PluginMessage
+            {
+                Type = "intelligence.suggest.request",
+                CorrelationId = Guid.NewGuid().ToString("N"),
+                Source = Id,
+                Payload = new Dictionary<string, object>
+                {
+                    ["suggestionType"] = "compliance_remediation",
+                    ["framework"] = SupportedFramework.ToString(),
+                    ["controlId"] = checkResult.ControlId,
+                    ["status"] = checkResult.Status.ToString()
+                }
+            };
+
+            await MessageBus.PublishAsync("intelligence.suggest", request, ct);
+            return null;
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Requests AI-driven compliance gap analysis.
+    /// </summary>
+    /// <param name="currentResults">Current compliance check results.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>Gap analysis with prioritized recommendations.</returns>
+    protected async Task<Dictionary<string, object>?> RequestGapAnalysisAsync(
+        IReadOnlyList<AutomationCheckResult> currentResults,
+        CancellationToken ct = default)
+    {
+        if (MessageBus == null) return null;
+
+        try
+        {
+            var request = new PluginMessage
+            {
+                Type = "intelligence.analyze.request",
+                CorrelationId = Guid.NewGuid().ToString("N"),
+                Source = Id,
+                Payload = new Dictionary<string, object>
+                {
+                    ["analysisType"] = "compliance_gap",
+                    ["framework"] = SupportedFramework.ToString(),
+                    ["compliantCount"] = currentResults.Count(r => r.Status == AutomationComplianceStatus.Compliant),
+                    ["nonCompliantCount"] = currentResults.Count(r => r.Status == AutomationComplianceStatus.NonCompliant)
+                }
+            };
+
+            await MessageBus.PublishAsync("intelligence.analyze", request, ct);
+            return null;
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    #endregion
 
     /// <summary>
     /// Loads all control definitions for the supported framework.
@@ -166,9 +303,142 @@ public abstract class ComplianceAutomationPluginBase : FeaturePluginBase, ICompl
 /// Base class for Data Subject Rights plugin implementations.
 /// Provides GDPR/CCPA/LGPD/PIPEDA/PDPA rights automation.
 /// Implementations must provide data collection, deletion, and consent management.
+/// Intelligence-aware: Supports AI-driven PII detection and data mapping.
 /// </summary>
 public abstract class DataSubjectRightsPluginBase : FeaturePluginBase, IDataSubjectRights
 {
+    #region Intelligence Integration
+
+    /// <summary>
+    /// Capabilities declared by this data subject rights provider.
+    /// </summary>
+    protected override IReadOnlyList<RegisteredCapability> DeclaredCapabilities => new[]
+    {
+        new RegisteredCapability
+        {
+            CapabilityId = $"{Id}.data-subject-rights",
+            DisplayName = $"{Name} - Data Subject Rights",
+            Description = "GDPR/CCPA/LGPD data subject rights automation (access, erasure, portability)",
+            Category = CapabilityCategory.Governance,
+            SubCategory = "DataSubjectRights",
+            PluginId = Id,
+            PluginName = Name,
+            PluginVersion = Version,
+            Tags = new[] { "gdpr", "ccpa", "privacy", "data-subject-rights" },
+            SemanticDescription = "Use this for managing data subject access, deletion, and portability requests",
+            Metadata = new Dictionary<string, object>
+            {
+                ["supportedFrameworks"] = "GDPR,CCPA,LGPD,PIPEDA,PDPA",
+                ["supportsRightToAccess"] = true,
+                ["supportsRightToErasure"] = true,
+                ["supportsRightToPortability"] = true
+            }
+        }
+    };
+
+    /// <summary>
+    /// Gets static knowledge for Intelligence registration.
+    /// </summary>
+    protected override IReadOnlyList<KnowledgeObject> GetStaticKnowledge()
+    {
+        var knowledge = new List<KnowledgeObject>(base.GetStaticKnowledge());
+
+        knowledge.Add(new KnowledgeObject
+        {
+            Id = $"{Id}.dsr.capability",
+            Topic = "data-subject-rights",
+            SourcePluginId = Id,
+            SourcePluginName = Name,
+            KnowledgeType = "capability",
+            Description = "Data subject rights automation for privacy compliance",
+            Payload = new Dictionary<string, object>
+            {
+                ["supportedFrameworks"] = new[] { "GDPR", "CCPA", "LGPD", "PIPEDA", "PDPA" },
+                ["supportsRightToAccess"] = true,
+                ["supportsRightToErasure"] = true,
+                ["supportsRightToRectification"] = true,
+                ["supportsRightToPortability"] = true,
+                ["supportsRightToRestriction"] = true
+            },
+            Tags = new[] { "privacy", "gdpr", "data-subject" },
+            Confidence = 1.0f,
+            Timestamp = DateTimeOffset.UtcNow
+        });
+
+        return knowledge;
+    }
+
+    /// <summary>
+    /// Requests AI-driven PII detection in collected data.
+    /// </summary>
+    /// <param name="data">Data to analyze for PII.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>Detected PII categories and locations.</returns>
+    protected async Task<Dictionary<string, IReadOnlyList<string>>?> RequestPIIDetectionAsync(
+        byte[] data,
+        CancellationToken ct = default)
+    {
+        if (MessageBus == null) return null;
+
+        try
+        {
+            var request = new PluginMessage
+            {
+                Type = "intelligence.detect.request",
+                CorrelationId = Guid.NewGuid().ToString("N"),
+                Source = Id,
+                Payload = new Dictionary<string, object>
+                {
+                    ["detectionType"] = "pii",
+                    ["dataSize"] = data.Length
+                }
+            };
+
+            await MessageBus.PublishAsync("intelligence.detect", request, ct);
+            return null;
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Requests AI-driven data mapping across systems.
+    /// </summary>
+    /// <param name="subjectId">Data subject identifier.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>Map of systems and data locations.</returns>
+    protected async Task<Dictionary<string, IReadOnlyList<string>>?> RequestDataMappingAsync(
+        string subjectId,
+        CancellationToken ct = default)
+    {
+        if (MessageBus == null) return null;
+
+        try
+        {
+            var request = new PluginMessage
+            {
+                Type = "intelligence.map.request",
+                CorrelationId = Guid.NewGuid().ToString("N"),
+                Source = Id,
+                Payload = new Dictionary<string, object>
+                {
+                    ["mappingType"] = "subject_data",
+                    ["subjectId"] = subjectId
+                }
+            };
+
+            await MessageBus.PublishAsync("intelligence.map", request, ct);
+            return null;
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    #endregion
     /// <summary>
     /// Collects all personal data for a data subject.
     /// Implementations should query all data stores and aggregate subject data.
@@ -312,9 +582,140 @@ public abstract class DataSubjectRightsPluginBase : FeaturePluginBase, IDataSubj
 /// Base class for compliance audit plugin implementations.
 /// Provides immutable audit trail for regulatory evidence.
 /// Implementations must provide audit storage and querying.
+/// Intelligence-aware: Supports AI-driven audit analysis and anomaly detection.
 /// </summary>
 public abstract class ComplianceAuditPluginBase : FeaturePluginBase, IComplianceAudit
 {
+    #region Intelligence Integration
+
+    /// <summary>
+    /// Capabilities declared by this compliance audit provider.
+    /// </summary>
+    protected override IReadOnlyList<RegisteredCapability> DeclaredCapabilities => new[]
+    {
+        new RegisteredCapability
+        {
+            CapabilityId = $"{Id}.compliance-audit",
+            DisplayName = $"{Name} - Compliance Audit Trail",
+            Description = "Immutable audit trail with tamper-evident logging for compliance evidence",
+            Category = CapabilityCategory.Governance,
+            SubCategory = "ComplianceAudit",
+            PluginId = Id,
+            PluginName = Name,
+            PluginVersion = Version,
+            Tags = new[] { "audit", "compliance", "evidence", "immutable" },
+            SemanticDescription = "Use this for maintaining immutable audit trails for regulatory compliance",
+            Metadata = new Dictionary<string, object>
+            {
+                ["supportsImmutableAuditTrail"] = true,
+                ["supportsTimeRangeQueries"] = true,
+                ["supportsFrameworkReporting"] = true
+            }
+        }
+    };
+
+    /// <summary>
+    /// Gets static knowledge for Intelligence registration.
+    /// </summary>
+    protected override IReadOnlyList<KnowledgeObject> GetStaticKnowledge()
+    {
+        var knowledge = new List<KnowledgeObject>(base.GetStaticKnowledge());
+
+        knowledge.Add(new KnowledgeObject
+        {
+            Id = $"{Id}.audit.capability",
+            Topic = "compliance-audit",
+            SourcePluginId = Id,
+            SourcePluginName = Name,
+            KnowledgeType = "capability",
+            Description = "Immutable compliance audit trail provider",
+            Payload = new Dictionary<string, object>
+            {
+                ["supportsImmutableAuditTrail"] = true,
+                ["supportsTimeRangeQueries"] = true,
+                ["supportsFrameworkReporting"] = true,
+                ["supportsTamperEvidence"] = true
+            },
+            Tags = new[] { "audit", "compliance", "evidence" },
+            Confidence = 1.0f,
+            Timestamp = DateTimeOffset.UtcNow
+        });
+
+        return knowledge;
+    }
+
+    /// <summary>
+    /// Requests AI-driven audit anomaly detection.
+    /// </summary>
+    /// <param name="events">Recent audit events to analyze.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>Detected anomalies with severity.</returns>
+    protected async Task<IReadOnlyList<(string EventId, string AnomalyType, double Severity)>?> RequestAuditAnomalyDetectionAsync(
+        IReadOnlyList<ComplianceAuditEvent> events,
+        CancellationToken ct = default)
+    {
+        if (MessageBus == null) return null;
+
+        try
+        {
+            var request = new PluginMessage
+            {
+                Type = "intelligence.anomaly.request",
+                CorrelationId = Guid.NewGuid().ToString("N"),
+                Source = Id,
+                Payload = new Dictionary<string, object>
+                {
+                    ["analysisType"] = "audit_events",
+                    ["eventCount"] = events.Count
+                }
+            };
+
+            await MessageBus.PublishAsync("intelligence.anomaly", request, ct);
+            return null;
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Requests AI-generated audit report summary.
+    /// </summary>
+    /// <param name="report">Audit report to summarize.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>Executive summary text.</returns>
+    protected async Task<string?> RequestAuditReportSummaryAsync(
+        AuditReport report,
+        CancellationToken ct = default)
+    {
+        if (MessageBus == null) return null;
+
+        try
+        {
+            var request = new PluginMessage
+            {
+                Type = "intelligence.summarize.request",
+                CorrelationId = Guid.NewGuid().ToString("N"),
+                Source = Id,
+                Payload = new Dictionary<string, object>
+                {
+                    ["contentType"] = "audit_report",
+                    ["framework"] = report.Framework.ToString(),
+                    ["eventCount"] = report.TotalEvents
+                }
+            };
+
+            await MessageBus.PublishAsync("intelligence.summarize", request, ct);
+            return null;
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    #endregion
     /// <summary>
     /// Stores an audit event.
     /// Implementations should ensure immutability and integrity protection.

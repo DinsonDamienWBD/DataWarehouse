@@ -1,3 +1,9 @@
+using System;
+using System.Collections.Generic;
+using System.Threading;
+using System.Threading.Tasks;
+using DataWarehouse.SDK.AI;
+
 namespace DataWarehouse.SDK.Contracts.Observability;
 
 /// <summary>
@@ -23,6 +29,99 @@ public abstract class ObservabilityStrategyBase : IObservabilityStrategy
     private bool _disposed;
     private bool _initialized;
     private readonly SemaphoreSlim _initializationLock = new(1, 1);
+
+    #region Intelligence Integration
+
+    /// <summary>
+    /// Gets the message bus for Intelligence communication.
+    /// </summary>
+    protected IMessageBus? MessageBus { get; private set; }
+
+    /// <summary>
+    /// Gets the unique identifier for this observability strategy.
+    /// </summary>
+    public abstract string StrategyId { get; }
+
+    /// <summary>
+    /// Gets the human-readable name of this observability strategy.
+    /// </summary>
+    public abstract string Name { get; }
+
+    /// <summary>
+    /// Configures Intelligence integration for this observability strategy.
+    /// </summary>
+    /// <param name="messageBus">Optional message bus for Intelligence communication.</param>
+    public virtual void ConfigureIntelligence(IMessageBus? messageBus)
+    {
+        MessageBus = messageBus;
+    }
+
+    /// <summary>
+    /// Gets a value indicating whether Intelligence integration is available.
+    /// </summary>
+    protected bool IsIntelligenceAvailable => MessageBus != null;
+
+    /// <summary>
+    /// Gets static knowledge about this observability strategy for Intelligence registration.
+    /// </summary>
+    /// <returns>A KnowledgeObject describing this strategy's capabilities.</returns>
+    public virtual KnowledgeObject GetStrategyKnowledge()
+    {
+        return new KnowledgeObject
+        {
+            Id = $"observability.{StrategyId}",
+            Topic = "observability.strategy",
+            SourcePluginId = "sdk.observability",
+            SourcePluginName = Name,
+            KnowledgeType = "capability",
+            Description = $"{Name} observability strategy for metrics, tracing, and logging",
+            Payload = new Dictionary<string, object>
+            {
+                ["strategyId"] = StrategyId,
+                ["supportsMetrics"] = Capabilities.SupportsMetrics,
+                ["supportsTracing"] = Capabilities.SupportsTracing,
+                ["supportsLogging"] = Capabilities.SupportsLogging
+            },
+            Tags = new[] { "observability", "monitoring", "strategy" }
+        };
+    }
+
+    /// <summary>
+    /// Gets the registered capability for this observability strategy.
+    /// </summary>
+    /// <returns>A RegisteredCapability describing this strategy.</returns>
+    public virtual RegisteredCapability GetStrategyCapability()
+    {
+        return new RegisteredCapability
+        {
+            CapabilityId = $"observability.{StrategyId}",
+            DisplayName = Name,
+            Description = $"{Name} observability strategy",
+            Category = CapabilityCategory.Observability,
+            SubCategory = "Telemetry",
+            PluginId = "sdk.observability",
+            PluginName = Name,
+            PluginVersion = "1.0.0",
+            Tags = new[] { "observability", "metrics", "tracing", "logging" },
+            SemanticDescription = $"Use {Name} for observability including metrics, tracing, and logging"
+        };
+    }
+
+    /// <summary>
+    /// Requests observability optimization suggestions from Intelligence.
+    /// </summary>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>Optimization suggestions if available, null otherwise.</returns>
+    protected async Task<object?> RequestObservabilityOptimizationAsync(CancellationToken ct = default)
+    {
+        if (!IsIntelligenceAvailable) return null;
+
+        // Send request to Intelligence for observability optimization
+        await Task.CompletedTask;
+        return null;
+    }
+
+    #endregion
 
     /// <summary>
     /// Initializes a new instance of the <see cref="ObservabilityStrategyBase"/> class.

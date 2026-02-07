@@ -1,3 +1,5 @@
+using DataWarehouse.SDK.AI;
+using DataWarehouse.SDK.Contracts.IntelligenceAware;
 using DataWarehouse.SDK.Primitives;
 using DataWarehouse.SDK.Security.Transit;
 using System;
@@ -31,8 +33,73 @@ namespace DataWarehouse.SDK.Contracts
     /// - Statistics collection
     /// </para>
     /// </remarks>
-    public abstract class TransitCompressionPluginBase : PipelinePluginBase, ITransitCompression
+    public abstract class TransitCompressionPluginBase : PipelinePluginBase, ITransitCompression, IIntelligenceAware
     {
+        #region Intelligence Socket
+
+        public bool IsIntelligenceAvailable { get; protected set; }
+        public IntelligenceCapabilities AvailableCapabilities { get; protected set; }
+
+        public virtual async Task<bool> DiscoverIntelligenceAsync(CancellationToken ct = default)
+        {
+            if (MessageBus == null) { IsIntelligenceAvailable = false; return false; }
+            IsIntelligenceAvailable = false;
+            return IsIntelligenceAvailable;
+        }
+
+        protected override IReadOnlyList<RegisteredCapability> DeclaredCapabilities => new[]
+        {
+            new RegisteredCapability
+            {
+                CapabilityId = $"{Id}.transit-compression",
+                DisplayName = $"{Name} - Transit Compression",
+                Description = "Data compression for network transit optimization",
+                Category = CapabilityCategory.Pipeline,
+                SubCategory = "Compression",
+                PluginId = Id,
+                PluginName = Name,
+                PluginVersion = Version,
+                Tags = new[] { "compression", "transit", "pipeline", "bandwidth" },
+                SemanticDescription = "Use for data compression during transit"
+            }
+        };
+
+        protected virtual IReadOnlyList<KnowledgeObject> GetStaticKnowledge()
+        {
+            return new[]
+            {
+                new KnowledgeObject
+                {
+                    Id = $"{Id}.transit-compression.capability",
+                    Topic = "pipeline.compression.transit",
+                    SourcePluginId = Id,
+                    SourcePluginName = Name,
+                    KnowledgeType = "capability",
+                    Description = $"Transit compression, Algorithms: {string.Join(", ", GetSupportedAlgorithms())}",
+                    Payload = new Dictionary<string, object>
+                    {
+                        ["supportedAlgorithms"] = GetSupportedAlgorithms().ToArray(),
+                        ["supportsStreaming"] = SupportsStreaming(),
+                        ["supportsDictionary"] = SupportsDictionary(),
+                        ["hasHardwareAcceleration"] = HasHardwareAcceleration()
+                    },
+                    Tags = new[] { "compression", "transit", "pipeline" }
+                }
+            };
+        }
+
+        /// <summary>
+        /// Requests AI-assisted compression strategy recommendation.
+        /// </summary>
+        protected virtual async Task<CompressionStrategyRecommendation?> RequestCompressionStrategyAsync(long dataSize, double? entropy, CancellationToken ct = default)
+        {
+            if (!IsIntelligenceAvailable || MessageBus == null) return null;
+            await Task.CompletedTask;
+            return null;
+        }
+
+        #endregion
+
         private long _totalCompressions;
         private long _totalDecompressions;
         private long _totalBytesCompressed;
@@ -656,4 +723,16 @@ namespace DataWarehouse.SDK.Contracts
             );
         }
     }
+
+    #region Stub Types for Transit Compression Intelligence Integration
+
+    /// <summary>Stub type for compression strategy recommendation from AI.</summary>
+    public record CompressionStrategyRecommendation(
+        string RecommendedAlgorithm,
+        int RecommendedLevel,
+        bool ShouldCompress,
+        string Rationale,
+        double ConfidenceScore);
+
+    #endregion
 }

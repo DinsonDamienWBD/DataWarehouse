@@ -1,7 +1,10 @@
 // Licensed to the DataWarehouse under one or more agreements.
 // DataWarehouse licenses this file under the MIT license.
 
+using DataWarehouse.SDK.AI;
+using DataWarehouse.SDK.Contracts.IntelligenceAware;
 using DataWarehouse.SDK.Primitives;
+using System.Threading;
 
 namespace DataWarehouse.SDK.Contracts.TamperProof;
 
@@ -116,8 +119,72 @@ public interface IAccessLogProvider
 /// with default implementations for attribution analysis.
 /// Derived classes only need to implement the persistence layer (PersistLogEntryAsync and QueryLogsAsync).
 /// </summary>
-public abstract class AccessLogProviderPluginBase : FeaturePluginBase, IAccessLogProvider
+public abstract class AccessLogProviderPluginBase : FeaturePluginBase, IAccessLogProvider, IIntelligenceAware
 {
+    #region Intelligence Socket
+
+    public bool IsIntelligenceAvailable { get; protected set; }
+    public IntelligenceCapabilities AvailableCapabilities { get; protected set; }
+
+    public virtual async Task<bool> DiscoverIntelligenceAsync(CancellationToken ct = default)
+    {
+        if (MessageBus == null) { IsIntelligenceAvailable = false; return false; }
+        IsIntelligenceAvailable = false;
+        return IsIntelligenceAvailable;
+    }
+
+    protected override IReadOnlyList<RegisteredCapability> DeclaredCapabilities => new[]
+    {
+        new RegisteredCapability
+        {
+            CapabilityId = $"{Id}.accesslog",
+            DisplayName = $"{Name} - Access Log Provider",
+            Description = "Access logging and tamper attribution",
+            Category = CapabilityCategory.TamperProof,
+            SubCategory = "AuditLog",
+            PluginId = Id,
+            PluginName = Name,
+            PluginVersion = Version,
+            Tags = new[] { "access-log", "audit", "attribution", "tamper-proof" },
+            SemanticDescription = "Use for access logging and tamper attribution analysis"
+        }
+    };
+
+    protected virtual IReadOnlyList<KnowledgeObject> GetStaticKnowledge()
+    {
+        return new[]
+        {
+            new KnowledgeObject
+            {
+                Id = $"{Id}.accesslog.capability",
+                Topic = "tamperproof.accesslog",
+                SourcePluginId = Id,
+                SourcePluginName = Name,
+                KnowledgeType = "capability",
+                Description = "Access log provider with attribution analysis",
+                Payload = new Dictionary<string, object>
+                {
+                    ["supportsTamperAttribution"] = true,
+                    ["supportsForensicAnalysis"] = true,
+                    ["supportsAdvancedQuery"] = true
+                },
+                Tags = new[] { "access-log", "audit", "attribution" }
+            }
+        };
+    }
+
+    /// <summary>
+    /// Requests AI-assisted access pattern analysis.
+    /// </summary>
+    protected virtual async Task<AccessPatternAnalysis?> RequestAccessPatternAnalysisAsync(Guid objectId, CancellationToken ct = default)
+    {
+        if (!IsIntelligenceAvailable || MessageBus == null) return null;
+        await Task.CompletedTask;
+        return null;
+    }
+
+    #endregion
+
     /// <summary>
     /// Category is always FeatureProvider for access log plugins.
     /// </summary>
@@ -553,3 +620,15 @@ public abstract class AccessLogProviderPluginBase : FeaturePluginBase, IAccessLo
         return metadata;
     }
 }
+
+#region Stub Types for Access Log Intelligence Integration
+
+/// <summary>Stub type for access pattern analysis from AI.</summary>
+public record AccessPatternAnalysis(
+    bool IsAnomalous,
+    string[] DetectedPatterns,
+    string[] SuspiciousBehaviors,
+    double RiskScore,
+    string Recommendation);
+
+#endregion

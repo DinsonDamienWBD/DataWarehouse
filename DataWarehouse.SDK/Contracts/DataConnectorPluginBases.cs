@@ -1,6 +1,10 @@
+using DataWarehouse.SDK.AI;
 using DataWarehouse.SDK.Connectors;
+using DataWarehouse.SDK.Primitives;
+using DataWarehouse.SDK.Utilities;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -10,6 +14,7 @@ namespace DataWarehouse.SDK.Contracts
     /// Abstract base class for data connector plugins.
     /// Provides common infrastructure for connecting to and interacting with external data sources.
     /// Implements connection lifecycle management, error handling, and capability enforcement.
+    /// Intelligence-aware: Supports AI-driven schema discovery and query optimization.
     /// </summary>
     public abstract class DataConnectorPluginBase : FeaturePluginBase, IDataConnector
     {
@@ -39,6 +44,142 @@ namespace DataWarehouse.SDK.Contracts
         /// Current connection configuration (set after successful connection).
         /// </summary>
         protected ConnectorConfig? CurrentConfig { get; private set; }
+
+        #endregion
+
+        #region Intelligence Integration
+
+        /// <summary>
+        /// Capabilities declared by this data connector.
+        /// </summary>
+        protected override IReadOnlyList<RegisteredCapability> DeclaredCapabilities => new[]
+        {
+            new RegisteredCapability
+            {
+                CapabilityId = $"{Id}.connector",
+                DisplayName = $"{Name} - Data Connector",
+                Description = $"Data connector for {ConnectorCategory} sources with read/write capabilities",
+                Category = CapabilityCategory.Pipeline,
+                SubCategory = "DataConnector",
+                PluginId = Id,
+                PluginName = Name,
+                PluginVersion = Version,
+                Tags = new[] { "connector", "data", ConnectorCategory.ToString().ToLowerInvariant() },
+                SemanticDescription = $"Use this for connecting to and interacting with {ConnectorCategory} data sources",
+                Metadata = new Dictionary<string, object>
+                {
+                    ["connectorId"] = ConnectorId,
+                    ["connectorCategory"] = ConnectorCategory.ToString(),
+                    ["capabilities"] = Capabilities.ToString(),
+                    ["supportsRead"] = Capabilities.HasFlag(ConnectorCapabilities.Read),
+                    ["supportsWrite"] = Capabilities.HasFlag(ConnectorCapabilities.Write)
+                }
+            }
+        };
+
+        /// <summary>
+        /// Gets static knowledge for Intelligence registration.
+        /// </summary>
+        protected override IReadOnlyList<KnowledgeObject> GetStaticKnowledge()
+        {
+            var knowledge = new List<KnowledgeObject>(base.GetStaticKnowledge());
+
+            knowledge.Add(new KnowledgeObject
+            {
+                Id = $"{Id}.connector.capability",
+                Topic = "data-connector",
+                SourcePluginId = Id,
+                SourcePluginName = Name,
+                KnowledgeType = "capability",
+                Description = $"Data connector for {ConnectorCategory} sources",
+                Payload = new Dictionary<string, object>
+                {
+                    ["connectorId"] = ConnectorId,
+                    ["connectorCategory"] = ConnectorCategory.ToString(),
+                    ["capabilities"] = Capabilities.ToString(),
+                    ["supportsRead"] = Capabilities.HasFlag(ConnectorCapabilities.Read),
+                    ["supportsWrite"] = Capabilities.HasFlag(ConnectorCapabilities.Write),
+                    ["supportsSchema"] = Capabilities.HasFlag(ConnectorCapabilities.Schema),
+                    ["supportsTransactions"] = Capabilities.HasFlag(ConnectorCapabilities.Transactions)
+                },
+                Tags = new[] { "connector", ConnectorCategory.ToString().ToLowerInvariant() },
+                Confidence = 1.0f,
+                Timestamp = DateTimeOffset.UtcNow
+            });
+
+            return knowledge;
+        }
+
+        /// <summary>
+        /// Requests AI-driven schema suggestion based on sample data.
+        /// </summary>
+        /// <param name="sampleRecords">Sample data records.</param>
+        /// <param name="ct">Cancellation token.</param>
+        /// <returns>Suggested schema.</returns>
+        protected async Task<DataSchema?> RequestSchemaSuggestionAsync(
+            IReadOnlyList<DataRecord> sampleRecords,
+            CancellationToken ct = default)
+        {
+            if (MessageBus == null) return null;
+
+            try
+            {
+                var request = new PluginMessage
+                {
+                    Type = "intelligence.suggest.request",
+                    CorrelationId = Guid.NewGuid().ToString("N"),
+                    Source = Id,
+                    Payload = new Dictionary<string, object>
+                    {
+                        ["suggestionType"] = "schema",
+                        ["sampleCount"] = sampleRecords.Count,
+                        ["connectorCategory"] = ConnectorCategory.ToString()
+                    }
+                };
+
+                await MessageBus.PublishAsync("intelligence.suggest", request, ct);
+                return null;
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        /// <summary>
+        /// Requests AI-driven query optimization for the data source.
+        /// </summary>
+        /// <param name="query">Query to optimize.</param>
+        /// <param name="ct">Cancellation token.</param>
+        /// <returns>Optimized query.</returns>
+        protected async Task<DataQuery?> RequestQueryOptimizationAsync(
+            DataQuery query,
+            CancellationToken ct = default)
+        {
+            if (MessageBus == null) return null;
+
+            try
+            {
+                var request = new PluginMessage
+                {
+                    Type = "intelligence.optimize.request",
+                    CorrelationId = Guid.NewGuid().ToString("N"),
+                    Source = Id,
+                    Payload = new Dictionary<string, object>
+                    {
+                        ["optimizationType"] = "query",
+                        ["connectorCategory"] = ConnectorCategory.ToString()
+                    }
+                };
+
+                await MessageBus.PublishAsync("intelligence.optimize", request, ct);
+                return null;
+            }
+            catch
+            {
+                return null;
+            }
+        }
 
         #endregion
 
@@ -204,6 +345,7 @@ namespace DataWarehouse.SDK.Contracts
     /// Abstract base class for database connector plugins.
     /// Provides specialized infrastructure for relational and NoSQL databases.
     /// Supports PostgreSQL, MySQL, MongoDB, Cassandra, Redis, and similar systems.
+    /// Intelligence-aware: Supports AI-driven query generation and index recommendations.
     /// </summary>
     public abstract class DatabaseConnectorPluginBase : DataConnectorPluginBase
     {
@@ -220,6 +362,83 @@ namespace DataWarehouse.SDK.Contracts
             ConnectorCapabilities.Write |
             ConnectorCapabilities.Schema |
             ConnectorCapabilities.Transactions;
+
+        #region Database Intelligence Integration
+
+        /// <summary>
+        /// Requests AI-driven index recommendations based on query patterns.
+        /// </summary>
+        /// <param name="queryPatterns">Recent query patterns.</param>
+        /// <param name="ct">Cancellation token.</param>
+        /// <returns>Recommended indexes.</returns>
+        protected async Task<IReadOnlyList<string>?> RequestIndexRecommendationsAsync(
+            IReadOnlyList<string> queryPatterns,
+            CancellationToken ct = default)
+        {
+            if (MessageBus == null) return null;
+
+            try
+            {
+                var request = new PluginMessage
+                {
+                    Type = "intelligence.recommend.request",
+                    CorrelationId = Guid.NewGuid().ToString("N"),
+                    Source = Id,
+                    Payload = new Dictionary<string, object>
+                    {
+                        ["recommendationType"] = "database_indexes",
+                        ["queryPatternCount"] = queryPatterns.Count
+                    }
+                };
+
+                await MessageBus.PublishAsync("intelligence.recommend", request, ct);
+                return null;
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        /// <summary>
+        /// Requests AI-generated SQL query from natural language.
+        /// </summary>
+        /// <param name="naturalLanguageQuery">Natural language query.</param>
+        /// <param name="schema">Current schema for context.</param>
+        /// <param name="ct">Cancellation token.</param>
+        /// <returns>Generated SQL query.</returns>
+        protected async Task<string?> RequestNaturalLanguageToSqlAsync(
+            string naturalLanguageQuery,
+            DataSchema schema,
+            CancellationToken ct = default)
+        {
+            if (MessageBus == null) return null;
+
+            try
+            {
+                var request = new PluginMessage
+                {
+                    Type = "intelligence.generate.request",
+                    CorrelationId = Guid.NewGuid().ToString("N"),
+                    Source = Id,
+                    Payload = new Dictionary<string, object>
+                    {
+                        ["generationType"] = "nl_to_sql",
+                        ["query"] = naturalLanguageQuery,
+                        ["fieldCount"] = schema.Fields?.Length ?? 0
+                    }
+                };
+
+                await MessageBus.PublishAsync("intelligence.generate", request, ct);
+                return null;
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        #endregion
 
         #region Database-Specific Methods
 
@@ -259,6 +478,7 @@ namespace DataWarehouse.SDK.Contracts
     /// Abstract base class for messaging connector plugins.
     /// Provides specialized infrastructure for message queues and event streams.
     /// Supports Kafka, RabbitMQ, Pulsar, NATS, and similar messaging systems.
+    /// Intelligence-aware: Supports AI-driven message routing and anomaly detection.
     /// </summary>
     public abstract class MessagingConnectorPluginBase : DataConnectorPluginBase
     {
@@ -274,6 +494,83 @@ namespace DataWarehouse.SDK.Contracts
             ConnectorCapabilities.Read |
             ConnectorCapabilities.Write |
             ConnectorCapabilities.Streaming;
+
+        #region Messaging Intelligence Integration
+
+        /// <summary>
+        /// Requests AI-driven message routing recommendation.
+        /// </summary>
+        /// <param name="messageContent">Message content to route.</param>
+        /// <param name="availableTopics">Available topics.</param>
+        /// <param name="ct">Cancellation token.</param>
+        /// <returns>Recommended topic.</returns>
+        protected async Task<string?> RequestMessageRoutingAsync(
+            byte[] messageContent,
+            IReadOnlyList<string> availableTopics,
+            CancellationToken ct = default)
+        {
+            if (MessageBus == null) return null;
+
+            try
+            {
+                var request = new PluginMessage
+                {
+                    Type = "intelligence.recommend.request",
+                    CorrelationId = Guid.NewGuid().ToString("N"),
+                    Source = Id,
+                    Payload = new Dictionary<string, object>
+                    {
+                        ["recommendationType"] = "message_routing",
+                        ["messageSize"] = messageContent.Length,
+                        ["topicCount"] = availableTopics.Count
+                    }
+                };
+
+                await MessageBus.PublishAsync("intelligence.recommend", request, ct);
+                return null;
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        /// <summary>
+        /// Requests AI-driven message anomaly detection.
+        /// </summary>
+        /// <param name="recentMessages">Recent messages for analysis.</param>
+        /// <param name="ct">Cancellation token.</param>
+        /// <returns>Detected anomalies.</returns>
+        protected async Task<IReadOnlyList<(int MessageIndex, string AnomalyType)>?> RequestMessageAnomalyDetectionAsync(
+            IReadOnlyList<byte[]> recentMessages,
+            CancellationToken ct = default)
+        {
+            if (MessageBus == null) return null;
+
+            try
+            {
+                var request = new PluginMessage
+                {
+                    Type = "intelligence.anomaly.request",
+                    CorrelationId = Guid.NewGuid().ToString("N"),
+                    Source = Id,
+                    Payload = new Dictionary<string, object>
+                    {
+                        ["analysisType"] = "message_stream",
+                        ["messageCount"] = recentMessages.Count
+                    }
+                };
+
+                await MessageBus.PublishAsync("intelligence.anomaly", request, ct);
+                return null;
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        #endregion
 
         #region Messaging-Specific Methods
 
@@ -316,6 +613,7 @@ namespace DataWarehouse.SDK.Contracts
     /// Abstract base class for SaaS connector plugins.
     /// Provides specialized infrastructure for SaaS platforms with OAuth/token-based authentication.
     /// Supports Salesforce, HubSpot, Zendesk, Jira, and similar cloud services.
+    /// Intelligence-aware: Supports AI-driven API mapping and rate limit optimization.
     /// </summary>
     public abstract class SaaSConnectorPluginBase : DataConnectorPluginBase
     {
@@ -343,6 +641,86 @@ namespace DataWarehouse.SDK.Contracts
         /// Expiry time of the current access token.
         /// </summary>
         protected DateTimeOffset TokenExpiry { get; set; }
+
+        #endregion
+
+        #region SaaS Intelligence Integration
+
+        /// <summary>
+        /// Requests AI-driven API endpoint mapping suggestion.
+        /// </summary>
+        /// <param name="operation">Desired operation description.</param>
+        /// <param name="availableEndpoints">Available API endpoints.</param>
+        /// <param name="ct">Cancellation token.</param>
+        /// <returns>Recommended endpoint.</returns>
+        protected async Task<string?> RequestApiEndpointMappingAsync(
+            string operation,
+            IReadOnlyList<string> availableEndpoints,
+            CancellationToken ct = default)
+        {
+            if (MessageBus == null) return null;
+
+            try
+            {
+                var request = new PluginMessage
+                {
+                    Type = "intelligence.map.request",
+                    CorrelationId = Guid.NewGuid().ToString("N"),
+                    Source = Id,
+                    Payload = new Dictionary<string, object>
+                    {
+                        ["mappingType"] = "api_endpoint",
+                        ["operation"] = operation,
+                        ["endpointCount"] = availableEndpoints.Count
+                    }
+                };
+
+                await MessageBus.PublishAsync("intelligence.map", request, ct);
+                return null;
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        /// <summary>
+        /// Requests AI-driven rate limit optimization.
+        /// </summary>
+        /// <param name="rateLimitInfo">Current rate limit information.</param>
+        /// <param name="pendingRequests">Number of pending requests.</param>
+        /// <param name="ct">Cancellation token.</param>
+        /// <returns>Recommended request delay.</returns>
+        protected async Task<TimeSpan?> RequestRateLimitOptimizationAsync(
+            Dictionary<string, object> rateLimitInfo,
+            int pendingRequests,
+            CancellationToken ct = default)
+        {
+            if (MessageBus == null) return null;
+
+            try
+            {
+                var request = new PluginMessage
+                {
+                    Type = "intelligence.optimize.request",
+                    CorrelationId = Guid.NewGuid().ToString("N"),
+                    Source = Id,
+                    Payload = new Dictionary<string, object>
+                    {
+                        ["optimizationType"] = "rate_limit",
+                        ["rateLimitInfo"] = rateLimitInfo,
+                        ["pendingRequests"] = pendingRequests
+                    }
+                };
+
+                await MessageBus.PublishAsync("intelligence.optimize", request, ct);
+                return null;
+            }
+            catch
+            {
+                return null;
+            }
+        }
 
         #endregion
 

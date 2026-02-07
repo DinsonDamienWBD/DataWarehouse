@@ -1,3 +1,4 @@
+using DataWarehouse.SDK.AI;
 using DataWarehouse.SDK.Security;
 using System;
 using System.Collections.Concurrent;
@@ -831,6 +832,161 @@ namespace DataWarehouse.SDK.Contracts.Encryption
 
             return (iv, ciphertext, tag);
         }
+
+        #region Intelligence Integration
+
+        /// <summary>
+        /// Message bus reference for Intelligence communication.
+        /// </summary>
+        protected IMessageBus? MessageBus { get; private set; }
+
+        /// <summary>
+        /// Configures Intelligence integration for this strategy.
+        /// Called by the plugin to enable AI-enhanced features.
+        /// </summary>
+        public virtual void ConfigureIntelligence(IMessageBus? messageBus)
+        {
+            MessageBus = messageBus;
+        }
+
+        /// <summary>
+        /// Whether Intelligence is available for this strategy.
+        /// </summary>
+        protected bool IsIntelligenceAvailable => MessageBus != null;
+
+        /// <summary>
+        /// Gets static knowledge about this strategy for AI discovery.
+        /// Override to provide strategy-specific knowledge.
+        /// </summary>
+        public virtual KnowledgeObject GetStrategyKnowledge()
+        {
+            return new KnowledgeObject
+            {
+                Id = $"strategy.{StrategyId}",
+                Topic = $"{GetKnowledgeTopic()}",
+                SourcePluginId = "sdk.strategy",
+                SourcePluginName = StrategyName,
+                KnowledgeType = "capability",
+                Description = GetStrategyDescription(),
+                Payload = GetKnowledgePayload(),
+                Tags = GetKnowledgeTags()
+            };
+        }
+
+        /// <summary>
+        /// Gets the registered capability for this strategy.
+        /// </summary>
+        public virtual RegisteredCapability GetStrategyCapability()
+        {
+            return new RegisteredCapability
+            {
+                CapabilityId = $"strategy.{StrategyId}",
+                DisplayName = StrategyName,
+                Description = GetStrategyDescription(),
+                Category = GetCapabilityCategory(),
+                PluginId = "sdk.strategy",
+                PluginName = StrategyName,
+                PluginVersion = "1.0.0",
+                Tags = GetKnowledgeTags(),
+                Metadata = GetCapabilityMetadata(),
+                SemanticDescription = GetSemanticDescription()
+            };
+        }
+
+        /// <summary>
+        /// Gets the knowledge topic for this strategy type.
+        /// </summary>
+        protected virtual string GetKnowledgeTopic() => "encryption";
+
+        /// <summary>
+        /// Gets the capability category for this strategy type.
+        /// </summary>
+        protected virtual CapabilityCategory GetCapabilityCategory() => CapabilityCategory.Encryption;
+
+        /// <summary>
+        /// Gets a description for this strategy.
+        /// </summary>
+        protected virtual string GetStrategyDescription() => $"{StrategyName} encryption strategy using {CipherInfo.AlgorithmName}";
+
+        /// <summary>
+        /// Gets the knowledge payload for this strategy.
+        /// </summary>
+        protected virtual Dictionary<string, object> GetKnowledgePayload() => new()
+        {
+            ["algorithm"] = CipherInfo.AlgorithmName,
+            ["keySizeBits"] = CipherInfo.KeySizeBits,
+            ["blockSizeBytes"] = CipherInfo.BlockSizeBytes,
+            ["securityLevel"] = CipherInfo.SecurityLevel.ToString(),
+            ["isAuthenticated"] = CipherInfo.Capabilities.IsAuthenticated,
+            ["supportsAead"] = CipherInfo.Capabilities.SupportsAead,
+            ["isHardwareAccelerable"] = CipherInfo.Capabilities.IsHardwareAcceleratable
+        };
+
+        /// <summary>
+        /// Gets tags for this strategy.
+        /// </summary>
+        protected virtual string[] GetKnowledgeTags() => new[]
+        {
+            "strategy",
+            "encryption",
+            CipherInfo.AlgorithmName.ToLowerInvariant(),
+            CipherInfo.SecurityLevel.ToString().ToLowerInvariant()
+        };
+
+        /// <summary>
+        /// Gets capability metadata for this strategy.
+        /// </summary>
+        protected virtual Dictionary<string, object> GetCapabilityMetadata() => new()
+        {
+            ["algorithm"] = CipherInfo.AlgorithmName,
+            ["keySizeBits"] = CipherInfo.KeySizeBits,
+            ["securityLevel"] = CipherInfo.SecurityLevel.ToString()
+        };
+
+        /// <summary>
+        /// Gets the semantic description for AI-driven discovery.
+        /// </summary>
+        protected virtual string GetSemanticDescription() =>
+            $"Use {StrategyName} for {CipherInfo.SecurityLevel} security encryption with {CipherInfo.AlgorithmName}";
+
+        /// <summary>
+        /// Requests an AI recommendation for the best key configuration.
+        /// </summary>
+        /// <param name="dataClassification">The classification of data to be encrypted.</param>
+        /// <param name="complianceRequirements">Compliance requirements (e.g., FIPS, PCI-DSS).</param>
+        /// <param name="cancellationToken">Cancellation token.</param>
+        /// <returns>Recommended key configuration, or null if Intelligence unavailable.</returns>
+        protected async Task<Dictionary<string, object>?> RequestKeyRecommendationAsync(
+            string dataClassification,
+            string[]? complianceRequirements = null,
+            CancellationToken cancellationToken = default)
+        {
+            if (!IsIntelligenceAvailable || MessageBus == null)
+                return null;
+
+            var request = new Dictionary<string, object>
+            {
+                ["requestType"] = "key_recommendation",
+                ["strategyId"] = StrategyId,
+                ["dataClassification"] = dataClassification,
+                ["complianceRequirements"] = complianceRequirements ?? Array.Empty<string>(),
+                ["currentAlgorithm"] = CipherInfo.AlgorithmName,
+                ["currentKeySize"] = CipherInfo.KeySizeBits
+            };
+
+            var message = new Utilities.PluginMessage
+            {
+                MessageId = Guid.NewGuid().ToString(),
+                SourcePluginId = StrategyId,
+                MessageType = "intelligence.request",
+                Payload = request
+            };
+
+            var response = await MessageBus.SendAsync(MessageTopics.AIQuery, message, cancellationToken);
+            return response.Success ? response.Payload as Dictionary<string, object> : null;
+        }
+
+        #endregion
     }
 
     /// <summary>

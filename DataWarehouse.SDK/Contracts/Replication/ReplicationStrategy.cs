@@ -1,3 +1,5 @@
+using DataWarehouse.SDK.AI;
+using DataWarehouse.SDK.Utilities;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -454,5 +456,173 @@ namespace DataWarehouse.SDK.Contracts.Replication
                 throw new ArgumentException(
                     $"Maximum replica count is {Capabilities.MaxReplicaCount}, got {nodeCount}");
         }
+
+        #region Intelligence Integration
+
+        /// <summary>
+        /// Unique identifier for this replication strategy.
+        /// </summary>
+        public virtual string StrategyId => $"replication-{ConsistencyModel.ToString().ToLowerInvariant()}";
+
+        /// <summary>
+        /// Human-readable name of this replication strategy.
+        /// </summary>
+        public virtual string StrategyName => $"{ConsistencyModel} Replication";
+
+        /// <summary>
+        /// Message bus reference for Intelligence communication.
+        /// </summary>
+        protected IMessageBus? MessageBus { get; private set; }
+
+        /// <summary>
+        /// Configures Intelligence integration for this strategy.
+        /// Called by the plugin to enable AI-enhanced features.
+        /// </summary>
+        public virtual void ConfigureIntelligence(IMessageBus? messageBus)
+        {
+            MessageBus = messageBus;
+        }
+
+        /// <summary>
+        /// Whether Intelligence is available for this strategy.
+        /// </summary>
+        protected bool IsIntelligenceAvailable => MessageBus != null;
+
+        /// <summary>
+        /// Gets static knowledge about this strategy for AI discovery.
+        /// Override to provide strategy-specific knowledge.
+        /// </summary>
+        public virtual KnowledgeObject GetStrategyKnowledge()
+        {
+            return new KnowledgeObject
+            {
+                Id = $"strategy.{StrategyId}",
+                Topic = $"{GetKnowledgeTopic()}",
+                SourcePluginId = "sdk.strategy",
+                SourcePluginName = StrategyName,
+                KnowledgeType = "capability",
+                Description = GetStrategyDescription(),
+                Payload = GetKnowledgePayload(),
+                Tags = GetKnowledgeTags()
+            };
+        }
+
+        /// <summary>
+        /// Gets the registered capability for this strategy.
+        /// </summary>
+        public virtual RegisteredCapability GetStrategyCapability()
+        {
+            return new RegisteredCapability
+            {
+                CapabilityId = $"strategy.{StrategyId}",
+                DisplayName = StrategyName,
+                Description = GetStrategyDescription(),
+                Category = GetCapabilityCategory(),
+                PluginId = "sdk.strategy",
+                PluginName = StrategyName,
+                PluginVersion = "1.0.0",
+                Tags = GetKnowledgeTags(),
+                Metadata = GetCapabilityMetadata(),
+                SemanticDescription = GetSemanticDescription()
+            };
+        }
+
+        /// <summary>
+        /// Gets the knowledge topic for this strategy type.
+        /// </summary>
+        protected virtual string GetKnowledgeTopic() => "replication";
+
+        /// <summary>
+        /// Gets the capability category for this strategy type.
+        /// </summary>
+        protected virtual CapabilityCategory GetCapabilityCategory() => CapabilityCategory.Replication;
+
+        /// <summary>
+        /// Gets a description for this strategy.
+        /// </summary>
+        protected virtual string GetStrategyDescription() =>
+            $"{StrategyName} strategy with {ConsistencyModel} consistency and {Capabilities.MinReplicaCount}-{Capabilities.MaxReplicaCount} replicas";
+
+        /// <summary>
+        /// Gets the knowledge payload for this strategy.
+        /// </summary>
+        protected virtual Dictionary<string, object> GetKnowledgePayload() => new()
+        {
+            ["consistencyModel"] = ConsistencyModel.ToString(),
+            ["supportsMultiMaster"] = Capabilities.SupportsMultiMaster,
+            ["supportsAsyncReplication"] = Capabilities.SupportsAsyncReplication,
+            ["supportsSyncReplication"] = Capabilities.SupportsSyncReplication,
+            ["isGeoAware"] = Capabilities.IsGeoAware,
+            ["minReplicaCount"] = Capabilities.MinReplicaCount,
+            ["maxReplicaCount"] = Capabilities.MaxReplicaCount,
+            ["conflictResolutionMethods"] = Capabilities.ConflictResolutionMethods.Select(m => m.ToString()).ToArray()
+        };
+
+        /// <summary>
+        /// Gets tags for this strategy.
+        /// </summary>
+        protected virtual string[] GetKnowledgeTags() => new[]
+        {
+            "strategy",
+            "replication",
+            ConsistencyModel.ToString().ToLowerInvariant(),
+            Capabilities.SupportsMultiMaster ? "multi-master" : "single-master"
+        };
+
+        /// <summary>
+        /// Gets capability metadata for this strategy.
+        /// </summary>
+        protected virtual Dictionary<string, object> GetCapabilityMetadata() => new()
+        {
+            ["consistencyModel"] = ConsistencyModel.ToString(),
+            ["supportsMultiMaster"] = Capabilities.SupportsMultiMaster
+        };
+
+        /// <summary>
+        /// Gets the semantic description for AI-driven discovery.
+        /// </summary>
+        protected virtual string GetSemanticDescription() =>
+            $"Use {StrategyName} for {ConsistencyModel} consistency with {(Capabilities.SupportsMultiMaster ? "multi-master" : "single-master")} topology";
+
+        /// <summary>
+        /// Requests an AI recommendation for optimal replication configuration.
+        /// </summary>
+        /// <param name="latencyRequirement">Latency requirement in milliseconds.</param>
+        /// <param name="consistencyPreference">Preferred consistency level.</param>
+        /// <param name="geoDistributed">Whether nodes are geographically distributed.</param>
+        /// <param name="cancellationToken">Cancellation token.</param>
+        /// <returns>Recommended replication configuration, or null if Intelligence unavailable.</returns>
+        protected async Task<Dictionary<string, object>?> RequestReplicationRecommendationAsync(
+            int latencyRequirement,
+            string consistencyPreference,
+            bool geoDistributed = false,
+            CancellationToken cancellationToken = default)
+        {
+            if (!IsIntelligenceAvailable || MessageBus == null)
+                return null;
+
+            var request = new Dictionary<string, object>
+            {
+                ["requestType"] = "replication_recommendation",
+                ["strategyId"] = StrategyId,
+                ["latencyRequirement"] = latencyRequirement,
+                ["consistencyPreference"] = consistencyPreference,
+                ["geoDistributed"] = geoDistributed,
+                ["currentConsistencyModel"] = ConsistencyModel.ToString()
+            };
+
+            var message = new PluginMessage
+            {
+                MessageId = Guid.NewGuid().ToString(),
+                SourcePluginId = StrategyId,
+                MessageType = "intelligence.request",
+                Payload = request
+            };
+
+            var response = await MessageBus.SendAsync(MessageTopics.AIQuery, message, cancellationToken);
+            return response.Success ? response.Payload as Dictionary<string, object> : null;
+        }
+
+        #endregion
     }
 }

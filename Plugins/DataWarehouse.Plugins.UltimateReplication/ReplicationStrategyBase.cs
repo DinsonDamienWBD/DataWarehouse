@@ -5,7 +5,10 @@ using System.Linq;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
+using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Contracts.Replication;
+using DataWarehouse.SDK.Primitives;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateReplication
 {
@@ -410,7 +413,8 @@ namespace DataWarehouse.Plugins.UltimateReplication
 
     /// <summary>
     /// Enhanced base class for replication strategies with vector clock management,
-    /// conflict detection/resolution, replication lag tracking, and anti-entropy protocols.
+    /// conflict detection/resolution, replication lag tracking, anti-entropy protocols,
+    /// and Intelligence integration for AI-enhanced replication.
     /// </summary>
     public abstract class EnhancedReplicationStrategyBase : ReplicationStrategyBase
     {
@@ -440,6 +444,11 @@ namespace DataWarehouse.Plugins.UltimateReplication
         protected ConflictResolutionMethod ConflictResolution { get; set; } = ConflictResolutionMethod.LastWriteWins;
 
         /// <summary>
+        /// Plugin ID for correlation.
+        /// </summary>
+        protected string? PluginId { get; private set; }
+
+        /// <summary>
         /// Gets the characteristics of this replication strategy.
         /// </summary>
         public abstract ReplicationCharacteristics Characteristics { get; }
@@ -452,6 +461,18 @@ namespace DataWarehouse.Plugins.UltimateReplication
             LocalNodeId = nodeId ?? $"node-{Guid.NewGuid():N}"[..16];
             AntiEntropy = new AntiEntropyProtocol(antiEntropyInterval);
             VectorClock.Increment(LocalNodeId);
+        }
+
+        /// <summary>
+        /// Configures Intelligence integration for this strategy.
+        /// Call this to enable AI-enhanced replication features.
+        /// </summary>
+        /// <param name="messageBus">The message bus for Intelligence communication.</param>
+        /// <param name="pluginId">The plugin ID for correlation.</param>
+        public void ConfigureIntelligence(IMessageBus messageBus, string pluginId)
+        {
+            base.ConfigureIntelligence(messageBus);
+            PluginId = pluginId;
         }
 
         /// <summary>
@@ -584,6 +605,336 @@ namespace DataWarehouse.Plugins.UltimateReplication
         protected void UpdateRemoteNodeVersion(string nodeId, EnhancedVectorClock version)
         {
             AntiEntropy.UpdateNodeVersion(nodeId, version);
+        }
+
+        // ========================================
+        // Intelligence Integration Helpers
+        // ========================================
+
+        /// <summary>
+        /// Requests conflict prediction from Intelligence for a pending replication.
+        /// </summary>
+        /// <param name="sourceNode">Source node ID.</param>
+        /// <param name="targetNodes">Target node IDs.</param>
+        /// <param name="dataPattern">Optional data access pattern information.</param>
+        /// <param name="ct">Cancellation token.</param>
+        /// <returns>Predicted conflict probability (0.0-1.0), or null if Intelligence unavailable.</returns>
+        protected async Task<double?> RequestConflictPredictionAsync(
+            string sourceNode,
+            IEnumerable<string> targetNodes,
+            Dictionary<string, object>? dataPattern = null,
+            CancellationToken ct = default)
+        {
+            if (MessageBus == null || PluginId == null)
+                return null;
+
+            try
+            {
+                var correlationId = Guid.NewGuid().ToString("N");
+                var tcs = new TaskCompletionSource<double?>();
+
+                // Subscribe to response
+                var subscription = MessageBus.Subscribe(ReplicationTopics.PredictConflictResponse, msg =>
+                {
+                    if (msg.CorrelationId == correlationId)
+                    {
+                        if (msg.Payload.TryGetValue("conflictProbability", out var prob) && prob is double probability)
+                        {
+                            tcs.TrySetResult(probability);
+                        }
+                        else
+                        {
+                            tcs.TrySetResult(null);
+                        }
+                    }
+                    return Task.CompletedTask;
+                });
+
+                try
+                {
+                    // Send request
+                    var request = new PluginMessage
+                    {
+                        Type = ReplicationTopics.PredictConflict,
+                        CorrelationId = correlationId,
+                        Source = PluginId,
+                        Payload = new Dictionary<string, object>
+                        {
+                            ["sourceNode"] = sourceNode,
+                            ["targetNodes"] = targetNodes.ToArray(),
+                            ["dataPattern"] = dataPattern ?? new Dictionary<string, object>(),
+                            ["strategyName"] = Characteristics.StrategyName,
+                            ["consistencyModel"] = Characteristics.ConsistencyModel.ToString()
+                        }
+                    };
+
+                    await MessageBus.PublishAsync(ReplicationTopics.PredictConflict, request, ct);
+
+                    // Wait for response with timeout
+                    using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+                    cts.CancelAfter(TimeSpan.FromSeconds(5));
+
+                    return await tcs.Task.WaitAsync(cts.Token);
+                }
+                finally
+                {
+                    subscription?.Dispose();
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                return null;
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        /// <summary>
+        /// Requests optimal consistency model recommendation from Intelligence.
+        /// </summary>
+        /// <param name="dataType">Type of data being replicated.</param>
+        /// <param name="accessPattern">Read/write access pattern.</param>
+        /// <param name="latencyRequirements">Maximum acceptable latency in milliseconds.</param>
+        /// <param name="ct">Cancellation token.</param>
+        /// <returns>Recommended consistency model, or null if Intelligence unavailable.</returns>
+        protected async Task<ConsistencyModel?> RequestOptimalConsistencyAsync(
+            string dataType,
+            string accessPattern,
+            long latencyRequirements,
+            CancellationToken ct = default)
+        {
+            if (MessageBus == null || PluginId == null)
+                return null;
+
+            try
+            {
+                var correlationId = Guid.NewGuid().ToString("N");
+                var tcs = new TaskCompletionSource<ConsistencyModel?>();
+
+                // Subscribe to response
+                var subscription = MessageBus.Subscribe(ReplicationTopics.OptimizeConsistencyResponse, msg =>
+                {
+                    if (msg.CorrelationId == correlationId)
+                    {
+                        if (msg.Payload.TryGetValue("recommendedModel", out var model) &&
+                            Enum.TryParse<ConsistencyModel>(model?.ToString(), out var consistencyModel))
+                        {
+                            tcs.TrySetResult(consistencyModel);
+                        }
+                        else
+                        {
+                            tcs.TrySetResult(null);
+                        }
+                    }
+                    return Task.CompletedTask;
+                });
+
+                try
+                {
+                    // Send request
+                    var request = new PluginMessage
+                    {
+                        Type = ReplicationTopics.OptimizeConsistency,
+                        CorrelationId = correlationId,
+                        Source = PluginId,
+                        Payload = new Dictionary<string, object>
+                        {
+                            ["dataType"] = dataType,
+                            ["accessPattern"] = accessPattern,
+                            ["latencyRequirements"] = latencyRequirements,
+                            ["currentModel"] = Characteristics.ConsistencyModel.ToString()
+                        }
+                    };
+
+                    await MessageBus.PublishAsync(ReplicationTopics.OptimizeConsistency, request, ct);
+
+                    // Wait for response with timeout
+                    using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+                    cts.CancelAfter(TimeSpan.FromSeconds(5));
+
+                    return await tcs.Task.WaitAsync(cts.Token);
+                }
+                finally
+                {
+                    subscription?.Dispose();
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                return null;
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        /// <summary>
+        /// Reports replication lag data to Intelligence for learning and optimization.
+        /// </summary>
+        /// <param name="sourceNode">Source node ID.</param>
+        /// <param name="targetNode">Target node ID.</param>
+        /// <param name="lagMs">Current lag in milliseconds.</param>
+        /// <param name="ct">Cancellation token.</param>
+        /// <returns>Task representing the async operation.</returns>
+        protected async Task ReportLagToIntelligenceAsync(
+            string sourceNode,
+            string targetNode,
+            long lagMs,
+            CancellationToken ct = default)
+        {
+            if (MessageBus == null || PluginId == null)
+                return;
+
+            try
+            {
+                var message = new PluginMessage
+                {
+                    Type = ReplicationTopics.LagFeedback,
+                    Source = PluginId,
+                    Payload = new Dictionary<string, object>
+                    {
+                        ["sourceNode"] = sourceNode,
+                        ["targetNode"] = targetNode,
+                        ["lagMs"] = lagMs,
+                        ["strategyName"] = Characteristics.StrategyName,
+                        ["consistencyModel"] = Characteristics.ConsistencyModel.ToString(),
+                        ["timestamp"] = DateTimeOffset.UtcNow
+                    }
+                };
+
+                await MessageBus.PublishAsync(ReplicationTopics.LagFeedback, message, ct);
+            }
+            catch
+            {
+                // Silently ignore - feedback is best-effort
+            }
+        }
+
+        /// <summary>
+        /// Requests routing decision from Intelligence for replica selection.
+        /// </summary>
+        /// <param name="availableReplicas">Available replica node IDs.</param>
+        /// <param name="replicaLag">Current lag for each replica.</param>
+        /// <param name="replicaLoad">Current load on each replica.</param>
+        /// <param name="operationType">Type of operation (read/write).</param>
+        /// <param name="ct">Cancellation token.</param>
+        /// <returns>Recommended replica node ID, or null if Intelligence unavailable.</returns>
+        protected async Task<string?> RequestRoutingDecisionAsync(
+            IEnumerable<string> availableReplicas,
+            Dictionary<string, long> replicaLag,
+            Dictionary<string, double> replicaLoad,
+            string operationType = "read",
+            CancellationToken ct = default)
+        {
+            if (MessageBus == null || PluginId == null)
+                return null;
+
+            try
+            {
+                var correlationId = Guid.NewGuid().ToString("N");
+                var tcs = new TaskCompletionSource<string?>();
+
+                // Subscribe to response
+                var subscription = MessageBus.Subscribe(ReplicationTopics.RouteRequestResponse, msg =>
+                {
+                    if (msg.CorrelationId == correlationId)
+                    {
+                        if (msg.Payload.TryGetValue("selectedReplica", out var replica) && replica is string replicaId)
+                        {
+                            tcs.TrySetResult(replicaId);
+                        }
+                        else
+                        {
+                            tcs.TrySetResult(null);
+                        }
+                    }
+                    return Task.CompletedTask;
+                });
+
+                try
+                {
+                    // Send request
+                    var request = new PluginMessage
+                    {
+                        Type = ReplicationTopics.RouteRequest,
+                        CorrelationId = correlationId,
+                        Source = PluginId,
+                        Payload = new Dictionary<string, object>
+                        {
+                            ["availableReplicas"] = availableReplicas.ToArray(),
+                            ["currentLag"] = replicaLag,
+                            ["replicaLoad"] = replicaLoad,
+                            ["operationType"] = operationType,
+                            ["strategyName"] = Characteristics.StrategyName
+                        }
+                    };
+
+                    await MessageBus.PublishAsync(ReplicationTopics.RouteRequest, request, ct);
+
+                    // Wait for response with timeout
+                    using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+                    cts.CancelAfter(TimeSpan.FromSeconds(3));
+
+                    return await tcs.Task.WaitAsync(cts.Token);
+                }
+                finally
+                {
+                    subscription?.Dispose();
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                return null;
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        /// <summary>
+        /// Reports conflict resolution outcome to Intelligence for learning.
+        /// </summary>
+        /// <param name="conflictId">Unique conflict identifier.</param>
+        /// <param name="resolutionMethod">Method used to resolve the conflict.</param>
+        /// <param name="wasSuccessful">Whether resolution was successful.</param>
+        /// <param name="ct">Cancellation token.</param>
+        /// <returns>Task representing the async operation.</returns>
+        protected async Task ReportConflictResolutionAsync(
+            string conflictId,
+            ConflictResolutionMethod resolutionMethod,
+            bool wasSuccessful,
+            CancellationToken ct = default)
+        {
+            if (MessageBus == null || PluginId == null)
+                return;
+
+            try
+            {
+                var message = new PluginMessage
+                {
+                    Type = ReplicationTopics.ConflictFeedback,
+                    Source = PluginId,
+                    Payload = new Dictionary<string, object>
+                    {
+                        ["conflictId"] = conflictId,
+                        ["resolutionMethod"] = resolutionMethod.ToString(),
+                        ["wasSuccessful"] = wasSuccessful,
+                        ["strategyName"] = Characteristics.StrategyName,
+                        ["consistencyModel"] = Characteristics.ConsistencyModel.ToString(),
+                        ["timestamp"] = DateTimeOffset.UtcNow
+                    }
+                };
+
+                await MessageBus.PublishAsync(ReplicationTopics.ConflictFeedback, message, ct);
+            }
+            catch
+            {
+                // Silently ignore - feedback is best-effort
+            }
         }
     }
 }

@@ -1,8 +1,11 @@
 using System.Collections.Concurrent;
 using System.Reflection;
+using DataWarehouse.SDK.AI;
 using DataWarehouse.SDK.Contracts;
+using DataWarehouse.SDK.Contracts.IntelligenceAware;
 using DataWarehouse.SDK.Primitives;
 using DataWarehouse.SDK.Utilities;
+using CapabilityCategory = DataWarehouse.SDK.Contracts.CapabilityCategory;
 
 namespace DataWarehouse.Plugins.UltimateRAID;
 
@@ -31,8 +34,10 @@ namespace DataWarehouse.Plugins.UltimateRAID;
 /// - Thread-safe operations
 /// - XOR parity calculations
 /// - Galois Field operations for erasure coding
+/// - Intelligence-aware for AI-powered predictive failure detection
+/// - AI-driven RAID level recommendations
 /// </summary>
-public sealed class UltimateRaidPlugin : PluginBase, IDisposable
+public sealed class UltimateRaidPlugin : IntelligenceAwarePluginBase, IDisposable
 {
     private readonly RaidStrategyRegistry _registry;
     private readonly ConcurrentDictionary<string, long> _usageStats = new();
@@ -140,24 +145,304 @@ public sealed class UltimateRaidPlugin : PluginBase, IDisposable
     }
 
     /// <inheritdoc/>
-    protected override List<PluginCapabilityDescriptor> GetCapabilities()
+    protected override IReadOnlyList<RegisteredCapability> DeclaredCapabilities
     {
-        return
-        [
-            new() { Name = "raid.initialize", DisplayName = "Initialize RAID", Description = "Initialize a RAID array" },
-            new() { Name = "raid.write", DisplayName = "Write", Description = "Write data to RAID array" },
-            new() { Name = "raid.read", DisplayName = "Read", Description = "Read data from RAID array" },
-            new() { Name = "raid.rebuild", DisplayName = "Rebuild", Description = "Rebuild failed disk" },
-            new() { Name = "raid.verify", DisplayName = "Verify", Description = "Verify RAID integrity" },
-            new() { Name = "raid.scrub", DisplayName = "Scrub", Description = "Scrub RAID array for errors" },
-            new() { Name = "raid.health", DisplayName = "Health Check", Description = "Check RAID health status" },
-            new() { Name = "raid.stats", DisplayName = "Statistics", Description = "Get RAID statistics" },
-            new() { Name = "raid.add-disk", DisplayName = "Add Disk", Description = "Add disk to RAID array" },
-            new() { Name = "raid.remove-disk", DisplayName = "Remove Disk", Description = "Remove disk from RAID array" },
-            new() { Name = "raid.replace-disk", DisplayName = "Replace Disk", Description = "Replace failed disk" },
-            new() { Name = "raid.list-strategies", DisplayName = "List Strategies", Description = "List available RAID strategies" },
-            new() { Name = "raid.set-default", DisplayName = "Set Default", Description = "Set default RAID strategy" }
-        ];
+        get
+        {
+            var capabilities = new List<RegisteredCapability>();
+
+            // Core RAID operations
+            capabilities.Add(new RegisteredCapability
+            {
+                CapabilityId = $"{Id}.initialize",
+                DisplayName = "Initialize RAID Array",
+                Description = "Initialize a RAID array with specified configuration",
+                Category = CapabilityCategory.Storage,
+                SubCategory = "RAID",
+                PluginId = Id,
+                PluginName = Name,
+                PluginVersion = Version,
+                Tags = new[] { "raid", "storage", "initialize" },
+                SemanticDescription = "Initialize and configure a RAID array with the specified strategy and disk configuration"
+            });
+
+            capabilities.Add(new RegisteredCapability
+            {
+                CapabilityId = $"{Id}.write",
+                DisplayName = "RAID Write",
+                Description = "Write data to RAID array with parity/redundancy handling",
+                Category = CapabilityCategory.Storage,
+                SubCategory = "RAID",
+                PluginId = Id,
+                PluginName = Name,
+                PluginVersion = Version,
+                Tags = new[] { "raid", "storage", "write", "io" },
+                SemanticDescription = "Write data to RAID array with automatic striping, mirroring, or parity calculation"
+            });
+
+            capabilities.Add(new RegisteredCapability
+            {
+                CapabilityId = $"{Id}.read",
+                DisplayName = "RAID Read",
+                Description = "Read data from RAID array with automatic reconstruction",
+                Category = CapabilityCategory.Storage,
+                SubCategory = "RAID",
+                PluginId = Id,
+                PluginName = Name,
+                PluginVersion = Version,
+                Tags = new[] { "raid", "storage", "read", "io" },
+                SemanticDescription = "Read data from RAID array with automatic reconstruction if disk failure is detected"
+            });
+
+            capabilities.Add(new RegisteredCapability
+            {
+                CapabilityId = $"{Id}.rebuild",
+                DisplayName = "RAID Rebuild",
+                Description = "Rebuild failed disk using parity/redundancy",
+                Category = CapabilityCategory.Storage,
+                SubCategory = "RAID",
+                PluginId = Id,
+                PluginName = Name,
+                PluginVersion = Version,
+                Tags = new[] { "raid", "storage", "rebuild", "recovery" },
+                SemanticDescription = "Rebuild a failed disk in the RAID array using parity data or mirrored copies"
+            });
+
+            capabilities.Add(new RegisteredCapability
+            {
+                CapabilityId = $"{Id}.health",
+                DisplayName = "RAID Health Check",
+                Description = "Check RAID array health status with SMART monitoring",
+                Category = CapabilityCategory.Storage,
+                SubCategory = "RAID",
+                PluginId = Id,
+                PluginName = Name,
+                PluginVersion = Version,
+                Tags = new[] { "raid", "storage", "health", "monitoring", "smart" },
+                SemanticDescription = "Perform comprehensive health check on RAID array including SMART data analysis"
+            });
+
+            // Intelligence-enhanced capabilities
+            if (IsIntelligenceAvailable)
+            {
+                capabilities.Add(new RegisteredCapability
+                {
+                    CapabilityId = $"{Id}.predict-failure",
+                    DisplayName = "AI-Powered Disk Failure Prediction",
+                    Description = "Predict disk failures before they occur using AI analysis",
+                    Category = CapabilityCategory.Storage,
+                    SubCategory = "RAID",
+                    PluginId = Id,
+                    PluginName = Name,
+                    PluginVersion = Version,
+                    Tags = new[] { "raid", "storage", "ai", "prediction", "smart", "predictive-maintenance" },
+                    SemanticDescription = "Use AI to analyze SMART data and I/O patterns to predict disk failures before they occur",
+                    Metadata = new Dictionary<string, object>
+                    {
+                        ["requiresIntelligence"] = true,
+                        ["predictionType"] = "disk-failure",
+                        ["outputFormat"] = "probability-with-timeframe"
+                    }
+                });
+
+                capabilities.Add(new RegisteredCapability
+                {
+                    CapabilityId = $"{Id}.optimize-level",
+                    DisplayName = "AI RAID Level Recommendation",
+                    Description = "Get AI-powered RAID level recommendations based on workload",
+                    Category = CapabilityCategory.Storage,
+                    SubCategory = "RAID",
+                    PluginId = Id,
+                    PluginName = Name,
+                    PluginVersion = Version,
+                    Tags = new[] { "raid", "storage", "ai", "optimization", "recommendation" },
+                    SemanticDescription = "Analyze workload patterns and requirements to recommend optimal RAID level and configuration",
+                    Metadata = new Dictionary<string, object>
+                    {
+                        ["requiresIntelligence"] = true,
+                        ["analysisType"] = "workload-optimization",
+                        ["outputFormat"] = "ranked-recommendations"
+                    }
+                });
+            }
+
+            // Strategy-specific capabilities
+            foreach (var strategy in _registry.GetAllStrategies())
+            {
+                capabilities.Add(new RegisteredCapability
+                {
+                    CapabilityId = $"{Id}.strategy.{strategy.StrategyId}",
+                    DisplayName = $"RAID {strategy.RaidLevel} - {strategy.StrategyName}",
+                    Description = $"{strategy.StrategyName} ({strategy.Category})",
+                    Category = CapabilityCategory.Storage,
+                    SubCategory = $"RAID-{strategy.RaidLevel}",
+                    PluginId = Id,
+                    PluginName = Name,
+                    PluginVersion = Version,
+                    Tags = new[]
+                    {
+                        "raid",
+                        "storage",
+                        $"raid-{strategy.RaidLevel}",
+                        strategy.Category.ToLowerInvariant()
+                    },
+                    SemanticDescription = $"RAID {strategy.RaidLevel} strategy providing {strategy.FaultTolerance}-disk fault tolerance " +
+                        $"with {strategy.StorageEfficiency:P0} storage efficiency",
+                    Metadata = new Dictionary<string, object>
+                    {
+                        ["strategyId"] = strategy.StrategyId,
+                        ["raidLevel"] = strategy.RaidLevel,
+                        ["category"] = strategy.Category,
+                        ["minimumDisks"] = strategy.MinimumDisks,
+                        ["faultTolerance"] = strategy.FaultTolerance,
+                        ["storageEfficiency"] = strategy.StorageEfficiency,
+                        ["readPerformance"] = strategy.ReadPerformanceMultiplier,
+                        ["writePerformance"] = strategy.WritePerformanceMultiplier,
+                        ["supportsHotSpare"] = strategy.SupportsHotSpare,
+                        ["supportsOnlineExpansion"] = strategy.SupportsOnlineExpansion,
+                        ["supportsHardwareAcceleration"] = strategy.SupportsHardwareAcceleration
+                    }
+                });
+            }
+
+            return capabilities;
+        }
+    }
+
+    /// <inheritdoc/>
+    protected override IReadOnlyList<KnowledgeObject> GetStaticKnowledge()
+    {
+        var knowledge = new List<KnowledgeObject>(base.GetStaticKnowledge());
+
+        // Summary knowledge
+        knowledge.Add(new KnowledgeObject
+        {
+            Id = $"{Id}.overview",
+            Topic = "raid.overview",
+            SourcePluginId = Id,
+            SourcePluginName = Name,
+            KnowledgeType = "raid-overview",
+            Description = "Ultimate RAID plugin overview and capabilities",
+            Payload = new Dictionary<string, object>
+            {
+                ["type"] = "raid-plugin-overview",
+                ["totalStrategies"] = _registry.GetAllStrategies().Count,
+                ["categories"] = new[]
+                {
+                    "standard",
+                    "nested",
+                    "advanced",
+                    "vendor-specific",
+                    "software-defined"
+                },
+                ["capabilities"] = new[]
+                {
+                    "fault-tolerance",
+                    "performance-optimization",
+                    "capacity-efficiency",
+                    "hot-spare",
+                    "online-expansion",
+                    "hardware-acceleration",
+                    "smart-monitoring",
+                    "rebuild-tracking",
+                    "scrubbing",
+                    "verification"
+                },
+                ["intelligenceEnhanced"] = IsIntelligenceAvailable,
+                ["aiFeatures"] = IsIntelligenceAvailable ? new[]
+                {
+                    "predictive-failure-detection",
+                    "workload-based-recommendations",
+                    "adaptive-optimization"
+                } : Array.Empty<string>()
+            },
+            Confidence = 1.0,
+            Timestamp = DateTimeOffset.UtcNow,
+            Tags = new[] { "raid", "storage", "overview" }
+        });
+
+        // Individual strategy knowledge
+        foreach (var strategy in _registry.GetAllStrategies())
+        {
+            knowledge.Add(new KnowledgeObject
+            {
+                Id = $"{Id}.strategy.{strategy.StrategyId}",
+                Topic = $"raid.strategy.{strategy.StrategyId}",
+                SourcePluginId = Id,
+                SourcePluginName = Name,
+                KnowledgeType = "raid-strategy",
+                Description = $"RAID {strategy.RaidLevel} - {strategy.StrategyName}",
+                Payload = new Dictionary<string, object>
+                {
+                    ["strategyId"] = strategy.StrategyId,
+                    ["strategyName"] = strategy.StrategyName,
+                    ["raidLevel"] = strategy.RaidLevel,
+                    ["category"] = strategy.Category,
+                    ["minimumDisks"] = strategy.MinimumDisks,
+                    ["faultTolerance"] = strategy.FaultTolerance,
+                    ["storageEfficiency"] = strategy.StorageEfficiency,
+                    ["readPerformance"] = strategy.ReadPerformanceMultiplier,
+                    ["writePerformance"] = strategy.WritePerformanceMultiplier,
+                    ["features"] = new Dictionary<string, bool>
+                    {
+                        ["hotSpare"] = strategy.SupportsHotSpare,
+                        ["onlineExpansion"] = strategy.SupportsOnlineExpansion,
+                        ["hardwareAcceleration"] = strategy.SupportsHardwareAcceleration
+                    },
+                    ["useCases"] = GetUseCasesForRaidLevel(strategy.RaidLevel),
+                    ["tradeoffs"] = GetTradeoffsForRaidLevel(strategy.RaidLevel)
+                },
+                Confidence = 1.0,
+                Timestamp = DateTimeOffset.UtcNow,
+                Tags = new[] { "raid", "storage", "strategy", strategy.StrategyId, $"level-{strategy.RaidLevel}" }
+            });
+        }
+
+        return knowledge;
+    }
+
+    /// <inheritdoc/>
+    protected override Task OnStartWithIntelligenceAsync(CancellationToken ct)
+    {
+        // Subscribe to Intelligence-enhanced RAID topics
+        if (MessageBus != null)
+        {
+            MessageBus.Subscribe(RaidTopics.PredictFailure, HandlePredictFailureAsync);
+            MessageBus.Subscribe(RaidTopics.OptimizeLevel, HandleOptimizeLevelAsync);
+            MessageBus.Subscribe(RaidTopics.PredictWorkload, HandlePredictWorkloadAsync);
+        }
+
+        return Task.CompletedTask;
+    }
+
+    /// <inheritdoc/>
+    protected override Task OnStartWithoutIntelligenceAsync(CancellationToken ct)
+    {
+        // Basic RAID operation without AI enhancements
+        return Task.CompletedTask;
+    }
+
+    /// <inheritdoc/>
+    protected override Task OnStartCoreAsync(CancellationToken ct)
+    {
+        // Subscribe to standard RAID topics
+        if (MessageBus != null)
+        {
+            MessageBus.Subscribe(RaidTopics.Write, HandleWriteAsync);
+            MessageBus.Subscribe(RaidTopics.Read, HandleReadAsync);
+            MessageBus.Subscribe(RaidTopics.Rebuild, HandleRebuildAsync);
+            MessageBus.Subscribe(RaidTopics.Verify, HandleVerifyAsync);
+            MessageBus.Subscribe(RaidTopics.Scrub, HandleScrubAsync);
+            MessageBus.Subscribe(RaidTopics.Health, HandleHealthCheckAsync);
+            MessageBus.Subscribe(RaidTopics.Statistics, HandleStatsAsync);
+            MessageBus.Subscribe(RaidTopics.AddDisk, HandleAddDiskAsync);
+            MessageBus.Subscribe(RaidTopics.RemoveDisk, HandleRemoveDiskAsync);
+            MessageBus.Subscribe(RaidTopics.ReplaceDisk, HandleReplaceDiskAsync);
+            MessageBus.Subscribe(RaidTopics.ListStrategies, HandleListStrategiesAsync);
+            MessageBus.Subscribe(RaidTopics.SetDefault, HandleSetDefaultAsync);
+        }
+
+        return Task.CompletedTask;
     }
 
     /// <inheritdoc/>
@@ -179,23 +464,9 @@ public sealed class UltimateRaidPlugin : PluginBase, IDisposable
     /// <inheritdoc/>
     public override Task OnMessageAsync(PluginMessage message)
     {
-        return message.Type switch
-        {
-            "raid.initialize" => HandleInitializeAsync(message),
-            "raid.write" => HandleWriteAsync(message),
-            "raid.read" => HandleReadAsync(message),
-            "raid.rebuild" => HandleRebuildAsync(message),
-            "raid.verify" => HandleVerifyAsync(message),
-            "raid.scrub" => HandleScrubAsync(message),
-            "raid.health" => HandleHealthCheckAsync(message),
-            "raid.stats" => HandleStatsAsync(message),
-            "raid.add-disk" => HandleAddDiskAsync(message),
-            "raid.remove-disk" => HandleRemoveDiskAsync(message),
-            "raid.replace-disk" => HandleReplaceDiskAsync(message),
-            "raid.list-strategies" => HandleListStrategiesAsync(message),
-            "raid.set-default" => HandleSetDefaultAsync(message),
-            _ => base.OnMessageAsync(message)
-        };
+        // Message routing is now handled by message bus subscriptions in OnStartCoreAsync
+        // This method is kept for legacy compatibility
+        return base.OnMessageAsync(message);
     }
 
     #region Message Handlers
@@ -473,6 +744,169 @@ public sealed class UltimateRaidPlugin : PluginBase, IDisposable
 
     #endregion
 
+    #region Intelligence-Enhanced Message Handlers
+
+    private async Task HandlePredictFailureAsync(PluginMessage message)
+    {
+        if (!IsIntelligenceAvailable)
+        {
+            message.Payload["error"] = "Intelligence not available for prediction";
+            return;
+        }
+
+        if (!message.Payload.TryGetValue("strategyId", out var sidObj) || sidObj is not string strategyId)
+        {
+            throw new ArgumentException("Missing 'strategyId' parameter");
+        }
+
+        if (!message.Payload.TryGetValue("diskIndex", out var idxObj) || idxObj is not int diskIndex)
+        {
+            throw new ArgumentException("Missing 'diskIndex' parameter");
+        }
+
+        var strategy = _registry.GetStrategy(strategyId)
+            ?? throw new ArgumentException($"RAID strategy '{strategyId}' not found");
+
+        var health = await strategy.GetHealthStatusAsync();
+        if (diskIndex < 0 || diskIndex >= health.DiskStatuses.Count)
+        {
+            throw new ArgumentOutOfRangeException(nameof(diskIndex));
+        }
+
+        var diskStatus = health.DiskStatuses[diskIndex];
+
+        // Request failure prediction from Intelligence
+        var predictionData = new Dictionary<string, object>
+        {
+            ["diskId"] = diskStatus.DiskId,
+            ["smartData"] = diskStatus.SmartData != null ? new Dictionary<string, object>
+            {
+                ["temperature"] = diskStatus.SmartData.Temperature,
+                ["powerOnHours"] = diskStatus.SmartData.PowerOnHours,
+                ["reallocatedSectorCount"] = diskStatus.SmartData.ReallocatedSectorCount,
+                ["pendingSectorCount"] = diskStatus.SmartData.PendingSectorCount,
+                ["uncorrectableErrorCount"] = diskStatus.SmartData.UncorrectableErrorCount,
+                ["healthPercentage"] = diskStatus.SmartData.HealthPercentage
+            } : new Dictionary<string, object>(),
+            ["readErrors"] = diskStatus.ReadErrors,
+            ["writeErrors"] = diskStatus.WriteErrors,
+            ["temperature"] = diskStatus.TemperatureCelsius
+        };
+
+        var prediction = await RequestPredictionAsync(
+            "disk-failure",
+            predictionData,
+            new IntelligenceContext { Timeout = TimeSpan.FromSeconds(10) }
+        );
+
+        if (prediction != null)
+        {
+            message.Payload["failureProbability"] = prediction.Confidence;
+            message.Payload["prediction"] = prediction.Prediction ?? "unavailable";
+            message.Payload["metadata"] = prediction.Metadata;
+        }
+        else
+        {
+            message.Payload["error"] = "Prediction unavailable";
+        }
+    }
+
+    private async Task HandleOptimizeLevelAsync(PluginMessage message)
+    {
+        if (!IsIntelligenceAvailable)
+        {
+            message.Payload["error"] = "Intelligence not available for optimization";
+            return;
+        }
+
+        // Extract workload requirements
+        var workloadProfile = message.Payload.TryGetValue("workloadProfile", out var wpObj) ? wpObj : null;
+        var availableDisks = message.Payload.TryGetValue("availableDisks", out var adObj) && adObj is int disks ? disks : 4;
+        var priorityGoal = message.Payload.TryGetValue("priorityGoal", out var pgObj) && pgObj is string goal ? goal : "balanced";
+
+        // Build classification request for Intelligence
+        var categories = _registry.GetAllStrategies()
+            .Where(s => s.MinimumDisks <= availableDisks)
+            .Select(s => s.StrategyId)
+            .ToArray();
+
+        var classificationText = $"Workload: {workloadProfile}, Disks: {availableDisks}, Goal: {priorityGoal}";
+
+        var classifications = await RequestClassificationAsync(
+            classificationText,
+            categories,
+            multiLabel: true,
+            new IntelligenceContext { Timeout = TimeSpan.FromSeconds(10) }
+        );
+
+        if (classifications != null && classifications.Length > 0)
+        {
+            var recommended = classifications.OrderByDescending(c => c.Confidence).First();
+            message.Payload["recommendedLevel"] = recommended.Category ?? "";
+            message.Payload["confidence"] = recommended.Confidence;
+            message.Payload["alternatives"] = classifications.Skip(1).Take(3).Select(c => new
+            {
+                level = c.Category ?? "",
+                confidence = c.Confidence
+            }).ToArray();
+        }
+        else
+        {
+            message.Payload["error"] = "Optimization unavailable";
+        }
+    }
+
+    private async Task HandlePredictWorkloadAsync(PluginMessage message)
+    {
+        if (!IsIntelligenceAvailable)
+        {
+            message.Payload["error"] = "Intelligence not available for workload prediction";
+            return;
+        }
+
+        if (!message.Payload.TryGetValue("strategyId", out var sidObj) || sidObj is not string strategyId)
+        {
+            throw new ArgumentException("Missing 'strategyId' parameter");
+        }
+
+        var strategy = _registry.GetStrategy(strategyId)
+            ?? throw new ArgumentException($"RAID strategy '{strategyId}' not found");
+
+        var stats = await strategy.GetStatisticsAsync();
+
+        // Request workload prediction
+        var predictionData = new Dictionary<string, object>
+        {
+            ["totalReads"] = stats.TotalReads,
+            ["totalWrites"] = stats.TotalWrites,
+            ["bytesRead"] = stats.BytesRead,
+            ["bytesWritten"] = stats.BytesWritten,
+            ["readLatency"] = stats.AverageReadLatencyMs,
+            ["writeLatency"] = stats.AverageWriteLatencyMs,
+            ["readThroughput"] = stats.ReadThroughputMBps,
+            ["writeThroughput"] = stats.WriteThroughputMBps
+        };
+
+        var prediction = await RequestPredictionAsync(
+            "workload-pattern",
+            predictionData,
+            new IntelligenceContext { Timeout = TimeSpan.FromSeconds(10) }
+        );
+
+        if (prediction != null)
+        {
+            message.Payload["prediction"] = prediction.Prediction ?? "unavailable";
+            message.Payload["confidence"] = prediction.Confidence;
+            message.Payload["metadata"] = prediction.Metadata;
+        }
+        else
+        {
+            message.Payload["error"] = "Prediction unavailable";
+        }
+    }
+
+    #endregion
+
     #region Helper Methods
 
     private List<IRaidStrategy> GetStrategiesByCategory(string category)
@@ -489,6 +923,58 @@ public sealed class UltimateRaidPlugin : PluginBase, IDisposable
     {
         // Auto-discover strategies in this assembly
         _registry.DiscoverStrategies(Assembly.GetExecutingAssembly());
+    }
+
+    private static string[] GetUseCasesForRaidLevel(int level)
+    {
+        return level switch
+        {
+            0 => new[] { "Maximum performance", "Non-critical data", "Temporary storage" },
+            1 => new[] { "Critical data", "Operating systems", "Small databases" },
+            5 => new[] { "Balanced performance/capacity", "File servers", "Application servers" },
+            6 => new[] { "High reliability", "Large arrays", "Mission-critical data" },
+            10 => new[] { "High performance + redundancy", "Databases", "Virtualization" },
+            50 => new[] { "Large capacity with performance", "Data warehouses", "Archive systems" },
+            60 => new[] { "Maximum fault tolerance", "Enterprise storage", "High-availability systems" },
+            _ => new[] { "General purpose storage" }
+        };
+    }
+
+    private static Dictionary<string, string> GetTradeoffsForRaidLevel(int level)
+    {
+        return level switch
+        {
+            0 => new Dictionary<string, string>
+            {
+                ["pros"] = "Maximum performance, full capacity utilization",
+                ["cons"] = "No redundancy, any disk failure loses all data"
+            },
+            1 => new Dictionary<string, string>
+            {
+                ["pros"] = "Simple, excellent redundancy, fast reads",
+                ["cons"] = "50% capacity overhead, slower writes"
+            },
+            5 => new Dictionary<string, string>
+            {
+                ["pros"] = "Good balance of performance, capacity, and redundancy",
+                ["cons"] = "Slower writes due to parity, vulnerable during rebuild"
+            },
+            6 => new Dictionary<string, string>
+            {
+                ["pros"] = "Survives two disk failures, good for large arrays",
+                ["cons"] = "Higher overhead, more complex parity calculations"
+            },
+            10 => new Dictionary<string, string>
+            {
+                ["pros"] = "Excellent performance and redundancy",
+                ["cons"] = "50% capacity overhead, requires minimum 4 disks"
+            },
+            _ => new Dictionary<string, string>
+            {
+                ["pros"] = "Varies by implementation",
+                ["cons"] = "Varies by implementation"
+            }
+        };
     }
 
     #endregion

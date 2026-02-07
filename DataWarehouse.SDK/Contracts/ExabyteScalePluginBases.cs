@@ -1,6 +1,10 @@
+using DataWarehouse.SDK.AI;
+using DataWarehouse.SDK.Contracts.IntelligenceAware;
+using DataWarehouse.SDK.Primitives;
 using DataWarehouse.SDK.Scale;
 using System;
 using System.Collections.Generic;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace DataWarehouse.SDK.Contracts;
@@ -17,8 +21,114 @@ namespace DataWarehouse.SDK.Contracts;
 /// - Implement GetAllShardsAsync for topology queries
 /// - Override MaxShardsPerNode for capacity planning
 /// </remarks>
-public abstract class ShardManagerPluginBase : FeaturePluginBase, IShardManager
+public abstract class ShardManagerPluginBase : FeaturePluginBase, IShardManager, IIntelligenceAware
 {
+    #region Intelligence Socket
+
+    /// <summary>
+    /// Gets whether Universal Intelligence (T90) is available for AI-assisted sharding decisions.
+    /// </summary>
+    public bool IsIntelligenceAvailable { get; protected set; }
+
+    /// <summary>
+    /// Gets the available Intelligence capabilities.
+    /// </summary>
+    public IntelligenceCapabilities AvailableCapabilities { get; protected set; }
+
+    /// <summary>
+    /// Discovers Intelligence availability. Called during startup.
+    /// </summary>
+    public virtual async Task<bool> DiscoverIntelligenceAsync(CancellationToken ct = default)
+    {
+        // Default implementation: check if message bus is available and T90 responds
+        if (MessageBus == null)
+        {
+            IsIntelligenceAvailable = false;
+            return false;
+        }
+        // Attempt discovery with timeout
+        IsIntelligenceAvailable = false; // Placeholder - real impl would query T90
+        return IsIntelligenceAvailable;
+    }
+
+    /// <summary>
+    /// Declared capabilities for this sharding plugin.
+    /// </summary>
+    protected override IReadOnlyList<RegisteredCapability> DeclaredCapabilities => new[]
+    {
+        new RegisteredCapability
+        {
+            CapabilityId = $"{Id}.sharding",
+            DisplayName = $"{Name} - Shard Management",
+            Description = "Exabyte-scale data sharding and distribution",
+            Category = CapabilityCategory.Storage,
+            SubCategory = "Sharding",
+            PluginId = Id,
+            PluginName = Name,
+            PluginVersion = Version,
+            Tags = new[] { "sharding", "scale", "distributed", "exabyte" },
+            SemanticDescription = "Use for distributing data across shards at massive scale"
+        },
+        new RegisteredCapability
+        {
+            CapabilityId = $"{Id}.rebalancing",
+            DisplayName = $"{Name} - Shard Rebalancing",
+            Description = "Automatic shard rebalancing across cluster nodes",
+            Category = CapabilityCategory.Storage,
+            SubCategory = "Sharding",
+            PluginId = Id,
+            PluginName = Name,
+            PluginVersion = Version,
+            Tags = new[] { "sharding", "rebalancing", "migration" },
+            SemanticDescription = "Use for rebalancing shards when nodes are added or removed"
+        }
+    };
+
+    /// <summary>
+    /// Gets static knowledge about sharding capabilities for AI agents.
+    /// </summary>
+    protected virtual IReadOnlyList<KnowledgeObject> GetStaticKnowledge()
+    {
+        return new[]
+        {
+            new KnowledgeObject
+            {
+                Id = $"{Id}.shard.capability",
+                Topic = "sharding.exabyte",
+                SourcePluginId = Id,
+                SourcePluginName = Name,
+                KnowledgeType = "capability",
+                Description = $"Shard manager using {Strategy} strategy with {DefaultShardCount} default shards",
+                Payload = new Dictionary<string, object>
+                {
+                    ["strategy"] = Strategy.ToString(),
+                    ["defaultShardCount"] = DefaultShardCount,
+                    ["maxShardsPerNode"] = MaxShardsPerNode
+                },
+                Tags = new[] { "sharding", "exabyte", "distributed" }
+            }
+        };
+    }
+
+    /// <summary>
+    /// Requests AI-assisted optimal sharding strategy for the given data size.
+    /// Returns null if Intelligence is unavailable.
+    /// </summary>
+    /// <param name="dataSize">Total data size in bytes.</param>
+    /// <param name="nodeCount">Number of available nodes.</param>
+    /// <param name="ct">Cancellation token.</param>
+    protected virtual async Task<ShardRecommendation?> RequestOptimalShardingAsync(long dataSize, int nodeCount, CancellationToken ct = default)
+    {
+        if (!IsIntelligenceAvailable || MessageBus == null) return null;
+
+        // Request Intelligence for optimal sharding strategy
+        // This would send a message to T90 and await response
+        await Task.CompletedTask; // Placeholder
+        return null;
+    }
+
+    #endregion
+
     /// <summary>
     /// Gets the sharding strategy used by this implementation.
     /// Determines how keys are distributed across shards.
@@ -231,8 +341,108 @@ public abstract class ShardManagerPluginBase : FeaturePluginBase, IShardManager
 /// Write path: MemTable -> Flush to Level 0 -> Compact to Level 1 -> ... -> Level N
 /// Read path: Check MemTable -> Check Bloom filters -> Read SSTables (newest first)
 /// </remarks>
-public abstract class DistributedMetadataIndexPluginBase : FeaturePluginBase, IDistributedMetadataIndex
+public abstract class DistributedMetadataIndexPluginBase : FeaturePluginBase, IDistributedMetadataIndex, IIntelligenceAware
 {
+    #region Intelligence Socket
+
+    /// <summary>
+    /// Gets whether Universal Intelligence (T90) is available for AI-assisted indexing decisions.
+    /// </summary>
+    public bool IsIntelligenceAvailable { get; protected set; }
+
+    /// <summary>
+    /// Gets the available Intelligence capabilities.
+    /// </summary>
+    public IntelligenceCapabilities AvailableCapabilities { get; protected set; }
+
+    /// <summary>
+    /// Discovers Intelligence availability. Called during startup.
+    /// </summary>
+    public virtual async Task<bool> DiscoverIntelligenceAsync(CancellationToken ct = default)
+    {
+        if (MessageBus == null)
+        {
+            IsIntelligenceAvailable = false;
+            return false;
+        }
+        IsIntelligenceAvailable = false; // Placeholder
+        return IsIntelligenceAvailable;
+    }
+
+    /// <summary>
+    /// Declared capabilities for this metadata index plugin.
+    /// </summary>
+    protected override IReadOnlyList<RegisteredCapability> DeclaredCapabilities => new[]
+    {
+        new RegisteredCapability
+        {
+            CapabilityId = $"{Id}.indexing",
+            DisplayName = $"{Name} - Metadata Indexing",
+            Description = "LSM-tree based distributed metadata indexing for trillion-object scale",
+            Category = CapabilityCategory.Metadata,
+            SubCategory = "Indexing",
+            PluginId = Id,
+            PluginName = Name,
+            PluginVersion = Version,
+            Tags = new[] { "indexing", "metadata", "lsm-tree", "search" },
+            SemanticDescription = "Use for indexing and searching metadata at exabyte scale"
+        },
+        new RegisteredCapability
+        {
+            CapabilityId = $"{Id}.compaction",
+            DisplayName = $"{Name} - LSM Compaction",
+            Description = "Background compaction of LSM-tree levels for optimal read performance",
+            Category = CapabilityCategory.Metadata,
+            SubCategory = "Maintenance",
+            PluginId = Id,
+            PluginName = Name,
+            PluginVersion = Version,
+            Tags = new[] { "compaction", "lsm-tree", "maintenance" },
+            SemanticDescription = "Use for triggering or monitoring LSM compaction operations"
+        }
+    };
+
+    /// <summary>
+    /// Gets static knowledge about indexing capabilities for AI agents.
+    /// </summary>
+    protected virtual IReadOnlyList<KnowledgeObject> GetStaticKnowledge()
+    {
+        return new[]
+        {
+            new KnowledgeObject
+            {
+                Id = $"{Id}.index.capability",
+                Topic = "indexing.metadata",
+                SourcePluginId = Id,
+                SourcePluginName = Name,
+                KnowledgeType = "capability",
+                Description = $"LSM-tree index with {MaxLevels} levels, {MemTableSizeBytes / (1024 * 1024)}MB MemTable",
+                Payload = new Dictionary<string, object>
+                {
+                    ["maxLevels"] = MaxLevels,
+                    ["memTableSizeMB"] = MemTableSizeBytes / (1024 * 1024),
+                    ["bloomFilterFpr"] = BloomFilterFalsePositiveRate
+                },
+                Tags = new[] { "indexing", "lsm-tree", "metadata" }
+            }
+        };
+    }
+
+    /// <summary>
+    /// Requests AI-assisted query optimization.
+    /// Returns null if Intelligence is unavailable.
+    /// </summary>
+    /// <param name="query">The metadata query to optimize.</param>
+    /// <param name="ct">Cancellation token.</param>
+    protected virtual async Task<QueryOptimizationHint?> RequestQueryOptimizationAsync(MetadataQuery query, CancellationToken ct = default)
+    {
+        if (!IsIntelligenceAvailable || MessageBus == null) return null;
+        await Task.CompletedTask; // Placeholder
+        return null;
+    }
+
+    #endregion
+
     /// <summary>
     /// Gets the maximum number of LSM tree levels.
     /// Typically 5-7 levels for trillion-object scale (each level 10x larger).
@@ -598,3 +808,43 @@ public abstract class DistributedCachePluginBase : FeaturePluginBase, IDistribut
     public Task<DistributedCacheStatistics> GetStatisticsAsync() => GetStatsAsync();
 }
 */
+
+#region Intelligence Stub Types
+
+/// <summary>
+/// AI recommendation for optimal sharding configuration.
+/// </summary>
+public record ShardRecommendation
+{
+    /// <summary>Recommended number of shards.</summary>
+    public int RecommendedShardCount { get; init; }
+
+    /// <summary>Recommended sharding strategy.</summary>
+    public ShardingStrategy RecommendedStrategy { get; init; }
+
+    /// <summary>Expected data distribution efficiency (0.0-1.0).</summary>
+    public double ExpectedDistributionEfficiency { get; init; }
+
+    /// <summary>Reason for the recommendation.</summary>
+    public string? Reason { get; init; }
+}
+
+/// <summary>
+/// AI hint for query optimization.
+/// </summary>
+public record QueryOptimizationHint
+{
+    /// <summary>Suggested index to use.</summary>
+    public string? SuggestedIndex { get; init; }
+
+    /// <summary>Whether to use parallel query execution.</summary>
+    public bool UseParallelExecution { get; init; }
+
+    /// <summary>Estimated query cost.</summary>
+    public double EstimatedCost { get; init; }
+
+    /// <summary>Optimization suggestions.</summary>
+    public string[]? Suggestions { get; init; }
+}
+
+#endregion

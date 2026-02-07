@@ -1,3 +1,5 @@
+using DataWarehouse.SDK.AI;
+using DataWarehouse.SDK.Utilities;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -970,5 +972,154 @@ namespace DataWarehouse.SDK.Contracts.Compliance
         {
             Interlocked.Increment(ref _errorCount);
         }
+
+        #region Intelligence Integration
+
+        /// <summary>
+        /// Message bus reference for Intelligence communication.
+        /// </summary>
+        protected IMessageBus? MessageBus { get; private set; }
+
+        /// <summary>
+        /// Configures Intelligence integration for this strategy.
+        /// Called by the plugin to enable AI-enhanced features.
+        /// </summary>
+        public virtual void ConfigureIntelligence(IMessageBus? messageBus)
+        {
+            MessageBus = messageBus;
+        }
+
+        /// <summary>
+        /// Whether Intelligence is available for this strategy.
+        /// </summary>
+        protected bool IsIntelligenceAvailable => MessageBus != null;
+
+        /// <summary>
+        /// Gets static knowledge about this strategy for AI discovery.
+        /// Override to provide strategy-specific knowledge.
+        /// </summary>
+        public virtual KnowledgeObject GetStrategyKnowledge()
+        {
+            return new KnowledgeObject
+            {
+                Id = $"strategy.{StrategyId}",
+                Topic = $"{GetKnowledgeTopic()}",
+                SourcePluginId = "sdk.strategy",
+                SourcePluginName = StrategyName,
+                KnowledgeType = "capability",
+                Description = GetStrategyDescription(),
+                Payload = GetKnowledgePayload(),
+                Tags = GetKnowledgeTags()
+            };
+        }
+
+        /// <summary>
+        /// Gets the registered capability for this strategy.
+        /// </summary>
+        public virtual RegisteredCapability GetStrategyCapability()
+        {
+            return new RegisteredCapability
+            {
+                CapabilityId = $"strategy.{StrategyId}",
+                DisplayName = StrategyName,
+                Description = GetStrategyDescription(),
+                Category = GetCapabilityCategory(),
+                PluginId = "sdk.strategy",
+                PluginName = StrategyName,
+                PluginVersion = "1.0.0",
+                Tags = GetKnowledgeTags(),
+                Metadata = GetCapabilityMetadata(),
+                SemanticDescription = GetSemanticDescription()
+            };
+        }
+
+        /// <summary>
+        /// Gets the knowledge topic for this strategy type.
+        /// </summary>
+        protected virtual string GetKnowledgeTopic() => "compliance";
+
+        /// <summary>
+        /// Gets the capability category for this strategy type.
+        /// </summary>
+        protected virtual CapabilityCategory GetCapabilityCategory() => CapabilityCategory.Governance;
+
+        /// <summary>
+        /// Gets a description for this strategy.
+        /// </summary>
+        protected virtual string GetStrategyDescription() =>
+            $"{StrategyName} compliance strategy supporting {string.Join(", ", SupportedFrameworks)}";
+
+        /// <summary>
+        /// Gets the knowledge payload for this strategy.
+        /// </summary>
+        protected virtual Dictionary<string, object> GetKnowledgePayload() => new()
+        {
+            ["supportedFrameworks"] = SupportedFrameworks.Select(f => f.ToString()).ToArray(),
+            ["frameworkCount"] = SupportedFrameworks.Count
+        };
+
+        /// <summary>
+        /// Gets tags for this strategy.
+        /// </summary>
+        protected virtual string[] GetKnowledgeTags()
+        {
+            var tags = new List<string> { "strategy", "compliance", "governance" };
+            tags.AddRange(SupportedFrameworks.Select(f => f.ToString().ToLowerInvariant()));
+            return tags.ToArray();
+        }
+
+        /// <summary>
+        /// Gets capability metadata for this strategy.
+        /// </summary>
+        protected virtual Dictionary<string, object> GetCapabilityMetadata() => new()
+        {
+            ["supportedFrameworks"] = SupportedFrameworks.Select(f => f.ToString()).ToArray()
+        };
+
+        /// <summary>
+        /// Gets the semantic description for AI-driven discovery.
+        /// </summary>
+        protected virtual string GetSemanticDescription() =>
+            $"Use {StrategyName} for {string.Join(", ", SupportedFrameworks)} compliance assessment";
+
+        /// <summary>
+        /// Requests an AI recommendation for compliance controls.
+        /// </summary>
+        /// <param name="framework">Compliance framework.</param>
+        /// <param name="dataClassification">Classification of data being protected.</param>
+        /// <param name="industry">Industry vertical.</param>
+        /// <param name="cancellationToken">Cancellation token.</param>
+        /// <returns>Recommended compliance controls, or null if Intelligence unavailable.</returns>
+        protected async Task<Dictionary<string, object>?> RequestComplianceRecommendationAsync(
+            ComplianceFramework framework,
+            string dataClassification,
+            string? industry = null,
+            CancellationToken cancellationToken = default)
+        {
+            if (!IsIntelligenceAvailable || MessageBus == null)
+                return null;
+
+            var request = new Dictionary<string, object>
+            {
+                ["requestType"] = "compliance_recommendation",
+                ["strategyId"] = StrategyId,
+                ["framework"] = framework.ToString(),
+                ["dataClassification"] = dataClassification,
+                ["industry"] = industry ?? "general"
+            };
+
+            var message = new PluginMessage
+            {
+                MessageId = Guid.NewGuid().ToString(),
+                SourcePluginId = StrategyId,
+                MessageType = "intelligence.request",
+                Payload = request
+            };
+
+            var response = await MessageBus.SendAsync(MessageTopics.AIQuery, message, cancellationToken);
+            return response.Success ? response.Payload as Dictionary<string, object> : null;
+        }
+
+        #endregion
     }
 }

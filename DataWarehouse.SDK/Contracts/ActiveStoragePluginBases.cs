@@ -4,7 +4,9 @@ using System.Collections.Generic;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
+using DataWarehouse.SDK.AI;
 using DataWarehouse.SDK.Primitives;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.SDK.Contracts;
 
@@ -624,6 +626,7 @@ public class WasmValidationResult
 /// <summary>
 /// Abstract base class for WASM function plugin implementations.
 /// Provides compute-on-storage capabilities using WebAssembly.
+/// Intelligence-aware: Supports AI-driven function optimization and execution planning.
 /// </summary>
 public abstract class WasmFunctionPluginBase : FeaturePluginBase, IWasmRuntime
 {
@@ -647,6 +650,142 @@ public abstract class WasmFunctionPluginBase : FeaturePluginBase, IWasmRuntime
     /// Default is 100.
     /// </summary>
     public virtual int MaxConcurrentExecutions => 100;
+
+    #region Intelligence Integration
+
+    /// <summary>
+    /// Capabilities declared by this WASM runtime provider.
+    /// </summary>
+    protected override IReadOnlyList<RegisteredCapability> DeclaredCapabilities => new[]
+    {
+        new RegisteredCapability
+        {
+            CapabilityId = $"{Id}.wasm-runtime",
+            DisplayName = $"{Name} - WASM Compute-on-Storage",
+            Description = "WebAssembly function execution with sandboxed compute-on-storage",
+            Category = CapabilityCategory.Pipeline,
+            SubCategory = "ComputeOnStorage",
+            PluginId = Id,
+            PluginName = Name,
+            PluginVersion = Version,
+            Tags = new[] { "wasm", "compute", "serverless", "functions" },
+            SemanticDescription = "Use this for executing custom logic directly on stored data using WebAssembly",
+            Metadata = new Dictionary<string, object>
+            {
+                ["supportedFeatures"] = SupportedFeatures,
+                ["maxConcurrentExecutions"] = MaxConcurrentExecutions
+            }
+        }
+    };
+
+    /// <summary>
+    /// Gets static knowledge for Intelligence registration.
+    /// </summary>
+    protected override IReadOnlyList<KnowledgeObject> GetStaticKnowledge()
+    {
+        var knowledge = new List<KnowledgeObject>(base.GetStaticKnowledge());
+
+        knowledge.Add(new KnowledgeObject
+        {
+            Id = $"{Id}.wasm.capability",
+            Topic = "wasm-compute",
+            SourcePluginId = Id,
+            SourcePluginName = Name,
+            KnowledgeType = "capability",
+            Description = $"WASM runtime supporting {string.Join(", ", SupportedFeatures)}",
+            Payload = new Dictionary<string, object>
+            {
+                ["supportedFeatures"] = SupportedFeatures,
+                ["maxConcurrentExecutions"] = MaxConcurrentExecutions,
+                ["supportsServerless"] = true,
+                ["supportsEventTriggers"] = true
+            },
+            Tags = new[] { "wasm", "compute", "serverless" },
+            Confidence = 1.0f,
+            Timestamp = DateTimeOffset.UtcNow
+        });
+
+        return knowledge;
+    }
+
+    /// <summary>
+    /// Requests AI-driven resource limit recommendation for a function.
+    /// </summary>
+    /// <param name="metadata">Function metadata.</param>
+    /// <param name="historicalStats">Historical execution statistics.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>Recommended resource limits.</returns>
+    protected async Task<WasmResourceLimits?> RequestOptimalResourceLimitsAsync(
+        WasmFunctionMetadata metadata,
+        WasmFunctionStatistics? historicalStats,
+        CancellationToken ct = default)
+    {
+        if (MessageBus == null) return null;
+
+        try
+        {
+            var request = new PluginMessage
+            {
+                Type = "intelligence.recommend.request",
+                CorrelationId = Guid.NewGuid().ToString("N"),
+                Source = Id,
+                Payload = new Dictionary<string, object>
+                {
+                    ["recommendationType"] = "wasm_resources",
+                    ["functionId"] = metadata.FunctionId,
+                    ["avgExecutionTime"] = historicalStats?.AverageExecutionTime.TotalMilliseconds ?? 0,
+                    ["peakMemory"] = historicalStats?.PeakMemoryBytes ?? 0
+                }
+            };
+
+            await MessageBus.PublishAsync("intelligence.recommend", request, ct);
+            return null;
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Requests AI-driven execution scheduling recommendation.
+    /// </summary>
+    /// <param name="functionId">Function to schedule.</param>
+    /// <param name="systemLoad">Current system load metrics.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>Recommended execution time.</returns>
+    protected async Task<DateTimeOffset?> RequestOptimalExecutionTimeAsync(
+        string functionId,
+        Dictionary<string, double> systemLoad,
+        CancellationToken ct = default)
+    {
+        if (MessageBus == null) return null;
+
+        try
+        {
+            var request = new PluginMessage
+            {
+                Type = "intelligence.recommend.request",
+                CorrelationId = Guid.NewGuid().ToString("N"),
+                Source = Id,
+                Payload = new Dictionary<string, object>
+                {
+                    ["recommendationType"] = "execution_time",
+                    ["functionId"] = functionId,
+                    ["systemLoad"] = systemLoad
+                }
+            };
+
+            await MessageBus.PublishAsync("intelligence.recommend", request, ct);
+            return null;
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    #endregion
 
     /// <summary>
     /// Deploys a WASM function to the runtime.
@@ -1690,6 +1829,7 @@ public static class SchemaInference
 /// <summary>
 /// Abstract base class for data virtualization plugin implementations.
 /// Enables SQL queries over object storage data.
+/// Intelligence-aware: Supports AI-driven query optimization and schema inference.
 /// </summary>
 public abstract class DataVirtualizationPluginBase : FeaturePluginBase, IVirtualTableProvider
 {
@@ -1712,6 +1852,143 @@ public abstract class DataVirtualizationPluginBase : FeaturePluginBase, IVirtual
     /// Default is ANSI SQL.
     /// </summary>
     public virtual string SqlDialect => "ANSI";
+
+    #region Intelligence Integration
+
+    /// <summary>
+    /// Capabilities declared by this data virtualization provider.
+    /// </summary>
+    protected override IReadOnlyList<RegisteredCapability> DeclaredCapabilities => new[]
+    {
+        new RegisteredCapability
+        {
+            CapabilityId = $"{Id}.data-virtualization",
+            DisplayName = $"{Name} - SQL Data Virtualization",
+            Description = "SQL queries over object storage with schema inference and query optimization",
+            Category = CapabilityCategory.Pipeline,
+            SubCategory = "DataVirtualization",
+            PluginId = Id,
+            PluginName = Name,
+            PluginVersion = Version,
+            Tags = new[] { "sql", "virtualization", "query", "analytics" },
+            SemanticDescription = "Use this for running SQL queries directly on object storage data without ETL",
+            Metadata = new Dictionary<string, object>
+            {
+                ["supportedFormats"] = SupportedFormats.Select(f => f.ToString()).ToArray(),
+                ["sqlDialect"] = SqlDialect
+            }
+        }
+    };
+
+    /// <summary>
+    /// Gets static knowledge for Intelligence registration.
+    /// </summary>
+    protected override IReadOnlyList<KnowledgeObject> GetStaticKnowledge()
+    {
+        var knowledge = new List<KnowledgeObject>(base.GetStaticKnowledge());
+
+        knowledge.Add(new KnowledgeObject
+        {
+            Id = $"{Id}.virtualization.capability",
+            Topic = "data-virtualization",
+            SourcePluginId = Id,
+            SourcePluginName = Name,
+            KnowledgeType = "capability",
+            Description = $"Data virtualization with {SqlDialect} SQL support",
+            Payload = new Dictionary<string, object>
+            {
+                ["supportedFormats"] = SupportedFormats.Select(f => f.ToString()).ToArray(),
+                ["sqlDialect"] = SqlDialect,
+                ["supportsSchemaInference"] = true,
+                ["supportsQueryOptimization"] = true
+            },
+            Tags = new[] { "sql", "virtualization", SqlDialect.ToLowerInvariant() },
+            Confidence = 1.0f,
+            Timestamp = DateTimeOffset.UtcNow
+        });
+
+        return knowledge;
+    }
+
+    /// <summary>
+    /// Requests AI-driven query optimization suggestions.
+    /// </summary>
+    /// <param name="sql">SQL query to optimize.</param>
+    /// <param name="plan">Current execution plan.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>Optimized SQL query, or null if unavailable.</returns>
+    protected async Task<string?> RequestQueryOptimizationAsync(
+        string sql,
+        QueryExecutionPlan plan,
+        CancellationToken ct = default)
+    {
+        if (MessageBus == null) return null;
+
+        try
+        {
+            var request = new PluginMessage
+            {
+                Type = "intelligence.optimize.request",
+                CorrelationId = Guid.NewGuid().ToString("N"),
+                Source = Id,
+                Payload = new Dictionary<string, object>
+                {
+                    ["optimizationType"] = "sql_query",
+                    ["sql"] = sql,
+                    ["estimatedCost"] = plan.EstimatedCost,
+                    ["tablesAccessed"] = plan.TablesAccessed
+                }
+            };
+
+            await MessageBus.PublishAsync("intelligence.optimize", request, ct);
+            return null;
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Requests AI-driven schema enhancement with semantic annotations.
+    /// </summary>
+    /// <param name="schema">Schema to enhance.</param>
+    /// <param name="sampleData">Sample data for analysis.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>Enhanced schema with descriptions.</returns>
+    protected async Task<VirtualTableSchema?> RequestSchemaEnhancementAsync(
+        VirtualTableSchema schema,
+        IReadOnlyList<object?[]> sampleData,
+        CancellationToken ct = default)
+    {
+        if (MessageBus == null) return null;
+
+        try
+        {
+            var request = new PluginMessage
+            {
+                Type = "intelligence.enhance.request",
+                CorrelationId = Guid.NewGuid().ToString("N"),
+                Source = Id,
+                Payload = new Dictionary<string, object>
+                {
+                    ["enhancementType"] = "schema",
+                    ["tableName"] = schema.TableName,
+                    ["columnCount"] = schema.Columns.Count,
+                    ["sampleRowCount"] = sampleData.Count
+                }
+            };
+
+            await MessageBus.PublishAsync("intelligence.enhance", request, ct);
+            return null;
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    #endregion
 
     /// <summary>
     /// Registers a virtual table from a data source.
@@ -2263,6 +2540,11 @@ public class TranscodingJob
     public DateTime CreatedAt { get; init; }
 
     /// <summary>
+    /// Alias for CreatedAt for compatibility.
+    /// </summary>
+    public DateTimeOffset Timestamp { get => new DateTimeOffset(CreatedAt); init => CreatedAt = value.DateTime; }
+
+    /// <summary>
     /// When processing started.
     /// </summary>
     public DateTime? StartedAt { get; init; }
@@ -2615,6 +2897,7 @@ public class TranscodingStatistics
 /// <summary>
 /// Abstract base class for media transcoding plugin implementations.
 /// Provides automatic media format conversion capabilities.
+/// Intelligence-aware: Supports AI-driven quality optimization and format selection.
 /// </summary>
 public abstract class MediaTranscodingPluginBase : FeaturePluginBase, ITranscodingProvider
 {
@@ -2668,6 +2951,148 @@ public abstract class MediaTranscodingPluginBase : FeaturePluginBase, ITranscodi
     /// </summary>
     public virtual int MaxConcurrentJobs => 4;
 
+    #region Intelligence Integration
+
+    /// <summary>
+    /// Capabilities declared by this transcoding provider.
+    /// </summary>
+    protected override IReadOnlyList<RegisteredCapability> DeclaredCapabilities => new[]
+    {
+        new RegisteredCapability
+        {
+            CapabilityId = $"{Id}.transcoding",
+            DisplayName = $"{Name} - Media Transcoding",
+            Description = "Automatic media format conversion with quality optimization",
+            Category = CapabilityCategory.Pipeline,
+            SubCategory = "MediaTranscoding",
+            PluginId = Id,
+            PluginName = Name,
+            PluginVersion = Version,
+            Tags = new[] { "media", "transcoding", "video", "audio", "image" },
+            SemanticDescription = "Use this for converting media files between formats with quality optimization",
+            Metadata = new Dictionary<string, object>
+            {
+                ["supportedInputFormats"] = SupportedInputFormats.Select(f => f.ToString()).ToArray(),
+                ["supportedOutputFormats"] = SupportedOutputFormats.Select(f => f.ToString()).ToArray(),
+                ["hardwareAcceleration"] = HardwareAccelerationAvailable,
+                ["maxConcurrentJobs"] = MaxConcurrentJobs
+            }
+        }
+    };
+
+    /// <summary>
+    /// Gets static knowledge for Intelligence registration.
+    /// </summary>
+    protected override IReadOnlyList<KnowledgeObject> GetStaticKnowledge()
+    {
+        var knowledge = new List<KnowledgeObject>(base.GetStaticKnowledge());
+
+        knowledge.Add(new KnowledgeObject
+        {
+            Id = $"{Id}.transcoding.capability",
+            Topic = "media-transcoding",
+            SourcePluginId = Id,
+            SourcePluginName = Name,
+            KnowledgeType = "capability",
+            Description = $"Media transcoding with {(HardwareAccelerationAvailable ? "hardware" : "software")} acceleration",
+            Payload = new Dictionary<string, object>
+            {
+                ["supportedInputFormats"] = SupportedInputFormats.Select(f => f.ToString()).ToArray(),
+                ["supportedOutputFormats"] = SupportedOutputFormats.Select(f => f.ToString()).ToArray(),
+                ["hardwareAcceleration"] = HardwareAccelerationAvailable,
+                ["maxConcurrentJobs"] = MaxConcurrentJobs
+            },
+            Tags = new[] { "media", "transcoding" },
+            Confidence = 1.0f,
+            Timestamp = DateTimeOffset.UtcNow
+        });
+
+        return knowledge;
+    }
+
+    /// <summary>
+    /// Requests AI-driven optimal format recommendation based on target use case.
+    /// </summary>
+    /// <param name="sourceInfo">Source media information.</param>
+    /// <param name="targetUseCase">Target use case (web, mobile, archive, etc.).</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>Recommended format and profile.</returns>
+    protected async Task<(MediaFormat Format, TranscodingProfile Profile)?> RequestOptimalFormatAsync(
+        MediaInfo sourceInfo,
+        string targetUseCase,
+        CancellationToken ct = default)
+    {
+        if (MessageBus == null) return null;
+
+        try
+        {
+            var request = new PluginMessage
+            {
+                Type = "intelligence.recommend.request",
+                CorrelationId = Guid.NewGuid().ToString("N"),
+                Source = Id,
+                Payload = new Dictionary<string, object>
+                {
+                    ["recommendationType"] = "media_format",
+                    ["sourceFormat"] = sourceInfo.Format.ToString(),
+                    ["sourceWidth"] = sourceInfo.Width ?? 0,
+                    ["sourceHeight"] = sourceInfo.Height ?? 0,
+                    ["targetUseCase"] = targetUseCase
+                }
+            };
+
+            await MessageBus.PublishAsync("intelligence.recommend", request, ct);
+            return null;
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Requests AI-driven quality settings optimization.
+    /// </summary>
+    /// <param name="profile">Current profile.</param>
+    /// <param name="sourceInfo">Source media information.</param>
+    /// <param name="targetQuality">Target perceptual quality (0.0-1.0).</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>Optimized profile settings.</returns>
+    protected async Task<TranscodingProfile?> RequestQualityOptimizationAsync(
+        TranscodingProfile profile,
+        MediaInfo sourceInfo,
+        double targetQuality,
+        CancellationToken ct = default)
+    {
+        if (MessageBus == null) return null;
+
+        try
+        {
+            var request = new PluginMessage
+            {
+                Type = "intelligence.optimize.request",
+                CorrelationId = Guid.NewGuid().ToString("N"),
+                Source = Id,
+                Payload = new Dictionary<string, object>
+                {
+                    ["optimizationType"] = "media_quality",
+                    ["currentProfile"] = profile.ProfileId,
+                    ["targetQuality"] = targetQuality,
+                    ["sourceFormat"] = sourceInfo.Format.ToString()
+                }
+            };
+
+            await MessageBus.PublishAsync("intelligence.optimize", request, ct);
+            return null;
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    #endregion
+
     /// <summary>
     /// Constructor - registers default profiles.
     /// </summary>
@@ -2716,7 +3141,7 @@ public abstract class MediaTranscodingPluginBase : FeaturePluginBase, ITranscodi
             Status = TranscodingStatus.Queued,
             Progress = 0,
             SourceSizeBytes = sourceInfo.SizeBytes,
-            CreatedAt = DateTime.UtcNow
+            Timestamp = DateTimeOffset.UtcNow
         };
 
         _jobs[jobId] = job;

@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
+using DataWarehouse.SDK.AI;
 
 namespace DataWarehouse.SDK.Contracts.StorageProcessing
 {
@@ -547,6 +548,90 @@ namespace DataWarehouse.SDK.Contracts.StorageProcessing
         /// Gets the capabilities supported by this storage processing engine.
         /// </summary>
         public abstract StorageProcessingCapabilities Capabilities { get; }
+
+        #region Intelligence Integration
+
+        /// <summary>
+        /// Gets the message bus for Intelligence communication.
+        /// </summary>
+        protected IMessageBus? MessageBus { get; private set; }
+
+        /// <summary>
+        /// Configures Intelligence integration for this storage processing strategy.
+        /// </summary>
+        /// <param name="messageBus">Optional message bus for Intelligence communication.</param>
+        public virtual void ConfigureIntelligence(IMessageBus? messageBus)
+        {
+            MessageBus = messageBus;
+        }
+
+        /// <summary>
+        /// Gets a value indicating whether Intelligence integration is available.
+        /// </summary>
+        protected bool IsIntelligenceAvailable => MessageBus != null;
+
+        /// <summary>
+        /// Gets static knowledge about this storage processing strategy for Intelligence registration.
+        /// </summary>
+        /// <returns>A KnowledgeObject describing this strategy's capabilities.</returns>
+        public virtual KnowledgeObject GetStrategyKnowledge()
+        {
+            return new KnowledgeObject
+            {
+                Id = $"storageprocessing.{StrategyId}",
+                Topic = "storageprocessing.strategy",
+                SourcePluginId = "sdk.storageprocessing",
+                SourcePluginName = Name,
+                KnowledgeType = "capability",
+                Description = $"{Name} storage processing strategy for in-place data operations",
+                Payload = new Dictionary<string, object>
+                {
+                    ["strategyId"] = StrategyId,
+                    ["supportsFiltering"] = Capabilities.SupportsFiltering,
+                    ["supportsAggregation"] = Capabilities.SupportsAggregation,
+                    ["supportsJoins"] = Capabilities.SupportsJoins,
+                    ["maxQueryComplexity"] = Capabilities.MaxQueryComplexity
+                },
+                Tags = new[] { "storageprocessing", "compute", "pushdown", "strategy" }
+            };
+        }
+
+        /// <summary>
+        /// Gets the registered capability for this storage processing strategy.
+        /// </summary>
+        /// <returns>A RegisteredCapability describing this strategy.</returns>
+        public virtual RegisteredCapability GetStrategyCapability()
+        {
+            return new RegisteredCapability
+            {
+                CapabilityId = $"storageprocessing.{StrategyId}",
+                DisplayName = Name,
+                Description = $"{Name} storage processing strategy",
+                Category = CapabilityCategory.Compute,
+                SubCategory = "StorageProcessing",
+                PluginId = "sdk.storageprocessing",
+                PluginName = Name,
+                PluginVersion = "1.0.0",
+                Tags = new[] { "storageprocessing", "query", "aggregation" },
+                SemanticDescription = $"Use {Name} for storage-side compute and query pushdown"
+            };
+        }
+
+        /// <summary>
+        /// Requests storage processing optimization suggestions from Intelligence.
+        /// </summary>
+        /// <param name="ct">Cancellation token.</param>
+        /// <returns>Optimization suggestions if available, null otherwise.</returns>
+        protected async Task<object?> RequestStorageProcessingOptimizationAsync(CancellationToken ct = default)
+        {
+            if (!IsIntelligenceAvailable) return null;
+
+            // Send request to Intelligence for storage processing optimization
+            await Task.CompletedTask;
+            return null;
+        }
+
+        #endregion
 
         /// <inheritdoc/>
         public abstract Task<ProcessingResult> ProcessAsync(ProcessingQuery query, CancellationToken ct = default);

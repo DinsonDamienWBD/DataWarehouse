@@ -1,8 +1,11 @@
 // Licensed to the DataWarehouse under one or more agreements.
 // DataWarehouse licenses this file under the MIT license.
 
+using DataWarehouse.SDK.AI;
 using DataWarehouse.SDK.Contracts;
+using DataWarehouse.SDK.Contracts.IntelligenceAware;
 using DataWarehouse.SDK.Primitives;
+using System.Threading;
 
 namespace DataWarehouse.SDK.Contracts.TamperProof;
 
@@ -125,7 +128,7 @@ public interface ITamperProofProvider
 /// Implements common orchestration logic for the four-tier architecture.
 /// Derived classes implement provider-specific manifest creation and pipeline execution.
 /// </summary>
-public abstract class TamperProofProviderPluginBase : FeaturePluginBase, ITamperProofProvider
+public abstract class TamperProofProviderPluginBase : FeaturePluginBase, ITamperProofProvider, IIntelligenceAware
 {
     private readonly IIntegrityProvider _integrityProvider;
     private readonly IBlockchainProvider _blockchainProvider;
@@ -136,6 +139,95 @@ public abstract class TamperProofProviderPluginBase : FeaturePluginBase, ITamper
     private readonly Dictionary<string, InstanceDegradationState> _instanceStates = new();
     private bool _isSealed = false;
     private readonly object _sealLock = new object();
+
+    #region Intelligence Socket
+
+    public bool IsIntelligenceAvailable { get; protected set; }
+    public IntelligenceCapabilities AvailableCapabilities { get; protected set; }
+
+    public virtual async Task<bool> DiscoverIntelligenceAsync(CancellationToken ct = default)
+    {
+        if (MessageBus == null) { IsIntelligenceAvailable = false; return false; }
+        IsIntelligenceAvailable = false;
+        return IsIntelligenceAvailable;
+    }
+
+    protected override IReadOnlyList<RegisteredCapability> DeclaredCapabilities => new[]
+    {
+        new RegisteredCapability
+        {
+            CapabilityId = $"{Id}.tamperproof",
+            DisplayName = $"{Name} - Tamper-Proof Provider",
+            Description = $"Four-tier tamper-proof storage with {Configuration.HashAlgorithm} integrity, WORM backup, and blockchain anchoring",
+            Category = CapabilityCategory.TamperProof,
+            SubCategory = "Storage",
+            PluginId = Id,
+            PluginName = Name,
+            PluginVersion = Version,
+            Tags = new[] { "tamper-proof", "integrity", "worm", "blockchain", "raid", "audit", "recovery" },
+            SemanticDescription = "Use for immutable, tamper-evident storage with automatic recovery and full audit trail"
+        }
+    };
+
+    protected virtual IReadOnlyList<KnowledgeObject> GetStaticKnowledge()
+    {
+        return new[]
+        {
+            new KnowledgeObject
+            {
+                Id = $"{Id}.tamperproof.capability",
+                Topic = "tamperproof.provider",
+                SourcePluginId = Id,
+                SourcePluginName = Name,
+                KnowledgeType = "capability",
+                Description = $"Tamper-proof provider with four-tier architecture, Hash: {Configuration.HashAlgorithm}, WORM: {Configuration.WormMode}, Consensus: {Configuration.ConsensusMode}",
+                Payload = new Dictionary<string, object>
+                {
+                    ["hashAlgorithm"] = Configuration.HashAlgorithm.ToString(),
+                    ["wormMode"] = Configuration.WormMode.ToString(),
+                    ["consensusMode"] = Configuration.ConsensusMode.ToString(),
+                    ["supportsRaid"] = true,
+                    ["supportsBlockchain"] = true,
+                    ["supportsAutoRecovery"] = true,
+                    ["supportsTamperAttribution"] = true,
+                    ["supportsCorrections"] = true
+                },
+                Tags = new[] { "tamper-proof", "integrity", "worm", "blockchain", "storage" }
+            }
+        };
+    }
+
+    /// <summary>
+    /// Requests AI-assisted tamper detection analysis.
+    /// </summary>
+    protected virtual async Task<TamperDetectionAnalysis?> RequestTamperDetectionAsync(Guid objectId, CancellationToken ct = default)
+    {
+        if (!IsIntelligenceAvailable || MessageBus == null) return null;
+        await Task.CompletedTask;
+        return null;
+    }
+
+    /// <summary>
+    /// Requests AI-assisted recovery strategy recommendation.
+    /// </summary>
+    protected virtual async Task<RecoveryStrategyRecommendation?> RequestRecoveryStrategyAsync(Guid objectId, TamperIncidentReport incident, CancellationToken ct = default)
+    {
+        if (!IsIntelligenceAvailable || MessageBus == null) return null;
+        await Task.CompletedTask;
+        return null;
+    }
+
+    /// <summary>
+    /// Requests AI-assisted storage tier optimization.
+    /// </summary>
+    protected virtual async Task<TierOptimizationHint?> RequestTierOptimizationAsync(CancellationToken ct = default)
+    {
+        if (!IsIntelligenceAvailable || MessageBus == null) return null;
+        await Task.CompletedTask;
+        return null;
+    }
+
+    #endregion
 
     /// <summary>
     /// Initializes a new tamper-proof provider plugin.
@@ -690,3 +782,31 @@ public abstract class TamperProofProviderPluginBase : FeaturePluginBase, ITamper
         return metadata;
     }
 }
+
+#region Stub Types for Tamper-Proof Intelligence Integration
+
+/// <summary>Stub type for AI tamper detection analysis.</summary>
+public record TamperDetectionAnalysis(
+    bool TamperingLikely,
+    double ConfidenceScore,
+    string[] RiskIndicators,
+    string[] SuspectedComponents,
+    string Recommendation);
+
+/// <summary>Stub type for AI recovery strategy recommendation.</summary>
+public record RecoveryStrategyRecommendation(
+    string RecommendedSource,
+    string[] AlternativeSources,
+    bool RequiresManualIntervention,
+    string[] PreRecoveryChecks,
+    string Reasoning);
+
+/// <summary>Stub type for AI tier optimization hints.</summary>
+public record TierOptimizationHint(
+    bool WormEnabled,
+    bool BlockchainEnabled,
+    string RecommendedRaidLevel,
+    string[] OptimizationSuggestions,
+    double EstimatedCostReduction);
+
+#endregion

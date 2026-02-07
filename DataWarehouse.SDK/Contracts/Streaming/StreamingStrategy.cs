@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
+using DataWarehouse.SDK.AI;
 
 namespace DataWarehouse.SDK.Contracts.Streaming
 {
@@ -645,6 +646,90 @@ namespace DataWarehouse.SDK.Contracts.Streaming
         /// Gets the supported streaming protocols.
         /// </summary>
         public abstract IReadOnlyList<string> SupportedProtocols { get; }
+
+        #region Intelligence Integration
+
+        /// <summary>
+        /// Gets the message bus for Intelligence communication.
+        /// </summary>
+        protected IMessageBus? MessageBus { get; private set; }
+
+        /// <summary>
+        /// Configures Intelligence integration for this streaming strategy.
+        /// </summary>
+        /// <param name="messageBus">Optional message bus for Intelligence communication.</param>
+        public virtual void ConfigureIntelligence(IMessageBus? messageBus)
+        {
+            MessageBus = messageBus;
+        }
+
+        /// <summary>
+        /// Gets a value indicating whether Intelligence integration is available.
+        /// </summary>
+        protected bool IsIntelligenceAvailable => MessageBus != null;
+
+        /// <summary>
+        /// Gets static knowledge about this streaming strategy for Intelligence registration.
+        /// </summary>
+        /// <returns>A KnowledgeObject describing this strategy's capabilities.</returns>
+        public virtual KnowledgeObject GetStrategyKnowledge()
+        {
+            return new KnowledgeObject
+            {
+                Id = $"streaming.{StrategyId}",
+                Topic = "streaming.strategy",
+                SourcePluginId = "sdk.streaming",
+                SourcePluginName = Name,
+                KnowledgeType = "capability",
+                Description = $"{Name} streaming strategy for real-time data processing",
+                Payload = new Dictionary<string, object>
+                {
+                    ["strategyId"] = StrategyId,
+                    ["protocols"] = SupportedProtocols,
+                    ["supportsOrdering"] = Capabilities.SupportsOrdering,
+                    ["supportsPartitioning"] = Capabilities.SupportsPartitioning,
+                    ["supportsExactlyOnce"] = Capabilities.SupportsExactlyOnce
+                },
+                Tags = new[] { "streaming", "realtime", "strategy" }
+            };
+        }
+
+        /// <summary>
+        /// Gets the registered capability for this streaming strategy.
+        /// </summary>
+        /// <returns>A RegisteredCapability describing this strategy.</returns>
+        public virtual RegisteredCapability GetStrategyCapability()
+        {
+            return new RegisteredCapability
+            {
+                CapabilityId = $"streaming.{StrategyId}",
+                DisplayName = Name,
+                Description = $"{Name} streaming strategy",
+                Category = CapabilityCategory.Transport,
+                SubCategory = "Streaming",
+                PluginId = "sdk.streaming",
+                PluginName = Name,
+                PluginVersion = "1.0.0",
+                Tags = new[] { "streaming", "pubsub", "messaging" },
+                SemanticDescription = $"Use {Name} for real-time streaming and message processing"
+            };
+        }
+
+        /// <summary>
+        /// Requests streaming optimization suggestions from Intelligence.
+        /// </summary>
+        /// <param name="ct">Cancellation token.</param>
+        /// <returns>Optimization suggestions if available, null otherwise.</returns>
+        protected async Task<object?> RequestStreamingOptimizationAsync(CancellationToken ct = default)
+        {
+            if (!IsIntelligenceAvailable) return null;
+
+            // Send request to Intelligence for streaming optimization
+            await Task.CompletedTask;
+            return null;
+        }
+
+        #endregion
 
         /// <inheritdoc/>
         public abstract Task<PublishResult> PublishAsync(string streamName, StreamMessage message, CancellationToken ct = default);

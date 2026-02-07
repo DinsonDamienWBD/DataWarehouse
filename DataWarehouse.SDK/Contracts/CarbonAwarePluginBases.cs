@@ -1,10 +1,14 @@
+using DataWarehouse.SDK.AI;
+using DataWarehouse.SDK.Primitives;
 using DataWarehouse.SDK.Sustainability;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.SDK.Contracts;
 
 /// <summary>
 /// Base class for carbon intensity provider plugins.
 /// Provides caching and common functionality for fetching carbon data.
+/// Intelligence-aware: Supports AI-driven carbon forecasting and optimization.
 /// </summary>
 public abstract class CarbonIntensityProviderPluginBase : FeaturePluginBase, ICarbonIntensityProvider
 {
@@ -15,6 +19,102 @@ public abstract class CarbonIntensityProviderPluginBase : FeaturePluginBase, ICa
     /// Override to customize cache behavior.
     /// </summary>
     protected virtual TimeSpan CacheDuration => TimeSpan.FromMinutes(5);
+
+    #region Intelligence Integration
+
+    /// <summary>
+    /// Capabilities declared by this carbon intensity provider.
+    /// </summary>
+    protected override IReadOnlyList<RegisteredCapability> DeclaredCapabilities => new[]
+    {
+        new RegisteredCapability
+        {
+            CapabilityId = $"{Id}.carbon-intensity",
+            DisplayName = $"{Name} - Carbon Intensity Data",
+            Description = "Real-time and forecasted carbon intensity data for sustainability optimization",
+            Category = CapabilityCategory.Custom,
+            SubCategory = "Sustainability",
+            PluginId = Id,
+            PluginName = Name,
+            PluginVersion = Version,
+            Tags = new[] { "carbon", "sustainability", "green", "intensity" },
+            SemanticDescription = "Use this for accessing carbon intensity data for green computing decisions",
+            Metadata = new Dictionary<string, object>
+            {
+                ["cacheDuration"] = CacheDuration.TotalMinutes,
+                ["supportsForecast"] = true
+            }
+        }
+    };
+
+    /// <summary>
+    /// Gets static knowledge for Intelligence registration.
+    /// </summary>
+    protected override IReadOnlyList<KnowledgeObject> GetStaticKnowledge()
+    {
+        var knowledge = new List<KnowledgeObject>(base.GetStaticKnowledge());
+
+        knowledge.Add(new KnowledgeObject
+        {
+            Id = $"{Id}.carbon.capability",
+            Topic = "carbon-intensity",
+            SourcePluginId = Id,
+            SourcePluginName = Name,
+            KnowledgeType = "capability",
+            Description = "Carbon intensity provider for sustainability-aware computing",
+            Payload = new Dictionary<string, object>
+            {
+                ["cacheDurationMinutes"] = CacheDuration.TotalMinutes,
+                ["supportsForecast"] = true,
+                ["supportsRegionSelection"] = true
+            },
+            Tags = new[] { "carbon", "sustainability", "green" },
+            Confidence = 1.0f,
+            Timestamp = DateTimeOffset.UtcNow
+        });
+
+        return knowledge;
+    }
+
+    /// <summary>
+    /// Requests AI-driven carbon forecast improvement using historical patterns.
+    /// </summary>
+    /// <param name="regionId">Region to forecast.</param>
+    /// <param name="historicalData">Historical intensity data.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>Improved forecast data.</returns>
+    protected async Task<IReadOnlyList<CarbonIntensityData>?> RequestImprovedForecastAsync(
+        string regionId,
+        IReadOnlyList<CarbonIntensityData> historicalData,
+        CancellationToken ct = default)
+    {
+        if (MessageBus == null) return null;
+
+        try
+        {
+            var request = new PluginMessage
+            {
+                Type = "intelligence.predict.request",
+                CorrelationId = Guid.NewGuid().ToString("N"),
+                Source = Id,
+                Payload = new Dictionary<string, object>
+                {
+                    ["predictionType"] = "carbon_forecast",
+                    ["regionId"] = regionId,
+                    ["historicalPoints"] = historicalData.Count
+                }
+            };
+
+            await MessageBus.PublishAsync("intelligence.predict", request, ct);
+            return null;
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    #endregion
 
     /// <summary>
     /// Fetches current carbon intensity from the provider API.
@@ -97,6 +197,7 @@ public abstract class CarbonIntensityProviderPluginBase : FeaturePluginBase, ICa
 /// <summary>
 /// Base class for carbon-aware scheduler plugins.
 /// Provides scheduling logic for deferring operations to low-carbon periods.
+/// Intelligence-aware: Supports AI-driven optimal scheduling and workload prediction.
 /// </summary>
 public abstract class CarbonAwareSchedulerPluginBase : FeaturePluginBase, ICarbonAwareScheduler
 {
@@ -105,6 +206,102 @@ public abstract class CarbonAwareSchedulerPluginBase : FeaturePluginBase, ICarbo
     /// Should be injected or resolved from the kernel context.
     /// </summary>
     protected ICarbonIntensityProvider? IntensityProvider { get; set; }
+
+    #region Intelligence Integration
+
+    /// <summary>
+    /// Capabilities declared by this carbon-aware scheduler.
+    /// </summary>
+    protected override IReadOnlyList<RegisteredCapability> DeclaredCapabilities => new[]
+    {
+        new RegisteredCapability
+        {
+            CapabilityId = $"{Id}.carbon-scheduler",
+            DisplayName = $"{Name} - Carbon-Aware Scheduling",
+            Description = "Deferred execution scheduling for low-carbon periods",
+            Category = CapabilityCategory.Pipeline,
+            SubCategory = "Sustainability",
+            PluginId = Id,
+            PluginName = Name,
+            PluginVersion = Version,
+            Tags = new[] { "carbon", "sustainability", "scheduling", "green" },
+            SemanticDescription = "Use this for scheduling workloads during low-carbon intensity periods",
+            Metadata = new Dictionary<string, object>
+            {
+                ["supportsDeferredExecution"] = true,
+                ["supportsThresholdExecution"] = true
+            }
+        }
+    };
+
+    /// <summary>
+    /// Gets static knowledge for Intelligence registration.
+    /// </summary>
+    protected override IReadOnlyList<KnowledgeObject> GetStaticKnowledge()
+    {
+        var knowledge = new List<KnowledgeObject>(base.GetStaticKnowledge());
+
+        knowledge.Add(new KnowledgeObject
+        {
+            Id = $"{Id}.scheduler.capability",
+            Topic = "carbon-scheduling",
+            SourcePluginId = Id,
+            SourcePluginName = Name,
+            KnowledgeType = "capability",
+            Description = "Carbon-aware scheduler for sustainable workload execution",
+            Payload = new Dictionary<string, object>
+            {
+                ["supportsDeferredExecution"] = true,
+                ["supportsThresholdExecution"] = true,
+                ["supportsOptimalTimeCalculation"] = true
+            },
+            Tags = new[] { "carbon", "scheduling", "sustainability" },
+            Confidence = 1.0f,
+            Timestamp = DateTimeOffset.UtcNow
+        });
+
+        return knowledge;
+    }
+
+    /// <summary>
+    /// Requests AI-driven workload duration prediction.
+    /// </summary>
+    /// <param name="operationId">Operation identifier.</param>
+    /// <param name="historicalDurations">Historical execution durations.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>Predicted duration.</returns>
+    protected async Task<TimeSpan?> RequestWorkloadDurationPredictionAsync(
+        string operationId,
+        IReadOnlyList<TimeSpan> historicalDurations,
+        CancellationToken ct = default)
+    {
+        if (MessageBus == null) return null;
+
+        try
+        {
+            var request = new PluginMessage
+            {
+                Type = "intelligence.predict.request",
+                CorrelationId = Guid.NewGuid().ToString("N"),
+                Source = Id,
+                Payload = new Dictionary<string, object>
+                {
+                    ["predictionType"] = "workload_duration",
+                    ["operationId"] = operationId,
+                    ["historicalCount"] = historicalDurations.Count
+                }
+            };
+
+            await MessageBus.PublishAsync("intelligence.predict", request, ct);
+            return null;
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    #endregion
 
     /// <summary>
     /// Creates a scheduled operation with the given constraints.
@@ -187,9 +384,103 @@ public abstract class CarbonAwareSchedulerPluginBase : FeaturePluginBase, ICarbo
 /// <summary>
 /// Base class for carbon reporter plugins.
 /// Provides storage and aggregation for carbon usage tracking.
+/// Intelligence-aware: Supports AI-driven carbon trend analysis and optimization recommendations.
 /// </summary>
 public abstract class CarbonReporterPluginBase : FeaturePluginBase, ICarbonReporter
 {
+    #region Intelligence Integration
+
+    /// <summary>
+    /// Capabilities declared by this carbon reporter.
+    /// </summary>
+    protected override IReadOnlyList<RegisteredCapability> DeclaredCapabilities => new[]
+    {
+        new RegisteredCapability
+        {
+            CapabilityId = $"{Id}.carbon-reporter",
+            DisplayName = $"{Name} - Carbon Usage Reporting",
+            Description = "Carbon usage tracking, aggregation, and reporting for sustainability metrics",
+            Category = CapabilityCategory.Pipeline,
+            SubCategory = "Sustainability",
+            PluginId = Id,
+            PluginName = Name,
+            PluginVersion = Version,
+            Tags = new[] { "carbon", "sustainability", "reporting", "metrics" },
+            SemanticDescription = "Use this for tracking and reporting carbon emissions from operations",
+            Metadata = new Dictionary<string, object>
+            {
+                ["supportsUsageTracking"] = true,
+                ["supportsReportGeneration"] = true
+            }
+        }
+    };
+
+    /// <summary>
+    /// Gets static knowledge for Intelligence registration.
+    /// </summary>
+    protected override IReadOnlyList<KnowledgeObject> GetStaticKnowledge()
+    {
+        var knowledge = new List<KnowledgeObject>(base.GetStaticKnowledge());
+
+        knowledge.Add(new KnowledgeObject
+        {
+            Id = $"{Id}.reporter.capability",
+            Topic = "carbon-reporting",
+            SourcePluginId = Id,
+            SourcePluginName = Name,
+            KnowledgeType = "capability",
+            Description = "Carbon usage reporter for sustainability metrics",
+            Payload = new Dictionary<string, object>
+            {
+                ["supportsUsageTracking"] = true,
+                ["supportsReportGeneration"] = true,
+                ["supportsGranularReporting"] = true
+            },
+            Tags = new[] { "carbon", "reporting", "sustainability" },
+            Confidence = 1.0f,
+            Timestamp = DateTimeOffset.UtcNow
+        });
+
+        return knowledge;
+    }
+
+    /// <summary>
+    /// Requests AI-driven carbon trend analysis.
+    /// </summary>
+    /// <param name="records">Historical usage records.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>Trend analysis with projections.</returns>
+    protected async Task<Dictionary<string, object>?> RequestCarbonTrendAnalysisAsync(
+        IReadOnlyList<CarbonUsageRecord> records,
+        CancellationToken ct = default)
+    {
+        if (MessageBus == null) return null;
+
+        try
+        {
+            var request = new PluginMessage
+            {
+                Type = "intelligence.analyze.request",
+                CorrelationId = Guid.NewGuid().ToString("N"),
+                Source = Id,
+                Payload = new Dictionary<string, object>
+                {
+                    ["analysisType"] = "carbon_trend",
+                    ["recordCount"] = records.Count,
+                    ["totalCarbon"] = records.Sum(r => r.CarbonGrams)
+                }
+            };
+
+            await MessageBus.PublishAsync("intelligence.analyze", request, ct);
+            return null;
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    #endregion
     /// <summary>
     /// Stores a carbon usage record.
     /// Must be implemented by derived classes for persistence.
@@ -278,6 +569,7 @@ public abstract class CarbonReporterPluginBase : FeaturePluginBase, ICarbonRepor
 /// <summary>
 /// Base class for green region selector plugins.
 /// Provides ranking logic for choosing low-carbon regions.
+/// Intelligence-aware: Supports AI-driven region selection optimization.
 /// </summary>
 public abstract class GreenRegionSelectorPluginBase : FeaturePluginBase, IGreenRegionSelector
 {
@@ -285,6 +577,102 @@ public abstract class GreenRegionSelectorPluginBase : FeaturePluginBase, IGreenR
     /// Gets or sets the carbon intensity provider.
     /// </summary>
     protected ICarbonIntensityProvider? IntensityProvider { get; set; }
+
+    #region Intelligence Integration
+
+    /// <summary>
+    /// Capabilities declared by this green region selector.
+    /// </summary>
+    protected override IReadOnlyList<RegisteredCapability> DeclaredCapabilities => new[]
+    {
+        new RegisteredCapability
+        {
+            CapabilityId = $"{Id}.green-region",
+            DisplayName = $"{Name} - Green Region Selection",
+            Description = "Intelligent region selection based on carbon intensity and renewable energy",
+            Category = CapabilityCategory.Custom,
+            SubCategory = "Sustainability",
+            PluginId = Id,
+            PluginName = Name,
+            PluginVersion = Version,
+            Tags = new[] { "carbon", "sustainability", "region", "green" },
+            SemanticDescription = "Use this for selecting the most sustainable region for workload placement",
+            Metadata = new Dictionary<string, object>
+            {
+                ["supportsRanking"] = true,
+                ["supportsRenewablePreference"] = true
+            }
+        }
+    };
+
+    /// <summary>
+    /// Gets static knowledge for Intelligence registration.
+    /// </summary>
+    protected override IReadOnlyList<KnowledgeObject> GetStaticKnowledge()
+    {
+        var knowledge = new List<KnowledgeObject>(base.GetStaticKnowledge());
+
+        knowledge.Add(new KnowledgeObject
+        {
+            Id = $"{Id}.region.capability",
+            Topic = "green-region",
+            SourcePluginId = Id,
+            SourcePluginName = Name,
+            KnowledgeType = "capability",
+            Description = "Green region selector for sustainable workload placement",
+            Payload = new Dictionary<string, object>
+            {
+                ["supportsRanking"] = true,
+                ["supportsRenewablePreference"] = true,
+                ["supportsMultiCriteriaSelection"] = true
+            },
+            Tags = new[] { "carbon", "region", "sustainability" },
+            Confidence = 1.0f,
+            Timestamp = DateTimeOffset.UtcNow
+        });
+
+        return knowledge;
+    }
+
+    /// <summary>
+    /// Requests AI-driven optimal region prediction based on forecasts.
+    /// </summary>
+    /// <param name="regionIds">Available regions.</param>
+    /// <param name="executionWindow">Time window for execution.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>Predicted optimal region.</returns>
+    protected async Task<string?> RequestOptimalRegionPredictionAsync(
+        string[] regionIds,
+        TimeSpan executionWindow,
+        CancellationToken ct = default)
+    {
+        if (MessageBus == null) return null;
+
+        try
+        {
+            var request = new PluginMessage
+            {
+                Type = "intelligence.predict.request",
+                CorrelationId = Guid.NewGuid().ToString("N"),
+                Source = Id,
+                Payload = new Dictionary<string, object>
+                {
+                    ["predictionType"] = "optimal_region",
+                    ["regionCount"] = regionIds.Length,
+                    ["windowHours"] = executionWindow.TotalHours
+                }
+            };
+
+            await MessageBus.PublishAsync("intelligence.predict", request, ct);
+            return null;
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    #endregion
 
     /// <summary>
     /// Calculates a composite score for region selection.
@@ -357,9 +745,105 @@ public abstract class GreenRegionSelectorPluginBase : FeaturePluginBase, IGreenR
 /// <summary>
 /// Base class for carbon offset provider plugins.
 /// Integrates with offset marketplaces and registries.
+/// Intelligence-aware: Supports AI-driven offset project recommendations.
 /// </summary>
 public abstract class CarbonOffsetProviderPluginBase : FeaturePluginBase, ICarbonOffsetProvider
 {
+    #region Intelligence Integration
+
+    /// <summary>
+    /// Capabilities declared by this carbon offset provider.
+    /// </summary>
+    protected override IReadOnlyList<RegisteredCapability> DeclaredCapabilities => new[]
+    {
+        new RegisteredCapability
+        {
+            CapabilityId = $"{Id}.carbon-offset",
+            DisplayName = $"{Name} - Carbon Offset Purchasing",
+            Description = "Carbon offset purchasing and tracking through verified registries",
+            Category = CapabilityCategory.Custom,
+            SubCategory = "Sustainability",
+            PluginId = Id,
+            PluginName = Name,
+            PluginVersion = Version,
+            Tags = new[] { "carbon", "sustainability", "offset", "credits" },
+            SemanticDescription = "Use this for purchasing carbon offsets to achieve carbon neutrality",
+            Metadata = new Dictionary<string, object>
+            {
+                ["supportsProjectSelection"] = true,
+                ["supportsPurchaseTracking"] = true
+            }
+        }
+    };
+
+    /// <summary>
+    /// Gets static knowledge for Intelligence registration.
+    /// </summary>
+    protected override IReadOnlyList<KnowledgeObject> GetStaticKnowledge()
+    {
+        var knowledge = new List<KnowledgeObject>(base.GetStaticKnowledge());
+
+        knowledge.Add(new KnowledgeObject
+        {
+            Id = $"{Id}.offset.capability",
+            Topic = "carbon-offset",
+            SourcePluginId = Id,
+            SourcePluginName = Name,
+            KnowledgeType = "capability",
+            Description = "Carbon offset provider for emissions compensation",
+            Payload = new Dictionary<string, object>
+            {
+                ["supportsProjectSelection"] = true,
+                ["supportsPurchaseTracking"] = true,
+                ["supportsVerifiedCredits"] = true
+            },
+            Tags = new[] { "carbon", "offset", "sustainability" },
+            Confidence = 1.0f,
+            Timestamp = DateTimeOffset.UtcNow
+        });
+
+        return knowledge;
+    }
+
+    /// <summary>
+    /// Requests AI-driven offset project recommendations.
+    /// </summary>
+    /// <param name="carbonAmount">Amount of carbon to offset in grams.</param>
+    /// <param name="preferences">User preferences for project types.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>Recommended projects.</returns>
+    protected async Task<IReadOnlyList<OffsetProject>?> RequestProjectRecommendationsAsync(
+        double carbonAmount,
+        Dictionary<string, object>? preferences,
+        CancellationToken ct = default)
+    {
+        if (MessageBus == null) return null;
+
+        try
+        {
+            var request = new PluginMessage
+            {
+                Type = "intelligence.recommend.request",
+                CorrelationId = Guid.NewGuid().ToString("N"),
+                Source = Id,
+                Payload = new Dictionary<string, object>
+                {
+                    ["recommendationType"] = "offset_projects",
+                    ["carbonGrams"] = carbonAmount,
+                    ["preferences"] = preferences ?? new Dictionary<string, object>()
+                }
+            };
+
+            await MessageBus.PublishAsync("intelligence.recommend", request, ct);
+            return null;
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    #endregion
     /// <summary>
     /// Purchases offsets from the provider's marketplace.
     /// Must be implemented by derived classes.

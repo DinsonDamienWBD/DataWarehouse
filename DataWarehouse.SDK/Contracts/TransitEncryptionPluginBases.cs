@@ -1,3 +1,5 @@
+using DataWarehouse.SDK.AI;
+using DataWarehouse.SDK.Contracts.IntelligenceAware;
 using DataWarehouse.SDK.Primitives;
 using DataWarehouse.SDK.Security;
 using DataWarehouse.SDK.Security.Transit;
@@ -29,8 +31,72 @@ namespace DataWarehouse.SDK.Contracts
     /// - Plugin lifecycle integration (handshake, initialization)
     /// </para>
     /// </remarks>
-    public abstract class CipherPresetProviderPluginBase : PluginBase, ICommonCipherPresets
+    public abstract class CipherPresetProviderPluginBase : PluginBase, ICommonCipherPresets, IIntelligenceAware
     {
+        #region Intelligence Socket
+
+        public bool IsIntelligenceAvailable { get; protected set; }
+        public IntelligenceCapabilities AvailableCapabilities { get; protected set; }
+
+        public virtual async Task<bool> DiscoverIntelligenceAsync(CancellationToken ct = default)
+        {
+            if (MessageBus == null) { IsIntelligenceAvailable = false; return false; }
+            IsIntelligenceAvailable = false;
+            return IsIntelligenceAvailable;
+        }
+
+        protected override IReadOnlyList<RegisteredCapability> DeclaredCapabilities => new[]
+        {
+            new RegisteredCapability
+            {
+                CapabilityId = $"{Id}.cipher-presets",
+                DisplayName = $"{Name} - Cipher Presets",
+                Description = "Cipher preset definitions for transit encryption",
+                Category = CapabilityCategory.Security,
+                SubCategory = "Encryption",
+                PluginId = Id,
+                PluginName = Name,
+                PluginVersion = Version,
+                Tags = new[] { "cipher", "presets", "encryption", "security" },
+                SemanticDescription = "Use for cipher preset selection and validation"
+            }
+        };
+
+        protected virtual IReadOnlyList<KnowledgeObject> GetStaticKnowledge()
+        {
+            return new[]
+            {
+                new KnowledgeObject
+                {
+                    Id = $"{Id}.cipher-presets.capability",
+                    Topic = "security.encryption.presets",
+                    SourcePluginId = Id,
+                    SourcePluginName = Name,
+                    KnowledgeType = "capability",
+                    Description = $"Cipher presets: {_standardPresets.Count} standard, {_highSecurityPresets.Count} high, {_quantumSafePresets.Count} quantum-safe",
+                    Payload = new Dictionary<string, object>
+                    {
+                        ["standardCount"] = _standardPresets.Count,
+                        ["highSecurityCount"] = _highSecurityPresets.Count,
+                        ["quantumSafeCount"] = _quantumSafePresets.Count
+                    },
+                    Tags = new[] { "cipher", "presets", "encryption" }
+                }
+            };
+        }
+
+        /// <summary>
+        /// Requests AI-assisted cipher preset recommendation.
+        /// </summary>
+        protected virtual async Task<CipherPresetRecommendation?> RequestPresetRecommendationAsync(TransitSecurityLevel securityLevel, CancellationToken ct = default)
+        {
+            if (!IsIntelligenceAvailable || MessageBus == null) return null;
+            await Task.CompletedTask;
+            return null;
+        }
+
+        #endregion
+
         private readonly List<CipherPreset> _standardPresets = new();
         private readonly List<CipherPreset> _highSecurityPresets = new();
         private readonly List<CipherPreset> _quantumSafePresets = new();
@@ -245,8 +311,71 @@ namespace DataWarehouse.SDK.Contracts
     /// - Capability advertisement
     /// </para>
     /// </remarks>
-    public abstract class TransitEncryptionPluginBase : PipelinePluginBase, ITransitEncryption
+    public abstract class TransitEncryptionPluginBase : PipelinePluginBase, ITransitEncryption, IIntelligenceAware
     {
+        #region Intelligence Socket
+
+        public bool IsIntelligenceAvailable { get; protected set; }
+        public IntelligenceCapabilities AvailableCapabilities { get; protected set; }
+
+        public virtual async Task<bool> DiscoverIntelligenceAsync(CancellationToken ct = default)
+        {
+            if (MessageBus == null) { IsIntelligenceAvailable = false; return false; }
+            IsIntelligenceAvailable = false;
+            return IsIntelligenceAvailable;
+        }
+
+        protected override IReadOnlyList<RegisteredCapability> DeclaredCapabilities => new[]
+        {
+            new RegisteredCapability
+            {
+                CapabilityId = $"{Id}.transit-encryption",
+                DisplayName = $"{Name} - Transit Encryption",
+                Description = "Data encryption for secure network transit",
+                Category = CapabilityCategory.Pipeline,
+                SubCategory = "Encryption",
+                PluginId = Id,
+                PluginName = Name,
+                PluginVersion = Version,
+                Tags = new[] { "encryption", "transit", "pipeline", "security" },
+                SemanticDescription = "Use for data encryption during transit"
+            }
+        };
+
+        protected virtual IReadOnlyList<KnowledgeObject> GetStaticKnowledge()
+        {
+            return new[]
+            {
+                new KnowledgeObject
+                {
+                    Id = $"{Id}.transit-encryption.capability",
+                    Topic = "pipeline.encryption.transit",
+                    SourcePluginId = Id,
+                    SourcePluginName = Name,
+                    KnowledgeType = "capability",
+                    Description = "Transit encryption with cipher negotiation",
+                    Payload = new Dictionary<string, object>
+                    {
+                        ["supportsNegotiation"] = true,
+                        ["supportsCompression"] = true
+                    },
+                    Tags = new[] { "encryption", "transit", "pipeline" }
+                }
+            };
+        }
+
+        /// <summary>
+        /// Requests AI-assisted cipher selection recommendation.
+        /// </summary>
+        protected virtual async Task<CipherSelectionRecommendation?> RequestCipherSelectionAsync(TransitSecurityLevel securityLevel, EndpointCapabilities? remoteCapabilities, CancellationToken ct = default)
+        {
+            if (!IsIntelligenceAvailable || MessageBus == null) return null;
+            await Task.CompletedTask;
+            return null;
+        }
+
+        #endregion
+
         /// <summary>
         /// Key store for encryption key retrieval.
         /// Must be set by derived classes (via constructor or initialization).
@@ -647,8 +776,72 @@ namespace DataWarehouse.SDK.Contracts
     /// - Secure memory wiping
     /// </para>
     /// </remarks>
-    public abstract class TranscryptionPluginBase : PluginBase, ITranscryptionService
+    public abstract class TranscryptionPluginBase : PluginBase, ITranscryptionService, IIntelligenceAware
     {
+        #region Intelligence Socket
+
+        public bool IsIntelligenceAvailable { get; protected set; }
+        public IntelligenceCapabilities AvailableCapabilities { get; protected set; }
+
+        public virtual async Task<bool> DiscoverIntelligenceAsync(CancellationToken ct = default)
+        {
+            if (MessageBus == null) { IsIntelligenceAvailable = false; return false; }
+            IsIntelligenceAvailable = false;
+            return IsIntelligenceAvailable;
+        }
+
+        protected override IReadOnlyList<RegisteredCapability> DeclaredCapabilities => new[]
+        {
+            new RegisteredCapability
+            {
+                CapabilityId = $"{Id}.transcryption",
+                DisplayName = $"{Name} - Transcryption Service",
+                Description = "Re-encryption service for cipher/key rotation",
+                Category = CapabilityCategory.Security,
+                SubCategory = "Encryption",
+                PluginId = Id,
+                PluginName = Name,
+                PluginVersion = Version,
+                Tags = new[] { "transcryption", "reencryption", "security", "key-rotation" },
+                SemanticDescription = "Use for re-encrypting data with new ciphers or keys"
+            }
+        };
+
+        protected virtual IReadOnlyList<KnowledgeObject> GetStaticKnowledge()
+        {
+            return new[]
+            {
+                new KnowledgeObject
+                {
+                    Id = $"{Id}.transcryption.capability",
+                    Topic = "security.transcryption",
+                    SourcePluginId = Id,
+                    SourcePluginName = Name,
+                    KnowledgeType = "capability",
+                    Description = "Transcryption for cipher/key rotation",
+                    Payload = new Dictionary<string, object>
+                    {
+                        ["supportsBatch"] = true,
+                        ["supportsStream"] = true,
+                        ["supportsSecurityUpgrade"] = true
+                    },
+                    Tags = new[] { "transcryption", "security" }
+                }
+            };
+        }
+
+        /// <summary>
+        /// Requests AI-assisted transcryption optimization.
+        /// </summary>
+        protected virtual async Task<TranscryptionOptimizationHint?> RequestTranscryptionOptimizationAsync(int batchSize, CancellationToken ct = default)
+        {
+            if (!IsIntelligenceAvailable || MessageBus == null) return null;
+            await Task.CompletedTask;
+            return null;
+        }
+
+        #endregion
+
         /// <summary>
         /// Transit encryption service for decrypt/encrypt operations.
         /// Must be set by derived classes.
@@ -860,4 +1053,28 @@ namespace DataWarehouse.SDK.Contracts
                 throw new InvalidOperationException("PresetProvider dependency is not set.");
         }
     }
+
+    #region Stub Types for Transit Encryption Intelligence Integration
+
+    /// <summary>Stub type for cipher preset recommendation from AI.</summary>
+    public record CipherPresetRecommendation(
+        string RecommendedPresetId,
+        string Rationale,
+        double ConfidenceScore);
+
+    /// <summary>Stub type for cipher selection recommendation from AI.</summary>
+    public record CipherSelectionRecommendation(
+        string RecommendedCipher,
+        string[] FallbackCiphers,
+        string Rationale,
+        double ConfidenceScore);
+
+    /// <summary>Stub type for transcryption optimization hint from AI.</summary>
+    public record TranscryptionOptimizationHint(
+        int OptimalBatchSize,
+        int OptimalParallelism,
+        string Rationale,
+        double ConfidenceScore);
+
+    #endregion
 }

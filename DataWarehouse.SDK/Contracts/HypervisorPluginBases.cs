@@ -1,5 +1,10 @@
+using DataWarehouse.SDK.AI;
+using DataWarehouse.SDK.Contracts.IntelligenceAware;
 using DataWarehouse.SDK.Primitives;
 using DataWarehouse.SDK.Virtualization;
+using System.Collections.Generic;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace DataWarehouse.SDK.Contracts;
 
@@ -8,9 +13,88 @@ namespace DataWarehouse.SDK.Contracts;
 /// Provides common infrastructure for detecting virtualization platforms and querying VM information.
 /// Implements caching to avoid repeated expensive detection operations.
 /// </summary>
-public abstract class HypervisorDetectorPluginBase : FeaturePluginBase, IHypervisorDetector
+public abstract class HypervisorDetectorPluginBase : FeaturePluginBase, IHypervisorDetector, IIntelligenceAware
 {
     private HypervisorType? _cachedType;
+
+    #region Intelligence Socket
+
+    /// <summary>
+    /// Gets whether Universal Intelligence (T90) is available for AI-assisted VM analysis.
+    /// </summary>
+    public bool IsIntelligenceAvailable { get; protected set; }
+
+    /// <summary>
+    /// Gets the available Intelligence capabilities.
+    /// </summary>
+    public IntelligenceCapabilities AvailableCapabilities { get; protected set; }
+
+    /// <summary>
+    /// Discovers Intelligence availability.
+    /// </summary>
+    public virtual async Task<bool> DiscoverIntelligenceAsync(CancellationToken ct = default)
+    {
+        if (MessageBus == null) { IsIntelligenceAvailable = false; return false; }
+        IsIntelligenceAvailable = false;
+        return IsIntelligenceAvailable;
+    }
+
+    /// <summary>
+    /// Declared capabilities for hypervisor detection.
+    /// </summary>
+    protected override IReadOnlyList<RegisteredCapability> DeclaredCapabilities => new[]
+    {
+        new RegisteredCapability
+        {
+            CapabilityId = $"{Id}.detection",
+            DisplayName = $"{Name} - Hypervisor Detection",
+            Description = "Detects virtualization platform and capabilities",
+            Category = CapabilityCategory.Infrastructure,
+            SubCategory = "Virtualization",
+            PluginId = Id,
+            PluginName = Name,
+            PluginVersion = Version,
+            Tags = new[] { "hypervisor", "virtualization", "detection" },
+            SemanticDescription = "Use for detecting if running on a hypervisor and its type"
+        }
+    };
+
+    /// <summary>
+    /// Gets static knowledge about hypervisor detection.
+    /// </summary>
+    protected virtual IReadOnlyList<KnowledgeObject> GetStaticKnowledge()
+    {
+        return new[]
+        {
+            new KnowledgeObject
+            {
+                Id = $"{Id}.hypervisor.capability",
+                Topic = "virtualization.detection",
+                SourcePluginId = Id,
+                SourcePluginName = Name,
+                KnowledgeType = "capability",
+                Description = $"Hypervisor detector: {DetectedHypervisor}, Virtualized: {IsVirtualized}",
+                Payload = new Dictionary<string, object>
+                {
+                    ["detectedHypervisor"] = DetectedHypervisor.ToString(),
+                    ["isVirtualized"] = IsVirtualized
+                },
+                Tags = new[] { "hypervisor", "virtualization" }
+            }
+        };
+    }
+
+    /// <summary>
+    /// Requests AI-assisted VM resource prediction.
+    /// </summary>
+    protected virtual async Task<VmResourcePrediction?> RequestVmResourcePredictionAsync(VmInfo vmInfo, CancellationToken ct = default)
+    {
+        if (!IsIntelligenceAvailable || MessageBus == null) return null;
+        await Task.CompletedTask;
+        return null;
+    }
+
+    #endregion
 
     /// <summary>
     /// Gets the detected hypervisor type.
@@ -116,8 +200,66 @@ public abstract class HypervisorDetectorPluginBase : FeaturePluginBase, IHypervi
 /// Provides infrastructure for memory ballooning/reclamation in virtualized environments.
 /// Balloon drivers allow the hypervisor to reclaim unused guest memory dynamically.
 /// </summary>
-public abstract class BalloonDriverPluginBase : FeaturePluginBase, IBalloonDriver
+public abstract class BalloonDriverPluginBase : FeaturePluginBase, IBalloonDriver, IIntelligenceAware
 {
+    #region Intelligence Socket
+
+    public bool IsIntelligenceAvailable { get; protected set; }
+    public IntelligenceCapabilities AvailableCapabilities { get; protected set; }
+
+    public virtual async Task<bool> DiscoverIntelligenceAsync(CancellationToken ct = default)
+    {
+        if (MessageBus == null) { IsIntelligenceAvailable = false; return false; }
+        IsIntelligenceAvailable = false;
+        return IsIntelligenceAvailable;
+    }
+
+    protected override IReadOnlyList<RegisteredCapability> DeclaredCapabilities => new[]
+    {
+        new RegisteredCapability
+        {
+            CapabilityId = $"{Id}.ballooning",
+            DisplayName = $"{Name} - Memory Ballooning",
+            Description = "Dynamic memory reclamation via balloon driver",
+            Category = CapabilityCategory.Infrastructure,
+            SubCategory = "Memory",
+            PluginId = Id,
+            PluginName = Name,
+            PluginVersion = Version,
+            Tags = new[] { "memory", "ballooning", "virtualization" },
+            SemanticDescription = "Use for dynamic memory management in virtualized environments"
+        }
+    };
+
+    protected virtual IReadOnlyList<KnowledgeObject> GetStaticKnowledge()
+    {
+        return new[]
+        {
+            new KnowledgeObject
+            {
+                Id = $"{Id}.balloon.capability",
+                Topic = "virtualization.memory",
+                SourcePluginId = Id,
+                SourcePluginName = Name,
+                KnowledgeType = "capability",
+                Description = $"Balloon driver available: {IsAvailable}",
+                Payload = new Dictionary<string, object> { ["isAvailable"] = IsAvailable },
+                Tags = new[] { "memory", "ballooning" }
+            }
+        };
+    }
+
+    /// <summary>
+    /// Requests AI-assisted memory pressure prediction.
+    /// </summary>
+    protected virtual async Task<MemoryPressurePrediction?> RequestMemoryPredictionAsync(BalloonStatistics stats, CancellationToken ct = default)
+    {
+        if (!IsIntelligenceAvailable || MessageBus == null) return null;
+        await Task.CompletedTask;
+        return null;
+    }
+
+    #endregion
     /// <summary>
     /// Gets whether the balloon driver is available and loaded.
     /// Override to check driver availability in the guest OS.
@@ -192,8 +334,66 @@ public abstract class BalloonDriverPluginBase : FeaturePluginBase, IBalloonDrive
 /// Provides infrastructure for creating application-consistent VM snapshots.
 /// Coordinates with hypervisor snapshot mechanisms and guest OS quiescing.
 /// </summary>
-public abstract class VmSnapshotProviderPluginBase : FeaturePluginBase, IVmSnapshotProvider
+public abstract class VmSnapshotProviderPluginBase : FeaturePluginBase, IVmSnapshotProvider, IIntelligenceAware
 {
+    #region Intelligence Socket
+
+    public bool IsIntelligenceAvailable { get; protected set; }
+    public IntelligenceCapabilities AvailableCapabilities { get; protected set; }
+
+    public virtual async Task<bool> DiscoverIntelligenceAsync(CancellationToken ct = default)
+    {
+        if (MessageBus == null) { IsIntelligenceAvailable = false; return false; }
+        IsIntelligenceAvailable = false;
+        return IsIntelligenceAvailable;
+    }
+
+    protected override IReadOnlyList<RegisteredCapability> DeclaredCapabilities => new[]
+    {
+        new RegisteredCapability
+        {
+            CapabilityId = $"{Id}.snapshot",
+            DisplayName = $"{Name} - VM Snapshots",
+            Description = "Application-consistent VM snapshot creation",
+            Category = CapabilityCategory.Storage,
+            SubCategory = "Snapshot",
+            PluginId = Id,
+            PluginName = Name,
+            PluginVersion = Version,
+            Tags = new[] { "snapshot", "virtualization", "backup" },
+            SemanticDescription = "Use for creating consistent point-in-time VM snapshots"
+        }
+    };
+
+    protected virtual IReadOnlyList<KnowledgeObject> GetStaticKnowledge()
+    {
+        return new[]
+        {
+            new KnowledgeObject
+            {
+                Id = $"{Id}.snapshot.capability",
+                Topic = "virtualization.snapshot",
+                SourcePluginId = Id,
+                SourcePluginName = Name,
+                KnowledgeType = "capability",
+                Description = $"Snapshot provider, app-consistent: {IsApplicationConsistentSupported}",
+                Payload = new Dictionary<string, object> { ["supportsAppConsistent"] = IsApplicationConsistentSupported },
+                Tags = new[] { "snapshot", "backup" }
+            }
+        };
+    }
+
+    /// <summary>
+    /// Requests AI-assisted optimal snapshot timing.
+    /// </summary>
+    protected virtual async Task<SnapshotTimingRecommendation?> RequestOptimalSnapshotTimeAsync(CancellationToken ct = default)
+    {
+        if (!IsIntelligenceAvailable || MessageBus == null) return null;
+        await Task.CompletedTask;
+        return null;
+    }
+
+    #endregion
     /// <summary>
     /// Gets whether application-consistent snapshots are supported.
     /// Override to check for VSS, filesystem freeze, or other quiescing mechanisms.
@@ -276,8 +476,66 @@ public abstract class VmSnapshotProviderPluginBase : FeaturePluginBase, IVmSnaps
 /// like VMware VADP, Hyper-V VSS, and Proxmox Backup Server.
 /// Enables efficient incremental backups using changed-block tracking.
 /// </summary>
-public abstract class BackupApiPluginBase : FeaturePluginBase, IBackupApiIntegration
+public abstract class BackupApiPluginBase : FeaturePluginBase, IBackupApiIntegration, IIntelligenceAware
 {
+    #region Intelligence Socket
+
+    public bool IsIntelligenceAvailable { get; protected set; }
+    public IntelligenceCapabilities AvailableCapabilities { get; protected set; }
+
+    public virtual async Task<bool> DiscoverIntelligenceAsync(CancellationToken ct = default)
+    {
+        if (MessageBus == null) { IsIntelligenceAvailable = false; return false; }
+        IsIntelligenceAvailable = false;
+        return IsIntelligenceAvailable;
+    }
+
+    protected override IReadOnlyList<RegisteredCapability> DeclaredCapabilities => new[]
+    {
+        new RegisteredCapability
+        {
+            CapabilityId = $"{Id}.backup",
+            DisplayName = $"{Name} - Backup API",
+            Description = "Integration with hypervisor backup APIs (VADP, CBT)",
+            Category = CapabilityCategory.Storage,
+            SubCategory = "Backup",
+            PluginId = Id,
+            PluginName = Name,
+            PluginVersion = Version,
+            Tags = new[] { "backup", "virtualization", "cbt" },
+            SemanticDescription = "Use for efficient incremental VM backups via hypervisor APIs"
+        }
+    };
+
+    protected virtual IReadOnlyList<KnowledgeObject> GetStaticKnowledge()
+    {
+        return new[]
+        {
+            new KnowledgeObject
+            {
+                Id = $"{Id}.backup.capability",
+                Topic = "virtualization.backup",
+                SourcePluginId = Id,
+                SourcePluginName = Name,
+                KnowledgeType = "capability",
+                Description = $"Backup API type: {ApiType}",
+                Payload = new Dictionary<string, object> { ["apiType"] = ApiType.ToString() },
+                Tags = new[] { "backup", "cbt" }
+            }
+        };
+    }
+
+    /// <summary>
+    /// Requests AI-assisted backup schedule optimization.
+    /// </summary>
+    protected virtual async Task<BackupScheduleRecommendation?> RequestBackupScheduleAsync(CancellationToken ct = default)
+    {
+        if (!IsIntelligenceAvailable || MessageBus == null) return null;
+        await Task.CompletedTask;
+        return null;
+    }
+
+    #endregion
     /// <summary>
     /// Gets the backup API type supported by this plugin.
     /// </summary>
@@ -345,3 +603,76 @@ public abstract class BackupApiPluginBase : FeaturePluginBase, IBackupApiIntegra
         return metadata;
     }
 }
+
+#region Intelligence Stub Types
+
+/// <summary>
+/// AI-predicted VM resource requirements.
+/// </summary>
+public record VmResourcePrediction
+{
+    /// <summary>Predicted CPU utilization.</summary>
+    public double PredictedCpuUtilization { get; init; }
+
+    /// <summary>Predicted memory usage in bytes.</summary>
+    public long PredictedMemoryBytes { get; init; }
+
+    /// <summary>Confidence in the prediction (0.0-1.0).</summary>
+    public double Confidence { get; init; }
+
+    /// <summary>Recommendation for resource adjustment.</summary>
+    public string? Recommendation { get; init; }
+}
+
+/// <summary>
+/// AI-predicted memory pressure information.
+/// </summary>
+public record MemoryPressurePrediction
+{
+    /// <summary>Predicted memory pressure level (0.0-1.0).</summary>
+    public double PredictedPressure { get; init; }
+
+    /// <summary>Recommended target memory size.</summary>
+    public long RecommendedTargetBytes { get; init; }
+
+    /// <summary>Confidence in the prediction (0.0-1.0).</summary>
+    public double Confidence { get; init; }
+
+    /// <summary>Time until pressure is expected.</summary>
+    public TimeSpan? TimeToEvent { get; init; }
+}
+
+/// <summary>
+/// AI recommendation for optimal snapshot timing.
+/// </summary>
+public record SnapshotTimingRecommendation
+{
+    /// <summary>Recommended time for snapshot.</summary>
+    public DateTimeOffset RecommendedTime { get; init; }
+
+    /// <summary>Expected I/O impact during snapshot.</summary>
+    public double ExpectedIoImpact { get; init; }
+
+    /// <summary>Reason for the recommendation.</summary>
+    public string? Reason { get; init; }
+}
+
+/// <summary>
+/// AI recommendation for backup schedule.
+/// </summary>
+public record BackupScheduleRecommendation
+{
+    /// <summary>Recommended backup frequency.</summary>
+    public TimeSpan RecommendedFrequency { get; init; }
+
+    /// <summary>Optimal time window for backups.</summary>
+    public TimeSpan OptimalWindow { get; init; }
+
+    /// <summary>Whether incremental backup is recommended.</summary>
+    public bool UseIncremental { get; init; }
+
+    /// <summary>Reason for the recommendation.</summary>
+    public string? Reason { get; init; }
+}
+
+#endregion

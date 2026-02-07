@@ -35,6 +35,10 @@ public enum CapabilityCategory
     Transport = 22,
     Compute = 23,
     Archival = 24,
+    Infrastructure = 25,
+    Hardware = 26,
+    Compliance = 27,
+    TamperProof = 28,
     Custom = 100
 }
 

@@ -76,6 +76,11 @@ namespace DataWarehouse.SDK.AI
         public DateTimeOffset Timestamp { get; init; } = DateTimeOffset.UtcNow;
 
         /// <summary>
+        /// Alias for Timestamp for backward compatibility.
+        /// </summary>
+        public DateTimeOffset CreatedAt { get => Timestamp; init => Timestamp = value; }
+
+        /// <summary>
         /// When this knowledge expires (optional).
         /// Null means knowledge does not expire.
         /// </summary>

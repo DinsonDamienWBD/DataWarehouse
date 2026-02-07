@@ -142,9 +142,24 @@ namespace DataWarehouse.SDK.Utilities
     public class PluginMessage
     {
         /// <summary>
+        /// Unique message identifier.
+        /// </summary>
+        public string MessageId { get; init; } = Guid.NewGuid().ToString("N");
+
+        /// <summary>
         /// Message type identifier (e.g., "config.changed", "system.shutdown", "ai.query").
         /// </summary>
         public string Type { get; init; } = string.Empty;
+
+        /// <summary>
+        /// Alias for Type for compatibility.
+        /// </summary>
+        public string MessageType { get => Type; init => Type = value; }
+
+        /// <summary>
+        /// Plugin ID that sent this message.
+        /// </summary>
+        public string SourcePluginId { get; init; } = string.Empty;
 
         /// <summary>
         /// Message payload as a dictionary for structured access.

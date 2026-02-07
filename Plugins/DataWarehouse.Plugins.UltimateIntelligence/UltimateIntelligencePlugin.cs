@@ -417,37 +417,23 @@ public sealed class UltimateIntelligencePlugin : PipelinePluginBase
             Tags = new[] { "intelligence", "strategies", "summary", "ai", "vector", "graph" }
         });
 
-        // Add individual strategy knowledge
+        // Add individual strategy knowledge using GetStrategyKnowledge()
         foreach (var strategy in _allStrategies.Values)
         {
-            knowledge.Add(new KnowledgeObject
+            if (strategy is IntelligenceStrategyBase strategyBase)
             {
-                Id = $"{Id}.strategy.{strategy.StrategyId}",
-                Topic = $"intelligence.{strategy.Category.ToString().ToLowerInvariant()}",
-                SourcePluginId = Id,
-                SourcePluginName = Name,
-                KnowledgeType = "capability",
-                Description = $"{strategy.StrategyName}: {strategy.Info.Description}",
-                Payload = new Dictionary<string, object>
+                var strategyKnowledge = strategyBase.GetStrategyKnowledge();
+                // Enrich with additional runtime information
+                strategyKnowledge.Payload["isAvailable"] = strategy.IsAvailable;
+                strategyKnowledge.Payload["configurationRequirements"] = strategy.Info.ConfigurationRequirements.Select(r => new
                 {
-                    ["strategyId"] = strategy.StrategyId,
-                    ["strategyName"] = strategy.StrategyName,
-                    ["category"] = strategy.Category.ToString(),
-                    ["provider"] = strategy.Info.ProviderName,
-                    ["capabilities"] = strategy.Info.Capabilities.ToString(),
-                    ["costTier"] = strategy.Info.CostTier,
-                    ["latencyTier"] = strategy.Info.LatencyTier,
-                    ["isAvailable"] = strategy.IsAvailable,
-                    ["configurationRequirements"] = strategy.Info.ConfigurationRequirements.Select(r => new
-                    {
-                        r.Key,
-                        r.Description,
-                        r.Required,
-                        r.DefaultValue
-                    }).ToArray()
-                },
-                Tags = strategy.Info.Tags.Concat(new[] { "intelligence", strategy.Category.ToString().ToLowerInvariant() }).ToArray()
-            });
+                    r.Key,
+                    r.Description,
+                    r.Required,
+                    r.DefaultValue
+                }).ToArray();
+                knowledge.Add(strategyKnowledge);
+            }
         }
 
         return knowledge;

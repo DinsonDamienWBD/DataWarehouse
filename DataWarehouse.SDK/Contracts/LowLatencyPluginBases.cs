@@ -1,5 +1,11 @@
+using DataWarehouse.SDK.AI;
+using DataWarehouse.SDK.Contracts.IntelligenceAware;
 using DataWarehouse.SDK.Performance;
 using DataWarehouse.SDK.Primitives;
+using System;
+using System.Collections.Generic;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace DataWarehouse.SDK.Contracts;
 
@@ -8,8 +14,76 @@ namespace DataWarehouse.SDK.Contracts;
 /// Provides infrastructure for sub-millisecond storage operations with hardware acceleration.
 /// Implements common patterns for direct I/O, pre-warming, and latency tracking.
 /// </summary>
-public abstract class LowLatencyStoragePluginBase : StorageProviderPluginBase, ILowLatencyStorage
+public abstract class LowLatencyStoragePluginBase : StorageProviderPluginBase, ILowLatencyStorage, IIntelligenceAware
 {
+    #region Intelligence Socket
+
+    public bool IsIntelligenceAvailable { get; protected set; }
+
+    /// <summary>Intelligence capabilities (explicit interface implementation to avoid name conflict with HardwareCapabilities).</summary>
+    private IntelligenceCapabilities _intelligenceCapabilities;
+    IntelligenceCapabilities IIntelligenceAware.AvailableCapabilities => _intelligenceCapabilities;
+
+    public virtual async Task<bool> DiscoverIntelligenceAsync(CancellationToken ct = default)
+    {
+        if (MessageBus == null) { IsIntelligenceAvailable = false; return false; }
+        IsIntelligenceAvailable = false;
+        return IsIntelligenceAvailable;
+    }
+
+    protected override IReadOnlyList<RegisteredCapability> DeclaredCapabilities => new[]
+    {
+        new RegisteredCapability
+        {
+            CapabilityId = $"{Id}.lowlatency",
+            DisplayName = $"{Name} - Low-Latency Storage",
+            Description = $"Sub-millisecond storage at {Tier} tier",
+            Category = CapabilityCategory.Storage,
+            SubCategory = "LowLatency",
+            PluginId = Id,
+            PluginName = Name,
+            PluginVersion = Version,
+            Tags = new[] { "low-latency", "performance", Tier.ToString().ToLowerInvariant() },
+            SemanticDescription = "Use for ultra-low latency storage operations"
+        }
+    };
+
+    protected virtual IReadOnlyList<KnowledgeObject> GetStaticKnowledge()
+    {
+        return new[]
+        {
+            new KnowledgeObject
+            {
+                Id = $"{Id}.lowlatency.capability",
+                Topic = "performance.lowlatency",
+                SourcePluginId = Id,
+                SourcePluginName = Name,
+                KnowledgeType = "capability",
+                Description = $"Low-latency storage at {Tier} tier with hardware caps: {AvailableCapabilities}",
+                Payload = new Dictionary<string, object>
+                {
+                    ["tier"] = Tier.ToString(),
+                    ["ioDepth"] = DefaultIoDepth,
+                    ["blockSize"] = DefaultBlockSize,
+                    ["useDirectIo"] = UseDirectIo
+                },
+                Tags = new[] { "low-latency", "storage" }
+            }
+        };
+    }
+
+    /// <summary>
+    /// Requests AI-assisted latency optimization.
+    /// </summary>
+    protected virtual async Task<LatencyOptimizationHint?> RequestLatencyOptimizationAsync(LatencyStatistics stats, CancellationToken ct = default)
+    {
+        if (!IsIntelligenceAvailable || MessageBus == null) return null;
+        await Task.CompletedTask;
+        return null;
+    }
+
+    #endregion
+
     /// <summary>
     /// Gets the latency tier this storage provider operates in.
     /// Must be implemented by derived classes based on hardware characteristics.
@@ -151,8 +225,57 @@ public abstract class LowLatencyStoragePluginBase : StorageProviderPluginBase, I
 /// Provides infrastructure for zero-copy remote memory access via InfiniBand/RoCE.
 /// Requires platform-specific RDMA libraries (libibverbs on Linux, NetworkDirect on Windows).
 /// </summary>
-public abstract class RdmaTransportPluginBase : FeaturePluginBase, IRdmaTransport
+public abstract class RdmaTransportPluginBase : FeaturePluginBase, IRdmaTransport, IIntelligenceAware
 {
+    #region Intelligence Socket
+
+    public bool IsIntelligenceAvailable { get; protected set; }
+    public IntelligenceCapabilities AvailableCapabilities { get; protected set; }
+
+    public virtual async Task<bool> DiscoverIntelligenceAsync(CancellationToken ct = default)
+    {
+        if (MessageBus == null) { IsIntelligenceAvailable = false; return false; }
+        IsIntelligenceAvailable = false;
+        return IsIntelligenceAvailable;
+    }
+
+    protected override IReadOnlyList<RegisteredCapability> DeclaredCapabilities => new[]
+    {
+        new RegisteredCapability
+        {
+            CapabilityId = $"{Id}.rdma",
+            DisplayName = $"{Name} - RDMA Transport",
+            Description = "Zero-copy remote memory access via InfiniBand/RoCE",
+            Category = CapabilityCategory.Infrastructure,
+            SubCategory = "Transport",
+            PluginId = Id,
+            PluginName = Name,
+            PluginVersion = Version,
+            Tags = new[] { "rdma", "infiniband", "low-latency" },
+            SemanticDescription = "Use for zero-copy network transport"
+        }
+    };
+
+    protected virtual IReadOnlyList<KnowledgeObject> GetStaticKnowledge()
+    {
+        return new[]
+        {
+            new KnowledgeObject
+            {
+                Id = $"{Id}.rdma.capability",
+                Topic = "transport.rdma",
+                SourcePluginId = Id,
+                SourcePluginName = Name,
+                KnowledgeType = "capability",
+                Description = $"RDMA transport, Available: {IsAvailable}",
+                Payload = new Dictionary<string, object> { ["isAvailable"] = IsAvailable },
+                Tags = new[] { "rdma", "transport" }
+            }
+        };
+    }
+
+    #endregion
+
     /// <summary>
     /// Gets whether RDMA hardware is available and initialized.
     /// Must be implemented by derived classes to check for RDMA NICs.
@@ -199,8 +322,57 @@ public abstract class RdmaTransportPluginBase : FeaturePluginBase, IRdmaTranspor
 /// Provides infrastructure for ultra-low overhead async I/O using kernel io_uring.
 /// Requires liburing or direct syscall implementation.
 /// </summary>
-public abstract class IoUringProviderPluginBase : FeaturePluginBase, IIoUringProvider
+public abstract class IoUringProviderPluginBase : FeaturePluginBase, IIoUringProvider, IIntelligenceAware
 {
+    #region Intelligence Socket
+
+    public bool IsIntelligenceAvailable { get; protected set; }
+    public IntelligenceCapabilities AvailableCapabilities { get; protected set; }
+
+    public virtual async Task<bool> DiscoverIntelligenceAsync(CancellationToken ct = default)
+    {
+        if (MessageBus == null) { IsIntelligenceAvailable = false; return false; }
+        IsIntelligenceAvailable = false;
+        return IsIntelligenceAvailable;
+    }
+
+    protected override IReadOnlyList<RegisteredCapability> DeclaredCapabilities => new[]
+    {
+        new RegisteredCapability
+        {
+            CapabilityId = $"{Id}.iouring",
+            DisplayName = $"{Name} - io_uring Provider",
+            Description = "Linux io_uring for ultra-low overhead async I/O",
+            Category = CapabilityCategory.Infrastructure,
+            SubCategory = "IO",
+            PluginId = Id,
+            PluginName = Name,
+            PluginVersion = Version,
+            Tags = new[] { "iouring", "linux", "async-io" },
+            SemanticDescription = "Use for ultra-low overhead async I/O on Linux 5.1+"
+        }
+    };
+
+    protected virtual IReadOnlyList<KnowledgeObject> GetStaticKnowledge()
+    {
+        return new[]
+        {
+            new KnowledgeObject
+            {
+                Id = $"{Id}.iouring.capability",
+                Topic = "io.iouring",
+                SourcePluginId = Id,
+                SourcePluginName = Name,
+                KnowledgeType = "capability",
+                Description = $"io_uring provider, Supported: {IsSupported}",
+                Payload = new Dictionary<string, object> { ["isSupported"] = IsSupported },
+                Tags = new[] { "iouring", "io" }
+            }
+        };
+    }
+
+    #endregion
+
     /// <summary>
     /// Gets whether io_uring is supported on this kernel.
     /// Default implementation checks for Linux and minimum kernel version.
@@ -254,8 +426,71 @@ public abstract class IoUringProviderPluginBase : FeaturePluginBase, IIoUringPro
 /// Provides infrastructure for explicit NUMA node memory allocation and thread affinity.
 /// Requires platform-specific NUMA APIs (libnuma on Linux, NUMA API on Windows).
 /// </summary>
-public abstract class NumaAllocatorPluginBase : FeaturePluginBase, INumaAllocator
+public abstract class NumaAllocatorPluginBase : FeaturePluginBase, INumaAllocator, IIntelligenceAware
 {
+    #region Intelligence Socket
+
+    public bool IsIntelligenceAvailable { get; protected set; }
+    public IntelligenceCapabilities AvailableCapabilities { get; protected set; }
+
+    public virtual async Task<bool> DiscoverIntelligenceAsync(CancellationToken ct = default)
+    {
+        if (MessageBus == null) { IsIntelligenceAvailable = false; return false; }
+        IsIntelligenceAvailable = false;
+        return IsIntelligenceAvailable;
+    }
+
+    protected override IReadOnlyList<RegisteredCapability> DeclaredCapabilities => new[]
+    {
+        new RegisteredCapability
+        {
+            CapabilityId = $"{Id}.numa",
+            DisplayName = $"{Name} - NUMA Allocator",
+            Description = "NUMA-aware memory allocation and thread affinity",
+            Category = CapabilityCategory.Infrastructure,
+            SubCategory = "Memory",
+            PluginId = Id,
+            PluginName = Name,
+            PluginVersion = Version,
+            Tags = new[] { "numa", "memory", "affinity" },
+            SemanticDescription = "Use for NUMA-optimized memory allocation"
+        }
+    };
+
+    protected virtual IReadOnlyList<KnowledgeObject> GetStaticKnowledge()
+    {
+        return new[]
+        {
+            new KnowledgeObject
+            {
+                Id = $"{Id}.numa.capability",
+                Topic = "memory.numa",
+                SourcePluginId = Id,
+                SourcePluginName = Name,
+                KnowledgeType = "capability",
+                Description = $"NUMA allocator with {NodeCount} nodes",
+                Payload = new Dictionary<string, object>
+                {
+                    ["nodeCount"] = NodeCount,
+                    ["currentNode"] = CurrentNode
+                },
+                Tags = new[] { "numa", "memory" }
+            }
+        };
+    }
+
+    /// <summary>
+    /// Requests AI-assisted NUMA placement advice.
+    /// </summary>
+    protected virtual async Task<NumaPlacementHint?> RequestNumaPlacementAsync(long allocationSize, CancellationToken ct = default)
+    {
+        if (!IsIntelligenceAvailable || MessageBus == null) return null;
+        await Task.CompletedTask;
+        return null;
+    }
+
+    #endregion
+
     /// <summary>
     /// Gets the total number of NUMA nodes in the system.
     /// Must be implemented by derived classes to query system topology.
@@ -297,3 +532,21 @@ public abstract class NumaAllocatorPluginBase : FeaturePluginBase, INumaAllocato
     /// </summary>
     public override PluginCategory Category => PluginCategory.InfrastructureProvider;
 }
+
+#region Stub Types for Intelligence Integration
+
+/// <summary>Stub type for latency optimization hints from AI.</summary>
+public record LatencyOptimizationHint(
+    string RecommendedAction,
+    int? SuggestedIoDepth,
+    int? SuggestedBlockSize,
+    bool? UseDirectIo,
+    double ConfidenceScore);
+
+/// <summary>Stub type for NUMA placement hints from AI.</summary>
+public record NumaPlacementHint(
+    int RecommendedNode,
+    string Reason,
+    double ConfidenceScore);
+
+#endregion

@@ -1,3 +1,6 @@
+using DataWarehouse.SDK.AI;
+using DataWarehouse.SDK.Utilities;
+using System.Collections.Generic;
 using System.Diagnostics;
 
 namespace DataWarehouse.SDK.Contracts.Storage
@@ -754,6 +757,163 @@ namespace DataWarehouse.SDK.Contracts.Storage
             {
                 _recentLatencies.Clear();
             }
+        }
+
+        #endregion
+
+        #region Intelligence Integration
+
+        /// <summary>
+        /// Message bus reference for Intelligence communication.
+        /// </summary>
+        protected IMessageBus? MessageBus { get; private set; }
+
+        /// <summary>
+        /// Configures Intelligence integration for this strategy.
+        /// Called by the plugin to enable AI-enhanced features.
+        /// </summary>
+        public virtual void ConfigureIntelligence(IMessageBus? messageBus)
+        {
+            MessageBus = messageBus;
+        }
+
+        /// <summary>
+        /// Whether Intelligence is available for this strategy.
+        /// </summary>
+        protected bool IsIntelligenceAvailable => MessageBus != null;
+
+        /// <summary>
+        /// Gets static knowledge about this strategy for AI discovery.
+        /// Override to provide strategy-specific knowledge.
+        /// </summary>
+        public virtual KnowledgeObject GetStrategyKnowledge()
+        {
+            return new KnowledgeObject
+            {
+                Id = $"strategy.{StrategyId}",
+                Topic = $"{GetKnowledgeTopic()}",
+                SourcePluginId = "sdk.strategy",
+                SourcePluginName = Name,
+                KnowledgeType = "capability",
+                Description = GetStrategyDescription(),
+                Payload = GetKnowledgePayload(),
+                Tags = GetKnowledgeTags()
+            };
+        }
+
+        /// <summary>
+        /// Gets the registered capability for this strategy.
+        /// </summary>
+        public virtual RegisteredCapability GetStrategyCapability()
+        {
+            return new RegisteredCapability
+            {
+                CapabilityId = $"strategy.{StrategyId}",
+                DisplayName = Name,
+                Description = GetStrategyDescription(),
+                Category = GetCapabilityCategory(),
+                PluginId = "sdk.strategy",
+                PluginName = Name,
+                PluginVersion = "1.0.0",
+                Tags = GetKnowledgeTags(),
+                Metadata = GetCapabilityMetadata(),
+                SemanticDescription = GetSemanticDescription()
+            };
+        }
+
+        /// <summary>
+        /// Gets the knowledge topic for this strategy type.
+        /// </summary>
+        protected virtual string GetKnowledgeTopic() => "storage";
+
+        /// <summary>
+        /// Gets the capability category for this strategy type.
+        /// </summary>
+        protected virtual CapabilityCategory GetCapabilityCategory() => CapabilityCategory.Storage;
+
+        /// <summary>
+        /// Gets a description for this strategy.
+        /// </summary>
+        protected virtual string GetStrategyDescription() =>
+            $"{Name} storage strategy for {Tier} tier with {Capabilities.ConsistencyModel} consistency";
+
+        /// <summary>
+        /// Gets the knowledge payload for this strategy.
+        /// </summary>
+        protected virtual Dictionary<string, object> GetKnowledgePayload() => new()
+        {
+            ["tier"] = Tier.ToString(),
+            ["consistencyModel"] = Capabilities.ConsistencyModel.ToString(),
+            ["supportsVersioning"] = Capabilities.SupportsVersioning,
+            ["supportsMetadata"] = Capabilities.SupportsMetadata,
+            ["supportsEncryption"] = Capabilities.SupportsEncryption,
+            ["supportsStreaming"] = Capabilities.SupportsStreaming,
+            ["maxObjectSize"] = Capabilities.MaxObjectSize ?? -1
+        };
+
+        /// <summary>
+        /// Gets tags for this strategy.
+        /// </summary>
+        protected virtual string[] GetKnowledgeTags() => new[]
+        {
+            "strategy",
+            "storage",
+            Tier.ToString().ToLowerInvariant(),
+            Capabilities.ConsistencyModel.ToString().ToLowerInvariant()
+        };
+
+        /// <summary>
+        /// Gets capability metadata for this strategy.
+        /// </summary>
+        protected virtual Dictionary<string, object> GetCapabilityMetadata() => new()
+        {
+            ["tier"] = Tier.ToString(),
+            ["consistencyModel"] = Capabilities.ConsistencyModel.ToString()
+        };
+
+        /// <summary>
+        /// Gets the semantic description for AI-driven discovery.
+        /// </summary>
+        protected virtual string GetSemanticDescription() =>
+            $"Use {Name} for {Tier} tier storage with {Capabilities.ConsistencyModel} consistency";
+
+        /// <summary>
+        /// Requests an AI recommendation for the optimal storage tier.
+        /// </summary>
+        /// <param name="accessPattern">Access pattern characteristics.</param>
+        /// <param name="dataSize">Size of data in bytes.</param>
+        /// <param name="retentionDays">Expected retention period in days.</param>
+        /// <param name="cancellationToken">Cancellation token.</param>
+        /// <returns>Recommended tier configuration, or null if Intelligence unavailable.</returns>
+        protected async Task<Dictionary<string, object>?> RequestTierRecommendationAsync(
+            string accessPattern,
+            long dataSize,
+            int retentionDays,
+            CancellationToken cancellationToken = default)
+        {
+            if (!IsIntelligenceAvailable || MessageBus == null)
+                return null;
+
+            var request = new Dictionary<string, object>
+            {
+                ["requestType"] = "tier_recommendation",
+                ["strategyId"] = StrategyId,
+                ["accessPattern"] = accessPattern,
+                ["dataSize"] = dataSize,
+                ["retentionDays"] = retentionDays,
+                ["currentTier"] = Tier.ToString()
+            };
+
+            var message = new PluginMessage
+            {
+                MessageId = Guid.NewGuid().ToString(),
+                SourcePluginId = StrategyId,
+                MessageType = "intelligence.request",
+                Payload = request
+            };
+
+            var response = await MessageBus.SendAsync(MessageTopics.AIQuery, message, cancellationToken);
+            return response.Success ? response.Payload as Dictionary<string, object> : null;
         }
 
         #endregion

@@ -249,6 +249,62 @@ public abstract class IntelligenceStrategyBase : IIntelligenceStrategy
             throw;
         }
     }
+
+    /// <summary>
+    /// Gets static knowledge about this Intelligence strategy.
+    /// </summary>
+    public virtual SDK.AI.KnowledgeObject GetStrategyKnowledge()
+    {
+        return new SDK.AI.KnowledgeObject
+        {
+            Id = $"intelligence.strategy.{StrategyId}",
+            Topic = $"intelligence.{Category.ToString().ToLowerInvariant()}",
+            SourcePluginId = "com.datawarehouse.intelligence.ultimate",
+            SourcePluginName = StrategyName,
+            KnowledgeType = "capability",
+            Description = Info.Description,
+            Payload = new Dictionary<string, object>
+            {
+                ["strategyId"] = StrategyId,
+                ["category"] = Category.ToString(),
+                ["provider"] = Info.ProviderName,
+                ["capabilities"] = Info.Capabilities.ToString(),
+                ["costTier"] = Info.CostTier,
+                ["latencyTier"] = Info.LatencyTier,
+                ["requiresNetwork"] = Info.RequiresNetworkAccess,
+                ["supportsOffline"] = Info.SupportsOfflineMode
+            },
+            Tags = Info.Tags.Concat(new[] { "intelligence", Category.ToString().ToLowerInvariant() }).ToArray()
+        };
+    }
+
+    /// <summary>
+    /// Gets the registered capability for this strategy.
+    /// </summary>
+    public virtual SDK.Contracts.RegisteredCapability GetStrategyCapability()
+    {
+        return new SDK.Contracts.RegisteredCapability
+        {
+            CapabilityId = $"intelligence.strategy.{StrategyId}",
+            DisplayName = StrategyName,
+            Description = Info.Description,
+            Category = SDK.Contracts.CapabilityCategory.AI,
+            SubCategory = Category.ToString(),
+            PluginId = "com.datawarehouse.intelligence.ultimate",
+            PluginName = "Ultimate Intelligence",
+            PluginVersion = "1.0.0",
+            Tags = Info.Tags,
+            Metadata = new Dictionary<string, object>
+            {
+                ["provider"] = Info.ProviderName,
+                ["costTier"] = Info.CostTier,
+                ["latencyTier"] = Info.LatencyTier,
+                ["requiresNetwork"] = Info.RequiresNetworkAccess,
+                ["supportsOffline"] = Info.SupportsOfflineMode
+            },
+            SemanticDescription = $"Use {Info.ProviderName} for {Info.Description}"
+        };
+    }
 }
 
 /// <summary>
