@@ -50,6 +50,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
         private int _maxConcurrentParts = 5;
         private int _maxRetries = 3;
         private int _retryDelayMs = 1000;
+        private bool _useSignatureV4 = true; // Use AWS Signature V4 by default (V2 deprecated)
 
         // Ceph-specific quota settings
         private long _userMaxObjects = -1; // -1 = unlimited
@@ -117,6 +118,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
             _maxConcurrentParts = GetConfiguration<int>("MaxConcurrentParts", 5);
             _maxRetries = GetConfiguration<int>("MaxRetries", 3);
             _retryDelayMs = GetConfiguration<int>("RetryDelayMs", 1000);
+            _useSignatureV4 = GetConfiguration<bool>("UseSignatureV4", true);
 
             // Load Ceph-specific quota configuration
             _enableQuotaManagement = GetConfiguration<bool>("EnableQuotaManagement", false);
@@ -722,6 +724,76 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
         {
             ValidateKey(key);
 
+            if (_useSignatureV4)
+            {
+                return GeneratePresignedUrlV4(key, expiresIn);
+            }
+            else
+            {
+                // Log deprecation warning
+                System.Diagnostics.Debug.WriteLine("WARNING: AWS Signature Version 2 is deprecated. Consider migrating to Signature Version 4 by setting 'UseSignatureV4' to true.");
+                return GeneratePresignedUrlV2(key, expiresIn);
+            }
+        }
+
+        /// <summary>
+        /// Generates a presigned URL using AWS Signature Version 4.
+        /// </summary>
+        private string GeneratePresignedUrlV4(string key, TimeSpan expiresIn)
+        {
+            var now = DateTime.UtcNow;
+            var dateStamp = now.ToString("yyyyMMdd");
+            var amzDate = now.ToString("yyyyMMddTHHmmssZ");
+            var expiresInSeconds = (int)expiresIn.TotalSeconds;
+
+            var endpoint = GetEndpointUrl(key);
+            var uri = new Uri(endpoint);
+
+            // Build credential scope
+            var credentialScope = $"{dateStamp}/{_region}/s3/aws4_request";
+            var credential = $"{_accessKey}/{credentialScope}";
+
+            // Build canonical query string
+            var queryParams = new SortedDictionary<string, string>
+            {
+                { "X-Amz-Algorithm", "AWS4-HMAC-SHA256" },
+                { "X-Amz-Credential", credential },
+                { "X-Amz-Date", amzDate },
+                { "X-Amz-Expires", expiresInSeconds.ToString() },
+                { "X-Amz-SignedHeaders", "host" }
+            };
+
+            var canonicalQueryString = string.Join("&", queryParams.Select(kvp => $"{Uri.EscapeDataString(kvp.Key)}={Uri.EscapeDataString(kvp.Value)}"));
+
+            // Build canonical request
+            var canonicalUri = uri.AbsolutePath;
+            var canonicalHeaders = $"host:{uri.Host}\n";
+            var signedHeaders = "host";
+            var payloadHash = "UNSIGNED-PAYLOAD";
+
+            var canonicalRequest = $"GET\n{canonicalUri}\n{canonicalQueryString}\n{canonicalHeaders}\n{signedHeaders}\n{payloadHash}";
+            var canonicalRequestHash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(canonicalRequest))).ToLower();
+
+            // Build string to sign
+            var stringToSign = $"AWS4-HMAC-SHA256\n{amzDate}\n{credentialScope}\n{canonicalRequestHash}";
+
+            // Calculate signature
+            var kDate = HmacSha256(Encoding.UTF8.GetBytes("AWS4" + _secretKey), dateStamp);
+            var kRegion = HmacSha256(kDate, _region);
+            var kService = HmacSha256(kRegion, "s3");
+            var kSigning = HmacSha256(kService, "aws4_request");
+            var signature = Convert.ToHexString(HmacSha256(kSigning, stringToSign)).ToLower();
+
+            // Build final URL
+            return $"{endpoint}?{canonicalQueryString}&X-Amz-Signature={signature}";
+        }
+
+        /// <summary>
+        /// Generates a presigned URL using AWS Signature Version 2 (deprecated).
+        /// </summary>
+        [Obsolete("AWS Signature Version 2 is deprecated. Use Signature Version 4 instead.")]
+        private string GeneratePresignedUrlV2(string key, TimeSpan expiresIn)
+        {
             var expires = DateTimeOffset.UtcNow.Add(expiresIn).ToUnixTimeSeconds();
             var endpoint = GetEndpointUrl(key);
 

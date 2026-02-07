@@ -48,6 +48,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.S3Compatible
         private int _maxRetries = 3;
         private int _retryDelayMs = 1000;
         private string _region = "auto"; // R2 uses "auto" as region
+        private bool _useSignatureV4 = true; // Use AWS Signature V4 by default (V2 deprecated)
 
         public override string StrategyId => "cloudflare-r2";
         public override string Name => "Cloudflare R2 Storage";
@@ -108,6 +109,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.S3Compatible
             _maxConcurrentParts = GetConfiguration<int>("MaxConcurrentParts", 10);
             _maxRetries = GetConfiguration<int>("MaxRetries", 3);
             _retryDelayMs = GetConfiguration<int>("RetryDelayMs", 1000);
+            _useSignatureV4 = GetConfiguration<bool>("UseSignatureV4", true);
 
             // Validate multipart settings
             if (_multipartChunkSizeBytes < 5 * 1024 * 1024)
@@ -529,6 +531,76 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.S3Compatible
         {
             ValidateKey(key);
 
+            if (_useSignatureV4)
+            {
+                return GeneratePresignedUrlV4(key, expiresIn);
+            }
+            else
+            {
+                // Log deprecation warning
+                System.Diagnostics.Debug.WriteLine("WARNING: AWS Signature Version 2 is deprecated. Consider migrating to Signature Version 4 by setting 'UseSignatureV4' to true.");
+                return GeneratePresignedUrlV2(key, expiresIn);
+            }
+        }
+
+        /// <summary>
+        /// Generates a presigned URL using AWS Signature Version 4.
+        /// </summary>
+        private string GeneratePresignedUrlV4(string key, TimeSpan expiresIn)
+        {
+            var now = DateTime.UtcNow;
+            var dateStamp = now.ToString("yyyyMMdd");
+            var amzDate = now.ToString("yyyyMMddTHHmmssZ");
+            var expiresInSeconds = (int)expiresIn.TotalSeconds;
+
+            var endpoint = GetEndpointUrl(key);
+            var uri = new Uri(endpoint);
+
+            // Build credential scope
+            var credentialScope = $"{dateStamp}/{_region}/s3/aws4_request";
+            var credential = $"{_accessKeyId}/{credentialScope}";
+
+            // Build canonical query string
+            var queryParams = new SortedDictionary<string, string>
+            {
+                { "X-Amz-Algorithm", "AWS4-HMAC-SHA256" },
+                { "X-Amz-Credential", credential },
+                { "X-Amz-Date", amzDate },
+                { "X-Amz-Expires", expiresInSeconds.ToString() },
+                { "X-Amz-SignedHeaders", "host" }
+            };
+
+            var canonicalQueryString = string.Join("&", queryParams.Select(kvp => $"{Uri.EscapeDataString(kvp.Key)}={Uri.EscapeDataString(kvp.Value)}"));
+
+            // Build canonical request
+            var canonicalUri = uri.AbsolutePath;
+            var canonicalHeaders = $"host:{uri.Host}\n";
+            var signedHeaders = "host";
+            var payloadHash = "UNSIGNED-PAYLOAD";
+
+            var canonicalRequest = $"GET\n{canonicalUri}\n{canonicalQueryString}\n{canonicalHeaders}\n{signedHeaders}\n{payloadHash}";
+            var canonicalRequestHash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(canonicalRequest))).ToLower();
+
+            // Build string to sign
+            var stringToSign = $"AWS4-HMAC-SHA256\n{amzDate}\n{credentialScope}\n{canonicalRequestHash}";
+
+            // Calculate signature
+            var kDate = HmacSha256(Encoding.UTF8.GetBytes("AWS4" + _secretAccessKey), dateStamp);
+            var kRegion = HmacSha256(kDate, _region);
+            var kService = HmacSha256(kRegion, "s3");
+            var kSigning = HmacSha256(kService, "aws4_request");
+            var signature = Convert.ToHexString(HmacSha256(kSigning, stringToSign)).ToLower();
+
+            // Build final URL
+            return $"{endpoint}?{canonicalQueryString}&X-Amz-Signature={signature}";
+        }
+
+        /// <summary>
+        /// Generates a presigned URL using AWS Signature Version 2 (deprecated).
+        /// </summary>
+        [Obsolete("AWS Signature Version 2 is deprecated. Use Signature Version 4 instead.")]
+        private string GeneratePresignedUrlV2(string key, TimeSpan expiresIn)
+        {
             var expires = DateTimeOffset.UtcNow.Add(expiresIn).ToUnixTimeSeconds();
             var endpoint = GetEndpointUrl(key);
 
@@ -590,20 +662,25 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.S3Compatible
         /// <param name="allowedHeaders">Allowed headers.</param>
         /// <param name="maxAgeSeconds">Max age for preflight cache.</param>
         /// <returns>Task representing the async operation.</returns>
-        public Task ConfigureCorsAsync(
+        public async Task ConfigureCorsAsync(
             IEnumerable<string> allowedOrigins,
             IEnumerable<string> allowedMethods,
             IEnumerable<string>? allowedHeaders = null,
             int maxAgeSeconds = 3600)
         {
             // Note: R2 CORS configuration requires Cloudflare API, not S3 API
-            // This is a placeholder for actual implementation via Cloudflare API
-            // In production, you would use Cloudflare API v4:
-            // PUT https://api.cloudflare.com/client/v4/accounts/{account_id}/r2/buckets/{bucket_name}/cors
+            // Uses Cloudflare API v4: PUT https://api.cloudflare.com/client/v4/accounts/{account_id}/r2/buckets/{bucket_name}/cors
 
             if (!_enableCors)
             {
                 throw new InvalidOperationException("CORS is not enabled. Set 'EnableCors' to true in configuration.");
+            }
+
+            // Get Cloudflare API token from configuration (required for API calls)
+            var apiToken = GetConfiguration<string>("CloudflareApiToken", string.Empty);
+            if (string.IsNullOrWhiteSpace(apiToken))
+            {
+                throw new InvalidOperationException("Cloudflare API token is required for CORS configuration. Set 'CloudflareApiToken' in configuration.");
             }
 
             // Store CORS configuration for reference
@@ -612,10 +689,53 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.S3Compatible
             SetConfiguration("CorsAllowedHeaders", allowedHeaders ?? Array.Empty<string>());
             SetConfiguration("CorsMaxAge", maxAgeSeconds);
 
-            // TODO: Implement actual Cloudflare API call for CORS configuration
-            // This requires a Cloudflare API token (different from R2 access key)
+            try
+            {
+                // Build CORS configuration JSON
+                var corsRules = new[]
+                {
+                    new
+                    {
+                        allowed_origins = allowedOrigins.ToArray(),
+                        allowed_methods = allowedMethods.ToArray(),
+                        allowed_headers = allowedHeaders?.ToArray() ?? new[] { "*" },
+                        expose_headers = new[] { "ETag", "Content-Length", "Content-Type" },
+                        max_age_seconds = maxAgeSeconds
+                    }
+                };
 
-            return Task.CompletedTask;
+                var jsonPayload = System.Text.Json.JsonSerializer.Serialize(new { cors_rules = corsRules });
+
+                // Make API request to Cloudflare
+                var apiEndpoint = $"https://api.cloudflare.com/client/v4/accounts/{_accountId}/r2/buckets/{_bucket}/cors";
+                var request = new HttpRequestMessage(HttpMethod.Put, apiEndpoint);
+                request.Headers.TryAddWithoutValidation("Authorization", $"Bearer {apiToken}");
+                request.Content = new StringContent(jsonPayload, Encoding.UTF8, "application/json");
+
+                var response = await _httpClient!.SendAsync(request);
+                var responseContent = await response.Content.ReadAsStringAsync();
+
+                if (!response.IsSuccessStatusCode)
+                {
+                    throw new InvalidOperationException($"Failed to configure CORS via Cloudflare API. Status: {response.StatusCode}, Response: {responseContent}");
+                }
+
+                // Parse response to check for success
+                using var jsonDoc = System.Text.Json.JsonDocument.Parse(responseContent);
+                var success = jsonDoc.RootElement.TryGetProperty("success", out var successProp) && successProp.GetBoolean();
+
+                if (!success)
+                {
+                    var errors = jsonDoc.RootElement.TryGetProperty("errors", out var errorsProp)
+                        ? errorsProp.ToString()
+                        : "Unknown error";
+                    throw new InvalidOperationException($"Cloudflare API returned success=false. Errors: {errors}");
+                }
+            }
+            catch (Exception ex) when (ex is not InvalidOperationException)
+            {
+                throw new InvalidOperationException($"Failed to configure CORS via Cloudflare API: {ex.Message}", ex);
+            }
         }
 
         /// <summary>
@@ -624,23 +744,98 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.S3Compatible
         /// </summary>
         /// <param name="rules">Lifecycle rules.</param>
         /// <returns>Task representing the async operation.</returns>
-        public Task SetLifecyclePolicyAsync(IEnumerable<LifecycleRule> rules)
+        public async Task SetLifecyclePolicyAsync(IEnumerable<LifecycleRule> rules)
         {
             // Note: R2 lifecycle configuration requires Cloudflare API
-            // This is a placeholder for actual implementation
+            // Uses Cloudflare API v4: PUT https://api.cloudflare.com/client/v4/accounts/{account_id}/r2/buckets/{bucket_name}/lifecycle
 
             if (rules == null || !rules.Any())
             {
                 throw new ArgumentException("At least one lifecycle rule is required", nameof(rules));
             }
 
+            // Get Cloudflare API token from configuration (required for API calls)
+            var apiToken = GetConfiguration<string>("CloudflareApiToken", string.Empty);
+            if (string.IsNullOrWhiteSpace(apiToken))
+            {
+                throw new InvalidOperationException("Cloudflare API token is required for lifecycle configuration. Set 'CloudflareApiToken' in configuration.");
+            }
+
             // Store lifecycle rules for reference
             SetConfiguration("LifecycleRules", rules);
 
-            // TODO: Implement actual Cloudflare API call for lifecycle configuration
-            // PUT https://api.cloudflare.com/client/v4/accounts/{account_id}/r2/buckets/{bucket_name}/lifecycle
+            try
+            {
+                // Build lifecycle configuration JSON
+                var lifecycleRules = rules.Select(rule =>
+                {
+                    var ruleObj = new Dictionary<string, object>
+                    {
+                        ["id"] = rule.Id,
+                        ["status"] = rule.Enabled ? "Enabled" : "Disabled"
+                    };
 
-            return Task.CompletedTask;
+                    // Add filter/prefix if specified
+                    if (!string.IsNullOrWhiteSpace(rule.Prefix))
+                    {
+                        ruleObj["filter"] = new { prefix = rule.Prefix };
+                    }
+
+                    // Add expiration configuration
+                    var expiration = new Dictionary<string, object>();
+                    if (rule.ExpirationDays.HasValue)
+                    {
+                        expiration["days"] = rule.ExpirationDays.Value;
+                    }
+                    if (rule.ExpirationDate.HasValue)
+                    {
+                        expiration["date"] = rule.ExpirationDate.Value.ToString("yyyy-MM-ddTHH:mm:ss.fffZ");
+                    }
+                    if (rule.ExpiredObjectDeleteMarker)
+                    {
+                        expiration["expired_object_delete_marker"] = true;
+                    }
+
+                    if (expiration.Count > 0)
+                    {
+                        ruleObj["expiration"] = expiration;
+                    }
+
+                    return ruleObj;
+                }).ToArray();
+
+                var jsonPayload = System.Text.Json.JsonSerializer.Serialize(new { rules = lifecycleRules });
+
+                // Make API request to Cloudflare
+                var apiEndpoint = $"https://api.cloudflare.com/client/v4/accounts/{_accountId}/r2/buckets/{_bucket}/lifecycle";
+                var request = new HttpRequestMessage(HttpMethod.Put, apiEndpoint);
+                request.Headers.TryAddWithoutValidation("Authorization", $"Bearer {apiToken}");
+                request.Content = new StringContent(jsonPayload, Encoding.UTF8, "application/json");
+
+                var response = await _httpClient!.SendAsync(request);
+                var responseContent = await response.Content.ReadAsStringAsync();
+
+                if (!response.IsSuccessStatusCode)
+                {
+                    throw new InvalidOperationException($"Failed to configure lifecycle policy via Cloudflare API. Status: {response.StatusCode}, Response: {responseContent}");
+                }
+
+                // Parse response to check for success
+                using var jsonDoc = System.Text.Json.JsonDocument.Parse(responseContent);
+                var success = jsonDoc.RootElement.TryGetProperty("success", out var successProp) && successProp.GetBoolean();
+
+                if (!success)
+                {
+                    var errors = jsonDoc.RootElement.TryGetProperty("errors", out var errorsProp)
+                        ? errorsProp.ToString()
+                        : "Unknown error";
+                    throw new InvalidOperationException($"Cloudflare API returned success=false. Errors: {errors}");
+                }
+            }
+            catch (Exception ex) when (ex is not InvalidOperationException && ex is not ArgumentException)
+            {
+                throw new InvalidOperationException($"Failed to configure lifecycle policy via Cloudflare API: {ex.Message}", ex);
+            }
         }
 
         private async Task<string> InitiateMultipartUploadAsync(string key, IDictionary<string, string>? metadata, CancellationToken ct)

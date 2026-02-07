@@ -279,7 +279,7 @@ public sealed class NoSqlProtocolPlugin : InterfacePluginBase, IDisposable
             {
                 Name = "mongodb_authentication",
                 DisplayName = "MongoDB Authentication",
-                Description = "SCRAM-SHA-1 and SCRAM-SHA-256 authentication mechanisms"
+                Description = "SCRAM-SHA-256 (default, MongoDB 4.0+) and SCRAM-SHA-1 (legacy) authentication mechanisms"
             },
             new()
             {

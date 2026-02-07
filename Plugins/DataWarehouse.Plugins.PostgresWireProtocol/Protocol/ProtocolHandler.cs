@@ -15,6 +15,7 @@ public sealed class ProtocolHandler
     private readonly MessageReader _reader;
     private readonly MessageWriter _writer;
     private readonly PgConnectionState _state;
+    private CancellationTokenSource? _queryTokenSource;
 
     public ProtocolHandler(
         TcpClient client,
@@ -102,7 +103,21 @@ public sealed class ProtocolHandler
         // Handle cancel request
         if (startup.IsCancelRequest)
         {
-            // TODO: Implement query cancellation
+            // Extract process ID and secret key from the cancel request
+            // Cancel request message format: int32 processId, int32 secretKey
+            if (startup.Parameters.TryGetValue("processId", out var pidStr) &&
+                startup.Parameters.TryGetValue("secretKey", out var keyStr) &&
+                int.TryParse(pidStr, out var processId) &&
+                int.TryParse(keyStr, out var secretKey))
+            {
+                // Verify the process ID and secret key match this connection
+                if (processId == _state.ProcessId && secretKey == _state.SecretKey)
+                {
+                    // Cancel the active query if one is running
+                    _queryTokenSource?.Cancel();
+                }
+            }
+            // No response is sent for cancel requests per PostgreSQL protocol
             return;
         }
 
@@ -283,40 +298,62 @@ public sealed class ProtocolHandler
             return;
         }
 
-        // Execute query
-        var result = await _queryProcessor.ExecuteQueryAsync(sql, ct);
+        // Create a cancellation token source for this query
+        _queryTokenSource?.Dispose();
+        _queryTokenSource = CancellationTokenSource.CreateLinkedTokenSource(ct);
 
-        if (result.IsEmpty)
+        try
         {
-            await _writer.WriteEmptyQueryResponseAsync(ct);
-        }
-        else if (!string.IsNullOrEmpty(result.ErrorMessage))
-        {
-            await _writer.WriteErrorResponseAsync(
-                PgProtocolConstants.SeverityError,
-                result.ErrorSqlState ?? PgProtocolConstants.SqlStateInternalError,
-                result.ErrorMessage,
-                ct: ct);
-        }
-        else if (result.Columns.Count > 0)
-        {
-            // SELECT query - send rows
-            await _writer.WriteRowDescriptionAsync(result.Columns, ct);
+            // Execute query with cancellation support
+            var result = await _queryProcessor.ExecuteQueryAsync(sql, _queryTokenSource.Token);
 
-            foreach (var row in result.Rows)
+            if (result.IsEmpty)
             {
-                await _writer.WriteDataRowAsync(row, ct);
+                await _writer.WriteEmptyQueryResponseAsync(ct);
+            }
+            else if (!string.IsNullOrEmpty(result.ErrorMessage))
+            {
+                await _writer.WriteErrorResponseAsync(
+                    PgProtocolConstants.SeverityError,
+                    result.ErrorSqlState ?? PgProtocolConstants.SqlStateInternalError,
+                    result.ErrorMessage,
+                    ct: ct);
+            }
+            else if (result.Columns.Count > 0)
+            {
+                // SELECT query - send rows
+                await _writer.WriteRowDescriptionAsync(result.Columns, ct);
+
+                foreach (var row in result.Rows)
+                {
+                    await _writer.WriteDataRowAsync(row, ct);
+                }
+
+                await _writer.WriteCommandCompleteAsync(result.CommandTag, ct);
+            }
+            else
+            {
+                // Non-SELECT query
+                await _writer.WriteCommandCompleteAsync(result.CommandTag, ct);
             }
 
-            await _writer.WriteCommandCompleteAsync(result.CommandTag, ct);
+            await _writer.WriteReadyForQueryAsync(GetTransactionStatus(), ct);
         }
-        else
+        catch (OperationCanceledException)
         {
-            // Non-SELECT query
-            await _writer.WriteCommandCompleteAsync(result.CommandTag, ct);
+            // Query was cancelled
+            await _writer.WriteErrorResponseAsync(
+                PgProtocolConstants.SeverityError,
+                PgProtocolConstants.SqlStateQueryCanceled,
+                "Query execution was cancelled",
+                ct: ct);
+            await _writer.WriteReadyForQueryAsync(GetTransactionStatus(), ct);
         }
-
-        await _writer.WriteReadyForQueryAsync(GetTransactionStatus(), ct);
+        finally
+        {
+            _queryTokenSource?.Dispose();
+            _queryTokenSource = null;
+        }
     }
 
     /// <summary>
@@ -463,33 +500,54 @@ public sealed class ProtocolHandler
         // Substitute parameters into query
         var sql = _queryProcessor.SubstituteParameters(stmt.Query, portal.Parameters);
 
-        // Execute query
-        var result = await _queryProcessor.ExecuteQueryAsync(sql, ct);
+        // Create a cancellation token source for this query
+        _queryTokenSource?.Dispose();
+        _queryTokenSource = CancellationTokenSource.CreateLinkedTokenSource(ct);
 
-        if (!string.IsNullOrEmpty(result.ErrorMessage))
+        try
         {
+            // Execute query with cancellation support
+            var result = await _queryProcessor.ExecuteQueryAsync(sql, _queryTokenSource.Token);
+
+            if (!string.IsNullOrEmpty(result.ErrorMessage))
+            {
+                await _writer.WriteErrorResponseAsync(
+                    PgProtocolConstants.SeverityError,
+                    result.ErrorSqlState ?? PgProtocolConstants.SqlStateInternalError,
+                    result.ErrorMessage,
+                    ct: ct);
+            }
+            else if (result.Columns.Count > 0)
+            {
+                // SELECT query
+                var rowsToSend = maxRows > 0 ? result.Rows.Take(maxRows).ToList() : result.Rows;
+
+                foreach (var row in rowsToSend)
+                {
+                    await _writer.WriteDataRowAsync(row, ct);
+                }
+
+                await _writer.WriteCommandCompleteAsync(result.CommandTag, ct);
+            }
+            else
+            {
+                // Non-SELECT query
+                await _writer.WriteCommandCompleteAsync(result.CommandTag, ct);
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // Query was cancelled
             await _writer.WriteErrorResponseAsync(
                 PgProtocolConstants.SeverityError,
-                result.ErrorSqlState ?? PgProtocolConstants.SqlStateInternalError,
-                result.ErrorMessage,
+                PgProtocolConstants.SqlStateQueryCanceled,
+                "Query execution was cancelled",
                 ct: ct);
         }
-        else if (result.Columns.Count > 0)
+        finally
         {
-            // SELECT query
-            var rowsToSend = maxRows > 0 ? result.Rows.Take(maxRows).ToList() : result.Rows;
-
-            foreach (var row in rowsToSend)
-            {
-                await _writer.WriteDataRowAsync(row, ct);
-            }
-
-            await _writer.WriteCommandCompleteAsync(result.CommandTag, ct);
-        }
-        else
-        {
-            // Non-SELECT query
-            await _writer.WriteCommandCompleteAsync(result.CommandTag, ct);
+            _queryTokenSource?.Dispose();
+            _queryTokenSource = null;
         }
     }
 

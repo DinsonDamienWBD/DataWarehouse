@@ -507,6 +507,8 @@ public sealed class MessageWriter
 
     /// <summary>
     /// Computes mysql_native_password authentication response.
+    /// DEPRECATED: This method uses SHA-1 which is cryptographically weak.
+    /// Prefer using caching_sha2_password for MySQL 8.0+.
     /// </summary>
     /// <param name="password">User password.</param>
     /// <param name="authData">Server authentication challenge.</param>
@@ -517,6 +519,9 @@ public sealed class MessageWriter
         {
             return Array.Empty<byte>();
         }
+
+        Console.WriteLine("[MySqlProtocol] WARNING: Using deprecated mysql_native_password (SHA-1 based). " +
+                          "Consider upgrading to caching_sha2_password for MySQL 8.0+.");
 
         // SHA1(password) XOR SHA1(auth_data + SHA1(SHA1(password)))
         using var sha1 = SHA1.Create();

@@ -20,9 +20,10 @@ public sealed class MySqlProtocolConfig
 
     /// <summary>
     /// Authentication method: "mysql_native_password", "caching_sha2_password", "trust".
-    /// Default is "mysql_native_password" for maximum compatibility.
+    /// Default is "caching_sha2_password" (MySQL 8.0+ default, SHA-256 based).
+    /// For legacy MySQL 5.7 compatibility, use "mysql_native_password" (deprecated SHA-1 based).
     /// </summary>
-    public string AuthMethod { get; set; } = "mysql_native_password";
+    public string AuthMethod { get; set; } = "caching_sha2_password";
 
     /// <summary>
     /// SSL mode: "disabled", "preferred", "required".

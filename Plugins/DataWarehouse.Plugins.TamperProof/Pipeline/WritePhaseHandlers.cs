@@ -40,10 +40,40 @@ public static class WritePhaseHandlers
             var stages = new List<PipelineStageRecord>();
             var currentData = originalData;
 
-            // TODO: Get configured pipeline stages from orchestrator
-            // For now, return data as-is with no transformations
-            // When pipeline is implemented, this will iterate through stages
-            // and apply each transformation, recording metadata
+            // Get configured pipeline stages from orchestrator
+            var configuredStages = orchestrator.GetConfiguredStages();
+
+            if (configuredStages.Count > 0)
+            {
+                logger.LogDebug("Applying {Count} pipeline stages", configuredStages.Count);
+
+                using var inputStream = new MemoryStream(currentData);
+                using var outputStream = await orchestrator.ApplyPipelineAsync(inputStream, ct);
+
+                using var resultMs = new MemoryStream();
+                await outputStream.CopyToAsync(resultMs, ct);
+                currentData = resultMs.ToArray();
+
+                // Record each stage (simplified - full implementation would track individual stages)
+                for (int i = 0; i < configuredStages.Count; i++)
+                {
+                    var stageId = configuredStages[i];
+                    stages.Add(new PipelineStageRecord
+                    {
+                        StageType = stageId,
+                        StageIndex = i,
+                        InputHash = i == 0 ? Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(originalData)) : stages[i - 1].OutputHash,
+                        OutputHash = i == configuredStages.Count - 1 ? Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(currentData)) : string.Empty,
+                        InputSize = i == 0 ? originalData.Length : 0,
+                        OutputSize = i == configuredStages.Count - 1 ? currentData.Length : 0,
+                        ExecutedAt = DateTimeOffset.UtcNow
+                    });
+                }
+            }
+            else
+            {
+                logger.LogDebug("No pipeline stages configured, returning data as-is");
+            }
 
             return (currentData, stages);
         }
@@ -460,12 +490,55 @@ public static class WritePhaseHandlers
         {
             try
             {
-                // TODO: Delete shards from data storage
+                // Delete shards from data storage
+                // Extract shard location from the resource ID
+                var shardPattern = $"shards/{objectId}";
+                logger.LogDebug("Deleting shards matching pattern: {Pattern}", shardPattern);
+
+                // Attempt to delete all shards for this object
+                var deletionErrors = new List<string>();
+                var deletedCount = 0;
+
+                try
+                {
+                    // Delete using pattern matching (best effort)
+                    // Note: This is a simplified approach. In production, we would:
+                    // 1. List all shard files matching the pattern
+                    // 2. Delete each individually
+                    // 3. Track partial failures
+
+                    // For now, attempt to delete the base shard directory
+                    var baseUri = new Uri($"data://{shardPattern}/");
+
+                    try
+                    {
+                        await dataStorage.DeleteAsync(baseUri);
+                        deletedCount++;
+                    }
+                    catch
+                    {
+                        // Individual shard deletion failed, try to continue
+                        deletionErrors.Add($"Failed to delete shard directory: {baseUri}");
+                    }
+
+                    logger.LogDebug("Deleted {Count} shard locations", deletedCount);
+                }
+                catch (Exception deleteEx)
+                {
+                    deletionErrors.Add($"Shard deletion error: {deleteEx.Message}");
+                }
+
+                if (deletionErrors.Count > 0)
+                {
+                    logger.LogWarning("Partial shard deletion: {Errors}", string.Join("; ", deletionErrors));
+                }
+
                 tierResults.Add(new TierRollbackResult
                 {
                     TierName = "Data",
-                    Success = true,
-                    Action = "Deleted shards"
+                    Success = deletionErrors.Count == 0,
+                    Action = deletionErrors.Count == 0 ? "Deleted all shards" : $"Partial deletion: {deletedCount} successful, {deletionErrors.Count} failed",
+                    ErrorMessage = deletionErrors.Count > 0 ? string.Join("; ", deletionErrors) : null
                 });
             }
             catch (Exception ex)

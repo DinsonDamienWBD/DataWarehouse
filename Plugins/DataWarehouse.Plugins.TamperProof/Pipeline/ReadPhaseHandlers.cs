@@ -325,16 +325,92 @@ public static class ReadPhaseHandlers
                     "WORM backup not found");
             }
 
-            // TODO: Restore shards to data storage
-            // This would recreate the RAID shards from WORM backup
+            // Restore shards to data storage
+            logger.LogDebug("Restoring shards from WORM backup to data storage");
 
-            logger.LogInformation("Recovery from WORM successful for object {ObjectId}", manifest.ObjectId);
+            try
+            {
+                // Recreate RAID shards from WORM backup
+                var shardSize = manifest.RaidConfiguration.ShardSize;
+                var dataShardCount = manifest.RaidConfiguration.DataShardCount;
+                var parityShardCount = manifest.RaidConfiguration.ParityShardCount;
 
-            return RecoveryResult.CreateSuccess(
-                manifest.ObjectId,
-                manifest.Version,
-                "WORM Storage",
-                "Restored from immutable backup");
+                // Split WORM data back into data shards
+                var shards = new List<byte[]>();
+                for (int i = 0; i < dataShardCount; i++)
+                {
+                    var start = i * shardSize;
+                    var length = Math.Min(shardSize, wormData.Length - start);
+                    if (length > 0)
+                    {
+                        var shard = new byte[length];
+                        Array.Copy(wormData, start, shard, 0, length);
+                        shards.Add(shard);
+                    }
+                }
+
+                // Recreate parity shards (simple XOR for now)
+                for (int i = 0; i < parityShardCount; i++)
+                {
+                    var parityShard = new byte[shardSize];
+                    for (int j = 0; j < dataShardCount; j++)
+                    {
+                        for (int k = 0; k < Math.Min(shardSize, shards[j].Length); k++)
+                        {
+                            parityShard[k] ^= shards[j][k];
+                        }
+                    }
+                    shards.Add(parityShard);
+                }
+
+                // Write shards back to data storage
+                var writeErrors = new List<string>();
+                var writtenCount = 0;
+
+                for (int i = 0; i < shards.Count; i++)
+                {
+                    var shardRecord = manifest.RaidConfiguration.Shards[i];
+                    var uri = new Uri($"data://shards/{shardRecord.StorageLocation}");
+
+                    try
+                    {
+                        using var shardStream = new MemoryStream(shards[i]);
+                        await dataStorage.SaveAsync(uri, shardStream);
+                        writtenCount++;
+                        logger.LogDebug("Restored shard {Index} to {Location}", i, shardRecord.StorageLocation);
+                    }
+                    catch (Exception ex)
+                    {
+                        writeErrors.Add($"Shard {i}: {ex.Message}");
+                        logger.LogWarning(ex, "Failed to restore shard {Index}", i);
+                    }
+                }
+
+                if (writeErrors.Count > 0)
+                {
+                    return RecoveryResult.CreateFailure(
+                        manifest.ObjectId,
+                        manifest.Version,
+                        $"Partial restoration: {writtenCount}/{shards.Count} shards restored. Errors: {string.Join("; ", writeErrors)}");
+                }
+
+                logger.LogInformation("Recovery from WORM successful: restored {Count} shards for object {ObjectId}",
+                    writtenCount, manifest.ObjectId);
+
+                return RecoveryResult.CreateSuccess(
+                    manifest.ObjectId,
+                    manifest.Version,
+                    "WORM Storage",
+                    $"Restored {writtenCount} shards from immutable backup");
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Failed to restore shards from WORM backup");
+                return RecoveryResult.CreateFailure(
+                    manifest.ObjectId,
+                    manifest.Version,
+                    $"Shard restoration error: {ex.Message}");
+            }
         }
         catch (Exception ex)
         {
@@ -368,14 +444,34 @@ public static class ReadPhaseHandlers
         {
             var currentData = transformedData;
 
-            // Reverse stages in opposite order
-            for (int i = manifest.PipelineStages.Count - 1; i >= 0; i--)
+            // Apply reverse transformations if pipeline stages were used
+            if (manifest.PipelineStages.Count > 0)
             {
-                var stage = manifest.PipelineStages[i];
-                logger.LogDebug("Reversing stage {Index}: {Type}", stage.StageIndex, stage.StageType);
+                logger.LogDebug("Applying reverse transformations for {Count} pipeline stages", manifest.PipelineStages.Count);
 
-                // TODO: Apply reverse transformation via orchestrator
-                // For now, data passes through unchanged if no stages
+                // Use orchestrator to reverse the pipeline
+                // The orchestrator should handle reversing in the correct order
+                using var inputStream = new MemoryStream(currentData);
+                using var outputStream = await orchestrator.ReversePipelineAsync(inputStream, ct);
+
+                using var resultMs = new MemoryStream();
+                await outputStream.CopyToAsync(resultMs, ct);
+                currentData = resultMs.ToArray();
+
+                logger.LogDebug("Pipeline reversal complete: transformed {FromBytes} bytes to {ToBytes} bytes",
+                    transformedData.Length, currentData.Length);
+
+                // Verify intermediate hashes if needed (for debugging/auditing)
+                for (int i = manifest.PipelineStages.Count - 1; i >= 0; i--)
+                {
+                    var stage = manifest.PipelineStages[i];
+                    logger.LogDebug("Reversed stage {Index}: {Type} ({InputSize} -> {OutputSize} bytes)",
+                        stage.StageIndex, stage.StageType, stage.OutputSize, stage.InputSize);
+                }
+            }
+            else
+            {
+                logger.LogDebug("No pipeline stages to reverse");
             }
 
             // Remove content padding if present

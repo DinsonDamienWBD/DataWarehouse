@@ -6,12 +6,14 @@ namespace DataWarehouse.Plugins.NoSqlProtocol;
 
 /// <summary>
 /// MongoDB authentication mechanisms.
+/// SCRAM-SHA-256 is the default for MongoDB 4.0+.
+/// SCRAM-SHA-1 is supported for backward compatibility with older servers.
 /// </summary>
 public enum MongoAuthMechanism
 {
-    /// <summary>SCRAM-SHA-1 authentication.</summary>
+    /// <summary>SCRAM-SHA-1 authentication (deprecated, for MongoDB 3.x compatibility).</summary>
     ScramSha1,
-    /// <summary>SCRAM-SHA-256 authentication.</summary>
+    /// <summary>SCRAM-SHA-256 authentication (default for MongoDB 4.0+).</summary>
     ScramSha256
 }
 
@@ -145,6 +147,8 @@ public sealed class MongoAuthenticator
 
     /// <summary>
     /// Processes a SCRAM authentication step.
+    /// SCRAM-SHA-256 is the default mechanism (MongoDB 4.0+).
+    /// SCRAM-SHA-1 is supported for backward compatibility but deprecated.
     /// </summary>
     /// <param name="connectionId">The connection ID.</param>
     /// <param name="mechanism">The authentication mechanism.</param>
@@ -159,6 +163,13 @@ public sealed class MongoAuthenticator
             "SCRAM-SHA-256" => MongoAuthMechanism.ScramSha256,
             _ => throw new NotSupportedException($"Unsupported mechanism: {mechanism}")
         };
+
+        // Log deprecation warning for SHA-1
+        if (mech == MongoAuthMechanism.ScramSha1)
+        {
+            Console.WriteLine("[MongoProtocol] WARNING: Using deprecated SCRAM-SHA-1 authentication. " +
+                              "Consider upgrading clients to SCRAM-SHA-256 for MongoDB 4.0+.");
+        }
 
         var conversation = new ScramConversation
         {

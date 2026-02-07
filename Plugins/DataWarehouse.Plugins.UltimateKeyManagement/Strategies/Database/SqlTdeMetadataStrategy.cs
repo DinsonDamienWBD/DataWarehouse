@@ -293,8 +293,10 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Database
                 // Check if SQL connection is healthy (if configured)
                 if (!string.IsNullOrEmpty(_config.SqlConnectionString))
                 {
-                    // TODO: Add SQL connection health check
-                    // For now, assume healthy if connection string is provided
+                    if (!await CheckSqlConnectionHealthAsync(cancellationToken))
+                    {
+                        return false;
+                    }
                 }
 
                 return true;
@@ -503,6 +505,66 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Database
                         _certificates[cert.CertificateId] = cert;
                     }
                 }
+            }
+        }
+
+        #endregion
+
+        #region SQL Connection Health
+
+        /// <summary>
+        /// Validates that the SQL Server connection is alive and accessible.
+        /// </summary>
+        /// <param name="cancellationToken">Cancellation token</param>
+        /// <returns>True if connection is healthy, false otherwise</returns>
+        private async Task<bool> CheckSqlConnectionHealthAsync(CancellationToken cancellationToken)
+        {
+            try
+            {
+                // Build connection string with explicit timeout if not already set
+                var connectionStringBuilder = new SqlConnectionStringBuilder(_config.SqlConnectionString);
+
+                // Set a reasonable timeout for the connection attempt (5 seconds) if not already specified
+                if (connectionStringBuilder.ConnectTimeout == 15) // 15 is the default
+                {
+                    connectionStringBuilder.ConnectTimeout = 5;
+                }
+
+                using var connection = new SqlConnection(connectionStringBuilder.ConnectionString);
+                await connection.OpenAsync(cancellationToken);
+
+                // Execute a simple query to verify connectivity
+                using var command = new SqlCommand("SELECT 1", connection);
+                command.CommandTimeout = 5;
+
+                var result = await command.ExecuteScalarAsync(cancellationToken);
+
+                // Verify we got the expected result
+                return result != null && result.Equals(1);
+            }
+            catch (SqlException ex)
+            {
+                // SQL-specific errors (connection failures, timeouts, permission issues)
+                System.Diagnostics.Debug.WriteLine($"SQL TDE health check failed: {ex.Message}");
+                return false;
+            }
+            catch (InvalidOperationException ex)
+            {
+                // Invalid connection string
+                System.Diagnostics.Debug.WriteLine($"SQL TDE health check failed (invalid connection): {ex.Message}");
+                return false;
+            }
+            catch (OperationCanceledException)
+            {
+                // Timeout or cancellation
+                System.Diagnostics.Debug.WriteLine("SQL TDE health check cancelled or timed out");
+                return false;
+            }
+            catch (Exception ex)
+            {
+                // Unexpected errors
+                System.Diagnostics.Debug.WriteLine($"SQL TDE health check failed (unexpected): {ex.Message}");
+                return false;
             }
         }
 

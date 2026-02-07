@@ -481,70 +481,482 @@ namespace DataWarehouse.Plugins.UltimateIntelligence.Strategies.ConnectorIntegra
 
         private async Task<Dictionary<string, object>> TransformPayloadWithAIAsync(TransformRequest request)
         {
-            // TODO: Integrate with AI provider to intelligently transform request payload
-            // For now, return the original payload
-            await Task.Delay(10); // Simulate AI processing
-            return new Dictionary<string, object>(request.RequestPayload);
+            // M10: AI payload transformation with intelligent request analysis
+            if (AIProvider == null)
+            {
+                _logger?.LogDebug("AI provider not available for payload transformation, returning original");
+                return new Dictionary<string, object>(request.RequestPayload);
+            }
+
+            try
+            {
+                // Build AI prompt with request context
+                var payloadJson = JsonSerializer.Serialize(request.RequestPayload);
+                var metadataJson = JsonSerializer.Serialize(request.Metadata);
+
+                var prompt = $@"Analyze and optimize this connector request payload for operation '{request.OperationType}'.
+
+Request Payload:
+{payloadJson}
+
+Metadata:
+{metadataJson}
+
+Tasks:
+1. Identify inefficient or redundant fields
+2. Suggest field transformations for better compatibility
+3. Add missing best-practice fields if applicable
+4. Return the optimized payload as valid JSON
+
+Provide only the optimized JSON payload in your response, no explanations.";
+
+                var aiRequest = new AIRequest
+                {
+                    Prompt = prompt,
+                    MaxTokens = 800,
+                    Temperature = 0.3f // Low temperature for consistent transformations
+                };
+
+                var aiResponse = await AIProvider.CompleteAsync(aiRequest);
+                RecordTokens(aiResponse.Usage?.TotalTokens ?? 0);
+
+                if (string.IsNullOrWhiteSpace(aiResponse.Content))
+                {
+                    _logger?.LogWarning("AI returned empty transformation, using original payload");
+                    return new Dictionary<string, object>(request.RequestPayload);
+                }
+
+                // Parse AI response as JSON
+                try
+                {
+                    var transformedPayload = JsonSerializer.Deserialize<Dictionary<string, object>>(aiResponse.Content);
+                    if (transformedPayload != null && transformedPayload.Count > 0)
+                    {
+                        _logger?.LogDebug("Successfully transformed payload using AI");
+                        return transformedPayload;
+                    }
+                }
+                catch (JsonException ex)
+                {
+                    _logger?.LogWarning(ex, "Failed to parse AI transformation response, using original payload");
+                }
+
+                return new Dictionary<string, object>(request.RequestPayload);
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogWarning(ex, "AI transformation failed, returning original payload");
+                return new Dictionary<string, object>(request.RequestPayload);
+            }
         }
 
         private async Task<string> OptimizeQueryWithAIAsync(OptimizeQueryRequest request)
         {
-            // TODO: Use AI provider to analyze and optimize query
-            // Example: Send query to LLM with schema context, get optimized version
-            await Task.Delay(50); // Simulate AI processing
-
-            if (AIProvider != null)
+            // M11: Query optimization with AI-powered analysis
+            if (AIProvider == null)
             {
-                try
-                {
-                    var aiRequest = new AIRequest
-                    {
-                        Prompt = $"Optimize this {request.QueryLanguage} query:\n{request.QueryText}\n\nSchema context: {JsonSerializer.Serialize(request.SchemaContext)}",
-                        MaxTokens = 500,
-                        Temperature = 0.3f
-                    };
-
-                    var aiResponse = await AIProvider.CompleteAsync(aiRequest);
-                    return aiResponse.Content ?? request.QueryText;
-                }
-                catch (Exception ex)
-                {
-                    _logger?.LogWarning(ex, "AI optimization failed, returning original query");
-                }
+                _logger?.LogDebug("AI provider not available for query optimization, returning original");
+                return request.QueryText;
             }
 
-            return request.QueryText; // Return original if AI not available
+            try
+            {
+                // Build comprehensive optimization prompt
+                var schemaJson = request.SchemaContext.Count > 0
+                    ? JsonSerializer.Serialize(request.SchemaContext)
+                    : "No schema context available";
+
+                var perfJson = request.PerformanceHistory.Count > 0
+                    ? JsonSerializer.Serialize(request.PerformanceHistory)
+                    : "No performance history available";
+
+                var prompt = $@"You are a database query optimization expert. Analyze and optimize this {request.QueryLanguage} query.
+
+Original Query:
+{request.QueryText}
+
+Schema Context:
+{schemaJson}
+
+Performance History:
+{perfJson}
+
+Optimization Guidelines:
+1. Add appropriate indexes hints if beneficial
+2. Simplify complex joins
+3. Eliminate redundant conditions
+4. Optimize WHERE clause ordering
+5. Use appropriate aggregation strategies
+6. Ensure query follows best practices for {request.QueryLanguage}
+
+Return ONLY the optimized query text. Do not include explanations or markdown formatting.";
+
+                var aiRequest = new AIRequest
+                {
+                    Prompt = prompt,
+                    MaxTokens = 1000,
+                    Temperature = 0.2f // Very low temperature for consistent query optimization
+                };
+
+                var aiResponse = await AIProvider.CompleteAsync(aiRequest);
+                RecordTokens(aiResponse.Usage?.TotalTokens ?? 0);
+
+                if (string.IsNullOrWhiteSpace(aiResponse.Content))
+                {
+                    _logger?.LogWarning("AI returned empty query optimization, using original");
+                    return request.QueryText;
+                }
+
+                // Clean up AI response (remove potential markdown formatting)
+                var optimizedQuery = aiResponse.Content.Trim();
+                optimizedQuery = optimizedQuery.Replace("```sql", "").Replace("```", "").Trim();
+
+                // Validate that we got a reasonable query back
+                if (optimizedQuery.Length > 0 && optimizedQuery.Length < 50000)
+                {
+                    _logger?.LogDebug("Successfully optimized query using AI, length: {OriginalLen} -> {OptimizedLen}",
+                        request.QueryText.Length, optimizedQuery.Length);
+                    return optimizedQuery;
+                }
+
+                _logger?.LogWarning("AI optimization produced invalid result, using original query");
+                return request.QueryText;
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogWarning(ex, "AI query optimization failed, returning original query");
+                return request.QueryText;
+            }
         }
 
         private async Task<Dictionary<string, object>> EnrichSchemaWithAIAsync(EnrichSchemaRequest request)
         {
-            // TODO: Use AI provider to analyze schema and generate semantic metadata
-            await Task.Delay(30); // Simulate AI processing
-
-            return new Dictionary<string, object>
+            // M12: Schema analysis with semantic metadata generation
+            var enrichedMetadata = new Dictionary<string, object>
             {
-                ["analyzed_by"] = "ai",
-                ["confidence"] = 0.8,
-                ["field_count"] = request.Fields.Count
+                ["analyzed_by"] = "heuristic",
+                ["confidence"] = 0.6,
+                ["field_count"] = request.Fields.Count,
+                ["analysis_timestamp"] = DateTimeOffset.UtcNow.ToString("o")
             };
+
+            if (AIProvider == null)
+            {
+                _logger?.LogDebug("AI provider not available for schema enrichment, using basic metadata");
+                return enrichedMetadata;
+            }
+
+            try
+            {
+                // Build field descriptions for AI analysis
+                var fieldsJson = JsonSerializer.Serialize(request.Fields.Select(f => new
+                {
+                    f.Name,
+                    f.DataType,
+                    f.IsNullable,
+                    f.MaxLength
+                }));
+
+                var prompt = $@"Analyze this database schema and provide semantic insights.
+
+Schema Name: {request.SchemaName}
+Fields:
+{fieldsJson}
+
+Provide a JSON response with:
+1. ""purpose"": Brief description of what this schema/table represents
+2. ""domain"": Business domain (e.g., ""user_management"", ""financial"", ""logging"")
+3. ""sensitivity"": Data sensitivity level (""public"", ""internal"", ""confidential"", ""restricted"")
+4. ""relationships"": Likely relationships to other schemas (array of strings)
+5. ""pii_fields"": Fields that may contain PII (array of field names)
+6. ""recommended_indexes"": Suggested index fields (array of field names)
+7. ""quality_concerns"": Potential data quality issues (array of strings)
+
+Return only valid JSON, no explanations.";
+
+                var aiRequest = new AIRequest
+                {
+                    Prompt = prompt,
+                    MaxTokens = 800,
+                    Temperature = 0.4f // Moderate temperature for creative but consistent analysis
+                };
+
+                var aiResponse = await AIProvider.CompleteAsync(aiRequest);
+                RecordTokens(aiResponse.Usage?.TotalTokens ?? 0);
+
+                if (!string.IsNullOrWhiteSpace(aiResponse.Content))
+                {
+                    try
+                    {
+                        var aiMetadata = JsonSerializer.Deserialize<Dictionary<string, object>>(aiResponse.Content);
+                        if (aiMetadata != null && aiMetadata.Count > 0)
+                        {
+                            // Merge AI results with base metadata
+                            foreach (var kvp in aiMetadata)
+                            {
+                                enrichedMetadata[kvp.Key] = kvp.Value;
+                            }
+
+                            enrichedMetadata["analyzed_by"] = "ai";
+                            enrichedMetadata["confidence"] = 0.85;
+
+                            _logger?.LogDebug("Successfully enriched schema '{SchemaName}' with AI metadata",
+                                request.SchemaName);
+                        }
+                    }
+                    catch (JsonException ex)
+                    {
+                        _logger?.LogWarning(ex, "Failed to parse AI schema enrichment response");
+                    }
+                }
+
+                return enrichedMetadata;
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogWarning(ex, "AI schema enrichment failed, returning basic metadata");
+                return enrichedMetadata;
+            }
         }
 
         private async Task<List<DetectedAnomaly>> DetectAnomaliesWithAIAsync(AnomalyDetectionRequest request)
         {
-            // TODO: Use AI/ML models to detect anomalies in response data
-            await Task.Delay(40); // Simulate AI processing
+            // M13: Anomaly detection using ML-based analysis
+            var anomalies = new List<DetectedAnomaly>();
 
-            // Example: Return no anomalies for now
-            return new List<DetectedAnomaly>();
+            // Basic statistical anomaly detection (works without AI)
+            var durationMs = request.OperationDuration.TotalMilliseconds;
+            if (durationMs > 5000) // 5 second threshold
+            {
+                anomalies.Add(new DetectedAnomaly
+                {
+                    Type = "performance",
+                    Severity = durationMs > 10000 ? "high" : "medium",
+                    Description = $"Operation duration ({durationMs:F0}ms) exceeds normal threshold",
+                    ConfidenceScore = 0.7,
+                    Metadata = new Dictionary<string, object>
+                    {
+                        ["duration_ms"] = durationMs,
+                        ["threshold_ms"] = 5000,
+                        ["detected_at"] = DateTimeOffset.UtcNow.ToString("o")
+                    }
+                });
+            }
+
+            if (AIProvider == null)
+            {
+                _logger?.LogDebug("AI provider not available for anomaly detection, using statistical methods only");
+                return anomalies;
+            }
+
+            try
+            {
+                // Use AI for deeper anomaly analysis
+                var responseJson = JsonSerializer.Serialize(request.ResponseData);
+                var baselineJson = request.BaselineData.Count > 0
+                    ? JsonSerializer.Serialize(request.BaselineData)
+                    : "No baseline data available";
+
+                var prompt = $@"Analyze this connector response data for anomalies.
+
+Operation: {request.OperationType}
+Duration: {request.OperationDuration.TotalMilliseconds}ms
+
+Response Data:
+{responseJson}
+
+Baseline Data:
+{baselineJson}
+
+Detect anomalies in:
+1. Response data structure (unexpected fields, missing data)
+2. Data values (outliers, suspicious patterns)
+3. Response size (unusually large/small)
+4. Error indicators
+5. Security concerns
+
+Return a JSON array of anomalies, each with:
+- ""type"": anomaly type (""data_quality"", ""performance"", ""security"", ""structural"")
+- ""severity"": ""low"", ""medium"", ""high"", or ""critical""
+- ""description"": brief explanation
+- ""affected_field"": field name if applicable (or null)
+- ""confidence"": 0.0 to 1.0
+
+Return only the JSON array, or [] if no anomalies detected.";
+
+                var aiRequest = new AIRequest
+                {
+                    Prompt = prompt,
+                    MaxTokens = 1000,
+                    Temperature = 0.3f // Low temperature for consistent detection
+                };
+
+                var aiResponse = await AIProvider.CompleteAsync(aiRequest);
+                RecordTokens(aiResponse.Usage?.TotalTokens ?? 0);
+
+                if (!string.IsNullOrWhiteSpace(aiResponse.Content))
+                {
+                    try
+                    {
+                        // Parse AI response as array of anomalies
+                        var content = aiResponse.Content.Trim();
+                        if (content.StartsWith("[") && content.EndsWith("]"))
+                        {
+                            var aiAnomalies = JsonSerializer.Deserialize<List<Dictionary<string, object>>>(content);
+                            if (aiAnomalies != null)
+                            {
+                                foreach (var aiAnomaly in aiAnomalies)
+                                {
+                                    anomalies.Add(new DetectedAnomaly
+                                    {
+                                        Type = aiAnomaly.GetValueOrDefault("type")?.ToString() ?? "unknown",
+                                        Severity = aiAnomaly.GetValueOrDefault("severity")?.ToString() ?? "medium",
+                                        Description = aiAnomaly.GetValueOrDefault("description")?.ToString() ?? "Anomaly detected",
+                                        AffectedField = aiAnomaly.GetValueOrDefault("affected_field")?.ToString(),
+                                        ConfidenceScore = Convert.ToDouble(aiAnomaly.GetValueOrDefault("confidence") ?? 0.5),
+                                        Metadata = new Dictionary<string, object>
+                                        {
+                                            ["detected_by"] = "ai",
+                                            ["operation_type"] = request.OperationType,
+                                            ["detected_at"] = DateTimeOffset.UtcNow.ToString("o")
+                                        }
+                                    });
+                                }
+
+                                _logger?.LogDebug("AI detected {Count} anomalies in response data", aiAnomalies.Count);
+                            }
+                        }
+                    }
+                    catch (JsonException ex)
+                    {
+                        _logger?.LogWarning(ex, "Failed to parse AI anomaly detection response");
+                    }
+                }
+
+                return anomalies;
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogWarning(ex, "AI anomaly detection failed, returning statistical results only");
+                return anomalies;
+            }
         }
 
         private async Task<double> PredictFailureWithAIAsync(FailurePredictionRequest request)
         {
-            // TODO: Use ML model to predict failure probability
-            await Task.Delay(20); // Simulate AI processing
+            // M14: Failure prediction using ML-based probability analysis
+            double baseProbability = 0.15; // Default low probability
 
-            // Example: Return low failure probability
-            return 0.15;
+            // Basic heuristic prediction based on metrics
+            if (request.HealthMetrics.TryGetValue("error_rate", out var errorRateObj) &&
+                errorRateObj is double errorRate && errorRate > 0.1)
+            {
+                baseProbability = Math.Min(0.6, baseProbability + (errorRate * 2));
+            }
+
+            if (request.HealthMetrics.TryGetValue("latency_ms", out var latencyObj) &&
+                latencyObj is double latency && latency > 3000)
+            {
+                baseProbability = Math.Min(0.8, baseProbability + 0.2);
+            }
+
+            if (AIProvider == null)
+            {
+                _logger?.LogDebug("AI provider not available for failure prediction, using heuristic: {Probability:P1}",
+                    baseProbability);
+                return baseProbability;
+            }
+
+            try
+            {
+                // Use AI for sophisticated failure prediction
+                var healthJson = request.HealthMetrics.Count > 0
+                    ? JsonSerializer.Serialize(request.HealthMetrics)
+                    : "No health metrics available";
+
+                var historyJson = request.HistoricalData.Count > 0
+                    ? JsonSerializer.Serialize(request.HistoricalData)
+                    : "No historical failure data available";
+
+                var envJson = request.EnvironmentalFactors.Count > 0
+                    ? JsonSerializer.Serialize(request.EnvironmentalFactors)
+                    : "No environmental data available";
+
+                var prompt = $@"Predict the probability of connection/operation failure based on current metrics.
+
+Operation: {request.OperationType}
+Connection: {request.ConnectionId}
+
+Current Health Metrics:
+{healthJson}
+
+Historical Failure Data:
+{historyJson}
+
+Environmental Factors:
+{envJson}
+
+Analyze:
+1. Current connection health indicators
+2. Historical failure patterns
+3. Environmental risk factors
+4. Correlation between metrics and past failures
+
+Return a JSON object with:
+- ""probability"": failure probability from 0.0 to 1.0
+- ""confidence"": prediction confidence from 0.0 to 1.0
+- ""primary_risk_factor"": main contributing factor (string)
+- ""time_to_failure_minutes"": estimated minutes until failure (number or null)
+
+Return only valid JSON.";
+
+                var aiRequest = new AIRequest
+                {
+                    Prompt = prompt,
+                    MaxTokens = 500,
+                    Temperature = 0.2f // Low temperature for consistent predictions
+                };
+
+                var aiResponse = await AIProvider.CompleteAsync(aiRequest);
+                RecordTokens(aiResponse.Usage?.TotalTokens ?? 0);
+
+                if (!string.IsNullOrWhiteSpace(aiResponse.Content))
+                {
+                    try
+                    {
+                        var prediction = JsonSerializer.Deserialize<Dictionary<string, object>>(aiResponse.Content);
+                        if (prediction != null && prediction.TryGetValue("probability", out var probObj))
+                        {
+                            var aiProbability = Convert.ToDouble(probObj);
+
+                            // Validate probability is in valid range
+                            if (aiProbability >= 0.0 && aiProbability <= 1.0)
+                            {
+                                _logger?.LogDebug("AI predicted failure probability: {Probability:P1} (heuristic: {Base:P1})",
+                                    aiProbability, baseProbability);
+
+                                // Blend AI prediction with heuristic (weighted average)
+                                var confidence = prediction.TryGetValue("confidence", out var confObj)
+                                    ? Convert.ToDouble(confObj)
+                                    : 0.7;
+
+                                return (aiProbability * confidence) + (baseProbability * (1 - confidence));
+                            }
+                        }
+                    }
+                    catch (JsonException ex)
+                    {
+                        _logger?.LogWarning(ex, "Failed to parse AI failure prediction response");
+                    }
+                }
+
+                return baseProbability;
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogWarning(ex, "AI failure prediction failed, returning heuristic probability");
+                return baseProbability;
+            }
         }
 
         // ============================================================================

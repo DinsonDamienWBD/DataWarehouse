@@ -398,8 +398,6 @@ public sealed class UserProviderRegistry : IDisposable
             };
         }
 
-        // TODO: Implement actual validation by calling provider health endpoint
-        // For now, just check if API key is present for non-local providers
         var decryptedApiKey = DecryptApiKey(provider.ApiKey);
         if (provider.ProviderType != "ollama" && string.IsNullOrEmpty(decryptedApiKey))
         {
@@ -412,15 +410,233 @@ public sealed class UserProviderRegistry : IDisposable
             };
         }
 
-        await Task.CompletedTask; // Placeholder for async validation
+        // Perform health check validation by calling provider's health endpoint
+        var healthCheckResult = await PerformProviderHealthCheckAsync(provider, decryptedApiKey, ct);
 
         return new ProviderValidationResult
         {
-            IsValid = true,
+            IsValid = healthCheckResult.IsHealthy,
+            ErrorMessage = healthCheckResult.ErrorMessage,
             ProviderName = providerName,
             ProviderType = provider.ProviderType,
-            ValidatedAt = DateTime.UtcNow
+            ValidatedAt = DateTime.UtcNow,
+            AvailableModels = healthCheckResult.AvailableModels
         };
+    }
+
+    /// <summary>
+    /// Performs health check validation by calling the provider's health/models endpoint.
+    /// </summary>
+    /// <param name="provider">The provider to validate.</param>
+    /// <param name="apiKey">The decrypted API key.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>Health check result with validation status.</returns>
+    private async Task<ProviderHealthCheckResult> PerformProviderHealthCheckAsync(
+        RegisteredProvider provider,
+        string? apiKey,
+        CancellationToken ct)
+    {
+        try
+        {
+            using var httpClient = new System.Net.Http.HttpClient();
+            httpClient.Timeout = TimeSpan.FromSeconds(10);
+
+            // Determine health endpoint based on provider type
+            var (endpoint, headers) = GetProviderHealthEndpoint(provider, apiKey);
+
+            if (string.IsNullOrEmpty(endpoint))
+            {
+                // No health endpoint available, assume valid if API key is present
+                return new ProviderHealthCheckResult
+                {
+                    IsHealthy = true,
+                    AvailableModels = null
+                };
+            }
+
+            var request = new System.Net.Http.HttpRequestMessage(System.Net.Http.HttpMethod.Get, endpoint);
+            foreach (var header in headers)
+            {
+                request.Headers.TryAddWithoutValidation(header.Key, header.Value);
+            }
+
+            var response = await httpClient.SendAsync(request, ct);
+
+            if (!response.IsSuccessStatusCode)
+            {
+                var errorContent = await response.Content.ReadAsStringAsync(ct);
+                return new ProviderHealthCheckResult
+                {
+                    IsHealthy = false,
+                    ErrorMessage = $"Provider health check failed with status {response.StatusCode}: {errorContent}"
+                };
+            }
+
+            // Try to extract available models if the endpoint supports it
+            var models = await TryExtractModelsFromResponseAsync(provider.ProviderType, response, ct);
+
+            return new ProviderHealthCheckResult
+            {
+                IsHealthy = true,
+                AvailableModels = models
+            };
+        }
+        catch (System.Net.Http.HttpRequestException ex)
+        {
+            return new ProviderHealthCheckResult
+            {
+                IsHealthy = false,
+                ErrorMessage = $"Network error during health check: {ex.Message}"
+            };
+        }
+        catch (TaskCanceledException)
+        {
+            return new ProviderHealthCheckResult
+            {
+                IsHealthy = false,
+                ErrorMessage = "Health check timed out. Provider may be unavailable."
+            };
+        }
+        catch (Exception ex)
+        {
+            return new ProviderHealthCheckResult
+            {
+                IsHealthy = false,
+                ErrorMessage = $"Unexpected error during health check: {ex.Message}"
+            };
+        }
+    }
+
+    /// <summary>
+    /// Gets the health endpoint and required headers for a provider.
+    /// </summary>
+    private (string? Endpoint, Dictionary<string, string> Headers) GetProviderHealthEndpoint(
+        RegisteredProvider provider,
+        string? apiKey)
+    {
+        var headers = new Dictionary<string, string>();
+
+        var baseEndpoint = provider.Endpoint ?? provider.ProviderType.ToLowerInvariant() switch
+        {
+            "openai" => "https://api.openai.com/v1",
+            "anthropic" or "claude" => "https://api.anthropic.com/v1",
+            "google" or "gemini" => "https://generativelanguage.googleapis.com/v1",
+            "azure" or "azureopenai" => provider.Endpoint, // Azure requires custom endpoint
+            "ollama" => provider.Endpoint ?? "http://localhost:11434",
+            _ => null
+        };
+
+        if (string.IsNullOrEmpty(baseEndpoint))
+        {
+            return (null, headers);
+        }
+
+        var endpoint = provider.ProviderType.ToLowerInvariant() switch
+        {
+            "openai" => $"{baseEndpoint}/models",
+            "anthropic" or "claude" => $"{baseEndpoint}/models",
+            "ollama" => $"{baseEndpoint}/api/tags",
+            "google" or "gemini" => $"{baseEndpoint}/models",
+            "azure" or "azureopenai" => $"{baseEndpoint}/models?api-version=2023-05-15",
+            _ => $"{baseEndpoint}/models"
+        };
+
+        // Add authentication headers
+        if (!string.IsNullOrEmpty(apiKey))
+        {
+            switch (provider.ProviderType.ToLowerInvariant())
+            {
+                case "openai":
+                case "azure":
+                case "azureopenai":
+                    headers["Authorization"] = $"Bearer {apiKey}";
+                    if (!string.IsNullOrEmpty(provider.OrganizationId))
+                    {
+                        headers["OpenAI-Organization"] = provider.OrganizationId;
+                    }
+                    break;
+                case "anthropic":
+                case "claude":
+                    headers["x-api-key"] = apiKey;
+                    headers["anthropic-version"] = "2023-06-01";
+                    break;
+                case "google":
+                case "gemini":
+                    endpoint = $"{endpoint}?key={apiKey}";
+                    break;
+            }
+        }
+
+        return (endpoint, headers);
+    }
+
+    /// <summary>
+    /// Tries to extract available models from the health check response.
+    /// </summary>
+    private async Task<List<string>?> TryExtractModelsFromResponseAsync(
+        string providerType,
+        System.Net.Http.HttpResponseMessage response,
+        CancellationToken ct)
+    {
+        try
+        {
+            var content = await response.Content.ReadAsStringAsync(ct);
+            var jsonDoc = JsonSerializer.Deserialize<JsonElement>(content);
+
+            var models = new List<string>();
+
+            switch (providerType.ToLowerInvariant())
+            {
+                case "openai":
+                case "azure":
+                case "azureopenai":
+                    if (jsonDoc.TryGetProperty("data", out var dataArray) && dataArray.ValueKind == JsonValueKind.Array)
+                    {
+                        foreach (var model in dataArray.EnumerateArray())
+                        {
+                            if (model.TryGetProperty("id", out var id))
+                            {
+                                models.Add(id.GetString() ?? string.Empty);
+                            }
+                        }
+                    }
+                    break;
+
+                case "ollama":
+                    if (jsonDoc.TryGetProperty("models", out var modelsArray) && modelsArray.ValueKind == JsonValueKind.Array)
+                    {
+                        foreach (var model in modelsArray.EnumerateArray())
+                        {
+                            if (model.TryGetProperty("name", out var name))
+                            {
+                                models.Add(name.GetString() ?? string.Empty);
+                            }
+                        }
+                    }
+                    break;
+
+                case "anthropic":
+                case "claude":
+                    if (jsonDoc.TryGetProperty("data", out var claudeData) && claudeData.ValueKind == JsonValueKind.Array)
+                    {
+                        foreach (var model in claudeData.EnumerateArray())
+                        {
+                            if (model.TryGetProperty("id", out var id))
+                            {
+                                models.Add(id.GetString() ?? string.Empty);
+                            }
+                        }
+                    }
+                    break;
+            }
+
+            return models.Count > 0 ? models : null;
+        }
+        catch
+        {
+            // If we can't parse models, just return null
+            return null;
+        }
     }
 
     /// <summary>
@@ -682,4 +898,19 @@ public sealed record ProviderValidationResult
 
     /// <summary>Available models (if validation included model listing).</summary>
     public IReadOnlyList<string>? AvailableModels { get; init; }
+}
+
+/// <summary>
+/// Internal result of provider health check.
+/// </summary>
+internal sealed record ProviderHealthCheckResult
+{
+    /// <summary>Whether the provider is healthy.</summary>
+    public bool IsHealthy { get; init; }
+
+    /// <summary>Error message if unhealthy.</summary>
+    public string? ErrorMessage { get; init; }
+
+    /// <summary>Available models discovered during health check.</summary>
+    public List<string>? AvailableModels { get; init; }
 }

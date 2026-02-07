@@ -1471,12 +1471,75 @@ internal sealed class CLILearningStore : IDisposable
 
     private void LoadFromStorage()
     {
-        // TODO: Implement persistence
+        if (string.IsNullOrEmpty(_storagePath) || !File.Exists(_storagePath))
+            return;
+
+        try
+        {
+            var json = File.ReadAllText(_storagePath);
+            var data = JsonSerializer.Deserialize<StoredLearningData>(json);
+
+            if (data == null)
+                return;
+
+            // Load patterns
+            foreach (var pattern in data.Patterns)
+            {
+                _patterns[pattern.InputPhrase] = pattern;
+            }
+
+            // Load success counts
+            foreach (var (key, count) in data.SuccessCounts)
+            {
+                _successCounts[key] = count;
+            }
+
+            // Load failure counts
+            foreach (var (key, count) in data.FailureCounts)
+            {
+                _failureCounts[key] = count;
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"[QueryParsingEngine] Failed to load learning data: {ex.Message}");
+        }
     }
 
     private void SaveToStorage()
     {
-        // TODO: Implement persistence
+        if (string.IsNullOrEmpty(_storagePath))
+            return;
+
+        try
+        {
+            // Ensure directory exists
+            var directory = Path.GetDirectoryName(_storagePath);
+            if (!string.IsNullOrEmpty(directory))
+            {
+                Directory.CreateDirectory(directory);
+            }
+
+            var data = new StoredLearningData
+            {
+                Patterns = _patterns.Values.ToList(),
+                SuccessCounts = new Dictionary<string, int>(_successCounts),
+                FailureCounts = new Dictionary<string, int>(_failureCounts),
+                LastSavedAt = DateTime.UtcNow
+            };
+
+            var options = new JsonSerializerOptions
+            {
+                WriteIndented = true
+            };
+
+            var json = JsonSerializer.Serialize(data, options);
+            File.WriteAllText(_storagePath, json);
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"[QueryParsingEngine] Failed to save learning data: {ex.Message}");
+        }
     }
 
     public void Dispose()
@@ -1509,4 +1572,15 @@ internal sealed record LearningStatistics
     public int TotalSuccesses { get; init; }
     public int TotalFailures { get; init; }
     public double AverageConfidence { get; init; }
+}
+
+/// <summary>
+/// Serializable data structure for persisting learning data.
+/// </summary>
+internal sealed class StoredLearningData
+{
+    public List<LearnedPattern> Patterns { get; init; } = new();
+    public Dictionary<string, int> SuccessCounts { get; init; } = new();
+    public Dictionary<string, int> FailureCounts { get; init; } = new();
+    public DateTime LastSavedAt { get; init; }
 }
