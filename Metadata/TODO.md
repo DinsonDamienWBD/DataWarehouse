@@ -7057,6 +7057,64 @@ Context: The model is trained on the actual full-resolution data, not a down-sam
 
 ---
 
+**PHASE Y: Specialized Domain Models & Instance-Learning**
+> **Goal: Enable industry-specific AI models (Mathematics, Physics, Finance, Healthcare, etc.) plus trainable "blank" models that learn from DataWarehouse instance data and user feedback. Multi-instance support for ultra-specialized departmental models.**
+
+90.Y1	Specialized Domain Model Registry
+90.Y1.1	Implement IDomainModelStrategy — Base interface for all specialized domain models with domain-specific inference	[x]
+90.Y1.2	Implement DomainModelRegistry — Registers and discovers available domain models by category/industry	[x]
+90.Y1.3	Implement GenericModelConnector — Universal adapter for connecting external specialized models (ONNX, Hugging Face, OpenAI-compatible, etc.)	[x]
+90.Y1.4	Implement ModelCapabilityDiscovery — Auto-discovers model capabilities (input/output types, supported tasks, context limits)	[x]
+
+90.Y2	Industry-Specific Domain Models
+90.Y2.1	Implement MathematicsModelStrategy — Symbolic computation, theorem proving, equation solving, calculus, linear algebra	[x]
+90.Y2.2	Implement PhysicsModelStrategy — Physical simulations, unit conversions, formula solving, scientific notation	[x]
+90.Y2.3	Implement FinanceModelStrategy — Risk analysis, portfolio optimization, market prediction, pricing models (Black-Scholes, Monte Carlo)	[x]
+90.Y2.4	Implement EconomicsModelStrategy — Econometric modeling, forecasting, supply/demand analysis, market equilibrium	[x]
+90.Y2.5	Implement HealthcareModelStrategy — Medical diagnosis assistance, drug interaction checking, clinical decision support	[x]
+90.Y2.6	Implement LegalModelStrategy — Contract analysis, regulatory compliance checking, case law retrieval	[x]
+90.Y2.7	Implement EngineeringModelStrategy — CAD/CAM assistance, structural analysis, materials science, simulation	[x]
+90.Y2.8	Implement BioinformaticsModelStrategy — Genomics, proteomics, sequence analysis, molecular modeling	[x]
+90.Y2.9	Implement GeospatialModelStrategy — GIS analysis, spatial clustering, route optimization, terrain modeling	[x]
+90.Y2.10	Implement LogisticsModelStrategy — Supply chain optimization, fleet routing, inventory forecasting	[x]
+
+90.Y3	Instance-Learning "Blank" Model System
+90.Y3.1	Implement BlankModelFactory — Creates untrained model instances with configurable architectures (transformer, CNN, RNN, etc.)	[x]
+90.Y3.2	Implement InstanceDataCurator — Continuously observes and prepares instance data for training (schema analysis, sampling, anonymization)	[x]
+90.Y3.3	Implement IncrementalTrainer — Trains models incrementally on new data without full retraining (online learning)	[x]
+90.Y3.4	Implement WeightCheckpointManager — Saves/loads model weights, tracks training history, enables rollback	[x]
+90.Y3.5	Implement TrainingScheduler — Schedules training during low-usage periods, respects resource constraints	[x]
+
+90.Y4	User Feedback & Correction Loop
+90.Y4.1	Implement FeedbackCollector — Captures user corrections (thumbs up/down, explicit corrections, preferred outputs)	[x]
+90.Y4.2	Implement CorrectionMemory — Persists all corrections with context for future training	[x]
+90.Y4.3	Implement ReinforcementLearner — Adjusts weights based on accumulated feedback (RLHF-lite for edge)	[x]
+90.Y4.4	Implement ConfidenceTracker — Tracks model confidence per query type, auto-learns when to defer to humans	[x]
+90.Y4.5	Implement FeedbackDashboard — UI for admins to review feedback patterns, approve/reject corrections	[x]
+
+90.Y5	Multi-Instance Model Scoping
+90.Y5.1	Implement ModelScopeManager — Assigns models to instance, department, team, user group, or individual scope	[x]
+90.Y5.2	Implement ScopedModelRegistry — Manages multiple model instances with different scopes, handles inheritance	[x]
+90.Y5.3	Implement ModelIsolation — Ensures model data doesn't leak between scopes (tenant isolation for AI)	[x]
+90.Y5.4	Implement ScopedTrainingPolicy — Defines training policies per scope (frequency, data sources, resource limits)	[x]
+90.Y5.5	Implement ModelPromotionWorkflow — Promotes successful departmental models to broader scopes with approval	[x]
+
+90.Y6	Model Specialization & Expertise
+90.Y6.1	Implement ExpertiseScorer — Measures model expertise across different data domains/query types	[x]
+90.Y6.2	Implement SpecializationTracker — Tracks which model is best for which type of query in this instance	[x]
+90.Y6.3	Implement AdaptiveModelRouter — Routes queries to the most expert model for that query type	[x]
+90.Y6.4	Implement ExpertiseEvolution — Monitors expertise drift, triggers retraining when accuracy degrades	[x]
+90.Y6.5	Implement ModelEnsemble — Combines predictions from multiple specialized models for higher accuracy	[x]
+
+Feature: Instance-Expert Model Workflow
+Example: A manufacturing company deploys a blank model. Over 6 months:
+- The model trains on production logs, quality reports, and sensor data
+- Operators correct predictions ("No, that defect was actually a lighting artifact")
+- The model learns the specific patterns of THEIR equipment, THEIR products
+- Eventually becomes expert at predicting defects for THIS factory, outperforming generic models
+
+---
+
 ### CATEGORY K: Storage Reliability & Performance
 
 #### Task 91: Ultimate RAID Plugin
