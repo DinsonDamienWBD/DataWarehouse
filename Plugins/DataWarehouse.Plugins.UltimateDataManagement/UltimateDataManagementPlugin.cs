@@ -34,7 +34,7 @@ namespace DataWarehouse.Plugins.UltimateDataManagement;
 /// - Performance metrics and monitoring
 /// - Event-driven architecture
 /// </summary>
-public sealed class UltimateDataManagementPlugin : IntelligenceAwarePluginBase, IDisposable
+public sealed class UltimateDataManagementPlugin : IntelligenceAwareDataManagementPluginBase, IDisposable
 {
     private readonly DataManagementStrategyRegistry _registry;
     private readonly ConcurrentDictionary<string, long> _usageStats = new();

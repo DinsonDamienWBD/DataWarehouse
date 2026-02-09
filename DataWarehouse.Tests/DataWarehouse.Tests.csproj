@@ -31,8 +31,6 @@
   <ItemGroup>
     <ProjectReference Include="..\DataWarehouse.SDK\DataWarehouse.SDK.csproj" />
     <ProjectReference Include="..\DataWarehouse.Kernel\DataWarehouse.Kernel.csproj" />
-    <ProjectReference Include="..\Plugins\DataWarehouse.Plugins.AIAgents\DataWarehouse.Plugins.AIAgents.csproj" />
-    <ProjectReference Include="..\Plugins\DataWarehouse.Plugins.Compression\DataWarehouse.Plugins.Compression.csproj" />
     <ProjectReference Include="..\Plugins\DataWarehouse.Plugins.GeoReplication\DataWarehouse.Plugins.GeoReplication.csproj" />
   </ItemGroup>
 

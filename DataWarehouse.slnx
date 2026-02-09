@@ -145,6 +145,7 @@
     <Project Path="Plugins/DataWarehouse.Plugins.UltimateDataProtection/DataWarehouse.Plugins.UltimateDataProtection.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.UltimateEncryption/DataWarehouse.Plugins.UltimateEncryption.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.UltimateIntelligence/DataWarehouse.Plugins.UltimateIntelligence.csproj" />
+    <Project Path="Plugins/DataWarehouse.Plugins.UltimateInterface/DataWarehouse.Plugins.UltimateInterface.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.UltimateKeyManagement/DataWarehouse.Plugins.UltimateKeyManagement.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.UltimateRAID/DataWarehouse.Plugins.UltimateRAID.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.UltimateReplication/DataWarehouse.Plugins.UltimateReplication.csproj" />

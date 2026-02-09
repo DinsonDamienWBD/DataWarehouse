@@ -13,26 +13,44 @@ using DataWarehouse.SDK.Utilities;
 using DataWarehouse.Plugins.UltimateReplication.Strategies.Core;
 using DataWarehouse.Plugins.UltimateReplication.Strategies.Geo;
 using DataWarehouse.Plugins.UltimateReplication.Strategies.Federation;
+using DataWarehouse.Plugins.UltimateReplication.Strategies.Cloud;
+using DataWarehouse.Plugins.UltimateReplication.Strategies.ActiveActive;
+using DataWarehouse.Plugins.UltimateReplication.Strategies.CDC;
+using DataWarehouse.Plugins.UltimateReplication.Strategies.AI;
+using DataWarehouse.Plugins.UltimateReplication.Strategies.Conflict;
+using DataWarehouse.Plugins.UltimateReplication.Strategies.Topology;
+using DataWarehouse.Plugins.UltimateReplication.Strategies.Specialized;
+using DataWarehouse.Plugins.UltimateReplication.Strategies.DR;
+using DataWarehouse.Plugins.UltimateReplication.Strategies.AirGap;
+using DataWarehouse.Plugins.UltimateReplication.Strategies.Synchronous;
+using DataWarehouse.Plugins.UltimateReplication.Strategies.Asynchronous;
+using DataWarehouse.Plugins.UltimateReplication.Strategies.GeoReplication;
 
 namespace DataWarehouse.Plugins.UltimateReplication
 {
     /// <summary>
-    /// Ultimate Replication plugin consolidating 8 comprehensive replication strategies.
+    /// Ultimate Replication plugin consolidating 60+ comprehensive replication strategies.
     /// Provides CRDT-based, multi-master, real-time, delta, geo, cross-region, federation,
-    /// and federated query replication with full vector clock support, conflict resolution,
-    /// lag tracking, and anti-entropy protocols.
+    /// federated query, cloud-native, active-active, CDC, AI-enhanced, conflict resolution,
+    /// topology-based, specialized, disaster recovery, and air-gap replication with full
+    /// vector clock support, conflict resolution, lag tracking, and anti-entropy protocols.
     /// </summary>
     /// <remarks>
-    /// Supported replication strategies:
+    /// Supported replication strategy categories:
     /// <list type="bullet">
-    ///   <item>CRDT: Conflict-free Replicated Data Types (G-Counter, PN-Counter, OR-Set, LWW-Register)</item>
-    ///   <item>MultiMaster: Bidirectional sync with configurable conflict resolution</item>
-    ///   <item>RealTimeSync: Sub-second lag via WebSocket/gRPC streaming and CDC</item>
-    ///   <item>DeltaSync: Binary diff computation with version chain tracking</item>
-    ///   <item>GeoReplication: Region-aware routing with WAN optimization</item>
-    ///   <item>CrossRegion: Async replication with bounded staleness and auto-failover</item>
-    ///   <item>Federation: Multiple data source coordination with distributed transactions</item>
-    ///   <item>FederatedQuery: Query routing with result aggregation and read preferences</item>
+    ///   <item>Core: CRDT, MultiMaster, RealTimeSync, DeltaSync</item>
+    ///   <item>Geo: GeoReplication, CrossRegion, PrimarySecondary</item>
+    ///   <item>Federation: Federation, FederatedQuery</item>
+    ///   <item>Cloud: AWS, Azure, GCP, HybridCloud, Kubernetes, Edge</item>
+    ///   <item>Active-Active: HotHot, NWayActive, GlobalActive</item>
+    ///   <item>CDC: KafkaConnect, Debezium, Maxwell, Canal</item>
+    ///   <item>AI-Enhanced: Predictive, Semantic, Adaptive, Intelligent, AutoTune</item>
+    ///   <item>Conflict Resolution: LastWriteWins, VectorClock, Merge, Custom, CRDT, Version, ThreeWayMerge</item>
+    ///   <item>Topology: Star, Mesh, Chain, Tree, Ring, Hierarchical</item>
+    ///   <item>Specialized: Selective, Filtered, Compression, Encryption, Throttle, Priority</item>
+    ///   <item>DR: AsyncDR, SyncDR, ZeroRPO, ActivePassive, Failover</item>
+    ///   <item>Air-Gap: BidirectionalMerge, ConflictAvoidance, SchemaEvolution, ZeroDataLoss, ResumableMerge, IncrementalSync, ProvenanceTracking</item>
+    ///   <item>Sync Modes: Synchronous, Asynchronous</item>
     /// </list>
     ///
     /// Message Commands:
@@ -218,19 +236,93 @@ namespace DataWarehouse.Plugins.UltimateReplication
 
         private void DiscoverAndRegisterStrategies()
         {
-            // Register core strategies
+            // Register core strategies (4)
             _registry.Register(new CrdtReplicationStrategy());
             _registry.Register(new MultiMasterStrategy());
             _registry.Register(new RealTimeSyncStrategy());
             _registry.Register(new DeltaSyncStrategy());
 
-            // Register geo strategies
+            // Register geo strategies (2)
             _registry.Register(new GeoReplicationStrategy());
             _registry.Register(new CrossRegionStrategy());
 
-            // Register federation strategies
+            // Register federation strategies (2)
             _registry.Register(new FederationStrategy());
             _registry.Register(new FederatedQueryStrategy());
+
+            // Register sync mode strategies (2)
+            _registry.Register(new SynchronousReplicationStrategy());
+            _registry.Register(new AsynchronousReplicationStrategy());
+
+            // Register geo-replication strategies (1)
+            _registry.Register(new PrimarySecondaryReplicationStrategy());
+
+            // Register cloud strategies (6)
+            _registry.Register(new AwsReplicationStrategy());
+            _registry.Register(new AzureReplicationStrategy());
+            _registry.Register(new GcpReplicationStrategy());
+            _registry.Register(new HybridCloudStrategy());
+            _registry.Register(new KubernetesReplicationStrategy());
+            _registry.Register(new EdgeReplicationStrategy());
+
+            // Register active-active strategies (3)
+            _registry.Register(new HotHotStrategy());
+            _registry.Register(new NWayActiveStrategy());
+            _registry.Register(new GlobalActiveStrategy());
+
+            // Register CDC strategies (4)
+            _registry.Register(new KafkaConnectCdcStrategy());
+            _registry.Register(new DebeziumCdcStrategy());
+            _registry.Register(new MaxwellCdcStrategy());
+            _registry.Register(new CanalCdcStrategy());
+
+            // Register AI-enhanced strategies (5)
+            _registry.Register(new PredictiveReplicationStrategy());
+            _registry.Register(new SemanticReplicationStrategy());
+            _registry.Register(new AdaptiveReplicationStrategy());
+            _registry.Register(new IntelligentReplicationStrategy());
+            _registry.Register(new AutoTuneReplicationStrategy());
+
+            // Register conflict resolution strategies (7)
+            _registry.Register(new LastWriteWinsStrategy());
+            _registry.Register(new VectorClockStrategy());
+            _registry.Register(new MergeConflictStrategy());
+            _registry.Register(new CustomConflictStrategy());
+            _registry.Register(new CrdtConflictStrategy());
+            _registry.Register(new VersionConflictStrategy());
+            _registry.Register(new ThreeWayMergeStrategy());
+
+            // Register topology strategies (6)
+            _registry.Register(new StarTopologyStrategy());
+            _registry.Register(new MeshTopologyStrategy());
+            _registry.Register(new ChainTopologyStrategy());
+            _registry.Register(new TreeTopologyStrategy());
+            _registry.Register(new RingTopologyStrategy());
+            _registry.Register(new HierarchicalTopologyStrategy());
+
+            // Register specialized strategies (6)
+            _registry.Register(new SelectiveReplicationStrategy());
+            _registry.Register(new FilteredReplicationStrategy());
+            _registry.Register(new CompressionReplicationStrategy());
+            _registry.Register(new EncryptionReplicationStrategy());
+            _registry.Register(new ThrottleReplicationStrategy());
+            _registry.Register(new PriorityReplicationStrategy());
+
+            // Register disaster recovery strategies (5)
+            _registry.Register(new AsyncDRStrategy());
+            _registry.Register(new SyncDRStrategy());
+            _registry.Register(new ZeroRPOStrategy());
+            _registry.Register(new ActivePassiveStrategy());
+            _registry.Register(new FailoverDRStrategy());
+
+            // Register air-gap strategies (7)
+            _registry.Register(new BidirectionalMergeStrategy());
+            _registry.Register(new ConflictAvoidanceStrategy());
+            _registry.Register(new SchemaEvolutionStrategy());
+            _registry.Register(new ZeroDataLossStrategy());
+            _registry.Register(new ResumableMergeStrategy());
+            _registry.Register(new IncrementalSyncStrategy());
+            _registry.Register(new ProvenanceTrackingStrategy());
         }
 
         #endregion
@@ -577,8 +669,8 @@ namespace DataWarehouse.Plugins.UltimateReplication
             metadata["SupportsAntiEntropy"] = true;
             metadata["SupportedConsistencyModels"] = Enum.GetNames(typeof(ConsistencyModel));
             metadata["SupportedConflictResolutionMethods"] = Enum.GetNames(typeof(ConflictResolutionMethod));
-            metadata["SemanticDescription"] = "Ultimate replication plugin with 8 strategies including CRDT, multi-master, real-time sync, delta sync, geo-replication, cross-region, federation, and federated query support";
-            metadata["SemanticTags"] = new[] { "replication", "crdt", "multi-master", "geo", "federation", "vector-clock", "conflict-resolution" };
+            metadata["SemanticDescription"] = "Ultimate replication plugin with 60+ strategies including CRDT, multi-master, real-time sync, delta sync, geo-replication, cross-region, federation, federated query, cloud-native (AWS/Azure/GCP), active-active, CDC (Kafka/Debezium), AI-enhanced, conflict resolution, topology-based, specialized, disaster recovery, and air-gap support";
+            metadata["SemanticTags"] = new[] { "replication", "crdt", "multi-master", "geo", "federation", "vector-clock", "conflict-resolution", "cloud", "aws", "azure", "gcp", "kubernetes", "active-active", "cdc", "kafka", "debezium", "ai-enhanced", "predictive", "topology", "dr", "disaster-recovery", "air-gap" };
             return metadata;
         }
 

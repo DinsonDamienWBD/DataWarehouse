@@ -39,6 +39,8 @@ public enum CapabilityCategory
     Hardware = 26,
     Compliance = 27,
     TamperProof = 28,
+    Interface = 29,
+    AccessControl = 30,
     Custom = 100
 }
 
