@@ -33,7 +33,7 @@ This document outlines the implementation plan for achieving full production rea
 | Priority | Task | Name | Core Deliverable |
 |----------|------|------|------------------|
 | 1 | T99 | Ultimate SDK | [x] Foundation for all plugins |
-| 2 | T94 | Ultimate Key Management | [x] 70 strategies |
+| 2 | T94 | Ultimate Key Management | [x] 69 strategies |
 | 3 | T93 | Ultimate Encryption | [x] 66 strategies |
 | 4 | T97 | Ultimate Storage | [x] 132 strategies |
 | 5 | T92 | Ultimate Compression | [x] 59 strategies |
@@ -145,7 +145,7 @@ Before ANY release:
 
 | Order | Task | Name | Description | Dependencies | Status |
 |-------|------|------|-------------|--------------|--------|
-| **1.1** | **T94** | **Ultimate Key Management** | Composable key mgmt (Direct + Envelope modes) | T99 | [x] Complete - 70 strategies |
+| **1.1** | **T94** | **Ultimate Key Management** | Composable key mgmt (Direct + Envelope modes) | T99 | [x] Complete - 69 strategies |
 | **1.2** | **T93** | **Ultimate Encryption** | All encryption as strategies | T99, T94 | [x] Complete - 66 strategies |
 | **1.3** | **T92** | **Ultimate Compression** | All compression as strategies | T99 | [x] Complete - 59 strategies |
 | **1.4** | **T97** | **Ultimate Storage** | All storage backends as strategies | T99 | [x] Complete - 132 strategies |
@@ -15325,7 +15325,7 @@ T99 (Ultimate SDK)
 | T91 (Ultimate RAID) | ~150 | Extreme | [x] Complete - 33 strategies |
 | T92 (Ultimate Compression) | ~80 | High | [x] Complete - 59 strategies |
 | T93 (Ultimate Encryption) | ~100 | Very High | [x] Complete - 66 strategies |
-| T94 (Ultimate Key Management) | ~110 | High | [x] Complete - 70 strategies |
+| T94 (Ultimate Key Management) | ~110 | High | [x] Complete - 69 strategies |
 | T95 (Ultimate Access Control) | ~130 | Very High | [x] Complete - 8 strategies |
 | T96 (Ultimate Compliance) | ~120 | High | [x] Complete - 5 strategies |
 | T97 (Ultimate Storage) | ~110 | Very High | [x] Complete - 132 strategies |
