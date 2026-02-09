@@ -20,6 +20,7 @@
     <PackageReference Include="System.Management" Version="10.0.*" />
   </ItemGroup>
 
+
   <!-- Temporarily exclude old strategy implementations that need migration -->
   <ItemGroup>
     <Compile Remove="Strategies\**\*.cs" />

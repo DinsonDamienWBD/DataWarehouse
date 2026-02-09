@@ -11,7 +11,7 @@ namespace DataWarehouse.Plugins.AIInterface.Channels;
 
 /// <summary>
 /// Slack integration channel.
-/// Routes Slack requests (slash commands, interactive messages, events) to AIAgents via message bus.
+/// Routes Slack requests (slash commands, interactive messages, events) to UltimateIntelligence via message bus.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -24,7 +24,7 @@ namespace DataWarehouse.Plugins.AIInterface.Channels;
 /// </list>
 /// </para>
 /// <para>
-/// All AI processing is delegated to the AIAgents plugin. This channel only handles
+/// All AI processing is delegated to the UltimateIntelligence plugin. This channel only handles
 /// Slack-specific protocol translation and formatting.
 /// </para>
 /// </remarks>
@@ -199,8 +199,8 @@ public sealed class SlackChannel : IntegrationChannelBase, IDisposable
         }
 
         // Route to AI via message bus
-        var aiResponse = await RouteToAIAgentsAsync(
-            "ai.chat",
+        var aiResponse = await RouteToIntelligenceAsync(
+            "intelligence.request.conversation",
             new Dictionary<string, object>
             {
                 ["message"] = text,
@@ -238,8 +238,8 @@ public sealed class SlackChannel : IntegrationChannelBase, IDisposable
         var conversationId = $"slack:{channelId}:{Guid.NewGuid():N}";
 
         // Route to AI
-        var aiResponse = await RouteToAIAgentsAsync(
-            "ai.chat",
+        var aiResponse = await RouteToIntelligenceAsync(
+            "intelligence.request.conversation",
             new Dictionary<string, object>
             {
                 ["message"] = query,
@@ -293,8 +293,8 @@ public sealed class SlackChannel : IntegrationChannelBase, IDisposable
         var userId = ExtractUserId(request.Payload);
         var channelId = ExtractChannelId(request.Payload);
 
-        var aiResponse = await RouteToAIAgentsAsync(
-            "ai.chat",
+        var aiResponse = await RouteToIntelligenceAsync(
+            "intelligence.request.conversation",
             new Dictionary<string, object>
             {
                 ["message"] = query,

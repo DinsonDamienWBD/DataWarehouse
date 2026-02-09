@@ -2,13 +2,14 @@
 // Licensed under the Apache License, Version 2.0.
 
 using System.Text.Json.Serialization;
+using DataWarehouse.SDK.AI;
 
 namespace DataWarehouse.Plugins.AIInterface.Channels;
 
 /// <summary>
 /// Interface for all integration channels.
-/// Channels receive external requests and translate them to AI capability requests
-/// routed through the message bus to the AIAgents plugin.
+/// Channels receive external requests and translate them to Intelligence requests
+/// routed through the message bus to the UltimateIntelligence plugin.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -16,14 +17,14 @@ namespace DataWarehouse.Plugins.AIInterface.Channels;
 /// <list type="bullet">
 /// <item>Receiving requests from external platforms (Slack, Teams, Discord, Voice, LLMs)</item>
 /// <item>Validating incoming requests (signatures, authentication)</item>
-/// <item>Translating platform-specific formats to AI capability requests</item>
-/// <item>Routing requests to AIAgents via the message bus</item>
-/// <item>Formatting AI responses for the target platform</item>
+/// <item>Translating platform-specific formats to Intelligence requests</item>
+/// <item>Routing requests to UltimateIntelligence via the message bus</item>
+/// <item>Formatting Intelligence responses for the target platform</item>
 /// </list>
 /// </para>
 /// <para>
 /// Channels do NOT perform any AI processing themselves. All AI work is delegated
-/// to the AIAgents plugin through the message bus pattern.
+/// to the UltimateIntelligence plugin through the message bus pattern.
 /// </para>
 /// </remarks>
 public interface IIntegrationChannel
@@ -218,12 +219,12 @@ public sealed class ChannelHealth
 }
 
 /// <summary>
-/// AI capability request to send to the AIAgents plugin via message bus.
+/// Intelligence capability request to send to the UltimateIntelligence plugin via message bus.
 /// </summary>
 public sealed class AICapabilityRequest
 {
     /// <summary>Gets or sets the capability identifier.</summary>
-    /// <example>ai.chat, ai.complete, ai.embed, nl.query.search</example>
+    /// <example>intelligence.request.conversation, intelligence.request.completion, intelligence.request.embeddings</example>
     public string Capability { get; init; } = string.Empty;
 
     /// <summary>Gets or sets the request payload.</summary>
@@ -305,10 +306,58 @@ public abstract class IntegrationChannelBase : IIntegrationChannel
     /// <summary>
     /// Initializes the channel with the message bus.
     /// </summary>
-    /// <param name="messageBus">The message bus for AI routing.</param>
+    /// <param name="messageBus">The message bus for Intelligence routing.</param>
     public void Initialize(IMessageBus? messageBus)
     {
         MessageBus = messageBus;
+
+        // Register channel knowledge with Intelligence plugin
+        if (messageBus != null)
+        {
+            RegisterChannelKnowledge();
+        }
+    }
+
+    /// <summary>
+    /// Registers this channel's capabilities and status as knowledge with the Intelligence plugin.
+    /// </summary>
+    protected virtual void RegisterChannelKnowledge()
+    {
+        if (MessageBus == null) return;
+
+        try
+        {
+            var channelKnowledge = KnowledgeObject.CreateCapabilityKnowledge(
+                pluginId: $"aiinterface.{ChannelId}",
+                pluginName: $"AIInterface-{ChannelName}",
+                operations: new[]
+                {
+                    "receive.external.requests",
+                    "validate.signatures",
+                    "route.to.intelligence",
+                    "format.responses"
+                },
+                constraints: new Dictionary<string, object>
+                {
+                    ["channelId"] = ChannelId,
+                    ["channelName"] = ChannelName,
+                    ["category"] = Category.ToString(),
+                    ["isConfigured"] = IsConfigured,
+                    ["isEnabled"] = IsEnabled,
+                    ["webhookEndpoint"] = GetWebhookEndpoint()
+                }
+            );
+
+            // Publish knowledge registration to Intelligence plugin
+            MessageBus.Publish("intelligence.knowledge.register", new Dictionary<string, object>
+            {
+                ["knowledge"] = channelKnowledge
+            });
+        }
+        catch
+        {
+            // Silent failure - knowledge registration is optional
+        }
     }
 
     /// <inheritdoc />
@@ -336,15 +385,15 @@ public abstract class IntegrationChannelBase : IIntegrationChannel
     };
 
     /// <summary>
-    /// Routes an AI capability request through the message bus.
+    /// Routes an Intelligence request through the message bus.
     /// </summary>
-    /// <param name="capability">The AI capability to invoke.</param>
+    /// <param name="capability">The Intelligence capability to invoke.</param>
     /// <param name="payload">The request payload.</param>
     /// <param name="userId">Optional user identifier.</param>
     /// <param name="conversationId">Optional conversation identifier.</param>
     /// <param name="ct">Cancellation token.</param>
-    /// <returns>The AI capability response.</returns>
-    protected async Task<AICapabilityResponse> RouteToAIAgentsAsync(
+    /// <returns>The Intelligence capability response.</returns>
+    protected async Task<AICapabilityResponse> RouteToIntelligenceAsync(
         string capability,
         Dictionary<string, object> payload,
         string? userId = null,
@@ -407,7 +456,66 @@ public abstract class IntegrationChannelBase : IIntegrationChannel
     }
 
     /// <summary>
-    /// Parses an AI response from the raw result.
+    /// Converts a channel request to a KnowledgeRequest format for Intelligence plugin.
+    /// </summary>
+    protected KnowledgeRequest ConvertToKnowledgeRequest(AICapabilityRequest request)
+    {
+        return new KnowledgeRequest
+        {
+            RequestId = Guid.NewGuid().ToString("N"),
+            RequestorPluginId = $"aiinterface.{ChannelId}",
+            Topic = request.Capability,
+            QueryParameters = new Dictionary<string, object>(request.Payload)
+            {
+                ["_sourceChannel"] = request.SourceChannel ?? ChannelId,
+                ["_userId"] = request.UserId ?? string.Empty,
+                ["_conversationId"] = request.ConversationId ?? string.Empty
+            },
+            Timeout = TimeSpan.FromSeconds(30)
+        };
+    }
+
+    /// <summary>
+    /// Converts a KnowledgeResponse back to AICapabilityResponse format.
+    /// </summary>
+    protected AICapabilityResponse ConvertFromKnowledgeResponse(KnowledgeResponse response)
+    {
+        if (!response.Success)
+        {
+            return new AICapabilityResponse
+            {
+                Success = false,
+                Error = response.ErrorMessage ?? "Unknown error"
+            };
+        }
+
+        // Extract response data from KnowledgeObject results
+        if (response.Results.Length > 0)
+        {
+            var firstResult = response.Results[0];
+            var responseText = firstResult.Payload.TryGetValue("response", out var r) ? r?.ToString()
+                             : firstResult.Payload.TryGetValue("content", out var c) ? c?.ToString()
+                             : firstResult.Payload.TryGetValue("message", out var m) ? m?.ToString()
+                             : null;
+
+            return new AICapabilityResponse
+            {
+                Success = true,
+                Response = responseText,
+                Data = firstResult.Payload,
+                Metadata = firstResult.Metadata ?? new Dictionary<string, object>()
+            };
+        }
+
+        return new AICapabilityResponse
+        {
+            Success = true,
+            Data = response.Metadata
+        };
+    }
+
+    /// <summary>
+    /// Parses an Intelligence response from the raw result.
     /// </summary>
     private AICapabilityResponse ParseAIResponse(object? result)
     {
@@ -448,14 +556,14 @@ public abstract class IntegrationChannelBase : IIntegrationChannel
 
 /// <summary>
 /// Interface for message bus communication.
-/// Allows channels to route requests to the AIAgents plugin.
+/// Allows channels to route requests to the UltimateIntelligence plugin.
 /// </summary>
 public interface IMessageBus
 {
     /// <summary>
     /// Sends a request and waits for a response.
     /// </summary>
-    /// <param name="messageType">The message type (e.g., "ai.chat", "ai.complete").</param>
+    /// <param name="messageType">The message type (e.g., "intelligence.request.conversation", "intelligence.request.completion").</param>
     /// <param name="payload">The message payload.</param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>The response payload.</returns>

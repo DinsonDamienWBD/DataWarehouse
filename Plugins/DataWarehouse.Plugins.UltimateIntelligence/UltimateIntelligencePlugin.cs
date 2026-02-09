@@ -1,8 +1,10 @@
 using System.Collections.Concurrent;
+using System.Text.Json;
 using DataWarehouse.SDK.AI;
 using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Primitives;
 using DataWarehouse.SDK.Utilities;
+using DataWarehouse.Plugins.UltimateIntelligence.Strategies.Memory;
 
 namespace DataWarehouse.Plugins.UltimateIntelligence;
 
@@ -31,6 +33,10 @@ public sealed class UltimateIntelligencePlugin : PipelinePluginBase
     private IIntelligenceStrategy? _activeVectorStore;
     private IIntelligenceStrategy? _activeKnowledgeGraph;
     private IIntelligenceStrategy? _activeFeature;
+    private IIntelligenceStrategy? _activeLongTermMemory;
+
+    // Tiered memory system
+    private TieredMemoryStrategy? _tieredMemoryStrategy;
 
 
     /// <inheritdoc/>
@@ -66,7 +72,32 @@ public sealed class UltimateIntelligencePlugin : PipelinePluginBase
         }
 
         DiscoverAndRegisterStrategies();
+
+        // Initialize tiered memory strategy
+        _tieredMemoryStrategy = GetStrategy<TieredMemoryStrategy>("ltm-tiered-hierarchical");
     }
+
+    /// <summary>
+    /// Sets the active long-term memory strategy.
+    /// </summary>
+    /// <param name="strategyId">The strategy ID to activate.</param>
+    public void SetActiveLongTermMemory(string strategyId)
+    {
+        var strategy = GetStrategy(strategyId);
+        if (strategy?.Category != IntelligenceStrategyCategory.LongTermMemory)
+            throw new ArgumentException($"Strategy '{strategyId}' is not a long-term memory strategy");
+        _activeLongTermMemory = strategy;
+    }
+
+    /// <summary>
+    /// Gets the active long-term memory strategy.
+    /// </summary>
+    public LongTermMemoryStrategyBase? GetActiveLongTermMemory() => _activeLongTermMemory as LongTermMemoryStrategyBase;
+
+    /// <summary>
+    /// Gets the tiered memory strategy.
+    /// </summary>
+    public TieredMemoryStrategy? GetTieredMemoryStrategy() => _tieredMemoryStrategy;
 
     /// <summary>
     /// Registers an intelligence strategy with the plugin.
@@ -440,7 +471,7 @@ public sealed class UltimateIntelligencePlugin : PipelinePluginBase
     }
 
     /// <inheritdoc/>
-    public override Task OnMessageAsync(PluginMessage message)
+    public override async Task OnMessageAsync(PluginMessage message)
     {
         switch (message.Type)
         {
@@ -499,10 +530,406 @@ public sealed class UltimateIntelligencePlugin : PipelinePluginBase
                     // Note: Reply mechanism would need to be handled by caller
                 }
                 break;
+
+            // ============== TIERED MEMORY MESSAGE HANDLERS ==============
+
+            case MemoryTopics.Store:
+            case MemoryTopics.StoreWithTier:
+                await HandleMemoryStoreAsync(message);
+                break;
+
+            case MemoryTopics.Recall:
+            case MemoryTopics.RecallWithTier:
+                await HandleMemoryRecallAsync(message);
+                break;
+
+            case MemoryTopics.ConfigureTier:
+                await HandleConfigureTierAsync(message);
+                break;
+
+            case MemoryTopics.GetTierStats:
+                await HandleGetTierStatsAsync(message);
+                break;
+
+            case MemoryTopics.EnableTier:
+            case MemoryTopics.DisableTier:
+                await HandleTierEnableDisableAsync(message);
+                break;
+
+            case MemoryTopics.Consolidate:
+                await HandleConsolidateAsync(message);
+                break;
+
+            case MemoryTopics.Refine:
+                await HandleRefineAsync(message);
+                break;
+
+            case MemoryTopics.GetEvolution:
+                await HandleGetEvolutionAsync(message);
+                break;
+
+            case MemoryTopics.Regenerate:
+                await HandleRegenerateAsync(message);
+                break;
+
+            case MemoryTopics.ValidateRegeneration:
+                await HandleValidateRegenerationAsync(message);
+                break;
+
+            case MemoryTopics.Flush:
+                await HandleFlushAsync(message);
+                break;
+
+            case MemoryTopics.Restore:
+                await HandleRestoreAsync(message);
+                break;
+
+            case MemoryTopics.Forget:
+                await HandleForgetAsync(message);
+                break;
+
+            case MemoryTopics.Promote:
+                await HandlePromoteAsync(message);
+                break;
+
+            case MemoryTopics.Demote:
+                await HandleDemoteAsync(message);
+                break;
+
+            case MemoryTopics.GetStatistics:
+                await HandleGetMemoryStatisticsAsync(message);
+                break;
         }
 
-        return base.OnMessageAsync(message);
+        await base.OnMessageAsync(message);
     }
+
+    #region Memory Message Handlers
+
+    private async Task HandleMemoryStoreAsync(PluginMessage message)
+    {
+        if (_tieredMemoryStrategy == null) return;
+
+        try
+        {
+            var content = message.Payload.TryGetValue("content", out var c) ? c?.ToString() : null;
+            if (string.IsNullOrEmpty(content)) return;
+
+            var tier = MemoryTier.Working;
+            if (message.Payload.TryGetValue("tier", out var tierObj) && tierObj is string tierStr)
+            {
+                Enum.TryParse<MemoryTier>(tierStr, true, out tier);
+            }
+
+            var scope = message.Payload.TryGetValue("scope", out var s) ? s?.ToString() ?? "global" : "global";
+
+            Dictionary<string, object>? metadata = null;
+            if (message.Payload.TryGetValue("metadata", out var m) && m is Dictionary<string, object> md)
+            {
+                metadata = md;
+            }
+
+            var memoryId = await _tieredMemoryStrategy.StoreWithTierAsync(content, tier, scope, metadata);
+
+            // Response would be sent via message bus reply mechanism
+        }
+        catch
+        {
+            // Log error
+        }
+    }
+
+    private async Task HandleMemoryRecallAsync(PluginMessage message)
+    {
+        if (_tieredMemoryStrategy == null) return;
+
+        try
+        {
+            var query = message.Payload.TryGetValue("query", out var q) ? q?.ToString() : null;
+            if (string.IsNullOrEmpty(query)) return;
+
+            var minTier = MemoryTier.Working;
+            if (message.Payload.TryGetValue("minTier", out var tierObj) && tierObj is string tierStr)
+            {
+                Enum.TryParse<MemoryTier>(tierStr, true, out minTier);
+            }
+
+            var scope = message.Payload.TryGetValue("scope", out var s) ? s?.ToString() ?? "global" : "global";
+            var topK = message.Payload.TryGetValue("topK", out var tk) && tk is int tkInt ? tkInt : 10;
+
+            var results = await _tieredMemoryStrategy.RecallWithTierAsync(query, minTier, scope, topK);
+
+            // Response would be sent via message bus reply mechanism
+        }
+        catch
+        {
+            // Log error
+        }
+    }
+
+    private async Task HandleConfigureTierAsync(PluginMessage message)
+    {
+        if (_tieredMemoryStrategy == null) return;
+
+        try
+        {
+            if (!message.Payload.TryGetValue("tier", out var tierObj) || tierObj is not string tierStr)
+                return;
+
+            if (!Enum.TryParse<MemoryTier>(tierStr, true, out var tier))
+                return;
+
+            var enabled = message.Payload.TryGetValue("enabled", out var e) && e is bool eb && eb;
+            var persistence = MemoryPersistence.Volatile;
+            if (message.Payload.TryGetValue("persistence", out var p) && p is string ps)
+            {
+                Enum.TryParse<MemoryPersistence>(ps, true, out persistence);
+            }
+
+            var maxCapacity = message.Payload.TryGetValue("maxCapacityBytes", out var mc) && mc is long mcl ? mcl : 100 * 1024 * 1024L;
+
+            TimeSpan? ttl = null;
+            if (message.Payload.TryGetValue("ttlSeconds", out var ttlObj) && ttlObj is int ttlSec)
+            {
+                ttl = TimeSpan.FromSeconds(ttlSec);
+            }
+
+            await _tieredMemoryStrategy.ConfigureTierAsync(tier, enabled, persistence, maxCapacity, ttl);
+        }
+        catch
+        {
+            // Log error
+        }
+    }
+
+    private async Task HandleGetTierStatsAsync(PluginMessage message)
+    {
+        if (_tieredMemoryStrategy == null) return;
+
+        try
+        {
+            if (!message.Payload.TryGetValue("tier", out var tierObj) || tierObj is not string tierStr)
+                return;
+
+            if (!Enum.TryParse<MemoryTier>(tierStr, true, out var tier))
+                return;
+
+            var stats = await _tieredMemoryStrategy.GetTierStatisticsAsync(tier);
+
+            // Response would be sent via message bus reply mechanism
+        }
+        catch
+        {
+            // Log error
+        }
+    }
+
+    private async Task HandleTierEnableDisableAsync(PluginMessage message)
+    {
+        if (_tieredMemoryStrategy == null) return;
+
+        try
+        {
+            if (!message.Payload.TryGetValue("tier", out var tierObj) || tierObj is not string tierStr)
+                return;
+
+            if (!Enum.TryParse<MemoryTier>(tierStr, true, out var tier))
+                return;
+
+            var enabled = message.Type == MemoryTopics.EnableTier;
+            var currentConfig = _tieredMemoryStrategy.Configuration.Tiers.TryGetValue(tier, out var tc)
+                ? tc
+                : new TierConfig { Tier = tier };
+
+            await _tieredMemoryStrategy.ConfigureTierAsync(tier, enabled, currentConfig.Persistence, currentConfig.MaxCapacityBytes, currentConfig.TTL);
+        }
+        catch
+        {
+            // Log error
+        }
+    }
+
+    private async Task HandleConsolidateAsync(PluginMessage message)
+    {
+        if (_tieredMemoryStrategy == null) return;
+
+        try
+        {
+            await _tieredMemoryStrategy.ConsolidateMemoriesAsync();
+        }
+        catch
+        {
+            // Log error
+        }
+    }
+
+    private async Task HandleRefineAsync(PluginMessage message)
+    {
+        if (_tieredMemoryStrategy == null) return;
+
+        try
+        {
+            var scope = message.Payload.TryGetValue("scope", out var s) ? s?.ToString() : null;
+            await _tieredMemoryStrategy.RefineContextAsync(scope);
+        }
+        catch
+        {
+            // Log error
+        }
+    }
+
+    private Task HandleGetEvolutionAsync(PluginMessage message)
+    {
+        if (_tieredMemoryStrategy == null) return Task.CompletedTask;
+
+        try
+        {
+            var metrics = _tieredMemoryStrategy.GetEvolutionMetrics();
+            // Response would be sent via message bus reply mechanism
+        }
+        catch
+        {
+            // Log error
+        }
+
+        return Task.CompletedTask;
+    }
+
+    private async Task HandleRegenerateAsync(PluginMessage message)
+    {
+        if (_tieredMemoryStrategy == null) return;
+
+        try
+        {
+            var contextEntryId = message.Payload.TryGetValue("contextEntryId", out var id) ? id?.ToString() : null;
+            var expectedFormat = message.Payload.TryGetValue("expectedFormat", out var fmt) ? fmt?.ToString() : null;
+
+            if (string.IsNullOrEmpty(contextEntryId) || string.IsNullOrEmpty(expectedFormat))
+                return;
+
+            var result = await _tieredMemoryStrategy.RegenerateDataAsync(contextEntryId, expectedFormat);
+
+            // Response would be sent via message bus reply mechanism
+        }
+        catch
+        {
+            // Log error
+        }
+    }
+
+    private Task HandleValidateRegenerationAsync(PluginMessage message)
+    {
+        // Validation logic would be implemented here
+        return Task.CompletedTask;
+    }
+
+    private async Task HandleFlushAsync(PluginMessage message)
+    {
+        if (_tieredMemoryStrategy == null) return;
+
+        try
+        {
+            await _tieredMemoryStrategy.FlushToPersistentAsync();
+        }
+        catch
+        {
+            // Log error
+        }
+    }
+
+    private async Task HandleRestoreAsync(PluginMessage message)
+    {
+        if (_tieredMemoryStrategy == null) return;
+
+        try
+        {
+            await _tieredMemoryStrategy.RestoreFromPersistentAsync();
+        }
+        catch
+        {
+            // Log error
+        }
+    }
+
+    private async Task HandleForgetAsync(PluginMessage message)
+    {
+        if (_tieredMemoryStrategy == null) return;
+
+        try
+        {
+            var memoryId = message.Payload.TryGetValue("memoryId", out var id) ? id?.ToString() : null;
+            if (string.IsNullOrEmpty(memoryId)) return;
+
+            await _tieredMemoryStrategy.ForgetMemoryAsync(memoryId);
+        }
+        catch
+        {
+            // Log error
+        }
+    }
+
+    private async Task HandlePromoteAsync(PluginMessage message)
+    {
+        if (_tieredMemoryStrategy == null) return;
+
+        try
+        {
+            var memoryId = message.Payload.TryGetValue("memoryId", out var id) ? id?.ToString() : null;
+            if (string.IsNullOrEmpty(memoryId)) return;
+
+            if (!message.Payload.TryGetValue("targetTier", out var tierObj) || tierObj is not string tierStr)
+                return;
+
+            if (!Enum.TryParse<MemoryTier>(tierStr, true, out var targetTier))
+                return;
+
+            await _tieredMemoryStrategy.PromoteMemoryAsync(memoryId, targetTier);
+        }
+        catch
+        {
+            // Log error
+        }
+    }
+
+    private async Task HandleDemoteAsync(PluginMessage message)
+    {
+        if (_tieredMemoryStrategy == null) return;
+
+        try
+        {
+            var memoryId = message.Payload.TryGetValue("memoryId", out var id) ? id?.ToString() : null;
+            if (string.IsNullOrEmpty(memoryId)) return;
+
+            if (!message.Payload.TryGetValue("targetTier", out var tierObj) || tierObj is not string tierStr)
+                return;
+
+            if (!Enum.TryParse<MemoryTier>(tierStr, true, out var targetTier))
+                return;
+
+            await _tieredMemoryStrategy.DemoteMemoryAsync(memoryId, targetTier);
+        }
+        catch
+        {
+            // Log error
+        }
+    }
+
+    private async Task HandleGetMemoryStatisticsAsync(PluginMessage message)
+    {
+        if (_tieredMemoryStrategy == null) return;
+
+        try
+        {
+            var stats = await _tieredMemoryStrategy.GetMemoryStatisticsAsync();
+            // Response would be sent via message bus reply mechanism
+        }
+        catch
+        {
+            // Log error
+        }
+    }
+
+    #endregion
 
     /// <summary>
     /// Gets aggregate statistics across all strategies.

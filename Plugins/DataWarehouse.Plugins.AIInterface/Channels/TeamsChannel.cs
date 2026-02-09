@@ -10,7 +10,7 @@ namespace DataWarehouse.Plugins.AIInterface.Channels;
 
 /// <summary>
 /// Microsoft Teams integration channel using Bot Framework.
-/// Routes Teams requests (messages, adaptive cards, invokes) to AIAgents via message bus.
+/// Routes Teams requests (messages, adaptive cards, invokes) to UltimateIntelligence via message bus.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -23,7 +23,7 @@ namespace DataWarehouse.Plugins.AIInterface.Channels;
 /// </list>
 /// </para>
 /// <para>
-/// All AI processing is delegated to the AIAgents plugin. This channel only handles
+/// All AI processing is delegated to the UltimateIntelligence plugin. This channel only handles
 /// Teams Bot Framework protocol translation and adaptive card formatting.
 /// </para>
 /// </remarks>
@@ -221,8 +221,8 @@ public sealed class TeamsChannel : IntegrationChannelBase, IDisposable
         var conversationId = $"teams:{activity.Conversation?.Id ?? Guid.NewGuid().ToString()}";
 
         // Route to AI
-        var aiResponse = await RouteToAIAgentsAsync(
-            "ai.chat",
+        var aiResponse = await RouteToIntelligenceAsync(
+            "intelligence.request.conversation",
             new Dictionary<string, object>
             {
                 ["message"] = text,
@@ -263,8 +263,8 @@ public sealed class TeamsChannel : IntegrationChannelBase, IDisposable
             {
                 var userId = $"teams:{activity.From?.Id ?? "unknown"}";
 
-                var aiResponse = await RouteToAIAgentsAsync(
-                    "ai.chat",
+                var aiResponse = await RouteToIntelligenceAsync(
+                    "intelligence.request.conversation",
                     new Dictionary<string, object>
                     {
                         ["message"] = query,

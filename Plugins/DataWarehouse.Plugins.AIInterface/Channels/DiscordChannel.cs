@@ -11,7 +11,7 @@ namespace DataWarehouse.Plugins.AIInterface.Channels;
 
 /// <summary>
 /// Discord integration channel with slash commands.
-/// Routes Discord interactions to AIAgents via message bus.
+/// Routes Discord interactions to UltimateIntelligence via message bus.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -24,7 +24,7 @@ namespace DataWarehouse.Plugins.AIInterface.Channels;
 /// </list>
 /// </para>
 /// <para>
-/// All AI processing is delegated to the AIAgents plugin. This channel only handles
+/// All AI processing is delegated to the UltimateIntelligence plugin. This channel only handles
 /// Discord interaction protocol translation and embed formatting.
 /// </para>
 /// </remarks>
@@ -245,8 +245,8 @@ public sealed class DiscordChannel : IntegrationChannelBase, IDisposable
         var conversationId = $"discord:{guildId}:{interaction.ChannelId}";
 
         // Route to AI
-        var aiResponse = await RouteToAIAgentsAsync(
-            "ai.chat",
+        var aiResponse = await RouteToIntelligenceAsync(
+            "intelligence.request.conversation",
             new Dictionary<string, object>
             {
                 ["message"] = query,
@@ -277,8 +277,8 @@ public sealed class DiscordChannel : IntegrationChannelBase, IDisposable
 
         var userId = $"discord:{interaction.User?.Id ?? interaction.Member?.User?.Id ?? "unknown"}";
 
-        var aiResponse = await RouteToAIAgentsAsync(
-            "ai.chat",
+        var aiResponse = await RouteToIntelligenceAsync(
+            "intelligence.request.conversation",
             new Dictionary<string, object>
             {
                 ["message"] = query,

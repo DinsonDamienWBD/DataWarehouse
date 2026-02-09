@@ -5,6 +5,7 @@ using DataWarehouse.Plugins.AIInterface.Channels;
 using DataWarehouse.Plugins.AIInterface.Registry;
 using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Primitives;
+using DataWarehouse.SDK.AI;
 using System.Text.Json;
 
 namespace DataWarehouse.Plugins.AIInterface;
@@ -25,18 +26,18 @@ namespace DataWarehouse.Plugins.AIInterface;
 /// <b>Key Design Principle:</b> This plugin performs NO AI work itself. It only:
 /// <list type="number">
 /// <item>Receives requests from external channels</item>
-/// <item>Translates them to AI capability requests</item>
-/// <item>Routes to AIAgents plugin via message bus: <c>messageBus.RequestAsync("ai.capability.{capability}", payload)</c></item>
+/// <item>Translates them to Intelligence requests</item>
+/// <item>Routes to UltimateIntelligence plugin via message bus: <c>messageBus.RequestAsync("intelligence.*", payload)</c></item>
 /// <item>Returns responses formatted for the source channel</item>
 /// </list>
 /// </para>
 /// <para>
 /// This separation of concerns ensures:
 /// <list type="bullet">
-/// <item>All AI logic is centralized in the AIAgents plugin</item>
-/// <item>Channels can be enabled/disabled without affecting AI capabilities</item>
-/// <item>New channels can be added without modifying AI logic</item>
-/// <item>Consistent AI behavior across all integration points</item>
+/// <item>All AI logic is centralized in the UltimateIntelligence plugin</item>
+/// <item>Channels can be enabled/disabled without affecting Intelligence capabilities</item>
+/// <item>New channels can be added without modifying Intelligence logic</item>
+/// <item>Consistent Intelligence behavior across all integration points</item>
 /// </list>
 /// </para>
 /// </remarks>
@@ -78,7 +79,7 @@ public sealed class AIInterfacePlugin : PluginBase
     /// Initializes a new instance of the <see cref="AIInterfacePlugin"/> class.
     /// </summary>
     /// <param name="config">Plugin configuration.</param>
-    /// <param name="messageBus">Message bus for routing AI requests.</param>
+    /// <param name="messageBus">Message bus for routing Intelligence requests.</param>
     public AIInterfacePlugin(AIInterfaceConfig? config = null, Channels.IMessageBus? messageBus = null)
     {
         _config = config ?? new AIInterfaceConfig();
@@ -109,9 +110,52 @@ public sealed class AIInterfacePlugin : PluginBase
         // Apply initial configuration
         ApplyConfiguration();
 
+        // Register plugin knowledge with Intelligence
+        RegisterPluginKnowledge();
+
         _isInitialized = true;
 
         await Task.CompletedTask;
+    }
+
+    /// <summary>
+    /// Registers the plugin's capabilities and channel status as knowledge with the Intelligence plugin.
+    /// </summary>
+    private void RegisterPluginKnowledge()
+    {
+        if (_messageBus == null) return;
+
+        try
+        {
+            var channelSummaries = _registry.GetChannelSummaries();
+            var pluginKnowledge = KnowledgeObject.CreateCapabilityKnowledge(
+                pluginId: Id,
+                pluginName: Name,
+                operations: new[]
+                {
+                    "manage.integration.channels",
+                    "route.external.requests",
+                    "validate.webhooks",
+                    "format.channel.responses"
+                },
+                constraints: new Dictionary<string, object>
+                {
+                    ["totalChannels"] = channelSummaries.Count(),
+                    ["enabledChannels"] = channelSummaries.Count(c => c.IsEnabled),
+                    ["categories"] = channelSummaries.Select(c => c.Category.ToString()).Distinct().ToArray()
+                }
+            );
+
+            // Publish knowledge registration
+            _messageBus.Publish("intelligence.knowledge.register", new Dictionary<string, object>
+            {
+                ["knowledge"] = pluginKnowledge
+            });
+        }
+        catch
+        {
+            // Silent failure - knowledge registration is optional
+        }
     }
 
     /// <summary>

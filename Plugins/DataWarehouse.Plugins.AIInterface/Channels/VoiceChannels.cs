@@ -33,8 +33,8 @@ public abstract class VoiceChannelBase : IntegrationChannelBase
         string? sessionId,
         CancellationToken ct)
     {
-        var response = await RouteToAIAgentsAsync(
-            "ai.chat",
+        var response = await RouteToIntelligenceAsync(
+            "intelligence.request.conversation",
             new Dictionary<string, object>
             {
                 ["message"] = query,

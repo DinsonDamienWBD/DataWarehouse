@@ -25,7 +25,7 @@ namespace DataWarehouse.Plugins.AIInterface.Channels;
 /// </list>
 /// </para>
 /// <para>
-/// Routes all capability requests to the AIAgents plugin. This channel provides
+/// Routes all capability requests to the UltimateIntelligence plugin. This channel provides
 /// the interface layer for ChatGPT to interact with DataWarehouse capabilities.
 /// </para>
 /// </remarks>
@@ -184,7 +184,7 @@ Always prefer specific endpoints (search, status, backup) over the generic query
         if (!string.IsNullOrEmpty(fileType)) searchQuery += $" of type {fileType}";
 
         var userId = ExtractUserId(request.Headers);
-        var result = await RouteToAIAgentsAsync("ai.chat", new Dictionary<string, object>
+        var result = await RouteToIntelligenceAsync("intelligence.request.conversation", new Dictionary<string, object>
         {
             ["message"] = searchQuery,
             ["platform"] = "chatgpt"
@@ -202,7 +202,7 @@ Always prefer specific endpoints (search, status, backup) over the generic query
     private async Task<ChannelResponse> HandleStatusAsync(ChannelRequest request, CancellationToken ct)
     {
         var userId = ExtractUserId(request.Headers);
-        var result = await RouteToAIAgentsAsync("ai.chat", new Dictionary<string, object>
+        var result = await RouteToIntelligenceAsync("intelligence.request.conversation", new Dictionary<string, object>
         {
             ["message"] = "What is my storage status?",
             ["platform"] = "chatgpt"
@@ -224,7 +224,7 @@ Always prefer specific endpoints (search, status, backup) over the generic query
         };
 
         var userId = ExtractUserId(request.Headers);
-        var result = await RouteToAIAgentsAsync("ai.chat", new Dictionary<string, object>
+        var result = await RouteToIntelligenceAsync("intelligence.request.conversation", new Dictionary<string, object>
         {
             ["message"] = query,
             ["platform"] = "chatgpt"
@@ -241,7 +241,7 @@ Always prefer specific endpoints (search, status, backup) over the generic query
         var query = string.IsNullOrEmpty(fileId) ? $"Explain {question}" : $"Explain why {fileId} {question}";
 
         var userId = ExtractUserId(request.Headers);
-        var result = await RouteToAIAgentsAsync("ai.chat", new Dictionary<string, object>
+        var result = await RouteToIntelligenceAsync("intelligence.request.conversation", new Dictionary<string, object>
         {
             ["message"] = query,
             ["platform"] = "chatgpt"
@@ -255,7 +255,7 @@ Always prefer specific endpoints (search, status, backup) over the generic query
         var query = GetPayloadValue<string>(request.Payload, "query") ?? "help";
 
         var userId = ExtractUserId(request.Headers);
-        var result = await RouteToAIAgentsAsync("ai.chat", new Dictionary<string, object>
+        var result = await RouteToIntelligenceAsync("intelligence.request.conversation", new Dictionary<string, object>
         {
             ["message"] = query,
             ["platform"] = "chatgpt"
@@ -534,7 +534,7 @@ public sealed class ClaudeMCPChannel : IntegrationChannelBase
         var arguments = GetParam<Dictionary<string, object>>(request.Params, "arguments") ?? new();
 
         var query = ToolToQuery(toolName, arguments);
-        var result = await RouteToAIAgentsAsync("ai.chat", new Dictionary<string, object>
+        var result = await RouteToIntelligenceAsync("intelligence.request.conversation", new Dictionary<string, object>
         {
             ["message"] = query,
             ["platform"] = "claude_mcp"
@@ -559,7 +559,7 @@ public sealed class ClaudeMCPChannel : IntegrationChannelBase
             _ => $"Get information about {uri}"
         };
 
-        var result = await RouteToAIAgentsAsync("ai.chat", new Dictionary<string, object>
+        var result = await RouteToIntelligenceAsync("intelligence.request.conversation", new Dictionary<string, object>
         {
             ["message"] = query,
             ["platform"] = "claude_mcp"
@@ -778,7 +778,7 @@ public sealed class GenericWebhookChannel : IntegrationChannelBase
         var userId = ExtractValue<string>(request.Payload, "user_id") ?? $"{_config.ChannelId}:anonymous";
         var conversationId = ExtractValue<string>(request.Payload, "conversation_id");
 
-        var result = await RouteToAIAgentsAsync("ai.chat", new Dictionary<string, object>
+        var result = await RouteToIntelligenceAsync("intelligence.request.conversation", new Dictionary<string, object>
         {
             ["message"] = message,
             ["platform"] = _config.ChannelId
@@ -790,7 +790,7 @@ public sealed class GenericWebhookChannel : IntegrationChannelBase
     private async Task<ChannelResponse> HandleCompletionAsync(ChannelRequest request, CancellationToken ct)
     {
         var prompt = ExtractValue<string>(request.Payload, "prompt") ?? "";
-        var result = await RouteToAIAgentsAsync("ai.complete", new Dictionary<string, object>
+        var result = await RouteToIntelligenceAsync("intelligence.request.completion", new Dictionary<string, object>
         {
             ["prompt"] = prompt,
             ["platform"] = _config.ChannelId
@@ -815,7 +815,7 @@ public sealed class GenericWebhookChannel : IntegrationChannelBase
             _ => $"Execute {functionName}"
         };
 
-        var result = await RouteToAIAgentsAsync("ai.chat", new Dictionary<string, object>
+        var result = await RouteToIntelligenceAsync("intelligence.request.conversation", new Dictionary<string, object>
         {
             ["message"] = query,
             ["platform"] = _config.ChannelId
@@ -827,7 +827,7 @@ public sealed class GenericWebhookChannel : IntegrationChannelBase
     private async Task<ChannelResponse> HandleGenericAsync(ChannelRequest request, CancellationToken ct)
     {
         var query = ExtractMessage(request.Payload);
-        var result = await RouteToAIAgentsAsync("ai.chat", new Dictionary<string, object>
+        var result = await RouteToIntelligenceAsync("intelligence.request.conversation", new Dictionary<string, object>
         {
             ["message"] = query,
             ["platform"] = _config.ChannelId

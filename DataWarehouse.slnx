@@ -23,7 +23,7 @@
     <Project Path="Plugins/DataWarehouse.Plugins.AdaptiveEc/DataWarehouse.Plugins.AdaptiveEc.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.AdoNetProvider/DataWarehouse.Plugins.AdoNetProvider.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.AdvancedRaid/DataWarehouse.Plugins.AdvancedRaid.csproj" />
-    <Project Path="Plugins/DataWarehouse.Plugins.AIAgents/DataWarehouse.Plugins.AIAgents.csproj" />
+    <!-- DEPRECATED: AIAgents - migrated to UltimateIntelligence (T90 O3.1) -->
     <Project Path="Plugins/DataWarehouse.Plugins.AIInterface/DataWarehouse.Plugins.AIInterface.csproj" />
     <!-- DEPRECATED: AirGappedBackup - migrated to UltimateDataProtection -->
     <Project Path="Plugins/DataWarehouse.Plugins.Alerting/DataWarehouse.Plugins.Alerting.csproj" />
@@ -146,6 +146,8 @@
     <Project Path="Plugins/DataWarehouse.Plugins.UltimateEncryption/DataWarehouse.Plugins.UltimateEncryption.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.UltimateIntelligence/DataWarehouse.Plugins.UltimateIntelligence.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.UltimateKeyManagement/DataWarehouse.Plugins.UltimateKeyManagement.csproj" />
+    <Project Path="Plugins/DataWarehouse.Plugins.UltimateRAID/DataWarehouse.Plugins.UltimateRAID.csproj" />
+    <Project Path="Plugins/DataWarehouse.Plugins.UltimateReplication/DataWarehouse.Plugins.UltimateReplication.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.UltimateStorage/DataWarehouse.Plugins.UltimateStorage.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.VendorSpecificRaid/DataWarehouse.Plugins.VendorSpecificRaid.csproj" />
     <!-- DEPRECATED: Versioning - migrated to UltimateDataManagement -->
