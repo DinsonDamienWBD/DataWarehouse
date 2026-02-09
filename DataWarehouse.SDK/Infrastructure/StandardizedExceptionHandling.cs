@@ -494,6 +494,113 @@ namespace DataWarehouse.SDK.Infrastructure
     }
 
     /// <summary>
+    /// Exception thrown when FailClosed recovery behavior is triggered.
+    /// Indicates that corruption was detected and the affected block/shard has been sealed.
+    /// No reads or writes are permitted until manual intervention resolves the issue.
+    /// </summary>
+    public sealed class FailClosedCorruptionException : DataWarehouseException
+    {
+        /// <summary>
+        /// The block ID that has been sealed due to corruption.
+        /// </summary>
+        public Guid BlockId { get; }
+
+        /// <summary>
+        /// The version of the object that was affected.
+        /// </summary>
+        public int Version { get; }
+
+        /// <summary>
+        /// The expected hash from the manifest.
+        /// </summary>
+        public string ExpectedHash { get; }
+
+        /// <summary>
+        /// The actual hash computed from the corrupted data.
+        /// </summary>
+        public string ActualHash { get; }
+
+        /// <summary>
+        /// The storage instance where corruption was detected.
+        /// </summary>
+        public string AffectedInstance { get; }
+
+        /// <summary>
+        /// List of affected shard indices, if applicable.
+        /// Null if the entire block is affected.
+        /// </summary>
+        public IReadOnlyList<int>? AffectedShards { get; }
+
+        /// <summary>
+        /// Timestamp when the corruption was detected and block was sealed.
+        /// </summary>
+        public DateTimeOffset SealedAt { get; }
+
+        /// <summary>
+        /// Incident ID for tracking and audit purposes.
+        /// </summary>
+        public Guid IncidentId { get; }
+
+        /// <summary>
+        /// Creates a new FailClosedCorruptionException with full details.
+        /// </summary>
+        /// <param name="blockId">The block ID that was sealed.</param>
+        /// <param name="version">The object version.</param>
+        /// <param name="expectedHash">Expected hash from manifest.</param>
+        /// <param name="actualHash">Actual computed hash.</param>
+        /// <param name="affectedInstance">Storage instance where corruption was detected.</param>
+        /// <param name="affectedShards">Optional list of affected shard indices.</param>
+        /// <param name="incidentId">Incident ID for tracking.</param>
+        /// <param name="correlationId">Correlation ID for tracing.</param>
+        public FailClosedCorruptionException(
+            Guid blockId,
+            int version,
+            string expectedHash,
+            string actualHash,
+            string affectedInstance,
+            IReadOnlyList<int>? affectedShards = null,
+            Guid? incidentId = null,
+            string? correlationId = null)
+            : base(
+                ErrorCode.DataCorruption,
+                $"FAIL CLOSED: Corruption detected in block {blockId} version {version}. " +
+                $"Block has been sealed - no reads or writes permitted. " +
+                $"Expected hash: {expectedHash}, Actual hash: {actualHash}. " +
+                $"Manual intervention required. Incident ID: {incidentId ?? Guid.NewGuid()}",
+                correlationId)
+        {
+            BlockId = blockId;
+            Version = version;
+            ExpectedHash = expectedHash;
+            ActualHash = actualHash;
+            AffectedInstance = affectedInstance;
+            AffectedShards = affectedShards;
+            SealedAt = DateTimeOffset.UtcNow;
+            IncidentId = incidentId ?? Guid.NewGuid();
+        }
+
+        /// <summary>
+        /// Creates a FailClosedCorruptionException for a specific block.
+        /// </summary>
+        public static FailClosedCorruptionException Create(
+            Guid blockId,
+            int version,
+            string expectedHash,
+            string actualHash,
+            string affectedInstance,
+            IReadOnlyList<int>? affectedShards = null)
+        {
+            return new FailClosedCorruptionException(
+                blockId,
+                version,
+                expectedHash,
+                actualHash,
+                affectedInstance,
+                affectedShards);
+        }
+    }
+
+    /// <summary>
     /// Supported compliance frameworks.
     /// </summary>
     public enum ComplianceFramework

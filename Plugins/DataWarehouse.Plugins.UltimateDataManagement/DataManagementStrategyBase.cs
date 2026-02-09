@@ -41,7 +41,17 @@ public enum DataManagementCategory
     /// <summary>
     /// Data versioning strategies for version control and history.
     /// </summary>
-    Versioning
+    Versioning,
+
+    /// <summary>
+    /// Data branching strategies for Git-for-Data functionality.
+    /// </summary>
+    Branching,
+
+    /// <summary>
+    /// Event sourcing strategies for event-driven architectures.
+    /// </summary>
+    EventSourcing
 }
 
 /// <summary>

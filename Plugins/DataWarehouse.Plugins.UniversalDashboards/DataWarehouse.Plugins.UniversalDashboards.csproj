@@ -1,0 +1,36 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <LangVersion>latest</LangVersion>
+    <RootNamespace>DataWarehouse.Plugins.UniversalDashboards</RootNamespace>
+    <Description>Universal Dashboards Plugin - 40+ dashboard strategies for enterprise BI, open source, cloud native, embedded analytics, real-time visualization, and export capabilities</Description>
+    <Authors>DataWarehouse</Authors>
+    <Company>DataWarehouse</Company>
+    <Product>DataWarehouse Universal Dashboards</Product>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\DataWarehouse.SDK\DataWarehouse.SDK.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- HTTP client for API integrations -->
+    <PackageReference Include="System.Net.Http.Json" Version="10.0.0-preview.3.25171.5" />
+
+    <!-- WebSocket support for real-time updates -->
+    <PackageReference Include="System.Net.WebSockets.Client" Version="4.3.2" />
+
+    <!-- PDF generation -->
+    <PackageReference Include="QuestPDF" Version="2025.1.1" />
+
+    <!-- Image processing for exports -->
+    <PackageReference Include="SkiaSharp" Version="3.119.0" />
+
+    <!-- JSON handling -->
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
+  </ItemGroup>
+
+</Project>

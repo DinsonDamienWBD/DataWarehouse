@@ -1,0 +1,94 @@
+using System;
+using System.Collections.Concurrent;
+using System.Collections.Generic;
+using System.Linq;
+using System.Reflection;
+
+namespace DataWarehouse.Plugins.UltimateResilience;
+
+/// <summary>
+/// Registry for discovering and managing resilience strategies.
+/// </summary>
+public interface IResilienceStrategyRegistry
+{
+    /// <summary>
+    /// Gets a strategy by ID.
+    /// </summary>
+    IResilienceStrategy? GetStrategy(string strategyId);
+
+    /// <summary>
+    /// Gets all registered strategies.
+    /// </summary>
+    IReadOnlyList<IResilienceStrategy> GetAllStrategies();
+
+    /// <summary>
+    /// Gets strategies by category.
+    /// </summary>
+    IReadOnlyList<IResilienceStrategy> GetStrategiesByCategory(string category);
+
+    /// <summary>
+    /// Registers a strategy.
+    /// </summary>
+    void Register(IResilienceStrategy strategy);
+
+    /// <summary>
+    /// Discovers and registers strategies from an assembly.
+    /// </summary>
+    void DiscoverStrategies(Assembly assembly);
+}
+
+/// <summary>
+/// Default implementation of the resilience strategy registry.
+/// </summary>
+public sealed class ResilienceStrategyRegistry : IResilienceStrategyRegistry
+{
+    private readonly ConcurrentDictionary<string, IResilienceStrategy> _strategies = new(StringComparer.OrdinalIgnoreCase);
+
+    /// <inheritdoc/>
+    public IResilienceStrategy? GetStrategy(string strategyId)
+    {
+        return _strategies.TryGetValue(strategyId, out var strategy) ? strategy : null;
+    }
+
+    /// <inheritdoc/>
+    public IReadOnlyList<IResilienceStrategy> GetAllStrategies()
+    {
+        return _strategies.Values.ToList();
+    }
+
+    /// <inheritdoc/>
+    public IReadOnlyList<IResilienceStrategy> GetStrategiesByCategory(string category)
+    {
+        return _strategies.Values
+            .Where(s => s.Category.Equals(category, StringComparison.OrdinalIgnoreCase))
+            .ToList();
+    }
+
+    /// <inheritdoc/>
+    public void Register(IResilienceStrategy strategy)
+    {
+        _strategies[strategy.StrategyId] = strategy;
+    }
+
+    /// <inheritdoc/>
+    public void DiscoverStrategies(Assembly assembly)
+    {
+        var strategyTypes = assembly.GetTypes()
+            .Where(t => !t.IsAbstract && !t.IsInterface && typeof(IResilienceStrategy).IsAssignableFrom(t));
+
+        foreach (var type in strategyTypes)
+        {
+            try
+            {
+                if (Activator.CreateInstance(type) is IResilienceStrategy strategy)
+                {
+                    Register(strategy);
+                }
+            }
+            catch
+            {
+                // Skip types that can't be instantiated with parameterless constructor
+            }
+        }
+    }
+}

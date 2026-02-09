@@ -1,0 +1,30 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <LangVersion>latest</LangVersion>
+    <Description>Air-Gap Bridge Plugin - The Mule: Tri-Mode Removable Storage System for secure offline data transfer supporting Transport, Storage Extension, and Pocket Instance modes</Description>
+    <Authors>DataWarehouse</Authors>
+    <Company>DataWarehouse</Company>
+    <Product>DataWarehouse Air-Gap Bridge</Product>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\DataWarehouse.SDK\DataWarehouse.SDK.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- QR Code generation for data transfer -->
+    <PackageReference Include="QRCoder" Version="1.6.0" />
+
+    <!-- Cryptography for signatures and encryption -->
+    <PackageReference Include="BouncyCastle.Cryptography" Version="2.6.2" />
+
+    <!-- LiteDB for portable index -->
+    <PackageReference Include="LiteDB" Version="5.0.21" />
+  </ItemGroup>
+
+</Project>

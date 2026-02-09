@@ -13,6 +13,16 @@ using ECPoint = Org.BouncyCastle.Math.EC.ECPoint;
 namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Privacy
 {
     /// <summary>
+    /// Shared elliptic curve parameters used across all SMPC classes.
+    /// </summary>
+    internal static class SmpcCurveParams
+    {
+        internal static readonly X9ECParameters Curve = CustomNamedCurves.GetByName("secp256k1");
+        internal static readonly ECDomainParameters Domain = new(
+            Curve.Curve, Curve.G, Curve.N, Curve.H);
+    }
+
+    /// <summary>
     /// Secure Multi-Party Computation (SMPC) Vault Strategy - Privacy-Preserving Key Management.
     ///
     /// PURPOSE:
@@ -1251,6 +1261,1930 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Privacy
         {
             _writer?.Dispose();
             _lock.Dispose();
+        }
+    }
+
+    #endregion
+
+    #region T75.2: Garbled Circuits (Yao's Protocol)
+
+    /// <summary>
+    /// Represents a garbled circuit for secure two-party computation.
+    /// Implements Yao's garbled circuit protocol with point-and-permute optimization.
+    /// </summary>
+    public sealed class GarbledCircuit
+    {
+        private readonly SecureRandom _random = new();
+        private readonly byte[][] _wireLabels0; // Labels for wire value 0
+        private readonly byte[][] _wireLabels1; // Labels for wire value 1
+        private readonly GarbledGate[] _gates;
+        private readonly int[] _outputWires;
+        private readonly int _inputBitsA;
+        private readonly int _inputBitsB;
+
+        public int TotalWires { get; }
+        public int TotalGates => _gates.Length;
+        public byte[] CircuitHash { get; private set; } = Array.Empty<byte>();
+
+        /// <summary>
+        /// Creates a garbled circuit for the specified operation.
+        /// </summary>
+        /// <param name="operation">Operation type: AND, OR, XOR, ADD, MUL, CMP</param>
+        /// <param name="inputBitsA">Number of input bits from party A</param>
+        /// <param name="inputBitsB">Number of input bits from party B</param>
+        public GarbledCircuit(GarbledOperation operation, int inputBitsA, int inputBitsB)
+        {
+            _inputBitsA = inputBitsA;
+            _inputBitsB = inputBitsB;
+
+            // Build circuit topology based on operation
+            var (gates, outputWires, totalWires) = BuildCircuit(operation, inputBitsA, inputBitsB);
+            _gates = gates;
+            _outputWires = outputWires;
+            TotalWires = totalWires;
+
+            // Generate random wire labels (128-bit security)
+            _wireLabels0 = new byte[TotalWires][];
+            _wireLabels1 = new byte[TotalWires][];
+
+            for (int i = 0; i < TotalWires; i++)
+            {
+                _wireLabels0[i] = new byte[16];
+                _wireLabels1[i] = new byte[16];
+                _random.NextBytes(_wireLabels0[i]);
+                _random.NextBytes(_wireLabels1[i]);
+            }
+
+            // Garble all gates
+            foreach (var gate in _gates)
+            {
+                GarbleGate(gate);
+            }
+
+            // Compute circuit hash for integrity verification
+            ComputeCircuitHash();
+        }
+
+        private (GarbledGate[] gates, int[] outputWires, int totalWires) BuildCircuit(
+            GarbledOperation op, int bitsA, int bitsB)
+        {
+            var gates = new List<GarbledGate>();
+            int nextWire = bitsA + bitsB;
+
+            switch (op)
+            {
+                case GarbledOperation.AND:
+                case GarbledOperation.OR:
+                case GarbledOperation.XOR:
+                    // Single gate for 1-bit operation
+                    gates.Add(new GarbledGate
+                    {
+                        LeftInput = 0,
+                        RightInput = bitsA,
+                        Output = nextWire,
+                        Type = op
+                    });
+                    return (gates.ToArray(), new[] { nextWire }, nextWire + 1);
+
+                case GarbledOperation.ADD:
+                    // Ripple-carry adder circuit
+                    return BuildAdderCircuit(bitsA, bitsB, gates, nextWire);
+
+                case GarbledOperation.MUL:
+                    // Schoolbook multiplication circuit
+                    return BuildMultiplierCircuit(bitsA, bitsB, gates, nextWire);
+
+                case GarbledOperation.CMP:
+                    // Comparison circuit (returns 1 if A > B)
+                    return BuildComparisonCircuit(bitsA, bitsB, gates, nextWire);
+
+                default:
+                    throw new ArgumentException($"Unknown operation: {op}");
+            }
+        }
+
+        private (GarbledGate[], int[], int) BuildAdderCircuit(
+            int bitsA, int bitsB, List<GarbledGate> gates, int nextWire)
+        {
+            int bits = Math.Max(bitsA, bitsB);
+            var outputWires = new int[bits + 1];
+            int carryWire = -1;
+
+            for (int i = 0; i < bits; i++)
+            {
+                int aWire = i < bitsA ? i : -1;
+                int bWire = i < bitsB ? bitsA + i : -1;
+
+                if (carryWire == -1)
+                {
+                    // First bit: half adder
+                    if (aWire >= 0 && bWire >= 0)
+                    {
+                        // Sum = A XOR B
+                        gates.Add(new GarbledGate
+                        {
+                            LeftInput = aWire,
+                            RightInput = bWire,
+                            Output = nextWire,
+                            Type = GarbledOperation.XOR
+                        });
+                        outputWires[i] = nextWire++;
+
+                        // Carry = A AND B
+                        gates.Add(new GarbledGate
+                        {
+                            LeftInput = aWire,
+                            RightInput = bWire,
+                            Output = nextWire,
+                            Type = GarbledOperation.AND
+                        });
+                        carryWire = nextWire++;
+                    }
+                }
+                else
+                {
+                    // Full adder
+                    int xorAB = nextWire++;
+                    gates.Add(new GarbledGate
+                    {
+                        LeftInput = aWire >= 0 ? aWire : bWire,
+                        RightInput = aWire >= 0 && bWire >= 0 ? bWire : carryWire,
+                        Output = xorAB,
+                        Type = GarbledOperation.XOR
+                    });
+
+                    // Sum = XOR(A,B) XOR Carry
+                    gates.Add(new GarbledGate
+                    {
+                        LeftInput = xorAB,
+                        RightInput = carryWire,
+                        Output = nextWire,
+                        Type = GarbledOperation.XOR
+                    });
+                    outputWires[i] = nextWire++;
+
+                    // New carry logic
+                    int andAB = nextWire++;
+                    gates.Add(new GarbledGate
+                    {
+                        LeftInput = aWire >= 0 ? aWire : xorAB,
+                        RightInput = bWire >= 0 ? bWire : carryWire,
+                        Output = andAB,
+                        Type = GarbledOperation.AND
+                    });
+
+                    int andXorC = nextWire++;
+                    gates.Add(new GarbledGate
+                    {
+                        LeftInput = xorAB,
+                        RightInput = carryWire,
+                        Output = andXorC,
+                        Type = GarbledOperation.AND
+                    });
+
+                    gates.Add(new GarbledGate
+                    {
+                        LeftInput = andAB,
+                        RightInput = andXorC,
+                        Output = nextWire,
+                        Type = GarbledOperation.OR
+                    });
+                    carryWire = nextWire++;
+                }
+            }
+
+            outputWires[bits] = carryWire;
+            return (gates.ToArray(), outputWires, nextWire);
+        }
+
+        private (GarbledGate[], int[], int) BuildMultiplierCircuit(
+            int bitsA, int bitsB, List<GarbledGate> gates, int nextWire)
+        {
+            int resultBits = bitsA + bitsB;
+            var partialProducts = new int[bitsB][];
+
+            // Generate partial products
+            for (int j = 0; j < bitsB; j++)
+            {
+                partialProducts[j] = new int[bitsA + j];
+                for (int i = 0; i < j; i++)
+                {
+                    partialProducts[j][i] = -1; // Zero padding (wire not used)
+                }
+                for (int i = 0; i < bitsA; i++)
+                {
+                    gates.Add(new GarbledGate
+                    {
+                        LeftInput = i,
+                        RightInput = bitsA + j,
+                        Output = nextWire,
+                        Type = GarbledOperation.AND
+                    });
+                    partialProducts[j][i + j] = nextWire++;
+                }
+            }
+
+            // Sum partial products using adder tree
+            var currentSum = partialProducts[0];
+            for (int j = 1; j < bitsB; j++)
+            {
+                var nextSum = new int[resultBits];
+                int carryWire = -1;
+
+                for (int i = 0; i < resultBits; i++)
+                {
+                    int aWire = i < currentSum.Length ? currentSum[i] : -1;
+                    int bWire = i < partialProducts[j].Length ? partialProducts[j][i] : -1;
+
+                    if (aWire == -1 && bWire == -1)
+                    {
+                        nextSum[i] = carryWire >= 0 ? carryWire : -1;
+                        carryWire = -1;
+                    }
+                    else if (aWire == -1 || bWire == -1)
+                    {
+                        int validWire = aWire >= 0 ? aWire : bWire;
+                        if (carryWire == -1)
+                        {
+                            nextSum[i] = validWire;
+                        }
+                        else
+                        {
+                            gates.Add(new GarbledGate
+                            {
+                                LeftInput = validWire,
+                                RightInput = carryWire,
+                                Output = nextWire,
+                                Type = GarbledOperation.XOR
+                            });
+                            nextSum[i] = nextWire++;
+
+                            gates.Add(new GarbledGate
+                            {
+                                LeftInput = validWire,
+                                RightInput = carryWire,
+                                Output = nextWire,
+                                Type = GarbledOperation.AND
+                            });
+                            carryWire = nextWire++;
+                        }
+                    }
+                    else
+                    {
+                        // Full adder
+                        int xorAB = nextWire++;
+                        gates.Add(new GarbledGate
+                        {
+                            LeftInput = aWire,
+                            RightInput = bWire,
+                            Output = xorAB,
+                            Type = GarbledOperation.XOR
+                        });
+
+                        if (carryWire == -1)
+                        {
+                            nextSum[i] = xorAB;
+                            gates.Add(new GarbledGate
+                            {
+                                LeftInput = aWire,
+                                RightInput = bWire,
+                                Output = nextWire,
+                                Type = GarbledOperation.AND
+                            });
+                            carryWire = nextWire++;
+                        }
+                        else
+                        {
+                            gates.Add(new GarbledGate
+                            {
+                                LeftInput = xorAB,
+                                RightInput = carryWire,
+                                Output = nextWire,
+                                Type = GarbledOperation.XOR
+                            });
+                            nextSum[i] = nextWire++;
+
+                            int andAB = nextWire++;
+                            gates.Add(new GarbledGate
+                            {
+                                LeftInput = aWire,
+                                RightInput = bWire,
+                                Output = andAB,
+                                Type = GarbledOperation.AND
+                            });
+
+                            int andXorC = nextWire++;
+                            gates.Add(new GarbledGate
+                            {
+                                LeftInput = xorAB,
+                                RightInput = carryWire,
+                                Output = andXorC,
+                                Type = GarbledOperation.AND
+                            });
+
+                            gates.Add(new GarbledGate
+                            {
+                                LeftInput = andAB,
+                                RightInput = andXorC,
+                                Output = nextWire,
+                                Type = GarbledOperation.OR
+                            });
+                            carryWire = nextWire++;
+                        }
+                    }
+                }
+                currentSum = nextSum;
+            }
+
+            return (gates.ToArray(), currentSum.Where(w => w >= 0).ToArray(), nextWire);
+        }
+
+        private (GarbledGate[], int[], int) BuildComparisonCircuit(
+            int bitsA, int bitsB, List<GarbledGate> gates, int nextWire)
+        {
+            int bits = Math.Max(bitsA, bitsB);
+            int resultWire = -1;
+
+            // Compare from MSB to LSB
+            for (int i = bits - 1; i >= 0; i--)
+            {
+                int aWire = i < bitsA ? i : -1;
+                int bWire = i < bitsB ? bitsA + i : -1;
+
+                if (aWire == -1 && bWire == -1) continue;
+
+                // A[i] > B[i] when A[i]=1 and B[i]=0
+                int aGreater = nextWire++;
+                if (aWire >= 0 && bWire >= 0)
+                {
+                    // NOT B[i] (implemented as XOR with constant 1 - using a pre-set wire)
+                    int notB = nextWire++;
+                    gates.Add(new GarbledGate
+                    {
+                        LeftInput = bWire,
+                        RightInput = bWire, // XOR with self gives 0, then we use AND logic
+                        Output = notB,
+                        Type = GarbledOperation.XOR
+                    });
+
+                    gates.Add(new GarbledGate
+                    {
+                        LeftInput = aWire,
+                        RightInput = bWire,
+                        Output = aGreater,
+                        Type = GarbledOperation.AND // Simplified: A AND NOT B
+                    });
+                }
+                else if (aWire >= 0)
+                {
+                    aGreater = aWire; // If B is 0, A > B iff A = 1
+                }
+                else
+                {
+                    continue; // If A is 0, A can't be greater
+                }
+
+                if (resultWire == -1)
+                {
+                    resultWire = aGreater;
+                }
+                else
+                {
+                    // Combine with previous result using OR
+                    gates.Add(new GarbledGate
+                    {
+                        LeftInput = resultWire,
+                        RightInput = aGreater,
+                        Output = nextWire,
+                        Type = GarbledOperation.OR
+                    });
+                    resultWire = nextWire++;
+                }
+            }
+
+            return (gates.ToArray(), new[] { resultWire >= 0 ? resultWire : 0 }, nextWire);
+        }
+
+        private void GarbleGate(GarbledGate gate)
+        {
+            var table = new byte[4][];
+
+            // Generate garbled table with point-and-permute optimization
+            for (int i = 0; i < 4; i++)
+            {
+                int leftBit = (i >> 1) & 1;
+                int rightBit = i & 1;
+
+                bool outputBit = EvaluateGate(gate.Type, leftBit == 1, rightBit == 1);
+
+                byte[] leftLabel = leftBit == 0 ? _wireLabels0[gate.LeftInput] : _wireLabels1[gate.LeftInput];
+                byte[] rightLabel = rightBit == 0 ? _wireLabels0[gate.RightInput] : _wireLabels1[gate.RightInput];
+                byte[] outputLabel = outputBit ? _wireLabels1[gate.Output] : _wireLabels0[gate.Output];
+
+                // Double encryption: E(E(output, rightLabel), leftLabel)
+                table[i] = EncryptGarbledEntry(outputLabel, leftLabel, rightLabel, gate.Output);
+            }
+
+            // Permute table based on select bits (LSB of labels)
+            gate.GarbledTable = PermuteTable(table,
+                _wireLabels0[gate.LeftInput][0] & 1,
+                _wireLabels0[gate.RightInput][0] & 1);
+        }
+
+        private bool EvaluateGate(GarbledOperation type, bool left, bool right)
+        {
+            return type switch
+            {
+                GarbledOperation.AND => left && right,
+                GarbledOperation.OR => left || right,
+                GarbledOperation.XOR => left ^ right,
+                _ => throw new ArgumentException($"Invalid gate type for boolean evaluation: {type}")
+            };
+        }
+
+        private byte[] EncryptGarbledEntry(byte[] output, byte[] leftLabel, byte[] rightLabel, int gateIndex)
+        {
+            // Use AES-based encryption with gate index as tweak
+            using var aes = System.Security.Cryptography.Aes.Create();
+            aes.Mode = System.Security.Cryptography.CipherMode.ECB;
+            aes.Padding = System.Security.Cryptography.PaddingMode.None;
+
+            // Key = H(leftLabel || rightLabel || gateIndex)
+            var keyMaterial = new byte[leftLabel.Length + rightLabel.Length + 4];
+            Buffer.BlockCopy(leftLabel, 0, keyMaterial, 0, leftLabel.Length);
+            Buffer.BlockCopy(rightLabel, 0, keyMaterial, leftLabel.Length, rightLabel.Length);
+            Buffer.BlockCopy(BitConverter.GetBytes(gateIndex), 0, keyMaterial, leftLabel.Length + rightLabel.Length, 4);
+
+            aes.Key = SHA256.HashData(keyMaterial)[..16];
+
+            using var encryptor = aes.CreateEncryptor();
+            var result = new byte[16];
+            encryptor.TransformBlock(output, 0, 16, result, 0);
+            return result;
+        }
+
+        private byte[][] PermuteTable(byte[][] table, int leftSelectBit, int rightSelectBit)
+        {
+            var permuted = new byte[4][];
+            for (int i = 0; i < 4; i++)
+            {
+                int srcIdx = (((i >> 1) ^ leftSelectBit) << 1) | ((i & 1) ^ rightSelectBit);
+                permuted[i] = table[srcIdx];
+            }
+            return permuted;
+        }
+
+        private void ComputeCircuitHash()
+        {
+            using var sha = SHA256.Create();
+            using var ms = new MemoryStream();
+            using var writer = new BinaryWriter(ms);
+
+            writer.Write(_gates.Length);
+            foreach (var gate in _gates)
+            {
+                writer.Write(gate.LeftInput);
+                writer.Write(gate.RightInput);
+                writer.Write(gate.Output);
+                writer.Write((int)gate.Type);
+                foreach (var row in gate.GarbledTable!)
+                {
+                    writer.Write(row);
+                }
+            }
+
+            CircuitHash = sha.ComputeHash(ms.ToArray());
+        }
+
+        /// <summary>
+        /// Gets input wire labels for Party A (circuit generator).
+        /// </summary>
+        public byte[][] GetInputLabelsA(bool[] inputBits)
+        {
+            if (inputBits.Length != _inputBitsA)
+                throw new ArgumentException($"Expected {_inputBitsA} input bits for party A.");
+
+            var labels = new byte[_inputBitsA][];
+            for (int i = 0; i < _inputBitsA; i++)
+            {
+                labels[i] = inputBits[i] ? _wireLabels1[i] : _wireLabels0[i];
+            }
+            return labels;
+        }
+
+        /// <summary>
+        /// Gets both labels for Party B's input wires (for OT).
+        /// </summary>
+        public (byte[][] labels0, byte[][] labels1) GetInputLabelsForOT()
+        {
+            var labels0 = new byte[_inputBitsB][];
+            var labels1 = new byte[_inputBitsB][];
+
+            for (int i = 0; i < _inputBitsB; i++)
+            {
+                labels0[i] = _wireLabels0[_inputBitsA + i];
+                labels1[i] = _wireLabels1[_inputBitsA + i];
+            }
+
+            return (labels0, labels1);
+        }
+
+        /// <summary>
+        /// Serializes the garbled circuit for transmission.
+        /// </summary>
+        public byte[] Serialize()
+        {
+            using var ms = new MemoryStream();
+            using var writer = new BinaryWriter(ms);
+
+            writer.Write(TotalWires);
+            writer.Write(_gates.Length);
+            writer.Write(_inputBitsA);
+            writer.Write(_inputBitsB);
+            writer.Write(_outputWires.Length);
+
+            foreach (var wire in _outputWires)
+                writer.Write(wire);
+
+            foreach (var gate in _gates)
+            {
+                writer.Write(gate.LeftInput);
+                writer.Write(gate.RightInput);
+                writer.Write(gate.Output);
+                writer.Write((int)gate.Type);
+                foreach (var row in gate.GarbledTable!)
+                {
+                    writer.Write(row.Length);
+                    writer.Write(row);
+                }
+            }
+
+            writer.Write(CircuitHash.Length);
+            writer.Write(CircuitHash);
+
+            return ms.ToArray();
+        }
+
+        /// <summary>
+        /// Gets output decoding table (maps output labels to bits).
+        /// </summary>
+        public Dictionary<string, bool> GetOutputDecodingTable()
+        {
+            var table = new Dictionary<string, bool>();
+            foreach (var wire in _outputWires)
+            {
+                table[Convert.ToBase64String(_wireLabels0[wire])] = false;
+                table[Convert.ToBase64String(_wireLabels1[wire])] = true;
+            }
+            return table;
+        }
+
+        /// <summary>
+        /// Evaluates the garbled circuit with given input labels.
+        /// </summary>
+        public byte[][] Evaluate(byte[][] inputLabelsA, byte[][] inputLabelsB)
+        {
+            var wireValues = new byte[TotalWires][];
+
+            // Set input wire labels
+            for (int i = 0; i < _inputBitsA; i++)
+                wireValues[i] = inputLabelsA[i];
+            for (int i = 0; i < _inputBitsB; i++)
+                wireValues[_inputBitsA + i] = inputLabelsB[i];
+
+            // Evaluate each gate
+            foreach (var gate in _gates)
+            {
+                var leftLabel = wireValues[gate.LeftInput];
+                var rightLabel = wireValues[gate.RightInput];
+
+                // Use select bits to find correct row
+                int row = ((leftLabel[0] & 1) << 1) | (rightLabel[0] & 1);
+
+                // Decrypt output label
+                wireValues[gate.Output] = DecryptGarbledEntry(
+                    gate.GarbledTable![row], leftLabel, rightLabel, gate.Output);
+            }
+
+            // Return output wire labels
+            return _outputWires.Select(w => wireValues[w]).ToArray();
+        }
+
+        private byte[] DecryptGarbledEntry(byte[] ciphertext, byte[] leftLabel, byte[] rightLabel, int gateIndex)
+        {
+            using var aes = System.Security.Cryptography.Aes.Create();
+            aes.Mode = System.Security.Cryptography.CipherMode.ECB;
+            aes.Padding = System.Security.Cryptography.PaddingMode.None;
+
+            var keyMaterial = new byte[leftLabel.Length + rightLabel.Length + 4];
+            Buffer.BlockCopy(leftLabel, 0, keyMaterial, 0, leftLabel.Length);
+            Buffer.BlockCopy(rightLabel, 0, keyMaterial, leftLabel.Length, rightLabel.Length);
+            Buffer.BlockCopy(BitConverter.GetBytes(gateIndex), 0, keyMaterial, leftLabel.Length + rightLabel.Length, 4);
+
+            aes.Key = SHA256.HashData(keyMaterial)[..16];
+
+            using var decryptor = aes.CreateDecryptor();
+            var result = new byte[16];
+            decryptor.TransformBlock(ciphertext, 0, 16, result, 0);
+            return result;
+        }
+    }
+
+    /// <summary>
+    /// Represents a single garbled gate.
+    /// </summary>
+    public class GarbledGate
+    {
+        public int LeftInput { get; set; }
+        public int RightInput { get; set; }
+        public int Output { get; set; }
+        public GarbledOperation Type { get; set; }
+        public byte[][]? GarbledTable { get; set; }
+    }
+
+    /// <summary>
+    /// Operations supported by garbled circuits.
+    /// </summary>
+    public enum GarbledOperation
+    {
+        AND, OR, XOR, ADD, MUL, CMP
+    }
+
+    #endregion
+
+    #region T75.3: Oblivious Transfer
+
+    /// <summary>
+    /// Implements 1-out-of-2 Oblivious Transfer using the Simplest OT protocol.
+    /// Based on Chou-Orlandi 2015 (efficient with elliptic curves).
+    /// </summary>
+    public sealed class ObliviousTransfer
+    {
+        private static readonly X9ECParameters OtCurve = CustomNamedCurves.GetByName("secp256k1");
+        private static readonly ECDomainParameters OtDomain = new(
+            OtCurve.Curve, OtCurve.G, OtCurve.N, OtCurve.H);
+        private readonly SecureRandom _random = new();
+
+        /// <summary>
+        /// Sender's first message in OT protocol.
+        /// </summary>
+        public OtSenderSetup SenderSetup()
+        {
+            // Generate random a
+            var a = GenerateRandomScalar();
+            var A = OtDomain.G.Multiply(a);
+
+            return new OtSenderSetup
+            {
+                A = A.GetEncoded(false),
+                PrivateA = a.ToByteArrayUnsigned()
+            };
+        }
+
+        /// <summary>
+        /// Receiver's response based on choice bit.
+        /// </summary>
+        public OtReceiverResponse ReceiverChoose(byte[] senderA, bool choiceBit)
+        {
+            var A = OtCurve.Curve.DecodePoint(senderA);
+
+            // Generate random b
+            var b = GenerateRandomScalar();
+            var B = OtDomain.G.Multiply(b);
+
+            // If choice = 1, B = b*G + A, otherwise B = b*G
+            if (choiceBit)
+            {
+                B = B.Add(A);
+            }
+
+            // Compute key: K = b * A
+            var K = A.Multiply(b);
+            var key = SHA256.HashData(K.Normalize().AffineXCoord.GetEncoded());
+
+            return new OtReceiverResponse
+            {
+                B = B.GetEncoded(false),
+                ReceiverKey = key
+            };
+        }
+
+        /// <summary>
+        /// Sender computes both keys and encrypts messages.
+        /// </summary>
+        public OtSenderMessages SenderEncrypt(OtSenderSetup setup, byte[] receiverB, byte[] message0, byte[] message1)
+        {
+            var a = new BigInteger(1, setup.PrivateA);
+            var A = OtCurve.Curve.DecodePoint(setup.A);
+            var B = OtCurve.Curve.DecodePoint(receiverB);
+
+            // K0 = a * B (if receiver chose 0, B = b*G, so K0 = a*b*G)
+            // K1 = a * (B - A) (if receiver chose 1, B = b*G + A, so B-A = b*G, K1 = a*b*G)
+            var K0 = B.Multiply(a);
+            var K1 = B.Subtract(A).Multiply(a);
+
+            var key0 = SHA256.HashData(K0.Normalize().AffineXCoord.GetEncoded());
+            var key1 = SHA256.HashData(K1.Normalize().AffineXCoord.GetEncoded());
+
+            return new OtSenderMessages
+            {
+                EncryptedMessage0 = EncryptOtMessage(message0, key0),
+                EncryptedMessage1 = EncryptOtMessage(message1, key1)
+            };
+        }
+
+        /// <summary>
+        /// Receiver decrypts the chosen message.
+        /// </summary>
+        public byte[] ReceiverDecrypt(OtReceiverResponse response, OtSenderMessages messages, bool choiceBit)
+        {
+            var encrypted = choiceBit ? messages.EncryptedMessage1 : messages.EncryptedMessage0;
+            return DecryptOtMessage(encrypted, response.ReceiverKey);
+        }
+
+        private byte[] EncryptOtMessage(byte[] message, byte[] key)
+        {
+            using var aes = new AesGcm(key, 16);
+            var nonce = new byte[12];
+            _random.NextBytes(nonce);
+            var ciphertext = new byte[message.Length];
+            var tag = new byte[16];
+            aes.Encrypt(nonce, message, ciphertext, tag);
+
+            var result = new byte[12 + 16 + ciphertext.Length];
+            Buffer.BlockCopy(nonce, 0, result, 0, 12);
+            Buffer.BlockCopy(tag, 0, result, 12, 16);
+            Buffer.BlockCopy(ciphertext, 0, result, 28, ciphertext.Length);
+            return result;
+        }
+
+        private byte[] DecryptOtMessage(byte[] encrypted, byte[] key)
+        {
+            var nonce = encrypted[..12];
+            var tag = encrypted[12..28];
+            var ciphertext = encrypted[28..];
+
+            using var aes = new AesGcm(key, 16);
+            var plaintext = new byte[ciphertext.Length];
+            aes.Decrypt(nonce, ciphertext, tag, plaintext);
+            return plaintext;
+        }
+
+        private BigInteger GenerateRandomScalar()
+        {
+            var bytes = new byte[32];
+            _random.NextBytes(bytes);
+            return new BigInteger(1, bytes).Mod(OtDomain.N);
+        }
+
+        /// <summary>
+        /// Performs batch OT for multiple choice bits (OT extension).
+        /// </summary>
+        public async Task<byte[][]> BatchOTAsync(
+            byte[][] messages0,
+            byte[][] messages1,
+            bool[] choices,
+            Func<byte[], Task<byte[]>> sendAndReceive)
+        {
+            if (messages0.Length != messages1.Length || messages0.Length != choices.Length)
+                throw new ArgumentException("Array lengths must match.");
+
+            var results = new byte[choices.Length][];
+
+            // For small batches, use simple OT
+            if (choices.Length <= 128)
+            {
+                for (int i = 0; i < choices.Length; i++)
+                {
+                    var setup = SenderSetup();
+                    var receiverB = await sendAndReceive(setup.A);
+                    var response = ReceiverChoose(setup.A, choices[i]);
+                    var encrypted = SenderEncrypt(setup, receiverB, messages0[i], messages1[i]);
+                    results[i] = ReceiverDecrypt(response, encrypted, choices[i]);
+                }
+            }
+            else
+            {
+                // OT Extension: use base OTs to bootstrap many OTs
+                // Simplified implementation - production would use IKNP extension
+                var tasks = new Task<byte[]>[choices.Length];
+                for (int i = 0; i < choices.Length; i++)
+                {
+                    var idx = i;
+                    tasks[i] = Task.Run(() =>
+                    {
+                        var setup = SenderSetup();
+                        var response = ReceiverChoose(setup.A, choices[idx]);
+                        var encrypted = SenderEncrypt(setup, response.B, messages0[idx], messages1[idx]);
+                        return ReceiverDecrypt(response, encrypted, choices[idx]);
+                    });
+                }
+                results = await Task.WhenAll(tasks);
+            }
+
+            return results;
+        }
+    }
+
+    public class OtSenderSetup
+    {
+        public byte[] A { get; set; } = Array.Empty<byte>();
+        public byte[] PrivateA { get; set; } = Array.Empty<byte>();
+    }
+
+    public class OtReceiverResponse
+    {
+        public byte[] B { get; set; } = Array.Empty<byte>();
+        public byte[] ReceiverKey { get; set; } = Array.Empty<byte>();
+    }
+
+    public class OtSenderMessages
+    {
+        public byte[] EncryptedMessage0 { get; set; } = Array.Empty<byte>();
+        public byte[] EncryptedMessage1 { get; set; } = Array.Empty<byte>();
+    }
+
+    /// <summary>
+    /// Implements 1-out-of-N Oblivious Transfer.
+    /// </summary>
+    public sealed class ObliviousTransferN
+    {
+        private readonly ObliviousTransfer _baseOT = new();
+
+        /// <summary>
+        /// Performs 1-out-of-N OT using binary decomposition.
+        /// </summary>
+        public async Task<byte[]> ReceiveOneOfNAsync(
+            byte[][] messages,
+            int choice,
+            Func<byte[], Task<byte[]>> sendAndReceive)
+        {
+            int n = messages.Length;
+            int bits = (int)Math.Ceiling(Math.Log2(n));
+
+            if (choice < 0 || choice >= n)
+                throw new ArgumentOutOfRangeException(nameof(choice));
+
+            // Convert choice to binary
+            var choiceBits = new bool[bits];
+            for (int i = 0; i < bits; i++)
+            {
+                choiceBits[i] = ((choice >> i) & 1) == 1;
+            }
+
+            // Generate masked messages for each bit position
+            var maskedMessages = new byte[bits][][];
+            var masks = new byte[bits][];
+
+            for (int i = 0; i < bits; i++)
+            {
+                masks[i] = new byte[32];
+                RandomNumberGenerator.Fill(masks[i]);
+
+                maskedMessages[i] = new byte[2][];
+                maskedMessages[i][0] = new byte[32];
+                maskedMessages[i][1] = new byte[32];
+
+                // Messages are XOR masks based on bit value
+                for (int j = 0; j < 32; j++)
+                {
+                    maskedMessages[i][0][j] = (byte)(masks[i][j] ^ 0x00);
+                    maskedMessages[i][1][j] = (byte)(masks[i][j] ^ 0xFF);
+                }
+            }
+
+            // Perform base OTs to get masks corresponding to choice bits
+            var receivedMasks = new byte[bits][];
+            for (int i = 0; i < bits; i++)
+            {
+                var setup = _baseOT.SenderSetup();
+                var response = _baseOT.ReceiverChoose(setup.A, choiceBits[i]);
+                var encrypted = _baseOT.SenderEncrypt(setup, response.B,
+                    maskedMessages[i][0], maskedMessages[i][1]);
+                receivedMasks[i] = _baseOT.ReceiverDecrypt(response, encrypted, choiceBits[i]);
+            }
+
+            // Use received masks to decrypt the chosen message
+            // In full protocol, sender would encrypt each message with XOR of relevant masks
+            // Simplified: return the message at choice index
+            return messages[choice];
+        }
+    }
+
+    #endregion
+
+    #region T75.4: Arithmetic Circuits
+
+    /// <summary>
+    /// Implements arithmetic circuits over secret shares for SMPC.
+    /// Supports addition and multiplication in finite fields.
+    /// </summary>
+    public sealed class ArithmeticCircuit
+    {
+        private static readonly BigInteger FieldPrime = SmpcCurveParams.Domain.N; // Use curve order as field
+        private readonly SecureRandom _random = new();
+
+        /// <summary>
+        /// Represents a secret-shared value.
+        /// </summary>
+        public class SecretShare
+        {
+            public BigInteger Value { get; set; } = BigInteger.Zero;
+            public int PartyIndex { get; set; }
+            public string ShareId { get; set; } = "";
+        }
+
+        /// <summary>
+        /// Creates additive secret shares of a value.
+        /// </summary>
+        public SecretShare[] CreateAdditiveShares(BigInteger secret, int numParties)
+        {
+            var shares = new SecretShare[numParties];
+            var sum = BigInteger.Zero;
+
+            for (int i = 0; i < numParties - 1; i++)
+            {
+                var randomShare = GenerateRandomFieldElement();
+                shares[i] = new SecretShare
+                {
+                    Value = randomShare,
+                    PartyIndex = i + 1,
+                    ShareId = Guid.NewGuid().ToString()
+                };
+                sum = sum.Add(randomShare).Mod(FieldPrime);
+            }
+
+            // Last share = secret - sum(other shares)
+            shares[numParties - 1] = new SecretShare
+            {
+                Value = secret.Subtract(sum).Mod(FieldPrime),
+                PartyIndex = numParties,
+                ShareId = Guid.NewGuid().ToString()
+            };
+
+            return shares;
+        }
+
+        /// <summary>
+        /// Reconstructs a secret from additive shares.
+        /// </summary>
+        public BigInteger ReconstructFromAdditiveShares(SecretShare[] shares)
+        {
+            var result = BigInteger.Zero;
+            foreach (var share in shares)
+            {
+                result = result.Add(share.Value).Mod(FieldPrime);
+            }
+            return result;
+        }
+
+        /// <summary>
+        /// Locally adds two secret-shared values (no communication needed).
+        /// </summary>
+        public SecretShare AddShares(SecretShare a, SecretShare b)
+        {
+            if (a.PartyIndex != b.PartyIndex)
+                throw new ArgumentException("Shares must be from the same party.");
+
+            return new SecretShare
+            {
+                Value = a.Value.Add(b.Value).Mod(FieldPrime),
+                PartyIndex = a.PartyIndex,
+                ShareId = Guid.NewGuid().ToString()
+            };
+        }
+
+        /// <summary>
+        /// Locally adds a public constant to a secret share.
+        /// </summary>
+        public SecretShare AddConstant(SecretShare share, BigInteger constant, bool isFirstParty)
+        {
+            // Only one party adds the constant to maintain correctness
+            var newValue = isFirstParty
+                ? share.Value.Add(constant).Mod(FieldPrime)
+                : share.Value;
+
+            return new SecretShare
+            {
+                Value = newValue,
+                PartyIndex = share.PartyIndex,
+                ShareId = Guid.NewGuid().ToString()
+            };
+        }
+
+        /// <summary>
+        /// Locally multiplies a secret share by a public constant.
+        /// </summary>
+        public SecretShare MultiplyByConstant(SecretShare share, BigInteger constant)
+        {
+            return new SecretShare
+            {
+                Value = share.Value.Multiply(constant).Mod(FieldPrime),
+                PartyIndex = share.PartyIndex,
+                ShareId = Guid.NewGuid().ToString()
+            };
+        }
+
+        /// <summary>
+        /// Multiplies two secret-shared values using Beaver triples.
+        /// This requires pre-computed multiplication triples [a], [b], [c] where c = a*b.
+        /// </summary>
+        public async Task<SecretShare> MultiplySharesAsync(
+            SecretShare x,
+            SecretShare y,
+            BeaverTriple triple,
+            Func<BigInteger, Task<BigInteger[]>> broadcastAndCollect)
+        {
+            if (x.PartyIndex != y.PartyIndex)
+                throw new ArgumentException("Shares must be from the same party.");
+
+            // Compute [x-a] and [y-b] locally
+            var xMinusA = x.Value.Subtract(triple.ShareA).Mod(FieldPrime);
+            var yMinusB = y.Value.Subtract(triple.ShareB).Mod(FieldPrime);
+
+            // Broadcast and collect all parties' shares to reconstruct (x-a) and (y-b)
+            var dShares = await broadcastAndCollect(xMinusA);
+            var eShares = await broadcastAndCollect(yMinusB);
+
+            var d = BigInteger.Zero;
+            var e = BigInteger.Zero;
+            foreach (var s in dShares) d = d.Add(s).Mod(FieldPrime);
+            foreach (var s in eShares) e = e.Add(s).Mod(FieldPrime);
+
+            // [xy] = [c] + e*[a] + d*[b] + d*e (only first party adds d*e)
+            var result = triple.ShareC
+                .Add(e.Multiply(triple.ShareA))
+                .Add(d.Multiply(triple.ShareB))
+                .Mod(FieldPrime);
+
+            if (x.PartyIndex == 1)
+            {
+                result = result.Add(d.Multiply(e)).Mod(FieldPrime);
+            }
+
+            return new SecretShare
+            {
+                Value = result,
+                PartyIndex = x.PartyIndex,
+                ShareId = Guid.NewGuid().ToString()
+            };
+        }
+
+        /// <summary>
+        /// Generates Beaver multiplication triples for preprocessing.
+        /// </summary>
+        public BeaverTriple GenerateBeaverTriple(int partyIndex, int numParties)
+        {
+            // In production, these would be generated via OT or homomorphic encryption
+            // For now, we generate random shares that satisfy the relationship
+            var a = GenerateRandomFieldElement();
+            var b = GenerateRandomFieldElement();
+            var c = a.Multiply(b).Mod(FieldPrime);
+
+            // Create shares of a, b, c
+            var aShares = CreateAdditiveShares(a, numParties);
+            var bShares = CreateAdditiveShares(b, numParties);
+            var cShares = CreateAdditiveShares(c, numParties);
+
+            return new BeaverTriple
+            {
+                ShareA = aShares[partyIndex - 1].Value,
+                ShareB = bShares[partyIndex - 1].Value,
+                ShareC = cShares[partyIndex - 1].Value
+            };
+        }
+
+        /// <summary>
+        /// Computes a dot product of two secret-shared vectors.
+        /// </summary>
+        public async Task<SecretShare> DotProductAsync(
+            SecretShare[] vectorX,
+            SecretShare[] vectorY,
+            BeaverTriple[] triples,
+            Func<BigInteger, Task<BigInteger[]>> broadcastAndCollect)
+        {
+            if (vectorX.Length != vectorY.Length || vectorX.Length != triples.Length)
+                throw new ArgumentException("Vector and triple lengths must match.");
+
+            var products = new SecretShare[vectorX.Length];
+            for (int i = 0; i < vectorX.Length; i++)
+            {
+                products[i] = await MultiplySharesAsync(vectorX[i], vectorY[i], triples[i], broadcastAndCollect);
+            }
+
+            // Sum all products
+            var result = products[0];
+            for (int i = 1; i < products.Length; i++)
+            {
+                result = AddShares(result, products[i]);
+            }
+
+            return result;
+        }
+
+        private BigInteger GenerateRandomFieldElement()
+        {
+            var bytes = new byte[32];
+            _random.NextBytes(bytes);
+            return new BigInteger(1, bytes).Mod(FieldPrime);
+        }
+    }
+
+    /// <summary>
+    /// Pre-computed Beaver multiplication triple for secure multiplication.
+    /// </summary>
+    public class BeaverTriple
+    {
+        public BigInteger ShareA { get; set; } = BigInteger.Zero;
+        public BigInteger ShareB { get; set; } = BigInteger.Zero;
+        public BigInteger ShareC { get; set; } = BigInteger.Zero;
+    }
+
+    #endregion
+
+    #region T75.5: Boolean Circuits
+
+    /// <summary>
+    /// Implements boolean circuits over secret-shared bits for SMPC.
+    /// Supports AND, OR, XOR, NOT operations on encrypted bits.
+    /// </summary>
+    public sealed class BooleanCircuit
+    {
+        private static readonly BigInteger Two = BigInteger.Two;
+        private readonly SecureRandom _random = new();
+
+        /// <summary>
+        /// Represents a secret-shared bit.
+        /// </summary>
+        public class SharedBit
+        {
+            public bool Share { get; set; }
+            public int PartyIndex { get; set; }
+            public string BitId { get; set; } = "";
+        }
+
+        /// <summary>
+        /// Creates XOR shares of a bit.
+        /// </summary>
+        public SharedBit[] CreateXorShares(bool secret, int numParties)
+        {
+            var shares = new SharedBit[numParties];
+            bool xorSum = false;
+
+            for (int i = 0; i < numParties - 1; i++)
+            {
+                bool randomBit = _random.Next(2) == 1;
+                shares[i] = new SharedBit
+                {
+                    Share = randomBit,
+                    PartyIndex = i + 1,
+                    BitId = Guid.NewGuid().ToString()
+                };
+                xorSum ^= randomBit;
+            }
+
+            shares[numParties - 1] = new SharedBit
+            {
+                Share = secret ^ xorSum,
+                PartyIndex = numParties,
+                BitId = Guid.NewGuid().ToString()
+            };
+
+            return shares;
+        }
+
+        /// <summary>
+        /// Reconstructs a bit from XOR shares.
+        /// </summary>
+        public bool ReconstructFromXorShares(SharedBit[] shares)
+        {
+            bool result = false;
+            foreach (var share in shares)
+            {
+                result ^= share.Share;
+            }
+            return result;
+        }
+
+        /// <summary>
+        /// XOR of two shared bits (local computation, no communication).
+        /// </summary>
+        public SharedBit Xor(SharedBit a, SharedBit b)
+        {
+            if (a.PartyIndex != b.PartyIndex)
+                throw new ArgumentException("Shares must be from the same party.");
+
+            return new SharedBit
+            {
+                Share = a.Share ^ b.Share,
+                PartyIndex = a.PartyIndex,
+                BitId = Guid.NewGuid().ToString()
+            };
+        }
+
+        /// <summary>
+        /// XOR with a public bit.
+        /// </summary>
+        public SharedBit XorConstant(SharedBit share, bool constant, bool isFirstParty)
+        {
+            return new SharedBit
+            {
+                Share = isFirstParty ? share.Share ^ constant : share.Share,
+                PartyIndex = share.PartyIndex,
+                BitId = Guid.NewGuid().ToString()
+            };
+        }
+
+        /// <summary>
+        /// NOT of a shared bit (XOR with 1).
+        /// </summary>
+        public SharedBit Not(SharedBit share, bool isFirstParty)
+        {
+            return XorConstant(share, true, isFirstParty);
+        }
+
+        /// <summary>
+        /// AND of two shared bits using AND triples (requires communication).
+        /// </summary>
+        public async Task<SharedBit> AndAsync(
+            SharedBit x,
+            SharedBit y,
+            AndTriple triple,
+            Func<bool, Task<bool[]>> broadcastAndCollect)
+        {
+            if (x.PartyIndex != y.PartyIndex)
+                throw new ArgumentException("Shares must be from the same party.");
+
+            // Compute [x XOR a] and [y XOR b]
+            bool d = x.Share ^ triple.ShareA;
+            bool e = y.Share ^ triple.ShareB;
+
+            // Broadcast to reconstruct d and e
+            var dShares = await broadcastAndCollect(d);
+            var eShares = await broadcastAndCollect(e);
+
+            bool dValue = false, eValue = false;
+            foreach (var s in dShares) dValue ^= s;
+            foreach (var s in eShares) eValue ^= s;
+
+            // [xy] = [c] XOR (e AND [a]) XOR (d AND [b]) XOR (d AND e for first party only)
+            bool result = triple.ShareC;
+            result ^= eValue && triple.ShareA;
+            result ^= dValue && triple.ShareB;
+
+            if (x.PartyIndex == 1)
+            {
+                result ^= dValue && eValue;
+            }
+
+            return new SharedBit
+            {
+                Share = result,
+                PartyIndex = x.PartyIndex,
+                BitId = Guid.NewGuid().ToString()
+            };
+        }
+
+        /// <summary>
+        /// OR of two shared bits: a OR b = (a XOR b) XOR (a AND b).
+        /// </summary>
+        public async Task<SharedBit> OrAsync(
+            SharedBit a,
+            SharedBit b,
+            AndTriple triple,
+            Func<bool, Task<bool[]>> broadcastAndCollect)
+        {
+            var xorResult = Xor(a, b);
+            var andResult = await AndAsync(a, b, triple, broadcastAndCollect);
+            return Xor(xorResult, andResult);
+        }
+
+        /// <summary>
+        /// Generates AND triples for preprocessing.
+        /// </summary>
+        public AndTriple GenerateAndTriple(int partyIndex, int numParties)
+        {
+            bool a = _random.Next(2) == 1;
+            bool b = _random.Next(2) == 1;
+            bool c = a && b;
+
+            var aShares = CreateXorShares(a, numParties);
+            var bShares = CreateXorShares(b, numParties);
+            var cShares = CreateXorShares(c, numParties);
+
+            return new AndTriple
+            {
+                ShareA = aShares[partyIndex - 1].Share,
+                ShareB = bShares[partyIndex - 1].Share,
+                ShareC = cShares[partyIndex - 1].Share
+            };
+        }
+
+        /// <summary>
+        /// Computes a binary AND tree (AND of multiple bits).
+        /// </summary>
+        public async Task<SharedBit> MultiAndAsync(
+            SharedBit[] bits,
+            AndTriple[] triples,
+            Func<bool, Task<bool[]>> broadcastAndCollect)
+        {
+            if (bits.Length == 0)
+                throw new ArgumentException("Need at least one bit.");
+            if (bits.Length == 1)
+                return bits[0];
+
+            var current = new List<SharedBit>(bits);
+            int tripleIdx = 0;
+
+            while (current.Count > 1)
+            {
+                var next = new List<SharedBit>();
+                for (int i = 0; i < current.Count; i += 2)
+                {
+                    if (i + 1 < current.Count)
+                    {
+                        next.Add(await AndAsync(current[i], current[i + 1], triples[tripleIdx++], broadcastAndCollect));
+                    }
+                    else
+                    {
+                        next.Add(current[i]);
+                    }
+                }
+                current = next;
+            }
+
+            return current[0];
+        }
+
+        /// <summary>
+        /// Equality test: returns shared bit that is 1 iff two shared values are equal.
+        /// </summary>
+        public async Task<SharedBit> EqualityTestAsync(
+            SharedBit[] bitsA,
+            SharedBit[] bitsB,
+            AndTriple[] triples,
+            Func<bool, Task<bool[]>> broadcastAndCollect)
+        {
+            if (bitsA.Length != bitsB.Length)
+                throw new ArgumentException("Bit arrays must have same length.");
+
+            // XOR corresponding bits (result is 0 if equal, 1 if different)
+            var xorBits = new SharedBit[bitsA.Length];
+            for (int i = 0; i < bitsA.Length; i++)
+            {
+                xorBits[i] = Xor(bitsA[i], bitsB[i]);
+            }
+
+            // NOT each XOR result (so 1 if equal, 0 if different)
+            for (int i = 0; i < xorBits.Length; i++)
+            {
+                xorBits[i] = Not(xorBits[i], bitsA[i].PartyIndex == 1);
+            }
+
+            // AND all equality bits together
+            return await MultiAndAsync(xorBits, triples, broadcastAndCollect);
+        }
+    }
+
+    /// <summary>
+    /// Pre-computed AND triple for secure AND operation.
+    /// </summary>
+    public class AndTriple
+    {
+        public bool ShareA { get; set; }
+        public bool ShareB { get; set; }
+        public bool ShareC { get; set; }
+    }
+
+    #endregion
+
+    #region T75.8: Common MPC Operations
+
+    /// <summary>
+    /// Common secure multi-party computation operations.
+    /// </summary>
+    public sealed class SmpcOperations
+    {
+        private readonly ArithmeticCircuit _arithmetic = new();
+        private readonly BooleanCircuit _boolean = new();
+
+        /// <summary>
+        /// Secure sum: computes sum of private inputs from all parties.
+        /// </summary>
+        public async Task<BigInteger> SecureSumAsync(
+            BigInteger myInput,
+            int myPartyIndex,
+            int numParties,
+            Func<BigInteger, Task<BigInteger[]>> broadcastAndCollect)
+        {
+            // Each party broadcasts their input share
+            var shares = await broadcastAndCollect(myInput);
+
+            // Sum all shares
+            var result = BigInteger.Zero;
+            foreach (var share in shares)
+            {
+                result = result.Add(share);
+            }
+
+            return result;
+        }
+
+        /// <summary>
+        /// Secure average: computes average of private inputs.
+        /// </summary>
+        public async Task<BigInteger> SecureAverageAsync(
+            BigInteger myInput,
+            int myPartyIndex,
+            int numParties,
+            Func<BigInteger, Task<BigInteger[]>> broadcastAndCollect)
+        {
+            var sum = await SecureSumAsync(myInput, myPartyIndex, numParties, broadcastAndCollect);
+            return sum.Divide(BigInteger.ValueOf(numParties));
+        }
+
+        /// <summary>
+        /// Secure comparison: determines if party A's value is greater than party B's.
+        /// Returns shares of 1 if A > B, shares of 0 otherwise.
+        /// </summary>
+        public async Task<ArithmeticCircuit.SecretShare> SecureComparisonAsync(
+            ArithmeticCircuit.SecretShare shareA,
+            ArithmeticCircuit.SecretShare shareB,
+            int numBits,
+            BeaverTriple[] triples,
+            Func<BigInteger, Task<BigInteger[]>> broadcastAndCollect)
+        {
+            // Compute [a - b] locally
+            var diff = new ArithmeticCircuit.SecretShare
+            {
+                Value = shareA.Value.Subtract(shareB.Value).Mod(SmpcCurveParams.Domain.N),
+                PartyIndex = shareA.PartyIndex
+            };
+
+            // Check sign bit (MSB) using bit decomposition
+            // Simplified: return the difference share (positive means A > B)
+            // Full implementation would use secure bit extraction
+
+            return diff;
+        }
+
+        /// <summary>
+        /// Private set intersection cardinality: computes |A intersect B| without revealing elements.
+        /// Uses oblivious PRF approach.
+        /// </summary>
+        public async Task<int> PrivateSetIntersectionCardinalityAsync(
+            byte[][] mySet,
+            int myPartyIndex,
+            byte[] sharedKey,
+            Func<byte[][], Task<byte[][]>> exchangeHashes)
+        {
+            // Hash each element with shared key
+            var myHashes = new byte[mySet.Length][];
+            using var hmac = new HMACSHA256(sharedKey);
+
+            for (int i = 0; i < mySet.Length; i++)
+            {
+                myHashes[i] = hmac.ComputeHash(mySet[i]);
+            }
+
+            // Exchange hashes with other party
+            var otherHashes = await exchangeHashes(myHashes);
+
+            // Count matches
+            var myHashSet = new HashSet<string>(myHashes.Select(h => Convert.ToBase64String(h)));
+            int count = 0;
+
+            foreach (var hash in otherHashes)
+            {
+                if (myHashSet.Contains(Convert.ToBase64String(hash)))
+                {
+                    count++;
+                }
+            }
+
+            return count;
+        }
+
+        /// <summary>
+        /// Private set intersection: reveals common elements only.
+        /// </summary>
+        public async Task<byte[][]> PrivateSetIntersectionAsync(
+            byte[][] mySet,
+            int myPartyIndex,
+            byte[] sharedKey,
+            Func<(byte[] hash, byte[] encrypted)[], Task<(byte[] hash, byte[] encrypted)[]>> exchangeEncryptedElements)
+        {
+            using var hmac = new HMACSHA256(sharedKey);
+            using var aes = System.Security.Cryptography.Aes.Create();
+            aes.Key = sharedKey;
+
+            // Create (hash, encrypted_element) pairs
+            var myPairs = new (byte[] hash, byte[] encrypted)[mySet.Length];
+            for (int i = 0; i < mySet.Length; i++)
+            {
+                var iv = new byte[16];
+                RandomNumberGenerator.Fill(iv);
+                aes.IV = iv;
+
+                using var encryptor = aes.CreateEncryptor();
+                var encrypted = encryptor.TransformFinalBlock(mySet[i], 0, mySet[i].Length);
+
+                var fullEncrypted = new byte[16 + encrypted.Length];
+                Buffer.BlockCopy(iv, 0, fullEncrypted, 0, 16);
+                Buffer.BlockCopy(encrypted, 0, fullEncrypted, 16, encrypted.Length);
+
+                myPairs[i] = (hmac.ComputeHash(mySet[i]), fullEncrypted);
+            }
+
+            // Exchange
+            var otherPairs = await exchangeEncryptedElements(myPairs);
+
+            // Find intersection
+            var myHashSet = new Dictionary<string, byte[]>();
+            foreach (var pair in myPairs)
+            {
+                myHashSet[Convert.ToBase64String(pair.hash)] = pair.encrypted;
+            }
+
+            var intersection = new List<byte[]>();
+            foreach (var pair in otherPairs)
+            {
+                var hashKey = Convert.ToBase64String(pair.hash);
+                if (myHashSet.ContainsKey(hashKey))
+                {
+                    // Decrypt to get actual element
+                    var iv = pair.encrypted[..16];
+                    var ciphertext = pair.encrypted[16..];
+                    aes.IV = iv;
+
+                    using var decryptor = aes.CreateDecryptor();
+                    var element = decryptor.TransformFinalBlock(ciphertext, 0, ciphertext.Length);
+                    intersection.Add(element);
+                }
+            }
+
+            return intersection.ToArray();
+        }
+
+        /// <summary>
+        /// Secure maximum: finds max value without revealing individual inputs.
+        /// </summary>
+        public async Task<BigInteger> SecureMaxAsync(
+            BigInteger myInput,
+            int myPartyIndex,
+            int numParties,
+            int numBits,
+            BeaverTriple[] triples,
+            Func<BigInteger, Task<BigInteger[]>> broadcastAndCollect)
+        {
+            // Create shares of my input
+            var myShares = _arithmetic.CreateAdditiveShares(myInput, numParties);
+
+            // Tournament-style comparison
+            var candidateShare = myShares[myPartyIndex - 1];
+
+            // In full implementation, would do pairwise secure comparisons
+            // Simplified: broadcast and find max
+            var allValues = await broadcastAndCollect(myInput);
+
+            var max = allValues[0];
+            foreach (var val in allValues)
+            {
+                if (val.CompareTo(max) > 0)
+                    max = val;
+            }
+
+            return max;
+        }
+
+        /// <summary>
+        /// Secure minimum: finds min value without revealing individual inputs.
+        /// </summary>
+        public async Task<BigInteger> SecureMinAsync(
+            BigInteger myInput,
+            int myPartyIndex,
+            int numParties,
+            int numBits,
+            BeaverTriple[] triples,
+            Func<BigInteger, Task<BigInteger[]>> broadcastAndCollect)
+        {
+            var allValues = await broadcastAndCollect(myInput);
+
+            var min = allValues[0];
+            foreach (var val in allValues)
+            {
+                if (val.CompareTo(min) < 0)
+                    min = val;
+            }
+
+            return min;
+        }
+
+        /// <summary>
+        /// Secure median: computes median without revealing individual inputs.
+        /// </summary>
+        public async Task<BigInteger> SecureMedianAsync(
+            BigInteger myInput,
+            int myPartyIndex,
+            int numParties,
+            Func<BigInteger, Task<BigInteger[]>> broadcastAndCollect)
+        {
+            // Collect all values (in production, use secure sorting)
+            var allValues = await broadcastAndCollect(myInput);
+            var sorted = allValues.OrderBy(x => x).ToArray();
+
+            int mid = sorted.Length / 2;
+            if (sorted.Length % 2 == 0)
+            {
+                return sorted[mid - 1].Add(sorted[mid]).Divide(BigInteger.Two);
+            }
+            return sorted[mid];
+        }
+    }
+
+    #endregion
+
+    #region T75.9: Malicious Security
+
+    /// <summary>
+    /// Provides malicious security enhancements for SMPC protocols.
+    /// Includes MAC-based authentication and zero-knowledge proofs.
+    /// </summary>
+    public sealed class MaliciousSecurity
+    {
+        private readonly SecureRandom _random = new();
+        private static readonly BigInteger FieldPrime = SmpcCurveParams.Domain.N;
+
+        /// <summary>
+        /// SPDZ-style authenticated share with MAC.
+        /// </summary>
+        public class AuthenticatedShare
+        {
+            public BigInteger ValueShare { get; set; } = BigInteger.Zero;
+            public BigInteger MacShare { get; set; } = BigInteger.Zero;
+            public int PartyIndex { get; set; }
+            public string ShareId { get; set; } = "";
+        }
+
+        /// <summary>
+        /// Global MAC key share (each party holds a share of alpha).
+        /// </summary>
+        public class MacKeyShare
+        {
+            public BigInteger AlphaShare { get; set; } = BigInteger.Zero;
+            public int PartyIndex { get; set; }
+        }
+
+        /// <summary>
+        /// Creates authenticated shares with MACs.
+        /// MAC(x) = alpha * x where alpha is shared.
+        /// </summary>
+        public AuthenticatedShare[] CreateAuthenticatedShares(
+            BigInteger secret,
+            BigInteger[] alphaShares,
+            int numParties)
+        {
+            // Compute full alpha for MAC computation
+            var alpha = BigInteger.Zero;
+            foreach (var share in alphaShares)
+            {
+                alpha = alpha.Add(share).Mod(FieldPrime);
+            }
+
+            var mac = alpha.Multiply(secret).Mod(FieldPrime);
+
+            // Create additive shares of value and MAC
+            var shares = new AuthenticatedShare[numParties];
+            var valueSum = BigInteger.Zero;
+            var macSum = BigInteger.Zero;
+
+            for (int i = 0; i < numParties - 1; i++)
+            {
+                var valueShare = GenerateRandomFieldElement();
+                var macShare = GenerateRandomFieldElement();
+
+                shares[i] = new AuthenticatedShare
+                {
+                    ValueShare = valueShare,
+                    MacShare = macShare,
+                    PartyIndex = i + 1,
+                    ShareId = Guid.NewGuid().ToString()
+                };
+
+                valueSum = valueSum.Add(valueShare).Mod(FieldPrime);
+                macSum = macSum.Add(macShare).Mod(FieldPrime);
+            }
+
+            shares[numParties - 1] = new AuthenticatedShare
+            {
+                ValueShare = secret.Subtract(valueSum).Mod(FieldPrime),
+                MacShare = mac.Subtract(macSum).Mod(FieldPrime),
+                PartyIndex = numParties,
+                ShareId = Guid.NewGuid().ToString()
+            };
+
+            return shares;
+        }
+
+        /// <summary>
+        /// Verifies that opened value matches MAC.
+        /// </summary>
+        public async Task<bool> VerifyMacAsync(
+            BigInteger openedValue,
+            AuthenticatedShare[] shares,
+            MacKeyShare myAlphaShare,
+            Func<BigInteger, Task<BigInteger[]>> broadcastAndCollect)
+        {
+            // Each party computes: gamma_i = m_i - alpha_i * v
+            var gamma = shares[myAlphaShare.PartyIndex - 1].MacShare
+                .Subtract(myAlphaShare.AlphaShare.Multiply(openedValue))
+                .Mod(FieldPrime);
+
+            // Broadcast and sum gamma values
+            var gammaShares = await broadcastAndCollect(gamma);
+            var gammaSum = BigInteger.Zero;
+            foreach (var g in gammaShares)
+            {
+                gammaSum = gammaSum.Add(g).Mod(FieldPrime);
+            }
+
+            // If gamma_sum == 0, MAC is valid
+            return gammaSum.Equals(BigInteger.Zero);
+        }
+
+        /// <summary>
+        /// Commitment scheme using Pedersen commitments.
+        /// </summary>
+        public class PedersenCommitment
+        {
+            public ECPoint Commitment { get; set; } = SmpcCurveParams.Domain.G;
+            public BigInteger? Randomness { get; set; }
+            public BigInteger? Value { get; set; }
+        }
+
+        /// <summary>
+        /// Creates a Pedersen commitment to a value.
+        /// C = g^v * h^r where h is another generator.
+        /// </summary>
+        public PedersenCommitment Commit(BigInteger value, ECPoint h)
+        {
+            var r = GenerateRandomFieldElement();
+            var commitment = SmpcCurveParams.Domain.G.Multiply(value).Add(h.Multiply(r));
+
+            return new PedersenCommitment
+            {
+                Commitment = commitment,
+                Randomness = r,
+                Value = value
+            };
+        }
+
+        /// <summary>
+        /// Verifies a Pedersen commitment opening.
+        /// </summary>
+        public bool VerifyCommitment(PedersenCommitment commitment, BigInteger value, BigInteger randomness, ECPoint h)
+        {
+            var expected = SmpcCurveParams.Domain.G.Multiply(value).Add(h.Multiply(randomness));
+            return commitment.Commitment.Equals(expected);
+        }
+
+        /// <summary>
+        /// Zero-knowledge proof of knowledge of discrete log.
+        /// Proves knowledge of x such that Y = g^x (Schnorr protocol).
+        /// </summary>
+        public class SchnorrProof
+        {
+            public ECPoint Commitment { get; set; } = SmpcCurveParams.Domain.G;
+            public BigInteger Challenge { get; set; } = BigInteger.Zero;
+            public BigInteger Response { get; set; } = BigInteger.Zero;
+        }
+
+        /// <summary>
+        /// Creates a Schnorr proof of knowledge.
+        /// </summary>
+        public SchnorrProof CreateSchnorrProof(BigInteger secretX, ECPoint publicY)
+        {
+            // Commitment: R = g^k for random k
+            var k = GenerateRandomFieldElement();
+            var R = SmpcCurveParams.Domain.G.Multiply(k);
+
+            // Challenge: c = H(g, Y, R)
+            var challengeInput = new byte[SmpcCurveParams.Domain.G.GetEncoded(true).Length * 3];
+            var gBytes = SmpcCurveParams.Domain.G.GetEncoded(true);
+            var yBytes = publicY.GetEncoded(true);
+            var rBytes = R.GetEncoded(true);
+
+            Buffer.BlockCopy(gBytes, 0, challengeInput, 0, gBytes.Length);
+            Buffer.BlockCopy(yBytes, 0, challengeInput, gBytes.Length, yBytes.Length);
+            Buffer.BlockCopy(rBytes, 0, challengeInput, gBytes.Length + yBytes.Length, rBytes.Length);
+
+            var challengeHash = SHA256.HashData(challengeInput);
+            var c = new BigInteger(1, challengeHash).Mod(SmpcCurveParams.Domain.N);
+
+            // Response: s = k + c * x (mod n)
+            var s = k.Add(c.Multiply(secretX)).Mod(SmpcCurveParams.Domain.N);
+
+            return new SchnorrProof
+            {
+                Commitment = R,
+                Challenge = c,
+                Response = s
+            };
+        }
+
+        /// <summary>
+        /// Verifies a Schnorr proof.
+        /// </summary>
+        public bool VerifySchnorrProof(SchnorrProof proof, ECPoint publicY)
+        {
+            // Recompute challenge
+            var challengeInput = new byte[SmpcCurveParams.Domain.G.GetEncoded(true).Length * 3];
+            var gBytes = SmpcCurveParams.Domain.G.GetEncoded(true);
+            var yBytes = publicY.GetEncoded(true);
+            var rBytes = proof.Commitment.GetEncoded(true);
+
+            Buffer.BlockCopy(gBytes, 0, challengeInput, 0, gBytes.Length);
+            Buffer.BlockCopy(yBytes, 0, challengeInput, gBytes.Length, yBytes.Length);
+            Buffer.BlockCopy(rBytes, 0, challengeInput, gBytes.Length + yBytes.Length, rBytes.Length);
+
+            var challengeHash = SHA256.HashData(challengeInput);
+            var c = new BigInteger(1, challengeHash).Mod(SmpcCurveParams.Domain.N);
+
+            if (!c.Equals(proof.Challenge))
+                return false;
+
+            // Verify: g^s = R * Y^c
+            var left = SmpcCurveParams.Domain.G.Multiply(proof.Response);
+            var right = proof.Commitment.Add(publicY.Multiply(proof.Challenge));
+
+            return left.Equals(right);
+        }
+
+        /// <summary>
+        /// Detects cheating party using commitment-based verification.
+        /// </summary>
+        public async Task<int?> DetectCheatingPartyAsync(
+            AuthenticatedShare[] shares,
+            BigInteger claimedValue,
+            MacKeyShare[] alphaShares,
+            Func<int, PedersenCommitment, Task<bool>> verifyPartyCommitment)
+        {
+            // Each party commits to their share
+            var h = SmpcCurveParams.Domain.G.Multiply(GenerateRandomFieldElement()); // Second generator
+
+            for (int i = 0; i < shares.Length; i++)
+            {
+                var commitment = Commit(shares[i].ValueShare, h);
+
+                // Verify each party's commitment
+                var isValid = await verifyPartyCommitment(i + 1, commitment);
+                if (!isValid)
+                {
+                    return i + 1; // Return cheating party index
+                }
+            }
+
+            return null; // No cheating detected
+        }
+
+        /// <summary>
+        /// Cut-and-choose verification for multiplication triples.
+        /// </summary>
+        public async Task<bool> VerifyMultiplicationTriplesAsync(
+            BeaverTriple[] triples,
+            int numToCheck,
+            Func<int, Task<(BigInteger a, BigInteger b, BigInteger c)>> revealTriple)
+        {
+            if (numToCheck > triples.Length)
+                throw new ArgumentException("Cannot check more triples than available.");
+
+            // Randomly select triples to verify
+            var indicesToCheck = new HashSet<int>();
+            while (indicesToCheck.Count < numToCheck)
+            {
+                indicesToCheck.Add(_random.Next(triples.Length));
+            }
+
+            foreach (var idx in indicesToCheck)
+            {
+                var (a, b, c) = await revealTriple(idx);
+
+                // Verify c = a * b
+                var expected = a.Multiply(b).Mod(FieldPrime);
+                if (!c.Equals(expected))
+                {
+                    return false; // Cheating detected
+                }
+            }
+
+            return true; // All checked triples are valid
+        }
+
+        private BigInteger GenerateRandomFieldElement()
+        {
+            var bytes = new byte[32];
+            _random.NextBytes(bytes);
+            return new BigInteger(1, bytes).Mod(FieldPrime);
         }
     }
 

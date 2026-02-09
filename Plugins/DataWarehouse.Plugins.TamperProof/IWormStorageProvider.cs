@@ -17,7 +17,7 @@ public interface IWormStorageProvider
     /// <param name="request">Write request with data and retention policy.</param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>Write result with record ID.</returns>
-    Task<WormWriteResult> WriteAsync(WormWriteRequest request, CancellationToken ct = default);
+    Task<PluginWormWriteResult> WriteAsync(PluginWormWriteRequest request, CancellationToken ct = default);
 
     /// <summary>
     /// Read data from WORM storage.

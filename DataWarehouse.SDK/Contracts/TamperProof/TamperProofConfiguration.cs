@@ -105,6 +105,25 @@ public class TamperProofConfiguration
     public TimeSpan OperationTimeout { get; set; } = TimeSpan.FromSeconds(30);
 
     /// <summary>
+    /// Interval between background integrity scans. Changeable at runtime.
+    /// Default: 5 minutes.
+    /// </summary>
+    public TimeSpan? BackgroundScanInterval { get; set; } = TimeSpan.FromMinutes(5);
+
+    /// <summary>
+    /// Number of blocks to scan per batch during background integrity scans.
+    /// Changeable at runtime.
+    /// Default: 100.
+    /// </summary>
+    public int BackgroundScanBatchSize { get; set; } = 100;
+
+    /// <summary>
+    /// Whether to automatically start the background integrity scanner on plugin initialization.
+    /// Default: false (manual start required).
+    /// </summary>
+    public bool AutoStartBackgroundScanner { get; set; } = false;
+
+    /// <summary>
     /// Creates a deep clone of this configuration.
     /// </summary>
     public TamperProofConfiguration Clone()
@@ -124,7 +143,10 @@ public class TamperProofConfiguration
             Alerts = Alerts.Clone(),
             ContentPadding = ContentPadding.Clone(),
             MaxConcurrentWrites = MaxConcurrentWrites,
-            OperationTimeout = OperationTimeout
+            OperationTimeout = OperationTimeout,
+            BackgroundScanInterval = BackgroundScanInterval,
+            BackgroundScanBatchSize = BackgroundScanBatchSize,
+            AutoStartBackgroundScanner = AutoStartBackgroundScanner
         };
     }
 

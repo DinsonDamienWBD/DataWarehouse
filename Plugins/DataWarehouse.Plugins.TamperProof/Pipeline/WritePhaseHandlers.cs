@@ -3,6 +3,7 @@
 
 using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Contracts.TamperProof;
+using DataWarehouse.Plugins.TamperProof.Services;
 using Microsoft.Extensions.Logging;
 
 namespace DataWarehouse.Plugins.TamperProof;
@@ -13,6 +14,82 @@ namespace DataWarehouse.Plugins.TamperProof;
 /// </summary>
 public static class WritePhaseHandlers
 {
+    /// <summary>
+    /// Verifies that a block is not sealed before allowing write operations.
+    /// Throws BlockSealedException if the block is sealed.
+    /// </summary>
+    /// <param name="objectId">Object/block ID to check.</param>
+    /// <param name="sealService">Optional seal service (if null, check is skipped).</param>
+    /// <param name="logger">Logger instance.</param>
+    /// <param name="ct">Cancellation token.</param>
+    public static async Task VerifyNotSealedAsync(
+        Guid objectId,
+        ISealService? sealService,
+        ILogger logger,
+        CancellationToken ct)
+    {
+        if (sealService == null)
+        {
+            return;
+        }
+
+        logger.LogDebug("Checking seal status for block {ObjectId}", objectId);
+
+        var sealInfo = await sealService.GetSealInfoAsync(objectId, ct);
+        if (sealInfo != null)
+        {
+            logger.LogWarning(
+                "Write blocked: Block {ObjectId} is sealed since {SealedAt}. Reason: {Reason}",
+                objectId, sealInfo.SealedAt, sealInfo.Reason);
+
+            throw new BlockSealedException(objectId, sealInfo.SealedAt, sealInfo.Reason);
+        }
+    }
+
+    /// <summary>
+    /// Verifies that specific shards are not sealed before allowing write operations.
+    /// Throws BlockSealedException if any shard is sealed.
+    /// </summary>
+    /// <param name="objectId">Object/block ID containing the shards.</param>
+    /// <param name="shardIndices">Shard indices to check.</param>
+    /// <param name="sealService">Optional seal service (if null, check is skipped).</param>
+    /// <param name="logger">Logger instance.</param>
+    /// <param name="ct">Cancellation token.</param>
+    public static async Task VerifyShardsNotSealedAsync(
+        Guid objectId,
+        IEnumerable<int> shardIndices,
+        ISealService? sealService,
+        ILogger logger,
+        CancellationToken ct)
+    {
+        if (sealService == null)
+        {
+            return;
+        }
+
+        // First check if the entire block is sealed
+        await VerifyNotSealedAsync(objectId, sealService, logger, ct);
+
+        // Then check individual shards
+        foreach (var shardIndex in shardIndices)
+        {
+            var isShardSealed = await sealService.IsShardSealedAsync(objectId, shardIndex, ct);
+            if (isShardSealed)
+            {
+                logger.LogWarning(
+                    "Write blocked: Shard {ShardIndex} of block {ObjectId} is sealed",
+                    shardIndex, objectId);
+
+                // Get seal info for details
+                var sealInfo = await sealService.GetSealInfoAsync(objectId, ct);
+                var sealedAt = sealInfo?.SealedAt ?? DateTime.UtcNow;
+                var reason = sealInfo?.Reason ?? "Shard is sealed";
+
+                throw BlockSealedException.ForShard(objectId, shardIndex, sealedAt, reason);
+            }
+        }
+    }
+
     /// <summary>
     /// Phase 1: Apply user-defined transformations (compression, encryption) via pipeline orchestrator.
     /// </summary>
@@ -211,6 +288,53 @@ public static class WritePhaseHandlers
     /// <summary>
     /// Phase 4: Execute transactional write across 4 tiers with rollback on failure.
     /// Writes to: Data (shards), Metadata (manifest), WORM (backup), Blockchain (pending).
+    /// This overload includes seal verification before any write operations.
+    /// </summary>
+    /// <param name="objectId">Object ID being written.</param>
+    /// <param name="manifest">Tamper-proof manifest.</param>
+    /// <param name="shards">RAID shards to write.</param>
+    /// <param name="fullData">Complete transformed data for WORM backup.</param>
+    /// <param name="dataStorage">Data tier storage.</param>
+    /// <param name="metadataStorage">Metadata tier storage.</param>
+    /// <param name="worm">WORM storage provider.</param>
+    /// <param name="config">Tamper-proof configuration.</param>
+    /// <param name="sealService">Optional seal service for seal verification.</param>
+    /// <param name="logger">Logger instance.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>Transaction result with per-tier status.</returns>
+    /// <exception cref="BlockSealedException">Thrown if the block is sealed.</exception>
+    public static async Task<TransactionResult> ExecuteTransactionalWriteAsync(
+        Guid objectId,
+        TamperProofManifest manifest,
+        List<byte[]> shards,
+        byte[] fullData,
+        IStorageProvider dataStorage,
+        IStorageProvider metadataStorage,
+        IWormStorageProvider worm,
+        TamperProofConfiguration config,
+        ISealService? sealService,
+        ILogger logger,
+        CancellationToken ct)
+    {
+        logger.LogDebug("Starting transactional write for object {ObjectId}", objectId);
+
+        // CRITICAL: Check seal status BEFORE any write operations
+        // If the block is sealed, this will throw BlockSealedException
+        await VerifyNotSealedAsync(objectId, sealService, logger, ct);
+
+        // Also verify all shards are not individually sealed
+        var shardIndices = Enumerable.Range(0, shards.Count);
+        await VerifyShardsNotSealedAsync(objectId, shardIndices, sealService, logger, ct);
+
+        // Proceed with transactional write
+        return await ExecuteTransactionalWriteInternalAsync(
+            objectId, manifest, shards, fullData,
+            dataStorage, metadataStorage, worm, config, logger, ct);
+    }
+
+    /// <summary>
+    /// Phase 4: Execute transactional write across 4 tiers with rollback on failure.
+    /// Writes to: Data (shards), Metadata (manifest), WORM (backup), Blockchain (pending).
     /// </summary>
     /// <param name="objectId">Object ID being written.</param>
     /// <param name="manifest">Tamper-proof manifest.</param>
@@ -223,7 +347,7 @@ public static class WritePhaseHandlers
     /// <param name="logger">Logger instance.</param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>Transaction result with per-tier status.</returns>
-    public static async Task<TransactionResult> ExecuteTransactionalWriteAsync(
+    public static Task<TransactionResult> ExecuteTransactionalWriteAsync(
         Guid objectId,
         TamperProofManifest manifest,
         List<byte[]> shards,
@@ -235,7 +359,29 @@ public static class WritePhaseHandlers
         ILogger logger,
         CancellationToken ct)
     {
-        logger.LogDebug("Starting transactional write for object {ObjectId}", objectId);
+        // Call without seal service (backward compatible)
+        return ExecuteTransactionalWriteAsync(
+            objectId, manifest, shards, fullData,
+            dataStorage, metadataStorage, worm, config,
+            null, // No seal service
+            logger, ct);
+    }
+
+    /// <summary>
+    /// Internal implementation of transactional write (after seal verification).
+    /// </summary>
+    private static async Task<TransactionResult> ExecuteTransactionalWriteInternalAsync(
+        Guid objectId,
+        TamperProofManifest manifest,
+        List<byte[]> shards,
+        byte[] fullData,
+        IStorageProvider dataStorage,
+        IStorageProvider metadataStorage,
+        IWormStorageProvider worm,
+        TamperProofConfiguration config,
+        ILogger logger,
+        CancellationToken ct)
+    {
 
         var dataTierResult = (TierWriteResult?)null;
         var metadataTierResult = (TierWriteResult?)null;
@@ -384,6 +530,9 @@ public static class WritePhaseHandlers
             using var stream = new MemoryStream(manifestBytes);
             await metadataStorage.SaveAsync(uri, stream);
 
+            // Update version index for quick latest version lookup
+            await UpdateVersionIndexAsync(objectId, manifest.Version, metadataStorage, logger, ct);
+
             logger.LogDebug("Metadata tier write completed: {Bytes} bytes in {Ms}ms",
                 manifestBytes.Length, sw.ElapsedMilliseconds);
 
@@ -403,6 +552,92 @@ public static class WritePhaseHandlers
                 ex.Message,
                 sw.Elapsed);
         }
+    }
+
+    /// <summary>
+    /// Updates the version index for an object.
+    /// </summary>
+    private static async Task UpdateVersionIndexAsync(
+        Guid objectId,
+        int newVersion,
+        IStorageProvider metadataStorage,
+        ILogger logger,
+        CancellationToken ct)
+    {
+        try
+        {
+            var indexUri = new Uri($"metadata://manifests/{objectId}_versions.json");
+            VersionIndexRecord index;
+
+            // Try to load existing index
+            try
+            {
+                using var existingStream = await metadataStorage.LoadAsync(indexUri);
+                if (existingStream != null)
+                {
+                    var existingJson = await new StreamReader(existingStream).ReadToEndAsync(ct);
+                    var existingIndex = System.Text.Json.JsonSerializer.Deserialize<VersionIndexRecord>(existingJson);
+                    if (existingIndex != null)
+                    {
+                        // Update existing index
+                        var versions = existingIndex.AvailableVersions?.ToList() ?? new List<int>();
+                        if (!versions.Contains(newVersion))
+                        {
+                            versions.Add(newVersion);
+                        }
+                        versions.Sort();
+
+                        index = new VersionIndexRecord
+                        {
+                            ObjectId = objectId,
+                            LatestVersion = Math.Max(existingIndex.LatestVersion, newVersion),
+                            UpdatedAt = DateTimeOffset.UtcNow,
+                            AvailableVersions = versions
+                        };
+                    }
+                    else
+                    {
+                        index = CreateNewIndex(objectId, newVersion);
+                    }
+                }
+                else
+                {
+                    index = CreateNewIndex(objectId, newVersion);
+                }
+            }
+            catch
+            {
+                // Index doesn't exist, create new one
+                index = CreateNewIndex(objectId, newVersion);
+            }
+
+            // Write updated index
+            var indexJson = System.Text.Json.JsonSerializer.Serialize(index);
+            using var indexMs = new MemoryStream(System.Text.Encoding.UTF8.GetBytes(indexJson));
+            await metadataStorage.SaveAsync(indexUri, indexMs);
+
+            logger.LogDebug("Updated version index for object {ObjectId}: latest version {Version}",
+                objectId, index.LatestVersion);
+        }
+        catch (Exception ex)
+        {
+            // Non-critical failure, log and continue
+            logger.LogDebug(ex, "Failed to update version index for object {ObjectId}", objectId);
+        }
+    }
+
+    /// <summary>
+    /// Creates a new version index for an object.
+    /// </summary>
+    private static VersionIndexRecord CreateNewIndex(Guid objectId, int version)
+    {
+        return new VersionIndexRecord
+        {
+            ObjectId = objectId,
+            LatestVersion = version,
+            UpdatedAt = DateTimeOffset.UtcNow,
+            AvailableVersions = new List<int> { version }
+        };
     }
 
     /// <summary>
@@ -429,7 +664,7 @@ public static class WritePhaseHandlers
                 ExpiryTime = DateTimeOffset.UtcNow.Add(config.DefaultRetentionPeriod)
             };
 
-            var wormRequest = new WormWriteRequest
+            var wormRequest = new PluginWormWriteRequest
             {
                 ObjectId = objectId,
                 Version = manifest.Version,
@@ -616,12 +851,148 @@ public static class WritePhaseHandlers
 
         return DataWarehouse.SDK.Contracts.TamperProof.RollbackResult.CreateSuccess(objectId, tierResults, orphanedRecords);
     }
+
+    /// <summary>
+    /// Validates that a block can be deleted by checking retention policy and legal holds.
+    /// Throws RetentionPolicyBlockedException if deletion is not allowed.
+    /// </summary>
+    /// <param name="blockId">Block identifier to validate.</param>
+    /// <param name="retentionService">Retention policy service.</param>
+    /// <param name="logger">Logger instance.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <exception cref="RetentionPolicyBlockedException">Thrown when deletion is blocked by retention policy or legal hold.</exception>
+    public static async Task ValidateRetentionBeforeDeletionAsync(
+        Guid blockId,
+        IRetentionPolicyService retentionService,
+        ILogger logger,
+        CancellationToken ct)
+    {
+        logger.LogDebug("Validating retention policy before deletion for block {BlockId}", blockId);
+
+        var validationResult = await retentionService.ValidateDeletionAsync(blockId, ct);
+
+        if (!validationResult.IsAllowed)
+        {
+            logger.LogWarning(
+                "Deletion blocked for block {BlockId}: {Reason} - {Details}",
+                blockId, validationResult.Reason, validationResult.Details);
+
+            throw new RetentionPolicyBlockedException(
+                blockId,
+                validationResult.Reason,
+                validationResult.Details,
+                validationResult.ActiveLegalHolds,
+                validationResult.RetentionPolicy);
+        }
+
+        logger.LogDebug("Retention validation passed for block {BlockId}", blockId);
+    }
+
+    /// <summary>
+    /// Checks if a block has active legal holds without throwing.
+    /// </summary>
+    /// <param name="blockId">Block identifier to check.</param>
+    /// <param name="retentionService">Retention policy service.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>True if block has active legal holds.</returns>
+    public static async Task<bool> HasActiveLegalHoldsAsync(
+        Guid blockId,
+        IRetentionPolicyService retentionService,
+        CancellationToken ct)
+    {
+        var legalHolds = await retentionService.GetActiveLegalHoldsAsync(blockId, ct);
+        return legalHolds.Count > 0;
+    }
+
+    /// <summary>
+    /// Validates retention before executing a rollback that involves deletion.
+    /// This is called during transaction failure to ensure we respect retention policies
+    /// even during error recovery scenarios.
+    /// </summary>
+    /// <param name="objectId">Object identifier.</param>
+    /// <param name="retentionService">Retention policy service (optional, if null skips check).</param>
+    /// <param name="logger">Logger instance.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>True if rollback deletion is allowed, false if blocked by retention.</returns>
+    public static async Task<(bool Allowed, string? BlockedReason)> CanRollbackDeleteAsync(
+        Guid objectId,
+        IRetentionPolicyService? retentionService,
+        ILogger logger,
+        CancellationToken ct)
+    {
+        // If no retention service is available, allow the operation
+        if (retentionService == null)
+        {
+            return (true, null);
+        }
+
+        try
+        {
+            var validationResult = await retentionService.ValidateDeletionAsync(objectId, ct);
+
+            if (!validationResult.IsAllowed)
+            {
+                logger.LogWarning(
+                    "Rollback deletion blocked for object {ObjectId} due to retention: {Reason}",
+                    objectId, validationResult.Details);
+
+                return (false, validationResult.Details);
+            }
+
+            return (true, null);
+        }
+        catch (Exception ex)
+        {
+            // Log but don't fail the rollback entirely if retention check fails
+            logger.LogWarning(ex, "Failed to check retention policy during rollback for object {ObjectId}", objectId);
+            return (true, null); // Default to allowing rollback if check fails
+        }
+    }
 }
 
 /// <summary>
-/// Request for WORM write operation.
+/// Exception thrown when a deletion operation is blocked by retention policy or legal hold.
 /// </summary>
-public class WormWriteRequest
+public class RetentionPolicyBlockedException : InvalidOperationException
+{
+    /// <summary>Block ID that cannot be deleted.</summary>
+    public Guid BlockId { get; }
+
+    /// <summary>Reason the deletion is blocked.</summary>
+    public DeletionBlockedReason BlockedReason { get; }
+
+    /// <summary>Detailed explanation of why deletion is blocked.</summary>
+    public string BlockedDetails { get; }
+
+    /// <summary>Active legal holds if any.</summary>
+    public IReadOnlyList<RetentionLegalHold>? ActiveLegalHolds { get; }
+
+    /// <summary>Retention policy if blocking.</summary>
+    public Services.RetentionPolicy? RetentionPolicy { get; }
+
+    /// <summary>
+    /// Creates a new retention policy blocked exception.
+    /// </summary>
+    public RetentionPolicyBlockedException(
+        Guid blockId,
+        DeletionBlockedReason reason,
+        string details,
+        IReadOnlyList<RetentionLegalHold>? legalHolds = null,
+        Services.RetentionPolicy? retentionPolicy = null)
+        : base($"Deletion blocked for block {blockId}: {details}")
+    {
+        BlockId = blockId;
+        BlockedReason = reason;
+        BlockedDetails = details;
+        ActiveLegalHolds = legalHolds;
+        RetentionPolicy = retentionPolicy;
+    }
+}
+
+/// <summary>
+/// Request for WORM write operation (internal plugin type).
+/// </summary>
+public class PluginWormWriteRequest
 {
     public required Guid ObjectId { get; init; }
     public required int Version { get; init; }
@@ -631,11 +1002,315 @@ public class WormWriteRequest
 }
 
 /// <summary>
-/// Result of WORM write operation.
+/// Result of WORM write operation (internal plugin type).
 /// </summary>
-public class WormWriteResult
+public class PluginWormWriteResult
 {
     public required bool Success { get; init; }
     public required string RecordId { get; init; }
     public string? ErrorMessage { get; init; }
+}
+
+/// <summary>
+/// Version index record for tracking all versions of an object.
+/// </summary>
+public class VersionIndexRecord
+{
+    /// <summary>Object ID this index is for.</summary>
+    public required Guid ObjectId { get; init; }
+
+    /// <summary>Latest version number.</summary>
+    public required int LatestVersion { get; init; }
+
+    /// <summary>When the index was last updated.</summary>
+    public required DateTimeOffset UpdatedAt { get; init; }
+
+    /// <summary>All available versions.</summary>
+    public List<int>? AvailableVersions { get; init; }
+}
+
+/// <summary>
+/// Extension methods for audit trail integration with write operations.
+/// </summary>
+public static class WriteAuditTrailExtensions
+{
+    /// <summary>
+    /// Logs the creation of a new object to the audit trail.
+    /// </summary>
+    /// <param name="auditTrail">The audit trail service.</param>
+    /// <param name="objectId">Object ID being created.</param>
+    /// <param name="version">Version number.</param>
+    /// <param name="dataHash">Hash of the data being written.</param>
+    /// <param name="userId">User performing the operation.</param>
+    /// <param name="details">Additional details about the operation.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The created audit entry.</returns>
+    public static async Task<TamperProofAuditEntry> LogCreationAsync(
+        this IAuditTrailService auditTrail,
+        Guid objectId,
+        int version,
+        string dataHash,
+        string? userId,
+        string? details = null,
+        CancellationToken ct = default)
+    {
+        var operation = new AuditOperation(
+            BlockId: objectId,
+            Type: AuditOperationType.Created,
+            UserId: userId,
+            Details: details ?? $"Created object version {version}",
+            DataHash: dataHash,
+            Version: version);
+
+        return await auditTrail.LogOperationAsync(operation, ct);
+    }
+
+    /// <summary>
+    /// Logs a modification to an existing object.
+    /// </summary>
+    /// <param name="auditTrail">The audit trail service.</param>
+    /// <param name="objectId">Object ID being modified.</param>
+    /// <param name="version">New version number.</param>
+    /// <param name="dataHash">Hash of the new data.</param>
+    /// <param name="userId">User performing the operation.</param>
+    /// <param name="details">Additional details about the modification.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The created audit entry.</returns>
+    public static async Task<TamperProofAuditEntry> LogModificationAsync(
+        this IAuditTrailService auditTrail,
+        Guid objectId,
+        int version,
+        string dataHash,
+        string? userId,
+        string? details = null,
+        CancellationToken ct = default)
+    {
+        var operation = new AuditOperation(
+            BlockId: objectId,
+            Type: AuditOperationType.Modified,
+            UserId: userId,
+            Details: details ?? $"Modified to version {version}",
+            DataHash: dataHash,
+            Version: version);
+
+        return await auditTrail.LogOperationAsync(operation, ct);
+    }
+
+    /// <summary>
+    /// Logs that RAID shards were written for an object.
+    /// </summary>
+    /// <param name="auditTrail">The audit trail service.</param>
+    /// <param name="objectId">Object ID.</param>
+    /// <param name="shardCount">Number of shards written.</param>
+    /// <param name="dataShards">Number of data shards.</param>
+    /// <param name="parityShards">Number of parity shards.</param>
+    /// <param name="userId">User performing the operation.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The created audit entry.</returns>
+    public static async Task<TamperProofAuditEntry> LogShardsWrittenAsync(
+        this IAuditTrailService auditTrail,
+        Guid objectId,
+        int shardCount,
+        int dataShards,
+        int parityShards,
+        string? userId,
+        CancellationToken ct = default)
+    {
+        var metadata = new Dictionary<string, string>
+        {
+            ["ShardCount"] = shardCount.ToString(),
+            ["DataShards"] = dataShards.ToString(),
+            ["ParityShards"] = parityShards.ToString()
+        };
+
+        var operation = new AuditOperation(
+            BlockId: objectId,
+            Type: AuditOperationType.ShardsWritten,
+            UserId: userId,
+            Details: $"Wrote {shardCount} shards ({dataShards} data + {parityShards} parity)",
+            Metadata: metadata);
+
+        return await auditTrail.LogOperationAsync(operation, ct);
+    }
+
+    /// <summary>
+    /// Logs that a WORM backup was created.
+    /// </summary>
+    /// <param name="auditTrail">The audit trail service.</param>
+    /// <param name="objectId">Object ID.</param>
+    /// <param name="version">Version number.</param>
+    /// <param name="wormRecordId">WORM storage record ID.</param>
+    /// <param name="dataHash">Hash of the backed-up data.</param>
+    /// <param name="retentionPeriod">Retention period for the backup.</param>
+    /// <param name="userId">User performing the operation.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The created audit entry.</returns>
+    public static async Task<TamperProofAuditEntry> LogWormBackupCreatedAsync(
+        this IAuditTrailService auditTrail,
+        Guid objectId,
+        int version,
+        string wormRecordId,
+        string dataHash,
+        TimeSpan retentionPeriod,
+        string? userId,
+        CancellationToken ct = default)
+    {
+        var metadata = new Dictionary<string, string>
+        {
+            ["WormRecordId"] = wormRecordId,
+            ["RetentionDays"] = retentionPeriod.TotalDays.ToString("F0")
+        };
+
+        var operation = new AuditOperation(
+            BlockId: objectId,
+            Type: AuditOperationType.WormBackupCreated,
+            UserId: userId,
+            Details: $"WORM backup created for version {version}, retention {retentionPeriod.TotalDays:F0} days",
+            DataHash: dataHash,
+            Version: version,
+            Metadata: metadata);
+
+        return await auditTrail.LogOperationAsync(operation, ct);
+    }
+
+    /// <summary>
+    /// Logs that a blockchain anchor was created.
+    /// </summary>
+    /// <param name="auditTrail">The audit trail service.</param>
+    /// <param name="objectId">Object ID.</param>
+    /// <param name="version">Version number.</param>
+    /// <param name="anchorId">Blockchain anchor ID.</param>
+    /// <param name="dataHash">Hash that was anchored.</param>
+    /// <param name="userId">User performing the operation.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The created audit entry.</returns>
+    public static async Task<TamperProofAuditEntry> LogBlockchainAnchoredAsync(
+        this IAuditTrailService auditTrail,
+        Guid objectId,
+        int version,
+        string anchorId,
+        string dataHash,
+        string? userId,
+        CancellationToken ct = default)
+    {
+        var metadata = new Dictionary<string, string>
+        {
+            ["AnchorId"] = anchorId
+        };
+
+        var operation = new AuditOperation(
+            BlockId: objectId,
+            Type: AuditOperationType.BlockchainAnchored,
+            UserId: userId,
+            Details: $"Blockchain anchor created for version {version}",
+            DataHash: dataHash,
+            Version: version,
+            Metadata: metadata);
+
+        return await auditTrail.LogOperationAsync(operation, ct);
+    }
+
+    /// <summary>
+    /// Logs that a manifest was updated.
+    /// </summary>
+    /// <param name="auditTrail">The audit trail service.</param>
+    /// <param name="objectId">Object ID.</param>
+    /// <param name="version">Version number in the manifest.</param>
+    /// <param name="manifestHash">Hash of the manifest content.</param>
+    /// <param name="userId">User performing the operation.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The created audit entry.</returns>
+    public static async Task<TamperProofAuditEntry> LogManifestUpdatedAsync(
+        this IAuditTrailService auditTrail,
+        Guid objectId,
+        int version,
+        string manifestHash,
+        string? userId,
+        CancellationToken ct = default)
+    {
+        var operation = new AuditOperation(
+            BlockId: objectId,
+            Type: AuditOperationType.ManifestUpdated,
+            UserId: userId,
+            Details: $"Manifest updated for version {version}",
+            DataHash: manifestHash,
+            Version: version);
+
+        return await auditTrail.LogOperationAsync(operation, ct);
+    }
+
+    /// <summary>
+    /// Logs a secure correction operation.
+    /// </summary>
+    /// <param name="auditTrail">The audit trail service.</param>
+    /// <param name="objectId">Object ID.</param>
+    /// <param name="version">New version number after correction.</param>
+    /// <param name="dataHash">Hash of the corrected data.</param>
+    /// <param name="userId">User performing the correction.</param>
+    /// <param name="reason">Reason for the correction.</param>
+    /// <param name="authorizationId">ID of the authorization for this correction.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The created audit entry.</returns>
+    public static async Task<TamperProofAuditEntry> LogSecureCorrectionAsync(
+        this IAuditTrailService auditTrail,
+        Guid objectId,
+        int version,
+        string dataHash,
+        string? userId,
+        string reason,
+        string? authorizationId,
+        CancellationToken ct = default)
+    {
+        var metadata = new Dictionary<string, string>
+        {
+            ["CorrectionReason"] = reason
+        };
+
+        if (!string.IsNullOrEmpty(authorizationId))
+        {
+            metadata["AuthorizationId"] = authorizationId;
+        }
+
+        var operation = new AuditOperation(
+            BlockId: objectId,
+            Type: AuditOperationType.SecureCorrected,
+            UserId: userId,
+            Details: $"Secure correction applied, new version {version}. Reason: {reason}",
+            DataHash: dataHash,
+            Version: version,
+            Metadata: metadata);
+
+        return await auditTrail.LogOperationAsync(operation, ct);
+    }
+
+    /// <summary>
+    /// Logs that an object was sealed.
+    /// </summary>
+    /// <param name="auditTrail">The audit trail service.</param>
+    /// <param name="objectId">Object ID.</param>
+    /// <param name="userId">User who sealed the object.</param>
+    /// <param name="reason">Reason for sealing.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The created audit entry.</returns>
+    public static async Task<TamperProofAuditEntry> LogSealedAsync(
+        this IAuditTrailService auditTrail,
+        Guid objectId,
+        string? userId,
+        string reason,
+        CancellationToken ct = default)
+    {
+        var metadata = new Dictionary<string, string>
+        {
+            ["SealReason"] = reason
+        };
+
+        var operation = new AuditOperation(
+            BlockId: objectId,
+            Type: AuditOperationType.Sealed,
+            UserId: userId,
+            Details: $"Object sealed. Reason: {reason}",
+            Metadata: metadata);
+
+        return await auditTrail.LogOperationAsync(operation, ct);
+    }
 }

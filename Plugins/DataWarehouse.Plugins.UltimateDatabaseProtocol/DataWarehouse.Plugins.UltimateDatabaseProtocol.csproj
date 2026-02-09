@@ -1,0 +1,54 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <LangVersion>latest</LangVersion>
+    <Description>Ultimate Database Protocol Plugin - 50+ database wire protocol implementations for universal database connectivity</Description>
+    <Authors>DataWarehouse</Authors>
+    <Company>DataWarehouse</Company>
+    <Product>DataWarehouse Ultimate Database Protocol</Product>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\DataWarehouse.SDK\DataWarehouse.SDK.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- PostgreSQL protocol support -->
+    <PackageReference Include="Npgsql" Version="10.0.1" />
+
+    <!-- MySQL protocol support -->
+    <PackageReference Include="MySqlConnector" Version="2.4.1" />
+
+    <!-- SQL Server TDS protocol -->
+    <PackageReference Include="Microsoft.Data.SqlClient" Version="6.1.4" />
+
+    <!-- Oracle TNS protocol -->
+    <PackageReference Include="Oracle.ManagedDataAccess.Core" Version="23.7.0" />
+
+    <!-- MongoDB wire protocol -->
+    <PackageReference Include="MongoDB.Driver" Version="3.3.0" />
+
+    <!-- Redis RESP protocol -->
+    <PackageReference Include="StackExchange.Redis" Version="2.9.55" />
+
+    <!-- Cassandra CQL binary protocol -->
+    <PackageReference Include="CassandraCSharpDriver" Version="3.22.0" />
+
+    <!-- Elasticsearch transport protocol -->
+    <PackageReference Include="Elastic.Clients.Elasticsearch" Version="8.17.3" />
+
+    <!-- Neo4j Bolt protocol -->
+    <PackageReference Include="Neo4j.Driver" Version="5.30.0" />
+
+    <!-- InfluxDB line protocol -->
+    <PackageReference Include="InfluxDB.Client" Version="4.22.0" />
+
+    <!-- Generic ADO.NET support -->
+    <PackageReference Include="System.Data.Common" Version="4.3.0" />
+  </ItemGroup>
+
+</Project>

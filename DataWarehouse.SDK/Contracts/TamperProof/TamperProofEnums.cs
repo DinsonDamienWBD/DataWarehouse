@@ -18,7 +18,37 @@ public enum HashAlgorithmType
     SHA512,
 
     /// <summary>Blake3 hash algorithm (256-bit output, faster than SHA).</summary>
-    Blake3
+    Blake3,
+
+    /// <summary>SHA3-256 hash algorithm (256-bit output, NIST SHA-3 standard).</summary>
+    SHA3_256,
+
+    /// <summary>SHA3-384 hash algorithm (384-bit output, NIST SHA-3 standard).</summary>
+    SHA3_384,
+
+    /// <summary>SHA3-512 hash algorithm (512-bit output, NIST SHA-3 standard).</summary>
+    SHA3_512,
+
+    /// <summary>Keccak-256 hash algorithm (256-bit output, original Keccak, used by Ethereum).</summary>
+    Keccak256,
+
+    /// <summary>Keccak-384 hash algorithm (384-bit output, original Keccak).</summary>
+    Keccak384,
+
+    /// <summary>Keccak-512 hash algorithm (512-bit output, original Keccak).</summary>
+    Keccak512,
+
+    /// <summary>HMAC-SHA256 keyed hash algorithm (256-bit output).</summary>
+    HMAC_SHA256,
+
+    /// <summary>HMAC-SHA384 keyed hash algorithm (384-bit output).</summary>
+    HMAC_SHA384,
+
+    /// <summary>HMAC-SHA512 keyed hash algorithm (512-bit output).</summary>
+    HMAC_SHA512,
+
+    /// <summary>HMAC-SHA3-256 keyed hash algorithm (256-bit output).</summary>
+    HMAC_SHA3_256
 }
 
 /// <summary>
@@ -85,7 +115,22 @@ public enum TamperRecoveryBehavior
     /// Do not serve data. Alert admin and wait for manual intervention.
     /// Most secure option - prevents potentially corrupted data from being served.
     /// </summary>
-    AlertAndWait
+    AlertAndWait,
+
+    /// <summary>
+    /// Never auto-recover. Only log the corruption and alert administrators.
+    /// Requires explicit admin action to initiate recovery.
+    /// Returns RequiresManualIntervention = true in RecoveryResult.
+    /// </summary>
+    ManualOnly,
+
+    /// <summary>
+    /// Immediately seal the block/shard when corruption is detected.
+    /// No reads or writes are allowed on the affected data.
+    /// Throws FailClosedCorruptionException with details about the corruption.
+    /// Most restrictive option - prevents any access to potentially compromised data.
+    /// </summary>
+    FailClosed
 }
 
 /// <summary>

@@ -3239,4 +3239,920 @@ namespace DataWarehouse.SDK.Contracts.IntelligenceAware
     }
 
     #endregion
+
+    // ================================================================================
+    // T127.2: INTELLIGENCE-AWARE DATABASE PLUGIN BASE
+    // ================================================================================
+
+    #region Database Plugin Base
+
+    /// <summary>
+    /// Intelligence-aware base class for database plugins.
+    /// Provides hooks for AI-powered query optimization, schema inference,
+    /// predictive caching, and anomaly detection in database operations.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Database plugins can leverage Intelligence for:
+    /// </para>
+    /// <list type="bullet">
+    ///   <item>Query optimization and rewriting recommendations</item>
+    ///   <item>Schema inference and enrichment from sample data</item>
+    ///   <item>Predictive query result caching based on access patterns</item>
+    ///   <item>Anomaly detection in query patterns and performance</item>
+    ///   <item>Index recommendation based on query analysis</item>
+    ///   <item>Data quality assessment and validation</item>
+    /// </list>
+    /// </remarks>
+    public abstract class IntelligenceAwareDatabasePluginBase : IntelligenceAwarePluginBase
+    {
+        /// <summary>
+        /// Gets the database engine name (e.g., "MySQL", "MongoDB", "PostgreSQL").
+        /// </summary>
+        public abstract string Engine { get; }
+
+        /// <summary>
+        /// Gets the database category (e.g., "Relational", "NoSQL", "Graph").
+        /// </summary>
+        public abstract string DatabaseCategory { get; }
+
+        /// <summary>
+        /// Gets the plugin category.
+        /// </summary>
+        public override PluginCategory Category => PluginCategory.FeatureProvider;
+
+        /// <summary>
+        /// Gets the plugin sub-category.
+        /// </summary>
+        public virtual string SubCategory => "Database";
+
+        /// <summary>
+        /// Gets the quality level of this plugin (0-100).
+        /// </summary>
+        public virtual int QualityLevel => 50;
+
+        /// <summary>
+        /// Gets the default execution order in the pipeline.
+        /// </summary>
+        public virtual int DefaultOrder => 100;
+
+        /// <summary>
+        /// Gets whether this stage can be bypassed.
+        /// </summary>
+        public virtual bool AllowBypass => false;
+
+        /// <summary>
+        /// Gets stages that must precede this one.
+        /// </summary>
+        public virtual string[] RequiredPrecedingStages => Array.Empty<string>();
+
+        /// <summary>
+        /// Gets stages that are incompatible with this one.
+        /// </summary>
+        public virtual string[] IncompatibleStages => Array.Empty<string>();
+
+        /// <summary>
+        /// Gets AI-powered query optimization recommendations.
+        /// </summary>
+        /// <remarks>
+        /// <para>
+        /// This hook analyzes queries and provides optimization suggestions:
+        /// </para>
+        /// <list type="bullet">
+        ///   <item>Query rewriting for better performance</item>
+        ///   <item>Index usage recommendations</item>
+        ///   <item>Join order optimization</item>
+        ///   <item>Subquery optimization</item>
+        /// </list>
+        /// </remarks>
+        /// <param name="query">The query to optimize.</param>
+        /// <param name="schemaInfo">Optional schema information for context.</param>
+        /// <param name="queryHistory">Optional historical query data for pattern analysis.</param>
+        /// <param name="context">Intelligence context for the operation.</param>
+        /// <param name="ct">Cancellation token.</param>
+        /// <returns>Query optimization result with recommendations, or null if unavailable.</returns>
+        protected async Task<DatabaseQueryOptimizationResult?> OnQueryOptimizationAsync(
+            string query,
+            DatabaseSchemaInfo? schemaInfo = null,
+            QueryHistoryEntry[]? queryHistory = null,
+            IntelligenceContext? context = null,
+            CancellationToken ct = default)
+        {
+            if (!HasCapability(IntelligenceCapabilities.QueryOptimization))
+                return null;
+
+            var payload = new Dictionary<string, object>
+            {
+                ["query"] = query,
+                ["engine"] = Engine,
+                ["databaseCategory"] = DatabaseCategory,
+                ["pluginId"] = Id,
+                ["contextId"] = context?.ContextId ?? Guid.NewGuid().ToString("N")
+            };
+
+            if (schemaInfo != null)
+            {
+                payload["schemaInfo"] = new Dictionary<string, object>
+                {
+                    ["tables"] = schemaInfo.Tables ?? Array.Empty<string>(),
+                    ["indexes"] = schemaInfo.Indexes ?? Array.Empty<string>(),
+                    ["relationships"] = schemaInfo.Relationships ?? Array.Empty<string>(),
+                    ["columnStats"] = schemaInfo.ColumnStatistics ?? new Dictionary<string, object>()
+                };
+            }
+
+            if (queryHistory != null && queryHistory.Length > 0)
+            {
+                payload["queryHistory"] = queryHistory.Select(q => new Dictionary<string, object>
+                {
+                    ["queryHash"] = q.QueryHash,
+                    ["executionTime"] = q.ExecutionTimeMs,
+                    ["rowsExamined"] = q.RowsExamined,
+                    ["rowsReturned"] = q.RowsReturned,
+                    ["timestamp"] = q.Timestamp.ToString("O")
+                }).ToArray();
+            }
+
+            var response = await SendIntelligenceRequestAsync(
+                "intelligence.request.query-optimization",
+                payload,
+                context?.Timeout,
+                ct);
+
+            if (response?.Success == true && response.Payload is Dictionary<string, object> result)
+            {
+                return new DatabaseQueryOptimizationResult
+                {
+                    OriginalQuery = query,
+                    OptimizedQuery = result.TryGetValue("optimizedQuery", out var oq) && oq is string optimized ? optimized : query,
+                    Recommendations = result.TryGetValue("recommendations", out var recs) && recs is QueryRecommendation[] recommendations ? recommendations : Array.Empty<QueryRecommendation>(),
+                    SuggestedIndexes = result.TryGetValue("suggestedIndexes", out var idx) && idx is IndexSuggestion[] indexes ? indexes : Array.Empty<IndexSuggestion>(),
+                    EstimatedSpeedup = result.TryGetValue("estimatedSpeedup", out var speedup) && speedup is double speed ? speed : 1.0,
+                    PerformanceIssues = result.TryGetValue("performanceIssues", out var issues) && issues is string[] issueList ? issueList : Array.Empty<string>(),
+                    Confidence = result.TryGetValue("confidence", out var conf) && conf is double confidence ? confidence : 0.5
+                };
+            }
+
+            return null;
+        }
+
+        /// <summary>
+        /// Infers schema from sample data using AI.
+        /// </summary>
+        /// <remarks>
+        /// <para>
+        /// This hook enables AI-powered schema inference for:
+        /// </para>
+        /// <list type="bullet">
+        ///   <item>Data type detection from samples</item>
+        ///   <item>Relationship discovery between entities</item>
+        ///   <item>Primary key and foreign key suggestions</item>
+        ///   <item>Constraint recommendations</item>
+        /// </list>
+        /// </remarks>
+        /// <param name="sampleData">Sample data for schema inference.</param>
+        /// <param name="existingSchema">Optional existing schema for enhancement.</param>
+        /// <param name="context">Intelligence context for the operation.</param>
+        /// <param name="ct">Cancellation token.</param>
+        /// <returns>Inferred schema with field descriptions and relationships, or null if unavailable.</returns>
+        protected async Task<DatabaseSchemaInferenceResult?> OnSchemaInferenceAsync(
+            object[] sampleData,
+            DatabaseSchemaInfo? existingSchema = null,
+            IntelligenceContext? context = null,
+            CancellationToken ct = default)
+        {
+            if (!HasCapability(IntelligenceCapabilities.SchemaInference))
+                return null;
+
+            var payload = new Dictionary<string, object>
+            {
+                ["sampleData"] = sampleData,
+                ["sampleCount"] = sampleData.Length,
+                ["engine"] = Engine,
+                ["databaseCategory"] = DatabaseCategory,
+                ["pluginId"] = Id,
+                ["contextId"] = context?.ContextId ?? Guid.NewGuid().ToString("N")
+            };
+
+            if (existingSchema != null)
+            {
+                payload["existingSchema"] = existingSchema;
+            }
+
+            var response = await SendIntelligenceRequestAsync(
+                "intelligence.request.schema-inference",
+                payload,
+                context?.Timeout,
+                ct);
+
+            if (response?.Success == true && response.Payload is Dictionary<string, object> result)
+            {
+                return new DatabaseSchemaInferenceResult
+                {
+                    InferredFields = result.TryGetValue("inferredFields", out var fields) && fields is InferredField[] fieldList ? fieldList : Array.Empty<InferredField>(),
+                    SuggestedPrimaryKey = result.TryGetValue("suggestedPrimaryKey", out var pk) && pk is string primaryKey ? primaryKey : null,
+                    SuggestedForeignKeys = result.TryGetValue("suggestedForeignKeys", out var fks) && fks is ForeignKeySuggestion[] foreignKeys ? foreignKeys : Array.Empty<ForeignKeySuggestion>(),
+                    SuggestedIndexes = result.TryGetValue("suggestedIndexes", out var idx) && idx is string[] indexes ? indexes : Array.Empty<string>(),
+                    DataQualityIssues = result.TryGetValue("dataQualityIssues", out var issues) && issues is DataQualityIssue[] issueList ? issueList : Array.Empty<DataQualityIssue>(),
+                    Confidence = result.TryGetValue("confidence", out var conf) && conf is double confidence ? confidence : 0.5
+                };
+            }
+
+            return null;
+        }
+
+        /// <summary>
+        /// Detects anomalies in query patterns and database operations.
+        /// </summary>
+        /// <remarks>
+        /// <para>
+        /// This hook analyzes database operations for anomalies such as:
+        /// </para>
+        /// <list type="bullet">
+        ///   <item>Unusual query patterns indicating potential SQL injection</item>
+        ///   <item>Performance degradation trends</item>
+        ///   <item>Excessive data access patterns</item>
+        ///   <item>Schema modification attempts</item>
+        /// </list>
+        /// </remarks>
+        /// <param name="operationMetrics">Metrics about the database operation.</param>
+        /// <param name="baselineMetrics">Optional baseline metrics for comparison.</param>
+        /// <param name="context">Intelligence context for the operation.</param>
+        /// <param name="ct">Cancellation token.</param>
+        /// <returns>Anomaly detection result, or null if unavailable.</returns>
+        protected async Task<DatabaseAnomalyResult?> OnDatabaseAnomalyDetectionAsync(
+            DatabaseOperationMetrics operationMetrics,
+            DatabaseBaselineMetrics? baselineMetrics = null,
+            IntelligenceContext? context = null,
+            CancellationToken ct = default)
+        {
+            if (!HasCapability(IntelligenceCapabilities.AnomalyDetection))
+                return null;
+
+            var payload = new Dictionary<string, object>
+            {
+                ["operationMetrics"] = new Dictionary<string, object>
+                {
+                    ["queryType"] = operationMetrics.QueryType,
+                    ["executionTimeMs"] = operationMetrics.ExecutionTimeMs,
+                    ["rowsAffected"] = operationMetrics.RowsAffected,
+                    ["rowsExamined"] = operationMetrics.RowsExamined,
+                    ["timestamp"] = operationMetrics.Timestamp.ToString("O"),
+                    ["userId"] = operationMetrics.UserId ?? string.Empty,
+                    ["sourceIp"] = operationMetrics.SourceIp ?? string.Empty,
+                    ["database"] = operationMetrics.Database ?? string.Empty,
+                    ["table"] = operationMetrics.Table ?? string.Empty
+                },
+                ["engine"] = Engine,
+                ["pluginId"] = Id,
+                ["contextId"] = context?.ContextId ?? Guid.NewGuid().ToString("N")
+            };
+
+            if (baselineMetrics != null)
+            {
+                payload["baseline"] = new Dictionary<string, object>
+                {
+                    ["averageExecutionTimeMs"] = baselineMetrics.AverageExecutionTimeMs,
+                    ["averageRowsAffected"] = baselineMetrics.AverageRowsAffected,
+                    ["typicalQueryPatterns"] = baselineMetrics.TypicalQueryPatterns,
+                    ["typicalAccessHours"] = baselineMetrics.TypicalAccessHours,
+                    ["baselineCreatedAt"] = baselineMetrics.BaselineCreatedAt.ToString("O")
+                };
+            }
+
+            var response = await SendIntelligenceRequestAsync(
+                IntelligenceTopics.RequestAnomalyDetection,
+                payload,
+                context?.Timeout,
+                ct);
+
+            if (response?.Success == true && response.Payload is Dictionary<string, object> result)
+            {
+                return new DatabaseAnomalyResult
+                {
+                    IsAnomaly = result.TryGetValue("isAnomaly", out var ia) && ia is true,
+                    AnomalyScore = result.TryGetValue("anomalyScore", out var ascore) && ascore is double score ? score : 0.0,
+                    AnomalyType = result.TryGetValue("anomalyType", out var atype) && atype is string anomalyType ? anomalyType : null,
+                    ThreatLevel = result.TryGetValue("threatLevel", out var tl) && tl is string level ? level : "Low",
+                    Description = result.TryGetValue("description", out var desc) && desc is string description ? description : null,
+                    PotentialThreats = result.TryGetValue("potentialThreats", out var threats) && threats is string[] threatList ? threatList : Array.Empty<string>(),
+                    Recommendations = result.TryGetValue("recommendations", out var recs) && recs is string[] recommendations ? recommendations : Array.Empty<string>(),
+                    ShouldBlock = result.TryGetValue("shouldBlock", out var block) && block is true,
+                    ShouldAlert = result.TryGetValue("shouldAlert", out var alert) && alert is true,
+                    RequiresReview = result.TryGetValue("requiresReview", out var review) && review is true
+                };
+            }
+
+            return null;
+        }
+
+        /// <summary>
+        /// Predicts query result for potential cache preloading.
+        /// </summary>
+        /// <remarks>
+        /// <para>
+        /// This hook enables predictive caching by analyzing:
+        /// </para>
+        /// <list type="bullet">
+        ///   <item>Query patterns and access frequency</item>
+        ///   <item>Time-based access patterns</item>
+        ///   <item>User behavior patterns</item>
+        ///   <item>Data staleness and update frequency</item>
+        /// </list>
+        /// </remarks>
+        /// <param name="query">The query to analyze for caching.</param>
+        /// <param name="queryHistory">Historical query execution data.</param>
+        /// <param name="context">Intelligence context for the operation.</param>
+        /// <param name="ct">Cancellation token.</param>
+        /// <returns>Cache prediction result, or null if unavailable.</returns>
+        protected async Task<QueryCachePrediction?> OnPredictiveCacheAnalysisAsync(
+            string query,
+            QueryHistoryEntry[]? queryHistory = null,
+            IntelligenceContext? context = null,
+            CancellationToken ct = default)
+        {
+            if (!HasCapability(IntelligenceCapabilities.AccessPatternPrediction) &&
+                !HasCapability(IntelligenceCapabilities.Prediction))
+                return null;
+
+            var payload = new Dictionary<string, object>
+            {
+                ["query"] = query,
+                ["queryHash"] = ComputeQueryHash(query),
+                ["engine"] = Engine,
+                ["pluginId"] = Id,
+                ["contextId"] = context?.ContextId ?? Guid.NewGuid().ToString("N")
+            };
+
+            if (queryHistory != null && queryHistory.Length > 0)
+            {
+                payload["queryHistory"] = queryHistory.Select(q => new Dictionary<string, object>
+                {
+                    ["queryHash"] = q.QueryHash,
+                    ["executionTime"] = q.ExecutionTimeMs,
+                    ["timestamp"] = q.Timestamp.ToString("O"),
+                    ["rowsReturned"] = q.RowsReturned,
+                    ["cacheHit"] = q.WasCacheHit
+                }).ToArray();
+            }
+
+            var response = await SendIntelligenceRequestAsync(
+                "intelligence.request.cache-prediction",
+                payload,
+                context?.Timeout,
+                ct);
+
+            if (response?.Success == true && response.Payload is Dictionary<string, object> result)
+            {
+                return new QueryCachePrediction
+                {
+                    QueryHash = ComputeQueryHash(query),
+                    ShouldCache = result.TryGetValue("shouldCache", out var sc) && sc is true,
+                    ShouldPreload = result.TryGetValue("shouldPreload", out var sp) && sp is true,
+                    RecommendedTtl = result.TryGetValue("recommendedTtl", out var ttl) && ttl is string ttlStr && TimeSpan.TryParse(ttlStr, out var ttlVal) ? ttlVal : TimeSpan.FromMinutes(15),
+                    PredictedAccessCount = result.TryGetValue("predictedAccessCount", out var pac) && pac is int count ? count : 0,
+                    NextPredictedAccess = result.TryGetValue("nextPredictedAccess", out var npa) && npa is string npaStr && DateTimeOffset.TryParse(npaStr, out var npaDate) ? npaDate : null,
+                    AccessPattern = result.TryGetValue("accessPattern", out var ap) && ap is string pattern ? pattern : "Unknown",
+                    CachePriority = result.TryGetValue("cachePriority", out var cp) && cp is int priority ? priority : 50,
+                    Confidence = result.TryGetValue("confidence", out var conf) && conf is double confidence ? confidence : 0.5
+                };
+            }
+
+            return null;
+        }
+
+        /// <summary>
+        /// Computes a hash for a query string for caching purposes.
+        /// </summary>
+        private static string ComputeQueryHash(string query)
+        {
+            var normalizedQuery = System.Text.RegularExpressions.Regex.Replace(query.Trim().ToLowerInvariant(), @"\s+", " ");
+            var hashBytes = System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(normalizedQuery));
+            return Convert.ToHexString(hashBytes)[..16];
+        }
+
+        /// <inheritdoc/>
+        protected override Dictionary<string, object> GetMetadata()
+        {
+            var metadata = base.GetMetadata();
+            metadata["DatabaseType"] = "IntelligenceAware";
+            metadata["Engine"] = Engine;
+            metadata["DatabaseCategory"] = DatabaseCategory;
+            metadata["SupportsQueryOptimization"] = HasCapability(IntelligenceCapabilities.QueryOptimization);
+            metadata["SupportsSchemaInference"] = HasCapability(IntelligenceCapabilities.SchemaInference);
+            metadata["SupportsAnomalyDetection"] = HasCapability(IntelligenceCapabilities.AnomalyDetection);
+            metadata["SupportsPredictiveCaching"] = HasCapability(IntelligenceCapabilities.AccessPatternPrediction) ||
+                                                     HasCapability(IntelligenceCapabilities.Prediction);
+            return metadata;
+        }
+    }
+
+    #endregion
+
+    // ================================================================================
+    // T127.5 & T127.7: PREDICTIVE CACHING AND SMART OPTIMIZATION INTERFACES
+    // ================================================================================
+
+    #region Predictive Caching Interface
+
+    /// <summary>
+    /// Interface for plugins that support AI-powered predictive caching.
+    /// Enables cache preloading based on access pattern prediction.
+    /// </summary>
+    public interface IPredictiveCachingAware
+    {
+        /// <summary>
+        /// Gets whether predictive caching is enabled.
+        /// </summary>
+        bool IsPredictiveCachingEnabled { get; }
+
+        /// <summary>
+        /// Gets the current cache preload queue size.
+        /// </summary>
+        int PreloadQueueSize { get; }
+
+        /// <summary>
+        /// Analyzes access patterns and returns items to preload.
+        /// </summary>
+        /// <param name="recentAccesses">Recent access history.</param>
+        /// <param name="maxItems">Maximum items to return for preloading.</param>
+        /// <param name="ct">Cancellation token.</param>
+        /// <returns>List of items recommended for cache preloading.</returns>
+        Task<IEnumerable<PreloadRecommendation>> GetPreloadRecommendationsAsync(
+            AccessHistoryEntry[] recentAccesses,
+            int maxItems = 10,
+            CancellationToken ct = default);
+
+        /// <summary>
+        /// Reports a cache hit or miss for learning.
+        /// </summary>
+        /// <param name="itemId">The item identifier.</param>
+        /// <param name="wasHit">Whether it was a cache hit.</param>
+        /// <param name="accessMetadata">Optional access metadata.</param>
+        /// <param name="ct">Cancellation token.</param>
+        Task ReportCacheAccessAsync(
+            string itemId,
+            bool wasHit,
+            Dictionary<string, object>? accessMetadata = null,
+            CancellationToken ct = default);
+    }
+
+    /// <summary>
+    /// Recommendation for cache preloading.
+    /// </summary>
+    public sealed class PreloadRecommendation
+    {
+        /// <summary>Item identifier to preload.</summary>
+        public string ItemId { get; init; } = string.Empty;
+        /// <summary>Priority for preloading (higher = more urgent).</summary>
+        public int Priority { get; init; }
+        /// <summary>Predicted time of next access.</summary>
+        public DateTimeOffset? PredictedAccessTime { get; init; }
+        /// <summary>Confidence in the prediction (0.0-1.0).</summary>
+        public double Confidence { get; init; }
+        /// <summary>Reason for the recommendation.</summary>
+        public string? Reason { get; init; }
+    }
+
+    #endregion
+
+    #region Smart Optimization Interface
+
+    /// <summary>
+    /// Interface for plugins that support AI-powered smart optimization callbacks.
+    /// Provides a unified interface for optimization recommendations across plugin types.
+    /// </summary>
+    public interface ISmartOptimizationAware
+    {
+        /// <summary>
+        /// Gets whether smart optimization is enabled.
+        /// </summary>
+        bool IsSmartOptimizationEnabled { get; }
+
+        /// <summary>
+        /// Requests optimization analysis for the current state.
+        /// </summary>
+        /// <param name="optimizationType">Type of optimization to analyze.</param>
+        /// <param name="currentMetrics">Current performance/state metrics.</param>
+        /// <param name="constraints">Optional optimization constraints.</param>
+        /// <param name="ct">Cancellation token.</param>
+        /// <returns>Optimization recommendations.</returns>
+        Task<OptimizationAnalysisResult?> AnalyzeOptimizationAsync(
+            OptimizationType optimizationType,
+            Dictionary<string, object> currentMetrics,
+            OptimizationConstraints? constraints = null,
+            CancellationToken ct = default);
+
+        /// <summary>
+        /// Applies an optimization recommendation.
+        /// </summary>
+        /// <param name="recommendation">The recommendation to apply.</param>
+        /// <param name="ct">Cancellation token.</param>
+        /// <returns>Result of applying the optimization.</returns>
+        Task<OptimizationApplicationResult> ApplyOptimizationAsync(
+            OptimizationRecommendation recommendation,
+            CancellationToken ct = default);
+
+        /// <summary>
+        /// Event raised when optimization opportunities are detected.
+        /// </summary>
+        event EventHandler<OptimizationOpportunityEventArgs>? OptimizationOpportunityDetected;
+    }
+
+    /// <summary>
+    /// Types of optimization that can be analyzed.
+    /// </summary>
+    public enum OptimizationType
+    {
+        /// <summary>Performance optimization.</summary>
+        Performance,
+        /// <summary>Cost optimization.</summary>
+        Cost,
+        /// <summary>Storage efficiency optimization.</summary>
+        Storage,
+        /// <summary>Resource utilization optimization.</summary>
+        ResourceUtilization,
+        /// <summary>Query performance optimization.</summary>
+        Query,
+        /// <summary>Cache efficiency optimization.</summary>
+        Cache,
+        /// <summary>Network bandwidth optimization.</summary>
+        Network,
+        /// <summary>Security posture optimization.</summary>
+        Security,
+        /// <summary>Compliance optimization.</summary>
+        Compliance,
+        /// <summary>General/multi-dimensional optimization.</summary>
+        General
+    }
+
+    /// <summary>
+    /// Constraints for optimization analysis.
+    /// </summary>
+    public sealed class OptimizationConstraints
+    {
+        /// <summary>Maximum acceptable latency increase.</summary>
+        public double? MaxLatencyIncreasePercent { get; init; }
+        /// <summary>Maximum acceptable cost.</summary>
+        public decimal? MaxCost { get; init; }
+        /// <summary>Minimum acceptable performance level.</summary>
+        public double? MinPerformanceLevel { get; init; }
+        /// <summary>Required compliance frameworks.</summary>
+        public string[]? RequiredCompliance { get; init; }
+        /// <summary>Features that must be preserved.</summary>
+        public string[]? PreserveFeatures { get; init; }
+        /// <summary>Maximum downtime during optimization.</summary>
+        public TimeSpan? MaxDowntime { get; init; }
+    }
+
+    /// <summary>
+    /// Result of optimization analysis.
+    /// </summary>
+    public sealed class OptimizationAnalysisResult
+    {
+        /// <summary>Current optimization score (0-100).</summary>
+        public int CurrentScore { get; init; }
+        /// <summary>Potential optimized score (0-100).</summary>
+        public int PotentialScore { get; init; }
+        /// <summary>Identified optimization opportunities.</summary>
+        public OptimizationRecommendation[] Recommendations { get; init; } = Array.Empty<OptimizationRecommendation>();
+        /// <summary>Areas already optimized.</summary>
+        public string[] OptimizedAreas { get; init; } = Array.Empty<string>();
+        /// <summary>Areas needing attention.</summary>
+        public string[] AreasNeedingAttention { get; init; } = Array.Empty<string>();
+        /// <summary>When the analysis was performed.</summary>
+        public DateTimeOffset AnalyzedAt { get; init; } = DateTimeOffset.UtcNow;
+    }
+
+    /// <summary>
+    /// An optimization recommendation.
+    /// </summary>
+    public sealed class OptimizationRecommendation
+    {
+        /// <summary>Unique identifier for the recommendation.</summary>
+        public string Id { get; init; } = Guid.NewGuid().ToString("N");
+        /// <summary>Type of optimization.</summary>
+        public OptimizationType Type { get; init; }
+        /// <summary>Title of the recommendation.</summary>
+        public string Title { get; init; } = string.Empty;
+        /// <summary>Detailed description.</summary>
+        public string Description { get; init; } = string.Empty;
+        /// <summary>Impact level (Low, Medium, High, Critical).</summary>
+        public string Impact { get; init; } = "Medium";
+        /// <summary>Effort required (Low, Medium, High).</summary>
+        public string Effort { get; init; } = "Medium";
+        /// <summary>Estimated improvement percentage.</summary>
+        public double EstimatedImprovement { get; init; }
+        /// <summary>Estimated cost savings.</summary>
+        public decimal? EstimatedCostSavings { get; init; }
+        /// <summary>Whether this can be auto-applied.</summary>
+        public bool CanAutoApply { get; init; }
+        /// <summary>Steps to implement manually.</summary>
+        public string[] ImplementationSteps { get; init; } = Array.Empty<string>();
+        /// <summary>Potential risks of implementing.</summary>
+        public string[] Risks { get; init; } = Array.Empty<string>();
+        /// <summary>Confidence in the recommendation (0.0-1.0).</summary>
+        public double Confidence { get; init; }
+    }
+
+    /// <summary>
+    /// Result of applying an optimization.
+    /// </summary>
+    public sealed class OptimizationApplicationResult
+    {
+        /// <summary>Whether the optimization was applied successfully.</summary>
+        public bool Success { get; init; }
+        /// <summary>The recommendation that was applied.</summary>
+        public string RecommendationId { get; init; } = string.Empty;
+        /// <summary>Actual improvement achieved.</summary>
+        public double? ActualImprovement { get; init; }
+        /// <summary>Actual cost savings achieved.</summary>
+        public decimal? ActualCostSavings { get; init; }
+        /// <summary>Error message if failed.</summary>
+        public string? ErrorMessage { get; init; }
+        /// <summary>When the optimization was applied.</summary>
+        public DateTimeOffset AppliedAt { get; init; } = DateTimeOffset.UtcNow;
+        /// <summary>Metrics before optimization.</summary>
+        public Dictionary<string, object>? MetricsBefore { get; init; }
+        /// <summary>Metrics after optimization.</summary>
+        public Dictionary<string, object>? MetricsAfter { get; init; }
+    }
+
+    /// <summary>
+    /// Event arguments for optimization opportunity detection.
+    /// </summary>
+    public sealed class OptimizationOpportunityEventArgs : EventArgs
+    {
+        /// <summary>The detected opportunity.</summary>
+        public OptimizationRecommendation Opportunity { get; init; } = null!;
+        /// <summary>When the opportunity was detected.</summary>
+        public DateTimeOffset DetectedAt { get; init; } = DateTimeOffset.UtcNow;
+        /// <summary>Urgency level (Low, Normal, High, Urgent).</summary>
+        public string Urgency { get; init; } = "Normal";
+    }
+
+    #endregion
+
+    // ================================================================================
+    // T127.2 DATABASE SUPPORTING TYPES
+    // ================================================================================
+
+    #region Database Types
+
+    /// <summary>
+    /// Schema information for query optimization.
+    /// </summary>
+    public sealed class DatabaseSchemaInfo
+    {
+        /// <summary>Table names in the database.</summary>
+        public string[]? Tables { get; init; }
+        /// <summary>Index names in the database.</summary>
+        public string[]? Indexes { get; init; }
+        /// <summary>Relationship descriptions.</summary>
+        public string[]? Relationships { get; init; }
+        /// <summary>Column statistics for query planning.</summary>
+        public Dictionary<string, object>? ColumnStatistics { get; init; }
+    }
+
+    /// <summary>
+    /// Historical query execution entry.
+    /// </summary>
+    public sealed class QueryHistoryEntry
+    {
+        /// <summary>Hash of the query for grouping.</summary>
+        public string QueryHash { get; init; } = string.Empty;
+        /// <summary>Execution time in milliseconds.</summary>
+        public double ExecutionTimeMs { get; init; }
+        /// <summary>Number of rows examined.</summary>
+        public long RowsExamined { get; init; }
+        /// <summary>Number of rows returned.</summary>
+        public long RowsReturned { get; init; }
+        /// <summary>When the query was executed.</summary>
+        public DateTimeOffset Timestamp { get; init; }
+        /// <summary>Whether the result was from cache.</summary>
+        public bool WasCacheHit { get; init; }
+    }
+
+    /// <summary>
+    /// Result of database query optimization analysis.
+    /// </summary>
+    public sealed class DatabaseQueryOptimizationResult
+    {
+        /// <summary>The original query.</summary>
+        public string OriginalQuery { get; init; } = string.Empty;
+        /// <summary>The optimized query.</summary>
+        public string OptimizedQuery { get; init; } = string.Empty;
+        /// <summary>Optimization recommendations.</summary>
+        public QueryRecommendation[] Recommendations { get; init; } = Array.Empty<QueryRecommendation>();
+        /// <summary>Suggested indexes to create.</summary>
+        public IndexSuggestion[] SuggestedIndexes { get; init; } = Array.Empty<IndexSuggestion>();
+        /// <summary>Estimated speedup factor.</summary>
+        public double EstimatedSpeedup { get; init; } = 1.0;
+        /// <summary>Identified performance issues.</summary>
+        public string[] PerformanceIssues { get; init; } = Array.Empty<string>();
+        /// <summary>Confidence in the optimization.</summary>
+        public double Confidence { get; init; }
+    }
+
+    /// <summary>
+    /// A query optimization recommendation.
+    /// </summary>
+    public sealed class QueryRecommendation
+    {
+        /// <summary>Type of recommendation.</summary>
+        public string Type { get; init; } = string.Empty;
+        /// <summary>Description of the recommendation.</summary>
+        public string Description { get; init; } = string.Empty;
+        /// <summary>Impact level.</summary>
+        public string Impact { get; init; } = "Medium";
+        /// <summary>Suggested change.</summary>
+        public string? SuggestedChange { get; init; }
+    }
+
+    /// <summary>
+    /// A suggested index for query optimization.
+    /// </summary>
+    public sealed class IndexSuggestion
+    {
+        /// <summary>Table name for the index.</summary>
+        public string Table { get; init; } = string.Empty;
+        /// <summary>Columns to include in the index.</summary>
+        public string[] Columns { get; init; } = Array.Empty<string>();
+        /// <summary>Index type (e.g., BTREE, HASH).</summary>
+        public string IndexType { get; init; } = "BTREE";
+        /// <summary>Estimated improvement.</summary>
+        public double EstimatedImprovement { get; init; }
+        /// <summary>Reason for the suggestion.</summary>
+        public string? Reason { get; init; }
+    }
+
+    /// <summary>
+    /// Result of database schema inference.
+    /// </summary>
+    public sealed class DatabaseSchemaInferenceResult
+    {
+        /// <summary>Inferred fields with types and descriptions.</summary>
+        public InferredField[] InferredFields { get; init; } = Array.Empty<InferredField>();
+        /// <summary>Suggested primary key field.</summary>
+        public string? SuggestedPrimaryKey { get; init; }
+        /// <summary>Suggested foreign key relationships.</summary>
+        public ForeignKeySuggestion[] SuggestedForeignKeys { get; init; } = Array.Empty<ForeignKeySuggestion>();
+        /// <summary>Suggested indexes.</summary>
+        public string[] SuggestedIndexes { get; init; } = Array.Empty<string>();
+        /// <summary>Data quality issues found.</summary>
+        public DataQualityIssue[] DataQualityIssues { get; init; } = Array.Empty<DataQualityIssue>();
+        /// <summary>Confidence in the inference.</summary>
+        public double Confidence { get; init; }
+    }
+
+    /// <summary>
+    /// An inferred field from schema inference.
+    /// </summary>
+    public sealed class InferredField
+    {
+        /// <summary>Field name.</summary>
+        public string Name { get; init; } = string.Empty;
+        /// <summary>Inferred data type.</summary>
+        public string DataType { get; init; } = string.Empty;
+        /// <summary>Whether the field appears nullable.</summary>
+        public bool IsNullable { get; init; }
+        /// <summary>Whether the field appears unique.</summary>
+        public bool IsUnique { get; init; }
+        /// <summary>AI-generated description.</summary>
+        public string? Description { get; init; }
+        /// <summary>Sample values found.</summary>
+        public string[]? SampleValues { get; init; }
+        /// <summary>Suggested constraints.</summary>
+        public string[]? SuggestedConstraints { get; init; }
+    }
+
+    /// <summary>
+    /// A suggested foreign key relationship.
+    /// </summary>
+    public sealed class ForeignKeySuggestion
+    {
+        /// <summary>Source table.</summary>
+        public string SourceTable { get; init; } = string.Empty;
+        /// <summary>Source column.</summary>
+        public string SourceColumn { get; init; } = string.Empty;
+        /// <summary>Target table.</summary>
+        public string TargetTable { get; init; } = string.Empty;
+        /// <summary>Target column.</summary>
+        public string TargetColumn { get; init; } = string.Empty;
+        /// <summary>Confidence in the suggestion.</summary>
+        public double Confidence { get; init; }
+    }
+
+    /// <summary>
+    /// A data quality issue found during analysis.
+    /// </summary>
+    public sealed class DataQualityIssue
+    {
+        /// <summary>Type of issue.</summary>
+        public string IssueType { get; init; } = string.Empty;
+        /// <summary>Affected field.</summary>
+        public string? AffectedField { get; init; }
+        /// <summary>Description of the issue.</summary>
+        public string Description { get; init; } = string.Empty;
+        /// <summary>Severity level.</summary>
+        public string Severity { get; init; } = "Low";
+        /// <summary>Suggested fix.</summary>
+        public string? SuggestedFix { get; init; }
+    }
+
+    /// <summary>
+    /// Metrics for a database operation.
+    /// </summary>
+    public sealed class DatabaseOperationMetrics
+    {
+        /// <summary>Type of query (SELECT, INSERT, UPDATE, DELETE).</summary>
+        public string QueryType { get; init; } = string.Empty;
+        /// <summary>Execution time in milliseconds.</summary>
+        public double ExecutionTimeMs { get; init; }
+        /// <summary>Number of rows affected.</summary>
+        public long RowsAffected { get; init; }
+        /// <summary>Number of rows examined.</summary>
+        public long RowsExamined { get; init; }
+        /// <summary>When the operation occurred.</summary>
+        public DateTimeOffset Timestamp { get; init; } = DateTimeOffset.UtcNow;
+        /// <summary>User who performed the operation.</summary>
+        public string? UserId { get; init; }
+        /// <summary>Source IP address.</summary>
+        public string? SourceIp { get; init; }
+        /// <summary>Database name.</summary>
+        public string? Database { get; init; }
+        /// <summary>Table name.</summary>
+        public string? Table { get; init; }
+    }
+
+    /// <summary>
+    /// Baseline metrics for anomaly detection.
+    /// </summary>
+    public sealed class DatabaseBaselineMetrics
+    {
+        /// <summary>Average execution time in milliseconds.</summary>
+        public double AverageExecutionTimeMs { get; init; }
+        /// <summary>Average rows affected.</summary>
+        public double AverageRowsAffected { get; init; }
+        /// <summary>Typical query patterns.</summary>
+        public string[] TypicalQueryPatterns { get; init; } = Array.Empty<string>();
+        /// <summary>Typical access hours (0-23).</summary>
+        public int[] TypicalAccessHours { get; init; } = Array.Empty<int>();
+        /// <summary>When the baseline was created.</summary>
+        public DateTimeOffset BaselineCreatedAt { get; init; }
+    }
+
+    /// <summary>
+    /// Result of database anomaly detection.
+    /// </summary>
+    public sealed class DatabaseAnomalyResult
+    {
+        /// <summary>Whether an anomaly was detected.</summary>
+        public bool IsAnomaly { get; init; }
+        /// <summary>Anomaly score (0.0-1.0).</summary>
+        public double AnomalyScore { get; init; }
+        /// <summary>Type of anomaly detected.</summary>
+        public string? AnomalyType { get; init; }
+        /// <summary>Threat level assessment.</summary>
+        public string ThreatLevel { get; init; } = "Low";
+        /// <summary>Description of the anomaly.</summary>
+        public string? Description { get; init; }
+        /// <summary>Potential threats identified.</summary>
+        public string[] PotentialThreats { get; init; } = Array.Empty<string>();
+        /// <summary>Recommended actions.</summary>
+        public string[] Recommendations { get; init; } = Array.Empty<string>();
+        /// <summary>Whether to block the operation.</summary>
+        public bool ShouldBlock { get; init; }
+        /// <summary>Whether to raise an alert.</summary>
+        public bool ShouldAlert { get; init; }
+        /// <summary>Whether manual review is required.</summary>
+        public bool RequiresReview { get; init; }
+    }
+
+    /// <summary>
+    /// Prediction for query caching behavior.
+    /// </summary>
+    public sealed class QueryCachePrediction
+    {
+        /// <summary>Hash of the query.</summary>
+        public string QueryHash { get; init; } = string.Empty;
+        /// <summary>Whether to cache this query's results.</summary>
+        public bool ShouldCache { get; init; }
+        /// <summary>Whether to preload this query's results.</summary>
+        public bool ShouldPreload { get; init; }
+        /// <summary>Recommended time-to-live for cache.</summary>
+        public TimeSpan RecommendedTtl { get; init; }
+        /// <summary>Predicted number of accesses in the next hour.</summary>
+        public int PredictedAccessCount { get; init; }
+        /// <summary>Predicted time of next access.</summary>
+        public DateTimeOffset? NextPredictedAccess { get; init; }
+        /// <summary>Detected access pattern type.</summary>
+        public string AccessPattern { get; init; } = "Unknown";
+        /// <summary>Cache priority (0-100, higher = more important).</summary>
+        public int CachePriority { get; init; }
+        /// <summary>Confidence in the prediction.</summary>
+        public double Confidence { get; init; }
+    }
+
+    #endregion
 }

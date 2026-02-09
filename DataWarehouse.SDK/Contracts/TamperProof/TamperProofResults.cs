@@ -215,6 +215,11 @@ public class SecureReadResult
     public required ReadMode ReadMode { get; init; }
 
     /// <summary>
+    /// Blockchain verification result (populated for Audit mode).
+    /// </summary>
+    public BlockchainVerificationDetails? BlockchainVerification { get; init; }
+
+    /// <summary>
     /// Creates a successful read result.
     /// </summary>
     public static SecureReadResult CreateSuccess(
@@ -239,6 +244,36 @@ public class SecureReadResult
             CompletedAt = DateTimeOffset.UtcNow,
             OriginalWriteContext = originalWriteContext,
             ReadMode = readMode
+        };
+    }
+
+    /// <summary>
+    /// Creates a successful read result with blockchain verification details.
+    /// </summary>
+    public static SecureReadResult CreateSuccess(
+        Guid objectId,
+        int version,
+        byte[] data,
+        IntegrityVerificationResult integrityVerification,
+        ReadMode readMode,
+        WriteContextRecord? originalWriteContext,
+        bool recoveryPerformed,
+        RecoveryResult? recoveryDetails,
+        BlockchainVerificationDetails? blockchainVerification)
+    {
+        return new SecureReadResult
+        {
+            Success = true,
+            ObjectId = objectId,
+            Version = version,
+            Data = data,
+            IntegrityVerification = integrityVerification,
+            RecoveryPerformed = recoveryPerformed,
+            RecoveryDetails = recoveryDetails,
+            CompletedAt = DateTimeOffset.UtcNow,
+            OriginalWriteContext = originalWriteContext,
+            ReadMode = readMode,
+            BlockchainVerification = blockchainVerification
         };
     }
 
@@ -505,6 +540,18 @@ public class RecoveryResult
     public string? ErrorMessage { get; init; }
 
     /// <summary>
+    /// Indicates that manual intervention is required to complete recovery.
+    /// Set to true when recovery behavior is ManualOnly or when automatic
+    /// recovery has failed and administrator action is needed.
+    /// </summary>
+    public bool RequiresManualIntervention { get; init; } = false;
+
+    /// <summary>
+    /// The recovery behavior that was applied during this operation.
+    /// </summary>
+    public RecoveryBehavior Behavior { get; init; } = RecoveryBehavior.AutoRecover;
+
+    /// <summary>
     /// Creates a successful recovery result.
     /// </summary>
     public static RecoveryResult CreateSuccess(
@@ -522,7 +569,9 @@ public class RecoveryResult
             RecoverySource = recoverySource,
             RecoveryDetails = recoveryDetails,
             TamperIncident = tamperIncident,
-            CompletedAt = DateTimeOffset.UtcNow
+            CompletedAt = DateTimeOffset.UtcNow,
+            RequiresManualIntervention = false,
+            Behavior = RecoveryBehavior.AutoRecover
         };
     }
 
@@ -542,9 +591,242 @@ public class RecoveryResult
             RecoverySource = "N/A",
             RecoveryDetails = "Recovery failed",
             CompletedAt = DateTimeOffset.UtcNow,
+            ErrorMessage = errorMessage,
+            RequiresManualIntervention = false,
+            Behavior = RecoveryBehavior.AutoRecover
+        };
+    }
+
+    /// <summary>
+    /// Creates a recovery result indicating manual intervention is required.
+    /// Used when ManualOnly recovery behavior is configured.
+    /// </summary>
+    public static RecoveryResult CreateManualRequired(
+        Guid objectId,
+        int version,
+        string details)
+    {
+        return new RecoveryResult
+        {
+            Success = false,
+            ObjectId = objectId,
+            Version = version,
+            RecoverySource = "N/A",
+            RecoveryDetails = details,
+            CompletedAt = DateTimeOffset.UtcNow,
+            RequiresManualIntervention = true,
+            Behavior = RecoveryBehavior.ManualOnly,
+            ErrorMessage = "Manual intervention required - automatic recovery is disabled"
+        };
+    }
+}
+
+/// <summary>
+/// Defines the recovery behavior applied during tamper detection.
+/// </summary>
+public enum RecoveryBehavior
+{
+    /// <summary>
+    /// Automatic recovery from backup sources (WORM, RAID parity).
+    /// </summary>
+    AutoRecover,
+
+    /// <summary>
+    /// Manual intervention required - no automatic recovery performed.
+    /// Only logging and alerting occurs.
+    /// </summary>
+    ManualOnly,
+
+    /// <summary>
+    /// Fail closed - seal the affected block/shard and prevent all access.
+    /// </summary>
+    FailClosed,
+
+    /// <summary>
+    /// Alert only - log and notify but allow continued access to potentially corrupted data.
+    /// </summary>
+    AlertOnly
+}
+
+/// <summary>
+/// Result of a secure correction operation with full audit trail.
+/// Contains provenance information for compliance and forensic purposes.
+/// </summary>
+public class SecureCorrectionResult
+{
+    /// <summary>
+    /// Whether the secure correction succeeded.
+    /// </summary>
+    public required bool Success { get; init; }
+
+    /// <summary>
+    /// Unique identifier for this audit entry.
+    /// Can be used to trace the correction in audit logs.
+    /// </summary>
+    public required Guid AuditId { get; init; }
+
+    /// <summary>
+    /// Timestamp when the correction was applied.
+    /// </summary>
+    public required DateTimeOffset Timestamp { get; init; }
+
+    /// <summary>
+    /// Principal who authorized the correction.
+    /// Extracted from the authorization token.
+    /// </summary>
+    public required string AuthorizedBy { get; init; }
+
+    /// <summary>
+    /// Hash of the original (corrupted) data before correction.
+    /// </summary>
+    public required string OriginalHash { get; init; }
+
+    /// <summary>
+    /// Hash of the corrected data after the operation.
+    /// </summary>
+    public required string NewHash { get; init; }
+
+    /// <summary>
+    /// Reason provided for the correction.
+    /// Required for audit trail and compliance.
+    /// </summary>
+    public required string Reason { get; init; }
+
+    /// <summary>
+    /// Block ID that was corrected.
+    /// </summary>
+    public required Guid BlockId { get; init; }
+
+    /// <summary>
+    /// Version number after correction.
+    /// </summary>
+    public int? NewVersion { get; init; }
+
+    /// <summary>
+    /// Provenance chain linking this correction to previous versions.
+    /// </summary>
+    public IReadOnlyList<ProvenanceEntry>? ProvenanceChain { get; init; }
+
+    /// <summary>
+    /// Error message if Success is false.
+    /// </summary>
+    public string? ErrorMessage { get; init; }
+
+    /// <summary>
+    /// Creates a successful secure correction result.
+    /// </summary>
+    public static SecureCorrectionResult CreateSuccess(
+        Guid auditId,
+        string authorizedBy,
+        string originalHash,
+        string newHash,
+        string reason,
+        Guid blockId,
+        int? newVersion = null,
+        IReadOnlyList<ProvenanceEntry>? provenanceChain = null)
+    {
+        return new SecureCorrectionResult
+        {
+            Success = true,
+            AuditId = auditId,
+            Timestamp = DateTimeOffset.UtcNow,
+            AuthorizedBy = authorizedBy,
+            OriginalHash = originalHash,
+            NewHash = newHash,
+            Reason = reason,
+            BlockId = blockId,
+            NewVersion = newVersion,
+            ProvenanceChain = provenanceChain
+        };
+    }
+
+    /// <summary>
+    /// Creates a failed secure correction result.
+    /// </summary>
+    public static SecureCorrectionResult CreateFailure(
+        Guid blockId,
+        string reason,
+        string errorMessage)
+    {
+        return new SecureCorrectionResult
+        {
+            Success = false,
+            AuditId = Guid.Empty,
+            Timestamp = DateTimeOffset.UtcNow,
+            AuthorizedBy = string.Empty,
+            OriginalHash = string.Empty,
+            NewHash = string.Empty,
+            Reason = reason,
+            BlockId = blockId,
             ErrorMessage = errorMessage
         };
     }
+}
+
+/// <summary>
+/// Entry in a provenance chain tracking data lineage.
+/// </summary>
+public class ProvenanceEntry
+{
+    /// <summary>
+    /// Unique identifier for this provenance entry.
+    /// </summary>
+    public required Guid EntryId { get; init; }
+
+    /// <summary>
+    /// Type of operation that created this entry.
+    /// </summary>
+    public required ProvenanceOperationType OperationType { get; init; }
+
+    /// <summary>
+    /// Timestamp when this operation occurred.
+    /// </summary>
+    public required DateTimeOffset Timestamp { get; init; }
+
+    /// <summary>
+    /// Principal who performed the operation.
+    /// </summary>
+    public required string Principal { get; init; }
+
+    /// <summary>
+    /// Hash of the data at this point in the chain.
+    /// </summary>
+    public required string DataHash { get; init; }
+
+    /// <summary>
+    /// Reference to the previous entry in the chain.
+    /// Null for the initial entry.
+    /// </summary>
+    public Guid? PreviousEntryId { get; init; }
+
+    /// <summary>
+    /// Additional metadata about this operation.
+    /// </summary>
+    public Dictionary<string, string>? Metadata { get; init; }
+}
+
+/// <summary>
+/// Types of operations that can create provenance entries.
+/// </summary>
+public enum ProvenanceOperationType
+{
+    /// <summary>Initial creation of the data.</summary>
+    Create,
+
+    /// <summary>Standard write operation.</summary>
+    Write,
+
+    /// <summary>Correction of existing data.</summary>
+    Correct,
+
+    /// <summary>Recovery from backup.</summary>
+    Recover,
+
+    /// <summary>Secure correction with authorization.</summary>
+    SecureCorrect,
+
+    /// <summary>Migration from another system.</summary>
+    Migrate
 }
 
 /// <summary>
@@ -1345,6 +1627,11 @@ public class AccessLog
     /// Error message if access failed.
     /// </summary>
     public string? ErrorMessage { get; init; }
+
+    /// <summary>
+    /// Additional details about the access (verification summary, etc.).
+    /// </summary>
+    public string? Details { get; init; }
 }
 
 /// <summary>
@@ -1411,4 +1698,179 @@ public class TamperIncident
     /// Whether administrators were notified.
     /// </summary>
     public required bool AdminNotified { get; init; }
+
+    /// <summary>
+    /// Additional details about the access.
+    /// </summary>
+    public string? Details { get; init; }
+}
+
+/// <summary>
+/// Details of blockchain verification for Audit mode reads.
+/// </summary>
+public class BlockchainVerificationDetails
+{
+    /// <summary>
+    /// Whether the blockchain anchor was verified.
+    /// </summary>
+    public required bool Verified { get; init; }
+
+    /// <summary>
+    /// Block number where the anchor was found.
+    /// </summary>
+    public long? BlockNumber { get; init; }
+
+    /// <summary>
+    /// Timestamp when the anchor was created.
+    /// </summary>
+    public DateTimeOffset? AnchoredAt { get; init; }
+
+    /// <summary>
+    /// Number of confirmations.
+    /// </summary>
+    public int? Confirmations { get; init; }
+
+    /// <summary>
+    /// The blockchain anchor record.
+    /// </summary>
+    public BlockchainAnchor? Anchor { get; init; }
+
+    /// <summary>
+    /// Error message if verification failed.
+    /// </summary>
+    public string? ErrorMessage { get; init; }
+
+    /// <summary>
+    /// Creates successful verification details.
+    /// </summary>
+    public static BlockchainVerificationDetails CreateSuccess(
+        long blockNumber,
+        DateTimeOffset anchoredAt,
+        int confirmations,
+        BlockchainAnchor? anchor = null)
+    {
+        return new BlockchainVerificationDetails
+        {
+            Verified = true,
+            BlockNumber = blockNumber,
+            AnchoredAt = anchoredAt,
+            Confirmations = confirmations,
+            Anchor = anchor
+        };
+    }
+
+    /// <summary>
+    /// Creates failed verification details.
+    /// </summary>
+    public static BlockchainVerificationDetails CreateFailure(string errorMessage)
+    {
+        return new BlockchainVerificationDetails
+        {
+            Verified = false,
+            ErrorMessage = errorMessage
+        };
+    }
+
+    /// <summary>
+    /// Creates from a BlockchainVerificationResult from the Services namespace.
+    /// </summary>
+    public static BlockchainVerificationDetails? FromServiceResult(object? serviceResult)
+    {
+        if (serviceResult == null) return null;
+
+        // Use reflection to avoid circular reference between SDK and Plugin
+        var type = serviceResult.GetType();
+        var success = (bool?)type.GetProperty("Success")?.GetValue(serviceResult) ?? false;
+
+        if (success)
+        {
+            return new BlockchainVerificationDetails
+            {
+                Verified = true,
+                BlockNumber = (long?)type.GetProperty("BlockNumber")?.GetValue(serviceResult),
+                AnchoredAt = (DateTimeOffset?)type.GetProperty("AnchoredAt")?.GetValue(serviceResult),
+                Confirmations = (int?)type.GetProperty("Confirmations")?.GetValue(serviceResult)
+            };
+        }
+        else
+        {
+            return new BlockchainVerificationDetails
+            {
+                Verified = false,
+                ErrorMessage = (string?)type.GetProperty("ErrorMessage")?.GetValue(serviceResult)
+            };
+        }
+    }
+}
+
+/// <summary>
+/// Exception thrown when attempting to modify a sealed block or shard.
+/// Sealed data is permanently locked and cannot be modified under any circumstances.
+/// </summary>
+public class BlockSealedException : Exception
+{
+    /// <summary>
+    /// The sealed block ID that was attempted to be modified.
+    /// </summary>
+    public Guid BlockId { get; }
+
+    /// <summary>
+    /// When the block was sealed.
+    /// </summary>
+    public DateTime SealedAt { get; }
+
+    /// <summary>
+    /// The reason the block was sealed.
+    /// </summary>
+    public string Reason { get; }
+
+    /// <summary>
+    /// The shard index if a specific shard was sealed (null for entire block).
+    /// </summary>
+    public int? ShardIndex { get; init; }
+
+    /// <summary>
+    /// Creates a new BlockSealedException.
+    /// </summary>
+    /// <param name="blockId">The sealed block ID.</param>
+    /// <param name="sealedAt">When the block was sealed.</param>
+    /// <param name="reason">The reason for sealing.</param>
+    public BlockSealedException(Guid blockId, DateTime sealedAt, string reason)
+        : base($"Block {blockId} is sealed and cannot be modified. Sealed at: {sealedAt:O}. Reason: {reason}")
+    {
+        BlockId = blockId;
+        SealedAt = sealedAt;
+        Reason = reason;
+    }
+
+    /// <summary>
+    /// Creates a new BlockSealedException with an inner exception.
+    /// </summary>
+    /// <param name="blockId">The sealed block ID.</param>
+    /// <param name="sealedAt">When the block was sealed.</param>
+    /// <param name="reason">The reason for sealing.</param>
+    /// <param name="innerException">The inner exception.</param>
+    public BlockSealedException(Guid blockId, DateTime sealedAt, string reason, Exception innerException)
+        : base($"Block {blockId} is sealed and cannot be modified. Sealed at: {sealedAt:O}. Reason: {reason}", innerException)
+    {
+        BlockId = blockId;
+        SealedAt = sealedAt;
+        Reason = reason;
+    }
+
+    /// <summary>
+    /// Creates a BlockSealedException for a sealed shard.
+    /// </summary>
+    /// <param name="blockId">The block ID containing the sealed shard.</param>
+    /// <param name="shardIndex">The sealed shard index.</param>
+    /// <param name="sealedAt">When the shard was sealed.</param>
+    /// <param name="reason">The reason for sealing.</param>
+    /// <returns>A new BlockSealedException for the shard.</returns>
+    public static BlockSealedException ForShard(Guid blockId, int shardIndex, DateTime sealedAt, string reason)
+    {
+        return new BlockSealedException(blockId, sealedAt, reason)
+        {
+            ShardIndex = shardIndex
+        };
+    }
 }

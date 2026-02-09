@@ -1,0 +1,160 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RootNamespace>DataWarehouse.Plugins.UltimateDatabaseStorage</RootNamespace>
+    <Description>Ultimate Database Storage Plugin - Comprehensive database storage strategies including relational (PostgreSQL, MySQL, SQL Server, Oracle, SQLite), NoSQL document (MongoDB, CouchDB, RavenDB), key-value (Redis, Memcached, etcd, RocksDB), wide-column (Cassandra, HBase, ScyllaDB), graph (Neo4j, JanusGraph, ArangoDB), time-series (InfluxDB, TimescaleDB, QuestDB), search (Elasticsearch, OpenSearch, Meilisearch), and embedded databases (SQLite, DuckDB, H2)</Description>
+    <Authors>DataWarehouse</Authors>
+    <Company>DataWarehouse</Company>
+    <Product>DataWarehouse Ultimate Database Storage</Product>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\DataWarehouse.SDK\DataWarehouse.SDK.csproj" />
+  </ItemGroup>
+
+  <!-- Relational Databases -->
+  <ItemGroup>
+    <!-- PostgreSQL -->
+    <PackageReference Include="Npgsql" Version="10.*" />
+
+    <!-- MySQL/MariaDB -->
+    <PackageReference Include="MySql.Data" Version="9.2.*" />
+    <PackageReference Include="MySqlConnector" Version="2.5.*" />
+
+    <!-- SQL Server -->
+    <PackageReference Include="Microsoft.Data.SqlClient" Version="6.0.*" />
+
+    <!-- Oracle -->
+    <PackageReference Include="Oracle.ManagedDataAccess.Core" Version="23.8.*" />
+
+    <!-- SQLite -->
+    <PackageReference Include="Microsoft.Data.Sqlite" Version="10.*" />
+  </ItemGroup>
+
+  <!-- NoSQL Document Databases -->
+  <ItemGroup>
+    <!-- MongoDB -->
+    <PackageReference Include="MongoDB.Driver" Version="3.6.0" />
+
+    <!-- CouchDB -->
+    <PackageReference Include="CouchDB.NET" Version="3.4.*" />
+
+    <!-- RavenDB -->
+    <PackageReference Include="RavenDB.Client" Version="6.2.*" />
+  </ItemGroup>
+
+  <!-- Key-Value Stores -->
+  <ItemGroup>
+    <!-- Redis -->
+    <PackageReference Include="StackExchange.Redis" Version="2.10.14" />
+
+    <!-- Memcached -->
+    <PackageReference Include="EnyimMemcachedCore" Version="3.4.5" />
+
+    <!-- etcd -->
+    <PackageReference Include="dotnet-etcd" Version="8.0.*" />
+
+    <!-- RocksDB -->
+    <PackageReference Include="RocksDB" Version="8.10.*" />
+
+    <!-- LevelDB - Note: Using RocksDB as LevelDB packages not compatible with .NET 10 -->
+
+    <!-- FoundationDB -->
+    <PackageReference Include="FoundationDB.Client" Version="7.3.2" />
+  </ItemGroup>
+
+  <!-- Wide-Column Stores -->
+  <ItemGroup>
+    <!-- Cassandra / ScyllaDB -->
+    <PackageReference Include="CassandraCSharpDriver" Version="3.22.*" />
+
+    <!-- HBase (via Thrift/REST) -->
+    <PackageReference Include="Apache.Thrift" Version="0.22.*" />
+
+    <!-- Google Cloud Bigtable -->
+    <PackageReference Include="Google.Cloud.Bigtable.V2" Version="3.15.*" />
+    <PackageReference Include="Google.Cloud.Bigtable.Admin.V2" Version="3.20.*" />
+  </ItemGroup>
+
+  <!-- Graph Databases -->
+  <ItemGroup>
+    <!-- Neo4j -->
+    <PackageReference Include="Neo4j.Driver" Version="6.0.*" />
+
+    <!-- ArangoDB -->
+    <PackageReference Include="ArangoDBNetStandard" Version="2.5.*" />
+
+    <!-- JanusGraph (Gremlin) -->
+    <PackageReference Include="Gremlin.Net" Version="3.8.*" />
+  </ItemGroup>
+
+  <!-- Time-Series Databases -->
+  <ItemGroup>
+    <!-- InfluxDB -->
+    <PackageReference Include="InfluxDB.Client" Version="4.19.*" />
+
+    <!-- TimescaleDB uses PostgreSQL driver (already included) -->
+
+    <!-- QuestDB (uses PostgreSQL wire protocol) -->
+  </ItemGroup>
+
+  <!-- Search Engines -->
+  <ItemGroup>
+    <!-- Elasticsearch / OpenSearch -->
+    <PackageReference Include="Elastic.Clients.Elasticsearch" Version="9.0.*" />
+    <PackageReference Include="OpenSearch.Client" Version="1.8.*" />
+
+    <!-- Meilisearch -->
+    <PackageReference Include="Meilisearch" Version="0.18.*" />
+
+    <!-- Typesense -->
+    <PackageReference Include="Typesense" Version="1.1.*" />
+  </ItemGroup>
+
+  <!-- Embedded Databases -->
+  <ItemGroup>
+    <!-- DuckDB -->
+    <PackageReference Include="DuckDB.NET.Data" Version="1.2.*" />
+
+    <!-- LiteDB -->
+    <PackageReference Include="LiteDB.Async" Version="0.1.*" />
+  </ItemGroup>
+
+  <!-- Analytics Databases -->
+  <ItemGroup>
+    <!-- ClickHouse -->
+    <PackageReference Include="ClickHouse.Client" Version="7.14.*" />
+  </ItemGroup>
+
+  <!-- Cloud Databases -->
+  <ItemGroup>
+    <!-- Azure Cosmos DB (DocumentDB) -->
+    <PackageReference Include="Microsoft.Azure.Cosmos" Version="3.48.*" />
+
+    <!-- AWS DynamoDB -->
+    <PackageReference Include="AWSSDK.DynamoDBv2" Version="4.0.*" />
+
+    <!-- Google Cloud Spanner -->
+    <PackageReference Include="Google.Cloud.Spanner.Data" Version="5.0.*" />
+
+    <!-- HashiCorp Consul -->
+    <PackageReference Include="Consul" Version="1.7.*" />
+  </ItemGroup>
+
+  <!-- Streaming Platforms -->
+  <ItemGroup>
+    <!-- Apache Kafka -->
+    <PackageReference Include="Confluent.Kafka" Version="2.9.*" />
+  </ItemGroup>
+
+  <!-- Additional Dependencies -->
+  <ItemGroup>
+    <PackageReference Include="System.Linq.Async" Version="7.*" />
+    <PackageReference Include="Polly" Version="8.*" />
+    <PackageReference Include="System.Data.Odbc" Version="10.*" />
+  </ItemGroup>
+
+</Project>

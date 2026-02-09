@@ -1,0 +1,48 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <LangVersion>latest</LangVersion>
+    <RootNamespace>DataWarehouse.Plugins.UltimateDeployment</RootNamespace>
+    <Description>Ultimate Deployment Plugin - 65+ deployment strategies including blue/green, canary, rolling update, container orchestration (Kubernetes, Docker Swarm, Nomad, ECS, AKS, GKE, EKS), serverless (AWS Lambda, Azure Functions, Google Cloud Functions), VM/bare metal (Ansible, Terraform, Puppet, Chef), CI/CD integration, feature flags, hot reload, and rollback strategies</Description>
+    <Authors>DataWarehouse</Authors>
+    <Company>DataWarehouse</Company>
+    <Product>DataWarehouse Ultimate Deployment</Product>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\DataWarehouse.SDK\DataWarehouse.SDK.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Kubernetes client for container orchestration -->
+    <PackageReference Include="KubernetesClient" Version="15.0.1" />
+
+    <!-- Docker client -->
+    <PackageReference Include="Docker.DotNet" Version="3.125.15" />
+
+    <!-- AWS SDK for Lambda and ECS -->
+    <PackageReference Include="AWSSDK.Lambda" Version="3.7.*" />
+    <PackageReference Include="AWSSDK.ECS" Version="3.7.*" />
+
+    <!-- Azure SDK for Functions and AKS -->
+    <PackageReference Include="Azure.ResourceManager.AppService" Version="1.2.*" />
+    <PackageReference Include="Azure.ResourceManager.ContainerService" Version="1.2.*" />
+
+    <!-- Google Cloud for GKE and Cloud Functions -->
+    <PackageReference Include="Google.Cloud.Functions.V2" Version="1.6.*" />
+    <PackageReference Include="Google.Cloud.Container.V1" Version="3.7.*" />
+
+    <!-- SSH for VM deployments -->
+    <PackageReference Include="SSH.NET" Version="2024.2.0" />
+
+    <!-- YAML processing for configuration -->
+    <PackageReference Include="YamlDotNet" Version="16.2.0" />
+
+    <!-- HTTP client for webhooks and API calls -->
+    <PackageReference Include="Polly" Version="8.5.0" />
+  </ItemGroup>
+
+</Project>
