@@ -227,8 +227,6 @@ T99 (SDK) → T94 (Key Mgmt) → T93 (Encryption) → TamperProof (T3.4.2)
 > **CRITICAL: These tasks were designed before Ultimate plugins existed.**
 > **All SDK Requirements and Plugin specifications are now redirected to Ultimate plugins.**
 
-#### CATEGORY B: Advanced Security (Tasks 73-76)
-
 | Order | Task | Name | Original Plugin | NOW: Implement In | Status |
 |-------|------|------|-----------------|-------------------|--------|
 | **4.1** | T73 | Canary Objects | ~~DataWarehouse.Plugins.Security.Canary~~ | **T95 (UltimateAccessControl)** as `CanaryStrategy` | [x] |
@@ -242,8 +240,6 @@ T99 (SDK) → T94 (Key Mgmt) → T93 (Encryption) → TamperProof (T3.4.2)
 - `ISecureComputationProvider` → T99.A3 (Key Management interfaces)
 - `IEphemeralSharingProvider` → T99.A4
 
-#### CATEGORY C: Physics & Logistics (Tasks 77-79)
-
 | Order | Task | Name | Original Plugin | NOW: Implement In | Status |
 |-------|------|------|-----------------|-------------------|--------|
 | **4.5** | T77 | Sovereignty Geofencing | ~~DataWarehouse.Plugins.Governance.Geofencing~~ | **T96 (UltimateCompliance)** as `GeofencingStrategy` | [x] |
@@ -252,42 +248,25 @@ T99 (SDK) → T94 (Key Mgmt) → T93 (Encryption) → TamperProof (T3.4.2)
 
 **Note:** T78 and T79 remain standalone due to their unique transport layer requirements that don't fit existing Ultimate plugin categories.
 
-#### CATEGORY D: Data Physics & Time (Tasks 80-81)
-
 | Order | Task | Name | Original Plugin | NOW: Implement In | Status |
 |-------|------|------|-----------------|-------------------|--------|
 | **4.8** | T80 | Ultimate Data Protection | `DataWarehouse.Plugins.DataProtection` | **Already Ultimate** (consolidates backup plugins) | [ ] |
 | **4.9** | T81 | Liquid Storage Tiers | ~~DataWarehouse.Plugins.Tiering.BlockLevel~~ | **T104 (UltimateDataManagement)** as `BlockLevelTieringStrategy` | [ ] |
-
-#### CATEGORY E: Collaboration (Tasks 82-83)
-
 | Order | Task | Name | Original Plugin | NOW: Implement In | Status |
 |-------|------|------|-----------------|-------------------|--------|
 | **4.10** | T82 | Data Branching (Git-for-Data) | ~~DataWarehouse.Plugins.VersionControl.Branching~~ | **T104 (UltimateDataManagement)** as `BranchingStrategy` | [ ] |
 | **4.11** | T83 | Data Marketplace | ~~DataWarehouse.Plugins.Commerce.Marketplace~~ | **Standalone** `DataWarehouse.Plugins.DataMarketplace` (commerce/billing is unique domain, no Ultimate match) | [ ] |
-
-#### CATEGORY F: Generative & Probabilistic (Tasks 84-85)
-
 | Order | Task | Name | Original Plugin | NOW: Implement In | Status |
 |-------|------|------|-----------------|-------------------|--------|
 | **4.12** | T84 | Generative Compression | ~~DataWarehouse.Plugins.Storage.Generative~~ | **T92 (UltimateCompression)** as `GenerativeCompressionStrategy` | [x] |
 | **4.13** | T85 | Probabilistic Storage | ~~DataWarehouse.Plugins.Storage.Probabilistic~~ | **SDK (T99)** primitives + **T104** `ProbabilisticStorageStrategy` | [ ] |
-
-#### CATEGORY G: The Immortal Layer (Task 86)
-
 | Order | Task | Name | Original Plugin | NOW: Implement In | Status |
 |-------|------|------|-----------------|-------------------|--------|
 | **4.14** | T86 | Self-Emulating Objects | ~~DataWarehouse.Plugins.Archival.SelfEmulation~~ | **Standalone** (unique WASM bundling) | [ ] |
-
-#### CATEGORY H: Spatial & Human Layer (Tasks 87-88)
-
 | Order | Task | Name | Original Plugin | NOW: Implement In | Status |
 |-------|------|------|-----------------|-------------------|--------|
 | **4.15** | T87 | Spatial AR Anchors | ~~DataWarehouse.Plugins.Spatial.ArAnchors~~ | **SDK (T99)** primitives + **T104** `SpatialAnchorStrategy` + client libs | [ ] |
 | **4.16** | T88 | Psychometric Indexing | ~~DataWarehouse.Plugins.Indexing.Psychometric~~ | **T90 (UniversalIntelligence)** as `PsychometricIndexingStrategy` | [ ] |
-
-#### CATEGORY I: The Traitor Layer (Task 89)
-
 | Order | Task | Name | Original Plugin | NOW: Implement In | Status |
 |-------|------|------|-----------------|-------------------|--------|
 | **4.17** | T89 | Forensic Watermarking | ~~DataWarehouse.Plugins.Security.Watermarking~~ | **T95 (UltimateAccessControl)** as `WatermarkingStrategy` | [x] |
@@ -576,8 +555,6 @@ T99 (SDK) → T94 (Key Mgmt) → T93 (Encryption) → TamperProof (T3.4.2)
 
 ---
 
-## GOD TIER FEATURES - Future-Proofing & Industry Leadership (2026-2027)
-
 #### Task 57: Plugin Marketplace & Certification
 **Priority:** P4 (Lowest)
 **Effort:** Medium
@@ -622,12 +599,6 @@ T99 (SDK) → T94 (Key Mgmt) → T93 (Encryption) → TamperProof (T3.4.2)
 | Compliance Audit Trail | Immutable audit logging | [~] In-memory implementation exists |
 
 ---
-
-### CATEGORY I: Active Enterprise Distribution System (AEDS)
-
-> **VISION:** Transform DataWarehouse from a passive storage repository into an **Active Logistics Platform**
-> that enables governed, secure, and intelligent propagation of data, commands, and software updates
-> from a central authority to distributed endpoints (and vice-versa) without requiring user intervention.
 
 #### Task 60: AEDS Core Infrastructure
 **Priority:** P0 (Enterprise)
@@ -5395,15 +5366,7 @@ This creates a complete audit trail for every change, enabling compliance report
 
 ---
 
-## PHASE 5: ACTIVE STORAGE - The Sentient Data Platform
-
-**Vision:** Transform DataWarehouse from a passive storage system into an **Active, Intelligent, Self-Defending Data Organism** that processes, protects, and evolves data autonomously.
-
-**Target:** Create a **Category of One** platform with capabilities no existing system (AWS S3, Dropbox, Synology, Snowflake) can match.
-
 ---
-
-### CATEGORY B: Advanced Security & Counter-Measures
 
 #### Task 73: Canary Objects (Honeytokens)
 **Priority:** P0
@@ -5544,8 +5507,6 @@ This creates a complete audit trail for every change, enabling compliance report
 - `DestructionPolicy` enum (OnRead, OnTime, OnRevoke)
 
 ---
-
-### CATEGORY C: Physics & Logistics
 
 #### Task 77: Sovereignty Geofencing
 **Priority:** P0
@@ -5690,8 +5651,6 @@ This creates a complete audit trail for every change, enabling compliance report
 - `ProcessingManifest` class for EHT local-vs-deferred tracking
 
 ---
-
-### CATEGORY D: Data Physics & Time
 
 #### Task 80: Ultimate Data Protection & Recovery
 **Priority:** P0
@@ -6066,8 +6025,6 @@ var config = new DataProtectionConfig
 
 ---
 
-### CATEGORY E: Collaboration
-
 #### Task 82: Data Branching (Git-for-Data)
 **Priority:** P0
 **Effort:** Very High
@@ -6141,8 +6098,6 @@ var config = new DataProtectionConfig
 - `PricingModel` enum (PerQuery, PerByte, Subscription, OneTime)
 
 ---
-
-### CATEGORY F: Generative & Probabilistic Layer
 
 #### Task 84: Generative/Semantic Compression (The "Dream" Store)
 **Priority:** P1
@@ -6225,8 +6180,6 @@ var config = new DataProtectionConfig
 
 ---
 
-### CATEGORY G: The Immortal Layer
-
 #### Task 86: Self-Emulating Objects (The Time Capsule)
 **Priority:** P1
 **Effort:** Very High
@@ -6262,8 +6215,6 @@ var config = new DataProtectionConfig
 - `ViewerCapability` enum for viewer features
 
 ---
-
-### CATEGORY H: Spatial & Human Layer
 
 #### Task 87: Spatial AR Anchors (The Metaverse Interface)
 **Priority:** P2
@@ -6352,8 +6303,6 @@ var config = new DataProtectionConfig
 
 ---
 
-### CATEGORY I: The Traitor Layer
-
 #### Task 89: Dynamic Forensic Watermarking (Traitor Tracing)
 **Priority:** P0
 **Effort:** High
@@ -6389,8 +6338,6 @@ var config = new DataProtectionConfig
 - `ExtractionResult` class for leak investigation
 
 ---
-
-### CATEGORY J: AI & Intelligence Layer
 
 #### Task 90: Ultimate Intelligence Plugin
 **Priority:** P0
@@ -7134,8 +7081,6 @@ Example: A manufacturing company deploys a blank model. Over 6 months:
 
 ---
 
-### CATEGORY K: Storage Reliability & Performance
-
 #### Task 91: Ultimate RAID Plugin
 **Priority:** P0
 **Effort:** Extreme
@@ -7840,30 +7785,7 @@ Consolidate all 8 encryption plugins into a single Ultimate Encryption plugin us
 
 ### Architecture: Strategy Pattern for Cipher Extensibility
 
-```csharp
-public interface IEncryptionStrategy
-{
-    string AlgorithmId { get; }              // "aes-256-gcm", "chacha20-poly1305"
-    string DisplayName { get; }
-    CipherCapabilities Capabilities { get; }
-    SecurityLevel SecurityLevel { get; }      // Standard, High, Military, QuantumSafe
-    bool IsFipsCompliant { get; }
-
-    Task<EncryptedPayload> EncryptAsync(Stream input, EncryptionKey key, EncryptionOptions options, CancellationToken ct);
-    Task<Stream> DecryptAsync(EncryptedPayload payload, EncryptionKey key, CancellationToken ct);
-    bool CanDecrypt(EncryptedPayload payload);
-}
-
-public record CipherCapabilities
-{
-    public int[] SupportedKeySizes { get; init; }
-    public CipherMode[] SupportedModes { get; init; }
-    public bool SupportsAEAD { get; init; }
-    public bool SupportsStreaming { get; init; }
-    public bool SupportsHardwareAcceleration { get; init; }
-    public bool IsQuantumResistant { get; init; }
-}
-```
+> Interface definitions: See `DataWarehouse.SDK/Contracts/Encryption/`
 
 ### Phase A: SDK Foundation (Sub-Tasks A1-A8)
 
@@ -8016,30 +7938,7 @@ Consolidate all 4 key management plugins into a single Ultimate Key Management p
 
 ### Architecture: Strategy Pattern for Key Stores
 
-```csharp
-public interface IKeyStoreStrategy
-{
-    string StoreId { get; }                  // "file", "vault", "hsm", "aws-kms"
-    string DisplayName { get; }
-    KeyStoreCapabilities Capabilities { get; }
-
-    Task<EncryptionKey> GetKeyAsync(string keyId, CancellationToken ct);
-    Task<string> StoreKeyAsync(EncryptionKey key, KeyMetadata metadata, CancellationToken ct);
-    Task RotateKeyAsync(string keyId, RotationPolicy policy, CancellationToken ct);
-    Task<bool> DeleteKeyAsync(string keyId, CancellationToken ct);
-    Task<IEnumerable<KeyMetadata>> ListKeysAsync(KeyFilter filter, CancellationToken ct);
-}
-
-public record KeyStoreCapabilities
-{
-    public bool SupportsHSM { get; init; }
-    public bool SupportsAutoRotation { get; init; }
-    public bool SupportsVersioning { get; init; }
-    public bool SupportsKeyEscrow { get; init; }
-    public bool SupportsSoftDelete { get; init; }
-    public bool IsCloudBacked { get; init; }
-}
-```
+> Interface definitions: See `DataWarehouse.SDK/Contracts/KeyManagement/`
 
 ### Phase A: SDK Foundation (Sub-Tasks A1-A6) ✅ COMPLETE
 
@@ -8129,28 +8028,7 @@ T95 focuses on **authorization and access control** - determining WHO can access
 
 ### Architecture: Unified Security Framework
 
-```csharp
-public interface ISecurityStrategy
-{
-    string StrategyId { get; }
-    SecurityDomain Domain { get; }  // AccessControl, ThreatDetection, Integrity, etc.
-    SecurityLevel Level { get; }
-
-    Task<SecurityDecision> EvaluateAsync(SecurityContext context, CancellationToken ct);
-    Task<SecurityAuditEntry> AuditAsync(SecurityOperation operation, CancellationToken ct);
-}
-
-public enum SecurityDomain
-{
-    AccessControl,
-    Identity,
-    ThreatDetection,
-    Integrity,
-    TamperProof,
-    ZeroTrust,
-    EntropyAnalysis
-}
-```
+> Interface definitions: See `DataWarehouse.SDK/Contracts/Security/`
 
 ### Phase A: SDK Foundation (Sub-Tasks A1-A8)
 
@@ -8584,33 +8462,7 @@ Consolidate all 10 storage provider plugins into a single Ultimate Storage plugi
 
 ### Architecture: Strategy Pattern for Storage Backends
 
-```csharp
-public interface IStorageStrategy
-{
-    string BackendId { get; }                // "local", "s3", "azure-blob", "gcs"
-    string DisplayName { get; }
-    StorageCapabilities Capabilities { get; }
-    StorageTier DefaultTier { get; }
-
-    Task<StorageResult> WriteAsync(string path, Stream data, StorageOptions options, CancellationToken ct);
-    Task<Stream> ReadAsync(string path, CancellationToken ct);
-    Task<bool> DeleteAsync(string path, CancellationToken ct);
-    Task<StorageMetadata> GetMetadataAsync(string path, CancellationToken ct);
-    Task<IEnumerable<StorageEntry>> ListAsync(string prefix, CancellationToken ct);
-}
-
-public record StorageCapabilities
-{
-    public bool SupportsStreaming { get; init; }
-    public bool SupportsVersioning { get; init; }
-    public bool SupportsMultipart { get; init; }
-    public bool SupportsEncryption { get; init; }
-    public bool SupportsLifecycle { get; init; }
-    public bool SupportsReplication { get; init; }
-    public long MaxObjectSize { get; init; }
-    public StorageTier[] SupportedTiers { get; init; }
-}
-```
+> Interface definitions: See `DataWarehouse.SDK/Contracts/Storage/`
 
 ### Phase A: SDK Foundation (Sub-Tasks A1-A6) ✅ COMPLETE
 
