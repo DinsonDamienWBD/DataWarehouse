@@ -7374,31 +7374,31 @@ Example: A manufacturing company deploys a blank model. Over 6 months:
 |---|----------|-------------|--------|
 | **I1: Code Migration** |
 | 91.I1.1 | Migrate Raid Plugin | Absorb DataWarehouse.Plugins.Raid | [x] |
-| 91.I1.2 | Migrate StandardRaid | Absorb DataWarehouse.Plugins.StandardRaid | [ ] |
-| 91.I1.3 | Migrate AdvancedRaid | Absorb DataWarehouse.Plugins.AdvancedRaid | [ ] |
-| 91.I1.4 | Migrate EnhancedRaid | Absorb DataWarehouse.Plugins.EnhancedRaid | [ ] |
-| 91.I1.5 | Migrate NestedRaid | Absorb DataWarehouse.Plugins.NestedRaid | [ ] |
-| 91.I1.6 | Migrate SelfHealingRaid | Absorb DataWarehouse.Plugins.SelfHealingRaid | [ ] |
-| 91.I1.7 | Migrate ZfsRaid | Absorb DataWarehouse.Plugins.ZfsRaid | [ ] |
-| 91.I1.8 | Migrate VendorSpecificRaid | Absorb DataWarehouse.Plugins.VendorSpecificRaid | [ ] |
-| 91.I1.9 | Migrate ExtendedRaid | Absorb DataWarehouse.Plugins.ExtendedRaid | [ ] |
-| 91.I1.10 | Migrate AutoRaid | Absorb DataWarehouse.Plugins.AutoRaid | [ ] |
-| 91.I1.11 | Migrate SharedRaidUtilities | Move to SDK (GaloisField, ReedSolomon) | [ ] |
-| 91.I1.12 | Migrate ErasureCoding | Absorb DataWarehouse.Plugins.ErasureCoding | [ ] |
+| 91.I1.2 | Migrate StandardRaid | Absorb DataWarehouse.Plugins.StandardRaid | [x] |
+| 91.I1.3 | Migrate AdvancedRaid | Absorb DataWarehouse.Plugins.AdvancedRaid | [x] |
+| 91.I1.4 | Migrate EnhancedRaid | Absorb DataWarehouse.Plugins.EnhancedRaid | [x] |
+| 91.I1.5 | Migrate NestedRaid | Absorb DataWarehouse.Plugins.NestedRaid | [x] |
+| 91.I1.6 | Migrate SelfHealingRaid | Absorb DataWarehouse.Plugins.SelfHealingRaid | [x] |
+| 91.I1.7 | Migrate ZfsRaid | Absorb DataWarehouse.Plugins.ZfsRaid | [x] |
+| 91.I1.8 | Migrate VendorSpecificRaid | Absorb DataWarehouse.Plugins.VendorSpecificRaid | [x] |
+| 91.I1.9 | Migrate ExtendedRaid | Absorb DataWarehouse.Plugins.ExtendedRaid | [x] |
+| 91.I1.10 | Migrate AutoRaid | Absorb DataWarehouse.Plugins.AutoRaid | [x] |
+| 91.I1.11 | Migrate SharedRaidUtilities | Move to SDK (GaloisField, ReedSolomon) | [x] |
+| 91.I1.12 | Migrate ErasureCoding | Absorb DataWarehouse.Plugins.ErasureCoding | [x] |
 | **I2: User Migration** |
-| 91.I2.1 | Config Migration Tool | Convert old configs to new format | [ ] |
-| 91.I2.2 | Array Migration | Migrate existing arrays to new plugin | [ ] |
-| 91.I2.3 | Deprecation Notices | Mark old plugins as deprecated | [ ] |
-| 91.I2.4 | Backward Compatibility | Support old APIs during transition | [ ] |
-| **I3: Cleanup** |
-| 91.I3.1 | Remove Old Projects | Remove deprecated plugin projects | [ ] |
-| 91.I3.2 | Update Solution File | Remove old plugins from .slnx | [ ] |
-| 91.I3.3 | Update References | Update all project references | [ ] |
-| 91.I3.4 | Update Documentation | Update all RAID documentation | [ ] |
+| 91.I2.1 | Config Migration Tool | Convert old configs to new format | [x] |
+| 91.I2.2 | Array Migration | Migrate existing arrays to new plugin | [x] |
+| 91.I2.3 | Deprecation Notices | Mark old plugins as deprecated | [x] |
+| 91.I2.4 | Backward Compatibility | Support old APIs during transition | [x] |
+| **I3: Cleanup (Deferred to Phase 18)** |
+| 91.I3.1 | Remove Old Projects | Remove deprecated plugin projects -- Deferred to Phase 18 | [ ] |
+| 91.I3.2 | Update Solution File | Remove old plugins from .slnx -- Deferred to Phase 18 | [ ] |
+| 91.I3.3 | Update References | Update all project references -- Deferred to Phase 18 | [ ] |
+| 91.I3.4 | Update Documentation | Update all RAID documentation -- Deferred to Phase 18 | [ ] |
 | **I4: SDK-Only Verification** |
-| 91.I4.1 | Verify SDK-Only Dependencies | **CRITICAL:** Ultimate RAID MUST only reference DataWarehouse.SDK | [ ] |
-| 91.I4.2 | Remove SharedRaidUtilities Reference | Replace with SDK GaloisField/ReedSolomon | [ ] |
-| 91.I4.3 | Audit All Imports | Ensure no plugin-to-plugin references | [ ] |
+| 91.I4.1 | Verify SDK-Only Dependencies | **CRITICAL:** Ultimate RAID MUST only reference DataWarehouse.SDK | [x] |
+| 91.I4.2 | Remove SharedRaidUtilities Reference | Replace with SDK GaloisField/ReedSolomon | [x] |
+| 91.I4.3 | Audit All Imports | Ensure no plugin-to-plugin references | [x] |
 | 91.I4.4 | CI/CD Dependency Check | Add build verification for SDK-only rule | [ ] |
 
 ---
