@@ -32,6 +32,35 @@ namespace DataWarehouse.Plugins.UltimateAccessControl
     /// - Watermarking: Forensic tracing for leak detection
     /// - Intelligence-aware behavior analysis
     /// </para>
+    /// <para>
+    /// <b>MIGRATION GUIDE (from individual security plugins):</b>
+    /// </para>
+    /// <para>
+    /// This Ultimate Access Control plugin consolidates and replaces the following deprecated plugins:
+    /// - DataWarehouse.Plugins.AccessControl (basic access control)
+    /// - DataWarehouse.Plugins.IAM (identity and access management)
+    /// - DataWarehouse.Plugins.Security (miscellaneous security features)
+    /// </para>
+    /// <para>
+    /// <b>Migration Steps:</b>
+    /// 1. Update plugin references to use UltimateAccessControl instead of individual security plugins
+    /// 2. Review access control strategies - all previous strategies are included as consolidated strategies
+    /// 3. Update configuration to use unified policy evaluation modes (FirstMatch, AllMustAllow, AnyMustAllow, Weighted)
+    /// 4. Test access control policies with the unified policy engine (EvaluateWithPolicyEngineAsync)
+    /// 5. Remove references to deprecated plugins after verification
+    /// </para>
+    /// <para>
+    /// <b>Key Differences:</b>
+    /// - Strategy Pattern: All access control modes are now strategies (RBAC, ABAC, ZeroTrust, etc.)
+    /// - Unified Policy Engine: Multiple strategies can be evaluated with configurable modes
+    /// - Intelligence Integration: Built-in UEBA and anomaly detection via Intelligence plugin
+    /// - Advanced Features: Includes DLP, PAM, MFA orchestration, threat intelligence, and SIEM integration
+    /// </para>
+    /// <para>
+    /// <b>Deprecation Timeline:</b>
+    /// Individual security plugins will be marked obsolete in Phase 17 and removed in Phase 18.
+    /// All new projects should use UltimateAccessControl exclusively.
+    /// </para>
     /// </remarks>
     public sealed class UltimateAccessControlPlugin : IntelligenceAwareAccessControlPluginBase, IDisposable
     {
