@@ -72,7 +72,14 @@ public enum ConsensusMode
     /// Raft-based consensus for writes. Slower but provides strong consistency.
     /// Requires quorum of nodes for write operations.
     /// </summary>
-    RaftConsensus
+    RaftConsensus,
+
+    /// <summary>
+    /// Periodic anchoring to external/public blockchain for independent verification.
+    /// Provides highest trust level through third-party immutability guarantee.
+    /// Anchors are published via message bus for external chain integration.
+    /// </summary>
+    ExternalAnchor
 }
 
 /// <summary>
@@ -299,5 +306,11 @@ public enum OrphanedWormStatus
     Expired,
 
     /// <summary>Manually reviewed by administrator.</summary>
-    Reviewed
+    Reviewed,
+
+    /// <summary>Purged after retention expired and compliance checks passed.</summary>
+    Purged,
+
+    /// <summary>Linked to a successful retry transaction with matching content hash.</summary>
+    LinkedToRetry
 }

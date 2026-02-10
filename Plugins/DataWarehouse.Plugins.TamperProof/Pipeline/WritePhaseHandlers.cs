@@ -162,6 +162,222 @@ public static class WritePhaseHandlers
     }
 
     /// <summary>
+    /// Applies content padding to the transformed data, including support for Chaff padding mode.
+    /// Chaff padding generates plausible-looking data using a seeded CSPRNG that produces byte
+    /// patterns matching typical content distribution, indistinguishable from real content.
+    /// </summary>
+    /// <param name="data">Transformed data to pad.</param>
+    /// <param name="config">Content padding configuration.</param>
+    /// <param name="logger">Logger instance.</param>
+    /// <returns>Padded data and content padding record for the manifest.</returns>
+    public static (byte[] paddedData, ContentPaddingRecord paddingRecord) ApplyContentPadding(
+        byte[] data,
+        ContentPaddingConfig config,
+        ILogger logger)
+    {
+        if (!config.Enabled || data.Length == 0)
+        {
+            return (data, new ContentPaddingRecord
+            {
+                PrefixPaddingBytes = 0,
+                SuffixPaddingBytes = 0,
+                PaddingPattern = "none"
+            });
+        }
+
+        // Calculate padding needed
+        var paddingNeeded = 0;
+        if (config.PadToMultipleOf > 0)
+        {
+            var remainder = data.Length % config.PadToMultipleOf;
+            if (remainder > 0)
+            {
+                paddingNeeded = config.PadToMultipleOf - remainder;
+            }
+        }
+
+        paddingNeeded = Math.Max(paddingNeeded, config.MinimumPadding);
+        paddingNeeded = Math.Min(paddingNeeded, config.MaximumPadding);
+
+        if (paddingNeeded == 0)
+        {
+            return (data, new ContentPaddingRecord
+            {
+                PrefixPaddingBytes = 0,
+                SuffixPaddingBytes = 0,
+                PaddingPattern = "none"
+            });
+        }
+
+        // Split padding between prefix and suffix (suffix gets the larger portion)
+        var prefixPadding = paddingNeeded / 4;
+        var suffixPadding = paddingNeeded - prefixPadding;
+
+        byte[] prefixBytes;
+        byte[] suffixBytes;
+        long? paddingSeed = null;
+        string paddingPattern;
+
+        if (config.UseRandomPadding)
+        {
+            // Use Chaff padding: seeded CSPRNG producing plausible-looking byte patterns
+            paddingSeed = GenerateChaffSeed();
+            prefixBytes = GenerateChaffPadding(prefixPadding, paddingSeed.Value, data);
+            suffixBytes = GenerateChaffPadding(suffixPadding, paddingSeed.Value + 1, data);
+            paddingPattern = "Chaff";
+
+            logger.LogDebug(
+                "Applied Chaff padding: {Prefix} prefix bytes + {Suffix} suffix bytes (seed: {Seed})",
+                prefixPadding, suffixPadding, paddingSeed.Value);
+        }
+        else
+        {
+            // Use simple byte-fill padding
+            prefixBytes = new byte[prefixPadding];
+            suffixBytes = new byte[suffixPadding];
+            Array.Fill(prefixBytes, config.PaddingByte);
+            Array.Fill(suffixBytes, config.PaddingByte);
+            paddingPattern = config.PaddingByte == 0x00 ? "zeros" : $"fill-0x{config.PaddingByte:X2}";
+
+            logger.LogDebug(
+                "Applied {Pattern} padding: {Prefix} prefix bytes + {Suffix} suffix bytes",
+                paddingPattern, prefixPadding, suffixPadding);
+        }
+
+        // Assemble padded data
+        var paddedData = new byte[prefixPadding + data.Length + suffixPadding];
+        Array.Copy(prefixBytes, 0, paddedData, 0, prefixPadding);
+        Array.Copy(data, 0, paddedData, prefixPadding, data.Length);
+        Array.Copy(suffixBytes, 0, paddedData, prefixPadding + data.Length, suffixPadding);
+
+        // Compute padding hash for verification
+        var paddingHashInput = new byte[prefixPadding + suffixPadding];
+        Array.Copy(prefixBytes, 0, paddingHashInput, 0, prefixPadding);
+        Array.Copy(suffixBytes, 0, paddingHashInput, prefixPadding, suffixPadding);
+        var paddingHash = Convert.ToHexString(
+            System.Security.Cryptography.SHA256.HashData(paddingHashInput));
+
+        return (paddedData, new ContentPaddingRecord
+        {
+            PrefixPaddingBytes = prefixPadding,
+            SuffixPaddingBytes = suffixPadding,
+            PaddingHash = paddingHash,
+            PaddingSeed = paddingSeed,
+            PaddingPattern = paddingPattern
+        });
+    }
+
+    /// <summary>
+    /// Generates a cryptographically secure seed for Chaff padding.
+    /// </summary>
+    /// <returns>A 64-bit seed value.</returns>
+    private static long GenerateChaffSeed()
+    {
+        Span<byte> seedBytes = stackalloc byte[8];
+        System.Security.Cryptography.RandomNumberGenerator.Fill(seedBytes);
+        return BitConverter.ToInt64(seedBytes);
+    }
+
+    /// <summary>
+    /// Generates Chaff padding: plausible-looking data using a seeded CSPRNG
+    /// that produces byte patterns matching typical content distribution.
+    /// The output is deterministically reproducible from the stored seed for verification,
+    /// but statistically indistinguishable from real content.
+    /// </summary>
+    /// <param name="length">Number of padding bytes to generate.</param>
+    /// <param name="seed">Seed for deterministic reproduction.</param>
+    /// <param name="referenceData">Reference data to model byte distribution from.</param>
+    /// <returns>Chaff padding bytes.</returns>
+    private static byte[] GenerateChaffPadding(int length, long seed, byte[] referenceData)
+    {
+        if (length <= 0)
+        {
+            return Array.Empty<byte>();
+        }
+
+        var chaff = new byte[length];
+
+        // Build a byte frequency distribution from the reference data
+        // This makes the chaff statistically similar to the actual content
+        var frequency = new int[256];
+        foreach (var b in referenceData)
+        {
+            frequency[b]++;
+        }
+
+        // Build cumulative distribution for weighted random selection
+        var totalSamples = referenceData.Length;
+        var cumulativeDistribution = new double[256];
+        double cumulative = 0;
+        for (int i = 0; i < 256; i++)
+        {
+            cumulative += totalSamples > 0
+                ? (double)frequency[i] / totalSamples
+                : 1.0 / 256.0; // Uniform if no reference data
+            cumulativeDistribution[i] = cumulative;
+        }
+
+        // Normalize final entry to exactly 1.0 to avoid floating-point edge cases
+        cumulativeDistribution[255] = 1.0;
+
+        // Use a seeded deterministic generator for reproducibility
+        // We derive the PRNG state from the seed using SHA-256 in counter mode
+        var seedBytes = BitConverter.GetBytes(seed);
+        var position = 0;
+        var blockCounter = 0;
+
+        while (position < length)
+        {
+            // Generate a block of deterministic random bytes from the seed + counter
+            var counterBytes = BitConverter.GetBytes(blockCounter);
+            var input = new byte[seedBytes.Length + counterBytes.Length];
+            Array.Copy(seedBytes, 0, input, 0, seedBytes.Length);
+            Array.Copy(counterBytes, 0, input, seedBytes.Length, counterBytes.Length);
+
+            var hashBlock = System.Security.Cryptography.SHA256.HashData(input);
+            blockCounter++;
+
+            // Use pairs of hash bytes to generate values from the content distribution
+            for (int i = 0; i + 1 < hashBlock.Length && position < length; i += 2)
+            {
+                // Convert 2 bytes to a value in [0, 1)
+                var uniformValue = (double)((hashBlock[i] << 8) | hashBlock[i + 1]) / 65536.0;
+
+                // Binary search in cumulative distribution to find the corresponding byte value
+                var selectedByte = BinarySearchDistribution(cumulativeDistribution, uniformValue);
+                chaff[position++] = (byte)selectedByte;
+            }
+        }
+
+        return chaff;
+    }
+
+    /// <summary>
+    /// Binary searches a cumulative distribution array to find the byte value
+    /// corresponding to a uniform random value in [0, 1).
+    /// </summary>
+    private static int BinarySearchDistribution(double[] cumulativeDistribution, double value)
+    {
+        int lo = 0;
+        int hi = 255;
+
+        while (lo < hi)
+        {
+            int mid = (lo + hi) / 2;
+            if (cumulativeDistribution[mid] < value)
+            {
+                lo = mid + 1;
+            }
+            else
+            {
+                hi = mid;
+            }
+        }
+
+        return lo;
+    }
+
+    /// <summary>
     /// Phase 2: Compute integrity hash of the transformed data.
     /// </summary>
     /// <param name="data">Transformed data to hash.</param>
