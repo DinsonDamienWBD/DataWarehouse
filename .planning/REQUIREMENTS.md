@@ -1,0 +1,256 @@
+# Requirements: DataWarehouse Production Readiness
+
+**Defined:** 2026-02-10
+**Core Value:** Every task in Metadata/TODO.md verified production-ready — no placeholders, stubs, or deferred logic
+
+**Detail Source:** All sub-task details are in `Metadata/TODO.md` and `Metadata/Incomplete Tasks.txt`. Each REQ-ID below maps to one or more task groups. Verification means checking every sub-task line under that group.
+
+## v1 Requirements
+
+### TamperProof Pipeline (T3–T4)
+
+- [ ] **TP-01**: Verify/implement read pipeline — manifest retrieval, shard retrieval, reconstruction (T3.1–T3.2)
+- [ ] **TP-02**: Verify/implement integrity verification by ReadMode — Fast, Verified, Audit (T3.3)
+- [ ] **TP-03**: Verify/implement reverse transformations — decrypt, decompress, strip padding (T3.4)
+- [ ] **TP-04**: Verify/implement tamper detection, incident creation, and attribution (T3.5–T3.9)
+- [ ] **TP-05**: Verify/implement TamperRecoveryBehavior — all 5 modes (T4.1)
+- [ ] **TP-06**: Verify/implement WORM recovery, corrections, audit, seal mechanism (T4.2–T4.5)
+- [ ] **TP-07**: Verify/implement instance degradation state machine (T4.6)
+- [ ] **TP-08**: Verify/implement blockchain modes — SingleWriter, RaftConsensus, ExternalAnchor, batching (T4.7–T4.8)
+- [ ] **TP-09**: Verify/implement IWormWrapper, S3 Object Lock, Azure Immutable Blob (T4.9–T4.11)
+- [ ] **TP-10**: Verify/implement content/shard padding modes (T4.12–T4.13)
+- [ ] **TP-11**: Verify/implement TransactionalWriteManager with atomicity, orphan tracking (T4.14)
+- [ ] **TP-12**: Verify/implement background integrity scanner (T4.15)
+- [ ] **TP-13**: Verify/implement all hashing — SHA-3, Keccak, HMAC, Salted, Salted-HMAC variants (T4.16–T4.20)
+- [ ] **TP-14**: Verify/implement compression algorithms — RLE, Huffman, LZW, BZip2, LZMA, Snappy, PPM, NNCP (T4.21–T4.23)
+- [ ] **TP-15**: Verify/implement all TamperProof unit/integration tests (T6.1–T6.14)
+
+### SDK & Base Classes (T5.0, T99)
+
+- [ ] **SDK-01**: Verify/implement SDK base class refactoring (T5.0)
+- [ ] **SDK-02**: Verify/implement Ultimate SDK — all strategy interfaces, base classes, KnowledgeObject (T99)
+- [ ] **SDK-03**: Verify/implement SDK security infrastructure — ISecurityStrategy, SecurityDomain, ZeroTrust (T95.A1–A8)
+- [ ] **SDK-04**: Verify/implement SDK observability infrastructure (T100.A6)
+- [ ] **SDK-05**: Verify/implement SDK interface infrastructure (T109.A6)
+- [ ] **SDK-06**: Verify/implement SDK format infrastructure (T110.A7)
+- [ ] **SDK-07**: Verify/implement SDK streaming infrastructure (T113.A7)
+- [ ] **SDK-08**: Verify/implement SDK media infrastructure (T118.A7)
+- [ ] **SDK-09**: Verify/implement SDK processing infrastructure (T112.A6)
+- [ ] **SDK-10**: Verify/implement envelope encryption support and tests (T5.1.2, T5.1.4, T94.D2, T94.D4)
+
+### Ultimate Intelligence (T90)
+
+- [ ] **AI-01**: Verify/implement Universal Intelligence plugin — all AI providers, vector stores, features, KnowledgeObject envelope
+
+### Ultimate RAID (T91)
+
+- [ ] **RAID-01**: Verify/implement SDK interfaces and base classes (T91.A1–A4)
+- [ ] **RAID-02**: Verify/implement standard RAID strategies — RAID 0,1,5,6 (T91.B1)
+- [ ] **RAID-03**: Verify/implement nested RAID — 10, 01, 50, 60, 100 (T91.B2)
+- [ ] **RAID-04**: Verify/implement extended RAID — 1E, 5E, 5EE, 6E (T91.B3)
+- [ ] **RAID-05**: Verify/implement ZFS-style — RAID-Z1/Z2/Z3, CoW, checksums (T91.B4)
+- [ ] **RAID-06**: Verify/implement vendor-specific — NetApp DP, Synology SHR, Unraid, Matrix RAID (T91.B5–B6)
+- [ ] **RAID-07**: Verify/implement erasure coding — Reed-Solomon, LRC (T91.B7)
+- [ ] **RAID-08**: Verify/implement main plugin, configuration, strategy registry (T91.C1–C3)
+- [ ] **RAID-09**: Verify/implement health monitoring — SMART, predictive failure, alerting (T91.D1)
+- [ ] **RAID-10**: Verify/implement self-healing — degradation detection, hot spare, rebuild, scrub (T91.D2–D3)
+- [ ] **RAID-11**: Verify/implement AI optimization — workload analysis, auto-level selection, stripe optimization (T91.E1–E3)
+- [ ] **RAID-12**: Verify/implement performance — parallel parity, SIMD optimization (T91.G)
+- [ ] **RAID-13**: Verify/implement tiering — SSD caching, NVMe, auto-tiering (T91.F3)
+- [ ] **RAID-14**: Verify/implement migration — absorb old RAID plugins, config migration, deprecation (T91.I1–I4)
+- [ ] **RAID-15**: Verify/implement future strategies — quantum, AI-predictive, semantic, cross-cloud, etc. (T91.J0)
+- [ ] **RAID-16**: Verify/implement cross-plugin integrations — sharding, dedup, CLI, GUI, dashboard (T91.J1–J3)
+
+### Ultimate Compression (T92)
+
+- [ ] **COMP-01**: Verify/implement plugin orchestrator and strategy discovery (B1)
+- [ ] **COMP-02**: Verify/implement all LZ-family strategies — Zstd, LZ4, GZip, Deflate, Snappy, LZO, LZMA, LZFSE, etc. (B2)
+- [ ] **COMP-03**: Verify/implement BWT-based — Brotli, BZip2, BWT, MTF (B3)
+- [ ] **COMP-04**: Verify/implement extreme compression — ZPAQ, PAQ, CMIX, NNZ, PPM (B4)
+- [ ] **COMP-05**: Verify/implement entropy coding — Huffman, Arithmetic, ANS, RANS, RLE (B5)
+- [ ] **COMP-06**: Verify/implement differential — Delta, Xdelta, Bsdiff, VCDIFF, Zdelta (B6)
+- [ ] **COMP-07**: Verify/implement media-specific — FLAC, APNG, WebP, JXL, AVIF, DNA, TimeSeries (B7)
+- [ ] **COMP-08**: Verify/implement archive formats — ZIP, 7z, RAR, TAR, XZ (B8)
+- [ ] **COMP-09**: Verify/implement specialty — Density, Lizard, Oodle, Zling, Gipfeli (B9)
+- [ ] **COMP-10**: Verify/implement advanced features — dictionary, streaming, parallel, benchmarking, entropy analysis (C1–C8)
+- [ ] **COMP-11**: Verify/implement migration — update refs, deprecate old plugins (D1–D5)
+
+### Ultimate Encryption (T93)
+
+- [ ] **ENC-01**: Verify/implement all encryption strategies — currently 55/65 done, complete remaining 10
+
+### Ultimate Key Management (T94)
+
+- [ ] **KEY-01**: Verify/implement all key store strategies, envelope mode tests and benchmarks (T94.A5, T94.D2, T94.D4, T94.E7)
+
+### Ultimate Access Control (T95)
+
+- [ ] **AC-01**: Verify/implement plugin orchestrator and security policy engine (T95.B1)
+- [ ] **AC-02**: Verify/implement access control strategies — RBAC, ABAC, MAC, DAC, PBAC, ReBac, HrBAC, ACL, Capability (T95.B2)
+- [ ] **AC-03**: Verify/implement identity strategies — IAM, LDAP, OAuth2, OIDC, SAML, Kerberos, RADIUS, TACACS+, SCIM, FIDO2 (T95.B3)
+- [ ] **AC-04**: Verify/implement MFA strategies — TOTP, HOTP, SMS OTP, Email OTP (T95.B4)
+
+### Ultimate Compliance (T96)
+
+- [ ] **GOV-01**: Verify/implement compliance plugin with all frameworks
+- [ ] **GOV-02**: Verify/implement compliance reporting — SOC2, HIPAA, FedRAMP, GDPR (T5.12–T5.16)
+
+### Ultimate Storage (T97)
+
+- [ ] **STOR-01**: Verify/implement all storage provider strategies
+
+### Ultimate Replication (T98)
+
+- [ ] **REP-01**: Verify/implement replication with geo-dispersed WORM and sharding (T5.5–T5.6)
+
+### Universal Observability (T100)
+
+- [ ] **OBS-01**: Verify/implement observability plugin — metrics, tracing, alerting
+
+### Ultimate Interface (T109)
+
+- [ ] **INTF-01**: Verify/implement plugin orchestrator and protocol discovery (T109.B1)
+- [ ] **INTF-02**: Verify/implement REST strategies — REST, OpenAPI, JSON:API, HATEOAS, OData, Falcor (T109.B2)
+- [ ] **INTF-03**: Verify/implement RPC strategies — gRPC, gRPC-Web, Connect, Twirp, JSON-RPC, XML-RPC (T109.B3)
+- [ ] **INTF-04**: Verify/implement query strategies — GraphQL, SQL, Relay, Apollo, Hasura, PostGraphile, Prisma (T109.B4)
+- [ ] **INTF-05**: Verify/implement real-time strategies — WebSocket, SSE, Long Polling, Socket.IO, SignalR (T109.B5)
+- [ ] **INTF-06**: Verify/implement messaging strategies — MQTT, AMQP, STOMP, NATS, Kafka REST (T109.B6)
+- [ ] **INTF-07**: Verify/implement conversational strategies — Slack, Teams, Discord, Alexa, Google, Siri, ChatGPT, Claude MCP (T109.B7)
+- [ ] **INTF-08**: Verify/implement AI-driven API strategies (T109.B8)
+- [ ] **INTF-09**: Verify/implement security API strategies (T109.B9)
+- [ ] **INTF-10**: Verify/implement developer experience strategies (T109.B10)
+- [ ] **INTF-11**: Verify/implement convergence UI strategies (T109.B11)
+- [ ] **INTF-12**: Verify/implement advanced features and migration (T109.C–D)
+
+### Ultimate Data Format (T110)
+
+- [ ] **FMT-01**: Verify/implement all text format strategies — CSV, JSON, XML, YAML, TOML, etc. (T110.B2)
+- [ ] **FMT-02**: Verify/implement all binary format strategies — MessagePack, CBOR, BSON, Ion, etc. (T110.B3)
+- [ ] **FMT-03**: Verify/implement schema format strategies — Avro, Protobuf, Thrift, FlatBuffers, etc. (T110.B4)
+- [ ] **FMT-04**: Verify/implement columnar format strategies — Parquet, Arrow, ORC, Feather, Lance (T110.B5)
+- [ ] **FMT-05**: Verify/implement scientific format strategies — HDF5, NetCDF, FITS, ROOT, Zarr, etc. (T110.B6)
+- [ ] **FMT-06**: Verify/implement geo format strategies — GeoJSON, GeoParquet, Shapefile, KML, etc. (T110.B7)
+- [ ] **FMT-07**: Verify/implement graph/document format strategies (T110.B8)
+- [ ] **FMT-08**: Verify/implement lakehouse format strategies — Delta Lake, Iceberg, Hudi (T110.B9)
+- [ ] **FMT-09**: Verify/implement AI-driven format strategies (T110.B10)
+- [ ] **FMT-10**: Verify/implement ML model format strategies — ONNX, SafeTensors, PyTorch, TF, etc. (T110.B11)
+- [ ] **FMT-11**: Verify/implement simulation/engineering format strategies (T110.B12)
+
+### Ultimate Compute & Processing (T111, T112)
+
+- [ ] **PROC-01**: Verify/implement compute orchestrator and domain pipelines (T111)
+- [ ] **PROC-02**: Verify/implement storage processing — on-storage compression, build, render, media, data ops (T112)
+
+### Ultimate Streaming (T113)
+
+- [ ] **STRM-01**: Verify/implement message queue strategies — Kafka, Pulsar, RabbitMQ, NATS, Redis, etc. (T113.B2)
+- [ ] **STRM-02**: Verify/implement IoT strategies — MQTT, CoAP, LwM2M, LoRaWAN, Zigbee, Matter (T113.B3)
+- [ ] **STRM-03**: Verify/implement industrial strategies — OPC-UA, Modbus, BACnet, PROFINET, etc. (T113.B4)
+- [ ] **STRM-04**: Verify/implement healthcare strategies — HL7, FHIR, ICU, waveform, DICOM (T113.B5)
+- [ ] **STRM-05**: Verify/implement financial strategies — FIX, FAST, SBE, tick data, order book (T113.B6)
+- [ ] **STRM-06**: Verify/implement cloud streaming — Kinesis, Event Hubs, Pub/Sub, CloudEvents (T113.B7)
+- [ ] **STRM-07**: Verify/implement stream processing — windowing, exactly-once, watermarks (T113.B8)
+- [ ] **STRM-08**: Verify/implement AI-driven streaming strategies (T113.B9)
+- [ ] **STRM-09**: Verify/implement advanced features and migration (T113.C–D)
+
+### Ultimate Media (T118)
+
+- [ ] **MED-01**: Verify/implement streaming delivery — HLS, DASH, CMAF, low-latency variants (T118.B2)
+- [ ] **MED-02**: Verify/implement video codecs — H.264, H.265, VP9, AV1, VVC, ProRes, DNxHD (T118.B3)
+- [ ] **MED-03**: Verify/implement image strategies — JPEG, PNG, WebP, AVIF, JXL, HEIF, TIFF, EXR (T118.B4)
+- [ ] **MED-04**: Verify/implement RAW camera strategies (T118.B5)
+- [ ] **MED-05**: Verify/implement GPU texture compression strategies — BC1-7, ASTC, ETC2, PVRTC, KTX (T118.B6)
+- [ ] **MED-06**: Verify/implement 3D model strategies — glTF, GLB, FBX, USD, OBJ (T118.B7)
+
+### Security Features (T73–T77, T89)
+
+- [ ] **SEC-01**: Verify/implement canary objects — generator, placement, monitoring, lockdown, alerts (T73)
+- [ ] **SEC-02**: Verify/implement steganographic sharding — LSB, DCT, audio, video, carrier selection (T74)
+- [ ] **SEC-03**: Verify/implement secure multi-party computation — Shamir, garbled circuits, OT (T75)
+- [ ] **SEC-04**: Verify/implement digital dead drops — ephemeral links, TTL, burn-after-reading (T76)
+- [ ] **SEC-05**: Verify/implement sovereignty geofencing — geo-tagging, replication fences, attestation (T77)
+- [ ] **SEC-06**: Verify/implement forensic watermarking — text, image, PDF, video, extraction (T89)
+
+### Storage Features (T79–T86)
+
+- [ ] **FEAT-01**: Verify/implement tri-mode USB / air-gap bridge — sentinel, package, auto-ingest, security, pocket (T79)
+- [ ] **FEAT-02**: Verify/implement continuous data protection (T80) including deprecation notices
+- [ ] **FEAT-03**: Verify/implement block-level tiering — heatmap, prefetch, cost optimizer (T81)
+- [ ] **FEAT-04**: Verify/implement data branching — CoW, diff, merge, permissions (T82)
+- [ ] **FEAT-05**: Verify/implement generative compression — AI content analysis, model training, reconstruction (T84)
+- [ ] **FEAT-06**: Verify/implement probabilistic data structures — Count-Min, HyperLogLog, Bloom, t-digest (T85)
+- [ ] **FEAT-07**: Verify/implement self-emulating objects — WASM viewers, format preservation (T86)
+
+### Spatial & Advanced (T87–T88)
+
+- [ ] **ADV-01**: Verify/implement AR spatial anchors — GPS binding, SLAM, proximity verification (T87)
+- [ ] **ADV-02**: Verify/implement psychometric indexing — sentiment, emotion, deception detection (T88)
+
+### AEDS — Autonomous Edge Distribution (AEDS-C, CP, DP, X)
+
+- [ ] **AEDS-01**: Verify/implement core plugins — AedsCore, IntentManifestSigner, ServerDispatcher, ClientCourier
+- [ ] **AEDS-02**: Verify/implement control plane — WebSocket, MQTT, gRPC streaming
+- [ ] **AEDS-03**: Verify/implement data plane — HTTP/3, QUIC, HTTP/2, WebTransport
+- [ ] **AEDS-04**: Verify/implement extensions — swarm intelligence, delta sync, PreCog, mule, global dedup, notification, code signing, policy engine, zero-trust pairing
+
+### Data Governance Intelligence (T146)
+
+- [ ] **DGI-01**: Verify/implement lineage strategies — capture, real-time, inference, impact analysis, visualization (T146.B1)
+- [ ] **DGI-02**: Verify/implement catalog strategies — self-learning, auto-tagging, relationship discovery (T146.B2)
+- [ ] **DGI-03**: Verify/implement quality strategies — anticipator, drift detector, anomaly flagging, trend, root cause (T146.B3)
+- [ ] **DGI-04**: Verify/implement semantic strategies — meaning extractor, contextual relevance, domain knowledge (T146.B4)
+- [ ] **DGI-05**: Verify/implement governance strategies — policy recommendation, compliance gap, sensitivity, retention (T146.B5)
+
+### Other Ultimate Plugins (T101–T108)
+
+- [ ] **OTHER-01**: Verify/implement Universal Dashboards (T101)
+- [ ] **OTHER-02**: Verify/implement Ultimate Database Protocol (T102)
+- [ ] **OTHER-03**: Verify/implement Ultimate Database Storage (T103)
+- [ ] **OTHER-04**: Verify/implement Ultimate Data Management (T104)
+- [ ] **OTHER-05**: Verify/implement Ultimate Resilience (T105)
+- [ ] **OTHER-06**: Verify/implement Ultimate Deployment (T106)
+- [ ] **OTHER-07**: Verify/implement Ultimate Sustainability (T107)
+- [ ] **OTHER-08**: Verify/implement plugin deprecation & cleanup (T108)
+
+### Bug Fixes & Testing
+
+- [ ] **BUG-01**: Fix critical bugs — Raft, S3 plugin fixes (T26–T31)
+- [ ] **BUG-02**: Fix known build errors — CS8602, record-type errors, missing types
+- [ ] **BUG-03**: Resolve all TODO comments in codebase (36+ identified)
+- [ ] **BUG-04**: Fix nullable reference suppressions (39 instances)
+- [ ] **TEST-01**: Verify/implement comprehensive test suite (T121)
+- [ ] **TEST-02**: Verify/implement security penetration test plan (T122)
+
+### Plugin Marketplace (T57)
+
+- [ ] **MKTPL-01**: Verify/implement plugin marketplace — discovery, install, versioning, certification, rating, analytics
+
+## v2 Requirements
+
+(None — all items in scope for this milestone)
+
+## Out of Scope
+
+| Feature | Reason |
+|---------|--------|
+| New plugins not in TODO.md | Only complete what's tracked |
+| CI/CD pipeline setup | Focus is on code completeness |
+| Performance optimization beyond tasks | Only optimize where tasks require it |
+| Deployment automation | Not in current task list |
+
+## Traceability
+
+Updated during roadmap creation — each requirement maps to a phase.
+
+| Requirement | Phase | Status |
+|-------------|-------|--------|
+| (Populated by roadmapper) | | |
+
+**Coverage:**
+- v1 requirements: 89 total
+- Mapped to phases: TBD
+- Unmapped: TBD
+
+---
+*Requirements defined: 2026-02-10*
+*Last updated: 2026-02-10 after initial definition*
