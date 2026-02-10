@@ -15,7 +15,27 @@ namespace DataWarehouse.Plugins.UltimateCompression
     /// Intelligence-aware for AI-powered compression recommendations.
     /// </summary>
     /// <remarks>
-    /// Supported algorithm families:
+    /// <para><b>MIGRATION GUIDE:</b></para>
+    /// <para>
+    /// This plugin replaces the following individual compression plugins which have been deprecated:
+    /// </para>
+    /// <list type="table">
+    ///   <listheader><term>Old Plugin</term><description>Replacement Strategy</description></listheader>
+    ///   <item><term>BrotliCompression</term><description><see cref="Strategies.Transform.BrotliStrategy"/></description></item>
+    ///   <item><term>DeflateCompression</term><description><see cref="Strategies.LzFamily.DeflateStrategy"/></description></item>
+    ///   <item><term>GZipCompression</term><description><see cref="Strategies.LzFamily.GZipStrategy"/></description></item>
+    ///   <item><term>Lz4Compression</term><description><see cref="Strategies.LzFamily.Lz4Strategy"/></description></item>
+    ///   <item><term>ZstdCompression</term><description><see cref="Strategies.LzFamily.ZstdStrategy"/></description></item>
+    ///   <item><term>Compression (base)</term><description>Merged into <see cref="UltimateCompressionPlugin"/> orchestrator</description></item>
+    /// </list>
+    /// <para><b>Migration steps:</b></para>
+    /// <list type="number">
+    ///   <item>Replace direct plugin references with UltimateCompression plugin registration.</item>
+    ///   <item>Use <see cref="GetStrategy(string)"/> to access individual algorithms by name.</item>
+    ///   <item>Use <see cref="SelectBestStrategy(ReadOnlySpan{byte}, bool)"/> for content-aware automatic selection.</item>
+    ///   <item>Old plugin configurations are read via the same algorithm names (case-insensitive).</item>
+    /// </list>
+    /// <para><b>Supported algorithm families:</b></para>
     /// <list type="bullet">
     ///   <item>LZ-family: Zstd, LZ4, GZip, Deflate, Snappy, LZO, LZ77/78, LZMA/LZMA2, LZFSE, LZH, LZX</item>
     ///   <item>Transform-based: Brotli, BZip2, BWT, MTF</item>
@@ -26,6 +46,10 @@ namespace DataWarehouse.Plugins.UltimateCompression
     ///   <item>Archive formats: ZIP, 7z, RAR (read), TAR, XZ</item>
     ///   <item>Emerging: Density, Lizard, Oodle, Zling, Gipfeli</item>
     /// </list>
+    /// <para><b>Backward Compatibility:</b> All algorithm names from deprecated plugins are recognized
+    /// case-insensitively. Existing pipeline configurations referencing old plugin algorithm names
+    /// will continue to work during the transition period. Old compression plugins are deprecated
+    /// and scheduled for file deletion in Phase 18.</para>
     /// </remarks>
     public sealed class UltimateCompressionPlugin : IntelligenceAwareCompressionPluginBase
     {
