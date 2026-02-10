@@ -8139,35 +8139,35 @@ T95 focuses on **authorization and access control** - determining WHO can access
 | 95.B7.8 | ⭐ HoneypotStrategy - Deception technology | [x] |
 | 95.B7.9 | ⭐ ThreatIntelStrategy - Threat intelligence feeds | [x] |
 | **B8: Data Integrity & Tamper Protection** |
-| 95.B8.1 | IntegrityStrategy - Data integrity verification | [ ] |
-| 95.B8.2 | TamperProofStrategy - Tamper-evident storage | [ ] |
-| 95.B8.3 | ⭐ MerkleTreeStrategy - Merkle tree integrity | [ ] |
-| 95.B8.4 | ⭐ BlockchainAnchorStrategy - Blockchain timestamping | [ ] |
-| 95.B8.5 | ⭐ TsaStrategy - Timestamping Authority (RFC 3161) | [ ] |
-| 95.B8.6 | ⭐ WormStrategy - Write-Once-Read-Many | [ ] |
-| 95.B8.7 | ⭐ ImmutableLedgerStrategy - Append-only audit ledger | [ ] |
+| 95.B8.1 | IntegrityStrategy - Data integrity verification | [x] |
+| 95.B8.2 | TamperProofStrategy - Tamper-evident storage | [x] |
+| 95.B8.3 | ⭐ MerkleTreeStrategy - Merkle tree integrity | [x] |
+| 95.B8.4 | ⭐ BlockchainAnchorStrategy - Blockchain timestamping | [x] |
+| 95.B8.5 | ⭐ TsaStrategy - Timestamping Authority (RFC 3161) | [x] |
+| 95.B8.6 | ⭐ WormStrategy - Write-Once-Read-Many | [x] |
+| 95.B8.7 | ⭐ ImmutableLedgerStrategy - Append-only audit ledger | [x] |
 | **B9: Data Protection & Privacy** |
-| 95.B9.1 | EntropyAnalysisStrategy - Entropy/randomness analysis | [ ] |
-| 95.B9.2 | ⭐ DlpStrategy - Data Loss Prevention | [ ] |
-| 95.B9.3 | ⭐ DataMaskingStrategy - Dynamic data masking | [ ] |
-| 95.B9.4 | ⭐ TokenizationStrategy - Data tokenization | [ ] |
-| 95.B9.5 | ⭐ AnonymizationStrategy - Data anonymization | [ ] |
-| 95.B9.6 | ⭐ PseudonymizationStrategy - Data pseudonymization | [ ] |
-| 95.B9.7 | ⭐ DifferentialPrivacyStrategy - Differential privacy | [ ] |
+| 95.B9.1 | EntropyAnalysisStrategy - Entropy/randomness analysis | [x] |
+| 95.B9.2 | ⭐ DlpStrategy - Data Loss Prevention | [x] |
+| 95.B9.3 | ⭐ DataMaskingStrategy - Dynamic data masking | [x] |
+| 95.B9.4 | ⭐ TokenizationStrategy - Data tokenization | [x] |
+| 95.B9.5 | ⭐ AnonymizationStrategy - Data anonymization | [x] |
+| 95.B9.6 | ⭐ PseudonymizationStrategy - Data pseudonymization | [x] |
+| 95.B9.7 | ⭐ DifferentialPrivacyStrategy - Differential privacy | [x] |
 | **B10: Military/Government Security** |
-| 95.B10.1 | MilitarySecurityStrategy - Classified data handling | [ ] |
-| 95.B10.2 | ⭐ Mls Strategy - Multi-Level Security (TS/S/C/U) | [ ] |
-| 95.B10.3 | ⭐ Cds Strategy - Cross-Domain Solutions | [ ] |
-| 95.B10.4 | ⭐ CuiStrategy - Controlled Unclassified Information | [ ] |
-| 95.B10.5 | ⭐ Itar Strategy - ITAR compliance controls | [ ] |
-| 95.B10.6 | ⭐ SciStrategy - Sensitive Compartmented Information | [ ] |
+| 95.B10.1 | MilitarySecurityStrategy - Classified data handling | [x] |
+| 95.B10.2 | ⭐ Mls Strategy - Multi-Level Security (TS/S/C/U) | [x] |
+| 95.B10.3 | ⭐ Cds Strategy - Cross-Domain Solutions | [x] |
+| 95.B10.4 | ⭐ CuiStrategy - Controlled Unclassified Information | [x] |
+| 95.B10.5 | ⭐ Itar Strategy - ITAR compliance controls | [x] |
+| 95.B10.6 | ⭐ SciStrategy - Sensitive Compartmented Information | [x] |
 | **B11: Network Security** |
-| 95.B11.1 | ⭐ FirewallRulesStrategy - Firewall rule management | [ ] |
-| 95.B11.2 | ⭐ WafStrategy - Web Application Firewall | [ ] |
-| 95.B11.3 | ⭐ IpsStrategy - Intrusion Prevention System | [ ] |
-| 95.B11.4 | ⭐ DdosProtectionStrategy - DDoS protection | [ ] |
-| 95.B11.5 | ⭐ VpnStrategy - VPN integration | [ ] |
-| 95.B11.6 | ⭐ SdWanStrategy - SD-WAN security policies | [ ] |
+| 95.B11.1 | ⭐ FirewallRulesStrategy - Firewall rule management | [x] |
+| 95.B11.2 | ⭐ WafStrategy - Web Application Firewall | [x] |
+| 95.B11.3 | ⭐ IpsStrategy - Intrusion Prevention System | [x] |
+| 95.B11.4 | ⭐ DdosProtectionStrategy - DDoS protection | [x] |
+| 95.B11.5 | ⭐ VpnStrategy - VPN integration | [x] |
+| 95.B11.6 | ⭐ SdWanStrategy - SD-WAN security policies | [x] |
 | **B12: 🚀 INDUSTRY-FIRST Security Innovations** |
 | 95.B12.1 | 🚀 QuantumSecureChannelStrategy - QKD-secured communication | [ ] |
 | 95.B12.2 | 🚀 HomomorphicAccessControlStrategy - Encrypted policy evaluation | [ ] |
