@@ -114,14 +114,14 @@ Plans:
   3. UltimateStorage plugin supports all storage provider strategies with seamless provider switching
   4. UltimateReplication plugin enables geo-dispersed WORM replication with sharding support
   5. UniversalObservability plugin captures metrics, tracing, and alerting across all plugins
-**Plans**: TBD
+**Plans**: 5 plans in 2 waves
 
 Plans:
-- [ ] 04-01: Verify and complete UltimateCompliance plugin (T96)
-- [ ] 04-02: Verify and complete compliance reporting (T5.12-T5.16)
-- [ ] 04-03: Verify and complete UltimateStorage plugin (T97)
-- [ ] 04-04: Verify and complete UltimateReplication with geo-dispersed WORM (T98, T5.5-T5.6)
-- [ ] 04-05: Verify and complete UniversalObservability plugin (T100)
+- [ ] 04-01-PLAN.md — Verify and complete UltimateCompliance plugin with 100+ framework strategies (T96)
+- [ ] 04-02-PLAN.md — Implement compliance reporting services (T5.12-T5.16)
+- [ ] 04-03-PLAN.md — Verify UltimateStorage plugin with 90+ backend strategies (T97)
+- [ ] 04-04-PLAN.md — Verify UltimateReplication and implement geo-dispersed WORM/sharding (T98, T5.5-T5.6)
+- [ ] 04-05-PLAN.md — Verify UniversalObservability plugin with 50+ observability strategies (T100)
 
 ### Phase 5: TamperProof Pipeline
 **Goal**: TamperProof read/write pipeline is fully operational with all integrity, WORM, and blockchain features
