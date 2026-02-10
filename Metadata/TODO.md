@@ -8106,14 +8106,14 @@ T95 focuses on **authorization and access control** - determining WHO can access
 | 95.B3.9 | ⭐ ScimStrategy - SCIM provisioning | [x] |
 | 95.B3.10 | ⭐ Fido2Strategy - FIDO2/WebAuthn | [x] |
 | **B4: Multi-Factor Authentication** |
-| 95.B4.1 | ⭐ TotpStrategy - Time-based OTP (Google Auth, Authy) | [ ] |
-| 95.B4.2 | ⭐ HotpStrategy - HMAC-based OTP | [ ] |
-| 95.B4.3 | ⭐ SmsOtpStrategy - SMS-based OTP | [ ] |
-| 95.B4.4 | ⭐ EmailOtpStrategy - Email-based OTP | [ ] |
-| 95.B4.5 | ⭐ PushNotificationStrategy - Push notification MFA | [ ] |
-| 95.B4.6 | ⭐ BiometricStrategy - Biometric authentication | [ ] |
-| 95.B4.7 | ⭐ HardwareTokenStrategy - Hardware tokens (YubiKey) | [ ] |
-| 95.B4.8 | ⭐ SmartCardStrategy - Smart card/PIV authentication | [ ] |
+| 95.B4.1 | ⭐ TotpStrategy - Time-based OTP (Google Auth, Authy) | [x] |
+| 95.B4.2 | ⭐ HotpStrategy - HMAC-based OTP | [x] |
+| 95.B4.3 | ⭐ SmsOtpStrategy - SMS-based OTP | [x] |
+| 95.B4.4 | ⭐ EmailOtpStrategy - Email-based OTP | [x] |
+| 95.B4.5 | ⭐ PushNotificationStrategy - Push notification MFA | [x] |
+| 95.B4.6 | ⭐ BiometricStrategy - Biometric authentication | [x] |
+| 95.B4.7 | ⭐ HardwareTokenStrategy - Hardware tokens (YubiKey) | [x] |
+| 95.B4.8 | ⭐ SmartCardStrategy - Smart card/PIV authentication | [x] |
 | **B5: Zero Trust Architecture** |
 | 95.B5.1 | ZeroTrustStrategy - Core Zero Trust framework | [x] |
 | 95.B5.2 | ⭐ SpiffeSpireStrategy - SPIFFE/SPIRE workload identity | [x] |
@@ -8129,15 +8129,15 @@ T95 focuses on **authorization and access control** - determining WHO can access
 | 95.B6.5 | ⭐ PermifyStrategy - Permify authorization | [x] |
 | 95.B6.6 | ⭐ CerbosStrategy - Cerbos policy engine | [x] |
 | **B7: Threat Detection & Response** |
-| 95.B7.1 | ThreatDetectionStrategy - Generic threat detection | [ ] |
-| 95.B7.2 | ⭐ SiemIntegrationStrategy - SIEM integration (Splunk, Sentinel) | [ ] |
-| 95.B7.3 | ⭐ SoarStrategy - Security orchestration & response | [ ] |
-| 95.B7.4 | ⭐ UebaStrategy - User/Entity Behavior Analytics (delegates ML to T90) | [ ] |
-| 95.B7.5 | ⭐ NdRStrategy - Network Detection & Response | [ ] |
-| 95.B7.6 | ⭐ EdRStrategy - Endpoint Detection & Response | [ ] |
-| 95.B7.7 | ⭐ XdRStrategy - Extended Detection & Response | [ ] |
-| 95.B7.8 | ⭐ HoneypotStrategy - Deception technology | [ ] |
-| 95.B7.9 | ⭐ ThreatIntelStrategy - Threat intelligence feeds | [ ] |
+| 95.B7.1 | ThreatDetectionStrategy - Generic threat detection | [x] |
+| 95.B7.2 | ⭐ SiemIntegrationStrategy - SIEM integration (Splunk, Sentinel) | [x] |
+| 95.B7.3 | ⭐ SoarStrategy - Security orchestration | 95.B7.3 | ⭐ SoarStrategy - Security orchestration & response | [ ] | response | [x] |
+| 95.B7.4 | ⭐ UebaStrategy - User/Entity Behavior Analytics (delegates ML to T90) | [x] |
+| 95.B7.5 | ⭐ NdRStrategy - Network Detection | 95.B7.5 | ⭐ NdRStrategy - Network Detection & Response | [ ] | Response | [x] |
+| 95.B7.6 | ⭐ EdRStrategy - Endpoint Detection | 95.B7.6 | ⭐ EdRStrategy - Endpoint Detection & Response | [ ] | Response | [x] |
+| 95.B7.7 | ⭐ XdRStrategy - Extended Detection | 95.B7.7 | ⭐ XdRStrategy - Extended Detection & Response | [ ] | Response | [x] |
+| 95.B7.8 | ⭐ HoneypotStrategy - Deception technology | [x] |
+| 95.B7.9 | ⭐ ThreatIntelStrategy - Threat intelligence feeds | [x] |
 | **B8: Data Integrity & Tamper Protection** |
 | 95.B8.1 | IntegrityStrategy - Data integrity verification | [ ] |
 | 95.B8.2 | TamperProofStrategy - Tamper-evident storage | [ ] |
