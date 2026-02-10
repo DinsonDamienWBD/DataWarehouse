@@ -214,10 +214,9 @@
 
 ### Bug Fixes & Testing
 
-- [ ] **BUG-01**: Fix critical bugs — Raft, S3 plugin fixes (T26–T31)
-- [ ] **BUG-02**: Fix known build errors — CS8602, record-type errors, missing types
-- [ ] **BUG-03**: Resolve all TODO comments in codebase (36+ identified)
-- [ ] **BUG-04**: Fix nullable reference suppressions (39 instances)
+- [ ] **BUG-01**: Fix known build errors — CS8602, record-type errors, missing types
+- [ ] **BUG-02**: Resolve all TODO comments in codebase
+- [ ] **BUG-03**: Fix nullable reference suppressions
 - [ ] **TEST-01**: Verify/implement comprehensive test suite (T121)
 - [ ] **TEST-02**: Verify/implement security penetration test plan (T122)
 
@@ -244,13 +243,35 @@ Updated during roadmap creation — each requirement maps to a phase.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| (Populated by roadmapper) | | |
+| SDK-01, SDK-02, SDK-03, SDK-04, SDK-05, SDK-06, SDK-07, SDK-08, SDK-09, SDK-10 | Phase 1 | Pending |
+| AI-01 | Phase 2 | Pending |
+| RAID-01, RAID-02, RAID-03, RAID-04, RAID-05, RAID-06, RAID-07, RAID-08, RAID-09, RAID-10, RAID-11, RAID-12, RAID-13, RAID-14, RAID-15, RAID-16 | Phase 2 | Pending |
+| COMP-01, COMP-02, COMP-03, COMP-04, COMP-05, COMP-06, COMP-07, COMP-08, COMP-09, COMP-10, COMP-11 | Phase 2 | Pending |
+| ENC-01, KEY-01, AC-01, AC-02, AC-03, AC-04 | Phase 3 | Pending |
+| GOV-01, GOV-02, STOR-01, REP-01, OBS-01 | Phase 4 | Pending |
+| TP-01, TP-02, TP-03, TP-04, TP-05, TP-06, TP-07, TP-08, TP-09, TP-10, TP-11, TP-12, TP-13, TP-14, TP-15 | Phase 5 | Pending |
+| INTF-01, INTF-02, INTF-03, INTF-04, INTF-05, INTF-06, INTF-07, INTF-08, INTF-09, INTF-10, INTF-11, INTF-12 | Phase 6 | Pending |
+| FMT-01, FMT-02, FMT-03, FMT-04, FMT-05, FMT-06, FMT-07, FMT-08, FMT-09, FMT-10, FMT-11 | Phase 7 | Pending |
+| STRM-01, STRM-02, STRM-03, STRM-04, STRM-05, STRM-06, STRM-07, STRM-08, STRM-09 | Phase 7 | Pending |
+| MED-01, MED-02, MED-03, MED-04, MED-05, MED-06 | Phase 7 | Pending |
+| PROC-01, PROC-02, OTHER-02, OTHER-03, OTHER-04 | Phase 8 | Pending |
+| SEC-01, SEC-02, SEC-03, SEC-04, SEC-05, SEC-06 | Phase 9 | Pending |
+| FEAT-01, FEAT-02, FEAT-03, FEAT-04, FEAT-05, FEAT-06, FEAT-07 | Phase 10 | Pending |
+| ADV-01, ADV-02 | Phase 11 | Pending |
+| AEDS-01, AEDS-02, AEDS-03, AEDS-04 | Phase 12 | Pending |
+| DGI-01, DGI-02, DGI-03, DGI-04, DGI-05 | Phase 13 | Pending |
+| OTHER-01, OTHER-05, OTHER-06, OTHER-07, OTHER-08 | Phase 14 | Pending |
+| BUG-01, BUG-02, BUG-03, BUG-04 | Phase 15 | Pending |
+| TEST-01, TEST-02 | Phase 16 | Pending |
+| MKTPL-01 | Phase 17 | Pending |
 
 **Coverage:**
 - v1 requirements: 89 total
-- Mapped to phases: TBD
-- Unmapped: TBD
+- Mapped to phases: 89
+- Unmapped: 0
+
+All 89 requirements are mapped to phases 1-17 following dependency chains.
 
 ---
 *Requirements defined: 2026-02-10*
-*Last updated: 2026-02-10 after initial definition*
+*Last updated: 2026-02-10 after roadmap creation*
