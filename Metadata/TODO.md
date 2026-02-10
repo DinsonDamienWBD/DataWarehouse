@@ -8081,19 +8081,19 @@ T95 focuses on **authorization and access control** - determining WHO can access
 | Sub-Task | Description | Status |
 |----------|-------------|--------|
 | **B1: Project Setup** |
-| 95.B1.1 | Create DataWarehouse.Plugins.UltimateAccessControl project | [ ] |
-| 95.B1.2 | Implement UltimateAccessControlPlugin orchestrator | [ ] |
-| 95.B1.3 | Implement unified security policy engine | [ ] |
+| 95.B1.1 | Create DataWarehouse.Plugins.UltimateAccessControl project | [x] |
+| 95.B1.2 | Implement UltimateAccessControlPlugin orchestrator | [x] |
+| 95.B1.3 | Implement unified security policy engine | [x] |
 | **B2: Access Control Models** |
-| 95.B2.1 | RbacStrategy - Role-Based Access Control | [ ] |
-| 95.B2.2 | AbacStrategy - Attribute-Based Access Control | [ ] |
-| 95.B2.3 | ⭐ MacStrategy - Mandatory Access Control (Bell-LaPadula) | [ ] |
-| 95.B2.4 | ⭐ DacStrategy - Discretionary Access Control | [ ] |
-| 95.B2.5 | ⭐ PbacStrategy - Policy-Based Access Control | [ ] |
-| 95.B2.6 | ⭐ ReBacStrategy - Relationship-Based Access Control | [ ] |
-| 95.B2.7 | ⭐ HrBacStrategy - Hierarchical RBAC | [ ] |
-| 95.B2.8 | ⭐ AclStrategy - Access Control Lists | [ ] |
-| 95.B2.9 | ⭐ CapabilityStrategy - Capability-based security | [ ] |
+| 95.B2.1 | RbacStrategy - Role-Based Access Control | [x] |
+| 95.B2.2 | AbacStrategy - Attribute-Based Access Control | [x] |
+| 95.B2.3 | ⭐ MacStrategy - Mandatory Access Control (Bell-LaPadula) | [x] |
+| 95.B2.4 | ⭐ DacStrategy - Discretionary Access Control | [x] |
+| 95.B2.5 | ⭐ PbacStrategy - Policy-Based Access Control | [x] |
+| 95.B2.6 | ⭐ ReBacStrategy - Relationship-Based Access Control | [x] |
+| 95.B2.7 | ⭐ HrBacStrategy - Hierarchical RBAC | [x] |
+| 95.B2.8 | ⭐ AclStrategy - Access Control Lists | [x] |
+| 95.B2.9 | ⭐ CapabilityStrategy - Capability-based security | [x] |
 | **B3: Identity Providers & Federation** |
 | 95.B3.1 | IamStrategy - Generic IAM framework | [ ] |
 | 95.B3.2 | ⭐ LdapStrategy - LDAP/Active Directory | [ ] |
