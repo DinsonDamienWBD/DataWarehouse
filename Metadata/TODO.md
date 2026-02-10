@@ -7703,37 +7703,37 @@ public record CompressionCharacteristics
 | B2.12 | ⭐ LzhStrategy - LHarc/LZH format | [x] |
 | B2.13 | ⭐ LzxStrategy - Microsoft LZX (CAB files) | [x] |
 | **B3: Transform-Based Compression** |
-| B3.1 | BrotliStrategy - Google Brotli | [ ] |
-| B3.2 | ⭐ Bzip2Strategy - Burrows-Wheeler + Huffman | [ ] |
-| B3.3 | ⭐ BwtStrategy - Burrows-Wheeler Transform only | [ ] |
-| B3.4 | ⭐ MtfStrategy - Move-to-Front encoding | [ ] |
+| B3.1 | BrotliStrategy - Google Brotli | [x] |
+| B3.2 | ⭐ Bzip2Strategy - Burrows-Wheeler + Huffman | [x] |
+| B3.3 | ⭐ BwtStrategy - Burrows-Wheeler Transform only | [x] |
+| B3.4 | ⭐ MtfStrategy - Move-to-Front encoding | [x] |
 | **B4: Context Mixing & High-Ratio** |
-| B4.1 | ⭐ ZpaqStrategy - ZPAQ journaling archiver | [ ] |
-| B4.2 | ⭐ PaqStrategy - PAQ family (paq8) | [ ] |
-| B4.3 | ⭐ CmixStrategy - Context-mixing compressor | [ ] |
-| B4.4 | ⭐ NnzStrategy - Neural network-based (NNZ) | [ ] |
-| B4.5 | ⭐ PpmStrategy - Prediction by Partial Matching | [ ] |
-| B4.6 | ⭐ PpmdStrategy - PPMd variant | [ ] |
+| B4.1 | ⭐ ZpaqStrategy - ZPAQ journaling archiver | [x] |
+| B4.2 | ⭐ PaqStrategy - PAQ family (paq8) | [x] |
+| B4.3 | ⭐ CmixStrategy - Context-mixing compressor | [x] |
+| B4.4 | ⭐ NnzStrategy - Neural network-based (NNZ) | [x] |
+| B4.5 | ⭐ PpmStrategy - Prediction by Partial Matching | [x] |
+| B4.6 | ⭐ PpmdStrategy - PPMd variant | [x] |
 | **B5: Entropy Coders (Building Blocks)** |
-| B5.1 | ⭐ HuffmanStrategy - Huffman coding | [ ] |
-| B5.2 | ⭐ ArithmeticStrategy - Arithmetic coding | [ ] |
-| B5.3 | ⭐ AnsStrategy - Asymmetric Numeral Systems (FSE) | [ ] |
-| B5.4 | ⭐ RansStrategy - Range ANS | [ ] |
-| B5.5 | ⭐ RleStrategy - Run-Length Encoding | [ ] |
+| B5.1 | ⭐ HuffmanStrategy - Huffman coding | [x] |
+| B5.2 | ⭐ ArithmeticStrategy - Arithmetic coding | [x] |
+| B5.3 | ⭐ AnsStrategy - Asymmetric Numeral Systems (FSE) | [x] |
+| B5.4 | ⭐ RansStrategy - Range ANS | [x] |
+| B5.5 | ⭐ RleStrategy - Run-Length Encoding | [x] |
 | **B6: Delta & Specialized** |
-| B6.1 | ⭐ DeltaStrategy - Delta encoding | [ ] |
-| B6.2 | ⭐ XdeltaStrategy - Xdelta3 binary diff | [ ] |
-| B6.3 | ⭐ BsdiffStrategy - Binary diff | [ ] |
-| B6.4 | ⭐ VcdiffStrategy - RFC 3284 VCDIFF | [ ] |
-| B6.5 | ⭐ ZdeltaStrategy - Zdelta compression | [ ] |
+| B6.1 | ⭐ DeltaStrategy - Delta encoding | [x] |
+| B6.2 | ⭐ XdeltaStrategy - Xdelta3 binary diff | [x] |
+| B6.3 | ⭐ BsdiffStrategy - Binary diff | [x] |
+| B6.4 | ⭐ VcdiffStrategy - RFC 3284 VCDIFF | [x] |
+| B6.5 | ⭐ ZdeltaStrategy - Zdelta compression | [x] |
 | **B7: Domain-Specific Compression** |
-| B7.1 | ⭐ FlacStrategy - Lossless audio | [ ] |
-| B7.2 | ⭐ ApngStrategy - Animated PNG | [ ] |
-| B7.3 | ⭐ WebpLosslessStrategy - WebP lossless | [ ] |
-| B7.4 | ⭐ JxlLosslessStrategy - JPEG XL lossless | [ ] |
-| B7.5 | ⭐ AvifLosslessStrategy - AVIF lossless | [ ] |
-| B7.6 | ⭐ DnaCompressionStrategy - Genomic data | [ ] |
-| B7.7 | ⭐ TimeSeriesStrategy - Time-series specific (Gorilla, etc.) | [ ] |
+| B7.1 | ⭐ FlacStrategy - Lossless audio | [x] |
+| B7.2 | ⭐ ApngStrategy - Animated PNG | [x] |
+| B7.3 | ⭐ WebpLosslessStrategy - WebP lossless | [x] |
+| B7.4 | ⭐ JxlLosslessStrategy - JPEG XL lossless | [x] |
+| B7.5 | ⭐ AvifLosslessStrategy - AVIF lossless | [x] |
+| B7.6 | ⭐ DnaCompressionStrategy - Genomic data | [x] |
+| B7.7 | ⭐ TimeSeriesStrategy - Time-series specific (Gorilla, etc.) | [x] |
 | **B8: Archive Formats** |
 | B8.1 | ⭐ ZipStrategy - ZIP archives | [ ] |
 | B8.2 | ⭐ SevenZipStrategy - 7z archives | [ ] |
