@@ -119,6 +119,14 @@
     <Project Path="Plugins/DataWarehouse.Plugins.UltimateStorage/DataWarehouse.Plugins.UltimateStorage.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.UltimateStreamingData/DataWarehouse.Plugins.UltimateStreamingData.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.UltimateSustainability/DataWarehouse.Plugins.UltimateSustainability.csproj" />
+    <Project Path="Plugins/DataWarehouse.Plugins.UltimateDataFabric/DataWarehouse.Plugins.UltimateDataFabric.csproj" />
+    <Project Path="Plugins/DataWarehouse.Plugins.UltimateDataLineage/DataWarehouse.Plugins.UltimateDataLineage.csproj" />
+    <Project Path="Plugins/DataWarehouse.Plugins.UltimateDocGen/DataWarehouse.Plugins.UltimateDocGen.csproj" />
+    <Project Path="Plugins/DataWarehouse.Plugins.UltimateFilesystem/DataWarehouse.Plugins.UltimateFilesystem.csproj" />
+    <Project Path="Plugins/DataWarehouse.Plugins.UltimateResourceManager/DataWarehouse.Plugins.UltimateResourceManager.csproj" />
+    <Project Path="Plugins/DataWarehouse.Plugins.UltimateRTOSBridge/DataWarehouse.Plugins.UltimateRTOSBridge.csproj" />
+    <Project Path="Plugins/DataWarehouse.Plugins.UltimateSDKPorts/DataWarehouse.Plugins.UltimateSDKPorts.csproj" />
+    <Project Path="Plugins/DataWarehouse.Plugins.UltimateWorkflow/DataWarehouse.Plugins.UltimateWorkflow.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.UniversalDashboards/DataWarehouse.Plugins.UniversalDashboards.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.UniversalObservability/DataWarehouse.Plugins.UniversalObservability.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.VictoriaMetrics/DataWarehouse.Plugins.VictoriaMetrics.csproj" />

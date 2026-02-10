@@ -176,7 +176,11 @@
       "Bash(cmd /c mkdir \"C:\\\\Temp\\\\DataWarehouse\\\\DataWarehouse\\\\Plugins\\\\DataWarehouse.Plugins.UltimateIntelligence\\\\EdgeNative\")",
       "Bash(if [ -d \"C:\\\\Temp\\\\DataWarehouse\\\\DataWarehouse\\\\Plugins\\\\DataWarehouse.Plugins.UltimateRAID\" ])",
       "Bash(then echo \"Exists\")",
-      "Bash(else echo \"Does not exist\")"
+      "Bash(else echo \"Does not exist\")",
+      "Bash(99.E[1-8])",
+      "Bash(\" TODO.md)",
+      "Bash(timeout /t 15 /nobreak)",
+      "Bash(dotnet remove:*)"
     ]
   }
 }
