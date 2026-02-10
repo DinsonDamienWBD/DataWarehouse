@@ -230,7 +230,7 @@ T99 (SDK) → T94 (Key Mgmt) → T93 (Encryption) → TamperProof (T3.4.2)
 | **3.10** | T5.6 | Geo-Distributed Sharding | Cross-continent shards | Add as feature in **T98** | [ ] |
 | **3.11** | T5.7-T5.9 | Extreme Compression | PAQ, ZPAQ, CMIX | Add as strategies in **T92 (UltimateCompression)** | [x] |
 | **3.12** | T5.10-T5.11 | Database TDE | SQL TDE metadata | T5.10 in **T94**, T5.11 via IEnvelopeKeyStore | [x] |
-| **3.13** | T5.12-T5.16 | Compliance Reporting | SOC2, HIPAA reports | Add as feature in **T96 (UltimateCompliance)** | [ ] |
+| **3.13** | T5.12-T5.16 | Compliance Reporting | SOC2, HIPAA reports | Add as feature in **T96 (UltimateCompliance)** | [x] |
 
 **T6.x Transit Encryption - Uses Ultimate Plugins:**
 
@@ -3561,11 +3561,11 @@ ENVELOPE MODE (T5.1):       [Mode:1][WrappedDekLen:2][WrappedDEK:var][KekIdLen:1
 
 | Task | Component | Description | Status |
 |------|-----------|-------------|--------|
-| T5.12 | Compliance Report Generator | SOC2, HIPAA, FedRAMP, GDPR reports | [ ] |
-| T5.13 | Chain-of-Custody Export | PDF/JSON export for legal discovery | [ ] |
-| T5.14 | Dashboard Integration | Real-time integrity status widgets | [ ] |
-| T5.15 | Alert Integrations | Email, Slack, PagerDuty, OpsGenie | [ ] |
-| T5.16 | Tamper Incident Workflow | Automated incident ticket creation | [ ] |
+| T5.12 | Compliance Report Generator | SOC2, HIPAA, FedRAMP, GDPR reports | [x] |
+| T5.13 | Chain-of-Custody Export | PDF/JSON export for legal discovery | [x] |
+| T5.14 | Dashboard Integration | Real-time integrity status widgets | [x] |
+| T5.15 | Alert Integrations | Email, Slack, PagerDuty, OpsGenie | [x] |
+| T5.16 | Tamper Incident Workflow | Automated incident ticket creation | [x] |
 
 ---
 
