@@ -48,23 +48,40 @@ This refactored structure ensures a clean and maintainable codebase by promoting
 - [ ] Finally, implement the plugin stratergy specific base classes
 - [ ] Build and verify that these new mechanisms work seamlessly and efficiently within the SDK.
 
-### Phase 3: Update SDK to support Auto-scaling, Load Balancing, P2P, Auto-Sync (Online & Offline - Air-Gapped), Auto-Tier, Auto-Governance
+## Phase 3: Update SDK to support Auto-scaling, Load Balancing, P2P, Auto-Sync (Online & Offline - Air-Gapped), Auto-Tier, Auto-Governance
 - [ ] Auto-scaling and load balancing support: User can deploy DataWarehouse on a laptop, slowly as their storage capacity needs grow, DataWarehouse can automatically prompt the user to allow it to 'grow', and ask the user to provide a network/server layer. When user provides the necessary information, DataWarehouse can provide a script or package that the user just needs to execute on that server, and it will automatically deploy an instance of DataWarehouse with the same settings as the original laptop instance, and then the user can link his laptop instance with this server instance. As soon as linked, (depending on the 'Automatically grow' configurations), the system should automatically handle data distribution and load balancing across the nodes. Growth shouldn't be limited to just one server, but can be a cluster of servers, or even cloud instances. The system should be able to monitor the storage usage and performance metrics, and when it detects that the current nodes are reaching their limits, it can prompt the user to add more nodes to the cluster. The user can then provide the necessary information for the new nodes, and the system will handle the deployment and integration of these new nodes into the existing cluster. This way, DataWarehouse can seamlessly scale out as the user's storage needs grow, without any downtime or manual data migration.
 - [ ] Implement auto-scaling, load balancing, P2P, auto-sync (online & offline - Air-Gapped), auto-tier, auto-governance mechanisms in the proper plugin base classes (e.g., StoragePluginBase). 
 - [ ] Build and verify that these new mechanisms work seamlessly and efficiently within the SDK.
 
-## Phase 4: Update Ultimate Plugins
+## Phase 3.5: Decouple Plugins and Kernel
+** Make sure to verify and if necessary, update ALL the plugins to ensure the below behaviour: **
+- [ ] Make sure that no plugin or the Kernel depends on any other plugin or Kernel directly. 
+      * All plugins and kernel should only depend in the SDK. This way, we can ensure that all plugins can be used independently and flexibly, and we can also ensure that the UltimateIntelligence plugin can be used with any plugin without any compatibility issues. The UltimateIntelligence plugin should be designed in a way that it can seamlessly integrate with any plugin that inherits from IntelligentPluginBase, regardless of the specific functionalities of that plugin. This will allow us to maintain a clean and modular architecture while still providing powerful intelligent capabilities across all plugins.
+- [ ] Make sure that all plugins can register their capabilities and knowledge into the system knowledge bank, and that UltimateIntelligence can leverage this information to provide enhanced functionalities. 
+      * This will ensure that all plugins can benefit from the intelligent capabilities provided by UltimateIntelligence, while still maintaining their unique functionalities and behaviors.
+- [ ] Make sure that all plugins can leverage the auto-scaling, load balancing, P2P, auto-sync (online & offline - Air-Gapped), auto-tier, auto-governance features implemented in the SDK, and that these features work seamlessly and efficiently across all plugins. 
+      * This will ensure that all plugins can benefit from these powerful features, while still maintaining their unique functionalities and behaviors.
+- [ ] Make sure that all communications between plugins and kernel are done through Commands/Messages via the message bus only.
+      * This will ensure that all plugins and kernel are decoupled and can communicate with each other in a flexible and modular way, without any direct dependencies. This will also allow us to maintain a clean and scalable architecture, where we can easily add or remove plugins without affecting the overall system.
+- [ ] Kernel can make use of the registered capabilities and knowledge in the system knowledge bank to make informed decisions about which plugins to use for specific tasks, and how to route commands/messages between plugins.
+      * This will allow the kernel to optimize the execution of tasks by leveraging the unique capabilities and knowledge of each plugin, while still maintaining a high level of flexibility and modularity in the system architecture.
+
+## Phase 4A: Update Ultimate Plugins
 ### For each Ultimate plugin (e.g., UltimateEncryptionPlugin, UltimateCompressionPlugin, UltimateStoragePlugin):
 - [ ] Update the Ultimate plugins to inherit from their respective feature-specific plugin base classes (They already have implemented their unique functionalities as stratergies).
 - [ ] Update Ultimate Plugins to leverage the new auto-scaling, load balancing, P2P, auto-sync (online & offline - Air-Gapped), auto-tier, auto-governance features from the updated StoragePluginBase.
 - [ ] Verify that the new structure ensures that all plugins can seamlessly integrate with UltimateIntelligence
 - [ ] Verify that the new structure ensures auto-scaling, load balancing, P2P, auto-sync (online & offline - Air-Gapped), auto-tier, auto-governance features work seamlessly and efficiently in the Ultimate plugins.
 - [ ] Build and verify that these new mechanisms work seamlessly and efficiently within the Ultimate Plugin.
+## Phase 4B: Update Ultimate plugin Stratergies
+- [ ] Verify and if necessary update all stratergies so that all stratergies in the ultimate plugins are updated to leverage the new stratergy base class structure.
 
-## Phase 5: Update Standalone Plugins
+## Phase 5A: Update Standalone Plugins
 - [ ] Since standalone plugins are unique, they might not fit into the new plugin specific base class structure directly. Instead make sure that they inherit/extend the IntelligentPluginBase to leverage the UltimateIntelligence integration at the very least.
 - [ ] Verify that the new structure ensures auto-scaling, load balancing, P2P, auto-sync (online & offline - Air-Gapped), auto-tier, auto-governance features work seamlessly and efficiently with the standalone plugins.
 - [ ] Build and verify that these new mechanisms work seamlessly and efficiently within the Ultimate Plugin.
+## Phase 5B: Update Standalone plugin Stratergies
+- [ ] Verify and if necessary update all stratergies so that all stratergies in the standalone plugins are updated to leverage the new stratergy base class structure.
 
 ## Phase 6: Testing & Documentation
 - [ ] Conduct a full solution build to make sure everything compiles and links correctly.
