@@ -4,6 +4,8 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using DataWarehouse.SDK.Contracts.RAID;
+using SdkRaidStrategyBase = DataWarehouse.SDK.Contracts.RAID.RaidStrategyBase;
+using SdkDiskHealthStatus = DataWarehouse.SDK.Contracts.RAID.DiskHealthStatus;
 
 namespace DataWarehouse.Plugins.UltimateRAID.Strategies.ErasureCoding
 {
@@ -20,7 +22,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.ErasureCoding
     /// - Used in modern communications (DVB-S2, WiFi 802.11n)
     /// - Excellent for high-reliability storage systems
     /// </remarks>
-    public sealed class LdpcStrategy : RaidStrategyBase
+    public sealed class LdpcStrategy : SdkRaidStrategyBase
     {
         private readonly int _chunkSize;
         private readonly int _dataChunks;
@@ -138,7 +140,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.ErasureCoding
             for (int i = 0; i < diskList.Count; i++)
             {
                 var disk = diskList[i];
-                if (disk.HealthStatus == DiskHealthStatus.Healthy)
+                if (disk.HealthStatus == SdkDiskHealthStatus.Healthy)
                 {
                     try
                     {
@@ -426,7 +428,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.ErasureCoding
     /// - Raptor codes for practical linear-time encoding/decoding
     /// - Ideal for broadcast/multicast and unreliable channels
     /// </remarks>
-    public sealed class FountainCodesStrategy : RaidStrategyBase
+    public sealed class FountainCodesStrategy : SdkRaidStrategyBase
     {
         private readonly int _chunkSize;
         private readonly int _sourceSymbols; // k
@@ -528,7 +530,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.ErasureCoding
             for (int i = 0; i < diskList.Count; i++)
             {
                 var disk = diskList[i];
-                if (disk.HealthStatus == DiskHealthStatus.Healthy)
+                if (disk.HealthStatus == SdkDiskHealthStatus.Healthy)
                 {
                     try
                     {
@@ -590,11 +592,11 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.ErasureCoding
                 var sourceSymbols = DecodeLubyTransform(availableSymbols);
 
                 // Re-encode the specific symbol for the failed disk
-                var degree = GetDegree(failedDiskIndex);
-                var neighbors = GetNeighbors(failedDiskIndex, degree);
+                var rebuildDegree = GetDegree(failedDiskIndex);
+                var rebuildNeighbors = GetNeighbors(failedDiskIndex, rebuildDegree);
                 var rebuiltData = new byte[_chunkSize];
 
-                foreach (var neighborIdx in neighbors)
+                foreach (var neighborIdx in rebuildNeighbors)
                 {
                     if (neighborIdx < sourceSymbols.Count)
                     {

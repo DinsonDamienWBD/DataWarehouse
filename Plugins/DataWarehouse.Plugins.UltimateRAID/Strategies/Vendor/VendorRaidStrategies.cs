@@ -4,6 +4,8 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using DataWarehouse.SDK.Contracts.RAID;
+using SdkRaidStrategyBase = DataWarehouse.SDK.Contracts.RAID.RaidStrategyBase;
+using SdkDiskHealthStatus = DataWarehouse.SDK.Contracts.RAID.DiskHealthStatus;
 
 namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Vendor
 {
@@ -11,7 +13,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Vendor
     /// NetApp RAID-DP (Double Parity) strategy providing dual parity protection
     /// similar to RAID 6 but optimized for NetApp storage systems.
     /// </summary>
-    public class NetAppRaidDpStrategy : RaidStrategyBase
+    public class NetAppRaidDpStrategy : SdkRaidStrategyBase
     {
         public override RaidLevel Level => RaidLevel.NetAppRaidDp;
 
@@ -197,7 +199,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Vendor
     /// NetApp RAID-TEC (Triple Erasure Coding) strategy providing triple parity
     /// protection for maximum data integrity and survivability.
     /// </summary>
-    public class NetAppRaidTecStrategy : RaidStrategyBase
+    public class NetAppRaidTecStrategy : SdkRaidStrategyBase
     {
         public override RaidLevel Level => RaidLevel.NetAppRaidTec;
 
@@ -402,7 +404,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Vendor
     /// Synology Hybrid RAID (SHR) strategy supporting mixed disk sizes with 1-disk redundancy.
     /// Automatically optimizes capacity usage across heterogeneous disk configurations.
     /// </summary>
-    public class SynologyShrStrategy : RaidStrategyBase
+    public class SynologyShrStrategy : SdkRaidStrategyBase
     {
         public override RaidLevel Level => RaidLevel.SynologyShr;
 
@@ -569,7 +571,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Vendor
     /// <summary>
     /// Synology Hybrid RAID 2 (SHR-2) strategy with 2-disk redundancy for mixed disk sizes.
     /// </summary>
-    public class SynologyShr2Strategy : RaidStrategyBase
+    public class SynologyShr2Strategy : SdkRaidStrategyBase
     {
         public override RaidLevel Level => RaidLevel.SynologyShr2;
 
@@ -740,7 +742,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Vendor
     /// Drobo BeyondRAID strategy providing dynamic RAID with mixed disk sizes
     /// and automatic capacity optimization.
     /// </summary>
-    public class DroboBeyondRaidStrategy : RaidStrategyBase
+    public class DroboBeyondRaidStrategy : SdkRaidStrategyBase
     {
         public override RaidLevel Level => RaidLevel.DroboBeyondRaid;
 
@@ -916,7 +918,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Vendor
     /// <summary>
     /// QNAP Static Volume strategy similar to RAID 6 with QNAP-specific optimizations.
     /// </summary>
-    public class QnapStaticVolumeStrategy : RaidStrategyBase
+    public class QnapStaticVolumeStrategy : SdkRaidStrategyBase
     {
         public override RaidLevel Level => RaidLevel.QnapStaticVolume;
 
@@ -1131,7 +1133,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Vendor
     /// <summary>
     /// Unraid single parity disk strategy allowing mixed disk sizes with 1-disk redundancy.
     /// </summary>
-    public class UnraidSingleStrategy : RaidStrategyBase
+    public class UnraidSingleStrategy : SdkRaidStrategyBase
     {
         public override RaidLevel Level => RaidLevel.UnraidSingle;
 
@@ -1295,7 +1297,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Vendor
     /// <summary>
     /// Unraid dual parity disk strategy with 2-disk redundancy for mixed disk sizes.
     /// </summary>
-    public class UnraidDualStrategy : RaidStrategyBase
+    public class UnraidDualStrategy : SdkRaidStrategyBase
     {
         public override RaidLevel Level => RaidLevel.UnraidDual;
 

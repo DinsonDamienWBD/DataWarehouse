@@ -4,6 +4,8 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using DataWarehouse.SDK.Contracts.RAID;
+using SdkRaidStrategyBase = DataWarehouse.SDK.Contracts.RAID.RaidStrategyBase;
+using SdkDiskHealthStatus = DataWarehouse.SDK.Contracts.RAID.DiskHealthStatus;
 
 namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Nested
 {
@@ -21,7 +23,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Nested
     /// - Good for sequential workloads requiring redundancy
     /// - Minimum 6 disks (2 groups of 3 disks each)
     /// </remarks>
-    public sealed class Raid03Strategy : RaidStrategyBase
+    public sealed class Raid03Strategy : SdkRaidStrategyBase
     {
         private readonly int _chunkSize;
         private readonly int _disksPerRaid3Group;
@@ -274,7 +276,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Nested
                 var diskIndex = groupOffset + i;
                 var disk = diskList[diskIndex];
 
-                if (disk.HealthStatus == DiskHealthStatus.Healthy)
+                if (disk.HealthStatus == SdkDiskHealthStatus.Healthy)
                 {
                     try
                     {

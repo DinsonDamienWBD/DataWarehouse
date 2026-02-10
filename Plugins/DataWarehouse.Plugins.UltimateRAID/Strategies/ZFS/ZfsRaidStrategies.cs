@@ -4,6 +4,8 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using DataWarehouse.SDK.Contracts.RAID;
+using SdkRaidStrategyBase = DataWarehouse.SDK.Contracts.RAID.RaidStrategyBase;
+using SdkDiskHealthStatus = DataWarehouse.SDK.Contracts.RAID.DiskHealthStatus;
 
 namespace DataWarehouse.Plugins.UltimateRAID.Strategies.ZFS
 {
@@ -12,7 +14,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.ZFS
     /// copy-on-write semantics, checksum verification, and self-healing capabilities.
     /// Survives 1 disk failure with configurable stripe width (2-N data disks + 1 parity).
     /// </summary>
-    public class RaidZ1Strategy : RaidStrategyBase
+    public class RaidZ1Strategy : SdkRaidStrategyBase
     {
         private readonly int _defaultStripeWidth;
         private readonly Dictionary<string, byte[]> _checksumCache;
@@ -137,7 +139,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.ZFS
             var readTasks = stripe.DataDisks.Select(async diskIndex =>
             {
                 var disk = diskList[diskIndex];
-                if (disk.HealthStatus == DiskHealthStatus.Healthy)
+                if (disk.HealthStatus == SdkDiskHealthStatus.Healthy)
                 {
                     var chunk = await SimulateReadFromDisk(disk, offset, stripe.ChunkSize, cancellationToken);
                     lock (chunks)
@@ -382,7 +384,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.ZFS
     /// Survives 2 simultaneous disk failures with variable stripe width.
     /// Uses two independent parity calculations (P and Q parity).
     /// </summary>
-    public class RaidZ2Strategy : RaidStrategyBase
+    public class RaidZ2Strategy : SdkRaidStrategyBase
     {
         private readonly int _defaultStripeWidth;
         private readonly Dictionary<string, byte[]> _checksumCache;
@@ -519,7 +521,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.ZFS
             var readTasks = stripe.DataDisks.Select(async diskIndex =>
             {
                 var disk = diskList[diskIndex];
-                if (disk.HealthStatus == DiskHealthStatus.Healthy)
+                if (disk.HealthStatus == SdkDiskHealthStatus.Healthy)
                 {
                     try
                     {
@@ -769,7 +771,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.ZFS
     /// Survives 3 simultaneous disk failures using P, Q, and R parity.
     /// Ideal for large arrays where rebuild times are long.
     /// </summary>
-    public class RaidZ3Strategy : RaidStrategyBase
+    public class RaidZ3Strategy : SdkRaidStrategyBase
     {
         private readonly int _defaultStripeWidth;
         private readonly Dictionary<string, byte[]> _checksumCache;
@@ -894,7 +896,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.ZFS
             var readTasks = stripe.DataDisks.Select(async diskIndex =>
             {
                 var disk = diskList[diskIndex];
-                if (disk.HealthStatus == DiskHealthStatus.Healthy)
+                if (disk.HealthStatus == SdkDiskHealthStatus.Healthy)
                 {
                     try
                     {

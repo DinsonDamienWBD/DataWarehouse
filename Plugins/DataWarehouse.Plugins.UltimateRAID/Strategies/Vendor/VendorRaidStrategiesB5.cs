@@ -5,6 +5,8 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using DataWarehouse.SDK.Contracts.RAID;
+using SdkRaidStrategyBase = DataWarehouse.SDK.Contracts.RAID.RaidStrategyBase;
+using SdkDiskHealthStatus = DataWarehouse.SDK.Contracts.RAID.DiskHealthStatus;
 
 namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Vendor
 {
@@ -24,7 +26,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Vendor
     /// - Multiple parity drives for enhanced reliability
     /// - Real-time operating system on controller manages I/O
     /// </remarks>
-    public sealed class StorageTekRaid7Strategy : RaidStrategyBase
+    public sealed class StorageTekRaid7Strategy : SdkRaidStrategyBase
     {
         private readonly int _chunkSize;
         private readonly ConcurrentQueue<WriteOperation> _writeCache;
@@ -173,7 +175,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Vendor
                 var diskIndex = stripeInfo.DataDisks[i];
                 var disk = diskList[diskIndex];
 
-                if (disk.HealthStatus == DiskHealthStatus.Healthy)
+                if (disk.HealthStatus == SdkDiskHealthStatus.Healthy)
                 {
                     try
                     {
@@ -438,7 +440,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Vendor
             public long Offset { get; set; }
             public byte[] Data { get; set; } = Array.Empty<byte>();
             public DateTime Timestamp { get; set; }
-            public StripeInfo StripeInfo { get; set; }
+            public StripeInfo StripeInfo { get; set; } = default!;
         }
     }
 
@@ -457,7 +459,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Vendor
     /// - Recovery uses most recent snapshot state
     /// - Popular for media storage where real-time parity is less critical
     /// </remarks>
-    public sealed class FlexRaidFrStrategy : RaidStrategyBase
+    public sealed class FlexRaidFrStrategy : SdkRaidStrategyBase
     {
         private readonly int _chunkSize;
         private readonly ConcurrentDictionary<long, SnapshotInfo> _snapshots;
@@ -562,7 +564,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Vendor
                 var diskIndex = stripeInfo.DataDisks[i];
                 var disk = diskList[diskIndex];
 
-                if (disk.HealthStatus == DiskHealthStatus.Healthy)
+                if (disk.HealthStatus == SdkDiskHealthStatus.Healthy)
                 {
                     try
                     {

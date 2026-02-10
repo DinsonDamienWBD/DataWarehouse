@@ -343,7 +343,76 @@ namespace DataWarehouse.SDK.Contracts.RAID
         /// <summary>
         /// RAID-S (Sparse RAID) - Optimized for write-once workloads.
         /// </summary>
-        RaidS = 9102
+        RaidS = 9102,
+
+        // Additional Nested/Hybrid
+        /// <summary>
+        /// RAID 03 (0+3) - Striped RAID 3 arrays.
+        /// </summary>
+        Raid03 = 30,
+
+        // Additional Extended Levels
+        /// <summary>
+        /// N-Way Mirror - Mirrors data across N disks (N > 2).
+        /// </summary>
+        NWayMirror = 12,
+
+        /// <summary>
+        /// JBOD - Just a Bunch of Disks. No redundancy, disks concatenated.
+        /// </summary>
+        Jbod = 9200,
+
+        /// <summary>
+        /// Crypto RAID - Encrypted RAID with per-stripe key derivation.
+        /// </summary>
+        CryptoRaid = 9201,
+
+        /// <summary>
+        /// DDP/DUP - Dynamic Disk Pool / Data Unit Protection.
+        /// </summary>
+        Ddp = 9202,
+
+        /// <summary>
+        /// DUP - Duplicate data protection.
+        /// </summary>
+        Dup = 9203,
+
+        /// <summary>
+        /// SPAN/BIG - Disk spanning without striping.
+        /// </summary>
+        SpanBig = 9204,
+
+        /// <summary>
+        /// MAID - Massive Array of Idle Disks. Power-managed RAID.
+        /// </summary>
+        Maid = 9205,
+
+        /// <summary>
+        /// Linear RAID - Simple concatenation without striping.
+        /// </summary>
+        Linear = 9206,
+
+        // Additional Vendor-Specific
+        /// <summary>
+        /// StorageTek RAID 7 - Asynchronous RAID with NVRAM write cache.
+        /// </summary>
+        StorageTekRaid7 = 3500,
+
+        /// <summary>
+        /// FlexRAID FR - Snapshot-based flexible parity protection.
+        /// </summary>
+        FlexRaidFr = 3501,
+
+        // Additional Erasure Coding
+        /// <summary>
+        /// LDPC - Low-Density Parity-Check codes for erasure coding.
+        /// </summary>
+        Ldpc = 2003,
+
+        /// <summary>
+        /// Fountain Codes - Rateless erasure codes (LT/Raptor).
+        /// </summary>
+        FountainCodes = 2004
     }
 
     /// <summary>
