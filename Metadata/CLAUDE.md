@@ -721,3 +721,147 @@ public interface IEncryptionStrategy
 ```
 
 New algorithms are added as strategies, NOT as new plugins.
+
+---
+
+## TAMPERPROOF PIPELINE
+
+### Architecture: Three-Pillar Integrity Model
+
+The TamperProof Pipeline guarantees data immutability through three independent verification layers:
+
+```
+                    ┌─────────────────────────────────────────┐
+                    │         THREE-PILLAR INTEGRITY           │
+                    ├─────────────┬─────────────┬─────────────┤
+                    │  Live Data  │ Blockchain  │  WORM Vault │
+                    │  (Primary)  │  (Anchor)   │  (Backup)   │
+                    ├─────────────┼─────────────┼─────────────┤
+                    │ RAID shards │ Merkle root │ S3 Object   │
+                    │ + metadata  │ + consensus │ Lock / Azure│
+                    │ + hash      │ + block     │ Immutable   │
+                    │ chains      │ chain       │ Blob        │
+                    └─────────────┴─────────────┴─────────────┘
+```
+
+All three pillars must agree for data to be considered authentic. If any pillar detects a mismatch, tamper detection triggers and recovery begins.
+
+### Plugin Structure
+
+```
+Plugins/DataWarehouse.Plugins.TamperProof/
+├── TamperProofPlugin.cs          # Main orchestrator
+├── Pipeline/
+│   ├── WritePhase1Handler.cs     # Validate content + context
+│   ├── WritePhase2Handler.cs     # Transform (compress + encrypt)
+│   ├── WritePhase3Handler.cs     # Shard (RAID erasure coding)
+│   ├── WritePhase4Handler.cs     # Write (fan-out to tiers)
+│   ├── WritePhase5Handler.cs     # Anchor (blockchain + WORM)
+│   ├── ReadPhase1Handler.cs      # Manifest lookup
+│   ├── ReadPhase2Handler.cs      # Shard reconstruction
+│   ├── ReadPhase3Handler.cs      # Integrity verification
+│   ├── ReadPhase4Handler.cs      # Reverse transform
+│   └── ReadPhase5Handler.cs      # Response with audit
+├── Services/
+│   ├── DegradationStateService.cs
+│   ├── TamperDetectionService.cs
+│   ├── RecoveryService.cs
+│   ├── CorrectionWorkflowService.cs
+│   ├── AccessLogService.cs
+│   ├── BlockchainBatchService.cs
+│   ├── OrphanCleanupService.cs
+│   └── ContentPaddingService.cs
+├── Storage/
+│   ├── S3WormProvider.cs
+│   └── AzureImmutableBlobProvider.cs
+└── Hashing/
+    └── HashProviders (SHA-2, SHA-3, Keccak, BLAKE3, HMAC variants)
+```
+
+### Key SDK Contracts
+
+| Contract | Purpose |
+|----------|---------|
+| `TamperProofEnums.cs` | 11 enums: HashAlgorithmType (16 values), ConsensusMode (3), WormEnforcementMode (3), TamperRecoveryBehavior (5), ReadMode (3), InstanceDegradationState (6), AccessType (8), AttributionConfidence (4), TransactionFailureBehavior (2), OrphanedWormStatus (6), AlertSeverity (4) |
+| `TamperProofConfiguration.cs` | TamperProofConfiguration (structural: sealed at init), StorageInstancesConfig, RaidConfig, BlockchainBatchConfig, AlertConfig, WormRetentionPolicy |
+| `TamperProofManifest.cs` | TamperProofManifest (complete record of write), PipelineStageRecord, RaidRecord, ShardRecord, WormReference, BlockchainAnchorReference |
+| `TamperProofResults.cs` | SecureWriteResult, SecureReadResult, CorrectionResult, RecoveryResult, TransactionResult, IntegrityHash, AuditChain, BlockSealedException |
+| `WriteContext.cs` | WriteContext, CorrectionContext, WriteContextRecord, CorrectionContextRecord, WriteContextBuilder |
+| `AccessLogEntry.cs` | AccessLogEntry, AccessLogQuery, SuspiciousAccessAnalysis |
+| `TamperIncidentReport.cs` | TamperIncidentReport, AttributionAnalysis, TamperEvidence |
+| `IBlockchainProvider.cs` | IBlockchainProvider interface, BlockchainProviderPluginBase with ComputeMerkleRoot |
+
+### 5-Phase Write Pipeline
+
+```
+Phase 1: VALIDATE    → Content hash, WriteContext validation, duplicate check
+Phase 2: TRANSFORM   → Compress → Encrypt → Pad (chaff bytes for size uniformity)
+Phase 3: SHARD       → RAID erasure coding (data + parity shards)
+Phase 4: WRITE       → Fan-out to 4 tiers: Data, Metadata, WORM, Blockchain
+Phase 5: ANCHOR      → Blockchain batch anchor (Merkle root) + WORM backup
+```
+
+### 5-Phase Read Pipeline
+
+```
+Phase 1: MANIFEST    → Load manifest from metadata tier
+Phase 2: RECONSTRUCT → Retrieve shards, reconstruct via RAID (tolerate failures)
+Phase 3: VERIFY      → Integrity check: shard hashes, content hash, blockchain anchor
+Phase 4: REVERSE     → Strip padding → Decrypt → Decompress
+Phase 5: RESPOND     → Return content with verification status + audit trail
+```
+
+### Configuration Model
+
+**Structural configuration** (sealed at init, validated once):
+- `StorageInstances` - 4 tier assignments (Data, Metadata, WORM, Blockchain)
+- `Raid` - DataShards, ParityShards, ShardSize
+- `HashAlgorithm` - Default: SHA256
+- `ConsensusMode` - Default: SingleWriter
+- `WormMode` - Default: Software
+
+**Behavioral configuration** (mutable at runtime):
+- `RecoveryBehavior` - Default: AutoRecoverWithReport
+- `AlertConfig` - Notification thresholds and recipients
+
+### Recovery Behaviors
+
+| Mode | Auto-Recover | Alert |
+|------|:---:|:---:|
+| `AutoRecoverSilent` | Yes | No |
+| `AutoRecoverWithReport` | Yes | Yes |
+| `AlertAndWait` | No | Yes |
+| `ManualOnly` | No | Yes |
+| `FailClosed` | No | No |
+
+### Blockchain Consensus Modes
+
+| Mode | Description |
+|------|-------------|
+| `SingleWriter` | Single node anchors blocks (fastest, no distributed consensus) |
+| `RaftConsensus` | Raft-based distributed consensus across nodes |
+| `ExternalAnchor` | Anchor to external blockchain (Ethereum, Hyperledger) |
+
+### Degradation State Machine
+
+```
+Healthy → Degraded → DegradedReadOnly → Offline
+                  ↘ DegradedNoRecovery ↗
+Any state → Corrupted (requires admin override to leave)
+```
+
+Severity ordering: Healthy < Degraded < DegradedReadOnly < DegradedNoRecovery < Offline < Corrupted
+
+### WORM Hardware Integration
+
+| Provider | Governance/Unlocked | Compliance/Locked |
+|----------|:---:|:---:|
+| S3 Object Lock | `Software` (admin bypass) | `HardwareIntegrated` (no bypass) |
+| Azure Immutable Blob | `Software` (policy editable) | `HardwareIntegrated` (policy locked) |
+
+### Testing
+
+Tests are in `DataWarehouse.Tests/TamperProof/` (12 files, 100+ test methods):
+- Unit tests: IntegrityProvider, BlockchainProvider, WormProvider, AccessLogProvider
+- Integration tests: WritePipeline, ReadPipeline, TamperDetection, Recovery, CorrectionWorkflow, DegradationState, WormHardware
+- Performance benchmarks: SHA-256 throughput, manifest serialization, configuration construction (Stopwatch-based)
