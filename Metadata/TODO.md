@@ -8296,11 +8296,11 @@ public record ComplianceRequirements
 
 | Sub-Task | Description | Status |
 |----------|-------------|--------|
-| A1 | Add IComplianceStrategy interface to SDK | [ ] |
-| A2 | Add ComplianceRequirements record | [ ] |
-| A3 | Add ComplianceControl and ComplianceViolation types | [ ] |
-| A4 | Add evidence collection framework | [ ] |
-| A5 | Add compliance reporting abstractions | [ ] |
+| A1 | Add IComplianceStrategy interface to SDK | [x] |
+| A2 | Add ComplianceRequirements record | [x] |
+| A3 | Add ComplianceControl and ComplianceViolation types | [x] |
+| A4 | Add evidence collection framework | [x] |
+| A5 | Add compliance reporting abstractions | [x] |
 | A6 | Unit tests for SDK compliance infrastructure | [ ] |
 
 ### Phase B: Core Plugin Implementation - ALL Compliance Frameworks WORLDWIDE
