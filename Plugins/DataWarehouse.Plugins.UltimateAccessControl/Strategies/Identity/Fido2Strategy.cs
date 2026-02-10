@@ -174,7 +174,7 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Identity
                 {
                     CredentialId = credentialId,
                     UserId = challenge.UserId,
-                    Username = challenge.Username,
+                    Username = challenge.Username ?? "",
                     PublicKeyBytes = attestationBytes, // In production: extract from authData
                     SignCount = 0,
                     CreatedAt = DateTime.UtcNow,

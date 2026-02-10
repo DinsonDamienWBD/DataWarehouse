@@ -19,6 +19,8 @@
     <PackageReference Include="BouncyCastle.Cryptography" Version="2.6.2" />
     <!-- LDAP directory services -->
     <PackageReference Include="System.DirectoryServices.Protocols" Version="9.0.*" />
+    <!-- XML signature verification for SAML -->
+    <PackageReference Include="System.Security.Cryptography.Xml" Version="9.0.*" />
   </ItemGroup>
 
 </Project>

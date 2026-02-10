@@ -305,7 +305,7 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Mfa
 
             for (int i = 0; i < template1.Length; i++)
             {
-                var xor = template1[i] ^ template2[i];
+                var xor = (byte)(template1[i] ^ template2[i]);
                 // Count matching bits (0s in XOR result)
                 matchingBits += 8 - CountSetBits(xor);
             }
@@ -322,7 +322,7 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Mfa
             int count = 0;
             while (value != 0)
             {
-                count += value & 1;
+                count += (int)(value & 1);
                 value >>= 1;
             }
             return count;

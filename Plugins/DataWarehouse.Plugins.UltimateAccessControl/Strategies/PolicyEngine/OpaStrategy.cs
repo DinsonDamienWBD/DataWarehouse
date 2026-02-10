@@ -88,6 +88,22 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.PolicyEngine
             try
             {
                 // Build OPA input document
+                var environmentDict = new Dictionary<string, object>
+                {
+                    ["time"] = context.RequestTime.ToString("o"),
+                    ["ip_address"] = context.ClientIpAddress ?? "unknown"
+                };
+
+                if (context.Location != null)
+                {
+                    environmentDict["location"] = new Dictionary<string, object>
+                    {
+                        ["country"] = context.Location.Country ?? "unknown",
+                        ["latitude"] = context.Location.Latitude,
+                        ["longitude"] = context.Location.Longitude
+                    };
+                }
+
                 var input = new Dictionary<string, object>
                 {
                     ["subject"] = new Dictionary<string, object>
@@ -102,27 +118,15 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.PolicyEngine
                         ["attributes"] = context.ResourceAttributes
                     },
                     ["action"] = context.Action,
-                    ["environment"] = new Dictionary<string, object>
-                    {
-                        ["time"] = context.RequestTime.ToString("o"),
-                        ["ip_address"] = context.ClientIpAddress ?? "unknown",
-                        ["location"] = context.Location != null
-                            ? new Dictionary<string, object>
-                            {
-                                ["country"] = context.Location.Country ?? "unknown",
-                                ["latitude"] = context.Location.Latitude,
-                                ["longitude"] = context.Location.Longitude
-                            }
-                            : null
-                    }
+                    ["environment"] = environmentDict
                 };
 
                 // Add environment attributes
                 foreach (var attr in context.EnvironmentAttributes)
                 {
-                    if (!((Dictionary<string, object>)input["environment"]).ContainsKey(attr.Key))
+                    if (!environmentDict.ContainsKey(attr.Key))
                     {
-                        ((Dictionary<string, object>)input["environment"])[attr.Key] = attr.Value;
+                        environmentDict[attr.Key] = attr.Value;
                     }
                 }
 
