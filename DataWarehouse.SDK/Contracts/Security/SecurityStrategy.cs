@@ -47,7 +47,37 @@ namespace DataWarehouse.SDK.Contracts.Security
         /// Privacy and data protection (PII handling, data masking, consent).
         /// Protects personally identifiable information and enforces privacy regulations.
         /// </summary>
-        Privacy = 5
+        Privacy = 5,
+
+        /// <summary>
+        /// Data protection policies (encryption at rest, in transit, key management).
+        /// Ensures data confidentiality through cryptographic controls.
+        /// </summary>
+        DataProtection = 6,
+
+        /// <summary>
+        /// Network security policies (firewall rules, segmentation, TLS enforcement).
+        /// Controls network-level access and communication security.
+        /// </summary>
+        Network = 7,
+
+        /// <summary>
+        /// Regulatory compliance policies (GDPR, HIPAA, SOC2, FedRAMP).
+        /// Evaluates operations against regulatory framework requirements.
+        /// </summary>
+        Compliance = 8,
+
+        /// <summary>
+        /// Integrity verification policies (hash verification, digital signatures, chain of custody).
+        /// Provides cryptographic proof that data has not been tampered with.
+        /// </summary>
+        IntegrityVerification = 9,
+
+        /// <summary>
+        /// Zero trust security policies (never trust, always verify, least privilege).
+        /// Enforces continuous verification regardless of network location or prior authentication.
+        /// </summary>
+        ZeroTrust = 10
     }
 
     /// <summary>
