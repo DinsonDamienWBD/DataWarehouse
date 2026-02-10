@@ -7764,11 +7764,11 @@ public record CompressionCharacteristics
 
 | Sub-Task | Description | Status |
 |----------|-------------|--------|
-| D1 | Update all plugin references to use UltimateCompression | [ ] |
-| D2 | Create migration guide for existing implementations | [ ] |
-| D3 | Deprecate individual compression plugins | [ ] |
-| D4 | Remove deprecated plugins after transition period | [ ] |
-| D5 | Update documentation and examples | [ ] |
+| D1 | Update all plugin references to use UltimateCompression | [x] All 6 old plugins absorbed as strategies |
+| D2 | Create migration guide for existing implementations | [x] XML doc migration guide on UltimateCompressionPlugin |
+| D3 | Deprecate individual compression plugins | [x] Old plugins deprecated; functionality in UltimateCompression strategies |
+| D4 | Remove deprecated plugins after transition period | [ ] Deferred to Phase 18 (Plugin Deprecation & File Cleanup) |
+| D5 | Update documentation and examples | [x] Migration docs, backward compatibility notes in plugin XML docs |
 
 ### Configuration Example
 
