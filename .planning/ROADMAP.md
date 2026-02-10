@@ -60,21 +60,24 @@ Plans:
   1. UniversalIntelligence plugin integrates all AI providers and vector stores with KnowledgeObject envelope working
   2. UltimateRAID plugin implements all 50+ RAID strategies with health monitoring, self-healing, and AI optimization
   3. UltimateCompression plugin implements all compression families (LZ, BWT, extreme, entropy, differential, media, archive, specialty) with benchmarking
-  4. Migration from old RAID/compression plugins to Ultimate versions is complete with deprecation notices
+  4. Migration from old RAID/compression plugins to Ultimate versions is functionally complete (all features absorbed, deprecation notices in place, backward compatibility maintained; actual file deletion deferred to Phase 18)
   5. All three plugins integrate with microkernel via message bus with no direct references
-**Plans**: 10 plans in 4 waves
+  6. All AI-dependent features degrade gracefully when Intelligence plugin is unavailable (IsIntelligenceAvailable fallback)
+**Plans**: 12 plans in 4 waves
 
 Plans:
-- [ ] 02-01-PLAN.md — Verify and complete UniversalIntelligence plugin (T90)
-- [ ] 02-02-PLAN.md — Verify and complete UltimateRAID SDK and standard strategies (T91.A, T91.B1)
-- [ ] 02-03-PLAN.md — Verify and complete UltimateRAID nested, extended, ZFS, vendor-specific, erasure (T91.B2-B7)
-- [ ] 02-04-PLAN.md — Verify and complete UltimateRAID plugin orchestration, health, self-healing (T91.C, T91.D)
-- [ ] 02-05-PLAN.md — Verify and complete UltimateRAID AI optimization, tiering, performance (T91.E, T91.F, T91.G)
-- [ ] 02-06-PLAN.md — Verify and complete UltimateRAID migration and cross-plugin integrations (T91.I, T91.J)
-- [ ] 02-07-PLAN.md — Verify and complete UltimateCompression plugin and LZ-family strategies (T92.B1-B3)
-- [ ] 02-08-PLAN.md — Verify and complete UltimateCompression extreme, entropy, differential, media strategies (T92.B4-B7)
-- [ ] 02-09-PLAN.md — Verify and complete UltimateCompression archive, specialty, advanced features (T92.B8-B9, T92.C)
-- [ ] 02-10-PLAN.md — Verify and complete UltimateCompression migration (T92.D)
+- [ ] 02-01-PLAN.md — Verify and complete UniversalIntelligence plugin core, AI providers, KnowledgeSystem (T90 core)
+- [ ] 02-02-PLAN.md — Verify and complete UniversalIntelligence vector stores, knowledge graphs, features, memory (T90 remaining)
+- [ ] 02-03-PLAN.md — Verify and complete UltimateRAID SDK and standard strategies (T91.A, T91.B1)
+- [ ] 02-04-PLAN.md — Verify and complete UltimateRAID nested, extended, ZFS, vendor-specific, erasure (T91.B2-B7)
+- [ ] 02-05-PLAN.md — Verify and complete UltimateRAID plugin orchestration, health, self-healing (T91.C, T91.D)
+- [ ] 02-06-PLAN.md — Verify and complete UltimateRAID AI optimization, tiering, performance (T91.E, T91.F, T91.G)
+- [ ] 02-07-PLAN.md — Verify and complete UltimateRAID migration and cross-plugin integrations (T91.I, T91.J)
+- [ ] 02-08-PLAN.md — Verify and complete UltimateCompression plugin orchestrator and LZ-family strategies (T92.B1-B2)
+- [ ] 02-09-PLAN.md — Verify and complete UltimateCompression BWT-based / transform strategies (T92.B3)
+- [ ] 02-10-PLAN.md — Verify and complete UltimateCompression extreme, entropy, differential, media strategies (T92.B4-B7)
+- [ ] 02-11-PLAN.md — Verify and complete UltimateCompression archive, specialty, advanced features (T92.B8-B9, T92.C)
+- [ ] 02-12-PLAN.md — Verify and complete UltimateCompression migration (T92.D)
 
 ### Phase 3: Security Infrastructure (Encryption, Keys, Access Control)
 **Goal**: All security infrastructure plugins are production-ready with complete strategy coverage
@@ -392,7 +395,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8 -> 9 -> 10
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. SDK Foundation & Base Classes | 5/5 | COMPLETE | 2026-02-10 |
-| 2. Core Infrastructure | 0/10 | Not started | - |
+| 2. Core Infrastructure | 0/12 | Not started | - |
 | 3. Security Infrastructure | 0/4 | Not started | - |
 | 4. Compliance, Storage & Replication | 0/5 | Not started | - |
 | 5. TamperProof Pipeline | 0/9 | Not started | - |
