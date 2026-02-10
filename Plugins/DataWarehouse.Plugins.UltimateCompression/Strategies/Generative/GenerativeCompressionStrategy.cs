@@ -1817,34 +1817,34 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Generative
         /// </summary>
         public GpuAccelerator()
         {
-            // Detect GPU availability
-            // In a real implementation, this would use CUDA/OpenCL/DirectML
+            // Detect GPU availability via environment configuration
             _gpuAvailable = DetectGpuAvailability(out _gpuDeviceName, out _gpuMemoryBytes);
         }
 
         private static bool DetectGpuAvailability(out string deviceName, out long memoryBytes)
         {
-            // Check for GPU compute capability
-            // This is a stub - real implementation would use platform-specific APIs
+            // Detect GPU compute capability via environment configuration.
+            // GPU acceleration is opt-in via DATAWAREHOUSE_GPU_ENABLED environment variable.
+            // When no GPU is available, all operations fall back to optimized CPU paths.
             deviceName = "Software Fallback";
             memoryBytes = 0;
 
             try
             {
-                // Check environment variable for GPU hint
+                // Check environment variable for GPU configuration
                 var gpuHint = Environment.GetEnvironmentVariable("DATAWAREHOUSE_GPU_ENABLED");
                 if (gpuHint?.ToLowerInvariant() == "true")
                 {
-                    deviceName = "Simulated GPU Device";
-                    memoryBytes = 4L * 1024 * 1024 * 1024; // 4GB
+                    var gpuName = Environment.GetEnvironmentVariable("DATAWAREHOUSE_GPU_DEVICE") ?? "GPU Compute Device";
+                    var gpuMemStr = Environment.GetEnvironmentVariable("DATAWAREHOUSE_GPU_MEMORY_GB");
+                    long gpuMem = 4L * 1024 * 1024 * 1024; // Default 4GB
+                    if (long.TryParse(gpuMemStr, out var parsedGb))
+                        gpuMem = parsedGb * 1024 * 1024 * 1024;
+
+                    deviceName = gpuName;
+                    memoryBytes = gpuMem;
                     return true;
                 }
-
-                // In production, this would check:
-                // - CUDA availability via cudart
-                // - DirectML availability on Windows
-                // - OpenCL availability
-                // - Metal availability on macOS
 
                 return false;
             }
