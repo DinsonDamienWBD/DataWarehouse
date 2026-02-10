@@ -37,6 +37,7 @@ Progress: [###-------] 28%
 - Trend: Implementation-heavy plans take longer; verify-only plans are fast
 
 *Updated after each plan completion*
+| Phase 05 P02 | 10 | 2 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -91,6 +92,7 @@ Recent decisions affecting current work:
 - [Phase 04]: T5.5 complete -- GeoWormReplicationFeature with Compliance/Enterprise WORM modes, geofencing via compliance.geofence.check, multi-region replication with SHA-256 integrity verification
 - [Phase 04]: T5.6 complete -- GeoDistributedShardingFeature with consistent hashing, XOR-based erasure coding (k data + m parity shards), geo-aware shard placement with geofencing
 - [Phase 05]: T4.16-T4.20 hashing verified -- 16 hash providers (SHA-3/Keccak/HMAC/Salted) all production-ready with BouncyCastle and System.Security.Cryptography; added missing HmacSha3_384Provider and HmacSha3_512Provider; T4.21-T4.23 compression resolved via T92 UltimateCompression cross-reference; 36 items marked [x] in TODO.md
+- [Phase 05]: DegradationStateService uses ConcurrentDictionary + valid transition dict; Corrupted state requires admin override; Chaff padding models byte frequency via seeded SHA-256 counter mode; Added Purged/LinkedToRetry to OrphanedWormStatus
 
 ### Pending Todos
 
