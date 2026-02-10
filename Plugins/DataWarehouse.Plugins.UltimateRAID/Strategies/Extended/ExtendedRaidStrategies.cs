@@ -4,6 +4,8 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using DataWarehouse.SDK.Contracts.RAID;
+using SdkRaidStrategyBase = DataWarehouse.SDK.Contracts.RAID.RaidStrategyBase;
+using SdkDiskHealthStatus = DataWarehouse.SDK.Contracts.RAID.DiskHealthStatus;
 
 namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Extended
 {
@@ -11,7 +13,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Extended
     /// RAID 01 (0+1) strategy implementing mirrored stripes for high performance
     /// with redundancy through mirroring of entire stripe sets.
     /// </summary>
-    public class Raid01Strategy : RaidStrategyBase
+    public class Raid01Strategy : SdkRaidStrategyBase
     {
         public override RaidLevel Level => RaidLevel.Raid01;
 
@@ -85,7 +87,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Extended
                 var primaryDisk = diskList[diskIndex];
                 var mirrorDisk = diskList[diskIndex + halfCount];
 
-                if (primaryDisk.HealthStatus == DiskHealthStatus.Healthy)
+                if (primaryDisk.HealthStatus == SdkDiskHealthStatus.Healthy)
                 {
                     try
                     {
@@ -208,7 +210,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Extended
     /// RAID 100 (10+0) strategy implementing striped RAID 10 arrays for maximum
     /// performance and redundancy in very large storage systems.
     /// </summary>
-    public class Raid100Strategy : RaidStrategyBase
+    public class Raid100Strategy : SdkRaidStrategyBase
     {
         public override RaidLevel Level => RaidLevel.Raid100;
 
@@ -288,7 +290,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Extended
                 var chunkLength = Math.Min(Capabilities.StripeSize, length - position);
 
                 byte[] chunk;
-                if (primaryDisk.HealthStatus == DiskHealthStatus.Healthy)
+                if (primaryDisk.HealthStatus == SdkDiskHealthStatus.Healthy)
                 {
                     try
                     {
@@ -410,7 +412,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Extended
     /// RAID 50 (5+0) strategy combining RAID 5 arrays in a RAID 0 stripe for
     /// improved performance while maintaining single-disk redundancy per array.
     /// </summary>
-    public class Raid50Strategy : RaidStrategyBase
+    public class Raid50Strategy : SdkRaidStrategyBase
     {
         public override RaidLevel Level => RaidLevel.Raid50;
 
@@ -462,7 +464,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Extended
                     if (j == parityPos)
                     {
                         // Calculate and write parity
-                        var parityData = CalculateXorParity(new[] { chunks[i] });
+                        var parityData = CalculateXorParity(new ReadOnlyMemory<byte>[] { chunks[i] });
                         writeTasks.Add(WriteToDiskAsync(diskList[setOffset + j], parityData.ToArray(), offset + stripeIndex * Capabilities.StripeSize, cancellationToken));
                     }
                     else if (i < chunks.Count)
@@ -509,7 +511,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Extended
                     if (j != parityPos)
                     {
                         var disk = diskList[setOffset + j];
-                        if (disk.HealthStatus == DiskHealthStatus.Healthy)
+                        if (disk.HealthStatus == SdkDiskHealthStatus.Healthy)
                         {
                             try
                             {
@@ -675,7 +677,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Extended
     /// RAID 60 (6+0) strategy combining RAID 6 arrays in a RAID 0 stripe for
     /// high performance with dual-disk redundancy per array.
     /// </summary>
-    public class Raid60Strategy : RaidStrategyBase
+    public class Raid60Strategy : SdkRaidStrategyBase
     {
         public override RaidLevel Level => RaidLevel.Raid60;
 
@@ -719,10 +721,10 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Extended
                 var qParityPos = (int)((stripeIndex + 1) % disksPerSet);
 
                 // Calculate P parity (XOR)
-                var pParity = CalculateXorParity(new[] { chunks[i] });
+                var pParity = CalculateXorParity(new ReadOnlyMemory<byte>[] { chunks[i] });
 
                 // Calculate Q parity (Galois field)
-                var qParity = CalculateXorParity(new[] { chunks[i] }); // Simplified
+                var qParity = CalculateXorParity(new ReadOnlyMemory<byte>[] { chunks[i] }); // Simplified
 
                 // Write data and parity
                 for (int j = 0; j < disksPerSet; j++)
@@ -781,7 +783,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Extended
                     if (j != pParityPos && j != qParityPos)
                     {
                         var disk = diskList[setOffset + j];
-                        if (disk.HealthStatus == DiskHealthStatus.Healthy)
+                        if (disk.HealthStatus == SdkDiskHealthStatus.Healthy)
                         {
                             try
                             {
@@ -944,7 +946,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Extended
     /// RAID 1E strategy providing striped mirrors with support for odd number of disks.
     /// Combines characteristics of RAID 1 and RAID 0.
     /// </summary>
-    public class Raid1EStrategy : RaidStrategyBase
+    public class Raid1EStrategy : SdkRaidStrategyBase
     {
         public override RaidLevel Level => RaidLevel.Raid1E;
 
@@ -1013,7 +1015,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Extended
                 var primaryDisk = diskList[diskIndex];
                 var mirrorDisk = diskList[mirrorIndex];
 
-                if (primaryDisk.HealthStatus == DiskHealthStatus.Healthy)
+                if (primaryDisk.HealthStatus == SdkDiskHealthStatus.Healthy)
                 {
                     try
                     {
@@ -1128,7 +1130,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Extended
     /// RAID 5E strategy implementing RAID 5 with integrated hot spare capacity
     /// distributed across all disks.
     /// </summary>
-    public class Raid5EStrategy : RaidStrategyBase
+    public class Raid5EStrategy : SdkRaidStrategyBase
     {
         public override RaidLevel Level => RaidLevel.Raid5E;
 
@@ -1166,7 +1168,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Extended
                 var currentStripeInfo = CalculateStripe(blockIndex, diskList.Count);
 
                 // Calculate parity
-                var parity = CalculateXorParity(new[] { chunks[i] });
+                var parity = CalculateXorParity(new ReadOnlyMemory<byte>[] { chunks[i] });
 
                 // Write data to data disks
                 for (int j = 0; j < currentStripeInfo.DataDisks.Length && j < chunks.Count; j++)
@@ -1210,7 +1212,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Extended
                 foreach (var diskIndex in stripeInfo.DataDisks)
                 {
                     var disk = diskList[diskIndex];
-                    if (disk.HealthStatus == DiskHealthStatus.Healthy)
+                    if (disk.HealthStatus == SdkDiskHealthStatus.Healthy)
                     {
                         try
                         {
@@ -1371,7 +1373,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Extended
     /// RAID 5EE strategy implementing enhanced RAID 5E with distributed hot spare
     /// for improved rebuild performance and fault tolerance.
     /// </summary>
-    public class Raid5EEStrategy : RaidStrategyBase
+    public class Raid5EEStrategy : SdkRaidStrategyBase
     {
         public override RaidLevel Level => RaidLevel.Raid5EE;
 
@@ -1408,7 +1410,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Extended
                 var stripeInfo = CalculateStripe(blockIndex, diskList.Count);
 
                 // Calculate parity
-                var parity = CalculateXorParity(new[] { chunks[i] });
+                var parity = CalculateXorParity(new ReadOnlyMemory<byte>[] { chunks[i] });
 
                 // Write data
                 for (int j = 0; j < stripeInfo.DataDisks.Length && j < chunks.Count; j++)
@@ -1452,7 +1454,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Extended
                 foreach (var diskIndex in stripeInfo.DataDisks)
                 {
                     var disk = diskList[diskIndex];
-                    if (disk.HealthStatus == DiskHealthStatus.Healthy)
+                    if (disk.HealthStatus == SdkDiskHealthStatus.Healthy)
                     {
                         try
                         {
@@ -1606,7 +1608,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Extended
     /// RAID 6E strategy implementing RAID 6 with integrated hot spare capacity
     /// for maximum redundancy and automatic failover.
     /// </summary>
-    public class Raid6EStrategy : RaidStrategyBase
+    public class Raid6EStrategy : SdkRaidStrategyBase
     {
         public override RaidLevel Level => RaidLevel.Raid6E;
 
@@ -1643,8 +1645,8 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Extended
                 var stripeInfo = CalculateStripe(blockIndex, diskList.Count);
 
                 // Calculate dual parity
-                var parity1 = CalculateXorParity(new[] { chunks[i] });
-                var parity2 = CalculateXorParity(new[] { chunks[i], parity1.ToArray() });
+                var parity1 = CalculateXorParity(new ReadOnlyMemory<byte>[] { chunks[i] });
+                var parity2 = CalculateXorParity(new ReadOnlyMemory<byte>[] { chunks[i], parity1.ToArray() });
 
                 // Write data
                 for (int j = 0; j < stripeInfo.DataDisks.Length && j < chunks.Count; j++)
@@ -1691,7 +1693,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Extended
                 foreach (var diskIndex in stripeInfo.DataDisks)
                 {
                     var disk = diskList[diskIndex];
-                    if (disk.HealthStatus == DiskHealthStatus.Healthy)
+                    if (disk.HealthStatus == SdkDiskHealthStatus.Healthy)
                     {
                         try
                         {

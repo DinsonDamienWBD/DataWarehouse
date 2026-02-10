@@ -30,6 +30,15 @@
   <ItemGroup>
     <Compile Include="Strategies\Standard\StandardRaidStrategies.cs" />
     <Compile Include="Strategies\Standard\StandardRaidStrategiesB1.cs" />
+    <Compile Include="Strategies\Nested\NestedRaidStrategies.cs" />
+    <Compile Include="Strategies\Extended\ExtendedRaidStrategies.cs" />
+    <Compile Include="Strategies\Extended\ExtendedRaidStrategiesB6.cs" />
+    <Compile Include="Strategies\ZFS\ZfsRaidStrategies.cs" />
+    <Compile Include="Strategies\Vendor\VendorRaidStrategies.cs" />
+    <Compile Include="Strategies\Vendor\VendorRaidStrategiesB5.cs" />
+    <Compile Include="Strategies\ErasureCoding\ErasureCodingStrategies.cs" />
+    <Compile Include="Strategies\ErasureCoding\ErasureCodingStrategiesB7.cs" />
+    <Compile Include="Strategies\Adaptive\AdaptiveRaidStrategies.cs" />
   </ItemGroup>
 
 </Project>

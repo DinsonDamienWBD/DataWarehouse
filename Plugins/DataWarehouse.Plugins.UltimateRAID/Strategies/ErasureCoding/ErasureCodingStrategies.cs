@@ -4,6 +4,8 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using DataWarehouse.SDK.Contracts.RAID;
+using SdkRaidStrategyBase = DataWarehouse.SDK.Contracts.RAID.RaidStrategyBase;
+using SdkDiskHealthStatus = DataWarehouse.SDK.Contracts.RAID.DiskHealthStatus;
 
 namespace DataWarehouse.Plugins.UltimateRAID.Strategies.ErasureCoding
 {
@@ -12,7 +14,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.ErasureCoding
     /// Implements (k, m) encoding where any k chunks out of k+m total can reconstruct the original data.
     /// Uses Vandermonde matrix in Galois Field GF(2^8) for encoding and decoding.
     /// </summary>
-    public class ReedSolomonStrategy : RaidStrategyBase
+    public class ReedSolomonStrategy : SdkRaidStrategyBase
     {
         private readonly int _dataChunks;
         private readonly int _parityChunks;
@@ -108,7 +110,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.ErasureCoding
             var readTasks = Enumerable.Range(0, _dataChunks + _parityChunks).Select(async diskIndex =>
             {
                 var disk = diskList[diskIndex];
-                if (disk.HealthStatus == DiskHealthStatus.Healthy)
+                if (disk.HealthStatus == SdkDiskHealthStatus.Healthy)
                 {
                     try
                     {
@@ -504,7 +506,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.ErasureCoding
     /// Enables faster recovery by reconstructing from local group instead of all chunks.
     /// Typical configuration: (k, l, g) where k=data, l=local parity, g=global parity.
     /// </summary>
-    public class LocalReconstructionCodeStrategy : RaidStrategyBase
+    public class LocalReconstructionCodeStrategy : SdkRaidStrategyBase
     {
         private readonly int _dataChunks;
         private readonly int _localGroups;
@@ -640,7 +642,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.ErasureCoding
             var readTasks = Enumerable.Range(0, totalChunks).Select(async diskIndex =>
             {
                 var disk = diskList[diskIndex];
-                if (disk.HealthStatus == DiskHealthStatus.Healthy)
+                if (disk.HealthStatus == SdkDiskHealthStatus.Healthy)
                 {
                     try
                     {
@@ -673,7 +675,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.ErasureCoding
 
             if (reconstructed != null)
             {
-                return reconstructed.Value.AsMemory(0, Math.Min(length, reconstructed.Value.Length));
+                return reconstructed.AsMemory(0, Math.Min(length, reconstructed.Length));
             }
 
             // Fall back to global reconstruction
@@ -961,7 +963,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.ErasureCoding
     /// Optimized implementation using Intel ISA-L algorithms for maximum performance.
     /// Supports hardware acceleration via SIMD instructions (AVX2, AVX512).
     /// </summary>
-    public class IsalErasureStrategy : RaidStrategyBase
+    public class IsalErasureStrategy : SdkRaidStrategyBase
     {
         private readonly int _dataChunks;
         private readonly int _parityChunks;
@@ -1049,7 +1051,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.ErasureCoding
             var readTasks = Enumerable.Range(0, _dataChunks + _parityChunks).Select(async diskIndex =>
             {
                 var disk = diskList[diskIndex];
-                if (disk.HealthStatus == DiskHealthStatus.Healthy)
+                if (disk.HealthStatus == SdkDiskHealthStatus.Healthy)
                 {
                     try
                     {

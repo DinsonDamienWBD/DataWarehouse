@@ -6,6 +6,8 @@ using System.Security.Cryptography;
 using System.Threading;
 using System.Threading.Tasks;
 using DataWarehouse.SDK.Contracts.RAID;
+using SdkRaidStrategyBase = DataWarehouse.SDK.Contracts.RAID.RaidStrategyBase;
+using SdkDiskHealthStatus = DataWarehouse.SDK.Contracts.RAID.DiskHealthStatus;
 
 namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Extended
 {
@@ -13,7 +15,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Extended
     /// RAID 71/72 Strategy - Multi-parity variants with 3-4 parity drives.
     /// Extends RAID 6 concept to provide even higher fault tolerance.
     /// </summary>
-    public sealed class Raid7XStrategy : RaidStrategyBase
+    public sealed class Raid7XStrategy : SdkRaidStrategyBase
     {
         private readonly int _chunkSize;
         private readonly int _parityCount; // 3 for RAID 71, 4 for RAID 72
@@ -110,7 +112,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Extended
                 var diskIndex = stripeInfo.DataDisks[i];
                 var disk = diskList[diskIndex];
 
-                if (disk.HealthStatus == DiskHealthStatus.Healthy)
+                if (disk.HealthStatus == SdkDiskHealthStatus.Healthy)
                 {
                     try
                     {
@@ -349,7 +351,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Extended
     /// <summary>
     /// N-Way Mirror Strategy - 3+ way mirroring for extreme redundancy.
     /// </summary>
-    public sealed class NWayMirrorStrategy : RaidStrategyBase
+    public sealed class NWayMirrorStrategy : SdkRaidStrategyBase
     {
         private readonly int _chunkSize;
         private readonly int _mirrorCount;
@@ -390,7 +392,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Extended
             var diskList = disks.ToList();
             var dataBytes = data.ToArray();
 
-            var writeTasks = diskList.Where(d => d.HealthStatus == DiskHealthStatus.Healthy)
+            var writeTasks = diskList.Where(d => d.HealthStatus == SdkDiskHealthStatus.Healthy)
                 .Select(disk => WriteToDiskAsync(disk, dataBytes, offset, cancellationToken)).ToList();
 
             await Task.WhenAll(writeTasks);
@@ -400,7 +402,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Extended
             long offset, int length, CancellationToken cancellationToken = default)
         {
             ValidateDiskConfiguration(disks);
-            var healthyDisk = disks.FirstOrDefault(d => d.HealthStatus == DiskHealthStatus.Healthy)
+            var healthyDisk = disks.FirstOrDefault(d => d.HealthStatus == SdkDiskHealthStatus.Healthy)
                 ?? throw new InvalidOperationException("No healthy disks available");
             return await ReadFromDiskAsync(healthyDisk, offset, length, cancellationToken);
         }
@@ -439,7 +441,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Extended
     /// <summary>
     /// JBOD Strategy - Just a Bunch of Disks (concatenation).
     /// </summary>
-    public sealed class JbodStrategy : RaidStrategyBase
+    public sealed class JbodStrategy : SdkRaidStrategyBase
     {
         private readonly int _chunkSize;
 
@@ -514,7 +516,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Extended
     /// <summary>
     /// Crypto RAID Strategy - Encrypted RAID with per-disk keys.
     /// </summary>
-    public sealed class CryptoRaidStrategy : RaidStrategyBase
+    public sealed class CryptoRaidStrategy : SdkRaidStrategyBase
     {
         private readonly int _chunkSize;
         private readonly ConcurrentDictionary<string, byte[]> _diskKeys;
@@ -598,7 +600,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Extended
                 var diskIndex = stripeInfo.DataDisks[i];
                 var disk = diskList[diskIndex];
 
-                if (disk.HealthStatus == DiskHealthStatus.Healthy)
+                if (disk.HealthStatus == SdkDiskHealthStatus.Healthy)
                 {
                     try
                     {
@@ -772,7 +774,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Extended
     /// <summary>
     /// DUP/DDP Strategy - Data/Distributed Data Protection.
     /// </summary>
-    public sealed class DupDdpStrategy : RaidStrategyBase
+    public sealed class DupDdpStrategy : SdkRaidStrategyBase
     {
         private readonly int _chunkSize;
         private readonly bool _distributed;
@@ -836,7 +838,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Extended
             var dataDisk = diskList[stripeInfo.DataDisks[0]];
             var protectionDisk = diskList[stripeInfo.ParityDisks[0]];
 
-            if (dataDisk.HealthStatus == DiskHealthStatus.Healthy)
+            if (dataDisk.HealthStatus == SdkDiskHealthStatus.Healthy)
             {
                 try { return await ReadFromDiskAsync(dataDisk, offset, length, cancellationToken); }
                 catch { }
@@ -877,7 +879,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Extended
     /// <summary>
     /// SPAN/BIG Strategy - Simple spanning across disks.
     /// </summary>
-    public sealed class SpanBigStrategy : RaidStrategyBase
+    public sealed class SpanBigStrategy : SdkRaidStrategyBase
     {
         private readonly int _chunkSize;
 
@@ -938,7 +940,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Extended
     /// <summary>
     /// MAID Strategy - Massive Array of Idle Disks (power saving).
     /// </summary>
-    public sealed class MaidStrategy : RaidStrategyBase
+    public sealed class MaidStrategy : SdkRaidStrategyBase
     {
         private readonly int _chunkSize;
         private readonly ConcurrentDictionary<string, DiskPowerState> _diskStates;
@@ -1139,7 +1141,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Extended
     /// <summary>
     /// Linear Strategy - Linear concatenation of disks.
     /// </summary>
-    public sealed class LinearStrategy : RaidStrategyBase
+    public sealed class LinearStrategy : SdkRaidStrategyBase
     {
         private readonly int _chunkSize;
 

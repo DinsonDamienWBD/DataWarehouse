@@ -4,6 +4,8 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using DataWarehouse.SDK.Contracts.RAID;
+using SdkRaidStrategyBase = DataWarehouse.SDK.Contracts.RAID.RaidStrategyBase;
+using SdkDiskHealthStatus = DataWarehouse.SDK.Contracts.RAID.DiskHealthStatus;
 
 namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Adaptive
 {
@@ -11,7 +13,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Adaptive
     /// Adaptive RAID strategy that automatically adjusts RAID level based on workload
     /// patterns, I/O characteristics, and performance requirements.
     /// </summary>
-    public class AdaptiveRaidStrategy : RaidStrategyBase
+    public class AdaptiveRaidStrategy : SdkRaidStrategyBase
     {
         private RaidLevel _currentLevel;
         private readonly Dictionary<string, long> _workloadMetrics;
@@ -119,7 +121,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Adaptive
                 var chunks = new List<ReadOnlyMemory<byte>>();
                 foreach (var diskIndex in stripeInfo.DataDisks)
                 {
-                    if (diskList[diskIndex].HealthStatus == DiskHealthStatus.Healthy)
+                    if (diskList[diskIndex].HealthStatus == SdkDiskHealthStatus.Healthy)
                     {
                         // In production: var chunk = diskList[diskIndex].Read(offset, Capabilities.StripeSize)
                         chunks.Add(new byte[Capabilities.StripeSize]);
@@ -293,7 +295,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Adaptive
                 case RaidLevel.Raid6:
                     // Read from data disks, reconstruct from parity if needed
                     var position = 0;
-                    var failedDisks = disks.Where(d => d.HealthStatus != DiskHealthStatus.Healthy).ToList();
+                    var failedDisks = disks.Where(d => d.HealthStatus != SdkDiskHealthStatus.Healthy).ToList();
 
                     if (failedDisks.Count > 0)
                     {
@@ -301,7 +303,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Adaptive
                         var chunks = new List<ReadOnlyMemory<byte>>();
                         foreach (var diskIndex in stripeInfo.DataDisks)
                         {
-                            if (disks[diskIndex].HealthStatus == DiskHealthStatus.Healthy)
+                            if (disks[diskIndex].HealthStatus == SdkDiskHealthStatus.Healthy)
                             {
                                 // In production: chunks.Add(disks[diskIndex].Read(offset, stripeInfo.ChunkSize))
                             }
@@ -332,7 +334,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Adaptive
                         if (chunkSize <= 0) break;
 
                         var primaryDisk = disks[diskIndex];
-                        if (primaryDisk.HealthStatus == DiskHealthStatus.Healthy)
+                        if (primaryDisk.HealthStatus == SdkDiskHealthStatus.Healthy)
                         {
                             // In production: var chunk = disks[diskIndex].Read(offset, chunkSize)
                         }
@@ -435,7 +437,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Adaptive
     /// Self-Healing RAID strategy with AI-driven predictive failure detection,
     /// proactive rebuild, and automatic optimization.
     /// </summary>
-    public class SelfHealingRaidStrategy : RaidStrategyBase
+    public class SelfHealingRaidStrategy : SdkRaidStrategyBase
     {
         private readonly Dictionary<string, DiskHealthMetrics> _diskHealthHistory;
         private readonly Queue<DiskHealthMetrics> _predictionQueue;
@@ -531,7 +533,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Adaptive
                 var disk = diskList[diskIndex];
                 var chunkSize = Math.Min(stripeInfo.ChunkSize, length - position);
 
-                if (disk.HealthStatus == DiskHealthStatus.Healthy)
+                if (disk.HealthStatus == SdkDiskHealthStatus.Healthy)
                 {
                     // In production: var chunk = disk.Read(offset, chunkSize)
                     var chunk = new byte[chunkSize];
@@ -597,7 +599,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Adaptive
             // Rebuild critical blocks first, then remaining blocks
             var allBlocks = Enumerable.Range(0, (int)(totalBytes / Capabilities.StripeSize)).ToList();
             var sortedBlocks = criticalBlocks
-                .Concat(allBlocks.Where(b => !criticalBlocks.Contains(b)))
+                .Concat(allBlocks.Select(b => (long)b).Where(b => !criticalBlocks.Contains(b)))
                 .ToList();
 
             foreach (var blockIndex in sortedBlocks)
@@ -613,7 +615,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Adaptive
 
                 foreach (var diskIndex in stripeInfo.DataDisks)
                 {
-                    if (diskList[diskIndex].HealthStatus == DiskHealthStatus.Healthy)
+                    if (diskList[diskIndex].HealthStatus == SdkDiskHealthStatus.Healthy)
                     {
                         // In production: dataChunks.Add(diskList[diskIndex].Read(offset, Capabilities.StripeSize))
                         dataChunks.Add(new byte[Capabilities.StripeSize]);
@@ -795,7 +797,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Adaptive
             for (int i = 0; i < stripeInfo.DataDisks.Length; i++)
             {
                 var diskIndex = stripeInfo.DataDisks[i];
-                if (failedIndices.Contains(i) || disks[diskIndex].HealthStatus != DiskHealthStatus.Healthy)
+                if (failedIndices.Contains(i) || disks[diskIndex].HealthStatus != SdkDiskHealthStatus.Healthy)
                 {
                     dataChunks.Add(null);
                 }
@@ -897,7 +899,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Adaptive
                 temp <<= 1;
 
                 if (highBitSet)
-                    temp ^= 0x11D; // Different primitive polynomial for diversity
+                    temp ^= 0x1D; // Primitive polynomial x^8 + x^4 + x^3 + x^2 + 1 (reduced mod x^8)
 
                 b >>= 1;
             }
@@ -938,9 +940,9 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Adaptive
                 byte value = pParity[i];
                 for (int j = 0; j < dataChunks.Count; j++)
                 {
-                    if (j != missingIndex && dataChunks[j].HasValue)
+                    if (j != missingIndex && dataChunks[j] is { } chunk)
                     {
-                        value ^= dataChunks[j].Value.Span[i];
+                        value ^= chunk.Span[i];
                     }
                 }
                 reconstructed[i] = value;
@@ -977,7 +979,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Adaptive
     /// Tiered RAID strategy combining SSDs and HDDs with automatic data tiering
     /// based on access patterns and temperature.
     /// </summary>
-    public class TieredRaidStrategy : RaidStrategyBase
+    public class TieredRaidStrategy : SdkRaidStrategyBase
     {
         private readonly Dictionary<long, AccessPattern> _accessPatterns;
         private DateTime _lastTieringOperation;
@@ -1057,7 +1059,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Adaptive
                 if (chunkSize <= 0) break;
 
                 var disk = tierDisks[diskIndex];
-                if (disk.HealthStatus == DiskHealthStatus.Healthy)
+                if (disk.HealthStatus == SdkDiskHealthStatus.Healthy)
                 {
                     // In production: var chunk = disk.Read(offset, chunkSize)
                     // Read performance varies by tier:
@@ -1129,7 +1131,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Adaptive
                 var dataChunks = new List<ReadOnlyMemory<byte>>();
                 foreach (var diskIndex in stripeInfo.DataDisks)
                 {
-                    if (tierDisks[diskIndex].HealthStatus == DiskHealthStatus.Healthy)
+                    if (tierDisks[diskIndex].HealthStatus == SdkDiskHealthStatus.Healthy)
                     {
                         // In production: dataChunks.Add(tierDisks[diskIndex].Read(offset, Capabilities.StripeSize))
                         dataChunks.Add(new byte[Capabilities.StripeSize]);
@@ -1374,7 +1376,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Adaptive
 
             foreach (var diskIndex in stripeInfo.DataDisks)
             {
-                if (diskIndex != failedDiskIndex && disks[diskIndex].HealthStatus == DiskHealthStatus.Healthy)
+                if (diskIndex != failedDiskIndex && disks[diskIndex].HealthStatus == SdkDiskHealthStatus.Healthy)
                 {
                     // In production: var chunk = disks[diskIndex].Read(offset, length)
                     var chunk = new byte[length];
@@ -1408,7 +1410,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Adaptive
     /// Matrix RAID strategy partitioning disks for multiple simultaneous RAID levels,
     /// allowing different performance/redundancy profiles on the same disk set.
     /// </summary>
-    public class MatrixRaidStrategy : RaidStrategyBase
+    public class MatrixRaidStrategy : SdkRaidStrategyBase
     {
         private readonly Dictionary<string, RaidPartition> _partitions;
 
@@ -1496,7 +1498,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Adaptive
                         if (chunkSize <= 0) break;
 
                         var disk = diskList[diskIndex];
-                        if (disk.HealthStatus == DiskHealthStatus.Healthy)
+                        if (disk.HealthStatus == SdkDiskHealthStatus.Healthy)
                         {
                             // In production: var chunk = ReadFromPartitionZone(disk, partition, offset, chunkSize)
                             var chunk = new byte[chunkSize];
@@ -1522,7 +1524,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Adaptive
                     foreach (var diskIndex in stripeInfo.DataDisks)
                     {
                         var disk = diskList[diskIndex];
-                        if (disk.HealthStatus == DiskHealthStatus.Healthy)
+                        if (disk.HealthStatus == SdkDiskHealthStatus.Healthy)
                         {
                             // In production: var chunk = ReadFromPartitionZone(disk, partition, offset, stripeInfo.ChunkSize)
                             chunks.Add(new byte[stripeInfo.ChunkSize]);
@@ -1606,7 +1608,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Adaptive
                             var dataChunks = new List<ReadOnlyMemory<byte>>();
                             foreach (var diskIndex in stripeInfo.DataDisks)
                             {
-                                if (diskList[diskIndex].HealthStatus == DiskHealthStatus.Healthy)
+                                if (diskList[diskIndex].HealthStatus == SdkDiskHealthStatus.Healthy)
                                 {
                                     // In production: dataChunks.Add(diskList[diskIndex].Read(offset, Capabilities.StripeSize))
                                     dataChunks.Add(new byte[Capabilities.StripeSize]);
@@ -1868,7 +1870,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Adaptive
             for (int i = 0; i < stripeInfo.DataDisks.Length; i++)
             {
                 var diskIndex = stripeInfo.DataDisks[i];
-                if (!failedDiskIndices.Contains(diskIndex) && disks[diskIndex].HealthStatus == DiskHealthStatus.Healthy)
+                if (!failedDiskIndices.Contains(diskIndex) && disks[diskIndex].HealthStatus == SdkDiskHealthStatus.Healthy)
                 {
                     // In production: var chunk = ReadFromPartitionZone(disks[diskIndex], partition, offset, chunkSize)
                     healthyChunks[diskIndex] = new byte[chunkSize];
