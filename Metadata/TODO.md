@@ -7189,33 +7189,33 @@ Example: A manufacturing company deploys a blank model. Over 6 months:
 | 91.B1.6 | RAID 5 Strategy | Block-level striping with distributed parity | [x] |
 | 91.B1.7 | RAID 6 Strategy | Block-level striping with double parity (P+Q) | [x] |
 | **B2: Nested RAID Levels** |
-| 91.B2.1 | RAID 10 Strategy | Mirror + Stripe | [ ] |
-| 91.B2.2 | RAID 01 Strategy | Stripe + Mirror | [ ] |
+| 91.B2.1 | RAID 10 Strategy | Mirror + Stripe | [x] |
+| 91.B2.2 | RAID 01 Strategy | Stripe + Mirror | [x] |
 | 91.B2.3 | RAID 03 Strategy | Stripe + Dedicated Parity | [x] |
-| 91.B2.4 | RAID 50 Strategy | Stripe + RAID 5 | [ ] |
-| 91.B2.5 | RAID 60 Strategy | Stripe + RAID 6 | [ ] |
-| 91.B2.6 | RAID 100 Strategy | Mirror + Stripe + Mirror | [ ] |
+| 91.B2.4 | RAID 50 Strategy | Stripe + RAID 5 | [x] |
+| 91.B2.5 | RAID 60 Strategy | Stripe + RAID 6 | [x] |
+| 91.B2.6 | RAID 100 Strategy | Mirror + Stripe + Mirror | [x] |
 | **B3: Enhanced RAID Levels** |
-| 91.B3.1 | RAID 1E Strategy | Interleaved mirroring | [ ] |
-| 91.B3.2 | RAID 5E Strategy | RAID 5 with integrated spare | [ ] |
-| 91.B3.3 | RAID 5EE Strategy | RAID 5E with distributed spare | [ ] |
-| 91.B3.4 | RAID 6E Strategy | RAID 6 with integrated spare | [ ] |
+| 91.B3.1 | RAID 1E Strategy | Interleaved mirroring | [x] |
+| 91.B3.2 | RAID 5E Strategy | RAID 5 with integrated spare | [x] |
+| 91.B3.3 | RAID 5EE Strategy | RAID 5E with distributed spare | [x] |
+| 91.B3.4 | RAID 6E Strategy | RAID 6 with integrated spare | [x] |
 | **B4: ZFS-Style RAID (RAID-Z)** |
-| 91.B4.1 | RAID-Z1 Strategy | Single parity with variable stripe | [ ] |
-| 91.B4.2 | RAID-Z2 Strategy | Double parity with variable stripe | [ ] |
-| 91.B4.3 | RAID-Z3 Strategy | Triple parity with variable stripe | [ ] |
-| 91.B4.4 | Copy-on-Write Engine | ZFS-style CoW for atomic writes | [ ] |
-| 91.B4.5 | End-to-End Checksums | SHA256/Blake2b/Blake3 verification | [ ] |
+| 91.B4.1 | RAID-Z1 Strategy | Single parity with variable stripe | [x] |
+| 91.B4.2 | RAID-Z2 Strategy | Double parity with variable stripe | [x] |
+| 91.B4.3 | RAID-Z3 Strategy | Triple parity with variable stripe | [x] |
+| 91.B4.4 | Copy-on-Write Engine | ZFS-style CoW for atomic writes | [x] |
+| 91.B4.5 | End-to-End Checksums | SHA256/Blake2b/Blake3 verification | [x] |
 | **B5: Vendor-Specific RAID** |
-| 91.B5.1 | NetApp RAID DP | Diagonal parity (double parity) | [ ] |
-| 91.B5.2 | Synology SHR | Hybrid RAID (mixed disk sizes) | [ ] |
+| 91.B5.1 | NetApp RAID DP | Diagonal parity (double parity) | [x] |
+| 91.B5.2 | Synology SHR | Hybrid RAID (mixed disk sizes) | [x] |
 | 91.B5.3 | StorageTek RAID 7 | Asynchronous + caching | [x] |
 | 91.B5.4 | FlexRAID FR | Snapshot-based parity | [x] |
-| 91.B5.5 | Unraid Parity | Single/dual parity with independent disks | [ ] |
+| 91.B5.5 | Unraid Parity | Single/dual parity with independent disks | [x] |
 | **B6: Extended RAID Modes** |
 | 91.B6.1 | RAID 71/72 Strategy | Multi-parity variants | [x] |
 | 91.B6.2 | N-way Mirror | 3+ way mirroring | [x] |
-| 91.B6.3 | Matrix RAID | Intel Matrix Storage Technology | [ ] |
+| 91.B6.3 | Matrix RAID | Intel Matrix Storage Technology | [x] |
 | 91.B6.4 | JBOD Strategy | Just a Bunch of Disks (concatenation) | [x] |
 | 91.B6.5 | Crypto RAID | Encrypted RAID with per-disk keys | [x] |
 | 91.B6.6 | DUP/DDP Strategy | Data/Distributed Data Protection | [x] |
@@ -7223,8 +7223,8 @@ Example: A manufacturing company deploys a blank model. Over 6 months:
 | 91.B6.8 | MAID Strategy | Massive Array of Idle Disks (power saving) | [x] |
 | 91.B6.9 | Linear Strategy | Linear concatenation | [x] |
 | **B7: Erasure Coding Strategies** |
-| 91.B7.1 | Reed-Solomon Strategy | (k,m) configurable erasure coding | [ ] |
-| 91.B7.2 | LRC Strategy | Local Reconstruction Codes (Azure-style) | [ ] |
+| 91.B7.1 | Reed-Solomon Strategy | (k,m) configurable erasure coding | [x] |
+| 91.B7.2 | LRC Strategy | Local Reconstruction Codes (Azure-style) | [x] |
 | 91.B7.3 | LDPC Strategy | Low-Density Parity-Check codes | [x] |
 | 91.B7.4 | Fountain Codes | Rateless erasure codes | [x] |
 
