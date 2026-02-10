@@ -2015,81 +2015,81 @@ READ REQUEST (ObjectGuid, ReadMode)
 **Recovery Behaviors (User-Configurable):**
 | Task | Description | Dependencies | Status |
 |------|-------------|--------------|--------|
-| T4.1 | Implement `TamperRecoveryBehavior` enum and configuration | T3.* | [ ] |
-| T4.1.1 | ↳ `AutoRecoverSilent`: Recover from WORM, log internally only | T4.1 | [ ] |
-| T4.1.2 | ↳ `AutoRecoverWithReport`: Recover + generate incident report | T4.1 | [ ] |
-| T4.1.3 | ↳ `AlertAndWait`: Notify admin, block reads until resolved | T4.1 | [ ] |
-| T4.1.4 | ↳ `ManualOnly`: Never auto-recover, require explicit admin action | T4.1 | [ ] |
-| T4.1.5 | ↳ `FailClosed`: Reject all operations on tamper detection | T4.1 | [ ] |
-| T4.2 | Implement `RecoverFromWormAsync` manual recovery | T4.1 | [ ] |
+| T4.1 | Implement `TamperRecoveryBehavior` enum and configuration | T3.* | [x] |
+| T4.1.1 | ↳ `AutoRecoverSilent`: Recover from WORM, log internally only | T4.1 | [x] |
+| T4.1.2 | ↳ `AutoRecoverWithReport`: Recover + generate incident report | T4.1 | [x] |
+| T4.1.3 | ↳ `AlertAndWait`: Notify admin, block reads until resolved | T4.1 | [x] |
+| T4.1.4 | ↳ `ManualOnly`: Never auto-recover, require explicit admin action | T4.1 | [x] |
+| T4.1.5 | ↳ `FailClosed`: Reject all operations on tamper detection | T4.1 | [x] |
+| T4.2 | Implement `RecoverFromWormAsync` manual recovery | T4.1 | [x] |
 
 **Append-Only Corrections:**
 | Task | Description | Dependencies | Status |
 |------|-------------|--------------|--------|
-| T4.3 | Implement `SecureCorrectAsync` (append-only corrections) | T4.2 | [ ] |
-| T4.3.1 | ↳ Create new version, never delete original | T4.3 | [ ] |
-| T4.3.2 | ↳ Link new version to superseded version in manifest | T4.3 | [ ] |
-| T4.3.3 | ↳ Anchor correction in blockchain with supersedes reference | T4.3 | [ ] |
-| T4.4 | Implement `AuditAsync` with full chain verification | T4.3 | [ ] |
+| T4.3 | Implement `SecureCorrectAsync` (append-only corrections) | T4.2 | [x] |
+| T4.3.1 | ↳ Create new version, never delete original | T4.3 | [x] |
+| T4.3.2 | ↳ Link new version to superseded version in manifest | T4.3 | [x] |
+| T4.3.3 | ↳ Anchor correction in blockchain with supersedes reference | T4.3 | [x] |
+| T4.4 | Implement `AuditAsync` with full chain verification | T4.3 | [x] |
 
 **Seal Mechanism & Instance State:**
 | Task | Description | Dependencies | Status |
 |------|-------------|--------------|--------|
-| T4.5 | Implement seal mechanism (lock structural config after first write) | T4.4 | [ ] |
-| T4.5.1 | ↳ Lock: Storage instances, RAID config, hash algorithm, blockchain mode | T4.5 | [ ] |
-| T4.5.2 | ↳ Allow: Recovery behavior, read mode, logging, alerts | T4.5 | [ ] |
-| T4.5.3 | ↳ Persist seal state and validate on startup | T4.5 | [ ] |
-| T4.6 | Implement instance degradation state machine | T4.5 | [ ] |
-| T4.6.1 | ↳ State transitions and event notifications | T4.6 | [ ] |
-| T4.6.2 | ↳ Automatic state detection based on provider health | T4.6 | [ ] |
-| T4.6.3 | ↳ Admin override for manual state changes | T4.6 | [ ] |
+| T4.5 | Implement seal mechanism (lock structural config after first write) | T4.4 | [x] |
+| T4.5.1 | ↳ Lock: Storage instances, RAID config, hash algorithm, blockchain mode | T4.5 | [x] |
+| T4.5.2 | ↳ Allow: Recovery behavior, read mode, logging, alerts | T4.5 | [x] |
+| T4.5.3 | ↳ Persist seal state and validate on startup | T4.5 | [x] |
+| T4.6 | Implement instance degradation state machine | T4.5 | [x] |
+| T4.6.1 | ↳ State transitions and event notifications | T4.6 | [x] |
+| T4.6.2 | ↳ Automatic state detection based on provider health | T4.6 | [x] |
+| T4.6.3 | ↳ Admin override for manual state changes | T4.6 | [x] |
 
 **Blockchain Consensus Modes:**
 | Task | Description | Dependencies | Status |
 |------|-------------|--------------|--------|
-| T4.7 | Implement `BlockchainMode` enum and mode selection | T4.6 | [ ] |
-| T4.7.1 | ↳ `SingleWriter`: Local file-based chain, single instance | T4.7 | [ ] |
-| T4.7.2 | ↳ `RaftConsensus`: Multi-node consensus, majority required | T4.7 | [ ] |
-| T4.7.3 | ↳ `ExternalAnchor`: Periodic anchoring to public blockchain | T4.7 | [ ] |
-| T4.8 | Implement blockchain batching (N objects or T seconds) | T4.7 | [ ] |
-| T4.8.1 | ↳ Merkle root calculation for batched anchors | T4.8 | [ ] |
+| T4.7 | Implement `BlockchainMode` enum and mode selection | T4.6 | [x] |
+| T4.7.1 | ↳ `SingleWriter`: Local file-based chain, single instance | T4.7 | [x] |
+| T4.7.2 | ↳ `RaftConsensus`: Multi-node consensus, majority required | T4.7 | [x] |
+| T4.7.3 | ↳ `ExternalAnchor`: Periodic anchoring to public blockchain | T4.7 | [x] |
+| T4.8 | Implement blockchain batching (N objects or T seconds) | T4.7 | [x] |
+| T4.8.1 | ↳ Merkle root calculation for batched anchors | T4.8 | [x] |
 
 **WORM Provider Wrapping (Any Storage Provider):**
 | Task | Description | Dependencies | Status |
 |------|-------------|--------------|--------|
-| T4.9 | Implement `IWormWrapper` interface for wrapping any `IStorageProvider` | T4.8 | [ ] |
-| T4.9.1 | ↳ Software immutability wrapper (admin bypass with logging) | T4.9 | [ ] |
-| T4.9.2 | ↳ Hardware integration detection (S3 Object Lock, Azure Immutable) | T4.9 | [ ] |
-| T4.10 | Implement `S3ObjectLockWormPlugin` (AWS S3 Object Lock) | T4.9 | [ ] |
-| T4.11 | Implement `AzureImmutableBlobWormPlugin` (Azure Immutable Blob) | T4.10 | [ ] |
+| T4.9 | Implement `IWormWrapper` interface for wrapping any `IStorageProvider` | T4.8 | [x] |
+| T4.9.1 | ↳ Software immutability wrapper (admin bypass with logging) | T4.9 | [x] |
+| T4.9.2 | ↳ Hardware integration detection (S3 Object Lock, Azure Immutable) | T4.9 | [x] |
+| T4.10 | Implement `S3ObjectLockWormPlugin` (AWS S3 Object Lock) | T4.9 | [x] |
+| T4.11 | Implement `AzureImmutableBlobWormPlugin` (Azure Immutable Blob) | T4.10 | [x] |
 
 **Padding Configuration (User-Configurable):**
 | Task | Description | Dependencies | Status |
 |------|-------------|--------------|--------|
-| T4.12 | Implement `ContentPaddingMode` configuration | T4.11 | [ ] |
-| T4.12.1 | ↳ `None`: No padding | T4.12 | [ ] |
-| T4.12.2 | ↳ `SecureRandom`: Cryptographically secure random bytes | T4.12 | [ ] |
-| T4.12.3 | ↳ `Chaff`: Plausible-looking dummy data | T4.12 | [ ] |
-| T4.12.4 | ↳ `FixedSize`: Pad to fixed block size (e.g., 4KB, 64KB) | T4.12 | [ ] |
-| T4.13 | Implement `ShardPaddingMode` configuration | T4.12 | [ ] |
-| T4.13.1 | ↳ `None`: Variable shard sizes | T4.13 | [ ] |
-| T4.13.2 | ↳ `UniformSize`: Pad to largest shard size | T4.13 | [ ] |
-| T4.13.3 | ↳ `FixedBlock`: Pad to configured block boundary | T4.13 | [ ] |
+| T4.12 | Implement `ContentPaddingMode` configuration | T4.11 | [x] |
+| T4.12.1 | ↳ `None`: No padding | T4.12 | [x] |
+| T4.12.2 | ↳ `SecureRandom`: Cryptographically secure random bytes | T4.12 | [x] |
+| T4.12.3 | ↳ `Chaff`: Plausible-looking dummy data | T4.12 | [x] |
+| T4.12.4 | ↳ `FixedSize`: Pad to fixed block size (e.g., 4KB, 64KB) | T4.12 | [x] |
+| T4.13 | Implement `ShardPaddingMode` configuration | T4.12 | [x] |
+| T4.13.1 | ↳ `None`: Variable shard sizes | T4.13 | [x] |
+| T4.13.2 | ↳ `UniformSize`: Pad to largest shard size | T4.13 | [x] |
+| T4.13.3 | ↳ `FixedBlock`: Pad to configured block boundary | T4.13 | [x] |
 
 **Transactional Writes with Atomicity:**
 | Task | Description | Dependencies | Status |
 |------|-------------|--------------|--------|
-| T4.14 | Implement `TransactionalWriteManager` with atomicity guarantee | T4.13 | [ ] |
-| T4.14.1 | ↳ Write ordering: Data → Metadata → WORM → Blockchain queue | T4.14 | [ ] |
-| T4.14.2 | ↳ Implement `TransactionFailureBehavior` enum | T4.14 | [ ] |
-| T4.14.3 | ↳ Implement `TransactionFailurePhase` enum | T4.14 | [ ] |
-| T4.14.4 | ↳ Rollback on failure: Data, Metadata (WORM orphaned) | T4.14 | [ ] |
-| T4.14.5 | ↳ Implement `OrphanedWormRecord` structure | T4.14 | [ ] |
-| T4.14.6 | ↳ Implement `OrphanStatus` enum | T4.14 | [ ] |
-| T4.14.7 | ↳ WORM orphan tracking registry | T4.14 | [ ] |
-| T4.14.8 | ↳ Background orphan cleanup job (compliance-aware) | T4.14 | [ ] |
-| T4.14.9 | ↳ Orphan recovery mechanism (link to retry) | T4.14 | [ ] |
-| T4.14.10 | ↳ Transaction timeout and retry configuration | T4.14 | [ ] |
+| T4.14 | Implement `TransactionalWriteManager` with atomicity guarantee | T4.13 | [x] |
+| T4.14.1 | ↳ Write ordering: Data → Metadata → WORM → Blockchain queue | T4.14 | [x] |
+| T4.14.2 | ↳ Implement `TransactionFailureBehavior` enum | T4.14 | [x] |
+| T4.14.3 | ↳ Implement `TransactionFailurePhase` enum | T4.14 | [x] |
+| T4.14.4 | ↳ Rollback on failure: Data, Metadata (WORM orphaned) | T4.14 | [x] |
+| T4.14.5 | ↳ Implement `OrphanedWormRecord` structure | T4.14 | [x] |
+| T4.14.6 | ↳ Implement `OrphanStatus` enum | T4.14 | [x] |
+| T4.14.7 | ↳ WORM orphan tracking registry | T4.14 | [x] |
+| T4.14.8 | ↳ Background orphan cleanup job (compliance-aware) | T4.14 | [x] |
+| T4.14.9 | ↳ Orphan recovery mechanism (link to retry) | T4.14 | [x] |
+| T4.14.10 | ↳ Transaction timeout and retry configuration | T4.14 | [x] |
 
 **TransactionFailureBehavior Enum:**
 | Value | Description |
@@ -2143,7 +2143,7 @@ public record OrphanedWormRecord
 **Background Operations:**
 | Task | Description | Dependencies | Status |
 |------|-------------|--------------|--------|
-| T4.15 | Implement background integrity scanner (configurable intervals) | T4.14 | [ ] |
+| T4.15 | Implement background integrity scanner (configurable intervals) | T4.14 | [x] |
 
 **Additional Integrity Algorithms:**
 | Task | Description | Dependencies | Status |
