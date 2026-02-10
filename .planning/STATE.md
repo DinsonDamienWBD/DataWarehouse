@@ -69,6 +69,7 @@ Recent decisions affecting current work:
 - [Phase 02]: T92.B3 verified -- 4 BWT/transform strategies (Brotli, Bzip2, BWT, MTF) all production-ready; Intelligence fallback not applicable at strategy level
 - [Phase 02]: T92.B8-B9 + T92.C verified -- 10 archive+specialty strategies and 8 advanced features production-ready; AI fallback via IntelligenceAwarePluginBase confirmed
 - [Phase 02]: T92.D migration verified -- 59 strategies with SDK-only isolation; 6 old plugins deprecated with migration guide; D4 file deletion deferred to Phase 18
+- [Phase 02]: T91.E/F/G verified -- 12 AI optimization classes with rule-based fallbacks, TieredRaidStrategy (SSD/NVMe/auto-tiering), ParallelParityCalculator + SimdParityEngine using Vector<T>; 18 items synced in TODO.md
 
 ### Pending Todos
 
