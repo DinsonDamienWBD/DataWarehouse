@@ -3334,7 +3334,7 @@ For each new ENCRYPTION plugin:
 
 | Task | Description | Dependencies | Status |
 |------|-------------|--------------|--------|
-| **T5.0** | **SDK Base Classes and Plugin Refactoring** | None | [ ] |
+| **T5.0** | **SDK Base Classes and Plugin Refactoring** | None | [x] |
 | T5.0.1 | SDK Key Management Types (enums, interfaces, classes incl. EncryptionConfigMode) | - | [x] |
 | T5.0.2 | `KeyStorePluginBase` abstract class | T5.0.1 | [x] |
 | T5.0.3 | `EncryptionPluginBase` abstract class | T5.0.1 | [x] |
@@ -8064,10 +8064,10 @@ T95 focuses on **authorization and access control** - determining WHO can access
 
 | Sub-Task | Description | Status |
 |----------|-------------|--------|
-| A1 | Add ISecurityStrategy interface to SDK | [ ] |
-| A2 | Add SecurityDomain enum | [ ] |
-| A3 | Add SecurityContext for evaluation | [ ] |
-| A4 | Add SecurityDecision result types | [ ] |
+| A1 | Add ISecurityStrategy interface to SDK | [x] |
+| A2 | Add SecurityDomain enum | [x] |
+| A3 | Add SecurityContext for evaluation | [x] |
+| A4 | Add SecurityDecision result types | [x] |
 | A5 | Add ZeroTrust policy framework | [ ] |
 | A6 | Add threat detection abstractions | [ ] |
 | A7 | Add integrity verification framework | [ ] |
