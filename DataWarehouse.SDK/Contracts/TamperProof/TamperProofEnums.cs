@@ -48,7 +48,13 @@ public enum HashAlgorithmType
     HMAC_SHA512,
 
     /// <summary>HMAC-SHA3-256 keyed hash algorithm (256-bit output).</summary>
-    HMAC_SHA3_256
+    HMAC_SHA3_256,
+
+    /// <summary>HMAC-SHA3-384 keyed hash algorithm (384-bit output).</summary>
+    HMAC_SHA3_384,
+
+    /// <summary>HMAC-SHA3-512 keyed hash algorithm (512-bit output).</summary>
+    HMAC_SHA3_512
 }
 
 /// <summary>
