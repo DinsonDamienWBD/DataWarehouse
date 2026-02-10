@@ -1980,28 +1980,28 @@ READ REQUEST (ObjectGuid, ReadMode)
 
 | Task | Description | Dependencies | Status |
 |------|-------------|--------------|--------|
-| T3.1 | Implement Phase 1 read (manifest retrieval) | T2.* | [ ] |
-| T3.2 | Implement Phase 2 read (shard retrieval + reconstruction) | T3.1 | [ ] |
-| T3.2.1 | ↳ Load required shards from Data Instance | T3.2 | [ ] |
-| T3.2.2 | ↳ Verify individual shard hashes | T3.2 | [ ] |
-| T3.2.3 | ↳ Reconstruct original blob (Reed-Solomon if needed) | T3.2 | [ ] |
-| T3.2.4 | ↳ Strip shard padding (if applied) | T3.2 | [ ] |
-| T3.3 | Implement Phase 3 read (integrity verification by ReadMode) | T3.2 | [ ] |
-| T3.3.1 | ↳ Implement `ReadMode.Fast` (skip verification, trust shard hashes) | T3.3 | [ ] |
-| T3.3.2 | ↳ Implement `ReadMode.Verified` (compute hash, compare to manifest) | T3.3 | [ ] |
-| T3.3.3 | ↳ Implement `ReadMode.Audit` (full chain + blockchain + access log) | T3.3 | [ ] |
-| T3.4 | Implement Phase 4 read (reverse transformations) | T3.3 | [ ] |
-| T3.4.1 | ↳ Strip content padding (if applied) | T3.4 | [ ] |
-| T3.4.2 | ↳ Decrypt (if encrypted) | T3.4, **T5.0** | [ ] |
-| T3.4.3 | ↳ Decompress (if compressed) | T3.4 | [ ] |
-| T3.5 | Implement Phase 5 read (tamper response) | T3.4 | [ ] |
-| T3.6 | Implement `SecureReadAsync` with all ReadModes | T3.5 | [ ] |
-| T3.7 | Implement tamper detection and incident creation | T3.6 | [ ] |
-| T3.8 | Implement tamper attribution analysis | T3.7, T1.8 | [ ] |
-| T3.8.1 | ↳ Correlate access logs with tampering window | T3.8 | [ ] |
-| T3.8.2 | ↳ Identify suspect principals (single/multiple/none) | T3.8 | [ ] |
-| T3.8.3 | ↳ Detect access log tampering (sophisticated attack) | T3.8 | [ ] |
-| T3.9 | Implement `GetTamperIncidentAsync` with attribution | T3.8 | [ ] |
+| T3.1 | Implement Phase 1 read (manifest retrieval) | T2.* | [x] |
+| T3.2 | Implement Phase 2 read (shard retrieval + reconstruction) | T3.1 | [x] |
+| T3.2.1 | ↳ Load required shards from Data Instance | T3.2 | [x] |
+| T3.2.2 | ↳ Verify individual shard hashes | T3.2 | [x] |
+| T3.2.3 | ↳ Reconstruct original blob (Reed-Solomon if needed) | T3.2 | [x] |
+| T3.2.4 | ↳ Strip shard padding (if applied) | T3.2 | [x] |
+| T3.3 | Implement Phase 3 read (integrity verification by ReadMode) | T3.2 | [x] |
+| T3.3.1 | ↳ Implement `ReadMode.Fast` (skip verification, trust shard hashes) | T3.3 | [x] |
+| T3.3.2 | ↳ Implement `ReadMode.Verified` (compute hash, compare to manifest) | T3.3 | [x] |
+| T3.3.3 | ↳ Implement `ReadMode.Audit` (full chain + blockchain + access log) | T3.3 | [x] |
+| T3.4 | Implement Phase 4 read (reverse transformations) | T3.3 | [x] |
+| T3.4.1 | ↳ Strip content padding (if applied) | T3.4 | [x] |
+| T3.4.2 | ↳ Decrypt (if encrypted) | T3.4, **T5.0** | [x] |
+| T3.4.3 | ↳ Decompress (if compressed) | T3.4 | [x] |
+| T3.5 | Implement Phase 5 read (tamper response) | T3.4 | [x] |
+| T3.6 | Implement `SecureReadAsync` with all ReadModes | T3.5 | [x] |
+| T3.7 | Implement tamper detection and incident creation | T3.6 | [x] |
+| T3.8 | Implement tamper attribution analysis | T3.7, T1.8 | [x] |
+| T3.8.1 | ↳ Correlate access logs with tampering window | T3.8 | [x] |
+| T3.8.2 | ↳ Identify suspect principals (single/multiple/none) | T3.8 | [x] |
+| T3.8.3 | ↳ Detect access log tampering (sophisticated attack) | T3.8 | [x] |
+| T3.9 | Implement `GetTamperIncidentAsync` with attribution | T3.8 | [x] |
 
 **Read Modes:**
 | Mode | Verification Level | Use Case |
