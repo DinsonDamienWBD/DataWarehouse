@@ -614,6 +614,196 @@ public class HmacSha3_256Provider : IHashProvider
     }
 }
 
+/// <summary>
+/// HMAC-SHA3-384 provider using BouncyCastle.
+/// Provides keyed hash authentication using SHA3-384.
+/// </summary>
+public class HmacSha3_384Provider : IHashProvider
+{
+    private readonly byte[] _key;
+    private const int BlockSize = 104; // SHA3-384 block size (rate) in bytes: (1600 - 2*384) / 8
+
+    /// <summary>
+    /// Initializes a new HMAC-SHA3-384 provider with the specified key.
+    /// </summary>
+    /// <param name="key">The secret key for HMAC computation.</param>
+    public HmacSha3_384Provider(byte[] key)
+    {
+        ArgumentNullException.ThrowIfNull(key);
+        if (key.Length == 0)
+            throw new ArgumentException("Key cannot be empty.", nameof(key));
+        _key = (byte[])key.Clone();
+    }
+
+    /// <inheritdoc />
+    public string AlgorithmName => "HMAC-SHA3-384";
+
+    /// <inheritdoc />
+    public int HashSizeBytes => 48;
+
+    /// <inheritdoc />
+    public byte[] ComputeHash(ReadOnlySpan<byte> data)
+    {
+        return ComputeHmac(data.ToArray());
+    }
+
+    /// <inheritdoc />
+    public byte[] ComputeHash(Stream data)
+    {
+        using var ms = new MemoryStream();
+        data.CopyTo(ms);
+        return ComputeHmac(ms.ToArray());
+    }
+
+    /// <inheritdoc />
+    public async Task<byte[]> ComputeHashAsync(Stream data, CancellationToken ct = default)
+    {
+        using var ms = new MemoryStream();
+        await data.CopyToAsync(ms, ct);
+        return ComputeHmac(ms.ToArray());
+    }
+
+    private byte[] ComputeHmac(byte[] message)
+    {
+        // HMAC = H((K' XOR opad) || H((K' XOR ipad) || message))
+        byte[] keyPrime;
+        if (_key.Length > BlockSize)
+        {
+            var digest = new Sha3Digest(384);
+            digest.BlockUpdate(_key, 0, _key.Length);
+            keyPrime = new byte[HashSizeBytes];
+            digest.DoFinal(keyPrime, 0);
+        }
+        else
+        {
+            keyPrime = new byte[BlockSize];
+            Array.Copy(_key, keyPrime, _key.Length);
+        }
+
+        var paddedKey = new byte[BlockSize];
+        Array.Copy(keyPrime, paddedKey, Math.Min(keyPrime.Length, BlockSize));
+
+        var iKeyPad = new byte[BlockSize];
+        var oKeyPad = new byte[BlockSize];
+        for (int i = 0; i < BlockSize; i++)
+        {
+            iKeyPad[i] = (byte)(paddedKey[i] ^ 0x36);
+            oKeyPad[i] = (byte)(paddedKey[i] ^ 0x5c);
+        }
+
+        // Inner hash: H((K' XOR ipad) || message)
+        var innerDigest = new Sha3Digest(384);
+        innerDigest.BlockUpdate(iKeyPad, 0, BlockSize);
+        innerDigest.BlockUpdate(message, 0, message.Length);
+        var innerHash = new byte[HashSizeBytes];
+        innerDigest.DoFinal(innerHash, 0);
+
+        // Outer hash: H((K' XOR opad) || innerHash)
+        var outerDigest = new Sha3Digest(384);
+        outerDigest.BlockUpdate(oKeyPad, 0, BlockSize);
+        outerDigest.BlockUpdate(innerHash, 0, innerHash.Length);
+        var result = new byte[HashSizeBytes];
+        outerDigest.DoFinal(result, 0);
+
+        return result;
+    }
+}
+
+/// <summary>
+/// HMAC-SHA3-512 provider using BouncyCastle.
+/// Provides keyed hash authentication using SHA3-512.
+/// </summary>
+public class HmacSha3_512Provider : IHashProvider
+{
+    private readonly byte[] _key;
+    private const int BlockSize = 72; // SHA3-512 block size (rate) in bytes: (1600 - 2*512) / 8
+
+    /// <summary>
+    /// Initializes a new HMAC-SHA3-512 provider with the specified key.
+    /// </summary>
+    /// <param name="key">The secret key for HMAC computation.</param>
+    public HmacSha3_512Provider(byte[] key)
+    {
+        ArgumentNullException.ThrowIfNull(key);
+        if (key.Length == 0)
+            throw new ArgumentException("Key cannot be empty.", nameof(key));
+        _key = (byte[])key.Clone();
+    }
+
+    /// <inheritdoc />
+    public string AlgorithmName => "HMAC-SHA3-512";
+
+    /// <inheritdoc />
+    public int HashSizeBytes => 64;
+
+    /// <inheritdoc />
+    public byte[] ComputeHash(ReadOnlySpan<byte> data)
+    {
+        return ComputeHmac(data.ToArray());
+    }
+
+    /// <inheritdoc />
+    public byte[] ComputeHash(Stream data)
+    {
+        using var ms = new MemoryStream();
+        data.CopyTo(ms);
+        return ComputeHmac(ms.ToArray());
+    }
+
+    /// <inheritdoc />
+    public async Task<byte[]> ComputeHashAsync(Stream data, CancellationToken ct = default)
+    {
+        using var ms = new MemoryStream();
+        await data.CopyToAsync(ms, ct);
+        return ComputeHmac(ms.ToArray());
+    }
+
+    private byte[] ComputeHmac(byte[] message)
+    {
+        // HMAC = H((K' XOR opad) || H((K' XOR ipad) || message))
+        byte[] keyPrime;
+        if (_key.Length > BlockSize)
+        {
+            var digest = new Sha3Digest(512);
+            digest.BlockUpdate(_key, 0, _key.Length);
+            keyPrime = new byte[HashSizeBytes];
+            digest.DoFinal(keyPrime, 0);
+        }
+        else
+        {
+            keyPrime = new byte[BlockSize];
+            Array.Copy(_key, keyPrime, _key.Length);
+        }
+
+        var paddedKey = new byte[BlockSize];
+        Array.Copy(keyPrime, paddedKey, Math.Min(keyPrime.Length, BlockSize));
+
+        var iKeyPad = new byte[BlockSize];
+        var oKeyPad = new byte[BlockSize];
+        for (int i = 0; i < BlockSize; i++)
+        {
+            iKeyPad[i] = (byte)(paddedKey[i] ^ 0x36);
+            oKeyPad[i] = (byte)(paddedKey[i] ^ 0x5c);
+        }
+
+        // Inner hash: H((K' XOR ipad) || message)
+        var innerDigest = new Sha3Digest(512);
+        innerDigest.BlockUpdate(iKeyPad, 0, BlockSize);
+        innerDigest.BlockUpdate(message, 0, message.Length);
+        var innerHash = new byte[HashSizeBytes];
+        innerDigest.DoFinal(innerHash, 0);
+
+        // Outer hash: H((K' XOR opad) || innerHash)
+        var outerDigest = new Sha3Digest(512);
+        outerDigest.BlockUpdate(oKeyPad, 0, BlockSize);
+        outerDigest.BlockUpdate(innerHash, 0, innerHash.Length);
+        var result = new byte[HashSizeBytes];
+        outerDigest.DoFinal(result, 0);
+
+        return result;
+    }
+}
+
 #endregion
 
 #region T4.19 - Salted Hash Variants
@@ -781,7 +971,9 @@ public static class HashProviderFactory
         "HMAC-SHA256",
         "HMAC-SHA384",
         "HMAC-SHA512",
-        "HMAC-SHA3-256"
+        "HMAC-SHA3-256",
+        "HMAC-SHA3-384",
+        "HMAC-SHA3-512"
     };
 
     /// <summary>
@@ -827,6 +1019,8 @@ public static class HashProviderFactory
             "SHA384" or "SHA-384" or "HMAC-SHA384" => new HmacSha384Provider(key),
             "SHA512" or "SHA-512" or "HMAC-SHA512" => new HmacSha512Provider(key),
             "SHA3-256" or "SHA3256" or "HMAC-SHA3-256" => new HmacSha3_256Provider(key),
+            "SHA3-384" or "SHA3384" or "HMAC-SHA3-384" => new HmacSha3_384Provider(key),
+            "SHA3-512" or "SHA3512" or "HMAC-SHA3-512" => new HmacSha3_512Provider(key),
             _ => throw new ArgumentException($"Unsupported HMAC algorithm: {algorithm}", nameof(algorithm))
         };
     }
@@ -872,6 +1066,8 @@ public static class HashProviderFactory
             "HMAC-SHA384" => true,
             "HMAC-SHA512" => true,
             "HMAC-SHA3-256" => true,
+            "HMAC-SHA3-384" => true,
+            "HMAC-SHA3-512" => true,
             _ => false
         };
     }
