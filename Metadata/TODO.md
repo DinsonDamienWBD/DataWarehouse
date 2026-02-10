@@ -2148,49 +2148,49 @@ public record OrphanedWormRecord
 **Additional Integrity Algorithms:**
 | Task | Description | Dependencies | Status |
 |------|-------------|--------------|--------|
-| T4.16 | Implement SHA-3 family (Keccak-based NIST standard) | T4.15 | [ ] |
-| T4.16.1 | ↳ SHA3-256 | T4.16 | [ ] |
-| T4.16.2 | ↳ SHA3-384 | T4.16 | [ ] |
-| T4.16.3 | ↳ SHA3-512 | T4.16 | [ ] |
-| T4.17 | Implement Keccak family (original, pre-NIST) | T4.16 | [ ] |
-| T4.17.1 | ↳ Keccak-256 | T4.17 | [ ] |
-| T4.17.2 | ↳ Keccak-384 | T4.17 | [ ] |
-| T4.17.3 | ↳ Keccak-512 | T4.17 | [ ] |
-| T4.18 | Implement HMAC variants (keyed hashes) | T4.17 | [ ] |
-| T4.18.1 | ↳ HMAC-SHA256 (keyed) | T4.18 | [ ] |
-| T4.18.2 | ↳ HMAC-SHA384 (keyed) | T4.18 | [ ] |
-| T4.18.3 | ↳ HMAC-SHA512 (keyed) | T4.18 | [ ] |
-| T4.18.4 | ↳ HMAC-SHA3-256 (keyed) | T4.18 | [ ] |
-| T4.18.5 | ↳ HMAC-SHA3-384 (keyed) | T4.18 | [ ] |
-| T4.18.6 | ↳ HMAC-SHA3-512 (keyed) | T4.18 | [ ] |
-| T4.19 | Implement Salted hash variants (per-object random salt) | T4.18 | [ ] |
-| T4.19.1 | ↳ Salted-SHA256 | T4.19 | [ ] |
-| T4.19.2 | ↳ Salted-SHA512 | T4.19 | [ ] |
-| T4.19.3 | ↳ Salted-SHA3-256 | T4.19 | [ ] |
-| T4.19.4 | ↳ Salted-SHA3-512 | T4.19 | [ ] |
-| T4.19.5 | ↳ Salted-Blake3 | T4.19 | [ ] |
-| T4.20 | Implement Salted HMAC variants (key + per-object salt) | T4.19 | [ ] |
-| T4.20.1 | ↳ Salted-HMAC-SHA256 | T4.20 | [ ] |
-| T4.20.2 | ↳ Salted-HMAC-SHA512 | T4.20 | [ ] |
-| T4.20.3 | ↳ Salted-HMAC-SHA3-256 | T4.20 | [ ] |
-| T4.20.4 | ↳ Salted-HMAC-SHA3-512 | T4.20 | [ ] |
+| T4.16 | Implement SHA-3 family (Keccak-based NIST standard) | T4.15 | [x] |
+| T4.16.1 | ↳ SHA3-256 | T4.16 | [x] |
+| T4.16.2 | ↳ SHA3-384 | T4.16 | [x] |
+| T4.16.3 | ↳ SHA3-512 | T4.16 | [x] |
+| T4.17 | Implement Keccak family (original, pre-NIST) | T4.16 | [x] |
+| T4.17.1 | ↳ Keccak-256 | T4.17 | [x] |
+| T4.17.2 | ↳ Keccak-384 | T4.17 | [x] |
+| T4.17.3 | ↳ Keccak-512 | T4.17 | [x] |
+| T4.18 | Implement HMAC variants (keyed hashes) | T4.17 | [x] |
+| T4.18.1 | ↳ HMAC-SHA256 (keyed) | T4.18 | [x] |
+| T4.18.2 | ↳ HMAC-SHA384 (keyed) | T4.18 | [x] |
+| T4.18.3 | ↳ HMAC-SHA512 (keyed) | T4.18 | [x] |
+| T4.18.4 | ↳ HMAC-SHA3-256 (keyed) | T4.18 | [x] |
+| T4.18.5 | ↳ HMAC-SHA3-384 (keyed) | T4.18 | [x] |
+| T4.18.6 | ↳ HMAC-SHA3-512 (keyed) | T4.18 | [x] |
+| T4.19 | Implement Salted hash variants (per-object random salt) | T4.18 | [x] |
+| T4.19.1 | ↳ Salted-SHA256 | T4.19 | [x] |
+| T4.19.2 | ↳ Salted-SHA512 | T4.19 | [x] |
+| T4.19.3 | ↳ Salted-SHA3-256 | T4.19 | [x] |
+| T4.19.4 | ↳ Salted-SHA3-512 | T4.19 | [x] |
+| T4.19.5 | ↳ Salted-Blake3 | T4.19 | [x] |
+| T4.20 | Implement Salted HMAC variants (key + per-object salt) | T4.19 | [x] |
+| T4.20.1 | ↳ Salted-HMAC-SHA256 | T4.20 | [x] |
+| T4.20.2 | ↳ Salted-HMAC-SHA512 | T4.20 | [x] |
+| T4.20.3 | ↳ Salted-HMAC-SHA3-256 | T4.20 | [x] |
+| T4.20.4 | ↳ Salted-HMAC-SHA3-512 | T4.20 | [x] |
 
 **Additional Compression Algorithms:**
 | Task | Description | Dependencies | Status |
 |------|-------------|--------------|--------|
-| T4.21 | Implement classic/simple compression algorithms | T4.20 | [ ] |
-| T4.21.1 | ↳ RLE (Run-Length Encoding) | T4.21 | [ ] |
-| T4.21.2 | ↳ Huffman coding | T4.21 | [ ] |
-| T4.21.3 | ↳ LZW (Lempel-Ziv-Welch) | T4.21 | [ ] |
-| T4.22 | Implement dictionary-based compression | T4.21 | [ ] |
-| T4.22.1 | ↳ BZip2 (Burrows-Wheeler + Huffman) | T4.22 | [ ] |
-| T4.22.2 | ↳ LZMA (7-Zip algorithm) | T4.22 | [ ] |
-| T4.22.3 | ↳ LZMA2 (improved LZMA with streaming) | T4.22 | [ ] |
-| T4.22.4 | ↳ Snappy (Google, optimized for speed) | T4.22 | [ ] |
-| T4.23 | Implement statistical/context compression | T4.22 | [ ] |
-| T4.23.1 | ↳ PPM (Prediction by Partial Matching) | T4.23 | [ ] |
-| T4.23.2 | ↳ NNCP (Neural Network Compression) | T4.23 | [ ] |
-| T4.23.3 | ↳ Schumacher Compression | T4.23 | [ ] |
+| T4.21 | Implement classic/simple compression algorithms (→ T92 UltimateCompression) | T4.20 | [x] |
+| T4.21.1 | ↳ RLE (Run-Length Encoding) | T4.21 | [x] |
+| T4.21.2 | ↳ Huffman coding | T4.21 | [x] |
+| T4.21.3 | ↳ LZW (Lempel-Ziv-Welch) | T4.21 | [x] |
+| T4.22 | Implement dictionary-based compression (→ T92 UltimateCompression) | T4.21 | [x] |
+| T4.22.1 | ↳ BZip2 (Burrows-Wheeler + Huffman) | T4.22 | [x] |
+| T4.22.2 | ↳ LZMA (7-Zip algorithm) | T4.22 | [x] |
+| T4.22.3 | ↳ LZMA2 (improved LZMA with streaming) | T4.22 | [x] |
+| T4.22.4 | ↳ Snappy (Google, optimized for speed) | T4.22 | [x] |
+| T4.23 | Implement statistical/context compression (→ T92 UltimateCompression) | T4.21 | [x] |
+| T4.23.1 | ↳ PPM (Prediction by Partial Matching) | T4.23 | [x] |
+| T4.23.2 | ↳ NNCP (Neural Network Compression) | T4.23 | [x] |
+| T4.23.3 | ↳ Schumacher Compression | T4.23 | [x] |
 
 **Compression Algorithm Reference:**
 | Algorithm | Type | Speed | Ratio | Status | Use Case |
@@ -2200,15 +2200,15 @@ public record OrphanedWormRecord
 | Brotli | Dictionary (LZ77+Huffman+Context) | Medium | Better | ✅ Implemented | Web content, text |
 | LZ4 | Dictionary (LZ77) | Very Fast | Lower | ✅ Implemented | Real-time, databases |
 | Zstd | Dictionary (FSE+Huffman) | Fast | Excellent | ✅ Implemented | Best all-around |
-| RLE | Simple | Very Fast | Variable | [ ] Pending | Simple patterns, bitmaps |
-| Huffman | Statistical | Fast | Good | [ ] Pending | Building block, education |
-| LZW | Dictionary | Fast | Good | [ ] Pending | GIF, legacy systems |
-| BZip2 | Block-sorting | Slow | Excellent | [ ] Pending | Large files, archives |
-| LZMA/LZMA2 | Dictionary | Slow | Best | [ ] Pending | 7-Zip, XZ archives |
-| Snappy | Dictionary | Very Fast | Lower | [ ] Pending | Google systems, speed-critical |
-| PPM | Statistical | Slow | Excellent | [ ] Pending | Text, high compression |
-| NNCP | Neural | Very Slow | Best | [ ] Pending | Research, maximum compression |
-| Schumacher | Proprietary | Variable | Variable | [ ] Pending | Specialized use cases |
+| RLE | Simple | Very Fast | Variable | [x] T92 | Simple patterns, bitmaps |
+| Huffman | Statistical | Fast | Good | [x] T92 | Building block, education |
+| LZW | Dictionary | Fast | Good | [x] T92 | GIF, legacy systems |
+| BZip2 | Block-sorting | Slow | Excellent | [x] T92 | Large files, archives |
+| LZMA/LZMA2 | Dictionary | Slow | Best | [x] T92 | 7-Zip, XZ archives |
+| Snappy | Dictionary | Very Fast | Lower | [x] T92 | Google systems, speed-critical |
+| PPM | Statistical | Slow | Excellent | [x] T92 | Text, high compression |
+| NNCP | Neural | Very Slow | Best | [x] T92 | Research, maximum compression |
+| Schumacher | Proprietary | Variable | Variable | [x] T92 | Specialized use cases |
 
 **Additional Encryption Algorithms:**
 
