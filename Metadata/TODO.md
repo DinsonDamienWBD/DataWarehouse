@@ -8068,9 +8068,9 @@ T95 focuses on **authorization and access control** - determining WHO can access
 | A2 | Add SecurityDomain enum | [x] |
 | A3 | Add SecurityContext for evaluation | [x] |
 | A4 | Add SecurityDecision result types | [x] |
-| A5 | Add ZeroTrust policy framework | [ ] |
-| A6 | Add threat detection abstractions | [ ] |
-| A7 | Add integrity verification framework | [ ] |
+| A5 | Add ZeroTrust policy framework | [x] |
+| A6 | Add threat detection abstractions | [x] |
+| A7 | Add integrity verification framework | [x] |
 | A8 | Unit tests for SDK security infrastructure | [ ] |
 
 ### Phase B: Core Plugin Implementation - ALL Security Features

@@ -814,4 +814,746 @@ namespace DataWarehouse.SDK.Contracts.Security
             Interlocked.Increment(ref _errorCount);
         }
     }
+
+    #region T95.A5 — ZeroTrust Policy Framework
+
+    /// <summary>
+    /// Zero trust security principles that guide policy evaluation.
+    /// Based on NIST SP 800-207 Zero Trust Architecture.
+    /// </summary>
+    public enum ZeroTrustPrinciple
+    {
+        /// <summary>
+        /// Never trust any request implicitly; always verify identity, device, and context.
+        /// </summary>
+        NeverTrustAlwaysVerify = 0,
+
+        /// <summary>
+        /// Grant only the minimum permissions needed for the requested operation.
+        /// </summary>
+        LeastPrivilege = 1,
+
+        /// <summary>
+        /// Assume breach has already occurred; limit blast radius through segmentation.
+        /// </summary>
+        AssumeBreachLimitBlastRadius = 2,
+
+        /// <summary>
+        /// Isolate workloads and resources into fine-grained security zones.
+        /// </summary>
+        MicroSegmentation = 3,
+
+        /// <summary>
+        /// Continuously validate trust throughout the session, not just at login.
+        /// </summary>
+        ContinuousValidation = 4,
+
+        /// <summary>
+        /// Base access decisions on multiple signals (identity, device, location, behavior).
+        /// </summary>
+        ContextAwareAccess = 5,
+
+        /// <summary>
+        /// Encrypt all data in transit and at rest regardless of network location.
+        /// </summary>
+        EncryptEverything = 6
+    }
+
+    /// <summary>
+    /// A zero trust policy rule that defines conditions and actions for access evaluation.
+    /// Policies are composable and evaluated in priority order.
+    /// </summary>
+    public sealed record ZeroTrustRule
+    {
+        /// <summary>
+        /// Gets the unique identifier for this rule.
+        /// </summary>
+        public required string RuleId { get; init; }
+
+        /// <summary>
+        /// Gets the human-readable name of this rule.
+        /// </summary>
+        public required string Name { get; init; }
+
+        /// <summary>
+        /// Gets the zero trust principle this rule enforces.
+        /// </summary>
+        public required ZeroTrustPrinciple Principle { get; init; }
+
+        /// <summary>
+        /// Gets the priority of this rule (lower = higher priority, evaluated first).
+        /// </summary>
+        public int Priority { get; init; }
+
+        /// <summary>
+        /// Gets the conditions that must be met for this rule to apply.
+        /// Keys are condition names; values are expected values or patterns.
+        /// </summary>
+        public IReadOnlyDictionary<string, string>? Conditions { get; init; }
+
+        /// <summary>
+        /// Gets a value indicating whether this rule is enabled.
+        /// </summary>
+        public bool Enabled { get; init; } = true;
+
+        /// <summary>
+        /// Gets the description of what this rule enforces.
+        /// </summary>
+        public string? Description { get; init; }
+    }
+
+    /// <summary>
+    /// A zero trust policy composed of ordered rules evaluated against security contexts.
+    /// Policies support composability, versioning, and audit logging.
+    /// </summary>
+    public sealed record ZeroTrustPolicy
+    {
+        /// <summary>
+        /// Gets the unique identifier for this policy.
+        /// </summary>
+        public required string PolicyId { get; init; }
+
+        /// <summary>
+        /// Gets the human-readable name of this policy.
+        /// </summary>
+        public required string Name { get; init; }
+
+        /// <summary>
+        /// Gets the version of this policy for change tracking.
+        /// </summary>
+        public int Version { get; init; } = 1;
+
+        /// <summary>
+        /// Gets the ordered list of rules in this policy (evaluated by priority).
+        /// </summary>
+        public required IReadOnlyList<ZeroTrustRule> Rules { get; init; }
+
+        /// <summary>
+        /// Gets the default action when no rule matches.
+        /// True = allow, False = deny (secure default: deny).
+        /// </summary>
+        public bool DefaultAllow { get; init; } = false;
+
+        /// <summary>
+        /// Gets the zero trust principles enforced by this policy.
+        /// </summary>
+        public IReadOnlyList<ZeroTrustPrinciple>? EnforcedPrinciples { get; init; }
+
+        /// <summary>
+        /// Gets the minimum authentication strength required by this policy.
+        /// Examples: "mfa", "certificate", "biometric".
+        /// </summary>
+        public string? MinimumAuthenticationStrength { get; init; }
+
+        /// <summary>
+        /// Gets the maximum session duration before re-authentication is required.
+        /// Supports continuous validation principle.
+        /// </summary>
+        public TimeSpan? MaxSessionDuration { get; init; }
+
+        /// <summary>
+        /// Gets a value indicating whether device trust assessment is required.
+        /// </summary>
+        public bool RequireDeviceTrust { get; init; }
+
+        /// <summary>
+        /// Gets the timestamp when this policy was created.
+        /// </summary>
+        public DateTime CreatedAt { get; init; } = DateTime.UtcNow;
+
+        /// <summary>
+        /// Gets the timestamp when this policy was last modified.
+        /// </summary>
+        public DateTime? LastModifiedAt { get; init; }
+
+        /// <summary>
+        /// Gets additional metadata about this policy.
+        /// </summary>
+        public IReadOnlyDictionary<string, string>? Metadata { get; init; }
+    }
+
+    /// <summary>
+    /// Result of evaluating a zero trust policy against a security context.
+    /// Includes detailed per-principle and per-rule evaluation results for auditing.
+    /// </summary>
+    public sealed record ZeroTrustEvaluation
+    {
+        /// <summary>
+        /// Gets a value indicating whether the request passed zero trust evaluation.
+        /// </summary>
+        public required bool Passed { get; init; }
+
+        /// <summary>
+        /// Gets the policy that was evaluated.
+        /// </summary>
+        public required string PolicyId { get; init; }
+
+        /// <summary>
+        /// Gets the overall trust score (0.0 = no trust, 1.0 = full trust).
+        /// </summary>
+        public required double TrustScore { get; init; }
+
+        /// <summary>
+        /// Gets per-principle evaluation results.
+        /// </summary>
+        public IReadOnlyDictionary<ZeroTrustPrinciple, PrincipleEvaluation>? PrincipleResults { get; init; }
+
+        /// <summary>
+        /// Gets the list of rule IDs that were triggered (matched conditions).
+        /// </summary>
+        public IReadOnlyList<string>? TriggeredRules { get; init; }
+
+        /// <summary>
+        /// Gets the list of rule IDs that were violated.
+        /// </summary>
+        public IReadOnlyList<string>? ViolatedRules { get; init; }
+
+        /// <summary>
+        /// Gets required remediation actions to improve trust score.
+        /// </summary>
+        public IReadOnlyList<string>? RemediationActions { get; init; }
+
+        /// <summary>
+        /// Gets the timestamp when this evaluation was performed.
+        /// </summary>
+        public DateTime EvaluatedAt { get; init; } = DateTime.UtcNow;
+
+        /// <summary>
+        /// Gets the duration of the evaluation.
+        /// </summary>
+        public TimeSpan EvaluationDuration { get; init; }
+    }
+
+    /// <summary>
+    /// Evaluation result for a single zero trust principle.
+    /// </summary>
+    public sealed record PrincipleEvaluation
+    {
+        /// <summary>
+        /// Gets the principle that was evaluated.
+        /// </summary>
+        public required ZeroTrustPrinciple Principle { get; init; }
+
+        /// <summary>
+        /// Gets a value indicating whether this principle was satisfied.
+        /// </summary>
+        public required bool Satisfied { get; init; }
+
+        /// <summary>
+        /// Gets the trust score contribution from this principle (0.0 to 1.0).
+        /// </summary>
+        public double Score { get; init; }
+
+        /// <summary>
+        /// Gets the reason for the evaluation result.
+        /// </summary>
+        public string? Reason { get; init; }
+
+        /// <summary>
+        /// Gets evidence supporting this evaluation.
+        /// </summary>
+        public IReadOnlyDictionary<string, object>? Evidence { get; init; }
+    }
+
+    #endregion
+
+    #region T95.A6 — Threat Detection Abstractions
+
+    /// <summary>
+    /// Types of security threats that can be detected by strategy-level detectors.
+    /// </summary>
+    public enum SecurityThreatType
+    {
+        /// <summary>Unknown or unclassified threat.</summary>
+        Unknown = 0,
+
+        /// <summary>Unauthorized access attempt.</summary>
+        UnauthorizedAccess = 1,
+
+        /// <summary>Brute force password or token attack.</summary>
+        BruteForce = 2,
+
+        /// <summary>Credential stuffing or stolen credential usage.</summary>
+        CredentialAbuse = 3,
+
+        /// <summary>Privilege escalation attempt.</summary>
+        PrivilegeEscalation = 4,
+
+        /// <summary>Data exfiltration or unusual download patterns.</summary>
+        DataExfiltration = 5,
+
+        /// <summary>Insider threat or anomalous employee behavior.</summary>
+        InsiderThreat = 6,
+
+        /// <summary>Injection attack (SQL, command, LDAP, etc.).</summary>
+        InjectionAttack = 7,
+
+        /// <summary>Denial of service or resource exhaustion.</summary>
+        DenialOfService = 8,
+
+        /// <summary>Malware or ransomware activity.</summary>
+        Malware = 9,
+
+        /// <summary>Man-in-the-middle or session hijacking.</summary>
+        SessionHijacking = 10,
+
+        /// <summary>Replay attack using captured tokens or requests.</summary>
+        ReplayAttack = 11,
+
+        /// <summary>Anomalous behavior that does not match known patterns.</summary>
+        AnomalousBehavior = 12,
+
+        /// <summary>Policy violation detected.</summary>
+        PolicyViolation = 13,
+
+        /// <summary>Data tampering or integrity violation.</summary>
+        DataTampering = 14,
+
+        /// <summary>Cryptographic attack (key compromise, cipher downgrade).</summary>
+        CryptographicAttack = 15
+    }
+
+    /// <summary>
+    /// Severity levels for security threats detected at the strategy level.
+    /// Aligned with CVSS severity ratings.
+    /// </summary>
+    public enum SecurityThreatSeverity
+    {
+        /// <summary>Informational — no immediate risk.</summary>
+        Info = 0,
+
+        /// <summary>Low severity — minimal risk, routine monitoring.</summary>
+        Low = 1,
+
+        /// <summary>Medium severity — moderate risk, investigate within normal workflow.</summary>
+        Medium = 2,
+
+        /// <summary>High severity — significant risk, investigate promptly.</summary>
+        High = 3,
+
+        /// <summary>Critical severity — immediate risk, requires urgent response.</summary>
+        Critical = 4
+    }
+
+    /// <summary>
+    /// A threat indicator detected during security evaluation.
+    /// Immutable record for inclusion in threat reports and audit trails.
+    /// </summary>
+    public sealed record ThreatIndicator
+    {
+        /// <summary>
+        /// Gets the type of threat detected.
+        /// </summary>
+        public required SecurityThreatType Type { get; init; }
+
+        /// <summary>
+        /// Gets the severity of the detected threat.
+        /// </summary>
+        public required SecurityThreatSeverity Severity { get; init; }
+
+        /// <summary>
+        /// Gets the confidence score for this detection (0.0 to 1.0).
+        /// Higher values indicate greater certainty.
+        /// </summary>
+        public required double Confidence { get; init; }
+
+        /// <summary>
+        /// Gets a human-readable description of the threat indicator.
+        /// </summary>
+        public required string Description { get; init; }
+
+        /// <summary>
+        /// Gets the source of this indicator (e.g., "behavioral-analysis", "signature-match", "anomaly-detection").
+        /// </summary>
+        public string? Source { get; init; }
+
+        /// <summary>
+        /// Gets the affected resource identifier.
+        /// </summary>
+        public string? AffectedResource { get; init; }
+
+        /// <summary>
+        /// Gets the user or principal associated with the threat.
+        /// </summary>
+        public string? AssociatedPrincipal { get; init; }
+
+        /// <summary>
+        /// Gets the timestamp when this indicator was detected.
+        /// </summary>
+        public DateTime DetectedAt { get; init; } = DateTime.UtcNow;
+
+        /// <summary>
+        /// Gets additional evidence supporting this indicator.
+        /// </summary>
+        public IReadOnlyDictionary<string, object>? Evidence { get; init; }
+
+        /// <summary>
+        /// Gets recommended actions to mitigate this threat.
+        /// </summary>
+        public IReadOnlyList<string>? RecommendedActions { get; init; }
+    }
+
+    /// <summary>
+    /// Result of a threat detection evaluation.
+    /// Contains all detected indicators and an aggregate risk assessment.
+    /// </summary>
+    public sealed record ThreatDetectionResult
+    {
+        /// <summary>
+        /// Gets a value indicating whether any threats were detected.
+        /// </summary>
+        public required bool ThreatsDetected { get; init; }
+
+        /// <summary>
+        /// Gets the highest severity among all detected threats.
+        /// </summary>
+        public SecurityThreatSeverity HighestSeverity { get; init; } = SecurityThreatSeverity.Info;
+
+        /// <summary>
+        /// Gets the overall risk score (0.0 = no risk, 1.0 = maximum risk).
+        /// Calculated from individual indicator severities and confidences.
+        /// </summary>
+        public double RiskScore { get; init; }
+
+        /// <summary>
+        /// Gets the list of detected threat indicators.
+        /// </summary>
+        public IReadOnlyList<ThreatIndicator> Indicators { get; init; } = Array.Empty<ThreatIndicator>();
+
+        /// <summary>
+        /// Gets the timestamp when detection was performed.
+        /// </summary>
+        public DateTime DetectedAt { get; init; } = DateTime.UtcNow;
+
+        /// <summary>
+        /// Gets the duration of the detection analysis.
+        /// </summary>
+        public TimeSpan AnalysisDuration { get; init; }
+
+        /// <summary>
+        /// Creates a result indicating no threats were detected.
+        /// </summary>
+        /// <returns>A clean threat detection result.</returns>
+        public static ThreatDetectionResult Clean => new()
+        {
+            ThreatsDetected = false,
+            HighestSeverity = SecurityThreatSeverity.Info,
+            RiskScore = 0.0
+        };
+    }
+
+    /// <summary>
+    /// Interface for strategy-level threat detection within security evaluation.
+    /// Implementations analyze security contexts for indicators of compromise or attack.
+    /// </summary>
+    public interface IThreatDetector
+    {
+        /// <summary>
+        /// Gets the unique identifier for this threat detector.
+        /// </summary>
+        string DetectorId { get; }
+
+        /// <summary>
+        /// Gets the display name of this threat detector.
+        /// </summary>
+        string DetectorName { get; }
+
+        /// <summary>
+        /// Gets the threat types this detector can identify.
+        /// </summary>
+        IReadOnlyList<SecurityThreatType> DetectableThreats { get; }
+
+        /// <summary>
+        /// Detects threats in the given security context.
+        /// </summary>
+        /// <param name="context">The security context to analyze.</param>
+        /// <param name="cancellationToken">Cancellation token.</param>
+        /// <returns>A result containing any detected threat indicators.</returns>
+        /// <exception cref="ArgumentNullException">If context is null.</exception>
+        Task<ThreatDetectionResult> DetectAsync(
+            SecurityContext context,
+            CancellationToken cancellationToken = default);
+
+        /// <summary>
+        /// Reports a confirmed threat for learning and pattern updates.
+        /// </summary>
+        /// <param name="indicator">The confirmed threat indicator.</param>
+        /// <param name="cancellationToken">Cancellation token.</param>
+        /// <returns>A task representing the asynchronous operation.</returns>
+        Task ReportConfirmedThreatAsync(
+            ThreatIndicator indicator,
+            CancellationToken cancellationToken = default);
+    }
+
+    #endregion
+
+    #region T95.A7 — Integrity Verification Framework
+
+    /// <summary>
+    /// Types of integrity violations that can be detected.
+    /// </summary>
+    public enum IntegrityViolationType
+    {
+        /// <summary>Unknown violation type.</summary>
+        Unknown = 0,
+
+        /// <summary>Hash mismatch — computed hash differs from expected hash.</summary>
+        HashMismatch = 1,
+
+        /// <summary>Digital signature is invalid or cannot be verified.</summary>
+        SignatureInvalid = 2,
+
+        /// <summary>Digital signature has expired.</summary>
+        SignatureExpired = 3,
+
+        /// <summary>Data was modified after being sealed or committed.</summary>
+        TamperDetected = 4,
+
+        /// <summary>Chain of custody record is incomplete or inconsistent.</summary>
+        ChainOfCustodyBroken = 5,
+
+        /// <summary>Metadata does not match data contents.</summary>
+        MetadataMismatch = 6,
+
+        /// <summary>Version sequence is inconsistent or has gaps.</summary>
+        VersionSequenceViolation = 7,
+
+        /// <summary>Timestamp ordering is violated.</summary>
+        TimestampViolation = 8,
+
+        /// <summary>Size or checksum of stored data has changed unexpectedly.</summary>
+        StorageIntegrityViolation = 9
+    }
+
+    /// <summary>
+    /// A detected integrity violation with details about what failed and where.
+    /// Immutable record for inclusion in verification reports and audit trails.
+    /// </summary>
+    public sealed record IntegrityViolation
+    {
+        /// <summary>
+        /// Gets the type of violation detected.
+        /// </summary>
+        public required IntegrityViolationType Type { get; init; }
+
+        /// <summary>
+        /// Gets a human-readable description of the violation.
+        /// </summary>
+        public required string Description { get; init; }
+
+        /// <summary>
+        /// Gets the resource or data element affected by this violation.
+        /// </summary>
+        public required string AffectedResource { get; init; }
+
+        /// <summary>
+        /// Gets the expected value (hash, signature, version, etc.).
+        /// </summary>
+        public string? ExpectedValue { get; init; }
+
+        /// <summary>
+        /// Gets the actual value found during verification.
+        /// </summary>
+        public string? ActualValue { get; init; }
+
+        /// <summary>
+        /// Gets the severity of this violation.
+        /// </summary>
+        public SecurityThreatSeverity Severity { get; init; } = SecurityThreatSeverity.High;
+
+        /// <summary>
+        /// Gets the timestamp when this violation was detected.
+        /// </summary>
+        public DateTime DetectedAt { get; init; } = DateTime.UtcNow;
+
+        /// <summary>
+        /// Gets additional evidence supporting this violation finding.
+        /// </summary>
+        public IReadOnlyDictionary<string, object>? Evidence { get; init; }
+    }
+
+    /// <summary>
+    /// Result of an integrity verification operation.
+    /// Contains the verification outcome, any violations, and cryptographic proof.
+    /// </summary>
+    public sealed record IntegrityVerificationResult
+    {
+        /// <summary>
+        /// Gets a value indicating whether the data passed integrity verification.
+        /// </summary>
+        public required bool IsValid { get; init; }
+
+        /// <summary>
+        /// Gets the computed hash of the verified data.
+        /// </summary>
+        public string? ComputedHash { get; init; }
+
+        /// <summary>
+        /// Gets the hash algorithm used for verification.
+        /// Examples: "SHA-256", "SHA-384", "SHA-512", "BLAKE3".
+        /// </summary>
+        public string? HashAlgorithm { get; init; }
+
+        /// <summary>
+        /// Gets the digital signature verification status, if applicable.
+        /// </summary>
+        public bool? SignatureValid { get; init; }
+
+        /// <summary>
+        /// Gets the list of integrity violations found.
+        /// Empty list when IsValid is true.
+        /// </summary>
+        public IReadOnlyList<IntegrityViolation> Violations { get; init; } = Array.Empty<IntegrityViolation>();
+
+        /// <summary>
+        /// Gets the timestamp when verification was performed.
+        /// </summary>
+        public DateTime VerifiedAt { get; init; } = DateTime.UtcNow;
+
+        /// <summary>
+        /// Gets the duration of the verification operation.
+        /// </summary>
+        public TimeSpan VerificationDuration { get; init; }
+
+        /// <summary>
+        /// Gets the chain of custody records associated with this verification.
+        /// </summary>
+        public IReadOnlyList<CustodyRecord>? ChainOfCustody { get; init; }
+
+        /// <summary>
+        /// Gets additional metadata about the verification.
+        /// </summary>
+        public IReadOnlyDictionary<string, string>? Metadata { get; init; }
+
+        /// <summary>
+        /// Creates a valid result with the computed hash.
+        /// </summary>
+        /// <param name="hash">The computed hash value.</param>
+        /// <param name="algorithm">The hash algorithm used.</param>
+        /// <returns>A valid integrity verification result.</returns>
+        public static IntegrityVerificationResult Valid(string hash, string algorithm)
+        {
+            return new IntegrityVerificationResult
+            {
+                IsValid = true,
+                ComputedHash = hash,
+                HashAlgorithm = algorithm
+            };
+        }
+
+        /// <summary>
+        /// Creates an invalid result with violation details.
+        /// </summary>
+        /// <param name="violations">The list of violations found.</param>
+        /// <returns>An invalid integrity verification result.</returns>
+        public static IntegrityVerificationResult Invalid(IReadOnlyList<IntegrityViolation> violations)
+        {
+            return new IntegrityVerificationResult
+            {
+                IsValid = false,
+                Violations = violations
+            };
+        }
+    }
+
+    /// <summary>
+    /// A record in the chain of custody for data integrity tracking.
+    /// Documents who accessed or modified data and when.
+    /// </summary>
+    public sealed record CustodyRecord
+    {
+        /// <summary>
+        /// Gets the principal who performed the action.
+        /// </summary>
+        public required string Principal { get; init; }
+
+        /// <summary>
+        /// Gets the action performed (e.g., "created", "modified", "accessed", "transferred").
+        /// </summary>
+        public required string Action { get; init; }
+
+        /// <summary>
+        /// Gets the timestamp of the action.
+        /// </summary>
+        public required DateTime Timestamp { get; init; }
+
+        /// <summary>
+        /// Gets the hash of the data at this point in the chain.
+        /// </summary>
+        public string? DataHash { get; init; }
+
+        /// <summary>
+        /// Gets the location or system where the action occurred.
+        /// </summary>
+        public string? Location { get; init; }
+
+        /// <summary>
+        /// Gets additional notes or evidence for this custody record.
+        /// </summary>
+        public string? Notes { get; init; }
+    }
+
+    /// <summary>
+    /// Interface for strategy-level integrity verification within the security framework.
+    /// Implementations verify data integrity through hashing, signatures, and chain of custody.
+    /// </summary>
+    public interface IIntegrityVerifier
+    {
+        /// <summary>
+        /// Gets the unique identifier for this verifier.
+        /// </summary>
+        string VerifierId { get; }
+
+        /// <summary>
+        /// Gets the display name of this verifier.
+        /// </summary>
+        string VerifierName { get; }
+
+        /// <summary>
+        /// Gets the hash algorithms supported by this verifier.
+        /// </summary>
+        IReadOnlyList<string> SupportedAlgorithms { get; }
+
+        /// <summary>
+        /// Verifies the integrity of the specified data.
+        /// </summary>
+        /// <param name="data">The data to verify.</param>
+        /// <param name="expectedHash">The expected hash value for comparison.</param>
+        /// <param name="algorithm">The hash algorithm to use (e.g., "SHA-256").</param>
+        /// <param name="cancellationToken">Cancellation token.</param>
+        /// <returns>The integrity verification result.</returns>
+        /// <exception cref="ArgumentNullException">If data is null.</exception>
+        /// <exception cref="ArgumentException">If algorithm is not supported.</exception>
+        Task<IntegrityVerificationResult> VerifyAsync(
+            ReadOnlyMemory<byte> data,
+            string? expectedHash = null,
+            string algorithm = "SHA-256",
+            CancellationToken cancellationToken = default);
+
+        /// <summary>
+        /// Computes and stores a hash for future integrity verification.
+        /// </summary>
+        /// <param name="resourceId">The resource identifier.</param>
+        /// <param name="data">The data to hash.</param>
+        /// <param name="algorithm">The hash algorithm to use.</param>
+        /// <param name="cancellationToken">Cancellation token.</param>
+        /// <returns>The computed hash value.</returns>
+        Task<string> ComputeAndStoreHashAsync(
+            string resourceId,
+            ReadOnlyMemory<byte> data,
+            string algorithm = "SHA-256",
+            CancellationToken cancellationToken = default);
+
+        /// <summary>
+        /// Verifies the chain of custody for a resource.
+        /// </summary>
+        /// <param name="resourceId">The resource to verify.</param>
+        /// <param name="cancellationToken">Cancellation token.</param>
+        /// <returns>The integrity verification result including chain of custody analysis.</returns>
+        Task<IntegrityVerificationResult> VerifyChainOfCustodyAsync(
+            string resourceId,
+            CancellationToken cancellationToken = default);
+    }
+
+    #endregion
 }
