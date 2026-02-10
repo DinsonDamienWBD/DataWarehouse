@@ -26,4 +26,10 @@
     <Compile Remove="Strategies\**\*.cs" />
   </ItemGroup>
 
+  <!-- Re-include verified strategy implementations -->
+  <ItemGroup>
+    <Compile Include="Strategies\Standard\StandardRaidStrategies.cs" />
+    <Compile Include="Strategies\Standard\StandardRaidStrategiesB1.cs" />
+  </ItemGroup>
+
 </Project>

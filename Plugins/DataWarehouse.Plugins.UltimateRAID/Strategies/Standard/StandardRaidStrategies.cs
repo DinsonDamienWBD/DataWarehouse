@@ -5,6 +5,8 @@ using System.Threading;
 using System.Threading.Tasks;
 using DataWarehouse.SDK.Contracts.RAID;
 using DataWarehouse.SDK.Mathematics;
+using SdkRaidStrategyBase = DataWarehouse.SDK.Contracts.RAID.RaidStrategyBase;
+using SdkDiskHealthStatus = DataWarehouse.SDK.Contracts.RAID.DiskHealthStatus;
 
 namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Standard
 {
@@ -13,7 +15,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Standard
     /// Provides maximum performance by distributing data across all disks without parity.
     /// Data loss occurs if any single disk fails.
     /// </summary>
-    public sealed class Raid0Strategy : RaidStrategyBase
+    public sealed class Raid0Strategy : SdkRaidStrategyBase
     {
         private readonly int _chunkSize;
 
@@ -165,7 +167,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Standard
     /// Writes identical data to all disks. Reads can be distributed across mirrors for performance.
     /// Survives failure of all but one disk.
     /// </summary>
-    public sealed class Raid1Strategy : RaidStrategyBase
+    public sealed class Raid1Strategy : SdkRaidStrategyBase
     {
         private readonly int _chunkSize;
 
@@ -192,7 +194,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Standard
         public override StripeInfo CalculateStripe(long blockIndex, int diskCount)
         {
             ValidateDiskConfiguration(new DiskInfo[diskCount].Select((_, i) =>
-                new DiskInfo($"disk{i}", 0, 0, DiskHealthStatus.Healthy, DiskType.HDD, $"bay{i}")));
+                new DiskInfo($"disk{i}", 0, 0, SdkDiskHealthStatus.Healthy, DiskType.HDD, $"bay{i}")));
 
             // All disks contain the same data
             var dataDisks = new int[] { 0 };
@@ -220,7 +222,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Standard
 
             // Write to all mirrors simultaneously
             var writeTasks = diskList
-                .Where(d => d.HealthStatus == DiskHealthStatus.Healthy)
+                .Where(d => d.HealthStatus == SdkDiskHealthStatus.Healthy)
                 .Select(disk => WriteToDiskAsync(disk, dataBytes, offset, cancellationToken))
                 .ToList();
 
@@ -237,7 +239,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Standard
             ValidateDiskConfiguration(diskList);
 
             // Read from the first healthy disk (could implement load balancing)
-            var healthyDisk = diskList.FirstOrDefault(d => d.HealthStatus == DiskHealthStatus.Healthy);
+            var healthyDisk = diskList.FirstOrDefault(d => d.HealthStatus == SdkDiskHealthStatus.Healthy);
             if (healthyDisk == null)
                 throw new InvalidOperationException("No healthy disks available for read operation");
 
@@ -306,7 +308,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Standard
     /// Uses XOR parity distributed across all disks. Can survive single disk failure.
     /// Parity disk rotates with each stripe for balanced write performance.
     /// </summary>
-    public sealed class Raid5Strategy : RaidStrategyBase
+    public sealed class Raid5Strategy : SdkRaidStrategyBase
     {
         private readonly int _chunkSize;
         private readonly ReedSolomon _reedSolomon;
@@ -335,7 +337,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Standard
         public override StripeInfo CalculateStripe(long blockIndex, int diskCount)
         {
             ValidateDiskConfiguration(new DiskInfo[diskCount].Select((_, i) =>
-                new DiskInfo($"disk{i}", 0, 0, DiskHealthStatus.Healthy, DiskType.HDD, $"bay{i}")));
+                new DiskInfo($"disk{i}", 0, 0, SdkDiskHealthStatus.Healthy, DiskType.HDD, $"bay{i}")));
 
             var stripeIndex = blockIndex / (diskCount - 1);
             var parityDisk = (int)(stripeIndex % diskCount);
@@ -378,7 +380,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Standard
                 var stripeChunks = chunks[stripeIdx];
 
                 // Calculate XOR parity
-                var parity = CalculateXorParity(stripeChunks);
+                var parity = CalculateXorParity(stripeChunks.Select(c => (ReadOnlyMemory<byte>)c));
 
                 // Write data chunks
                 for (int i = 0; i < stripeChunks.Count; i++)
@@ -427,7 +429,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Standard
                     var diskIndex = stripeInfo.DataDisks[i];
                     var disk = diskList[diskIndex];
 
-                    if (disk.HealthStatus == DiskHealthStatus.Healthy)
+                    if (disk.HealthStatus == SdkDiskHealthStatus.Healthy)
                     {
                         try
                         {
@@ -588,7 +590,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Standard
     /// Uses P+Q parity with Reed-Solomon encoding in GF(2^8). Can survive two disk failures.
     /// P parity is XOR, Q parity uses Galois field multiplication.
     /// </summary>
-    public sealed class Raid6Strategy : RaidStrategyBase
+    public sealed class Raid6Strategy : SdkRaidStrategyBase
     {
         private readonly int _chunkSize;
         private readonly ReedSolomon _reedSolomon;
@@ -617,7 +619,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Standard
         public override StripeInfo CalculateStripe(long blockIndex, int diskCount)
         {
             ValidateDiskConfiguration(new DiskInfo[diskCount].Select((_, i) =>
-                new DiskInfo($"disk{i}", 0, 0, DiskHealthStatus.Healthy, DiskType.HDD, $"bay{i}")));
+                new DiskInfo($"disk{i}", 0, 0, SdkDiskHealthStatus.Healthy, DiskType.HDD, $"bay{i}")));
 
             var stripeIndex = blockIndex / (diskCount - 2);
             var pParityDisk = (int)(stripeIndex % diskCount);
@@ -719,7 +721,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Standard
                 var diskIndex = stripeInfo.DataDisks[i];
                 var disk = diskList[diskIndex];
 
-                if (disk.HealthStatus == DiskHealthStatus.Healthy)
+                if (disk.HealthStatus == SdkDiskHealthStatus.Healthy)
                 {
                     try
                     {
@@ -859,7 +861,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Standard
     /// Provides both performance and redundancy. Can survive multiple disk failures
     /// as long as no mirror pair loses both disks.
     /// </summary>
-    public sealed class Raid10Strategy : RaidStrategyBase
+    public sealed class Raid10Strategy : SdkRaidStrategyBase
     {
         private readonly int _chunkSize;
 
@@ -889,7 +891,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Standard
                 throw new ArgumentException("RAID 10 requires an even number of disks");
 
             ValidateDiskConfiguration(new DiskInfo[diskCount].Select((_, i) =>
-                new DiskInfo($"disk{i}", 0, 0, DiskHealthStatus.Healthy, DiskType.HDD, $"bay{i}")));
+                new DiskInfo($"disk{i}", 0, 0, SdkDiskHealthStatus.Healthy, DiskType.HDD, $"bay{i}")));
 
             var mirrorPairs = diskCount / 2;
             var stripeIndex = blockIndex / mirrorPairs;
@@ -971,7 +973,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Standard
                 byte[] chunk;
 
                 // Try primary disk first
-                if (primaryDisk.HealthStatus == DiskHealthStatus.Healthy)
+                if (primaryDisk.HealthStatus == SdkDiskHealthStatus.Healthy)
                 {
                     try
                     {

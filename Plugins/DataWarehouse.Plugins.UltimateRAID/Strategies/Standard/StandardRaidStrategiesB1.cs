@@ -4,6 +4,8 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using DataWarehouse.SDK.Contracts.RAID;
+using SdkRaidStrategyBase = DataWarehouse.SDK.Contracts.RAID.RaidStrategyBase;
+using SdkDiskHealthStatus = DataWarehouse.SDK.Contracts.RAID.DiskHealthStatus;
 
 namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Standard
 {
@@ -21,7 +23,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Standard
     /// - Single-bit error correction and double-bit error detection (SECDED)
     /// - Requires synchronized spindle rotation (obsolete with modern drives)
     /// </remarks>
-    public sealed class Raid2Strategy : RaidStrategyBase
+    public sealed class Raid2Strategy : SdkRaidStrategyBase
     {
         private readonly int _chunkSize;
         private readonly int _dataBits;
@@ -65,7 +67,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Standard
         public override StripeInfo CalculateStripe(long blockIndex, int diskCount)
         {
             ValidateDiskConfiguration(new DiskInfo[diskCount].Select((_, i) =>
-                new DiskInfo($"disk{i}", 0, 0, DiskHealthStatus.Healthy, DiskType.HDD, $"bay{i}")));
+                new DiskInfo($"disk{i}", 0, 0, SdkDiskHealthStatus.Healthy, DiskType.HDD, $"bay{i}")));
 
             // Data disks are at bit positions that are not powers of 2
             var dataDisks = new List<int>();
@@ -148,7 +150,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Standard
             {
                 var disk = diskList[i];
                 var diskIndex = i;
-                if (disk.HealthStatus == DiskHealthStatus.Healthy)
+                if (disk.HealthStatus == SdkDiskHealthStatus.Healthy)
                 {
                     readTasks.Add(ReadFromDiskWithIndexAsync(disk, diskIndex, offset, _chunkSize, cancellationToken));
                 }
@@ -427,7 +429,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Standard
     /// - Poor for small random I/O due to parity disk bottleneck
     /// - Single disk fault tolerance
     /// </remarks>
-    public sealed class Raid3Strategy : RaidStrategyBase
+    public sealed class Raid3Strategy : SdkRaidStrategyBase
     {
         private readonly int _chunkSize;
 
@@ -454,7 +456,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Standard
         public override StripeInfo CalculateStripe(long blockIndex, int diskCount)
         {
             ValidateDiskConfiguration(new DiskInfo[diskCount].Select((_, i) =>
-                new DiskInfo($"disk{i}", 0, 0, DiskHealthStatus.Healthy, DiskType.HDD, $"bay{i}")));
+                new DiskInfo($"disk{i}", 0, 0, SdkDiskHealthStatus.Healthy, DiskType.HDD, $"bay{i}")));
 
             // Last disk is always parity (dedicated)
             var dataDisks = Enumerable.Range(0, diskCount - 1).ToArray();
@@ -523,7 +525,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Standard
                 var diskIndex = stripeInfo.DataDisks[i];
                 var disk = diskList[diskIndex];
 
-                if (disk.HealthStatus == DiskHealthStatus.Healthy)
+                if (disk.HealthStatus == SdkDiskHealthStatus.Healthy)
                 {
                     try
                     {
@@ -728,7 +730,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Standard
     /// - Single disk fault tolerance
     /// - Predecessor to RAID 5 (which distributes parity)
     /// </remarks>
-    public sealed class Raid4Strategy : RaidStrategyBase
+    public sealed class Raid4Strategy : SdkRaidStrategyBase
     {
         private readonly int _chunkSize;
 
@@ -755,7 +757,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Standard
         public override StripeInfo CalculateStripe(long blockIndex, int diskCount)
         {
             ValidateDiskConfiguration(new DiskInfo[diskCount].Select((_, i) =>
-                new DiskInfo($"disk{i}", 0, 0, DiskHealthStatus.Healthy, DiskType.HDD, $"bay{i}")));
+                new DiskInfo($"disk{i}", 0, 0, SdkDiskHealthStatus.Healthy, DiskType.HDD, $"bay{i}")));
 
             // Last disk is dedicated parity (never rotates)
             var dataDisks = Enumerable.Range(0, diskCount - 1).ToArray();
@@ -830,7 +832,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Standard
                 var diskIndex = stripeInfo.DataDisks[i];
                 var disk = diskList[diskIndex];
 
-                if (disk.HealthStatus == DiskHealthStatus.Healthy)
+                if (disk.HealthStatus == SdkDiskHealthStatus.Healthy)
                 {
                     try
                     {
