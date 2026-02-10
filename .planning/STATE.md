@@ -64,6 +64,7 @@ Recent decisions affecting current work:
 - [Phase 02]: T91.A + T91.B1 verified -- UltimateRAID SDK types and standard RAID 0/1/5/6 strategies production-ready; namespace aliases for SDK/plugin type disambiguation
 - [Phase 02]: T90 strategies verified -- 6 vector stores, 4 knowledge graphs, 7+ feature strategies, 5 memory strategies all production-ready with zero forbidden patterns
 - [Phase 02]: T91.C + T91.D verified -- plugin orchestrator, array ops, I/O engine, health monitoring, self-healing, recovery all production-ready; 29 items synced in TODO.md
+- [Phase 02]: T91.B2-B7 verified -- 30+ advanced RAID strategies (nested, extended, ZFS, vendor, erasure coding) compiled with SDK alias pattern; 13 RaidLevel enum values added; 20 items synced in TODO.md
 
 ### Pending Todos
 
