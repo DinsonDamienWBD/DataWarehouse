@@ -50,6 +50,9 @@ Recent decisions affecting current work:
 - Named SecurityThreatType/SecurityThreatSeverity to avoid conflict with existing ThreatSeverity enums
 - Used NIST SP 800-207 for ZeroTrustPrinciple enum values
 - Expanded SecurityDomain from 6 to 11 values (non-breaking addition)
+- T5.0 verified complete: all 16 plugin base classes with correct inheritance, zero NotImplementedException
+- T99 Phase A verified: all 15 strategy domains have I*Strategy + Capabilities, 11/15 have *StrategyBase
+- T96 Phase A items A1-A5 synced to [x] in TODO.md (were out of sync with actual code)
 
 ### Pending Todos
 
