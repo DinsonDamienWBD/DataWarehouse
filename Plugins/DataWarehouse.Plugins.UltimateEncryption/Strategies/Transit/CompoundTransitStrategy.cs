@@ -7,6 +7,9 @@ using System.Collections.Generic;
 using System.Security.Cryptography;
 using System.Threading;
 using System.Threading.Tasks;
+using Org.BouncyCastle.Crypto.Engines;
+using Org.BouncyCastle.Crypto.Modes;
+using Org.BouncyCastle.Crypto.Parameters;
 
 namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.Transit;
 
@@ -86,15 +89,11 @@ public sealed class CompoundTransitStrategy : TransitEncryptionPluginBase
         Buffer.BlockCopy(primaryCiphertext, 0, primaryResult, 12, primaryCiphertext.Length);
         Buffer.BlockCopy(primaryTag, 0, primaryResult, 12 + primaryCiphertext.Length, 16);
 
-        // Step 2: Encrypt the result with secondary cipher (Serpent-256-GCM)
-        // For demonstration, using AES-GCM as placeholder for Serpent
+        // Step 2: Encrypt the result with secondary cipher (Serpent-256-GCM using BouncyCastle)
         var secondaryCiphertext = new byte[primaryResult.Length];
         var secondaryTag = new byte[16];
 
-        using (var secondaryAes = new AesGcm(secondaryKey, 16))
-        {
-            secondaryAes.Encrypt(secondaryNonce, primaryResult, secondaryCiphertext, secondaryTag, null);
-        }
+        EncryptSerpentGcm(primaryResult, secondaryKey, secondaryNonce, null, secondaryCiphertext, secondaryTag);
 
         // Secure memory cleanup
         CryptographicOperations.ZeroMemory(primaryKey);
@@ -170,10 +169,7 @@ public sealed class CompoundTransitStrategy : TransitEncryptionPluginBase
 
         var primaryLayerData = new byte[secondaryEncryptedLength];
 
-        using (var secondaryAes = new AesGcm(secondaryKey, 16))
-        {
-            secondaryAes.Decrypt(secondaryNonce, secondaryEncrypted, secondaryTag, primaryLayerData, null);
-        }
+        DecryptSerpentGcm(secondaryEncrypted, secondaryKey, secondaryNonce, secondaryTag, null, primaryLayerData);
 
         // Step 2: Decrypt inner layer (primary cipher)
         // Extract primary nonce, ciphertext, and tag
@@ -268,5 +264,60 @@ public sealed class CompoundTransitStrategy : TransitEncryptionPluginBase
             ["TotalOverhead"] = NonceSize + TagSize,
             ["SecurityLevel"] = "Maximum"
         };
+    }
+
+    /// <summary>
+    /// Encrypts data using Serpent-256 in GCM mode using BouncyCastle.
+    /// </summary>
+    private static void EncryptSerpentGcm(
+        byte[] plaintext,
+        byte[] key,
+        byte[] nonce,
+        byte[]? aad,
+        byte[] ciphertext,
+        byte[] tag)
+    {
+        var serpentEngine = new SerpentEngine();
+        var gcmCipher = new GcmBlockCipher(serpentEngine);
+
+        var keyParams = new KeyParameter(key);
+        var gcmParams = new AeadParameters(keyParams, 128, nonce, aad);
+        gcmCipher.Init(true, gcmParams);
+
+        var outputBuffer = new byte[gcmCipher.GetOutputSize(plaintext.Length)];
+        var len = gcmCipher.ProcessBytes(plaintext, 0, plaintext.Length, outputBuffer, 0);
+        len += gcmCipher.DoFinal(outputBuffer, len);
+
+        Buffer.BlockCopy(outputBuffer, 0, ciphertext, 0, plaintext.Length);
+        Buffer.BlockCopy(outputBuffer, plaintext.Length, tag, 0, 16);
+    }
+
+    /// <summary>
+    /// Decrypts data using Serpent-256 in GCM mode using BouncyCastle.
+    /// </summary>
+    private static void DecryptSerpentGcm(
+        byte[] ciphertext,
+        byte[] key,
+        byte[] nonce,
+        byte[] tag,
+        byte[]? aad,
+        byte[] plaintext)
+    {
+        var serpentEngine = new SerpentEngine();
+        var gcmCipher = new GcmBlockCipher(serpentEngine);
+
+        var keyParams = new KeyParameter(key);
+        var gcmParams = new AeadParameters(keyParams, 128, nonce, aad);
+        gcmCipher.Init(false, gcmParams);
+
+        var inputBuffer = new byte[ciphertext.Length + tag.Length];
+        Buffer.BlockCopy(ciphertext, 0, inputBuffer, 0, ciphertext.Length);
+        Buffer.BlockCopy(tag, 0, inputBuffer, ciphertext.Length, tag.Length);
+
+        var outputBuffer = new byte[gcmCipher.GetOutputSize(inputBuffer.Length)];
+        var len = gcmCipher.ProcessBytes(inputBuffer, 0, inputBuffer.Length, outputBuffer, 0);
+        len += gcmCipher.DoFinal(outputBuffer, len);
+
+        Buffer.BlockCopy(outputBuffer, 0, plaintext, 0, plaintext.Length);
     }
 }

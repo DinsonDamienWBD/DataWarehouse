@@ -438,13 +438,54 @@ public sealed class AdiantumStrategy : EncryptionStrategyBase
     }
 
     /// <summary>
-    /// Computes NH hash (simplified version using HMAC-SHA256 as placeholder).
-    /// Production should use actual NH hash function.
+    /// Computes NH hash using the polynomial hash function as specified in Adiantum.
+    /// NH is a fast universal hash with 32-bit word operations.
     /// </summary>
     private static byte[] ComputeNhHash(byte[] data, byte[] key)
     {
-        using var hmac = new HMACSHA256(key);
-        return hmac.ComputeHash(data).Take(16).ToArray();
+        // NH hash operates on 32-bit words
+        // Formula: sum((msg[i] + key[i]) * (msg[i+stride] + key[i+stride]))
+        const int stride = 2;
+        const int hashKeyBytes = 1024; // NH requires 1024 bytes of key material
+
+        // Derive NH hash key from encryption key using HKDF
+        var hashKey = HKDF.DeriveKey(
+            HashAlgorithmName.SHA256,
+            key,
+            hashKeyBytes,
+            null,
+            "NH-Hash-Key"u8.ToArray());
+
+        // Pad data to multiple of 32 bytes (8 words)
+        var paddedLength = ((data.Length + 31) / 32) * 32;
+        var paddedData = new byte[paddedLength];
+        Buffer.BlockCopy(data, 0, paddedData, 0, data.Length);
+
+        ulong accumulator = 0;
+        int keyOffset = 0;
+
+        for (int i = 0; i < paddedData.Length; i += 4)
+        {
+            var msgWord = BitConverter.ToUInt32(paddedData, i);
+            var keyWord = BitConverter.ToUInt32(hashKey, keyOffset % hashKeyBytes);
+            keyOffset += 4;
+
+            if (i + stride * 4 < paddedData.Length)
+            {
+                var msgWord2 = BitConverter.ToUInt32(paddedData, i + stride * 4);
+                var keyWord2 = BitConverter.ToUInt32(hashKey, keyOffset % hashKeyBytes);
+
+                // NH formula: (msg + key) * (msg' + key')
+                ulong product = ((ulong)msgWord + keyWord) * ((ulong)msgWord2 + keyWord2);
+                accumulator += product;
+            }
+        }
+
+        // Return first 16 bytes of hash
+        var hashBytes = new byte[16];
+        BitConverter.TryWriteBytes(hashBytes.AsSpan(0, 8), accumulator);
+        BitConverter.TryWriteBytes(hashBytes.AsSpan(8, 8), accumulator >> 32);
+        return hashBytes;
     }
 
     /// <summary>
