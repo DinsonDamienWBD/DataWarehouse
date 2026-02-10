@@ -1,0 +1,46 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
+
+namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.MiddleEastAfrica
+{
+    /// <summary>
+    /// KDPA (Kenya Data Protection Act) compliance strategy.
+    /// </summary>
+    public sealed class KdpaStrategy : ComplianceStrategyBase
+    {
+        public override string StrategyId => "kdpa";
+        public override string StrategyName => "KDPA Compliance";
+        public override string Framework => "KDPA";
+
+        protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken)
+        {
+            var violations = new List<ComplianceViolation>();
+            var recommendations = new List<string>();
+
+            if (!context.Attributes.TryGetValue("RegisteredWithCommissioner", out var regObj) || regObj is not true)
+            {
+                violations.Add(new ComplianceViolation { Code = "KDPA-001", Description = "Not registered with Data Protection Commissioner", Severity = ViolationSeverity.Critical, Remediation = "Register with ODPC Kenya", RegulatoryReference = "KDPA Section 28" });
+            }
+
+            if (!context.Attributes.TryGetValue("ConsentObtained", out var consentObj) || consentObj is not true)
+            {
+                violations.Add(new ComplianceViolation { Code = "KDPA-002", Description = "Consent not obtained", Severity = ViolationSeverity.High, Remediation = "Obtain valid consent", RegulatoryReference = "KDPA Section 30" });
+            }
+
+            if (context.OperationType.Equals("access-request", StringComparison.OrdinalIgnoreCase))
+            {
+                if (context.Attributes.TryGetValue("ResponseDays", out var daysObj) && daysObj is int days && days > 30)
+                {
+                    violations.Add(new ComplianceViolation { Code = "KDPA-003", Description = $"Access request exceeded 30 days ({days} days)", Severity = ViolationSeverity.High, Remediation = "Respond within 30 days", RegulatoryReference = "KDPA Section 38" });
+                }
+            }
+
+            var isCompliant = !violations.Any(v => v.Severity >= ViolationSeverity.High);
+            var status = violations.Count == 0 ? ComplianceStatus.Compliant : violations.Any(v => v.Severity >= ViolationSeverity.High) ? ComplianceStatus.NonCompliant : ComplianceStatus.PartiallyCompliant;
+            return Task.FromResult(new ComplianceResult { IsCompliant = isCompliant, Framework = Framework, Status = status, Violations = violations, Recommendations = recommendations });
+        }
+    }
+}
