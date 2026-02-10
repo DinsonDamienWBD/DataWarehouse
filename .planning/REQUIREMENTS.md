@@ -220,6 +220,10 @@
 - [ ] **TEST-01**: Verify/implement comprehensive test suite (T121)
 - [ ] **TEST-02**: Verify/implement security penetration test plan (T122)
 
+### Plugin Deprecation & File Cleanup
+
+- [ ] **DEPR-01**: Deprecate, remove from DataWarehouse.slnx, and delete files/folders of all plugins whose features have been fully migrated into Ultimate/Universal plugins — verify each migration is complete before removal
+
 ### Plugin Marketplace (T57)
 
 - [ ] **MKTPL-01**: Verify/implement plugin marketplace — discovery, install, versioning, certification, rating, analytics
@@ -264,13 +268,14 @@ Updated during roadmap creation — each requirement maps to a phase.
 | BUG-01, BUG-02, BUG-03, BUG-04 | Phase 15 | Pending |
 | TEST-01, TEST-02 | Phase 16 | Pending |
 | MKTPL-01 | Phase 17 | Pending |
+| DEPR-01 | Phase 18 | Pending |
 
 **Coverage:**
-- v1 requirements: 89 total
-- Mapped to phases: 89
+- v1 requirements: 90 total
+- Mapped to phases: 90
 - Unmapped: 0
 
-All 89 requirements are mapped to phases 1-17 following dependency chains.
+All 90 requirements are mapped to phases 1-18 following dependency chains.
 
 ---
 *Requirements defined: 2026-02-10*

@@ -29,6 +29,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [ ] **Phase 15: Bug Fixes & Build Health** - Fix all critical bugs, build errors, TODO comments, nullable suppressions
 - [ ] **Phase 16: Testing & Quality Assurance** - Verify/implement comprehensive test suite and security penetration test plan
 - [ ] **Phase 17: Plugin Marketplace** - Verify/implement plugin marketplace with discovery, install, versioning, certification
+- [ ] **Phase 18: Plugin Deprecation & File Cleanup** - Remove migrated plugins from slnx, delete their files/folders
 
 ## Phase Details
 
@@ -366,10 +367,27 @@ Plans:
 Plans:
 - [ ] 17-01: Verify and complete plugin marketplace (T57)
 
+### Phase 18: Plugin Deprecation & File Cleanup
+**Goal**: All plugins whose features have been fully migrated into Ultimate/Universal plugins are deprecated, removed from the solution, and their files/folders deleted
+**Depends on**: All previous phases (must verify all migrations are complete first)
+**Requirements**: DEPR-01
+**Success Criteria** (what must be TRUE):
+  1. Every plugin whose functionality has been absorbed by an Ultimate/Universal plugin is identified
+  2. Each identified plugin is removed from DataWarehouse.slnx
+  3. Each identified plugin's project folder and all contained files are deleted from the repository
+  4. No remaining code references the deleted plugins (no broken using statements, project references, or message bus registrations)
+  5. Solution builds cleanly after all removals
+**Plans**: TBD
+
+Plans:
+- [ ] 18-01: Identify all plugins migrated into Ultimate/Universal plugins
+- [ ] 18-02: Remove migrated plugins from DataWarehouse.slnx and delete their files/folders
+- [ ] 18-03: Clean up any remaining references and verify clean build
+
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 → 9 → 10 → 11 → 12 → 13 → 14 → 15 → 16 → 17
+Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 → 9 → 10 → 11 → 12 → 13 → 14 → 15 → 16 → 17 → 18
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
@@ -390,3 +408,4 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 →
 | 15. Bug Fixes & Build Health | 0/4 | Not started | - |
 | 16. Testing & Quality Assurance | 0/2 | Not started | - |
 | 17. Plugin Marketplace | 0/1 | Not started | - |
+| 18. Plugin Deprecation & File Cleanup | 0/3 | Not started | - |
