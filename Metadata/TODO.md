@@ -8115,19 +8115,19 @@ T95 focuses on **authorization and access control** - determining WHO can access
 | 95.B4.7 | ⭐ HardwareTokenStrategy - Hardware tokens (YubiKey) | [ ] |
 | 95.B4.8 | ⭐ SmartCardStrategy - Smart card/PIV authentication | [ ] |
 | **B5: Zero Trust Architecture** |
-| 95.B5.1 | ZeroTrustStrategy - Core Zero Trust framework | [ ] |
-| 95.B5.2 | ⭐ SpiffeSpireStrategy - SPIFFE/SPIRE workload identity | [ ] |
-| 95.B5.3 | ⭐ MtlsStrategy - Mutual TLS everywhere | [ ] |
-| 95.B5.4 | ⭐ ServiceMeshStrategy - Service mesh integration (Istio, Linkerd) | [ ] |
-| 95.B5.5 | ⭐ MicroSegmentationStrategy - Network micro-segmentation | [ ] |
-| 95.B5.6 | ⭐ ContinuousVerificationStrategy - Continuous authentication | [ ] |
+| 95.B5.1 | ZeroTrustStrategy - Core Zero Trust framework | [x] |
+| 95.B5.2 | ⭐ SpiffeSpireStrategy - SPIFFE/SPIRE workload identity | [x] |
+| 95.B5.3 | ⭐ MtlsStrategy - Mutual TLS everywhere | [x] |
+| 95.B5.4 | ⭐ ServiceMeshStrategy - Service mesh integration (Istio, Linkerd) | [x] |
+| 95.B5.5 | ⭐ MicroSegmentationStrategy - Network micro-segmentation | [x] |
+| 95.B5.6 | ⭐ ContinuousVerificationStrategy - Continuous authentication | [x] |
 | **B6: Policy Engines** |
-| 95.B6.1 | ⭐ OpaStrategy - Open Policy Agent (Rego) | [ ] |
-| 95.B6.2 | ⭐ CasbinStrategy - Casbin policy engine | [ ] |
-| 95.B6.3 | ⭐ CedarStrategy - AWS Cedar policy language | [ ] |
-| 95.B6.4 | ⭐ ZanzibarStrategy - Google Zanzibar-style ReBAC | [ ] |
-| 95.B6.5 | ⭐ PermifyStrategy - Permify authorization | [ ] |
-| 95.B6.6 | ⭐ CerbosStrategy - Cerbos policy engine | [ ] |
+| 95.B6.1 | ⭐ OpaStrategy - Open Policy Agent (Rego) | [x] |
+| 95.B6.2 | ⭐ CasbinStrategy - Casbin policy engine | [x] |
+| 95.B6.3 | ⭐ CedarStrategy - AWS Cedar policy language | [x] |
+| 95.B6.4 | ⭐ ZanzibarStrategy - Google Zanzibar-style ReBAC | [x] |
+| 95.B6.5 | ⭐ PermifyStrategy - Permify authorization | [x] |
+| 95.B6.6 | ⭐ CerbosStrategy - Cerbos policy engine | [x] |
 | **B7: Threat Detection & Response** |
 | 95.B7.1 | ThreatDetectionStrategy - Generic threat detection | [ ] |
 | 95.B7.2 | ⭐ SiemIntegrationStrategy - SIEM integration (Splunk, Sentinel) | [ ] |
