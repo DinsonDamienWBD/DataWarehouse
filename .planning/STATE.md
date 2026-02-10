@@ -10,18 +10,18 @@ See: .planning/PROJECT.md (updated 2026-02-10)
 ## Current Position
 
 Phase: 3 of 18 (Security Infrastructure) -- IN PROGRESS
-Plan: 4 of TBD in current phase (plan 03-04 complete)
-Status: Phase 03 in progress -- Plan 03-04 complete: Implemented 10 identity authentication strategies (IAM, LDAP, OAuth2, OIDC, SAML, Kerberos, RADIUS, TACACS+, SCIM, FIDO2) with real protocol implementations. 10 items synced in TODO.md.
-Last activity: 2026-02-10 — Completed 03-04-PLAN.md (Identity Strategies)
+Plan: 5 of TBD in current phase (plan 03-07 complete)
+Status: Phase 03 in progress -- Plan 03-07 complete: Implemented 9 threat detection strategies (ThreatDetection, SIEM, SOAR, UEBA, NDR, EDR, XDR, Honeypot, ThreatIntel) with AI message bus wiring to Intelligence plugin topics "intelligence.analyze" and "intelligence.enrich" plus rule-based fallbacks. 9 items synced in TODO.md.
+Last activity: 2026-02-10 — Completed 03-07-PLAN.md (Threat Detection Strategies)
 
 Progress: [#---------] 10% (estimate)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 21
-- Average duration: 5.9 min
-- Total execution time: 2.08 hours
+- Total plans completed: 22
+- Average duration: 6.0 min
+- Total execution time: 2.25 hours
 
 **By Phase:**
 
@@ -29,10 +29,10 @@ Progress: [#---------] 10% (estimate)
 |-------|-------|-------|----------|
 | 01 | 5 | 30 min | 6 min |
 | 02 | 12 | 74 min | 6 min |
-| 03 | 4 | 31 min | 8 min |
+| 03 | 5 | 41 min | 8 min |
 
 **Recent Trend:**
-- Last 5 plans: 03-04 (10 min), 03-06 (9 min), 03-01 (5 min), 03-03 (7 min), 02-07 (6 min)
+- Last 5 plans: 03-07 (10 min), 03-04 (10 min), 03-06 (9 min), 03-01 (5 min), 03-03 (7 min)
 - Trend: Stable
 
 *Updated after each plan completion*
@@ -77,6 +77,7 @@ Recent decisions affecting current work:
 - [Phase 03]: T93 verified production-ready -- 69 encryption strategies (exceeds 65 requirement); fixed NH hash in AdiantumStrategy (replaced HMAC-SHA256 with actual polynomial hash); fixed CompoundTransitStrategy to use real Serpent-GCM via BouncyCastle
 - [Phase 03]: T95.B5+B6 complete -- 11 Zero Trust and policy engine strategies implemented; B5.1 (ZeroTrustStrategy) already existed in Core/; 5 new Zero Trust strategies (SPIFFE/SPIRE, mTLS, service mesh, micro-segmentation, continuous verification); 6 policy engine integrations (OPA, Casbin, Cedar, Zanzibar, Permify, Cerbos); 12 items synced in TODO.md
 - [Phase 03]: T95.B3 complete -- 10 identity authentication strategies (IAM with PBKDF2+TOTP, LDAP via System.DirectoryServices.Protocols, OAuth2 with RFC 7662 introspection, OIDC with discovery, SAML 2.0 with XML signature validation, Kerberos SPNEGO/GSSAPI, RADIUS RFC 2865, TACACS+ RFC 8907, SCIM 2.0 RFC 7643/7644, FIDO2/WebAuthn); all production-ready with real protocol implementations; 10 items synced in TODO.md
+- [Phase 03]: T95.B7 complete -- 9 threat detection strategies (ThreatDetectionStrategy, SiemIntegrationStrategy, SoarStrategy, UebaStrategy, NdRStrategy, EdRStrategy, XdRStrategy, HoneypotStrategy, ThreatIntelStrategy); UebaStrategy uses message bus topic "intelligence.analyze" with Z-score fallback; ThreatIntelStrategy uses "intelligence.enrich" with STIX/TAXII fallback; all production-ready with explicit AI wiring and rule-based fallbacks; 9 items synced in TODO.md
 
 ### Pending Todos
 
@@ -88,8 +89,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-02-10 (Phase 03 plan 03-04 execution complete)
-Stopped at: Completed 03-04-PLAN.md — 10 identity authentication strategies (IAM, LDAP, OAuth2, OIDC, SAML, Kerberos, RADIUS, TACACS+, SCIM, FIDO2) with real protocol implementations
-Resume file: Ready for next plan in Phase 3 (Security Infrastructure)
-Stopped at: Completed 03-06-PLAN.md — Zero Trust & Policy Engine strategies (11 strategies: SPIFFE/SPIRE, mTLS, service mesh, micro-segmentation, continuous verification, OPA, Casbin, Cedar, Zanzibar, Permify, Cerbos)
+Last session: 2026-02-10 (Phase 03 plan 03-07 execution complete)
+Stopped at: Completed 03-07-PLAN.md — 9 threat detection strategies with AI message bus wiring (ThreatDetection, SIEM, SOAR, UEBA, NDR, EDR, XDR, Honeypot, ThreatIntel)
 Resume file: Ready for next plan in Phase 3 (Security Infrastructure)
