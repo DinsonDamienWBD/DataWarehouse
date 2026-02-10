@@ -89,13 +89,17 @@ Plans:
   3. UltimateAccessControl plugin orchestrator and security policy engine enforce access controls via message bus
   4. All access control strategies (RBAC, ABAC, MAC, DAC, PBAC, ReBac, HrBAC, ACL, Capability) are implemented
   5. All identity strategies (IAM, LDAP, OAuth2, OIDC, SAML, Kerberos, RADIUS, TACACS+, SCIM, FIDO2) and MFA strategies work end-to-end
-**Plans**: TBD
+**Plans**: 8 plans in 4 waves
 
 Plans:
-- [ ] 03-01: Verify and complete UltimateEncryption strategies (T93)
-- [ ] 03-02: Verify and complete UltimateKeyManagement strategies and envelope mode (T94)
-- [ ] 03-03: Verify and complete UltimateAccessControl orchestrator and access control strategies (T95.B1-B2)
-- [ ] 03-04: Verify and complete UltimateAccessControl identity and MFA strategies (T95.B3-B4)
+- [ ] 03-01-PLAN.md — Verify and complete UltimateEncryption strategies (T93)
+- [ ] 03-02-PLAN.md — Verify and complete UltimateKeyManagement tests and envelope benchmarks (T94)
+- [ ] 03-03-PLAN.md — Verify and complete UltimateAccessControl orchestrator and access control strategies (T95.B1-B2)
+- [ ] 03-04-PLAN.md — Implement UltimateAccessControl identity and MFA strategies (T95.B3-B4)
+- [ ] 03-05-PLAN.md — Implement Zero Trust, policy engines, and threat detection strategies (T95.B5-B7)
+- [ ] 03-06-PLAN.md — Implement integrity, data protection, military, and network security strategies (T95.B8-B11)
+- [ ] 03-07-PLAN.md — Implement advanced, embedded identity, and platform auth strategies (T95.B12-B14)
+- [ ] 03-08-PLAN.md — Complete duress, clearance, advanced features, and migration (T95.B15-B16, C, D)
 
 ### Phase 4: Compliance, Storage & Replication
 **Goal**: Compliance, storage, and replication plugins are complete with geo-dispersed capabilities
@@ -396,7 +400,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8 -> 9 -> 10
 |-------|----------------|--------|-----------|
 | 1. SDK Foundation & Base Classes | 5/5 | COMPLETE | 2026-02-10 |
 | 2. Core Infrastructure | 12/12 | COMPLETE | 2026-02-10 |
-| 3. Security Infrastructure | 0/4 | Not started | - |
+| 3. Security Infrastructure | 0/8 | Not started | - |
 | 4. Compliance, Storage & Replication | 0/5 | Not started | - |
 | 5. TamperProof Pipeline | 0/9 | Not started | - |
 | 6. Interface Layer | 0/9 | Not started | - |
