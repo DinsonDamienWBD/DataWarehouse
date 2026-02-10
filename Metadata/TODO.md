@@ -8131,11 +8131,11 @@ T95 focuses on **authorization and access control** - determining WHO can access
 | **B7: Threat Detection & Response** |
 | 95.B7.1 | ThreatDetectionStrategy - Generic threat detection | [x] |
 | 95.B7.2 | ⭐ SiemIntegrationStrategy - SIEM integration (Splunk, Sentinel) | [x] |
-| 95.B7.3 | ⭐ SoarStrategy - Security orchestration | 95.B7.3 | ⭐ SoarStrategy - Security orchestration & response | [ ] | response | [x] |
+| 95.B7.3 | ⭐ SoarStrategy - Security orchestration & response | [x] |
 | 95.B7.4 | ⭐ UebaStrategy - User/Entity Behavior Analytics (delegates ML to T90) | [x] |
-| 95.B7.5 | ⭐ NdRStrategy - Network Detection | 95.B7.5 | ⭐ NdRStrategy - Network Detection & Response | [ ] | Response | [x] |
-| 95.B7.6 | ⭐ EdRStrategy - Endpoint Detection | 95.B7.6 | ⭐ EdRStrategy - Endpoint Detection & Response | [ ] | Response | [x] |
-| 95.B7.7 | ⭐ XdRStrategy - Extended Detection | 95.B7.7 | ⭐ XdRStrategy - Extended Detection & Response | [ ] | Response | [x] |
+| 95.B7.5 | ⭐ NdRStrategy - Network Detection & Response | [x] |
+| 95.B7.6 | ⭐ EdRStrategy - Endpoint Detection & Response | [x] |
+| 95.B7.7 | ⭐ XdRStrategy - Extended Detection & Response | [x] |
 | 95.B7.8 | ⭐ HoneypotStrategy - Deception technology | [x] |
 | 95.B7.9 | ⭐ ThreatIntelStrategy - Threat intelligence feeds | [x] |
 | **B8: Data Integrity & Tamper Protection** |
