@@ -15,7 +15,7 @@
   <!-- Common HTTP/JSON packages for REST API-based strategies -->
   <ItemGroup>
     <PackageReference Include="System.Net.Http.Json" Version="10.0.2" />
-    <PackageReference Include="Microsoft.Data.SqlClient" Version="5.2.3" />
+    <PackageReference Include="Microsoft.Data.SqlClient" Version="6.1.4" />
   </ItemGroup>
 
   <!-- PKCS#11 Interop for HSM hardware security module integration -->
@@ -65,7 +65,7 @@
     <!-- Kubernetes client for K8s Secrets, External Secrets Operator, and Sealed Secrets -->
     <PackageReference Include="KubernetesClient" Version="18.0.13" />
     <!-- YAML parsing for SOPS and Kubernetes manifests -->
-    <PackageReference Include="YamlDotNet" Version="16.3.*" />
+    <PackageReference Include="YamlDotNet" Version="16.3.0" />
   </ItemGroup>
 
   <!-- Password-Derived Key Strategies -->

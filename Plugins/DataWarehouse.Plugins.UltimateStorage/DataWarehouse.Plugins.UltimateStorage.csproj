@@ -18,7 +18,7 @@
   <!-- Cloud Storage Providers -->
   <ItemGroup>
     <!-- AWS S3 -->
-    <PackageReference Include="AWSSDK.S3" Version="4.0.*" />
+    <PackageReference Include="AWSSDK.S3" Version="4.0.18.3" />
 
     <!-- Azure Blob Storage -->
     <PackageReference Include="Azure.Storage.Blobs" Version="12.27.0" />
@@ -96,11 +96,11 @@
     <!-- ODBC/Database Connectors -->
     <PackageReference Include="System.Data.Odbc" Version="10.*" />
     <PackageReference Include="System.Data.SqlClient" Version="4.9.*" />
-    <PackageReference Include="MySql.Data" Version="9.2.*" />
-    <PackageReference Include="Oracle.ManagedDataAccess.Core" Version="23.8.*" />
+    <PackageReference Include="MySql.Data" Version="9.6.0" />
+    <PackageReference Include="Oracle.ManagedDataAccess.Core" Version="23.26.100" />
 
     <!-- Kafka & Streaming -->
-    <PackageReference Include="Confluent.Kafka" Version="2.8.*" />
+    <PackageReference Include="Confluent.Kafka" Version="2.13.0" />
 
     <!-- Additional Dependencies -->
     <PackageReference Include="System.Linq.Async" Version="7.*" />

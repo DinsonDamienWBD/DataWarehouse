@@ -27,25 +27,25 @@
     <PackageReference Include="Microsoft.Data.SqlClient" Version="6.1.4" />
 
     <!-- Oracle TNS protocol -->
-    <PackageReference Include="Oracle.ManagedDataAccess.Core" Version="23.7.0" />
+    <PackageReference Include="Oracle.ManagedDataAccess.Core" Version="23.26.100" />
 
     <!-- MongoDB wire protocol -->
-    <PackageReference Include="MongoDB.Driver" Version="3.3.0" />
+    <PackageReference Include="MongoDB.Driver" Version="3.6.0" />
 
     <!-- Redis RESP protocol -->
-    <PackageReference Include="StackExchange.Redis" Version="2.9.55" />
+    <PackageReference Include="StackExchange.Redis" Version="2.10.14" />
 
     <!-- Cassandra CQL binary protocol -->
     <PackageReference Include="CassandraCSharpDriver" Version="3.22.0" />
 
     <!-- Elasticsearch transport protocol -->
-    <PackageReference Include="Elastic.Clients.Elasticsearch" Version="8.17.3" />
+    <PackageReference Include="Elastic.Clients.Elasticsearch" Version="9.3.0" />
 
     <!-- Neo4j Bolt protocol -->
     <PackageReference Include="Neo4j.Driver" Version="5.30.0" />
 
     <!-- InfluxDB line protocol -->
-    <PackageReference Include="InfluxDB.Client" Version="4.22.0" />
+    <PackageReference Include="InfluxDB.Client" Version="5.0.0" />
 
     <!-- Generic ADO.NET support -->
     <PackageReference Include="System.Data.Common" Version="4.3.0" />

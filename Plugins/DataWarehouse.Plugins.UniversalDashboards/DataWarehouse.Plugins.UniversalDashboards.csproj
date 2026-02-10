@@ -18,16 +18,16 @@
 
   <ItemGroup>
     <!-- HTTP client for API integrations -->
-    <PackageReference Include="System.Net.Http.Json" Version="10.0.0-preview.3.25171.5" />
+    <PackageReference Include="System.Net.Http.Json" Version="10.0.2" />
 
     <!-- WebSocket support for real-time updates -->
     <PackageReference Include="System.Net.WebSockets.Client" Version="4.3.2" />
 
     <!-- PDF generation -->
-    <PackageReference Include="QuestPDF" Version="2025.1.1" />
+    <PackageReference Include="QuestPDF" Version="2025.12.4" />
 
     <!-- Image processing for exports -->
-    <PackageReference Include="SkiaSharp" Version="3.119.0" />
+    <PackageReference Include="SkiaSharp" Version="3.119.2" />
 
     <!-- JSON handling -->
     <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />

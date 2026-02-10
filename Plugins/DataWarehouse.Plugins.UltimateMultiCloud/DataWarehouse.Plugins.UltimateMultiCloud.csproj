@@ -18,11 +18,11 @@
   <!-- Cloud Provider SDKs -->
   <ItemGroup>
     <!-- AWS -->
-    <PackageReference Include="AWSSDK.S3" Version="3.*" />
-    <PackageReference Include="AWSSDK.EC2" Version="3.*" />
-    <PackageReference Include="AWSSDK.CloudWatch" Version="3.*" />
-    <PackageReference Include="AWSSDK.CostExplorer" Version="3.*" />
-    <PackageReference Include="AWSSDK.SecurityToken" Version="3.*" />
+    <PackageReference Include="AWSSDK.S3" Version="4.0.18.3" />
+    <PackageReference Include="AWSSDK.EC2" Version="4.0.72" />
+    <PackageReference Include="AWSSDK.CloudWatch" Version="4.0.6.7" />
+    <PackageReference Include="AWSSDK.CostExplorer" Version="4.0.11.5" />
+    <PackageReference Include="AWSSDK.SecurityToken" Version="4.0.5.9" />
 
     <!-- Azure -->
     <PackageReference Include="Azure.ResourceManager" Version="1.*" />
@@ -33,8 +33,8 @@
     <!-- Google Cloud -->
     <PackageReference Include="Google.Cloud.Storage.V1" Version="4.*" />
     <PackageReference Include="Google.Cloud.Compute.V1" Version="3.*" />
-    <PackageReference Include="Google.Cloud.Monitoring.V3" Version="3.*" />
-    <PackageReference Include="Google.Cloud.Billing.V1" Version="2.*" />
+    <PackageReference Include="Google.Cloud.Monitoring.V3" Version="3.16.0" />
+    <PackageReference Include="Google.Cloud.Billing.V1" Version="3.10.0" />
 
     <!-- Multi-Cloud Tools -->
     <PackageReference Include="Pulumi.Automation" Version="3.*" />

@@ -3,10 +3,11 @@
     <File Path="Metadata/CLAUDE.md" />
     <File Path="Metadata/CODE_REVIEW_REPORT.md" />
     <File Path="Metadata/IMPROVEMENT_ROADMAP.md" />
+    <File Path="Metadata/Production_Readiness.md" />
     <File Path="Metadata/REFACTOR_STATUS.md" />
     <File Path="Metadata/RULES.md" />
-    <File Path="Metadata/TODO-T110-T111-ADDITIONS.md" />
     <File Path="Metadata/TODO.md" />
+    <File Path="Metadata/TODO_updated.md" />
   </Folder>
   <Folder Name="/Metadata/Adapter/">
     <File Path="Metadata/Adapter/AdapterFactory.cs" />
@@ -18,10 +19,10 @@
   <Folder Name="/Plugins/">
     <File Path="Plugin Readme.txt" />
     <Project Path="Plugins/DataWarehouse.Plugins.AccessLog/DataWarehouse.Plugins.AccessLog.csproj" />
-    <Project Path="Plugins/DataWarehouse.Plugins.AedsCore/DataWarehouse.Plugins.AedsCore.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.AccessPrediction/DataWarehouse.Plugins.AccessPrediction.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.AdaptiveTransport/DataWarehouse.Plugins.AdaptiveTransport.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.AdoNetProvider/DataWarehouse.Plugins.AdoNetProvider.csproj" />
+    <Project Path="Plugins/DataWarehouse.Plugins.AedsCore/DataWarehouse.Plugins.AedsCore.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.AIInterface/DataWarehouse.Plugins.AIInterface.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.Alerting/DataWarehouse.Plugins.Alerting.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.AlertingOps/DataWarehouse.Plugins.AlertingOps.csproj" />

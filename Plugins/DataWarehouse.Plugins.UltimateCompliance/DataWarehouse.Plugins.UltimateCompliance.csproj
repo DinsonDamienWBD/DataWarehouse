@@ -14,7 +14,7 @@
 
   <ItemGroup>
     <!-- MaxMind GeoIP for location detection -->
-    <PackageReference Include="MaxMind.GeoIP2" Version="5.3.*" />
+    <PackageReference Include="MaxMind.GeoIP2" Version="5.4.1" />
   </ItemGroup>
 
 </Project>

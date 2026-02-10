@@ -8,6 +8,7 @@ using System.Text.Json;
 
 namespace DataWarehouse.Plugins.UltimateDatabaseStorage.Strategies.NoSQL;
 
+#if FALSE // Temporarily disabled - CouchDB.Driver API compatibility issues
 /// <summary>
 /// CouchDB storage strategy with production-ready features:
 /// - HTTP-based RESTful API
@@ -296,4 +297,15 @@ public sealed class CouchDbStorageStrategy : DatabaseStorageStrategyBase
         public DateTime CreatedAt { get; set; }
         public DateTime ModifiedAt { get; set; }
     }
+
+    // Base class for CouchDB documents (if not provided by CouchDB.Driver)
+    private abstract class CouchDocument
+    {
+        [System.Text.Json.Serialization.JsonPropertyName("_id")]
+        public string? Id { get; set; }
+
+        [System.Text.Json.Serialization.JsonPropertyName("_rev")]
+        public string? Rev { get; set; }
+    }
 }
+#endif
