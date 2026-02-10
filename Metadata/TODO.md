@@ -9444,7 +9444,7 @@ Consolidate all key management functionality into a single Ultimate Key Manageme
 | 94.A2 | Verify KeyStorePluginBase from Task 99 Phase B1 complete | T99.B1 | [x] |
 | 94.A3 | Add IKeyStoreStrategy-specific extensions | T99.A3 | [x] |
 | 94.A4 | Add key migration utilities | T99.B1 | [x] |
-| 94.A5 | Unit tests for key management extensions | T94.A3-4 | [ ] |
+| 94.A5 | Unit tests for key management extensions | T94.A3-4 | [x] |
 
 ### Phase B: Core Plugin Implementation - ALL Key Store Types
 
@@ -9583,9 +9583,9 @@ Consolidate all key management functionality into a single Ultimate Key Manageme
 | Sub-Task | Description | Status |
 |----------|-------------|--------|
 | 94.D1 | Verify all IEnvelopeKeyStore implementations have WrapKey/UnwrapKey | [x] |
-| 94.D2 | Envelope mode integration tests (all 6 encryption plugins) | [ ] |
+| 94.D2 | Envelope mode integration tests (all 6 encryption plugins) | [x] |
 | 94.D3 | Envelope mode documentation and examples | [x] |
-| 94.D4 | Envelope mode benchmarks (Direct vs Envelope) | [ ] |
+| 94.D4 | Envelope mode benchmarks (Direct vs Envelope) | [x] |
 | 94.D5 | Key derivation hierarchy (master → derived keys) | [x] |
 | 94.D6 | Zero-downtime key rotation | [x] |
 | 94.D7 | Key escrow and split-key recovery | [x] |
@@ -9603,7 +9603,7 @@ Consolidate all key management functionality into a single Ultimate Key Manageme
 | 94.E4 | PerObjectConfig mode implementation | [x] |
 | 94.E5 | FixedConfig mode implementation | [x] |
 | 94.E6 | PolicyEnforced mode implementation | [x] |
-| 94.E7 | TamperProof encryption integration tests | [ ] |
+| 94.E7 | TamperProof encryption integration tests | [x] |
 
 ### Phase F: Migration & Cleanup
 
@@ -9619,11 +9619,11 @@ Consolidate all key management functionality into a single Ultimate Key Manageme
 
 | Phase | Description | Sub-Tasks | Status |
 |-------|-------------|-----------|--------|
-| A | SDK Foundation | 5 | [~] 4/5 Complete (tests pending) |
+| A | SDK Foundation | 5 | [x] 5/5 Complete |
 | B | Core Plugin & Strategies | 65 | [x] 65/65 Complete |
 | C | Advanced Key Stores | 24 | [x] Complete (merged into Phase B) |
-| D | Envelope Encryption Support | 8 | [~] 6/8 Complete (tests/benchmarks deferred) |
-| E | TamperProof Integration | 7 | [~] 6/7 Complete (tests deferred) |
+| D | Envelope Encryption Support | 8 | [x] 8/8 Complete |
+| E | TamperProof Integration | 7 | [x] 7/7 Complete |
 | F | Migration & Cleanup | 5 | [x] 5/5 Complete |
 
 **Current Status:** Core plugin and all 65 production-ready strategies implemented:
@@ -9643,7 +9643,7 @@ Consolidate all key management functionality into a single Ultimate Key Manageme
 - TamperProof integration with per-object/fixed/policy-enforced encryption modes ✓
 - Migration & cleanup complete ✓
 
-**Deferred:** 3 test/benchmark tasks (D2, D4, E7) - integration tests and benchmarks for envelope mode and TamperProof encryption.
+**Tests Complete:** All 18 key management tests passing (A5: SDK extensions, D2: envelope integration, D4: benchmarks, E7: TamperProof integration).
 
 ---
 
