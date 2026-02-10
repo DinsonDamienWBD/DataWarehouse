@@ -70,10 +70,10 @@ namespace DataWarehouse.Tests.Infrastructure
         #region InterfaceProtocol Enum Tests
 
         [Fact]
-        public void InterfaceProtocol_Has14Values()
+        public void InterfaceProtocol_Has15Values()
         {
             var values = Enum.GetValues<InterfaceProtocol>();
-            Assert.Equal(14, values.Length);
+            Assert.Equal(15, values.Length);
         }
 
         [Theory]
