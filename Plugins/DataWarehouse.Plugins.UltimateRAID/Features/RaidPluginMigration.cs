@@ -7,6 +7,26 @@ namespace DataWarehouse.Plugins.UltimateRAID.Features;
 /// 91.I1.1: RAID Plugin Migration - Infrastructure for absorbing legacy RAID plugins.
 /// Provides compatibility layer and migration tools for transitioning from old plugins
 /// to the Ultimate RAID plugin.
+///
+/// <para><b>MIGRATION STATUS:</b> All legacy RAID plugin functionality has been absorbed into
+/// UltimateRAID. The following plugins are deprecated and should not be used for new development:</para>
+/// <list type="bullet">
+/// <item><description>DataWarehouse.Plugins.Raid (91.I1.1) -- Use UltimateRAID RAID 0/1/5 strategies</description></item>
+/// <item><description>DataWarehouse.Plugins.StandardRaid (91.I1.2) -- Use UltimateRAID Standard strategies</description></item>
+/// <item><description>DataWarehouse.Plugins.AdvancedRaid (91.I1.3) -- Use UltimateRAID Extended strategies</description></item>
+/// <item><description>DataWarehouse.Plugins.EnhancedRaid (91.I1.4) -- Use UltimateRAID Extended strategies</description></item>
+/// <item><description>DataWarehouse.Plugins.NestedRaid (91.I1.5) -- Use UltimateRAID Nested strategies</description></item>
+/// <item><description>DataWarehouse.Plugins.SelfHealingRaid (91.I1.6) -- Use UltimateRAID Adaptive strategies</description></item>
+/// <item><description>DataWarehouse.Plugins.ZfsRaid (91.I1.7) -- Use UltimateRAID ZFS strategies</description></item>
+/// <item><description>DataWarehouse.Plugins.VendorSpecificRaid (91.I1.8) -- Use UltimateRAID Vendor strategies</description></item>
+/// <item><description>DataWarehouse.Plugins.ExtendedRaid (91.I1.9) -- Use UltimateRAID Extended strategies</description></item>
+/// <item><description>DataWarehouse.Plugins.AutoRaid (91.I1.10) -- Use UltimateRAID Adaptive strategies</description></item>
+/// <item><description>DataWarehouse.Plugins.SharedRaidUtilities (91.I1.11) -- GaloisField/ReedSolomon now in SDK</description></item>
+/// <item><description>DataWarehouse.Plugins.ErasureCoding (91.I1.12) -- Use UltimateRAID ErasureCoding strategies</description></item>
+/// </list>
+///
+/// <para><b>NOTE:</b> Actual file deletion of old plugin directories is deferred to Phase 18.
+/// During the transition period, old APIs continue to work via backward-compatible adapters.</para>
 /// </summary>
 public sealed class RaidPluginMigration
 {
@@ -381,7 +401,13 @@ public sealed class MigrationEntry
 
 /// <summary>
 /// Legacy RAID strategy adapter for backward compatibility.
+/// This adapter enables old RAID plugin API calls to work during the transition period.
 /// </summary>
+/// <remarks>
+/// <b>DEPRECATED:</b> This adapter is part of the migration infrastructure. Use UltimateRAID strategies
+/// directly instead of routing through legacy adapters. Old plugin directories will be removed in Phase 18.
+/// </remarks>
+[Obsolete("Legacy RAID plugins have been absorbed into UltimateRAID. Use IRaidStrategy implementations directly. Old plugins will be removed in Phase 18.")]
 public sealed class LegacyRaidStrategyAdapter
 {
     private readonly string _legacyId;
@@ -434,29 +460,79 @@ public sealed class LegacyRaidStrategyAdapter
 }
 
 /// <summary>
-/// Deprecation notice generator for legacy plugins.
+/// Deprecation notice generator for legacy RAID plugins.
+/// Provides migration guidance for each deprecated plugin.
 /// </summary>
+/// <remarks>
+/// All legacy RAID plugins are deprecated in favor of <see cref="UltimateRaidPlugin"/>.
+/// File deletion of old plugins is deferred to Phase 18.
+/// </remarks>
 public static class DeprecationNotices
 {
+    /// <summary>
+    /// Known deprecated plugins and their UltimateRAID replacement strategies.
+    /// </summary>
+    public static readonly IReadOnlyDictionary<string, string> DeprecatedPlugins = new Dictionary<string, string>
+    {
+        ["DataWarehouse.Plugins.Raid"] = "UltimateRAID Standard strategies (RAID 0/1/5)",
+        ["DataWarehouse.Plugins.StandardRaid"] = "UltimateRAID Standard strategies (RAID 0/1/5/6/10)",
+        ["DataWarehouse.Plugins.AdvancedRaid"] = "UltimateRAID Extended strategies (RAID 50/60, RAID-Z)",
+        ["DataWarehouse.Plugins.EnhancedRaid"] = "UltimateRAID Extended strategies (RAID 1E/5E/6E)",
+        ["DataWarehouse.Plugins.NestedRaid"] = "UltimateRAID Nested strategies (RAID 10/01/100)",
+        ["DataWarehouse.Plugins.SelfHealingRaid"] = "UltimateRAID Adaptive strategies (SelfHealing)",
+        ["DataWarehouse.Plugins.ZfsRaid"] = "UltimateRAID ZFS strategies (RAID-Z1/Z2/Z3)",
+        ["DataWarehouse.Plugins.VendorSpecificRaid"] = "UltimateRAID Vendor strategies (NetApp, Dell, HP, Synology)",
+        ["DataWarehouse.Plugins.ExtendedRaid"] = "UltimateRAID Extended strategies (Matrix, Tiered)",
+        ["DataWarehouse.Plugins.AutoRaid"] = "UltimateRAID Adaptive strategies (AutoLevelSelector)",
+        ["DataWarehouse.Plugins.SharedRaidUtilities"] = "DataWarehouse.SDK.Mathematics (GaloisField, ReedSolomon)",
+        ["DataWarehouse.Plugins.ErasureCoding"] = "UltimateRAID ErasureCoding strategies (ReedSolomon, LRC)"
+    };
+
+    /// <summary>
+    /// Generates a deprecation notice for a legacy plugin.
+    /// </summary>
+    /// <param name="pluginId">The legacy plugin identifier.</param>
+    /// <param name="replacementId">The replacement plugin/strategy identifier.</param>
+    /// <returns>A formatted deprecation notice string.</returns>
     public static string GenerateNotice(string pluginId, string replacementId)
     {
+        var replacement = DeprecatedPlugins.TryGetValue(pluginId, out var desc) ? desc : replacementId;
+
         return $"""
             [DEPRECATION NOTICE]
             Plugin: {pluginId}
             Status: DEPRECATED
-            Replacement: {replacementId}
+            Replacement: {replacement}
 
-            This plugin has been deprecated and will be removed in a future version.
-            Please migrate to the Ultimate RAID plugin ({replacementId}) for continued support.
+            This plugin has been deprecated and all functionality has been absorbed into
+            the Ultimate RAID plugin ({replacementId}).
+
+            During the transition period, backward compatibility is maintained through
+            the RaidPluginMigration class and LegacyRaidStrategyAdapter.
 
             Migration Guide:
-            1. Install Ultimate RAID plugin
-            2. Run migration tool: UltimateRaid.Migrate("{pluginId}")
-            3. Verify migrated arrays
+            1. Install Ultimate RAID plugin (com.datawarehouse.raid.ultimate)
+            2. Run migration tool: RaidPluginMigration.MigratePluginAsync("{pluginId}")
+            3. Verify migrated arrays using CompatibilityMapping
             4. Update configuration references
-            5. Remove deprecated plugin
+            5. Old plugin directories will be removed in Phase 18
 
             For assistance, see documentation or contact support.
             """;
     }
+
+    /// <summary>
+    /// Checks if a plugin ID refers to a deprecated RAID plugin.
+    /// </summary>
+    /// <param name="pluginId">The plugin identifier to check.</param>
+    /// <returns>True if the plugin is deprecated.</returns>
+    public static bool IsDeprecated(string pluginId) => DeprecatedPlugins.ContainsKey(pluginId);
+
+    /// <summary>
+    /// Gets the recommended replacement for a deprecated plugin.
+    /// </summary>
+    /// <param name="pluginId">The deprecated plugin identifier.</param>
+    /// <returns>The replacement description, or null if not found.</returns>
+    public static string? GetReplacement(string pluginId) =>
+        DeprecatedPlugins.TryGetValue(pluginId, out var replacement) ? replacement : null;
 }
