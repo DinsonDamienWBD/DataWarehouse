@@ -8095,16 +8095,16 @@ T95 focuses on **authorization and access control** - determining WHO can access
 | 95.B2.8 | ⭐ AclStrategy - Access Control Lists | [x] |
 | 95.B2.9 | ⭐ CapabilityStrategy - Capability-based security | [x] |
 | **B3: Identity Providers & Federation** |
-| 95.B3.1 | IamStrategy - Generic IAM framework | [ ] |
-| 95.B3.2 | ⭐ LdapStrategy - LDAP/Active Directory | [ ] |
-| 95.B3.3 | ⭐ OAuth2Strategy - OAuth 2.0 authorization | [ ] |
-| 95.B3.4 | ⭐ OidcStrategy - OpenID Connect | [ ] |
-| 95.B3.5 | ⭐ SamlStrategy - SAML 2.0 SSO | [ ] |
-| 95.B3.6 | ⭐ KerberosStrategy - Kerberos authentication | [ ] |
-| 95.B3.7 | ⭐ RadiusStrategy - RADIUS authentication | [ ] |
-| 95.B3.8 | ⭐ TacacsStrategy - TACACS+ | [ ] |
-| 95.B3.9 | ⭐ ScimStrategy - SCIM provisioning | [ ] |
-| 95.B3.10 | ⭐ Fido2Strategy - FIDO2/WebAuthn | [ ] |
+| 95.B3.1 | IamStrategy - Generic IAM framework | [x] |
+| 95.B3.2 | ⭐ LdapStrategy - LDAP/Active Directory | [x] |
+| 95.B3.3 | ⭐ OAuth2Strategy - OAuth 2.0 authorization | [x] |
+| 95.B3.4 | ⭐ OidcStrategy - OpenID Connect | [x] |
+| 95.B3.5 | ⭐ SamlStrategy - SAML 2.0 SSO | [x] |
+| 95.B3.6 | ⭐ KerberosStrategy - Kerberos authentication | [x] |
+| 95.B3.7 | ⭐ RadiusStrategy - RADIUS authentication | [x] |
+| 95.B3.8 | ⭐ TacacsStrategy - TACACS+ | [x] |
+| 95.B3.9 | ⭐ ScimStrategy - SCIM provisioning | [x] |
+| 95.B3.10 | ⭐ Fido2Strategy - FIDO2/WebAuthn | [x] |
 | **B4: Multi-Factor Authentication** |
 | 95.B4.1 | ⭐ TotpStrategy - Time-based OTP (Google Auth, Authy) | [ ] |
 | 95.B4.2 | ⭐ HotpStrategy - HMAC-based OTP | [ ] |
