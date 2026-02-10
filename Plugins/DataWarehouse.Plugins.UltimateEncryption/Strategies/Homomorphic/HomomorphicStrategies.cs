@@ -1015,10 +1015,9 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.Homomorphic
     }
 
     /// <summary>
-    /// BFV/BGV-style leveled homomorphic encryption placeholder.
+    /// BFV/BGV-style leveled fully homomorphic encryption strategy.
     ///
-    /// This is a placeholder for full FHE schemes that would require
-    /// external libraries like Microsoft SEAL or OpenFHE.
+    /// This strategy requires external libraries like Microsoft SEAL or OpenFHE.
     ///
     /// Status: NOT AVAILABLE - Requires native library integration.
     /// When full FHE is needed, integrate Microsoft SEAL via NuGet.
@@ -1085,7 +1084,7 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.Homomorphic
     }
 
     /// <summary>
-    /// CKKS-style approximate FHE placeholder for real number operations.
+    /// CKKS-style approximate fully homomorphic encryption for real number operations.
     ///
     /// Status: NOT AVAILABLE - Requires native library integration.
     /// </summary>
@@ -1141,7 +1140,7 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.Homomorphic
     }
 
     /// <summary>
-    /// TFHE placeholder for boolean circuit FHE.
+    /// TFHE (Torus Fully Homomorphic Encryption) for boolean circuit operations.
     ///
     /// Status: NOT AVAILABLE - Requires native library integration.
     /// </summary>
