@@ -290,4 +290,42 @@ namespace DataWarehouse.Plugins.UltimateAccessControl
             }
         }
     }
+
+    /// <summary>
+    /// Strategy decision detail for policy engine evaluation.
+    /// </summary>
+    public sealed record StrategyDecisionDetail
+    {
+        public required string StrategyId { get; init; }
+        public required string StrategyName { get; init; }
+        public required AccessDecision Decision { get; init; }
+        public double Weight { get; init; } = 1.0;
+        public string? Error { get; init; }
+    }
+
+    /// <summary>
+    /// Policy access decision with multi-strategy evaluation details.
+    /// </summary>
+    public sealed record PolicyAccessDecision
+    {
+        public required bool IsGranted { get; init; }
+        public required string Reason { get; init; }
+        public required string DecisionId { get; init; }
+        public required DateTime Timestamp { get; init; }
+        public required double EvaluationTimeMs { get; init; }
+        public required PolicyEvaluationMode EvaluationMode { get; init; }
+        public required IReadOnlyList<StrategyDecisionDetail> StrategyDecisions { get; init; }
+        public required AccessContext Context { get; init; }
+    }
+
+    /// <summary>
+    /// Policy evaluation mode forward declaration (defined in plugin).
+    /// </summary>
+    public enum PolicyEvaluationMode
+    {
+        AllMustAllow,
+        AnyMustAllow,
+        FirstMatch,
+        Weighted
+    }
 }

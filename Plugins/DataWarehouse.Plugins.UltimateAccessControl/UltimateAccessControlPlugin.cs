@@ -36,7 +36,10 @@ namespace DataWarehouse.Plugins.UltimateAccessControl
     public sealed class UltimateAccessControlPlugin : IntelligenceAwareAccessControlPluginBase, IDisposable
     {
         private readonly ConcurrentDictionary<string, IAccessControlStrategy> _strategies = new();
+        private readonly ConcurrentDictionary<string, double> _strategyWeights = new();
+        private readonly List<PolicyAccessDecision> _auditLog = new();
         private IAccessControlStrategy? _defaultStrategy;
+        private PolicyEvaluationMode _evaluationMode = PolicyEvaluationMode.FirstMatch;
         private bool _initialized;
         private bool _disposed;
 
@@ -82,6 +85,22 @@ namespace DataWarehouse.Plugins.UltimateAccessControl
         }
 
         /// <summary>
+        /// Sets the policy evaluation mode.
+        /// </summary>
+        public void SetEvaluationMode(PolicyEvaluationMode mode)
+        {
+            _evaluationMode = mode;
+        }
+
+        /// <summary>
+        /// Sets the weight for a strategy (used in Weighted evaluation mode).
+        /// </summary>
+        public void SetStrategyWeight(string strategyId, double weight)
+        {
+            _strategyWeights[strategyId] = weight;
+        }
+
+        /// <summary>
         /// Evaluates access using the specified or default strategy.
         /// </summary>
         public async Task<AccessDecision> EvaluateAccessAsync(
@@ -94,6 +113,162 @@ namespace DataWarehouse.Plugins.UltimateAccessControl
                 : _defaultStrategy ?? throw new InvalidOperationException("No default strategy configured");
 
             return await strategy.EvaluateAccessAsync(context, cancellationToken);
+        }
+
+        /// <summary>
+        /// Evaluates access using unified security policy engine with multiple strategies.
+        /// </summary>
+        public async Task<PolicyAccessDecision> EvaluateWithPolicyEngineAsync(
+            AccessContext context,
+            IEnumerable<string>? strategyIds = null,
+            PolicyEvaluationMode? mode = null,
+            CancellationToken cancellationToken = default)
+        {
+            var evaluationMode = mode ?? _evaluationMode;
+            var strategies = strategyIds != null
+                ? strategyIds.Select(id => GetStrategy(id)).Where(s => s != null).Cast<IAccessControlStrategy>().ToList()
+                : _strategies.Values.ToList();
+
+            if (!strategies.Any())
+            {
+                throw new InvalidOperationException("No strategies available for evaluation");
+            }
+
+            var startTime = DateTime.UtcNow;
+            var sw = System.Diagnostics.Stopwatch.StartNew();
+            var strategyDecisions = new List<StrategyDecisionDetail>();
+
+            // Evaluate all strategies
+            foreach (var strategy in strategies)
+            {
+                try
+                {
+                    var decision = await strategy.EvaluateAccessAsync(context, cancellationToken);
+                    strategyDecisions.Add(new StrategyDecisionDetail
+                    {
+                        StrategyId = strategy.StrategyId,
+                        StrategyName = strategy.StrategyName,
+                        Decision = decision,
+                        Weight = _strategyWeights.TryGetValue(strategy.StrategyId, out var w) ? w : 1.0
+                    });
+                }
+                catch (Exception ex)
+                {
+                    strategyDecisions.Add(new StrategyDecisionDetail
+                    {
+                        StrategyId = strategy.StrategyId,
+                        StrategyName = strategy.StrategyName,
+                        Decision = new AccessDecision
+                        {
+                            IsGranted = false,
+                            Reason = $"Strategy evaluation failed: {ex.Message}"
+                        },
+                        Weight = 0,
+                        Error = ex.Message
+                    });
+                }
+            }
+
+            sw.Stop();
+
+            // Apply policy evaluation mode
+            var finalDecision = ApplyPolicyEvaluationMode(strategyDecisions, evaluationMode);
+            var policyDecision = new PolicyAccessDecision
+            {
+                IsGranted = finalDecision.IsGranted,
+                Reason = finalDecision.Reason,
+                DecisionId = Guid.NewGuid().ToString("N"),
+                Timestamp = startTime,
+                EvaluationTimeMs = sw.Elapsed.TotalMilliseconds,
+                EvaluationMode = evaluationMode,
+                StrategyDecisions = strategyDecisions.AsReadOnly(),
+                Context = context
+            };
+
+            // Audit logging
+            LogAccessDecision(policyDecision);
+
+            return policyDecision;
+        }
+
+        private (bool IsGranted, string Reason) ApplyPolicyEvaluationMode(
+            List<StrategyDecisionDetail> decisions,
+            PolicyEvaluationMode mode)
+        {
+            return mode switch
+            {
+                PolicyEvaluationMode.AllMustAllow => EvaluateAllMustAllow(decisions),
+                PolicyEvaluationMode.AnyMustAllow => EvaluateAnyMustAllow(decisions),
+                PolicyEvaluationMode.FirstMatch => EvaluateFirstMatch(decisions),
+                PolicyEvaluationMode.Weighted => EvaluateWeighted(decisions),
+                _ => (false, "Unknown evaluation mode")
+            };
+        }
+
+        private (bool IsGranted, string Reason) EvaluateAllMustAllow(List<StrategyDecisionDetail> decisions)
+        {
+            var deniedStrategies = decisions.Where(d => !d.Decision.IsGranted).ToList();
+            if (deniedStrategies.Any())
+            {
+                var deniedNames = string.Join(", ", deniedStrategies.Select(d => d.StrategyName));
+                return (false, $"Access denied by AllMustAllow mode - denied by: {deniedNames}");
+            }
+
+            return (true, "Access granted - all strategies allowed");
+        }
+
+        private (bool IsGranted, string Reason) EvaluateAnyMustAllow(List<StrategyDecisionDetail> decisions)
+        {
+            var grantedStrategy = decisions.FirstOrDefault(d => d.Decision.IsGranted);
+            if (grantedStrategy != null)
+            {
+                return (true, $"Access granted by AnyMustAllow mode - allowed by: {grantedStrategy.StrategyName}");
+            }
+
+            return (false, "Access denied by AnyMustAllow mode - no strategy allowed");
+        }
+
+        private (bool IsGranted, string Reason) EvaluateFirstMatch(List<StrategyDecisionDetail> decisions)
+        {
+            var firstDecision = decisions.FirstOrDefault();
+            if (firstDecision != null)
+            {
+                return (firstDecision.Decision.IsGranted,
+                    $"First match: {firstDecision.StrategyName} - {firstDecision.Decision.Reason}");
+            }
+
+            return (false, "No strategy evaluated");
+        }
+
+        private (bool IsGranted, string Reason) EvaluateWeighted(List<StrategyDecisionDetail> decisions)
+        {
+            var totalWeight = decisions.Sum(d => d.Weight);
+            var grantedWeight = decisions.Where(d => d.Decision.IsGranted).Sum(d => d.Weight);
+            var grantedPercentage = totalWeight > 0 ? (grantedWeight / totalWeight) * 100 : 0;
+
+            // Threshold: require >50% weighted approval
+            var isGranted = grantedPercentage > 50;
+            return (isGranted,
+                $"Weighted decision: {grantedPercentage:F1}% approval ({grantedWeight}/{totalWeight}) - {(isGranted ? "granted" : "denied")}");
+        }
+
+        private void LogAccessDecision(PolicyAccessDecision decision)
+        {
+            _auditLog.Add(decision);
+
+            // Keep only last 1000 decisions in memory
+            if (_auditLog.Count > 1000)
+            {
+                _auditLog.RemoveRange(0, _auditLog.Count - 1000);
+            }
+        }
+
+        /// <summary>
+        /// Gets recent access decisions for audit purposes.
+        /// </summary>
+        public IReadOnlyList<PolicyAccessDecision> GetAuditLog(int maxCount = 100)
+        {
+            return _auditLog.TakeLast(maxCount).ToList().AsReadOnly();
         }
 
         /// <inheritdoc/>
