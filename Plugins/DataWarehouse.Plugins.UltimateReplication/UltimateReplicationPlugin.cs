@@ -29,14 +29,21 @@ using DataWarehouse.Plugins.UltimateReplication.Strategies.GeoReplication;
 namespace DataWarehouse.Plugins.UltimateReplication
 {
     /// <summary>
-    /// Ultimate Replication plugin consolidating 60+ comprehensive replication strategies.
-    /// Provides CRDT-based, multi-master, real-time, delta, geo, cross-region, federation,
-    /// federated query, cloud-native, active-active, CDC, AI-enhanced, conflict resolution,
-    /// topology-based, specialized, disaster recovery, and air-gap replication with full
-    /// vector clock support, conflict resolution, lag tracking, and anti-entropy protocols.
+    /// Ultimate Replication plugin — the canonical replication handler for DataWarehouse.
+    /// Consolidates 60 comprehensive replication strategies across 15 categories with
+    /// 12 advanced features including geo-dispersed WORM replication and geo-distributed sharding.
     /// </summary>
     /// <remarks>
-    /// Supported replication strategy categories:
+    /// <para><b>Migration Guide (Phase D):</b></para>
+    /// <para>
+    /// UltimateReplication supersedes all prior replication plugins. Migrate by subscribing to
+    /// "replication.ultimate.*" topics instead of legacy "replication.*" topics. All strategy
+    /// selection, conflict resolution, and replication operations are handled through this plugin.
+    /// Legacy replication plugins (SimpleReplication, BasicReplication, GeoReplication) are
+    /// deprecated and will be removed in Phase 18.
+    /// </para>
+    ///
+    /// <para><b>Supported replication strategy categories (60 strategies):</b></para>
     /// <list type="bullet">
     ///   <item>Core: CRDT, MultiMaster, RealTimeSync, DeltaSync</item>
     ///   <item>Geo: GeoReplication, CrossRegion, PrimarySecondary</item>
@@ -53,15 +60,42 @@ namespace DataWarehouse.Plugins.UltimateReplication
     ///   <item>Sync Modes: Synchronous, Asynchronous</item>
     /// </list>
     ///
-    /// Message Commands:
-    /// - replication.strategy.list: List available strategies
-    /// - replication.strategy.select: Select active strategy
-    /// - replication.strategy.info: Get strategy details
-    /// - replication.replicate: Replicate data
-    /// - replication.status: Get replication status
-    /// - replication.lag: Get replication lag
-    /// - replication.conflict.detect: Detect conflicts
-    /// - replication.conflict.resolve: Resolve conflicts
+    /// <para><b>Advanced Features (12):</b></para>
+    /// <list type="bullet">
+    ///   <item>C1: Global Transaction Coordination (2PC/3PC)</item>
+    ///   <item>C2: Smart Conflict Resolution (semantic merge + LWW fallback)</item>
+    ///   <item>C3: Bandwidth-Aware Scheduling</item>
+    ///   <item>C4: Priority-Based Queue</item>
+    ///   <item>C5: Partial Replication (tag/pattern/size/age filters)</item>
+    ///   <item>C6: Replication Lag Monitoring (warning/critical/emergency alerts)</item>
+    ///   <item>C7: Cross-Cloud Replication (AWS/Azure/GCP)</item>
+    ///   <item>C8: RAID Integration (parity check, erasure rebuild)</item>
+    ///   <item>C9: Storage Integration (read/write via message bus)</item>
+    ///   <item>C10: Intelligence Integration (AI conflict prediction + rule-based fallback)</item>
+    ///   <item>T5.5: Geo-Dispersed WORM Replication (compliance/enterprise modes)</item>
+    ///   <item>T5.6: Geo-Distributed Sharding (erasure coding across continents)</item>
+    /// </list>
+    ///
+    /// <para><b>Message Commands:</b></para>
+    /// <list type="bullet">
+    ///   <item>replication.strategy.list: List available strategies</item>
+    ///   <item>replication.strategy.select: Select active strategy</item>
+    ///   <item>replication.strategy.info: Get strategy details</item>
+    ///   <item>replication.replicate: Replicate data</item>
+    ///   <item>replication.status: Get replication status</item>
+    ///   <item>replication.lag: Get replication lag</item>
+    ///   <item>replication.conflict.detect: Detect conflicts</item>
+    ///   <item>replication.conflict.resolve: Resolve conflicts</item>
+    ///   <item>replication.ultimate.worm.replicate: Geo-dispersed WORM replication</item>
+    ///   <item>replication.ultimate.shard.distribute: Geo-distributed sharding</item>
+    /// </list>
+    ///
+    /// <para><b>Deprecation Notice:</b></para>
+    /// <para>
+    /// [Obsolete] Legacy replication plugins are deprecated. Use UltimateReplication for all
+    /// replication operations. Migration path: replace direct plugin references with message
+    /// bus topics prefixed "replication.ultimate.*". File deletion deferred to Phase 18.
+    /// </para>
     /// </remarks>
     public sealed class UltimateReplicationPlugin : IntelligenceAwarePluginBase
     {
