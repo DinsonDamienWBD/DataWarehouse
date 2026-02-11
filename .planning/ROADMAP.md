@@ -373,10 +373,12 @@ Plans:
   4. Certification process validates plugin quality and security
   5. Rating and review system enables community feedback
   6. Analytics track plugin usage and popularity
-**Plans**: 7 plans in 1 wave
+**Plans**: 3 plans in 2 waves
 
 Plans:
-- [ ] 17-01: Verify and complete plugin marketplace (T57)
+- [ ] 17-01-PLAN.md — Create PluginMarketplace plugin with catalog, message handlers, dependency resolution, version archiving (T57 core)
+- [ ] 17-02-PLAN.md — Add certification pipeline, rating/review system, and revenue tracking (T57 certification + reviews + revenue)
+- [ ] 17-03-PLAN.md — Add usage analytics, final build verification, and mark T57 complete (T57 analytics + completion)
 
 ### Phase 18: Plugin Deprecation & File Cleanup
 **Goal**: All plugins whose features have been fully migrated into Ultimate/Universal plugins are deprecated, removed from the solution, and their files/folders deleted
@@ -483,7 +485,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8 -> 9 -> 10
 | 14. Other Ultimate Plugins | 0/5 | Not started | - |
 | 15. Bug Fixes & Build Health | 0/4 | Not started | - |
 | 16. Testing & Quality Assurance | 0/2 | Not started | - |
-| 17. Plugin Marketplace | 0/1 | Not started | - |
+| 17. Plugin Marketplace | 0/3 | Planned | - |
 | 18. Plugin Deprecation & File Cleanup | 0/3 | Not started | - |
 | 19. Application Platform Services | 0/4 | Not started | - |
 | 20. WASM/WASI Language Ecosystem | 0/4 | Not started | - |
