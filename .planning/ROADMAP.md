@@ -390,12 +390,12 @@ Plans:
   3. Each identified plugin's project folder and all contained files are deleted from the repository
   4. No remaining code references the deleted plugins (no broken using statements, project references, or message bus registrations)
   5. Solution builds cleanly after all removals
-**Plans**: 7 plans in 1 wave
+**Plans**: 3 plans in 3 waves
 
 Plans:
-- [ ] 18-01: Identify all plugins migrated into Ultimate/Universal plugins
-- [ ] 18-02: Remove migrated plugins from DataWarehouse.slnx and delete their files/folders
-- [ ] 18-03: Clean up any remaining references and verify clean build
+- [ ] 18-01-PLAN.md — Verify inventory of 88 deprecated plugins against filesystem and slnx (T108 verification)
+- [ ] 18-02-PLAN.md — Remove 66 slnx entries, delete 88 plugin directories, clean 17 orphaned test files (T108 execution)
+- [ ] 18-03-PLAN.md — Scan for orphaned references, update TODO.md, verify clean build (T108 completion)
 
 ### Phase 19: Application Platform Services
 **Goal**: DW becomes a platform that registered applications (e.g., SoftwareCenter) can consume — per-app service routing, per-app AI workflows, per-app access control policies, and per-app observability
@@ -486,7 +486,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8 -> 9 -> 10
 | 15. Bug Fixes & Build Health | 0/4 | Planned | - |
 | 16. Testing & Quality Assurance | 0/2 | Planned | - |
 | 17. Plugin Marketplace | 0/3 | Planned | - |
-| 18. Plugin Deprecation & File Cleanup | 0/3 | Not started | - |
+| 18. Plugin Deprecation & File Cleanup | 0/3 | Planned | - |
 | 19. Application Platform Services | 0/4 | Planned | - |
 | 20. WASM/WASI Language Ecosystem | 0/4 | Planned | - |
 | 21. UltimateDataTransit | 0/5 | Planned | - |
