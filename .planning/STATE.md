@@ -5,14 +5,14 @@
 See: .planning/PROJECT.md (updated 2026-02-10)
 
 **Core value:** Every feature listed in the task tracker must be fully production-ready — no placeholders, no simulations, no stubs, no deferred logic. The codebase must match what the task list claims is "complete."
-**Current focus:** Phase 19 Plan 02 COMPLETE — Per-app access policy isolation and service routing
+**Current focus:** Phase 19 Plan 03 COMPLETE — Per-app AI workflow configuration and Intelligence routing
 
 ## Current Position
 
 Phase: 19 of 22 (Application Platform Services)
-Plan: 2 of 4 in Phase 19 (19-02 COMPLETE)
-Status: 19-02 COMPLETE — AppAccessPolicy (RBAC/ABAC/MAC/DAC/PBAC), AppContextRouter (token+scope+status validation), 6 service routes + 4 policy handlers
-Last activity: 2026-02-11 — Completed 19-02: Access Policy Isolation and Service Routing
+Plan: 3 of 4 in Phase 19 (19-03 COMPLETE)
+Status: 19-03 COMPLETE — AppAiWorkflowConfig (Auto/Manual/Budget/Approval), AppAiWorkflowStrategy (budget+concurrency+operation enforcement), 7 AI workflow topic handlers
+Last activity: 2026-02-11 — Completed 19-03: Per-App AI Workflow Configuration
 
 Progress: [######----] 65%
 
@@ -103,6 +103,7 @@ Progress: [######----] 65%
 | Phase 13 P05 | 5 min | 2 tasks | 2 files |
 | Phase 19 P01 | 4 min | 2 tasks | 8 files |
 | Phase 19 P02 | 5 min | 2 tasks | 6 files |
+| Phase 19 P03 | 5 min | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -204,6 +205,7 @@ Recent decisions affecting current work:
 - [Phase 13-05]: 4 Intelligent Governance strategies (T146.B5) implemented -- PolicyRecommendationStrategy (scored template matching: 50% sensitivity + 30% framework + 20% risk, 5 seeded templates), ComplianceGapDetectorStrategy (GDPR 5 + HIPAA 5 + PCI-DSS 4 = 14 requirements), SensitivityClassifierStrategy (9 compiled regex rules for PII/PHI/PCI across 3 sensitivity levels), RetentionOptimizerStrategy (value scoring: 30% access frequency + 30% recency + 40% criticality, 4 regulatory minimums); changed nested records from internal to public for method accessibility
 - [Phase 19-01]: AppPlatform plugin uses IntelligenceAwarePluginBase for T90 integration; SHA256.HashData for token hashing; 30s validation cache TTL; tenant provisioning via accesscontrol.tenant.register message bus topic
 - [Phase 19-02]: Per-app access policy supports 5 models (RBAC/ABAC/MAC/DAC/PBAC); AppContextRouter validates token + scope + app status in 3-step pipeline; enriched messages include AppId, AppContext, ServiceTokenId; policy topics use platform.policy.* prefix distinct from accesscontrol.policy.* downstream topics
+- [Phase 19-03]: Per-app AI workflow with 4 modes (Auto/Manual/Budget/Approval); budget enforcement (monthly + per-request); concurrency limiting via Interlocked; ConcurrentDictionary<string, int> for live concurrent counts separate from immutable AiUsageTracking record; automatic monthly period reset; Intelligence routing via intelligence.workflow.configure, intelligence.workflow.remove, intelligence.request topics
 - [Phase 12-01]: AEDS core plugins verified - Http2DataPlanePlugin 100% production-ready (0 TODOs, full HTTP/2 implementation), 3 core plugins 75-85% complete with critical P0 gaps: signature verification in AedsCorePlugin/ClientCourierPlugin requires T94 UltimateKeyManagement integration, Control Plane wiring in ServerDispatcherPlugin uses Task.Delay simulation; 6 TODOs identified, 3 require immediate fix before production use
 - [Phase 17-01]: T57 Plugin Marketplace complete -- PluginMarketplacePlugin (2000 lines) with 4 GUI message handlers (list/install/uninstall/update), topological sort dependency resolution, version archiving with rollback, persistent JSON catalog, 21 built-in plugin definitions; uses built-in catalog population instead of runtime reflection scanning
 - [Phase 17-02]: T57 certification + reviews + revenue complete -- 5-stage certification pipeline (Security Scan/SDK Compat/Deps/Static Analysis/Scoring) with kernel.plugin.validate message bus integration; multi-dimensional review system (reliability/performance/documentation ratings); decimal-precision revenue tracking with 30% commission; review data flows to GUI via marketplace.list
@@ -220,6 +222,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-02-11 (Phase 19 Plan 02 COMPLETE)
-Stopped at: Completed 19-02-PLAN.md (Access Policy Isolation and Service Routing)
-Resume file: Phase 19 Plan 02 complete. Ready for 19-03.
+Last session: 2026-02-11 (Phase 19 Plan 03 COMPLETE)
+Stopped at: Completed 19-03-PLAN.md (Per-App AI Workflow Configuration)
+Resume file: Phase 19 Plan 03 complete. Ready for 19-04.
