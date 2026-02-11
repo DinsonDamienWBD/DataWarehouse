@@ -10980,12 +10980,12 @@ public enum InterfaceProtocol { REST, gRPC, GraphQL, SQL, WebSocket, MQTT, AMQP,
 | 109.B2.5 | ⭐ ODataStrategy - OData protocol | [x] |
 | 109.B2.6 | ⭐ FalcorStrategy - Netflix Falcor | [x] |
 | **B3: RPC Protocols** |
-| 109.B3.1 | GrpcStrategy - gRPC with protobuf | [ ] |
-| 109.B3.2 | ⭐ GrpcWebStrategy - gRPC-Web for browsers | [ ] |
-| 109.B3.3 | ⭐ ConnectRpcStrategy - Connect RPC | [ ] |
-| 109.B3.4 | ⭐ TwirpStrategy - Twirp RPC | [ ] |
-| 109.B3.5 | ⭐ JsonRpcStrategy - JSON-RPC 2.0 | [ ] |
-| 109.B3.6 | ⭐ XmlRpcStrategy - XML-RPC | [ ] |
+| 109.B3.1 | GrpcStrategy - gRPC with protobuf | [x] |
+| 109.B3.2 | ⭐ GrpcWebStrategy - gRPC-Web for browsers | [x] |
+| 109.B3.3 | ⭐ ConnectRpcStrategy - Connect RPC | [x] |
+| 109.B3.4 | ⭐ TwirpStrategy - Twirp RPC | [x] |
+| 109.B3.5 | ⭐ JsonRpcStrategy - JSON-RPC 2.0 | [x] |
+| 109.B3.6 | ⭐ XmlRpcStrategy - XML-RPC | [x] |
 | **B4: Query Languages** |
 | 109.B4.1 | GraphQlStrategy - GraphQL API | [x] |
 | 109.B4.2 | SqlStrategy - SQL interface | [x] |
