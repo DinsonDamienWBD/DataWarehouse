@@ -86,79 +86,95 @@ public sealed class DeltaSyncPlugin : FeaturePluginBase
     /// <summary>
     /// Computes delta between base version and new version.
     /// </summary>
-    /// <param name="payloadId">Payload ID of the new version.</param>
-    /// <param name="baseVersion">Base version identifier.</param>
+    /// <param name="baseStream">Base version stream.</param>
+    /// <param name="targetStream">Target version stream.</param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>Delta descriptor with diff instructions.</returns>
     public async Task<DeltaDescriptor> ComputeDeltaAsync(
-        string payloadId,
-        string baseVersion,
+        Stream baseStream,
+        Stream targetStream,
         CancellationToken ct = default)
     {
-        if (string.IsNullOrEmpty(payloadId))
-            throw new ArgumentException("Payload ID cannot be null or empty.", nameof(payloadId));
-        if (string.IsNullOrEmpty(baseVersion))
-            throw new ArgumentException("Base version cannot be null or empty.", nameof(baseVersion));
+        if (baseStream == null)
+            throw new ArgumentNullException(nameof(baseStream));
+        if (targetStream == null)
+            throw new ArgumentNullException(nameof(targetStream));
 
-        var request = new PluginMessage
+        var baseSignature = await GenerateSignatureAsync(baseStream, ct);
+        var targetSignature = await GenerateSignatureAsync(targetStream, ct);
+
+        var addedChunks = new List<int>();
+        var removedChunks = new List<int>();
+        var modifiedChunks = new List<DeltaChunk>();
+
+        // Find added chunks (in target but not in base)
+        for (int i = 0; i < targetSignature.Length; i++)
         {
-            Type = "aeds.compute-delta",
-            SourcePluginId = Name,
-            Payload = new Dictionary<string, object>
+            if (i >= baseSignature.Length || baseSignature[i] != targetSignature[i])
             {
-                ["payloadId"] = payloadId,
-                ["baseVersion"] = baseVersion,
-                ["requestedAt"] = DateTimeOffset.UtcNow
+                addedChunks.Add(i);
+
+                // Read the chunk data from target
+                targetStream.Position = i * SignatureChunkSize;
+                var buffer = new byte[SignatureChunkSize];
+                var bytesRead = await targetStream.ReadAsync(buffer, 0, SignatureChunkSize, ct);
+
+                var chunkData = new byte[bytesRead];
+                Array.Copy(buffer, chunkData, bytesRead);
+
+                modifiedChunks.Add(new DeltaChunk(i, i * SignatureChunkSize, chunkData, DeltaOperation.InsertNew));
             }
-        };
-
-        var response = await MessageBus.PublishAsync(request, ct);
-
-        if (response?.Payload is Dictionary<string, object> payload)
-        {
-            var addedChunks = ParseIntArray(payload, "addedChunks");
-            var removedChunks = ParseIntArray(payload, "removedChunks");
-            var modifiedChunksObj = payload.GetValueOrDefault("modifiedChunks");
-            var deltaSize = payload.TryGetValue("deltaSizeBytes", out var sizeObj) && sizeObj is long size ? size : 0L;
-
-            var modifiedChunks = ParseModifiedChunks(modifiedChunksObj);
-
-            return new DeltaDescriptor(addedChunks, removedChunks, modifiedChunks, deltaSize);
         }
 
-        throw new InvalidOperationException($"Failed to compute delta for payload {payloadId}.");
+        // Find removed chunks (in base but not in target)
+        for (int i = targetSignature.Length; i < baseSignature.Length; i++)
+        {
+            removedChunks.Add(i);
+        }
+
+        var deltaSizeBytes = modifiedChunks.Sum(c => c.NewData?.Length ?? 0);
+
+        return new DeltaDescriptor(
+            addedChunks.ToArray(),
+            removedChunks.ToArray(),
+            modifiedChunks.ToArray(),
+            deltaSizeBytes
+        );
     }
 
     /// <summary>
     /// Applies delta to base stream to reconstruct target.
     /// </summary>
     /// <param name="baseStream">Base version stream.</param>
-    /// <param name="deltaStream">Delta instructions stream.</param>
+    /// <param name="delta">Delta descriptor.</param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>Reconstructed stream.</returns>
     public async Task<Stream> ApplyDeltaAsync(
         Stream baseStream,
-        Stream deltaStream,
+        DeltaDescriptor delta,
         CancellationToken ct = default)
     {
         if (baseStream == null)
             throw new ArgumentNullException(nameof(baseStream));
-        if (deltaStream == null)
-            throw new ArgumentNullException(nameof(deltaStream));
+        if (delta == null)
+            throw new ArgumentNullException(nameof(delta));
 
         var resultStream = new MemoryStream();
-        var deltaDescriptor = await ReadDeltaDescriptorAsync(deltaStream, ct);
-
         var baseData = new byte[baseStream.Length];
         await baseStream.ReadAsync(baseData, 0, (int)baseStream.Length, ct);
 
-        foreach (var chunk in deltaDescriptor.ModifiedChunks.OrderBy(c => c.ChunkIndex))
+        var processedChunks = new HashSet<int>(delta.RemovedChunks);
+
+        foreach (var chunk in delta.ModifiedChunks.OrderBy(c => c.ChunkIndex))
         {
             switch (chunk.Operation)
             {
                 case DeltaOperation.CopyFromBase:
-                    var copyLength = Math.Min(SignatureChunkSize, baseData.Length - chunk.BaseOffset);
-                    await resultStream.WriteAsync(baseData, (int)chunk.BaseOffset, (int)copyLength, ct);
+                    if (chunk.BaseOffset < baseData.Length)
+                    {
+                        var copyLength = Math.Min(SignatureChunkSize, baseData.Length - chunk.BaseOffset);
+                        await resultStream.WriteAsync(baseData, (int)chunk.BaseOffset, (int)copyLength, ct);
+                    }
                     break;
 
                 case DeltaOperation.InsertNew:
@@ -167,6 +183,20 @@ public sealed class DeltaSyncPlugin : FeaturePluginBase
                         await resultStream.WriteAsync(chunk.NewData, 0, chunk.NewData.Length, ct);
                     }
                     break;
+            }
+
+            processedChunks.Add(chunk.ChunkIndex);
+        }
+
+        // Copy unchanged chunks from base
+        var maxChunks = (int)Math.Ceiling(baseData.Length / (double)SignatureChunkSize);
+        for (int i = 0; i < maxChunks; i++)
+        {
+            if (!processedChunks.Contains(i))
+            {
+                var offset = i * SignatureChunkSize;
+                var length = Math.Min(SignatureChunkSize, baseData.Length - offset);
+                await resultStream.WriteAsync(baseData, offset, length, ct);
             }
         }
 
@@ -201,6 +231,7 @@ public sealed class DeltaSyncPlugin : FeaturePluginBase
         if (stream == null)
             throw new ArgumentNullException(nameof(stream));
 
+        stream.Position = 0;
         var signatures = new List<string>();
         var buffer = new byte[SignatureChunkSize];
         int bytesRead;
@@ -244,64 +275,6 @@ public sealed class DeltaSyncPlugin : FeaturePluginBase
     public static bool IsEnabled(ClientCapabilities capabilities)
     {
         return capabilities.HasFlag(ClientCapabilities.DeltaSync);
-    }
-
-    private int[] ParseIntArray(Dictionary<string, object> payload, string key)
-    {
-        if (payload.TryGetValue(key, out var value))
-        {
-            return value switch
-            {
-                int[] arr => arr,
-                List<int> list => list.ToArray(),
-                _ => Array.Empty<int>()
-            };
-        }
-        return Array.Empty<int>();
-    }
-
-    private DeltaChunk[] ParseModifiedChunks(object? chunksObj)
-    {
-        if (chunksObj is not List<object> chunksList)
-            return Array.Empty<DeltaChunk>();
-
-        var chunks = new List<DeltaChunk>();
-
-        foreach (var chunkObj in chunksList)
-        {
-            if (chunkObj is Dictionary<string, object> chunkDict)
-            {
-                var chunkIndex = chunkDict.TryGetValue("chunkIndex", out var idxObj) && idxObj is int idx ? idx : 0;
-                var baseOffset = chunkDict.TryGetValue("baseOffset", out var offsetObj) && offsetObj is long offset ? offset : 0L;
-                var newData = chunkDict.TryGetValue("newData", out var dataObj) && dataObj is byte[] data ? data : null;
-                var operation = chunkDict.TryGetValue("operation", out var opObj) && opObj is string opStr &&
-                                Enum.TryParse<DeltaOperation>(opStr, out var op) ? op : DeltaOperation.CopyFromBase;
-
-                chunks.Add(new DeltaChunk(chunkIndex, baseOffset, newData, operation));
-            }
-        }
-
-        return chunks.ToArray();
-    }
-
-    private async Task<DeltaDescriptor> ReadDeltaDescriptorAsync(Stream deltaStream, CancellationToken ct)
-    {
-        using var reader = new StreamReader(deltaStream, Encoding.UTF8, leaveOpen: true);
-        var json = await reader.ReadToEndAsync(ct);
-
-        var payload = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, object>>(json);
-
-        if (payload == null)
-            throw new InvalidOperationException("Failed to parse delta descriptor.");
-
-        var addedChunks = ParseIntArray(payload, "addedChunks");
-        var removedChunks = ParseIntArray(payload, "removedChunks");
-        var modifiedChunksObj = payload.GetValueOrDefault("modifiedChunks");
-        var deltaSize = payload.TryGetValue("deltaSizeBytes", out var sizeObj) && sizeObj is long size ? size : 0L;
-
-        var modifiedChunks = ParseModifiedChunks(modifiedChunksObj);
-
-        return new DeltaDescriptor(addedChunks, removedChunks, modifiedChunks, deltaSize);
     }
 
     /// <inheritdoc />

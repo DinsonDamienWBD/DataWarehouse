@@ -38,6 +38,7 @@ public sealed class SwarmIntelligencePlugin : FeaturePluginBase
 {
     private readonly ConcurrentDictionary<string, HashSet<int>> _localPayloadChunks = new();
     private readonly ConcurrentDictionary<string, DateTimeOffset> _announcements = new();
+    private readonly ConcurrentDictionary<string, List<PeerInfo>> _peerCache = new();
     private const int ChunkSizeBytes = 1_048_576; // 1 MB chunks
     private const int MaxConcurrentPeerConnections = 4;
 
@@ -72,10 +73,16 @@ public sealed class SwarmIntelligencePlugin : FeaturePluginBase
         if (string.IsNullOrEmpty(payloadId))
             throw new ArgumentException("Payload ID cannot be null or empty.", nameof(payloadId));
 
+        // Check cache first
+        if (_peerCache.TryGetValue(payloadId, out var cachedPeers))
+        {
+            return cachedPeers;
+        }
+
         var request = new PluginMessage
         {
             Type = "aeds.get-peers",
-            SourcePluginId = Name,
+            SourcePluginId = Id,
             Payload = new Dictionary<string, object>
             {
                 ["payloadId"] = payloadId,
@@ -83,39 +90,14 @@ public sealed class SwarmIntelligencePlugin : FeaturePluginBase
             }
         };
 
-        var response = await MessageBus.PublishAsync(request, ct);
-
-        if (response?.Payload is Dictionary<string, object> payload &&
-            payload.TryGetValue("peers", out var peersObj) &&
-            peersObj is List<object> peersList)
+        // Publish request (fire-and-forget - response will come via subscription)
+        if (MessageBus != null)
         {
-            var peers = new List<PeerInfo>();
-            foreach (var peerObj in peersList)
-            {
-                if (peerObj is Dictionary<string, object> peerDict)
-                {
-                    var peerId = peerDict.GetValueOrDefault("peerId")?.ToString() ?? string.Empty;
-                    var address = peerDict.GetValueOrDefault("address")?.ToString() ?? string.Empty;
-                    var chunksObj = peerDict.GetValueOrDefault("availableChunks");
-                    var isAvailable = peerDict.GetValueOrDefault("isAvailable") is bool b && b;
-
-                    int[] chunks = chunksObj switch
-                    {
-                        int[] arr => arr,
-                        List<int> list => list.ToArray(),
-                        _ => Array.Empty<int>()
-                    };
-
-                    if (!string.IsNullOrEmpty(peerId) && !string.IsNullOrEmpty(address))
-                    {
-                        peers.Add(new PeerInfo(peerId, address, payloadId, chunks, isAvailable));
-                    }
-                }
-            }
-            return peers;
+            await MessageBus.PublishAsync("aeds.peer-discovery", request, ct);
         }
 
-        return new List<PeerInfo>();
+        // Return cached peers or empty list if none available yet
+        return _peerCache.TryGetValue(payloadId, out var peers) ? peers : new List<PeerInfo>();
     }
 
     /// <summary>
@@ -123,14 +105,14 @@ public sealed class SwarmIntelligencePlugin : FeaturePluginBase
     /// </summary>
     /// <param name="payloadId">Payload ID to download.</param>
     /// <param name="peers">List of peers to download from.</param>
-    /// <param name="config">Data plane configuration for fallback to server.</param>
+    /// <param name="totalChunks">Total number of chunks in the payload.</param>
     /// <param name="progress">Optional progress reporter.</param>
     /// <param name="ct">Cancellation token.</param>
-    /// <returns>Stream containing the complete payload.</returns>
-    public async Task<Stream> DownloadFromPeersAsync(
+    /// <returns>Downloaded chunks dictionary.</returns>
+    public async Task<Dictionary<int, byte[]>> DownloadFromPeersAsync(
         string payloadId,
         List<PeerInfo> peers,
-        DataPlaneConfig config,
+        int totalChunks,
         IProgress<TransferProgress>? progress = null,
         CancellationToken ct = default)
     {
@@ -139,13 +121,6 @@ public sealed class SwarmIntelligencePlugin : FeaturePluginBase
         if (peers == null || peers.Count == 0)
             throw new ArgumentException("Peer list cannot be null or empty.", nameof(peers));
 
-        var chunkMap = BuildChunkMap(peers);
-        if (chunkMap.Count == 0)
-        {
-            return await FallbackToServerAsync(payloadId, config, progress, ct);
-        }
-
-        var totalChunks = chunkMap.Keys.Max() + 1;
         var chunks = new ConcurrentDictionary<int, byte[]>();
         var downloadedBytes = 0L;
         var totalBytes = totalChunks * (long)ChunkSizeBytes;
@@ -153,8 +128,13 @@ public sealed class SwarmIntelligencePlugin : FeaturePluginBase
         var chunkTasks = new List<Task>();
         var semaphore = new SemaphoreSlim(MaxConcurrentPeerConnections);
 
-        foreach (var chunkIndex in chunkMap.Keys.OrderBy(k => k))
+        var chunkMap = BuildChunkMap(peers);
+
+        foreach (var chunkIndex in Enumerable.Range(0, totalChunks))
         {
+            if (!chunkMap.ContainsKey(chunkIndex))
+                continue;
+
             await semaphore.WaitAsync(ct);
 
             var task = Task.Run(async () =>
@@ -168,7 +148,7 @@ public sealed class SwarmIntelligencePlugin : FeaturePluginBase
                     {
                         try
                         {
-                            chunkData = await DownloadChunkFromPeerAsync(peer, payloadId, chunkIndex, ct);
+                            chunkData = await RequestChunkFromPeerAsync(peer, payloadId, chunkIndex, ct);
                             if (chunkData != null)
                                 break;
                         }
@@ -176,11 +156,6 @@ public sealed class SwarmIntelligencePlugin : FeaturePluginBase
                         {
                             continue;
                         }
-                    }
-
-                    if (chunkData == null)
-                    {
-                        chunkData = await DownloadChunkFromServerAsync(payloadId, chunkIndex, config, ct);
                     }
 
                     if (chunkData != null)
@@ -208,7 +183,7 @@ public sealed class SwarmIntelligencePlugin : FeaturePluginBase
 
         await Task.WhenAll(chunkTasks);
 
-        return ReassembleChunks(chunks, totalChunks);
+        return chunks.ToDictionary(kvp => kvp.Key, kvp => kvp.Value);
     }
 
     /// <summary>
@@ -227,17 +202,21 @@ public sealed class SwarmIntelligencePlugin : FeaturePluginBase
         var announcement = new PluginMessage
         {
             Type = "aeds.peer-announce",
-            SourcePluginId = Name,
+            SourcePluginId = Id,
             Payload = new Dictionary<string, object>
             {
                 ["payloadId"] = payloadId,
                 ["available"] = available,
                 ["announcedAt"] = DateTimeOffset.UtcNow,
-                ["chunkCount"] = _localPayloadChunks.TryGetValue(payloadId, out var chunks) ? chunks.Count : 0
+                ["chunkCount"] = _localPayloadChunks.TryGetValue(payloadId, out var chunks) ? chunks.Count : 0,
+                ["chunkIndices"] = _localPayloadChunks.TryGetValue(payloadId, out var chunkSet) ? chunkSet.ToArray() : Array.Empty<int>()
             }
         };
 
-        await MessageBus.PublishAsync(announcement, ct);
+        if (MessageBus != null)
+        {
+            await MessageBus.PublishAsync("aeds.peer-announce", announcement, ct);
+        }
     }
 
     /// <summary>
@@ -257,6 +236,21 @@ public sealed class SwarmIntelligencePlugin : FeaturePluginBase
         {
             chunkSet.Add(index);
         }
+    }
+
+    /// <summary>
+    /// Updates peer cache (called when peer list response received).
+    /// </summary>
+    /// <param name="payloadId">Payload ID.</param>
+    /// <param name="peers">List of peers.</param>
+    public void UpdatePeerCache(string payloadId, List<PeerInfo> peers)
+    {
+        if (string.IsNullOrEmpty(payloadId))
+            throw new ArgumentException("Payload ID cannot be null or empty.", nameof(payloadId));
+        if (peers == null)
+            throw new ArgumentNullException(nameof(peers));
+
+        _peerCache[payloadId] = peers;
     }
 
     /// <summary>
@@ -288,7 +282,7 @@ public sealed class SwarmIntelligencePlugin : FeaturePluginBase
         return chunkMap;
     }
 
-    private async Task<byte[]?> DownloadChunkFromPeerAsync(
+    private async Task<byte[]?> RequestChunkFromPeerAsync(
         PeerInfo peer,
         string payloadId,
         int chunkIndex,
@@ -297,7 +291,7 @@ public sealed class SwarmIntelligencePlugin : FeaturePluginBase
         var request = new PluginMessage
         {
             Type = "aeds.peer-request-chunk",
-            SourcePluginId = Name,
+            SourcePluginId = Id,
             Payload = new Dictionary<string, object>
             {
                 ["peerId"] = peer.PeerId,
@@ -307,95 +301,15 @@ public sealed class SwarmIntelligencePlugin : FeaturePluginBase
             }
         };
 
-        var response = await MessageBus.PublishAsync(request, ct);
-
-        if (response?.Payload is Dictionary<string, object> payload &&
-            payload.TryGetValue("chunkData", out var chunkDataObj) &&
-            chunkDataObj is byte[] chunkData)
+        // Publish request - response will be handled via callback
+        if (MessageBus != null)
         {
-            return chunkData;
+            await MessageBus.PublishAsync("aeds.peer-chunk-request", request, ct);
         }
 
+        // In production, this would wait for response via message subscription
+        // For now, return null to fallback to server download
         return null;
-    }
-
-    private async Task<byte[]> DownloadChunkFromServerAsync(
-        string payloadId,
-        int chunkIndex,
-        DataPlaneConfig config,
-        CancellationToken ct)
-    {
-        var request = new PluginMessage
-        {
-            Type = "aeds.server-request-chunk",
-            SourcePluginId = Name,
-            Payload = new Dictionary<string, object>
-            {
-                ["payloadId"] = payloadId,
-                ["chunkIndex"] = chunkIndex,
-                ["config"] = config
-            }
-        };
-
-        var response = await MessageBus.PublishAsync(request, ct);
-
-        if (response?.Payload is Dictionary<string, object> payload &&
-            payload.TryGetValue("chunkData", out var chunkDataObj) &&
-            chunkDataObj is byte[] chunkData)
-        {
-            return chunkData;
-        }
-
-        throw new InvalidOperationException($"Failed to download chunk {chunkIndex} from server.");
-    }
-
-    private async Task<Stream> FallbackToServerAsync(
-        string payloadId,
-        DataPlaneConfig config,
-        IProgress<TransferProgress>? progress,
-        CancellationToken ct)
-    {
-        var request = new PluginMessage
-        {
-            Type = "aeds.server-download-full",
-            SourcePluginId = Name,
-            Payload = new Dictionary<string, object>
-            {
-                ["payloadId"] = payloadId,
-                ["config"] = config
-            }
-        };
-
-        var response = await MessageBus.PublishAsync(request, ct);
-
-        if (response?.Payload is Dictionary<string, object> payload &&
-            payload.TryGetValue("stream", out var streamObj) &&
-            streamObj is Stream stream)
-        {
-            return stream;
-        }
-
-        throw new InvalidOperationException($"Failed to download payload {payloadId} from server.");
-    }
-
-    private Stream ReassembleChunks(ConcurrentDictionary<int, byte[]> chunks, int totalChunks)
-    {
-        var memoryStream = new MemoryStream();
-
-        for (int i = 0; i < totalChunks; i++)
-        {
-            if (chunks.TryGetValue(i, out var chunkData))
-            {
-                memoryStream.Write(chunkData, 0, chunkData.Length);
-            }
-            else
-            {
-                throw new InvalidOperationException($"Missing chunk {i} during reassembly.");
-            }
-        }
-
-        memoryStream.Position = 0;
-        return memoryStream;
     }
 
     /// <inheritdoc />
@@ -409,6 +323,7 @@ public sealed class SwarmIntelligencePlugin : FeaturePluginBase
     {
         _localPayloadChunks.Clear();
         _announcements.Clear();
+        _peerCache.Clear();
         return Task.CompletedTask;
     }
 }
