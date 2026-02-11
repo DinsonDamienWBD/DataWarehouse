@@ -6188,16 +6188,16 @@ var config = new DataProtectionConfig
 
 | # | Sub-Task | Description | Status |
 |---|----------|-------------|--------|
-| 85.1 | Count-Min Sketch | Frequency estimation with bounded error | [ ] |
-| 85.2 | HyperLogLog | Cardinality estimation for distinct counts | [ ] |
-| 85.3 | Bloom Filters | Membership testing with false positive control | [ ] |
-| 85.4 | Top-K Heavy Hitters | Track most frequent items | [ ] |
-| 85.5 | Quantile Sketches | Approximate percentiles (t-digest, KLL) | [ ] |
-| 85.6 | Error Bound Configuration | User-specified accuracy vs space tradeoff | [ ] |
-| 85.7 | Merge Operations | Combine sketches from distributed nodes | [ ] |
-| 85.8 | Query Interface | SQL-like queries over probabilistic stores | [ ] |
-| 85.9 | Accuracy Reporting | Report confidence intervals on results | [ ] |
-| 85.10 | Upgrade Path | Convert probabilistic to exact when needed | [ ] |
+| 85.1 | Count-Min Sketch | Frequency estimation with bounded error | [x] |
+| 85.2 | HyperLogLog | Cardinality estimation for distinct counts | [x] |
+| 85.3 | Bloom Filters | Membership testing with false positive control | [x] |
+| 85.4 | Top-K Heavy Hitters | Track most frequent items | [x] |
+| 85.5 | Quantile Sketches | Approximate percentiles (t-digest, KLL) | [x] |
+| 85.6 | Error Bound Configuration | User-specified accuracy vs space tradeoff | [x] |
+| 85.7 | Merge Operations | Combine sketches from distributed nodes | [x] |
+| 85.8 | Query Interface | SQL-like queries over probabilistic stores | [x] |
+| 85.9 | Accuracy Reporting | Report confidence intervals on results | [x] |
+| 85.10 | Upgrade Path | Convert probabilistic to exact when needed | [x] |
 
 **SDK Additions (in T99):**
 - `IProbabilisticStructure` - Common interface for all probabilistic structures
@@ -7580,7 +7580,7 @@ var config = new UltimateRaidConfig
 | 82 | Data Branching | Collaboration | P0 | Very High | [ ] |
 | 83 | Data Marketplace | Collaboration | P1 | High | [ ] |
 | 84 | Generative Compression | Storage | P1 | Extreme | [ ] |
-| 85 | Probabilistic Storage | Storage | P1 | High | [ ] |
+| 85 | Probabilistic Storage | Storage | P1 | High | [x] |
 | 86 | Self-Emulating Objects | Archival | P1 | Very High | [ ] |
 | 87 | Spatial AR Anchors | Spatial | P2 | Very High | [ ] |
 | 88 | Psychometric Indexing | Indexing | P2 | High | [ ] |
