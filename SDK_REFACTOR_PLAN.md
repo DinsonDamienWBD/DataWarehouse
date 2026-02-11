@@ -83,6 +83,9 @@ This refactored structure ensures a clean and maintainable codebase by promoting
 ## Phase 5B: Update Standalone plugin Stratergies
 - [ ] Verify and if necessary update all stratergies so that all stratergies in the standalone plugins are updated to leverage the new stratergy base class structure.
 
+## Phase 5C: Fix DataWarehouse.CLI
+- [ ] The NuGet package System.Commandline.NamingConventionBinder has been deprecated and is no longer maintained. As a result, the DataWarehouse.CLI project, which relies on this package, is currently broken. I have removed the dependency on this deprecated package. Update the DataWarehouse.CLI project to use an alternative approach for command-line parsing and binding that does not rely on the deprecated package or older versions of System.Commandline.
+
 ## Phase 6: Testing & Documentation
 - [ ] Conduct a full solution build to make sure everything compiles and links correctly.
 - [ ] Update Test Cases to cover new base classes and their functionalities.
