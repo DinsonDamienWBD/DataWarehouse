@@ -428,13 +428,13 @@ Plans:
   4. Each verified language has a sample compute-on-data function that runs successfully in DW's WASM runtime
   5. Language-specific SDK bindings or documentation exist for common DW operations (read, write, query, transform)
   6. Performance benchmarks compare execution speed across language runtimes for a standardized workload
-**Plans**: 7 plans in 1 wave
+**Plans**: 4 plans in 1 wave
 
 Plans:
-- [ ] 20-01: Verify Tier 1 languages (Rust, C/C++, .NET, Go, AssemblyScript, Zig)
-- [ ] 20-02: Verify Tier 2 languages (Python, Ruby, JS/TS, Kotlin, Swift, Java, Dart, PHP, Lua)
-- [ ] 20-03: Verify Tier 2 continued (Haskell, OCaml, Grain, MoonBit) and Tier 3 feasibility
-- [ ] 20-04: SDK bindings, documentation, and performance benchmarks
+- [ ] 20-01-PLAN.md — Create WASM language infrastructure (base class, types) and 7 Tier 1 strategies (Rust, C, C++, .NET, Go, AssemblyScript, Zig)
+- [ ] 20-02-PLAN.md — Implement 10 Tier 2A strategies (Python, Ruby, JS, TS, Kotlin, Swift, Java, Dart, PHP, Lua)
+- [ ] 20-03-PLAN.md — Implement 4 Tier 2B (Haskell, OCaml, Grain, MoonBit) and 10 Tier 3 experimental strategies
+- [ ] 20-04-PLAN.md — SDK bindings documentation, performance benchmarks, ecosystem aggregation, and TODO.md sync
 
 ### Phase 21: UltimateDataTransit
 **Goal**: New plugin providing user-selectable data transport strategies — the physical "how" of data movement, complementing existing plugins that handle "why" and "where"
@@ -488,5 +488,5 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8 -> 9 -> 10
 | 17. Plugin Marketplace | 0/3 | Planned | - |
 | 18. Plugin Deprecation & File Cleanup | 0/3 | Not started | - |
 | 19. Application Platform Services | 0/4 | Planned | - |
-| 20. WASM/WASI Language Ecosystem | 0/4 | Not started | - |
+| 20. WASM/WASI Language Ecosystem | 0/4 | Planned | - |
 | 21. UltimateDataTransit | 0/5 | Planned | - |
