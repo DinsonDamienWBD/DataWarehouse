@@ -67,15 +67,30 @@ See `.planning/MILESTONES.md` for full accomplishment list.
 - ✓ Build health (warnings 1,201→16, 121 null! fixed, 37 TODOs resolved)
 - ✓ Plugin cleanup (88 deprecated dirs removed, 60 active plugins)
 
-### Active
+### Active (v2.0 — SDK Hardening & Distributed Infrastructure)
 
-No active requirements. Use `/gsd:new-milestone` to define next milestone.
+- [ ] Refactor plugin base class hierarchy (PluginBase → IntelligentPluginBase → feature-specific bases)
+- [ ] Refactor strategy base class hierarchy (unified multi-tier StrategyBase)
+- [ ] Add auto-scaling, load balancing, P2P, auto-sync, auto-tier, auto-governance SDK contracts
+- [ ] Verify and enforce plugin/kernel decoupling (SDK-only deps, message bus only)
+- [ ] Update all Ultimate plugins to new base class hierarchy
+- [ ] Update all standalone plugins to new base class hierarchy
+- [ ] Fix DataWarehouse.CLI System.CommandLine deprecation
+- [ ] Memory safety: IDisposable on PluginBase, secure memory wiping, bounded collections
+- [ ] Cryptographic hygiene: constant-time comparisons, key rotation contracts, algorithm agility
+- [ ] Input validation at all SDK boundaries with ReDoS protection
+- [ ] Resilience contracts: circuit breakers, timeouts, bulkhead isolation in SDK
+- [ ] Observability contracts: ActivitySource, health checks, resource metering per plugin
+- [ ] API contract safety: immutable DTOs, strong typing, versioned interfaces
+- [ ] Static analysis: TreatWarningsAsErrors, Roslyn analyzers, banned API checks
+- [ ] Supply chain security: vulnerability audit, dependency pinning, SBOM
+- [ ] Comprehensive test suite for all new/refactored base classes
 
 ### Out of Scope
 
-- Creating new plugins not listed in TODO.md — only complete what's tracked
-- Deployment/CI/CD pipeline setup — focus is on code completeness
-- Performance optimization beyond what specific tasks require
+- Creating new plugins beyond what's in SDK_REFACTOR_PLAN.md
+- Deployment/CI/CD pipeline setup
+- UI/Dashboard changes (SDK-only milestone)
 
 ## Constraints
 
@@ -95,5 +110,13 @@ No active requirements. Use `/gsd:new-milestone` to define next milestone.
 | Strategy pattern throughout | Consistent extensibility model | 140+ base classes |
 | Message bus communication | Plugin isolation, no direct references | Zero cross-plugin imports |
 
+## Current Milestone: v2.0 SDK Hardening & Distributed Infrastructure
+
+**Goal:** Clean up, optimize, and harden the SDK to pass hyperscale/military-level code review — refactor base class hierarchies, add distributed infrastructure contracts, enforce security best practices throughout.
+
+**Approach:** Verify first, implement only where code deviates from plan. Much of the base class hierarchy and plugin isolation already exists from v1.0.
+
+**Source:** `SDK_REFACTOR_PLAN.md` + hyperscale/military additions
+
 ---
-*Last updated: 2026-02-11 — v1.0 shipped*
+*Last updated: 2026-02-11 — v2.0 milestone started*
