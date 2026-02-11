@@ -122,4 +122,47 @@ internal static class PlatformTopics
     /// Topic for evaluating an access control decision against a per-app policy.
     /// </summary>
     public const string PolicyEvaluate = $"{Prefix}.policy.evaluate";
+
+    // ========================================
+    // AI Workflow Topics
+    // ========================================
+
+    /// <summary>
+    /// Topic for configuring an application's AI workflow mode, budget limits,
+    /// model preferences, and operation restrictions.
+    /// </summary>
+    public const string AiWorkflowConfigure = $"{Prefix}.ai.configure";
+
+    /// <summary>
+    /// Topic for removing an application's AI workflow configuration.
+    /// </summary>
+    public const string AiWorkflowRemove = $"{Prefix}.ai.remove";
+
+    /// <summary>
+    /// Topic for retrieving an application's current AI workflow configuration.
+    /// </summary>
+    public const string AiWorkflowGet = $"{Prefix}.ai.get";
+
+    /// <summary>
+    /// Topic for updating an application's AI workflow configuration.
+    /// </summary>
+    public const string AiWorkflowUpdate = $"{Prefix}.ai.update";
+
+    /// <summary>
+    /// Topic for submitting an app-scoped AI request that is routed through
+    /// budget, concurrency, and operation enforcement before forwarding to Intelligence.
+    /// </summary>
+    public const string AiRequest = $"{Prefix}.ai.request";
+
+    /// <summary>
+    /// Topic for retrieving an application's current AI usage tracking data
+    /// including monthly spend, request count, and active concurrent requests.
+    /// </summary>
+    public const string AiUsageGet = $"{Prefix}.ai.usage";
+
+    /// <summary>
+    /// Topic for resetting an application's monthly AI usage counters
+    /// (total spend and request count).
+    /// </summary>
+    public const string AiUsageReset = $"{Prefix}.ai.usage.reset";
 }
