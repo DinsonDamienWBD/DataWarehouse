@@ -71,6 +71,7 @@ Progress: [######----] 60%
 | Phase 14 P02 | 2 min | 2 tasks | 1 files |
 | Phase 14 P02 | 2 | 2 tasks | 1 files |
 | Phase 14 P01 | 2 | 2 tasks | 0 files |
+| Phase 10 P07 | 9 | 2 tasks | 4 files |
 
 ## Accumulated Context
 
