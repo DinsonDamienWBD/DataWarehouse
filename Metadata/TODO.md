@@ -1735,6 +1735,18 @@ var chatManifest = new IntentManifest
 | **Phase 8** | AEDS-X1, AEDS-X2 | P2P mesh, delta sync | Phase 3 |
 | **Phase 9** | AEDS-X3, AEDS-X4, AEDS-X5 | Pre-cog AI, Mule, Dedup | Phase 3 |
 
+**Verification Status (2026-02-11):**
+- ✅ **Http2DataPlanePlugin** - Production-ready (0 TODOs, full HTTP/2 implementation)
+- ⚠️ **AedsCorePlugin** - 85% complete (missing: signature verification via T94 KeyManagement)
+- ⚠️ **ServerDispatcherPlugin** - 80% complete (missing: Control Plane wiring, multicast targeting)
+- ⚠️ **ClientCourierPlugin** - 75% complete (missing: signature verification, sandboxed execution, toast notifications, auto-sync)
+- 📄 **Details:** See `.planning/phases/12-aeds-system/12-01-VERIFICATION.md` for full gap analysis
+
+**Critical P0 Gaps:**
+1. Signature verification in AedsCorePlugin.VerifySignatureAsync (line 223) - requires UltimateKeyManagement integration via message bus
+2. Signature verification in ClientCourierPlugin.ProcessManifestAsync (line 279) - same as above
+3. Control Plane wiring in ServerDispatcherPlugin.ProcessJobAsync (line 139) - replace Task.Delay with real IControlPlaneTransport.SendManifestAsync
+
 ---
 
 ## Tamper-Proof Storage Provider Implementation Plan
