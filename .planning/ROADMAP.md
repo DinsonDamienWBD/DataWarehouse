@@ -21,7 +21,7 @@
 - [x] **Phase 12: AEDS System** — 4 plans, core engine, control plane (WebSocket/MQTT/gRPC), data plane (HTTP/3/QUIC/WebTransport), 9 extensions
 - [x] **Phase 13: Data Governance Intelligence** — 5 plans, active lineage, living catalog, predictive quality, semantic intelligence, intelligent governance
 - [x] **Phase 14: Other Ultimate Plugins** — 5 plans, dashboards, resilience, deployment, sustainability, deprecation scoping
-- [x] **Phase 15: Bug Fixes & Build Health** — 4 plans, warnings 1,201→16, 121 null! fixed, 37 TODOs resolved, critical bugs verified
+- [x] **Phase 15: Bug Fixes & Build Health** — 4 plans, warnings 1,201 to 16, 121 null! fixed, 37 TODOs resolved, critical bugs verified
 - [x] **Phase 16: Testing & Quality Assurance** — 2 plans, 1,039 tests passing (0 failures), STRIDE/OWASP penetration test plan
 - [x] **Phase 17: Plugin Marketplace** — 3 plans, discovery, install, versioning, certification, ratings, analytics
 - [x] **Phase 18: Plugin Deprecation & File Cleanup** — 3 plans, 88 deprecated dirs removed (~200K lines dead code), 60 active plugins remain
@@ -31,6 +31,193 @@
 
 </details>
 
-## Next Milestone
+---
 
-Not yet defined. Use `/gsd:new-milestone` to start a new milestone cycle.
+## Milestone: v2.0 SDK Hardening & Distributed Infrastructure
+
+> 8 phases (22-29) | 89 requirements across 16 categories | Approach: verify first, implement only where code deviates
+
+**Milestone Goal:** Harden the SDK to pass hyperscale/military-level code review -- refactor base class hierarchies, enforce security best practices, add distributed infrastructure contracts, achieve zero compiler warnings.
+
+**Ordering Rationale:** Security-first. Build tooling and static analysis go first (catches issues in all subsequent work). Memory/crypto hardening before hierarchy refactoring (IDisposable must exist before plugin hierarchy changes). Hierarchies before distributed contracts (clean base classes before layering distributed features). Plugin migration after both hierarchies stabilize. Advanced distributed implementations after contracts defined. Testing last as the final gate.
+
+### Phases
+
+- [ ] **Phase 22: Build Safety & Supply Chain** - Roslyn analyzers, TreatWarningsAsErrors rollout, SBOM, vulnerability audit, CLI fix
+- [ ] **Phase 23: Memory Safety & Cryptographic Hygiene** - IDisposable patterns, secure memory wiping, bounded collections, constant-time comparisons, FIPS compliance
+- [ ] **Phase 24: Plugin Hierarchy & Input Validation** - PluginBase through feature-specific bases, lifecycle methods, capability/knowledge registries, input validation at all boundaries
+- [ ] **Phase 25: Strategy Hierarchy & API Contracts** - Unified StrategyBase, adapter wrappers, intelligence-aware strategies, immutable DTOs, versioned interfaces
+- [ ] **Phase 26: Distributed Contracts & Resilience** - All distributed SDK contracts, security primitives, multi-phase init, in-memory implementations, circuit breakers, observability
+- [ ] **Phase 27: Plugin Migration & Decoupling Verification** - All Ultimate and standalone plugins updated to new hierarchies, decoupling enforced
+- [ ] **Phase 28: Advanced Distributed Coordination** - SWIM gossip, Raft consensus, CRDT replication, FederatedMessageBus, load balancing implementations
+- [ ] **Phase 29: Testing & Final Verification** - Full build validation, behavioral verification, distributed integration tests, analyzer clean pass
+
+### Phase Details
+
+#### Phase 22: Build Safety & Supply Chain
+**Goal**: The SDK build pipeline enforces code quality and supply chain security at compile time -- zero warnings, static analysis on every build, known dependency posture.
+**Depends on**: Nothing (first v2.0 phase)
+**Requirements**: BUILD-01, BUILD-02, BUILD-03, BUILD-04, BUILD-05, SUPPLY-01, SUPPLY-02, SUPPLY-03, SUPPLY-04, CLI-01
+**Approach**: Verify existing build configuration first. Incrementally enable TreatWarningsAsErrors by category to avoid halting 1.1M LOC build. CLI fix is isolated and can be done in parallel.
+**Success Criteria** (what must be TRUE):
+  1. `dotnet build` runs Roslyn analyzers (NetAnalyzers, SecurityCodeScan, SonarAnalyzer, Roslynator, BannedApiAnalyzers) and reports findings on every compilation
+  2. TreatWarningsAsErrors is enabled across all projects with zero remaining compiler warnings (excluding NuGet-sourced)
+  3. EnforceCodeStyleInBuild produces consistent code style enforcement at build time
+  4. `dotnet list package --vulnerable` returns zero known vulnerabilities and all package versions are pinned (no floating ranges)
+  5. SBOM generation produces a valid CycloneDX or SPDX artifact for the full solution
+**Plans**: TBD (estimated 3-4 plans)
+
+Plans:
+- [ ] 22-01: Roslyn analyzer suite integration and build configuration
+- [ ] 22-02: TreatWarningsAsErrors incremental rollout (category-based, leaf projects first)
+- [ ] 22-03: Supply chain security (vulnerability audit, version pinning, SBOM generation)
+- [ ] 22-04: CLI System.CommandLine migration and XML doc enforcement
+
+#### Phase 23: Memory Safety & Cryptographic Hygiene
+**Goal**: All SDK code handles memory deterministically and uses cryptographic primitives correctly -- no leaked secrets in memory, no timing attacks, no unsafe random sources.
+**Depends on**: Phase 22 (analyzers catch memory/crypto issues during implementation)
+**Requirements**: MEM-01, MEM-02, MEM-03, MEM-04, MEM-05, CRYPTO-01, CRYPTO-02, CRYPTO-03, CRYPTO-04, CRYPTO-05, CRYPTO-06
+**Approach**: Verify existing patterns first. Many crypto implementations from v1.0 may already use correct APIs. Focus on gaps -- especially IDisposable on PluginBase (affects all 60 plugins) and secure memory wiping of key material.
+**Success Criteria** (what must be TRUE):
+  1. All key material, tokens, and passwords are zeroed from memory after use via CryptographicOperations.ZeroMemory -- no secret persists in managed memory after its scope ends
+  2. Hot-path buffer allocations use ArrayPool/MemoryPool instead of raw `new byte[]` -- verified by BannedApiAnalyzers or code review
+  3. All public collections have configurable maximum sizes preventing unbounded memory growth
+  4. All secret/hash comparisons use CryptographicOperations.FixedTimeEquals -- no timing side channels in authentication or verification paths
+  5. All cryptographic random generation uses RandomNumberGenerator, never System.Random -- verified by BannedApiAnalyzers rule
+**Plans**: TBD (estimated 3-4 plans)
+
+Plans:
+- [ ] 23-01: IDisposable/IAsyncDisposable on PluginBase with proper dispose pattern
+- [ ] 23-02: Secure memory wiping and buffer pooling across SDK
+- [ ] 23-03: Cryptographic hygiene audit (constant-time, RNG, FIPS compliance)
+- [ ] 23-04: Key rotation contracts and algorithm agility framework
+
+#### Phase 24: Plugin Hierarchy & Input Validation
+**Goal**: The plugin base class hierarchy is clean, layered, and enforces security at every boundary -- PluginBase through feature-specific bases form a complete inheritance chain with validated inputs.
+**Depends on**: Phase 23 (IDisposable pattern must be on PluginBase before hierarchy work)
+**Requirements**: HIER-01, HIER-02, HIER-03, HIER-04, HIER-05, HIER-06, HIER-07, HIER-08, HIER-09, VALID-01, VALID-02, VALID-03, VALID-04, VALID-05
+**Approach**: Verify existing hierarchy first -- much of the PluginBase/IntelligentPluginBase/FeaturePluginBase chain exists from v1.0. Focus on gaps: capability registry, knowledge registry, lifecycle completeness. Input validation is co-located here because plugin boundaries are the primary validation surface.
+**Success Criteria** (what must be TRUE):
+  1. PluginBase has complete lifecycle (Initialize/Execute/Shutdown with CancellationToken), IDisposable/IAsyncDisposable, capability registry, and knowledge registry
+  2. IntelligenceAwarePluginBase (IntelligentPluginBase) extends FeaturePluginBase with graceful degradation when UltimateIntelligence is unavailable
+  3. All 10 feature-specific base classes (Encryption, Compression, Storage, Security, Observability, Interface, Format, Streaming, Media, Processing) inherit from IntelligenceAwarePluginBase and provide domain-common functionality
+  4. Every public SDK method validates its inputs (null checks, range checks, format validation) before processing -- no unvalidated data crosses a plugin boundary
+  5. All 60 existing plugins still compile and pass tests after hierarchy changes
+**Plans**: TBD (estimated 3-5 plans)
+
+Plans:
+- [ ] 24-01: PluginBase lifecycle, capability registry, and knowledge registry
+- [ ] 24-02: IntelligenceAwarePluginBase and feature-specific base classes
+- [ ] 24-03: Input validation framework (boundary validation, path traversal, size limits, ReDoS)
+- [ ] 24-04: Plugin identity verification for distributed message authentication
+- [ ] 24-05: Hierarchy build verification across all 60 plugins
+
+#### Phase 25: Strategy Hierarchy & API Contracts
+**Goal**: All strategy implementations share a unified base hierarchy with backward-compatible adapters, and all public SDK types use immutable, versioned contracts.
+**Depends on**: Phase 24 (plugin hierarchy must be stable -- strategies belong to plugins)
+**Requirements**: STRAT-01, STRAT-02, STRAT-03, STRAT-04, STRAT-05, STRAT-06, API-01, API-02, API-03, API-04
+**Approach**: Verify existing 7 fragmented strategy bases. Design unified StrategyBase top-down, then create adapter wrappers so existing strategies compile unchanged. Migrate one domain at a time starting with smallest. API contracts (immutable DTOs, strong typing) apply to strategy contracts and are natural co-work.
+**Success Criteria** (what must be TRUE):
+  1. A unified StrategyBase root class exists with Initialize/Execute/Cleanup lifecycle, capability declaration, and CancellationToken support
+  2. IntelligenceAwareStrategyBase provides UltimateIntelligence integration mirroring the plugin-side pattern
+  3. All 7 existing fragmented strategy bases are consolidated under the unified hierarchy via adapter wrappers -- existing strategy code compiles without changes
+  4. All public SDK data transfer types use C# records or init-only setters (immutable by default) and strongly-typed contracts replace Dictionary<string, object>
+  5. All existing plugin strategies produce identical results after hierarchy migration (behavioral verification)
+**Plans**: TBD (estimated 3-4 plans)
+
+Plans:
+- [ ] 25-01: Unified StrategyBase design and IntelligenceAwareStrategyBase
+- [ ] 25-02: Adapter wrappers for 7 fragmented strategy bases
+- [ ] 25-03: API contract safety (immutable DTOs, strong typing, SdkCompatibility, null-object pattern)
+- [ ] 25-04: Behavioral verification of strategy migration
+
+#### Phase 26: Distributed Contracts & Resilience
+**Goal**: The SDK defines all distributed infrastructure contracts with security primitives baked in, in-memory single-node implementations for backward compatibility, and resilience/observability contracts that any plugin can use.
+**Depends on**: Phase 24 (plugin hierarchy for multi-phase init), Phase 25 (strategy hierarchy for distributed strategies)
+**Requirements**: DIST-01, DIST-02, DIST-03, DIST-04, DIST-05, DIST-06, DIST-07, DIST-08, DIST-09, DIST-10, DIST-11, RESIL-01, RESIL-02, RESIL-03, RESIL-04, RESIL-05, OBS-01, OBS-02, OBS-03, OBS-04, OBS-05
+**Approach**: Contract-first design. Define all interfaces (IClusterMembership, ILoadBalancerStrategy, IP2PNetwork, etc.) before any implementation. Build in-memory implementations that make the system work on a single laptop with no cluster. Security primitives (message signing, replay protection) are architectural -- included here, not bolted on later.
+**Success Criteria** (what must be TRUE):
+  1. All 7 distributed contracts (IClusterMembership, ILoadBalancerStrategy, IP2PNetwork, IAutoScaler, IReplicationSync, IAutoTier, IAutoGovernance) are defined in the SDK with XML documentation
+  2. FederatedMessageBus wraps IMessageBus with transparent local/remote routing -- existing single-node code works unchanged
+  3. Multi-phase plugin initialization (construction with zero deps, initialization with MessageBus, activation with distributed coordination) prevents circular dependency deadlocks
+  4. In-memory single-node implementations exist for every distributed contract -- the SDK runs on a single laptop without any cluster configuration
+  5. ICircuitBreaker, IBulkheadIsolation, IHealthCheck, and ActivitySource contracts are available to all plugins with sensible defaults
+**Plans**: TBD (estimated 4-5 plans)
+
+Plans:
+- [ ] 26-01: Distributed SDK contracts (cluster membership, load balancing, P2P, auto-scaling, sync, tiering, governance)
+- [ ] 26-02: FederatedMessageBus architecture and multi-phase plugin initialization
+- [ ] 26-03: Resilience contracts (circuit breaker, bulkhead, timeouts, dead letter queue, graceful shutdown)
+- [ ] 26-04: Observability contracts (ActivitySource, structured logging, health checks, resource metering, audit trail)
+- [ ] 26-05: In-memory single-node implementations and distributed security primitives (HMAC, replay protection)
+
+#### Phase 27: Plugin Migration & Decoupling Verification
+**Goal**: All 60 plugins use the new base class hierarchies and distributed infrastructure features -- no plugin references another plugin directly, all communication flows through the message bus.
+**Depends on**: Phase 25 (strategy hierarchy), Phase 26 (distributed contracts)
+**Requirements**: UPLT-01, UPLT-02, UPLT-03, UPST-01, UPST-02, UPST-03, DECPL-01, DECPL-02, DECPL-03, DECPL-04, DECPL-05
+**Approach**: Verify first -- many plugins may already use correct base classes from v1.0. Batch migration by plugin category. Static analysis to verify zero cross-plugin references. Decoupling verification is a gate: phase does not complete until every plugin is verified SDK-only.
+**Success Criteria** (what must be TRUE):
+  1. All Ultimate plugins inherit from their respective feature-specific plugin base classes and use unified strategy hierarchy
+  2. All standalone plugins inherit from IntelligenceAwarePluginBase at minimum and use unified strategy base classes
+  3. Zero plugins or kernel depend on any other plugin directly -- static analysis confirms SDK-only dependencies
+  4. All inter-plugin and plugin-kernel communication uses Commands/Messages via message bus only -- no direct method calls between plugins
+  5. All plugins register capabilities and knowledge into the system knowledge bank and leverage distributed infrastructure from SDK base classes
+**Plans**: TBD (estimated 3-5 plans)
+
+Plans:
+- [ ] 27-01: Ultimate plugin migration to feature-specific base classes (batch 1: Encryption, Compression, Storage, Security)
+- [ ] 27-02: Ultimate plugin migration (batch 2: Observability, Interface, Format, Streaming, Media, Compute)
+- [ ] 27-03: Standalone plugin migration to IntelligenceAwarePluginBase
+- [ ] 27-04: Decoupling verification (static analysis, message bus audit, capability/knowledge registration)
+
+#### Phase 28: Advanced Distributed Coordination
+**Goal**: The SDK has production-ready implementations of cluster membership, consensus, replication, and load balancing -- a multi-node DataWarehouse cluster can form, elect leaders, replicate data, and balance load.
+**Depends on**: Phase 26 (distributed contracts), Phase 27 (plugins updated to use distributed features)
+**Requirements**: DIST-12, DIST-13, DIST-14, DIST-15, DIST-16, DIST-17
+**Approach**: Implement against the contracts defined in Phase 26. SWIM gossip for membership, Raft for consensus, CRDT for conflict resolution, consistent hashing and resource-aware load balancing. All implementations are plugins using the SDK contracts -- no special kernel coupling.
+**Success Criteria** (what must be TRUE):
+  1. SWIM gossip protocol handles decentralized cluster membership with automatic failure detection -- nodes join and leave without manual intervention
+  2. Raft consensus provides leader election in multi-node clusters -- exactly one leader at any time, automatic re-election on leader failure
+  3. Multi-master replication with CRDT conflict resolution allows concurrent writes from multiple nodes with deterministic merge
+  4. Consistent hashing load balancer with virtual nodes distributes requests cache-friendly across cluster nodes
+  5. Resource-aware load balancer monitors CPU/memory and adapts routing to avoid overloaded nodes
+**Plans**: TBD (estimated 3-4 plans)
+
+Plans:
+- [ ] 28-01: SWIM gossip cluster membership and P2P gossip replication
+- [ ] 28-02: Raft consensus for leader election
+- [ ] 28-03: Multi-master replication with CRDT conflict resolution
+- [ ] 28-04: Consistent hashing and resource-aware load balancing
+
+#### Phase 29: Testing & Final Verification
+**Goal**: The entire v2.0 milestone passes comprehensive verification -- all tests pass, behavioral equivalence confirmed, distributed contracts integration-tested, analyzers produce zero warnings.
+**Depends on**: All prior v2.0 phases (22-28)
+**Requirements**: TEST-01, TEST-02, TEST-03, TEST-04, TEST-05, TEST-06
+**Approach**: This phase runs verification, not implementation. If failures are found, they are fixed here. The phase is the final gate before the milestone ships.
+**Success Criteria** (what must be TRUE):
+  1. Full solution builds with zero errors and zero compiler warnings after all refactoring
+  2. All 1,039+ existing tests continue to pass -- no regressions from v2.0 changes
+  3. New unit tests cover all new/modified base classes (plugin hierarchy, strategy hierarchy, distributed contracts)
+  4. Behavioral verification tests confirm existing strategies produce identical results after hierarchy migration
+  5. Roslyn analyzer clean pass with zero suppressed warnings without documented justification
+**Plans**: TBD (estimated 2-3 plans)
+
+Plans:
+- [ ] 29-01: Build validation and existing test suite regression check
+- [ ] 29-02: New unit tests for base classes and behavioral verification suite
+- [ ] 29-03: Distributed infrastructure integration tests with in-memory implementations
+
+### Progress
+
+**Execution Order:** 22 -> 23 -> 24 -> 25 -> 26 -> 27 -> 28 -> 29
+
+| Phase | Milestone | Plans Complete | Status | Completed |
+|-------|-----------|----------------|--------|-----------|
+| 22. Build Safety & Supply Chain | v2.0 | 0/4 | Not started | - |
+| 23. Memory Safety & Crypto Hygiene | v2.0 | 0/4 | Not started | - |
+| 24. Plugin Hierarchy & Input Validation | v2.0 | 0/5 | Not started | - |
+| 25. Strategy Hierarchy & API Contracts | v2.0 | 0/4 | Not started | - |
+| 26. Distributed Contracts & Resilience | v2.0 | 0/5 | Not started | - |
+| 27. Plugin Migration & Decoupling | v2.0 | 0/4 | Not started | - |
+| 28. Advanced Distributed Coordination | v2.0 | 0/4 | Not started | - |
+| 29. Testing & Final Verification | v2.0 | 0/3 | Not started | - |

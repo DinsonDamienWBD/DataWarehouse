@@ -16,10 +16,31 @@
 - Data Governance: Active lineage, Living catalog, Predictive quality, Semantic intelligence, Intelligent governance
 - AEDS (Autonomous Edge Distribution): Core engine, Control plane, Data plane, 9 extension plugins
 - App Platform services, Plugin Marketplace (7 features), Data Transit (6 protocols + chunked/delta/P2P/QoS)
-- Build health: Warnings 1,201→16, 121 null! suppressions fixed, 37 TODO comments resolved, 1,039 tests passing (0 failures)
+- Build health: Warnings 1,201 to 16, 121 null! suppressions fixed, 37 TODO comments resolved, 1,039 tests passing (0 failures)
 - Plugin cleanup: 88 deprecated directories removed (~200K lines dead code), 60 active plugins remain
 
-**Timeline:** 30 days (2026-01-13 → 2026-02-11)
+**Timeline:** 30 days (2026-01-13 to 2026-02-11)
 
 ---
 
+## v2.0 SDK Hardening & Distributed Infrastructure (In Progress)
+
+**Phases planned:** 8 phases (22-29), ~33 plans estimated | **Requirements:** 89 across 16 categories
+
+**Goal:** Harden the SDK to pass hyperscale/military-level code review -- refactor base class hierarchies, enforce security best practices, add distributed infrastructure contracts, achieve zero compiler warnings.
+
+**Approach:** Verify first, implement only where code deviates from plan. Security-first phase ordering.
+
+**Planned deliverables:**
+- Build safety: Roslyn analyzers, TreatWarningsAsErrors, SBOM generation, supply chain audit
+- Memory/crypto hardening: IDisposable on PluginBase, secure memory wiping, constant-time comparisons, FIPS compliance
+- Plugin hierarchy: Clean PluginBase through feature-specific base class chain
+- Strategy hierarchy: Unified StrategyBase with adapter wrappers for backward compatibility
+- Distributed contracts: IClusterMembership, ILoadBalancer, IP2P, IAutoScaler, IReplicationSync, IAutoTier, IAutoGovernance
+- Resilience/observability: Circuit breakers, bulkhead isolation, ActivitySource, health checks
+- Plugin migration: All 60 plugins updated to new hierarchies
+- Advanced distributed: SWIM gossip, Raft consensus, CRDT replication, consistent hashing load balancing
+
+**Started:** 2026-02-12
+
+---
