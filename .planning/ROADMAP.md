@@ -291,7 +291,7 @@ Plans:
 - [ ] 12-04-PLAN.md — Implement 9 AEDS extension plugins (swarm, delta, PreCog, mule, dedup, notification, code signing, policy, zero-trust)
 
 ### Phase 13: Data Governance Intelligence
-**Goal**: Data governance intelligence plugin provides comprehensive lineage, catalog, quality, semantic, and governance capabilities
+**Goal**: Data governance intelligence provides comprehensive lineage, catalog, quality, semantic, and governance capabilities via 23 AI-native strategies across 5 existing plugins
 **Depends on**: Phase 2 (Intelligence plugin), Phase 8 (data management)
 **Requirements**: DGI-01, DGI-02, DGI-03, DGI-04, DGI-05
 **Success Criteria** (what must be TRUE):
@@ -300,14 +300,14 @@ Plans:
   3. Quality strategies anticipate issues, detect drift, flag anomalies, identify trends, and determine root causes
   4. Semantic strategies extract meaning, assess contextual relevance, and integrate domain knowledge
   5. Governance strategies recommend policies, identify compliance gaps, classify sensitivity, and manage retention
-**Plans**: 7 plans in 1 wave
+**Plans**: 5 plans in 1 wave
 
 Plans:
-- [ ] 13-01: Verify and complete lineage strategies (T146.B1)
-- [ ] 13-02: Verify and complete catalog strategies (T146.B2)
-- [ ] 13-03: Verify and complete quality strategies (T146.B3)
-- [ ] 13-04: Verify and complete semantic strategies (T146.B4)
-- [ ] 13-05: Verify and complete governance strategies (T146.B5)
+- [ ] 13-01-PLAN.md — Implement 5 active lineage strategies in UltimateDataLineage (T146.B1)
+- [ ] 13-02-PLAN.md — Implement 5 living catalog strategies in UltimateDataCatalog (T146.B2)
+- [ ] 13-03-PLAN.md — Implement 5 predictive quality strategies in UltimateDataQuality (T146.B3)
+- [ ] 13-04-PLAN.md — Implement 4 semantic intelligence strategies in UltimateIntelligence (T146.B4)
+- [ ] 13-05-PLAN.md — Implement 4 intelligent governance strategies in UltimateDataGovernance (T146.B5)
 
 ### Phase 14: Other Ultimate Plugins
 **Goal**: Remaining Ultimate/Universal plugins are complete and integrated
@@ -479,7 +479,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8 -> 9 -> 10
 | 10. Advanced Storage Features | 0/7 | Not started | - |
 | 11. Spatial & Psychometric | 0/2 | Not started | - |
 | 12. AEDS System | 0/4 | Planned | - |
-| 13. Data Governance Intelligence | 0/5 | Not started | - |
+| 13. Data Governance Intelligence | 0/5 | Planned | - |
 | 14. Other Ultimate Plugins | 0/5 | Not started | - |
 | 15. Bug Fixes & Build Health | 0/4 | Not started | - |
 | 16. Testing & Quality Assurance | 0/2 | Not started | - |
