@@ -123,6 +123,7 @@
     <Project Path="Plugins/DataWarehouse.Plugins.UltimateMicroservices/DataWarehouse.Plugins.UltimateMicroservices.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.UltimateMultiCloud/DataWarehouse.Plugins.UltimateMultiCloud.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.UltimateRAID/DataWarehouse.Plugins.UltimateRAID.csproj" />
+    <Project Path="Plugins/DataWarehouse.Plugins.UltimateDataTransit/DataWarehouse.Plugins.UltimateDataTransit.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.UltimateReplication/DataWarehouse.Plugins.UltimateReplication.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.UltimateResilience/DataWarehouse.Plugins.UltimateResilience.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.UltimateResourceManager/DataWarehouse.Plugins.UltimateResourceManager.csproj" />
