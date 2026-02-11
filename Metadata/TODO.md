@@ -10973,12 +10973,12 @@ public enum InterfaceProtocol { REST, gRPC, GraphQL, SQL, WebSocket, MQTT, AMQP,
 | 109.B1.3 | Implement protocol auto-discovery | [x] |
 | 109.B1.4 | Implement request routing | [x] |
 | **B2: REST Protocols** |
-| 109.B2.1 | RestStrategy - RESTful HTTP API | [ ] |
-| 109.B2.2 | ⭐ OpenApiStrategy - OpenAPI/Swagger auto-generation | [ ] |
-| 109.B2.3 | ⭐ JsonApiStrategy - JSON:API specification | [ ] |
-| 109.B2.4 | ⭐ HateoasStrategy - HATEOAS hypermedia controls | [ ] |
-| 109.B2.5 | ⭐ ODataStrategy - OData protocol | [ ] |
-| 109.B2.6 | ⭐ FalcorStrategy - Netflix Falcor | [ ] |
+| 109.B2.1 | RestStrategy - RESTful HTTP API | [x] |
+| 109.B2.2 | ⭐ OpenApiStrategy - OpenAPI/Swagger auto-generation | [x] |
+| 109.B2.3 | ⭐ JsonApiStrategy - JSON:API specification | [x] |
+| 109.B2.4 | ⭐ HateoasStrategy - HATEOAS hypermedia controls | [x] |
+| 109.B2.5 | ⭐ ODataStrategy - OData protocol | [x] |
+| 109.B2.6 | ⭐ FalcorStrategy - Netflix Falcor | [x] |
 | **B3: RPC Protocols** |
 | 109.B3.1 | GrpcStrategy - gRPC with protobuf | [ ] |
 | 109.B3.2 | ⭐ GrpcWebStrategy - gRPC-Web for browsers | [ ] |
@@ -10987,13 +10987,13 @@ public enum InterfaceProtocol { REST, gRPC, GraphQL, SQL, WebSocket, MQTT, AMQP,
 | 109.B3.5 | ⭐ JsonRpcStrategy - JSON-RPC 2.0 | [ ] |
 | 109.B3.6 | ⭐ XmlRpcStrategy - XML-RPC | [ ] |
 | **B4: Query Languages** |
-| 109.B4.1 | GraphQlStrategy - GraphQL API | [ ] |
-| 109.B4.2 | SqlStrategy - SQL interface | [ ] |
-| 109.B4.3 | ⭐ RelayStrategy - Relay-compliant GraphQL | [ ] |
-| 109.B4.4 | ⭐ ApolloFederationStrategy - Apollo Federation | [ ] |
-| 109.B4.5 | ⭐ HasuraStrategy - Hasura-style instant API | [ ] |
-| 109.B4.6 | ⭐ PostGraphileStrategy - PostGraphile-style | [ ] |
-| 109.B4.7 | ⭐ PrismaStrategy - Prisma-style API | [ ] |
+| 109.B4.1 | GraphQlStrategy - GraphQL API | [x] |
+| 109.B4.2 | SqlStrategy - SQL interface | [x] |
+| 109.B4.3 | ⭐ RelayStrategy - Relay-compliant GraphQL | [x] |
+| 109.B4.4 | ⭐ ApolloFederationStrategy - Apollo Federation | [x] |
+| 109.B4.5 | ⭐ HasuraStrategy - Hasura-style instant API | [x] |
+| 109.B4.6 | ⭐ PostGraphileStrategy - PostGraphile-style | [x] |
+| 109.B4.7 | ⭐ PrismaStrategy - Prisma-style API | [x] |
 | **B5: Real-Time Protocols** |
 | 109.B5.1 | ⭐ WebSocketStrategy - WebSocket bidirectional | [ ] |
 | 109.B5.2 | ⭐ ServerSentEventsStrategy - SSE streaming | [ ] |
