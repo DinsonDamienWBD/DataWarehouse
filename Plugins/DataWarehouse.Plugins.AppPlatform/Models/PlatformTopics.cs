@@ -98,4 +98,28 @@ internal static class PlatformTopics
     /// Topic for routing requests to the compliance service.
     /// </summary>
     public const string ServiceCompliance = $"{Prefix}.service.compliance";
+
+    // ========================================
+    // Policy Management Topics
+    // ========================================
+
+    /// <summary>
+    /// Topic for binding a per-app access control policy.
+    /// </summary>
+    public const string PolicyBind = $"{Prefix}.policy.bind";
+
+    /// <summary>
+    /// Topic for unbinding a per-app access control policy.
+    /// </summary>
+    public const string PolicyUnbind = $"{Prefix}.policy.unbind";
+
+    /// <summary>
+    /// Topic for retrieving a per-app access control policy.
+    /// </summary>
+    public const string PolicyGet = $"{Prefix}.policy.get";
+
+    /// <summary>
+    /// Topic for evaluating an access control decision against a per-app policy.
+    /// </summary>
+    public const string PolicyEvaluate = $"{Prefix}.policy.evaluate";
 }
