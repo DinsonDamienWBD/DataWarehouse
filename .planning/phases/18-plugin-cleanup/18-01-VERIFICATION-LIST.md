@@ -223,3 +223,58 @@ These plugins must NOT be deleted. They are either standalone feature plugins or
 | 43 | UltimateWorkflow | Ultimate | YES |
 | 44 | UniversalDashboards | Universal | YES |
 | 45 | UniversalObservability | Universal | YES |
+
+---
+
+## Orphaned Test Files
+
+The 18-RESEARCH.md identified 17 test files that were excluded from compilation via `<Compile Remove>` entries in DataWarehouse.Tests.csproj. Verification against current state:
+
+**Status: ALL 17 FILES ALREADY DELETED. ALL `<Compile Remove>` ENTRIES ALREADY REMOVED.**
+
+This cleanup was completed during Phase 16 (comprehensive test suite overhaul).
+
+| # | File Path | Exists on Disk | Compile Remove Entry |
+|---|-----------|---------------|---------------------|
+| 1 | PluginTests.cs | NO (already deleted) | NO (already removed) |
+| 2 | Replication/GeoReplicationPluginTests.cs | NO (already deleted) | NO (already removed) |
+| 3 | Database/RelationalDatabasePluginTests.cs | NO (already deleted) | NO (already removed) |
+| 4 | Database/EmbeddedDatabasePluginTests.cs | NO (already deleted) | NO (already removed) |
+| 5 | Infrastructure/CircuitBreakerPolicyTests.cs | NO (already deleted) | NO (already removed) |
+| 6 | Infrastructure/MetricsCollectorTests.cs | NO (already deleted) | NO (already removed) |
+| 7 | Infrastructure/SdkInfrastructureTests.cs | NO (already deleted) | NO (already removed) |
+| 8 | Infrastructure/TokenBucketRateLimiterTests.cs | NO (already deleted) | NO (already removed) |
+| 9 | Infrastructure/CodeCleanupVerificationTests.cs | NO (already deleted) | NO (already removed) |
+| 10 | Telemetry/DistributedTracingTests.cs | NO (already deleted) | NO (already removed) |
+| 11 | Hyperscale/ErasureCodingTests.cs | NO (already deleted) | NO (already removed) |
+| 12 | Storage/DurableStateTests.cs | NO (already deleted) | NO (already removed) |
+| 13 | Kernel/DataWarehouseKernelTests.cs | NO (already deleted) | NO (already removed) |
+| 14 | Integration/KernelIntegrationTests.cs | NO (already deleted) | NO (already removed) |
+| 15 | Messaging/AdvancedMessageBusTests.cs | NO (already deleted) | NO (already removed) |
+| 16 | Pipeline/PipelineOrchestratorTests.cs | NO (already deleted) | NO (already removed) |
+| 17 | Security/MpcStrategyTests.cs | NO (already deleted) | NO (already removed) |
+
+---
+
+## Plugin Readme.txt
+
+**File:** `Plugin Readme.txt` (referenced in slnx at `<File Path="Plugin Readme.txt" />`)
+**Exists:** YES
+**Content:** "All plugins go here as individual projects in this folder."
+**Action for Plan 18-03:** Review and update content to reflect post-cleanup state (60 retained plugins).
+
+---
+
+## Execution Summary for Plan 18-02
+
+| Action | Count | Details |
+|--------|-------|---------|
+| slnx entries to remove | 66 | All in DELETE_FROM_SLNX section above |
+| Plugin directories to delete | 88 | 66 (DELETE_FROM_SLNX) + 22 (DELETE_DISK_ONLY) |
+| Test files to delete | 0 | Already deleted in Phase 16 |
+| Compile Remove entries to clean | 0 | Already removed in Phase 16 |
+
+**Post-cleanup expected state:**
+- Plugin directories on disk: 60 (15 standalone + 45 Ultimate/Universal)
+- Plugin entries in slnx: 58 (13 standalone-in-slnx + 45 Ultimate/Universal)
+- Plugins on disk but not in slnx: 2 (AirGapBridge, DataMarketplace)
