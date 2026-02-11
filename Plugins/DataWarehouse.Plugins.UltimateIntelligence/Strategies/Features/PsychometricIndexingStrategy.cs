@@ -358,6 +358,10 @@ public sealed class PsychometricAnalysis
     public List<EmotionScore> Emotions { get; set; } = new();
     public WritingStyleMetrics WritingStyle { get; set; } = new();
     public List<string> CognitivePatterns { get; set; } = new();
+    /// <summary>
+    /// Deception detection signals (null if not requested in analysis).
+    /// </summary>
+    public DeceptionSignals? DeceptionIndicators { get; set; }
     public DateTime AnalyzedAt { get; set; }
 }
 
@@ -404,4 +408,84 @@ public sealed class BigFiveScores
     public float Extraversion { get; init; }
     public float Agreeableness { get; init; }
     public float Neuroticism { get; init; }
+}
+
+/// <summary>
+/// Deception detection signals extracted from content analysis.
+/// </summary>
+/// <remarks>
+/// Based on linguistic and psychometric research into deception indicators.
+/// Scores are 0-1 normalized values where higher = stronger signal.
+/// NOT a definitive lie detector - use as risk indicator requiring human review.
+/// </remarks>
+public sealed class DeceptionSignals
+{
+    /// <summary>
+    /// Linguistic distance score - unusual word choice, unnatural phrasing.
+    /// </summary>
+    /// <remarks>
+    /// Measures deviation from author's typical writing style.
+    /// Range: 0 (normal) to 1 (highly unusual).
+    /// </remarks>
+    public float LinguisticDistanceScore { get; init; }
+
+    /// <summary>
+    /// Temporal inconsistency score - conflicting time references, timeline gaps.
+    /// </summary>
+    /// <remarks>
+    /// Detects contradictions in when events occurred.
+    /// Range: 0 (consistent) to 1 (conflicting).
+    /// </remarks>
+    public float TemporalInconsistencyScore { get; init; }
+
+    /// <summary>
+    /// Emotional incongruence score - sentiment mismatch with topic.
+    /// </summary>
+    /// <remarks>
+    /// E.g., positive sentiment when discussing negative event.
+    /// Range: 0 (congruent) to 1 (incongruent).
+    /// </remarks>
+    public float EmotionalIncongruenceScore { get; init; }
+
+    /// <summary>
+    /// Overspecification score - excessive unnecessary detail.
+    /// </summary>
+    /// <remarks>
+    /// Deceptive content often includes excessive detail to appear credible.
+    /// Range: 0 (appropriate) to 1 (excessive).
+    /// </remarks>
+    public float OverspecificationScore { get; init; }
+
+    /// <summary>
+    /// Hedging language score - use of qualifiers ("maybe", "possibly", "sort of").
+    /// </summary>
+    /// <remarks>
+    /// Frequent hedging may indicate uncertainty or deception.
+    /// Range: 0 (direct) to 1 (heavily hedged).
+    /// </remarks>
+    public float HedgingLanguageScore { get; init; }
+
+    /// <summary>
+    /// Overall deception probability - composite score.
+    /// </summary>
+    /// <remarks>
+    /// Weighted combination of all signals.
+    /// Range: 0 (likely truthful) to 1 (likely deceptive).
+    /// Threshold recommendation: 0.7+ warrants human review.
+    /// </remarks>
+    public float OverallDeceptionProbability { get; init; }
+
+    /// <summary>
+    /// Confidence in deception assessment.
+    /// </summary>
+    /// <remarks>
+    /// Affected by content length, clarity, language complexity.
+    /// Range: 0 (low confidence) to 1 (high confidence).
+    /// </remarks>
+    public float AssessmentConfidence { get; init; }
+
+    /// <summary>
+    /// Explanation of primary deception indicators detected.
+    /// </summary>
+    public string? PrimaryIndicators { get; init; }
 }
