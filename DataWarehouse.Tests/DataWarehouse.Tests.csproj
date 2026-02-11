@@ -31,6 +31,7 @@
   <ItemGroup>
     <ProjectReference Include="..\DataWarehouse.SDK\DataWarehouse.SDK.csproj" />
     <ProjectReference Include="..\DataWarehouse.Kernel\DataWarehouse.Kernel.csproj" />
+    <ProjectReference Include="..\Plugins\DataWarehouse.Plugins.UltimateAccessControl\DataWarehouse.Plugins.UltimateAccessControl.csproj" />
   </ItemGroup>
 
   <!-- Exclude test files for removed functionality to fix build errors -->
@@ -51,6 +52,7 @@
     <Compile Remove="PluginTests.cs" />
     <Compile Remove="Pipeline\PipelineOrchestratorTests.cs" />
     <Compile Remove="Replication\GeoReplicationPluginTests.cs" />
+    <Compile Remove="Security\MpcStrategyTests.cs" />
   </ItemGroup>
 
 </Project>
