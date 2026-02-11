@@ -42,14 +42,23 @@ public sealed class PluginMarketplacePlugin : FeaturePluginBase
     private readonly ConcurrentDictionary<string, List<PluginReviewEntry>> _reviews = new();
     private readonly ConcurrentDictionary<string, CertificationResult> _certifications = new();
     private readonly ConcurrentDictionary<string, List<DeveloperRevenueRecord>> _revenueRecords = new();
+    private readonly ConcurrentDictionary<string, List<PluginUsageEvent>> _usageEvents = new();
+    private readonly ConcurrentDictionary<string, PluginUsageAnalytics> _monthlyAnalytics = new();
     private readonly SemaphoreSlim _catalogLock = new(1, 1);
     private readonly SemaphoreSlim _fileLock = new(1, 1);
     private readonly PluginMarketplaceConfig _config;
     private readonly CertificationPolicy _certificationPolicy;
     private readonly RevenueConfig _revenueConfig;
     private readonly string _storagePath;
+    private readonly Timer _analyticsAggregationTimer;
     private MarketplaceState _state;
     private volatile bool _isRunning;
+
+    /// <summary>Maximum number of usage events kept in memory per plugin before evicting oldest.</summary>
+    private const int MaxEventsPerPlugin = 10000;
+
+    /// <summary>Number of days of event log files to retain on disk before rotation.</summary>
+    private const int EventLogRetentionDays = 90;
 
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
@@ -84,6 +93,11 @@ public sealed class PluginMarketplacePlugin : FeaturePluginBase
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
             "DataWarehouse", "plugin-marketplace");
         _state = new MarketplaceState();
+        _analyticsAggregationTimer = new Timer(
+            callback: _ => _ = AggregateAnalyticsFireAndForgetAsync(),
+            state: null,
+            dueTime: Timeout.Infinite,
+            period: Timeout.Infinite);
     }
 
     /// <inheritdoc/>
@@ -96,6 +110,7 @@ public sealed class PluginMarketplacePlugin : FeaturePluginBase
         await LoadReviewsAsync();
         await LoadCertificationsAsync();
         await LoadRevenueRecordsAsync();
+        await LoadAnalyticsAsync();
 
         // If catalog is empty, populate with built-in entries
         if (_catalog.IsEmpty)
@@ -170,7 +185,7 @@ public sealed class PluginMarketplacePlugin : FeaturePluginBase
                 await HandleReviewAsync(message);
                 break;
             case "marketplace.analytics":
-                HandleAnalytics(message);
+                await HandleAnalyticsAsync(message);
                 break;
             default:
                 await base.OnMessageAsync(message);
@@ -189,6 +204,12 @@ public sealed class PluginMarketplacePlugin : FeaturePluginBase
         Directory.CreateDirectory(Path.Combine(_storagePath, "archive"));
         Directory.CreateDirectory(Path.Combine(_storagePath, "certifications"));
         Directory.CreateDirectory(Path.Combine(_storagePath, "revenue"));
+        Directory.CreateDirectory(Path.Combine(_storagePath, "analytics"));
+
+        // Start analytics aggregation timer: initial delay 5 minutes, then every hour
+        _analyticsAggregationTimer.Change(
+            dueTime: TimeSpan.FromMinutes(5),
+            period: TimeSpan.FromHours(1));
 
         await Task.CompletedTask;
     }
@@ -197,6 +218,12 @@ public sealed class PluginMarketplacePlugin : FeaturePluginBase
     public override async Task StopAsync()
     {
         _isRunning = false;
+
+        // Stop analytics timer and run one final aggregation
+        await _analyticsAggregationTimer.DisposeAsync();
+        await AggregateAnalyticsAsync(CancellationToken.None);
+        await SaveAnalyticsAsync();
+
         await SaveStateAsync();
         await SaveAllCatalogEntriesAsync();
     }
@@ -405,6 +432,16 @@ public sealed class PluginMarketplacePlugin : FeaturePluginBase
         UpdateCatalogEntryInstalled(pluginId, targetVersion);
         Interlocked.Increment(ref _state._totalInstalls);
 
+        // Record usage analytics event for installation
+        await RecordUsageEventAsync(new PluginUsageEvent
+        {
+            EventId = Guid.NewGuid().ToString("N"),
+            PluginId = pluginId,
+            EventType = UsageEventType.Installed,
+            Timestamp = DateTime.UtcNow,
+            Metadata = new Dictionary<string, object> { ["version"] = targetVersion }
+        }, CancellationToken.None);
+
         // Record revenue if plugin has a price (author = developer)
         if (_catalog.TryGetValue(pluginId, out var updatedEntry))
         {
@@ -543,6 +580,15 @@ public sealed class PluginMarketplacePlugin : FeaturePluginBase
         };
 
         Interlocked.Increment(ref _state._totalUninstalls);
+
+        // Record usage analytics event for uninstallation
+        await RecordUsageEventAsync(new PluginUsageEvent
+        {
+            EventId = Guid.NewGuid().ToString("N"),
+            PluginId = pluginId,
+            EventType = UsageEventType.Uninstalled,
+            Timestamp = DateTime.UtcNow
+        }, CancellationToken.None);
 
         await SaveCatalogEntryAsync(pluginId);
         await SaveStateAsync();
@@ -730,6 +776,20 @@ public sealed class PluginMarketplacePlugin : FeaturePluginBase
 
         // Record version change in history
         AddVersionToHistory(pluginId, newVersion, $"Updated from v{oldVersion} to v{newVersion}");
+
+        // Record usage analytics event for update
+        await RecordUsageEventAsync(new PluginUsageEvent
+        {
+            EventId = Guid.NewGuid().ToString("N"),
+            PluginId = pluginId,
+            EventType = UsageEventType.Updated,
+            Timestamp = DateTime.UtcNow,
+            Metadata = new Dictionary<string, object>
+            {
+                ["previousVersion"] = oldVersion,
+                ["newVersion"] = newVersion
+            }
+        }, CancellationToken.None);
 
         await SaveCatalogEntryAsync(pluginId);
         await SaveStateAsync();
@@ -1643,61 +1703,413 @@ public sealed class PluginMarketplacePlugin : FeaturePluginBase
 
     #endregion
 
-    #region marketplace.analytics Handler
+    #region Usage Analytics System
 
     /// <summary>
-    /// Handles the marketplace.analytics message to return marketplace usage statistics.
+    /// Handles the marketplace.analytics message. Returns per-plugin analytics when pluginId
+    /// is provided, or marketplace-wide analytics summary otherwise.
     /// </summary>
-    /// <param name="message">The incoming plugin message.</param>
-    private void HandleAnalytics(PluginMessage message)
+    /// <param name="message">The incoming plugin message with optional pluginId and monthsBack.</param>
+    private async Task HandleAnalyticsAsync(PluginMessage message)
+    {
+        var pluginId = GetString(message.Payload, "pluginId");
+        var monthsBack = GetInt(message.Payload, "monthsBack");
+        if (monthsBack <= 0) monthsBack = 12;
+
+        if (!string.IsNullOrWhiteSpace(pluginId))
+        {
+            var summary = await GetPluginAnalyticsAsync(pluginId, monthsBack, CancellationToken.None);
+            message.Payload["result"] = summary;
+        }
+        else
+        {
+            var summary = await GetMarketplaceAnalyticsAsync(CancellationToken.None);
+            message.Payload["result"] = summary;
+        }
+    }
+
+    /// <summary>
+    /// Records a usage event for a plugin. Appends the event to the in-memory collection
+    /// (bounded to <see cref="MaxEventsPerPlugin"/> per plugin) and persists it to a daily
+    /// event log file at {storagePath}/analytics/events-{yyyy-MM-dd}.json.
+    /// </summary>
+    /// <param name="usageEvent">The usage event to record.</param>
+    /// <param name="ct">Cancellation token.</param>
+    private async Task RecordUsageEventAsync(PluginUsageEvent usageEvent, CancellationToken ct)
+    {
+        if (!Enum.IsDefined(typeof(UsageEventType), usageEvent.EventType))
+        {
+            return; // Invalid event type
+        }
+
+        // Add to in-memory collection with bounded size
+        var events = _usageEvents.GetOrAdd(usageEvent.PluginId, _ => new List<PluginUsageEvent>());
+        lock (events)
+        {
+            events.Add(usageEvent);
+
+            // Evict oldest events when exceeding max per plugin
+            while (events.Count > MaxEventsPerPlugin)
+            {
+                events.RemoveAt(0);
+            }
+        }
+
+        // Append to daily event log file
+        var analyticsDir = Path.Combine(_storagePath, "analytics");
+        Directory.CreateDirectory(analyticsDir);
+
+        var dailyLogPath = Path.Combine(analyticsDir, $"events-{usageEvent.Timestamp:yyyy-MM-dd}.json");
+        var eventJson = JsonSerializer.Serialize(usageEvent, JsonOptions);
+
+        await _fileLock.WaitAsync(ct);
+        try
+        {
+            await File.AppendAllTextAsync(dailyLogPath, eventJson + Environment.NewLine, ct);
+        }
+        finally
+        {
+            _fileLock.Release();
+        }
+    }
+
+    /// <summary>
+    /// Fire-and-forget wrapper for timer-based aggregation. Catches and suppresses exceptions
+    /// to prevent unobserved task exceptions from timer callbacks.
+    /// </summary>
+    private async Task AggregateAnalyticsFireAndForgetAsync()
+    {
+        try
+        {
+            await AggregateAnalyticsAsync(CancellationToken.None);
+        }
+        catch
+        {
+            // Timer callback errors are suppressed; aggregation will retry on next tick
+        }
+    }
+
+    /// <summary>
+    /// Aggregates in-memory usage events into monthly analytics records. For each plugin with
+    /// events, computes install/uninstall/update/error/message counts, active user count,
+    /// popularity score, and trend direction by comparing against the previous month.
+    /// Persists results to monthly analytics files.
+    /// </summary>
+    /// <param name="ct">Cancellation token.</param>
+    private async Task AggregateAnalyticsAsync(CancellationToken ct)
+    {
+        var currentPeriod = DateTime.UtcNow.ToString("yyyy-MM");
+        var lastMonthPeriod = DateTime.UtcNow.AddMonths(-1).ToString("yyyy-MM");
+
+        foreach (var kvp in _usageEvents)
+        {
+            var pluginId = kvp.Key;
+            List<PluginUsageEvent> eventSnapshot;
+            lock (kvp.Value)
+            {
+                eventSnapshot = new List<PluginUsageEvent>(kvp.Value);
+            }
+
+            // Group events by period (yyyy-MM)
+            var byPeriod = eventSnapshot.GroupBy(e => e.Timestamp.ToString("yyyy-MM"));
+
+            foreach (var periodGroup in byPeriod)
+            {
+                var period = periodGroup.Key;
+                var periodEvents = periodGroup.ToList();
+
+                var installCount = periodEvents.Count(e => e.EventType == UsageEventType.Installed);
+                var uninstallCount = periodEvents.Count(e => e.EventType == UsageEventType.Uninstalled);
+                var updateCount = periodEvents.Count(e => e.EventType == UsageEventType.Updated);
+                var errorCount = periodEvents.Count(e => e.EventType == UsageEventType.ErrorOccurred);
+                var messageCount = (long)periodEvents.Count(e => e.EventType == UsageEventType.MessageHandled);
+                var activeUserCount = periodEvents
+                    .Where(e => e.UserId != null)
+                    .Select(e => e.UserId!)
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .Count();
+
+                // PopularityScore formula: real event counts weighted and clamped to 0-100
+                var rawScore = (installCount * 10) + (activeUserCount * 5) - (uninstallCount * 3) - (errorCount * 2);
+                var popularityScore = Math.Clamp(rawScore, 0.0, 100.0);
+
+                // Determine trend direction by comparing to previous month
+                var previousPeriodKey = $"{pluginId}:{GetPreviousPeriod(period)}";
+                var trendDirection = TrendDirection.Stable;
+                if (_monthlyAnalytics.TryGetValue(previousPeriodKey, out var previousAnalytics))
+                {
+                    if (popularityScore > previousAnalytics.PopularityScore + 2.0)
+                        trendDirection = TrendDirection.Rising;
+                    else if (popularityScore < previousAnalytics.PopularityScore - 2.0)
+                        trendDirection = TrendDirection.Declining;
+                }
+
+                var analytics = new PluginUsageAnalytics
+                {
+                    PluginId = pluginId,
+                    Period = period,
+                    InstallCount = installCount,
+                    UninstallCount = uninstallCount,
+                    UpdateCount = updateCount,
+                    ActiveUserCount = activeUserCount,
+                    ErrorCount = errorCount,
+                    MessageCount = messageCount,
+                    PopularityScore = popularityScore,
+                    TrendDirection = trendDirection
+                };
+
+                var analyticsKey = $"{pluginId}:{period}";
+                _monthlyAnalytics[analyticsKey] = analytics;
+            }
+        }
+
+        // Persist monthly analytics and rotate old event log files
+        await SaveAnalyticsAsync();
+        RotateEventLogFiles();
+    }
+
+    /// <summary>
+    /// Returns a per-plugin analytics summary with monthly data for the past N months.
+    /// </summary>
+    /// <param name="pluginId">The plugin to get analytics for.</param>
+    /// <param name="monthsBack">Number of months of historical data to include.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>Plugin analytics summary with monthly breakdown and aggregates.</returns>
+    private Task<PluginAnalyticsSummary> GetPluginAnalyticsAsync(string pluginId, int monthsBack, CancellationToken ct)
+    {
+        var monthlyData = new List<PluginUsageAnalytics>();
+        var now = DateTime.UtcNow;
+
+        for (int i = 0; i < monthsBack; i++)
+        {
+            var period = now.AddMonths(-i).ToString("yyyy-MM");
+            var key = $"{pluginId}:{period}";
+            if (_monthlyAnalytics.TryGetValue(key, out var analytics))
+            {
+                monthlyData.Add(analytics);
+            }
+        }
+
+        var totalInstalls = _catalog.TryGetValue(pluginId, out var entry) ? entry.InstallCount : 0L;
+        var totalUninstalls = monthlyData.Sum(m => (long)m.UninstallCount);
+        var currentActiveInstalls = _catalog.TryGetValue(pluginId, out var catEntry) && catEntry.IsInstalled ? 1 : 0;
+        var mostActiveMonth = monthlyData.Count > 0
+            ? monthlyData.OrderByDescending(m => m.ActiveUserCount).First().Period
+            : now.ToString("yyyy-MM");
+
+        // Compute average session duration from events (approximation based on event spread)
+        var avgSessionDuration = TimeSpan.Zero;
+        if (_usageEvents.TryGetValue(pluginId, out var events))
+        {
+            List<PluginUsageEvent> eventSnapshot;
+            lock (events)
+            {
+                eventSnapshot = new List<PluginUsageEvent>(events);
+            }
+
+            if (eventSnapshot.Count >= 2)
+            {
+                var sorted = eventSnapshot.OrderBy(e => e.Timestamp).ToList();
+                var totalSpan = sorted[^1].Timestamp - sorted[0].Timestamp;
+                var distinctUsers = sorted.Where(e => e.UserId != null).Select(e => e.UserId!).Distinct().Count();
+                if (distinctUsers > 0)
+                {
+                    avgSessionDuration = TimeSpan.FromTicks(totalSpan.Ticks / distinctUsers);
+                }
+            }
+        }
+
+        var summary = new PluginAnalyticsSummary
+        {
+            PluginId = pluginId,
+            TotalInstalls = totalInstalls,
+            TotalUninstalls = totalUninstalls,
+            CurrentActiveInstalls = currentActiveInstalls,
+            AverageSessionDuration = avgSessionDuration,
+            MostActiveMonth = mostActiveMonth,
+            MonthlyData = monthlyData.OrderByDescending(m => m.Period).ToArray()
+        };
+
+        return Task.FromResult(summary);
+    }
+
+    /// <summary>
+    /// Returns a marketplace-wide analytics summary with aggregate stats across all plugins.
+    /// </summary>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>Marketplace analytics summary with totals, popular plugins, and growth rate.</returns>
+    private Task<MarketplaceAnalyticsSummary> GetMarketplaceAnalyticsAsync(CancellationToken ct)
     {
         var totalPlugins = _catalog.Count;
-        var installedCount = _catalog.Values.Count(e => e.IsInstalled);
-        var certifiedCount = _catalog.Values.Count(e => e.CertificationLevel >= CertificationLevel.BasicCertified);
         var totalInstalls = Interlocked.Read(ref _state._totalInstalls);
-        var totalUninstalls = Interlocked.Read(ref _state._totalUninstalls);
 
-        var categoryCounts = _catalog.Values
-            .GroupBy(e => e.Category)
-            .ToDictionary(g => g.Key, g => g.Count());
+        // Get current and last month periods
+        var currentPeriod = DateTime.UtcNow.ToString("yyyy-MM");
+        var lastPeriod = DateTime.UtcNow.AddMonths(-1).ToString("yyyy-MM");
 
-        var topRated = _catalog.Values
-            .Where(e => e.RatingCount >= 1)
-            .OrderByDescending(e => e.AverageRating)
-            .Take(10)
-            .Select(e => new Dictionary<string, object>
-            {
-                ["id"] = e.Id,
-                ["name"] = e.Name,
-                ["rating"] = e.AverageRating,
-                ["ratingCount"] = e.RatingCount
-            })
+        // Aggregate per-plugin analytics for current period
+        var currentMonthAnalytics = _monthlyAnalytics.Values
+            .Where(a => a.Period == currentPeriod)
             .ToList();
 
-        var mostInstalled = _catalog.Values
-            .OrderByDescending(e => e.InstallCount)
-            .Take(10)
-            .Select(e => new Dictionary<string, object>
-            {
-                ["id"] = e.Id,
-                ["name"] = e.Name,
-                ["installCount"] = e.InstallCount
-            })
+        var lastMonthAnalytics = _monthlyAnalytics.Values
+            .Where(a => a.Period == lastPeriod)
             .ToList();
 
-        message.Payload["result"] = new Dictionary<string, object>
+        // Most popular plugins by PopularityScore
+        var mostPopularPlugins = currentMonthAnalytics
+            .OrderByDescending(a => a.PopularityScore)
+            .Take(10)
+            .Select(a => a.PluginId)
+            .ToArray();
+
+        // If no current month analytics, fall back to catalog data
+        if (mostPopularPlugins.Length == 0)
         {
-            ["totalPlugins"] = totalPlugins,
-            ["installedPlugins"] = installedCount,
-            ["certifiedPlugins"] = certifiedCount,
-            ["totalInstalls"] = totalInstalls,
-            ["totalUninstalls"] = totalUninstalls,
-            ["categoryCounts"] = categoryCounts,
-            ["topRated"] = topRated,
-            ["mostInstalled"] = mostInstalled,
-            ["lastCatalogRefresh"] = _state.LastCatalogRefresh.ToString("o"),
-            ["activePluginCount"] = installedCount
+            mostPopularPlugins = _catalog.Values
+                .OrderByDescending(e => e.InstallCount)
+                .Take(10)
+                .Select(e => e.Id)
+                .ToArray();
+        }
+
+        // Most active category
+        var mostActiveCategory = _catalog.Values
+            .GroupBy(e => e.Category)
+            .OrderByDescending(g => g.Sum(e => e.InstallCount))
+            .Select(g => g.Key)
+            .FirstOrDefault() ?? "Unknown";
+
+        // Growth rate: (this month installs - last month installs) / max(last month installs, 1)
+        var thisMonthInstalls = currentMonthAnalytics.Sum(a => a.InstallCount);
+        var lastMonthInstalls = lastMonthAnalytics.Sum(a => a.InstallCount);
+        var growthRate = (double)(thisMonthInstalls - lastMonthInstalls) / Math.Max(lastMonthInstalls, 1);
+
+        var summary = new MarketplaceAnalyticsSummary
+        {
+            TotalPlugins = totalPlugins,
+            TotalInstalls = totalInstalls,
+            MostPopularPlugins = mostPopularPlugins,
+            MostActiveCategory = mostActiveCategory,
+            GrowthRate = growthRate,
+            GeneratedAt = DateTime.UtcNow
         };
+
+        return Task.FromResult(summary);
+    }
+
+    /// <summary>
+    /// Gets the previous month period string (yyyy-MM) from a given period.
+    /// </summary>
+    /// <param name="period">Current period in yyyy-MM format.</param>
+    /// <returns>Previous month period string.</returns>
+    private static string GetPreviousPeriod(string period)
+    {
+        if (DateTime.TryParseExact(period, "yyyy-MM", System.Globalization.CultureInfo.InvariantCulture,
+            System.Globalization.DateTimeStyles.None, out var dt))
+        {
+            return dt.AddMonths(-1).ToString("yyyy-MM");
+        }
+        return DateTime.UtcNow.AddMonths(-1).ToString("yyyy-MM");
+    }
+
+    /// <summary>
+    /// Saves monthly analytics data to JSON files at {storagePath}/analytics/usage-{yyyy-MM}.json.
+    /// Groups all analytics records by period and writes each period to its own file.
+    /// </summary>
+    private async Task SaveAnalyticsAsync()
+    {
+        var analyticsDir = Path.Combine(_storagePath, "analytics");
+        Directory.CreateDirectory(analyticsDir);
+
+        var byPeriod = _monthlyAnalytics.Values
+            .GroupBy(a => a.Period);
+
+        foreach (var group in byPeriod)
+        {
+            var filePath = Path.Combine(analyticsDir, $"usage-{SanitizeFileName(group.Key)}.json");
+
+            await _fileLock.WaitAsync();
+            try
+            {
+                var json = JsonSerializer.Serialize(group.ToArray(), JsonOptions);
+                await File.WriteAllTextAsync(filePath, json);
+            }
+            finally
+            {
+                _fileLock.Release();
+            }
+        }
+    }
+
+    /// <summary>
+    /// Loads monthly analytics data from JSON files on startup.
+    /// Reads all usage-*.json files from the analytics directory.
+    /// </summary>
+    private async Task LoadAnalyticsAsync()
+    {
+        var analyticsDir = Path.Combine(_storagePath, "analytics");
+        if (!Directory.Exists(analyticsDir)) return;
+
+        foreach (var file in Directory.GetFiles(analyticsDir, "usage-*.json"))
+        {
+            await _fileLock.WaitAsync();
+            try
+            {
+                var json = await File.ReadAllTextAsync(file);
+                var records = JsonSerializer.Deserialize<PluginUsageAnalytics[]>(json, JsonOptions);
+                if (records != null)
+                {
+                    foreach (var record in records)
+                    {
+                        var key = $"{record.PluginId}:{record.Period}";
+                        _monthlyAnalytics[key] = record;
+                    }
+                }
+            }
+            catch
+            {
+                // Skip corrupted analytics files
+            }
+            finally
+            {
+                _fileLock.Release();
+            }
+        }
+    }
+
+    /// <summary>
+    /// Rotates daily event log files, deleting files older than <see cref="EventLogRetentionDays"/> days.
+    /// </summary>
+    private void RotateEventLogFiles()
+    {
+        var analyticsDir = Path.Combine(_storagePath, "analytics");
+        if (!Directory.Exists(analyticsDir)) return;
+
+        var cutoffDate = DateTime.UtcNow.AddDays(-EventLogRetentionDays);
+
+        foreach (var file in Directory.GetFiles(analyticsDir, "events-*.json"))
+        {
+            var fileName = Path.GetFileNameWithoutExtension(file);
+            // Extract date from "events-yyyy-MM-dd"
+            if (fileName.Length >= 17 &&
+                DateTime.TryParseExact(fileName[7..], "yyyy-MM-dd",
+                    System.Globalization.CultureInfo.InvariantCulture,
+                    System.Globalization.DateTimeStyles.None, out var fileDate))
+            {
+                if (fileDate < cutoffDate)
+                {
+                    try
+                    {
+                        File.Delete(file);
+                    }
+                    catch
+                    {
+                        // Best-effort rotation; file may be locked
+                    }
+                }
+            }
+        }
     }
 
     #endregion
@@ -3187,5 +3599,165 @@ internal sealed record BuiltInPluginDefinition(
     long DefaultInstallCount,
     PluginDependencyInfo[]? Dependencies = null,
     bool IsInstalled = false);
+
+/// <summary>
+/// Types of usage events tracked for plugin analytics.
+/// </summary>
+public enum UsageEventType
+{
+    /// <summary>Plugin was installed.</summary>
+    Installed = 0,
+
+    /// <summary>Plugin was uninstalled.</summary>
+    Uninstalled = 1,
+
+    /// <summary>Plugin was updated to a new version.</summary>
+    Updated = 2,
+
+    /// <summary>Plugin was activated/started.</summary>
+    Activated = 3,
+
+    /// <summary>Plugin was deactivated/stopped.</summary>
+    Deactivated = 4,
+
+    /// <summary>An error occurred during plugin operation.</summary>
+    ErrorOccurred = 5,
+
+    /// <summary>A message was handled by the plugin.</summary>
+    MessageHandled = 6
+}
+
+/// <summary>
+/// Indicates the direction of a plugin's popularity trend relative to the previous month.
+/// </summary>
+public enum TrendDirection
+{
+    /// <summary>Popularity is increasing.</summary>
+    Rising = 0,
+
+    /// <summary>Popularity is stable.</summary>
+    Stable = 1,
+
+    /// <summary>Popularity is declining.</summary>
+    Declining = 2
+}
+
+/// <summary>
+/// Represents a single usage event for a plugin, used for event-based analytics tracking.
+/// Events are recorded in real time and aggregated periodically into monthly analytics.
+/// </summary>
+public sealed record PluginUsageEvent
+{
+    /// <summary>Unique event identifier (generated GUID).</summary>
+    public string EventId { get; init; } = string.Empty;
+
+    /// <summary>The plugin this event relates to.</summary>
+    public string PluginId { get; init; } = string.Empty;
+
+    /// <summary>The type of usage event.</summary>
+    public UsageEventType EventType { get; init; }
+
+    /// <summary>When the event occurred (UTC).</summary>
+    public DateTime Timestamp { get; init; }
+
+    /// <summary>Optional user ID associated with the event.</summary>
+    public string? UserId { get; init; }
+
+    /// <summary>Optional additional metadata for the event.</summary>
+    public Dictionary<string, object>? Metadata { get; init; }
+}
+
+/// <summary>
+/// Monthly aggregated usage analytics for a specific plugin.
+/// Computed periodically from raw usage events by the aggregation timer.
+/// </summary>
+public sealed record PluginUsageAnalytics
+{
+    /// <summary>The plugin these analytics describe.</summary>
+    public string PluginId { get; init; } = string.Empty;
+
+    /// <summary>The month period in yyyy-MM format.</summary>
+    public string Period { get; init; } = string.Empty;
+
+    /// <summary>Number of installations in this period.</summary>
+    public int InstallCount { get; init; }
+
+    /// <summary>Number of uninstallations in this period.</summary>
+    public int UninstallCount { get; init; }
+
+    /// <summary>Number of updates in this period.</summary>
+    public int UpdateCount { get; init; }
+
+    /// <summary>Count of distinct active users in this period.</summary>
+    public int ActiveUserCount { get; init; }
+
+    /// <summary>Number of errors that occurred in this period.</summary>
+    public int ErrorCount { get; init; }
+
+    /// <summary>Number of messages handled in this period.</summary>
+    public long MessageCount { get; init; }
+
+    /// <summary>
+    /// Popularity score computed from event counts.
+    /// Formula: (InstallCount * 10 + ActiveUserCount * 5 - UninstallCount * 3 - ErrorCount * 2), clamped to 0-100.
+    /// </summary>
+    public double PopularityScore { get; init; }
+
+    /// <summary>Trend direction comparing this month to the previous month.</summary>
+    public TrendDirection TrendDirection { get; init; }
+}
+
+/// <summary>
+/// Per-plugin analytics summary with monthly breakdown and aggregate statistics.
+/// Returned by the marketplace.analytics handler when a pluginId is provided.
+/// </summary>
+public sealed record PluginAnalyticsSummary
+{
+    /// <summary>The plugin these analytics summarize.</summary>
+    public string PluginId { get; init; } = string.Empty;
+
+    /// <summary>Total number of installations over all time.</summary>
+    public long TotalInstalls { get; init; }
+
+    /// <summary>Total number of uninstallations over all time.</summary>
+    public long TotalUninstalls { get; init; }
+
+    /// <summary>Number of currently active installations.</summary>
+    public int CurrentActiveInstalls { get; init; }
+
+    /// <summary>Average session duration across all users.</summary>
+    public TimeSpan AverageSessionDuration { get; init; }
+
+    /// <summary>The month with the highest active user count (yyyy-MM format).</summary>
+    public string MostActiveMonth { get; init; } = string.Empty;
+
+    /// <summary>Monthly analytics data ordered by period descending.</summary>
+    public PluginUsageAnalytics[] MonthlyData { get; init; } = Array.Empty<PluginUsageAnalytics>();
+}
+
+/// <summary>
+/// Marketplace-wide analytics summary with aggregate statistics across all plugins.
+/// Returned by the marketplace.analytics handler when no pluginId is provided.
+/// </summary>
+public sealed record MarketplaceAnalyticsSummary
+{
+    /// <summary>Total number of plugins in the marketplace catalog.</summary>
+    public int TotalPlugins { get; init; }
+
+    /// <summary>Total number of installations across all plugins.</summary>
+    public long TotalInstalls { get; init; }
+
+    /// <summary>Top 10 most popular plugins by popularity score.</summary>
+    public string[] MostPopularPlugins { get; init; } = Array.Empty<string>();
+
+    /// <summary>The most active plugin category by total installs.</summary>
+    public string MostActiveCategory { get; init; } = string.Empty;
+
+    /// <summary>Month-over-month growth rate: (thisMonth - lastMonth) / max(lastMonth, 1).</summary>
+    public double GrowthRate { get; init; }
+
+    /// <summary>When this summary was generated (UTC).</summary>
+    public DateTime GeneratedAt { get; init; }
+}
 
 #endregion
