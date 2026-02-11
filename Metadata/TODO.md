@@ -12217,37 +12217,37 @@ public enum MediaDomain { Video, Image, Texture, Audio, Mesh, Animation, Font }
 | 118.B3.6 | ⭐ ProResStrategy - Apple ProRes | [ ] |
 | 118.B3.7 | ⭐ DnxHdStrategy - Avid DNxHD/HR | [ ] |
 | **B4: Image Formats** |
-| 118.B4.1 | ⭐ JpegStrategy - JPEG with quality levels | [ ] |
-| 118.B4.2 | ⭐ PngStrategy - PNG with optimization | [ ] |
-| 118.B4.3 | ⭐ WebPStrategy - WebP | [ ] |
-| 118.B4.4 | ⭐ AvifStrategy - AVIF | [ ] |
+| 118.B4.1 | ⭐ JpegStrategy - JPEG with quality levels | [x] |
+| 118.B4.2 | ⭐ PngStrategy - PNG with optimization | [x] |
+| 118.B4.3 | ⭐ WebPStrategy - WebP | [x] |
+| 118.B4.4 | ⭐ AvifStrategy - AVIF | [x] |
 | 118.B4.5 | ⭐ JxlStrategy - JPEG XL | [ ] |
 | 118.B4.6 | ⭐ HeifStrategy - HEIF/HEIC | [ ] |
 | 118.B4.7 | ⭐ TiffStrategy - TIFF | [ ] |
 | 118.B4.8 | ⭐ ExrStrategy - OpenEXR (HDR) | [ ] |
 | **B5: RAW Camera Formats** |
-| 118.B5.1 | ⭐ ArwStrategy - Sony ARW | [ ] |
-| 118.B5.2 | ⭐ Cr2Strategy - Canon CR2/CR3 | [ ] |
-| 118.B5.3 | ⭐ NefStrategy - Nikon NEF | [ ] |
-| 118.B5.4 | ⭐ DngStrategy - Adobe DNG | [ ] |
+| 118.B5.1 | ⭐ ArwStrategy - Sony ARW | [x] |
+| 118.B5.2 | ⭐ Cr2Strategy - Canon CR2/CR3 | [x] |
+| 118.B5.3 | ⭐ NefStrategy - Nikon NEF | [x] |
+| 118.B5.4 | ⭐ DngStrategy - Adobe DNG | [x] |
 | 118.B5.5 | ⭐ RafStrategy - Fujifilm RAF | [ ] |
 | **B6: GPU Texture Formats (Domain-Specific, GPU-Decompressible)** |
-| 118.B6.1 | ⭐ Bc1Strategy - BC1/DXT1 (RGB) | [ ] |
-| 118.B6.2 | ⭐ Bc3Strategy - BC3/DXT5 (RGBA) | [ ] |
-| 118.B6.3 | ⭐ Bc4Strategy - BC4 (grayscale) | [ ] |
-| 118.B6.4 | ⭐ Bc5Strategy - BC5 (normal maps) | [ ] |
-| 118.B6.5 | ⭐ Bc6hStrategy - BC6H (HDR) | [ ] |
-| 118.B6.6 | ⭐ Bc7Strategy - BC7 (high quality RGBA) | [ ] |
+| 118.B6.1 | ⭐ Bc1Strategy - BC1/DXT1 (RGB) | [x] |
+| 118.B6.2 | ⭐ Bc3Strategy - BC3/DXT5 (RGBA) | [x] |
+| 118.B6.3 | ⭐ Bc4Strategy - BC4 (grayscale) | [x] |
+| 118.B6.4 | ⭐ Bc5Strategy - BC5 (normal maps) | [x] |
+| 118.B6.5 | ⭐ Bc6hStrategy - BC6H (HDR) | [x] |
+| 118.B6.6 | ⭐ Bc7Strategy - BC7 (high quality RGBA) | [x] |
 | 118.B6.7 | ⭐ AstcStrategy - ASTC (adaptive) | [ ] |
 | 118.B6.8 | ⭐ Etc2Strategy - ETC2 (mobile) | [ ] |
 | 118.B6.9 | ⭐ PvrtcStrategy - PVRTC (iOS legacy) | [ ] |
-| 118.B6.10 | ⭐ KtxStrategy - KTX/KTX2 container | [ ] |
+| 118.B6.10 | ⭐ KtxStrategy - KTX/KTX2 container | [x] |
 | 118.B6.11 | ⭐ BasisUStrategy - Basis Universal (transcoding) | [ ] |
 | **B7: 3D/Game Asset Formats** |
-| 118.B7.1 | ⭐ GltfStrategy - glTF 2.0 | [ ] |
-| 118.B7.2 | ⭐ GlbStrategy - GLB (binary glTF) | [ ] |
+| 118.B7.1 | ⭐ GltfStrategy - glTF 2.0 | [x] |
+| 118.B7.2 | ⭐ GlbStrategy - GLB (binary glTF) | [x] |
 | 118.B7.3 | ⭐ FbxStrategy - Autodesk FBX | [ ] |
-| 118.B7.4 | ⭐ UsdStrategy - Universal Scene Description | [ ] |
+| 118.B7.4 | ⭐ UsdStrategy - Universal Scene Description | [x] |
 | 118.B7.5 | ⭐ ObjStrategy - Wavefront OBJ | [ ] |
 | 118.B7.6 | ⭐ ColladaStrategy - COLLADA | [ ] |
 | 118.B7.7 | ⭐ DrcoStrategy - Draco mesh compression | [ ] |
