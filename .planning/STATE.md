@@ -10,18 +10,18 @@ See: .planning/PROJECT.md (updated 2026-02-10)
 ## Current Position
 
 Phase: 10 of 18 (Advanced Storage Features)
-Plan: 5 of 7 in Phase 10
-Status: Phase 10 in progress — 10-05 complete (Generative Compression verification)
-Last activity: 2026-02-11 — Completed 10-05: Verified T84 generative compression complete (10 sub-tasks, 2870 lines, self-contained neural network implementation)
+Plan: 6 of 7 in Phase 10
+Status: Phase 10 in progress — 10-06 complete (Probabilistic Storage verification)
+Last activity: 2026-02-11 — Completed 10-06: Verified T85 probabilistic storage complete (10 sub-tasks, 3454 lines, 7 SDK primitives + storage strategy)
 
 Progress: [######----] 60%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 53
+- Total plans completed: 54
 - Average duration: 8 min
-- Total execution time: ~7.3 hours
+- Total execution time: ~7.4 hours
 
 **By Phase:**
 
@@ -66,6 +66,7 @@ Progress: [######----] 60%
 | Phase 11 P02 | 18 | 2 tasks | 1 files |
 | Phase 10 P04 | 14 | 2 tasks | 3 files |
 | Phase 10 P05 | 4 | 2 tasks | 0 files |
+| Phase 10 P06 | 4 | 2 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -142,6 +143,7 @@ Recent decisions affecting current work:
 - [Phase 10]: All snapshot and CDP strategies already production-ready - verification confirmed zero gaps
 - [Phase 11]: Place deception types in plugin (not SDK) following existing psychometric type pattern
 - [Phase 11]: Deception detection opt-in via EnableDeception config (default: false) for backward compatibility
+- [Phase 10-06]: Verified T85 probabilistic storage complete - 7 SDK primitives (BloomFilter, CountMinSketch, HyperLogLog, TDigest, TopKHeavyHitters) and ProbabilisticStorageStrategy achieving 10-1000x memory savings; all 10 sub-tasks production-ready with SQL-like query interface, merge operations, and upgrade path to exact tracking
 - [Phase 10-05]: Generative compression uses self-contained neural network-inspired algorithms (adaptive context modeling + arithmetic coding) instead of Intelligence plugin delegation; 10 sub-tasks implemented (exceeds plan requirement of 8); production-ready with hybrid fallback to Zstd
 
 ### Pending Todos
