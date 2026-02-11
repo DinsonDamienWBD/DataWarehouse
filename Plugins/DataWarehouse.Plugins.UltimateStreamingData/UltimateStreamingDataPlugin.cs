@@ -295,7 +295,25 @@ public enum StreamingCategory
     StreamFaultTolerance,
 
     /// <summary>111.8: Stream scalability</summary>
-    StreamScalability
+    StreamScalability,
+
+    /// <summary>113.B4: Industrial protocols (OPC UA, Modbus, SCADA)</summary>
+    IndustrialProtocols,
+
+    /// <summary>113.B5: Healthcare/Medical protocols (HL7, FHIR)</summary>
+    HealthcareProtocols,
+
+    /// <summary>113.B6: Financial/Trading protocols (FIX, SWIFT)</summary>
+    FinancialProtocols,
+
+    /// <summary>113.B7: Cloud event streaming (Kinesis, Event Hubs, Pub/Sub)</summary>
+    CloudEventStreaming,
+
+    /// <summary>113.B2: Message queue protocols (Kafka, Pulsar, RabbitMQ, NATS)</summary>
+    MessageQueueProtocols,
+
+    /// <summary>113.B3: IoT/sensor protocols (MQTT, CoAP, LoRaWAN, Zigbee)</summary>
+    IoTProtocols
 }
 
 /// <summary>
