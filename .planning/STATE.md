@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-02-10)
 
 **Core value:** Every feature listed in the task tracker must be fully production-ready — no placeholders, no simulations, no stubs, no deferred logic. The codebase must match what the task list claims is "complete."
-**Current focus:** Phase 21 IN PROGRESS — Data Transit (Plan 03 of 5 complete)
+**Current focus:** Phase 21 COMPLETE — Data Transit (Plan 05 of 5 complete)
 
 ## Current Position
 
-Phase: 21 of 22 (Data Transit) IN PROGRESS
-Plan: 3 of 5 in Phase 21 (21-03 COMPLETE)
-Status: 21-03 COMPLETE — P2PSwarmStrategy (BitTorrent-style piece distribution, bounded-channel backpressure) + MultiPathParallelStrategy (weighted path scoring, dynamic rebalancing)
-Last activity: 2026-02-11 — Completed 21-03: P2P Swarm and Multi-Path Parallel Strategies
+Phase: 21 of 22 (Data Transit) COMPLETE
+Plan: 5 of 5 in Phase 21 (21-05 COMPLETE)
+Status: 21-05 COMPLETE — Composable decorator layers (compression/encryption), TransitAuditService, cost-aware selection, cross-plugin transport delegation
+Last activity: 2026-02-11 — Completed 21-05: Decorator Layers, Audit Trail, and Cross-Plugin Integration
 
-Progress: [######----] 67%
+Progress: [########--] 85%
 
 ## Performance Metrics
 
@@ -113,7 +113,9 @@ Progress: [######----] 67%
 | Phase 20 P03 | 6 | 2 tasks | 14 files |
 | Phase 21 P03 | 8 min | 2 tasks | 2 files |
 | Phase 15 P01 | 5 min | 2 tasks | 4 files |
+| Phase 21 P04 | 7 min | 2 tasks | 3 files |
 | Phase 20 P04 | 10 min | 2 tasks | 4 files |
+| Phase 21 P05 | 5 min | 2 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -228,11 +230,14 @@ Recent decisions affecting current work:
 - [Phase 20]: Grain and MoonBit report WasiSupportLevel.Full as WASM-native languages; Perl reports None (Emscripten-only); all other Tier 3 report Experimental
 - [Phase 21-03]: Bounded Channel<int>(64) for P2P piece queue prevents unbounded memory (research pitfall 3); SemaphoreSlim(8) global + per-peer limit 4; path scoring formula 0.5*throughput - 0.3*latency - 0.2*errorRate with rebalance at 50% threshold; public long field for async-compatible Interlocked byte counting
 - [Phase 15]: T26-T31 bug fixes verified present; deferred tests implemented (36 tests); S3 XML parsing/async fixes not applicable in UltimateStorage (uses AWS SDK)
+- [Phase 21-04]: StoreAndForwardStrategy uses IncrementalHash for streaming SHA-256 on large files; two-phase bandwidth allocation (minimums first, remainder by weight); token bucket capacity 2x per-second for burst; ThrottledStream applies throttle after read, before write; CostAwareRouter min-max normalization for balanced scoring
+- [Phase 21-05]: CompressionInTransitLayer delegates to UltimateCompression via compression.compress topic with GZip fallback; EncryptionInTransitLayer delegates to UltimateEncryption via encryption.transit.encrypt topic with AES-256-GCM fallback; decorator ordering compress-then-encrypt (pitfall 4); idempotency markers in metadata; fire-and-forget audit publishing; cost-aware selection with CostCapped policy fallback to standard scoring
 - [Phase 20-04]: WasmLanguageBenchmarkStrategy (compute.wasm.benchmark) discovers all language strategies via reflection, measures execution time/memory/binary size; WasmLanguageEcosystemStrategy (compute.wasm.ecosystem) aggregates full 31-language catalog; WasmLanguageSdkDocumentation provides DW host function binding examples for 23 languages (Rust extern C, .NET DllImport, Go wasmimport, AssemblyScript @external, etc.); Phase 20 COMPLETE with all 6 ROADMAP success criteria satisfied
 
 ### Pending Todos
 
 - **Phase 20 COMPLETE:** All 4 plans complete with 33 WASM strategies (31 languages + benchmark + ecosystem) plus SDK documentation utility.
+- **Phase 21 COMPLETE:** All 5 plans complete with UltimateDataTransit plugin providing 6 direct strategies + chunked/resumable + delta + P2P swarm + multi-path parallel + store-and-forward + QoS throttling + cost-aware routing + compression/encryption decorators + audit trail + cross-plugin transport delegation.
 
 - **TODO.md discrepancy:** T100 Phase B9 (8 innovation strategies) and Phase F (20 innovation strategies) marked [x] Complete in TODO.md but not found as separate strategy files in codebase. Core observability infrastructure (55 strategies) is production-ready. Innovation strategies may be: (a) intentionally deferred, (b) consolidated into orchestrator AI layer, or (c) marked complete prematurely. Recommendation: Address at planning level.
 - **Phase 6 COMPLETE:** All 12 plans complete with 68 strategies total.
@@ -244,6 +249,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-02-11 (Phase 21 Plan 03 COMPLETE)
-Stopped at: Completed 21-03-PLAN.md (P2P Swarm and Multi-Path Parallel Strategies)
-Resume file: Phase 21 in progress (plan 3 of 5 complete). Ready for 21-04.
+Last session: 2026-02-11 (Phase 21 Plan 05 COMPLETE)
+Stopped at: Completed 21-05-PLAN.md (Decorator Layers, Audit Trail, Cross-Plugin Integration)
+Resume file: Phase 21 COMPLETE (all 5 plans done). Ready for Phase 22.
