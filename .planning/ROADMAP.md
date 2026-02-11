@@ -208,14 +208,14 @@ Plans:
   3. UltimateDatabaseProtocol plugin implements SQL wire protocols for database compatibility
   4. UltimateDatabaseStorage plugin provides database storage backends
   5. UltimateDataManagement plugin handles data lifecycle operations
-**Plans**: 7 plans in 1 wave
+**Plans**: 5 plans in 1 wave
 
 Plans:
-- [ ] 08-01: Verify and complete UltimateCompute orchestrator (T111)
-- [ ] 08-02: Verify and complete storage processing (T112)
-- [ ] 08-03: Verify and complete UltimateDatabaseProtocol (T102)
-- [ ] 08-04: Verify and complete UltimateDatabaseStorage (T103)
-- [ ] 08-05: Verify and complete UltimateDataManagement (T104)
+- [ ] 08-01-PLAN.md — Create UltimateCompute plugin with 51 compute runtime strategies (T111 Phase B)
+- [ ] 08-02-PLAN.md — Create UltimateStorageProcessing plugin with 47 storage processing strategies (T112 Phase B)
+- [ ] 08-03-PLAN.md — Verify UltimateDatabaseProtocol production-readiness with 50 strategies (T102)
+- [ ] 08-04-PLAN.md — Verify UltimateDatabaseStorage production-readiness with 45 strategies (T103)
+- [ ] 08-05-PLAN.md — Verify UltimateDataManagement production-readiness with 92 strategies (T104)
 
 ### Phase 9: Advanced Security Features
 **Goal**: Advanced security features (canary, steganography, MPC, ephemeral, sovereignty, watermarking) are production-ready
@@ -228,7 +228,6 @@ Plans:
   4. Digital dead drops create ephemeral links with TTL, burn-after-reading, and destruction proof
   5. Sovereignty geofencing enforces geo-tagging, replication fences, and attestation
   6. Forensic watermarking embeds and extracts watermarks from text, images, PDFs, videos
-**Plans**: 7 plans in 1 wave
 **Plans**: 6 plans in 1 wave
 
 Plans:
@@ -475,7 +474,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8 -> 9 -> 10
 | 5. TamperProof Pipeline | 5/5 | COMPLETE | 2026-02-11 |
 | 6. Interface Layer | 0/12 | Planned | - |
 | 7. Format & Media Processing | 0/8 | Not started | - |
-| 8. Compute & Processing | 0/5 | Not started | - |
+| 8. Compute & Processing | 0/5 | Planned | - |
 | 9. Advanced Security Features | 0/6 | Not started | - |
 | 10. Advanced Storage Features | 0/7 | Not started | - |
 | 11. Spatial & Psychometric | 0/2 | Not started | - |
