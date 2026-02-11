@@ -5,6 +5,9 @@ using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Contracts.Transit;
 using DataWarehouse.SDK.Primitives;
 using DataWarehouse.SDK.Utilities;
+using DataWarehouse.Plugins.UltimateDataTransit.Audit;
+using DataWarehouse.Plugins.UltimateDataTransit.Layers;
+using DataWarehouse.Plugins.UltimateDataTransit.QoS;
 
 namespace DataWarehouse.Plugins.UltimateDataTransit;
 
@@ -41,6 +44,10 @@ internal sealed class UltimateDataTransitPlugin : FeaturePluginBase, ITransitOrc
 {
     private readonly TransitStrategyRegistry _registry;
     private readonly ConcurrentDictionary<string, ActiveTransfer> _activeTransfers = new();
+    private TransitAuditService? _auditService;
+    private QoSThrottlingManager? _qosManager;
+    private CostAwareRouter? _costRouter;
+    private IDisposable? _transferRequestSubscription;
     private bool _disposed;
 
     /// <inheritdoc/>
@@ -68,6 +75,52 @@ internal sealed class UltimateDataTransitPlugin : FeaturePluginBase, ITransitOrc
     /// <inheritdoc/>
     public override async Task StartAsync(CancellationToken ct)
     {
+        // Initialize audit service
+        if (MessageBus != null)
+        {
+            _auditService = new TransitAuditService(MessageBus);
+        }
+
+        // Initialize QoS throttling with default configuration
+        // Total: 100 MB/s, Critical: 50%/10MB min, High: 30%/5MB min, Normal: 15%/2MB min, Low: 5%/1MB min
+        _qosManager = new QoSThrottlingManager(new QoSConfiguration
+        {
+            TotalBandwidthBytesPerSecond = 100L * 1024 * 1024, // 100 MB/s
+            PriorityConfigs = new Dictionary<TransitPriority, PriorityConfig>
+            {
+                [TransitPriority.Critical] = new PriorityConfig
+                {
+                    WeightPercent = 0.50,
+                    MinBandwidthBytesPerSecond = 10L * 1024 * 1024, // 10 MB/s min
+                    MaxBandwidthBytesPerSecond = long.MaxValue
+                },
+                [TransitPriority.High] = new PriorityConfig
+                {
+                    WeightPercent = 0.30,
+                    MinBandwidthBytesPerSecond = 5L * 1024 * 1024, // 5 MB/s min
+                    MaxBandwidthBytesPerSecond = long.MaxValue
+                },
+                [TransitPriority.Normal] = new PriorityConfig
+                {
+                    WeightPercent = 0.15,
+                    MinBandwidthBytesPerSecond = 2L * 1024 * 1024, // 2 MB/s min
+                    MaxBandwidthBytesPerSecond = long.MaxValue
+                },
+                [TransitPriority.Low] = new PriorityConfig
+                {
+                    WeightPercent = 0.05,
+                    MinBandwidthBytesPerSecond = 1L * 1024 * 1024, // 1 MB/s min
+                    MaxBandwidthBytesPerSecond = long.MaxValue
+                }
+            }
+        });
+
+        // Initialize cost-aware router with balanced default policy
+        _costRouter = new CostAwareRouter(RoutingPolicy.Balanced);
+
+        // Register default cost profiles for each strategy type
+        RegisterDefaultCostProfiles();
+
         // Configure Intelligence integration on all discovered strategies
         foreach (var strategy in _registry.GetAll())
         {
@@ -77,9 +130,14 @@ internal sealed class UltimateDataTransitPlugin : FeaturePluginBase, ITransitOrc
             }
         }
 
-        // Publish registration events for each strategy
+        // Subscribe to cross-plugin transfer requests for inter-plugin transport delegation
         if (MessageBus != null)
         {
+            _transferRequestSubscription = MessageBus.Subscribe(
+                "transit.transfer.request",
+                HandleTransferRequestAsync);
+
+            // Publish registration events for each strategy
             foreach (var strategy in _registry.GetAll())
             {
                 var message = new PluginMessage
@@ -98,9 +156,135 @@ internal sealed class UltimateDataTransitPlugin : FeaturePluginBase, ITransitOrc
         }
     }
 
+    /// <summary>
+    /// Registers default cost profiles for common strategy types.
+    /// HTTP strategies are free tier, FTP/SFTP are metered, P2P strategies are free.
+    /// </summary>
+    private void RegisterDefaultCostProfiles()
+    {
+        if (_costRouter == null) return;
+
+        foreach (var strategy in _registry.GetAll())
+        {
+            var profile = strategy.StrategyId switch
+            {
+                var id when id.Contains("http", StringComparison.OrdinalIgnoreCase) => new TransitCostProfile
+                {
+                    CostPerGB = 0.00m,
+                    FixedCostPerTransfer = 0.00m,
+                    Tier = TransitCostTier.Free,
+                    IsMetered = false
+                },
+                var id when id.Contains("ftp", StringComparison.OrdinalIgnoreCase) ||
+                            id.Contains("sftp", StringComparison.OrdinalIgnoreCase) => new TransitCostProfile
+                {
+                    CostPerGB = 0.01m,
+                    FixedCostPerTransfer = 0.001m,
+                    Tier = TransitCostTier.Metered,
+                    IsMetered = true
+                },
+                var id when id.Contains("grpc", StringComparison.OrdinalIgnoreCase) => new TransitCostProfile
+                {
+                    CostPerGB = 0.00m,
+                    FixedCostPerTransfer = 0.00m,
+                    Tier = TransitCostTier.Free,
+                    IsMetered = false
+                },
+                var id when id.Contains("p2p", StringComparison.OrdinalIgnoreCase) ||
+                            id.Contains("swarm", StringComparison.OrdinalIgnoreCase) => new TransitCostProfile
+                {
+                    CostPerGB = 0.00m,
+                    FixedCostPerTransfer = 0.00m,
+                    Tier = TransitCostTier.Free,
+                    IsMetered = false
+                },
+                var id when id.Contains("store-and-forward", StringComparison.OrdinalIgnoreCase) ||
+                            id.Contains("offline", StringComparison.OrdinalIgnoreCase) => new TransitCostProfile
+                {
+                    CostPerGB = 0.00m,
+                    FixedCostPerTransfer = 0.05m,
+                    Tier = TransitCostTier.Free,
+                    IsMetered = false
+                },
+                _ => new TransitCostProfile
+                {
+                    CostPerGB = 0.005m,
+                    FixedCostPerTransfer = 0.001m,
+                    Tier = TransitCostTier.Metered,
+                    IsMetered = true
+                }
+            };
+
+            _costRouter.RegisterCostProfile(strategy.StrategyId, profile);
+        }
+    }
+
+    /// <summary>
+    /// Handles cross-plugin transfer requests received via the message bus.
+    /// Parses the request from the message payload, executes the transfer using the
+    /// orchestrator pipeline, and returns the result via message response.
+    /// </summary>
+    /// <param name="message">The incoming plugin message containing transfer request details.</param>
+    /// <returns>A message response containing the transfer result.</returns>
+    private async Task<MessageResponse> HandleTransferRequestAsync(PluginMessage message)
+    {
+        try
+        {
+            // Parse transfer request from message payload
+            var payload = message.Payload;
+            var sourceUri = payload.TryGetValue("sourceUri", out var srcObj) && srcObj is string srcStr
+                ? new Uri(srcStr) : null;
+            var destUri = payload.TryGetValue("destinationUri", out var dstObj) && dstObj is string dstStr
+                ? new Uri(dstStr) : null;
+
+            if (sourceUri == null || destUri == null)
+            {
+                return MessageResponse.Error("Missing sourceUri or destinationUri in transfer request.", "INVALID_REQUEST");
+            }
+
+            var sizeBytes = payload.TryGetValue("sizeBytes", out var sizeObj)
+                ? Convert.ToInt64(sizeObj) : 0L;
+            var preferredStrategy = payload.TryGetValue("preferredStrategy", out var stratObj)
+                ? stratObj?.ToString() : null;
+            var protocol = payload.TryGetValue("protocol", out var protoObj)
+                ? protoObj?.ToString() : null;
+
+            var request = new TransitRequest
+            {
+                TransferId = $"cross-plugin-{Guid.NewGuid():N}",
+                Source = new TransitEndpoint { Uri = sourceUri, Protocol = protocol },
+                Destination = new TransitEndpoint { Uri = destUri, Protocol = protocol },
+                SizeBytes = sizeBytes
+            };
+
+            // Execute transfer using the full orchestrator pipeline
+            var result = await TransferAsync(request, null, CancellationToken.None);
+
+            return new MessageResponse
+            {
+                Success = result.Success,
+                Payload = result,
+                Metadata = new Dictionary<string, object>
+                {
+                    ["transferId"] = result.TransferId,
+                    ["bytesTransferred"] = result.BytesTransferred,
+                    ["strategyUsed"] = result.StrategyUsed ?? string.Empty
+                }
+            };
+        }
+        catch (Exception ex)
+        {
+            return MessageResponse.Error($"Transfer request failed: {ex.Message}", "TRANSFER_FAILED");
+        }
+    }
+
     /// <inheritdoc/>
     public override Task StopAsync()
     {
+        // Dispose subscription
+        _transferRequestSubscription?.Dispose();
+        _transferRequestSubscription = null;
+
         // Cancel all active transfers
         foreach (var kvp in _activeTransfers)
         {
@@ -108,6 +292,11 @@ internal sealed class UltimateDataTransitPlugin : FeaturePluginBase, ITransitOrc
         }
 
         _activeTransfers.Clear();
+
+        // Dispose QoS manager
+        _qosManager?.Dispose();
+        _qosManager = null;
+
         return Task.CompletedTask;
     }
 
@@ -120,9 +309,9 @@ internal sealed class UltimateDataTransitPlugin : FeaturePluginBase, ITransitOrc
             ?? request.Destination.Uri.Scheme;
 
         var candidates = _registry.GetAll();
-        IDataTransitStrategy? bestStrategy = null;
-        var bestScore = int.MinValue;
 
+        // Build list of available, protocol-matching strategies
+        var availableStrategies = new List<IDataTransitStrategy>();
         foreach (var strategy in candidates)
         {
             ct.ThrowIfCancellationRequested();
@@ -139,7 +328,69 @@ internal sealed class UltimateDataTransitPlugin : FeaturePluginBase, ITransitOrc
             if (!available)
                 continue;
 
-            // Score the strategy
+            availableStrategies.Add(strategy);
+        }
+
+        if (availableStrategies.Count == 0)
+        {
+            throw new InvalidOperationException(
+                $"No available transit strategy found for protocol '{destinationProtocol}' " +
+                $"and destination '{request.Destination.Uri}'.");
+        }
+
+        // If cost limit is set and cost router is available, use cost-aware route selection
+        if (_costRouter != null && request.QoSPolicy?.CostLimit > 0)
+        {
+            var routes = availableStrategies.Select(s =>
+            {
+                var costProfile = _costRouter.GetCostProfile(s.StrategyId) ?? new TransitCostProfile();
+                return new TransitRoute
+                {
+                    StrategyId = s.StrategyId,
+                    Endpoint = request.Destination,
+                    CostProfile = costProfile,
+                    EstimatedThroughputBytesPerSec = s.Capabilities.SupportsStreaming ? 100_000_000 : 50_000_000,
+                    EstimatedLatencyMs = s.Capabilities.SupportsStreaming ? 10 : 50
+                };
+            }).ToList();
+
+            try
+            {
+                var selectedRoute = _costRouter.SelectRoute(routes, request, RoutingPolicy.CostCapped);
+
+                // Audit cost-aware route selection
+                _auditService?.LogEvent(new TransitAuditEntry
+                {
+                    TransferId = request.TransferId,
+                    EventType = TransitAuditEventType.CostRouteSelected,
+                    StrategyId = selectedRoute.StrategyId,
+                    SourceEndpoint = request.Source.Uri.ToString(),
+                    DestinationEndpoint = request.Destination.Uri.ToString(),
+                    Details = new Dictionary<string, object>
+                    {
+                        ["costLimit"] = request.QoSPolicy.CostLimit,
+                        ["selectedRoute"] = selectedRoute.StrategyId,
+                        ["candidateCount"] = routes.Count
+                    }
+                });
+
+                var costSelectedStrategy = availableStrategies
+                    .FirstOrDefault(s => s.StrategyId == selectedRoute.StrategyId);
+                if (costSelectedStrategy != null)
+                    return costSelectedStrategy;
+            }
+            catch (InvalidOperationException)
+            {
+                // No routes within cost limit; fall through to standard scoring
+            }
+        }
+
+        // Standard scoring-based selection
+        IDataTransitStrategy? bestStrategy = null;
+        var bestScore = int.MinValue;
+
+        foreach (var strategy in availableStrategies)
+        {
             var score = ScoreStrategy(strategy, request);
             if (score > bestScore)
             {
@@ -148,14 +399,25 @@ internal sealed class UltimateDataTransitPlugin : FeaturePluginBase, ITransitOrc
             }
         }
 
-        if (bestStrategy == null)
+        // Audit strategy selection
+        if (bestStrategy != null)
         {
-            throw new InvalidOperationException(
-                $"No available transit strategy found for protocol '{destinationProtocol}' " +
-                $"and destination '{request.Destination.Uri}'.");
+            _auditService?.LogEvent(new TransitAuditEntry
+            {
+                TransferId = request.TransferId,
+                EventType = TransitAuditEventType.StrategySelected,
+                StrategyId = bestStrategy.StrategyId,
+                SourceEndpoint = request.Source.Uri.ToString(),
+                DestinationEndpoint = request.Destination.Uri.ToString(),
+                Details = new Dictionary<string, object>
+                {
+                    ["score"] = bestScore,
+                    ["candidateCount"] = availableStrategies.Count
+                }
+            });
         }
 
-        return bestStrategy;
+        return bestStrategy!;
     }
 
     /// <inheritdoc/>
@@ -173,7 +435,25 @@ internal sealed class UltimateDataTransitPlugin : FeaturePluginBase, ITransitOrc
 
         _activeTransfers[request.TransferId] = activeTransfer;
 
-        // Publish transfer started event
+        // Audit: transfer started
+        _auditService?.LogEvent(new TransitAuditEntry
+        {
+            TransferId = request.TransferId,
+            EventType = TransitAuditEventType.TransferStarted,
+            StrategyId = strategy.StrategyId,
+            SourceEndpoint = request.Source.Uri.ToString(),
+            DestinationEndpoint = request.Destination.Uri.ToString(),
+            BytesTransferred = 0,
+            Details = new Dictionary<string, object>
+            {
+                ["sizeBytes"] = request.SizeBytes,
+                ["hasCompression"] = request.Layers?.EnableCompression == true,
+                ["hasEncryption"] = request.Layers?.EnableEncryption == true,
+                ["haQoS"] = request.QoSPolicy != null
+            }
+        });
+
+        // Publish transfer started event to message bus
         await PublishTransferEventAsync(TransitMessageTopics.TransferStarted, new Dictionary<string, object>
         {
             ["transferId"] = request.TransferId,
@@ -184,14 +464,92 @@ internal sealed class UltimateDataTransitPlugin : FeaturePluginBase, ITransitOrc
         }, ct);
 
         var stopwatch = Stopwatch.StartNew();
+        var currentRequest = request;
 
         try
         {
-            var result = await strategy.TransferAsync(request, progress, cts.Token);
+            // Apply QoS throttling if QoS policy is set
+            if (_qosManager != null && request.QoSPolicy != null && request.DataStream != null)
+            {
+                var throttledStream = await _qosManager.CreateThrottledStreamAsync(
+                    request.DataStream,
+                    request.QoSPolicy.Priority,
+                    cts.Token);
+
+                currentRequest = request with { DataStream = throttledStream };
+
+                _auditService?.LogEvent(new TransitAuditEntry
+                {
+                    TransferId = request.TransferId,
+                    EventType = TransitAuditEventType.QoSEnforced,
+                    StrategyId = strategy.StrategyId,
+                    SourceEndpoint = request.Source.Uri.ToString(),
+                    DestinationEndpoint = request.Destination.Uri.ToString(),
+                    Details = new Dictionary<string, object>
+                    {
+                        ["priority"] = request.QoSPolicy.Priority.ToString(),
+                        ["maxBandwidth"] = request.QoSPolicy.MaxBandwidthBytesPerSecond
+                    }
+                });
+            }
+
+            // Apply decorator layers: compression first, then encryption (per research pitfall 4)
+            IDataTransitStrategy wrappedStrategy = strategy;
+            if (currentRequest.Layers != null && MessageBus != null)
+            {
+                if (currentRequest.Layers.EnableCompression)
+                {
+                    wrappedStrategy = new CompressionInTransitLayer(wrappedStrategy, MessageBus);
+
+                    _auditService?.LogEvent(new TransitAuditEntry
+                    {
+                        TransferId = request.TransferId,
+                        EventType = TransitAuditEventType.LayerApplied,
+                        StrategyId = strategy.StrategyId,
+                        Details = new Dictionary<string, object>
+                        {
+                            ["layer"] = "compression",
+                            ["algorithm"] = currentRequest.Layers.CompressionAlgorithm ?? "gzip"
+                        }
+                    });
+                }
+
+                if (currentRequest.Layers.EnableEncryption)
+                {
+                    wrappedStrategy = new EncryptionInTransitLayer(wrappedStrategy, MessageBus);
+
+                    _auditService?.LogEvent(new TransitAuditEntry
+                    {
+                        TransferId = request.TransferId,
+                        EventType = TransitAuditEventType.LayerApplied,
+                        StrategyId = strategy.StrategyId,
+                        Details = new Dictionary<string, object>
+                        {
+                            ["layer"] = "encryption",
+                            ["algorithm"] = currentRequest.Layers.EncryptionAlgorithm ?? "aes-256-gcm"
+                        }
+                    });
+                }
+            }
+
+            var result = await wrappedStrategy.TransferAsync(currentRequest, progress, cts.Token);
             stopwatch.Stop();
 
             if (result.Success)
             {
+                // Audit: transfer completed
+                _auditService?.LogEvent(new TransitAuditEntry
+                {
+                    TransferId = request.TransferId,
+                    EventType = TransitAuditEventType.TransferCompleted,
+                    StrategyId = strategy.StrategyId,
+                    SourceEndpoint = request.Source.Uri.ToString(),
+                    DestinationEndpoint = request.Destination.Uri.ToString(),
+                    BytesTransferred = result.BytesTransferred,
+                    Duration = stopwatch.Elapsed,
+                    Success = true
+                });
+
                 await PublishTransferEventAsync(TransitMessageTopics.TransferCompleted, new Dictionary<string, object>
                 {
                     ["transferId"] = request.TransferId,
@@ -203,6 +561,20 @@ internal sealed class UltimateDataTransitPlugin : FeaturePluginBase, ITransitOrc
             }
             else
             {
+                // Audit: transfer failed
+                _auditService?.LogEvent(new TransitAuditEntry
+                {
+                    TransferId = request.TransferId,
+                    EventType = TransitAuditEventType.TransferFailed,
+                    StrategyId = strategy.StrategyId,
+                    SourceEndpoint = request.Source.Uri.ToString(),
+                    DestinationEndpoint = request.Destination.Uri.ToString(),
+                    BytesTransferred = result.BytesTransferred,
+                    Duration = stopwatch.Elapsed,
+                    Success = false,
+                    ErrorMessage = result.ErrorMessage
+                });
+
                 await PublishTransferEventAsync(TransitMessageTopics.TransferFailed, new Dictionary<string, object>
                 {
                     ["transferId"] = request.TransferId,
@@ -215,6 +587,18 @@ internal sealed class UltimateDataTransitPlugin : FeaturePluginBase, ITransitOrc
         }
         catch (OperationCanceledException)
         {
+            _auditService?.LogEvent(new TransitAuditEntry
+            {
+                TransferId = request.TransferId,
+                EventType = TransitAuditEventType.TransferCancelled,
+                StrategyId = strategy.StrategyId,
+                SourceEndpoint = request.Source.Uri.ToString(),
+                DestinationEndpoint = request.Destination.Uri.ToString(),
+                Duration = stopwatch.Elapsed,
+                Success = false,
+                ErrorMessage = "Transfer was cancelled."
+            });
+
             await PublishTransferEventAsync(TransitMessageTopics.TransferCancelled, new Dictionary<string, object>
             {
                 ["transferId"] = request.TransferId,
@@ -232,6 +616,18 @@ internal sealed class UltimateDataTransitPlugin : FeaturePluginBase, ITransitOrc
         }
         catch (Exception ex)
         {
+            _auditService?.LogEvent(new TransitAuditEntry
+            {
+                TransferId = request.TransferId,
+                EventType = TransitAuditEventType.TransferFailed,
+                StrategyId = strategy.StrategyId,
+                SourceEndpoint = request.Source.Uri.ToString(),
+                DestinationEndpoint = request.Destination.Uri.ToString(),
+                Duration = stopwatch.Elapsed,
+                Success = false,
+                ErrorMessage = ex.Message
+            });
+
             await PublishTransferEventAsync(TransitMessageTopics.TransferFailed, new Dictionary<string, object>
             {
                 ["transferId"] = request.TransferId,
