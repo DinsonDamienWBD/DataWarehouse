@@ -107,7 +107,55 @@ public enum MediaFormat
     /// <summary>
     /// WebP image format (.webp).
     /// </summary>
-    WebP = 302
+    WebP = 302,
+
+    /// <summary>
+    /// AV1 Image File Format (.avif).
+    /// </summary>
+    AVIF = 303,
+
+    // RAW Camera Formats
+    /// <summary>
+    /// Canon RAW version 2 format (.cr2).
+    /// </summary>
+    CR2 = 400,
+
+    /// <summary>
+    /// Nikon Electronic Format (.nef).
+    /// </summary>
+    NEF = 401,
+
+    /// <summary>
+    /// Sony Alpha RAW format (.arw).
+    /// </summary>
+    ARW = 402,
+
+    /// <summary>
+    /// Adobe Digital Negative format (.dng).
+    /// </summary>
+    DNG = 403,
+
+    // GPU Texture Formats
+    /// <summary>
+    /// DirectDraw Surface format (.dds).
+    /// </summary>
+    DDS = 500,
+
+    /// <summary>
+    /// Khronos Texture format (.ktx, .ktx2).
+    /// </summary>
+    KTX = 501,
+
+    // 3D Model Formats
+    /// <summary>
+    /// GL Transmission Format 2.0 (.gltf, .glb).
+    /// </summary>
+    GLTF = 600,
+
+    /// <summary>
+    /// Universal Scene Description format (.usd, .usda, .usdc).
+    /// </summary>
+    USD = 601
 }
 
 /// <summary>
