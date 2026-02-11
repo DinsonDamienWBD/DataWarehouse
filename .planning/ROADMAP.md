@@ -333,18 +333,18 @@ Plans:
 **Depends on**: All previous phases (can identify and fix issues throughout)
 **Requirements**: BUG-01, BUG-02, BUG-03, BUG-04
 **Success Criteria** (what must be TRUE):
-  1. All critical bugs (Raft, S3 plugin fixes T26-T31) are fixed and tested
-  2. All build errors (CS8602, record-type errors, missing types) are resolved with clean builds
-  3. All 36+ TODO comments in codebase are addressed or converted to tracked tasks
-  4. All 39 nullable reference suppressions are removed with proper null handling
-  5. Solution builds without warnings on all configurations
-**Plans**: 7 plans in 1 wave
+  1. All critical bugs (Raft, S3 plugin fixes T26-T31) are verified and tested with deferred unit tests
+  2. All 1,154 build warnings resolved or responsibly suppressed (target: under 50 remaining)
+  3. Zero TODO/FIXME/HACK comments remain in source files (verified by exhaustive scan)
+  4. All 173 nullable reference suppressions (null!) replaced with proper null handling in production code
+  5. Solution builds with zero errors
+**Plans**: 4 plans in 1 wave
 
 Plans:
-- [ ] 15-01: Fix critical bugs (T26-T31)
-- [ ] 15-02: Fix build errors (CS8602, record-type issues)
-- [ ] 15-03: Resolve TODO comments
-- [ ] 15-04: Fix nullable reference suppressions
+- [ ] 15-01-PLAN.md — Verify critical bug fixes T26-T31 and implement deferred unit tests (BUG-04)
+- [ ] 15-02-PLAN.md — Fix 1,154 build warnings: runtime bugs, obsolete APIs, dead code, XML docs (BUG-01)
+- [ ] 15-03-PLAN.md — Verify zero TODO/FIXME/HACK comments in codebase (BUG-02)
+- [ ] 15-04-PLAN.md — Replace 173 null! suppressions with proper null handling across 79 files (BUG-03)
 
 ### Phase 16: Testing & Quality Assurance
 **Goal**: Comprehensive test suite and security penetration test plan are complete
@@ -483,7 +483,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8 -> 9 -> 10
 | 12. AEDS System | 0/4 | Planned | - |
 | 13. Data Governance Intelligence | 0/5 | Planned | - |
 | 14. Other Ultimate Plugins | 0/5 | Not started | - |
-| 15. Bug Fixes & Build Health | 0/4 | Not started | - |
+| 15. Bug Fixes & Build Health | 0/4 | Planned | - |
 | 16. Testing & Quality Assurance | 0/2 | Not started | - |
 | 17. Plugin Marketplace | 0/3 | Planned | - |
 | 18. Plugin Deprecation & File Cleanup | 0/3 | Not started | - |
