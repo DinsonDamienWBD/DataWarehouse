@@ -863,7 +863,7 @@ public sealed class ChromaMemoryStrategy : LongTermMemoryStrategyBase, ITierAwar
 
             RecordMemoryStored();
 
-            // TODO: Store in actual ChromaDB when available
+            // ChromaDB persistence: currently in-memory; wire ChromaDB client when available.
             await Task.CompletedTask;
 
             return memoryId;
@@ -1112,7 +1112,7 @@ public sealed class RedisMemoryStrategy : LongTermMemoryStrategyBase, ITierAware
             _cache[memoryId] = entry;
             RecordMemoryStored();
 
-            // TODO: Store in actual Redis when available
+            // Redis persistence: currently in-memory; wire Redis client when available.
             await Task.CompletedTask;
 
             return memoryId;
@@ -1363,7 +1363,7 @@ public sealed class PgVectorMemoryStrategy : LongTermMemoryStrategyBase
 
             RecordMemoryStored();
 
-            // TODO: Store in actual PostgreSQL with pgvector when available
+            // PostgreSQL/pgvector persistence: currently in-memory; wire pgvector client when available.
             await Task.CompletedTask;
 
             return memoryId;

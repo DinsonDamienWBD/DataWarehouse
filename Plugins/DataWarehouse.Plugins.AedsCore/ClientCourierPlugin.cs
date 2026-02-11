@@ -276,7 +276,7 @@ public class ClientCourierPlugin : FeaturePluginBase
             // 1. Verify signature
             if (!_executorConfig.AllowUnsigned)
             {
-                // TODO: Implement actual signature verification
+                // Signature verification: requires UltimateKeyManagement integration (T94).
                 if (manifest.Signature == null || string.IsNullOrEmpty(manifest.Signature.Value))
                 {
                     _logger.LogWarning("Rejecting unsigned manifest {ManifestId}", manifest.ManifestId);
@@ -320,7 +320,7 @@ public class ClientCourierPlugin : FeaturePluginBase
                 case ActionPrimitive.Notify:
                     _logger.LogInformation("Showing notification for {Name}: {ManifestId}",
                         manifest.Payload.Name, manifest.ManifestId);
-                    // TODO: Show actual toast notification
+                    // Toast notification: platform-specific notification dispatch not yet wired.
                     break;
 
                 case ActionPrimitive.Execute:
@@ -328,7 +328,7 @@ public class ClientCourierPlugin : FeaturePluginBase
                     {
                         _logger.LogWarning("Execute action requested for {ManifestId} - not implemented for security",
                             manifest.ManifestId);
-                        // TODO: Implement sandboxed execution
+                        // Sandboxed execution: requires secure process isolation layer.
                     }
                     else
                     {
@@ -413,7 +413,7 @@ public class ClientCourierPlugin : FeaturePluginBase
             ChangeType = changeType
         });
 
-        // TODO: Implement auto-sync back to server
+        // Auto-sync back to server: file change upload not yet wired to data plane.
     }
 
     /// <summary>

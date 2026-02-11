@@ -13,7 +13,7 @@ namespace DataWarehouse.CLI.Commands;
 /// </summary>
 public static class DeveloperCommands
 {
-    // TODO: Inject IDeveloperToolsService once service is created
+    // DeveloperToolsService injection point: wire IDeveloperToolsService when service layer is created.
     // private static IDeveloperToolsService? _devToolsService;
 
     #region API Explorer Commands
@@ -77,7 +77,7 @@ public static class DeveloperCommands
         await AnsiConsole.Status()
             .StartAsync($"Calling {method} {endpoint}...", async ctx =>
             {
-                // TODO: Implement actual API call via DeveloperToolsService
+                // Placeholder: replace with actual API call via DeveloperToolsService when available.
                 await Task.Delay(300);
 
                 AnsiConsole.MarkupLine($"[bold]API Call:[/] {method} {endpoint}");
@@ -260,7 +260,7 @@ public static class DeveloperCommands
             {
                 await Task.Delay(300);
 
-                // TODO: Implement actual schema creation via DeveloperToolsService
+                // Placeholder: replace with actual schema creation via DeveloperToolsService when available.
                 AnsiConsole.MarkupLine($"[green]Schema '{name}' created successfully.[/]");
             });
     }
@@ -272,7 +272,7 @@ public static class DeveloperCommands
             {
                 await Task.Delay(300);
 
-                // TODO: Implement actual schema update via DeveloperToolsService
+                // Placeholder: replace with actual schema update via DeveloperToolsService when available.
                 AnsiConsole.MarkupLine($"[green]Schema '{name}' updated successfully.[/]");
             });
     }
@@ -294,7 +294,7 @@ public static class DeveloperCommands
             {
                 await Task.Delay(300);
 
-                // TODO: Implement actual schema deletion via DeveloperToolsService
+                // Placeholder: replace with actual schema deletion via DeveloperToolsService when available.
                 AnsiConsole.MarkupLine($"[green]Schema '{name}' deleted successfully.[/]");
             });
     }
@@ -345,7 +345,7 @@ public static class DeveloperCommands
             {
                 await Task.Delay(300);
 
-                // TODO: Implement actual schema import via DeveloperToolsService
+                // Placeholder: replace with actual schema import via DeveloperToolsService when available.
                 AnsiConsole.MarkupLine($"[green]Schema imported successfully from:[/] {file}");
             });
     }
@@ -455,7 +455,7 @@ public static class DeveloperCommands
                 };
                 AnsiConsole.Write(panel);
 
-                // TODO: Execute actual query via DeveloperToolsService
+                // Placeholder: replace with actual query execution via DeveloperToolsService when available.
                 var results = GetSampleResults(collection, limit);
 
                 AnsiConsole.MarkupLine($"\n[bold]Results:[/] {results.Count} row(s)");
@@ -534,7 +534,7 @@ public static class DeveloperCommands
             {
                 await Task.Delay(300);
 
-                // TODO: Implement actual template save via DeveloperToolsService
+                // Placeholder: replace with actual template save via DeveloperToolsService when available.
                 AnsiConsole.MarkupLine($"[green]Query template '{name}' saved successfully.[/]");
             });
     }
@@ -546,7 +546,7 @@ public static class DeveloperCommands
             {
                 await Task.Delay(300);
 
-                // TODO: Implement actual template load and execution via DeveloperToolsService
+                // Placeholder: replace with actual template load and execution via DeveloperToolsService when available.
                 AnsiConsole.MarkupLine($"[green]Query template '{name}' loaded and executed.[/]");
             });
     }

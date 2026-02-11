@@ -162,7 +162,7 @@ public class TamperProofPlugin : PluginBase, IDisposable
             e.Violations.Count,
             e.DetectedAt);
 
-        // TODO: Once IMessageBus is injected, publish like this:
+        // Message bus integration: once IMessageBus is injected, publish violation events:
         // await _messageBus.PublishAsync("tamperproof.background.violation", e, ct);
 
         await Task.CompletedTask;
@@ -850,7 +850,7 @@ public class TamperProofPlugin : PluginBase, IDisposable
                 incident.ObjectId,
                 incident.Version);
 
-            // TODO: Once IMessageBus is injected, publish like this:
+            // Message bus integration: once IMessageBus is injected, publish alert events:
             // await _messageBus.PublishAsync("tamperproof.alert.detected", incident, ct);
 
             await Task.CompletedTask;

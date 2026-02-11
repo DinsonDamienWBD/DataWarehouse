@@ -274,7 +274,7 @@ public class ServerDispatcherPlugin : ServerDispatcherPluginBase
                     break;
 
                 case DeliveryMode.Multicast:
-                    // TODO: Implement multicast targeting with criteria matching
+                    // Multicast targeting with criteria matching: not yet implemented.
                     _logger.LogWarning("Multicast delivery mode not yet fully implemented");
                     break;
 

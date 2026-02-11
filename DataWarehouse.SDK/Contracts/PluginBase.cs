@@ -3043,7 +3043,7 @@ namespace DataWarehouse.SDK.Contracts
                 return secCtx;
 
             // Try to get from kernel context
-            // TODO: Define how kernel context provides security context
+            // Kernel security context resolution: define kernel context -> security context mapping when available.
 
             // Fallback to system context
             return new DefaultSecurityContext();

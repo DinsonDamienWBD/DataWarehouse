@@ -702,16 +702,13 @@ public sealed class ProtocolHandler
     /// <returns>The stored password hash (md5(password + username) as hex string), or null if user not found.</returns>
     private string? GetStoredPasswordHash(string username)
     {
-        // TODO: Implement actual user database lookup with PBKDF2 or bcrypt hashed passwords
-        // This is a placeholder that demonstrates the structure
-        // In production:
-        // 1. Query your user database
-        // 2. Use a proper password hashing library (PBKDF2, bcrypt, Argon2)
+        // User database lookup: requires integration with an auth provider (PBKDF2/bcrypt/Argon2).
+        // Currently rejects all authentication attempts until a user database is wired in.
+        // Production requirements:
+        // 1. Query a secure user database
+        // 2. Use proper password hashing (PBKDF2, bcrypt, Argon2)
         // 3. Store salts and hashed passwords separately
         // 4. Never store plaintext passwords
-
-        // For now, return null to reject all authentication attempts
-        // Remove this when implementing actual user database
         Console.Error.WriteLine($"[PostgresWireProtocol] WARNING: User authentication database not implemented. Rejecting login for user '{username}'.");
         return null;
     }

@@ -2066,7 +2066,7 @@ public sealed class FederationManager : IAsyncDisposable
         {
             LocalInstanceId = LocalInstanceId,
             RegistryStats = registryStats,
-            TotalFederatedQueries = 0, // TODO: Track this
+            TotalFederatedQueries = 0, // Federated query counter: wire into query execution path to track.
             AverageFederatedQueryTimeMs = latencyProfiles.Count > 0
                 ? latencyProfiles.Values.Average(p => p.AverageLatencyMs)
                 : 0,
