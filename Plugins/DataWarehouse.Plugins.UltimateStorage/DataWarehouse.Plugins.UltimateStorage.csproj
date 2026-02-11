@@ -18,7 +18,7 @@
   <!-- Cloud Storage Providers -->
   <ItemGroup>
     <!-- AWS S3 -->
-    <PackageReference Include="AWSSDK.S3" Version="4.0.18.3" />
+    <PackageReference Include="AWSSDK.S3" Version="4.0.18.4" />
 
     <!-- Azure Blob Storage -->
     <PackageReference Include="Azure.Storage.Blobs" Version="12.27.0" />
@@ -37,8 +37,8 @@
     <PackageReference Include="Tencent.QCloud.Cos.Sdk" Version="5.4.*" />
 
     <!-- Oracle Cloud Infrastructure Object Storage -->
-    <PackageReference Include="OCI.DotNetSDK.Objectstorage" Version="127.0.0" />
-    <PackageReference Include="OCI.DotNetSDK.Common" Version="127.0.0" />
+    <PackageReference Include="OCI.DotNetSDK.Objectstorage" Version="127.1.0" />
+    <PackageReference Include="OCI.DotNetSDK.Common" Version="127.1.0" />
   </ItemGroup>
 
   <!-- Database Storage -->

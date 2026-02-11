@@ -17,7 +17,7 @@
 
   <!-- SMART Monitoring (Windows only) -->
   <ItemGroup Condition="$([MSBuild]::IsOSPlatform('Windows'))">
-    <PackageReference Include="System.Management" Version="10.0.*" />
+    <PackageReference Include="System.Management" Version="10.0.3" />
   </ItemGroup>
 
 

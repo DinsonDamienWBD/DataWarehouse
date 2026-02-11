@@ -31,7 +31,7 @@
     <PackageReference Include="Oracle.ManagedDataAccess.Core" Version="23.26.100" />
 
     <!-- SQLite -->
-    <PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.2" />
+    <PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.3" />
   </ItemGroup>
 
   <!-- NoSQL Document Databases -->

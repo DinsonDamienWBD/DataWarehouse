@@ -18,17 +18,17 @@
   <!-- Cloud Provider SDKs -->
   <ItemGroup>
     <!-- AWS -->
-    <PackageReference Include="AWSSDK.S3" Version="4.0.18.3" />
+    <PackageReference Include="AWSSDK.S3" Version="4.0.18.4" />
     <PackageReference Include="AWSSDK.EC2" Version="4.0.72" />
     <PackageReference Include="AWSSDK.CloudWatch" Version="4.0.6.7" />
     <PackageReference Include="AWSSDK.CostExplorer" Version="4.0.11.5" />
     <PackageReference Include="AWSSDK.SecurityToken" Version="4.0.5.9" />
+    <PackageReference Include="Azure.Monitor.Query.Logs" Version="1.0.0" />
 
     <!-- Azure -->
     <PackageReference Include="Azure.ResourceManager" Version="1.*" />
     <PackageReference Include="Azure.Identity" Version="1.*" />
     <PackageReference Include="Azure.Storage.Blobs" Version="12.*" />
-    <PackageReference Include="Azure.Monitor.Query" Version="1.*" />
 
     <!-- Google Cloud -->
     <PackageReference Include="Google.Cloud.Storage.V1" Version="4.*" />
