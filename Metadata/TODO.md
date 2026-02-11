@@ -11170,16 +11170,16 @@ public enum DataFormatFamily { Row, Column, Scientific, Binary, Hierarchical, Gr
 | 110.B4.6 | ⭐ BondStrategy - Microsoft Bond | [ ] |
 | 110.B4.7 | ⭐ SbeStrategy - Simple Binary Encoding | [ ] |
 | **B5: Columnar Formats** |
-| 110.B5.1 | ⭐ ParquetStrategy - Apache Parquet with column pruning | [ ] |
-| 110.B5.2 | ⭐ ArrowStrategy - Apache Arrow IPC | [ ] |
+| 110.B5.1 | ⭐ ParquetStrategy - Apache Parquet with column pruning | [x] |
+| 110.B5.2 | ⭐ ArrowStrategy - Apache Arrow IPC | [x] |
 | 110.B5.3 | ⭐ ArrowFlightStrategy - Arrow Flight RPC | [ ] |
-| 110.B5.4 | ⭐ OrcStrategy - Apache ORC | [ ] |
+| 110.B5.4 | ⭐ OrcStrategy - Apache ORC | [x] |
 | 110.B5.5 | ⭐ FeatherStrategy - Feather V2 (Arrow-based) | [ ] |
 | 110.B5.6 | ⭐ LanceStrategy - Lance format (ML-optimized) | [ ] |
 | **B6: Scientific & Research Formats** |
-| 110.B6.1 | ⭐ Hdf5Strategy - HDF5 hierarchical data | [ ] |
-| 110.B6.2 | ⭐ NetCdfStrategy - NetCDF climate/ocean data | [ ] |
-| 110.B6.3 | ⭐ FitsStrategy - FITS astronomical data | [ ] |
+| 110.B6.1 | ⭐ Hdf5Strategy - HDF5 hierarchical data | [x] |
+| 110.B6.2 | ⭐ NetCdfStrategy - NetCDF climate/ocean data | [x] |
+| 110.B6.3 | ⭐ FitsStrategy - FITS astronomical data | [x] |
 | 110.B6.4 | ⭐ RootStrategy - ROOT (CERN particle physics) | [ ] |
 | 110.B6.5 | ⭐ ZarrStrategy - Zarr chunked arrays | [ ] |
 | 110.B6.6 | ⭐ TileDbStrategy - TileDB multi-dimensional | [ ] |
@@ -11188,11 +11188,11 @@ public enum DataFormatFamily { Row, Column, Scientific, Binary, Hierarchical, Gr
 | 110.B6.9 | ⭐ NumpyStrategy - NumPy .npy/.npz files | [ ] |
 | 110.B6.10 | ⭐ PickleStrategy - Python pickle (read-only) | [ ] |
 | **B7: GIS & Spatial Formats** |
-| 110.B7.1 | ⭐ GeoJsonStrategy - GeoJSON | [ ] |
+| 110.B7.1 | ⭐ GeoJsonStrategy - GeoJSON | [x] |
 | 110.B7.2 | ⭐ GeoParquetStrategy - GeoParquet | [ ] |
-| 110.B7.3 | ⭐ ShapefileStrategy - ESRI Shapefile | [ ] |
+| 110.B7.3 | ⭐ ShapefileStrategy - ESRI Shapefile | [x] |
 | 110.B7.4 | ⭐ GeoPackageStrategy - OGC GeoPackage | [ ] |
-| 110.B7.5 | ⭐ KmlStrategy - KML/KMZ | [ ] |
+| 110.B7.5 | ⭐ KmlStrategy - KML/KMZ | [x] |
 | 110.B7.6 | ⭐ WkbStrategy - Well-Known Binary | [ ] |
 | 110.B7.7 | ⭐ FlatGeobufStrategy - FlatGeobuf | [ ] |
 | **B8: Graph & Document Formats** |
