@@ -61,6 +61,7 @@ Progress: [######----] 60%
 | Phase 10 P03 | 4 | 2 tasks | 1 files |
 | Phase 11 P01 | 17 | 2 tasks | 7 files |
 | Phase 09 P04 | 26 | 2 tasks | 1 files |
+| Phase 10 P02 | 12 | 2 tasks | 0 files |
 
 ## Accumulated Context
 
@@ -133,6 +134,9 @@ Recent decisions affecting current work:
 - [Phase 10-01]: Verified T79 AirGapBridge tri-mode implementation complete - all 35 sub-tasks production-ready (5578 lines across 9 components)
 - [Phase 10]: Verified BlockLevelTieringStrategy.cs (2250 lines) already implements all 10 T81 sub-tasks - no implementation needed
 - [Phase 11-01]: AR spatial anchors with GPS + SLAM visual features for sub-meter precision (0.5m with high-confidence features, 10m GPS-only); in-memory storage acceptable for Phase 11 (cloud persistence is enhancement opportunity)
+- [Phase 10]: All snapshot and CDP strategies already production-ready - verification confirmed zero gaps
+- [Phase 11]: Place deception types in plugin (not SDK) following existing psychometric type pattern
+- [Phase 11]: Deception detection opt-in via EnableDeception config (default: false) for backward compatibility
 
 ### Pending Todos
 
