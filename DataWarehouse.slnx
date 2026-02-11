@@ -28,6 +28,7 @@
     <Project Path="Plugins/DataWarehouse.Plugins.Alerting/DataWarehouse.Plugins.Alerting.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.AlertingOps/DataWarehouse.Plugins.AlertingOps.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.ApacheSuperset/DataWarehouse.Plugins.ApacheSuperset.csproj" />
+    <Project Path="Plugins/DataWarehouse.Plugins.AppPlatform/DataWarehouse.Plugins.AppPlatform.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.AuditLogging/DataWarehouse.Plugins.AuditLogging.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.BatteryAware/DataWarehouse.Plugins.BatteryAware.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.BlueGreenDeployment/DataWarehouse.Plugins.BlueGreenDeployment.csproj" />
@@ -71,6 +72,7 @@
     <Project Path="Plugins/DataWarehouse.Plugins.OpenTelemetry/DataWarehouse.Plugins.OpenTelemetry.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.OracleTnsProtocol/DataWarehouse.Plugins.OracleTnsProtocol.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.Perses/DataWarehouse.Plugins.Perses.csproj" />
+    <Project Path="Plugins/DataWarehouse.Plugins.PluginMarketplace/DataWarehouse.Plugins.PluginMarketplace.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.PostgresWireProtocol/DataWarehouse.Plugins.PostgresWireProtocol.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.PowerBI/DataWarehouse.Plugins.PowerBI.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.Prometheus/DataWarehouse.Plugins.Prometheus.csproj" />
