@@ -145,7 +145,7 @@ public sealed class DataWarehouseTransaction : DbTransaction
     /// </summary>
     /// <param name="savepointName">The name of the savepoint.</param>
     /// <param name="cancellationToken">The cancellation token.</param>
-    public async Task SaveAsync(string savepointName, CancellationToken cancellationToken = default)
+    public override async Task SaveAsync(string savepointName, CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrEmpty(savepointName);
         ThrowIfDisposed();
@@ -160,7 +160,7 @@ public sealed class DataWarehouseTransaction : DbTransaction
     /// </summary>
     /// <param name="savepointName">The name of the savepoint.</param>
     /// <param name="cancellationToken">The cancellation token.</param>
-    public async Task ReleaseAsync(string savepointName, CancellationToken cancellationToken = default)
+    public override async Task ReleaseAsync(string savepointName, CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrEmpty(savepointName);
         ThrowIfDisposed();

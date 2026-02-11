@@ -131,8 +131,10 @@ namespace DataWarehouse.Tests.Compliance
 
             // Must not allow weak protocols
             Assert.False(securityConfig.AllowedProtocols.HasFlag(System.Security.Authentication.SslProtocols.Ssl3));
+#pragma warning disable SYSLIB0039 // TLS 1.0/1.1 referenced intentionally in compliance test
             Assert.False(securityConfig.AllowedProtocols.HasFlag(System.Security.Authentication.SslProtocols.Tls));
             Assert.False(securityConfig.AllowedProtocols.HasFlag(System.Security.Authentication.SslProtocols.Tls11));
+#pragma warning restore SYSLIB0039
         }
 
         [Fact]

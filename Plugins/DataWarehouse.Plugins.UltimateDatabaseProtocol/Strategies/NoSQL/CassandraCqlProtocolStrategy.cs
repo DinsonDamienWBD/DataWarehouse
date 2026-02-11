@@ -567,7 +567,7 @@ public sealed class CassandraCqlProtocolStrategy : DatabaseProtocolStrategyBase
 
     #region Encoding Helpers
 
-    private static void WriteInt32BE(Span<byte> buffer, int value)
+    private static new void WriteInt32BE(Span<byte> buffer, int value)
     {
         buffer[0] = (byte)(value >> 24);
         buffer[1] = (byte)(value >> 16);

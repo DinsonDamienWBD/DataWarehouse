@@ -298,7 +298,7 @@ public sealed class TieredMemoryStrategy : LongTermMemoryStrategyBase, ITierAwar
     /// <summary>
     /// Gets the current tier configuration.
     /// </summary>
-    public TieredMemoryConfig Configuration { get; private set; }
+    public new TieredMemoryConfig Configuration { get; private set; }
 
     /// <inheritdoc/>
     public override IntelligenceStrategyInfo Info => new()

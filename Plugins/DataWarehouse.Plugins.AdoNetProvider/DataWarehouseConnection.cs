@@ -203,7 +203,7 @@ public sealed class DataWarehouseConnection : DbConnection
     /// </summary>
     /// <param name="databaseName">The name of the database to use.</param>
     /// <param name="cancellationToken">The cancellation token.</param>
-    public async Task ChangeDatabaseAsync(string databaseName, CancellationToken cancellationToken = default)
+    public override async Task ChangeDatabaseAsync(string databaseName, CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrEmpty(databaseName);
         ThrowIfDisposed();
@@ -254,7 +254,7 @@ public sealed class DataWarehouseConnection : DbConnection
     /// </summary>
     /// <param name="cancellationToken">The cancellation token.</param>
     /// <returns>A task that returns a new transaction.</returns>
-    public async ValueTask<DataWarehouseTransaction> BeginTransactionAsync(CancellationToken cancellationToken = default)
+    public new async ValueTask<DataWarehouseTransaction> BeginTransactionAsync(CancellationToken cancellationToken = default)
     {
         return await BeginTransactionAsync(IsolationLevel.ReadCommitted, cancellationToken);
     }
@@ -265,7 +265,7 @@ public sealed class DataWarehouseConnection : DbConnection
     /// <param name="isolationLevel">The isolation level for the transaction.</param>
     /// <param name="cancellationToken">The cancellation token.</param>
     /// <returns>A task that returns a new transaction.</returns>
-    public async ValueTask<DataWarehouseTransaction> BeginTransactionAsync(IsolationLevel isolationLevel, CancellationToken cancellationToken = default)
+    public new async ValueTask<DataWarehouseTransaction> BeginTransactionAsync(IsolationLevel isolationLevel, CancellationToken cancellationToken = default)
     {
         ThrowIfDisposed();
 

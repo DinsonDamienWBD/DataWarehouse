@@ -338,7 +338,6 @@ public sealed class DataWarehouseConnectionStringBuilder : DbConnectionStringBui
     /// Retrieves a value indicating whether the specified key exists.
     /// </summary>
     /// <param name="keyword">The key to find.</param>
-    /// <param name="value">The key's value if found.</param>
     /// <returns>true if the key exists; otherwise, false.</returns>
     public override bool ShouldSerialize(string keyword)
     {

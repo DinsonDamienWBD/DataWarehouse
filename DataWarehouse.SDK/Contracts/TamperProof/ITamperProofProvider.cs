@@ -170,7 +170,7 @@ public abstract class TamperProofProviderPluginBase : FeaturePluginBase, ITamper
         }
     };
 
-    protected virtual IReadOnlyList<KnowledgeObject> GetStaticKnowledge()
+    protected override IReadOnlyList<KnowledgeObject> GetStaticKnowledge()
     {
         return new[]
         {

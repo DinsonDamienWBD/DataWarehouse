@@ -48,7 +48,7 @@ public abstract class LowLatencyStoragePluginBase : StorageProviderPluginBase, I
         }
     };
 
-    protected virtual IReadOnlyList<KnowledgeObject> GetStaticKnowledge()
+    protected override IReadOnlyList<KnowledgeObject> GetStaticKnowledge()
     {
         return new[]
         {
@@ -256,7 +256,7 @@ public abstract class RdmaTransportPluginBase : FeaturePluginBase, IRdmaTranspor
         }
     };
 
-    protected virtual IReadOnlyList<KnowledgeObject> GetStaticKnowledge()
+    protected override IReadOnlyList<KnowledgeObject> GetStaticKnowledge()
     {
         return new[]
         {
@@ -353,7 +353,7 @@ public abstract class IoUringProviderPluginBase : FeaturePluginBase, IIoUringPro
         }
     };
 
-    protected virtual IReadOnlyList<KnowledgeObject> GetStaticKnowledge()
+    protected override IReadOnlyList<KnowledgeObject> GetStaticKnowledge()
     {
         return new[]
         {
@@ -457,7 +457,7 @@ public abstract class NumaAllocatorPluginBase : FeaturePluginBase, INumaAllocato
         }
     };
 
-    protected virtual IReadOnlyList<KnowledgeObject> GetStaticKnowledge()
+    protected override IReadOnlyList<KnowledgeObject> GetStaticKnowledge()
     {
         return new[]
         {

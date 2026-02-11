@@ -7,6 +7,8 @@
     <AssemblyName>DataWarehouse.Plugins.UltimateDataLineage</AssemblyName>
     <Description>Ultimate Data Lineage Plugin - End-to-end data provenance tracking, impact analysis, and lineage visualization</Description>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <!-- CS1591: XML doc warnings suppressed - internal plugin strategies have self-documenting names -->
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\DataWarehouse.SDK\DataWarehouse.SDK.csproj" />

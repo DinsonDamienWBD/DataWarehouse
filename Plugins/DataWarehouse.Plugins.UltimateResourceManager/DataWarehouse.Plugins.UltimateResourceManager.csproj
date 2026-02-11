@@ -7,6 +7,8 @@
     <AssemblyName>DataWarehouse.Plugins.UltimateResourceManager</AssemblyName>
     <Description>Ultimate Resource Manager Plugin - Central resource orchestration for CPU, Memory, I/O, and GPU management with hierarchical quotas and fair scheduling</Description>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <!-- CS1591: XML doc warnings suppressed - internal plugin strategies have self-documenting names -->
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\DataWarehouse.SDK\DataWarehouse.SDK.csproj" />

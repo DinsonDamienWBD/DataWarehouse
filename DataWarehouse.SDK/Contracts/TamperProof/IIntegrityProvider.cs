@@ -116,7 +116,7 @@ public abstract class IntegrityProviderPluginBase : FeaturePluginBase, IIntegrit
         }
     };
 
-    protected virtual IReadOnlyList<KnowledgeObject> GetStaticKnowledge()
+    protected override IReadOnlyList<KnowledgeObject> GetStaticKnowledge()
     {
         return new[]
         {

@@ -150,7 +150,7 @@ public abstract class AccessLogProviderPluginBase : FeaturePluginBase, IAccessLo
         }
     };
 
-    protected virtual IReadOnlyList<KnowledgeObject> GetStaticKnowledge()
+    protected override IReadOnlyList<KnowledgeObject> GetStaticKnowledge()
     {
         return new[]
         {
