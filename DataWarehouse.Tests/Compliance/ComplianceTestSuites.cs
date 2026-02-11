@@ -1446,8 +1446,12 @@ namespace DataWarehouse.Tests.Compliance
 
         public TimeSpan GetDelay(int attempt)
         {
-            var delay = TimeSpan.FromMilliseconds(_baseDelay.TotalMilliseconds * Math.Pow(2, attempt - 1));
-            return delay > _maxDelay ? _maxDelay : delay;
+            var multiplier = Math.Pow(2, attempt - 1);
+            var delayMs = _baseDelay.TotalMilliseconds * multiplier;
+            // Cap at max delay to prevent overflow
+            if (double.IsInfinity(delayMs) || delayMs > _maxDelay.TotalMilliseconds)
+                return _maxDelay;
+            return TimeSpan.FromMilliseconds(delayMs);
         }
     }
 
@@ -1499,12 +1503,13 @@ namespace DataWarehouse.Tests.Compliance
         public TracerSpan StartSpan(string name, SpanContext? parent = null)
         {
             var traceId = parent?.TraceId ?? Guid.NewGuid().ToString("N");
+            var spanId = Guid.NewGuid().ToString("N")[..16];
             return new TracerSpan
             {
                 TraceId = traceId,
-                SpanId = Guid.NewGuid().ToString("N")[..16],
+                SpanId = spanId,
                 ParentSpanId = parent?.SpanId,
-                Context = new SpanContext { TraceId = traceId, SpanId = Guid.NewGuid().ToString("N")[..16] }
+                Context = new SpanContext { TraceId = traceId, SpanId = spanId }
             };
         }
     }

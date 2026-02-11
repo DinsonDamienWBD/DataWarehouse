@@ -1508,10 +1508,13 @@ This is an automated alert from the DataWarehouse Canary Detection System.
         public string GenerateFakeApiKey()
         {
             var prefix = "sk_live_";
-            var key = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32))
+            // Generate enough bytes to ensure at least 40 alphanumeric chars remain after stripping
+            var key = Convert.ToBase64String(RandomNumberGenerator.GetBytes(64))
                 .Replace("+", "")
                 .Replace("/", "")
-                .Replace("=", "")[..40];
+                .Replace("=", "");
+            // Safely take up to 40 chars (or all if shorter, which is unlikely with 64 bytes)
+            key = key.Length > 40 ? key[..40] : key;
             return prefix + key;
         }
 
@@ -1752,7 +1755,10 @@ users:
 
         private static string GenerateAwsAccessKey()
         {
-            return "AKIA" + Convert.ToBase64String(RandomNumberGenerator.GetBytes(12)).Replace("+", "").Replace("/", "")[..16];
+            var key = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32))
+                .Replace("+", "").Replace("/", "").Replace("=", "");
+            key = key.Length > 16 ? key[..16] : key;
+            return "AKIA" + key;
         }
 
         private static string GenerateAzureCredential()
