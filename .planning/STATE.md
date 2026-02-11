@@ -5,14 +5,14 @@
 See: .planning/PROJECT.md (updated 2026-02-10)
 
 **Core value:** Every feature listed in the task tracker must be fully production-ready — no placeholders, no simulations, no stubs, no deferred logic. The codebase must match what the task list claims is "complete."
-**Current focus:** Phase 19 Plan 03 COMPLETE — Per-app AI workflow configuration and Intelligence routing
+**Current focus:** Phase 19 COMPLETE — All 4 plans implemented (app registration, tokens, routing, policies, AI workflows, observability, service discovery)
 
 ## Current Position
 
-Phase: 19 of 22 (Application Platform Services)
-Plan: 3 of 4 in Phase 19 (19-03 COMPLETE)
-Status: 19-03 COMPLETE — AppAiWorkflowConfig (Auto/Manual/Budget/Approval), AppAiWorkflowStrategy (budget+concurrency+operation enforcement), 7 AI workflow topic handlers
-Last activity: 2026-02-11 — Completed 19-03: Per-App AI Workflow Configuration
+Phase: 19 of 22 (Application Platform Services) COMPLETE
+Plan: 4 of 4 in Phase 19 (19-04 COMPLETE)
+Status: 19-04 COMPLETE — Per-app observability isolation (app_id tag injection on metrics/traces/logs, mandatory app_id query filters), PlatformServiceFacade (6 services), 14 new topic handlers
+Last activity: 2026-02-11 — Completed 19-04: Per-App Observability Isolation and Service Discovery
 
 Progress: [######----] 65%
 
@@ -105,6 +105,7 @@ Progress: [######----] 65%
 | Phase 19 P02 | 5 min | 2 tasks | 6 files |
 | Phase 19 P03 | 5 min | 2 tasks | 4 files |
 | Phase 17 P03 | 5 min | 2 tasks | 1 files |
+| Phase 19 P04 | 6 min | 2 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -209,6 +210,7 @@ Recent decisions affecting current work:
 - [Phase 19-03]: Per-app AI workflow with 4 modes (Auto/Manual/Budget/Approval); budget enforcement (monthly + per-request); concurrency limiting via Interlocked; ConcurrentDictionary<string, int> for live concurrent counts separate from immutable AiUsageTracking record; automatic monthly period reset; Intelligence routing via intelligence.workflow.configure, intelligence.workflow.remove, intelligence.request topics
 - [Phase 12-01]: AEDS core plugins verified - Http2DataPlanePlugin 100% production-ready (0 TODOs, full HTTP/2 implementation), 3 core plugins 75-85% complete with critical P0 gaps: signature verification in AedsCorePlugin/ClientCourierPlugin requires T94 UltimateKeyManagement integration, Control Plane wiring in ServerDispatcherPlugin uses Task.Delay simulation; 6 TODOs identified, 3 require immediate fix before production use
 - [Phase 17-01]: T57 Plugin Marketplace complete -- PluginMarketplacePlugin (2000 lines) with 4 GUI message handlers (list/install/uninstall/update), topological sort dependency resolution, version archiving with rollback, persistent JSON catalog, 21 built-in plugin definitions; uses built-in catalog population instead of runtime reflection scanning
+- [Phase 19-04]: Per-app observability with app_id tag injection on all emitted telemetry and mandatory app_id filter on all queries; PlatformServiceFacade with 6 services (Storage, AccessControl, Intelligence, Observability, Replication, Compliance); 14 new topic handlers (10 observability + 4 service discovery); ObservabilityLevel enum for log level filtering; static Lazy<T> service catalog
 - [Phase 17-02]: T57 certification + reviews + revenue complete -- 5-stage certification pipeline (Security Scan/SDK Compat/Deps/Static Analysis/Scoring) with kernel.plugin.validate message bus integration; multi-dimensional review system (reliability/performance/documentation ratings); decimal-precision revenue tracking with 30% commission; review data flows to GUI via marketplace.list
 - [Phase 17-03]: T57 usage analytics complete -- event-based tracking (PluginUsageEvent with 7 event types) wired into install/uninstall/update handlers; hourly timer-based aggregation computing PopularityScore from real event counts ((installs*10 + activeUsers*5 - uninstalls*3 - errors*2) clamped 0-100); per-plugin and marketplace-wide analytics via marketplace.analytics handler; daily event log rotation (90 days); Phase 17 complete
 
@@ -224,6 +226,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-02-11 (Phase 17 Plan 03 COMPLETE)
-Stopped at: Completed 17-03-PLAN.md (Usage Analytics for Plugin Marketplace)
-Resume file: Phase 17 complete (all 3 plans). T57 fully implemented.
+Last session: 2026-02-11 (Phase 19 Plan 04 COMPLETE)
+Stopped at: Completed 19-04-PLAN.md (Per-App Observability Isolation and Service Discovery)
+Resume file: Phase 19 complete (all 4 plans). Ready for Phase 20.
