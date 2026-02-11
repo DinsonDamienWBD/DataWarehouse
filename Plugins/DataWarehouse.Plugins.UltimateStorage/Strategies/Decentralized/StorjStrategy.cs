@@ -860,8 +860,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Decentralized
                 rng.GetBytes(salt);
             }
 
-            using var pbkdf2 = new Rfc2898DeriveBytes(_encryptionPassword, salt, 100000, HashAlgorithmName.SHA256);
-            var key = pbkdf2.GetBytes(32); // 256-bit key for AES-256
+            var key = Rfc2898DeriveBytes.Pbkdf2(_encryptionPassword, salt, 100000, HashAlgorithmName.SHA256, 32); // 256-bit key for AES-256
 
             // Encrypt using AES-GCM
             var nonce = new byte[AesGcm.NonceByteSizes.MaxSize];
@@ -918,8 +917,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Decentralized
             Buffer.BlockCopy(encryptedBytes, 32 + AesGcm.NonceByteSizes.MaxSize + AesGcm.TagByteSizes.MaxSize, cipherBytes, 0, cipherBytesLength);
 
             // Derive key from password
-            using var pbkdf2 = new Rfc2898DeriveBytes(_encryptionPassword, salt, 100000, HashAlgorithmName.SHA256);
-            var key = pbkdf2.GetBytes(32);
+            var key = Rfc2898DeriveBytes.Pbkdf2(_encryptionPassword, salt, 100000, HashAlgorithmName.SHA256, 32);
 
             // Decrypt using AES-GCM
             var plainBytes = new byte[cipherBytes.Length];

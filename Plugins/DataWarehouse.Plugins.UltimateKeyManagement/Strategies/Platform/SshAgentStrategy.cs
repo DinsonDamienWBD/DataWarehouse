@@ -379,12 +379,12 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Platform
             Buffer.BlockCopy(ephemeralPublic, 0, combinedMaterial, 0, ephemeralPublic.Length);
             Buffer.BlockCopy(keyMaterial, 0, combinedMaterial, ephemeralPublic.Length, keyMaterial.Length);
 
-            using var pbkdf2 = new Rfc2898DeriveBytes(
+            var encryptionKey = Rfc2898DeriveBytes.Pbkdf2(
                 combinedMaterial,
                 SHA256.HashData(Encoding.UTF8.GetBytes("DataWarehouse.SSH.Salt.v1")),
                 100000,
-                HashAlgorithmName.SHA256);
-            var encryptionKey = pbkdf2.GetBytes(32);
+                HashAlgorithmName.SHA256,
+                32);
 
             // Encrypt with AES-GCM
             var nonce = RandomNumberGenerator.GetBytes(12);
@@ -440,12 +440,12 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Platform
             Buffer.BlockCopy(ephemeralPublic, 0, combinedMaterial, 0, ephemeralPublic.Length);
             Buffer.BlockCopy(keyMaterial, 0, combinedMaterial, ephemeralPublic.Length, keyMaterial.Length);
 
-            using var pbkdf2 = new Rfc2898DeriveBytes(
+            var encryptionKey = Rfc2898DeriveBytes.Pbkdf2(
                 combinedMaterial,
                 SHA256.HashData(Encoding.UTF8.GetBytes("DataWarehouse.SSH.Salt.v1")),
                 100000,
-                HashAlgorithmName.SHA256);
-            var encryptionKey = pbkdf2.GetBytes(32);
+                HashAlgorithmName.SHA256,
+                32);
 
             // Decrypt with AES-GCM
             var plaintext = new byte[ciphertext.Length];
@@ -501,12 +501,12 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Platform
         private byte[] DeriveFallbackKey()
         {
             var entropy = $"{Environment.MachineName}:{Environment.UserName}:DataWarehouse.SSH.Fallback.v1";
-            using var pbkdf2 = new Rfc2898DeriveBytes(
+            return Rfc2898DeriveBytes.Pbkdf2(
                 Encoding.UTF8.GetBytes(entropy),
                 SHA256.HashData(Encoding.UTF8.GetBytes("DataWarehouse.SSH.Fallback.Salt.v1")),
                 100000,
-                HashAlgorithmName.SHA256);
-            return pbkdf2.GetBytes(32);
+                HashAlgorithmName.SHA256,
+                32);
         }
 
         private static string ComputeFingerprint(string publicKeyBase64)

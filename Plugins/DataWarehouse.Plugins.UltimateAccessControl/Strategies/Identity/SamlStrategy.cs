@@ -43,7 +43,7 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Identity
 
             if (configuration.TryGetValue("CertificatePath", out var certPath) && certPath is string certPathStr)
             {
-                _certificate = new X509Certificate2(certPathStr);
+                _certificate = X509CertificateLoader.LoadCertificateFromFile(certPathStr);
             }
 
             return base.InitializeAsync(configuration, cancellationToken);

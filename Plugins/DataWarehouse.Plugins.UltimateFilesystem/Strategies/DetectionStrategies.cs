@@ -49,7 +49,9 @@ public sealed class AutoDetectStrategy : FilesystemStrategyBase
         using var fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read);
         fs.Seek(offset, SeekOrigin.Begin);
         var buffer = new byte[length];
+#pragma warning disable CA2022 // Intentional partial read - bytesRead is checked and buffer resized
         var bytesRead = fs.Read(buffer, 0, length);
+#pragma warning restore CA2022
         if (bytesRead < length)
             Array.Resize(ref buffer, bytesRead);
         return Task.FromResult(buffer);
@@ -126,7 +128,9 @@ public sealed class NtfsStrategy : FilesystemStrategyBase
         using var fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read, options?.BufferSize ?? 4096, fileOptions);
         fs.Seek(offset, SeekOrigin.Begin);
         var buffer = new byte[length];
+#pragma warning disable CA2022 // Intentional partial read - bytesRead is checked and buffer resized
         var bytesRead = fs.Read(buffer, 0, length);
+#pragma warning restore CA2022
         if (bytesRead < length)
             Array.Resize(ref buffer, bytesRead);
         return Task.FromResult(buffer);

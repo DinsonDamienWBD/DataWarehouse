@@ -609,7 +609,7 @@ public sealed class InstanceRegistry : IAsyncDisposable
         if (config.AuthMethod == InstanceAuthMethod.MutualTls && !string.IsNullOrEmpty(config.ClientCertificate))
         {
             var certBytes = Convert.FromBase64String(config.ClientCertificate);
-            var cert = new X509Certificate2(certBytes, config.ClientCertificatePassword);
+            var cert = X509CertificateLoader.LoadPkcs12(certBytes, config.ClientCertificatePassword);
             handler.ClientCertificates.Add(cert);
         }
 
@@ -2674,7 +2674,7 @@ public sealed class EncryptedTransport
         if (!string.IsNullOrEmpty(serverCertificatePfx))
         {
             var certBytes = Convert.FromBase64String(serverCertificatePfx);
-            _serverCertificate = new X509Certificate2(certBytes, password);
+            _serverCertificate = X509CertificateLoader.LoadPkcs12(certBytes, password);
         }
     }
 

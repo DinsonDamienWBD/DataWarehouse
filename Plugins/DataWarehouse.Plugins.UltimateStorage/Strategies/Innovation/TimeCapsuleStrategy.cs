@@ -492,13 +492,13 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
             var vdfProof = Convert.ToBase64String(vdfResult);
 
             // Derive time-lock key from VDF result
-            using var pbkdf2 = new Rfc2898DeriveBytes(vdfResult, temporalBytes, 10000, HashAlgorithmName.SHA256);
-            var timeLockKey = Convert.ToBase64String(pbkdf2.GetBytes(32));
+            var derivedBytes = Rfc2898DeriveBytes.Pbkdf2(vdfResult, temporalBytes, 10000, HashAlgorithmName.SHA256, 80);
+            var timeLockKey = Convert.ToBase64String(derivedBytes[..32]);
 
             // Encrypt data with AES-256
             using var aes = Aes.Create();
-            aes.Key = pbkdf2.GetBytes(32);
-            aes.IV = pbkdf2.GetBytes(16);
+            aes.Key = derivedBytes[32..64];
+            aes.IV = derivedBytes[64..80];
             aes.Mode = CipherMode.CBC;
             aes.Padding = PaddingMode.PKCS7;
 
@@ -533,9 +533,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
             var keyBytes = Convert.FromBase64String(timeLockKey);
 
             using var aes = Aes.Create();
-            using var pbkdf2 = new Rfc2898DeriveBytes(keyBytes, keyBytes.Take(16).ToArray(), 1, HashAlgorithmName.SHA256);
-            aes.Key = pbkdf2.GetBytes(32);
-            aes.IV = pbkdf2.GetBytes(16);
+            var derivedBytes = Rfc2898DeriveBytes.Pbkdf2(keyBytes, keyBytes.Take(16).ToArray(), 1, HashAlgorithmName.SHA256, 48);
+            aes.Key = derivedBytes[..32];
+            aes.IV = derivedBytes[32..48];
             aes.Mode = CipherMode.CBC;
             aes.Padding = PaddingMode.PKCS7;
 

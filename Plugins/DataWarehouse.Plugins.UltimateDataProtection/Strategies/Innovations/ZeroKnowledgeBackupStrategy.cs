@@ -556,15 +556,16 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Innovations
             CancellationToken ct)
         {
             // Derive multiple keys for different purposes
-            using var pbkdf2 = new Rfc2898DeriveBytes(
+            var derivedBytes = Rfc2898DeriveBytes.Pbkdf2(
                 passphrase,
                 salt,
                 iterations,
-                HashAlgorithmName.SHA512);
+                HashAlgorithmName.SHA512,
+                96); // 3 x 32 bytes
 
-            var masterKey = pbkdf2.GetBytes(32);     // 256-bit master key
-            var searchKey = pbkdf2.GetBytes(32);     // 256-bit search key
-            var proofKey = pbkdf2.GetBytes(32);      // 256-bit proof key
+            var masterKey = derivedBytes[..32];       // 256-bit master key
+            var searchKey = derivedBytes[32..64];     // 256-bit search key
+            var proofKey = derivedBytes[64..96];      // 256-bit proof key
 
             return Task.FromResult(new KeyDerivationResult
             {

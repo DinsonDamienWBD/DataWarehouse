@@ -82,7 +82,7 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Mfa
                 X509Certificate2 certificate;
                 try
                 {
-                    certificate = new X509Certificate2(certificateBytes);
+                    certificate = X509CertificateLoader.LoadCertificate(certificateBytes);
                 }
                 catch (Exception ex)
                 {
@@ -198,7 +198,7 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Mfa
             try
             {
                 // Parse certificate
-                var certificate = new X509Certificate2(certificateBytes);
+                var certificate = X509CertificateLoader.LoadCertificate(certificateBytes);
 
                 // Validate certificate
                 var chainValidation = ValidateCertificateChain(certificate);

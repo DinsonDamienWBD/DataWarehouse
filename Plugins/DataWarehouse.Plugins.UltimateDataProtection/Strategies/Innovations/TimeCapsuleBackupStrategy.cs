@@ -888,11 +888,9 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Innovations
                 ? salt // Use random key
                 : System.Text.Encoding.UTF8.GetBytes(userKey);
 
-            using var pbkdf2 = new Rfc2898DeriveBytes(keyBytes, salt, 600000, HashAlgorithmName.SHA512);
-
             return new KeyMaterial
             {
-                MasterKey = pbkdf2.GetBytes(32),
+                MasterKey = Rfc2898DeriveBytes.Pbkdf2(keyBytes, salt, 600000, HashAlgorithmName.SHA512, 32),
                 Salt = salt
             };
         }

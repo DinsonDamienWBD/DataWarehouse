@@ -375,13 +375,14 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Identity
             var salt = Convert.ToBase64String(System.Security.Cryptography.RandomNumberGenerator.GetBytes(32));
             var saltBytes = Convert.FromBase64String(salt);
 
-            using var pbkdf2 = new System.Security.Cryptography.Rfc2898DeriveBytes(
+            var hashBytes = System.Security.Cryptography.Rfc2898DeriveBytes.Pbkdf2(
                 password,
                 saltBytes,
                 _pbkdf2Iterations,
-                System.Security.Cryptography.HashAlgorithmName.SHA256);
+                System.Security.Cryptography.HashAlgorithmName.SHA256,
+                32);
 
-            var hash = Convert.ToBase64String(pbkdf2.GetBytes(32));
+            var hash = Convert.ToBase64String(hashBytes);
             return (hash, salt);
         }
 
@@ -389,13 +390,14 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Identity
         {
             var saltBytes = Convert.FromBase64String(salt);
 
-            using var pbkdf2 = new System.Security.Cryptography.Rfc2898DeriveBytes(
+            var computedHashBytes = System.Security.Cryptography.Rfc2898DeriveBytes.Pbkdf2(
                 password,
                 saltBytes,
                 _pbkdf2Iterations,
-                System.Security.Cryptography.HashAlgorithmName.SHA256);
+                System.Security.Cryptography.HashAlgorithmName.SHA256,
+                32);
 
-            var computedHash = Convert.ToBase64String(pbkdf2.GetBytes(32));
+            var computedHash = Convert.ToBase64String(computedHashBytes);
             return computedHash == hash;
         }
 
