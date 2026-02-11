@@ -18,7 +18,7 @@
 
   <ItemGroup>
     <!-- HTTP client for API integrations -->
-    <PackageReference Include="System.Net.Http.Json" Version="10.0.2" />
+    <PackageReference Include="System.Net.Http.Json" Version="10.0.3" />
 
     <!-- WebSocket support for real-time updates -->
     <PackageReference Include="System.Net.WebSockets.Client" Version="4.3.2" />
