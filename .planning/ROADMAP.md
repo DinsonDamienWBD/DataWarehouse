@@ -229,15 +229,15 @@ Plans:
   5. Sovereignty geofencing enforces geo-tagging, replication fences, and attestation
   6. Forensic watermarking embeds and extracts watermarks from text, images, PDFs, videos
 **Plans**: TBD
+**Plans**: 6 plans in 1 wave
 
 Plans:
-- [ ] 09-01: Verify and complete canary objects (T73)
-- [ ] 09-02: Verify and complete steganographic sharding (T74)
-- [ ] 09-03: Verify and complete secure multi-party computation (T75)
-- [ ] 09-04: Verify and complete digital dead drops (T76)
-- [ ] 09-05: Verify and complete sovereignty geofencing (T77)
-- [ ] 09-06: Verify and complete forensic watermarking (T89)
-
+- [ ] 09-01-PLAN.md — Verify and test canary objects (T73) - generation, placement, monitoring, forensics, alerts, rotation
+- [ ] 09-02-PLAN.md — Verify and test steganographic sharding (T74) - LSB image, text, audio/video, shard distribution
+- [ ] 09-03-PLAN.md — Verify and test secure multi-party computation (T75) - Shamir secret sharing, distributed signing
+- [ ] 09-04-PLAN.md — Verify and test digital dead drops (T76) - ephemeral shares, TTL, burn-after-reading, duress
+- [ ] 09-05-PLAN.md — Verify and test sovereignty geofencing (T77) - regional policies, GDPR/CCPA/PIPL compliance
+- [ ] 09-06-PLAN.md — Verify and test forensic watermarking (T89) - generation, embedding, extraction, traitor tracing
 ### Phase 10: Advanced Storage Features
 **Goal**: Advanced storage features are fully implemented and integrated
 **Depends on**: Phase 4 (storage infrastructure), Phase 5 (pipeline)
