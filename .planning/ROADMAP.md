@@ -30,6 +30,9 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [ ] **Phase 16: Testing & Quality Assurance** - Verify/implement comprehensive test suite and security penetration test plan
 - [ ] **Phase 17: Plugin Marketplace** - Verify/implement plugin marketplace with discovery, install, versioning, certification
 - [ ] **Phase 18: Plugin Deprecation & File Cleanup** - Remove migrated plugins from slnx, delete their files/folders
+- [ ] **Phase 19: Application Platform Services** - DW as a platform for registered apps — per-app service routing, per-app AI workflows, per-app access control policies
+- [ ] **Phase 20: WASM/WASI Language Ecosystem** - Verify WASM/WASI compute-on-data works with all 30+ compatible languages (Rust, C/C++, Go, Python, Ruby, Java, Kotlin, Swift, Zig, etc.)
+- [ ] **Phase 21: UltimateDataTransit** - New plugin with user-selectable transport strategies for data movement (chunked, P2P, delta, multi-path, QoS, store-and-forward, cost-aware routing)
 
 ## Phase Details
 
@@ -393,10 +396,75 @@ Plans:
 - [ ] 18-02: Remove migrated plugins from DataWarehouse.slnx and delete their files/folders
 - [ ] 18-03: Clean up any remaining references and verify clean build
 
+### Phase 19: Application Platform Services
+**Goal**: DW becomes a platform that registered applications (e.g., SoftwareCenter) can consume — per-app service routing, per-app AI workflows, per-app access control policies, and per-app observability
+**Depends on**: Phase 6 (Interface Layer for API exposure), Phase 3 (Access Control for per-app policies), Phase 2 (Intelligence for per-app AI workflows)
+**Requirements**: PLATFORM-01, PLATFORM-02, PLATFORM-03
+**Success Criteria** (what must be TRUE):
+  1. Applications can register with DW via an app registration API (app ID, name, description, callback URLs)
+  2. Registered apps receive app-specific API keys / service tokens for authenticating with DW services
+  3. Per-app access control policies — each app defines its own RBAC/ABAC rules within DW's UltimateAccessControl
+  4. Per-app AI workflows — each app configures how UltimateIntelligence handles its requests (auto/manual/budget/approval flow)
+  5. Per-app observability — each app's telemetry is isolated and viewable independently via UniversalObservability
+  6. DW routes incoming service requests to the correct app context based on app ID in the request
+  7. Service consumption API exposes: Storage, Access Control, Intelligence, Observability, Replication, Compliance as app-consumable services
+**Plans**: TBD
+
+Plans:
+- [ ] 19-01: App registration model and service token management
+- [ ] 19-02: Per-app access control policy isolation
+- [ ] 19-03: Per-app AI workflow configuration and routing
+- [ ] 19-04: Per-app observability isolation and service consumption API
+
+### Phase 20: WASM/WASI Language Ecosystem
+**Goal**: Verify and ensure DW's compute-on-data/code-on-data WASM/WASI runtime supports all major languages that can compile to WASM/WASI
+**Depends on**: Phase 8 (Compute & Processing for WASM runtime)
+**Requirements**: WASM-01, WASM-02, WASM-03
+**Success Criteria** (what must be TRUE):
+  1. Tier 1 languages verified working: Rust, C, C++, .NET (C#/F#), Go (TinyGo), AssemblyScript, Zig
+  2. Tier 2 languages verified working: Python, Ruby, JavaScript (QuickJS), TypeScript, Kotlin, Swift, Java (TeaVM), Dart, PHP, Lua, Haskell, OCaml, Grain, MoonBit
+  3. Tier 3 languages verified where feasible: Nim, V, Crystal, Perl, R, Fortran, Scala, Elixir/Erlang, Prolog, Ada
+  4. Each verified language has a sample compute-on-data function that runs successfully in DW's WASM runtime
+  5. Language-specific SDK bindings or documentation exist for common DW operations (read, write, query, transform)
+  6. Performance benchmarks compare execution speed across language runtimes for a standardized workload
+**Plans**: TBD
+
+Plans:
+- [ ] 20-01: Verify Tier 1 languages (Rust, C/C++, .NET, Go, AssemblyScript, Zig)
+- [ ] 20-02: Verify Tier 2 languages (Python, Ruby, JS/TS, Kotlin, Swift, Java, Dart, PHP, Lua)
+- [ ] 20-03: Verify Tier 2 continued (Haskell, OCaml, Grain, MoonBit) and Tier 3 feasibility
+- [ ] 20-04: SDK bindings, documentation, and performance benchmarks
+
+### Phase 21: UltimateDataTransit
+**Goal**: New plugin providing user-selectable data transport strategies — the physical "how" of data movement, complementing existing plugins that handle "why" and "where"
+**Depends on**: Phase 6 (Interface Layer for protocol support), Phase 4 (Storage, Replication for data sources/targets)
+**Requirements**: TRANSIT-01, TRANSIT-02, TRANSIT-03
+**Success Criteria** (what must be TRUE):
+  1. Plugin orchestrator discovers and registers all transit strategies with auto-selection based on data size, network conditions, and cost
+  2. Direct transfer strategies: HTTP/2, HTTP/3 (QUIC), gRPC streaming, FTP/SFTP, SCP/rsync
+  3. Chunked/resumable transfer: Large file chunking with resume-on-failure, integrity verification per chunk
+  4. P2P swarm transfer: BitTorrent-style distributed transfer for large datasets across multiple nodes
+  5. Delta/differential transfer: Only transmit changes (binary diff, rsync algorithm, content-defined chunking)
+  6. Multi-path parallel transfer: Split data across multiple network paths for maximum throughput
+  7. Store-and-forward: Offline/sneakernet mode — package data to removable media, verify on ingest
+  8. Composable layers: Compression-in-transit and encryption-in-transit as pluggable middleware
+  9. QoS/throttling: Bandwidth limits, priority queuing, fair-share scheduling across concurrent transfers
+  10. Cost-aware routing: Choose cheapest path vs fastest path based on configurable cost models
+  11. Transit audit trail: Log what moved where, when, how much data, which strategy, success/failure
+  12. Other plugins (DataIntegration, Replication, EdgeComputing, MultiCloud) can delegate transport to UltimateDataTransit via message bus
+**Plans**: TBD
+
+Plans:
+- [ ] 21-01: Plugin orchestrator and direct transfer strategies
+- [ ] 21-02: Chunked/resumable and delta/differential strategies
+- [ ] 21-03: P2P swarm and multi-path parallel strategies
+- [ ] 21-04: Store-and-forward, QoS, cost-aware routing
+- [ ] 21-05: Composable layers, audit trail, and cross-plugin integration
+
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8 -> 9 -> 10 -> 11 -> 12 -> 13 -> 14 -> 15 -> 16 -> 17 -> 18
+Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8 -> 9 -> 10 -> 11 -> 12 -> 13 -> 14 -> 15 -> 16 -> 17 -> 18 -> 19 -> 20 -> 21
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
@@ -418,3 +486,6 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8 -> 9 -> 10
 | 16. Testing & Quality Assurance | 0/2 | Not started | - |
 | 17. Plugin Marketplace | 0/1 | Not started | - |
 | 18. Plugin Deprecation & File Cleanup | 0/3 | Not started | - |
+| 19. Application Platform Services | 0/4 | Not started | - |
+| 20. WASM/WASI Language Ecosystem | 0/4 | Not started | - |
+| 21. UltimateDataTransit | 0/5 | Not started | - |
