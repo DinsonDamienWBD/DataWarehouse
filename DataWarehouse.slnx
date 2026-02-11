@@ -98,6 +98,7 @@
     <Project Path="Plugins/DataWarehouse.Plugins.UltimateDatabaseStorage/DataWarehouse.Plugins.UltimateDatabaseStorage.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.UltimateDataCatalog/DataWarehouse.Plugins.UltimateDataCatalog.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.UltimateDataFabric/DataWarehouse.Plugins.UltimateDataFabric.csproj" />
+    <Project Path="Plugins/DataWarehouse.Plugins.UltimateDataFormat/DataWarehouse.Plugins.UltimateDataFormat.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.UltimateDataGovernance/DataWarehouse.Plugins.UltimateDataGovernance.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.UltimateDataIntegration/DataWarehouse.Plugins.UltimateDataIntegration.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.UltimateDataLake/DataWarehouse.Plugins.UltimateDataLake.csproj" />
