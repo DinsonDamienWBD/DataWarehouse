@@ -4,8 +4,13 @@ namespace DataWarehouse.Plugins.UltimateIntelligence.Strategies.Features;
 
 /// <summary>
 /// Psychometric indexing feature strategy (T88).
-/// Analyzes content sentiment, emotional tone, and psychological patterns for advanced indexing.
+/// Analyzes content sentiment, emotional tone, psychological patterns, and deception detection for advanced indexing.
 /// </summary>
+/// <remarks>
+/// Supports optional deception detection via EnableDeception configuration.
+/// Deception analysis provides risk indicators only - not definitive lie detection.
+/// All deception signals require human review for interpretation.
+/// </remarks>
 public sealed class PsychometricIndexingStrategy : FeatureStrategyBase
 {
     /// <inheritdoc/>
@@ -24,7 +29,8 @@ public sealed class PsychometricIndexingStrategy : FeatureStrategyBase
         {
             new ConfigurationRequirement { Key = "AnalysisDepth", Description = "Analysis depth (basic|standard|deep)", Required = false, DefaultValue = "standard" },
             new ConfigurationRequirement { Key = "EmotionModel", Description = "Emotion model (ekman|plutchik|panas)", Required = false, DefaultValue = "plutchik" },
-            new ConfigurationRequirement { Key = "EnablePersonality", Description = "Enable Big Five personality inference", Required = false, DefaultValue = "false" }
+            new ConfigurationRequirement { Key = "EnablePersonality", Description = "Enable Big Five personality inference", Required = false, DefaultValue = "false" },
+            new ConfigurationRequirement { Key = "EnableDeception", Description = "Enable deception detection analysis", Required = false, DefaultValue = "false" }
         },
         CostTier = 3,
         LatencyTier = 3,
@@ -47,8 +53,9 @@ public sealed class PsychometricIndexingStrategy : FeatureStrategyBase
             var depth = GetConfig("AnalysisDepth") ?? "standard";
             var emotionModel = GetConfig("EmotionModel") ?? "plutchik";
             var enablePersonality = bool.Parse(GetConfig("EnablePersonality") ?? "false");
+            var enableDeception = bool.Parse(GetConfig("EnableDeception") ?? "false");
 
-            var prompt = BuildAnalysisPrompt(content, depth, emotionModel, enablePersonality);
+            var prompt = BuildAnalysisPrompt(content, depth, emotionModel, enablePersonality, enableDeception);
 
             var response = await AIProvider.CompleteAsync(new AIRequest
             {
@@ -59,7 +66,7 @@ public sealed class PsychometricIndexingStrategy : FeatureStrategyBase
 
             RecordTokens(response.Usage?.TotalTokens ?? 0);
 
-            var analysis = ParsePsychometricAnalysis(response.Content);
+            var analysis = ParsePsychometricAnalysis(response.Content, enableDeception);
             analysis.Content = content.Length > 200 ? content.Substring(0, 200) + "..." : content;
             analysis.AnalyzedAt = DateTime.UtcNow;
 
@@ -78,6 +85,8 @@ public sealed class PsychometricIndexingStrategy : FeatureStrategyBase
                         ["sentiment"] = analysis.Sentiment.Label,
                         ["sentiment_score"] = analysis.Sentiment.Score,
                         ["dominant_emotion"] = analysis.Emotions.OrderByDescending(e => e.Intensity).FirstOrDefault()?.Name ?? "neutral",
+                        ["deception_probability"] = analysis.DeceptionIndicators?.OverallDeceptionProbability ?? 0.0f,
+                        ["deception_enabled"] = enableDeception,
                         ["analyzed_at"] = analysis.AnalyzedAt
                     },
                     ct
@@ -220,7 +229,7 @@ Return JSON:
         });
     }
 
-    private static string BuildAnalysisPrompt(string content, string depth, string emotionModel, bool includePersonality)
+    private static string BuildAnalysisPrompt(string content, string depth, string emotionModel, bool includePersonality, bool includeDeception)
     {
         var emotionList = emotionModel switch
         {
@@ -247,6 +256,20 @@ Analyze for:
 5. Cognitive patterns (analytical, emotional, practical)";
         }
 
+        if (includeDeception)
+        {
+            var sectionNumber = (depth == "deep" || includePersonality) ? 6 : 4;
+            prompt += $@"
+{sectionNumber}. Deception Detection Analysis:
+   Analyze for deception signals:
+   - Linguistic distance: unusual word choice or phrasing (0-1)
+   - Temporal inconsistency: conflicting time references (0-1)
+   - Emotional incongruence: sentiment mismatch with topic (0-1)
+   - Overspecification: excessive unnecessary detail (0-1)
+   - Hedging language: qualifiers (maybe, possibly, sort of) (0-1)
+   Provide scores 0-1 for each signal, overall deception probability (0-1), confidence (0-1), and primary indicators.";
+        }
+
         prompt += @"
 
 Return JSON:
@@ -254,20 +277,38 @@ Return JSON:
   ""sentiment"": {""label"": ""positive/negative/neutral"", ""score"": -1.0 to 1.0},
   ""emotions"": [{""name"": ""emotion"", ""intensity"": 0.0-1.0}],
   ""writing_style"": {""formality"": 0.0-1.0, ""complexity"": 0.0-1.0},
-  ""cognitive_patterns"": [""pattern1"", ""pattern2""]
+  ""cognitive_patterns"": [""pattern1"", ""pattern2""]";
+
+        if (includeDeception)
+        {
+            prompt += @",
+  ""deception"": {
+    ""linguistic_distance"": 0.0-1.0,
+    ""temporal_inconsistency"": 0.0-1.0,
+    ""emotional_incongruence"": 0.0-1.0,
+    ""overspecification"": 0.0-1.0,
+    ""hedging_language"": 0.0-1.0,
+    ""overall_probability"": 0.0-1.0,
+    ""confidence"": 0.0-1.0,
+    ""primary_indicators"": ""description""
+  }";
+        }
+
+        prompt += @"
 }";
 
         return prompt;
     }
 
-    private static PsychometricAnalysis ParsePsychometricAnalysis(string response)
+    private static PsychometricAnalysis ParsePsychometricAnalysis(string response, bool includeDeception)
     {
         var analysis = new PsychometricAnalysis
         {
             Sentiment = new SentimentScore { Label = "neutral", Score = 0 },
             Emotions = new List<EmotionScore>(),
             WritingStyle = new WritingStyleMetrics(),
-            CognitivePatterns = new List<string>()
+            CognitivePatterns = new List<string>(),
+            DeceptionIndicators = null
         };
 
         try
@@ -315,6 +356,21 @@ Return JSON:
                         .Select(p => p.GetString() ?? "")
                         .Where(p => !string.IsNullOrEmpty(p))
                         .ToList();
+                }
+
+                if (includeDeception && doc.RootElement.TryGetProperty("deception", out var deception))
+                {
+                    analysis.DeceptionIndicators = new DeceptionSignals
+                    {
+                        LinguisticDistanceScore = deception.TryGetProperty("linguistic_distance", out var ld) ? ld.GetSingle() : 0.0f,
+                        TemporalInconsistencyScore = deception.TryGetProperty("temporal_inconsistency", out var ti) ? ti.GetSingle() : 0.0f,
+                        EmotionalIncongruenceScore = deception.TryGetProperty("emotional_incongruence", out var ei) ? ei.GetSingle() : 0.0f,
+                        OverspecificationScore = deception.TryGetProperty("overspecification", out var os) ? os.GetSingle() : 0.0f,
+                        HedgingLanguageScore = deception.TryGetProperty("hedging_language", out var hl) ? hl.GetSingle() : 0.0f,
+                        OverallDeceptionProbability = deception.TryGetProperty("overall_probability", out var op) ? op.GetSingle() : 0.0f,
+                        AssessmentConfidence = deception.TryGetProperty("confidence", out var conf) ? conf.GetSingle() : 0.0f,
+                        PrimaryIndicators = deception.TryGetProperty("primary_indicators", out var pi) ? pi.GetString() : null
+                    };
                 }
             }
         }
