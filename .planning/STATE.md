@@ -5,14 +5,14 @@
 See: .planning/PROJECT.md (updated 2026-02-10)
 
 **Core value:** Every feature listed in the task tracker must be fully production-ready — no placeholders, no simulations, no stubs, no deferred logic. The codebase must match what the task list claims is "complete."
-**Current focus:** Phase 17 Plan 01 COMPLETE — Plugin Marketplace (T57) with catalog, message handlers, dependency resolution
+**Current focus:** Phase 19 Plan 02 COMPLETE — Per-app access policy isolation and service routing
 
 ## Current Position
 
-Phase: 17 of 22 (Plugin Marketplace)
-Plan: 1 of 3 in Phase 17 (17-01 COMPLETE)
-Status: 17-01 COMPLETE — PluginMarketplacePlugin with persistent JSON catalog, 4 GUI message handlers, topological sort dependency resolution, version archiving with rollback
-Last activity: 2026-02-11 — Completed 17-01: Plugin Marketplace (T57)
+Phase: 19 of 22 (Application Platform Services)
+Plan: 2 of 4 in Phase 19 (19-02 COMPLETE)
+Status: 19-02 COMPLETE — AppAccessPolicy (RBAC/ABAC/MAC/DAC/PBAC), AppContextRouter (token+scope+status validation), 6 service routes + 4 policy handlers
+Last activity: 2026-02-11 — Completed 19-02: Access Policy Isolation and Service Routing
 
 Progress: [######----] 65%
 
@@ -102,6 +102,7 @@ Progress: [######----] 65%
 | Phase 13 P04 | 5 min | 2 tasks | 2 files |
 | Phase 13 P05 | 5 min | 2 tasks | 2 files |
 | Phase 19 P01 | 4 min | 2 tasks | 8 files |
+| Phase 19 P02 | 5 min | 2 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -202,6 +203,7 @@ Recent decisions affecting current work:
 - [Phase 13-04]: 4 Semantic Intelligence strategies (T146.B4) implemented -- SemanticMeaningExtractor (regex entity extraction, keyword frequency, domain dictionaries), ContextualRelevance (TF-IDF term weighting, cosine similarity), DomainKnowledgeIntegrator (glossary word boundary matching, business rule detection), CrossSystemSemanticMatch (name normalization, prefix stripping, shared char ratio, sample value overlap); all internal sealed to avoid type conflicts with existing DataSemanticStrategies.cs
 - [Phase 13-05]: 4 Intelligent Governance strategies (T146.B5) implemented -- PolicyRecommendationStrategy (scored template matching: 50% sensitivity + 30% framework + 20% risk, 5 seeded templates), ComplianceGapDetectorStrategy (GDPR 5 + HIPAA 5 + PCI-DSS 4 = 14 requirements), SensitivityClassifierStrategy (9 compiled regex rules for PII/PHI/PCI across 3 sensitivity levels), RetentionOptimizerStrategy (value scoring: 30% access frequency + 30% recency + 40% criticality, 4 regulatory minimums); changed nested records from internal to public for method accessibility
 - [Phase 19-01]: AppPlatform plugin uses IntelligenceAwarePluginBase for T90 integration; SHA256.HashData for token hashing; 30s validation cache TTL; tenant provisioning via accesscontrol.tenant.register message bus topic
+- [Phase 19-02]: Per-app access policy supports 5 models (RBAC/ABAC/MAC/DAC/PBAC); AppContextRouter validates token + scope + app status in 3-step pipeline; enriched messages include AppId, AppContext, ServiceTokenId; policy topics use platform.policy.* prefix distinct from accesscontrol.policy.* downstream topics
 - [Phase 12-01]: AEDS core plugins verified - Http2DataPlanePlugin 100% production-ready (0 TODOs, full HTTP/2 implementation), 3 core plugins 75-85% complete with critical P0 gaps: signature verification in AedsCorePlugin/ClientCourierPlugin requires T94 UltimateKeyManagement integration, Control Plane wiring in ServerDispatcherPlugin uses Task.Delay simulation; 6 TODOs identified, 3 require immediate fix before production use
 - [Phase 17-01]: T57 Plugin Marketplace complete -- PluginMarketplacePlugin (2000 lines) with 4 GUI message handlers (list/install/uninstall/update), topological sort dependency resolution, version archiving with rollback, persistent JSON catalog, 21 built-in plugin definitions; uses built-in catalog population instead of runtime reflection scanning
 
@@ -217,6 +219,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-02-11 (Phase 17 Plan 01 COMPLETE)
-Stopped at: Completed 17-01-PLAN.md (Plugin Marketplace T57)
-Resume file: Phase 17 Plan 01 complete. Ready for 17-02.
+Last session: 2026-02-11 (Phase 19 Plan 02 COMPLETE)
+Stopped at: Completed 19-02-PLAN.md (Access Policy Isolation and Service Routing)
+Resume file: Phase 19 Plan 02 complete. Ready for 19-03.
