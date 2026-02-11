@@ -268,11 +268,11 @@ Plans:
 **Success Criteria** (what must be TRUE):
   1. AR spatial anchors bind data to GPS coordinates with SLAM support and proximity verification
   2. Psychometric indexing extracts sentiment, emotion, and deception detection signals from content
-**Plans**: TBD
+**Plans**: 2 plans in 1 wave
 
 Plans:
-- [ ] 11-01: Verify and complete AR spatial anchors (T87)
-- [ ] 11-02: Verify and complete psychometric indexing (T88)
+- [ ] 11-01-PLAN.md — Implement AR spatial anchors with GPS + SLAM + proximity verification (T87)
+- [ ] 11-02-PLAN.md — Enhance psychometric indexing with deception detection signals (T88)
 
 ### Phase 12: AEDS System
 **Goal**: Autonomous Edge Distribution System is complete with all core, control plane, data plane, and extensions
