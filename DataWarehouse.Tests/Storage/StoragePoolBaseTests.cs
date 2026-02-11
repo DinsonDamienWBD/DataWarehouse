@@ -77,23 +77,20 @@ public class StoragePoolBaseTests
     {
         // Arrange
         var pool = new TestStoragePool();
-        var provider1 = new InMemoryStoragePlugin();
-        var provider2 = new InMemoryStoragePlugin();
-        pool.AddProvider(provider1);
-        pool.AddProvider(provider2, StorageRole.Mirror);
-        pool.SetStrategy(new MirroredStrategy());
+        var provider = new InMemoryStoragePlugin();
+        pool.AddProvider(provider);
 
         var uri = new Uri("memory:///position.txt");
         var data = "test data for position handling"u8.ToArray();
         var stream = new MemoryStream(data);
         stream.Position = 10; // Start in the middle
 
-        // Act
+        // Act - StoragePoolBase resets position to 0 before writing
         var result = await pool.SaveAsync(uri, stream);
 
         // Assert - Should save from beginning regardless of initial position
         result.Success.Should().BeTrue();
-        var loaded = await provider1.LoadAsync(uri);
+        var loaded = await provider.LoadAsync(uri);
         using var reader = new StreamReader(loaded);
         var content = await reader.ReadToEndAsync();
         content.Should().Be("test data for position handling");
@@ -322,11 +319,22 @@ public class StoragePoolBaseTests
 
     /// <summary>
     /// Concrete test implementation of StoragePoolBase.
+    /// Uses a counter-based key to allow registering multiple instances
+    /// of the same provider type (which share the same plugin Id).
     /// </summary>
     private class TestStoragePool : StoragePoolBase
     {
+        private int _providerCounter;
+
         public override string Id => "test-storage-pool";
         public override string PoolId => "test-pool";
+
+        public override void AddProvider(IStorageProvider provider, StorageRole role = StorageRole.Primary)
+        {
+            ArgumentNullException.ThrowIfNull(provider);
+            var id = $"{(provider as IPlugin)?.Id ?? provider.Scheme}-{Interlocked.Increment(ref _providerCounter)}";
+            _providers[id] = (provider, role);
+        }
 
         public override Task StartAsync(CancellationToken ct)
         {

@@ -40,27 +40,15 @@
     <ProjectReference Include="..\Plugins\DataWarehouse.Plugins.UltimateAccessControl\DataWarehouse.Plugins.UltimateAccessControl.csproj" />
     <ProjectReference Include="..\Plugins\DataWarehouse.Plugins.UltimateCompliance\DataWarehouse.Plugins.UltimateCompliance.csproj" />
     <ProjectReference Include="..\Plugins\DataWarehouse.Plugins.Raft\DataWarehouse.Plugins.Raft.csproj" />
-  </ItemGroup>
-
-  <!-- Exclude test files for removed functionality to fix build errors -->
-  <ItemGroup>
-    <Compile Remove="Infrastructure\CircuitBreakerPolicyTests.cs" />
-    <Compile Remove="Infrastructure\MetricsCollectorTests.cs" />
-    <Compile Remove="Infrastructure\TokenBucketRateLimiterTests.cs" />
-    <Compile Remove="Infrastructure\SdkInfrastructureTests.cs" />
-    <Compile Remove="Telemetry\DistributedTracingTests.cs" />
-    <Compile Remove="Hyperscale\ErasureCodingTests.cs" />
-    <Compile Remove="Storage\DurableStateTests.cs" />
-    <Compile Remove="Kernel\DataWarehouseKernelTests.cs" />
-    <Compile Remove="Database\RelationalDatabasePluginTests.cs" />
-    <Compile Remove="Database\EmbeddedDatabasePluginTests.cs" />
-    <Compile Remove="Infrastructure\CodeCleanupVerificationTests.cs" />
-    <Compile Remove="Integration\KernelIntegrationTests.cs" />
-    <Compile Remove="Messaging\AdvancedMessageBusTests.cs" />
-    <Compile Remove="PluginTests.cs" />
-    <Compile Remove="Pipeline\PipelineOrchestratorTests.cs" />
-    <Compile Remove="Replication\GeoReplicationPluginTests.cs" />
-    <Compile Remove="Security\MpcStrategyTests.cs" />
+    <ProjectReference Include="..\Plugins\DataWarehouse.Plugins.UltimateEncryption\DataWarehouse.Plugins.UltimateEncryption.csproj" />
+    <ProjectReference Include="..\Plugins\DataWarehouse.Plugins.UltimateCompression\DataWarehouse.Plugins.UltimateCompression.csproj" />
+    <ProjectReference Include="..\Plugins\DataWarehouse.Plugins.UltimateStorage\DataWarehouse.Plugins.UltimateStorage.csproj" />
+    <ProjectReference Include="..\Plugins\DataWarehouse.Plugins.UltimateRAID\DataWarehouse.Plugins.UltimateRAID.csproj" />
+    <ProjectReference Include="..\Plugins\DataWarehouse.Plugins.UltimateReplication\DataWarehouse.Plugins.UltimateReplication.csproj" />
+    <ProjectReference Include="..\Plugins\DataWarehouse.Plugins.UltimateKeyManagement\DataWarehouse.Plugins.UltimateKeyManagement.csproj" />
+    <ProjectReference Include="..\Plugins\DataWarehouse.Plugins.UltimateInterface\DataWarehouse.Plugins.UltimateInterface.csproj" />
+    <ProjectReference Include="..\Plugins\DataWarehouse.Plugins.UltimateIntelligence\DataWarehouse.Plugins.UltimateIntelligence.csproj" />
+    <ProjectReference Include="..\Plugins\DataWarehouse.Plugins.TamperProof\DataWarehouse.Plugins.TamperProof.csproj" />
   </ItemGroup>
 
 </Project>

@@ -119,8 +119,6 @@ public class PluginDiscoveryServiceTests
     {
         _loggerMock = new Mock<ILogger<TestPluginDiscoveryService>>();
         _configMock = new Mock<IConfiguration>();
-        _configMock.Setup(c => c.GetValue<string>("PluginsDirectory", It.IsAny<string>()))
-            .Returns((string)null!);
         _service = new TestPluginDiscoveryService(_loggerMock.Object, _configMock.Object);
     }
 

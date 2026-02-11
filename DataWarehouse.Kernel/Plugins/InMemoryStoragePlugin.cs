@@ -429,7 +429,8 @@ namespace DataWarehouse.Kernel.Plugins
             if (_config.MaxMemoryBytes.HasValue && TotalSizeBytes >= _config.MaxMemoryBytes.Value * 0.95)
                 return EvictionReason.MemoryLimit;
 
-            if (_config.MaxItemCount.HasValue && _storage.Count >= _config.MaxItemCount.Value)
+            // Check item count limit; use Count + 1 because the evicted item was already removed
+            if (_config.MaxItemCount.HasValue && (_storage.Count + 1) >= _config.MaxItemCount.Value)
                 return EvictionReason.ItemCountLimit;
 
             if (IsUnderMemoryPressure)
@@ -604,6 +605,7 @@ namespace DataWarehouse.Kernel.Plugins
         public void Clear()
         {
             _storage.Clear();
+            Interlocked.Exchange(ref _currentSizeBytes, 0);
         }
 
         /// <summary>
