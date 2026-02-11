@@ -12074,31 +12074,31 @@ public enum DeliverySemantics { AtMostOnce, AtLeastOnce, ExactlyOnce }
 | 113.B3.6 | ⭐ ZigbeeStrategy - Zigbee | [x] |
 | 113.B3.7 | ⭐ MatterStrategy - Matter (smart home) | [ ] |
 | **B4: Industrial Protocols** |
-| 113.B4.1 | ⭐ OpcUaStrategy - OPC-UA | [ ] |
+| 113.B4.1 | ⭐ OpcUaStrategy - OPC-UA | [x] |
 | 113.B4.2 | ⭐ OpcDaStrategy - OPC-DA (legacy) | [ ] |
-| 113.B4.3 | ⭐ ModbusStrategy - Modbus TCP/RTU | [ ] |
+| 113.B4.3 | ⭐ ModbusStrategy - Modbus TCP/RTU | [x] |
 | 113.B4.4 | ⭐ BacNetStrategy - BACnet | [ ] |
 | 113.B4.5 | ⭐ Profinet Strategy - PROFINET | [ ] |
 | 113.B4.6 | ⭐ EtherNetIpStrategy - EtherNet/IP | [ ] |
 | 113.B4.7 | ⭐ Iec61850Strategy - IEC 61850 (power grid) | [ ] |
 | 113.B4.8 | ⭐ DnpStrategy - DNP3 (utilities) | [ ] |
 | **B5: Healthcare/Medical Protocols** |
-| 113.B5.1 | ⭐ Hl7Strategy - HL7 v2 messages | [ ] |
-| 113.B5.2 | ⭐ FhirStreamStrategy - FHIR event streams | [ ] |
+| 113.B5.1 | ⭐ Hl7Strategy - HL7 v2 messages | [x] |
+| 113.B5.2 | ⭐ FhirStreamStrategy - FHIR event streams | [x] |
 | 113.B5.3 | ⭐ IcuMonitorStrategy - ICU monitor data | [ ] |
 | 113.B5.4 | ⭐ WaveformStrategy - Medical waveforms | [ ] |
 | 113.B5.5 | ⭐ DicomStreamStrategy - DICOM streaming | [ ] |
 | **B6: Financial/Trading Protocols** |
-| 113.B6.1 | ⭐ FixStrategy - FIX protocol | [ ] |
+| 113.B6.1 | ⭐ FixStrategy - FIX protocol | [x] |
 | 113.B6.2 | ⭐ FastStrategy - FAST (market data) | [ ] |
 | 113.B6.3 | ⭐ SbeMarketDataStrategy - SBE market data | [ ] |
 | 113.B6.4 | ⭐ TickDataStrategy - Tick-by-tick data | [ ] |
 | 113.B6.5 | ⭐ OrderBookStrategy - Order book updates | [ ] |
 | 113.B6.6 | ⭐ CryptoExchangeStrategy - Crypto exchange feeds | [ ] |
 | **B7: Cloud Event Streaming** |
-| 113.B7.1 | ⭐ AwsKinesisStrategy - AWS Kinesis | [ ] |
-| 113.B7.2 | ⭐ AzureEventHubsStrategy - Azure Event Hubs | [ ] |
-| 113.B7.3 | ⭐ GcpPubSubStrategy - GCP Pub/Sub | [ ] |
+| 113.B7.1 | ⭐ AwsKinesisStrategy - AWS Kinesis | [x] |
+| 113.B7.2 | ⭐ AzureEventHubsStrategy - Azure Event Hubs | [x] |
+| 113.B7.3 | ⭐ GcpPubSubStrategy - GCP Pub/Sub | [x] |
 | 113.B7.4 | ⭐ CloudEventsStrategy - CloudEvents format | [ ] |
 | 113.B7.5 | ⭐ EventBridgeStrategy - AWS EventBridge | [ ] |
 | **B8: Streaming Semantics** |
