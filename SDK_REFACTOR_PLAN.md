@@ -31,7 +31,7 @@ This refactored structure ensures a clean and maintainable codebase by promoting
 
 # Tasks
 ## Phase 1: Refactor PluginBase and Create IntelligentPluginBase
-- [ ] - [ ] Upgrade PluginBase class with all common functionalities.
+- [ ] Upgrade PluginBase class with all common functionalities.
 - [ ] Make sure PluginBase class has Knowledge Registry & Capability Registry and the necessary registeration methods implemented.
 - [ ] Make sure UltimateIntelligence plugin inherits from PluginBase.
 - [ ] Create IntelligentPluginBase class that extends PluginBase.
