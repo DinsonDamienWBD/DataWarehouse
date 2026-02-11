@@ -323,7 +323,7 @@ T99 (SDK) → T94 (Key Mgmt) → T93 (Encryption) → TamperProof (T3.4.2)
 
 | Order | Task | Name | Description | Dependencies | Status |
 |-------|------|------|-------------|--------------|--------|
-| **7.1** | T108 | Plugin Deprecation & Cleanup | Remove 127+ deprecated plugins (Analysis complete - see .planning/phases/18-plugin-cleanup/DEPRECATION-ANALYSIS.md) | All Ultimate plugins verified | [~] Scoped - Execution in Phase 18 |
+| **7.1** | T108 | Plugin Deprecation & Cleanup | Remove 127+ deprecated plugins (Analysis complete - see .planning/phases/18-plugin-cleanup/DEPRECATION-ANALYSIS.md) | All Ultimate plugins verified | [x] Complete - Phase 18 removed 88 deprecated plugins (66 slnx entries + 88 directories), 200K+ lines eliminated, 60 plugins remain |
 
 ---
 
