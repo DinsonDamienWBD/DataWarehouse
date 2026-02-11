@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
 using System.Threading;
@@ -296,23 +297,39 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Steganography
                 throw new InvalidDataException("No steganographic marker found in text");
             }
 
+            // Extract base64 length between markers (filter out whitespace/newlines)
             var lengthStr = text.Substring(markerStart + 1, markerEnd - markerStart - 1);
-            int dataLength = BitConverter.ToInt32(Convert.FromBase64String(lengthStr), 0);
+            lengthStr = new string(lengthStr.Where(c => !char.IsWhiteSpace(c)).ToArray());
+
+            if (string.IsNullOrEmpty(lengthStr))
+            {
+                throw new InvalidDataException("Invalid length marker in steganographic text");
+            }
+
+            int dataLength;
+            try
+            {
+                dataLength = BitConverter.ToInt32(Convert.FromBase64String(lengthStr), 0);
+            }
+            catch (FormatException)
+            {
+                throw new InvalidDataException("Invalid base64 encoding in length marker");
+            }
 
             if (dataLength < 0 || dataLength > 10_000_000)
             {
                 throw new InvalidDataException("Invalid data length in steganographic text");
             }
 
-            // Extract from whitespace
+            // Extract from whitespace (only up to first marker to avoid processing base64 content)
             var result = new byte[dataLength];
             int dataIndex = 0;
             int bitIndex = 0;
 
-            foreach (char c in text)
+            // Only process characters before the first marker
+            for (int i = 0; i < markerStart && dataIndex < dataLength; i++)
             {
-                if (dataIndex >= dataLength)
-                    break;
+                char c = text[i];
 
                 if (c == ' ')
                 {
@@ -345,6 +362,294 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Steganography
         }
 
         /// <summary>
+        /// Hides data within audio using LSB embedding in PCM samples.
+        /// </summary>
+        /// <param name="carrierData">The carrier audio data (WAV format).</param>
+        /// <param name="secretData">The data to hide.</param>
+        /// <param name="encrypt">Whether to encrypt the secret data before embedding.</param>
+        /// <returns>The carrier with hidden data.</returns>
+        public byte[] HideInAudio(byte[] carrierData, byte[] secretData, bool encrypt = true)
+        {
+            var dataToHide = PrepareDataForHiding(secretData, encrypt);
+
+            // WAV header is typically 44 bytes
+            int wavHeaderSize = 44;
+            if (carrierData.Length < wavHeaderSize + 1000)
+            {
+                throw new InvalidOperationException("Audio carrier too small");
+            }
+
+            // Verify WAV signature
+            if (carrierData[0] != 'R' || carrierData[1] != 'I' || carrierData[2] != 'F' || carrierData[3] != 'F')
+            {
+                throw new InvalidOperationException("Audio carrier must be in WAV format");
+            }
+
+            var minCarrierSize = (dataToHide.Length + HeaderSize) * 8 + wavHeaderSize;
+            if (carrierData.Length < minCarrierSize)
+            {
+                throw new InvalidOperationException(
+                    $"Audio carrier too small. Need at least {minCarrierSize} bytes, got {carrierData.Length}");
+            }
+
+            // Create a copy of the carrier
+            var result = new byte[carrierData.Length];
+            Array.Copy(carrierData, result, carrierData.Length);
+
+            // Create header
+            var header = new byte[HeaderSize];
+            Array.Copy(Magic, 0, header, 0, 4);
+            BitConverter.GetBytes(dataToHide.Length).CopyTo(header, 4);
+            var checksum = ComputeChecksum(dataToHide);
+            BitConverter.GetBytes(checksum).CopyTo(header, 8);
+
+            // Combine header and data
+            var payload = new byte[header.Length + dataToHide.Length];
+            Array.Copy(header, 0, payload, 0, header.Length);
+            Array.Copy(dataToHide, 0, payload, header.Length, dataToHide.Length);
+
+            // Embed using LSB in audio samples (skip WAV header)
+            int bitIndex = 0;
+            for (int i = wavHeaderSize; i < result.Length && bitIndex < payload.Length * 8; i++)
+            {
+                int byteIndex = bitIndex / 8;
+                int bitPosition = 7 - (bitIndex % 8);
+                int bit = (payload[byteIndex] >> bitPosition) & 1;
+
+                result[i] = (byte)((result[i] & 0xFE) | bit);
+                bitIndex++;
+            }
+
+            if (bitIndex < payload.Length * 8)
+            {
+                throw new InvalidOperationException("Audio carrier too small to hold all secret data");
+            }
+
+            return result;
+        }
+
+        /// <summary>
+        /// Extracts hidden data from audio carrier.
+        /// </summary>
+        /// <param name="carrierData">The carrier audio with hidden data.</param>
+        /// <param name="decrypt">Whether to decrypt the extracted data.</param>
+        /// <returns>The extracted secret data.</returns>
+        public byte[] ExtractFromAudio(byte[] carrierData, bool decrypt = true)
+        {
+            int wavHeaderSize = 44;
+            if (carrierData.Length < wavHeaderSize + HeaderSize * 8)
+            {
+                throw new InvalidOperationException("Audio carrier too small");
+            }
+
+            // Extract header first
+            var header = new byte[HeaderSize];
+            int bitIndex = 0;
+            for (int i = wavHeaderSize; i < carrierData.Length && bitIndex < HeaderSize * 8; i++)
+            {
+                int byteIndex = bitIndex / 8;
+                int bitPosition = 7 - (bitIndex % 8);
+                int bit = carrierData[i] & 1;
+
+                header[byteIndex] |= (byte)(bit << bitPosition);
+                bitIndex++;
+            }
+
+            // Verify magic
+            if (header[0] != Magic[0] || header[1] != Magic[1] ||
+                header[2] != Magic[2] || header[3] != Magic[3])
+            {
+                throw new InvalidDataException("No steganographic data found in audio carrier");
+            }
+
+            // Extract length
+            int dataLength = BitConverter.ToInt32(header, 4);
+            if (dataLength < 0 || dataLength > 100_000_000)
+            {
+                throw new InvalidDataException("Invalid data length in steganographic header");
+            }
+
+            uint expectedChecksum = BitConverter.ToUInt32(header, 8);
+
+            // Extract data
+            var extractedData = new byte[dataLength];
+            int extractBitIndex = 0;
+            int skipBits = HeaderSize * 8;
+            bitIndex = 0;
+
+            for (int i = wavHeaderSize; i < carrierData.Length && extractBitIndex < dataLength * 8; i++)
+            {
+                if (bitIndex >= skipBits)
+                {
+                    int byteIndex = extractBitIndex / 8;
+                    int bitPosition = 7 - (extractBitIndex % 8);
+                    int bit = carrierData[i] & 1;
+
+                    extractedData[byteIndex] |= (byte)(bit << bitPosition);
+                    extractBitIndex++;
+                }
+                bitIndex++;
+            }
+
+            // Verify checksum
+            uint actualChecksum = ComputeChecksum(extractedData);
+            if (actualChecksum != expectedChecksum)
+            {
+                throw new InvalidDataException("Checksum verification failed - data may be corrupted");
+            }
+
+            // Decrypt if needed
+            if (decrypt && _encryptionKey != null)
+            {
+                return DecryptData(extractedData);
+            }
+
+            return extractedData;
+        }
+
+        /// <summary>
+        /// Hides data within video by embedding in frame data (simplified keyframe LSB).
+        /// </summary>
+        /// <param name="carrierData">The carrier video data.</param>
+        /// <param name="secretData">The data to hide.</param>
+        /// <param name="encrypt">Whether to encrypt the secret data before embedding.</param>
+        /// <returns>The carrier with hidden data.</returns>
+        public byte[] HideInVideo(byte[] carrierData, byte[] secretData, bool encrypt = true)
+        {
+            var dataToHide = PrepareDataForHiding(secretData, encrypt);
+
+            // For simplicity, embed in video container data using LSB
+            // Production implementation would parse video codec frames
+            int videoHeaderSize = 512; // Conservative estimate for video headers
+
+            if (carrierData.Length < videoHeaderSize + 1000)
+            {
+                throw new InvalidOperationException("Video carrier too small");
+            }
+
+            var minCarrierSize = (dataToHide.Length + HeaderSize) * 8 + videoHeaderSize;
+            if (carrierData.Length < minCarrierSize)
+            {
+                throw new InvalidOperationException(
+                    $"Video carrier too small. Need at least {minCarrierSize} bytes, got {carrierData.Length}");
+            }
+
+            // Create a copy of the carrier
+            var result = new byte[carrierData.Length];
+            Array.Copy(carrierData, result, carrierData.Length);
+
+            // Create header
+            var header = new byte[HeaderSize];
+            Array.Copy(Magic, 0, header, 0, 4);
+            BitConverter.GetBytes(dataToHide.Length).CopyTo(header, 4);
+            var checksum = ComputeChecksum(dataToHide);
+            BitConverter.GetBytes(checksum).CopyTo(header, 8);
+
+            // Combine header and data
+            var payload = new byte[header.Length + dataToHide.Length];
+            Array.Copy(header, 0, payload, 0, header.Length);
+            Array.Copy(dataToHide, 0, payload, header.Length, dataToHide.Length);
+
+            // Embed using LSB (skip video header region)
+            int bitIndex = 0;
+            for (int i = videoHeaderSize; i < result.Length && bitIndex < payload.Length * 8; i++)
+            {
+                int byteIndex = bitIndex / 8;
+                int bitPosition = 7 - (bitIndex % 8);
+                int bit = (payload[byteIndex] >> bitPosition) & 1;
+
+                result[i] = (byte)((result[i] & 0xFE) | bit);
+                bitIndex++;
+            }
+
+            if (bitIndex < payload.Length * 8)
+            {
+                throw new InvalidOperationException("Video carrier too small to hold all secret data");
+            }
+
+            return result;
+        }
+
+        /// <summary>
+        /// Extracts hidden data from video carrier.
+        /// </summary>
+        /// <param name="carrierData">The carrier video with hidden data.</param>
+        /// <param name="decrypt">Whether to decrypt the extracted data.</param>
+        /// <returns>The extracted secret data.</returns>
+        public byte[] ExtractFromVideo(byte[] carrierData, bool decrypt = true)
+        {
+            int videoHeaderSize = 512;
+            if (carrierData.Length < videoHeaderSize + HeaderSize * 8)
+            {
+                throw new InvalidOperationException("Video carrier too small");
+            }
+
+            // Extract header first
+            var header = new byte[HeaderSize];
+            int bitIndex = 0;
+            for (int i = videoHeaderSize; i < carrierData.Length && bitIndex < HeaderSize * 8; i++)
+            {
+                int byteIndex = bitIndex / 8;
+                int bitPosition = 7 - (bitIndex % 8);
+                int bit = carrierData[i] & 1;
+
+                header[byteIndex] |= (byte)(bit << bitPosition);
+                bitIndex++;
+            }
+
+            // Verify magic
+            if (header[0] != Magic[0] || header[1] != Magic[1] ||
+                header[2] != Magic[2] || header[3] != Magic[3])
+            {
+                throw new InvalidDataException("No steganographic data found in video carrier");
+            }
+
+            // Extract length
+            int dataLength = BitConverter.ToInt32(header, 4);
+            if (dataLength < 0 || dataLength > 100_000_000)
+            {
+                throw new InvalidDataException("Invalid data length in steganographic header");
+            }
+
+            uint expectedChecksum = BitConverter.ToUInt32(header, 8);
+
+            // Extract data
+            var extractedData = new byte[dataLength];
+            int extractBitIndex = 0;
+            int skipBits = HeaderSize * 8;
+            bitIndex = 0;
+
+            for (int i = videoHeaderSize; i < carrierData.Length && extractBitIndex < dataLength * 8; i++)
+            {
+                if (bitIndex >= skipBits)
+                {
+                    int byteIndex = extractBitIndex / 8;
+                    int bitPosition = 7 - (extractBitIndex % 8);
+                    int bit = carrierData[i] & 1;
+
+                    extractedData[byteIndex] |= (byte)(bit << bitPosition);
+                    extractBitIndex++;
+                }
+                bitIndex++;
+            }
+
+            // Verify checksum
+            uint actualChecksum = ComputeChecksum(extractedData);
+            if (actualChecksum != expectedChecksum)
+            {
+                throw new InvalidDataException("Checksum verification failed - data may be corrupted");
+            }
+
+            // Decrypt if needed
+            if (decrypt && _encryptionKey != null)
+            {
+                return DecryptData(extractedData);
+            }
+
+            return extractedData;
+        }
+
+        /// <summary>
         /// Estimates the capacity of a carrier for hidden data.
         /// </summary>
         public long EstimateCapacity(byte[] carrierData, CarrierType type)
@@ -353,6 +658,7 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Steganography
             {
                 CarrierType.Image => (carrierData.Length - 100) / 8 - HeaderSize,
                 CarrierType.Audio => (carrierData.Length - 44) / 8 - HeaderSize, // Skip WAV header
+                CarrierType.Video => (carrierData.Length - 512) / 8 - HeaderSize, // Skip video headers
                 CarrierType.Text => carrierData.Length / 10, // Approximate
                 _ => carrierData.Length / 8 - HeaderSize
             };
