@@ -409,13 +409,13 @@ Plans:
   5. Per-app observability — each app's telemetry is isolated and viewable independently via UniversalObservability
   6. DW routes incoming service requests to the correct app context based on app ID in the request
   7. Service consumption API exposes: Storage, Access Control, Intelligence, Observability, Replication, Compliance as app-consumable services
-**Plans**: 7 plans in 1 wave
+**Plans**: 4 plans in 3 waves
 
 Plans:
-- [ ] 19-01: App registration model and service token management
-- [ ] 19-02: Per-app access control policy isolation
-- [ ] 19-03: Per-app AI workflow configuration and routing
-- [ ] 19-04: Per-app observability isolation and service consumption API
+- [ ] 19-01-PLAN.md — App registration model, service token management, and AppPlatform plugin foundation (PLATFORM-01)
+- [ ] 19-02-PLAN.md — Per-app access control policy isolation and service request routing (PLATFORM-02)
+- [ ] 19-03-PLAN.md — Per-app AI workflow configuration, budget enforcement, and Intelligence routing (PLATFORM-02)
+- [ ] 19-04-PLAN.md — Per-app observability isolation and unified service consumption API (PLATFORM-03)
 
 ### Phase 20: WASM/WASI Language Ecosystem
 **Goal**: Verify and ensure DW's compute-on-data/code-on-data WASM/WASI runtime supports all major languages that can compile to WASM/WASI
@@ -487,6 +487,6 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8 -> 9 -> 10
 | 16. Testing & Quality Assurance | 0/2 | Not started | - |
 | 17. Plugin Marketplace | 0/3 | Planned | - |
 | 18. Plugin Deprecation & File Cleanup | 0/3 | Not started | - |
-| 19. Application Platform Services | 0/4 | Not started | - |
+| 19. Application Platform Services | 0/4 | Planned | - |
 | 20. WASM/WASI Language Ecosystem | 0/4 | Not started | - |
 | 21. UltimateDataTransit | 0/5 | Not started | - |
