@@ -5,23 +5,23 @@
 See: .planning/PROJECT.md (updated 2026-02-10)
 
 **Core value:** Every feature listed in the task tracker must be fully production-ready — no placeholders, no simulations, no stubs, no deferred logic. The codebase must match what the task list claims is "complete."
-**Current focus:** Phase 20 IN PROGRESS — WASM/WASI Language Ecosystem (Plan 01 of 4 complete)
+**Current focus:** Phase 21 IN PROGRESS — Data Transit (Plan 01 of 5 complete)
 
 ## Current Position
 
-Phase: 20 of 22 (WASM/WASI Language Ecosystem) IN PROGRESS
-Plan: 1 of 4 in Phase 20 (20-01 COMPLETE)
-Status: 20-01 COMPLETE — WasmLanguageStrategyBase + 7 Tier 1 language strategies (Rust/C/C++/.NET/Go/AssemblyScript/Zig) with production-ready toolchain metadata
-Last activity: 2026-02-11 — Completed 20-01: Tier 1 WASM Language Strategies
+Phase: 21 of 22 (Data Transit) IN PROGRESS
+Plan: 1 of 5 in Phase 21 (21-01 COMPLETE)
+Status: 21-01 COMPLETE — SDK transit contracts + UltimateDataTransit plugin with orchestrator, registry, and 6 direct strategies (HTTP/2, HTTP/3, gRPC, FTP, SFTP, SCP/rsync)
+Last activity: 2026-02-11 — Completed 21-01: Data Transit Foundation
 
 Progress: [######----] 67%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 58
+- Total plans completed: 59
 - Average duration: 8 min
-- Total execution time: ~8.1 hours
+- Total execution time: ~8.3 hours
 
 **By Phase:**
 
@@ -107,6 +107,7 @@ Progress: [######----] 67%
 | Phase 17 P03 | 5 min | 2 tasks | 1 files |
 | Phase 19 P04 | 6 min | 2 tasks | 6 files |
 | Phase 20 P01 | 6 min | 2 tasks | 9 files |
+| Phase 21 P01 | 11 min | 2 tasks | 15 files |
 
 ## Accumulated Context
 
@@ -215,6 +216,7 @@ Recent decisions affecting current work:
 - [Phase 17-02]: T57 certification + reviews + revenue complete -- 5-stage certification pipeline (Security Scan/SDK Compat/Deps/Static Analysis/Scoring) with kernel.plugin.validate message bus integration; multi-dimensional review system (reliability/performance/documentation ratings); decimal-precision revenue tracking with 30% commission; review data flows to GUI via marketplace.list
 - [Phase 17-03]: T57 usage analytics complete -- event-based tracking (PluginUsageEvent with 7 event types) wired into install/uninstall/update handlers; hourly timer-based aggregation computing PopularityScore from real event counts ((installs*10 + activeUsers*5 - uninstalls*3 - errors*2) clamped 0-100); per-plugin and marketplace-wide analytics via marketplace.analytics handler; daily event log rotation (90 days); Phase 17 complete
 - [Phase 20-01]: WasmLanguageStrategyBase extends ComputeRuntimeStrategyBase with wasmtime CLI execution, VerifyLanguageAsync pipeline; 7 Tier 1 language strategies (Rust/C/C++/.NET/Go/AssemblyScript/Zig) with real toolchain metadata; AssemblyScript correctly reports WasiSupportLevel.None; embedded 34-byte minimal WASM module shared across all strategies
+- [Phase 21-01]: ByteTracker class pattern for thread-safe byte counting across stream wrappers (avoids ref parameter closure issues in C#); XxHash32 for rolling-hash delta detection in SCP/rsync strategy; raw HTTP/2 gRPC binary framing (no protobuf compilation required); CapabilityCategory.Transport for transit strategy capabilities
 
 ### Pending Todos
 
@@ -228,6 +230,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-02-11 (Phase 20 Plan 01 COMPLETE)
-Stopped at: Completed 20-01-PLAN.md (Tier 1 WASM Language Strategies)
-Resume file: Phase 20 in progress (plan 1 of 4 complete). Ready for 20-02.
+Last session: 2026-02-11 (Phase 21 Plan 01 COMPLETE)
+Stopped at: Completed 21-01-PLAN.md (Data Transit Foundation)
+Resume file: Phase 21 in progress (plan 1 of 5 complete). Ready for 21-02.
