@@ -453,14 +453,14 @@ Plans:
   10. Cost-aware routing: Choose cheapest path vs fastest path based on configurable cost models
   11. Transit audit trail: Log what moved where, when, how much data, which strategy, success/failure
   12. Other plugins (DataIntegration, Replication, EdgeComputing, MultiCloud) can delegate transport to UltimateDataTransit via message bus
-**Plans**: 7 plans in 1 wave
+**Plans**: 5 plans in 2 waves
 
 Plans:
-- [ ] 21-01: Plugin orchestrator and direct transfer strategies
-- [ ] 21-02: Chunked/resumable and delta/differential strategies
-- [ ] 21-03: P2P swarm and multi-path parallel strategies
-- [ ] 21-04: Store-and-forward, QoS, cost-aware routing
-- [ ] 21-05: Composable layers, audit trail, and cross-plugin integration
+- [ ] 21-01-PLAN.md — SDK transit contracts + plugin orchestrator + 6 direct transfer strategies (HTTP/2, HTTP/3, gRPC, FTP, SFTP, SCP/rsync)
+- [ ] 21-02-PLAN.md — Chunked/resumable transfer with manifest tracking + delta/differential with rolling hash
+- [ ] 21-03-PLAN.md — P2P swarm distribution with backpressure + multi-path parallel with path scoring
+- [ ] 21-04-PLAN.md — Store-and-forward offline transfer + QoS throttling manager + cost-aware router
+- [ ] 21-05-PLAN.md — Composable layers (compression/encryption decorators) + audit trail + cross-plugin integration
 
 ## Progress
 
@@ -489,4 +489,4 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8 -> 9 -> 10
 | 18. Plugin Deprecation & File Cleanup | 0/3 | Not started | - |
 | 19. Application Platform Services | 0/4 | Planned | - |
 | 20. WASM/WASI Language Ecosystem | 0/4 | Not started | - |
-| 21. UltimateDataTransit | 0/5 | Not started | - |
+| 21. UltimateDataTransit | 0/5 | Planned | - |
