@@ -822,7 +822,8 @@ public enum InterfaceCategory
     AiNative,
     Query,
     Conversational,
-    Innovation
+    Innovation,
+    Convergence
 }
 
 /// <summary>
