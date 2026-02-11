@@ -52,6 +52,7 @@ Progress: [######----] 60%
 | Phase 06 P11 | 7 min | 2 tasks | 7 files |
 | Phase 06 P12 | 7 min | 2 tasks | 10 files |
 | Phase 06 P12 | 7 | 2 tasks | 10 files |
+| Phase 09 P02 | 16 | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -117,6 +118,7 @@ Recent decisions affecting current work:
 - [Phase 06]: Fixed ReadOnlyMemory<byte> vs byte[] type compatibility for request.Body.Span access
 - [Phase 06-10]: Fixed message bus PublishAsync type errors - all security strategies now use proper PluginMessage objects with Type/SourcePluginId/Payload structure (Deviation Rule 1)
 - [Phase 06-08]: All AI-dependent strategies use message bus with graceful degradation to rule-based fallbacks
+- [Phase 09-02]: Audio steganography uses WAV PCM LSB embedding; video uses simplified frame LSB; text extraction processes pre-marker content only
 
 ### Pending Todos
 
