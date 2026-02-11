@@ -206,6 +206,7 @@ Recent decisions affecting current work:
 - [Phase 19-02]: Per-app access policy supports 5 models (RBAC/ABAC/MAC/DAC/PBAC); AppContextRouter validates token + scope + app status in 3-step pipeline; enriched messages include AppId, AppContext, ServiceTokenId; policy topics use platform.policy.* prefix distinct from accesscontrol.policy.* downstream topics
 - [Phase 12-01]: AEDS core plugins verified - Http2DataPlanePlugin 100% production-ready (0 TODOs, full HTTP/2 implementation), 3 core plugins 75-85% complete with critical P0 gaps: signature verification in AedsCorePlugin/ClientCourierPlugin requires T94 UltimateKeyManagement integration, Control Plane wiring in ServerDispatcherPlugin uses Task.Delay simulation; 6 TODOs identified, 3 require immediate fix before production use
 - [Phase 17-01]: T57 Plugin Marketplace complete -- PluginMarketplacePlugin (2000 lines) with 4 GUI message handlers (list/install/uninstall/update), topological sort dependency resolution, version archiving with rollback, persistent JSON catalog, 21 built-in plugin definitions; uses built-in catalog population instead of runtime reflection scanning
+- [Phase 17-02]: T57 certification + reviews + revenue complete -- 5-stage certification pipeline (Security Scan/SDK Compat/Deps/Static Analysis/Scoring) with kernel.plugin.validate message bus integration; multi-dimensional review system (reliability/performance/documentation ratings); decimal-precision revenue tracking with 30% commission; review data flows to GUI via marketplace.list
 
 ### Pending Todos
 
