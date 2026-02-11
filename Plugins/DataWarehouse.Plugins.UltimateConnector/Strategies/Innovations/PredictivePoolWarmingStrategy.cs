@@ -383,7 +383,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Innovations
 
         private class PoolWarmingState
         {
-            public TrafficHistogram Histogram { get; set; } = null!;
+            public required TrafficHistogram Histogram { get; set; }
             public int CurrentPoolSize { get; set; }
             public int BasePoolSize { get; set; }
             public int MaxPoolSize { get; set; }

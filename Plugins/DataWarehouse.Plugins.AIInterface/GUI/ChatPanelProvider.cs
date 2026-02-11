@@ -730,7 +730,7 @@ public sealed class ChatPanelConfig
 public sealed class ChatMessageEventArgs : EventArgs
 {
     /// <summary>Gets or sets the message.</summary>
-    public ChatMessage Message { get; init; } = null!;
+    public required ChatMessage Message { get; init; }
 }
 
 /// <summary>

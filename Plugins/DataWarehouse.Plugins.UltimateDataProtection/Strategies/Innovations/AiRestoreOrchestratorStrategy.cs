@@ -771,7 +771,7 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Innovations
         private sealed class RestoreOrchestrationState
         {
             public string RestoreId { get; set; } = string.Empty;
-            public RestorePlan Plan { get; set; } = null!;
+            public required RestorePlan Plan { get; set; }
             public DateTimeOffset StartTime { get; set; }
             public int CurrentPhase { get; set; }
             public int TotalPhases { get; set; }

@@ -436,7 +436,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Innovations
 
         private class FingerprintState
         {
-            public EndpointVitals Vitals { get; set; } = null!;
+            public required EndpointVitals Vitals { get; set; }
             public double DegradationThreshold { get; set; }
             public int ProbeIntervalMs { get; set; }
             public double CompositeScore { get; set; }

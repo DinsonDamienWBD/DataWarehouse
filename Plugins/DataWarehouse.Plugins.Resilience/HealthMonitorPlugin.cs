@@ -786,7 +786,7 @@ namespace DataWarehouse.Plugins.Resilience
         /// <summary>
         /// The health check instance.
         /// </summary>
-        public IHealthCheck Check { get; set; } = null!;
+        public required IHealthCheck Check { get; set; }
 
         /// <summary>
         /// Tags for categorizing the check.

@@ -1145,8 +1145,8 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Threshold
     {
         public BigInteger D { get; set; } = BigInteger.Zero;
         public BigInteger E { get; set; } = BigInteger.Zero;
-        public ECPoint DCommitment { get; set; } = null!;
-        public ECPoint ECommitment { get; set; } = null!;
+        public required ECPoint DCommitment { get; set; }
+        public required ECPoint ECommitment { get; set; }
         public int Index { get; set; }
     }
 
@@ -1154,7 +1154,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Threshold
     {
         public byte[] Message { get; set; } = Array.Empty<byte>();
         public int[] SignerIndices { get; set; } = Array.Empty<int>();
-        public FrostNonce ActiveNonce { get; set; } = null!;
+        public required FrostNonce ActiveNonce { get; set; }
         public ECPoint? R { get; set; }
         public BigInteger? Challenge { get; set; }
         public int Phase { get; set; }

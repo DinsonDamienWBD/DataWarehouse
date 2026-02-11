@@ -324,7 +324,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Innovations
         private class TransportChannel
         {
             public string Name { get; set; } = "";
-            public HttpClient Client { get; set; } = null!;
+            public required HttpClient Client { get; set; }
             public double ReliabilityScore { get; set; }
             public double SpeedScore { get; set; }
             public double CostScore { get; set; }

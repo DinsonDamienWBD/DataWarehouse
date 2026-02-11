@@ -1092,7 +1092,7 @@ public sealed class RecommendationEngineConfig
 public sealed class RecommendationEventArgs : EventArgs
 {
     /// <summary>Gets or sets the recommendation.</summary>
-    public Recommendation Recommendation { get; init; } = null!;
+    public required Recommendation Recommendation { get; init; }
 }
 
 /// <summary>

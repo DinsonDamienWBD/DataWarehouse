@@ -853,11 +853,11 @@ public sealed class DeploymentConfig
 public sealed class DeceptionEnvironment
 {
     public string EnvironmentId { get; init; } = "";
-    public FakeFileTree FileTree { get; init; } = null!;
+    public required FakeFileTree FileTree { get; init; }
     public DateTime DeployedAt { get; init; }
     public DateTime? LastRotatedAt { get; set; }
     public bool IsActive { get; set; }
-    public DeploymentConfig Configuration { get; init; } = null!;
+    public required DeploymentConfig Configuration { get; init; }
     public Dictionary<string, object> Metadata { get; init; } = new();
 }
 

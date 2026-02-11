@@ -2871,10 +2871,10 @@ internal sealed class ProposalState
     public string ProposalId { get; init; } = string.Empty;
 
     /// <summary>Associated consensus round.</summary>
-    public ConsensusRound Round { get; init; } = null!;
+    public required ConsensusRound Round { get; init; }
 
     /// <summary>Completion source for async waiting.</summary>
-    public TaskCompletionSource<bool> CompletionSource { get; init; } = null!;
+    public required TaskCompletionSource<bool> CompletionSource { get; init; }
 }
 
 /// <summary>
