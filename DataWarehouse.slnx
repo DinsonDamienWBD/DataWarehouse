@@ -128,6 +128,7 @@
     <Project Path="Plugins/DataWarehouse.Plugins.UltimateSDKPorts/DataWarehouse.Plugins.UltimateSDKPorts.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.UltimateServerless/DataWarehouse.Plugins.UltimateServerless.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.UltimateStorage/DataWarehouse.Plugins.UltimateStorage.csproj" />
+    <Project Path="Plugins/DataWarehouse.Plugins.UltimateStorageProcessing/DataWarehouse.Plugins.UltimateStorageProcessing.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.UltimateStreamingData/DataWarehouse.Plugins.UltimateStreamingData.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.UltimateSustainability/DataWarehouse.Plugins.UltimateSustainability.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.UltimateWorkflow/DataWarehouse.Plugins.UltimateWorkflow.csproj" />
