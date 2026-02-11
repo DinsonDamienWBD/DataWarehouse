@@ -356,11 +356,11 @@ Plans:
   3. Security penetration test plan documents test scenarios and procedures
   4. All tests pass consistently in CI/CD pipeline
   5. Performance benchmarks establish baseline metrics for all major operations
-**Plans**: 7 plans in 1 wave
+**Plans**: 2 plans in 1 wave
 
 Plans:
-- [ ] 16-01: Verify and complete comprehensive test suite (T121)
-- [ ] 16-02: Verify and complete security penetration test plan (T122)
+- [ ] 16-01-PLAN.md — Fix 18 failing tests, resolve 17 excluded files, add plugin references, create shared helpers, write tests for 6 untested plugin categories, configure coverage (T121)
+- [ ] 16-02-PLAN.md — Create security penetration test plan with STRIDE threat model, OWASP Top 10 mapping, AI-assisted procedures, remediation framework (T122)
 
 ### Phase 17: Plugin Marketplace
 **Goal**: Plugin marketplace is fully functional for discovery, installation, and management
@@ -484,7 +484,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8 -> 9 -> 10
 | 13. Data Governance Intelligence | 0/5 | Planned | - |
 | 14. Other Ultimate Plugins | 0/5 | Not started | - |
 | 15. Bug Fixes & Build Health | 0/4 | Planned | - |
-| 16. Testing & Quality Assurance | 0/2 | Not started | - |
+| 16. Testing & Quality Assurance | 0/2 | Planned | - |
 | 17. Plugin Marketplace | 0/3 | Planned | - |
 | 18. Plugin Deprecation & File Cleanup | 0/3 | Not started | - |
 | 19. Application Platform Services | 0/4 | Planned | - |
