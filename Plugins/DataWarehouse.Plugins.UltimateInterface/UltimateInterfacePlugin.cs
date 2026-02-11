@@ -5,6 +5,7 @@ using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Contracts.IntelligenceAware;
 using DataWarehouse.SDK.Primitives;
 using DataWarehouse.SDK.Utilities;
+using SdkInterface = DataWarehouse.SDK.Contracts.Interface;
 
 namespace DataWarehouse.Plugins.UltimateInterface;
 
@@ -197,7 +198,7 @@ public sealed class UltimateInterfacePlugin : IntelligenceAwareInterfacePluginBa
                 // Add feature-specific tags
                 if (strategy.Capabilities.SupportsStreaming)
                     tags.Add("streaming");
-                if (strategy.Capabilities.SupportsBidirectional)
+                if (strategy.Capabilities.SupportsBidirectionalStreaming)
                     tags.Add("bidirectional");
                 if (strategy.Capabilities.SupportsAuthentication)
                     tags.Add("authentication");
@@ -348,14 +349,17 @@ public sealed class UltimateInterfacePlugin : IntelligenceAwareInterfacePluginBa
             ["id"] = s.StrategyId,
             ["displayName"] = s.DisplayName,
             ["category"] = s.Category.ToString(),
-            ["protocol"] = s.Protocol,
+            ["protocol"] = s.Protocol.ToString(),
             ["capabilities"] = new Dictionary<string, object>
             {
                 ["supportsStreaming"] = s.Capabilities.SupportsStreaming,
-                ["supportsBidirectional"] = s.Capabilities.SupportsBidirectional,
+                ["supportsBidirectional"] = s.Capabilities.SupportsBidirectionalStreaming,
                 ["supportsAuthentication"] = s.Capabilities.SupportsAuthentication,
-                ["supportsCompression"] = s.Capabilities.SupportsCompression,
-                ["supportsEncryption"] = s.Capabilities.SupportsEncryption
+                ["supportsMultiplexing"] = s.Capabilities.SupportsMultiplexing,
+                ["requiresTLS"] = s.Capabilities.RequiresTLS,
+                ["supportedContentTypes"] = string.Join(", ", s.Capabilities.SupportedContentTypes),
+                ["maxRequestSize"] = s.Capabilities.MaxRequestSize ?? 0,
+                ["maxResponseSize"] = s.Capabilities.MaxResponseSize ?? 0
             },
             ["tags"] = s.Tags
         }).ToList();
@@ -536,7 +540,7 @@ public sealed class UltimateInterfacePlugin : IntelligenceAwareInterfacePluginBa
 
     #region Helper Methods
 
-    private IInterfaceStrategy GetStrategyOrThrow(string strategyId)
+    private IPluginInterfaceStrategy GetStrategyOrThrow(string strategyId)
     {
         var strategy = _registry.Get(strategyId)
             ?? throw new ArgumentException($"Interface strategy '{strategyId}' not found");
@@ -746,24 +750,24 @@ public sealed class UltimateInterfacePlugin : IntelligenceAwareInterfacePluginBa
 /// </summary>
 public sealed class InterfaceStrategyRegistry
 {
-    private readonly ConcurrentDictionary<string, IInterfaceStrategy> _strategies = new(StringComparer.OrdinalIgnoreCase);
+    private readonly ConcurrentDictionary<string, IPluginInterfaceStrategy> _strategies = new(StringComparer.OrdinalIgnoreCase);
 
     public int Count => _strategies.Count;
 
-    public void Register(IInterfaceStrategy strategy)
+    public void Register(IPluginInterfaceStrategy strategy)
     {
         ArgumentNullException.ThrowIfNull(strategy);
         _strategies[strategy.StrategyId] = strategy;
     }
 
-    public IInterfaceStrategy? Get(string strategyId)
+    public IPluginInterfaceStrategy? Get(string strategyId)
     {
         return _strategies.TryGetValue(strategyId, out var strategy) ? strategy : null;
     }
 
-    public IEnumerable<IInterfaceStrategy> GetAll() => _strategies.Values;
+    public IEnumerable<IPluginInterfaceStrategy> GetAll() => _strategies.Values;
 
-    public IEnumerable<IInterfaceStrategy> GetByCategory(InterfaceCategory category)
+    public IEnumerable<IPluginInterfaceStrategy> GetByCategory(InterfaceCategory category)
     {
         return _strategies.Values.Where(s => s.Category == category);
     }
@@ -772,13 +776,13 @@ public sealed class InterfaceStrategyRegistry
     {
         var discovered = 0;
         var strategyTypes = assembly.GetTypes()
-            .Where(t => !t.IsAbstract && typeof(IInterfaceStrategy).IsAssignableFrom(t));
+            .Where(t => !t.IsAbstract && typeof(IPluginInterfaceStrategy).IsAssignableFrom(t));
 
         foreach (var type in strategyTypes)
         {
             try
             {
-                if (Activator.CreateInstance(type) is IInterfaceStrategy strategy)
+                if (Activator.CreateInstance(type) is IPluginInterfaceStrategy strategy)
                 {
                     Register(strategy);
                     discovered++;
@@ -792,36 +796,19 @@ public sealed class InterfaceStrategyRegistry
 }
 
 /// <summary>
-/// Interface strategy contract.
+/// Plugin-level interface strategy contract extending SDK IInterfaceStrategy with metadata.
 /// </summary>
-public interface IInterfaceStrategy
+public interface IPluginInterfaceStrategy : SdkInterface.IInterfaceStrategy
 {
     string StrategyId { get; }
     string DisplayName { get; }
-    string Protocol { get; }
     string SemanticDescription { get; }
     InterfaceCategory Category { get; }
-    InterfaceCapabilities Capabilities { get; }
     string[] Tags { get; }
-
-    Task StartAsync(CancellationToken ct);
-    Task StopAsync();
 }
 
 /// <summary>
-/// Interface strategy capabilities.
-/// </summary>
-public sealed class InterfaceCapabilities
-{
-    public bool SupportsStreaming { get; init; }
-    public bool SupportsBidirectional { get; init; }
-    public bool SupportsAuthentication { get; init; }
-    public bool SupportsCompression { get; init; }
-    public bool SupportsEncryption { get; init; }
-}
-
-/// <summary>
-/// Interface categories.
+/// Interface categories for grouping strategies.
 /// </summary>
 public enum InterfaceCategory
 {
@@ -832,7 +819,10 @@ public enum InterfaceCategory
     Messaging,
     Binary,
     Legacy,
-    AiNative
+    AiNative,
+    Query,
+    Conversational,
+    Innovation
 }
 
 /// <summary>
@@ -853,121 +843,125 @@ internal sealed class InterfaceHealthStatus
 /// <summary>
 /// REST interface strategy.
 /// </summary>
-internal sealed class RestInterfaceStrategy : IInterfaceStrategy
+internal sealed class RestInterfaceStrategy : SdkInterface.InterfaceStrategyBase, IPluginInterfaceStrategy
 {
     public string StrategyId => "rest";
     public string DisplayName => "REST API";
-    public string Protocol => "http";
     public string SemanticDescription => "RESTful API interface with HTTP/HTTPS support, OpenAPI, and content negotiation.";
     public InterfaceCategory Category => InterfaceCategory.Http;
-    public InterfaceCapabilities Capabilities => new()
-    {
-        SupportsStreaming = true,
-        SupportsBidirectional = false,
-        SupportsAuthentication = true,
-        SupportsCompression = true,
-        SupportsEncryption = true
-    };
     public string[] Tags => ["rest", "http", "openapi", "crud"];
 
-    public Task StartAsync(CancellationToken ct) => Task.CompletedTask;
-    public Task StopAsync() => Task.CompletedTask;
+    public override SdkInterface.InterfaceProtocol Protocol => SdkInterface.InterfaceProtocol.REST;
+    public override SdkInterface.InterfaceCapabilities Capabilities => SdkInterface.InterfaceCapabilities.CreateRestDefaults();
+
+    protected override Task StartAsyncCore(CancellationToken cancellationToken) => Task.CompletedTask;
+    protected override Task StopAsyncCore(CancellationToken cancellationToken) => Task.CompletedTask;
+    protected override Task<SdkInterface.InterfaceResponse> HandleRequestAsyncCore(SdkInterface.InterfaceRequest request, CancellationToken cancellationToken)
+    {
+        var body = System.Text.Encoding.UTF8.GetBytes("{\"strategy\":\"rest\",\"capabilities\":\"OpenAPI, content negotiation\"}");
+        return Task.FromResult(SdkInterface.InterfaceResponse.Ok(body, "application/json"));
+    }
 }
 
 /// <summary>
 /// gRPC interface strategy.
 /// </summary>
-internal sealed class GrpcInterfaceStrategy : IInterfaceStrategy
+internal sealed class GrpcInterfaceStrategy : SdkInterface.InterfaceStrategyBase, IPluginInterfaceStrategy
 {
     public string StrategyId => "grpc";
     public string DisplayName => "gRPC";
-    public string Protocol => "http2";
     public string SemanticDescription => "High-performance gRPC interface with Protocol Buffers and bidirectional streaming.";
     public InterfaceCategory Category => InterfaceCategory.Rpc;
-    public InterfaceCapabilities Capabilities => new()
-    {
-        SupportsStreaming = true,
-        SupportsBidirectional = true,
-        SupportsAuthentication = true,
-        SupportsCompression = true,
-        SupportsEncryption = true
-    };
     public string[] Tags => ["grpc", "protobuf", "rpc", "streaming"];
 
-    public Task StartAsync(CancellationToken ct) => Task.CompletedTask;
-    public Task StopAsync() => Task.CompletedTask;
+    public override SdkInterface.InterfaceProtocol Protocol => SdkInterface.InterfaceProtocol.gRPC;
+    public override SdkInterface.InterfaceCapabilities Capabilities => SdkInterface.InterfaceCapabilities.CreateGrpcDefaults();
+
+    protected override Task StartAsyncCore(CancellationToken cancellationToken) => Task.CompletedTask;
+    protected override Task StopAsyncCore(CancellationToken cancellationToken) => Task.CompletedTask;
+    protected override Task<SdkInterface.InterfaceResponse> HandleRequestAsyncCore(SdkInterface.InterfaceRequest request, CancellationToken cancellationToken)
+    {
+        var body = System.Text.Encoding.UTF8.GetBytes("{\"strategy\":\"grpc\",\"capabilities\":\"Protocol Buffers, bidirectional streaming\"}");
+        return Task.FromResult(SdkInterface.InterfaceResponse.Ok(body, "application/json"));
+    }
 }
 
 /// <summary>
 /// WebSocket interface strategy.
 /// </summary>
-internal sealed class WebSocketInterfaceStrategy : IInterfaceStrategy
+internal sealed class WebSocketInterfaceStrategy : SdkInterface.InterfaceStrategyBase, IPluginInterfaceStrategy
 {
     public string StrategyId => "websocket";
     public string DisplayName => "WebSocket";
-    public string Protocol => "ws";
     public string SemanticDescription => "Real-time bidirectional WebSocket interface for push notifications and live updates.";
     public InterfaceCategory Category => InterfaceCategory.RealTime;
-    public InterfaceCapabilities Capabilities => new()
-    {
-        SupportsStreaming = true,
-        SupportsBidirectional = true,
-        SupportsAuthentication = true,
-        SupportsCompression = true,
-        SupportsEncryption = true
-    };
     public string[] Tags => ["websocket", "realtime", "push", "bidirectional"];
 
-    public Task StartAsync(CancellationToken ct) => Task.CompletedTask;
-    public Task StopAsync() => Task.CompletedTask;
+    public override SdkInterface.InterfaceProtocol Protocol => SdkInterface.InterfaceProtocol.WebSocket;
+    public override SdkInterface.InterfaceCapabilities Capabilities => SdkInterface.InterfaceCapabilities.CreateWebSocketDefaults();
+
+    protected override Task StartAsyncCore(CancellationToken cancellationToken) => Task.CompletedTask;
+    protected override Task StopAsyncCore(CancellationToken cancellationToken) => Task.CompletedTask;
+    protected override Task<SdkInterface.InterfaceResponse> HandleRequestAsyncCore(SdkInterface.InterfaceRequest request, CancellationToken cancellationToken)
+    {
+        var body = System.Text.Encoding.UTF8.GetBytes("{\"strategy\":\"websocket\",\"capabilities\":\"bidirectional, push notifications\"}");
+        return Task.FromResult(SdkInterface.InterfaceResponse.Ok(body, "application/json"));
+    }
 }
 
 /// <summary>
 /// GraphQL interface strategy.
 /// </summary>
-internal sealed class GraphQLInterfaceStrategy : IInterfaceStrategy
+internal sealed class GraphQLInterfaceStrategy : SdkInterface.InterfaceStrategyBase, IPluginInterfaceStrategy
 {
     public string StrategyId => "graphql";
     public string DisplayName => "GraphQL";
-    public string Protocol => "http";
     public string SemanticDescription => "Flexible GraphQL interface with query, mutation, and subscription support.";
     public InterfaceCategory Category => InterfaceCategory.Http;
-    public InterfaceCapabilities Capabilities => new()
-    {
-        SupportsStreaming = true,
-        SupportsBidirectional = true,
-        SupportsAuthentication = true,
-        SupportsCompression = true,
-        SupportsEncryption = true
-    };
     public string[] Tags => ["graphql", "query", "mutation", "subscription", "flexible"];
 
-    public Task StartAsync(CancellationToken ct) => Task.CompletedTask;
-    public Task StopAsync() => Task.CompletedTask;
+    public override SdkInterface.InterfaceProtocol Protocol => SdkInterface.InterfaceProtocol.GraphQL;
+    public override SdkInterface.InterfaceCapabilities Capabilities => SdkInterface.InterfaceCapabilities.CreateGraphQLDefaults();
+
+    protected override Task StartAsyncCore(CancellationToken cancellationToken) => Task.CompletedTask;
+    protected override Task StopAsyncCore(CancellationToken cancellationToken) => Task.CompletedTask;
+    protected override Task<SdkInterface.InterfaceResponse> HandleRequestAsyncCore(SdkInterface.InterfaceRequest request, CancellationToken cancellationToken)
+    {
+        var body = System.Text.Encoding.UTF8.GetBytes("{\"strategy\":\"graphql\",\"capabilities\":\"query, mutation, subscription\"}");
+        return Task.FromResult(SdkInterface.InterfaceResponse.Ok(body, "application/json"));
+    }
 }
 
 /// <summary>
 /// MCP (Model Context Protocol) interface strategy for AI-native integration.
 /// </summary>
-internal sealed class McpInterfaceStrategy : IInterfaceStrategy
+internal sealed class McpInterfaceStrategy : SdkInterface.InterfaceStrategyBase, IPluginInterfaceStrategy
 {
     public string StrategyId => "mcp";
     public string DisplayName => "MCP (Model Context Protocol)";
-    public string Protocol => "mcp";
     public string SemanticDescription => "AI-native Model Context Protocol interface for LLM tool integration and context management.";
     public InterfaceCategory Category => InterfaceCategory.AiNative;
-    public InterfaceCapabilities Capabilities => new()
-    {
-        SupportsStreaming = true,
-        SupportsBidirectional = true,
-        SupportsAuthentication = true,
-        SupportsCompression = false,
-        SupportsEncryption = true
-    };
     public string[] Tags => ["mcp", "ai", "llm", "tools", "context", "agent"];
 
-    public Task StartAsync(CancellationToken ct) => Task.CompletedTask;
-    public Task StopAsync() => Task.CompletedTask;
+    public override SdkInterface.InterfaceProtocol Protocol => SdkInterface.InterfaceProtocol.Custom;
+    public override SdkInterface.InterfaceCapabilities Capabilities => new(
+        SupportsStreaming: true,
+        SupportsAuthentication: true,
+        SupportedContentTypes: new[] { "application/json", "application/mcp+json" },
+        MaxRequestSize: 10 * 1024 * 1024,
+        MaxResponseSize: 50 * 1024 * 1024,
+        SupportsBidirectionalStreaming: true,
+        DefaultTimeout: TimeSpan.FromSeconds(60),
+        RequiresTLS: true
+    );
+
+    protected override Task StartAsyncCore(CancellationToken cancellationToken) => Task.CompletedTask;
+    protected override Task StopAsyncCore(CancellationToken cancellationToken) => Task.CompletedTask;
+    protected override Task<SdkInterface.InterfaceResponse> HandleRequestAsyncCore(SdkInterface.InterfaceRequest request, CancellationToken cancellationToken)
+    {
+        var body = System.Text.Encoding.UTF8.GetBytes("{\"strategy\":\"mcp\",\"capabilities\":\"LLM tool integration, context management\"}");
+        return Task.FromResult(SdkInterface.InterfaceResponse.Ok(body, "application/json"));
+    }
 }
 
 #endregion
