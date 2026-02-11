@@ -299,7 +299,7 @@ T99 (SDK) → T94 (Key Mgmt) → T93 (Encryption) → TamperProof (T3.4.2)
 | Order | Task | Name | Description | Dependencies | Status |
 |-------|------|------|-------------|--------------|--------|
 | **5.1** | T60 | AEDS Core Infrastructure | Active Enterprise Distribution System | T99, T90, T93 | [x] Complete |
-| **5.2** | T26-T31 | Critical Bug Fixes | Raft, S3 plugin fixes | None | [ ] |
+| **5.2** | T26-T31 | Critical Bug Fixes | Raft, S3 plugin fixes | None | [x] Complete |
 | **5.3** | T59 | Compliance Automation | Regulatory frameworks | T96 | [x] Merged into T96 |
 
 ---
@@ -530,7 +530,7 @@ T99 (SDK) → T94 (Key Mgmt) → T93 (Encryption) → TamperProof (T3.4.2)
 
 | Step | Action | Status |
 |------|--------|--------|
-| 7 | Add unit tests for exception scenarios | [~] Deferred to testing sprint |
+| 7 | Add unit tests for exception scenarios | [x] Complete (RaftBugFixTests.cs) |
 
 ---
 
@@ -542,7 +542,7 @@ T99 (SDK) → T94 (Key Mgmt) → T93 (Encryption) → TamperProof (T3.4.2)
 
 | Step | Action | Status |
 |------|--------|--------|
-| 8 | Add unit tests for crash recovery scenarios | [~] Deferred to testing sprint |
+| 8 | Add unit tests for crash recovery scenarios | [x] Complete (RaftBugFixTests.cs) |
 
 **New files created:**
 - `Plugins/DataWarehouse.Plugins.Raft/IRaftLogStore.cs`
@@ -558,7 +558,7 @@ T99 (SDK) → T94 (Key Mgmt) → T93 (Encryption) → TamperProof (T3.4.2)
 
 | Step | Action | Status |
 |------|--------|--------|
-| 4 | Test with various S3 response formats | [~] Deferred to testing sprint |
+| 4 | Test with various S3 response formats | [x] Complete (StorageBugFixTests.cs) |
 
 **Verification:** `grep "\.Split\(" S3StoragePlugin.cs` returns 0 matches for XML parsing
 
@@ -572,7 +572,7 @@ T99 (SDK) → T94 (Key Mgmt) → T93 (Encryption) → TamperProof (T3.4.2)
 
 | Step | Action | Status |
 |------|--------|--------|
-| 4 | Add success/failure metrics | [~] Deferred to testing sprint |
+| 4 | Add success/failure metrics | [x] Complete (StorageBugFixTests.cs) |
 
 ---
 
