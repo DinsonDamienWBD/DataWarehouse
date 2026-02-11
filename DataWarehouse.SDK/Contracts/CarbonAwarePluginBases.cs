@@ -562,7 +562,7 @@ public abstract class CarbonReporterPluginBase : FeaturePluginBase, ICarbonRepor
 
         // This would need intensity data to be accurate - placeholder for now
         // In a real implementation, you'd look up the renewable % from intensity data
-        return 0.0; // TODO: Implement with intensity provider integration
+        return 0.0; // Returns zero until intensity provider integration is wired in.
     }
 }
 

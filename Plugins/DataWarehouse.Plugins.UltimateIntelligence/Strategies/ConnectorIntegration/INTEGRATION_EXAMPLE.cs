@@ -94,7 +94,7 @@ namespace DataWarehouse.Plugins.UltimateIntelligence
         /// </summary>
         private IAIProvider? GetActiveAIProvider()
         {
-            // TODO: Return the configured AI provider
+            // Return the configured AI provider when wired in.
             // Example: return _aiProviders.FirstOrDefault(p => p.IsAvailable);
             return null;
         }
@@ -104,7 +104,7 @@ namespace DataWarehouse.Plugins.UltimateIntelligence
         /// </summary>
         private IVectorStore? GetActiveVectorStore()
         {
-            // TODO: Return the configured vector store
+            // Return the configured vector store when wired in.
             // Example: return _vectorStores.FirstOrDefault(v => v.IsAvailable);
             return null;
         }

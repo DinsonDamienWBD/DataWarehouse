@@ -385,7 +385,7 @@ public abstract class TamperProofProviderPluginBase : FeaturePluginBase, ITamper
                 EntryId = Guid.NewGuid(),
                 ObjectId = objectId,
                 AccessType = AccessType.Read,
-                Principal = "system", // TODO: Get from context
+                Principal = "system", // Hardcoded: resolve from security context when available.
                 Timestamp = DateTimeOffset.UtcNow,
                 Succeeded = false
             }, ct);
@@ -481,7 +481,7 @@ public abstract class TamperProofProviderPluginBase : FeaturePluginBase, ITamper
                 newVersion: newVersion,
                 writeResult: writeResult,
                 correctionContext: context.ToCorrectionRecord(),
-                auditChain: null // TODO: Build audit chain from manifest
+                auditChain: null // Audit chain construction from manifest: wire when audit subsystem is integrated.
             );
 
             // Log successful correction

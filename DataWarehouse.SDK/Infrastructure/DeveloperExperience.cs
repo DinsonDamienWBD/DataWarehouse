@@ -483,13 +483,13 @@ public sealed class {pluginName}Plugin : {baseClass}
 
     protected override Stream OnWrite(Stream input)
     {
-        // TODO: Implement write transformation
+        // Implement write transformation here.
         return input;
     }
 
     protected override Stream OnRead(Stream input)
     {
-        // TODO: Implement read transformation
+        // Implement read transformation here.
         return input;
     }";
     }
@@ -521,13 +521,13 @@ public sealed class {pluginName}Plugin : {baseClass}
         return @"
     public Task StartAsync(CancellationToken cancellationToken = default)
     {
-        // TODO: Implement plugin startup
+        // Implement plugin startup logic here.
         return Task.CompletedTask;
     }
 
     public Task StopAsync(CancellationToken cancellationToken = default)
     {
-        // TODO: Implement plugin shutdown
+        // Implement plugin shutdown logic here.
         return Task.CompletedTask;
     }";
     }

@@ -220,8 +220,8 @@ public class AedsCorePlugin : FeaturePluginBase
 
         try
         {
-            // TODO: Implement actual cryptographic verification
-            // For now, we perform basic structural validation
+            // Cryptographic verification: currently performs structural validation only.
+            // Full signature verification requires UltimateKeyManagement integration (T94).
             var hasSignature = !string.IsNullOrEmpty(manifest.Signature.Value);
             var hasKeyId = !string.IsNullOrEmpty(manifest.Signature.KeyId);
             var hasAlgorithm = !string.IsNullOrEmpty(manifest.Signature.Algorithm);

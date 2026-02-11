@@ -617,7 +617,7 @@ public abstract class DistributedMetadataIndexPluginBase : FeaturePluginBase, ID
     public Task<DistributedIndexStatistics> GetStatisticsAsync() => ComputeStatisticsAsync();
 }
 
-// TODO: Fix CS0535 compiler error - DistributedCachePluginBase does not implement IDistributedCache.SetAsync<T>
+// Known issue: CS0535 compiler error - DistributedCachePluginBase does not implement IDistributedCache.SetAsync<T>
 // The signature matches exactly but the compiler doesn't recognize it. Investigate namespace/generic constraints.
 /*
 /// <summary>

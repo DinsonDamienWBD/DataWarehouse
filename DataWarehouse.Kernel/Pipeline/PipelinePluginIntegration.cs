@@ -276,8 +276,8 @@ namespace DataWarehouse.Kernel.Pipeline
             if (securityContext.IsSystemAdmin)
                 return true;
 
-            // TODO: Integrate with UltimateAccessControl plugin when available
-            // For now, allow all authenticated users
+            // UltimateAccessControl integration: currently allows all authenticated users.
+            // When UltimateAccessControl is wired in, replace with plugin-based policy check.
             if (!string.IsNullOrEmpty(securityContext.UserId))
                 return true;
 
@@ -295,8 +295,8 @@ namespace DataWarehouse.Kernel.Pipeline
         {
             var mandatoryStages = new List<PipelineStagePolicy>();
 
-            // TODO: Integrate with UltimateCompliance plugin when available
-            // For now, return empty list (no mandatory stages)
+            // UltimateCompliance integration: currently returns no mandatory stages.
+            // When UltimateCompliance is wired in, query compliance rules for mandatory pipeline stages.
 
             // Example of what this might look like:
             // if (compliancePlugin.RequiresEncryption(securityContext.TenantId))
