@@ -10995,11 +10995,11 @@ public enum InterfaceProtocol { REST, gRPC, GraphQL, SQL, WebSocket, MQTT, AMQP,
 | 109.B4.6 | ⭐ PostGraphileStrategy - PostGraphile-style | [x] |
 | 109.B4.7 | ⭐ PrismaStrategy - Prisma-style API | [x] |
 | **B5: Real-Time Protocols** |
-| 109.B5.1 | ⭐ WebSocketStrategy - WebSocket bidirectional | [ ] |
-| 109.B5.2 | ⭐ ServerSentEventsStrategy - SSE streaming | [ ] |
-| 109.B5.3 | ⭐ LongPollingStrategy - Long polling | [ ] |
-| 109.B5.4 | ⭐ SocketIoStrategy - Socket.IO | [ ] |
-| 109.B5.5 | ⭐ SignalRStrategy - SignalR | [ ] |
+| 109.B5.1 | ⭐ WebSocketStrategy - WebSocket bidirectional | [x] |
+| 109.B5.2 | ⭐ ServerSentEventsStrategy - SSE streaming | [x] |
+| 109.B5.3 | ⭐ LongPollingStrategy - Long polling | [x] |
+| 109.B5.4 | ⭐ SocketIoStrategy - Socket.IO | [x] |
+| 109.B5.5 | ⭐ SignalRStrategy - SignalR | [x] |
 | **B6: Messaging Protocols** |
 | 109.B6.1 | ⭐ MqttStrategy - MQTT for IoT | [ ] |
 | 109.B6.2 | ⭐ AmqpStrategy - AMQP (RabbitMQ) | [ ] |
