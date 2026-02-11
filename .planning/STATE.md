@@ -111,6 +111,7 @@ Progress: [######----] 67%
 | Phase 20 P02 | 4 | 2 tasks | 10 files |
 | Phase 21 P02 | 7 min | 2 tasks | 2 files |
 | Phase 20 P03 | 6 | 2 tasks | 14 files |
+| Phase 15 P01 | 5 min | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -223,6 +224,7 @@ Recent decisions affecting current work:
 - [Phase 21-02]: ChunkManifest stores TransitRequest reference for resume; Adler-32 mod 65521 for weak hash (rsync-compatible); SHA-256 for strong hash collision resolution; binary delta payload (instruction count + type byte + data); RollingHashComputer stateless/thread-safe
 - [Phase 20]: Tier 2 WASM languages: interpreted (Python/Ruby/JS/PHP/Lua) document interpreter-in-WASM with realistic binary sizes; compiled (TS/Kotlin/Swift/Java/Dart) document AOT/transpiler toolchains
 - [Phase 20]: Grain and MoonBit report WasiSupportLevel.Full as WASM-native languages; Perl reports None (Emscripten-only); all other Tier 3 report Experimental
+- [Phase 15]: T26-T31 bug fixes verified present; deferred tests implemented (36 tests); S3 XML parsing/async fixes not applicable in UltimateStorage (uses AWS SDK)
 
 ### Pending Todos
 
