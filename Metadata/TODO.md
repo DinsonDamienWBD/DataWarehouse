@@ -11001,11 +11001,11 @@ public enum InterfaceProtocol { REST, gRPC, GraphQL, SQL, WebSocket, MQTT, AMQP,
 | 109.B5.4 | ⭐ SocketIoStrategy - Socket.IO | [x] |
 | 109.B5.5 | ⭐ SignalRStrategy - SignalR | [x] |
 | **B6: Messaging Protocols** |
-| 109.B6.1 | ⭐ MqttStrategy - MQTT for IoT | [ ] |
-| 109.B6.2 | ⭐ AmqpStrategy - AMQP (RabbitMQ) | [ ] |
-| 109.B6.3 | ⭐ StompStrategy - STOMP | [ ] |
-| 109.B6.4 | ⭐ NatsStrategy - NATS messaging | [ ] |
-| 109.B6.5 | ⭐ KafkaRestStrategy - Kafka REST proxy | [ ] |
+| 109.B6.1 | ⭐ MqttStrategy - MQTT for IoT | [x] |
+| 109.B6.2 | ⭐ AmqpStrategy - AMQP (RabbitMQ) | [x] |
+| 109.B6.3 | ⭐ StompStrategy - STOMP | [x] |
+| 109.B6.4 | ⭐ NatsStrategy - NATS messaging | [x] |
+| 109.B6.5 | ⭐ KafkaRestStrategy - Kafka REST proxy | [x] |
 | **B7: AI Interface Integration** |
 | 109.B7.1 | SlackChannelStrategy - Slack integration | [ ] |
 | 109.B7.2 | TeamsChannelStrategy - MS Teams integration | [ ] |
