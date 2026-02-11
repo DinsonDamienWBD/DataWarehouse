@@ -47,10 +47,12 @@ namespace DataWarehouse.SDK.Contracts
     /// </summary>
     public class BatchSaveItem
     {
-        public Uri Uri { get; init; } = null!;
-        public Stream Data { get; init; } = null!;
+        public required Uri Uri { get; init; }
+        public required Stream Data { get; init; }
 
         public BatchSaveItem() { }
+
+        [System.Diagnostics.CodeAnalysis.SetsRequiredMembers]
         public BatchSaveItem(Uri uri, Stream data)
         {
             Uri = uri;
@@ -79,7 +81,7 @@ namespace DataWarehouse.SDK.Contracts
     /// </summary>
     public class BatchItemResult
     {
-        public Uri Uri { get; init; } = null!;
+        public required Uri Uri { get; init; }
         public bool Success { get; init; }
         public string? Error { get; init; }
         public long BytesWritten { get; init; }
@@ -209,7 +211,7 @@ namespace DataWarehouse.SDK.Contracts
 
     public class ProviderWritePlan
     {
-        public IStorageProvider Provider { get; init; } = null!;
+        public required IStorageProvider Provider { get; init; }
         public StorageRole Role { get; init; }
         public bool IsRequired { get; init; } = true;
         public int Priority { get; init; }
@@ -292,7 +294,7 @@ namespace DataWarehouse.SDK.Contracts
 
     public class IndexingStatus
     {
-        public Uri Uri { get; init; } = null!;
+        public required Uri Uri { get; init; }
         public IndexingState State { get; init; }
         public DateTime? StartedAt { get; init; }
         public DateTime? CompletedAt { get; init; }
@@ -399,7 +401,7 @@ namespace DataWarehouse.SDK.Contracts
 
     public class SearchResultItem
     {
-        public Uri Uri { get; init; } = null!;
+        public required Uri Uri { get; init; }
         public string Title { get; init; } = string.Empty;
         public string? Snippet { get; init; }
         public double Score { get; init; }
@@ -515,7 +517,7 @@ namespace DataWarehouse.SDK.Contracts
     public class IntegrityReport
     {
         public bool IsValid { get; init; }
-        public Uri Uri { get; init; } = null!;
+        public required Uri Uri { get; init; }
         public string ExpectedHash { get; init; } = string.Empty;
         public Dictionary<string, SiteIntegrity> SiteResults { get; init; } = new();
         public DateTime VerifiedAt { get; init; }

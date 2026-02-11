@@ -672,7 +672,7 @@ public sealed class WriteAheadLog : IAsyncDisposable
         {
             _logStream.Seek(-sizeof(long), SeekOrigin.End);
             var buffer = new byte[sizeof(long)];
-            await _logStream.ReadAsync(buffer, ct);
+            await _logStream.ReadExactlyAsync(buffer, ct);
             _sequenceNumber = BitConverter.ToInt64(buffer, 0);
         }
     }

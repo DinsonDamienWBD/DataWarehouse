@@ -82,7 +82,7 @@ public sealed class VtkStrategy : DataFormatStrategyBase
         try
         {
             var buffer = new byte[Math.Min(4096, stream.Length)];
-            await stream.ReadAsync(buffer, 0, buffer.Length, ct);
+            await stream.ReadExactlyAsync(buffer, 0, buffer.Length, ct);
             var text = Encoding.ASCII.GetString(buffer);
 
             var fields = new List<SchemaField>();
@@ -229,7 +229,7 @@ public sealed class VtkStrategy : DataFormatStrategyBase
         try
         {
             var buffer = new byte[Math.Min(2048, stream.Length)];
-            await stream.ReadAsync(buffer, 0, buffer.Length, ct);
+            await stream.ReadExactlyAsync(buffer, 0, buffer.Length, ct);
             var text = Encoding.ASCII.GetString(buffer);
 
             var errors = new List<ValidationError>();

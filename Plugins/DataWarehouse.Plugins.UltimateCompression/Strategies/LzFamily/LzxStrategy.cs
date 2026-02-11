@@ -269,7 +269,7 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.LzFamily
                 if (!_initialized)
                 {
                     var compressed = new byte[_baseStream.Length];
-                    _baseStream.Read(compressed, 0, compressed.Length);
+                    _baseStream.ReadExactly(compressed, 0, compressed.Length);
                     var strategy = new LzxStrategy();
                     var decompressed = strategy.DecompressCore(compressed);
                     _decompressedBuffer = new MemoryStream(decompressed);

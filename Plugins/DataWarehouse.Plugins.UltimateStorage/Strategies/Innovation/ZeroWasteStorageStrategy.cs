@@ -518,7 +518,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
                     var bytesToRead = Math.Min(_blockSize, totalSize - offset);
 
                     _blockDevice!.Seek(position, SeekOrigin.Begin);
-                    await _blockDevice.ReadAsync(data.AsMemory(offset, bytesToRead), ct);
+                    await _blockDevice.ReadExactlyAsync(data.AsMemory(offset, bytesToRead), ct);
 
                     offset += bytesToRead;
 

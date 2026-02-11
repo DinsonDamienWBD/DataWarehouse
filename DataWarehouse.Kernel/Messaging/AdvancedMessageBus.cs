@@ -814,7 +814,7 @@ namespace DataWarehouse.Kernel.Messaging
         {
             public string MessageId { get; set; } = string.Empty;
             public string Topic { get; set; } = string.Empty;
-            public PluginMessage Message { get; set; } = null!;
+            public required PluginMessage Message { get; set; }
             public ReliablePublishOptions Options { get; set; } = new();
             public DateTime CreatedAt { get; set; }
             public DateTime? DeliveredAt { get; set; }
@@ -829,8 +829,8 @@ namespace DataWarehouse.Kernel.Messaging
         {
             public string SubscriptionId { get; set; } = string.Empty;
             public string Topic { get; set; } = string.Empty;
-            public Func<PluginMessage, bool> Filter { get; set; } = null!;
-            public Action<PluginMessage> Handler { get; set; } = null!;
+            public required Func<PluginMessage, bool> Filter { get; set; }
+            public required Action<PluginMessage> Handler { get; set; }
         }
 
         private class MessageGroup
@@ -845,7 +845,7 @@ namespace DataWarehouse.Kernel.Messaging
         private class GroupedMessage
         {
             public string Topic { get; set; } = string.Empty;
-            public PluginMessage Message { get; set; } = null!;
+            public required PluginMessage Message { get; set; }
             public DateTime AddedAt { get; set; }
         }
 

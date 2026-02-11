@@ -72,44 +72,54 @@ public sealed class UltimateEdgeComputingPlugin : PluginBase, EC.IEdgeComputingS
         StatusMessage = _initialized ? "Running" : "Not initialized"
     };
 
-    /// <summary>Gets the edge node manager.</summary>
-    public EC.IEdgeNodeManager NodeManager { get; private set; } = null!;
+    /// <summary>Gets the edge node manager. Available after InitializeAsync.</summary>
+    public EC.IEdgeNodeManager? NodeManager { get; private set; }
 
-    /// <summary>Gets the data synchronizer.</summary>
-    public EC.IEdgeDataSynchronizer DataSynchronizer { get; private set; } = null!;
+    /// <summary>Gets the data synchronizer. Available after InitializeAsync.</summary>
+    public EC.IEdgeDataSynchronizer? DataSynchronizer { get; private set; }
 
-    /// <summary>Gets the offline operation manager.</summary>
-    public EC.IOfflineOperationManager OfflineManager { get; private set; } = null!;
+    /// <summary>Gets the offline operation manager. Available after InitializeAsync.</summary>
+    public EC.IOfflineOperationManager? OfflineManager { get; private set; }
 
-    /// <summary>Gets the edge-cloud communicator.</summary>
-    public EC.IEdgeCloudCommunicator CloudCommunicator { get; private set; } = null!;
+    /// <summary>Gets the edge-cloud communicator. Available after InitializeAsync.</summary>
+    public EC.IEdgeCloudCommunicator? CloudCommunicator { get; private set; }
 
-    /// <summary>Gets the edge analytics engine.</summary>
-    public EC.IEdgeAnalyticsEngine AnalyticsEngine { get; private set; } = null!;
+    /// <summary>Gets the edge analytics engine. Available after InitializeAsync.</summary>
+    public EC.IEdgeAnalyticsEngine? AnalyticsEngine { get; private set; }
 
-    /// <summary>Gets the edge security manager.</summary>
-    public EC.IEdgeSecurityManager SecurityManager { get; private set; } = null!;
+    /// <summary>Gets the edge security manager. Available after InitializeAsync.</summary>
+    public EC.IEdgeSecurityManager? SecurityManager { get; private set; }
 
-    /// <summary>Gets the edge resource manager.</summary>
-    public EC.IEdgeResourceManager ResourceManager { get; private set; } = null!;
+    /// <summary>Gets the edge resource manager. Available after InitializeAsync.</summary>
+    public EC.IEdgeResourceManager? ResourceManager { get; private set; }
 
-    /// <summary>Gets the multi-edge orchestrator.</summary>
-    public EC.IMultiEdgeOrchestrator Orchestrator { get; private set; } = null!;
+    /// <summary>Gets the multi-edge orchestrator. Available after InitializeAsync.</summary>
+    public EC.IMultiEdgeOrchestrator? Orchestrator { get; private set; }
 
     /// <summary>Initializes the edge computing strategy with configuration.</summary>
     public async Task InitializeAsync(EC.EdgeComputingConfiguration config, CancellationToken ct = default)
     {
         _config = config;
-        NodeManager = new EdgeNodeManagerImpl(MessageBus);
-        DataSynchronizer = new EdgeDataSynchronizerImpl(MessageBus);
-        OfflineManager = new OfflineOperationManagerImpl(MessageBus);
-        CloudCommunicator = new EdgeCloudCommunicatorImpl(MessageBus);
-        AnalyticsEngine = new EdgeAnalyticsEngineImpl(MessageBus);
-        SecurityManager = new EdgeSecurityManagerImpl(MessageBus);
-        ResourceManager = new EdgeResourceManagerImpl(MessageBus);
-        Orchestrator = new MultiEdgeOrchestratorImpl(MessageBus, NodeManager);
+        var nodeManager = new EdgeNodeManagerImpl(MessageBus);
+        var dataSynchronizer = new EdgeDataSynchronizerImpl(MessageBus);
+        var offlineManager = new OfflineOperationManagerImpl(MessageBus);
+        var cloudCommunicator = new EdgeCloudCommunicatorImpl(MessageBus);
+        var analyticsEngine = new EdgeAnalyticsEngineImpl(MessageBus);
+        var securityManager = new EdgeSecurityManagerImpl(MessageBus);
+        var resourceManager = new EdgeResourceManagerImpl(MessageBus);
+        var orchestrator = new MultiEdgeOrchestratorImpl(MessageBus, nodeManager);
 
-        RegisterStrategies();
+        NodeManager = nodeManager;
+        DataSynchronizer = dataSynchronizer;
+        OfflineManager = offlineManager;
+        CloudCommunicator = cloudCommunicator;
+        AnalyticsEngine = analyticsEngine;
+        SecurityManager = securityManager;
+        ResourceManager = resourceManager;
+        Orchestrator = orchestrator;
+
+        RegisterStrategies(nodeManager, dataSynchronizer, offlineManager, cloudCommunicator,
+            analyticsEngine, securityManager, resourceManager, orchestrator);
         _initialized = true;
         await Task.CompletedTask;
     }
@@ -122,11 +132,15 @@ public sealed class UltimateEdgeComputingPlugin : PluginBase, EC.IEdgeComputingS
         await Task.CompletedTask;
     }
 
-    private void RegisterStrategies()
+    private void RegisterStrategies(
+        EC.IEdgeNodeManager nodeManager, EC.IEdgeDataSynchronizer dataSynchronizer,
+        EC.IOfflineOperationManager offlineManager, EC.IEdgeCloudCommunicator cloudCommunicator,
+        EC.IEdgeAnalyticsEngine analyticsEngine, EC.IEdgeSecurityManager securityManager,
+        EC.IEdgeResourceManager resourceManager, EC.IMultiEdgeOrchestrator orchestrator)
     {
         _strategies["comprehensive"] = new ComprehensiveEdgeStrategy(
-            NodeManager, DataSynchronizer, OfflineManager, CloudCommunicator,
-            AnalyticsEngine, SecurityManager, ResourceManager, Orchestrator);
+            nodeManager, dataSynchronizer, offlineManager, cloudCommunicator,
+            analyticsEngine, securityManager, resourceManager, orchestrator);
         _strategies["iot-gateway"] = new IoTGatewayStrategy(MessageBus);
         _strategies["fog-computing"] = new FogComputingStrategy(MessageBus);
         _strategies["mec"] = new MobileEdgeComputingStrategy(MessageBus);

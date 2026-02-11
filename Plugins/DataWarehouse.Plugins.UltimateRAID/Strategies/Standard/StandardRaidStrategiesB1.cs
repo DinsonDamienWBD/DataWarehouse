@@ -535,13 +535,13 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Standard
                     catch
                     {
                         failedDiskIndex = i;
-                        chunks.Add(null!);
+                        chunks.Add(Array.Empty<byte>());
                     }
                 }
                 else
                 {
                     failedDiskIndex = i;
-                    chunks.Add(null!);
+                    chunks.Add(Array.Empty<byte>());
                 }
             }
 
@@ -555,7 +555,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Standard
                 var reconstructed = parityChunk.ToArray();
                 for (int i = 0; i < chunks.Count; i++)
                 {
-                    if (i != failedDiskIndex && chunks[i] != null)
+                    if (i != failedDiskIndex && chunks[i].Length > 0)
                     {
                         for (int j = 0; j < _chunkSize; j++)
                         {

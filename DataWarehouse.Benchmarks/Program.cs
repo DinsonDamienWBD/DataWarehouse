@@ -38,10 +38,10 @@ public static class Program
 [RankColumn]
 public class StorageBenchmarks
 {
-    private byte[] _smallData = null!;
-    private byte[] _mediumData = null!;
-    private byte[] _largeData = null!;
-    private ConcurrentDictionary<string, byte[]> _storage = null!;
+    private byte[] _smallData = null!; // Initialized in [GlobalSetup]
+    private byte[] _mediumData = null!; // Initialized in [GlobalSetup]
+    private byte[] _largeData = null!; // Initialized in [GlobalSetup]
+    private ConcurrentDictionary<string, byte[]> _storage = null!; // Initialized in [GlobalSetup]
 
     [GlobalSetup]
     public void Setup()
@@ -120,9 +120,9 @@ public class StorageBenchmarks
 [RankColumn]
 public class CryptoBenchmarks
 {
-    private byte[] _data1MB = null!;
-    private byte[] _key = null!;
-    private byte[] _iv = null!;
+    private byte[] _data1MB = null!; // Initialized in [GlobalSetup]
+    private byte[] _key = null!; // Initialized in [GlobalSetup]
+    private byte[] _iv = null!; // Initialized in [GlobalSetup]
 
     [GlobalSetup]
     public void Setup()
@@ -189,9 +189,9 @@ public class CryptoBenchmarks
 [RankColumn]
 public class SerializationBenchmarks
 {
-    private TestObject _simpleObject = null!;
-    private TestObject[] _objectArray = null!;
-    private string _jsonString = null!;
+    private TestObject _simpleObject = null!; // Initialized in [GlobalSetup]
+    private TestObject[] _objectArray = null!; // Initialized in [GlobalSetup]
+    private string _jsonString = null!; // Initialized in [GlobalSetup]
 
     [GlobalSetup]
     public void Setup()
@@ -273,9 +273,9 @@ public class SerializationBenchmarks
 [RankColumn]
 public class ConcurrencyBenchmarks
 {
-    private ConcurrentDictionary<int, int> _concurrentDict = null!;
-    private ConcurrentQueue<int> _concurrentQueue = null!;
-    private ConcurrentBag<int> _concurrentBag = null!;
+    private ConcurrentDictionary<int, int> _concurrentDict = null!; // Initialized in [GlobalSetup]
+    private ConcurrentQueue<int> _concurrentQueue = null!; // Initialized in [GlobalSetup]
+    private ConcurrentBag<int> _concurrentBag = null!; // Initialized in [GlobalSetup]
 
     [GlobalSetup]
     public void Setup()
@@ -364,7 +364,7 @@ public class ConcurrencyBenchmarks
 [RankColumn]
 public class MemoryBenchmarks
 {
-    private ArrayPool<byte> _arrayPool = null!;
+    private ArrayPool<byte> _arrayPool = null!; // Initialized in [GlobalSetup]
 
     [GlobalSetup]
     public void Setup()
@@ -438,8 +438,8 @@ public class MemoryBenchmarks
 [RankColumn]
 public class CompressionBenchmarks
 {
-    private byte[] _compressibleData = null!;
-    private byte[] _randomData = null!;
+    private byte[] _compressibleData = null!; // Initialized in [GlobalSetup]
+    private byte[] _randomData = null!; // Initialized in [GlobalSetup]
 
     [GlobalSetup]
     public void Setup()

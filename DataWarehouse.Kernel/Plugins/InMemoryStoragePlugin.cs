@@ -630,7 +630,7 @@ namespace DataWarehouse.Kernel.Plugins
         private sealed class StoredBlob
         {
             public string Key { get; init; } = string.Empty;
-            public Uri Uri { get; init; } = null!;
+            public required Uri Uri { get; init; }
             public byte[] Data { get; init; } = [];
             public DateTime CreatedAt { get; init; }
             public DateTime LastAccessedAt { get; set; }
@@ -714,7 +714,7 @@ namespace DataWarehouse.Kernel.Plugins
     public class EvictionEvent
     {
         public string Key { get; init; } = string.Empty;
-        public Uri Uri { get; init; } = null!;
+        public required Uri Uri { get; init; }
         public long SizeBytes { get; init; }
         public EvictionReason Reason { get; init; }
         public DateTime EvictedAt { get; init; }

@@ -106,7 +106,7 @@ public sealed class OnnxStrategy : DataFormatStrategyBase
         try
         {
             var buffer = new byte[stream.Length];
-            await stream.ReadAsync(buffer, 0, buffer.Length, ct);
+            await stream.ReadExactlyAsync(buffer, 0, buffer.Length, ct);
 
             var fields = new List<SchemaField>();
 
@@ -156,7 +156,7 @@ public sealed class OnnxStrategy : DataFormatStrategyBase
         try
         {
             var buffer = new byte[Math.Min(4096, stream.Length)];
-            await stream.ReadAsync(buffer, 0, buffer.Length, ct);
+            await stream.ReadExactlyAsync(buffer, 0, buffer.Length, ct);
 
             var errors = new List<ValidationError>();
 

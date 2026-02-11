@@ -42,7 +42,7 @@ public sealed class EmbeddedResourceManager
         if (stream == null) return null;
 
         var buffer = new byte[stream.Length];
-        stream.Read(buffer, 0, buffer.Length);
+        stream.ReadExactly(buffer, 0, buffer.Length);
         _cachedResources[resourceName] = buffer;
         return buffer;
     }

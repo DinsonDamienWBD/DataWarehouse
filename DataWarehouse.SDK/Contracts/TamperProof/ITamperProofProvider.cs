@@ -5,6 +5,7 @@ using DataWarehouse.SDK.AI;
 using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Contracts.IntelligenceAware;
 using DataWarehouse.SDK.Primitives;
+using System.Linq;
 using System.Threading;
 
 namespace DataWarehouse.SDK.Contracts.TamperProof;
@@ -571,7 +572,17 @@ public abstract class TamperProofProviderPluginBase : FeaturePluginBase, ITamper
             var auditResult = AuditResult.CreateSuccess(
                 objectId: objectId,
                 auditChain: new AuditChain { RootObjectId = objectId, Entries = Array.Empty<AuditChainEntry>() },
-                accessLogs: accessLogs.Cast<AccessLog>().ToList(),
+                accessLogs: accessLogs.Select(e => new AccessLog
+                {
+                    ObjectId = e.ObjectId,
+                    Version = 1,
+                    AccessType = e.AccessType,
+                    Principal = e.Principal,
+                    AccessedAt = e.Timestamp,
+                    ClientIp = e.ClientIp,
+                    SessionId = e.SessionId,
+                    Success = e.Succeeded
+                }).ToList(),
                 tamperIncidents: incidents
             );
 

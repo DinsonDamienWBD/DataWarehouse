@@ -302,7 +302,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
                     using var fs = File.OpenRead(filePath);
                     fs.Seek(offset, SeekOrigin.Begin);
                     var buffer = new byte[chunkSize];
-                    await fs.ReadAsync(buffer, 0, chunkSize, ct);
+                    await fs.ReadExactlyAsync(buffer, 0, chunkSize, ct);
                     chunks[chunkIndex] = buffer;
                 }, ct));
 

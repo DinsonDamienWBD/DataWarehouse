@@ -29,7 +29,7 @@ public sealed class ContainerPackedStrategy : FilesystemStrategyBase
         using var fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read);
         fs.Seek(offset, SeekOrigin.Begin);
         var buffer = new byte[length];
-        fs.Read(buffer, 0, length);
+        fs.ReadExactly(buffer, 0, length);
         return Task.FromResult(buffer);
     }
 
@@ -73,7 +73,7 @@ public sealed class OverlayFsStrategy : FilesystemStrategyBase
         using var fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read);
         fs.Seek(offset, SeekOrigin.Begin);
         var buffer = new byte[length];
-        fs.Read(buffer, 0, length);
+        fs.ReadExactly(buffer, 0, length);
         return Task.FromResult(buffer);
     }
 
@@ -126,7 +126,7 @@ public sealed class BlockCacheStrategy : FilesystemStrategyBase
         using var fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read);
         fs.Seek(offset, SeekOrigin.Begin);
         var buffer = new byte[length];
-        fs.Read(buffer, 0, length);
+        fs.ReadExactly(buffer, 0, length);
 
         if (_cache.Count < _cacheSize)
         {
@@ -181,7 +181,7 @@ public sealed class QuotaEnforcementStrategy : FilesystemStrategyBase
         using var fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read);
         fs.Seek(offset, SeekOrigin.Begin);
         var buffer = new byte[length];
-        fs.Read(buffer, 0, length);
+        fs.ReadExactly(buffer, 0, length);
         return Task.FromResult(buffer);
     }
 
@@ -251,7 +251,7 @@ public sealed class XfsStrategy : FilesystemStrategyBase
         using var fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read);
         fs.Seek(offset, SeekOrigin.Begin);
         var buffer = new byte[length];
-        fs.Read(buffer, 0, length);
+        fs.ReadExactly(buffer, 0, length);
         return Task.FromResult(buffer);
     }
 
@@ -315,7 +315,7 @@ public sealed class RefsStrategy : FilesystemStrategyBase
         using var fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read);
         fs.Seek(offset, SeekOrigin.Begin);
         var buffer = new byte[length];
-        fs.Read(buffer, 0, length);
+        fs.ReadExactly(buffer, 0, length);
         return Task.FromResult(buffer);
     }
 

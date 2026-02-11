@@ -67,7 +67,7 @@ public sealed class RdfStrategy : DataFormatStrategyBase
         try
         {
             var buffer = new byte[input.Length];
-            await input.ReadAsync(buffer, 0, buffer.Length, ct);
+            await input.ReadExactlyAsync(buffer, 0, buffer.Length, ct);
             var text = Encoding.UTF8.GetString(buffer);
 
             List<RdfTriple> triples;
@@ -157,7 +157,7 @@ public sealed class RdfStrategy : DataFormatStrategyBase
         {
             stream.Position = 0;
             var buffer = new byte[stream.Length];
-            stream.Read(buffer, 0, buffer.Length);
+            stream.ReadExactly(buffer, 0, buffer.Length);
             var text = Encoding.UTF8.GetString(buffer);
 
             var errors = new List<ValidationError>();

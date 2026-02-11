@@ -1112,7 +1112,7 @@ public sealed class StreamProcessingConfig
 /// </summary>
 public sealed class StreamProcessingResult
 {
-    public DataPoint ProcessedPoint { get; init; } = null!;
+    public required DataPoint ProcessedPoint { get; init; }
     public bool Filtered { get; init; }
     public DateTime ProcessedAt { get; init; }
 }
@@ -1448,7 +1448,7 @@ public sealed class ScalingResult
 public sealed class ResourceSnapshot
 {
     public DateTime Timestamp { get; init; }
-    public ResourceUsage Usage { get; init; } = null!;
+    public required ResourceUsage Usage { get; init; }
 }
 
 /// <summary>
@@ -1751,7 +1751,7 @@ public sealed class SyncCompletedEventArgs : EventArgs
 {
     public required string NodeId { get; init; }
     public required string DataId { get; init; }
-    public SyncResult Result { get; init; } = null!;
+    public required SyncResult Result { get; init; }
 }
 
 /// <summary>
@@ -1759,7 +1759,7 @@ public sealed class SyncCompletedEventArgs : EventArgs
 /// </summary>
 public sealed class SyncConflictEventArgs : EventArgs
 {
-    public SyncConflict Conflict { get; init; } = null!;
+    public required SyncConflict Conflict { get; init; }
 }
 
 /// <summary>
@@ -1778,7 +1778,7 @@ public sealed class ConnectivityChangedEventArgs : EventArgs
 public sealed class CloudMessageReceivedEventArgs : EventArgs
 {
     public required string NodeId { get; init; }
-    public EdgeMessage Message { get; init; } = null!;
+    public required EdgeMessage Message { get; init; }
 }
 
 /// <summary>
@@ -1787,7 +1787,7 @@ public sealed class CloudMessageReceivedEventArgs : EventArgs
 public sealed class AnomalyDetectedEventArgs : EventArgs
 {
     public required string NodeId { get; init; }
-    public AnomalyDetectionResult Result { get; init; } = null!;
+    public required AnomalyDetectionResult Result { get; init; }
 }
 
 /// <summary>

@@ -263,7 +263,7 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Delta
                     {
                         throw new InvalidDataException("Invalid Delta header magic.");
                     }
-                    _input.Read(new byte[4], 0, 4); // Skip length
+                    _input.ReadExactly(new byte[4], 0, 4); // Skip length
                     _headerRead = true;
                 }
 

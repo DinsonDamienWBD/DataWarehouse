@@ -117,7 +117,9 @@ public sealed class DeltaSyncPlugin : FeaturePluginBase
                 // Read the chunk data from target
                 targetStream.Position = i * SignatureChunkSize;
                 var buffer = new byte[SignatureChunkSize];
+                #pragma warning disable CA2022 // Intentional partial read - last chunk may be smaller than SignatureChunkSize
                 var bytesRead = await targetStream.ReadAsync(buffer, 0, SignatureChunkSize, ct);
+                #pragma warning restore CA2022
 
                 var chunkData = new byte[bytesRead];
                 Array.Copy(buffer, chunkData, bytesRead);
@@ -161,7 +163,7 @@ public sealed class DeltaSyncPlugin : FeaturePluginBase
 
         var resultStream = new MemoryStream();
         var baseData = new byte[baseStream.Length];
-        await baseStream.ReadAsync(baseData, 0, (int)baseStream.Length, ct);
+        await baseStream.ReadExactlyAsync(baseData, 0, (int)baseStream.Length, ct);
 
         var processedChunks = new HashSet<int>(delta.RemovedChunks);
 
@@ -236,7 +238,9 @@ public sealed class DeltaSyncPlugin : FeaturePluginBase
         var buffer = new byte[SignatureChunkSize];
         int bytesRead;
 
+        #pragma warning disable CA2022 // Intentional: read loop checks return value for EOF detection
         while ((bytesRead = await stream.ReadAsync(buffer, 0, SignatureChunkSize, ct)) > 0)
+        #pragma warning restore CA2022
         {
             var hash = ComputeRollingHash(buffer, bytesRead);
             signatures.Add(hash);

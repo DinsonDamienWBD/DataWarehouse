@@ -1263,7 +1263,7 @@ public sealed class ThrottleManager
     private readonly SemaphoreSlim _requestSemaphore;
     private readonly int _maxConcurrentRequests;
     private double _currentLoad;
-    private volatile int _activeRequests;
+    private int _activeRequests; // Accessed via Volatile.Read/Interlocked - volatile keyword not needed
     private readonly ConcurrentQueue<(DateTime, int)> _loadHistory = new();
     private readonly Timer _loadUpdateTimer;
     private readonly object _lockObject = new();

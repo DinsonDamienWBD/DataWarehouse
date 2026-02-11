@@ -439,13 +439,13 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Standard
                         catch
                         {
                             failedDiskIndex = i;
-                            chunks.Add(null!);
+                            chunks.Add(Array.Empty<byte>());
                         }
                     }
                     else
                     {
                         failedDiskIndex = i;
-                        chunks.Add(null!);
+                        chunks.Add(Array.Empty<byte>());
                     }
                 }
 
@@ -495,7 +495,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Standard
                 {
                     if (stripeInfo.DataDisks[i] == failedDiskIndex)
                     {
-                        chunks.Add(null!);
+                        chunks.Add(Array.Empty<byte>());
                     }
                     else
                     {
@@ -673,6 +673,12 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Standard
                 }
             }
 
+            // Initialize parity shards (Encode will fill them)
+            for (int i = dataDisksCount; i < totalShards; i++)
+            {
+                shards[i] = new byte[_chunkSize];
+            }
+
             // Encode to generate parity shards
             rs.Encode(shards.AsSpan());
 
@@ -715,6 +721,12 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Standard
             var shardPresent = new bool[diskCount];
             var failedCount = 0;
 
+            // Initialize all shards with empty arrays
+            for (int i = 0; i < diskCount; i++)
+            {
+                shards[i] = Array.Empty<byte>();
+            }
+
             // Read data disks
             for (int i = 0; i < dataDisksCount; i++)
             {
@@ -730,14 +742,12 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Standard
                     }
                     catch
                     {
-                        shards[i] = null!;
                         shardPresent[i] = false;
                         failedCount++;
                     }
                 }
                 else
                 {
-                    shards[i] = null!;
                     shardPresent[i] = false;
                     failedCount++;
                 }
@@ -809,7 +819,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Standard
                 {
                     if (i == failedDiskIndex)
                     {
-                        shards[i] = null!;
+                        shards[i] = Array.Empty<byte>();
                         shardPresent[i] = false;
                     }
                     else

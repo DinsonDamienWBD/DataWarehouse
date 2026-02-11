@@ -599,7 +599,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Extended
                     var diskIndex = setOffset + i;
                     if (diskIndex == failedDiskIndex)
                     {
-                        chunks.Add(null!);
+                        chunks.Add(Array.Empty<byte>());
                     }
                     else
                     {
@@ -868,7 +868,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Extended
                     var diskIndex = setOffset + i;
                     if (diskIndex == failedDiskIndex)
                     {
-                        chunks.Add(null!);
+                        chunks.Add(Array.Empty<byte>());
                     }
                     else
                     {
@@ -1285,7 +1285,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Extended
                 {
                     if (i == failedDiskIndex)
                     {
-                        chunks.Add(null!);
+                        chunks.Add(Array.Empty<byte>());
                     }
                     else if (stripeInfo.ParityDisks.Contains(i))
                     {
@@ -1301,7 +1301,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Extended
                     }
                     else
                     {
-                        chunks.Add(null!);
+                        chunks.Add(Array.Empty<byte>());
                     }
                 }
 
@@ -1526,7 +1526,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Extended
                 {
                     if (i == failedDiskIndex)
                     {
-                        chunks.Add(null!);
+                        chunks.Add(Array.Empty<byte>());
                     }
                     else if (stripeInfo.ParityDisks.Contains(i) || stripeInfo.DataDisks.Contains(i))
                     {
@@ -1536,7 +1536,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Extended
                     }
                     else
                     {
-                        chunks.Add(null!);
+                        chunks.Add(Array.Empty<byte>());
                     }
                 }
 
@@ -1765,7 +1765,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Extended
                 {
                     if (i == failedDiskIndex)
                     {
-                        chunks.Add(null!);
+                        chunks.Add(Array.Empty<byte>());
                     }
                     else if (stripeInfo.ParityDisks.Contains(i) || stripeInfo.DataDisks.Contains(i))
                     {
@@ -1775,7 +1775,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Extended
                     }
                     else
                     {
-                        chunks.Add(null!);
+                        chunks.Add(Array.Empty<byte>());
                     }
                 }
 

@@ -263,7 +263,7 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Transform
                 if (!_initialized)
                 {
                     var compressed = new byte[_baseStream.Length];
-                    _baseStream.Read(compressed, 0, compressed.Length);
+                    _baseStream.ReadExactly(compressed, 0, compressed.Length);
                     var strategy = new BwtStrategy();
                     var decompressed = strategy.DecompressCore(compressed);
                     _decompressedBuffer = new MemoryStream(decompressed);

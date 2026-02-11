@@ -837,7 +837,7 @@ public interface IKubernetesClient
     Task<KubernetesOperationResult> ApplyResourceAsync(
         string apiVersion,
         string resourceType,
-        string namespaceName,
+        string? namespaceName,
         string name,
         string json,
         CancellationToken ct = default);
@@ -846,7 +846,7 @@ public interface IKubernetesClient
     Task<KubernetesOperationResult> DeleteResourceAsync(
         string apiVersion,
         string resourceType,
-        string namespaceName,
+        string? namespaceName,
         string name,
         CancellationToken ct = default);
 
@@ -854,7 +854,7 @@ public interface IKubernetesClient
     Task<KubernetesResourceResult> GetResourceAsync(
         string apiVersion,
         string resourceType,
-        string namespaceName,
+        string? namespaceName,
         string name,
         CancellationToken ct = default);
 
@@ -862,7 +862,7 @@ public interface IKubernetesClient
     Task<KubernetesListResult> ListResourcesAsync(
         string apiVersion,
         string resourceType,
-        string namespaceName,
+        string? namespaceName,
         string? labelSelector = null,
         CancellationToken ct = default);
 
@@ -870,7 +870,7 @@ public interface IKubernetesClient
     Task<KubernetesOperationResult> PatchResourceAsync(
         string apiVersion,
         string resourceType,
-        string namespaceName,
+        string? namespaceName,
         string name,
         string patchJson,
         string patchType = "application/strategic-merge-patch+json",

@@ -195,7 +195,7 @@ public sealed class RbacManager
         var result = await _client.ApplyResourceAsync(
             "rbac.authorization.k8s.io/v1",
             "clusterroles",
-            null!,
+            null,
             name,
             json,
             ct);
@@ -330,7 +330,7 @@ public sealed class RbacManager
         var result = await _client.ApplyResourceAsync(
             "rbac.authorization.k8s.io/v1",
             "clusterrolebindings",
-            null!,
+            null,
             name,
             json,
             ct);
@@ -658,7 +658,7 @@ public sealed class RbacManager
         var crbResult = await _client.DeleteResourceAsync(
             "rbac.authorization.k8s.io/v1",
             "clusterrolebindings",
-            null!,
+            null,
             $"{componentName}-clusterrolebinding",
             ct);
         if (!crbResult.Success && !crbResult.NotFound)
@@ -668,7 +668,7 @@ public sealed class RbacManager
         var crResult = await _client.DeleteResourceAsync(
             "rbac.authorization.k8s.io/v1",
             "clusterroles",
-            null!,
+            null,
             $"{componentName}-clusterrole",
             ct);
         if (!crResult.Success && !crResult.NotFound)

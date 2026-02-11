@@ -48,7 +48,7 @@ public sealed class SafeTensorsStrategy : DataFormatStrategyBase
             return false;
 
         var lengthBytes = new byte[8];
-        await stream.ReadAsync(lengthBytes, 0, 8, ct);
+        await stream.ReadExactlyAsync(lengthBytes, 0, 8, ct);
 
         // Read header length (little-endian)
         long headerLength = BitConverter.ToInt64(lengthBytes, 0);
@@ -63,7 +63,7 @@ public sealed class SafeTensorsStrategy : DataFormatStrategyBase
 
         // Read header JSON
         var headerBytes = new byte[headerLength];
-        await stream.ReadAsync(headerBytes, 0, (int)headerLength, ct);
+        await stream.ReadExactlyAsync(headerBytes, 0, (int)headerLength, ct);
 
         try
         {
@@ -102,12 +102,12 @@ public sealed class SafeTensorsStrategy : DataFormatStrategyBase
         {
             // Read header length
             var lengthBytes = new byte[8];
-            await input.ReadAsync(lengthBytes, 0, 8, ct);
+            await input.ReadExactlyAsync(lengthBytes, 0, 8, ct);
             long headerLength = BitConverter.ToInt64(lengthBytes, 0);
 
             // Read header JSON
             var headerBytes = new byte[headerLength];
-            await input.ReadAsync(headerBytes, 0, (int)headerLength, ct);
+            await input.ReadExactlyAsync(headerBytes, 0, (int)headerLength, ct);
             var headerJson = Encoding.UTF8.GetString(headerBytes);
 
             var header = JsonSerializer.Deserialize<JsonElement>(headerJson);
@@ -142,7 +142,7 @@ public sealed class SafeTensorsStrategy : DataFormatStrategyBase
                 // Read tensor data
                 var tensorData = new byte[tensorSize];
                 input.Position = 8 + headerLength + startOffset;
-                await input.ReadAsync(tensorData, 0, (int)tensorSize, ct);
+                await input.ReadExactlyAsync(tensorData, 0, (int)tensorSize, ct);
 
                 tensors[tensorName] = new SafeTensor
                 {
@@ -215,12 +215,12 @@ public sealed class SafeTensorsStrategy : DataFormatStrategyBase
         {
             // Read header length
             var lengthBytes = new byte[8];
-            await stream.ReadAsync(lengthBytes, 0, 8, ct);
+            await stream.ReadExactlyAsync(lengthBytes, 0, 8, ct);
             long headerLength = BitConverter.ToInt64(lengthBytes, 0);
 
             // Read header JSON
             var headerBytes = new byte[headerLength];
-            await stream.ReadAsync(headerBytes, 0, (int)headerLength, ct);
+            await stream.ReadExactlyAsync(headerBytes, 0, (int)headerLength, ct);
             var headerJson = Encoding.UTF8.GetString(headerBytes);
 
             var header = JsonSerializer.Deserialize<JsonElement>(headerJson);
@@ -277,7 +277,7 @@ public sealed class SafeTensorsStrategy : DataFormatStrategyBase
             }
 
             var lengthBytes = new byte[8];
-            await stream.ReadAsync(lengthBytes, 0, 8, ct);
+            await stream.ReadExactlyAsync(lengthBytes, 0, 8, ct);
             long headerLength = BitConverter.ToInt64(lengthBytes, 0);
 
             // Validate header length
@@ -292,7 +292,7 @@ public sealed class SafeTensorsStrategy : DataFormatStrategyBase
 
             // Read and validate header JSON
             var headerBytes = new byte[headerLength];
-            await stream.ReadAsync(headerBytes, 0, (int)headerLength, ct);
+            await stream.ReadExactlyAsync(headerBytes, 0, (int)headerLength, ct);
 
             try
             {
