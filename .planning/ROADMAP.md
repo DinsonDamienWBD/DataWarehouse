@@ -283,13 +283,13 @@ Plans:
   2. Control plane protocols (WebSocket, MQTT, gRPC streaming) manage control messages
   3. Data plane protocols (HTTP/3, QUIC, HTTP/2, WebTransport) transfer data efficiently
   4. Extensions (swarm intelligence, delta sync, PreCog, mule, global dedup, notification, code signing, policy engine, zero-trust pairing) enhance distribution capabilities
-**Plans**: 7 plans in 1 wave
+**Plans**: 4 plans in 1 wave
 
 Plans:
-- [ ] 12-01: Verify and complete AEDS core plugins (AEDS-C)
-- [ ] 12-02: Verify and complete AEDS control plane (AEDS-CP)
-- [ ] 12-03: Verify and complete AEDS data plane (AEDS-DP)
-- [ ] 12-04: Verify and complete AEDS extensions (AEDS-X)
+- [ ] 12-01-PLAN.md — Verify AEDS core plugins (AedsCore, ServerDispatcher, ClientCourier, Http2DataPlane) for production-readiness
+- [ ] 12-02-PLAN.md — Implement 3 Control Plane transports (WebSocket, MQTT, gRPC streaming)
+- [ ] 12-03-PLAN.md — Implement 3 Data Plane transports (QUIC, HTTP/3, WebTransport stub)
+- [ ] 12-04-PLAN.md — Implement 9 AEDS extension plugins (swarm, delta, PreCog, mule, dedup, notification, code signing, policy, zero-trust)
 
 ### Phase 13: Data Governance Intelligence
 **Goal**: Data governance intelligence plugin provides comprehensive lineage, catalog, quality, semantic, and governance capabilities
@@ -479,7 +479,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8 -> 9 -> 10
 | 9. Advanced Security Features | 0/6 | Not started | - |
 | 10. Advanced Storage Features | 0/7 | Not started | - |
 | 11. Spatial & Psychometric | 0/2 | Not started | - |
-| 12. AEDS System | 0/4 | Not started | - |
+| 12. AEDS System | 0/4 | Planned | - |
 | 13. Data Governance Intelligence | 0/5 | Not started | - |
 | 14. Other Ultimate Plugins | 0/5 | Not started | - |
 | 15. Bug Fixes & Build Health | 0/4 | Not started | - |
