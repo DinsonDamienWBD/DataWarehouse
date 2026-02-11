@@ -5,14 +5,14 @@
 See: .planning/PROJECT.md (updated 2026-02-10)
 
 **Core value:** Every feature listed in the task tracker must be fully production-ready — no placeholders, no simulations, no stubs, no deferred logic. The codebase must match what the task list claims is "complete."
-**Current focus:** Phase 21 IN PROGRESS — Data Transit (Plan 02 of 5 complete)
+**Current focus:** Phase 21 IN PROGRESS — Data Transit (Plan 03 of 5 complete)
 
 ## Current Position
 
 Phase: 21 of 22 (Data Transit) IN PROGRESS
-Plan: 2 of 5 in Phase 21 (21-02 COMPLETE)
-Status: 21-02 COMPLETE — ChunkedResumableStrategy (manifest-based resume, SHA-256 per-chunk) + DeltaDifferentialStrategy (Adler-32 rolling hash, rsync-style delta sync)
-Last activity: 2026-02-11 — Completed 21-02: Chunked/Resumable and Delta/Differential Strategies
+Plan: 3 of 5 in Phase 21 (21-03 COMPLETE)
+Status: 21-03 COMPLETE — P2PSwarmStrategy (BitTorrent-style piece distribution, bounded-channel backpressure) + MultiPathParallelStrategy (weighted path scoring, dynamic rebalancing)
+Last activity: 2026-02-11 — Completed 21-03: P2P Swarm and Multi-Path Parallel Strategies
 
 Progress: [######----] 67%
 
@@ -111,6 +111,7 @@ Progress: [######----] 67%
 | Phase 20 P02 | 4 | 2 tasks | 10 files |
 | Phase 21 P02 | 7 min | 2 tasks | 2 files |
 | Phase 20 P03 | 6 | 2 tasks | 14 files |
+| Phase 21 P03 | 8 min | 2 tasks | 2 files |
 | Phase 15 P01 | 5 min | 2 tasks | 4 files |
 
 ## Accumulated Context
@@ -224,6 +225,7 @@ Recent decisions affecting current work:
 - [Phase 21-02]: ChunkManifest stores TransitRequest reference for resume; Adler-32 mod 65521 for weak hash (rsync-compatible); SHA-256 for strong hash collision resolution; binary delta payload (instruction count + type byte + data); RollingHashComputer stateless/thread-safe
 - [Phase 20]: Tier 2 WASM languages: interpreted (Python/Ruby/JS/PHP/Lua) document interpreter-in-WASM with realistic binary sizes; compiled (TS/Kotlin/Swift/Java/Dart) document AOT/transpiler toolchains
 - [Phase 20]: Grain and MoonBit report WasiSupportLevel.Full as WASM-native languages; Perl reports None (Emscripten-only); all other Tier 3 report Experimental
+- [Phase 21-03]: Bounded Channel<int>(64) for P2P piece queue prevents unbounded memory (research pitfall 3); SemaphoreSlim(8) global + per-peer limit 4; path scoring formula 0.5*throughput - 0.3*latency - 0.2*errorRate with rebalance at 50% threshold; public long field for async-compatible Interlocked byte counting
 - [Phase 15]: T26-T31 bug fixes verified present; deferred tests implemented (36 tests); S3 XML parsing/async fixes not applicable in UltimateStorage (uses AWS SDK)
 
 ### Pending Todos
@@ -238,6 +240,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-02-11 (Phase 21 Plan 02 COMPLETE)
-Stopped at: Completed 21-02-PLAN.md (Chunked/Resumable and Delta/Differential Strategies)
-Resume file: Phase 21 in progress (plan 2 of 5 complete). Ready for 21-03.
+Last session: 2026-02-11 (Phase 21 Plan 03 COMPLETE)
+Stopped at: Completed 21-03-PLAN.md (P2P Swarm and Multi-Path Parallel Strategies)
+Resume file: Phase 21 in progress (plan 3 of 5 complete). Ready for 21-04.
