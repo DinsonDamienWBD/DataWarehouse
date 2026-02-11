@@ -54,6 +54,20 @@ namespace DataWarehouse.Plugins.AppPlatform;
 ///   <item><c>platform.ai.request</c>: Submit an app-scoped AI request with enforcement</item>
 ///   <item><c>platform.ai.usage</c>: Get per-app AI usage tracking data</item>
 ///   <item><c>platform.ai.usage.reset</c>: Reset per-app monthly AI usage counters</item>
+///   <item><c>platform.observability.configure</c>: Configure per-app observability settings</item>
+///   <item><c>platform.observability.remove</c>: Remove per-app observability configuration</item>
+///   <item><c>platform.observability.get</c>: Get per-app observability configuration</item>
+///   <item><c>platform.observability.update</c>: Update per-app observability configuration</item>
+///   <item><c>platform.observability.emit.metric</c>: Emit a metric with app_id tag injection</item>
+///   <item><c>platform.observability.emit.trace</c>: Emit a trace with app_id attribute injection</item>
+///   <item><c>platform.observability.emit.log</c>: Emit a log with app_id property injection</item>
+///   <item><c>platform.observability.query.metrics</c>: Query metrics with app_id isolation</item>
+///   <item><c>platform.observability.query.traces</c>: Query traces with app_id isolation</item>
+///   <item><c>platform.observability.query.logs</c>: Query logs with app_id isolation</item>
+///   <item><c>platform.services.list</c>: List all available platform services</item>
+///   <item><c>platform.services.get</c>: Get a specific service endpoint</item>
+///   <item><c>platform.services.forapp</c>: Get services available to an app based on scopes</item>
+///   <item><c>platform.services.health</c>: Check the health status of a platform service</item>
 /// </list>
 /// </para>
 /// </summary>
@@ -85,6 +99,18 @@ public sealed class AppPlatformPlugin : IntelligenceAwarePluginBase, IDisposable
     /// concurrency limiting, and routing AI requests to UltimateIntelligence.
     /// </summary>
     private AppAiWorkflowStrategy? _aiWorkflowStrategy;
+
+    /// <summary>
+    /// Strategy for managing per-app observability configurations and routing
+    /// metrics, traces, and logs with app_id isolation to UniversalObservability.
+    /// </summary>
+    private AppObservabilityStrategy? _observabilityStrategy;
+
+    /// <summary>
+    /// Facade for unified service discovery, providing a catalog of all consumable
+    /// platform services with their topics, scopes, and supported operations.
+    /// </summary>
+    private PlatformServiceFacade? _serviceFacade;
 
     /// <summary>
     /// List of message bus subscription handles for cleanup on disposal.
@@ -142,6 +168,8 @@ public sealed class AppPlatformPlugin : IntelligenceAwarePluginBase, IDisposable
         _accessPolicyStrategy = new AppAccessPolicyStrategy(MessageBus!, Id);
         _contextRouter = new AppContextRouter(MessageBus!, Id, _tokenService, _registrationService);
         _aiWorkflowStrategy = new AppAiWorkflowStrategy(MessageBus!, Id);
+        _observabilityStrategy = new AppObservabilityStrategy(MessageBus!, Id);
+        _serviceFacade = new PlatformServiceFacade(MessageBus!, Id);
         SubscribeToPlatformTopics();
     }
 
@@ -188,6 +216,24 @@ public sealed class AppPlatformPlugin : IntelligenceAwarePluginBase, IDisposable
         _subscriptions.Add(MessageBus.Subscribe(PlatformTopics.AiRequest, HandleAiRequestAsync));
         _subscriptions.Add(MessageBus.Subscribe(PlatformTopics.AiUsageGet, HandleAiUsageGetAsync));
         _subscriptions.Add(MessageBus.Subscribe(PlatformTopics.AiUsageReset, HandleAiUsageResetAsync));
+
+        // Observability topics
+        _subscriptions.Add(MessageBus.Subscribe(PlatformTopics.ObservabilityConfigure, HandleObservabilityConfigureAsync));
+        _subscriptions.Add(MessageBus.Subscribe(PlatformTopics.ObservabilityRemove, HandleObservabilityRemoveAsync));
+        _subscriptions.Add(MessageBus.Subscribe(PlatformTopics.ObservabilityGet, HandleObservabilityGetAsync));
+        _subscriptions.Add(MessageBus.Subscribe(PlatformTopics.ObservabilityUpdate, HandleObservabilityUpdateAsync));
+        _subscriptions.Add(MessageBus.Subscribe(PlatformTopics.ObservabilityEmitMetric, HandleObservabilityEmitMetricAsync));
+        _subscriptions.Add(MessageBus.Subscribe(PlatformTopics.ObservabilityEmitTrace, HandleObservabilityEmitTraceAsync));
+        _subscriptions.Add(MessageBus.Subscribe(PlatformTopics.ObservabilityEmitLog, HandleObservabilityEmitLogAsync));
+        _subscriptions.Add(MessageBus.Subscribe(PlatformTopics.ObservabilityQueryMetrics, HandleObservabilityQueryMetricsAsync));
+        _subscriptions.Add(MessageBus.Subscribe(PlatformTopics.ObservabilityQueryTraces, HandleObservabilityQueryTracesAsync));
+        _subscriptions.Add(MessageBus.Subscribe(PlatformTopics.ObservabilityQueryLogs, HandleObservabilityQueryLogsAsync));
+
+        // Service discovery topics
+        _subscriptions.Add(MessageBus.Subscribe(PlatformTopics.ServicesList, HandleServicesListAsync));
+        _subscriptions.Add(MessageBus.Subscribe(PlatformTopics.ServicesGet, HandleServicesGetAsync));
+        _subscriptions.Add(MessageBus.Subscribe(PlatformTopics.ServicesForApp, HandleServicesForAppAsync));
+        _subscriptions.Add(MessageBus.Subscribe(PlatformTopics.ServicesHealth, HandleServicesHealthAsync));
     }
 
     // ========================================
@@ -1042,6 +1088,483 @@ public sealed class AppPlatformPlugin : IntelligenceAwarePluginBase, IDisposable
     }
 
     // ========================================
+    // Observability Handlers
+    // ========================================
+
+    /// <summary>
+    /// Handles per-app observability configuration requests.
+    /// Extracts telemetry settings, retention days, log level, and alerting thresholds
+    /// from the payload to create an <see cref="AppObservabilityConfig"/> and delegates
+    /// to <see cref="AppObservabilityStrategy"/>.
+    /// </summary>
+    /// <param name="message">The incoming message containing observability configuration details.</param>
+    /// <returns>A <see cref="MessageResponse"/> confirming the configuration or an error.</returns>
+    private async Task<MessageResponse> HandleObservabilityConfigureAsync(PluginMessage message)
+    {
+        try
+        {
+            var appId = GetPayloadString(message, "AppId");
+            if (appId is null)
+                return MessageResponse.Error("Missing required field: AppId");
+
+            var metricsEnabled = GetPayloadBool(message, "MetricsEnabled") ?? true;
+            var tracingEnabled = GetPayloadBool(message, "TracingEnabled") ?? true;
+            var loggingEnabled = GetPayloadBool(message, "LoggingEnabled") ?? true;
+            var alertingEnabled = GetPayloadBool(message, "AlertingEnabled") ?? false;
+
+            var metricsRetention = GetPayloadInt(message, "MetricsRetentionDays") ?? 30;
+            var tracingRetention = GetPayloadInt(message, "TracingRetentionDays") ?? 7;
+            var logRetention = GetPayloadInt(message, "LogRetentionDays") ?? 14;
+
+            var logLevelStr = GetPayloadString(message, "LogLevel") ?? "Info";
+            if (!Enum.TryParse<ObservabilityLevel>(logLevelStr, true, out var logLevel))
+                logLevel = ObservabilityLevel.Info;
+
+            var alertErrorRate = GetPayloadDouble(message, "AlertThresholdErrorRate");
+            var alertLatencyMs = GetPayloadDouble(message, "AlertThresholdLatencyMs");
+            var alertRpm = GetPayloadInt(message, "AlertThresholdRequestsPerMinute");
+            var alertChannels = GetPayloadStringArray(message, "AlertNotificationChannels") ?? [];
+
+            var config = new AppObservabilityConfig
+            {
+                AppId = appId,
+                MetricsEnabled = metricsEnabled,
+                TracingEnabled = tracingEnabled,
+                LoggingEnabled = loggingEnabled,
+                AlertingEnabled = alertingEnabled,
+                MetricsRetentionDays = metricsRetention,
+                TracingRetentionDays = tracingRetention,
+                LogRetentionDays = logRetention,
+                LogLevel = logLevel,
+                AlertThresholdErrorRate = alertErrorRate,
+                AlertThresholdLatencyMs = alertLatencyMs,
+                AlertThresholdRequestsPerMinute = alertRpm,
+                AlertNotificationChannels = alertChannels,
+                CreatedAt = DateTime.UtcNow
+            };
+
+            var response = await _observabilityStrategy!.ConfigureObservabilityAsync(config);
+            return MessageResponse.Ok(new { Config = config, UpstreamResponse = response });
+        }
+        catch (Exception ex)
+        {
+            return MessageResponse.Error($"Observability configuration failed: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Handles per-app observability configuration removal requests.
+    /// Removes the observability configuration for the specified AppId.
+    /// </summary>
+    /// <param name="message">The incoming message containing the AppId.</param>
+    /// <returns>A <see cref="MessageResponse"/> confirming the removal or an error.</returns>
+    private async Task<MessageResponse> HandleObservabilityRemoveAsync(PluginMessage message)
+    {
+        try
+        {
+            var appId = GetPayloadString(message, "AppId");
+            if (appId is null)
+                return MessageResponse.Error("Missing required field: AppId");
+
+            var response = await _observabilityStrategy!.RemoveObservabilityAsync(appId);
+            return MessageResponse.Ok(new { Removed = true, AppId = appId, UpstreamResponse = response });
+        }
+        catch (Exception ex)
+        {
+            return MessageResponse.Error($"Observability removal failed: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Handles per-app observability configuration retrieval requests.
+    /// Returns the current observability configuration for the specified AppId.
+    /// </summary>
+    /// <param name="message">The incoming message containing the AppId.</param>
+    /// <returns>A <see cref="MessageResponse"/> with the <see cref="AppObservabilityConfig"/> or an error.</returns>
+    private async Task<MessageResponse> HandleObservabilityGetAsync(PluginMessage message)
+    {
+        try
+        {
+            var appId = GetPayloadString(message, "AppId");
+            if (appId is null)
+                return MessageResponse.Error("Missing required field: AppId");
+
+            var config = await _observabilityStrategy!.GetObservabilityConfigAsync(appId);
+            return config is not null
+                ? MessageResponse.Ok(config)
+                : MessageResponse.Error($"No observability config found for application: {appId}");
+        }
+        catch (Exception ex)
+        {
+            return MessageResponse.Error($"Observability retrieval failed: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Handles per-app observability configuration update requests.
+    /// Extracts updated settings from the payload, builds a new
+    /// <see cref="AppObservabilityConfig"/>, and delegates to the strategy.
+    /// </summary>
+    /// <param name="message">The incoming message containing update details.</param>
+    /// <returns>A <see cref="MessageResponse"/> confirming the update or an error.</returns>
+    private async Task<MessageResponse> HandleObservabilityUpdateAsync(PluginMessage message)
+    {
+        try
+        {
+            var appId = GetPayloadString(message, "AppId");
+            if (appId is null)
+                return MessageResponse.Error("Missing required field: AppId");
+
+            var existing = await _observabilityStrategy!.GetObservabilityConfigAsync(appId);
+            if (existing is null)
+                return MessageResponse.Error($"No observability config found for application: {appId}");
+
+            var metricsEnabled = GetPayloadBool(message, "MetricsEnabled") ?? existing.MetricsEnabled;
+            var tracingEnabled = GetPayloadBool(message, "TracingEnabled") ?? existing.TracingEnabled;
+            var loggingEnabled = GetPayloadBool(message, "LoggingEnabled") ?? existing.LoggingEnabled;
+            var alertingEnabled = GetPayloadBool(message, "AlertingEnabled") ?? existing.AlertingEnabled;
+
+            var metricsRetention = GetPayloadInt(message, "MetricsRetentionDays") ?? existing.MetricsRetentionDays;
+            var tracingRetention = GetPayloadInt(message, "TracingRetentionDays") ?? existing.TracingRetentionDays;
+            var logRetention = GetPayloadInt(message, "LogRetentionDays") ?? existing.LogRetentionDays;
+
+            var logLevel = existing.LogLevel;
+            var logLevelStr = GetPayloadString(message, "LogLevel");
+            if (logLevelStr is not null && Enum.TryParse<ObservabilityLevel>(logLevelStr, true, out var parsedLevel))
+                logLevel = parsedLevel;
+
+            var alertErrorRate = message.Payload.ContainsKey("AlertThresholdErrorRate")
+                ? GetPayloadDouble(message, "AlertThresholdErrorRate")
+                : existing.AlertThresholdErrorRate;
+            var alertLatencyMs = message.Payload.ContainsKey("AlertThresholdLatencyMs")
+                ? GetPayloadDouble(message, "AlertThresholdLatencyMs")
+                : existing.AlertThresholdLatencyMs;
+            var alertRpm = message.Payload.ContainsKey("AlertThresholdRequestsPerMinute")
+                ? GetPayloadInt(message, "AlertThresholdRequestsPerMinute")
+                : existing.AlertThresholdRequestsPerMinute;
+            var alertChannels = GetPayloadStringArray(message, "AlertNotificationChannels")
+                ?? existing.AlertNotificationChannels;
+
+            var updatedConfig = new AppObservabilityConfig
+            {
+                AppId = appId,
+                MetricsEnabled = metricsEnabled,
+                TracingEnabled = tracingEnabled,
+                LoggingEnabled = loggingEnabled,
+                AlertingEnabled = alertingEnabled,
+                MetricsRetentionDays = metricsRetention,
+                TracingRetentionDays = tracingRetention,
+                LogRetentionDays = logRetention,
+                LogLevel = logLevel,
+                AlertThresholdErrorRate = alertErrorRate,
+                AlertThresholdLatencyMs = alertLatencyMs,
+                AlertThresholdRequestsPerMinute = alertRpm,
+                AlertNotificationChannels = alertChannels,
+                CreatedAt = existing.CreatedAt
+            };
+
+            var response = await _observabilityStrategy.UpdateObservabilityAsync(updatedConfig);
+            return MessageResponse.Ok(new { Config = updatedConfig, UpstreamResponse = response });
+        }
+        catch (Exception ex)
+        {
+            return MessageResponse.Error($"Observability update failed: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Handles metric emission requests with per-app isolation.
+    /// Extracts AppId, MetricName, Value, and optional Tags from the payload and
+    /// delegates to <see cref="AppObservabilityStrategy.EmitMetricAsync"/> which
+    /// injects the app_id tag for isolation.
+    /// </summary>
+    /// <param name="message">The incoming message containing metric details.</param>
+    /// <returns>A <see cref="MessageResponse"/> from UniversalObservability or an error.</returns>
+    private async Task<MessageResponse> HandleObservabilityEmitMetricAsync(PluginMessage message)
+    {
+        try
+        {
+            var appId = GetPayloadString(message, "AppId");
+            var metricName = GetPayloadString(message, "MetricName");
+
+            if (appId is null || metricName is null)
+                return MessageResponse.Error("Missing required fields: AppId, MetricName");
+
+            var value = 0.0;
+            if (message.Payload.TryGetValue("Value", out var valObj))
+            {
+                value = valObj switch
+                {
+                    double d => d,
+                    float f => f,
+                    int i => i,
+                    long l => l,
+                    decimal dec => (double)dec,
+                    string s when double.TryParse(s, out var parsed) => parsed,
+                    _ => 0.0
+                };
+            }
+
+            var tags = ExtractStringDictionary(message, "Tags");
+
+            var response = await _observabilityStrategy!.EmitMetricAsync(appId, metricName, value, tags);
+            return response ?? MessageResponse.Ok(new { Emitted = false, Reason = "Metrics disabled for app" });
+        }
+        catch (Exception ex)
+        {
+            return MessageResponse.Error($"Metric emission failed: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Handles trace emission requests with per-app isolation.
+    /// Extracts AppId, SpanName, TraceId, and optional Attributes from the payload and
+    /// delegates to <see cref="AppObservabilityStrategy.EmitTraceAsync"/> which
+    /// injects the app_id attribute for isolation.
+    /// </summary>
+    /// <param name="message">The incoming message containing trace details.</param>
+    /// <returns>A <see cref="MessageResponse"/> from UniversalObservability or an error.</returns>
+    private async Task<MessageResponse> HandleObservabilityEmitTraceAsync(PluginMessage message)
+    {
+        try
+        {
+            var appId = GetPayloadString(message, "AppId");
+            var spanName = GetPayloadString(message, "SpanName");
+            var traceId = GetPayloadString(message, "TraceId");
+
+            if (appId is null || spanName is null || traceId is null)
+                return MessageResponse.Error("Missing required fields: AppId, SpanName, TraceId");
+
+            var attributes = ExtractStringDictionary(message, "Attributes");
+
+            var response = await _observabilityStrategy!.EmitTraceAsync(appId, spanName, traceId, attributes);
+            return response ?? MessageResponse.Ok(new { Emitted = false, Reason = "Tracing disabled for app" });
+        }
+        catch (Exception ex)
+        {
+            return MessageResponse.Error($"Trace emission failed: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Handles log emission requests with per-app isolation.
+    /// Extracts AppId, Level, Message, and optional Properties from the payload and
+    /// delegates to <see cref="AppObservabilityStrategy.EmitLogAsync"/> which
+    /// injects the app_id property and filters by configured log level.
+    /// </summary>
+    /// <param name="message">The incoming message containing log details.</param>
+    /// <returns>A <see cref="MessageResponse"/> from UniversalObservability or an error.</returns>
+    private async Task<MessageResponse> HandleObservabilityEmitLogAsync(PluginMessage message)
+    {
+        try
+        {
+            var appId = GetPayloadString(message, "AppId");
+            var logMessage = GetPayloadString(message, "Message");
+
+            if (appId is null || logMessage is null)
+                return MessageResponse.Error("Missing required fields: AppId, Message");
+
+            var levelStr = GetPayloadString(message, "Level") ?? "Info";
+            if (!Enum.TryParse<ObservabilityLevel>(levelStr, true, out var level))
+                level = ObservabilityLevel.Info;
+
+            var properties = ExtractStringDictionary(message, "Properties");
+
+            var response = await _observabilityStrategy!.EmitLogAsync(appId, level, logMessage, properties);
+            return response ?? MessageResponse.Ok(new { Emitted = false, Reason = "Logging disabled or level filtered for app" });
+        }
+        catch (Exception ex)
+        {
+            return MessageResponse.Error($"Log emission failed: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Handles metric query requests with mandatory app_id filter for per-app isolation.
+    /// Extracts AppId, MetricName, From, and To from the payload and delegates to
+    /// <see cref="AppObservabilityStrategy.QueryMetricsAsync"/> which always includes
+    /// the app_id filter to prevent cross-app data leakage.
+    /// </summary>
+    /// <param name="message">The incoming message containing query parameters.</param>
+    /// <returns>A <see cref="MessageResponse"/> with the query results or an error.</returns>
+    private async Task<MessageResponse> HandleObservabilityQueryMetricsAsync(PluginMessage message)
+    {
+        try
+        {
+            var appId = GetPayloadString(message, "AppId");
+            var metricName = GetPayloadString(message, "MetricName");
+
+            if (appId is null || metricName is null)
+                return MessageResponse.Error("Missing required fields: AppId, MetricName");
+
+            var from = GetPayloadDateTime(message, "From") ?? DateTime.UtcNow.AddHours(-1);
+            var to = GetPayloadDateTime(message, "To") ?? DateTime.UtcNow;
+
+            return await _observabilityStrategy!.QueryMetricsAsync(appId, metricName, from, to);
+        }
+        catch (Exception ex)
+        {
+            return MessageResponse.Error($"Metric query failed: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Handles trace query requests with mandatory app_id filter for per-app isolation.
+    /// Extracts AppId and TraceId from the payload and delegates to
+    /// <see cref="AppObservabilityStrategy.QueryTracesAsync"/> which always includes
+    /// the app_id filter to prevent cross-app data leakage.
+    /// </summary>
+    /// <param name="message">The incoming message containing query parameters.</param>
+    /// <returns>A <see cref="MessageResponse"/> with the query results or an error.</returns>
+    private async Task<MessageResponse> HandleObservabilityQueryTracesAsync(PluginMessage message)
+    {
+        try
+        {
+            var appId = GetPayloadString(message, "AppId");
+            var traceId = GetPayloadString(message, "TraceId");
+
+            if (appId is null || traceId is null)
+                return MessageResponse.Error("Missing required fields: AppId, TraceId");
+
+            return await _observabilityStrategy!.QueryTracesAsync(appId, traceId);
+        }
+        catch (Exception ex)
+        {
+            return MessageResponse.Error($"Trace query failed: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Handles log query requests with mandatory app_id filter for per-app isolation.
+    /// Extracts AppId, optional MinLevel, From, and To from the payload and delegates
+    /// to <see cref="AppObservabilityStrategy.QueryLogsAsync"/> which always includes
+    /// the app_id filter to prevent cross-app data leakage.
+    /// </summary>
+    /// <param name="message">The incoming message containing query parameters.</param>
+    /// <returns>A <see cref="MessageResponse"/> with the query results or an error.</returns>
+    private async Task<MessageResponse> HandleObservabilityQueryLogsAsync(PluginMessage message)
+    {
+        try
+        {
+            var appId = GetPayloadString(message, "AppId");
+            if (appId is null)
+                return MessageResponse.Error("Missing required field: AppId");
+
+            ObservabilityLevel? minLevel = null;
+            var minLevelStr = GetPayloadString(message, "MinLevel");
+            if (minLevelStr is not null && Enum.TryParse<ObservabilityLevel>(minLevelStr, true, out var parsedLevel))
+                minLevel = parsedLevel;
+
+            var from = GetPayloadDateTime(message, "From") ?? DateTime.UtcNow.AddHours(-1);
+            var to = GetPayloadDateTime(message, "To") ?? DateTime.UtcNow;
+
+            return await _observabilityStrategy!.QueryLogsAsync(appId, minLevel, from, to);
+        }
+        catch (Exception ex)
+        {
+            return MessageResponse.Error($"Log query failed: {ex.Message}");
+        }
+    }
+
+    // ========================================
+    // Service Discovery Handlers
+    // ========================================
+
+    /// <summary>
+    /// Handles requests to list all available platform services.
+    /// Returns the full <see cref="PlatformServiceCatalog"/> with all 6 services,
+    /// making the complete platform API discoverable via a single message.
+    /// </summary>
+    /// <param name="message">The incoming message (payload unused).</param>
+    /// <returns>A <see cref="MessageResponse"/> with the <see cref="PlatformServiceCatalog"/>.</returns>
+    private async Task<MessageResponse> HandleServicesListAsync(PluginMessage message)
+    {
+        try
+        {
+            var catalog = await _serviceFacade!.GetServiceCatalogAsync();
+            return MessageResponse.Ok(catalog);
+        }
+        catch (Exception ex)
+        {
+            return MessageResponse.Error($"Service catalog retrieval failed: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Handles requests to retrieve a specific service endpoint by name.
+    /// Extracts ServiceName from the payload and returns the matching endpoint.
+    /// </summary>
+    /// <param name="message">The incoming message containing the ServiceName.</param>
+    /// <returns>A <see cref="MessageResponse"/> with the <see cref="ServiceEndpoint"/> or an error.</returns>
+    private async Task<MessageResponse> HandleServicesGetAsync(PluginMessage message)
+    {
+        try
+        {
+            var serviceName = GetPayloadString(message, "ServiceName");
+            if (serviceName is null)
+                return MessageResponse.Error("Missing required field: ServiceName");
+
+            var endpoint = await _serviceFacade!.GetServiceEndpointAsync(serviceName);
+            return endpoint is not null
+                ? MessageResponse.Ok(endpoint)
+                : MessageResponse.Error($"Service not found: {serviceName}");
+        }
+        catch (Exception ex)
+        {
+            return MessageResponse.Error($"Service lookup failed: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Handles requests to list services available to a specific application based
+    /// on its token scopes. Extracts AppId and Scopes from the payload and returns
+    /// the filtered service list.
+    /// </summary>
+    /// <param name="message">The incoming message containing AppId and Scopes.</param>
+    /// <returns>A <see cref="MessageResponse"/> with the accessible <see cref="ServiceEndpoint"/> array.</returns>
+    private async Task<MessageResponse> HandleServicesForAppAsync(PluginMessage message)
+    {
+        try
+        {
+            var appId = GetPayloadString(message, "AppId");
+            var scopes = GetPayloadStringArray(message, "Scopes");
+
+            if (appId is null || scopes is null)
+                return MessageResponse.Error("Missing required fields: AppId, Scopes");
+
+            var services = await _serviceFacade!.GetServicesForAppAsync(appId, scopes);
+            return MessageResponse.Ok(services);
+        }
+        catch (Exception ex)
+        {
+            return MessageResponse.Error($"Service filter failed: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Handles requests to check the health of a specific platform service.
+    /// Extracts ServiceName from the payload and pings the service via the message bus.
+    /// </summary>
+    /// <param name="message">The incoming message containing the ServiceName.</param>
+    /// <returns>A <see cref="MessageResponse"/> with the <see cref="ServiceStatus"/>.</returns>
+    private async Task<MessageResponse> HandleServicesHealthAsync(PluginMessage message)
+    {
+        try
+        {
+            var serviceName = GetPayloadString(message, "ServiceName");
+            if (serviceName is null)
+                return MessageResponse.Error("Missing required field: ServiceName");
+
+            var status = await _serviceFacade!.CheckServiceHealthAsync(serviceName);
+            return MessageResponse.Ok(new { ServiceName = serviceName, Status = status.ToString() });
+        }
+        catch (Exception ex)
+        {
+            return MessageResponse.Error($"Service health check failed: {ex.Message}");
+        }
+    }
+
+    // ========================================
     // Lifecycle Management
     // ========================================
 
@@ -1056,13 +1579,21 @@ public sealed class AppPlatformPlugin : IntelligenceAwarePluginBase, IDisposable
     }
 
     /// <summary>
-    /// Disposes the plugin and all held resources.
+    /// Disposes the plugin and all held resources, including subscriptions
+    /// and references to services, strategies, and facades.
     /// </summary>
     public void Dispose()
     {
         if (_disposed) return;
         _disposed = true;
         DisposeSubscriptions();
+        _registrationService = null;
+        _tokenService = null;
+        _accessPolicyStrategy = null;
+        _contextRouter = null;
+        _aiWorkflowStrategy = null;
+        _observabilityStrategy = null;
+        _serviceFacade = null;
     }
 
     /// <summary>
@@ -1227,5 +1758,134 @@ public sealed class AppPlatformPlugin : IntelligenceAwarePluginBase, IDisposable
             string s when decimal.TryParse(s, out var parsed) => parsed,
             _ => null
         };
+    }
+
+    /// <summary>
+    /// Extracts a boolean value from the message payload by key.
+    /// Handles direct bool values, string representations, and JsonElement deserialization.
+    /// </summary>
+    /// <param name="message">The message to extract from.</param>
+    /// <param name="key">The payload key.</param>
+    /// <returns>The boolean value, or <c>null</c> if not found or not convertible.</returns>
+    private static bool? GetPayloadBool(PluginMessage message, string key)
+    {
+        if (!message.Payload.TryGetValue(key, out var value))
+            return null;
+
+        return value switch
+        {
+            bool b => b,
+            string s when bool.TryParse(s, out var parsed) => parsed,
+            JsonElement je when je.ValueKind == JsonValueKind.True => true,
+            JsonElement je when je.ValueKind == JsonValueKind.False => false,
+            _ => null
+        };
+    }
+
+    /// <summary>
+    /// Extracts an integer value from the message payload by key.
+    /// Handles direct int values, other numeric types, string representations,
+    /// and JsonElement deserialization.
+    /// </summary>
+    /// <param name="message">The message to extract from.</param>
+    /// <param name="key">The payload key.</param>
+    /// <returns>The integer value, or <c>null</c> if not found or not convertible.</returns>
+    private static int? GetPayloadInt(PluginMessage message, string key)
+    {
+        if (!message.Payload.TryGetValue(key, out var value))
+            return null;
+
+        return value switch
+        {
+            int i => i,
+            long l => (int)l,
+            double d => (int)d,
+            string s when int.TryParse(s, out var parsed) => parsed,
+            JsonElement je when je.ValueKind == JsonValueKind.Number => je.GetInt32(),
+            _ => null
+        };
+    }
+
+    /// <summary>
+    /// Extracts a double value from the message payload by key.
+    /// Handles direct double values, other numeric types, string representations,
+    /// and JsonElement deserialization.
+    /// </summary>
+    /// <param name="message">The message to extract from.</param>
+    /// <param name="key">The payload key.</param>
+    /// <returns>The double value, or <c>null</c> if not found or not convertible.</returns>
+    private static double? GetPayloadDouble(PluginMessage message, string key)
+    {
+        if (!message.Payload.TryGetValue(key, out var value))
+            return null;
+
+        return value switch
+        {
+            double d => d,
+            float f => f,
+            int i => i,
+            long l => l,
+            decimal dec => (double)dec,
+            string s when double.TryParse(s, out var parsed) => parsed,
+            JsonElement je when je.ValueKind == JsonValueKind.Number => je.GetDouble(),
+            _ => null
+        };
+    }
+
+    /// <summary>
+    /// Extracts a DateTime value from the message payload by key.
+    /// Handles direct DateTime values, ISO 8601 string representations,
+    /// and JsonElement deserialization.
+    /// </summary>
+    /// <param name="message">The message to extract from.</param>
+    /// <param name="key">The payload key.</param>
+    /// <returns>The DateTime value, or <c>null</c> if not found or not convertible.</returns>
+    private static DateTime? GetPayloadDateTime(PluginMessage message, string key)
+    {
+        if (!message.Payload.TryGetValue(key, out var value))
+            return null;
+
+        return value switch
+        {
+            DateTime dt => dt,
+            string s when DateTime.TryParse(s, null, System.Globalization.DateTimeStyles.RoundtripKind, out var parsed) => parsed,
+            JsonElement je when je.ValueKind == JsonValueKind.String && DateTime.TryParse(je.GetString(), null, System.Globalization.DateTimeStyles.RoundtripKind, out var parsed) => parsed,
+            _ => null
+        };
+    }
+
+    /// <summary>
+    /// Extracts a <see cref="Dictionary{TKey, TValue}"/> of string key-value pairs from the message payload.
+    /// Handles direct dictionaries, JsonElement objects, and various other dictionary types.
+    /// </summary>
+    /// <param name="message">The message to extract from.</param>
+    /// <param name="key">The payload key.</param>
+    /// <returns>The string dictionary, or <c>null</c> if not found or not convertible.</returns>
+    private static Dictionary<string, string>? ExtractStringDictionary(PluginMessage message, string key)
+    {
+        if (!message.Payload.TryGetValue(key, out var value))
+            return null;
+
+        if (value is Dictionary<string, string> dict)
+            return dict;
+
+        if (value is Dictionary<string, object> objDict)
+        {
+            return objDict.ToDictionary(
+                kvp => kvp.Key,
+                kvp => kvp.Value?.ToString() ?? string.Empty);
+        }
+
+        if (value is JsonElement je && je.ValueKind == JsonValueKind.Object)
+        {
+            var result = new Dictionary<string, string>();
+            foreach (var prop in je.EnumerateObject())
+            {
+                result[prop.Name] = prop.Value.GetString() ?? prop.Value.ToString();
+            }
+            return result;
+        }
+
+        return null;
     }
 }
