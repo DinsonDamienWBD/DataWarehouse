@@ -109,6 +109,7 @@ Progress: [######----] 67%
 | Phase 20 P01 | 6 min | 2 tasks | 9 files |
 | Phase 21 P01 | 11 min | 2 tasks | 15 files |
 | Phase 20 P02 | 4 | 2 tasks | 10 files |
+| Phase 20 P03 | 6 | 2 tasks | 14 files |
 
 ## Accumulated Context
 
@@ -219,6 +220,7 @@ Recent decisions affecting current work:
 - [Phase 20-01]: WasmLanguageStrategyBase extends ComputeRuntimeStrategyBase with wasmtime CLI execution, VerifyLanguageAsync pipeline; 7 Tier 1 language strategies (Rust/C/C++/.NET/Go/AssemblyScript/Zig) with real toolchain metadata; AssemblyScript correctly reports WasiSupportLevel.None; embedded 34-byte minimal WASM module shared across all strategies
 - [Phase 21-01]: ByteTracker class pattern for thread-safe byte counting across stream wrappers (avoids ref parameter closure issues in C#); XxHash32 for rolling-hash delta detection in SCP/rsync strategy; raw HTTP/2 gRPC binary framing (no protobuf compilation required); CapabilityCategory.Transport for transit strategy capabilities
 - [Phase 20]: Tier 2 WASM languages: interpreted (Python/Ruby/JS/PHP/Lua) document interpreter-in-WASM with realistic binary sizes; compiled (TS/Kotlin/Swift/Java/Dart) document AOT/transpiler toolchains
+- [Phase 20]: Grain and MoonBit report WasiSupportLevel.Full as WASM-native languages; Perl reports None (Emscripten-only); all other Tier 3 report Experimental
 
 ### Pending Todos
 
