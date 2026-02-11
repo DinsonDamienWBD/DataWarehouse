@@ -11196,15 +11196,15 @@ public enum DataFormatFamily { Row, Column, Scientific, Binary, Hierarchical, Gr
 | 110.B7.6 | ⭐ WkbStrategy - Well-Known Binary | [ ] |
 | 110.B7.7 | ⭐ FlatGeobufStrategy - FlatGeobuf | [ ] |
 | **B8: Graph & Document Formats** |
-| 110.B8.1 | ⭐ RdfStrategy - RDF (Turtle, N-Triples, JSON-LD) | [ ] |
-| 110.B8.2 | ⭐ GraphMlStrategy - GraphML | [ ] |
+| 110.B8.1 | ⭐ RdfStrategy - RDF (Turtle, N-Triples, JSON-LD) | [x] |
+| 110.B8.2 | ⭐ GraphMlStrategy - GraphML | [x] |
 | 110.B8.3 | ⭐ GexfStrategy - GEXF (Gephi) | [ ] |
 | 110.B8.4 | ⭐ DocxStrategy - Office Open XML | [ ] |
 | 110.B8.5 | ⭐ OdfStrategy - Open Document Format | [ ] |
 | 110.B8.6 | ⭐ PdfStrategy - PDF extraction | [ ] |
 | **B9: Table Formats (Lakehouse)** |
-| 110.B9.1 | ⭐ DeltaLakeStrategy - Delta Lake tables | [ ] |
-| 110.B9.2 | ⭐ IcebergStrategy - Apache Iceberg tables | [ ] |
+| 110.B9.1 | ⭐ DeltaLakeStrategy - Delta Lake tables | [x] |
+| 110.B9.2 | ⭐ IcebergStrategy - Apache Iceberg tables | [x] |
 | 110.B9.3 | ⭐ HudiStrategy - Apache Hudi tables | [ ] |
 | **B10: 🚀 INDUSTRY-FIRST Format Innovations** |
 | 110.B10.1 | 🚀 FormatAutoDetectionStrategy - Automatic format detection | [ ] |
@@ -11216,8 +11216,8 @@ public enum DataFormatFamily { Row, Column, Scientific, Binary, Hierarchical, Gr
 | 110.B10.7 | 🚀 VectorizedDeserializationStrategy - SIMD-accelerated parsing | [ ] |
 | 110.B10.8 | 🚀 InstanceProfileOptimizationStrategy - Deployment-time format tuning | [ ] |
 | **B11: AI/ML Model Formats** |
-| 110.B11.1 | ⭐ OnnxStrategy - Open Neural Network Exchange (.onnx) | [ ] |
-| 110.B11.2 | ⭐ SafeTensorsStrategy - Hugging Face secure format (.safetensors) | [ ] |
+| 110.B11.1 | ⭐ OnnxStrategy - Open Neural Network Exchange (.onnx) | [x] |
+| 110.B11.2 | ⭐ SafeTensorsStrategy - Hugging Face secure format (.safetensors) | [x] |
 | 110.B11.3 | ⭐ PyTorchCheckpointStrategy - PyTorch weights (.pt, .pth, .ckpt) | [ ] |
 | 110.B11.4 | ⭐ TensorFlowSavedModelStrategy - TF2 SavedModel format | [ ] |
 | 110.B11.5 | ⭐ TFRecordStrategy - TensorFlow training shards (.tfrecord) | [ ] |
@@ -11236,9 +11236,9 @@ public enum DataFormatFamily { Row, Column, Scientific, Binary, Hierarchical, Gr
 | 110.B11.18 | ⭐ TokenizerJsonStrategy - HF tokenizer.json format | [ ] |
 | **B12: Simulation & CFD Formats** |
 | 110.B12.1 | ⭐ OpenFoamStrategy - OpenFOAM native formats | [ ] |
-| 110.B12.2 | ⭐ VtkStrategy - VTK legacy/XML formats (.vtk, .vtu, .vtp, .vti) | [ ] |
+| 110.B12.2 | ⭐ VtkStrategy - VTK legacy/XML formats (.vtk, .vtu, .vtp, .vti) | [x] |
 | 110.B12.3 | ⭐ PvdStrategy - ParaView data collection (.pvd) | [ ] |
-| 110.B12.4 | ⭐ CgnsStrategy - CFD General Notation System (.cgns) | [ ] |
+| 110.B12.4 | ⭐ CgnsStrategy - CFD General Notation System (.cgns) | [x] |
 | 110.B12.5 | ⭐ ExodusStrategy - Exodus II FEA mesh (.exo, .e) | [ ] |
 | 110.B12.6 | ⭐ AdiosBpStrategy - ADIOS BP format (.bp) | [ ] |
 | 110.B12.7 | ⭐ OpenVdbStrategy - DreamWorks volumetric (.vdb) | [ ] |
