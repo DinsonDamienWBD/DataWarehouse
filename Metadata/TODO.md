@@ -11042,14 +11042,14 @@ public enum InterfaceProtocol { REST, gRPC, GraphQL, SQL, WebSocket, MQTT, AMQP,
 | 109.B10.5 | 🚀 ChangelogGenerationStrategy - Auto changelog from diffs | [x] |
 | 109.B10.6 | 🚀 BreakingChangeDetectionStrategy - Detects breaking changes | [x] |
 | **B11: Air-Gap Convergence UI (for T123/T124)** |
-| 109.B11.1 | ⭐ InstanceArrivalNotificationStrategy - Notify user when air-gapped instance detected | [ ] |
-| 109.B11.2 | ⭐ ConvergenceChoiceDialogStrategy - "Keep Separate" vs "Merge" user decision | [ ] |
-| 109.B11.3 | ⭐ MergeStrategySelectionStrategy - UI for selecting merge strategy | [ ] |
-| 109.B11.4 | ⭐ MasterInstanceSelectionStrategy - UI for selecting master instance | [ ] |
-| 109.B11.5 | ⭐ SchemaConflictResolutionUIStrategy - Interactive per-field conflict resolution | [ ] |
-| 109.B11.6 | ⭐ MergePreviewStrategy - Show preview of merge outcome before execution | [ ] |
-| 109.B11.7 | ⭐ MergeProgressTrackingStrategy - Real-time progress during merge | [ ] |
-| 109.B11.8 | ⭐ MergeResultsSummaryStrategy - Post-merge summary and statistics | [ ] |
+| 109.B11.1 | ⭐ InstanceArrivalNotificationStrategy - Notify user when air-gapped instance detected | [x] |
+| 109.B11.2 | ⭐ ConvergenceChoiceDialogStrategy - "Keep Separate" vs "Merge" user decision | [x] |
+| 109.B11.3 | ⭐ MergeStrategySelectionStrategy - UI for selecting merge strategy | [x] |
+| 109.B11.4 | ⭐ MasterInstanceSelectionStrategy - UI for selecting master instance | [x] |
+| 109.B11.5 | ⭐ SchemaConflictResolutionUIStrategy - Interactive per-field conflict resolution | [x] |
+| 109.B11.6 | ⭐ MergePreviewStrategy - Show preview of merge outcome before execution | [x] |
+| 109.B11.7 | ⭐ MergeProgressTrackingStrategy - Real-time progress during merge | [x] |
+| 109.B11.8 | ⭐ MergeResultsSummaryStrategy - Post-merge summary and statistics | [x] |
 
 ### Phase C: Advanced Features
 
