@@ -1059,7 +1059,7 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Innovations
 
         private sealed class MountedBackup
         {
-            public MountMetadata Metadata { get; set; } = null!;
+            public required MountMetadata Metadata { get; set; }
             public bool IsMounted { get; set; }
             public string MountId { get; set; } = string.Empty;
             public string? MountPath { get; set; }
@@ -1074,7 +1074,7 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Innovations
         private sealed class MountMetadata
         {
             public string BackupId { get; set; } = string.Empty;
-            public BlockMap BlockMap { get; set; } = null!;
+            public required BlockMap BlockMap { get; set; }
             public DateTimeOffset CreatedAt { get; set; }
             public string FileSystemType { get; set; } = string.Empty;
             public bool SupportsWriteback { get; set; }

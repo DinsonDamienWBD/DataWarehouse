@@ -1146,9 +1146,9 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Innovations
         private sealed class MigrationState
         {
             public string RestoreId { get; set; } = string.Empty;
-            public SchemaSnapshot BackupSchema { get; set; } = null!;
-            public SchemaSnapshot TargetSchema { get; set; } = null!;
-            public SchemaComparison Comparison { get; set; } = null!;
+            public required SchemaSnapshot BackupSchema { get; set; }
+            public required SchemaSnapshot TargetSchema { get; set; }
+            public required SchemaComparison Comparison { get; set; }
             public MigrationPipeline? Pipeline { get; set; }
             public DateTimeOffset StartTime { get; set; }
             public int CompletedSteps { get; set; }

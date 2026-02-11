@@ -1077,7 +1077,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Features
     /// </summary>
     public class RecoveryRequestEventArgs : EventArgs
     {
-        public RecoveryRequest Request { get; set; } = null!;
+        public required RecoveryRequest Request { get; set; }
     }
 
     /// <summary>

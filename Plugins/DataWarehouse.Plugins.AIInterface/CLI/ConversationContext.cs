@@ -523,7 +523,7 @@ internal sealed class SessionHistory
 /// </summary>
 internal sealed class StateEntry
 {
-    public object Value { get; init; } = null!;
+    public required object Value { get; init; }
     public DateTime CreatedAt { get; init; }
 }
 
@@ -563,7 +563,7 @@ public sealed class SessionExport
 public sealed class ExportedStateEntry
 {
     /// <summary>Gets or sets the value.</summary>
-    public object Value { get; init; } = null!;
+    public required object Value { get; init; }
 
     /// <summary>Gets or sets when the entry was created.</summary>
     public DateTime CreatedAt { get; init; }

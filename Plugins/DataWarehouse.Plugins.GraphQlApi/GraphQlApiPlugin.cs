@@ -1693,8 +1693,8 @@ scalar DateTime
     private sealed class SubscriptionState
     {
         public string SubscriptionId { get; init; } = string.Empty;
-        public System.Net.WebSockets.WebSocket WebSocket { get; init; } = null!;
-        public CancellationTokenSource CancellationSource { get; init; } = null!;
+        public required System.Net.WebSockets.WebSocket WebSocket { get; init; }
+        public required CancellationTokenSource CancellationSource { get; init; }
         public HashSet<string> SubscribedTopics { get; init; } = new();
     }
 
