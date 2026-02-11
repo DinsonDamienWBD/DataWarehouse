@@ -5612,7 +5612,7 @@ This creates a complete audit trail for every change, enabling compliance report
 #### Task 79: The Mule (Air-Gap Bridge) - Tri-Mode Removable System
 **Priority:** P0
 **Effort:** Very High
-**Status:** [ ] Not Started
+**Status:** [x] Complete
 **Implements In:** Standalone plugin `DataWarehouse.Plugins.AirGapBridge`
 **Dependencies (via Message Bus):**
 - T93 (Ultimate Encryption) - Package encryption
@@ -5628,47 +5628,47 @@ This creates a complete audit trail for every change, enabling compliance report
 | # | Sub-Task | Description | Status |
 |---|----------|-------------|--------|
 | **Detection & Handshake** |
-| 79.1 | USB/External storage/Network Storage Sentinel Service | Windows service monitoring drive insertion/mounting/connection events | [ ] |
-| 79.2 | Config File Scanner | Detect `.dw-config` identity file on drive root | [ ] |
-| 79.3 | Mode Detection | Parse config to determine Transport/Storage/Instance mode | [ ] |
-| 79.4 | Cryptographic Signature | Verify drive authenticity via embedded signatures | [ ] |
+| 79.1 | USB/External storage/Network Storage Sentinel Service | Windows service monitoring drive insertion/mounting/connection events | [x] |
+| 79.2 | Config File Scanner | Detect `.dw-config` identity file on drive root | [x] |
+| 79.3 | Mode Detection | Parse config to determine Transport/Storage/Instance mode | [x] |
+| 79.4 | Cryptographic Signature | Verify drive authenticity via embedded signatures | [x] |
 | **Mode 1: Transport (The Mule)** |
-| 79.5 | Package Creator | Create `.dwpack` files (encrypted shards + manifest) | [ ] |
-| 79.6 | Auto-Ingest Engine | Detect BlobContainer tag and import automatically | [ ] |
-| 79.7 | Signature Verification | Verify package against trusted keys before import | [ ] |
-| 79.8 | Shard Unpacker | Extract and store shards to local storage | [ ] |
-| 79.9 | Result Logging | Write `result.log` to USB for sender feedback | [ ] |
-| 79.10 | Secure Wipe | Optional cryptographic wipe after successful import | [ ] |
+| 79.5 | Package Creator | Create `.dwpack` files (encrypted shards + manifest) | [x] |
+| 79.6 | Auto-Ingest Engine | Detect BlobContainer tag and import automatically | [x] |
+| 79.7 | Signature Verification | Verify package against trusted keys before import | [x] |
+| 79.8 | Shard Unpacker | Extract and store shards to local storage | [x] |
+| 79.9 | Result Logging | Write `result.log` to USB for sender feedback | [x] |
+| 79.10 | Secure Wipe | Optional cryptographic wipe after successful import | [x] |
 | **Mode 2: Storage Extension (The Sidecar)** |
-| 79.11 | Dynamic Provider Loading | Load `LocalFileSystemProvider` for drive path | [ ] |
-| 79.12 | Capacity Registration | Register drive capacity with storage pool | [ ] |
-| 79.13 | Cold Data Migration | Auto-migrate cold data to drive tier | [ ] |
-| 79.14 | Safe Removal/unmounting/disconnect Handler | Handle unplugging gracefully | [ ] |
-| 79.15 | Offline Index | Maintain index entries for offline drive data | [ ] |
+| 79.11 | Dynamic Provider Loading | Load `LocalFileSystemProvider` for drive path | [x] |
+| 79.12 | Capacity Registration | Register drive capacity with storage pool | [x] |
+| 79.13 | Cold Data Migration | Auto-migrate cold data to drive tier | [x] |
+| 79.14 | Safe Removal/unmounting/disconnect Handler | Handle unplugging gracefully | [x] |
+| 79.15 | Offline Index | Maintain index entries for offline drive data | [x] |
 | **Mode 3: Pocket Instance (Full DW on a Stick)** |
-| 79.16 | Guest Context Isolation | Spin up isolated DW instance for removable drive | [ ] |
-| 79.17 | Portable Index DB | SQLite/LiteDB index on removable drive | [ ] |
-| 79.18 | Bridge Mode UI | Show "External: [Name] (USB)" in sidebar | [ ] |
-| 79.19 | Cross-Instance Transfer | Drag-drop between laptop DW and removable drive DW | [ ] |
-| 79.20 | Sync Tasks | Configurable sync rules between instances | [ ] |
+| 79.16 | Guest Context Isolation | Spin up isolated DW instance for removable drive | [x] |
+| 79.17 | Portable Index DB | SQLite/LiteDB index on removable drive | [x] |
+| 79.18 | Bridge Mode UI | Show "External: [Name] (USB)" in sidebar | [x] |
+| 79.19 | Cross-Instance Transfer | Drag-drop between laptop DW and removable drive DW | [x] |
+| 79.20 | Sync Tasks | Configurable sync rules between instances | [x] |
 | **Security** |
-| 79.21 | Full Volume Encryption | BitLocker or internal encryption-at-rest | [ ] |
-| 79.22 | PIN/Password Prompt | Authentication dialog on drive detection | [ ] |
-| 79.23 | Keyfile Authentication | Auto-mount from trusted machines | [ ] |
-| 79.24 | Time-to-Live Kill Switch | Auto-delete keys after N days offline | [ ] |
-| 79.25 | Hardware Key Support | YubiKey/FIDO2 for drive authentication | [ ] |
+| 79.21 | Full Volume Encryption | BitLocker or internal encryption-at-rest | [x] |
+| 79.22 | PIN/Password Prompt | Authentication dialog on drive detection | [x] |
+| 79.23 | Keyfile Authentication | Auto-mount from trusted machines | [x] |
+| 79.24 | Time-to-Live Kill Switch | Auto-delete keys after N days offline | [x] |
+| 79.25 | Hardware Key Support | YubiKey/FIDO2 for drive authentication | [x] |
 | **Setup & Management** |
-| 79.26 | Pocket Setup Wizard | Format Drive as Pocket DW utility | [ ] |
-| 79.27 | Instance ID Generator | Unique cryptographic instance identifiers | [ ] |
-| 79.28 | Portable Client Bundler | Include portable DW client on removable drive | [ ] |
+| 79.26 | Pocket Setup Wizard | Format Drive as Pocket DW utility | [x] |
+| 79.27 | Instance ID Generator | Unique cryptographic instance identifiers | [x] |
+| 79.28 | Portable Client Bundler | Include portable DW client on removable drive | [x] |
 | **Instance Convergence Support (for T123/T124)** |
-| 79.29 | ⭐ Instance Detection Events | Publish `InstanceDetectedEvent` to message bus when Pocket Instance found | [ ] |
-| 79.30 | ⭐ Multi-Instance Arrival Tracking | Track multiple arriving instances for convergence workflow | [ ] |
-| 79.31 | ⭐ Instance Metadata Extraction | Extract schema, version, data statistics from detected instance | [ ] |
-| 79.32 | ⭐ Compatibility Verification | Verify instance version compatibility before convergence | [ ] |
-| 79.33 | ⭐ Processing Manifest Packaging | Include compute manifest (what was processed locally) in transport packages | [ ] |
-| 79.34 | ⭐ Cross-Platform Hardware Detection | Linux udev, macOS FSEvents, Windows WMI for hardware events | [ ] |
-| 79.35 | ⭐ Network-Attached Air-Gap Detection | Detect network drives configured as air-gap storage | [ ] |
+| 79.29 | ⭐ Instance Detection Events | Publish `InstanceDetectedEvent` to message bus when Pocket Instance found | [x] |
+| 79.30 | ⭐ Multi-Instance Arrival Tracking | Track multiple arriving instances for convergence workflow | [x] |
+| 79.31 | ⭐ Instance Metadata Extraction | Extract schema, version, data statistics from detected instance | [x] |
+| 79.32 | ⭐ Compatibility Verification | Verify instance version compatibility before convergence | [x] |
+| 79.33 | ⭐ Processing Manifest Packaging | Include compute manifest (what was processed locally) in transport packages | [x] |
+| 79.34 | ⭐ Cross-Platform Hardware Detection | Linux udev, macOS FSEvents, Windows WMI for hardware events | [x] |
+| 79.35 | ⭐ Network-Attached Air-Gap Detection | Detect network drives configured as air-gap storage | [x] |
 
 **SDK Requirements:**
 - `IAirGapTransport` interface
