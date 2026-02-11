@@ -1332,8 +1332,8 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Features
     /// </summary>
     public class BreakGlassInitiatedEventArgs : EventArgs
     {
-        public BreakGlassSession Session { get; set; } = null!;
-        public EmergencyAccessPolicy Policy { get; set; } = null!;
+        public required BreakGlassSession Session { get; set; }
+        public required EmergencyAccessPolicy Policy { get; set; }
     }
 
     /// <summary>
@@ -1341,8 +1341,8 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Features
     /// </summary>
     public class BreakGlassAuthorizedEventArgs : EventArgs
     {
-        public BreakGlassSession Session { get; set; } = null!;
-        public AuthorizedResponder FinalAuthorizer { get; set; } = null!;
+        public required BreakGlassSession Session { get; set; }
+        public required AuthorizedResponder FinalAuthorizer { get; set; }
     }
 
     /// <summary>
@@ -1361,7 +1361,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Features
     /// </summary>
     public class BreakGlassSessionEndedEventArgs : EventArgs
     {
-        public BreakGlassSession Session { get; set; } = null!;
+        public required BreakGlassSession Session { get; set; }
         public string? EndedBy { get; set; }
         public string? Reason { get; set; }
     }

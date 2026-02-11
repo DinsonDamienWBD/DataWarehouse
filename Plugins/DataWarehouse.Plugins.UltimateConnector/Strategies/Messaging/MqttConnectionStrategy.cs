@@ -35,7 +35,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Messaging
             await stream.FlushAsync(ct);
             // Read CONNACK
             var ackBuffer = new byte[4];
-            await stream.ReadAsync(ackBuffer, 0, 4, ct);
+            await stream.ReadExactlyAsync(ackBuffer, 0, 4, ct);
             return new DefaultConnectionHandle(tcpClient, new Dictionary<string, object> { ["Host"] = host, ["Port"] = port });
         }
         protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct) { try { return handle.GetConnection<TcpClient>()?.Connected ?? false; } catch { return false; } }
@@ -66,7 +66,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Messaging
             await stream.FlushAsync(ct);
             // Read SUBACK
             var subackBuffer = new byte[5];
-            await stream.ReadAsync(subackBuffer, 0, 5, ct);
+            await stream.ReadExactlyAsync(subackBuffer, 0, 5, ct);
             // Read PUBLISH messages
             while (!ct.IsCancellationRequested && client.Connected)
             {
@@ -158,7 +158,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Messaging
             var multiplier = 1;
             var value = 0;
             byte encodedByte;
-            do { var buffer = new byte[1]; await stream.ReadAsync(buffer, 0, 1, ct); encodedByte = buffer[0]; value += (encodedByte & 127) * multiplier; multiplier *= 128; } while ((encodedByte & 128) != 0);
+            do { var buffer = new byte[1]; await stream.ReadExactlyAsync(buffer, 0, 1, ct); encodedByte = buffer[0]; value += (encodedByte & 127) * multiplier; multiplier *= 128; } while ((encodedByte & 128) != 0);
             return value;
         }
     }

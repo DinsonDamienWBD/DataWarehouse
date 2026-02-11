@@ -217,7 +217,7 @@ public sealed class CertManagerIntegration
         var result = await _client.ApplyResourceAsync(
             "cert-manager.io/v1",
             "clusterissuers",
-            null!,
+            null,
             name,
             json,
             ct);

@@ -31,7 +31,9 @@ public sealed class PosixDriverStrategy : FilesystemStrategyBase
         await using var fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read, options?.BufferSize ?? 4096, fileOptions);
         fs.Seek(offset, SeekOrigin.Begin);
         var buffer = new byte[length];
+        #pragma warning disable CA2022 // Intentional partial read - bytesRead is checked and buffer resized
         var bytesRead = await fs.ReadAsync(buffer, 0, length, ct);
+        #pragma warning restore CA2022
         if (bytesRead < length)
             Array.Resize(ref buffer, bytesRead);
         return buffer;
@@ -82,7 +84,9 @@ public sealed class DirectIoDriverStrategy : FilesystemStrategyBase
         await using var fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read, 4096, FileOptions.WriteThrough);
         fs.Seek(alignedOffset, SeekOrigin.Begin);
         var buffer = new byte[alignedLength];
+        #pragma warning disable CA2022 // Intentional partial read - aligned buffer may exceed available data
         var bytesRead = await fs.ReadAsync(buffer, 0, alignedLength, ct);
+        #pragma warning restore CA2022
 
         // Return only requested portion
         var result = new byte[Math.Min(length, bytesRead)];
@@ -132,7 +136,7 @@ public sealed class IoUringDriverStrategy : FilesystemStrategyBase
         await using var fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read, 4096, FileOptions.Asynchronous);
         fs.Seek(offset, SeekOrigin.Begin);
         var buffer = new byte[length];
-        await fs.ReadAsync(buffer, 0, length, ct);
+        await fs.ReadExactlyAsync(buffer, 0, length, ct);
         return buffer;
     }
 
@@ -222,7 +226,7 @@ public sealed class WindowsNativeDriverStrategy : FilesystemStrategyBase
         await using var fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read, options?.BufferSize ?? 4096, fileOptions);
         fs.Seek(offset, SeekOrigin.Begin);
         var buffer = new byte[length];
-        await fs.ReadAsync(buffer, 0, length, ct);
+        await fs.ReadExactlyAsync(buffer, 0, length, ct);
         return buffer;
     }
 
@@ -268,7 +272,7 @@ public sealed class AsyncIoDriverStrategy : FilesystemStrategyBase
         await using var fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read, 4096, FileOptions.Asynchronous);
         fs.Seek(offset, SeekOrigin.Begin);
         var buffer = new byte[length];
-        await fs.ReadAsync(buffer.AsMemory(0, length), ct);
+        await fs.ReadExactlyAsync(buffer.AsMemory(0, length), ct);
         return buffer;
     }
 

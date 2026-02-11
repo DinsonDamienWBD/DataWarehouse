@@ -3884,7 +3884,7 @@ namespace DataWarehouse.SDK.Contracts.IntelligenceAware
     public sealed class OptimizationOpportunityEventArgs : EventArgs
     {
         /// <summary>The detected opportunity.</summary>
-        public OptimizationRecommendation Opportunity { get; init; } = null!;
+        public required OptimizationRecommendation Opportunity { get; init; }
         /// <summary>When the opportunity was detected.</summary>
         public DateTimeOffset DetectedAt { get; init; } = DateTimeOffset.UtcNow;
         /// <summary>Urgency level (Low, Normal, High, Urgent).</summary>

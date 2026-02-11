@@ -2523,8 +2523,8 @@ public class MediaTranscodingPlugin : MediaTranscodingPluginBase
 /// </summary>
 internal class TranscodingJobContext
 {
-    public TranscodingJob Job { get; init; } = null!;
-    public CancellationTokenSource CancellationTokenSource { get; init; } = null!;
+    public required TranscodingJob Job { get; init; }
+    public required CancellationTokenSource CancellationTokenSource { get; init; }
     public DateTime StartedAt { get; init; }
     public double Progress { get; set; }
 }
@@ -2541,7 +2541,7 @@ public class CachedTranscodingResult
     /// <summary>Profile identifier.</summary>
     public string ProfileId { get; init; } = string.Empty;
     /// <summary>Transcoding result.</summary>
-    public TranscodingResult Result { get; init; } = null!;
+    public required TranscodingResult Result { get; init; }
     /// <summary>When cached.</summary>
     public DateTime CachedAt { get; init; }
     /// <summary>When expires.</summary>
@@ -2573,7 +2573,7 @@ public class TranscodingCompletedEventArgs : EventArgs
     /// <summary>Whether transcoding succeeded.</summary>
     public bool Success { get; init; }
     /// <summary>Transcoding result.</summary>
-    public TranscodingResult Result { get; init; } = null!;
+    public required TranscodingResult Result { get; init; }
     /// <summary>Whether result was from cache.</summary>
     public bool FromCache { get; init; }
 }

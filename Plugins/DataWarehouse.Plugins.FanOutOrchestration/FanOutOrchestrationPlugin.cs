@@ -63,7 +63,7 @@ public class FanOutWorkItem
     /// <summary>
     /// The payload to process.
     /// </summary>
-    public object Payload { get; set; } = null!;
+    public required object Payload { get; set; }
 
     /// <summary>
     /// Priority (higher = process first).
@@ -898,12 +898,12 @@ public class FanOutErrorContext
     /// <summary>
     /// The failed work item.
     /// </summary>
-    public FanOutWorkItem WorkItem { get; init; } = null!;
+    public required FanOutWorkItem WorkItem { get; init; }
 
     /// <summary>
     /// The exception that occurred.
     /// </summary>
-    public Exception Exception { get; init; } = null!;
+    public required Exception Exception { get; init; }
 
     /// <summary>
     /// Current retry attempt.
@@ -2311,8 +2311,8 @@ public class FanOutMetrics
     public long SuccessfulItems { get; init; }
     public long FailedItems { get; init; }
     public int ActiveOperations { get; init; }
-    public CircuitBreakerStatus CircuitBreakerStatus { get; init; } = null!;
-    public CacheStatistics CacheStatistics { get; init; } = null!;
+    public required CircuitBreakerStatus CircuitBreakerStatus { get; init; }
+    public required CacheStatistics CacheStatistics { get; init; }
     public RateLimitStatistics? RateLimitStatistics { get; init; }
     public Dictionary<string, long> OperationsPerStrategy { get; init; } = new();
 

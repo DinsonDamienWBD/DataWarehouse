@@ -63,7 +63,7 @@ public sealed class ShapefileStrategy : DataFormatStrategyBase
         // We need to read 4 more bytes at offset 32
         stream.Position = 32;
         var shapeTypeBuffer = new byte[4];
-        await stream.ReadAsync(shapeTypeBuffer, 0, 4, ct);
+        await stream.ReadExactlyAsync(shapeTypeBuffer, 0, 4, ct);
 
         int shapeType = shapeTypeBuffer[0] | (shapeTypeBuffer[1] << 8) | (shapeTypeBuffer[2] << 16) | (shapeTypeBuffer[3] << 24);
 
@@ -114,7 +114,7 @@ public sealed class ShapefileStrategy : DataFormatStrategyBase
         // Read shape type from header for basic schema info
         stream.Position = 32;
         var shapeTypeBuffer = new byte[4];
-        await stream.ReadAsync(shapeTypeBuffer, 0, 4, ct);
+        await stream.ReadExactlyAsync(shapeTypeBuffer, 0, 4, ct);
         int shapeType = shapeTypeBuffer[0] | (shapeTypeBuffer[1] << 8) | (shapeTypeBuffer[2] << 16) | (shapeTypeBuffer[3] << 24);
 
         var shapeTypeNames = new Dictionary<int, string>
@@ -164,7 +164,7 @@ public sealed class ShapefileStrategy : DataFormatStrategyBase
         // Check file length in header
         stream.Position = 24;
         var lengthBuffer = new byte[4];
-        await stream.ReadAsync(lengthBuffer, 0, 4, ct);
+        await stream.ReadExactlyAsync(lengthBuffer, 0, 4, ct);
         int fileLength = (lengthBuffer[0] << 24) | (lengthBuffer[1] << 16) | (lengthBuffer[2] << 8) | lengthBuffer[3];
         int expectedLength = fileLength * 2; // File length is in 16-bit words
 

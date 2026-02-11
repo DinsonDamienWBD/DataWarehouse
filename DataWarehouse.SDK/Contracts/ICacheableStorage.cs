@@ -258,10 +258,10 @@ public enum CacheEvictionPolicy
 public class CacheEntryMetadata
 {
     /// <summary>URI of the cached item.</summary>
-    public Uri Uri { get; set; } = null!;
+    public Uri? Uri { get; set; }
 
     /// <summary>String key for the cached item (alternative to Uri).</summary>
-    public string Key { get => Uri?.ToString() ?? ""; set => Uri = string.IsNullOrEmpty(value) ? null! : new Uri(value); }
+    public string Key { get => Uri?.ToString() ?? ""; set => Uri = string.IsNullOrEmpty(value) ? null : new Uri(value); }
 
     /// <summary>Size of the cached data in bytes.</summary>
     public long SizeBytes { get; set; }

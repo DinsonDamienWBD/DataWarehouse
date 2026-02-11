@@ -1669,7 +1669,7 @@ namespace DataWarehouse.SDK.Services
         /// <summary>
         /// Gets or sets the affected task.
         /// </summary>
-        public AgentTask Task { get; init; } = null!;
+        public required AgentTask Task { get; init; }
 
         /// <summary>
         /// Gets or sets when the change occurred.

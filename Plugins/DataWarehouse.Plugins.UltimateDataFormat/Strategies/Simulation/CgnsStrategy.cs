@@ -160,7 +160,7 @@ public sealed class CgnsStrategy : DataFormatStrategyBase
         try
         {
             var buffer = new byte[8];
-            await stream.ReadAsync(buffer, 0, 8, ct);
+            await stream.ReadExactlyAsync(buffer, 0, 8, ct);
 
             var errors = new List<ValidationError>();
 

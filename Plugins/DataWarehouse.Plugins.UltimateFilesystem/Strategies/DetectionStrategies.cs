@@ -188,7 +188,7 @@ public sealed class Ext4Strategy : FilesystemStrategyBase
         using var fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read);
         fs.Seek(offset, SeekOrigin.Begin);
         var buffer = new byte[length];
-        fs.Read(buffer, 0, length);
+        fs.ReadExactly(buffer, 0, length);
         return Task.FromResult(buffer);
     }
 
@@ -248,7 +248,7 @@ public sealed class BtrfsStrategy : FilesystemStrategyBase
         using var fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read);
         fs.Seek(offset, SeekOrigin.Begin);
         var buffer = new byte[length];
-        fs.Read(buffer, 0, length);
+        fs.ReadExactly(buffer, 0, length);
         return Task.FromResult(buffer);
     }
 
@@ -305,7 +305,7 @@ public sealed class ZfsStrategy : FilesystemStrategyBase
         using var fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read);
         fs.Seek(offset, SeekOrigin.Begin);
         var buffer = new byte[length];
-        fs.Read(buffer, 0, length);
+        fs.ReadExactly(buffer, 0, length);
         return Task.FromResult(buffer);
     }
 
@@ -365,7 +365,7 @@ public sealed class ApfsStrategy : FilesystemStrategyBase
         using var fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read);
         fs.Seek(offset, SeekOrigin.Begin);
         var buffer = new byte[length];
-        fs.Read(buffer, 0, length);
+        fs.ReadExactly(buffer, 0, length);
         return Task.FromResult(buffer);
     }
 

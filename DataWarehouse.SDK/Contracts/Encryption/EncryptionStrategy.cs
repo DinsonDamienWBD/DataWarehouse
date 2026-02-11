@@ -1311,12 +1311,12 @@ namespace DataWarehouse.SDK.Contracts.Encryption
         /// </summary>
         public static byte[] DerivePbkdf2(string password, byte[] salt, int iterations, int keyLengthBytes)
         {
-            using var pbkdf2 = new Rfc2898DeriveBytes(
+            return Rfc2898DeriveBytes.Pbkdf2(
                 password,
                 salt,
                 iterations,
-                HashAlgorithmName.SHA256);
-            return pbkdf2.GetBytes(keyLengthBytes);
+                HashAlgorithmName.SHA256,
+                keyLengthBytes);
         }
 
         /// <summary>
@@ -1324,12 +1324,12 @@ namespace DataWarehouse.SDK.Contracts.Encryption
         /// </summary>
         public static byte[] DerivePbkdf2Sha512(string password, byte[] salt, int iterations, int keyLengthBytes)
         {
-            using var pbkdf2 = new Rfc2898DeriveBytes(
+            return Rfc2898DeriveBytes.Pbkdf2(
                 password,
                 salt,
                 iterations,
-                HashAlgorithmName.SHA512);
-            return pbkdf2.GetBytes(keyLengthBytes);
+                HashAlgorithmName.SHA512,
+                keyLengthBytes);
         }
 
         /// <summary>

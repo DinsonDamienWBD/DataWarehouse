@@ -47,7 +47,7 @@ public sealed class KmlStrategy : DataFormatStrategyBase
 
             // Check for KMZ (ZIP signature: PK)
             var buffer = new byte[2];
-            await stream.ReadAsync(buffer, 0, 2, ct);
+            await stream.ReadExactlyAsync(buffer, 0, 2, ct);
 
             if (buffer[0] == 0x50 && buffer[1] == 0x4B) // "PK" - ZIP signature
             {
@@ -82,7 +82,7 @@ public sealed class KmlStrategy : DataFormatStrategyBase
 
             // Check if KMZ (compressed)
             var buffer = new byte[2];
-            await input.ReadAsync(buffer, 0, 2, ct);
+            await input.ReadExactlyAsync(buffer, 0, 2, ct);
 
             if (buffer[0] == 0x50 && buffer[1] == 0x4B) // KMZ
             {

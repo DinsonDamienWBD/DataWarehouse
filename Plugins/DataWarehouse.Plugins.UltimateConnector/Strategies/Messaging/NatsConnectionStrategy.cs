@@ -29,7 +29,9 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Messaging
             var stream = tcpClient.GetStream();
             // Read server INFO
             var buffer = new byte[1024];
+            #pragma warning disable CA2022 // Intentional partial read - NATS INFO message is variable-length
             await stream.ReadAsync(buffer, 0, buffer.Length, ct);
+            #pragma warning restore CA2022
             // Send CONNECT
             var connectCmd = "CONNECT {\"verbose\":false,\"pedantic\":false,\"name\":\"datawarehouse\"}\r\n";
             var connectBytes = Encoding.UTF8.GetBytes(connectCmd);

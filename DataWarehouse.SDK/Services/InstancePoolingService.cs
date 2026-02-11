@@ -734,7 +734,7 @@ public enum PoolHealth
 public class PooledInstance<T> where T : class
 {
     public int Id { get; set; }
-    public T Instance { get; set; } = null!;
+    public required T Instance { get; set; }
     public DateTime CreatedAt { get; set; }
     public DateTime LastUsed { get; set; }
     public int UseCount { get; set; }

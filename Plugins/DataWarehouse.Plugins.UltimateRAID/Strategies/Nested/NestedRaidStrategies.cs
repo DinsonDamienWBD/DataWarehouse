@@ -286,13 +286,13 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Nested
                     catch
                     {
                         failedDiskInGroup = i;
-                        chunks.Add(null!);
+                        chunks.Add(Array.Empty<byte>());
                     }
                 }
                 else
                 {
                     failedDiskInGroup = i;
-                    chunks.Add(null!);
+                    chunks.Add(Array.Empty<byte>());
                 }
             }
 
@@ -305,7 +305,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Nested
                 var reconstructed = parityChunk.ToArray();
                 for (int i = 0; i < chunks.Count; i++)
                 {
-                    if (i != failedDiskInGroup && chunks[i] != null)
+                    if (i != failedDiskInGroup && chunks[i].Length > 0)
                     {
                         for (int j = 0; j < _chunkSize; j++)
                         {

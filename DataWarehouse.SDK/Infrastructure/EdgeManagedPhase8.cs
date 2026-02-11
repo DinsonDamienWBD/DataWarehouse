@@ -675,7 +675,7 @@ public enum EdgeClassification { Edge, Regional, Origin, Remote }
 
 public sealed class EdgeNodeEventArgs : EventArgs
 {
-    public EdgeNodeInfo Node { get; init; } = null!;
+    public required EdgeNodeInfo Node { get; init; }
 }
 
 public sealed class EdgeOriginSyncConfig
@@ -812,7 +812,7 @@ public enum TenantStatus { Active, Suspended, PendingDeletion, Deleted }
 
 public sealed class TenantEventArgs : EventArgs
 {
-    public TenantInfo Tenant { get; init; } = null!;
+    public required TenantInfo Tenant { get; init; }
 }
 
 public sealed class UsageRecord

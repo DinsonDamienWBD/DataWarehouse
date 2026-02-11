@@ -136,7 +136,7 @@ public sealed class ParquetStrategy : DataFormatStrategyBase
         // Check PAR1 magic at start
         stream.Position = 0;
         var header = new byte[4];
-        await stream.ReadAsync(header, 0, 4, ct);
+        await stream.ReadExactlyAsync(header, 0, 4, ct);
 
         if (header[0] != 'P' || header[1] != 'A' || header[2] != 'R' || header[3] != '1')
         {
