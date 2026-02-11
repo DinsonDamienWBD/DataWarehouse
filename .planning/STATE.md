@@ -5,14 +5,14 @@
 See: .planning/PROJECT.md (updated 2026-02-10)
 
 **Core value:** Every feature listed in the task tracker must be fully production-ready — no placeholders, no simulations, no stubs, no deferred logic. The codebase must match what the task list claims is "complete."
-**Current focus:** Phase 21 IN PROGRESS — Data Transit (Plan 01 of 5 complete)
+**Current focus:** Phase 21 IN PROGRESS — Data Transit (Plan 02 of 5 complete)
 
 ## Current Position
 
 Phase: 21 of 22 (Data Transit) IN PROGRESS
-Plan: 1 of 5 in Phase 21 (21-01 COMPLETE)
-Status: 21-01 COMPLETE — SDK transit contracts + UltimateDataTransit plugin with orchestrator, registry, and 6 direct strategies (HTTP/2, HTTP/3, gRPC, FTP, SFTP, SCP/rsync)
-Last activity: 2026-02-11 — Completed 21-01: Data Transit Foundation
+Plan: 2 of 5 in Phase 21 (21-02 COMPLETE)
+Status: 21-02 COMPLETE — ChunkedResumableStrategy (manifest-based resume, SHA-256 per-chunk) + DeltaDifferentialStrategy (Adler-32 rolling hash, rsync-style delta sync)
+Last activity: 2026-02-11 — Completed 21-02: Chunked/Resumable and Delta/Differential Strategies
 
 Progress: [######----] 67%
 
@@ -109,6 +109,7 @@ Progress: [######----] 67%
 | Phase 20 P01 | 6 min | 2 tasks | 9 files |
 | Phase 21 P01 | 11 min | 2 tasks | 15 files |
 | Phase 20 P02 | 4 | 2 tasks | 10 files |
+| Phase 21 P02 | 7 min | 2 tasks | 2 files |
 | Phase 20 P03 | 6 | 2 tasks | 14 files |
 
 ## Accumulated Context
@@ -219,6 +220,7 @@ Recent decisions affecting current work:
 - [Phase 17-03]: T57 usage analytics complete -- event-based tracking (PluginUsageEvent with 7 event types) wired into install/uninstall/update handlers; hourly timer-based aggregation computing PopularityScore from real event counts ((installs*10 + activeUsers*5 - uninstalls*3 - errors*2) clamped 0-100); per-plugin and marketplace-wide analytics via marketplace.analytics handler; daily event log rotation (90 days); Phase 17 complete
 - [Phase 20-01]: WasmLanguageStrategyBase extends ComputeRuntimeStrategyBase with wasmtime CLI execution, VerifyLanguageAsync pipeline; 7 Tier 1 language strategies (Rust/C/C++/.NET/Go/AssemblyScript/Zig) with real toolchain metadata; AssemblyScript correctly reports WasiSupportLevel.None; embedded 34-byte minimal WASM module shared across all strategies
 - [Phase 21-01]: ByteTracker class pattern for thread-safe byte counting across stream wrappers (avoids ref parameter closure issues in C#); XxHash32 for rolling-hash delta detection in SCP/rsync strategy; raw HTTP/2 gRPC binary framing (no protobuf compilation required); CapabilityCategory.Transport for transit strategy capabilities
+- [Phase 21-02]: ChunkManifest stores TransitRequest reference for resume; Adler-32 mod 65521 for weak hash (rsync-compatible); SHA-256 for strong hash collision resolution; binary delta payload (instruction count + type byte + data); RollingHashComputer stateless/thread-safe
 - [Phase 20]: Tier 2 WASM languages: interpreted (Python/Ruby/JS/PHP/Lua) document interpreter-in-WASM with realistic binary sizes; compiled (TS/Kotlin/Swift/Java/Dart) document AOT/transpiler toolchains
 - [Phase 20]: Grain and MoonBit report WasiSupportLevel.Full as WASM-native languages; Perl reports None (Emscripten-only); all other Tier 3 report Experimental
 
@@ -234,6 +236,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-02-11 (Phase 21 Plan 01 COMPLETE)
-Stopped at: Completed 21-01-PLAN.md (Data Transit Foundation)
-Resume file: Phase 21 in progress (plan 1 of 5 complete). Ready for 21-02.
+Last session: 2026-02-11 (Phase 21 Plan 02 COMPLETE)
+Stopped at: Completed 21-02-PLAN.md (Chunked/Resumable and Delta/Differential Strategies)
+Resume file: Phase 21 in progress (plan 2 of 5 complete). Ready for 21-03.
