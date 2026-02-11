@@ -81,6 +81,7 @@
     <Project Path="Plugins/DataWarehouse.Plugins.RetryPolicy/DataWarehouse.Plugins.RetryPolicy.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.SchemaRegistry/DataWarehouse.Plugins.SchemaRegistry.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.Search/DataWarehouse.Plugins.Search.csproj" />
+    <Project Path="Plugins/DataWarehouse.Plugins.SelfEmulatingObjects/DataWarehouse.Plugins.SelfEmulatingObjects.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.SigNoz/DataWarehouse.Plugins.SigNoz.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.SmartScheduling/DataWarehouse.Plugins.SmartScheduling.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.Splunk/DataWarehouse.Plugins.Splunk.csproj" />

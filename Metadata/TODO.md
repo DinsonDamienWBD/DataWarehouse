@@ -283,7 +283,7 @@ T99 (SDK) → T94 (Key Mgmt) → T93 (Encryption) → TamperProof (T3.4.2)
 | **4.13** | T85 | Probabilistic Storage | ~~DataWarehouse.Plugins.Storage.Probabilistic~~ | **SDK (T99)** primitives + **T104** `ProbabilisticStorageStrategy` | [x] |
 | Order | Task | Name | Original Plugin | NOW: Implement In | Status |
 |-------|------|------|-----------------|-------------------|--------|
-| **4.14** | T86 | Self-Emulating Objects | ~~DataWarehouse.Plugins.Archival.SelfEmulation~~ | **Standalone** (unique WASM bundling) | [x] |
+| **4.14** | T86 | Self-Emulating Objects | DataWarehouse.Plugins.SelfEmulatingObjects | **Standalone** (WASM viewer bundling for format preservation) | [x] |
 | Order | Task | Name | Original Plugin | NOW: Implement In | Status |
 |-------|------|------|-----------------|-------------------|--------|
 | **4.15** | T87 | Spatial AR Anchors | ~~DataWarehouse.Plugins.Spatial.ArAnchors~~ | **SDK (T99)** primitives + **T104** `SpatialAnchorStrategy` + client libs | [x] |
@@ -6227,16 +6227,14 @@ var config = new DataProtectionConfig
 
 | # | Sub-Task | Description | Status |
 |---|----------|-------------|--------|
-| 86.1 | Format Detection | Identify file formats requiring preservation | [ ] |
-| 86.2 | Viewer Compilation | Compile headless viewers to WASM | [ ] |
-| 86.3 | Bundle Creator | Package file + viewer into self-contained object | [ ] |
-| 86.4 | Universal Container | Cross-platform container format | [ ] |
-| 86.5 | Viewer Registry | Library of format viewers (Excel, PDF, etc.) | [ ] |
-| 86.6 | Dependency Bundling | Include all viewer dependencies | [ ] |
-| 86.7 | Execution Sandbox | Safe execution of bundled viewers | [ ] |
-| 86.8 | Format Migration | Option to convert to modern format instead | [ ] |
-| 86.9 | Size Optimization | Minimize viewer overhead per object | [ ] |
-| 86.10 | Backwards Compatibility | Support opening legacy self-emulating objects | [ ] |
+| 86.1 | Format Detection | Magic number-based format detection (12 formats) | [x] |
+| 86.2 | Viewer Bundler | Combine data + WASM viewer into self-contained object | [x] |
+| 86.3 | Viewer Library | Pre-built WASM viewers for common formats (8 formats) | [x] |
+| 86.4 | Viewer Runtime | Execute WASM viewers in sandboxed environment via Compute.Wasm | [x] |
+| 86.5 | Security Sandbox | Isolate execution with 128MB memory/5s CPU limits, no network/FS | [x] |
+| 86.6 | Viewer API | Standard interface for viewers to access bundled data | [x] |
+| 86.7 | Metadata Preservation | Store format metadata alongside data | [x] |
+| 86.8 | Viewer Versioning | Track viewer versions for reproducibility | [x] |
 
 **SDK Requirements:**
 - `ISelfEmulatingArchive` interface
