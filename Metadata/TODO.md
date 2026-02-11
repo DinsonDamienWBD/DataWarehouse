@@ -12202,18 +12202,18 @@ public enum MediaDomain { Video, Image, Texture, Audio, Mesh, Animation, Font }
 | 118.B1.3 | Implement adaptive bitrate controller | [ ] |
 | 118.B1.4 | Implement CDN integration layer | [ ] |
 | **B2: Video Streaming Formats** |
-| 118.B2.1 | ⭐ HlsStrategy - HTTP Live Streaming | [ ] |
-| 118.B2.2 | ⭐ DashStrategy - MPEG-DASH | [ ] |
-| 118.B2.3 | ⭐ CmafStrategy - Common Media Application Format | [ ] |
+| 118.B2.1 | ⭐ HlsStrategy - HTTP Live Streaming | [x] |
+| 118.B2.2 | ⭐ DashStrategy - MPEG-DASH | [x] |
+| 118.B2.3 | ⭐ CmafStrategy - Common Media Application Format | [x] |
 | 118.B2.4 | ⭐ SmoothStreamingStrategy - Microsoft Smooth Streaming | [ ] |
 | 118.B2.5 | ⭐ LowLatencyHlsStrategy - LL-HLS | [ ] |
 | 118.B2.6 | ⭐ LowLatencyDashStrategy - LL-DASH | [ ] |
 | **B3: Video Codecs** |
-| 118.B3.1 | ⭐ H264Strategy - H.264/AVC | [ ] |
-| 118.B3.2 | ⭐ H265Strategy - H.265/HEVC | [ ] |
-| 118.B3.3 | ⭐ Vp9Strategy - VP9 | [ ] |
-| 118.B3.4 | ⭐ Av1Strategy - AV1 | [ ] |
-| 118.B3.5 | ⭐ Vvc Strategy - VVC/H.266 | [ ] |
+| 118.B3.1 | ⭐ H264Strategy - H.264/AVC | [x] |
+| 118.B3.2 | ⭐ H265Strategy - H.265/HEVC | [x] |
+| 118.B3.3 | ⭐ Vp9Strategy - VP9 | [x] |
+| 118.B3.4 | ⭐ Av1Strategy - AV1 | [x] |
+| 118.B3.5 | ⭐ Vvc Strategy - VVC/H.266 | [x] |
 | 118.B3.6 | ⭐ ProResStrategy - Apple ProRes | [ ] |
 | 118.B3.7 | ⭐ DnxHdStrategy - Avid DNxHD/HR | [ ] |
 | **B4: Image Formats** |
