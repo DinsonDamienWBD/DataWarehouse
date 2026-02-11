@@ -47,6 +47,13 @@ namespace DataWarehouse.Plugins.AppPlatform;
 ///   <item><c>platform.policy.unbind</c>: Unbind a per-app access control policy</item>
 ///   <item><c>platform.policy.get</c>: Get a per-app access control policy</item>
 ///   <item><c>platform.policy.evaluate</c>: Evaluate access against a per-app policy</item>
+///   <item><c>platform.ai.configure</c>: Configure per-app AI workflow mode and limits</item>
+///   <item><c>platform.ai.remove</c>: Remove per-app AI workflow configuration</item>
+///   <item><c>platform.ai.get</c>: Get per-app AI workflow configuration</item>
+///   <item><c>platform.ai.update</c>: Update per-app AI workflow configuration</item>
+///   <item><c>platform.ai.request</c>: Submit an app-scoped AI request with enforcement</item>
+///   <item><c>platform.ai.usage</c>: Get per-app AI usage tracking data</item>
+///   <item><c>platform.ai.usage.reset</c>: Reset per-app monthly AI usage counters</item>
 /// </list>
 /// </para>
 /// </summary>
@@ -72,6 +79,12 @@ public sealed class AppPlatformPlugin : IntelligenceAwarePluginBase, IDisposable
     /// messages to downstream service plugins.
     /// </summary>
     private AppContextRouter? _contextRouter;
+
+    /// <summary>
+    /// Strategy for managing per-app AI workflow configurations, budget enforcement,
+    /// concurrency limiting, and routing AI requests to UltimateIntelligence.
+    /// </summary>
+    private AppAiWorkflowStrategy? _aiWorkflowStrategy;
 
     /// <summary>
     /// List of message bus subscription handles for cleanup on disposal.
@@ -128,6 +141,7 @@ public sealed class AppPlatformPlugin : IntelligenceAwarePluginBase, IDisposable
         _tokenService = new ServiceTokenService();
         _accessPolicyStrategy = new AppAccessPolicyStrategy(MessageBus!, Id);
         _contextRouter = new AppContextRouter(MessageBus!, Id, _tokenService, _registrationService);
+        _aiWorkflowStrategy = new AppAiWorkflowStrategy(MessageBus!, Id);
         SubscribeToPlatformTopics();
     }
 
@@ -165,6 +179,15 @@ public sealed class AppPlatformPlugin : IntelligenceAwarePluginBase, IDisposable
         _subscriptions.Add(MessageBus.Subscribe(PlatformTopics.PolicyUnbind, HandlePolicyUnbindAsync));
         _subscriptions.Add(MessageBus.Subscribe(PlatformTopics.PolicyGet, HandlePolicyGetAsync));
         _subscriptions.Add(MessageBus.Subscribe(PlatformTopics.PolicyEvaluate, HandlePolicyEvaluateAsync));
+
+        // AI workflow topics
+        _subscriptions.Add(MessageBus.Subscribe(PlatformTopics.AiWorkflowConfigure, HandleAiWorkflowConfigureAsync));
+        _subscriptions.Add(MessageBus.Subscribe(PlatformTopics.AiWorkflowRemove, HandleAiWorkflowRemoveAsync));
+        _subscriptions.Add(MessageBus.Subscribe(PlatformTopics.AiWorkflowGet, HandleAiWorkflowGetAsync));
+        _subscriptions.Add(MessageBus.Subscribe(PlatformTopics.AiWorkflowUpdate, HandleAiWorkflowUpdateAsync));
+        _subscriptions.Add(MessageBus.Subscribe(PlatformTopics.AiRequest, HandleAiRequestAsync));
+        _subscriptions.Add(MessageBus.Subscribe(PlatformTopics.AiUsageGet, HandleAiUsageGetAsync));
+        _subscriptions.Add(MessageBus.Subscribe(PlatformTopics.AiUsageReset, HandleAiUsageResetAsync));
     }
 
     // ========================================
@@ -708,6 +731,317 @@ public sealed class AppPlatformPlugin : IntelligenceAwarePluginBase, IDisposable
     }
 
     // ========================================
+    // AI Workflow Handlers
+    // ========================================
+
+    /// <summary>
+    /// Handles AI workflow configuration requests.
+    /// Extracts AppId, Mode, budget limits, provider/model preferences, approval settings,
+    /// concurrency limits, and allowed operations from the payload to create an
+    /// <see cref="AppAiWorkflowConfig"/> and delegates to <see cref="AppAiWorkflowStrategy"/>.
+    /// </summary>
+    /// <param name="message">The incoming message containing AI workflow configuration details.</param>
+    /// <returns>A <see cref="MessageResponse"/> confirming the configuration or an error.</returns>
+    private async Task<MessageResponse> HandleAiWorkflowConfigureAsync(PluginMessage message)
+    {
+        try
+        {
+            var appId = GetPayloadString(message, "AppId");
+            if (appId is null)
+                return MessageResponse.Error("Missing required field: AppId");
+
+            var modeStr = GetPayloadString(message, "Mode") ?? "Auto";
+            if (!Enum.TryParse<AiWorkflowMode>(modeStr, true, out var mode))
+                mode = AiWorkflowMode.Auto;
+
+            decimal? budgetPerMonth = null;
+            if (message.Payload.TryGetValue("BudgetLimitPerMonth", out var bpmObj))
+            {
+                budgetPerMonth = ParseDecimal(bpmObj);
+            }
+
+            decimal? budgetPerRequest = null;
+            if (message.Payload.TryGetValue("BudgetLimitPerRequest", out var bprObj))
+            {
+                budgetPerRequest = ParseDecimal(bprObj);
+            }
+
+            var preferredProvider = GetPayloadString(message, "PreferredProvider");
+            var preferredModel = GetPayloadString(message, "PreferredModel");
+
+            var requireApproval = false;
+            if (message.Payload.TryGetValue("RequireApproval", out var raObj))
+            {
+                requireApproval = raObj switch
+                {
+                    bool b => b,
+                    string s when bool.TryParse(s, out var parsed) => parsed,
+                    _ => false
+                };
+            }
+
+            var maxConcurrent = 10;
+            if (message.Payload.TryGetValue("MaxConcurrentRequests", out var mcrObj))
+            {
+                maxConcurrent = mcrObj switch
+                {
+                    int i => i,
+                    long l => (int)l,
+                    double d => (int)d,
+                    string s when int.TryParse(s, out var parsed) => parsed,
+                    _ => 10
+                };
+            }
+
+            var allowedOperations = GetPayloadStringArray(message, "AllowedOperations")
+                ?? ["chat", "embeddings", "analysis"];
+
+            var config = new AppAiWorkflowConfig
+            {
+                AppId = appId,
+                Mode = mode,
+                BudgetLimitPerMonth = budgetPerMonth,
+                BudgetLimitPerRequest = budgetPerRequest,
+                PreferredProvider = preferredProvider,
+                PreferredModel = preferredModel,
+                RequireApproval = requireApproval,
+                MaxConcurrentRequests = maxConcurrent,
+                AllowedOperations = allowedOperations,
+                CreatedAt = DateTime.UtcNow
+            };
+
+            var response = await _aiWorkflowStrategy!.ConfigureWorkflowAsync(config);
+            return MessageResponse.Ok(new { Config = config, UpstreamResponse = response });
+        }
+        catch (Exception ex)
+        {
+            return MessageResponse.Error($"AI workflow configuration failed: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Handles AI workflow removal requests.
+    /// Extracts AppId from the payload and removes the AI workflow configuration.
+    /// </summary>
+    /// <param name="message">The incoming message containing the AppId.</param>
+    /// <returns>A <see cref="MessageResponse"/> confirming the removal or an error.</returns>
+    private async Task<MessageResponse> HandleAiWorkflowRemoveAsync(PluginMessage message)
+    {
+        try
+        {
+            var appId = GetPayloadString(message, "AppId");
+            if (appId is null)
+                return MessageResponse.Error("Missing required field: AppId");
+
+            var response = await _aiWorkflowStrategy!.RemoveWorkflowAsync(appId);
+            return MessageResponse.Ok(new { Removed = true, AppId = appId, UpstreamResponse = response });
+        }
+        catch (Exception ex)
+        {
+            return MessageResponse.Error($"AI workflow removal failed: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Handles AI workflow retrieval requests.
+    /// Extracts AppId from the payload and returns the current AI workflow configuration.
+    /// </summary>
+    /// <param name="message">The incoming message containing the AppId.</param>
+    /// <returns>A <see cref="MessageResponse"/> with the <see cref="AppAiWorkflowConfig"/> or an error.</returns>
+    private async Task<MessageResponse> HandleAiWorkflowGetAsync(PluginMessage message)
+    {
+        try
+        {
+            var appId = GetPayloadString(message, "AppId");
+            if (appId is null)
+                return MessageResponse.Error("Missing required field: AppId");
+
+            var config = await _aiWorkflowStrategy!.GetWorkflowAsync(appId);
+            return config is not null
+                ? MessageResponse.Ok(config)
+                : MessageResponse.Error($"No AI workflow configured for application: {appId}");
+        }
+        catch (Exception ex)
+        {
+            return MessageResponse.Error($"AI workflow retrieval failed: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Handles AI workflow update requests.
+    /// Extracts configuration fields from the payload, builds an updated
+    /// <see cref="AppAiWorkflowConfig"/>, and delegates to <see cref="AppAiWorkflowStrategy"/>.
+    /// </summary>
+    /// <param name="message">The incoming message containing update details.</param>
+    /// <returns>A <see cref="MessageResponse"/> confirming the update or an error.</returns>
+    private async Task<MessageResponse> HandleAiWorkflowUpdateAsync(PluginMessage message)
+    {
+        try
+        {
+            var appId = GetPayloadString(message, "AppId");
+            if (appId is null)
+                return MessageResponse.Error("Missing required field: AppId");
+
+            // Get existing config as base
+            var existing = await _aiWorkflowStrategy!.GetWorkflowAsync(appId);
+            if (existing is null)
+                return MessageResponse.Error($"No AI workflow configured for application: {appId}");
+
+            // Apply updates from payload
+            var modeStr = GetPayloadString(message, "Mode");
+            var mode = existing.Mode;
+            if (modeStr is not null && Enum.TryParse<AiWorkflowMode>(modeStr, true, out var parsedMode))
+                mode = parsedMode;
+
+            var budgetPerMonth = existing.BudgetLimitPerMonth;
+            if (message.Payload.TryGetValue("BudgetLimitPerMonth", out var bpmObj))
+                budgetPerMonth = ParseDecimal(bpmObj);
+
+            var budgetPerRequest = existing.BudgetLimitPerRequest;
+            if (message.Payload.TryGetValue("BudgetLimitPerRequest", out var bprObj))
+                budgetPerRequest = ParseDecimal(bprObj);
+
+            var preferredProvider = GetPayloadString(message, "PreferredProvider") ?? existing.PreferredProvider;
+            var preferredModel = GetPayloadString(message, "PreferredModel") ?? existing.PreferredModel;
+
+            var requireApproval = existing.RequireApproval;
+            if (message.Payload.TryGetValue("RequireApproval", out var raObj))
+            {
+                requireApproval = raObj switch
+                {
+                    bool b => b,
+                    string s when bool.TryParse(s, out var parsed) => parsed,
+                    _ => requireApproval
+                };
+            }
+
+            var maxConcurrent = existing.MaxConcurrentRequests;
+            if (message.Payload.TryGetValue("MaxConcurrentRequests", out var mcrObj))
+            {
+                maxConcurrent = mcrObj switch
+                {
+                    int i => i,
+                    long l => (int)l,
+                    double d => (int)d,
+                    string s when int.TryParse(s, out var parsed) => parsed,
+                    _ => maxConcurrent
+                };
+            }
+
+            var allowedOperations = GetPayloadStringArray(message, "AllowedOperations") ?? existing.AllowedOperations;
+
+            var updatedConfig = new AppAiWorkflowConfig
+            {
+                AppId = appId,
+                Mode = mode,
+                BudgetLimitPerMonth = budgetPerMonth,
+                BudgetLimitPerRequest = budgetPerRequest,
+                PreferredProvider = preferredProvider,
+                PreferredModel = preferredModel,
+                RequireApproval = requireApproval,
+                MaxConcurrentRequests = maxConcurrent,
+                AllowedOperations = allowedOperations,
+                CreatedAt = existing.CreatedAt
+            };
+
+            var response = await _aiWorkflowStrategy.UpdateWorkflowAsync(updatedConfig);
+            return MessageResponse.Ok(new { Config = updatedConfig, UpstreamResponse = response });
+        }
+        catch (Exception ex)
+        {
+            return MessageResponse.Error($"AI workflow update failed: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Handles app-scoped AI requests by validating the service token, checking the
+    /// "intelligence" scope, and delegating to <see cref="AppAiWorkflowStrategy.ProcessAiRequestAsync"/>
+    /// for budget, concurrency, and operation enforcement before forwarding to Intelligence.
+    /// </summary>
+    /// <param name="message">The incoming message containing RawKey and AI request details.</param>
+    /// <returns>
+    /// A <see cref="MessageResponse"/> with the Intelligence result, an approval-required
+    /// notification, or an error describing the constraint violation.
+    /// </returns>
+    private async Task<MessageResponse> HandleAiRequestAsync(PluginMessage message)
+    {
+        try
+        {
+            var appId = GetPayloadString(message, "AppId");
+            var rawKey = GetPayloadString(message, "RawKey");
+
+            if (appId is null || rawKey is null)
+                return MessageResponse.Error("Missing required fields: AppId, RawKey");
+
+            // Validate token
+            var validation = await _tokenService!.ValidateTokenAsync(rawKey);
+            if (!validation.IsValid)
+                return MessageResponse.Error($"Authentication failed: {validation.FailureReason}", "AUTH_FAILED");
+
+            // Check "intelligence" scope
+            if (!validation.AllowedScopes.Contains("intelligence", StringComparer.OrdinalIgnoreCase))
+                return MessageResponse.Error(
+                    "Token does not have 'intelligence' scope",
+                    "SCOPE_DENIED");
+
+            // Delegate to AI workflow strategy for enforcement and forwarding
+            return await _aiWorkflowStrategy!.ProcessAiRequestAsync(appId, message);
+        }
+        catch (Exception ex)
+        {
+            return MessageResponse.Error($"AI request failed: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Handles AI usage tracking retrieval requests.
+    /// Returns the current monthly spend, request count, and active concurrent requests for an app.
+    /// </summary>
+    /// <param name="message">The incoming message containing the AppId.</param>
+    /// <returns>A <see cref="MessageResponse"/> with the <see cref="AiUsageTracking"/> or an error.</returns>
+    private async Task<MessageResponse> HandleAiUsageGetAsync(PluginMessage message)
+    {
+        try
+        {
+            var appId = GetPayloadString(message, "AppId");
+            if (appId is null)
+                return MessageResponse.Error("Missing required field: AppId");
+
+            var usage = await _aiWorkflowStrategy!.GetUsageAsync(appId);
+            return usage is not null
+                ? MessageResponse.Ok(usage)
+                : MessageResponse.Error($"No AI usage tracking found for application: {appId}");
+        }
+        catch (Exception ex)
+        {
+            return MessageResponse.Error($"AI usage retrieval failed: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Handles monthly AI usage reset requests.
+    /// Zeroes out the monthly spend and request count for the specified app.
+    /// </summary>
+    /// <param name="message">The incoming message containing the AppId.</param>
+    /// <returns>A <see cref="MessageResponse"/> confirming the reset or an error.</returns>
+    private async Task<MessageResponse> HandleAiUsageResetAsync(PluginMessage message)
+    {
+        try
+        {
+            var appId = GetPayloadString(message, "AppId");
+            if (appId is null)
+                return MessageResponse.Error("Missing required field: AppId");
+
+            await _aiWorkflowStrategy!.ResetMonthlyUsageAsync(appId);
+            return MessageResponse.Ok(new { Reset = true, AppId = appId });
+        }
+        catch (Exception ex)
+        {
+            return MessageResponse.Error($"AI usage reset failed: {ex.Message}");
+        }
+    }
+
+    // ========================================
     // Lifecycle Management
     // ========================================
 
@@ -874,5 +1208,24 @@ public sealed class AppPlatformPlugin : IntelligenceAwarePluginBase, IDisposable
         }
 
         return [];
+    }
+
+    /// <summary>
+    /// Parses a decimal value from a payload object, handling various numeric and string representations.
+    /// </summary>
+    /// <param name="value">The payload value to parse.</param>
+    /// <returns>The parsed decimal value, or <c>null</c> if the value cannot be parsed.</returns>
+    private static decimal? ParseDecimal(object? value)
+    {
+        return value switch
+        {
+            decimal d => d,
+            double dbl => (decimal)dbl,
+            float f => (decimal)f,
+            int i => i,
+            long l => l,
+            string s when decimal.TryParse(s, out var parsed) => parsed,
+            _ => null
+        };
     }
 }
