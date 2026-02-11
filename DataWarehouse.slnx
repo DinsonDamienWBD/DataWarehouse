@@ -93,6 +93,7 @@
     <Project Path="Plugins/DataWarehouse.Plugins.UltimateAccessControl/DataWarehouse.Plugins.UltimateAccessControl.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.UltimateCompliance/DataWarehouse.Plugins.UltimateCompliance.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.UltimateCompression/DataWarehouse.Plugins.UltimateCompression.csproj" />
+    <Project Path="Plugins/DataWarehouse.Plugins.UltimateCompute/DataWarehouse.Plugins.UltimateCompute.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.UltimateConnector/DataWarehouse.Plugins.UltimateConnector.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.UltimateDatabaseProtocol/DataWarehouse.Plugins.UltimateDatabaseProtocol.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.UltimateDatabaseStorage/DataWarehouse.Plugins.UltimateDatabaseStorage.csproj" />
