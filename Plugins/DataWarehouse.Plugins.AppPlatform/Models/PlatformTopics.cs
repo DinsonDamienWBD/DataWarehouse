@@ -165,4 +165,85 @@ internal static class PlatformTopics
     /// (total spend and request count).
     /// </summary>
     public const string AiUsageReset = $"{Prefix}.ai.usage.reset";
+
+    // ========================================
+    // Observability Topics
+    // ========================================
+
+    /// <summary>
+    /// Topic for configuring per-app observability settings (metrics, traces, logs,
+    /// retention, log level, and alerting thresholds).
+    /// </summary>
+    public const string ObservabilityConfigure = $"{Prefix}.observability.configure";
+
+    /// <summary>
+    /// Topic for removing per-app observability configuration.
+    /// </summary>
+    public const string ObservabilityRemove = $"{Prefix}.observability.remove";
+
+    /// <summary>
+    /// Topic for retrieving per-app observability configuration.
+    /// </summary>
+    public const string ObservabilityGet = $"{Prefix}.observability.get";
+
+    /// <summary>
+    /// Topic for updating per-app observability configuration.
+    /// </summary>
+    public const string ObservabilityUpdate = $"{Prefix}.observability.update";
+
+    /// <summary>
+    /// Topic for emitting a metric with per-app isolation via app_id tag injection.
+    /// </summary>
+    public const string ObservabilityEmitMetric = $"{Prefix}.observability.emit.metric";
+
+    /// <summary>
+    /// Topic for emitting a trace span with per-app isolation via app_id attribute injection.
+    /// </summary>
+    public const string ObservabilityEmitTrace = $"{Prefix}.observability.emit.trace";
+
+    /// <summary>
+    /// Topic for emitting a log entry with per-app isolation via app_id property injection.
+    /// </summary>
+    public const string ObservabilityEmitLog = $"{Prefix}.observability.emit.log";
+
+    /// <summary>
+    /// Topic for querying metrics with mandatory app_id filter for per-app isolation.
+    /// </summary>
+    public const string ObservabilityQueryMetrics = $"{Prefix}.observability.query.metrics";
+
+    /// <summary>
+    /// Topic for querying traces with mandatory app_id filter for per-app isolation.
+    /// </summary>
+    public const string ObservabilityQueryTraces = $"{Prefix}.observability.query.traces";
+
+    /// <summary>
+    /// Topic for querying logs with mandatory app_id filter for per-app isolation.
+    /// </summary>
+    public const string ObservabilityQueryLogs = $"{Prefix}.observability.query.logs";
+
+    // ========================================
+    // Service Discovery Topics
+    // ========================================
+
+    /// <summary>
+    /// Topic for listing all available platform services and their access requirements.
+    /// Returns a <c>PlatformServiceCatalog</c> with all service endpoints.
+    /// </summary>
+    public const string ServicesList = $"{Prefix}.services.list";
+
+    /// <summary>
+    /// Topic for retrieving a specific service endpoint by name.
+    /// </summary>
+    public const string ServicesGet = $"{Prefix}.services.get";
+
+    /// <summary>
+    /// Topic for retrieving the subset of services available to a specific app
+    /// based on its token scopes.
+    /// </summary>
+    public const string ServicesForApp = $"{Prefix}.services.forapp";
+
+    /// <summary>
+    /// Topic for checking the health status of a specific platform service.
+    /// </summary>
+    public const string ServicesHealth = $"{Prefix}.services.health";
 }
