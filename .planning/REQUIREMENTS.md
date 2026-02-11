@@ -1,7 +1,7 @@
 # Requirements: DataWarehouse SDK v2.0
 
 **Defined:** 2026-02-11
-**Core Value:** SDK must pass hyperscale/military-level code review — clean hierarchy, secure by default, distributed-ready, zero warnings.
+**Core Value:** SDK must pass hyperscale/military-level code review -- clean hierarchy, secure by default, distributed-ready, zero warnings.
 
 ## v2.0 Requirements
 
@@ -13,14 +13,14 @@
 - [ ] **HIER-04**: PluginBase knowledge registry enables plugins to register and query knowledge objects via ConcurrentDictionary cache
 - [ ] **HIER-05**: IntelligenceAwarePluginBase (IntelligentPluginBase) extends FeaturePluginBase with UltimateIntelligence socket, graceful degradation when unavailable
 - [ ] **HIER-06**: All feature-specific plugin base classes (Encryption, Compression, Storage, Security, Observability, Interface, Format, Streaming, Media, Processing) inherit from IntelligenceAwarePluginBase
-- [ ] **HIER-07**: UltimateIntelligence plugin inherits from PluginBase directly (not IntelligenceAwarePluginBase — it IS the intelligence provider)
+- [ ] **HIER-07**: UltimateIntelligence plugin inherits from PluginBase directly (not IntelligenceAwarePluginBase -- it IS the intelligence provider)
 - [ ] **HIER-08**: Each feature-specific base class implements common functionality for its domain without code duplication across Ultimate plugins
 - [ ] **HIER-09**: All base classes compile and all 60 existing plugins still build without errors after hierarchy changes
 
 ### Strategy Hierarchy
 
 - [ ] **STRAT-01**: Unified StrategyBase root class exists with common strategy lifecycle (Initialize, Execute, Cleanup), capability declaration, and CancellationToken support
-- [ ] **STRAT-02**: Multi-tier strategy hierarchy: StrategyBase → IntelligenceAwareStrategyBase → feature-specific strategy bases (InterfaceStrategyBase, MediaStrategyBase, etc.)
+- [ ] **STRAT-02**: Multi-tier strategy hierarchy: StrategyBase -> IntelligenceAwareStrategyBase -> feature-specific strategy bases (InterfaceStrategyBase, MediaStrategyBase, etc.)
 - [ ] **STRAT-03**: IntelligenceAwareStrategyBase provides UltimateIntelligence integration with graceful degradation (mirroring IntelligenceAwarePluginBase pattern)
 - [ ] **STRAT-04**: All 7 existing fragmented strategy bases are consolidated under the unified hierarchy via adapter wrappers for backward compatibility
 - [ ] **STRAT-05**: Feature-specific strategy base classes implement domain-common functionality (e.g., MediaStrategyBase has format detection, InterfaceStrategyBase has protocol negotiation)
@@ -36,8 +36,8 @@
 - [ ] **DIST-06**: SDK defines IAutoTier contract for automatic data placement based on access patterns and cost optimization
 - [ ] **DIST-07**: SDK defines IAutoGovernance contract for policy enforcement at SDK level (retention, classification, compliance)
 - [ ] **DIST-08**: FederatedMessageBus wraps IMessageBus with transparent local/remote routing using consistent hashing
-- [ ] **DIST-09**: Multi-phase plugin initialization: construction (zero deps) → initialization (MessageBus) → activation (distributed coordination)
-- [ ] **DIST-10**: In-memory single-node implementations exist for all distributed contracts (backward compatible — single laptop works without cluster)
+- [ ] **DIST-09**: Multi-phase plugin initialization: construction (zero deps) -> initialization (MessageBus) -> activation (distributed coordination)
+- [ ] **DIST-10**: In-memory single-node implementations exist for all distributed contracts (backward compatible -- single laptop works without cluster)
 - [ ] **DIST-11**: Auto-scaling prompts user when nodes reach capacity limits, accepts new node information, deploys and integrates new nodes automatically
 - [ ] **DIST-12**: SWIM gossip protocol implementation for decentralized cluster membership and failure detection
 - [ ] **DIST-13**: Raft consensus implementation for leader election in multi-node clusters
@@ -48,7 +48,7 @@
 
 ### Decoupling Verification
 
-- [ ] **DECPL-01**: Zero plugins or kernel depend on any other plugin directly — all depend only on SDK
+- [ ] **DECPL-01**: Zero plugins or kernel depend on any other plugin directly -- all depend only on SDK
 - [ ] **DECPL-02**: All inter-plugin and plugin-kernel communication uses Commands/Messages via message bus only
 - [ ] **DECPL-03**: Kernel leverages capability registry and knowledge bank for informed routing decisions
 - [ ] **DECPL-04**: All plugins can register capabilities and knowledge into system knowledge bank
@@ -80,8 +80,8 @@
 - [ ] **CRYPTO-01**: All secret/hash comparisons use CryptographicOperations.FixedTimeEquals (constant-time) to prevent timing attacks
 - [ ] **CRYPTO-02**: All cryptographic random generation uses RandomNumberGenerator, never System.Random
 - [ ] **CRYPTO-03**: Key rotation contracts defined in SDK (IKeyRotationPolicy) usable by any plugin
-- [ ] **CRYPTO-04**: Algorithm agility — no hardcoded algorithm choices in SDK; all configurable via strategy
-- [ ] **CRYPTO-05**: FIPS 140-3 compliance verified — all crypto uses .NET BCL implementations (no custom crypto)
+- [ ] **CRYPTO-04**: Algorithm agility -- no hardcoded algorithm choices in SDK; all configurable via strategy
+- [ ] **CRYPTO-05**: FIPS 140-3 compliance verified -- all crypto uses .NET BCL implementations (no custom crypto)
 - [ ] **CRYPTO-06**: Distributed message authentication uses HMAC-SHA256 signatures with replay protection
 
 ### Input Validation
@@ -104,7 +104,7 @@
 
 - [ ] **OBS-01**: SDK provides ActivitySource for distributed tracing at plugin, strategy, kernel, and registry boundaries
 - [ ] **OBS-02**: All SDK operations include structured logging with mandatory correlation IDs
-- [ ] **OBS-03**: IHealthCheck interface required by all plugins — kernel aggregates health status
+- [ ] **OBS-03**: IHealthCheck interface required by all plugins -- kernel aggregates health status
 - [ ] **OBS-04**: Resource usage metering per plugin (memory, CPU, I/O) available via SDK contracts
 - [ ] **OBS-05**: Audit trail interface for security-sensitive operations (immutable, append-only)
 
@@ -128,7 +128,7 @@
 - [ ] **SUPPLY-01**: NuGet vulnerability audit passes with zero known vulnerabilities (dotnet list package --vulnerable)
 - [ ] **SUPPLY-02**: All package versions pinned to exact versions (no floating ranges)
 - [ ] **SUPPLY-03**: SBOM generated for SDK and all plugins (CycloneDX or SPDX format)
-- [ ] **SUPPLY-04**: Minimal dependency surface — SDK maintains ≤6 direct PackageReferences
+- [ ] **SUPPLY-04**: Minimal dependency surface -- SDK maintains <=6 direct PackageReferences
 
 ### Testing
 
@@ -150,26 +150,112 @@
 
 | Feature | Reason |
 |---------|--------|
-| Orleans/Aspire as SDK dependencies | Vendor lock-in, violates dependency-lean principle — use SDK contracts instead |
-| SecureString usage | Deprecated in .NET — use CryptographicOperations.ZeroMemory |
-| Global TreatWarningsAsErrors day-one | Would break 1.1M LOC build — use incremental category rollout |
-| Real-time sync everywhere | Complexity without value — use eventual consistency with configurable intervals |
+| Orleans/Aspire as SDK dependencies | Vendor lock-in, violates dependency-lean principle -- use SDK contracts instead |
+| SecureString usage | Deprecated in .NET -- use CryptographicOperations.ZeroMemory |
+| Global TreatWarningsAsErrors day-one | Would break 1.1M LOC build -- use incremental category rollout |
+| Real-time sync everywhere | Complexity without value -- use eventual consistency with configurable intervals |
 | UI/Dashboard changes | SDK-only milestone |
-| Synchronous blocking APIs | Causes deadlocks — all APIs must be async with CancellationToken |
+| Synchronous blocking APIs | Causes deadlocks -- all APIs must be async with CancellationToken |
 
 ## Traceability
 
-Updated during roadmap creation.
-
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| (populated by roadmapper) | | |
+| BUILD-01 | Phase 22 | Pending |
+| BUILD-02 | Phase 22 | Pending |
+| BUILD-03 | Phase 22 | Pending |
+| BUILD-04 | Phase 22 | Pending |
+| BUILD-05 | Phase 22 | Pending |
+| SUPPLY-01 | Phase 22 | Pending |
+| SUPPLY-02 | Phase 22 | Pending |
+| SUPPLY-03 | Phase 22 | Pending |
+| SUPPLY-04 | Phase 22 | Pending |
+| CLI-01 | Phase 22 | Pending |
+| MEM-01 | Phase 23 | Pending |
+| MEM-02 | Phase 23 | Pending |
+| MEM-03 | Phase 23 | Pending |
+| MEM-04 | Phase 23 | Pending |
+| MEM-05 | Phase 23 | Pending |
+| CRYPTO-01 | Phase 23 | Pending |
+| CRYPTO-02 | Phase 23 | Pending |
+| CRYPTO-03 | Phase 23 | Pending |
+| CRYPTO-04 | Phase 23 | Pending |
+| CRYPTO-05 | Phase 23 | Pending |
+| CRYPTO-06 | Phase 23 | Pending |
+| HIER-01 | Phase 24 | Pending |
+| HIER-02 | Phase 24 | Pending |
+| HIER-03 | Phase 24 | Pending |
+| HIER-04 | Phase 24 | Pending |
+| HIER-05 | Phase 24 | Pending |
+| HIER-06 | Phase 24 | Pending |
+| HIER-07 | Phase 24 | Pending |
+| HIER-08 | Phase 24 | Pending |
+| HIER-09 | Phase 24 | Pending |
+| VALID-01 | Phase 24 | Pending |
+| VALID-02 | Phase 24 | Pending |
+| VALID-03 | Phase 24 | Pending |
+| VALID-04 | Phase 24 | Pending |
+| VALID-05 | Phase 24 | Pending |
+| STRAT-01 | Phase 25 | Pending |
+| STRAT-02 | Phase 25 | Pending |
+| STRAT-03 | Phase 25 | Pending |
+| STRAT-04 | Phase 25 | Pending |
+| STRAT-05 | Phase 25 | Pending |
+| STRAT-06 | Phase 25 | Pending |
+| API-01 | Phase 25 | Pending |
+| API-02 | Phase 25 | Pending |
+| API-03 | Phase 25 | Pending |
+| API-04 | Phase 25 | Pending |
+| DIST-01 | Phase 26 | Pending |
+| DIST-02 | Phase 26 | Pending |
+| DIST-03 | Phase 26 | Pending |
+| DIST-04 | Phase 26 | Pending |
+| DIST-05 | Phase 26 | Pending |
+| DIST-06 | Phase 26 | Pending |
+| DIST-07 | Phase 26 | Pending |
+| DIST-08 | Phase 26 | Pending |
+| DIST-09 | Phase 26 | Pending |
+| DIST-10 | Phase 26 | Pending |
+| DIST-11 | Phase 26 | Pending |
+| RESIL-01 | Phase 26 | Pending |
+| RESIL-02 | Phase 26 | Pending |
+| RESIL-03 | Phase 26 | Pending |
+| RESIL-04 | Phase 26 | Pending |
+| RESIL-05 | Phase 26 | Pending |
+| OBS-01 | Phase 26 | Pending |
+| OBS-02 | Phase 26 | Pending |
+| OBS-03 | Phase 26 | Pending |
+| OBS-04 | Phase 26 | Pending |
+| OBS-05 | Phase 26 | Pending |
+| UPLT-01 | Phase 27 | Pending |
+| UPLT-02 | Phase 27 | Pending |
+| UPLT-03 | Phase 27 | Pending |
+| UPST-01 | Phase 27 | Pending |
+| UPST-02 | Phase 27 | Pending |
+| UPST-03 | Phase 27 | Pending |
+| DECPL-01 | Phase 27 | Pending |
+| DECPL-02 | Phase 27 | Pending |
+| DECPL-03 | Phase 27 | Pending |
+| DECPL-04 | Phase 27 | Pending |
+| DECPL-05 | Phase 27 | Pending |
+| DIST-12 | Phase 28 | Pending |
+| DIST-13 | Phase 28 | Pending |
+| DIST-14 | Phase 28 | Pending |
+| DIST-15 | Phase 28 | Pending |
+| DIST-16 | Phase 28 | Pending |
+| DIST-17 | Phase 28 | Pending |
+| TEST-01 | Phase 29 | Pending |
+| TEST-02 | Phase 29 | Pending |
+| TEST-03 | Phase 29 | Pending |
+| TEST-04 | Phase 29 | Pending |
+| TEST-05 | Phase 29 | Pending |
+| TEST-06 | Phase 29 | Pending |
 
 **Coverage:**
-- v2.0 requirements: 76 total
-- Mapped to phases: 0
-- Unmapped: 76
+- v2.0 requirements: 89 total (16 categories)
+- Mapped to phases: 89
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-02-11*
-*Last updated: 2026-02-11 after research synthesis*
+*Last updated: 2026-02-12 -- traceability mapped by roadmapper*
