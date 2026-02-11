@@ -320,14 +320,14 @@ Plans:
   3. UltimateDeployment plugin manages deployment strategies and orchestration
   4. UltimateSustainability plugin tracks and optimizes energy usage and carbon footprint
   5. Plugin deprecation and cleanup is complete with all old plugins removed and references updated
-**Plans**: TBD
+**Plans**: 5 plans in 2 waves
 
 Plans:
-- [ ] 14-01: Verify and complete UniversalDashboards (T101)
-- [ ] 14-02: Verify and complete UltimateResilience (T105)
-- [ ] 14-03: Verify and complete UltimateDeployment (T106)
-- [ ] 14-04: Verify and complete UltimateSustainability (T107)
-- [ ] 14-05: Verify and complete plugin deprecation and cleanup (T108)
+- [ ] 14-01-PLAN.md — Verify UniversalDashboards implementation completeness (T101)
+- [ ] 14-02-PLAN.md — Verify UltimateResilience implementation completeness (T105)
+- [ ] 14-03-PLAN.md — Verify UltimateDeployment implementation completeness (T106)
+- [ ] 14-04-PLAN.md — Verify UltimateSustainability implementation completeness (T107)
+- [ ] 14-05-PLAN.md — Scope plugin deprecation for Phase 18 execution (T108 analysis only)
 
 ### Phase 15: Bug Fixes & Build Health
 **Goal**: All critical bugs, build errors, TODO comments, and nullable suppressions are resolved
