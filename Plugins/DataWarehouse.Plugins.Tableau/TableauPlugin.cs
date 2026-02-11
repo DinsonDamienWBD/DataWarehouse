@@ -224,6 +224,7 @@ namespace DataWarehouse.Plugins.Tableau
         /// </summary>
         /// <param name="extractId">The extract ID.</param>
         /// <param name="rows">The rows to add.</param>
+        /// <param name="ct">Cancellation token.</param>
         /// <returns>A task representing the asynchronous operation.</returns>
         public async Task AddRowsAsync(string extractId, IEnumerable<TableauRow> rows, CancellationToken ct = default)
         {
@@ -255,6 +256,7 @@ namespace DataWarehouse.Plugins.Tableau
         /// Finalizes an extract, making it ready for publishing.
         /// </summary>
         /// <param name="extractId">The extract ID.</param>
+        /// <param name="ct">Cancellation token.</param>
         /// <returns>A task representing the asynchronous operation.</returns>
         public async Task FinalizeExtractAsync(string extractId, CancellationToken ct = default)
         {
@@ -303,6 +305,7 @@ namespace DataWarehouse.Plugins.Tableau
         /// Publishes an extract to Tableau Server.
         /// </summary>
         /// <param name="extractId">The extract ID.</param>
+        /// <param name="ct">Cancellation token.</param>
         /// <returns>The published datasource ID.</returns>
         public async Task<string> PublishExtractAsync(string extractId, CancellationToken ct = default)
         {

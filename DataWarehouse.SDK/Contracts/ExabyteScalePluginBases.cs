@@ -87,7 +87,7 @@ public abstract class ShardManagerPluginBase : FeaturePluginBase, IShardManager,
     /// <summary>
     /// Gets static knowledge about sharding capabilities for AI agents.
     /// </summary>
-    protected virtual IReadOnlyList<KnowledgeObject> GetStaticKnowledge()
+    protected override IReadOnlyList<KnowledgeObject> GetStaticKnowledge()
     {
         return new[]
         {
@@ -405,7 +405,7 @@ public abstract class DistributedMetadataIndexPluginBase : FeaturePluginBase, ID
     /// <summary>
     /// Gets static knowledge about indexing capabilities for AI agents.
     /// </summary>
-    protected virtual IReadOnlyList<KnowledgeObject> GetStaticKnowledge()
+    protected override IReadOnlyList<KnowledgeObject> GetStaticKnowledge()
     {
         return new[]
         {

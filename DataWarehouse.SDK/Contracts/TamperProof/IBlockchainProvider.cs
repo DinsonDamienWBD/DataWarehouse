@@ -407,7 +407,7 @@ public abstract class BlockchainProviderPluginBase : FeaturePluginBase, IBlockch
         }
     };
 
-    protected virtual IReadOnlyList<KnowledgeObject> GetStaticKnowledge()
+    protected override IReadOnlyList<KnowledgeObject> GetStaticKnowledge()
     {
         return new[]
         {

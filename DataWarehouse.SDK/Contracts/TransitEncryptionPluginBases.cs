@@ -62,7 +62,7 @@ namespace DataWarehouse.SDK.Contracts
             }
         };
 
-        protected virtual IReadOnlyList<KnowledgeObject> GetStaticKnowledge()
+        protected override IReadOnlyList<KnowledgeObject> GetStaticKnowledge()
         {
             return new[]
             {
@@ -342,7 +342,7 @@ namespace DataWarehouse.SDK.Contracts
             }
         };
 
-        protected virtual IReadOnlyList<KnowledgeObject> GetStaticKnowledge()
+        protected override IReadOnlyList<KnowledgeObject> GetStaticKnowledge()
         {
             return new[]
             {
@@ -807,7 +807,7 @@ namespace DataWarehouse.SDK.Contracts
             }
         };
 
-        protected virtual IReadOnlyList<KnowledgeObject> GetStaticKnowledge()
+        protected override IReadOnlyList<KnowledgeObject> GetStaticKnowledge()
         {
             return new[]
             {

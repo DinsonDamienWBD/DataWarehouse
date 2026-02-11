@@ -306,7 +306,7 @@ public abstract class WormStorageProviderPluginBase : FeaturePluginBase, IWormSt
         }
     };
 
-    protected virtual IReadOnlyList<KnowledgeObject> GetStaticKnowledge()
+    protected override IReadOnlyList<KnowledgeObject> GetStaticKnowledge()
     {
         return new[]
         {

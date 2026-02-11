@@ -442,7 +442,7 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.ThreatDetection
         /// <summary>
         /// Gets threat feed statistics.
         /// </summary>
-        public ThreatFeedStatistics GetStatistics()
+        public new ThreatFeedStatistics GetStatistics()
         {
             return new ThreatFeedStatistics
             {

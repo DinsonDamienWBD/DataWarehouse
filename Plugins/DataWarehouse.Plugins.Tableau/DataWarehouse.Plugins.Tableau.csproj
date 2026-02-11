@@ -7,6 +7,8 @@
     <LangVersion>latest</LangVersion>
     <Description>Tableau BI integration plugin with Hyper API data extracts, REST API publishing, and Web Data Connector support</Description>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <!-- CS1591: XML doc warnings suppressed - internal plugin strategies have self-documenting names -->
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>

@@ -62,7 +62,7 @@ public abstract class HypervisorDetectorPluginBase : FeaturePluginBase, IHypervi
     /// <summary>
     /// Gets static knowledge about hypervisor detection.
     /// </summary>
-    protected virtual IReadOnlyList<KnowledgeObject> GetStaticKnowledge()
+    protected override IReadOnlyList<KnowledgeObject> GetStaticKnowledge()
     {
         return new[]
         {
@@ -231,7 +231,7 @@ public abstract class BalloonDriverPluginBase : FeaturePluginBase, IBalloonDrive
         }
     };
 
-    protected virtual IReadOnlyList<KnowledgeObject> GetStaticKnowledge()
+    protected override IReadOnlyList<KnowledgeObject> GetStaticKnowledge()
     {
         return new[]
         {
@@ -365,7 +365,7 @@ public abstract class VmSnapshotProviderPluginBase : FeaturePluginBase, IVmSnaps
         }
     };
 
-    protected virtual IReadOnlyList<KnowledgeObject> GetStaticKnowledge()
+    protected override IReadOnlyList<KnowledgeObject> GetStaticKnowledge()
     {
         return new[]
         {
@@ -507,7 +507,7 @@ public abstract class BackupApiPluginBase : FeaturePluginBase, IBackupApiIntegra
         }
     };
 
-    protected virtual IReadOnlyList<KnowledgeObject> GetStaticKnowledge()
+    protected override IReadOnlyList<KnowledgeObject> GetStaticKnowledge()
     {
         return new[]
         {

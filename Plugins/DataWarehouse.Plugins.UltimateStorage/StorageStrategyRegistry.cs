@@ -184,7 +184,7 @@ public sealed class StorageStrategyRegistry : IStorageStrategyRegistry
 public interface IStorageStrategyExtended : IStorageStrategy
 {
     /// <summary>Gets the unique identifier for this storage strategy.</summary>
-    string StrategyId { get; }
+    new string StrategyId { get; }
 
     /// <summary>Gets the human-readable name of this storage strategy.</summary>
     string StrategyName { get; }

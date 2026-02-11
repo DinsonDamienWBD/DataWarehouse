@@ -67,6 +67,7 @@ public sealed class QueryProcessor
     /// Prepares a SQL statement and returns parameter information.
     /// </summary>
     /// <param name="sql">The SQL query with parameters.</param>
+    /// <param name="statementId">The statement identifier.</param>
     /// <returns>The prepared statement info.</returns>
     public JdbcPreparedStatementInfo PrepareStatement(string sql, int statementId)
     {

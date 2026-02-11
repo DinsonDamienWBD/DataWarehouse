@@ -985,7 +985,7 @@ public class StreamInferencePipeline
         string modelPath,
         IAsyncEnumerable<InferenceInput> inputStream,
         InferenceOptions? options = null,
-        CancellationToken ct = default)
+        [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct = default)
     {
         options ??= new InferenceOptions();
 

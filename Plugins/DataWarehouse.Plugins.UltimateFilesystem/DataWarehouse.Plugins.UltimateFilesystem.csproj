@@ -7,6 +7,8 @@
     <AssemblyName>DataWarehouse.Plugins.UltimateFilesystem</AssemblyName>
     <Description>Ultimate Filesystem Plugin - Polymorphic storage engine with auto-detect drivers, kernel-bypass I/O, and unified block abstraction</Description>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <!-- CS1591: XML doc warnings suppressed - internal plugin strategies have self-documenting names -->
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
   <ItemGroup>

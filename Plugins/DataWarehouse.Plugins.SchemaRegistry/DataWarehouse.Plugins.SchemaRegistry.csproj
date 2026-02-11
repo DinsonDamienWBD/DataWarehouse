@@ -7,6 +7,8 @@
     <RootNamespace>DataWarehouse.Plugins.SchemaRegistry</RootNamespace>
     <Description>Schema Registry plugin for tracking database and table schemas with version management</Description>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <!-- CS1591: XML doc warnings suppressed - internal plugin strategies have self-documenting names -->
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>

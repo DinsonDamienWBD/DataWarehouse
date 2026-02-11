@@ -326,7 +326,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Database
                 SignatureAlgorithm = cert.SignatureAlgorithm.FriendlyName ?? "",
                 PublicKeyData = cert.GetPublicKey(),
                 KeyAlgorithm = cert.GetKeyAlgorithm(),
-                KeySize = cert.PublicKey.Key.KeySize,
+                KeySize = (cert.PublicKey.GetRSAPublicKey()?.KeySize ?? cert.PublicKey.GetECDsaPublicKey()?.KeySize ?? 0),
                 HasPrivateKey = cert.HasPrivateKey,
                 ImportedAt = DateTime.UtcNow,
                 ImportSource = $"File: {certificateFilePath}",

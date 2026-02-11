@@ -66,7 +66,7 @@ namespace DataWarehouse.SDK.Contracts
         /// <summary>
         /// Gets static knowledge about hardware acceleration capabilities.
         /// </summary>
-        protected virtual IReadOnlyList<KnowledgeObject> GetStaticKnowledge()
+        protected override IReadOnlyList<KnowledgeObject> GetStaticKnowledge()
         {
             return new[]
             {
@@ -623,7 +623,7 @@ namespace DataWarehouse.SDK.Contracts
             }
         };
 
-        protected virtual IReadOnlyList<KnowledgeObject> GetStaticKnowledge()
+        protected override IReadOnlyList<KnowledgeObject> GetStaticKnowledge()
         {
             return new[]
             {
@@ -832,7 +832,7 @@ namespace DataWarehouse.SDK.Contracts
             }
         };
 
-        protected virtual IReadOnlyList<KnowledgeObject> GetStaticKnowledge()
+        protected override IReadOnlyList<KnowledgeObject> GetStaticKnowledge()
         {
             return new[]
             {

@@ -174,7 +174,7 @@ public sealed class DataWarehouseParameter : DbParameter, ICloneable
     /// <summary>
     /// Gets or sets the precision for numeric parameters.
     /// </summary>
-    public byte Precision
+    public override byte Precision
     {
         get => _precision;
         set => _precision = value;
@@ -183,7 +183,7 @@ public sealed class DataWarehouseParameter : DbParameter, ICloneable
     /// <summary>
     /// Gets or sets the scale for numeric parameters.
     /// </summary>
-    public byte Scale
+    public override byte Scale
     {
         get => _scale;
         set => _scale = value;

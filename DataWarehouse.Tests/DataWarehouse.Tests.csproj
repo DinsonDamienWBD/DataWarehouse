@@ -6,6 +6,12 @@
     <Nullable>enable</Nullable>
     <IsPackable>false</IsPackable>
     <IsTestProject>true</IsTestProject>
+    <!-- Suppress xUnit analyzer warnings that are informational:
+         xUnit1051: Use TestContext.Current.CancellationToken (not needed for unit tests)
+         xUnit1031: Do not use blocking task operations in test method
+         xUnit2002: Do not use null check on value type
+         xUnit2031: Do not use Assert.Null() on value types -->
+    <NoWarn>$(NoWarn);xUnit1051;xUnit1031;xUnit2002;xUnit2031</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>
