@@ -57,6 +57,11 @@ public enum MediaFormat
     /// </summary>
     SmoothStreaming = 102,
 
+    /// <summary>
+    /// Common Media Application Format (CMAF) with fragmented MP4 segments.
+    /// </summary>
+    CMAF = 103,
+
     // Audio Formats
     /// <summary>
     /// MPEG-1 or MPEG-2 Audio Layer III (.mp3).
