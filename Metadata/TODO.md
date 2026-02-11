@@ -1470,10 +1470,10 @@ public abstract class ClientExecutorPluginBase : FeaturePluginBase, IClientExecu
 
 | Task | Plugin | Base Class | Description | Status |
 |------|--------|------------|-------------|--------|
-| AEDS-C1 | `AedsCorePlugin` | `FeaturePluginBase` | Core orchestration, manifest validation, job queue | [ ] |
+| AEDS-C1 | `AedsCorePlugin` | `FeaturePluginBase` | Core orchestration, manifest validation, job queue | [~] Incomplete |
 | AEDS-C2 | `IntentManifestSignerPlugin` | `FeaturePluginBase` | Ed25519/RSA signing for manifests | [ ] |
-| AEDS-C3 | `ServerDispatcherPlugin` | `ServerDispatcherPluginBase` | Default server-side job dispatch | [ ] |
-| AEDS-C4 | `ClientCourierPlugin` | `FeaturePluginBase` | Combines Sentinel + Executor + Watchdog | [ ] |
+| AEDS-C3 | `ServerDispatcherPlugin` | `ServerDispatcherPluginBase` | Default server-side job dispatch | [~] Incomplete |
+| AEDS-C4 | `ClientCourierPlugin` | `FeaturePluginBase` | Combines Sentinel + Executor + Watchdog | [~] Incomplete |
 
 ###### Control Plane Transport Plugins (User Picks)
 
@@ -1489,7 +1489,7 @@ public abstract class ClientExecutorPluginBase : FeaturePluginBase, IClientExecu
 |------|--------|------------|-------------|--------|
 | AEDS-DP1 | `Http3DataPlanePlugin` | `DataPlaneTransportPluginBase` | HTTP/3 over QUIC | [ ] |
 | AEDS-DP2 | `QuicDataPlanePlugin` | `DataPlaneTransportPluginBase` | Raw QUIC streams | [ ] |
-| AEDS-DP3 | `Http2DataPlanePlugin` | `DataPlaneTransportPluginBase` | HTTP/2 fallback | [ ] |
+| AEDS-DP3 | `Http2DataPlanePlugin` | `DataPlaneTransportPluginBase` | HTTP/2 fallback | [x] Complete |
 | AEDS-DP4 | `WebTransportDataPlanePlugin` | `DataPlaneTransportPluginBase` | WebTransport for browsers | [ ] |
 
 ###### Extension Plugins (Optional, Composable)
@@ -11129,30 +11129,30 @@ public enum DataFormatFamily { Row, Column, Scientific, Binary, Hierarchical, Gr
 | Sub-Task | Description | Status |
 |----------|-------------|--------|
 | **B1: Project Setup** |
-| 110.B1.1 | Create DataWarehouse.Plugins.UltimateDataFormat project | [ ] |
-| 110.B1.2 | Implement UltimateDataFormatPlugin orchestrator | [ ] |
-| 110.B1.3 | Implement format auto-detection engine | [ ] |
+| 110.B1.1 | Create DataWarehouse.Plugins.UltimateDataFormat project | [x] |
+| 110.B1.2 | Implement UltimateDataFormatPlugin orchestrator | [x] |
+| 110.B1.3 | Implement format auto-detection engine | [x] |
 | 110.B1.4 | Implement instance profile system | [ ] |
 | **B2: Row-Oriented Text Formats** |
-| 110.B2.1 | ⭐ CsvStrategy - CSV with dialect detection | [ ] |
+| 110.B2.1 | ⭐ CsvStrategy - CSV with dialect detection | [x] |
 | 110.B2.2 | ⭐ TsvStrategy - Tab-separated values | [ ] |
-| 110.B2.3 | ⭐ JsonStrategy - JSON with streaming support | [ ] |
+| 110.B2.3 | ⭐ JsonStrategy - JSON with streaming support | [x] |
 | 110.B2.4 | ⭐ JsonlStrategy - JSON Lines (newline-delimited) | [ ] |
 | 110.B2.5 | ⭐ NdjsonStrategy - NDJSON format | [ ] |
-| 110.B2.6 | ⭐ XmlStrategy - XML with schema validation | [ ] |
-| 110.B2.7 | ⭐ YamlStrategy - YAML format | [ ] |
-| 110.B2.8 | ⭐ TomlStrategy - TOML configuration format | [ ] |
+| 110.B2.6 | ⭐ XmlStrategy - XML with schema validation | [x] |
+| 110.B2.7 | ⭐ YamlStrategy - YAML format | [x] |
+| 110.B2.8 | ⭐ TomlStrategy - TOML configuration format | [x] |
 | **B3: Row-Oriented Binary Formats** |
-| 110.B3.1 | ⭐ MessagePackStrategy - MessagePack binary | [ ] |
+| 110.B3.1 | ⭐ MessagePackStrategy - MessagePack binary | [x] |
 | 110.B3.2 | ⭐ CborStrategy - CBOR (RFC 8949) | [ ] |
 | 110.B3.3 | ⭐ BsonStrategy - Binary JSON (MongoDB) | [ ] |
 | 110.B3.4 | ⭐ IonStrategy - Amazon Ion (text + binary) | [ ] |
 | 110.B3.5 | ⭐ UbjsonStrategy - Universal Binary JSON | [ ] |
 | 110.B3.6 | ⭐ SmileStrategy - Jackson Smile format | [ ] |
 | **B4: Schema-Based Binary Formats** |
-| 110.B4.1 | ⭐ AvroStrategy - Apache Avro with schema registry | [ ] |
-| 110.B4.2 | ⭐ ProtobufStrategy - Protocol Buffers | [ ] |
-| 110.B4.3 | ⭐ ThriftStrategy - Apache Thrift | [ ] |
+| 110.B4.1 | ⭐ AvroStrategy - Apache Avro with schema registry | [x] |
+| 110.B4.2 | ⭐ ProtobufStrategy - Protocol Buffers | [x] |
+| 110.B4.3 | ⭐ ThriftStrategy - Apache Thrift | [x] |
 | 110.B4.4 | ⭐ FlatBuffersStrategy - Google FlatBuffers | [ ] |
 | 110.B4.5 | ⭐ CapnProtoStrategy - Cap'n Proto | [ ] |
 | 110.B4.6 | ⭐ BondStrategy - Microsoft Bond | [ ] |
