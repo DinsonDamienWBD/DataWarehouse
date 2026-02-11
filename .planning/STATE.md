@@ -113,6 +113,7 @@ Progress: [######----] 67%
 | Phase 20 P03 | 6 | 2 tasks | 14 files |
 | Phase 21 P03 | 8 min | 2 tasks | 2 files |
 | Phase 15 P01 | 5 min | 2 tasks | 4 files |
+| Phase 20 P04 | 10 min | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -227,8 +228,11 @@ Recent decisions affecting current work:
 - [Phase 20]: Grain and MoonBit report WasiSupportLevel.Full as WASM-native languages; Perl reports None (Emscripten-only); all other Tier 3 report Experimental
 - [Phase 21-03]: Bounded Channel<int>(64) for P2P piece queue prevents unbounded memory (research pitfall 3); SemaphoreSlim(8) global + per-peer limit 4; path scoring formula 0.5*throughput - 0.3*latency - 0.2*errorRate with rebalance at 50% threshold; public long field for async-compatible Interlocked byte counting
 - [Phase 15]: T26-T31 bug fixes verified present; deferred tests implemented (36 tests); S3 XML parsing/async fixes not applicable in UltimateStorage (uses AWS SDK)
+- [Phase 20-04]: WasmLanguageBenchmarkStrategy (compute.wasm.benchmark) discovers all language strategies via reflection, measures execution time/memory/binary size; WasmLanguageEcosystemStrategy (compute.wasm.ecosystem) aggregates full 31-language catalog; WasmLanguageSdkDocumentation provides DW host function binding examples for 23 languages (Rust extern C, .NET DllImport, Go wasmimport, AssemblyScript @external, etc.); Phase 20 COMPLETE with all 6 ROADMAP success criteria satisfied
 
 ### Pending Todos
+
+- **Phase 20 COMPLETE:** All 4 plans complete with 33 WASM strategies (31 languages + benchmark + ecosystem) plus SDK documentation utility.
 
 - **TODO.md discrepancy:** T100 Phase B9 (8 innovation strategies) and Phase F (20 innovation strategies) marked [x] Complete in TODO.md but not found as separate strategy files in codebase. Core observability infrastructure (55 strategies) is production-ready. Innovation strategies may be: (a) intentionally deferred, (b) consolidated into orchestrator AI layer, or (c) marked complete prematurely. Recommendation: Address at planning level.
 - **Phase 6 COMPLETE:** All 12 plans complete with 68 strategies total.
