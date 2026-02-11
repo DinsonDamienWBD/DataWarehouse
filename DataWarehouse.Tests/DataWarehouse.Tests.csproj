@@ -33,6 +33,7 @@
     <ProjectReference Include="..\DataWarehouse.Kernel\DataWarehouse.Kernel.csproj" />
     <ProjectReference Include="..\Plugins\DataWarehouse.Plugins.UltimateAccessControl\DataWarehouse.Plugins.UltimateAccessControl.csproj" />
     <ProjectReference Include="..\Plugins\DataWarehouse.Plugins.UltimateCompliance\DataWarehouse.Plugins.UltimateCompliance.csproj" />
+    <ProjectReference Include="..\Plugins\DataWarehouse.Plugins.Raft\DataWarehouse.Plugins.Raft.csproj" />
   </ItemGroup>
 
   <!-- Exclude test files for removed functionality to fix build errors -->
