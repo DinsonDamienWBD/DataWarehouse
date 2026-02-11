@@ -198,9 +198,9 @@ public sealed class ProtocolHandler : IDisposable
             DateTimeOffset.UtcNow.AddMinutes(-5),
             DateTimeOffset.UtcNow.AddYears(1));
 
-        return new X509Certificate2(
+        return X509CertificateLoader.LoadPkcs12(
             certificate.Export(X509ContentType.Pfx),
-            (string?)null,
+            null,
             X509KeyStorageFlags.MachineKeySet | X509KeyStorageFlags.Exportable);
     }
 

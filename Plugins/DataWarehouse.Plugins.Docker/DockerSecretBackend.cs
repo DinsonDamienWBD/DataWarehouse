@@ -359,13 +359,12 @@ namespace DataWarehouse.Plugins.Docker
 
         private static byte[] DeriveKey(string passphrase, byte[] salt)
         {
-            using var pbkdf2 = new Rfc2898DeriveBytes(
+            return Rfc2898DeriveBytes.Pbkdf2(
                 passphrase,
                 salt,
                 Pbkdf2Iterations,
-                HashAlgorithmName.SHA256);
-
-            return pbkdf2.GetBytes(KeySize);
+                HashAlgorithmName.SHA256,
+                KeySize);
         }
 
         private static string GetMachineIdentifier()

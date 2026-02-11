@@ -490,13 +490,12 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Platform
             var combinedEntropy = string.Join("|", entropyParts);
             var entropyBytes = Encoding.UTF8.GetBytes(combinedEntropy);
 
-            using var pbkdf2 = new Rfc2898DeriveBytes(
+            return Rfc2898DeriveBytes.Pbkdf2(
                 entropyBytes,
-                salt: SHA256.HashData(Encoding.UTF8.GetBytes("DataWarehouse.Linux.SecretService.Salt.v1")),
-                iterations: 100000,
-                HashAlgorithmName.SHA256);
-
-            return pbkdf2.GetBytes(32);
+                SHA256.HashData(Encoding.UTF8.GetBytes("DataWarehouse.Linux.SecretService.Salt.v1")),
+                100000,
+                HashAlgorithmName.SHA256,
+                32);
         }
 
         #endregion

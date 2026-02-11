@@ -184,7 +184,7 @@ public sealed class TdsProtocolHandler : IDisposable
 
         if (!string.IsNullOrEmpty(_config.SslCertificatePath) && File.Exists(_config.SslCertificatePath))
         {
-            serverCert = new X509Certificate2(_config.SslCertificatePath, _config.SslCertificatePassword);
+            serverCert = X509CertificateLoader.LoadPkcs12FromFile(_config.SslCertificatePath, _config.SslCertificatePassword);
         }
         else
         {
@@ -246,7 +246,7 @@ public sealed class TdsProtocolHandler : IDisposable
         var cert = request.CreateSelfSigned(DateTimeOffset.UtcNow, DateTimeOffset.UtcNow.AddYears(1));
 
         // Export and re-import to get a certificate with a private key that works on all platforms
-        return new X509Certificate2(cert.Export(X509ContentType.Pfx), (string?)null,
+        return X509CertificateLoader.LoadPkcs12(cert.Export(X509ContentType.Pfx), null,
             X509KeyStorageFlags.MachineKeySet | X509KeyStorageFlags.Exportable);
     }
 

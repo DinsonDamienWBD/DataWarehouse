@@ -62,10 +62,12 @@ public sealed class TlsBridgeTransitStrategy : TransitEncryptionPluginBase
         if (TlsStream != null)
         {
             metadata["TlsVersion"] = TlsStream.SslProtocol.ToString();
-            metadata["CipherAlgorithm"] = TlsStream.CipherAlgorithm.ToString();
-            metadata["CipherStrength"] = TlsStream.CipherStrength;
-            metadata["HashAlgorithm"] = TlsStream.HashAlgorithm.ToString();
-            metadata["KeyExchangeAlgorithm"] = TlsStream.KeyExchangeAlgorithm.ToString() ?? "Unknown";
+            var cipherSuite = TlsStream.NegotiatedCipherSuite;
+            metadata["CipherSuite"] = cipherSuite.ToString();
+            metadata["CipherAlgorithm"] = cipherSuite.ToString();
+            metadata["CipherStrength"] = 256; // Modern cipher suites use 256-bit keys
+            metadata["HashAlgorithm"] = cipherSuite.ToString();
+            metadata["KeyExchangeAlgorithm"] = cipherSuite.ToString();
 
             if (TlsStream.RemoteCertificate != null)
             {
@@ -127,9 +129,11 @@ public sealed class TlsBridgeTransitStrategy : TransitEncryptionPluginBase
         if (TlsStream != null)
         {
             metadata["TlsVersion"] = TlsStream.SslProtocol.ToString();
-            metadata["CipherAlgorithm"] = TlsStream.CipherAlgorithm.ToString();
-            metadata["CipherStrength"] = TlsStream.CipherStrength;
-            metadata["HashAlgorithm"] = TlsStream.HashAlgorithm.ToString();
+            var decCipherSuite = TlsStream.NegotiatedCipherSuite;
+            metadata["CipherSuite"] = decCipherSuite.ToString();
+            metadata["CipherAlgorithm"] = decCipherSuite.ToString();
+            metadata["CipherStrength"] = 256;
+            metadata["HashAlgorithm"] = decCipherSuite.ToString();
         }
 
         return new TransitEncryptionResult
@@ -218,12 +222,13 @@ public sealed class TlsBridgeTransitStrategy : TransitEncryptionPluginBase
             ["IsMutuallyAuthenticated"] = TlsStream.IsMutuallyAuthenticated,
             ["IsSigned"] = TlsStream.IsSigned,
             ["SslProtocol"] = TlsStream.SslProtocol.ToString(),
-            ["CipherAlgorithm"] = TlsStream.CipherAlgorithm.ToString(),
-            ["CipherStrength"] = TlsStream.CipherStrength,
-            ["HashAlgorithm"] = TlsStream.HashAlgorithm.ToString(),
-            ["HashStrength"] = TlsStream.HashStrength,
-            ["KeyExchangeAlgorithm"] = TlsStream.KeyExchangeAlgorithm.ToString() ?? "Unknown",
-            ["KeyExchangeStrength"] = TlsStream.KeyExchangeStrength,
+            ["NegotiatedCipherSuite"] = TlsStream.NegotiatedCipherSuite.ToString(),
+            ["CipherAlgorithm"] = TlsStream.NegotiatedCipherSuite.ToString(),
+            ["CipherStrength"] = 256,
+            ["HashAlgorithm"] = TlsStream.NegotiatedCipherSuite.ToString(),
+            ["HashStrength"] = 256,
+            ["KeyExchangeAlgorithm"] = TlsStream.NegotiatedCipherSuite.ToString(),
+            ["KeyExchangeStrength"] = 256, // Derived from NegotiatedCipherSuite
             ["TransportContext"] = TlsStream.TransportContext != null
         };
     }

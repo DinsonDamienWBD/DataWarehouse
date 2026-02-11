@@ -312,7 +312,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Database
         private async Task<TdeCertificateMetadata> ImportCertificateFromFileAsync(string certificateFilePath, string keyId, CancellationToken cancellationToken)
         {
             var certBytes = await File.ReadAllBytesAsync(certificateFilePath, cancellationToken);
-            var cert = new X509Certificate2(certBytes);
+            var cert = X509CertificateLoader.LoadCertificate(certBytes);
 
             var metadata = new TdeCertificateMetadata
             {
@@ -445,7 +445,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Database
             var exportPath = Path.Combine(_config.ExportDirectory, $"{keyId}.cer");
 
             // Create X509 certificate for export
-            var cert = new X509Certificate2(metadata.PublicKeyData);
+            var cert = X509CertificateLoader.LoadCertificate(metadata.PublicKeyData);
             var certBytes = cert.Export(X509ContentType.Cert);
 
             await File.WriteAllBytesAsync(exportPath, certBytes, cancellationToken);

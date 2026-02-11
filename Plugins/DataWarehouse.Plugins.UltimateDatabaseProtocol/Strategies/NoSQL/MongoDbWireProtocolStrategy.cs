@@ -239,9 +239,8 @@ public sealed class MongoDbWireProtocolStrategy : DatabaseProtocolStrategyBase
 
     private static byte[] Hi(string password, byte[] salt, int iterations)
     {
-        using var pbkdf2 = new System.Security.Cryptography.Rfc2898DeriveBytes(
-            password, salt, iterations, System.Security.Cryptography.HashAlgorithmName.SHA256);
-        return pbkdf2.GetBytes(32);
+        return System.Security.Cryptography.Rfc2898DeriveBytes.Pbkdf2(
+            password, salt, iterations, System.Security.Cryptography.HashAlgorithmName.SHA256, 32);
     }
 
     private static byte[] HmacSha256(byte[] key, string message)

@@ -90,7 +90,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.IndustryFirst
             var handler = new HttpClientHandler();
             if (!string.IsNullOrEmpty(_config.ClientCertificatePath))
             {
-                var cert = new System.Security.Cryptography.X509Certificates.X509Certificate2(
+                var cert = System.Security.Cryptography.X509Certificates.X509CertificateLoader.LoadPkcs12FromFile(
                     _config.ClientCertificatePath, _config.ClientCertificatePassword);
                 handler.ClientCertificates.Add(cert);
             }

@@ -149,7 +149,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Container
 
                 if (!string.IsNullOrEmpty(_config.TlsCertPath))
                 {
-                    var cert = new System.Security.Cryptography.X509Certificates.X509Certificate2(
+                    var cert = System.Security.Cryptography.X509Certificates.X509CertificateLoader.LoadCertificateFromFile(
                         _config.TlsCertPath);
                     httpHandler.ClientCertificates.Add(cert);
                 }

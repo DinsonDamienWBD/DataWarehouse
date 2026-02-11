@@ -121,7 +121,7 @@ public sealed class CodeSigningPlugin : FeaturePluginBase
             chain.ChainPolicy.RevocationFlag = X509RevocationFlag.EndCertificateOnly;
 
             var leafCertBytes = Convert.FromBase64String(certificateChain[0]);
-            var leafCert = new X509Certificate2(leafCertBytes);
+            var leafCert = X509CertificateLoader.LoadCertificate(leafCertBytes);
 
             return chain.Build(leafCert);
         }

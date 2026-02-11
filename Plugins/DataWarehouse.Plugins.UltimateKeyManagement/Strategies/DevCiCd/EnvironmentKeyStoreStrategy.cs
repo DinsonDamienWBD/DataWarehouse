@@ -229,8 +229,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.DevCiCd
         {
             // Derive a cryptographically strong key from a string value
             var salt = SHA256.HashData(Encoding.UTF8.GetBytes(_config.KeyDerivationSalt));
-            using var pbkdf2 = new Rfc2898DeriveBytes(value, salt, 100000, HashAlgorithmName.SHA256);
-            return pbkdf2.GetBytes(32); // 256-bit key
+            return Rfc2898DeriveBytes.Pbkdf2(value, salt, 100000, HashAlgorithmName.SHA256, 32); // 256-bit key
         }
     }
 

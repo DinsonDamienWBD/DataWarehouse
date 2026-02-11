@@ -297,12 +297,12 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.CloudKms
 
         private byte[] DeriveKeyFromToken(string token)
         {
-            using var pbkdf2 = new Rfc2898DeriveBytes(
+            return Rfc2898DeriveBytes.Pbkdf2(
                 token,
                 Encoding.UTF8.GetBytes("DataWarehouse.DigitalOcean.Salt"),
                 100000,
-                HashAlgorithmName.SHA256);
-            return pbkdf2.GetBytes(32);
+                HashAlgorithmName.SHA256,
+                32);
         }
 
         private byte[] WrapKeyLocally(byte[] key)

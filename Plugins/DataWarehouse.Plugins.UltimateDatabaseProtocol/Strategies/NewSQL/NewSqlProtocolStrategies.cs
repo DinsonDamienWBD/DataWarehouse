@@ -300,12 +300,12 @@ public sealed class CockroachDbProtocolStrategy : DatabaseProtocolStrategyBase
 
     private static byte[] ComputeScramSaltedPassword(string password, byte[] salt, int iterations)
     {
-        using var pbkdf2 = new Rfc2898DeriveBytes(
+        return Rfc2898DeriveBytes.Pbkdf2(
             Encoding.UTF8.GetBytes(password),
             salt,
             iterations,
-            HashAlgorithmName.SHA256);
-        return pbkdf2.GetBytes(32);
+            HashAlgorithmName.SHA256,
+            32);
     }
 
     private static byte[] ComputeHmac(byte[] key, string data)

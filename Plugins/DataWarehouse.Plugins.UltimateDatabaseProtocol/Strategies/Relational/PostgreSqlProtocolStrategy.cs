@@ -381,8 +381,7 @@ public sealed class PostgreSqlProtocolStrategy : DatabaseProtocolStrategyBase
     private static byte[] Hi(string password, byte[] salt, int iterations)
     {
         // PBKDF2 with HMAC-SHA256
-        using var pbkdf2 = new Rfc2898DeriveBytes(password, salt, iterations, HashAlgorithmName.SHA256);
-        return pbkdf2.GetBytes(32);
+        return Rfc2898DeriveBytes.Pbkdf2(password, salt, iterations, HashAlgorithmName.SHA256, 32);
     }
 
     private static Dictionary<string, string> ParseScramMessage(string message)

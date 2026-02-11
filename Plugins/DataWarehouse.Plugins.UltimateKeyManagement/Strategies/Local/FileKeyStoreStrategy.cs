@@ -333,13 +333,12 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Local
             var entropyBytes = Encoding.UTF8.GetBytes(combinedEntropy);
 
             // Use PBKDF2 to derive a strong key
-            using var pbkdf2 = new Rfc2898DeriveBytes(
+            return Rfc2898DeriveBytes.Pbkdf2(
                 entropyBytes,
-                salt: SHA256.HashData(Encoding.UTF8.GetBytes("DataWarehouse.DPAPI.Salt.v1")),
-                iterations: 100000,
-                HashAlgorithmName.SHA256);
-
-            return pbkdf2.GetBytes(32); // 256-bit key
+                SHA256.HashData(Encoding.UTF8.GetBytes("DataWarehouse.DPAPI.Salt.v1")),
+                100000,
+                HashAlgorithmName.SHA256,
+                32); // 256-bit key
         }
     }
 
@@ -382,8 +381,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Local
         private static byte[] DeriveKey(string password)
         {
             var salt = SHA256.HashData(Encoding.UTF8.GetBytes("DataWarehouse.Salt.v1"));
-            using var pbkdf2 = new Rfc2898DeriveBytes(password, salt, 100000, HashAlgorithmName.SHA256);
-            return pbkdf2.GetBytes(32);
+            return Rfc2898DeriveBytes.Pbkdf2(password, salt, 100000, HashAlgorithmName.SHA256, 32);
         }
 
         private static byte[] EncryptWithAes(byte[] data, byte[] key)
@@ -454,8 +452,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Local
         private static byte[] DeriveKey(string password, string context)
         {
             var salt = SHA256.HashData(Encoding.UTF8.GetBytes($"DataWarehouse.{context}.Salt.v1"));
-            using var pbkdf2 = new Rfc2898DeriveBytes(password, salt, 150000, HashAlgorithmName.SHA256);
-            return pbkdf2.GetBytes(32);
+            return Rfc2898DeriveBytes.Pbkdf2(password, salt, 150000, HashAlgorithmName.SHA256, 32);
         }
 
         private static byte[] EncryptWithDatabaseKey(byte[] data, byte[] key)
@@ -564,8 +561,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Local
 
         private static byte[] DeriveKey(string password, byte[] salt)
         {
-            using var pbkdf2 = new Rfc2898DeriveBytes(password, salt, 200000, HashAlgorithmName.SHA256);
-            return pbkdf2.GetBytes(32);
+            return Rfc2898DeriveBytes.Pbkdf2(password, salt, 200000, HashAlgorithmName.SHA256, 32);
         }
     }
 
