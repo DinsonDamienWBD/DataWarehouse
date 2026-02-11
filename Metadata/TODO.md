@@ -12056,22 +12056,22 @@ public enum DeliverySemantics { AtMostOnce, AtLeastOnce, ExactlyOnce }
 | 113.B1.3 | Implement unified stream router | [ ] |
 | 113.B1.4 | Implement backpressure manager | [ ] |
 | **B2: Message Queue Protocols** |
-| 113.B2.1 | ⭐ KafkaStrategy - Apache Kafka | [ ] |
+| 113.B2.1 | ⭐ KafkaStrategy - Apache Kafka | [x] |
 | 113.B2.2 | ⭐ KafkaConnectStrategy - Kafka Connect | [ ] |
-| 113.B2.3 | ⭐ PulsarStrategy - Apache Pulsar | [ ] |
-| 113.B2.4 | ⭐ RabbitMqStrategy - RabbitMQ/AMQP | [ ] |
-| 113.B2.5 | ⭐ NatsStrategy - NATS | [ ] |
+| 113.B2.3 | ⭐ PulsarStrategy - Apache Pulsar | [x] |
+| 113.B2.4 | ⭐ RabbitMqStrategy - RabbitMQ/AMQP | [x] |
+| 113.B2.5 | ⭐ NatsStrategy - NATS | [x] |
 | 113.B2.6 | ⭐ NatsJetStreamStrategy - NATS JetStream | [ ] |
 | 113.B2.7 | ⭐ RedisStreamsStrategy - Redis Streams | [ ] |
 | 113.B2.8 | ⭐ ActiveMqStrategy - Apache ActiveMQ | [ ] |
 | 113.B2.9 | ⭐ RocketMqStrategy - Apache RocketMQ | [ ] |
 | **B3: IoT/Sensor Protocols** |
-| 113.B3.1 | ⭐ MqttStrategy - MQTT 3.1.1/5.0 | [ ] |
+| 113.B3.1 | ⭐ MqttStrategy - MQTT 3.1.1/5.0 | [x] |
 | 113.B3.2 | ⭐ MqttSparkplugStrategy - Sparkplug B | [ ] |
-| 113.B3.3 | ⭐ CoapStrategy - CoAP | [ ] |
+| 113.B3.3 | ⭐ CoapStrategy - CoAP | [x] |
 | 113.B3.4 | ⭐ LwM2MStrategy - LwM2M | [ ] |
-| 113.B3.5 | ⭐ LoraWanStrategy - LoRaWAN | [ ] |
-| 113.B3.6 | ⭐ ZigbeeStrategy - Zigbee | [ ] |
+| 113.B3.5 | ⭐ LoraWanStrategy - LoRaWAN | [x] |
+| 113.B3.6 | ⭐ ZigbeeStrategy - Zigbee | [x] |
 | 113.B3.7 | ⭐ MatterStrategy - Matter (smart home) | [ ] |
 | **B4: Industrial Protocols** |
 | 113.B4.1 | ⭐ OpcUaStrategy - OPC-UA | [ ] |
