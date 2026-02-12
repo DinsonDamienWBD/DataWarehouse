@@ -35,22 +35,25 @@
 
 ## Milestone: v2.0 SDK Hardening & Distributed Infrastructure
 
-> 8 phases (22-29) | 89 requirements across 16 categories | Approach: verify first, implement only where code deviates
+> 10 phases (22-31) | 89+ requirements across 16+ categories | Approach: verify first, implement only where code deviates
+> Architecture decisions: .planning/ARCHITECTURE_DECISIONS.md (AD-01 through AD-07)
 
 **Milestone Goal:** Harden the SDK to pass hyperscale/military-level code review -- refactor base class hierarchies, enforce security best practices, add distributed infrastructure contracts, achieve zero compiler warnings.
 
-**Ordering Rationale:** Security-first. Build tooling and static analysis go first (catches issues in all subsequent work). Memory/crypto hardening before hierarchy refactoring (IDisposable must exist before plugin hierarchy changes). Hierarchies before distributed contracts (clean base classes before layering distributed features). Plugin migration after both hierarchies stabilize. Advanced distributed implementations after contracts defined. Testing last as the final gate.
+**Ordering Rationale:** Security-first. Build tooling and static analysis go first (catches issues in all subsequent work). Memory/crypto hardening before hierarchy refactoring (IDisposable must exist before plugin hierarchy changes). Hierarchies before distributed contracts (clean base classes before layering distributed features). Strategy hierarchy is split: design first (25a), then mechanical migration (25b) after plugin migration. Dead code cleanup after hierarchies stabilize. Testing last as the final gate.
 
 ### Phases
 
 - [ ] **Phase 22: Build Safety & Supply Chain** - Roslyn analyzers, TreatWarningsAsErrors rollout, SBOM, vulnerability audit, CLI fix
 - [ ] **Phase 23: Memory Safety & Cryptographic Hygiene** - IDisposable patterns, secure memory wiping, bounded collections, constant-time comparisons, FIPS compliance
-- [ ] **Phase 24: Plugin Hierarchy & Input Validation** - PluginBase through feature-specific bases, lifecycle methods, capability/knowledge registries, input validation at all boundaries
-- [ ] **Phase 25: Strategy Hierarchy & API Contracts** - Unified StrategyBase, adapter wrappers, intelligence-aware strategies, immutable DTOs, versioned interfaces
+- [ ] **Phase 24: Plugin Hierarchy, Storage Core & Input Validation** - Two-branch plugin hierarchy (DataPipeline + Feature), object storage core with translation layer, specialized bases to composable services, input validation (AD-01, AD-02, AD-03, AD-04)
+- [ ] **Phase 25a: Strategy Hierarchy Design & API Contracts** - Flat StrategyBase → domain bases (no intelligence layer), API contract safety (AD-05)
+- [ ] **Phase 25b: Strategy Migration** - Migrate ~1,500 strategies to new bases, remove duplicated boilerplate, domain by domain
 - [ ] **Phase 26: Distributed Contracts & Resilience** - All distributed SDK contracts, security primitives, multi-phase init, in-memory implementations, circuit breakers, observability
 - [ ] **Phase 27: Plugin Migration & Decoupling Verification** - All Ultimate and standalone plugins updated to new hierarchies, decoupling enforced
-- [ ] **Phase 28: Advanced Distributed Coordination** - SWIM gossip, Raft consensus, CRDT replication, FederatedMessageBus, load balancing implementations
-- [ ] **Phase 29: Testing & Final Verification** - Full build validation, behavioral verification, distributed integration tests, analyzer clean pass
+- [ ] **Phase 28: Dead Code Cleanup** - Remove truly unused classes/files, keep future-ready interfaces for unreleased hardware/technology (AD-06)
+- [ ] **Phase 29: Advanced Distributed Coordination** - SWIM gossip, Raft consensus, CRDT replication, FederatedMessageBus, load balancing implementations
+- [ ] **Phase 30: Testing & Final Verification** - Full build validation, behavioral verification, distributed integration tests, analyzer clean pass
 
 ### Phase Details
 
@@ -92,44 +95,72 @@ Plans:
 - [ ] 23-03: Cryptographic hygiene audit (constant-time, RNG, FIPS compliance)
 - [ ] 23-04: Key rotation contracts and algorithm agility framework
 
-#### Phase 24: Plugin Hierarchy & Input Validation
-**Goal**: The plugin base class hierarchy is clean, layered, and enforces security at every boundary -- PluginBase through feature-specific bases form a complete inheritance chain with validated inputs.
+#### Phase 24: Plugin Hierarchy, Storage Core & Input Validation
+**Goal**: The plugin base class hierarchy follows the two-branch design (DataPipeline + Feature), object-based storage is the universal core with a path translation layer, specialized bases are extracted into composable services, and all boundaries validate inputs. See AD-01, AD-02, AD-03, AD-04.
 **Depends on**: Phase 23 (IDisposable pattern must be on PluginBase before hierarchy work)
 **Requirements**: HIER-01, HIER-02, HIER-03, HIER-04, HIER-05, HIER-06, HIER-07, HIER-08, HIER-09, VALID-01, VALID-02, VALID-03, VALID-04, VALID-05
-**Approach**: Verify existing hierarchy first -- much of the PluginBase/IntelligentPluginBase/FeaturePluginBase chain exists from v1.0. Focus on gaps: capability registry, knowledge registry, lifecycle completeness. Input validation is co-located here because plugin boundaries are the primary validation surface.
+**Architecture Decisions**: AD-01 (two branches), AD-02 (single encryption/compression base), AD-03 (composable services), AD-04 (object storage core)
+**Approach**: Verify existing hierarchy first. Restructure into two branches under IntelligenceAwarePluginBase: DataPipelinePluginBase (encryption, storage, replication, transit, integrity) and FeaturePluginBase (security, interface, compute, observability, etc.). Extract specialized base class logic (TieredStorage, CacheableStorage, etc.) into composable services. Unify storage model around object/key-based core with URI translation layer.
 **Success Criteria** (what must be TRUE):
   1. PluginBase has complete lifecycle (Initialize/Execute/Shutdown with CancellationToken), IDisposable/IAsyncDisposable, capability registry, and knowledge registry
-  2. IntelligenceAwarePluginBase (IntelligentPluginBase) extends FeaturePluginBase with graceful degradation when UltimateIntelligence is unavailable
-  3. All 10 feature-specific base classes (Encryption, Compression, Storage, Security, Observability, Interface, Format, Streaming, Media, Processing) inherit from IntelligenceAwarePluginBase and provide domain-common functionality
-  4. Every public SDK method validates its inputs (null checks, range checks, format validation) before processing -- no unvalidated data crosses a plugin boundary
-  5. All 60 existing plugins still compile and pass tests after hierarchy changes
-**Plans**: TBD (estimated 3-5 plans)
+  2. IntelligenceAwarePluginBase extends PluginBase with graceful degradation -- every plugin except UltimateIntelligencePlugin inherits this
+  3. DataPipelinePluginBase and FeaturePluginBase are sibling branches under IntelligenceAwarePluginBase with ~15-20 domain bases total
+  4. Object/key-based storage is the universal core model with StorageObjectMetadata; PathStorageAdapter provides URI translation layer
+  5. Specialized base class logic (tiering, caching, indexing, hybrid) extracted into composable services accessible by all storage plugins
+  6. Every public SDK method validates its inputs (null checks, range checks, format validation, path traversal protection, ReDoS protection)
+  7. All 60 existing plugins still compile and pass tests after hierarchy changes
+**Plans**: TBD (estimated 5-7 plans)
 
 Plans:
-- [ ] 24-01: PluginBase lifecycle, capability registry, and knowledge registry
-- [ ] 24-02: IntelligenceAwarePluginBase and feature-specific base classes
-- [ ] 24-03: Input validation framework (boundary validation, path traversal, size limits, ReDoS)
-- [ ] 24-04: Plugin identity verification for distributed message authentication
-- [ ] 24-05: Hierarchy build verification across all 60 plugins
+- [ ] 24-01: PluginBase lifecycle, capability registry, and knowledge registry verification
+- [ ] 24-02: IntelligenceAwarePluginBase → DataPipelinePluginBase + FeaturePluginBase two-branch design
+- [ ] 24-03: Domain plugin bases (Encryption, Storage, Security, Interface, Compute, etc.) under correct branch
+- [ ] 24-04: Object storage core unification and PathStorageAdapter translation layer
+- [ ] 24-05: Extract specialized bases into composable services (TierManager, CacheManager, StorageIndex, etc.)
+- [ ] 24-06: Input validation framework (boundary validation, path traversal, size limits, ReDoS)
+- [ ] 24-07: Hierarchy build verification across all 60 plugins
 
-#### Phase 25: Strategy Hierarchy & API Contracts
-**Goal**: All strategy implementations share a unified base hierarchy with backward-compatible adapters, and all public SDK types use immutable, versioned contracts.
+#### Phase 25a: Strategy Hierarchy Design & API Contracts
+**Goal**: Design and implement the unified strategy base hierarchy (flat, two-level, NO intelligence layer) and enforce immutable API contracts. See AD-05.
 **Depends on**: Phase 24 (plugin hierarchy must be stable -- strategies belong to plugins)
-**Requirements**: STRAT-01, STRAT-02, STRAT-03, STRAT-04, STRAT-05, STRAT-06, API-01, API-02, API-03, API-04
-**Approach**: Verify existing 7 fragmented strategy bases. Design unified StrategyBase top-down, then create adapter wrappers so existing strategies compile unchanged. Migrate one domain at a time starting with smallest. API contracts (immutable DTOs, strong typing) apply to strategy contracts and are natural co-work.
+**Requirements**: STRAT-01, STRAT-02, STRAT-04, STRAT-05, API-01, API-02, API-03, API-04
+**Architecture Decisions**: AD-05 (flat strategy hierarchy, no intelligence layer)
+**Approach**: Strategies are workers, not orchestrators. They do NOT have intelligence, capability registry, knowledge bank access, or pipeline awareness. The plugin handles all of that. Strategy hierarchy is flat: StrategyBase → ~15 domain strategy bases → concrete strategies. Remove STRAT-03 (IntelligenceAwareStrategyBase) per AD-05 -- intelligence belongs at the plugin level only.
 **Success Criteria** (what must be TRUE):
-  1. A unified StrategyBase root class exists with Initialize/Execute/Cleanup lifecycle, capability declaration, and CancellationToken support
-  2. IntelligenceAwareStrategyBase provides UltimateIntelligence integration mirroring the plugin-side pattern
-  3. All 7 existing fragmented strategy bases are consolidated under the unified hierarchy via adapter wrappers -- existing strategy code compiles without changes
+  1. StrategyBase exists with lifecycle (Initialize/Shutdown), IDisposable/IAsyncDisposable, metadata (Name, Description, Characteristics), CancellationToken support -- NO intelligence, NO capability registry, NO knowledge bank
+  2. ~15 domain strategy bases exist (Encryption, Compression, Storage, Security, KeyManagement, Compliance, Interface, Connector, Compute, Observability, Replication, Media, Streaming, Format, Transit, DataManagement) each defining their domain contract
+  3. Common boilerplate from 7 fragmented bases consolidated into StrategyBase (~1,000 lines of duplication eliminated)
   4. All public SDK data transfer types use C# records or init-only setters (immutable by default) and strongly-typed contracts replace Dictionary<string, object>
-  5. All existing plugin strategies produce identical results after hierarchy migration (behavioral verification)
-**Plans**: TBD (estimated 3-4 plans)
+  5. Adapter wrappers allow existing strategies to compile against new hierarchy without changes (temporary -- removed during 25b migration)
+**Plans**: TBD (estimated 4-5 plans)
 
 Plans:
-- [ ] 25-01: Unified StrategyBase design and IntelligenceAwareStrategyBase
-- [ ] 25-02: Adapter wrappers for 7 fragmented strategy bases
-- [ ] 25-03: API contract safety (immutable DTOs, strong typing, SdkCompatibility, null-object pattern)
-- [ ] 25-04: Behavioral verification of strategy migration
+- [ ] 25a-01: StrategyBase design (lifecycle, dispose, metadata, logging -- no intelligence)
+- [ ] 25a-02: Domain strategy bases (~15 bases with domain-specific contracts)
+- [ ] 25a-03: Adapter wrappers for 7 fragmented strategy bases (temporary backward compatibility)
+- [ ] 25a-04: API contract safety (immutable DTOs, strong typing, SdkCompatibility, null-object pattern)
+- [ ] 25a-05: Build verification -- all strategies compile against new hierarchy via adapters
+
+#### Phase 25b: Strategy Migration
+**Goal**: Migrate all ~1,500 strategy classes to the new hierarchy, remove duplicated boilerplate (intelligence, capability, dispose code), verify behavioral equivalence.
+**Depends on**: Phase 25a (new strategy bases must exist)
+**Requirements**: STRAT-04, STRAT-06
+**Approach**: Mechanical migration, domain by domain, smallest first. For each strategy: change base class, remove duplicated boilerplate (ConfigureIntelligence, GetStrategyKnowledge, GetStrategyCapability, redundant Dispose), verify it compiles. Start with smallest domains (Transit 11, Encryption 12) to prove pattern, end with largest (Connector 280, Compliance 145).
+**Success Criteria** (what must be TRUE):
+  1. All ~1,500 strategies inherit from their correct domain strategy base (no more direct inheritance from fragmented bases)
+  2. Intelligence/capability/knowledge boilerplate removed from all strategy classes (this code now lives only in the plugin)
+  3. Adapter wrappers from 25a removed -- strategies use new bases directly
+  4. All existing plugin strategies produce identical results after migration (behavioral verification tests)
+  5. Build compiles with zero errors across all 60 plugins
+**Plans**: TBD (estimated 5-8 plans)
+
+Plans:
+- [ ] 25b-01: Migrate smallest domains (Transit 11, Encryption 12, Streaming 17, Media 20)
+- [ ] 25b-02: Migrate medium domains (DataFormat 28, DataProtection 35, StorageProcessing 43, DatabaseStorage 49)
+- [ ] 25b-03: Migrate large domains (Observability 55, Compression 59, Replication 60, Interface 68, KeyManagement 68)
+- [ ] 25b-04: Migrate largest domains (DataManagement 78, Compute 83, Storage 130)
+- [ ] 25b-05: Migrate mega domains (AccessControl 142, Compliance 145, Connector 280)
+- [ ] 25b-06: Remove adapter wrappers, final build verification, behavioral equivalence tests
 
 #### Phase 26: Distributed Contracts & Resilience
 **Goal**: The SDK defines all distributed infrastructure contracts with security primitives baked in, in-memory single-node implementations for backward compatibility, and resilience/observability contracts that any plugin can use.
@@ -153,7 +184,7 @@ Plans:
 
 #### Phase 27: Plugin Migration & Decoupling Verification
 **Goal**: All 60 plugins use the new base class hierarchies and distributed infrastructure features -- no plugin references another plugin directly, all communication flows through the message bus.
-**Depends on**: Phase 25 (strategy hierarchy), Phase 26 (distributed contracts)
+**Depends on**: Phase 25b (strategy migration), Phase 26 (distributed contracts)
 **Requirements**: UPLT-01, UPLT-02, UPLT-03, UPST-01, UPST-02, UPST-03, DECPL-01, DECPL-02, DECPL-03, DECPL-04, DECPL-05
 **Approach**: Verify first -- many plugins may already use correct base classes from v1.0. Batch migration by plugin category. Static analysis to verify zero cross-plugin references. Decoupling verification is a gate: phase does not complete until every plugin is verified SDK-only.
 **Success Criteria** (what must be TRUE):
@@ -170,7 +201,27 @@ Plans:
 - [ ] 27-03: Standalone plugin migration to IntelligenceAwarePluginBase
 - [ ] 27-04: Decoupling verification (static analysis, message bus audit, capability/knowledge registration)
 
-#### Phase 28: Advanced Distributed Coordination
+#### Phase 28: Dead Code Cleanup
+**Goal**: Remove truly unused classes, files, and interfaces that are referenced by nothing. Keep future-ready interfaces for unreleased hardware/technology (quantum crypto, brain-reading encryption, DNA storage, neuromorphic computing). See AD-06.
+**Depends on**: Phase 27 (plugin migration must be complete -- know what's used before deleting)
+**Requirements**: (new — CLEAN-01 through CLEAN-03)
+**Architecture Decisions**: AD-06 (dead code cleanup policy)
+**Approach**: Systematic scan for zero-reference classes/files. For each candidate: verify zero references (grep class name), confirm not future-ready, confirm logic exists elsewhere if useful. Remove in batches by category.
+**Success Criteria** (what must be TRUE):
+  1. All classes/files with zero references (no inheritance, no instantiation, no import) that are NOT future-ready interfaces are removed
+  2. Superseded implementations (logic reimplemented elsewhere) are removed
+  3. Future-ready interfaces for unreleased technology are preserved and documented with clear "FUTURE:" comments
+  4. Build compiles with zero errors after cleanup
+  5. No functionality is lost -- all removed code verified as either dead or extracted into composable services (AD-03)
+**Plans**: TBD (estimated 3-4 plans)
+
+Plans:
+- [ ] 28-01: Dead code scan -- identify all zero-reference classes/files across SDK and plugins
+- [ ] 28-02: Categorize candidates (truly dead vs future-ready vs superseded)
+- [ ] 28-03: Remove dead code in batches, preserve future-ready interfaces with documentation
+- [ ] 28-04: Build verification and LOC impact report
+
+#### Phase 29: Advanced Distributed Coordination
 **Goal**: The SDK has production-ready implementations of cluster membership, consensus, replication, and load balancing -- a multi-node DataWarehouse cluster can form, elect leaders, replicate data, and balance load.
 **Depends on**: Phase 26 (distributed contracts), Phase 27 (plugins updated to use distributed features)
 **Requirements**: DIST-12, DIST-13, DIST-14, DIST-15, DIST-16, DIST-17
@@ -184,14 +235,14 @@ Plans:
 **Plans**: TBD (estimated 3-4 plans)
 
 Plans:
-- [ ] 28-01: SWIM gossip cluster membership and P2P gossip replication
-- [ ] 28-02: Raft consensus for leader election
-- [ ] 28-03: Multi-master replication with CRDT conflict resolution
-- [ ] 28-04: Consistent hashing and resource-aware load balancing
+- [ ] 29-01: SWIM gossip cluster membership and P2P gossip replication
+- [ ] 29-02: Raft consensus for leader election
+- [ ] 29-03: Multi-master replication with CRDT conflict resolution
+- [ ] 29-04: Consistent hashing and resource-aware load balancing
 
-#### Phase 29: Testing & Final Verification
+#### Phase 30: Testing & Final Verification
 **Goal**: The entire v2.0 milestone passes comprehensive verification -- all tests pass, behavioral equivalence confirmed, distributed contracts integration-tested, analyzers produce zero warnings.
-**Depends on**: All prior v2.0 phases (22-28)
+**Depends on**: All prior v2.0 phases (22-29)
 **Requirements**: TEST-01, TEST-02, TEST-03, TEST-04, TEST-05, TEST-06
 **Approach**: This phase runs verification, not implementation. If failures are found, they are fixed here. The phase is the final gate before the milestone ships.
 **Success Criteria** (what must be TRUE):
@@ -203,21 +254,23 @@ Plans:
 **Plans**: TBD (estimated 2-3 plans)
 
 Plans:
-- [ ] 29-01: Build validation and existing test suite regression check
-- [ ] 29-02: New unit tests for base classes and behavioral verification suite
-- [ ] 29-03: Distributed infrastructure integration tests with in-memory implementations
+- [ ] 30-01: Build validation and existing test suite regression check
+- [ ] 30-02: New unit tests for base classes and behavioral verification suite
+- [ ] 30-03: Distributed infrastructure integration tests with in-memory implementations
 
 ### Progress
 
-**Execution Order:** 22 -> 23 -> 24 -> 25 -> 26 -> 27 -> 28 -> 29
+**Execution Order:** 22 → 23 → 24 → 25a → 25b → 26 → 27 → 28 → 29 → 30
 
-| Phase | Milestone | Plans Complete | Status | Completed |
-|-------|-----------|----------------|--------|-----------|
+| Phase | Milestone | Plans | Status | Completed |
+|-------|-----------|-------|--------|-----------|
 | 22. Build Safety & Supply Chain | v2.0 | 0/4 | Not started | - |
 | 23. Memory Safety & Crypto Hygiene | v2.0 | 0/4 | Not started | - |
-| 24. Plugin Hierarchy & Input Validation | v2.0 | 0/5 | Not started | - |
-| 25. Strategy Hierarchy & API Contracts | v2.0 | 0/4 | Not started | - |
+| 24. Plugin Hierarchy, Storage Core & Validation | v2.0 | 0/7 | Not started | - |
+| 25a. Strategy Hierarchy Design & API Contracts | v2.0 | 0/5 | Not started | - |
+| 25b. Strategy Migration (~1,500 strategies) | v2.0 | 0/6 | Not started | - |
 | 26. Distributed Contracts & Resilience | v2.0 | 0/5 | Not started | - |
 | 27. Plugin Migration & Decoupling | v2.0 | 0/4 | Not started | - |
-| 28. Advanced Distributed Coordination | v2.0 | 0/4 | Not started | - |
-| 29. Testing & Final Verification | v2.0 | 0/3 | Not started | - |
+| 28. Dead Code Cleanup | v2.0 | 0/4 | Not started | - |
+| 29. Advanced Distributed Coordination | v2.0 | 0/4 | Not started | - |
+| 30. Testing & Final Verification | v2.0 | 0/3 | Not started | - |
