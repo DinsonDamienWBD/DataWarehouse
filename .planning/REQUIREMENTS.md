@@ -3,6 +3,8 @@
 **Defined:** 2026-02-11
 **Core Value:** SDK must pass hyperscale/military-level code review -- clean hierarchy, secure by default, distributed-ready, zero warnings.
 
+> **CRITICAL: ZERO REGRESSION (AD-08)** — ALL refactoring work MUST preserve every piece of already-implemented logic. No plugin functionality lost, no strategy behavior changed, no feature removed. See AD-08 in ARCHITECTURE_DECISIONS.md.
+
 ## v2.0 Requirements
 
 ### Plugin Hierarchy
@@ -11,7 +13,7 @@
 - [ ] **HIER-02**: PluginBase has complete lifecycle methods: Initialize(), Execute(), Shutdown() with CancellationToken on all async overloads
 - [ ] **HIER-03**: PluginBase capability registry allows plugins to register, query, and deregister capabilities at runtime
 - [ ] **HIER-04**: PluginBase knowledge registry enables plugins to register and query knowledge objects via ConcurrentDictionary cache
-- [ ] **HIER-05**: IntelligenceAwarePluginBase (IntelligentPluginBase) extends FeaturePluginBase with UltimateIntelligence socket, graceful degradation when unavailable
+- [ ] **HIER-05**: IntelligenceAwarePluginBase (IntelligentPluginBase) extends PluginBase with UltimateIntelligence socket, graceful degradation when unavailable — parent of both DataPipelinePluginBase and FeaturePluginBase (per AD-01)
 - [ ] **HIER-06**: All feature-specific plugin base classes (Encryption, Compression, Storage, Security, Observability, Interface, Format, Streaming, Media, Processing) inherit from IntelligenceAwarePluginBase
 - [ ] **HIER-07**: UltimateIntelligence plugin inherits from PluginBase directly (not IntelligenceAwarePluginBase -- it IS the intelligence provider)
 - [ ] **HIER-08**: Each feature-specific base class implements common functionality for its domain without code duplication across Ultimate plugins
@@ -136,6 +138,15 @@
 - [ ] **CLEAN-02**: Superseded implementations whose logic exists elsewhere (extracted to composable services per AD-03) are removed
 - [ ] **CLEAN-03**: Future-ready interfaces for unreleased technology (quantum crypto, brain-reading encryption, DNA storage, neuromorphic computing, hardware-specific bases) are preserved with "FUTURE:" documentation comments
 
+### Regression Prevention (AD-08)
+
+- [ ] **REGR-01**: All 60 plugins compile and retain their FULL strategy catalogs after every phase — zero plugins lose functionality during refactoring
+- [ ] **REGR-02**: All ~1,500 strategies produce IDENTICAL results for identical inputs after base class migration — behavioral equivalence verified by tests
+- [ ] **REGR-03**: All 1,039+ existing tests pass at every phase boundary — test suite is the regression gate, NO phase is complete until tests pass
+- [ ] **REGR-04**: All v1.0 features remain fully operational: encryption (30+ algorithms), compression (40+ algorithms), storage (130+ backends), RAID (50+ strategies), security (142+ access control strategies), compliance (145+ strategies), interfaces (80+ strategies), compute (83+ strategies), formats (28+ strategies), media codecs, governance intelligence, AEDS, marketplace, app platform, WASM ecosystem, data transit — NOTHING is lost
+- [ ] **REGR-05**: When extracting logic from specialized bases to composable services (AD-03), the logic MUST be extracted to the new location FIRST, verified to compile and work, ONLY THEN can the old location be removed
+- [ ] **REGR-06**: Dead code cleanup (Phase 28) ONLY happens AFTER plugin migration (Phase 27) verifies everything works — never delete during restructuring
+
 ### Testing
 
 - [ ] **TEST-01**: Full solution builds with zero errors after all refactoring
@@ -208,10 +219,10 @@
 | STRAT-04 | Phase 25a | Pending |
 | STRAT-05 | Phase 25a | Pending |
 | STRAT-06 | Phase 25b | Pending |
-| API-01 | Phase 25 | Pending |
-| API-02 | Phase 25 | Pending |
-| API-03 | Phase 25 | Pending |
-| API-04 | Phase 25 | Pending |
+| API-01 | Phase 25a | Pending |
+| API-02 | Phase 25a | Pending |
+| API-03 | Phase 25a | Pending |
+| API-04 | Phase 25a | Pending |
 | DIST-01 | Phase 26 | Pending |
 | DIST-02 | Phase 26 | Pending |
 | DIST-03 | Phase 26 | Pending |
@@ -245,12 +256,6 @@
 | DECPL-04 | Phase 27 | Pending |
 | DECPL-05 | Phase 27 | Pending |
 | DIST-12 | Phase 29 | Pending |
-| STRAT-01 | Phase 25a | Pending |
-| STRAT-02 | Phase 25a | Pending |
-| STRAT-03 | — | REMOVED (AD-05) |
-| STRAT-04 | Phase 25a | Pending |
-| STRAT-05 | Phase 25a | Pending |
-| STRAT-06 | Phase 25b | Pending |
 | DIST-13 | Phase 29 | Pending |
 | DIST-14 | Phase 29 | Pending |
 | DIST-15 | Phase 29 | Pending |
@@ -259,6 +264,12 @@
 | CLEAN-01 | Phase 28 | Pending |
 | CLEAN-02 | Phase 28 | Pending |
 | CLEAN-03 | Phase 28 | Pending |
+| REGR-01 | ALL phases (22-30) | Pending |
+| REGR-02 | Phase 25b, 27, 30 | Pending |
+| REGR-03 | ALL phases (22-30) | Pending |
+| REGR-04 | Phase 27, 30 | Pending |
+| REGR-05 | Phase 24, 25a | Pending |
+| REGR-06 | Phase 28 | Pending |
 | TEST-01 | Phase 30 | Pending |
 | TEST-02 | Phase 30 | Pending |
 | TEST-03 | Phase 30 | Pending |
@@ -267,10 +278,11 @@
 | TEST-06 | Phase 30 | Pending |
 
 **Coverage:**
-- v2.0 requirements: 92 total (17 categories, STRAT-03 removed, 3 CLEAN-* added)
-- Mapped to phases: 91 (1 removed)
+- v2.0 requirements: 98 total (18 categories, STRAT-03 removed, 3 CLEAN-* added, 6 REGR-* added)
+- Mapped to phases: 97 (1 removed)
 - Unmapped: 0
-- Architecture decisions: .planning/ARCHITECTURE_DECISIONS.md (AD-01 through AD-07)
+- Architecture decisions: .planning/ARCHITECTURE_DECISIONS.md (AD-01 through AD-08)
+- SDK_REFACTOR_PLAN.md phases: All 6 main phases + subphases (3.5, 4A, 4B, 5A, 5B, 5C) fully covered
 
 ---
 *Requirements defined: 2026-02-11*

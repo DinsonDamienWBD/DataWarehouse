@@ -244,5 +244,55 @@ IStrategy (interface — Name, Description, Characteristics)
 | AD-07 | 111+ bases → ~15-20 domain bases | Maintainable hierarchy |
 
 ---
+
+## AD-08: Zero Regression Policy — DO NOT LOSE IMPLEMENTED LOGIC
+
+**Decision:** The v2.0 refactor MUST NOT lose ANY already-implemented logic, functionality, or behavior. Every line of production code that was painstakingly implemented across v1.0's 21 phases, 116 plans, 863 commits, and 1,110,244 lines of C# MUST be preserved or correctly migrated.
+
+**Rationale:** v1.0 took 30 days of intensive implementation across 60 plugins with ~1,500 strategies covering encryption, compression, storage, RAID, security, compliance, interfaces, compute, formats, media, governance, AEDS, marketplace, app platform, WASM ecosystem, data transit, and more. Losing any of this through careless refactoring would be catastrophic.
+
+**Mandatory Rules for ALL v2.0 Work:**
+
+1. **VERIFY BEFORE MODIFY**: Before changing any file, read and understand what it does. Never assume code is unused without grep verification.
+2. **EXTRACT, DON'T DELETE**: When moving logic from specialized bases to composable services (AD-03), the logic MUST be extracted into the new location FIRST, verified to compile and work, and ONLY THEN can the old location be deprecated.
+3. **BEHAVIORAL EQUIVALENCE**: After any strategy migration (Phase 25b), the strategy MUST produce identical results for identical inputs. This is not optional — it is verified by tests.
+4. **BASE CLASS MIGRATION ≠ LOGIC REMOVAL**: Changing a plugin's base class (Phase 27) means updating the inheritance chain. It does NOT mean removing the plugin's unique functionality. All 60 plugins must retain their full feature set.
+5. **STRATEGY BOILERPLATE vs STRATEGY LOGIC**: When removing "boilerplate" from strategies (intelligence/capability/dispose code that moves to the plugin level), only remove code that is TRULY redundant. If a strategy has custom dispose logic (e.g., releasing hardware resources), that STAYS.
+6. **COMPILE + TEST GATE**: Every plan execution MUST end with a successful `dotnet build` and `dotnet test`. If the build breaks or tests fail, the plan is NOT complete.
+7. **NO SILENT REMOVALS**: Any file/class removal must be logged with justification. Dead code cleanup (Phase 28) happens AFTER migration is verified, not during.
+
+**What "No Regression" Means Specifically:**
+- All 1,039+ tests continue to pass at every phase boundary
+- All 60 plugins compile and retain their full strategy catalogs
+- All ~1,500 strategies produce identical results after migration
+- All message bus subscriptions, capability registrations, and knowledge registrations still function
+- All distributed features (AEDS, replication, RAID, transit) still operate correctly
+- All interface protocols (REST, gRPC, GraphQL, SQL wire, WebSocket, etc.) still work
+- All security features (encryption, access control, key management, compliance, zero trust) remain functional
+- All data formats (columnar, graph, scientific, lakehouse, streaming, media) still parse and serialize correctly
+
+**Verification Approach:**
+- Phase 24/25: Build compiles, existing tests pass, adapter wrappers maintain backward compat
+- Phase 25b: Each strategy domain migration verified before proceeding to next
+- Phase 27: Each plugin batch verified individually
+- Phase 28: Dead code removal only AFTER Phase 27 verifies everything works
+- Phase 30: Final comprehensive regression test suite
+
+---
+
+## Summary Table
+
+| ID | Decision | Impact |
+|----|----------|--------|
+| AD-01 | Two branches: DataPipeline + Feature | Clarifies plugin identity |
+| AD-02 | Single encryption/compression base | Eliminates unnecessary split |
+| AD-03 | Specialized bases → composable services | Unlocks composition for Ultimate plugins |
+| AD-04 | Object storage core + translation layer | Uniform foundation for all features |
+| AD-05 | Flat strategy hierarchy, no intelligence | Massive simplification (~1,000 lines removed) |
+| AD-06 | Dead code cleanup (keep future-ready) | Cleaner codebase, less confusion |
+| AD-07 | 111+ bases → ~15-20 domain bases | Maintainable hierarchy |
+| AD-08 | ZERO REGRESSION — preserve all v1.0 logic | Protects 30 days of implementation work |
+
+---
 *Decided: 2026-02-12*
 *Participants: User (architect), Claude (analysis)*
