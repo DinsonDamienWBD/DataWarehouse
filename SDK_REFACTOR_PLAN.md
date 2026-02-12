@@ -90,3 +90,467 @@ This refactored structure ensures a clean and maintainable codebase by promoting
 - [ ] Conduct a full solution build to make sure everything compiles and links correctly.
 - [ ] Update Test Cases to cover new base classes and their functionalities.
 - [ ] Run all existing and new test cases to ensure everything works as expected.
+
+
+Current Hirerarchy:
+
+  PluginBase (root — 3,777 lines)
+  │
+  ├── DataTransformationPluginBase
+  │   └── PipelinePluginBase
+  │       ├── EncryptionPluginBase
+  │       ├── CompressionPluginBase
+  │       ├── TransitEncryptionPluginBase
+  │       ├── TransitCompressionPluginBase
+  │       └── UltimateIntelligencePlugin ★
+  │
+  ├── FeaturePluginBase
+  │   │
+  │   ├── IntelligenceAwarePluginBase (AI socket + graceful degradation)
+  │   │   ├── IntelligenceAwareEncryptionPluginBase
+  │   │   │   └── UltimateEncryptionPlugin ★
+  │   │   ├── IntelligenceAwareCompressionPluginBase
+  │   │   │   └── UltimateCompressionPlugin ★
+  │   │   ├── IntelligenceAwareStoragePluginBase
+  │   │   │   └── UltimateStoragePlugin ★
+  │   │   ├── IntelligenceAwareAccessControlPluginBase
+  │   │   │   └── UltimateAccessControlPlugin ★
+  │   │   ├── IntelligenceAwareKeyManagementPluginBase
+  │   │   │   └── UltimateKeyManagementPlugin ★
+  │   │   ├── IntelligenceAwareCompliancePluginBase
+  │   │   │   └── UltimateCompliancePlugin ★
+  │   │   ├── IntelligenceAwareInterfacePluginBase
+  │   │   │   └── UltimateInterfacePlugin ★
+  │   │   ├── IntelligenceAwareConnectorPluginBase
+  │   │   │   └── UltimateConnectorPlugin ★
+  │   │   ├── IntelligenceAwareDataManagementPluginBase
+  │   │   │   ├── UltimateDataGovernancePlugin ★
+  │   │   │   ├── UltimateDataCatalogPlugin ★
+  │   │   │   ├── UltimateDataManagementPlugin ★
+  │   │   │   ├── UltimateDataQualityPlugin ★
+  │   │   │   ├── UltimateDataPrivacyPlugin ★
+  │   │   │   ├── UltimateDataLakePlugin ★
+  │   │   │   └── UltimateDataMeshPlugin ★
+  │   │   ├── IntelligenceAwareDatabasePluginBase
+  │   │   │
+  │   │   └── (generic IntelligenceAwarePluginBase — no specialized sub-base)
+  │   │       ├── UltimateDocGenPlugin ★
+  │   │       ├── UltimateDeploymentPlugin ★
+  │   │       ├── UltimateIoTIntegrationPlugin ★
+  │   │       ├── UltimateDataFormatPlugin ★
+  │   │       ├── UltimateStreamingDataPlugin ★
+  │   │       ├── UltimateRTOSBridgePlugin ★
+  │   │       ├── UltimateResiliencePlugin ★
+  │   │       ├── UltimateComputePlugin ★
+  │   │       ├── UltimateDataFabricPlugin ★
+  │   │       ├── UltimateReplicationPlugin ★
+  │   │       ├── UltimateStorageProcessingPlugin ★
+  │   │       ├── UltimateDatabaseStoragePlugin ★
+  │   │       ├── UltimateDatabaseProtocolPlugin ★
+  │   │       ├── UltimateDataProtectionPlugin ★
+  │   │       ├── UltimateWorkflowPlugin ★
+  │   │       ├── UltimateRAIDPlugin ★
+  │   │       ├── UltimateSustainabilityPlugin ★
+  │   │       ├── UltimateServerlessPlugin ★
+  │   │       ├── UltimateMultiCloudPlugin ★
+  │   │       ├── UltimateDataIntegrationPlugin ★
+  │   │       ├── UltimateMicroservicesPlugin ★
+  │   │       └── UltimateSDKPortsPlugin ★
+  │   │
+  │   ├── InterfacePluginBase
+  │   ├── ReplicationPluginBase
+  │   ├── ConsensusPluginBase
+  │   ├── RealTimePluginBase
+  │   ├── ContainerManagerPluginBase
+  │   ├── DataConnectorPluginBase
+  │   │   ├── DatabaseConnectorPluginBase
+  │   │   ├── MessagingConnectorPluginBase
+  │   │   └── SaaSConnectorPluginBase
+  │   ├── HardwareAcceleratorPluginBase
+  │   │   ├── QatAcceleratorPluginBase
+  │   │   └── GpuAcceleratorPluginBase
+  │   ├── RaidProviderPluginBase
+  │   ├── ComplianceProviderPluginBase
+  │   ├── ThreatDetectionPluginBase
+  │   ├── WormStorageProviderPluginBase
+  │   ├── TamperProofProviderPluginBase
+  │   ├── BlockchainProviderPluginBase
+  │   ├── ShardManagerPluginBase
+  │   ├── ... (60+ more feature-specific bases)
+  │   │
+  │   └── (directly from FeaturePluginBase — missing IntelligenceAware layer)
+  │       ├── UltimateResourceManagerPlugin ★
+  │       ├── UltimateDataTransitPlugin ★
+  │       ├── UltimateDataLineagePlugin ★
+  │       └── UltimateFilesystemPlugin ★
+  │
+  ├── StorageProviderPluginBase
+  │   ├── ListableStoragePluginBase
+  │   │   ├── TieredStoragePluginBase
+  │   │   └── CacheableStoragePluginBase
+  │   │       └── IndexableStoragePluginBase
+  │   │           ├── HybridStoragePluginBase<TConfig>
+  │   │           └── HybridDatabasePluginBase<TConfig>
+  │   └── LowLatencyStoragePluginBase
+  │
+  ├── SecurityProviderPluginBase
+  │   ├── AccessControlPluginBase
+  │   ├── KeyStorePluginBase
+  │   ├── MandatoryAccessControlPluginBase
+  │   ├── MultiLevelSecurityPluginBase
+  │   ├── TwoPersonIntegrityPluginBase
+  │   └── SecureDestructionPluginBase
+  │
+  ├── IntelligencePluginBase
+  ├── MetadataIndexPluginBase
+  ├── OrchestrationProviderPluginBase
+  ├── CloudEnvironmentPluginBase
+  ├── SerializerPluginBase
+  ├── SemanticMemoryPluginBase
+  ├── MetricsPluginBase
+  ├── GovernancePluginBase
+  │
+  └── UltimateEdgeComputingPlugin ★ (directly from PluginBase)
+
+  Legend: ★ = concrete Ultimate plugin (43 total)
+
+  Key observations:
+  - 37 of 43 Ultimate plugins use IntelligenceAwarePluginBase (correct)
+  - 4 plugins skip the IntelligenceAware layer (ResourceManager, DataTransit, DataLineage, Filesystem) — these are Phase 27 migration targets
+  - UltimateIntelligencePlugin inherits from PipelinePluginBase (correct — it IS the intelligence provider, not a consumer)
+  - UltimateEdgeComputingPlugin inherits directly from PluginBase (Phase 27 migration target)
+  - 111+ base classes total across the SDK
+
+
+  To-Be-Refactored Hierarchy:
+  (See .planning/ARCHITECTURE_DECISIONS.md for full rationale — AD-01 through AD-07)
+
+  ═══════════════════════════════════════════════════════════════════════
+  PLUGIN BASE CLASS HIERARCHY (after refactor)
+  ═══════════════════════════════════════════════════════════════════════
+
+  Principles:
+  - Every plugin (except UltimateIntelligencePlugin) inherits IntelligenceAwarePluginBase
+  - Two branches: DataPipelinePluginBase (data flows through) vs FeaturePluginBase (provides services)
+  - Specialized bases (TieredStorage, CacheableStorage, etc.) become composable services, not inheritance
+  - Object/key-based storage is the universal core; PathStorageAdapter provides URI translation
+  - Single EncryptionPluginBase and CompressionPluginBase (no AtRest/Transit split — strategies handle that)
+
+  IPlugin (interface contract)
+  └── PluginBase (lifecycle, capability registry, knowledge registry, IDisposable/IAsyncDisposable)
+      │   - Initialize(), Execute(), Shutdown() with CancellationToken
+      │   - RegisterCapability(), QueryCapabilities(), DeregisterCapability()
+      │   - RegisterKnowledge(), QueryKnowledge() via ConcurrentDictionary cache
+      │   - Dispose(bool) pattern with GC.SuppressFinalize
+      │   - Error handling, structured logging, message bus subscription
+      │
+      ├── UltimateIntelligencePlugin ★ (IS the intelligence provider — inherits PluginBase directly)
+      │   Rationale: It cannot plug into itself. It provides the AI socket that others consume.
+      │
+      └── IntelligenceAwarePluginBase (AI socket, graceful degradation)
+          │   - ConnectToUltimateIntelligence() / DisconnectFromUltimateIntelligence()
+          │   - Graceful degradation: manual mode ALWAYS works if AI unavailable
+          │   - All AI features: NLP, Semantics, Context, Learning, Reasoning, Planning, etc.
+          │
+          ├─── DataPipelinePluginBase (plugins that data flows THROUGH)
+          │    │   - Pipeline stage registration, ordering, back-pressure
+          │    │   - Throughput/latency metrics per stage
+          │    │   - Input/output data type declarations
+          │    │
+          │    ├── DataTransformationPluginBase (mutates/transforms data)
+          │    │   │   - Transform(Stream input) → Stream output pattern
+          │    │   │   - Bidirectional support (encode/decode, encrypt/decrypt, compress/decompress)
+          │    │   │
+          │    │   ├── EncryptionPluginBase
+          │    │   │   └── UltimateEncryptionPlugin ★ ............ (30+ strategies: AES, Serpent, ChaCha20, etc.)
+          │    │   │
+          │    │   └── CompressionPluginBase
+          │    │       └── UltimateCompressionPlugin ★ ........... (40+ strategies: LZ4, Zstd, BWT, PPM, etc.)
+          │    │
+          │    ├── StoragePluginBase (data persistence — object/key-based core)
+          │    │   │   - StoreAsync(key, Stream, metadata), RetrieveAsync(key), DeleteAsync(key), ListAsync(prefix)
+          │    │   │   - StorageObjectMetadata (ETag, ContentType, Tier, VersionId, CustomMetadata)
+          │    │   │   - Composable services (not inheritance): ITierManager, ICacheManager, IStorageIndex,
+          │    │   │     IConnectionRegistry, IHealthMonitor — extracted from old TieredStorage/CacheableStorage/etc. bases
+          │    │   │   - PathStorageAdapter: translates URI/file-path operations → object/key operations
+          │    │   │
+          │    │   ├── UltimateStoragePlugin ★ ................... (130+ strategies: S3, Azure, Local, Redis, IPFS, etc.)
+          │    │   ├── UltimateStorageProcessingPlugin ★ ......... (43 strategies)
+          │    │   ├── UltimateDatabaseStoragePlugin ★ ........... (49 strategies)
+          │    │   └── UltimateDatabaseProtocolPlugin ★
+          │    │
+          │    ├── ReplicationPluginBase (distributes/replicates data across nodes)
+          │    │   │   - ReplicateAsync(), SyncAsync(), ResolveConflictAsync()
+          │    │   │   - Consistency models: Eventual, Strong, ReadAfterWrite
+          │    │   │
+          │    │   ├── UltimateReplicationPlugin ★ ............... (60+ strategies: MultiMaster, Sharding, etc.)
+          │    │   └── UltimateRAIDPlugin ★ ...................... (50+ strategies: RAID levels, Erasure, etc.)
+          │    │
+          │    ├── DataTransitPluginBase (moves data between nodes/systems)
+          │    │   │   - TransferAsync(), ReceiveAsync(), ResumeAsync()
+          │    │   │   - Chunked, Delta, P2P, Multi-path, Store-and-forward
+          │    │   │
+          │    │   └── UltimateDataTransitPlugin ★ ............... (6 protocols + features)
+          │    │
+          │    └── IntegrityPluginBase (verifies/proves data at pipeline boundaries)
+          │        │   - Strategies: TamperProof, Blockchain, WORM, HashChain
+          │        │   - VerifyAsync(), ProveAsync(), AuditAsync()
+          │        │
+          │        └── (TamperProof strategies live here — no separate Ultimate plugin, uses strategies)
+          │
+          └─── FeaturePluginBase (plugins that provide services/capabilities, don't process data directly)
+               │
+               ├── SecurityPluginBase (authentication, authorization, keys, threat detection)
+               │   │   Sub-bases exist because SEPARATE Ultimate plugins handle each sub-domain
+               │   │
+               │   ├── AccessControlPluginBase
+               │   │   └── UltimateAccessControlPlugin ★ ........ (142 strategies: RBAC, ABAC, MAC, ZeroTrust, etc.)
+               │   │
+               │   ├── KeyManagementPluginBase
+               │   │   └── UltimateKeyManagementPlugin ★ ........ (68 strategies: HSM, FROST, Vault, PostQuantum, etc.)
+               │   │
+               │   ├── CompliancePluginBase
+               │   │   └── UltimateCompliancePlugin ★ ........... (145 strategies: GDPR, HIPAA, SOC2, FedRAMP, etc.)
+               │   │
+               │   ├── ThreatDetectionPluginBase
+               │   │
+               │   └── DataProtectionPluginBase
+               │       └── UltimateDataProtectionPlugin ★ ....... (35 strategies)
+               │
+               ├── InterfacePluginBase (external access protocols)
+               │   │   - StartAsync(), HandleRequestAsync(), StopAsync()
+               │   │   - Connectors merge here (connectors ARE interfaces to external systems)
+               │   │
+               │   ├── UltimateInterfacePlugin ★ ................. (68 strategies: REST, gRPC, GraphQL, SQL Wire, etc.)
+               │   └── UltimateConnectorPlugin ★ ................. (280 strategies: SQL, NoSQL, SaaS, Messaging, etc.)
+               │
+               ├── DataManagementPluginBase (catalog, quality, lineage, governance, privacy)
+               │   │   Sub-bases for each sub-domain
+               │   │
+               │   ├── UltimateDataGovernancePlugin ★
+               │   ├── UltimateDataCatalogPlugin ★
+               │   ├── UltimateDataQualityPlugin ★
+               │   ├── UltimateDataLineagePlugin ★
+               │   ├── UltimateDataManagementPlugin ★ ........... (78 strategies)
+               │   ├── UltimateDataPrivacyPlugin ★
+               │   ├── UltimateDataLakePlugin ★
+               │   ├── UltimateDataMeshPlugin ★
+               │   └── UltimateDataFabricPlugin ★
+               │
+               ├── ComputePluginBase (processing runtimes — WASM, containers, GPU, sandbox)
+               │   │   - Hardware accelerator bases merge here (GPU, QAT are compute strategies)
+               │   │
+               │   ├── UltimateComputePlugin ★ ................... (83 strategies: WASM, Container, GPU, Enclave, etc.)
+               │   └── UltimateServerlessPlugin ★
+               │
+               ├── ObservabilityPluginBase (monitoring, metrics, tracing, health, alerting)
+               │   │   - Metrics, Telemetry, HealthProvider bases merge here (they're observability strategies)
+               │   │
+               │   └── UniversalObservabilityPlugin ★ ............ (55 strategies: Prometheus, Jaeger, etc.)
+               │
+               ├── StreamingPluginBase (message queues, event streams, IoT, industrial)
+               │   │
+               │   ├── UltimateStreamingDataPlugin ★ ............. (17 strategies: Kafka, MQTT, AMQP, etc.)
+               │   ├── UltimateIoTIntegrationPlugin ★
+               │   └── UltimateRTOSBridgePlugin ★
+               │
+               ├── MediaPluginBase (video, image, 3D, transcoding)
+               │   │
+               │   └── (Media strategies: H.264, H.265, VP9, AV1, RAW, GPU textures, etc.)
+               │
+               ├── FormatPluginBase (data formats — columnar, graph, scientific, lakehouse)
+               │   │
+               │   └── UltimateDataFormatPlugin ★ ................ (28 strategies: Parquet, Arrow, etc.)
+               │
+               ├── InfrastructurePluginBase (deployment, resilience, sustainability, multi-cloud)
+               │   │
+               │   ├── UltimateDeploymentPlugin ★
+               │   ├── UltimateResiliencePlugin ★
+               │   ├── UltimateSustainabilityPlugin ★ ........... (45 strategies)
+               │   └── UltimateMultiCloudPlugin ★
+               │
+               ├── OrchestrationPluginBase (workflows, edge computing, data integration)
+               │   │
+               │   ├── UltimateWorkflowPlugin ★
+               │   ├── UltimateEdgeComputingPlugin ★
+               │   └── UltimateDataIntegrationPlugin ★
+               │
+               └── PlatformPluginBase (SDK ports, microservices, marketplace)
+                   │
+                   ├── UltimateSDKPortsPlugin ★
+                   ├── UltimateMicroservicesPlugin ★
+                   └── UltimateDocGenPlugin ★
+
+  Legend: ★ = concrete Ultimate/standalone plugin (43 total)
+
+
+  ═══════════════════════════════════════════════════════════════════════
+  STRATEGY BASE CLASS HIERARCHY (after refactor)
+  ═══════════════════════════════════════════════════════════════════════
+
+  Principles:
+  - Plugin = Container/Orchestrator (collection of ways to do a similar thing)
+  - Strategy = Worker (ONE specific way to do it — the actual algorithm/implementation)
+  - Flat hierarchy: only 2 levels deep (StrategyBase → DomainBase → ConcreteStrategy)
+  - NO IntelligenceAwareStrategyBase — intelligence belongs at the plugin level ONLY
+  - NO capability registry on strategies — strategy IS a capability of its parent plugin
+  - NO knowledge bank access — plugin registers runtime knowledge on strategy's behalf
+  - NO message bus access — plugin orchestrates all messaging
+  - Strategies declare characteristics (metadata); plugins register them as capabilities
+
+  Knowledge flow:
+    Plugin knowledge (static): "AES, Serpent available; AES disabled, Serpent enabled"
+    Strategy knowledge (runtime): "Block X encrypted with Serpent-256, key ID abc"
+    → Strategy produces runtime knowledge as RETURN VALUES
+    → Plugin registers it in the knowledge bank on behalf of the strategy
+
+  Intelligence flow:
+    Plugin has AI socket → asks AI "which strategy?" → gets recommendation
+    → passes recommendation as OPTIONS to strategy method
+    → strategy executes with given options (doesn't know AI was involved)
+    → plugin collects strategy metrics, feeds back to AI for learning
+
+  IStrategy (interface — Name, Description, Characteristics)
+  └── StrategyBase (abstract root)
+      │   - InitializeAsync(CancellationToken) / ShutdownAsync(CancellationToken)
+      │   - IDisposable / IAsyncDisposable with proper pattern
+      │   - string Name, string Description (identity)
+      │   - IReadOnlyDictionary<string, object> Characteristics (metadata, NOT capabilities)
+      │   - bool IsInitialized, bool IsDisposed (state)
+      │   - Structured logging hooks
+      │
+      │   What StrategyBase does NOT have:
+      │   ✗ Intelligence/AI integration
+      │   ✗ Capability registry
+      │   ✗ Knowledge bank access
+      │   ✗ Message bus access
+      │   ✗ Pipeline awareness
+      │
+      ├── EncryptionStrategyBase
+      │   │   + EncryptAsync(Stream, EncryptionOptions, CT) → EncryptionResult
+      │   │   + DecryptAsync(Stream, DecryptionOptions, CT) → Stream
+      │   │   + SupportedKeySizes, SupportsAuthentication, RequiresIV (characteristics)
+      │   │
+      │   └── AesGcmStrategy, AesCbcStrategy, SerpentStrategy, ChaCha20Strategy,
+      │       TwofishStrategy, BlowfishStrategy, OtpStrategy, ... (12+ strategies)
+      │
+      ├── CompressionStrategyBase
+      │   │   + CompressAsync(Stream, CompressionOptions, CT) → CompressionResult
+      │   │   + DecompressAsync(Stream, CT) → Stream
+      │   │   + CompressionLevel, SupportsStreaming, IsLossless (characteristics)
+      │   │
+      │   └── LZ4Strategy, ZstdStrategy, BwtStrategy, PpmStrategy, SnappyStrategy,
+      │       BrotliStrategy, DeflateStrategy, ... (59+ strategies)
+      │
+      ├── StorageStrategyBase
+      │   │   + StoreAsync(string key, Stream, StorageObjectMetadata, CT) → StorageResult
+      │   │   + RetrieveAsync(string key, CT) → (Stream, StorageObjectMetadata)
+      │   │   + DeleteAsync(string key, CT), ListAsync(string prefix, CT)
+      │   │   + ExistsAsync(string key, CT) → StorageObjectMetadata?
+      │   │   + SupportsTiering, SupportsVersioning, SupportsEncryption (characteristics)
+      │   │
+      │   └── LocalFileStrategy, AzureBlobStrategy, S3Strategy, RedisStrategy,
+      │       MongoGridFsStrategy, IpfsStrategy, CephStrategy, ... (130+ strategies)
+      │
+      ├── SecurityStrategyBase
+      │   │   + AuthenticateAsync(credentials, CT) → AuthResult
+      │   │   + AuthorizeAsync(principal, resource, action, CT) → bool
+      │   │   + ValidateAsync(token, CT) → ValidationResult
+      │   │
+      │   └── RbacStrategy, AbacStrategy, MacStrategy, ZeroTrustStrategy,
+      │       MlsStrategy, TwoPersonStrategy, ... (142+ strategies)
+      │
+      ├── KeyManagementStrategyBase
+      │   │   + GenerateKeyAsync(spec, CT) → KeyMaterial
+      │   │   + RotateKeyAsync(keyId, CT) → KeyMaterial
+      │   │   + StoreKeyAsync(keyId, material, CT), RetrieveKeyAsync(keyId, CT)
+      │   │
+      │   └── HsmStrategy, VaultStrategy, FrostStrategy, PostQuantumStrategy,
+      │       SoftwareKeyStore, CloudKmsStrategy, ... (68+ strategies)
+      │
+      ├── ComplianceStrategyBase
+      │   │   + AuditAsync(scope, CT) → AuditReport
+      │   │   + VerifyAsync(policy, data, CT) → ComplianceResult
+      │   │   + ReportAsync(framework, period, CT) → ComplianceReport
+      │   │
+      │   └── GdprStrategy, HipaaStrategy, Soc2Strategy, FedRampStrategy,
+      │       PciDssStrategy, Iso27001Strategy, ... (145+ strategies)
+      │
+      ├── InterfaceStrategyBase
+      │   │   + StartAsync(CT), StopAsync(CT)
+      │   │   + HandleRequestAsync(request, CT) → response
+      │   │   + Protocol, Port, IsSecure (characteristics)
+      │   │
+      │   └── RestStrategy, GrpcStrategy, GraphQlStrategy, WebSocketStrategy,
+      │       SqlWireStrategy, MqttStrategy, ... (68+ strategies)
+      │
+      ├── ConnectorStrategyBase
+      │   │   + ConnectAsync(config, CT), DisconnectAsync(CT)
+      │   │   + ExecuteAsync(command, CT) → result
+      │   │   + Built-in: retry logic with exponential backoff, connection pooling
+      │   │
+      │   └── SqlServerConnector, PostgresConnector, MongoConnector,
+      │       KafkaConnector, SalesforceConnector, ... (280+ strategies)
+      │
+      ├── ComputeStrategyBase
+      │   │   + ExecuteAsync(workload, CT) → ComputeResult
+      │   │   + SandboxAsync(code, limits, CT) → ExecutionResult
+      │   │   + ResourceLimits, SupportsGpu, SupportsIsolation (characteristics)
+      │   │
+      │   └── WasmStrategy, ContainerStrategy, GpuStrategy, EnclaveStrategy,
+      │       SandboxStrategy, ServerlessStrategy, ... (83+ strategies)
+      │
+      ├── ObservabilityStrategyBase
+      │   │   + EmitMetricsAsync(metrics, CT)
+      │   │   + TraceAsync(activity, CT)
+      │   │   + HealthCheckAsync(CT) → HealthStatus
+      │   │
+      │   └── PrometheusStrategy, JaegerStrategy, OtlpStrategy,
+      │       ElasticApmStrategy, DatadogStrategy, ... (55+ strategies)
+      │
+      ├── ReplicationStrategyBase
+      │   │   + ReplicateAsync(source, target, CT) → ReplicationResult
+      │   │   + SyncAsync(nodes, CT), ResolveConflictAsync(conflicts, CT)
+      │   │
+      │   └── MultiMasterStrategy, RaftStrategy, CrdtStrategy,
+      │       ErasureCodingStrategy, GeoReplicationStrategy, ... (60+ strategies)
+      │
+      ├── MediaStrategyBase
+      │   │   + TranscodeAsync(input, outputFormat, CT) → Stream
+      │   │   + ExtractMetadataAsync(input, CT) → MediaMetadata
+      │   │
+      │   └── H264Strategy, H265Strategy, Vp9Strategy, Av1Strategy,
+      │       JpegStrategy, PngStrategy, RawStrategy, ... (20+ strategies)
+      │
+      ├── StreamingStrategyBase
+      │   │   + PublishAsync(topic, message, CT)
+      │   │   + SubscribeAsync(topic, handler, CT), AcknowledgeAsync(messageId, CT)
+      │   │
+      │   └── KafkaStrategy, MqttStrategy, AmqpStrategy,
+      │       EventHubStrategy, KinesisStrategy, ... (17+ strategies)
+      │
+      ├── FormatStrategyBase
+      │   │   + SerializeAsync(data, CT) → Stream
+      │   │   + DeserializeAsync(Stream, CT) → data
+      │   │   + ValidateSchemaAsync(data, schema, CT) → bool
+      │   │
+      │   └── ParquetStrategy, ArrowStrategy, AvroStrategy,
+      │       ProtobufStrategy, JsonStrategy, ... (28+ strategies)
+      │
+      ├── TransitStrategyBase
+      │   │   + TransferAsync(source, destination, CT) → TransferResult
+      │   │   + ReceiveAsync(CT) → Stream, ResumeAsync(transferId, CT)
+      │   │
+      │   └── ChunkedStrategy, DeltaStrategy, P2PStrategy,
+      │       MultiPathStrategy, StoreAndForwardStrategy, ... (11+ strategies)
+      │
+      └── DataManagementStrategyBase
+          │   + CatalogAsync(asset, CT), TraceLineageAsync(asset, CT) → LineageGraph
+          │   + AssessQualityAsync(dataset, rules, CT) → QualityReport
+          │
+          └── LineageStrategy, CatalogStrategy, QualityStrategy,
+              GovernanceStrategy, PrivacyStrategy, ... (78+ strategies)
+
+  Total: ~1,500+ concrete strategies across ~16 domain bases
+  Boilerplate eliminated: ~1,000 lines of duplicated intelligence/capability/dispose code
+
