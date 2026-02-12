@@ -95,8 +95,51 @@ All 6 main phases and subphases from the original SDK_REFACTOR_PLAN.md are fully
   7. Full solution builds with zero errors after all changes
 **Plans**: 3 plans
 
+**Canonical source:** Use Launcher's versions of all types (most complete: has Service mode, Cluster connection, TLS, auth token, timeouts).
+
+**Verified impact map (files that need updating):**
+```
+CREATE:
+  DataWarehouse.SDK/Hosting/OperatingMode.cs      ← new file, Launcher values (Install/Connect/Embedded/Service)
+  DataWarehouse.SDK/Hosting/ConnectionTarget.cs    ← new file, Launcher values (Host/Port/LocalPath/AuthToken/UseTls/Timeout + factory methods)
+  DataWarehouse.SDK/Hosting/ConnectionType.cs      ← new file, Launcher values (Local/Remote/Cluster)
+  DataWarehouse.SDK/Hosting/InstallConfiguration.cs
+  DataWarehouse.SDK/Hosting/EmbeddedConfiguration.cs
+
+UPDATE (change namespace import to DataWarehouse.SDK.Hosting):
+  DataWarehouse.Launcher/Integration/DataWarehouseHost.cs  ← uses all types
+  DataWarehouse.Launcher/Integration/InstanceConnection.cs ← uses ConnectionTarget, ConnectionType
+  DataWarehouse.Launcher/Program.cs
+  DataWarehouse.Launcher/Adapters/DataWarehouseAdapter.cs
+  DataWarehouse.CLI/Commands/ConnectCommand.cs     ← currently imports DataWarehouse.Integration (example code!)
+  DataWarehouse.CLI/Commands/InstallCommand.cs     ← currently imports DataWarehouse.Integration
+  DataWarehouse.CLI/Commands/EmbeddedCommand.cs    ← currently imports DataWarehouse.Integration
+  DataWarehouse.CLI/Commands/StorageCommands.cs
+  DataWarehouse.Shared/InstanceManager.cs          ← has its own ConnectionType/ConnectionTarget (replace entirely)
+  DataWarehouse.Shared/MessageBridge.cs            ← uses Shared's ConnectionType enum
+  DataWarehouse.GUI/Components/Pages/Connections.razor
+
+DELETE (dead code — completely unused):
+  DataWarehouse.CLI/Integration/OperatingMode.cs   ← never imported by any CLI command
+  DataWarehouse.CLI/Integration/IKernelAdapter.cs  ← dead code
+  DataWarehouse.CLI/Integration/AdapterFactory.cs  ← dead code
+  DataWarehouse.CLI/Integration/AdapterRunner.cs   ← dead code
+  DataWarehouse.Launcher/Integration/OperatingMode.cs  ← replaced by SDK version
+
+UPDATE (example code — keep but change namespace):
+  Metadata/Adapter/OperatingMode.cs                ← update to use DataWarehouse.SDK.Hosting
+  Metadata/Adapter/DataWarehouseHost.cs            ← update to use DataWarehouse.SDK.Hosting
+  Metadata/Adapter/InstanceConnection.cs           ← update to use DataWarehouse.SDK.Hosting
+
+SPECIAL: DataWarehouse.Shared/InstanceManager.cs
+  - Remove inline ConnectionType enum (Local/Remote/InProcess → use SDK's Local/Remote/Cluster)
+  - Remove inline ConnectionTarget class (Address/Port → use SDK's Host/Port/LocalPath/etc.)
+  - Keep ConnectionProfile class (unique to Shared, not duplicated)
+  - Adapt ConnectRemoteAsync/ConnectLocalAsync/ConnectInProcessAsync to use SDK ConnectionTarget
+```
+
 Plans:
-- [ ] 21.5-01: Consolidate ConnectionType, ConnectionTarget, OperatingMode, InstallConfiguration, EmbeddedConfiguration into SDK (`DataWarehouse.SDK/Hosting/`); update all references in Launcher, CLI, Shared; delete CLI dead code; update Metadata/Adapter examples to use SDK types
+- [ ] 21.5-01: Consolidate ConnectionType, ConnectionTarget, OperatingMode, InstallConfiguration, EmbeddedConfiguration into SDK (`DataWarehouse.SDK/Hosting/`); update all references in Launcher, CLI, Shared, GUI; delete CLI dead code (4 files); update Metadata/Adapter examples to use SDK types
 - [ ] 21.5-02: Migrate DataWarehouse.Shared from Newtonsoft.Json to System.Text.Json (7 files: MessageBridge, InstanceManager, CapabilityManager, DeveloperToolsService, ComplianceReportService, plus UniversalDashboards plugin)
 - [ ] 21.5-03: Add DataWarehouse.Plugins.AirGapBridge and DataWarehouse.Plugins.DataMarketplace to DataWarehouse.slnx; verify full solution builds
 
