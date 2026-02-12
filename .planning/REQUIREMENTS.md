@@ -65,6 +65,15 @@
 - [ ] **UPST-02**: All standalone plugin strategies leverage the unified strategy base class hierarchy
 - [ ] **UPST-03**: All standalone plugins leverage distributed infrastructure features from SDK
 
+### Pre-Execution Cleanup
+
+- [ ] **PRECLEAN-01**: `ConnectionType` enum consolidated into SDK (`DataWarehouse.SDK.Hosting`) as superset: Local, Remote, InProcess, Cluster — replaces 4 duplicate definitions across Shared, Launcher, CLI, and Metadata/Adapter
+- [ ] **PRECLEAN-02**: `ConnectionTarget` class consolidated into SDK with merged properties (Name, Type, Host, Port, LocalPath, AuthToken, UseTls, TimeoutSeconds, Metadata) — all projects reference the single SDK type
+- [ ] **PRECLEAN-03**: `OperatingMode`, `InstallConfiguration`, `EmbeddedConfiguration` consolidated into SDK (`DataWarehouse.SDK.Hosting`) — Launcher and CLI reference SDK types; Metadata/Adapter examples updated
+- [ ] **PRECLEAN-04**: `DataWarehouse.CLI/Integration/OperatingMode.cs` deleted (completely unused dead code); CLI Commands updated to import SDK types
+- [ ] **PRECLEAN-05**: All Newtonsoft.Json usage in DataWarehouse.Shared (and UniversalDashboards plugin) migrated to System.Text.Json; Newtonsoft.Json PackageReference removed
+- [ ] **PRECLEAN-06**: DataWarehouse.Plugins.AirGapBridge and DataWarehouse.Plugins.DataMarketplace added to DataWarehouse.slnx; all 69 projects listed in solution
+
 ### CLI & Unified Interface
 
 - [ ] **CLI-01**: DataWarehouse.CLI uses current System.CommandLine API (not deprecated NamingConventionBinder) for all command parsing and binding
@@ -203,6 +212,12 @@
 | SUPPLY-02 | Phase 22 | Pending |
 | SUPPLY-03 | Phase 22 | Pending |
 | SUPPLY-04 | Phase 22 | Pending |
+| PRECLEAN-01 | Phase 21.5 | Pending |
+| PRECLEAN-02 | Phase 21.5 | Pending |
+| PRECLEAN-03 | Phase 21.5 | Pending |
+| PRECLEAN-04 | Phase 21.5 | Pending |
+| PRECLEAN-05 | Phase 21.5 | Pending |
+| PRECLEAN-06 | Phase 21.5 | Pending |
 | CLI-01 | Phase 22 | Pending |
 | CLI-02 | Phase 31 | Pending |
 | CLI-03 | Phase 31 | Pending |
@@ -307,8 +322,8 @@
 | TEST-06 | Phase 30 | Pending |
 
 **Coverage:**
-- v2.0 requirements: 112 total (20 categories, STRAT-03 removed, 3 CLEAN-* added, 6 REGR-* added, 4 CLI-* added, 9 DEPLOY-* added)
-- Mapped to phases: 111 (1 removed)
+- v2.0 requirements: 118 total (22 categories, STRAT-03 removed, 3 CLEAN-* added, 6 REGR-* added, 4 CLI-* added, 9 DEPLOY-* added, 6 PRECLEAN-* added)
+- Mapped to phases: 117 (1 removed)
 - Unmapped: 0
 - Architecture decisions: .planning/ARCHITECTURE_DECISIONS.md (AD-01 through AD-10)
 - SDK_REFACTOR_PLAN.md phases: All 6 main phases + subphases (3.5, 4A, 4B, 5A, 5B, 5C) fully covered

@@ -35,7 +35,7 @@
 
 ## Milestone: v2.0 SDK Hardening & Distributed Infrastructure
 
-> 11 phases (22-31) | 112 requirements across 20 categories | Approach: verify first, implement only where code deviates
+> 12 phases (21.5, 22-31) | 118 requirements across 22 categories | Approach: verify first, implement only where code deviates
 > Architecture decisions: .planning/ARCHITECTURE_DECISIONS.md (AD-01 through AD-10)
 
 **Milestone Goal:** Harden the SDK to pass hyperscale/military-level code review -- refactor base class hierarchies, enforce security best practices, add distributed infrastructure contracts, achieve zero compiler warnings.
@@ -65,6 +65,7 @@ All 6 main phases and subphases from the original SDK_REFACTOR_PLAN.md are fully
 
 ### Phases
 
+- [ ] **Phase 21.5: Pre-Execution Cleanup** - Consolidate duplicate types to SDK, standardize JSON serializer, add missing projects to solution, remove dead code
 - [ ] **Phase 22: Build Safety & Supply Chain** - Roslyn analyzers, TreatWarningsAsErrors rollout, SBOM, vulnerability audit, CLI fix
 - [ ] **Phase 23: Memory Safety & Cryptographic Hygiene** - IDisposable patterns, secure memory wiping, bounded collections, constant-time comparisons, FIPS compliance
 - [ ] **Phase 24: Plugin Hierarchy, Storage Core & Input Validation** - Two-branch plugin hierarchy (DataPipeline + Feature), object storage core with translation layer, specialized bases to composable services, input validation (AD-01, AD-02, AD-03, AD-04)
@@ -78,6 +79,26 @@ All 6 main phases and subphases from the original SDK_REFACTOR_PLAN.md are fully
 - [ ] **Phase 31: Unified Interface & Deployment Modes** - Dynamic CLI/GUI capability reflection, NLP query routing, three deployment modes (Client/Live/Install), platform-specific service management
 
 ### Phase Details
+
+#### Phase 21.5: Pre-Execution Cleanup
+**Goal**: Clean baseline before v2.0 execution begins — eliminate duplicate type definitions, standardize serialization, fix solution completeness, remove dead code.
+**Depends on**: Nothing (first action)
+**Requirements**: PRECLEAN-01, PRECLEAN-02, PRECLEAN-03, PRECLEAN-04, PRECLEAN-05, PRECLEAN-06
+**Approach**: Mechanical cleanup — no architectural changes. Move shared types to SDK, update all references, standardize serializer, add missing projects. Low risk, high hygiene value.
+**Success Criteria** (what must be TRUE):
+  1. `ConnectionType`, `ConnectionTarget`, `OperatingMode`, `InstallConfiguration`, `EmbeddedConfiguration` exist once in SDK (namespace `DataWarehouse.SDK.Hosting`), used by all projects
+  2. `DataWarehouse.CLI/Integration/OperatingMode.cs` deleted (unused dead code)
+  3. CLI Commands import SDK types instead of referencing example code namespace
+  4. All 7 Newtonsoft.Json usages in DataWarehouse.Shared migrated to System.Text.Json; Newtonsoft.Json PackageReference removed
+  5. All 69 .csproj files listed in DataWarehouse.slnx (AirGapBridge and DataMarketplace added)
+  6. Metadata/Adapter/ example code updated to reference SDK types (maintains value as integration example)
+  7. Full solution builds with zero errors after all changes
+**Plans**: 3 plans
+
+Plans:
+- [ ] 21.5-01: Consolidate ConnectionType, ConnectionTarget, OperatingMode, InstallConfiguration, EmbeddedConfiguration into SDK (`DataWarehouse.SDK/Hosting/`); update all references in Launcher, CLI, Shared; delete CLI dead code; update Metadata/Adapter examples to use SDK types
+- [ ] 21.5-02: Migrate DataWarehouse.Shared from Newtonsoft.Json to System.Text.Json (7 files: MessageBridge, InstanceManager, CapabilityManager, DeveloperToolsService, ComplianceReportService, plus UniversalDashboards plugin)
+- [ ] 21.5-03: Add DataWarehouse.Plugins.AirGapBridge and DataWarehouse.Plugins.DataMarketplace to DataWarehouse.slnx; verify full solution builds
 
 #### Phase 22: Build Safety & Supply Chain
 **Goal**: The SDK build pipeline enforces code quality and supply chain security at compile time -- zero warnings, static analysis on every build, known dependency posture.
@@ -318,10 +339,11 @@ Plans:
 
 ### Progress
 
-**Execution Order:** 22 → 23 → 24 → 25a → 25b → 26 → 27 → 28 → 29 → 30 → 31
+**Execution Order:** 21.5 → 22 → 23 → 24 → 25a → 25b → 26 → 27 → 28 → 29 → 30 → 31
 
 | Phase | Milestone | Plans | Status | Completed |
 |-------|-----------|-------|--------|-----------|
+| 21.5. Pre-Execution Cleanup | v2.0 | 0/3 | Not started | - |
 | 22. Build Safety & Supply Chain | v2.0 | 0/4 | Not started | - |
 | 23. Memory Safety & Crypto Hygiene | v2.0 | 0/4 | Not started | - |
 | 24. Plugin Hierarchy, Storage Core & Validation | v2.0 | 0/7 | Not started | - |
