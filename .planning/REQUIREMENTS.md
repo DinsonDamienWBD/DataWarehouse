@@ -65,9 +65,25 @@
 - [ ] **UPST-02**: All standalone plugin strategies leverage the unified strategy base class hierarchy
 - [ ] **UPST-03**: All standalone plugins leverage distributed infrastructure features from SDK
 
-### CLI
+### CLI & Unified Interface
 
 - [ ] **CLI-01**: DataWarehouse.CLI uses current System.CommandLine API (not deprecated NamingConventionBinder) for all command parsing and binding
+- [ ] **CLI-02**: DataWarehouse.Shared subscribes to `capability.changed`, `plugin.loaded`, `plugin.unloaded` events via MessageBridge and maintains a `DynamicCommandRegistry` that auto-updates available commands/features at runtime
+- [ ] **CLI-03**: User NLP queries route through MessageBridge → UltimateInterfacePlugin → IntelligenceAwarePluginBase AI socket → Knowledge Bank, with graceful degradation to direct Capability Registry lookup (keyword matching) when Intelligence is unavailable
+- [ ] **CLI-04**: CommandExecutor generates available commands dynamically from `DynamicCommandRegistry` (no hardcoded command lists) — when a plugin loads/unloads, CLI/GUI commands appear/disappear without restart
+- [ ] **CLI-05**: CLI and GUI both read from the same Shared `DynamicCommandRegistry` ensuring 100% feature parity — anything possible in CLI is possible in GUI and vice versa
+
+### Deployment Modes
+
+- [ ] **DEPLOY-01**: `dw connect` command fully operational — MessageBridge connects to real DW instance via HTTP/gRPC (not mock/placeholder), capability discovery returns live data
+- [ ] **DEPLOY-02**: Launcher exposes HTTP/gRPC listener endpoint compatible with Shared's `RemoteInstanceConnection` protocol (`/api/v1/info`, `/api/v1/capabilities`, `/api/v1/message`, `/api/v1/execute`)
+- [ ] **DEPLOY-03**: `dw live [--port] [--memory]` command starts embedded DW instance with `PersistData=false`, in-memory storage, HTTP endpoint for CLI/GUI connection — "Linux Live CD" style
+- [ ] **DEPLOY-04**: USB/portable media auto-detection — when CLI/GUI runs from removable media, adapts paths to avoid writes to host filesystem; auto-discovers local live instance on known ports
+- [ ] **DEPLOY-05**: `dw install --path <path> [--autostart] [--service] [--admin-password <pwd>]` command runs full installation pipeline with real implementations (not stubs): copy binaries, init config, init plugins, create admin user, register service
+- [ ] **DEPLOY-06**: `dw install --from-usb <source> --path <target>` clones a portable DW instance from USB to local disk: copies tree, remaps paths in configuration, copies data (optional), registers service, verifies installation
+- [ ] **DEPLOY-07**: Platform-specific service registration: Windows `sc create`, Linux systemd unit file, macOS launchd plist — production-ready, not placeholder
+- [ ] **DEPLOY-08**: Platform-specific autostart configuration: Windows Task Scheduler or `sc config start=auto`, Linux `systemctl enable`, macOS `launchctl load`
+- [ ] **DEPLOY-09**: `ServerStartCommand` and `ServerStopCommand` use real kernel startup/shutdown via DataWarehouseHost (not `Task.Delay` placeholder); `MessageBridge.SendInProcessAsync()` uses real in-memory message queue (not mock response)
 
 ### Memory Safety
 
@@ -171,7 +187,7 @@
 | SecureString usage | Deprecated in .NET -- use CryptographicOperations.ZeroMemory |
 | Global TreatWarningsAsErrors day-one | Would break 1.1M LOC build -- use incremental category rollout |
 | Real-time sync everywhere | Complexity without value -- use eventual consistency with configurable intervals |
-| UI/Dashboard changes | SDK-only milestone |
+| Dashboard UI redesign | Phase 31 covers CLI/GUI dynamic reflection and deployment modes, but NOT Dashboard visual redesign |
 | Synchronous blocking APIs | Causes deadlocks -- all APIs must be async with CancellationToken |
 
 ## Traceability
@@ -188,6 +204,19 @@
 | SUPPLY-03 | Phase 22 | Pending |
 | SUPPLY-04 | Phase 22 | Pending |
 | CLI-01 | Phase 22 | Pending |
+| CLI-02 | Phase 31 | Pending |
+| CLI-03 | Phase 31 | Pending |
+| CLI-04 | Phase 31 | Pending |
+| CLI-05 | Phase 31 | Pending |
+| DEPLOY-01 | Phase 31 | Pending |
+| DEPLOY-02 | Phase 31 | Pending |
+| DEPLOY-03 | Phase 31 | Pending |
+| DEPLOY-04 | Phase 31 | Pending |
+| DEPLOY-05 | Phase 31 | Pending |
+| DEPLOY-06 | Phase 31 | Pending |
+| DEPLOY-07 | Phase 31 | Pending |
+| DEPLOY-08 | Phase 31 | Pending |
+| DEPLOY-09 | Phase 31 | Pending |
 | MEM-01 | Phase 23 | Pending |
 | MEM-02 | Phase 23 | Pending |
 | MEM-03 | Phase 23 | Pending |
@@ -278,10 +307,10 @@
 | TEST-06 | Phase 30 | Pending |
 
 **Coverage:**
-- v2.0 requirements: 98 total (18 categories, STRAT-03 removed, 3 CLEAN-* added, 6 REGR-* added)
-- Mapped to phases: 97 (1 removed)
+- v2.0 requirements: 112 total (20 categories, STRAT-03 removed, 3 CLEAN-* added, 6 REGR-* added, 4 CLI-* added, 9 DEPLOY-* added)
+- Mapped to phases: 111 (1 removed)
 - Unmapped: 0
-- Architecture decisions: .planning/ARCHITECTURE_DECISIONS.md (AD-01 through AD-08)
+- Architecture decisions: .planning/ARCHITECTURE_DECISIONS.md (AD-01 through AD-10)
 - SDK_REFACTOR_PLAN.md phases: All 6 main phases + subphases (3.5, 4A, 4B, 5A, 5B, 5C) fully covered
 
 ---
