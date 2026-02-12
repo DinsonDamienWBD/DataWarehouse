@@ -294,5 +294,211 @@ IStrategy (interface — Name, Description, Characteristics)
 | AD-08 | ZERO REGRESSION — preserve all v1.0 logic | Protects 30 days of implementation work |
 
 ---
+
+## AD-09: Unified User Interface — Shared ↔ UltimateInterface Connection
+
+**Decision:** CLI and GUI are thin UI wrappers over `DataWarehouse.Shared`. Shared connects to `UltimateInterfacePlugin` (server-side) via the message bus through the kernel. No new plugin or project needed — connect the existing pieces.
+
+**Rationale:** The architecture already has all the components. Shared has CommandExecutor, InstanceManager, MessageBridge, CapabilityManager. UltimateInterfacePlugin already inherits IntelligenceAwarePluginBase (AI socket, graceful degradation) and has 68+ protocol strategies. The kernel already publishes `capability.changed`, `plugin.loaded`, `plugin.unloaded` events. The Knowledge Bank already supports dynamic queries. These just aren't wired together for dynamic CLI/GUI reflection.
+
+**Architecture:**
+```
+CLI executable ──┐
+                 ├── DataWarehouse.Shared (command routing, MessageBridge, CapabilityManager)
+GUI executable ──┘           ↕ (message bus via kernel)
+                         Kernel (routes messages, manages plugins)
+                           ↕ (message bus)
+                   UltimateInterfacePlugin (IntelligenceAware, 68+ strategies)
+                           ↕
+                   Capability Registry + Knowledge Bank
+```
+
+**What needs wiring:**
+
+1. **Dynamic capability reflection**: Shared subscribes to `capability.changed`, `plugin.loaded`, `plugin.unloaded` events via MessageBridge. Maintains a `DynamicCommandRegistry` that auto-updates available commands/features. CLI/GUI read from this registry — no hardcoded command lists.
+
+2. **NLP query routing**: When user asks "What encryption algorithms are available?", the flow is:
+   - CLI/GUI → Shared → MessageBridge → Kernel → UltimateInterfacePlugin
+   - UltimateInterfacePlugin uses its IntelligenceAwarePluginBase AI socket to parse the NLP query
+   - Queries Knowledge Bank for capability answers
+   - Returns structured response
+   - If Intelligence unavailable: falls back to direct Capability Registry lookup (keyword matching). Manual mode always works.
+
+3. **Dynamic command generation**: When UltimateEncryption loads at runtime:
+   - Kernel loads plugin → plugin registers 30+ capabilities
+   - Publishes `capability.changed` on message bus
+   - Shared receives event → DynamicCommandRegistry updates
+   - CLI: `dw encrypt --algorithm aes-256-gcm` now available
+   - GUI: Encryption panel appears dynamically
+   - No restart of kernel, CLI, or GUI needed
+
+4. **Feature parity**: CLI and GUI both read from the same Shared `DynamicCommandRegistry`. Whatever one can do, the other can do. Guaranteed by design — single source of truth.
+
+**What already works:**
+- PluginCapabilityRegistry has `OnCapabilityRegistered`, `OnCapabilityUnregistered`, `OnAvailabilityChanged`
+- Message bus topics: `capability.register`, `capability.unregister`, `capability.changed`
+- Knowledge Bank: `QueryAsync(KnowledgeQuery)` with topic patterns, types, text search
+- Shared's InstanceManager already handles Local/Remote/InProcess connections
+- CLI already delegates all business logic to Shared via CommandExecutor
+
+**What's missing:**
+- Shared doesn't subscribe to capability change events (no dynamic reflection)
+- NLP queries aren't connected to UltimateInterface's AI socket
+- CommandExecutor uses hardcoded command lists instead of dynamic generation
+- No mechanism enforcing CLI/GUI parity (both should read same registry)
+
+---
+
+## AD-10: Deployment Modes — Three Operating Modes for CLI/GUI
+
+**Decision:** DW CLI/GUI supports three deployment modes: Standard Client, Live Mode, and Install Mode. No new projects needed — use existing DataWarehouseHost, Launcher, and Shared infrastructure.
+
+**Rationale:** DataWarehouseHost already defines Install, Connect, Embedded, and Service modes. The infrastructure exists but isn't exposed as user-facing CLI/GUI commands, and several operational methods are stubs. Complete the implementation, wire up the CLI commands, and add USB/portable awareness.
+
+### Mode 1: Standard Client (Connect to any DW instance)
+
+**What it does:** CLI/GUI connects to any running DW instance (local, remote, or cluster) to manage and configure it. The user must have appropriate access and permissions.
+
+**Architecture:**
+```
+CLI/GUI (client-side)                    DW Instance (server-side)
+┌────────────────────┐                  ┌──────────────────────────┐
+│ DataWarehouse.Shared│                  │ DataWarehouse.Launcher   │
+│ ├── InstanceManager │◄────────────────►│ ├── ServiceHost          │
+│ ├── MessageBridge   │   HTTP/gRPC/TCP  │ ├── DataWarehouseHost    │
+│ ├── CapabilityMgr   │                  │ └── Kernel + Plugins     │
+│ └── CommandExecutor │                  │                          │
+└────────────────────┘                  └──────────────────────────┘
+```
+
+**What exists:**
+- `dw connect --host <host> --port <port>` CLI command
+- `InstanceManager` with Local/Remote/InProcess connections
+- `MessageBridge` with TCP client (length-prefixed JSON)
+- `DataWarehouseHost.ConnectAsync()` with Local/Remote/Cluster support
+- `RemoteInstanceConnection` using HTTP API (`/api/v1/info`, `/api/v1/capabilities`, etc.)
+- `LocalInstanceConnection` using named pipes/IPC
+- `ClusterInstanceConnection` for multi-node clusters
+- Launcher as service/daemon with gRPC/HTTP endpoints
+- Dashboard as web API with REST, SignalR, JWT auth
+
+**What needs completing:**
+- `ServerStartCommand` must actually start the kernel (currently `Task.Delay(100)` placeholder)
+- `MessageBridge.SendInProcessAsync()` must use real in-memory message queue (currently returns mock)
+- `InstanceManager.ExecuteAsync()` must not return mock data when disconnected (should error)
+- Protocol alignment: MessageBridge uses raw TCP, Launcher/Dashboard use HTTP/gRPC. Either unify or support both.
+- Launcher must expose a listener endpoint that MessageBridge can connect to
+
+**No new projects needed.** Server-side: Launcher already exists. Client-side: Shared/InstanceManager already exists. AEDS already has ServerDispatcher (server) and ClientCourier (client) for content distribution. For management/control, Launcher + Dashboard cover the server-side.
+
+### Mode 2: Live Mode (In-memory, no persistence — "Linux Live CD" style)
+
+**What it does:** A portable DW instance runs entirely in memory with no persistence. Perfect for USB drives, demo environments, or evaluation. CLI/GUI auto-connect to the local live instance.
+
+**Architecture:**
+```
+USB Drive / Portable Media
+├── dw.exe (CLI)
+├── dw-gui.exe (GUI)
+├── dw-live.exe (Live kernel — embedded mode, no persistence)
+├── live-config.json (preconfigured embedded settings)
+└── plugins/ (minimal plugin set)
+
+On launch:
+1. dw-live.exe starts DataWarehouseHost.RunEmbeddedAsync(PersistData=false, ExposeHttp=true)
+2. dw.exe / dw-gui.exe auto-detect local live instance on localhost:8080
+3. User works in DW — all data in memory
+4. On shutdown — everything vanishes (no trace on host machine)
+```
+
+**What exists:**
+- `DataWarehouseHost.RunEmbeddedAsync()` with `EmbeddedConfiguration { PersistData = false, MaxMemoryMb = 512 }`
+- `OperatingMode.Embedded` enum value
+- `AdapterRunner` for running the kernel in embedded mode
+
+**What needs implementing:**
+- CLI command: `dw live [--port 8080] [--memory 512]` — starts embedded DW instance
+- Live profile: pre-configured `EmbeddedConfiguration` bundled with installer/USB
+- Auto-discovery: CLI/GUI detect local live instance (check localhost ports, named pipe, or marker file)
+- USB/portable detection: detect if running from removable media, adapt paths accordingly (no writes to host filesystem)
+- Minimal plugin set for live mode: Storage (in-memory), Interface (REST for CLI/GUI), Intelligence (optional)
+
+### Mode 3: Install Mode (Deploy new or copy "DW-on-a-stick" to local machine)
+
+**What it does:** CLI/GUI installs DW to the local machine. Two sub-modes:
+- **Clean install**: Fresh DW instance with user-chosen configuration
+- **Copy from USB**: Clone an entire portable DW instance (with data, config, plugins) from USB to local disk, remap paths, register services, set up autostart
+
+**Architecture (Clean Install):**
+```
+dw install --path "C:\DataWarehouse" --admin-password "..." --autostart --service
+    ↓
+DataWarehouseHost.InstallAsync()
+    ├── Step 1: Validate configuration
+    ├── Step 2: Create directories (data, config, plugins, logs)
+    ├── Step 3: Copy binaries and plugin DLLs
+    ├── Step 4: Initialize configuration (datawarehouse.json)
+    ├── Step 5: Initialize plugins (copy, register)
+    ├── Step 6: Create admin user (in security store)
+    ├── Step 7: Register service (sc create / systemd / launchd)
+    └── Step 8: Configure autostart (Task Scheduler / systemd enable / launchctl)
+```
+
+**Architecture (Copy from USB):**
+```
+dw install --from-usb "E:\" --path "C:\DataWarehouse" --autostart --service
+    ↓
+    ├── Step 1: Detect USB source layout (validate it's a DW instance)
+    ├── Step 2: Copy entire DW tree from USB to target path
+    ├── Step 3: Remap all paths in configuration (USB drive letter → local path)
+    ├── Step 4: Copy data (if present and user opts in)
+    ├── Step 5: Register service with remapped paths
+    ├── Step 6: Configure autostart
+    └── Step 7: Verify installation (start kernel, run health check)
+```
+
+**What exists:**
+- `DataWarehouseHost.InstallAsync()` with full 7-step pipeline
+- `InstallConfiguration` with InstallPath, DataPath, IncludedPlugins, CreateService, AutoStart, AdminPassword
+- `InstallStep` enum for progress tracking
+- Platform-aware service registration scaffold (Windows/Linux detected)
+- UltimateDeployment plugin with 65+ deployment strategies
+
+**What needs completing:**
+- `CopyFilesAsync()` — currently stub, needs real binary/DLL copy logic
+- `RegisterServiceAsync()` — currently just logs, needs real `sc create` (Windows), systemd unit file (Linux), `launchctl` (macOS)
+- `CreateAdminUserAsync()` — currently just logs, needs real security store integration
+- `InitializePluginsAsync()` — currently just creates dirs, needs actual plugin DLL copy
+- CLI command: `dw install [--path <path>] [--from-usb <source>] [--autostart] [--service] [--admin-password <pwd>]`
+- USB source detection and validation
+- Path remapping logic for copy-from-USB mode
+- Post-install verification (start kernel, run health check)
+- Autostart configuration beyond service registration (Task Scheduler, systemd enable, launchd plist)
+
+**Platform-specific service operations:**
+| Platform | Service Registration | Autostart | Service Name |
+|----------|---------------------|-----------|-------------|
+| Windows | `sc create DataWarehouse binPath=...` | Task Scheduler or `sc config start=auto` | DataWarehouse |
+| Linux | Write `/etc/systemd/system/datawarehouse.service` unit file | `systemctl enable datawarehouse` | datawarehouse |
+| macOS | Write `~/Library/LaunchAgents/com.datawarehouse.plist` | `launchctl load` | com.datawarehouse |
+
+---
+
+## Summary Table (Updated)
+
+| ID | Decision | Impact |
+|----|----------|--------|
+| AD-01 | Two branches: DataPipeline + Feature | Clarifies plugin identity |
+| AD-02 | Single encryption/compression base | Eliminates unnecessary split |
+| AD-03 | Specialized bases → composable services | Unlocks composition for Ultimate plugins |
+| AD-04 | Object storage core + translation layer | Uniform foundation for all features |
+| AD-05 | Flat strategy hierarchy, no intelligence | Massive simplification (~1,000 lines removed) |
+| AD-06 | Dead code cleanup (keep future-ready) | Cleaner codebase, less confusion |
+| AD-07 | 111+ bases → ~15-20 domain bases | Maintainable hierarchy |
+| AD-08 | ZERO REGRESSION — preserve all v1.0 logic | Protects 30 days of implementation work |
+| AD-09 | Unified UI — Shared ↔ UltimateInterface | 100% CLI/GUI feature parity, dynamic capability reflection |
+| AD-10 | Three deployment modes (Client/Live/Install) | Portable, installable, and client-server DW |
+
+---
 *Decided: 2026-02-12*
 *Participants: User (architect), Claude (analysis)*

@@ -35,8 +35,8 @@
 
 ## Milestone: v2.0 SDK Hardening & Distributed Infrastructure
 
-> 10 phases (22-30) | 92 requirements across 17 categories | Approach: verify first, implement only where code deviates
-> Architecture decisions: .planning/ARCHITECTURE_DECISIONS.md (AD-01 through AD-08)
+> 11 phases (22-31) | 112 requirements across 20 categories | Approach: verify first, implement only where code deviates
+> Architecture decisions: .planning/ARCHITECTURE_DECISIONS.md (AD-01 through AD-10)
 
 **Milestone Goal:** Harden the SDK to pass hyperscale/military-level code review -- refactor base class hierarchies, enforce security best practices, add distributed infrastructure contracts, achieve zero compiler warnings.
 
@@ -59,8 +59,9 @@ All 6 main phases and subphases from the original SDK_REFACTOR_PLAN.md are fully
 | Phase 4B: Update Ultimate Plugin Strategies | Phase 25b + 27 | STRAT-06, UPLT-03 |
 | Phase 5A: Update Standalone Plugins | Phase 27 | UPST-01 to UPST-03 |
 | Phase 5B: Update Standalone Plugin Strategies | Phase 27 | UPST-02 |
-| Phase 5C: Fix DataWarehouse.CLI | Phase 22 | CLI-01 |
+| Phase 5C: Fix DataWarehouse.CLI | Phase 22 + 31 | CLI-01 to CLI-05 |
 | Phase 6: Testing & Documentation | Phase 30 | TEST-01 to TEST-06 |
+| NEW: Unified Interface & Deployment | Phase 31 | CLI-02 to CLI-05, DEPLOY-01 to DEPLOY-09 |
 
 ### Phases
 
@@ -74,6 +75,7 @@ All 6 main phases and subphases from the original SDK_REFACTOR_PLAN.md are fully
 - [ ] **Phase 28: Dead Code Cleanup** - Remove truly unused classes/files, keep future-ready interfaces for unreleased hardware/technology (AD-06)
 - [ ] **Phase 29: Advanced Distributed Coordination** - SWIM gossip, Raft consensus, CRDT replication, FederatedMessageBus, load balancing implementations
 - [ ] **Phase 30: Testing & Final Verification** - Full build validation, behavioral verification, distributed integration tests, analyzer clean pass
+- [ ] **Phase 31: Unified Interface & Deployment Modes** - Dynamic CLI/GUI capability reflection, NLP query routing, three deployment modes (Client/Live/Install), platform-specific service management
 
 ### Phase Details
 
@@ -278,9 +280,45 @@ Plans:
 - [ ] 30-02: New unit tests for base classes and behavioral verification suite
 - [ ] 30-03: Distributed infrastructure integration tests with in-memory implementations
 
+#### Phase 31: Unified Interface & Deployment Modes
+**Goal**: CLI and GUI dynamically reflect plugin capabilities at runtime, NLP queries route through the intelligence stack, and DW supports three deployment modes: Standard Client (connect to any instance), Live Mode (in-memory portable), and Install Mode (deploy to local machine from clean or USB source). See AD-09, AD-10.
+**Depends on**: Phase 27 (UltimateInterface must be migrated to new hierarchy), Phase 22 (CLI System.CommandLine fix)
+**Requirements**: CLI-02, CLI-03, CLI-04, CLI-05, DEPLOY-01, DEPLOY-02, DEPLOY-03, DEPLOY-04, DEPLOY-05, DEPLOY-06, DEPLOY-07, DEPLOY-08, DEPLOY-09
+**Architecture Decisions**: AD-09 (unified user interface), AD-10 (deployment modes)
+**Approach**: Three work streams that can largely run in parallel:
+
+**Stream A — Dynamic Capability Reflection (CLI-02, CLI-04, CLI-05):**
+Wire Shared to subscribe to capability change events via MessageBridge. Build DynamicCommandRegistry that auto-generates available commands from live capabilities. Replace hardcoded command lists in CommandExecutor. Both CLI and GUI read from this single registry.
+
+**Stream B — Intelligence-Backed Queries (CLI-03, DEPLOY-09):**
+Connect NLP query path from Shared → MessageBridge → UltimateInterface → AI socket → Knowledge Bank. Implement graceful degradation (AI unavailable → keyword-based capability lookup). Replace mock/placeholder server commands with real kernel startup/shutdown. Replace mock MessageBridge.SendInProcessAsync with real in-memory message queue.
+
+**Stream C — Deployment Modes (DEPLOY-01 through DEPLOY-08):**
+Complete the stub implementations in DataWarehouseHost (CopyFiles, RegisterService, CreateAdmin, InitializePlugins). Add CLI commands: `dw live`, `dw install`. Implement platform-specific service registration (sc create, systemd, launchd). Add USB/portable detection and path adaptation. Add copy-from-USB installation mode with path remapping.
+
+**Success Criteria** (what must be TRUE):
+  1. When a plugin loads/unloads at runtime, CLI and GUI commands appear/disappear dynamically within seconds — no restart needed
+  2. User NLP queries ("What encryption algorithms are available?") return accurate, live answers from the Knowledge Bank; if intelligence is unavailable, keyword-based fallback provides capability listings
+  3. CLI and GUI have 100% feature parity — verified by ensuring both read from the same DynamicCommandRegistry
+  4. `dw connect --host <ip> --port <port>` connects to a real running DW instance, discovers capabilities, and enables remote management
+  5. `dw live` starts an in-memory DW instance that CLI/GUI can connect to; all data vanishes on shutdown
+  6. `dw install --path <path> --service --autostart` creates a working DW installation with registered service and autostart on Windows, Linux, and macOS
+  7. `dw install --from-usb <source> --path <target>` clones a portable DW instance to local disk with remapped paths and registered service
+**Plans**: TBD (estimated 6-8 plans)
+
+Plans:
+- [ ] 31-01: DynamicCommandRegistry — subscribe to capability events, auto-generate commands from live capabilities
+- [ ] 31-02: NLP query routing — Shared → MessageBridge → UltimateInterface → Knowledge Bank with graceful degradation
+- [ ] 31-03: Remove mocks/stubs — real kernel startup in ServerCommands, real in-memory message queue in MessageBridge.SendInProcessAsync, real InstanceManager.ExecuteAsync error handling
+- [ ] 31-04: Launcher endpoint alignment — ensure Launcher exposes `/api/v1/*` endpoints compatible with RemoteInstanceConnection protocol
+- [ ] 31-05: Live mode — `dw live` command, EmbeddedConfiguration with PersistData=false, auto-discovery, USB/portable detection
+- [ ] 31-06: Install mode (clean) — `dw install` command, real CopyFilesAsync, real RegisterServiceAsync, real CreateAdminUserAsync, real InitializePluginsAsync
+- [ ] 31-07: Install mode (from USB) — `dw install --from-usb`, USB source validation, tree copy, path remapping, post-install verification
+- [ ] 31-08: Platform-specific service management — Windows (sc create, Task Scheduler), Linux (systemd unit, systemctl enable), macOS (launchd plist, launchctl load)
+
 ### Progress
 
-**Execution Order:** 22 → 23 → 24 → 25a → 25b → 26 → 27 → 28 → 29 → 30
+**Execution Order:** 22 → 23 → 24 → 25a → 25b → 26 → 27 → 28 → 29 → 30 → 31
 
 | Phase | Milestone | Plans | Status | Completed |
 |-------|-----------|-------|--------|-----------|
@@ -294,3 +332,4 @@ Plans:
 | 28. Dead Code Cleanup | v2.0 | 0/4 | Not started | - |
 | 29. Advanced Distributed Coordination | v2.0 | 0/4 | Not started | - |
 | 30. Testing & Final Verification | v2.0 | 0/3 | Not started | - |
+| 31. Unified Interface & Deployment Modes | v2.0 | 0/8 | Not started | - |
