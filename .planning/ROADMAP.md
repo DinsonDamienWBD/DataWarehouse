@@ -35,12 +35,32 @@
 
 ## Milestone: v2.0 SDK Hardening & Distributed Infrastructure
 
-> 10 phases (22-31) | 89+ requirements across 16+ categories | Approach: verify first, implement only where code deviates
-> Architecture decisions: .planning/ARCHITECTURE_DECISIONS.md (AD-01 through AD-07)
+> 10 phases (22-30) | 92 requirements across 17 categories | Approach: verify first, implement only where code deviates
+> Architecture decisions: .planning/ARCHITECTURE_DECISIONS.md (AD-01 through AD-08)
 
 **Milestone Goal:** Harden the SDK to pass hyperscale/military-level code review -- refactor base class hierarchies, enforce security best practices, add distributed infrastructure contracts, achieve zero compiler warnings.
 
+> **CRITICAL DIRECTIVE — ZERO REGRESSION (AD-08):**
+> DO NOT LOSE ANY ALREADY-IMPLEMENTED LOGIC. v1.0 represents 30 days, 21 phases, 116 plans, 863 commits, and 1,110,244 LOC of production-ready C# code. Every plugin, every strategy, every feature MUST be preserved or correctly migrated. All ~1,500 strategies must produce identical results. All 1,039+ tests must pass at every phase boundary. EXTRACT first, VERIFY, then deprecate. No exceptions. All sub-agents executing plans MUST understand and follow this policy.
+
 **Ordering Rationale:** Security-first. Build tooling and static analysis go first (catches issues in all subsequent work). Memory/crypto hardening before hierarchy refactoring (IDisposable must exist before plugin hierarchy changes). Hierarchies before distributed contracts (clean base classes before layering distributed features). Strategy hierarchy is split: design first (25a), then mechanical migration (25b) after plugin migration. Dead code cleanup after hierarchies stabilize. Testing last as the final gate.
+
+### Cross-Reference: SDK_REFACTOR_PLAN.md Phases → v2.0 Roadmap
+
+All 6 main phases and subphases from the original SDK_REFACTOR_PLAN.md are fully covered:
+
+| SDK_REFACTOR_PLAN Phase | v2.0 Phase(s) | Requirements |
+|---|---|---|
+| Phase 1: Refactor PluginBase + IntelligentPluginBase | Phase 24 | HIER-01 to HIER-09 |
+| Phase 2: Refactor StrategyBase | Phase 25a + 25b | STRAT-01 to STRAT-06 |
+| Phase 3: Auto-scaling, LB, P2P, Sync, Tier, Governance | Phase 26 | DIST-01 to DIST-11 |
+| Phase 3.5: Decouple Plugins and Kernel | Phase 27 | DECPL-01 to DECPL-05 |
+| Phase 4A: Update Ultimate Plugins | Phase 27 | UPLT-01 to UPLT-03 |
+| Phase 4B: Update Ultimate Plugin Strategies | Phase 25b + 27 | STRAT-06, UPLT-03 |
+| Phase 5A: Update Standalone Plugins | Phase 27 | UPST-01 to UPST-03 |
+| Phase 5B: Update Standalone Plugin Strategies | Phase 27 | UPST-02 |
+| Phase 5C: Fix DataWarehouse.CLI | Phase 22 | CLI-01 |
+| Phase 6: Testing & Documentation | Phase 30 | TEST-01 to TEST-06 |
 
 ### Phases
 

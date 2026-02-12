@@ -1,3 +1,21 @@
+════════════════════════════════════════════════════════════════════════════════
+  ██  CRITICAL: ZERO REGRESSION POLICY (AD-08)  ██
+
+  DO NOT LOSE ANY ALREADY-IMPLEMENTED LOGIC.
+
+  v1.0 took 30 days, 21 phases, 116 plans, 863 commits, and 1,110,244 lines
+  of C# to implement. Every strategy, every plugin, every feature MUST be
+  preserved or correctly migrated during the v2.0 refactor.
+
+  - All 60 plugins MUST retain their full functionality
+  - All ~1,500 strategies MUST produce identical results after migration
+  - All 1,039+ tests MUST continue to pass at every phase boundary
+  - EXTRACT first, VERIFY it works, ONLY THEN deprecate the old location
+  - Build + test gate after every plan execution — no exceptions
+
+  See .planning/ARCHITECTURE_DECISIONS.md AD-08 for full details.
+════════════════════════════════════════════════════════════════════════════════
+
 PluginBase  →   The Lowest abstract base class for all plugins.
             →   Contains the base lifecycle and common functionality for all plugins. Already fully implemented in a 100% production ready state.
             →   Implements methods such as initialize(), execute(), and shutdown().
@@ -553,4 +571,30 @@ Current Hirerarchy:
 
   Total: ~1,500+ concrete strategies across ~16 domain bases
   Boilerplate eliminated: ~1,000 lines of duplicated intelligence/capability/dispose code
+
+
+  ═══════════════════════════════════════════════════════════════════════
+  PHASE CROSS-REFERENCE: SDK_REFACTOR_PLAN → v2.0 ROADMAP
+  ═══════════════════════════════════════════════════════════════════════
+
+  All 6 main phases and subphases are fully covered in the v2.0 roadmap:
+
+  Phase 1 (PluginBase + IntelligentPluginBase)     → v2.0 Phase 24 (HIER-01 to HIER-09)
+  Phase 2 (StrategyBase refactor)                   → v2.0 Phase 25a + 25b (STRAT-01 to STRAT-06)
+  Phase 3 (Auto-scaling, LB, P2P, Sync, etc.)      → v2.0 Phase 26 (DIST-01 to DIST-11)
+  Phase 3.5 (Decouple Plugins and Kernel)           → v2.0 Phase 27 (DECPL-01 to DECPL-05)
+  Phase 4A (Update Ultimate Plugins)                → v2.0 Phase 27 (UPLT-01 to UPLT-03)
+  Phase 4B (Update Ultimate Plugin Strategies)      → v2.0 Phase 25b + 27 (STRAT-06, UPLT-03)
+  Phase 5A (Update Standalone Plugins)              → v2.0 Phase 27 (UPST-01 to UPST-03)
+  Phase 5B (Update Standalone Plugin Strategies)    → v2.0 Phase 27 (UPST-02)
+  Phase 5C (Fix DataWarehouse.CLI)                  → v2.0 Phase 22 (CLI-01)
+  Phase 6 (Testing & Documentation)                 → v2.0 Phase 30 (TEST-01 to TEST-06)
+
+  Additional v2.0 phases not in original plan:
+  Phase 22: Build Safety & Supply Chain             (BUILD-01 to BUILD-05, SUPPLY-01 to SUPPLY-04)
+  Phase 23: Memory Safety & Cryptographic Hygiene   (MEM-01 to MEM-05, CRYPTO-01 to CRYPTO-06)
+  Phase 28: Dead Code Cleanup                       (CLEAN-01 to CLEAN-03)
+  Phase 29: Advanced Distributed Coordination       (DIST-12 to DIST-17)
+
+  Regression Prevention: REGR-01 to REGR-06 apply to ALL phases (see AD-08)
 
