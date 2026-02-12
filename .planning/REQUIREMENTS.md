@@ -19,12 +19,12 @@
 
 ### Strategy Hierarchy
 
-- [ ] **STRAT-01**: Unified StrategyBase root class exists with common strategy lifecycle (Initialize, Execute, Cleanup), capability declaration, and CancellationToken support
-- [ ] **STRAT-02**: Multi-tier strategy hierarchy: StrategyBase -> IntelligenceAwareStrategyBase -> feature-specific strategy bases (InterfaceStrategyBase, MediaStrategyBase, etc.)
-- [ ] **STRAT-03**: IntelligenceAwareStrategyBase provides UltimateIntelligence integration with graceful degradation (mirroring IntelligenceAwarePluginBase pattern)
+- [ ] **STRAT-01**: Unified StrategyBase root class exists with common strategy lifecycle (Initialize, Shutdown), IDisposable/IAsyncDisposable, metadata (Name, Description, Characteristics), CancellationToken support — NO intelligence, NO capability registry, NO knowledge bank (per AD-05)
+- [ ] **STRAT-02**: Flat two-level hierarchy: StrategyBase → ~15 domain strategy bases (Encryption, Compression, Storage, Security, KeyManagement, Compliance, Interface, Connector, Compute, Observability, Replication, Media, Streaming, Format, Transit, DataManagement) — NO IntelligenceAwareStrategyBase (per AD-05)
+- [ ] **~~STRAT-03~~**: ~~IntelligenceAwareStrategyBase~~ — **REMOVED per AD-05**: Intelligence belongs at plugin level only. Strategies are workers, not orchestrators. Plugins pass AI-derived decisions as options to strategy methods.
 - [ ] **STRAT-04**: All 7 existing fragmented strategy bases are consolidated under the unified hierarchy via adapter wrappers for backward compatibility
-- [ ] **STRAT-05**: Feature-specific strategy base classes implement domain-common functionality (e.g., MediaStrategyBase has format detection, InterfaceStrategyBase has protocol negotiation)
-- [ ] **STRAT-06**: All existing plugin strategies still compile and function identically after hierarchy unification
+- [ ] **STRAT-05**: Domain strategy base classes implement domain-common contracts (e.g., EncryptionStrategyBase has Encrypt/Decrypt, StorageStrategyBase has Store/Retrieve/Delete/List)
+- [ ] **STRAT-06**: All ~1,500 existing plugin strategies migrated to new bases, duplicated boilerplate removed, behavioral equivalence verified
 
 ### Distributed Infrastructure
 
@@ -130,6 +130,12 @@
 - [ ] **SUPPLY-03**: SBOM generated for SDK and all plugins (CycloneDX or SPDX format)
 - [ ] **SUPPLY-04**: Minimal dependency surface -- SDK maintains <=6 direct PackageReferences
 
+### Dead Code Cleanup
+
+- [ ] **CLEAN-01**: All classes/files with zero references (no inheritance, no instantiation, no import) that are NOT future-ready interfaces are removed
+- [ ] **CLEAN-02**: Superseded implementations whose logic exists elsewhere (extracted to composable services per AD-03) are removed
+- [ ] **CLEAN-03**: Future-ready interfaces for unreleased technology (quantum crypto, brain-reading encryption, DNA storage, neuromorphic computing, hardware-specific bases) are preserved with "FUTURE:" documentation comments
+
 ### Testing
 
 - [ ] **TEST-01**: Full solution builds with zero errors after all refactoring
@@ -196,12 +202,12 @@
 | VALID-03 | Phase 24 | Pending |
 | VALID-04 | Phase 24 | Pending |
 | VALID-05 | Phase 24 | Pending |
-| STRAT-01 | Phase 25 | Pending |
-| STRAT-02 | Phase 25 | Pending |
-| STRAT-03 | Phase 25 | Pending |
-| STRAT-04 | Phase 25 | Pending |
-| STRAT-05 | Phase 25 | Pending |
-| STRAT-06 | Phase 25 | Pending |
+| STRAT-01 | Phase 25a | Pending |
+| STRAT-02 | Phase 25a | Pending |
+| STRAT-03 | — | REMOVED (AD-05) |
+| STRAT-04 | Phase 25a | Pending |
+| STRAT-05 | Phase 25a | Pending |
+| STRAT-06 | Phase 25b | Pending |
 | API-01 | Phase 25 | Pending |
 | API-02 | Phase 25 | Pending |
 | API-03 | Phase 25 | Pending |
@@ -238,24 +244,34 @@
 | DECPL-03 | Phase 27 | Pending |
 | DECPL-04 | Phase 27 | Pending |
 | DECPL-05 | Phase 27 | Pending |
-| DIST-12 | Phase 28 | Pending |
-| DIST-13 | Phase 28 | Pending |
-| DIST-14 | Phase 28 | Pending |
-| DIST-15 | Phase 28 | Pending |
-| DIST-16 | Phase 28 | Pending |
-| DIST-17 | Phase 28 | Pending |
-| TEST-01 | Phase 29 | Pending |
-| TEST-02 | Phase 29 | Pending |
-| TEST-03 | Phase 29 | Pending |
-| TEST-04 | Phase 29 | Pending |
-| TEST-05 | Phase 29 | Pending |
-| TEST-06 | Phase 29 | Pending |
+| DIST-12 | Phase 29 | Pending |
+| STRAT-01 | Phase 25a | Pending |
+| STRAT-02 | Phase 25a | Pending |
+| STRAT-03 | — | REMOVED (AD-05) |
+| STRAT-04 | Phase 25a | Pending |
+| STRAT-05 | Phase 25a | Pending |
+| STRAT-06 | Phase 25b | Pending |
+| DIST-13 | Phase 29 | Pending |
+| DIST-14 | Phase 29 | Pending |
+| DIST-15 | Phase 29 | Pending |
+| DIST-16 | Phase 29 | Pending |
+| DIST-17 | Phase 29 | Pending |
+| CLEAN-01 | Phase 28 | Pending |
+| CLEAN-02 | Phase 28 | Pending |
+| CLEAN-03 | Phase 28 | Pending |
+| TEST-01 | Phase 30 | Pending |
+| TEST-02 | Phase 30 | Pending |
+| TEST-03 | Phase 30 | Pending |
+| TEST-04 | Phase 30 | Pending |
+| TEST-05 | Phase 30 | Pending |
+| TEST-06 | Phase 30 | Pending |
 
 **Coverage:**
-- v2.0 requirements: 89 total (16 categories)
-- Mapped to phases: 89
+- v2.0 requirements: 92 total (17 categories, STRAT-03 removed, 3 CLEAN-* added)
+- Mapped to phases: 91 (1 removed)
 - Unmapped: 0
+- Architecture decisions: .planning/ARCHITECTURE_DECISIONS.md (AD-01 through AD-07)
 
 ---
 *Requirements defined: 2026-02-11*
-*Last updated: 2026-02-12 -- traceability mapped by roadmapper*
+*Last updated: 2026-02-12 -- architecture decisions applied, phases renumbered, STRAT-03 removed, CLEAN-* added*
