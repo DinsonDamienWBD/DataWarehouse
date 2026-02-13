@@ -5,17 +5,17 @@
 See: .planning/PROJECT.md (updated 2026-02-12)
 
 **Core value:** SDK must pass hyperscale/military-level code review -- clean hierarchy, secure by default, distributed-ready, zero warnings.
-**Current focus:** Phase 23 complete -- ready for Phase 24
+**Current focus:** Phase 24 complete -- ready for Phase 25b
 
 ## Current Position
 
 Milestone: v2.0 SDK Hardening & Distributed Infrastructure
-Phase: 23 of 29 (Memory Safety & Cryptographic Hygiene) -- COMPLETE
-Plan: 4 of 4 in current phase (all done)
+Phase: 24 of 29 (Plugin Hierarchy, Storage Core & Input Validation) -- COMPLETE
+Plan: 7 of 7 in current phase (all done)
 Status: Phase complete
-Last activity: 2026-02-14 -- Phase 23 complete (4/4 plans)
+Last activity: 2026-02-14 -- Phase 24 complete (7/7 plans)
 
-Progress: [##########░░] 36% (12/33 plans)
+Progress: [##############░░] 58% (19/33 plans)
 
 ## Performance Metrics
 
@@ -25,7 +25,7 @@ Progress: [##########░░] 36% (12/33 plans)
 - Timeline: 30 days (2026-01-13 to 2026-02-11)
 
 **v2.0:**
-- Total plans completed: 12 / 33 estimated
+- Total plans completed: 19 / 33 estimated
 - Average duration: ~8 min/plan
 
 | Phase | Plan | Duration | Tasks | Files |
@@ -41,6 +41,13 @@ Progress: [##########░░] 36% (12/33 plans)
 | 23 | 03 - Cryptographic Hygiene | ~10 min | 3 | 17 |
 | 23 | 02 - Secure Memory & Bounded Collections | ~12 min | 3 | 7 |
 | 23 | 04 - Key Rotation & Message Auth | ~8 min | 2 | 5 |
+| 24 | 01 - PluginBase Lifecycle | ~5 min | 2 | 1 |
+| 24 | 02 - Hierarchy Restructuring | ~8 min | 3 | 31 |
+| 24 | 03 - Domain Plugin Bases | ~6 min | 2 | 19 |
+| 24 | 04 - Object Storage Core | ~5 min | 2 | 2 |
+| 24 | 05 - Composable Services | ~6 min | 2 | 8 |
+| 24 | 06 - Input Validation | ~8 min | 3 | 10 |
+| 24 | 07 - Build Verification | ~7 min | 2 | 25 |
 
 ## Accumulated Context
 
@@ -65,6 +72,15 @@ Progress: [##########░░] 36% (12/33 plans)
 - IKeyRotatable extends IKeyStore directly (not PluginBase) for clean composition
 - IAuthenticatedMessageBus is opt-in per topic via ConfigureAuthentication
 - All Phase 23 crypto contracts are additive -- zero breaking changes to existing interfaces
+- Two-branch hierarchy: DataPipelinePluginBase (data flows) + FeaturePluginBase (services) under IntelligenceAwarePluginBase (AD-01)
+- LegacyFeaturePluginBase with [Obsolete] for backward compat during Phase 27 plugin migration
+- 18 domain plugin bases (7 DataPipeline + 11 Feature) provide domain-specific abstract methods (HIER-06)
+- IObjectStorageCore: key-based canonical storage contract with PathStorageAdapter for URI translation (AD-04)
+- Composable services over inheritance: ITierManager, ICacheManager, IStorageIndex, IConnectionRegistry (AD-03)
+- PluginIdentity: RSA-2048 PKCS#8 (FIPS-compliant), no external crypto deps
+- All Regex in SDK hardened with 100ms timeout (VALID-04)
+- Guards/SizeLimitOptions: centralized input validation (10MB messages, 1MB knowledge objects)
+- Member hiding resolution: `new` keyword for strategy base Dispose/DisposeAsync where hierarchy creates legitimate hiding
 
 ### SDK Audit Results (2026-02-14)
 
@@ -101,9 +117,18 @@ Progress: [##########░░] 36% (12/33 plans)
   - 23-02: ZeroMemory (7 files), 4 bounded collections, ArrayPool on decrypt hot path
   - 23-04: IKeyRotationPolicy, ICryptographicAlgorithmRegistry, IAuthenticatedMessageBus
   - 5 deviations: 90 CS0108 batch fix (Rule 1), TamperProof merge (Rule 1), AedsCore override (Rule 1), S3973 braces (Rule 1), CA5350/CA5351 revert (Rule 1)
+- [x] **Phase 24: Plugin Hierarchy, Storage Core & Input Validation** (7/7 plans) -- Two-branch hierarchy, domain bases, object storage, composable services, input validation
+  - 24-01: PluginBase lifecycle methods (InitializeAsync, ExecuteAsync, ShutdownAsync)
+  - 24-02: Two-branch hierarchy (AD-01), LegacyFeaturePluginBase rename, IntelligenceAwarePluginBase reparent
+  - 24-03: 18 domain plugin bases (7 DataPipeline + 11 Feature), IntelligenceAware* marked [Obsolete]
+  - 24-04: IObjectStorageCore + PathStorageAdapter (AD-04)
+  - 24-05: 4 composable services extracted (ITierManager, ICacheManager, IStorageIndex, IConnectionRegistry) (AD-03)
+  - 24-06: Guards, SizeLimitOptions, PluginIdentity, Regex timeout hardening (VALID-01 through VALID-05)
+  - 24-07: Build verification -- 66/69 projects pass (3 pre-existing), 21 plugin files fixed for LegacyFeaturePluginBase
+  - 2 deviations: FeaturePluginBase reference fix (Rule 1), member hiding resolution (Rule 1)
 
 ## Session Continuity
 
 Last session: 2026-02-14
-Stopped at: Completed Phase 23 (all 4 plans)
-Resume: `/gsd:plan-phase 24` or `/gsd:execute-phase 24`
+Stopped at: Completed Phase 24 (all 7 plans)
+Resume: `/gsd:plan-phase 25b` or `/gsd:execute-phase 25b`
