@@ -214,6 +214,64 @@ namespace DataWarehouse.SDK.Contracts
             return Task.CompletedTask;
         }
 
+        #region Explicit Lifecycle Methods (HIER-02)
+
+        /// <summary>
+        /// Initializes the plugin with the provided cancellation token.
+        /// Default implementation calls <see cref="OnHandshakeAsync"/> with a default request.
+        /// Override to add custom initialization logic. Always call base.InitializeAsync(ct).
+        /// </summary>
+        /// <param name="ct">Cancellation token for the initialization operation.</param>
+        /// <returns>A task representing the initialization operation.</returns>
+        public virtual async Task InitializeAsync(CancellationToken ct = default)
+        {
+            ct.ThrowIfCancellationRequested();
+
+            // Trigger the existing handshake flow which registers capabilities and knowledge
+            await OnHandshakeAsync(new HandshakeRequest
+            {
+                Timestamp = DateTime.UtcNow
+            });
+        }
+
+        /// <summary>
+        /// Executes the plugin's main processing logic.
+        /// Default implementation is a no-op. Override to implement plugin-specific processing.
+        /// For FeaturePluginBase derivatives, this maps to StartAsync.
+        /// For DataPipelinePluginBase derivatives, this sets up the pipeline stage.
+        /// </summary>
+        /// <param name="ct">Cancellation token for the execution operation.</param>
+        /// <returns>A task representing the execution operation.</returns>
+        public virtual Task ExecuteAsync(CancellationToken ct = default)
+        {
+            ct.ThrowIfCancellationRequested();
+            return Task.CompletedTask;
+        }
+
+        /// <summary>
+        /// Shuts down the plugin gracefully, releasing resources in preparation for disposal.
+        /// Default implementation unregisters from system registries. Always call base.ShutdownAsync(ct).
+        /// </summary>
+        /// <param name="ct">Cancellation token for the shutdown operation.</param>
+        /// <returns>A task representing the shutdown operation.</returns>
+        public virtual async Task ShutdownAsync(CancellationToken ct = default)
+        {
+            try
+            {
+                await UnregisterFromSystemAsync(ct);
+            }
+            catch (OperationCanceledException) when (ct.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch
+            {
+                // Best effort during shutdown
+            }
+        }
+
+        #endregion
+
         /// <summary>
         /// Capabilities provided by this plugin. Override to declare your capabilities.
         /// These are automatically registered with the central Capability Registry on handshake.
