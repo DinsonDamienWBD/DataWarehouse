@@ -1,6 +1,8 @@
 using DataWarehouse.SDK.Primitives;
 using System.Collections.Concurrent;
 
+using DataWarehouse.SDK.Contracts.Hierarchy;
+
 namespace DataWarehouse.SDK.Contracts
 {
     #region Interceptor Interfaces
@@ -954,8 +956,11 @@ namespace DataWarehouse.SDK.Contracts
     /// Abstract base class for search orchestrators.
     /// Provides parallel fan-out search with result merging.
     /// </summary>
-    public abstract class SearchOrchestratorPluginBase : LegacyFeaturePluginBase, ISearchOrchestrator
+    public abstract class SearchOrchestratorPluginBase : OrchestrationPluginBase, ISearchOrchestrator
     {
+        /// <inheritdoc/>
+        public override string OrchestrationMode => "Search";
+
         private readonly List<ISearchProvider> _providers = new();
         private readonly object _lock = new();
 
@@ -1119,8 +1124,11 @@ namespace DataWarehouse.SDK.Contracts
     /// Abstract base class for search providers.
     /// Provides common functionality for search indexing and querying.
     /// </summary>
-    public abstract class SearchProviderPluginBase : LegacyFeaturePluginBase, ISearchProvider
+    public abstract class SearchProviderPluginBase : InterfacePluginBase, ISearchProvider
     {
+        /// <inheritdoc/>
+        public override string Protocol => "Search";
+
         public override PluginCategory Category => PluginCategory.MetadataIndexingProvider;
 
         /// <summary>
@@ -1187,8 +1195,15 @@ namespace DataWarehouse.SDK.Contracts
     /// Abstract base class for content processors.
     /// Provides common functionality for text extraction, embedding generation, etc.
     /// </summary>
-    public abstract class ContentProcessorPluginBase : LegacyFeaturePluginBase, IContentProcessor
+    public abstract class ContentProcessorPluginBase : ComputePluginBase, IContentProcessor
     {
+        /// <inheritdoc/>
+        public override string RuntimeType => "ContentProcessor";
+
+        /// <inheritdoc/>
+        public override Task<Dictionary<string, object>> ExecuteWorkloadAsync(Dictionary<string, object> workload, CancellationToken ct = default)
+            => Task.FromResult(new Dictionary<string, object> { ["status"] = "delegated-to-content-processor" });
+
         public override PluginCategory Category => PluginCategory.DataTransformationProvider;
 
         /// <summary>
@@ -1303,8 +1318,11 @@ namespace DataWarehouse.SDK.Contracts
     /// Abstract base class for write fan-out orchestrators.
     /// Provides parallel write coordination to multiple destinations.
     /// </summary>
-    public abstract class WriteFanOutOrchestratorPluginBase : LegacyFeaturePluginBase, IWriteFanOutOrchestrator
+    public abstract class WriteFanOutOrchestratorPluginBase : OrchestrationPluginBase, IWriteFanOutOrchestrator
     {
+        /// <inheritdoc/>
+        public override string OrchestrationMode => "WriteFanOut";
+
         private readonly List<IWriteDestination> _destinations = new();
         private readonly object _lock = new();
 
@@ -1518,8 +1536,11 @@ namespace DataWarehouse.SDK.Contracts
     /// Abstract base class for write destinations.
     /// Provides common functionality for destination-specific writes.
     /// </summary>
-    public abstract class WriteDestinationPluginBase : LegacyFeaturePluginBase, IWriteDestination
+    public abstract class WriteDestinationPluginBase : InterfacePluginBase, IWriteDestination
     {
+        /// <inheritdoc/>
+        public override string Protocol => "WriteDestination";
+
         public override PluginCategory Category => PluginCategory.StorageProvider;
 
         /// <summary>

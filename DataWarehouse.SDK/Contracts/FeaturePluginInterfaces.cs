@@ -4,6 +4,8 @@ using DataWarehouse.SDK.Utilities;
 using System.Collections.Concurrent;
 using System.Security.Cryptography;
 
+using DataWarehouse.SDK.Contracts.Hierarchy;
+
 namespace DataWarehouse.SDK.Contracts
 {
     #region Deduplication Provider
@@ -121,8 +123,11 @@ namespace DataWarehouse.SDK.Contracts
     /// Provides content-defined chunking with Rabin fingerprinting.
     /// Intelligence-aware: Supports AI-driven deduplication ratio estimation.
     /// </summary>
-    public abstract class DeduplicationPluginBase : LegacyFeaturePluginBase, IDeduplicationProvider
+    public abstract class DeduplicationPluginBase : DataManagementPluginBase, IDeduplicationProvider
     {
+        /// <inheritdoc/>
+        public override string DataManagementDomain => "Deduplication";
+
         private readonly ConcurrentDictionary<string, long> _chunkRefCounts = new();
         private long _totalLogicalBytes;
         private long _totalPhysicalBytes;
@@ -577,8 +582,11 @@ namespace DataWarehouse.SDK.Contracts
     /// Abstract base class for versioning provider plugins.
     /// Intelligence-aware: Supports AI-driven version conflict resolution and diff analysis.
     /// </summary>
-    public abstract class VersioningPluginBase : LegacyFeaturePluginBase, IVersioningProvider
+    public abstract class VersioningPluginBase : DataManagementPluginBase, IVersioningProvider
     {
+        /// <inheritdoc/>
+        public override string DataManagementDomain => "Versioning";
+
         public override PluginCategory Category => PluginCategory.StorageProvider;
 
         public abstract bool SupportsBranching { get; }
@@ -960,8 +968,11 @@ namespace DataWarehouse.SDK.Contracts
     /// Abstract base class for snapshot provider plugins.
     /// Intelligence-aware: Supports AI-driven snapshot scheduling and retention optimization.
     /// </summary>
-    public abstract class SnapshotPluginBase : LegacyFeaturePluginBase, ISnapshotProvider
+    public abstract class SnapshotPluginBase : DataManagementPluginBase, ISnapshotProvider
     {
+        /// <inheritdoc/>
+        public override string DataManagementDomain => "Snapshot";
+
         public override PluginCategory Category => PluginCategory.StorageProvider;
 
         public abstract bool SupportsIncremental { get; }
@@ -1281,8 +1292,11 @@ namespace DataWarehouse.SDK.Contracts
     /// Abstract base class for telemetry provider plugins.
     /// Intelligence-aware: Supports AI-driven anomaly detection in metrics and traces.
     /// </summary>
-    public abstract class TelemetryPluginBase : LegacyFeaturePluginBase, ITelemetryProvider
+    public abstract class TelemetryPluginBase : ObservabilityPluginBase, ITelemetryProvider
     {
+        /// <inheritdoc/>
+        public override string ObservabilityDomain => "Telemetry";
+
         private readonly AsyncLocal<ITraceSpan?> _currentSpan = new();
 
         public override PluginCategory Category => PluginCategory.OrchestrationProvider;
@@ -1685,8 +1699,11 @@ namespace DataWarehouse.SDK.Contracts
     /// Abstract base class for threat detection provider plugins.
     /// Intelligence-aware: Supports AI-driven threat classification and behavioral analysis.
     /// </summary>
-    public abstract class ThreatDetectionPluginBase : LegacyFeaturePluginBase, IThreatDetectionProvider
+    public abstract class ThreatDetectionPluginBase : SecurityPluginBase, IThreatDetectionProvider
     {
+        /// <inheritdoc/>
+        public override string SecurityDomain => "ThreatDetection";
+
         private long _totalScans;
         private long _threatsDetected;
         private DateTime _lastScanTime;
@@ -2154,8 +2171,11 @@ namespace DataWarehouse.SDK.Contracts
     /// Abstract base class for backup provider plugins.
     /// Intelligence-aware: Supports AI-driven backup scheduling and recovery optimization.
     /// </summary>
-    public abstract class BackupPluginBase : LegacyFeaturePluginBase, IBackupProvider
+    public abstract class BackupPluginBase : DataManagementPluginBase, IBackupProvider
     {
+        /// <inheritdoc/>
+        public override string DataManagementDomain => "Backup";
+
         public override PluginCategory Category => PluginCategory.StorageProvider;
 
         public abstract BackupCapabilities Capabilities { get; }
@@ -2574,8 +2594,11 @@ namespace DataWarehouse.SDK.Contracts
     /// Abstract base class for operations provider plugins.
     /// Intelligence-aware: Supports AI-driven deployment risk assessment and alert correlation.
     /// </summary>
-    public abstract class OperationsPluginBase : LegacyFeaturePluginBase, IOperationsProvider
+    public abstract class OperationsPluginBase : InfrastructurePluginBase, IOperationsProvider
     {
+        /// <inheritdoc/>
+        public override string InfrastructureDomain => "Operations";
+
         public override PluginCategory Category => PluginCategory.OrchestrationProvider;
 
         public abstract OperationsCapabilities Capabilities { get; }

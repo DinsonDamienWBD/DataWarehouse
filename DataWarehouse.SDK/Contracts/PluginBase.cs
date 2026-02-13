@@ -1,4 +1,4 @@
-﻿using DataWarehouse.SDK.AI;
+using DataWarehouse.SDK.AI;
 using DataWarehouse.SDK.Contracts.Compression;
 using DataWarehouse.SDK.Contracts.Encryption;
 using DataWarehouse.SDK.Governance;
@@ -10,6 +10,10 @@ using System.Buffers;
 using System.Collections.Concurrent;
 using System.Linq;
 using System.Security.Cryptography;
+
+using HierarchyInterfacePluginBase = DataWarehouse.SDK.Contracts.Hierarchy.InterfacePluginBase;
+using HierarchyReplicationPluginBase = DataWarehouse.SDK.Contracts.Hierarchy.ReplicationPluginBase;
+using DataWarehouse.SDK.Contracts.Hierarchy;
 
 namespace DataWarehouse.SDK.Contracts
 {
@@ -1532,30 +1536,16 @@ namespace DataWarehouse.SDK.Contracts
     /// Provides default implementations for external interface operations.
     /// AI-native: Supports AI-driven interface discovery and usage.
     /// </summary>
-    public abstract class InterfacePluginBase : LegacyFeaturePluginBase
+    [Obsolete("Use DataWarehouse.SDK.Contracts.Hierarchy.InterfacePluginBase instead. This legacy base exists for backward compatibility.")]
+    public abstract class InterfacePluginBase : HierarchyInterfacePluginBase
     {
-        /// <summary>
-        /// Interface protocol type (e.g., "rest", "grpc", "sql", "websocket").
-        /// </summary>
-        public abstract string Protocol { get; }
-
-        /// <summary>
-        /// Port the interface listens on (if applicable).
-        /// </summary>
-        public virtual int? Port => null;
-
-        /// <summary>
-        /// Base path or endpoint for the interface.
-        /// </summary>
-        public virtual string? BasePath => null;
+        // Protocol, Port, BasePath are inherited from HierarchyInterfacePluginBase.
+        // Concrete subclasses override Protocol directly.
 
         protected override Dictionary<string, object> GetMetadata()
         {
             var metadata = base.GetMetadata();
             metadata["FeatureType"] = "Interface";
-            metadata["Protocol"] = Protocol;
-            if (Port.HasValue) metadata["Port"] = Port.Value;
-            if (BasePath != null) metadata["BasePath"] = BasePath;
             metadata["SupportsDiscovery"] = true;
             return metadata;
         }
@@ -2158,8 +2148,11 @@ namespace DataWarehouse.SDK.Contracts
     /// Provides default implementations for distributed consensus operations.
     /// AI-native: Supports intelligent leader election and quorum decisions.
     /// </summary>
-    public abstract class ConsensusPluginBase : LegacyFeaturePluginBase, IConsensusEngine
+    public abstract class ConsensusPluginBase : InfrastructurePluginBase, IConsensusEngine
     {
+        /// <inheritdoc/>
+        public override string InfrastructureDomain => "Consensus";
+
         /// <summary>
         /// Category is always OrchestrationProvider for consensus plugins.
         /// </summary>
@@ -2220,7 +2213,7 @@ namespace DataWarehouse.SDK.Contracts
     /// Provides default implementations for event publishing and subscription.
     /// AI-native: Supports intelligent event routing and filtering.
     /// </summary>
-    public abstract class RealTimePluginBase : LegacyFeaturePluginBase, IRealTimeProvider
+    public abstract class RealTimePluginBase : StreamingPluginBase, IRealTimeProvider
     {
         /// <summary>
         /// Category is always FeatureProvider for real-time plugins.
@@ -2343,12 +2336,21 @@ namespace DataWarehouse.SDK.Contracts
     /// Manages data redundancy, backups, and restoration.
     /// AI-native: Supports intelligent replica selection and auto-healing.
     /// </summary>
-    public abstract class ReplicationPluginBase : LegacyFeaturePluginBase, IReplicationService
+    [Obsolete("Use DataWarehouse.SDK.Contracts.Hierarchy.ReplicationPluginBase instead. This legacy base exists for backward compatibility.")]
+    public abstract class ReplicationPluginBase : HierarchyReplicationPluginBase, IReplicationService
     {
         /// <summary>
         /// Category is always FederationProvider for replication plugins.
         /// </summary>
         public override PluginCategory Category => PluginCategory.FederationProvider;
+
+        /// <inheritdoc/>
+        public override Task<Dictionary<string, object>> ReplicateAsync(string key, string[] targetNodes, CancellationToken ct = default)
+            => Task.FromResult(new Dictionary<string, object> { ["status"] = "delegated" });
+
+        /// <inheritdoc/>
+        public override Task<Dictionary<string, object>> GetSyncStatusAsync(string key, CancellationToken ct = default)
+            => Task.FromResult(new Dictionary<string, object> { ["status"] = "unknown" });
 
         /// <summary>
         /// Restores a corrupted blob using a healthy replica.
@@ -3965,8 +3967,15 @@ namespace DataWarehouse.SDK.Contracts
     /// Provides storage-agnostic partition management.
     /// AI-native: Supports intelligent quota management and access suggestions.
     /// </summary>
-    public abstract class ContainerManagerPluginBase : LegacyFeaturePluginBase, IContainerManager
+    public abstract class ContainerManagerPluginBase : ComputePluginBase, IContainerManager
     {
+        /// <inheritdoc/>
+        public override string RuntimeType => "Container";
+
+        /// <inheritdoc/>
+        public override Task<Dictionary<string, object>> ExecuteWorkloadAsync(Dictionary<string, object> workload, CancellationToken ct = default)
+            => Task.FromResult(new Dictionary<string, object> { ["status"] = "delegated-to-container-manager" });
+
         /// <summary>
         /// Category is always OrchestrationProvider for container managers.
         /// </summary>

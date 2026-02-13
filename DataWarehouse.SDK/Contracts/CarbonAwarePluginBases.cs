@@ -3,6 +3,8 @@ using DataWarehouse.SDK.Primitives;
 using DataWarehouse.SDK.Sustainability;
 using DataWarehouse.SDK.Utilities;
 
+using DataWarehouse.SDK.Contracts.Hierarchy;
+
 namespace DataWarehouse.SDK.Contracts;
 
 /// <summary>
@@ -10,8 +12,11 @@ namespace DataWarehouse.SDK.Contracts;
 /// Provides caching and common functionality for fetching carbon data.
 /// Intelligence-aware: Supports AI-driven carbon forecasting and optimization.
 /// </summary>
-public abstract class CarbonIntensityProviderPluginBase : LegacyFeaturePluginBase, ICarbonIntensityProvider
+public abstract class CarbonIntensityProviderPluginBase : InfrastructurePluginBase, ICarbonIntensityProvider
 {
+    /// <inheritdoc/>
+    public override string InfrastructureDomain => "CarbonIntensity";
+
     private readonly Dictionary<string, (CarbonIntensityData Data, DateTimeOffset CachedAt)> _cache = new();
 
     /// <summary>
@@ -199,8 +204,11 @@ public abstract class CarbonIntensityProviderPluginBase : LegacyFeaturePluginBas
 /// Provides scheduling logic for deferring operations to low-carbon periods.
 /// Intelligence-aware: Supports AI-driven optimal scheduling and workload prediction.
 /// </summary>
-public abstract class CarbonAwareSchedulerPluginBase : LegacyFeaturePluginBase, ICarbonAwareScheduler
+public abstract class CarbonAwareSchedulerPluginBase : InfrastructurePluginBase, ICarbonAwareScheduler
 {
+    /// <inheritdoc/>
+    public override string InfrastructureDomain => "CarbonScheduling";
+
     /// <summary>
     /// Gets or sets the carbon intensity provider.
     /// Should be injected or resolved from the kernel context.
@@ -386,8 +394,11 @@ public abstract class CarbonAwareSchedulerPluginBase : LegacyFeaturePluginBase, 
 /// Provides storage and aggregation for carbon usage tracking.
 /// Intelligence-aware: Supports AI-driven carbon trend analysis and optimization recommendations.
 /// </summary>
-public abstract class CarbonReporterPluginBase : LegacyFeaturePluginBase, ICarbonReporter
+public abstract class CarbonReporterPluginBase : InfrastructurePluginBase, ICarbonReporter
 {
+    /// <inheritdoc/>
+    public override string InfrastructureDomain => "CarbonReporting";
+
     #region Intelligence Integration
 
     /// <summary>
@@ -571,8 +582,11 @@ public abstract class CarbonReporterPluginBase : LegacyFeaturePluginBase, ICarbo
 /// Provides ranking logic for choosing low-carbon regions.
 /// Intelligence-aware: Supports AI-driven region selection optimization.
 /// </summary>
-public abstract class GreenRegionSelectorPluginBase : LegacyFeaturePluginBase, IGreenRegionSelector
+public abstract class GreenRegionSelectorPluginBase : InfrastructurePluginBase, IGreenRegionSelector
 {
+    /// <inheritdoc/>
+    public override string InfrastructureDomain => "GreenRegion";
+
     /// <summary>
     /// Gets or sets the carbon intensity provider.
     /// </summary>
@@ -747,8 +761,11 @@ public abstract class GreenRegionSelectorPluginBase : LegacyFeaturePluginBase, I
 /// Integrates with offset marketplaces and registries.
 /// Intelligence-aware: Supports AI-driven offset project recommendations.
 /// </summary>
-public abstract class CarbonOffsetProviderPluginBase : LegacyFeaturePluginBase, ICarbonOffsetProvider
+public abstract class CarbonOffsetProviderPluginBase : InfrastructurePluginBase, ICarbonOffsetProvider
 {
+    /// <inheritdoc/>
+    public override string InfrastructureDomain => "CarbonOffset";
+
     #region Intelligence Integration
 
     /// <summary>

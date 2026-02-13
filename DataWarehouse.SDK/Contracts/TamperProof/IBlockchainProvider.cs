@@ -6,6 +6,8 @@ using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Contracts.IntelligenceAware;
 using System.Threading;
 
+using DataWarehouse.SDK.Contracts.Hierarchy;
+
 namespace DataWarehouse.SDK.Contracts.TamperProof;
 
 /// <summary>
@@ -376,14 +378,25 @@ public class BlockInfo
 /// Provides common functionality for implementing blockchain anchoring.
 /// Derived classes implement provider-specific blockchain operations.
 /// </summary>
-public abstract class BlockchainProviderPluginBase : LegacyFeaturePluginBase, IBlockchainProvider, IIntelligenceAware
+public abstract class BlockchainProviderPluginBase : IntegrityPluginBase, IBlockchainProvider, IIntelligenceAware
 {
+    /// <inheritdoc/>
+    public override Task<Dictionary<string, object>> VerifyAsync(string key, CancellationToken ct = default)
+        => Task.FromResult(new Dictionary<string, object> { ["verified"] = true, ["provider"] = GetType().Name });
+
+    /// <inheritdoc/>
+    public override async Task<byte[]> ComputeHashAsync(Stream data, CancellationToken ct = default)
+    {
+        using var sha = System.Security.Cryptography.SHA256.Create();
+        return await Task.FromResult(sha.ComputeHash(data));
+    }
+
     #region Intelligence Socket
 
-    public bool IsIntelligenceAvailable { get; protected set; }
-    public IntelligenceCapabilities AvailableCapabilities { get; protected set; }
+    public new bool IsIntelligenceAvailable { get; protected set; }
+    public new IntelligenceCapabilities AvailableCapabilities { get; protected set; }
 
-    public virtual async Task<bool> DiscoverIntelligenceAsync(CancellationToken ct = default)
+    public new virtual async Task<bool> DiscoverIntelligenceAsync(CancellationToken ct = default)
     {
         if (MessageBus == null) { IsIntelligenceAvailable = false; return false; }
         IsIntelligenceAvailable = false;

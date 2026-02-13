@@ -1,3 +1,4 @@
+using DataWarehouse.SDK.Contracts.Hierarchy;
 using DataWarehouse.SDK.Distribution;
 
 namespace DataWarehouse.SDK.Contracts;
@@ -15,12 +16,15 @@ namespace DataWarehouse.SDK.Contracts;
 /// implementation to abstract methods.
 /// </para>
 /// </remarks>
-public abstract class ControlPlaneTransportPluginBase : LegacyFeaturePluginBase, IControlPlaneTransport
+public abstract class ControlPlaneTransportPluginBase : InterfacePluginBase, IControlPlaneTransport
 {
     /// <summary>
     /// Gets the unique transport identifier (e.g., "websocket", "mqtt", "grpc").
     /// </summary>
     public abstract string TransportId { get; }
+
+    /// <inheritdoc/>
+    public override string Protocol => TransportId;
 
     /// <summary>
     /// Gets whether this transport is currently connected.
@@ -157,12 +161,15 @@ public abstract class ControlPlaneTransportPluginBase : LegacyFeaturePluginBase,
 /// implementation to abstract methods.
 /// </para>
 /// </remarks>
-public abstract class DataPlaneTransportPluginBase : LegacyFeaturePluginBase, IDataPlaneTransport
+public abstract class DataPlaneTransportPluginBase : InterfacePluginBase, IDataPlaneTransport
 {
     /// <summary>
     /// Gets the unique transport identifier (e.g., "http3", "quic", "http2").
     /// </summary>
     public abstract string TransportId { get; }
+
+    /// <inheritdoc/>
+    public override string Protocol => TransportId;
 
     /// <summary>
     /// Fetches a payload from the server.
@@ -315,8 +322,11 @@ public abstract class DataPlaneTransportPluginBase : LegacyFeaturePluginBase, ID
 /// Production implementations should use persistent storage (database, message queue, etc.).
 /// </para>
 /// </remarks>
-public abstract class ServerDispatcherPluginBase : LegacyFeaturePluginBase, IServerDispatcher
+public abstract class ServerDispatcherPluginBase : OrchestrationPluginBase, IServerDispatcher
 {
+    /// <inheritdoc/>
+    public override string OrchestrationMode => "ServerDispatch";
+
     /// <summary>
     /// In-memory job storage (use persistent storage in production).
     /// </summary>
@@ -539,8 +549,11 @@ public abstract class ServerDispatcherPluginBase : LegacyFeaturePluginBase, ISer
 /// This base class provides event handling and delegates listening logic to abstract methods.
 /// </para>
 /// </remarks>
-public abstract class ClientSentinelPluginBase : LegacyFeaturePluginBase, IClientSentinel
+public abstract class ClientSentinelPluginBase : SecurityPluginBase, IClientSentinel
 {
+    /// <inheritdoc/>
+    public override string SecurityDomain => "ClientSentinel";
+
     /// <inheritdoc />
     public bool IsActive { get; protected set; }
 
@@ -636,8 +649,15 @@ public abstract class ClientSentinelPluginBase : LegacyFeaturePluginBase, IClien
 /// This base class provides validation and delegates execution logic to abstract methods.
 /// </para>
 /// </remarks>
-public abstract class ClientExecutorPluginBase : LegacyFeaturePluginBase, IClientExecutor
+public abstract class ClientExecutorPluginBase : ComputePluginBase, IClientExecutor
 {
+    /// <inheritdoc/>
+    public override string RuntimeType => "ClientExecutor";
+
+    /// <inheritdoc/>
+    public override Task<Dictionary<string, object>> ExecuteWorkloadAsync(Dictionary<string, object> workload, CancellationToken ct = default)
+        => Task.FromResult(new Dictionary<string, object> { ["status"] = "delegated-to-manifest-executor" });
+
     /// <summary>
     /// Performs the actual execution of an intent manifest.
     /// </summary>
