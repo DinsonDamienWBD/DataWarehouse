@@ -108,7 +108,7 @@ namespace DataWarehouse.SDK.Contracts
         /// Performs the health check. Override to provide custom logic.
         /// Default implementation aggregates all registered component checks.
         /// </summary>
-        public virtual async Task<HealthCheckResult> CheckHealthAsync(CancellationToken ct = default)
+        public override async Task<HealthCheckResult> CheckHealthAsync(CancellationToken ct = default)
         {
             // Check cache
             if (DateTime.UtcNow - _lastCheckTime < CacheDuration && _cachedResults.TryGetValue("_aggregate", out var cached))
