@@ -9,6 +9,8 @@ using DataWarehouse.Plugins.AirGapBridge.Security;
 using DataWarehouse.Plugins.AirGapBridge.Storage;
 using DataWarehouse.Plugins.AirGapBridge.Transport;
 using DataWarehouse.SDK.Contracts;
+using DataWarehouse.SDK.Contracts.Hierarchy;
+using DataWarehouse.SDK.Contracts.IntelligenceAware;
 using DataWarehouse.SDK.Primitives;
 using DataWarehouse.SDK.Utilities;
 
@@ -33,7 +35,7 @@ namespace DataWarehouse.Plugins.AirGapBridge;
 /// - 79.26-79.28: Setup & Management (pocket setup wizard, instance ID generator, portable client bundler)
 /// - 79.29-79.35: Instance Convergence Support (instance detection events, multi-instance tracking, metadata extraction, compatibility verification, processing manifest, cross-platform detection, network air-gap detection)
 /// </summary>
-public sealed class AirGapBridgePlugin : IFeaturePlugin, IDisposable
+public sealed class AirGapBridgePlugin : InfrastructurePluginBase, IDisposable
 {
     private readonly ConcurrentDictionary<string, AirGapDevice> _devices = new();
     private readonly byte[] _masterKey;
@@ -57,16 +59,19 @@ public sealed class AirGapBridgePlugin : IFeaturePlugin, IDisposable
     private string? _offlineIndexPath;
 
     /// <inheritdoc/>
-    public string Id => "com.datawarehouse.airgap.bridge";
+    public override string Id => "com.datawarehouse.airgap.bridge";
 
     /// <inheritdoc/>
-    public string Name => "Air-Gap Bridge (The Mule)";
+    public override string Name => "Air-Gap Bridge (The Mule)";
 
     /// <inheritdoc/>
-    public string Version => "1.0.0";
+    public override string Version => "1.0.0";
 
     /// <inheritdoc/>
-    public PluginCategory Category => PluginCategory.FeatureProvider;
+    public override PluginCategory Category => PluginCategory.FeatureProvider;
+
+    /// <inheritdoc/>
+    public override string InfrastructureDomain => "AirGap";
 
     /// <summary>
     /// Gets all connected devices.
@@ -124,7 +129,7 @@ public sealed class AirGapBridgePlugin : IFeaturePlugin, IDisposable
     }
 
     /// <inheritdoc/>
-    public async Task<HandshakeResponse> OnHandshakeAsync(HandshakeRequest request)
+    public override async Task<HandshakeResponse> OnHandshakeAsync(HandshakeRequest request)
     {
         _context = request.Context;
 
@@ -177,8 +182,9 @@ public sealed class AirGapBridgePlugin : IFeaturePlugin, IDisposable
     }
 
     /// <inheritdoc/>
-    public async Task StartAsync(CancellationToken ct)
+    public override async Task StartAsync(CancellationToken ct)
     {
+        await base.StartAsync(ct);
         if (_isRunning) return;
 
         _context?.LogInfo("Starting Air-Gap Bridge plugin...");
@@ -194,7 +200,7 @@ public sealed class AirGapBridgePlugin : IFeaturePlugin, IDisposable
     }
 
     /// <inheritdoc/>
-    public async Task StopAsync()
+    public override async Task StopAsync()
     {
         if (!_isRunning) return;
 
@@ -220,7 +226,7 @@ public sealed class AirGapBridgePlugin : IFeaturePlugin, IDisposable
     }
 
     /// <inheritdoc/>
-    public async Task OnMessageAsync(PluginMessage message)
+    public override async Task OnMessageAsync(PluginMessage message)
     {
         switch (message.Type)
         {
@@ -668,16 +674,20 @@ public sealed class AirGapBridgePlugin : IFeaturePlugin, IDisposable
 
     #endregion
 
-    public void Dispose()
+    protected override void Dispose(bool disposing)
     {
-        if (_disposed) return;
-        _disposed = true;
+        if (disposing)
+        {
+            if (_disposed) return;
+            _disposed = true;
 
-        _deviceSentinel?.Dispose();
-        _storageProvider?.Dispose();
-        _pocketInstanceManager?.Dispose();
-        _securityManager?.Dispose();
+            _deviceSentinel?.Dispose();
+            _storageProvider?.Dispose();
+            _pocketInstanceManager?.Dispose();
+            _securityManager?.Dispose();
 
-        CryptographicOperations.ZeroMemory(_masterKey);
+            CryptographicOperations.ZeroMemory(_masterKey);
+        }
+        base.Dispose(disposing);
     }
 }

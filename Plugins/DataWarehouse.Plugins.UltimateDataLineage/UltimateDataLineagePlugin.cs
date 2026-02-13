@@ -1,6 +1,8 @@
 using System.Collections.Concurrent;
 using System.Reflection;
 using DataWarehouse.SDK.Contracts;
+using DataWarehouse.SDK.Contracts.Hierarchy;
+using DataWarehouse.SDK.Contracts.IntelligenceAware;
 using DataWarehouse.SDK.Primitives;
 using DataWarehouse.SDK.Utilities;
 
@@ -26,7 +28,7 @@ namespace DataWarehouse.Plugins.UltimateDataLineage;
 /// - Compliance-ready audit trails
 /// - Integration with UltimateIntelligence for semantic understanding
 /// </summary>
-public sealed class UltimateDataLineagePlugin : LegacyFeaturePluginBase, IDisposable
+public sealed class UltimateDataLineagePlugin : DataManagementPluginBase, IDisposable
 {
     private readonly LineageStrategyRegistry _registry;
     private readonly ConcurrentDictionary<string, LineageNode> _nodes = new();
@@ -54,6 +56,9 @@ public sealed class UltimateDataLineagePlugin : LegacyFeaturePluginBase, IDispos
 
     /// <inheritdoc/>
     public override string Version => "1.0.0";
+
+    /// <inheritdoc/>
+    public override string DataManagementDomain => "DataLineage";
 
     /// <inheritdoc/>
     public override PluginCategory Category => PluginCategory.OrchestrationProvider;

@@ -1,4 +1,6 @@
 using DataWarehouse.SDK.Contracts;
+using DataWarehouse.SDK.Contracts.Hierarchy;
+using DataWarehouse.SDK.Contracts.IntelligenceAware;
 using DataWarehouse.SDK.Primitives;
 using DataWarehouse.SDK.Utilities;
 using System.Collections.Concurrent;
@@ -35,7 +37,7 @@ namespace DataWarehouse.Plugins.AdaptiveTransport;
 /// - transport.config: Configure transport settings
 /// - transport.stats: Get transport statistics
 /// </summary>
-public sealed class AdaptiveTransportPlugin : LegacyFeaturePluginBase
+public sealed class AdaptiveTransportPlugin : StreamingPluginBase
 {
     private readonly ConcurrentDictionary<string, ConnectionPool> _connectionPools = new();
     private readonly ConcurrentDictionary<string, NetworkQualityMetrics> _endpointMetrics = new();
@@ -1500,6 +1502,15 @@ public sealed class AdaptiveTransportPlugin : LegacyFeaturePluginBase
         return null;
     }
 
+    #endregion
+
+    #region Hierarchy StreamingPluginBase Abstract Methods
+    /// <inheritdoc/>
+    public override Task PublishAsync(string topic, Stream data, CancellationToken ct = default)
+        => Task.CompletedTask;
+    /// <inheritdoc/>
+    public override async IAsyncEnumerable<Dictionary<string, object>> SubscribeAsync(string topic, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct = default)
+    { await Task.CompletedTask; yield break; }
     #endregion
 }
 
