@@ -1,4 +1,4 @@
-using DataWarehouse.SDK.AI;
+﻿using DataWarehouse.SDK.AI;
 using DataWarehouse.SDK.Utilities;
 using System;
 using System.Buffers;
@@ -474,7 +474,7 @@ namespace DataWarehouse.SDK.Contracts.Compression
     /// Provides common functionality including validation, statistics tracking, and content detection.
     /// Thread-safe for concurrent operations.
     /// </summary>
-    public abstract class CompressionStrategyBase : ICompressionStrategy
+    public abstract class CompressionStrategyBase : StrategyBase, ICompressionStrategy
     {
         private readonly CompressionStatistics _statistics = new();
         private readonly object _statsLock = new();
@@ -490,7 +490,7 @@ namespace DataWarehouse.SDK.Contracts.Compression
         }
 
         /// <inheritdoc/>
-        public abstract CompressionCharacteristics Characteristics { get; }
+        public new abstract CompressionCharacteristics Characteristics { get; }
 
         /// <inheritdoc/>
         public CompressionLevel Level { get; }
@@ -974,171 +974,5 @@ namespace DataWarehouse.SDK.Contracts.Compression
                 _statistics.DecompressionFailures++;
             }
         }
-
-        #region Intelligence Integration
-
-        /// <summary>
-        /// Unique identifier for this compression strategy.
-        /// </summary>
-        public virtual string StrategyId => Characteristics.AlgorithmName.ToLowerInvariant().Replace(" ", "-");
-
-        /// <summary>
-        /// Human-readable name of this compression strategy.
-        /// </summary>
-        public virtual string StrategyName => Characteristics.AlgorithmName;
-
-        /// <summary>
-        /// Message bus reference for Intelligence communication.
-        /// </summary>
-        protected IMessageBus? MessageBus { get; private set; }
-
-        /// <summary>
-        /// Configures Intelligence integration for this strategy.
-        /// Called by the plugin to enable AI-enhanced features.
-        /// </summary>
-        public virtual void ConfigureIntelligence(IMessageBus? messageBus)
-        {
-            MessageBus = messageBus;
-        }
-
-        /// <summary>
-        /// Whether Intelligence is available for this strategy.
-        /// </summary>
-        protected bool IsIntelligenceAvailable => MessageBus != null;
-
-        /// <summary>
-        /// Gets static knowledge about this strategy for AI discovery.
-        /// Override to provide strategy-specific knowledge.
-        /// </summary>
-        public virtual KnowledgeObject GetStrategyKnowledge()
-        {
-            return new KnowledgeObject
-            {
-                Id = $"strategy.{StrategyId}",
-                Topic = $"{GetKnowledgeTopic()}",
-                SourcePluginId = "sdk.strategy",
-                SourcePluginName = StrategyName,
-                KnowledgeType = "capability",
-                Description = GetStrategyDescription(),
-                Payload = GetKnowledgePayload(),
-                Tags = GetKnowledgeTags()
-            };
-        }
-
-        /// <summary>
-        /// Gets the registered capability for this strategy.
-        /// </summary>
-        public virtual RegisteredCapability GetStrategyCapability()
-        {
-            return new RegisteredCapability
-            {
-                CapabilityId = $"strategy.{StrategyId}",
-                DisplayName = StrategyName,
-                Description = GetStrategyDescription(),
-                Category = GetCapabilityCategory(),
-                PluginId = "sdk.strategy",
-                PluginName = StrategyName,
-                PluginVersion = "1.0.0",
-                Tags = GetKnowledgeTags(),
-                Metadata = GetCapabilityMetadata(),
-                SemanticDescription = GetSemanticDescription()
-            };
-        }
-
-        /// <summary>
-        /// Gets the knowledge topic for this strategy type.
-        /// </summary>
-        protected virtual string GetKnowledgeTopic() => "compression";
-
-        /// <summary>
-        /// Gets the capability category for this strategy type.
-        /// </summary>
-        protected virtual CapabilityCategory GetCapabilityCategory() => CapabilityCategory.Compression;
-
-        /// <summary>
-        /// Gets a description for this strategy.
-        /// </summary>
-        protected virtual string GetStrategyDescription() =>
-            $"{StrategyName} compression strategy with {Characteristics.TypicalCompressionRatio:P0} typical ratio";
-
-        /// <summary>
-        /// Gets the knowledge payload for this strategy.
-        /// </summary>
-        protected virtual Dictionary<string, object> GetKnowledgePayload() => new()
-        {
-            ["algorithm"] = Characteristics.AlgorithmName,
-            ["level"] = Level.ToString(),
-            ["typicalRatio"] = Characteristics.TypicalCompressionRatio,
-            ["compressionSpeed"] = Characteristics.CompressionSpeed,
-            ["decompressionSpeed"] = Characteristics.DecompressionSpeed,
-            ["supportsStreaming"] = Characteristics.SupportsStreaming,
-            ["supportsParallel"] = Characteristics.SupportsParallelCompression
-        };
-
-        /// <summary>
-        /// Gets tags for this strategy.
-        /// </summary>
-        protected virtual string[] GetKnowledgeTags() => new[]
-        {
-            "strategy",
-            "compression",
-            Characteristics.AlgorithmName.ToLowerInvariant(),
-            Level.ToString().ToLowerInvariant()
-        };
-
-        /// <summary>
-        /// Gets capability metadata for this strategy.
-        /// </summary>
-        protected virtual Dictionary<string, object> GetCapabilityMetadata() => new()
-        {
-            ["algorithm"] = Characteristics.AlgorithmName,
-            ["level"] = Level.ToString(),
-            ["typicalRatio"] = Characteristics.TypicalCompressionRatio
-        };
-
-        /// <summary>
-        /// Gets the semantic description for AI-driven discovery.
-        /// </summary>
-        protected virtual string GetSemanticDescription() =>
-            $"Use {StrategyName} for {Level} compression with {Characteristics.TypicalCompressionRatio:P0} typical ratio";
-
-        /// <summary>
-        /// Requests an AI recommendation for the optimal compression algorithm.
-        /// </summary>
-        /// <param name="dataCharacteristics">Characteristics of the data to compress.</param>
-        /// <param name="optimizationGoal">Optimization goal (speed, ratio, balanced).</param>
-        /// <param name="cancellationToken">Cancellation token.</param>
-        /// <returns>Recommended algorithm configuration, or null if Intelligence unavailable.</returns>
-        protected async Task<Dictionary<string, object>?> RequestOptimalAlgorithmAsync(
-            Dictionary<string, object> dataCharacteristics,
-            string optimizationGoal = "balanced",
-            CancellationToken cancellationToken = default)
-        {
-            if (!IsIntelligenceAvailable || MessageBus == null)
-                return null;
-
-            var request = new Dictionary<string, object>
-            {
-                ["requestType"] = "algorithm_recommendation",
-                ["strategyId"] = StrategyId,
-                ["dataCharacteristics"] = dataCharacteristics,
-                ["optimizationGoal"] = optimizationGoal,
-                ["currentAlgorithm"] = Characteristics.AlgorithmName,
-                ["currentLevel"] = Level.ToString()
-            };
-
-            var message = new PluginMessage
-            {
-                MessageId = Guid.NewGuid().ToString(),
-                SourcePluginId = StrategyId,
-                MessageType = "intelligence.request",
-                Payload = request
-            };
-
-            var response = await MessageBus.SendAsync(MessageTopics.AIQuery, message, cancellationToken);
-            return response.Success ? response.Payload as Dictionary<string, object> : null;
-        }
-
-        #endregion
     }
 }

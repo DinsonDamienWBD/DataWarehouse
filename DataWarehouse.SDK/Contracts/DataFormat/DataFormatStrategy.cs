@@ -1,4 +1,4 @@
-using DataWarehouse.SDK.AI;
+﻿using DataWarehouse.SDK.AI;
 using DataWarehouse.SDK.Utilities;
 using System;
 using System.Collections.Generic;
@@ -631,10 +631,10 @@ namespace DataWarehouse.SDK.Contracts.DataFormat
     /// Abstract base class for data format strategies.
     /// Provides infrastructure for format detection, conversion, and schema extraction.
     /// </summary>
-    public abstract class DataFormatStrategyBase : IDataFormatStrategy
+    public abstract class DataFormatStrategyBase : StrategyBase, IDataFormatStrategy
     {
         /// <inheritdoc/>
-        public abstract string StrategyId { get; }
+        public override abstract string StrategyId { get; }
 
         /// <inheritdoc/>
         public abstract string DisplayName { get; }
@@ -730,167 +730,5 @@ namespace DataWarehouse.SDK.Contracts.DataFormat
         /// Core validation logic. Override in derived classes.
         /// </summary>
         protected abstract Task<FormatValidationResult> ValidateCoreAsync(Stream stream, FormatSchema? schema, CancellationToken ct);
-
-        #region Intelligence Integration
-
-        /// <summary>
-        /// Message bus reference for Intelligence communication.
-        /// </summary>
-        protected IMessageBus? MessageBus { get; private set; }
-
-        /// <summary>
-        /// Configures Intelligence integration for this strategy.
-        /// Called by the plugin to enable AI-enhanced features.
-        /// </summary>
-        public virtual void ConfigureIntelligence(IMessageBus? messageBus)
-        {
-            MessageBus = messageBus;
-        }
-
-        /// <summary>
-        /// Whether Intelligence is available for this strategy.
-        /// </summary>
-        protected bool IsIntelligenceAvailable => MessageBus != null;
-
-        /// <summary>
-        /// Gets static knowledge about this strategy for AI discovery.
-        /// Override to provide strategy-specific knowledge.
-        /// </summary>
-        public virtual KnowledgeObject GetStrategyKnowledge()
-        {
-            return new KnowledgeObject
-            {
-                Id = $"strategy.{StrategyId}",
-                Topic = $"{GetKnowledgeTopic()}",
-                SourcePluginId = "sdk.strategy",
-                SourcePluginName = DisplayName,
-                KnowledgeType = "capability",
-                Description = GetStrategyDescription(),
-                Payload = GetKnowledgePayload(),
-                Tags = GetKnowledgeTags()
-            };
-        }
-
-        /// <summary>
-        /// Gets the registered capability for this strategy.
-        /// </summary>
-        public virtual RegisteredCapability GetStrategyCapability()
-        {
-            return new RegisteredCapability
-            {
-                CapabilityId = $"strategy.{StrategyId}",
-                DisplayName = DisplayName,
-                Description = GetStrategyDescription(),
-                Category = GetCapabilityCategory(),
-                PluginId = "sdk.strategy",
-                PluginName = DisplayName,
-                PluginVersion = "1.0.0",
-                Tags = GetKnowledgeTags(),
-                Metadata = GetCapabilityMetadata(),
-                SemanticDescription = GetSemanticDescription()
-            };
-        }
-
-        /// <summary>
-        /// Gets the knowledge topic for this strategy type.
-        /// </summary>
-        protected virtual string GetKnowledgeTopic() => "dataformat";
-
-        /// <summary>
-        /// Gets the capability category for this strategy type.
-        /// </summary>
-        protected virtual CapabilityCategory GetCapabilityCategory() => CapabilityCategory.DataManagement;
-
-        /// <summary>
-        /// Gets a description for this strategy.
-        /// </summary>
-        protected virtual string GetStrategyDescription() =>
-            $"{DisplayName} data format strategy for {FormatInfo.DomainFamily} domain";
-
-        /// <summary>
-        /// Gets the knowledge payload for this strategy.
-        /// </summary>
-        protected virtual Dictionary<string, object> GetKnowledgePayload() => new()
-        {
-            ["formatId"] = FormatInfo.FormatId,
-            ["domainFamily"] = FormatInfo.DomainFamily.ToString(),
-            ["extensions"] = FormatInfo.Extensions.ToArray(),
-            ["mimeTypes"] = FormatInfo.MimeTypes.ToArray(),
-            ["bidirectional"] = Capabilities.Bidirectional,
-            ["streaming"] = Capabilities.Streaming,
-            ["schemaAware"] = Capabilities.SchemaAware,
-            ["compressionAware"] = Capabilities.CompressionAware,
-            ["randomAccess"] = Capabilities.RandomAccess
-        };
-
-        /// <summary>
-        /// Gets tags for this strategy.
-        /// </summary>
-        protected virtual string[] GetKnowledgeTags()
-        {
-            var tags = new List<string>
-            {
-                "strategy",
-                "dataformat",
-                FormatInfo.FormatId.ToLowerInvariant(),
-                FormatInfo.DomainFamily.ToString().ToLowerInvariant()
-            };
-            tags.AddRange(FormatInfo.Extensions.Select(e => e.TrimStart('.').ToLowerInvariant()));
-            return tags.ToArray();
-        }
-
-        /// <summary>
-        /// Gets capability metadata for this strategy.
-        /// </summary>
-        protected virtual Dictionary<string, object> GetCapabilityMetadata() => new()
-        {
-            ["formatId"] = FormatInfo.FormatId,
-            ["domainFamily"] = FormatInfo.DomainFamily.ToString()
-        };
-
-        /// <summary>
-        /// Gets the semantic description for AI-driven discovery.
-        /// </summary>
-        protected virtual string GetSemanticDescription() =>
-            $"Use {DisplayName} for {FormatInfo.DomainFamily} domain data with {string.Join(", ", FormatInfo.Extensions)} files";
-
-        /// <summary>
-        /// Requests an AI recommendation for optimal format conversion.
-        /// </summary>
-        /// <param name="targetDomain">Target domain family.</param>
-        /// <param name="optimizationGoal">Optimization goal (size, speed, compatibility).</param>
-        /// <param name="cancellationToken">Cancellation token.</param>
-        /// <returns>Recommended format configuration, or null if Intelligence unavailable.</returns>
-        protected async Task<Dictionary<string, object>?> RequestFormatRecommendationAsync(
-            string targetDomain,
-            string optimizationGoal = "balanced",
-            CancellationToken cancellationToken = default)
-        {
-            if (!IsIntelligenceAvailable || MessageBus == null)
-                return null;
-
-            var request = new Dictionary<string, object>
-            {
-                ["requestType"] = "format_recommendation",
-                ["strategyId"] = StrategyId,
-                ["sourceFormat"] = FormatInfo.FormatId,
-                ["sourceDomain"] = FormatInfo.DomainFamily.ToString(),
-                ["targetDomain"] = targetDomain,
-                ["optimizationGoal"] = optimizationGoal
-            };
-
-            var message = new PluginMessage
-            {
-                MessageId = Guid.NewGuid().ToString(),
-                SourcePluginId = StrategyId,
-                MessageType = "intelligence.request",
-                Payload = request
-            };
-
-            var response = await MessageBus.SendAsync(MessageTopics.AIQuery, message, cancellationToken);
-            return response.Success ? response.Payload as Dictionary<string, object> : null;
-        }
-
-        #endregion
     }
 }

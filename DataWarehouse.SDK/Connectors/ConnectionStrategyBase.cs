@@ -42,6 +42,11 @@ namespace DataWarehouse.SDK.Connectors
         /// <inheritdoc/>
         public abstract string DisplayName { get; }
 
+        /// <summary>
+        /// Gets the human-readable name. Delegates to DisplayName for backward compatibility.
+        /// </summary>
+        public override string Name => DisplayName;
+
         /// <inheritdoc/>
         public abstract ConnectorCategory Category { get; }
 

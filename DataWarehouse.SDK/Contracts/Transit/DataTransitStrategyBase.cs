@@ -1,9 +1,8 @@
-using System;
+﻿using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
-using DataWarehouse.SDK.AI;
 using DataWarehouse.SDK.Contracts;
 
 namespace DataWarehouse.SDK.Contracts.Transit
@@ -64,7 +63,7 @@ namespace DataWarehouse.SDK.Contracts.Transit
     /// consistent behavior for transfer tracking, cancellation, and AI-enhanced features.
     /// Thread-safe for concurrent transfer operations.
     /// </remarks>
-    public abstract class DataTransitStrategyBase : IDataTransitStrategy
+    public abstract class DataTransitStrategyBase : StrategyBase, IDataTransitStrategy
     {
         private long _transferCount;
         private long _bytesTransferred;
@@ -89,10 +88,10 @@ namespace DataWarehouse.SDK.Contracts.Transit
         }
 
         /// <inheritdoc/>
-        public abstract string StrategyId { get; }
+        public override abstract string StrategyId { get; }
 
         /// <inheritdoc/>
-        public abstract string Name { get; }
+        public override abstract string Name { get; }
 
         /// <inheritdoc/>
         public abstract TransitCapabilities Capabilities { get; }
@@ -214,135 +213,5 @@ namespace DataWarehouse.SDK.Contracts.Transit
             Interlocked.Exchange(ref _activeTransfers, 0);
             _lastUpdateTime = DateTime.UtcNow;
         }
-
-        #region Intelligence Integration
-
-        /// <summary>
-        /// Message bus reference for Intelligence communication.
-        /// </summary>
-        protected IMessageBus? MessageBus { get; private set; }
-
-        /// <summary>
-        /// Configures Intelligence integration for this strategy.
-        /// Called by the plugin orchestrator to enable AI-enhanced features.
-        /// </summary>
-        /// <param name="messageBus">The message bus instance for communication.</param>
-        public virtual void ConfigureIntelligence(IMessageBus? messageBus)
-        {
-            MessageBus = messageBus;
-        }
-
-        /// <summary>
-        /// Whether Intelligence is available for this strategy.
-        /// </summary>
-        protected bool IsIntelligenceAvailable => MessageBus != null;
-
-        /// <summary>
-        /// Gets static knowledge about this strategy for AI discovery.
-        /// Override to provide strategy-specific knowledge.
-        /// </summary>
-        /// <returns>A KnowledgeObject describing this strategy's capabilities.</returns>
-        public virtual KnowledgeObject GetStrategyKnowledge()
-        {
-            return new KnowledgeObject
-            {
-                Id = $"strategy.{StrategyId}",
-                Topic = GetKnowledgeTopic(),
-                SourcePluginId = "sdk.strategy",
-                SourcePluginName = Name,
-                KnowledgeType = "capability",
-                Description = GetStrategyDescription(),
-                Payload = GetKnowledgePayload(),
-                Tags = GetKnowledgeTags()
-            };
-        }
-
-        /// <summary>
-        /// Gets the registered capability for this strategy.
-        /// </summary>
-        /// <returns>A RegisteredCapability describing this strategy.</returns>
-        public virtual RegisteredCapability GetStrategyCapability()
-        {
-            return new RegisteredCapability
-            {
-                CapabilityId = $"strategy.{StrategyId}",
-                DisplayName = Name,
-                Description = GetStrategyDescription(),
-                Category = GetCapabilityCategory(),
-                PluginId = "sdk.strategy",
-                PluginName = Name,
-                PluginVersion = "1.0.0",
-                Tags = GetKnowledgeTags(),
-                Metadata = GetCapabilityMetadata(),
-                SemanticDescription = GetSemanticDescription()
-            };
-        }
-
-        /// <summary>
-        /// Gets the knowledge topic for this strategy type.
-        /// </summary>
-        /// <returns>The knowledge topic string.</returns>
-        protected virtual string GetKnowledgeTopic() => "transit";
-
-        /// <summary>
-        /// Gets the capability category for this strategy type.
-        /// </summary>
-        /// <returns>The capability category.</returns>
-        protected virtual CapabilityCategory GetCapabilityCategory() => CapabilityCategory.Transport;
-
-        /// <summary>
-        /// Gets a description for this strategy.
-        /// </summary>
-        /// <returns>The strategy description.</returns>
-        protected virtual string GetStrategyDescription() =>
-            $"{Name} transit strategy for data transfer over {string.Join(", ", Capabilities.SupportedProtocols)}";
-
-        /// <summary>
-        /// Gets the knowledge payload for this strategy.
-        /// </summary>
-        /// <returns>Dictionary of knowledge payload entries.</returns>
-        protected virtual Dictionary<string, object> GetKnowledgePayload() => new()
-        {
-            ["strategyId"] = StrategyId,
-            ["protocols"] = Capabilities.SupportedProtocols,
-            ["supportsResumable"] = Capabilities.SupportsResumable,
-            ["supportsStreaming"] = Capabilities.SupportsStreaming,
-            ["supportsDelta"] = Capabilities.SupportsDelta,
-            ["supportsCompression"] = Capabilities.SupportsCompression,
-            ["supportsEncryption"] = Capabilities.SupportsEncryption,
-            ["maxTransferSizeBytes"] = Capabilities.MaxTransferSizeBytes
-        };
-
-        /// <summary>
-        /// Gets tags for this strategy.
-        /// </summary>
-        /// <returns>Array of tag strings.</returns>
-        protected virtual string[] GetKnowledgeTags() =>
-        [
-            "strategy",
-            "transit",
-            "transport",
-            .. Capabilities.SupportedProtocols
-        ];
-
-        /// <summary>
-        /// Gets capability metadata for this strategy.
-        /// </summary>
-        /// <returns>Dictionary of capability metadata entries.</returns>
-        protected virtual Dictionary<string, object> GetCapabilityMetadata() => new()
-        {
-            ["strategyId"] = StrategyId,
-            ["protocols"] = Capabilities.SupportedProtocols,
-            ["supportsResumable"] = Capabilities.SupportsResumable
-        };
-
-        /// <summary>
-        /// Gets the semantic description for AI-driven discovery.
-        /// </summary>
-        /// <returns>The semantic description string.</returns>
-        protected virtual string GetSemanticDescription() =>
-            $"Use {Name} for transferring data via {string.Join("/", Capabilities.SupportedProtocols)} protocols";
-
-        #endregion
     }
 }
