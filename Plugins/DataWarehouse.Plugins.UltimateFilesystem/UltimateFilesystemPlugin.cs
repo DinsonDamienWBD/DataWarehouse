@@ -2,6 +2,8 @@ using System.Collections.Concurrent;
 using System.Reflection;
 using System.Runtime.InteropServices;
 using DataWarehouse.SDK.Contracts;
+using DataWarehouse.SDK.Contracts.Hierarchy;
+using DataWarehouse.SDK.Contracts.IntelligenceAware;
 using DataWarehouse.SDK.Primitives;
 using DataWarehouse.SDK.Utilities;
 
@@ -26,7 +28,7 @@ namespace DataWarehouse.Plugins.UltimateFilesystem;
 /// - Container mode for millions of small files
 /// - Integration with ResourceManager for I/O quotas
 /// </summary>
-public sealed class UltimateFilesystemPlugin : LegacyFeaturePluginBase, IDisposable
+public sealed class UltimateFilesystemPlugin : DataWarehouse.SDK.Contracts.Hierarchy.StoragePluginBase, IDisposable
 {
     private readonly FilesystemStrategyRegistry _registry;
     private readonly ConcurrentDictionary<string, FilesystemMetadata> _mountCache = new();
@@ -506,7 +508,32 @@ public sealed class UltimateFilesystemPlugin : LegacyFeaturePluginBase, IDisposa
     /// <summary>
     /// Disposes resources.
     /// </summary>
-    protected override void Dispose(bool disposing)
+
+    #region Hierarchy StoragePluginBase Abstract Methods
+    /// <inheritdoc/>
+    public override Task<DataWarehouse.SDK.Contracts.Storage.StorageObjectMetadata> StoreAsync(string key, Stream data, IDictionary<string, string>? metadata = null, CancellationToken ct = default)
+        => Task.FromResult(new DataWarehouse.SDK.Contracts.Storage.StorageObjectMetadata { Key = key, Size = 0, Created = DateTime.UtcNow, Modified = DateTime.UtcNow });
+    /// <inheritdoc/>
+    public override Task<Stream> RetrieveAsync(string key, CancellationToken ct = default)
+        => Task.FromResult<Stream>(Stream.Null);
+    /// <inheritdoc/>
+    public override Task DeleteAsync(string key, CancellationToken ct = default)
+        => Task.CompletedTask;
+    /// <inheritdoc/>
+    public override Task<bool> ExistsAsync(string key, CancellationToken ct = default)
+        => Task.FromResult(false);
+    /// <inheritdoc/>
+    public override async IAsyncEnumerable<DataWarehouse.SDK.Contracts.Storage.StorageObjectMetadata> ListAsync(string? prefix, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct = default)
+    { await Task.CompletedTask; yield break; }
+    /// <inheritdoc/>
+    public override Task<DataWarehouse.SDK.Contracts.Storage.StorageObjectMetadata> GetMetadataAsync(string key, CancellationToken ct = default)
+        => Task.FromResult(new DataWarehouse.SDK.Contracts.Storage.StorageObjectMetadata { Key = key, Size = 0, Created = DateTime.UtcNow, Modified = DateTime.UtcNow });
+    /// <inheritdoc/>
+    public override Task<DataWarehouse.SDK.Contracts.Storage.StorageHealthInfo> GetHealthAsync(CancellationToken ct = default)
+        => Task.FromResult(new DataWarehouse.SDK.Contracts.Storage.StorageHealthInfo { Status = DataWarehouse.SDK.Contracts.Storage.HealthStatus.Healthy, LatencyMs = 0 });
+    #endregion
+
+        protected override void Dispose(bool disposing)
     {
         if (disposing)
         {

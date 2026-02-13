@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using System.Reflection;
 using DataWarehouse.SDK.AI;
 using DataWarehouse.SDK.Contracts;
+using DataWarehouse.SDK.Contracts.Hierarchy;
 using DataWarehouse.SDK.Contracts.IntelligenceAware;
 using DataWarehouse.SDK.Primitives;
 using DataWarehouse.SDK.Utilities;
@@ -29,7 +30,7 @@ namespace DataWarehouse.Plugins.UltimateResourceManager;
 /// - Preemption support for priority workloads
 /// - Carbon-aware scheduling integration
 /// </summary>
-public sealed class UltimateResourceManagerPlugin : LegacyFeaturePluginBase, IDisposable
+public sealed class UltimateResourceManagerPlugin : InfrastructurePluginBase, IDisposable
 {
     private readonly ResourceStrategyRegistry _registry;
     private readonly ConcurrentDictionary<string, ResourceQuota> _quotas = new();
@@ -56,6 +57,9 @@ public sealed class UltimateResourceManagerPlugin : LegacyFeaturePluginBase, IDi
 
     /// <inheritdoc/>
     public override string Version => "1.0.0";
+
+    /// <inheritdoc/>
+    public override string InfrastructureDomain => "ResourceManagement";
 
     /// <inheritdoc/>
     public override PluginCategory Category => PluginCategory.OrchestrationProvider;

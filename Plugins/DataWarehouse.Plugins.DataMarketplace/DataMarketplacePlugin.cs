@@ -1,4 +1,6 @@
 using DataWarehouse.SDK.Contracts;
+using DataWarehouse.SDK.Contracts.Hierarchy;
+using DataWarehouse.SDK.Contracts.IntelligenceAware;
 using DataWarehouse.SDK.Primitives;
 using DataWarehouse.SDK.Utilities;
 using System.Collections.Concurrent;
@@ -36,7 +38,7 @@ namespace DataWarehouse.Plugins.DataMarketplace;
 /// - marketplace.revoke: Revoke access
 /// - marketplace.chargeback: Generate chargeback report
 /// </summary>
-public sealed class DataMarketplacePlugin : LegacyFeaturePluginBase
+public sealed class DataMarketplacePlugin : PlatformPluginBase
 {
     private readonly ConcurrentDictionary<string, DataListing> _listings = new();
     private readonly ConcurrentDictionary<string, Subscription> _subscriptions = new();
@@ -61,6 +63,9 @@ public sealed class DataMarketplacePlugin : LegacyFeaturePluginBase
 
     /// <inheritdoc/>
     public override string Version => "1.0.0";
+
+    /// <inheritdoc/>
+    public override string PlatformDomain => "DataMarketplace";
 
     /// <inheritdoc/>
     public override PluginCategory Category => PluginCategory.FeatureProvider;

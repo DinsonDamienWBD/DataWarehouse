@@ -5,6 +5,8 @@
 
 using System.Runtime.InteropServices;
 using DataWarehouse.SDK.Contracts;
+using DataWarehouse.SDK.Contracts.Hierarchy;
+using DataWarehouse.SDK.Contracts.IntelligenceAware;
 using DataWarehouse.SDK.Primitives;
 using DataWarehouse.SDK.Utilities;
 
@@ -30,7 +32,7 @@ namespace DataWarehouse.Plugins.FuseDriver;
 /// - macOS: macFUSE 4.x (install from https://osxfuse.github.io/)
 /// - FreeBSD: FUSE for FreeBSD (optional)
 /// </remarks>
-public sealed class FuseDriverPlugin : LegacyFeaturePluginBase, IDisposable
+public sealed class FuseDriverPlugin : DataWarehouse.SDK.Contracts.Hierarchy.InterfacePluginBase, IDisposable
 {
     private FuseConfig _config;
     private FuseFileSystem? _fileSystem;
@@ -60,6 +62,9 @@ public sealed class FuseDriverPlugin : LegacyFeaturePluginBase, IDisposable
 
     /// <inheritdoc />
     public override string Version => "1.0.0";
+
+    /// <inheritdoc/>
+    public override string Protocol => "FUSE";
 
     /// <summary>
     /// Gets a value indicating whether FUSE is supported on the current platform.

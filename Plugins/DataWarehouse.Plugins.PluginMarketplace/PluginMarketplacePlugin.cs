@@ -1,4 +1,6 @@
 using DataWarehouse.SDK.Contracts;
+using DataWarehouse.SDK.Contracts.Hierarchy;
+using DataWarehouse.SDK.Contracts.IntelligenceAware;
 using DataWarehouse.SDK.Primitives;
 using DataWarehouse.SDK.Utilities;
 using System.Collections.Concurrent;
@@ -35,7 +37,7 @@ namespace DataWarehouse.Plugins.PluginMarketplace;
 /// - marketplace.certify: Run 5-stage certification pipeline on a plugin assembly
 /// - marketplace.review: Submit a multi-dimensional rating and review
 /// </summary>
-public sealed class PluginMarketplacePlugin : LegacyFeaturePluginBase
+public sealed class PluginMarketplacePlugin : PlatformPluginBase
 {
     private readonly ConcurrentDictionary<string, PluginCatalogEntry> _catalog = new();
     private readonly ConcurrentDictionary<string, List<PluginVersionInfo>> _versionHistory = new();
@@ -76,6 +78,9 @@ public sealed class PluginMarketplacePlugin : LegacyFeaturePluginBase
 
     /// <inheritdoc/>
     public override string Version => "1.0.0";
+
+    /// <inheritdoc/>
+    public override string PlatformDomain => "PluginMarketplace";
 
     /// <inheritdoc/>
     public override PluginCategory Category => PluginCategory.FeatureProvider;

@@ -3,6 +3,8 @@
 // </copyright>
 
 using DataWarehouse.SDK.Contracts;
+using DataWarehouse.SDK.Contracts.Hierarchy;
+using DataWarehouse.SDK.Contracts.IntelligenceAware;
 using DataWarehouse.SDK.Primitives;
 using DataWarehouse.SDK.Utilities;
 using System.Collections.Concurrent;
@@ -45,7 +47,7 @@ namespace DataWarehouse.Plugins.WinFspDriver;
 /// </list>
 /// </para>
 /// </remarks>
-public sealed class WinFspDriverPlugin : LegacyFeaturePluginBase, IDisposable
+public sealed class WinFspDriverPlugin : DataWarehouse.SDK.Contracts.Hierarchy.InterfacePluginBase, IDisposable
 {
     private readonly WinFspConfig _config;
     private readonly ConcurrentDictionary<string, WinFspMountedInstance> _mountedInstances;
@@ -70,6 +72,9 @@ public sealed class WinFspDriverPlugin : LegacyFeaturePluginBase, IDisposable
     /// Gets the plugin version.
     /// </summary>
     public override string Version => "1.0.0";
+
+    /// <inheritdoc/>
+    public override string Protocol => "WinFsp";
 
     /// <summary>
     /// Gets the plugin category.

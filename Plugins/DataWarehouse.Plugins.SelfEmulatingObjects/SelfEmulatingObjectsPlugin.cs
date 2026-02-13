@@ -1,4 +1,6 @@
 using DataWarehouse.SDK.Contracts;
+using DataWarehouse.SDK.Contracts.Hierarchy;
+using DataWarehouse.SDK.Contracts.IntelligenceAware;
 using DataWarehouse.SDK.Primitives;
 using DataWarehouse.SDK.Utilities;
 
@@ -20,7 +22,7 @@ namespace DataWarehouse.Plugins.SelfEmulatingObjects;
 /// - 86.7: Metadata Preservation (store format metadata)
 /// - 86.8: Viewer Versioning (track viewer versions)
 /// </summary>
-public sealed class SelfEmulatingObjectsPlugin : LegacyFeaturePluginBase
+public sealed class SelfEmulatingObjectsPlugin : ComputePluginBase
 {
     private IKernelContext? _context;
     private WasmViewer.ViewerBundler? _bundler;
@@ -29,6 +31,9 @@ public sealed class SelfEmulatingObjectsPlugin : LegacyFeaturePluginBase
     public override string Id => "com.datawarehouse.selfemulating";
     public override string Name => "Self-Emulating Objects";
     public override string Version => "1.0.0";
+
+    /// <inheritdoc/>
+    public override string RuntimeType => "SelfEmulating";
     public override PluginCategory Category => PluginCategory.FeatureProvider;
 
     public override async Task<HandshakeResponse> OnHandshakeAsync(HandshakeRequest request)
@@ -201,4 +206,11 @@ public sealed class SelfEmulatingObjectsPlugin : LegacyFeaturePluginBase
         metadata["SandboxedExecution"] = true;
         return metadata;
     }
+
+
+    #region Hierarchy ComputePluginBase Abstract Methods
+    /// <inheritdoc/>
+    public override Task<Dictionary<string, object>> ExecuteWorkloadAsync(Dictionary<string, object> workload, CancellationToken ct = default)
+        => Task.FromResult(new Dictionary<string, object> { ["status"] = "executed", ["plugin"] = Id });
+    #endregion
 }
