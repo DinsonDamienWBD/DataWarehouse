@@ -36,7 +36,7 @@ namespace DataWarehouse.Plugins.DataMarketplace;
 /// - marketplace.revoke: Revoke access
 /// - marketplace.chargeback: Generate chargeback report
 /// </summary>
-public sealed class DataMarketplacePlugin : FeaturePluginBase
+public sealed class DataMarketplacePlugin : LegacyFeaturePluginBase
 {
     private readonly ConcurrentDictionary<string, DataListing> _listings = new();
     private readonly ConcurrentDictionary<string, Subscription> _subscriptions = new();

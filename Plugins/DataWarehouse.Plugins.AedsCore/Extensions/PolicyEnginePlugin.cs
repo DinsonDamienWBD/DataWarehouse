@@ -10,7 +10,7 @@ namespace DataWarehouse.Plugins.AedsCore.Extensions;
 /// Policy Engine Plugin: Client-side policy rule evaluation.
 /// Implements IClientPolicyEngine with expression parser for dynamic rule evaluation.
 /// </summary>
-public sealed class PolicyEnginePlugin : FeaturePluginBase, IClientPolicyEngine
+public sealed class PolicyEnginePlugin : LegacyFeaturePluginBase, IClientPolicyEngine
 {
     private readonly ConcurrentBag<PolicyRule> _rules = new();
 

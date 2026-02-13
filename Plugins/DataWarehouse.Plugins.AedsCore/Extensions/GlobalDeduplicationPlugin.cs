@@ -12,7 +12,7 @@ namespace DataWarehouse.Plugins.AedsCore.Extensions;
 /// Global Deduplication Plugin: Cross-client content hash tracking.
 /// Uses bloom filter for memory-efficient dedup checking with 0.01% false positive rate.
 /// </summary>
-public sealed class GlobalDeduplicationPlugin : FeaturePluginBase
+public sealed class GlobalDeduplicationPlugin : LegacyFeaturePluginBase
 {
     private readonly ConcurrentDictionary<string, bool> _localHashes = new();
     private const int BloomFilterSize = 100_000; // Support 100K unique hashes

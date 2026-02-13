@@ -45,7 +45,7 @@ namespace DataWarehouse.Plugins.WinFspDriver;
 /// </list>
 /// </para>
 /// </remarks>
-public sealed class WinFspDriverPlugin : FeaturePluginBase, IDisposable
+public sealed class WinFspDriverPlugin : LegacyFeaturePluginBase, IDisposable
 {
     private readonly WinFspConfig _config;
     private readonly ConcurrentDictionary<string, WinFspMountedInstance> _mountedInstances;

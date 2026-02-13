@@ -57,7 +57,7 @@ public enum DeltaOperation
 /// Implements rsync rolling hash algorithm (Adler-32 based) for content-defined chunking.
 /// Chunk size: 1 KB for signature generation, larger chunks for data transfer.
 /// </remarks>
-public sealed class DeltaSyncPlugin : FeaturePluginBase
+public sealed class DeltaSyncPlugin : LegacyFeaturePluginBase
 {
     private const int SignatureChunkSize = 1024; // 1 KB for rolling hash
     private const int DataChunkSize = 1_048_576; // 1 MB for data transfer

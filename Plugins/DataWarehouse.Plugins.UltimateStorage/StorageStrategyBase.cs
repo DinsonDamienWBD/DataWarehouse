@@ -141,7 +141,7 @@ namespace DataWarehouse.Plugins.UltimateStorage
         /// <summary>
         /// Disposes resources used by this storage strategy.
         /// </summary>
-        public virtual void Dispose()
+        public new virtual void Dispose()
         {
             if (_isDisposed)
             {
@@ -157,7 +157,7 @@ namespace DataWarehouse.Plugins.UltimateStorage
         /// <summary>
         /// Asynchronously disposes resources.
         /// </summary>
-        public async ValueTask DisposeAsync()
+        public new async ValueTask DisposeAsync()
         {
             if (_isDisposed)
             {
@@ -257,7 +257,7 @@ namespace DataWarehouse.Plugins.UltimateStorage
         /// <summary>
         /// Gets whether the strategy is initialized and ready for use.
         /// </summary>
-        public bool IsInitialized => _isInitialized;
+        public new bool IsInitialized => _isInitialized;
 
         /// <summary>
         /// Gets whether the strategy has been disposed.

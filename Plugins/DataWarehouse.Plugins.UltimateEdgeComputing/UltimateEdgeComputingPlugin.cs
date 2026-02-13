@@ -125,7 +125,7 @@ public sealed class UltimateEdgeComputingPlugin : PluginBase, EC.IEdgeComputingS
     }
 
     /// <summary>Shuts down the edge computing strategy.</summary>
-    public async Task ShutdownAsync(CancellationToken ct = default)
+    public new async Task ShutdownAsync(CancellationToken ct = default)
     {
         _initialized = false;
         _strategies.Clear();

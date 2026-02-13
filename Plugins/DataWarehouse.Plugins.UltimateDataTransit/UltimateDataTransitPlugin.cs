@@ -40,7 +40,7 @@ namespace DataWarehouse.Plugins.UltimateDataTransit;
 /// - Intelligence integration for AI-enhanced routing
 /// </para>
 /// </remarks>
-internal sealed class UltimateDataTransitPlugin : FeaturePluginBase, ITransitOrchestrator, IDisposable
+internal sealed class UltimateDataTransitPlugin : LegacyFeaturePluginBase, ITransitOrchestrator, IDisposable
 {
     private readonly TransitStrategyRegistry _registry;
     private readonly ConcurrentDictionary<string, ActiveTransfer> _activeTransfers = new();

@@ -34,7 +34,7 @@ namespace DataWarehouse.Plugins.AedsCore;
 /// </list>
 /// </para>
 /// </remarks>
-public class ClientCourierPlugin : FeaturePluginBase
+public class ClientCourierPlugin : LegacyFeaturePluginBase
 {
     private readonly ILogger<ClientCourierPlugin> _logger;
     private readonly ConcurrentDictionary<string, WatchedFile> _watchedFiles = new();

@@ -11,7 +11,7 @@ namespace DataWarehouse.Plugins.AedsCore.Extensions;
 /// Mule Plugin: Air-gap USB transport for manifests and payloads.
 /// Integrates with tri-mode USB (T79) for offline distribution.
 /// </summary>
-public sealed class MulePlugin : FeaturePluginBase
+public sealed class MulePlugin : LegacyFeaturePluginBase
 {
     /// <summary>
     /// Gets the plugin identifier.

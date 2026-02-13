@@ -20,7 +20,7 @@ namespace DataWarehouse.Plugins.SelfEmulatingObjects;
 /// - 86.7: Metadata Preservation (store format metadata)
 /// - 86.8: Viewer Versioning (track viewer versions)
 /// </summary>
-public sealed class SelfEmulatingObjectsPlugin : FeaturePluginBase
+public sealed class SelfEmulatingObjectsPlugin : LegacyFeaturePluginBase
 {
     private IKernelContext? _context;
     private WasmViewer.ViewerBundler? _bundler;

@@ -11,6 +11,7 @@ namespace DataWarehouse.SDK.Contracts
     /// Intelligence, capability registration, and knowledge bank access belong at
     /// the plugin level (see AD-05).
     /// </summary>
+    [SdkCompatibility("2.0.0", Notes = "Root strategy interface -- AD-05 flat hierarchy")]
     public interface IStrategy : IDisposable, IAsyncDisposable
     {
         /// <summary>

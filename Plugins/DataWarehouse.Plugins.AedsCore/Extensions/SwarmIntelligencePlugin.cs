@@ -34,7 +34,7 @@ public record PeerInfo(
 /// a registry of which clients have which content and facilitates peer discovery.
 /// Bandwidth savings: 40-60% reduction in server load for popular content.
 /// </remarks>
-public sealed class SwarmIntelligencePlugin : FeaturePluginBase
+public sealed class SwarmIntelligencePlugin : LegacyFeaturePluginBase
 {
     private readonly ConcurrentDictionary<string, HashSet<int>> _localPayloadChunks = new();
     private readonly ConcurrentDictionary<string, DateTimeOffset> _announcements = new();
