@@ -157,6 +157,11 @@ namespace DataWarehouse.SDK.Contracts
         public const string ConfigChanged = "config.changed";
         public const string ConfigReload = "config.reload";
 
+        // Authentication events
+        public const string AuthKeyRotated = "security.key.rotated";
+        public const string AuthSigningKeyChanged = "security.signing.changed";
+        public const string AuthReplayDetected = "security.replay.detected";
+
         // Knowledge and Capability topics
         public const string KnowledgeRegister = "knowledge.register";
         public const string KnowledgeQuery = "knowledge.query";
@@ -338,5 +343,177 @@ namespace DataWarehouse.SDK.Contracts
                 _onDispose();
             }
         }
+    }
+
+    /// <summary>
+    /// Configuration for message authentication on a specific topic.
+    /// </summary>
+    public class MessageAuthenticationOptions
+    {
+        /// <summary>
+        /// Whether messages on this topic require HMAC signatures.
+        /// </summary>
+        public bool RequireSignature { get; init; }
+
+        /// <summary>
+        /// Maximum age of a message before it is rejected (replay protection).
+        /// Default: 5 minutes.
+        /// </summary>
+        public TimeSpan MaxMessageAge { get; init; } = TimeSpan.FromMinutes(5);
+
+        /// <summary>
+        /// Whether to track nonces for replay detection.
+        /// When enabled, duplicate nonces within the MaxMessageAge window are rejected.
+        /// </summary>
+        public bool EnableReplayDetection { get; init; } = true;
+
+        /// <summary>
+        /// The hash algorithm to use for HMAC signing.
+        /// Default: SHA256 (HMAC-SHA256).
+        /// </summary>
+        public System.Security.Cryptography.HashAlgorithmName HmacAlgorithm { get; init; } = System.Security.Cryptography.HashAlgorithmName.SHA256;
+    }
+
+    /// <summary>
+    /// Result of message verification.
+    /// </summary>
+    public record MessageVerificationResult
+    {
+        /// <summary>
+        /// Whether the message passed verification.
+        /// </summary>
+        public bool IsValid { get; init; }
+
+        /// <summary>
+        /// Reason for verification failure, if any.
+        /// </summary>
+        public string? FailureReason { get; init; }
+
+        /// <summary>
+        /// The type of failure (for programmatic handling).
+        /// </summary>
+        public MessageVerificationFailure? FailureType { get; init; }
+
+        /// <summary>
+        /// Creates a successful verification result.
+        /// </summary>
+        public static MessageVerificationResult Valid() => new() { IsValid = true };
+
+        /// <summary>
+        /// Creates a failed verification result.
+        /// </summary>
+        public static MessageVerificationResult Invalid(MessageVerificationFailure failureType, string reason) =>
+            new() { IsValid = false, FailureType = failureType, FailureReason = reason };
+    }
+
+    /// <summary>
+    /// Types of message verification failures.
+    /// </summary>
+    public enum MessageVerificationFailure
+    {
+        /// <summary>Message has no signature but topic requires one.</summary>
+        MissingSignature,
+
+        /// <summary>HMAC signature does not match message content.</summary>
+        InvalidSignature,
+
+        /// <summary>Message has expired (ExpiresAt is in the past).</summary>
+        Expired,
+
+        /// <summary>Message nonce was already seen (replay attack detected).</summary>
+        ReplayDetected,
+
+        /// <summary>Message has no nonce but replay detection is enabled.</summary>
+        MissingNonce
+    }
+
+    /// <summary>
+    /// Extension of IMessageBus that adds HMAC-SHA256 message authentication and replay protection.
+    /// Implementations sign messages on publish and verify on receive for authenticated topics.
+    /// Authentication is opt-in per topic via ConfigureAuthentication.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// This interface extends IMessageBus to provide:
+    /// </para>
+    /// <list type="bullet">
+    ///   <item>HMAC-SHA256 message signing (or configurable algorithm via MessageAuthenticationOptions)</item>
+    ///   <item>Constant-time signature verification using CryptographicOperations.FixedTimeEquals</item>
+    ///   <item>Nonce-based replay protection with configurable time window</item>
+    ///   <item>Per-topic authentication configuration (not all topics need authentication)</item>
+    /// </list>
+    /// <para>
+    /// Usage: Register authenticated topics, then use standard Publish/Subscribe.
+    /// The authenticated bus automatically signs outgoing messages and verifies incoming ones.
+    /// </para>
+    /// </remarks>
+    public interface IAuthenticatedMessageBus : IMessageBus
+    {
+        /// <summary>
+        /// Configures authentication requirements for a topic.
+        /// Messages published to this topic will be signed; received messages will be verified.
+        /// </summary>
+        /// <param name="topic">The topic to configure.</param>
+        /// <param name="options">Authentication options.</param>
+        void ConfigureAuthentication(string topic, MessageAuthenticationOptions options);
+
+        /// <summary>
+        /// Configures authentication for topics matching a pattern.
+        /// </summary>
+        /// <param name="topicPattern">Glob pattern (e.g., "security.*", "*.sensitive").</param>
+        /// <param name="options">Authentication options.</param>
+        void ConfigureAuthenticationPattern(string topicPattern, MessageAuthenticationOptions options);
+
+        /// <summary>
+        /// Sets the signing key used for HMAC message authentication.
+        /// The key should be provisioned securely (e.g., from IKeyStore).
+        /// </summary>
+        /// <param name="key">The HMAC signing key.</param>
+        void SetSigningKey(byte[] key);
+
+        /// <summary>
+        /// Rotates the signing key. The old key is retained for verification of in-flight messages
+        /// during the grace period.
+        /// </summary>
+        /// <param name="newKey">The new HMAC signing key.</param>
+        /// <param name="gracePeriod">How long to accept signatures from the old key.</param>
+        void RotateSigningKey(byte[] newKey, TimeSpan gracePeriod);
+
+        /// <summary>
+        /// Manually verifies a message's signature and replay protection.
+        /// Useful for messages received from external sources.
+        /// </summary>
+        /// <param name="message">The message to verify.</param>
+        /// <param name="topic">The topic the message was received on.</param>
+        /// <returns>Verification result with pass/fail and reason.</returns>
+        MessageVerificationResult VerifyMessage(PluginMessage message, string topic);
+
+        /// <summary>
+        /// Gets whether a topic has authentication configured.
+        /// </summary>
+        bool IsAuthenticatedTopic(string topic);
+
+        /// <summary>
+        /// Gets the authentication options for a topic, or null if not configured.
+        /// </summary>
+        MessageAuthenticationOptions? GetAuthenticationOptions(string topic);
+    }
+
+    /// <summary>
+    /// Standard message topics that should use authenticated messaging.
+    /// </summary>
+    public static class AuthenticatedMessageTopics
+    {
+        /// <summary>Security-sensitive operations should be authenticated.</summary>
+        public const string SecurityPrefix = "security.";
+
+        /// <summary>Key management operations should be authenticated.</summary>
+        public const string KeyStorePrefix = "keystore.";
+
+        /// <summary>Plugin lifecycle (load/unload) should be authenticated to prevent spoofing.</summary>
+        public const string PluginLifecyclePrefix = "plugin.";
+
+        /// <summary>System-level commands should be authenticated.</summary>
+        public const string SystemPrefix = "system.";
     }
 }

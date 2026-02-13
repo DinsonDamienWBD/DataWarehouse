@@ -130,6 +130,7 @@ namespace DataWarehouse.SDK.Security
     /// Core interface for key management operations.
     /// All key store plugins must implement this interface.
     /// </summary>
+    /// <seealso cref="IKeyRotatable"/>
     public interface IKeyStore
     {
         /// <summary>
