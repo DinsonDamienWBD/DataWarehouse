@@ -259,14 +259,14 @@ Plans:
   3. Multi-phase plugin initialization (construction with zero deps, initialization with MessageBus, activation with distributed coordination) prevents circular dependency deadlocks
   4. In-memory single-node implementations exist for every distributed contract -- the SDK runs on a single laptop without any cluster configuration
   5. ICircuitBreaker, IBulkheadIsolation, IHealthCheck, and ActivitySource contracts are available to all plugins with sensible defaults
-**Plans**: TBD (estimated 4-5 plans)
+**Plans**: 5 plans
 
 Plans:
-- [ ] 26-01: Distributed SDK contracts (cluster membership, load balancing, P2P, auto-scaling, sync, tiering, governance)
-- [ ] 26-02: FederatedMessageBus architecture and multi-phase plugin initialization
-- [ ] 26-03: Resilience contracts (circuit breaker, bulkhead, timeouts, dead letter queue, graceful shutdown)
-- [ ] 26-04: Observability contracts (ActivitySource, structured logging, health checks, resource metering, audit trail)
-- [ ] 26-05: In-memory single-node implementations and distributed security primitives (HMAC, replay protection)
+- [ ] 26-01-PLAN.md — Distributed SDK contracts (cluster membership, load balancing, P2P, auto-scaling, sync, tiering, governance)
+- [ ] 26-02-PLAN.md — FederatedMessageBus architecture and multi-phase plugin initialization
+- [ ] 26-03-PLAN.md — Resilience contracts (circuit breaker, bulkhead, timeouts, dead letter queue, graceful shutdown)
+- [ ] 26-04-PLAN.md — Observability contracts (ActivitySource, structured logging, health checks, resource metering, audit trail)
+- [ ] 26-05-PLAN.md — In-memory single-node implementations and distributed security primitives (HMAC, replay protection)
 
 #### Phase 27: Plugin Migration & Decoupling Verification
 **Goal**: All 60 plugins use the new base class hierarchies and distributed infrastructure features -- no plugin references another plugin directly, all communication flows through the message bus.
@@ -392,7 +392,7 @@ Plans:
 | 24. Plugin Hierarchy, Storage Core & Validation | v2.0 | 0/7 | Planned | - |
 | 25a. Strategy Hierarchy Design & API Contracts | v2.0 | 0/5 | Planned | - |
 | 25b. Strategy Migration (~1,727 strategies) | v2.0 | 0/6 | Planned | - |
-| 26. Distributed Contracts & Resilience | v2.0 | 0/5 | Not started | - |
+| 26. Distributed Contracts & Resilience | v2.0 | 0/5 | Planned | - |
 | 27. Plugin Migration & Decoupling | v2.0 | 0/4 | Not started | - |
 | 28. Dead Code Cleanup | v2.0 | 0/4 | Not started | - |
 | 29. Advanced Distributed Coordination | v2.0 | 0/4 | Not started | - |
