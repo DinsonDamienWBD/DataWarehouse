@@ -2,6 +2,10 @@ using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 
+// FUTURE: Exabyte-scale sharding -- interfaces preserved for exabyte-scale storage partitioning per AD-06.
+// These types have zero current implementations but define contracts for future
+// exabyte-scale storage plugins. Do NOT delete during dead code cleanup.
+
 namespace DataWarehouse.SDK.Scale;
 
 /// <summary>

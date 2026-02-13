@@ -9,6 +9,10 @@ using System.Threading.Tasks;
 
 using DataWarehouse.SDK.Contracts.Hierarchy;
 
+// FUTURE: Low-latency I/O -- interfaces preserved for RDMA, io_uring, and NUMA-aware storage per AD-06.
+// These types have zero current implementations but define contracts for future
+// low-latency-capable storage plugins. Do NOT delete during dead code cleanup.
+
 namespace DataWarehouse.SDK.Contracts;
 
 /// <summary>

@@ -1,3 +1,7 @@
+// FUTURE: Hypervisor integration -- interfaces preserved for hypervisor detection and balloon
+// driver support per AD-06. These types have zero current implementations but define contracts
+// for future hypervisor-aware storage plugins. Do NOT delete during dead code cleanup.
+
 namespace DataWarehouse.SDK.Virtualization;
 
 /// <summary>

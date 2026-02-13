@@ -7,6 +7,10 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 
+// FUTURE: Military-grade security -- interfaces preserved for mandatory access control, multi-level
+// security, and two-person integrity per AD-06. These types have zero current implementations but
+// define contracts for future military-security-capable storage plugins. Do NOT delete during dead code cleanup.
+
 namespace DataWarehouse.SDK.Contracts
 {
     /// <summary>
