@@ -350,6 +350,25 @@ namespace DataWarehouse.SDK.Contracts.Replication
     /// </summary>
     public abstract class ReplicationStrategyBase : StrategyBase, IReplicationStrategy
     {
+        /// <summary>
+        /// Gets the unique identifier for this replication strategy.
+        /// Default implementation derives from the consistency model.
+        /// Override in concrete strategies to provide a custom identifier.
+        /// </summary>
+        public override string StrategyId => $"replication-{ConsistencyModel.ToString().ToLowerInvariant()}";
+
+        /// <summary>
+        /// Gets the display name for this replication strategy.
+        /// Default implementation derives from the consistency model.
+        /// Override in concrete strategies to provide a custom name.
+        /// </summary>
+        public virtual string StrategyName => $"{ConsistencyModel} Replication";
+
+        /// <summary>
+        /// Bridges StrategyName to the StrategyBase.Name contract.
+        /// </summary>
+        public override string Name => StrategyName;
+
         /// <inheritdoc/>
         public abstract ReplicationCapabilities Capabilities { get; }
 
@@ -456,5 +475,51 @@ namespace DataWarehouse.SDK.Contracts.Replication
                 throw new ArgumentException(
                     $"Maximum replica count is {Capabilities.MaxReplicaCount}, got {nodeCount}");
         }
+
+        #region Legacy Intelligence Helpers (Phase 25b removes these)
+
+        // TODO(25b): Remove -- intelligence belongs at plugin level per AD-05
+        /// <summary>Legacy: Gets a description for this strategy.</summary>
+        protected virtual string GetStrategyDescription() =>
+            $"{StrategyName} strategy with {ConsistencyModel} consistency and {Capabilities.MinReplicaCount}-{Capabilities.MaxReplicaCount} replicas";
+
+        // TODO(25b): Remove -- intelligence belongs at plugin level per AD-05
+        /// <summary>Legacy: Gets the knowledge payload for this strategy.</summary>
+        protected virtual Dictionary<string, object> GetKnowledgePayload() => new()
+        {
+            ["consistencyModel"] = ConsistencyModel.ToString(),
+            ["supportsMultiMaster"] = Capabilities.SupportsMultiMaster,
+            ["supportsAsyncReplication"] = Capabilities.SupportsAsyncReplication,
+            ["supportsSyncReplication"] = Capabilities.SupportsSyncReplication,
+            ["isGeoAware"] = Capabilities.IsGeoAware,
+            ["minReplicaCount"] = Capabilities.MinReplicaCount,
+            ["maxReplicaCount"] = Capabilities.MaxReplicaCount,
+            ["conflictResolutionMethods"] = Capabilities.ConflictResolutionMethods.Select(m => m.ToString()).ToArray()
+        };
+
+        // TODO(25b): Remove -- intelligence belongs at plugin level per AD-05
+        /// <summary>Legacy: Gets tags for this strategy.</summary>
+        protected virtual string[] GetKnowledgeTags() => new[]
+        {
+            "strategy",
+            "replication",
+            ConsistencyModel.ToString().ToLowerInvariant(),
+            Capabilities.SupportsMultiMaster ? "multi-master" : "single-master"
+        };
+
+        // TODO(25b): Remove -- intelligence belongs at plugin level per AD-05
+        /// <summary>Legacy: Gets capability metadata for this strategy.</summary>
+        protected virtual Dictionary<string, object> GetCapabilityMetadata() => new()
+        {
+            ["consistencyModel"] = ConsistencyModel.ToString(),
+            ["supportsMultiMaster"] = Capabilities.SupportsMultiMaster
+        };
+
+        // TODO(25b): Remove -- intelligence belongs at plugin level per AD-05
+        /// <summary>Legacy: Gets the semantic description for AI-driven discovery.</summary>
+        protected virtual string GetSemanticDescription() =>
+            $"Use {StrategyName} for {ConsistencyModel} consistency with {(Capabilities.SupportsMultiMaster ? "multi-master" : "single-master")} topology";
+
+        #endregion
     }
 }

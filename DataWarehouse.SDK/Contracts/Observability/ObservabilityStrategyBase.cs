@@ -30,6 +30,18 @@ public abstract class ObservabilityStrategyBase : StrategyBase, IObservabilitySt
     private readonly SemaphoreSlim _initializationLock = new(1, 1);
 
     /// <summary>
+    /// Gets the unique identifier for this observability strategy.
+    /// Default derives from the class name. Override to provide a custom identifier.
+    /// </summary>
+    public override string StrategyId => GetType().Name.Replace("Strategy", "").ToLowerInvariant();
+
+    /// <summary>
+    /// Gets the display name for this observability strategy.
+    /// Default derives from the class name. Override to provide a custom name.
+    /// </summary>
+    public override string Name => GetType().Name.Replace("Strategy", "");
+
+    /// <summary>
     /// Initializes a new instance of the <see cref="ObservabilityStrategyBase"/> class.
     /// </summary>
     /// <param name="capabilities">The capabilities supported by this strategy.</param>

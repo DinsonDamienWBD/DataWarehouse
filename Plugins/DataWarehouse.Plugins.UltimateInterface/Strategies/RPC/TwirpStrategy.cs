@@ -22,7 +22,7 @@ namespace DataWarehouse.Plugins.UltimateInterface.Strategies.RPC;
 /// </remarks>
 internal sealed class TwirpStrategy : SdkInterface.InterfaceStrategyBase, IPluginInterfaceStrategy
 {
-    public string StrategyId => "twirp";
+    public override string StrategyId => "twirp";
     public string DisplayName => "Twirp";
     public string SemanticDescription => "Twitch Twirp RPC interface with protobuf-over-HTTP, JSON/binary support, and simple error handling.";
     public InterfaceCategory Category => InterfaceCategory.Rpc;

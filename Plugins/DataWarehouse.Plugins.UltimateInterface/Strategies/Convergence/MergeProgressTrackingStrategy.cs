@@ -30,7 +30,7 @@ namespace DataWarehouse.Plugins.UltimateInterface.Strategies.Convergence;
 internal sealed class MergeProgressTrackingStrategy : SdkInterface.InterfaceStrategyBase, IPluginInterfaceStrategy
 {
     // IPluginInterfaceStrategy metadata
-    public string StrategyId => "merge-progress";
+    public override string StrategyId => "merge-progress";
     public string DisplayName => "Merge Progress Tracking";
     public string SemanticDescription => "Real-time progress tracking during merge execution with percentage completion.";
     public InterfaceCategory Category => InterfaceCategory.Convergence;

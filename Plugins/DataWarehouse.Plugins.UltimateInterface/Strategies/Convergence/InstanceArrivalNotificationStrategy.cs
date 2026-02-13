@@ -30,7 +30,7 @@ namespace DataWarehouse.Plugins.UltimateInterface.Strategies.Convergence;
 internal sealed class InstanceArrivalNotificationStrategy : SdkInterface.InterfaceStrategyBase, IPluginInterfaceStrategy
 {
     // IPluginInterfaceStrategy metadata
-    public string StrategyId => "instance-arrival-notification";
+    public override string StrategyId => "instance-arrival-notification";
     public string DisplayName => "Instance Arrival Notification";
     public string SemanticDescription => "Notifies operators when air-gapped instances arrive and provides pending arrivals list.";
     public InterfaceCategory Category => InterfaceCategory.Convergence;

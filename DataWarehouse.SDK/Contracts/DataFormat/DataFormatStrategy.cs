@@ -639,6 +639,11 @@ namespace DataWarehouse.SDK.Contracts.DataFormat
         /// <inheritdoc/>
         public abstract string DisplayName { get; }
 
+        /// <summary>
+        /// Bridges DisplayName to the StrategyBase.Name contract.
+        /// </summary>
+        public override string Name => DisplayName;
+
         /// <inheritdoc/>
         public abstract DataFormatCapabilities Capabilities { get; }
 

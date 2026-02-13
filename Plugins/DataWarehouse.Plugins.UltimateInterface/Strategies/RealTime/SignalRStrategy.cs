@@ -38,7 +38,7 @@ internal sealed class SignalRStrategy : SdkInterface.InterfaceStrategyBase, IPlu
     private readonly ConcurrentDictionary<string, SignalRGroup> _groups = new();
 
     // IPluginInterfaceStrategy metadata
-    public string StrategyId => "signalr";
+    public override string StrategyId => "signalr";
     public string DisplayName => "SignalR";
     public string SemanticDescription => "SignalR hub protocol with method invocation, streaming, groups, and connection state management.";
     public InterfaceCategory Category => InterfaceCategory.RealTime;

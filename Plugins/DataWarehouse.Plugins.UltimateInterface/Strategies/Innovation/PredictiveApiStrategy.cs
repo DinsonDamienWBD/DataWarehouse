@@ -36,7 +36,7 @@ internal sealed class PredictiveApiStrategy : SdkInterface.InterfaceStrategyBase
     private readonly object _lock = new();
 
     // IPluginInterfaceStrategy metadata
-    public string StrategyId => "predictive-api";
+    public override string StrategyId => "predictive-api";
     public string DisplayName => "Predictive API";
     public string SemanticDescription => "Tracks request sequences, predicts next queries via AI or LRU cache, includes X-Prefetch-Available header.";
     public InterfaceCategory Category => InterfaceCategory.Innovation;

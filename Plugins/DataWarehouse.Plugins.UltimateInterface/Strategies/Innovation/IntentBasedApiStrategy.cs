@@ -31,7 +31,7 @@ namespace DataWarehouse.Plugins.UltimateInterface.Strategies.Innovation;
 internal sealed class IntentBasedApiStrategy : SdkInterface.InterfaceStrategyBase, IPluginInterfaceStrategy
 {
     // IPluginInterfaceStrategy metadata
-    public string StrategyId => "intent-based-api";
+    public override string StrategyId => "intent-based-api";
     public string DisplayName => "Intent-Based API";
     public string SemanticDescription => "Accept high-level intent declarations (e.g., 'backup critical data'), resolve to operations via AI or predefined mappings.";
     public InterfaceCategory Category => InterfaceCategory.Innovation;

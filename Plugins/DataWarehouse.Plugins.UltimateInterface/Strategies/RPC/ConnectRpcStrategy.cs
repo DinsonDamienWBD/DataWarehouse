@@ -21,7 +21,7 @@ namespace DataWarehouse.Plugins.UltimateInterface.Strategies.RPC;
 /// </remarks>
 internal sealed class ConnectRpcStrategy : SdkInterface.InterfaceStrategyBase, IPluginInterfaceStrategy
 {
-    public string StrategyId => "connect-rpc";
+    public override string StrategyId => "connect-rpc";
     public string DisplayName => "Connect RPC";
     public string SemanticDescription => "Buf Connect RPC interface with HTTP/1.1 and HTTP/2 support, JSON/protobuf payloads, and SSE streaming.";
     public InterfaceCategory Category => InterfaceCategory.Rpc;

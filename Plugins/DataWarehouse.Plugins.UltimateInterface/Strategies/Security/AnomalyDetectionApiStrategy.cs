@@ -32,7 +32,7 @@ namespace DataWarehouse.Plugins.UltimateInterface.Strategies.Security;
 internal sealed class AnomalyDetectionApiStrategy : SdkInterface.InterfaceStrategyBase, IPluginInterfaceStrategy
 {
     // IPluginInterfaceStrategy metadata
-    public string StrategyId => "anomaly-detection-api";
+    public override string StrategyId => "anomaly-detection-api";
     public string DisplayName => "Anomaly Detection API";
     public string SemanticDescription => "ML-based API anomaly detection - tracks request patterns, uses Intelligence for scoring, flags high-anomaly requests to Access Control.";
     public InterfaceCategory Category => InterfaceCategory.Innovation;

@@ -116,6 +116,8 @@ public abstract class DataMeshStrategyBase : StrategyBase, IDataMeshStrategy
     public override abstract string StrategyId { get; }
     /// <inheritdoc/>
     public abstract string DisplayName { get; }
+    /// <summary>Bridges DisplayName to the StrategyBase.Name contract.</summary>
+    public override string Name => DisplayName;
     /// <inheritdoc/>
     public abstract DataMeshCategory Category { get; }
     /// <inheritdoc/>

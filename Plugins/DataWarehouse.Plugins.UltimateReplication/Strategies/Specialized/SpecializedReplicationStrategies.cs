@@ -965,11 +965,12 @@ namespace DataWarehouse.Plugins.UltimateReplication.Strategies.Specialized
         /// <summary>
         /// Disposes resources.
         /// </summary>
-        public void Dispose()
+        public new void Dispose()
         {
             _workerCts.Cancel();
             _workerTask?.Wait(TimeSpan.FromSeconds(5));
             _workerCts.Dispose();
+            base.Dispose();
         }
     }
 }

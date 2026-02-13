@@ -29,6 +29,18 @@ public abstract class InterfaceStrategyBase : StrategyBase, IInterfaceStrategy
     private int _isRunning;
     private bool _disposed;
 
+    /// <summary>
+    /// Gets the unique identifier for this interface strategy.
+    /// Default derives from the class name. Override to provide a custom identifier.
+    /// </summary>
+    public override string StrategyId => GetType().Name.Replace("Strategy", "").ToLowerInvariant();
+
+    /// <summary>
+    /// Gets the display name for this interface strategy.
+    /// Default derives from the class name. Override to provide a custom name.
+    /// </summary>
+    public override string Name => GetType().Name.Replace("Strategy", "");
+
     /// <inheritdoc/>
     public abstract InterfaceProtocol Protocol { get; }
 

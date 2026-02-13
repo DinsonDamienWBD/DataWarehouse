@@ -31,7 +31,7 @@ namespace DataWarehouse.Plugins.UltimateInterface.Strategies.Innovation;
 internal sealed class VersionlessApiStrategy : SdkInterface.InterfaceStrategyBase, IPluginInterfaceStrategy
 {
     // IPluginInterfaceStrategy metadata
-    public string StrategyId => "versionless-api";
+    public override string StrategyId => "versionless-api";
     public string DisplayName => "Versionless API";
     public string SemanticDescription => "No explicit API versioning required - detects client expectations from request shape and applies backward-compatible transformations.";
     public InterfaceCategory Category => InterfaceCategory.Innovation;

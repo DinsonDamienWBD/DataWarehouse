@@ -31,7 +31,7 @@ namespace DataWarehouse.Plugins.UltimateInterface.Strategies.Innovation;
 internal sealed class UnifiedApiStrategy : SdkInterface.InterfaceStrategyBase, IPluginInterfaceStrategy
 {
     // IPluginInterfaceStrategy metadata
-    public string StrategyId => "unified-api";
+    public override string StrategyId => "unified-api";
     public string DisplayName => "Unified API";
     public string SemanticDescription => "Single API endpoint that auto-detects request protocol (REST, GraphQL, gRPC, JSON-RPC) and responds in native format.";
     public InterfaceCategory Category => InterfaceCategory.Innovation;

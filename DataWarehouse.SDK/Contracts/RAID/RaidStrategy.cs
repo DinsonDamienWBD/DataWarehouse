@@ -646,6 +646,25 @@ namespace DataWarehouse.SDK.Contracts.RAID
     /// </summary>
     public abstract class RaidStrategyBase : StrategyBase, IRaidStrategy
     {
+        /// <summary>
+        /// Gets the unique identifier for this RAID strategy.
+        /// Default implementation derives from the RAID level.
+        /// Override in concrete strategies to provide a custom identifier.
+        /// </summary>
+        public override string StrategyId => $"raid-{Level.ToString().ToLowerInvariant()}";
+
+        /// <summary>
+        /// Gets the display name for this RAID strategy.
+        /// Default implementation derives from the RAID level.
+        /// Override in concrete strategies to provide a custom name.
+        /// </summary>
+        public virtual string StrategyName => $"RAID {Level}";
+
+        /// <summary>
+        /// Bridges StrategyName to the StrategyBase.Name contract.
+        /// </summary>
+        public override string Name => StrategyName;
+
         /// <inheritdoc/>
         public abstract RaidLevel Level { get; }
 
@@ -832,5 +851,54 @@ namespace DataWarehouse.SDK.Contracts.RAID
 
             return result;
         }
+
+        #region Legacy Intelligence Helpers (Phase 25b removes these)
+
+        // TODO(25b): Remove -- intelligence belongs at plugin level per AD-05
+        /// <summary>Legacy: Gets a description for this strategy.</summary>
+        protected virtual string GetStrategyDescription() =>
+            $"{StrategyName} strategy with {Capabilities.RedundancyLevel} disk fault tolerance and {Capabilities.CapacityEfficiency:P0} capacity efficiency";
+
+        // TODO(25b): Remove -- intelligence belongs at plugin level per AD-05
+        /// <summary>Legacy: Gets the knowledge payload for this strategy.</summary>
+        protected virtual Dictionary<string, object> GetKnowledgePayload() => new()
+        {
+            ["level"] = Level.ToString(),
+            ["redundancyLevel"] = Capabilities.RedundancyLevel,
+            ["minDisks"] = Capabilities.MinDisks,
+            ["maxDisks"] = Capabilities.MaxDisks ?? -1,
+            ["stripeSize"] = Capabilities.StripeSize,
+            ["capacityEfficiency"] = Capabilities.CapacityEfficiency,
+            ["readPerformance"] = Capabilities.ReadPerformanceMultiplier,
+            ["writePerformance"] = Capabilities.WritePerformanceMultiplier,
+            ["supportsHotSpare"] = Capabilities.SupportsHotSpare,
+            ["supportsOnlineExpansion"] = Capabilities.SupportsOnlineExpansion
+        };
+
+        // TODO(25b): Remove -- intelligence belongs at plugin level per AD-05
+        /// <summary>Legacy: Gets tags for this strategy.</summary>
+        protected virtual string[] GetKnowledgeTags() => new[]
+        {
+            "strategy",
+            "raid",
+            Level.ToString().ToLowerInvariant(),
+            $"redundancy-{Capabilities.RedundancyLevel}"
+        };
+
+        // TODO(25b): Remove -- intelligence belongs at plugin level per AD-05
+        /// <summary>Legacy: Gets capability metadata for this strategy.</summary>
+        protected virtual Dictionary<string, object> GetCapabilityMetadata() => new()
+        {
+            ["level"] = Level.ToString(),
+            ["redundancyLevel"] = Capabilities.RedundancyLevel,
+            ["capacityEfficiency"] = Capabilities.CapacityEfficiency
+        };
+
+        // TODO(25b): Remove -- intelligence belongs at plugin level per AD-05
+        /// <summary>Legacy: Gets the semantic description for AI-driven discovery.</summary>
+        protected virtual string GetSemanticDescription() =>
+            $"Use {StrategyName} for {Capabilities.RedundancyLevel}-disk fault tolerance with {Capabilities.CapacityEfficiency:P0} capacity efficiency";
+
+        #endregion
     }
 }

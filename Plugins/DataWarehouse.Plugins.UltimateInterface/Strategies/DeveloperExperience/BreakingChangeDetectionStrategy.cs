@@ -32,7 +32,7 @@ namespace DataWarehouse.Plugins.UltimateInterface.Strategies.DeveloperExperience
 internal sealed class BreakingChangeDetectionStrategy : SdkInterface.InterfaceStrategyBase, IPluginInterfaceStrategy
 {
     // IPluginInterfaceStrategy metadata
-    public string StrategyId => "breaking-change-detection";
+    public override string StrategyId => "breaking-change-detection";
     public string DisplayName => "Breaking Change Detection";
     public string SemanticDescription => "Automated detection of breaking changes between API versions by comparing OpenAPI specs with severity classification.";
     public InterfaceCategory Category => InterfaceCategory.Innovation;

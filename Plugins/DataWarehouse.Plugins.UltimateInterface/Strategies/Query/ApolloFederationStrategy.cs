@@ -32,7 +32,7 @@ namespace DataWarehouse.Plugins.UltimateInterface.Strategies.Query;
 /// </remarks>
 internal sealed class ApolloFederationStrategy : SdkInterface.InterfaceStrategyBase, IPluginInterfaceStrategy
 {
-    public string StrategyId => "apollo-federation";
+    public override string StrategyId => "apollo-federation";
     public string DisplayName => "Apollo Federation";
     public string SemanticDescription => "Apollo Federation v2 subgraph with entity references, SDL introspection, and directive support.";
     public InterfaceCategory Category => InterfaceCategory.Query;

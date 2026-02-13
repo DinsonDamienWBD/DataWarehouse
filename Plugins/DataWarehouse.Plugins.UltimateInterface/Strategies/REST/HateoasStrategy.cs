@@ -30,7 +30,7 @@ namespace DataWarehouse.Plugins.UltimateInterface.Strategies.REST;
 internal sealed class HateoasStrategy : SdkInterface.InterfaceStrategyBase, IPluginInterfaceStrategy
 {
     // IPluginInterfaceStrategy metadata
-    public string StrategyId => "hateoas";
+    public override string StrategyId => "hateoas";
     public string DisplayName => "HATEOAS";
     public string SemanticDescription => "Hypermedia as the Engine of Application State - REST API with embedded hypermedia controls and link relations.";
     public InterfaceCategory Category => InterfaceCategory.Http;

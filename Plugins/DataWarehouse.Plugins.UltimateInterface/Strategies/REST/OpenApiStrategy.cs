@@ -29,7 +29,7 @@ namespace DataWarehouse.Plugins.UltimateInterface.Strategies.REST;
 internal sealed class OpenApiStrategy : SdkInterface.InterfaceStrategyBase, IPluginInterfaceStrategy
 {
     // IPluginInterfaceStrategy metadata
-    public string StrategyId => "openapi";
+    public override string StrategyId => "openapi";
     public string DisplayName => "OpenAPI";
     public string SemanticDescription => "Auto-generates OpenAPI v3.1 specification documents describing available REST endpoints and schemas.";
     public InterfaceCategory Category => InterfaceCategory.Http;

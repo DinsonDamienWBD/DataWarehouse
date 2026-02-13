@@ -870,7 +870,7 @@ internal sealed class InterfaceHealthStatus
 /// </summary>
 internal sealed class RestInterfaceStrategy : SdkInterface.InterfaceStrategyBase, IPluginInterfaceStrategy
 {
-    public string StrategyId => "rest";
+    public override string StrategyId => "rest";
     public string DisplayName => "REST API";
     public string SemanticDescription => "RESTful API interface with HTTP/HTTPS support, OpenAPI, and content negotiation.";
     public InterfaceCategory Category => InterfaceCategory.Http;
@@ -893,7 +893,7 @@ internal sealed class RestInterfaceStrategy : SdkInterface.InterfaceStrategyBase
 /// </summary>
 internal sealed class GrpcInterfaceStrategy : SdkInterface.InterfaceStrategyBase, IPluginInterfaceStrategy
 {
-    public string StrategyId => "grpc";
+    public override string StrategyId => "grpc";
     public string DisplayName => "gRPC";
     public string SemanticDescription => "High-performance gRPC interface with Protocol Buffers and bidirectional streaming.";
     public InterfaceCategory Category => InterfaceCategory.Rpc;
@@ -916,7 +916,7 @@ internal sealed class GrpcInterfaceStrategy : SdkInterface.InterfaceStrategyBase
 /// </summary>
 internal sealed class WebSocketInterfaceStrategy : SdkInterface.InterfaceStrategyBase, IPluginInterfaceStrategy
 {
-    public string StrategyId => "websocket";
+    public override string StrategyId => "websocket";
     public string DisplayName => "WebSocket";
     public string SemanticDescription => "Real-time bidirectional WebSocket interface for push notifications and live updates.";
     public InterfaceCategory Category => InterfaceCategory.RealTime;
@@ -939,7 +939,7 @@ internal sealed class WebSocketInterfaceStrategy : SdkInterface.InterfaceStrateg
 /// </summary>
 internal sealed class GraphQLInterfaceStrategy : SdkInterface.InterfaceStrategyBase, IPluginInterfaceStrategy
 {
-    public string StrategyId => "graphql";
+    public override string StrategyId => "graphql";
     public string DisplayName => "GraphQL";
     public string SemanticDescription => "Flexible GraphQL interface with query, mutation, and subscription support.";
     public InterfaceCategory Category => InterfaceCategory.Http;
@@ -962,7 +962,7 @@ internal sealed class GraphQLInterfaceStrategy : SdkInterface.InterfaceStrategyB
 /// </summary>
 internal sealed class McpInterfaceStrategy : SdkInterface.InterfaceStrategyBase, IPluginInterfaceStrategy
 {
-    public string StrategyId => "mcp";
+    public override string StrategyId => "mcp";
     public string DisplayName => "MCP (Model Context Protocol)";
     public string SemanticDescription => "AI-native Model Context Protocol interface for LLM tool integration and context management.";
     public InterfaceCategory Category => InterfaceCategory.AiNative;

@@ -26,7 +26,7 @@ namespace DataWarehouse.Plugins.UltimateInterface.Strategies.RPC;
 /// </remarks>
 internal sealed class XmlRpcStrategy : SdkInterface.InterfaceStrategyBase, IPluginInterfaceStrategy
 {
-    public string StrategyId => "xml-rpc";
+    public override string StrategyId => "xml-rpc";
     public string DisplayName => "XML-RPC";
     public string SemanticDescription => "XML-RPC interface with support for all XML-RPC data types and fault handling.";
     public InterfaceCategory Category => InterfaceCategory.Rpc;

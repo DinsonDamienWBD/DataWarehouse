@@ -41,7 +41,7 @@ internal sealed class NatsStrategy : SdkInterface.InterfaceStrategyBase, IPlugin
     private readonly ConcurrentDictionary<string, List<NatsMessage>> _subjects = new();
     private readonly ConcurrentDictionary<string, TaskCompletionSource<NatsMessage>> _replyHandlers = new();
 
-    public string StrategyId => "nats";
+    public override string StrategyId => "nats";
     public string DisplayName => "NATS";
     public string SemanticDescription => "NATS cloud-native messaging with JetStream persistence, request/reply, queue groups, and wildcard subjects.";
     public InterfaceCategory Category => InterfaceCategory.Messaging;

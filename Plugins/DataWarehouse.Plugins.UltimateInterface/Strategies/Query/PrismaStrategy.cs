@@ -34,7 +34,7 @@ namespace DataWarehouse.Plugins.UltimateInterface.Strategies.Query;
 /// </remarks>
 internal sealed class PrismaStrategy : SdkInterface.InterfaceStrategyBase, IPluginInterfaceStrategy
 {
-    public string StrategyId => "prisma";
+    public override string StrategyId => "prisma";
     public string DisplayName => "Prisma GraphQL";
     public string SemanticDescription => "Prisma-style GraphQL API with findMany, findUnique, create, update, delete, upsert operations.";
     public InterfaceCategory Category => InterfaceCategory.Query;

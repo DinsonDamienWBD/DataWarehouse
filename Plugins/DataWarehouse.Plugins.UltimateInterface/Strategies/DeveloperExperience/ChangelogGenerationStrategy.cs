@@ -32,7 +32,7 @@ namespace DataWarehouse.Plugins.UltimateInterface.Strategies.DeveloperExperience
 internal sealed class ChangelogGenerationStrategy : SdkInterface.InterfaceStrategyBase, IPluginInterfaceStrategy
 {
     // IPluginInterfaceStrategy metadata
-    public string StrategyId => "changelog-generation";
+    public override string StrategyId => "changelog-generation";
     public string DisplayName => "Changelog Generation";
     public string SemanticDescription => "Auto-generated API changelog with categorized changes, migration guides, and impact assessment for version tracking.";
     public InterfaceCategory Category => InterfaceCategory.Innovation;

@@ -33,7 +33,7 @@ namespace DataWarehouse.Plugins.UltimateInterface.Strategies.Conversational;
 internal sealed class ClaudeMcpStrategy : SdkInterface.InterfaceStrategyBase, IPluginInterfaceStrategy
 {
     // IPluginInterfaceStrategy metadata
-    public string StrategyId => "claude-mcp";
+    public override string StrategyId => "claude-mcp";
     public string DisplayName => "Claude MCP Server";
     public string SemanticDescription => "Model Context Protocol server for Claude AI integration with tools, resources, and prompts.";
     public InterfaceCategory Category => InterfaceCategory.Conversational;

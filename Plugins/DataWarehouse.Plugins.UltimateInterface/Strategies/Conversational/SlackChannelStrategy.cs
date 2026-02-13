@@ -33,7 +33,7 @@ namespace DataWarehouse.Plugins.UltimateInterface.Strategies.Conversational;
 internal sealed class SlackChannelStrategy : SdkInterface.InterfaceStrategyBase, IPluginInterfaceStrategy
 {
     // IPluginInterfaceStrategy metadata
-    public string StrategyId => "slack";
+    public override string StrategyId => "slack";
     public string DisplayName => "Slack Channel";
     public string SemanticDescription => "Conversational interface for Slack workspace integration with Events API, slash commands, and Block Kit responses.";
     public InterfaceCategory Category => InterfaceCategory.Conversational;

@@ -30,7 +30,7 @@ namespace DataWarehouse.Plugins.UltimateInterface.Strategies.Convergence;
 internal sealed class MasterInstanceSelectionStrategy : SdkInterface.InterfaceStrategyBase, IPluginInterfaceStrategy
 {
     // IPluginInterfaceStrategy metadata
-    public string StrategyId => "master-instance-selection";
+    public override string StrategyId => "master-instance-selection";
     public string DisplayName => "Master Instance Selection";
     public string SemanticDescription => "Provides UI for selecting master instance for conflict resolution.";
     public InterfaceCategory Category => InterfaceCategory.Convergence;

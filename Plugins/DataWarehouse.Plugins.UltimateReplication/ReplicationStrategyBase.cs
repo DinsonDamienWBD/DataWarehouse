@@ -451,7 +451,7 @@ namespace DataWarehouse.Plugins.UltimateReplication
         /// <summary>
         /// Gets the characteristics of this replication strategy.
         /// </summary>
-        public abstract ReplicationCharacteristics Characteristics { get; }
+        public new abstract ReplicationCharacteristics Characteristics { get; }
 
         /// <summary>
         /// Creates a new enhanced replication strategy.

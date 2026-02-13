@@ -32,7 +32,7 @@ namespace DataWarehouse.Plugins.UltimateInterface.Strategies.DeveloperExperience
 internal sealed class ApiVersioningStrategy : SdkInterface.InterfaceStrategyBase, IPluginInterfaceStrategy
 {
     // IPluginInterfaceStrategy metadata
-    public string StrategyId => "api-versioning";
+    public override string StrategyId => "api-versioning";
     public string DisplayName => "API Versioning";
     public string SemanticDescription => "Multi-scheme API versioning with URL path, header, query parameter, and Accept header support plus deprecation warnings.";
     public InterfaceCategory Category => InterfaceCategory.Innovation;

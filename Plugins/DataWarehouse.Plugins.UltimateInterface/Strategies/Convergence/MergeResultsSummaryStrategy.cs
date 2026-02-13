@@ -30,7 +30,7 @@ namespace DataWarehouse.Plugins.UltimateInterface.Strategies.Convergence;
 internal sealed class MergeResultsSummaryStrategy : SdkInterface.InterfaceStrategyBase, IPluginInterfaceStrategy
 {
     // IPluginInterfaceStrategy metadata
-    public string StrategyId => "merge-results-summary";
+    public override string StrategyId => "merge-results-summary";
     public string DisplayName => "Merge Results Summary";
     public string SemanticDescription => "Post-merge summary with records merged, conflicts resolved, and execution time.";
     public InterfaceCategory Category => InterfaceCategory.Convergence;

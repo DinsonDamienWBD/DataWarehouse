@@ -31,7 +31,7 @@ namespace DataWarehouse.Plugins.UltimateInterface.Strategies.DeveloperExperience
 internal sealed class InteractivePlaygroundStrategy : SdkInterface.InterfaceStrategyBase, IPluginInterfaceStrategy
 {
     // IPluginInterfaceStrategy metadata
-    public string StrategyId => "interactive-playground";
+    public override string StrategyId => "interactive-playground";
     public string DisplayName => "Interactive API Playground";
     public string SemanticDescription => "Web-based interactive API explorer for testing DataWarehouse operations with live request/response visualization and operation catalog.";
     public InterfaceCategory Category => InterfaceCategory.Innovation;

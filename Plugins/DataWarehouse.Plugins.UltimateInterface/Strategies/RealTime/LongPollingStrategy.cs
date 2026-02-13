@@ -36,7 +36,7 @@ internal sealed class LongPollingStrategy : SdkInterface.InterfaceStrategyBase, 
     private readonly ConcurrentDictionary<string, DataQueue> _topicQueues = new();
 
     // IPluginInterfaceStrategy metadata
-    public string StrategyId => "long-polling";
+    public override string StrategyId => "long-polling";
     public string DisplayName => "Long Polling";
     public string SemanticDescription => "HTTP-based real-time updates using request holding with configurable timeout and ETag support.";
     public InterfaceCategory Category => InterfaceCategory.RealTime;

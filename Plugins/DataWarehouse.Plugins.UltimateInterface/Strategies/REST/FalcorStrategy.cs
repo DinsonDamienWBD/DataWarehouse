@@ -32,7 +32,7 @@ namespace DataWarehouse.Plugins.UltimateInterface.Strategies.REST;
 internal sealed class FalcorStrategy : SdkInterface.InterfaceStrategyBase, IPluginInterfaceStrategy
 {
     // IPluginInterfaceStrategy metadata
-    public string StrategyId => "falcor";
+    public override string StrategyId => "falcor";
     public string DisplayName => "Falcor";
     public string SemanticDescription => "Netflix Falcor JSON Graph protocol with path-based data fetching, batch optimization, and reference resolution.";
     public InterfaceCategory Category => InterfaceCategory.Http;

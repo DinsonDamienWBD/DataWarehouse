@@ -33,7 +33,7 @@ namespace DataWarehouse.Plugins.UltimateInterface.Strategies.Conversational;
 internal sealed class DiscordChannelStrategy : SdkInterface.InterfaceStrategyBase, IPluginInterfaceStrategy
 {
     // IPluginInterfaceStrategy metadata
-    public string StrategyId => "discord";
+    public override string StrategyId => "discord";
     public string DisplayName => "Discord Channel";
     public string SemanticDescription => "Conversational interface for Discord server integration with slash commands, interactions, and embed responses.";
     public InterfaceCategory Category => InterfaceCategory.Conversational;

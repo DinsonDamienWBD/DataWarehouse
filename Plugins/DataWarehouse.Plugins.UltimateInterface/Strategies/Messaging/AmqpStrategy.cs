@@ -40,7 +40,7 @@ internal sealed class AmqpStrategy : SdkInterface.InterfaceStrategyBase, IPlugin
     private readonly ConcurrentDictionary<string, AmqpQueue> _queues = new();
     private readonly ConcurrentDictionary<string, AmqpBinding> _bindings = new();
 
-    public string StrategyId => "amqp";
+    public override string StrategyId => "amqp";
     public string DisplayName => "AMQP";
     public string SemanticDescription => "AMQP 0-9-1 protocol for enterprise message queuing with exchanges, routing, and acknowledgements (RabbitMQ-compatible).";
     public InterfaceCategory Category => InterfaceCategory.Messaging;

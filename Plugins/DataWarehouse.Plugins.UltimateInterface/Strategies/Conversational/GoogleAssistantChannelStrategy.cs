@@ -32,7 +32,7 @@ namespace DataWarehouse.Plugins.UltimateInterface.Strategies.Conversational;
 internal sealed class GoogleAssistantChannelStrategy : SdkInterface.InterfaceStrategyBase, IPluginInterfaceStrategy
 {
     // IPluginInterfaceStrategy metadata
-    public string StrategyId => "google-assistant";
+    public override string StrategyId => "google-assistant";
     public string DisplayName => "Google Assistant";
     public string SemanticDescription => "Voice-driven interface for Google Assistant with Actions on Google webhook integration and rich response formatting.";
     public InterfaceCategory Category => InterfaceCategory.Conversational;

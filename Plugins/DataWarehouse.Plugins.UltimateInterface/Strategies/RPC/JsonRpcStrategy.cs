@@ -25,7 +25,7 @@ namespace DataWarehouse.Plugins.UltimateInterface.Strategies.RPC;
 /// </remarks>
 internal sealed class JsonRpcStrategy : SdkInterface.InterfaceStrategyBase, IPluginInterfaceStrategy
 {
-    public string StrategyId => "json-rpc";
+    public override string StrategyId => "json-rpc";
     public string DisplayName => "JSON-RPC 2.0";
     public string SemanticDescription => "JSON-RPC 2.0 interface with batch requests, notifications, and standard error codes.";
     public InterfaceCategory Category => InterfaceCategory.Rpc;

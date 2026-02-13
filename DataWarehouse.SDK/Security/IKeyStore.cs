@@ -938,6 +938,18 @@ namespace DataWarehouse.SDK.Security
         private Contracts.IMessageBus? _messageBus;
 
         /// <summary>
+        /// Gets the unique identifier for this key store strategy.
+        /// Default derives from the class name. Override to provide a custom identifier.
+        /// </summary>
+        public override string StrategyId => GetType().Name.Replace("Strategy", "").ToLowerInvariant();
+
+        /// <summary>
+        /// Gets the display name for this key store strategy.
+        /// Default derives from the class name. Override to provide a custom name.
+        /// </summary>
+        public override string Name => GetType().Name.Replace("Strategy", "");
+
+        /// <summary>
         /// Gets the capabilities of this key store implementation.
         /// Derived classes must override to specify their capabilities.
         /// </summary>

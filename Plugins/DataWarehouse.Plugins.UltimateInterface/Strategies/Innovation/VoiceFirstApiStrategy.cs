@@ -31,7 +31,7 @@ namespace DataWarehouse.Plugins.UltimateInterface.Strategies.Innovation;
 internal sealed class VoiceFirstApiStrategy : SdkInterface.InterfaceStrategyBase, IPluginInterfaceStrategy
 {
     // IPluginInterfaceStrategy metadata
-    public string StrategyId => "voice-first-api";
+    public override string StrategyId => "voice-first-api";
     public string DisplayName => "Voice-First API";
     public string SemanticDescription => "Voice-optimized API with SSML responses, NLP intent extraction, and voice assistant integration patterns.";
     public InterfaceCategory Category => InterfaceCategory.Innovation;

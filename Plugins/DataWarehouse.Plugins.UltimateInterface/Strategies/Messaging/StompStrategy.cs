@@ -40,7 +40,7 @@ internal sealed class StompStrategy : SdkInterface.InterfaceStrategyBase, IPlugi
     private readonly ConcurrentDictionary<string, StompTransaction> _transactions = new();
     private readonly ConcurrentDictionary<string, List<StompMessage>> _destinations = new();
 
-    public string StrategyId => "stomp";
+    public override string StrategyId => "stomp";
     public string DisplayName => "STOMP";
     public string SemanticDescription => "STOMP 1.2 text-based messaging protocol with transactions, acknowledgements, and heart-beating.";
     public InterfaceCategory Category => InterfaceCategory.Messaging;

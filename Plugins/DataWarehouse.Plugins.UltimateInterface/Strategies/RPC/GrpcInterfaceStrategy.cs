@@ -23,7 +23,7 @@ namespace DataWarehouse.Plugins.UltimateInterface.Strategies.RPC;
 /// </remarks>
 internal sealed class GrpcInterfaceStrategy : SdkInterface.InterfaceStrategyBase, IPluginInterfaceStrategy
 {
-    public string StrategyId => "grpc";
+    public override string StrategyId => "grpc";
     public string DisplayName => "gRPC";
     public string SemanticDescription => "High-performance gRPC interface with Protocol Buffers, HTTP/2, and bidirectional streaming support.";
     public InterfaceCategory Category => InterfaceCategory.Rpc;

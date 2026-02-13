@@ -31,7 +31,7 @@ namespace DataWarehouse.Plugins.UltimateInterface.Strategies.Conversational;
 internal sealed class SiriChannelStrategy : SdkInterface.InterfaceStrategyBase, IPluginInterfaceStrategy
 {
     // IPluginInterfaceStrategy metadata
-    public string StrategyId => "siri";
+    public override string StrategyId => "siri";
     public string DisplayName => "Apple Siri";
     public string SemanticDescription => "Voice-driven interface for Apple Siri with SiriKit intent processing and Shortcuts integration.";
     public InterfaceCategory Category => InterfaceCategory.Conversational;

@@ -30,7 +30,7 @@ namespace DataWarehouse.Plugins.UltimateInterface.Strategies.Convergence;
 internal sealed class MergeStrategySelectionStrategy : SdkInterface.InterfaceStrategyBase, IPluginInterfaceStrategy
 {
     // IPluginInterfaceStrategy metadata
-    public string StrategyId => "merge-strategy-selection";
+    public override string StrategyId => "merge-strategy-selection";
     public string DisplayName => "Merge Strategy Selection";
     public string SemanticDescription => "Provides UI for selecting merge strategy (last-write-wins, manual, field-level).";
     public InterfaceCategory Category => InterfaceCategory.Convergence;

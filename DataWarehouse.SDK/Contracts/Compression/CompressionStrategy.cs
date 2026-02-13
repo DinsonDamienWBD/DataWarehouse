@@ -489,6 +489,25 @@ namespace DataWarehouse.SDK.Contracts.Compression
             Level = level;
         }
 
+        /// <summary>
+        /// Gets the unique identifier for this compression strategy.
+        /// Default implementation derives from the algorithm name.
+        /// Override in concrete strategies to provide a custom identifier.
+        /// </summary>
+        public override string StrategyId => Characteristics.AlgorithmName.ToLowerInvariant().Replace(" ", "-");
+
+        /// <summary>
+        /// Gets the display name for this compression strategy.
+        /// Default implementation uses the algorithm name from Characteristics.
+        /// Override in concrete strategies to provide a custom name.
+        /// </summary>
+        public virtual string StrategyName => Characteristics.AlgorithmName;
+
+        /// <summary>
+        /// Bridges StrategyName to the StrategyBase.Name contract.
+        /// </summary>
+        public override string Name => StrategyName;
+
         /// <inheritdoc/>
         public new abstract CompressionCharacteristics Characteristics { get; }
 
@@ -974,5 +993,51 @@ namespace DataWarehouse.SDK.Contracts.Compression
                 _statistics.DecompressionFailures++;
             }
         }
+
+        #region Legacy Intelligence Helpers (Phase 25b removes these)
+
+        // TODO(25b): Remove -- intelligence belongs at plugin level per AD-05
+        /// <summary>Legacy: Gets a description for this strategy.</summary>
+        protected virtual string GetStrategyDescription() =>
+            $"{StrategyName} compression strategy with {Characteristics.TypicalCompressionRatio:P0} typical ratio";
+
+        // TODO(25b): Remove -- intelligence belongs at plugin level per AD-05
+        /// <summary>Legacy: Gets the knowledge payload for this strategy.</summary>
+        protected virtual Dictionary<string, object> GetKnowledgePayload() => new()
+        {
+            ["algorithm"] = Characteristics.AlgorithmName,
+            ["level"] = Level.ToString(),
+            ["typicalRatio"] = Characteristics.TypicalCompressionRatio,
+            ["compressionSpeed"] = Characteristics.CompressionSpeed,
+            ["decompressionSpeed"] = Characteristics.DecompressionSpeed,
+            ["supportsStreaming"] = Characteristics.SupportsStreaming,
+            ["supportsParallel"] = Characteristics.SupportsParallelCompression
+        };
+
+        // TODO(25b): Remove -- intelligence belongs at plugin level per AD-05
+        /// <summary>Legacy: Gets tags for this strategy.</summary>
+        protected virtual string[] GetKnowledgeTags() => new[]
+        {
+            "strategy",
+            "compression",
+            Characteristics.AlgorithmName.ToLowerInvariant(),
+            Level.ToString().ToLowerInvariant()
+        };
+
+        // TODO(25b): Remove -- intelligence belongs at plugin level per AD-05
+        /// <summary>Legacy: Gets capability metadata for this strategy.</summary>
+        protected virtual Dictionary<string, object> GetCapabilityMetadata() => new()
+        {
+            ["algorithm"] = Characteristics.AlgorithmName,
+            ["level"] = Level.ToString(),
+            ["typicalRatio"] = Characteristics.TypicalCompressionRatio
+        };
+
+        // TODO(25b): Remove -- intelligence belongs at plugin level per AD-05
+        /// <summary>Legacy: Gets the semantic description for AI-driven discovery.</summary>
+        protected virtual string GetSemanticDescription() =>
+            $"Use {StrategyName} for {Level} compression with {Characteristics.TypicalCompressionRatio:P0} typical ratio";
+
+        #endregion
     }
 }

@@ -31,7 +31,7 @@ namespace DataWarehouse.Plugins.UltimateInterface.Strategies.REST;
 internal sealed class RestInterfaceStrategy : SdkInterface.InterfaceStrategyBase, IPluginInterfaceStrategy
 {
     // IPluginInterfaceStrategy metadata
-    public string StrategyId => "rest";
+    public override string StrategyId => "rest";
     public string DisplayName => "REST API";
     public string SemanticDescription => "RESTful API interface with HTTP/HTTPS support, content negotiation, and standard CRUD operations.";
     public InterfaceCategory Category => InterfaceCategory.Http;

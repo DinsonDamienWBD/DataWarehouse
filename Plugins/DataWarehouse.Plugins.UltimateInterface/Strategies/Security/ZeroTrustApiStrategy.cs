@@ -31,7 +31,7 @@ namespace DataWarehouse.Plugins.UltimateInterface.Strategies.Security;
 internal sealed class ZeroTrustApiStrategy : SdkInterface.InterfaceStrategyBase, IPluginInterfaceStrategy
 {
     // IPluginInterfaceStrategy metadata
-    public string StrategyId => "zero-trust-api";
+    public override string StrategyId => "zero-trust-api";
     public string DisplayName => "Zero Trust API";
     public string SemanticDescription => "Zero Trust security model - every API request is authenticated and authorized with device posture checks and least-privilege enforcement.";
     public InterfaceCategory Category => InterfaceCategory.Innovation;

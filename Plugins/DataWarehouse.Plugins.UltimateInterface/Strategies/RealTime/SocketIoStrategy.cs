@@ -37,7 +37,7 @@ internal sealed class SocketIoStrategy : SdkInterface.InterfaceStrategyBase, IPl
     private readonly ConcurrentDictionary<string, SocketIoNamespace> _namespaces = new();
 
     // IPluginInterfaceStrategy metadata
-    public string StrategyId => "socket-io";
+    public override string StrategyId => "socket-io";
     public string DisplayName => "Socket.IO";
     public string SemanticDescription => "Socket.IO protocol with namespace separation, room support, acknowledgements, and Engine.IO transport negotiation.";
     public InterfaceCategory Category => InterfaceCategory.RealTime;

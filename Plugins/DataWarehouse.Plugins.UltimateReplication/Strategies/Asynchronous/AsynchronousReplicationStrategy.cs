@@ -245,11 +245,12 @@ namespace DataWarehouse.Plugins.UltimateReplication.Strategies.Asynchronous
         /// <summary>
         /// Disposes resources used by this strategy.
         /// </summary>
-        public void Dispose()
+        public new void Dispose()
         {
             _backgroundCts.Cancel();
             _backgroundTask?.Wait(TimeSpan.FromSeconds(5));
             _backgroundCts.Dispose();
+            base.Dispose();
         }
 
         /// <inheritdoc/>
