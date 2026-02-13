@@ -35,6 +35,7 @@ namespace DataWarehouse.SDK.Contracts.IntelligenceAware
     ///   <item>Anomaly detection in responses</item>
     /// </list>
     /// </remarks>
+    [Obsolete("Use InterfacePluginBase from DataWarehouse.SDK.Contracts.Hierarchy namespace. This class will be removed in Phase 28.")]
     public abstract class IntelligenceAwareConnectorPluginBase : IntelligenceAwarePluginBase
     {
         /// <summary>
@@ -239,6 +240,7 @@ namespace DataWarehouse.SDK.Contracts.IntelligenceAware
     /// Intelligence-aware base class for interface plugins (REST, gRPC, WebSocket, etc.).
     /// Provides hooks for NLP processing, intent recognition, and conversational interfaces.
     /// </summary>
+    [Obsolete("Use InterfacePluginBase from DataWarehouse.SDK.Contracts.Hierarchy namespace. This class will be removed in Phase 28.")]
     public abstract class IntelligenceAwareInterfacePluginBase : IntelligenceAwarePluginBase
     {
         /// <summary>
@@ -416,6 +418,7 @@ namespace DataWarehouse.SDK.Contracts.IntelligenceAware
     /// Intelligence-aware base class for encryption plugins.
     /// Provides hooks for cipher recommendation and threat assessment.
     /// </summary>
+    [Obsolete("Use EncryptionPluginBase from DataWarehouse.SDK.Contracts.Hierarchy namespace. This class will be removed in Phase 28.")]
     public abstract class IntelligenceAwareEncryptionPluginBase : IntelligenceAwarePluginBase
     {
         /// <summary>
@@ -691,6 +694,7 @@ namespace DataWarehouse.SDK.Contracts.IntelligenceAware
     /// Intelligence-aware base class for compression plugins.
     /// Provides hooks for compression algorithm recommendation based on content analysis.
     /// </summary>
+    [Obsolete("Use CompressionPluginBase from DataWarehouse.SDK.Contracts.Hierarchy namespace. This class will be removed in Phase 28.")]
     public abstract class IntelligenceAwareCompressionPluginBase : IntelligenceAwarePluginBase
     {
         /// <summary>
@@ -944,6 +948,7 @@ namespace DataWarehouse.SDK.Contracts.IntelligenceAware
     /// Intelligence-aware base class for storage plugins.
     /// Provides hooks for tiering prediction and access pattern analysis.
     /// </summary>
+    [Obsolete("Use StoragePluginBase from DataWarehouse.SDK.Contracts.Hierarchy namespace. This class will be removed in Phase 28.")]
     public abstract class IntelligenceAwareStoragePluginBase : IntelligenceAwarePluginBase
     {
         /// <summary>
@@ -1224,6 +1229,7 @@ namespace DataWarehouse.SDK.Contracts.IntelligenceAware
     /// Intelligence-aware base class for access control plugins.
     /// Provides hooks for UEBA (User and Entity Behavior Analytics) and anomaly detection.
     /// </summary>
+    [Obsolete("Use SecurityPluginBase from DataWarehouse.SDK.Contracts.Hierarchy namespace. This class will be removed in Phase 28.")]
     public abstract class IntelligenceAwareAccessControlPluginBase : IntelligenceAwarePluginBase
     {
         /// <summary>
@@ -1493,6 +1499,7 @@ namespace DataWarehouse.SDK.Contracts.IntelligenceAware
     /// Intelligence-aware base class for compliance plugins.
     /// Provides hooks for PII detection, compliance classification, and sensitivity assessment.
     /// </summary>
+    [Obsolete("Use SecurityPluginBase from DataWarehouse.SDK.Contracts.Hierarchy namespace. This class will be removed in Phase 28.")]
     public abstract class IntelligenceAwareCompliancePluginBase : IntelligenceAwarePluginBase
     {
         /// <summary>
@@ -1767,6 +1774,7 @@ namespace DataWarehouse.SDK.Contracts.IntelligenceAware
     /// Intelligence-aware base class for data management plugins.
     /// Provides hooks for semantic deduplication and lifecycle prediction.
     /// </summary>
+    [Obsolete("Use DataManagementPluginBase from DataWarehouse.SDK.Contracts.Hierarchy namespace. This class will be removed in Phase 28.")]
     public abstract class IntelligenceAwareDataManagementPluginBase : IntelligenceAwarePluginBase
     {
         /// <summary>
@@ -2009,6 +2017,7 @@ namespace DataWarehouse.SDK.Contracts.IntelligenceAware
     ///   <item>Intelligent key lifecycle management</item>
     /// </list>
     /// </remarks>
+    [Obsolete("Use SecurityPluginBase from DataWarehouse.SDK.Contracts.Hierarchy namespace. This class will be removed in Phase 28.")]
     public abstract class IntelligenceAwareKeyManagementPluginBase : IntelligenceAwarePluginBase
     {
         /// <summary>
@@ -3264,6 +3273,7 @@ namespace DataWarehouse.SDK.Contracts.IntelligenceAware
     ///   <item>Data quality assessment and validation</item>
     /// </list>
     /// </remarks>
+    [Obsolete("Use StoragePluginBase from DataWarehouse.SDK.Contracts.Hierarchy namespace. This class will be removed in Phase 28.")]
     public abstract class IntelligenceAwareDatabasePluginBase : IntelligenceAwarePluginBase
     {
         /// <summary>
