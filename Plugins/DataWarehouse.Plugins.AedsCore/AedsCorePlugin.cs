@@ -1,4 +1,6 @@
 using DataWarehouse.SDK.Contracts;
+using DataWarehouse.SDK.Contracts.Hierarchy;
+using DataWarehouse.SDK.Contracts.IntelligenceAware;
 using DataWarehouse.SDK.Distribution;
 using DataWarehouse.SDK.Primitives;
 using Microsoft.Extensions.Logging;
@@ -29,7 +31,7 @@ namespace DataWarehouse.Plugins.AedsCore;
 /// transport plugin to be registered. Gracefully degrades if specific transports are unavailable.
 /// </para>
 /// </remarks>
-public class AedsCorePlugin : LegacyFeaturePluginBase
+public class AedsCorePlugin : OrchestrationPluginBase
 {
     private readonly ILogger<AedsCorePlugin> _logger;
     private readonly Dictionary<string, IntentManifest> _manifestCache = new();
@@ -53,6 +55,9 @@ public class AedsCorePlugin : LegacyFeaturePluginBase
 
     /// <inheritdoc />
     public override string Version => "1.0.0";
+
+    /// <inheritdoc/>
+    public override string OrchestrationMode => "AedsCore";
 
     /// <inheritdoc />
     public override PluginCategory Category => PluginCategory.FeatureProvider;

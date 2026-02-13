@@ -1,5 +1,7 @@
 using DataWarehouse.SDK;
 using DataWarehouse.SDK.Contracts;
+using DataWarehouse.SDK.Contracts.Hierarchy;
+using DataWarehouse.SDK.Contracts.IntelligenceAware;
 using DataWarehouse.SDK.Distribution;
 using DataWarehouse.SDK.Primitives;
 using DataWarehouse.SDK.Utilities;
@@ -11,7 +13,7 @@ namespace DataWarehouse.Plugins.AedsCore.Extensions;
 /// Zero-Trust Pairing Plugin: PIN-based client registration and trust elevation.
 /// Generates cryptographically secure 6-digit PINs valid for 5 minutes.
 /// </summary>
-public sealed class ZeroTrustPairingPlugin : LegacyFeaturePluginBase
+public sealed class ZeroTrustPairingPlugin : SecurityPluginBase
 {
     private readonly Dictionary<string, (string Pin, DateTimeOffset Expires)> _pendingPins = new();
 
@@ -29,6 +31,9 @@ public sealed class ZeroTrustPairingPlugin : LegacyFeaturePluginBase
     /// Gets the plugin version.
     /// </summary>
     public override string Version => "1.0.0";
+
+    /// <inheritdoc/>
+    public override string SecurityDomain => "ZeroTrustPairing";
 
     /// <summary>
     /// Gets the plugin category.

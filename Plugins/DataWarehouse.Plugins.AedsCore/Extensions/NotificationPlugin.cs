@@ -1,5 +1,7 @@
 using DataWarehouse.SDK;
 using DataWarehouse.SDK.Contracts;
+using DataWarehouse.SDK.Contracts.Hierarchy;
+using DataWarehouse.SDK.Contracts.IntelligenceAware;
 using DataWarehouse.SDK.Distribution;
 using DataWarehouse.SDK.Primitives;
 using System.Diagnostics;
@@ -11,7 +13,7 @@ namespace DataWarehouse.Plugins.AedsCore.Extensions;
 /// Notification Plugin: Platform-specific toast/modal notifications.
 /// Supports Windows (native toast), Linux (libnotify), macOS (osascript).
 /// </summary>
-public sealed class NotificationPlugin : LegacyFeaturePluginBase
+public sealed class NotificationPlugin : PlatformPluginBase
 {
     /// <summary>
     /// Gets the plugin identifier.
@@ -27,6 +29,9 @@ public sealed class NotificationPlugin : LegacyFeaturePluginBase
     /// Gets the plugin version.
     /// </summary>
     public override string Version => "1.0.0";
+
+    /// <inheritdoc/>
+    public override string PlatformDomain => "Notification";
 
     /// <summary>
     /// Gets the plugin category.

@@ -1,5 +1,7 @@
 using DataWarehouse.SDK;
 using DataWarehouse.SDK.Contracts;
+using DataWarehouse.SDK.Contracts.Hierarchy;
+using DataWarehouse.SDK.Contracts.IntelligenceAware;
 using DataWarehouse.SDK.Distribution;
 using DataWarehouse.SDK.Primitives;
 using DataWarehouse.SDK.Utilities;
@@ -11,7 +13,7 @@ namespace DataWarehouse.Plugins.AedsCore.Extensions;
 /// Mule Plugin: Air-gap USB transport for manifests and payloads.
 /// Integrates with tri-mode USB (T79) for offline distribution.
 /// </summary>
-public sealed class MulePlugin : LegacyFeaturePluginBase
+public sealed class MulePlugin : DataManagementPluginBase
 {
     /// <summary>
     /// Gets the plugin identifier.
@@ -27,6 +29,9 @@ public sealed class MulePlugin : LegacyFeaturePluginBase
     /// Gets the plugin version.
     /// </summary>
     public override string Version => "1.0.0";
+
+    /// <inheritdoc/>
+    public override string DataManagementDomain => "DataTransfer";
 
     /// <summary>
     /// Gets the plugin category.
