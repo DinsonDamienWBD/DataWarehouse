@@ -5,17 +5,17 @@
 See: .planning/PROJECT.md (updated 2026-02-12)
 
 **Core value:** SDK must pass hyperscale/military-level code review -- clean hierarchy, secure by default, distributed-ready, zero warnings.
-**Current focus:** Phase 24 complete -- ready for Phase 25b
+**Current focus:** Phase 25a complete -- ready for Phase 25b
 
 ## Current Position
 
 Milestone: v2.0 SDK Hardening & Distributed Infrastructure
-Phase: 24 of 29 (Plugin Hierarchy, Storage Core & Input Validation) -- COMPLETE
-Plan: 7 of 7 in current phase (all done)
+Phase: 25a of 29 (Strategy Hierarchy Design & API Contracts) -- COMPLETE
+Plan: 5 of 5 in current phase (all done)
 Status: Phase complete
-Last activity: 2026-02-14 -- Phase 24 complete (7/7 plans)
+Last activity: 2026-02-14 -- Phase 25a complete (5/5 plans)
 
-Progress: [##############░░] 58% (19/33 plans)
+Progress: [################░] 73% (24/33 plans)
 
 ## Performance Metrics
 
@@ -25,8 +25,8 @@ Progress: [##############░░] 58% (19/33 plans)
 - Timeline: 30 days (2026-01-13 to 2026-02-11)
 
 **v2.0:**
-- Total plans completed: 19 / 33 estimated
-- Average duration: ~8 min/plan
+- Total plans completed: 24 / 33 estimated
+- Average duration: ~12 min/plan
 
 | Phase | Plan | Duration | Tasks | Files |
 |-------|------|----------|-------|-------|
@@ -48,6 +48,11 @@ Progress: [##############░░] 58% (19/33 plans)
 | 24 | 05 - Composable Services | ~6 min | 2 | 8 |
 | 24 | 06 - Input Validation | ~8 min | 3 | 10 |
 | 24 | 07 - Build Verification | ~7 min | 2 | 25 |
+| 25a | 01 - StrategyBase Root Class | ~15 min | 2 | 2 |
+| 25a | 04 - SdkCompatibility & NullObjects | ~10 min | 2 | 2 |
+| 25a | 02 - Domain Base Refactoring | ~45 min | 3 | 19 |
+| 25a | 03 - Backward-Compat Shims | ~90 min | 1 | 83 |
+| 25a | 05 - Build Verification | ~15 min | 1 | 0 |
 
 ## Accumulated Context
 
@@ -81,6 +86,11 @@ Progress: [##############░░] 58% (19/33 plans)
 - All Regex in SDK hardened with 100ms timeout (VALID-04)
 - Guards/SizeLimitOptions: centralized input validation (10MB messages, 1MB knowledge objects)
 - Member hiding resolution: `new` keyword for strategy base Dispose/DisposeAsync where hierarchy creates legitimate hiding
+- Flat strategy hierarchy: StrategyBase -> domain base -> concrete (AD-05, no deep inheritance)
+- Legacy intelligence backward-compat on StrategyBase only (not domain bases) with TODO(25b)
+- Name bridge pattern: domain bases bridge StrategyName/DisplayName to StrategyBase.Name
+- Default StrategyId from GetType().Name for bases that never had identity properties
+- Intelligence region removal was more aggressive than planned -- domain identity properties needed re-addition
 
 ### SDK Audit Results (2026-02-14)
 
@@ -126,9 +136,16 @@ Progress: [##############░░] 58% (19/33 plans)
   - 24-06: Guards, SizeLimitOptions, PluginIdentity, Regex timeout hardening (VALID-01 through VALID-05)
   - 24-07: Build verification -- 66/69 projects pass (3 pre-existing), 21 plugin files fixed for LegacyFeaturePluginBase
   - 2 deviations: FeaturePluginBase reference fix (Rule 1), member hiding resolution (Rule 1)
+- [x] **Phase 25a: Strategy Hierarchy Design & API Contracts** (5/5 plans) -- StrategyBase root, domain base refactoring, backward-compat, SdkCompatibility, verification
+  - 25a-01: IStrategy interface + StrategyBase abstract root (lifecycle, dispose, metadata, zero intelligence)
+  - 25a-04: SdkCompatibilityAttribute + NullMessageBus/NullLoggerProvider (null-object pattern)
+  - 25a-02: 19 domain bases refactored to inherit StrategyBase, 1,982 lines intelligence removed
+  - 25a-03: Backward-compat shims (legacy methods on StrategyBase, re-added domain identity, 69 plugin fixes)
+  - 25a-05: Build verification -- 0 new errors, 20 bases inherit StrategyBase, intelligence clean
+  - 8 deviations: StrategyId/StrategyName re-addition (Rule 1), GetStrategyDescription helpers (Rule 1), Interface override fix (Rule 3), Dispose hiding (Rule 1), NullLogger .NET 10 (Rule 1), StrategyId hiding (Rule 1), XML cref fix (Rule 3), IsInitialized hiding (Rule 1)
 
 ## Session Continuity
 
 Last session: 2026-02-14
-Stopped at: Completed Phase 24 (all 7 plans)
+Stopped at: Completed Phase 25a (all 5 plans)
 Resume: `/gsd:plan-phase 25b` or `/gsd:execute-phase 25b`
