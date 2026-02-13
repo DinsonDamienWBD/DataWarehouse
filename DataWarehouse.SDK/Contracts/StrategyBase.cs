@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
+using DataWarehouse.SDK.AI;
 
 namespace DataWarehouse.SDK.Contracts
 {
@@ -159,5 +160,75 @@ namespace DataWarehouse.SDK.Contracts
         {
             ObjectDisposedException.ThrowIf(_disposed, this);
         }
+
+        #region Legacy Intelligence Compatibility (Phase 25b removes these)
+
+        // LEGACY: These methods exist solely for backward compatibility with concrete
+        // strategies that override intelligence methods from the pre-v2.0 hierarchy.
+        // Per AD-05, intelligence belongs at the plugin level, NOT on strategies.
+        // Phase 25b removes these methods after migrating all concrete strategies.
+
+        /// <summary>
+        /// Legacy method for intelligence configuration. No-op in new hierarchy.
+        /// Intelligence belongs at the plugin level per AD-05.
+        /// </summary>
+        // TODO(25b): Remove -- intelligence belongs at plugin level per AD-05
+        public virtual void ConfigureIntelligence(IMessageBus? messageBus) { }
+
+        /// <summary>
+        /// Legacy method for strategy knowledge registration. Returns a default
+        /// KnowledgeObject in new hierarchy. Intelligence belongs at the plugin level per AD-05.
+        /// </summary>
+        // TODO(25b): Remove -- intelligence belongs at plugin level per AD-05
+        public virtual KnowledgeObject GetStrategyKnowledge()
+        {
+            return new KnowledgeObject
+            {
+                Id = $"strategy.{StrategyId}",
+                Topic = "strategy",
+                SourcePluginId = "sdk",
+                SourcePluginName = Name,
+                KnowledgeType = "capability",
+                Description = Description,
+                Payload = new Dictionary<string, object>(),
+                Tags = Array.Empty<string>()
+            };
+        }
+
+        /// <summary>
+        /// Legacy method for strategy capability registration. Returns a default
+        /// RegisteredCapability in new hierarchy. Intelligence belongs at the plugin level per AD-05.
+        /// </summary>
+        // TODO(25b): Remove -- intelligence belongs at plugin level per AD-05
+        public virtual RegisteredCapability GetStrategyCapability()
+        {
+            return new RegisteredCapability
+            {
+                CapabilityId = $"strategy.{StrategyId}",
+                DisplayName = Name,
+                Description = Description,
+                Category = CapabilityCategory.Custom,
+                PluginId = "sdk",
+                PluginName = Name,
+                PluginVersion = "1.0.0",
+                Tags = Array.Empty<string>(),
+                SemanticDescription = Description
+            };
+        }
+
+        /// <summary>
+        /// Legacy message bus property. Always null in new hierarchy.
+        /// Intelligence belongs at the plugin level per AD-05.
+        /// </summary>
+        // TODO(25b): Remove -- intelligence belongs at plugin level per AD-05
+        protected IMessageBus? MessageBus { get; private set; }
+
+        /// <summary>
+        /// Legacy intelligence availability check. Always returns false in new hierarchy.
+        /// </summary>
+        // TODO(25b): Remove -- intelligence belongs at plugin level per AD-05
+        protected bool IsIntelligenceAvailable => false;
+
+        #endregion
     }
 }

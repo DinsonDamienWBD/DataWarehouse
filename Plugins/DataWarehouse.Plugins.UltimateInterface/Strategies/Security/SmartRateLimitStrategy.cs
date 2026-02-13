@@ -32,7 +32,7 @@ namespace DataWarehouse.Plugins.UltimateInterface.Strategies.Security;
 internal sealed class SmartRateLimitStrategy : SdkInterface.InterfaceStrategyBase, IPluginInterfaceStrategy
 {
     // IPluginInterfaceStrategy metadata
-    public string StrategyId => "smart-rate-limit";
+    public override string StrategyId => "smart-rate-limit";
     public string DisplayName => "Smart Rate Limit";
     public string SemanticDescription => "Intelligent rate limiting - tracks request rates with sliding windows, uses AI for abuse detection, returns 429 with Retry-After for exceeded limits.";
     public InterfaceCategory Category => InterfaceCategory.Innovation;

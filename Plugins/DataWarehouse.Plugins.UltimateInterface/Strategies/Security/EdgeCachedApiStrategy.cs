@@ -33,7 +33,7 @@ namespace DataWarehouse.Plugins.UltimateInterface.Strategies.Security;
 internal sealed class EdgeCachedApiStrategy : SdkInterface.InterfaceStrategyBase, IPluginInterfaceStrategy
 {
     // IPluginInterfaceStrategy metadata
-    public string StrategyId => "edge-cached-api";
+    public override string StrategyId => "edge-cached-api";
     public string DisplayName => "Edge-Cached API";
     public string SemanticDescription => "Edge caching with conditional requests - accelerates API responses using ETags, Last-Modified, and 304 Not Modified responses.";
     public InterfaceCategory Category => InterfaceCategory.Innovation;

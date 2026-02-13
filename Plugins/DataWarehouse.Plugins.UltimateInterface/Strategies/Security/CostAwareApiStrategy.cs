@@ -32,7 +32,7 @@ namespace DataWarehouse.Plugins.UltimateInterface.Strategies.Security;
 internal sealed class CostAwareApiStrategy : SdkInterface.InterfaceStrategyBase, IPluginInterfaceStrategy
 {
     // IPluginInterfaceStrategy metadata
-    public string StrategyId => "cost-aware-api";
+    public override string StrategyId => "cost-aware-api";
     public string DisplayName => "Cost-Aware API";
     public string SemanticDescription => "Cost tracking and budget enforcement - computes operation costs, tracks budgets, returns cost headers, rejects over-budget requests with 402.";
     public InterfaceCategory Category => InterfaceCategory.Innovation;

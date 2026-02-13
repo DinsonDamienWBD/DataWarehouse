@@ -30,7 +30,7 @@ namespace DataWarehouse.Plugins.UltimateInterface.Strategies.Convergence;
 internal sealed class SchemaConflictResolutionUIStrategy : SdkInterface.InterfaceStrategyBase, IPluginInterfaceStrategy
 {
     // IPluginInterfaceStrategy metadata
-    public string StrategyId => "schema-conflict-resolution";
+    public override string StrategyId => "schema-conflict-resolution";
     public string DisplayName => "Schema Conflict Resolution";
     public string SemanticDescription => "Interactive per-field conflict resolution UI with diff visualization.";
     public InterfaceCategory Category => InterfaceCategory.Convergence;

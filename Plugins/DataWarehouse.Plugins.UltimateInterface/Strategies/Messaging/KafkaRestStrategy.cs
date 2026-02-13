@@ -42,7 +42,7 @@ internal sealed class KafkaRestStrategy : SdkInterface.InterfaceStrategyBase, IP
     private readonly ConcurrentDictionary<string, KafkaConsumerGroup> _consumerGroups = new();
     private readonly ConcurrentDictionary<string, KafkaConsumerInstance> _consumers = new();
 
-    public string StrategyId => "kafka-rest";
+    public override string StrategyId => "kafka-rest";
     public string DisplayName => "Kafka REST Proxy";
     public string SemanticDescription => "Kafka REST Proxy API for HTTP-based Kafka message production/consumption with schema registry support (Avro, JSON Schema, Protobuf).";
     public InterfaceCategory Category => InterfaceCategory.Messaging;

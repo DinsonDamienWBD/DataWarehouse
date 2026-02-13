@@ -33,7 +33,7 @@ namespace DataWarehouse.Plugins.UltimateInterface.Strategies.Conversational;
 internal sealed class GenericWebhookStrategy : SdkInterface.InterfaceStrategyBase, IPluginInterfaceStrategy
 {
     // IPluginInterfaceStrategy metadata
-    public string StrategyId => "webhook";
+    public override string StrategyId => "webhook";
     public string DisplayName => "Generic Webhook";
     public string SemanticDescription => "Universal webhook receiver with configurable event routing, HMAC verification, and retry detection.";
     public InterfaceCategory Category => InterfaceCategory.Conversational;

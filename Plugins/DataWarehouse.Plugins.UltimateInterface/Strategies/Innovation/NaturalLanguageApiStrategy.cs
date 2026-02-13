@@ -32,7 +32,7 @@ namespace DataWarehouse.Plugins.UltimateInterface.Strategies.Innovation;
 internal sealed class NaturalLanguageApiStrategy : SdkInterface.InterfaceStrategyBase, IPluginInterfaceStrategy
 {
     // IPluginInterfaceStrategy metadata
-    public string StrategyId => "natural-language-api";
+    public override string StrategyId => "natural-language-api";
     public string DisplayName => "Natural Language API";
     public string SemanticDescription => "Accept natural language queries in plain English, map to DataWarehouse operations via AI or keyword matching.";
     public InterfaceCategory Category => InterfaceCategory.Innovation;

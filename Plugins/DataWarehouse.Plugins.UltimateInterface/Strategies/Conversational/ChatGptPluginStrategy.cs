@@ -31,7 +31,7 @@ namespace DataWarehouse.Plugins.UltimateInterface.Strategies.Conversational;
 internal sealed class ChatGptPluginStrategy : SdkInterface.InterfaceStrategyBase, IPluginInterfaceStrategy
 {
     // IPluginInterfaceStrategy metadata
-    public string StrategyId => "chatgpt-plugin";
+    public override string StrategyId => "chatgpt-plugin";
     public string DisplayName => "ChatGPT Plugin";
     public string SemanticDescription => "AI-native interface for ChatGPT plugin integration with manifest, OpenAPI spec, and natural language query processing.";
     public InterfaceCategory Category => InterfaceCategory.Conversational;

@@ -133,6 +133,8 @@ public abstract class DataLakeStrategyBase : StrategyBase, IDataLakeStrategy
     public override abstract string StrategyId { get; }
     /// <inheritdoc/>
     public abstract string DisplayName { get; }
+    /// <summary>Bridges DisplayName to the StrategyBase.Name contract.</summary>
+    public override string Name => DisplayName;
     /// <inheritdoc/>
     public abstract DataLakeCategory Category { get; }
     /// <inheritdoc/>

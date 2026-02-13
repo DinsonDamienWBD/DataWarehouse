@@ -32,7 +32,7 @@ namespace DataWarehouse.Plugins.UltimateInterface.Strategies.Innovation;
 internal sealed class AdaptiveApiStrategy : SdkInterface.InterfaceStrategyBase, IPluginInterfaceStrategy
 {
     // IPluginInterfaceStrategy metadata
-    public string StrategyId => "adaptive-api";
+    public override string StrategyId => "adaptive-api";
     public string DisplayName => "Adaptive API";
     public string SemanticDescription => "Automatically adjusts response detail level and format based on client capabilities (User-Agent, Accept, bandwidth).";
     public InterfaceCategory Category => InterfaceCategory.Innovation;

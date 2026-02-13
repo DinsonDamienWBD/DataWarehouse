@@ -30,7 +30,7 @@ namespace DataWarehouse.Plugins.UltimateInterface.Strategies.Security;
 internal sealed class QuantumSafeApiStrategy : SdkInterface.InterfaceStrategyBase, IPluginInterfaceStrategy
 {
     // IPluginInterfaceStrategy metadata
-    public string StrategyId => "quantum-safe-api";
+    public override string StrategyId => "quantum-safe-api";
     public string DisplayName => "Quantum-Safe API";
     public string SemanticDescription => "Post-quantum cryptography - API using ML-KEM key encapsulation and ML-DSA signatures to resist quantum computer attacks.";
     public InterfaceCategory Category => InterfaceCategory.Innovation;

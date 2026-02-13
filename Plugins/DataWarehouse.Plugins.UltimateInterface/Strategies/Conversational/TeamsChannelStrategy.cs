@@ -32,7 +32,7 @@ namespace DataWarehouse.Plugins.UltimateInterface.Strategies.Conversational;
 internal sealed class TeamsChannelStrategy : SdkInterface.InterfaceStrategyBase, IPluginInterfaceStrategy
 {
     // IPluginInterfaceStrategy metadata
-    public string StrategyId => "teams";
+    public override string StrategyId => "teams";
     public string DisplayName => "Microsoft Teams";
     public string SemanticDescription => "Conversational interface for Microsoft Teams integration with Bot Framework activities and Adaptive Cards.";
     public InterfaceCategory Category => InterfaceCategory.Conversational;

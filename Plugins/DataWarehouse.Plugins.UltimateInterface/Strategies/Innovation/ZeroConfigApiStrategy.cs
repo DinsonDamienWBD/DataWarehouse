@@ -32,7 +32,7 @@ namespace DataWarehouse.Plugins.UltimateInterface.Strategies.Innovation;
 internal sealed class ZeroConfigApiStrategy : SdkInterface.InterfaceStrategyBase, IPluginInterfaceStrategy
 {
     // IPluginInterfaceStrategy metadata
-    public string StrategyId => "zero-config-api";
+    public override string StrategyId => "zero-config-api";
     public string DisplayName => "Zero-Config API";
     public string SemanticDescription => "Auto-discovers available operations, returns self-describing root document, supports ?discover=true for guided exploration.";
     public InterfaceCategory Category => InterfaceCategory.Innovation;

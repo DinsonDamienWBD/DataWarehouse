@@ -31,7 +31,7 @@ namespace DataWarehouse.Plugins.UltimateInterface.Strategies.Innovation;
 internal sealed class SelfDocumentingApiStrategy : SdkInterface.InterfaceStrategyBase, IPluginInterfaceStrategy
 {
     // IPluginInterfaceStrategy metadata
-    public string StrategyId => "self-documenting-api";
+    public override string StrategyId => "self-documenting-api";
     public string DisplayName => "Self-Documenting API";
     public string SemanticDescription => "Every response includes X-Api-Help header, supports ?explain=true for docs, root path returns navigable API map.";
     public InterfaceCategory Category => InterfaceCategory.Innovation;

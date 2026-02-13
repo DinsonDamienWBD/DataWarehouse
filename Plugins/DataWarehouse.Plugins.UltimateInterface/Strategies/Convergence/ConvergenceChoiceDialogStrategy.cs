@@ -30,7 +30,7 @@ namespace DataWarehouse.Plugins.UltimateInterface.Strategies.Convergence;
 internal sealed class ConvergenceChoiceDialogStrategy : SdkInterface.InterfaceStrategyBase, IPluginInterfaceStrategy
 {
     // IPluginInterfaceStrategy metadata
-    public string StrategyId => "convergence-choice-dialog";
+    public override string StrategyId => "convergence-choice-dialog";
     public string DisplayName => "Convergence Choice Dialog";
     public string SemanticDescription => "Provides 'Keep Separate' vs 'Merge' decision dialog for air-gapped instances.";
     public InterfaceCategory Category => InterfaceCategory.Convergence;

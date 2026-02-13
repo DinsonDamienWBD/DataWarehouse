@@ -30,7 +30,7 @@ namespace DataWarehouse.Plugins.UltimateInterface.Strategies.Convergence;
 internal sealed class MergePreviewStrategy : SdkInterface.InterfaceStrategyBase, IPluginInterfaceStrategy
 {
     // IPluginInterfaceStrategy metadata
-    public string StrategyId => "merge-preview";
+    public override string StrategyId => "merge-preview";
     public string DisplayName => "Merge Preview";
     public string SemanticDescription => "Shows preview of merge outcome (add/update/delete records, conflicts remaining).";
     public InterfaceCategory Category => InterfaceCategory.Convergence;

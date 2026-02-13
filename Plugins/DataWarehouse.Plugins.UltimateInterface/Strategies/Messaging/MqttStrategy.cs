@@ -40,7 +40,7 @@ internal sealed class MqttStrategy : SdkInterface.InterfaceStrategyBase, IPlugin
     private readonly ConcurrentDictionary<string, List<MqttMessage>> _retainedMessages = new();
     private readonly ConcurrentDictionary<string, MqttSession> _sessions = new();
 
-    public string StrategyId => "mqtt";
+    public override string StrategyId => "mqtt";
     public string DisplayName => "MQTT";
     public string SemanticDescription => "MQTT 5.0 protocol for IoT and lightweight publish-subscribe messaging with QoS, retained messages, and shared subscriptions.";
     public InterfaceCategory Category => InterfaceCategory.Messaging;

@@ -21,7 +21,7 @@ namespace DataWarehouse.Plugins.UltimateInterface.Strategies.RPC;
 /// </remarks>
 internal sealed class GrpcWebStrategy : SdkInterface.InterfaceStrategyBase, IPluginInterfaceStrategy
 {
-    public string StrategyId => "grpc-web";
+    public override string StrategyId => "grpc-web";
     public string DisplayName => "gRPC-Web";
     public string SemanticDescription => "Browser-compatible gRPC-Web interface with HTTP/1.1 support, base64 encoding, and CORS.";
     public InterfaceCategory Category => InterfaceCategory.Rpc;

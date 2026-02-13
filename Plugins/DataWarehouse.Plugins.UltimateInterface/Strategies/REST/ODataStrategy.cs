@@ -32,7 +32,7 @@ namespace DataWarehouse.Plugins.UltimateInterface.Strategies.REST;
 internal sealed class ODataStrategy : SdkInterface.InterfaceStrategyBase, IPluginInterfaceStrategy
 {
     // IPluginInterfaceStrategy metadata
-    public string StrategyId => "odata";
+    public override string StrategyId => "odata";
     public string DisplayName => "OData";
     public string SemanticDescription => "Open Data Protocol (OData) v4 interface with advanced query options including filter, select, orderby, expand, and metadata.";
     public InterfaceCategory Category => InterfaceCategory.Http;

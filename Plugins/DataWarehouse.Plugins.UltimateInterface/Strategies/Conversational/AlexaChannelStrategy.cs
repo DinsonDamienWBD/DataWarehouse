@@ -33,7 +33,7 @@ namespace DataWarehouse.Plugins.UltimateInterface.Strategies.Conversational;
 internal sealed class AlexaChannelStrategy : SdkInterface.InterfaceStrategyBase, IPluginInterfaceStrategy
 {
     // IPluginInterfaceStrategy metadata
-    public string StrategyId => "alexa";
+    public override string StrategyId => "alexa";
     public string DisplayName => "Amazon Alexa";
     public string SemanticDescription => "Voice-driven interface for Amazon Alexa skills with intent recognition, SSML responses, and multi-turn dialog.";
     public InterfaceCategory Category => InterfaceCategory.Conversational;

@@ -31,7 +31,7 @@ namespace DataWarehouse.Plugins.UltimateInterface.Strategies.Innovation;
 internal sealed class ProtocolMorphingStrategy : SdkInterface.InterfaceStrategyBase, IPluginInterfaceStrategy
 {
     // IPluginInterfaceStrategy metadata
-    public string StrategyId => "protocol-morphing";
+    public override string StrategyId => "protocol-morphing";
     public string DisplayName => "Protocol Morphing";
     public string SemanticDescription => "Transforms requests from one protocol format to another via X-Target-Protocol header (REST ↔ GraphQL ↔ JSON-RPC).";
     public InterfaceCategory Category => InterfaceCategory.Innovation;

@@ -36,7 +36,7 @@ internal sealed class MockServerStrategy : SdkInterface.InterfaceStrategyBase, I
     private bool _recordingMode;
 
     // IPluginInterfaceStrategy metadata
-    public string StrategyId => "mock-server";
+    public override string StrategyId => "mock-server";
     public string DisplayName => "Mock Server";
     public string SemanticDescription => "Development mock server for testing with configurable responses, delay simulation, and request recording mode.";
     public InterfaceCategory Category => InterfaceCategory.Innovation;

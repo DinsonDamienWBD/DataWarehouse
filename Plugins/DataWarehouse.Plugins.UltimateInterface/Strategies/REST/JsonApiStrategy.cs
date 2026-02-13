@@ -33,7 +33,7 @@ namespace DataWarehouse.Plugins.UltimateInterface.Strategies.REST;
 internal sealed class JsonApiStrategy : SdkInterface.InterfaceStrategyBase, IPluginInterfaceStrategy
 {
     // IPluginInterfaceStrategy metadata
-    public string StrategyId => "jsonapi";
+    public override string StrategyId => "jsonapi";
     public string DisplayName => "JSON:API";
     public string SemanticDescription => "Implements JSON:API specification with resource objects, relationships, compound documents, and sparse fieldsets.";
     public InterfaceCategory Category => InterfaceCategory.Http;

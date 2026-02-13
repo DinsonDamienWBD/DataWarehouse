@@ -32,7 +32,7 @@ namespace DataWarehouse.Plugins.UltimateInterface.Strategies.Query;
 /// </remarks>
 internal sealed class PostGraphileStrategy : SdkInterface.InterfaceStrategyBase, IPluginInterfaceStrategy
 {
-    public string StrategyId => "postgraphile";
+    public override string StrategyId => "postgraphile";
     public string DisplayName => "PostGraphile";
     public string SemanticDescription => "PostGraphile-style GraphQL with auto-introspected schema, CRUD operations, and computed columns.";
     public InterfaceCategory Category => InterfaceCategory.Query;

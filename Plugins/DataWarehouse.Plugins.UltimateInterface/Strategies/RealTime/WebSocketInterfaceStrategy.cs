@@ -36,7 +36,7 @@ internal sealed class WebSocketInterfaceStrategy : SdkInterface.InterfaceStrateg
     private Task? _heartbeatTask;
 
     // IPluginInterfaceStrategy metadata
-    public string StrategyId => "websocket";
+    public override string StrategyId => "websocket";
     public string DisplayName => "WebSocket";
     public string SemanticDescription => "Full-duplex bidirectional communication over WebSocket with room support, heartbeat, and message routing.";
     public InterfaceCategory Category => InterfaceCategory.RealTime;

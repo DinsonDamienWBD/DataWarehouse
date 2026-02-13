@@ -31,7 +31,7 @@ namespace DataWarehouse.Plugins.UltimateInterface.Strategies.DeveloperExperience
 internal sealed class InstantSdkGenerationStrategy : SdkInterface.InterfaceStrategyBase, IPluginInterfaceStrategy
 {
     // IPluginInterfaceStrategy metadata
-    public string StrategyId => "instant-sdk-generation";
+    public override string StrategyId => "instant-sdk-generation";
     public string DisplayName => "Instant SDK Generation";
     public string SemanticDescription => "Generate client SDKs for any supported language (C#, Python, TypeScript, Java, Go, Rust) via GET /sdk/{language} endpoint with introspection-based type generation.";
     public InterfaceCategory Category => InterfaceCategory.Innovation;

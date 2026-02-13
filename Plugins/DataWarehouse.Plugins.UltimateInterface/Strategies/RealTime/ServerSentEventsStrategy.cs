@@ -39,7 +39,7 @@ internal sealed class ServerSentEventsStrategy : SdkInterface.InterfaceStrategyB
     private long _eventIdCounter = 0;
 
     // IPluginInterfaceStrategy metadata
-    public string StrategyId => "sse";
+    public override string StrategyId => "sse";
     public string DisplayName => "Server-Sent Events";
     public string SemanticDescription => "Server-to-client event streaming over HTTP with automatic reconnection and event filtering.";
     public InterfaceCategory Category => InterfaceCategory.RealTime;
