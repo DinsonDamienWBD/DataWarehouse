@@ -369,17 +369,17 @@ Complete the stub implementations in DataWarehouseHost (CopyFiles, RegisterServi
   5. `dw live` starts an in-memory DW instance that CLI/GUI can connect to; all data vanishes on shutdown
   6. `dw install --path <path> --service --autostart` creates a working DW installation with registered service and autostart on Windows, Linux, and macOS
   7. `dw install --from-usb <source> --path <target>` clones a portable DW instance to local disk with remapped paths and registered service
-**Plans**: TBD (estimated 6-8 plans)
+**Plans**: 8 plans
 
 Plans:
-- [ ] 31-01: DynamicCommandRegistry — subscribe to capability events, auto-generate commands from live capabilities
-- [ ] 31-02: NLP query routing — Shared → MessageBridge → UltimateInterface → Knowledge Bank with graceful degradation
-- [ ] 31-03: Remove mocks/stubs — real kernel startup in ServerCommands, real in-memory message queue in MessageBridge.SendInProcessAsync, real InstanceManager.ExecuteAsync error handling
-- [ ] 31-04: Launcher endpoint alignment — ensure Launcher exposes `/api/v1/*` endpoints compatible with RemoteInstanceConnection protocol
-- [ ] 31-05: Live mode — `dw live` command, EmbeddedConfiguration with PersistData=false, auto-discovery, USB/portable detection
-- [ ] 31-06: Install mode (clean) — `dw install` command, real CopyFilesAsync, real RegisterServiceAsync, real CreateAdminUserAsync, real InitializePluginsAsync
-- [ ] 31-07: Install mode (from USB) — `dw install --from-usb`, USB source validation, tree copy, path remapping, post-install verification
-- [ ] 31-08: Platform-specific service management — Windows (sc create, Task Scheduler), Linux (systemd unit, systemctl enable), macOS (launchd plist, launchctl load)
+- [ ] 31-01-PLAN.md — DynamicCommandRegistry: subscribe to capability events, auto-generate commands, refactor CommandExecutor and CapabilityManager (CLI-02, CLI-04, CLI-05)
+- [ ] 31-02-PLAN.md — NLP query routing: NlpMessageBusRouter bridges NLP to UltimateInterfacePlugin via MessageBridge with graceful degradation (CLI-03)
+- [ ] 31-03-PLAN.md — Remove mocks/stubs: Channel-based MessageBridge.SendInProcessAsync, real InstanceManager errors, IServerHost for real kernel startup/shutdown (DEPLOY-09)
+- [ ] 31-04-PLAN.md — Launcher HTTP endpoints: ASP.NET Core minimal API /api/v1/* compatible with RemoteInstanceConnection protocol (DEPLOY-02)
+- [ ] 31-05-PLAN.md — Live mode: `dw live` command, EmbeddedConfiguration with PersistData=false, PortableMediaDetector for USB/auto-discovery (DEPLOY-03, DEPLOY-04)
+- [ ] 31-06-PLAN.md — Install mode (clean): real CopyFilesAsync, RegisterServiceAsync, CreateAdminUserAsync, InitializePluginsAsync + `dw install` CLI command (DEPLOY-05, DEPLOY-07, DEPLOY-08)
+- [ ] 31-07-PLAN.md — Install mode (from USB): UsbInstaller with validation, tree copy, path remapping, verification + `dw install --from-usb` CLI command (DEPLOY-06)
+- [ ] 31-08-PLAN.md — Platform service management: PlatformServiceManager, `dw service` commands, `dw connect/disconnect`, CLI/GUI feature parity verification (DEPLOY-01, DEPLOY-07, DEPLOY-08, CLI-05)
 
 ### Progress
 
@@ -398,4 +398,4 @@ Plans:
 | 28. Dead Code Cleanup | v2.0 | 0/4 | Planned | - |
 | 29. Advanced Distributed Coordination | v2.0 | 0/4 | Planned | - |
 | 30. Testing & Final Verification | v2.0 | 0/3 | Planned | - |
-| 31. Unified Interface & Deployment Modes | v2.0 | 0/8 | Not started | - |
+| 31. Unified Interface & Deployment Modes | v2.0 | 0/8 | Planned | - |
