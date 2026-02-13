@@ -218,14 +218,14 @@ Plans:
   3. Common boilerplate from 7 fragmented bases consolidated into StrategyBase (~1,000 lines of duplication eliminated)
   4. All public SDK data transfer types use C# records or init-only setters (immutable by default) and strongly-typed contracts replace Dictionary<string, object>
   5. Adapter wrappers allow existing strategies to compile against new hierarchy without changes (temporary -- removed during 25b migration)
-**Plans**: TBD (estimated 4-5 plans)
+**Plans**: 5 plans
 
 Plans:
-- [ ] 25a-01: StrategyBase design (lifecycle, dispose, metadata, logging -- no intelligence)
-- [ ] 25a-02: Domain strategy bases (~15 bases with domain-specific contracts)
-- [ ] 25a-03: Adapter wrappers for 7 fragmented strategy bases (temporary backward compatibility)
-- [ ] 25a-04: API contract safety (immutable DTOs, strong typing, SdkCompatibility, null-object pattern)
-- [ ] 25a-05: Build verification -- all strategies compile against new hierarchy via adapters
+- [ ] 25a-01-PLAN.md — StrategyBase root class + IStrategy interface (lifecycle, dispose, metadata, no intelligence)
+- [ ] 25a-02-PLAN.md — Refactor 17+ domain bases to inherit StrategyBase, remove intelligence boilerplate
+- [ ] 25a-03-PLAN.md — Backward-compatibility shim for ~1,500 plugin strategies
+- [ ] 25a-04-PLAN.md — SdkCompatibilityAttribute + NullMessageBus/NullLogger (API contract safety)
+- [ ] 25a-05-PLAN.md — Full build verification, test suite, hierarchy grep validation
 
 #### Phase 25b: Strategy Migration
 **Goal**: Migrate all ~1,500 strategy classes to the new hierarchy, remove duplicated boilerplate (intelligence, capability, dispose code), verify behavioral equivalence.
@@ -390,7 +390,7 @@ Plans:
 | 22. Build Safety & Supply Chain | v2.0 | 0/4 | Not started | - |
 | 23. Memory Safety & Crypto Hygiene | v2.0 | 0/4 | Not started | - |
 | 24. Plugin Hierarchy, Storage Core & Validation | v2.0 | 0/7 | Not started | - |
-| 25a. Strategy Hierarchy Design & API Contracts | v2.0 | 0/5 | Not started | - |
+| 25a. Strategy Hierarchy Design & API Contracts | v2.0 | 0/5 | Planned | - |
 | 25b. Strategy Migration (~1,500 strategies) | v2.0 | 0/6 | Not started | - |
 | 26. Distributed Contracts & Resilience | v2.0 | 0/5 | Not started | - |
 | 27. Plugin Migration & Decoupling | v2.0 | 0/4 | Not started | - |
