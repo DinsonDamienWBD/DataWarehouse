@@ -319,13 +319,13 @@ Plans:
   3. Multi-master replication with CRDT conflict resolution allows concurrent writes from multiple nodes with deterministic merge
   4. Consistent hashing load balancer with virtual nodes distributes requests cache-friendly across cluster nodes
   5. Resource-aware load balancer monitors CPU/memory and adapts routing to avoid overloaded nodes
-**Plans**: TBD (estimated 3-4 plans)
+**Plans**: 4 plans
 
 Plans:
-- [ ] 29-01: SWIM gossip cluster membership and P2P gossip replication
-- [ ] 29-02: Raft consensus for leader election
-- [ ] 29-03: Multi-master replication with CRDT conflict resolution
-- [ ] 29-04: Consistent hashing and resource-aware load balancing
+- [ ] 29-01-PLAN.md -- SWIM gossip cluster membership (SwimClusterMembership, SwimProtocolState) and P2P gossip replication (GossipReplicator) -- DIST-12, DIST-15
+- [ ] 29-02-PLAN.md -- Raft consensus engine with leader election and log replication (RaftConsensusEngine, IConsensusEngine) -- DIST-13
+- [ ] 29-03-PLAN.md -- Multi-master replication with CRDT conflict resolution (4 CRDT types, CrdtReplicationSync) -- DIST-14
+- [ ] 29-04-PLAN.md -- Consistent hashing (ConsistentHashRing + load balancer) and resource-aware load balancing -- DIST-16, DIST-17
 
 #### Phase 30: Testing & Final Verification
 **Goal**: The entire v2.0 milestone passes comprehensive verification -- all tests pass, behavioral equivalence confirmed, distributed contracts integration-tested, analyzers produce zero warnings.
@@ -396,6 +396,6 @@ Plans:
 | 26. Distributed Contracts & Resilience | v2.0 | 0/5 | Planned | - |
 | 27. Plugin Migration & Decoupling | v2.0 | 0/5 | Planned | - |
 | 28. Dead Code Cleanup | v2.0 | 0/4 | Planned | - |
-| 29. Advanced Distributed Coordination | v2.0 | 0/4 | Not started | - |
+| 29. Advanced Distributed Coordination | v2.0 | 0/4 | Planned | - |
 | 30. Testing & Final Verification | v2.0 | 0/3 | Not started | - |
 | 31. Unified Interface & Deployment Modes | v2.0 | 0/8 | Not started | - |
