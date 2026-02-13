@@ -9,7 +9,7 @@ namespace DataWarehouse.SDK.Contracts.IntelligenceAware
 {
     /// <summary>
     /// Abstract base class for plugins that can leverage Universal Intelligence (T90).
-    /// Extends <see cref="FeaturePluginBase"/> with automatic Intelligence discovery,
+    /// Extends <see cref="PluginBase"/> with automatic Intelligence discovery,
     /// capability caching, and protected helper methods for AI operations.
     /// </summary>
     /// <remarks>
@@ -53,7 +53,7 @@ namespace DataWarehouse.SDK.Contracts.IntelligenceAware
     /// }
     /// </code>
     /// </example>
-    public abstract class IntelligenceAwarePluginBase : FeaturePluginBase, IIntelligenceAware, IIntelligenceAwareNotifiable
+    public abstract class IntelligenceAwarePluginBase : PluginBase, IIntelligenceAware, IIntelligenceAwareNotifiable, IFeaturePlugin
     {
         /// <summary>
         /// Default timeout for Intelligence discovery requests.
@@ -248,7 +248,7 @@ namespace DataWarehouse.SDK.Contracts.IntelligenceAware
         /// Starts the plugin with automatic Intelligence discovery.
         /// </summary>
         /// <param name="ct">Cancellation token.</param>
-        public override async Task StartAsync(CancellationToken ct)
+        public virtual async Task StartAsync(CancellationToken ct)
         {
             // Subscribe to Intelligence topics first
             SubscribeToIntelligenceTopics();
@@ -272,7 +272,7 @@ namespace DataWarehouse.SDK.Contracts.IntelligenceAware
         /// <summary>
         /// Stops the plugin and cleans up Intelligence subscriptions.
         /// </summary>
-        public override async Task StopAsync()
+        public virtual async Task StopAsync()
         {
             // Unsubscribe from Intelligence topics
             foreach (var subscription in _intelligenceSubscriptions)
@@ -289,6 +289,23 @@ namespace DataWarehouse.SDK.Contracts.IntelligenceAware
             _pendingRequests.Clear();
 
             await OnStopCoreAsync();
+        }
+
+        /// <summary>
+        /// Executes the plugin by starting Intelligence discovery and initialization.
+        /// </summary>
+        public override async Task ExecuteAsync(CancellationToken ct = default)
+        {
+            await StartAsync(ct);
+        }
+
+        /// <summary>
+        /// Shuts down the plugin, cleaning up Intelligence subscriptions first.
+        /// </summary>
+        public override async Task ShutdownAsync(CancellationToken ct = default)
+        {
+            await StopAsync();
+            await base.ShutdownAsync(ct);
         }
 
         /// <summary>

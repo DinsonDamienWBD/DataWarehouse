@@ -13,7 +13,7 @@ namespace DataWarehouse.SDK.Contracts
     /// Abstract base class for hardware accelerator plugins.
     /// Provides common implementation for lifecycle management and statistics tracking.
     /// </summary>
-    public abstract class HardwareAcceleratorPluginBase : FeaturePluginBase, IHardwareAccelerator, IIntelligenceAware
+    public abstract class HardwareAcceleratorPluginBase : LegacyFeaturePluginBase, IHardwareAccelerator, IIntelligenceAware
     {
         private bool _initialized;
         private long _operationsCompleted;
@@ -568,7 +568,7 @@ namespace DataWarehouse.SDK.Contracts
     /// Abstract base class for TPM 2.0 provider plugins.
     /// Provides secure key storage and cryptographic operations using Trusted Platform Module.
     /// </summary>
-    public abstract class Tpm2ProviderPluginBase : FeaturePluginBase, ITpm2Provider, IIntelligenceAware
+    public abstract class Tpm2ProviderPluginBase : LegacyFeaturePluginBase, ITpm2Provider, IIntelligenceAware
     {
         /// <summary>
         /// Gets the category of this plugin. Always returns SecurityProvider for TPM plugins.
@@ -773,7 +773,7 @@ namespace DataWarehouse.SDK.Contracts
     /// Abstract base class for HSM provider plugins.
     /// Provides PKCS#11-based access to Hardware Security Modules.
     /// </summary>
-    public abstract class HsmProviderPluginBase : FeaturePluginBase, IHsmProvider, IIntelligenceAware
+    public abstract class HsmProviderPluginBase : LegacyFeaturePluginBase, IHsmProvider, IIntelligenceAware
     {
         /// <summary>
         /// Gets the category of this plugin. Always returns SecurityProvider for HSM plugins.

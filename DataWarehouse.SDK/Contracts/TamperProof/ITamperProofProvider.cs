@@ -129,7 +129,7 @@ public interface ITamperProofProvider
 /// Implements common orchestration logic for the four-tier architecture.
 /// Derived classes implement provider-specific manifest creation and pipeline execution.
 /// </summary>
-public abstract class TamperProofProviderPluginBase : FeaturePluginBase, ITamperProofProvider, IIntelligenceAware
+public abstract class TamperProofProviderPluginBase : LegacyFeaturePluginBase, ITamperProofProvider, IIntelligenceAware
 {
     private readonly IIntegrityProvider _integrityProvider;
     private readonly IBlockchainProvider _blockchainProvider;

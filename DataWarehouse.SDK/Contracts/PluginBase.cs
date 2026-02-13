@@ -1362,11 +1362,17 @@ namespace DataWarehouse.SDK.Contracts
     }
 
     /// <summary>
-    /// Abstract base class for feature plugins (SQL Listener, Consensus, Governance).
-    /// Provides default implementations for lifecycle management.
-    /// AI-native: Supports intelligent feature activation and monitoring.
+    /// Legacy base class for feature plugins. Use the new FeaturePluginBase from
+    /// DataWarehouse.SDK.Contracts.Hierarchy namespace instead.
     /// </summary>
-    public abstract class FeaturePluginBase : PluginBase, IFeaturePlugin
+    /// <remarks>
+    /// Classes that previously inherited FeaturePluginBase : PluginBase now need to either:
+    /// 1. Inherit LegacyFeaturePluginBase (temporary, until Phase 27 migration)
+    /// 2. Inherit the new FeaturePluginBase from DataWarehouse.SDK.Contracts.Hierarchy
+    /// See AD-01 in ARCHITECTURE_DECISIONS.md
+    /// </remarks>
+    [Obsolete("Use the new FeaturePluginBase from DataWarehouse.SDK.Contracts.Hierarchy namespace. This legacy base exists for backward compatibility during Phase 27 plugin migration.")]
+    public abstract class LegacyFeaturePluginBase : PluginBase, IFeaturePlugin
     {
         /// <summary>
         /// Start the feature. Must be implemented by derived classes.
@@ -1483,7 +1489,7 @@ namespace DataWarehouse.SDK.Contracts
     /// Provides default implementations for external interface operations.
     /// AI-native: Supports AI-driven interface discovery and usage.
     /// </summary>
-    public abstract class InterfacePluginBase : FeaturePluginBase
+    public abstract class InterfacePluginBase : LegacyFeaturePluginBase
     {
         /// <summary>
         /// Interface protocol type (e.g., "rest", "grpc", "sql", "websocket").
@@ -2109,7 +2115,7 @@ namespace DataWarehouse.SDK.Contracts
     /// Provides default implementations for distributed consensus operations.
     /// AI-native: Supports intelligent leader election and quorum decisions.
     /// </summary>
-    public abstract class ConsensusPluginBase : FeaturePluginBase, IConsensusEngine
+    public abstract class ConsensusPluginBase : LegacyFeaturePluginBase, IConsensusEngine
     {
         /// <summary>
         /// Category is always OrchestrationProvider for consensus plugins.
@@ -2171,7 +2177,7 @@ namespace DataWarehouse.SDK.Contracts
     /// Provides default implementations for event publishing and subscription.
     /// AI-native: Supports intelligent event routing and filtering.
     /// </summary>
-    public abstract class RealTimePluginBase : FeaturePluginBase, IRealTimeProvider
+    public abstract class RealTimePluginBase : LegacyFeaturePluginBase, IRealTimeProvider
     {
         /// <summary>
         /// Category is always FeatureProvider for real-time plugins.
@@ -2294,7 +2300,7 @@ namespace DataWarehouse.SDK.Contracts
     /// Manages data redundancy, backups, and restoration.
     /// AI-native: Supports intelligent replica selection and auto-healing.
     /// </summary>
-    public abstract class ReplicationPluginBase : FeaturePluginBase, IReplicationService
+    public abstract class ReplicationPluginBase : LegacyFeaturePluginBase, IReplicationService
     {
         /// <summary>
         /// Category is always FederationProvider for replication plugins.
@@ -3916,7 +3922,7 @@ namespace DataWarehouse.SDK.Contracts
     /// Provides storage-agnostic partition management.
     /// AI-native: Supports intelligent quota management and access suggestions.
     /// </summary>
-    public abstract class ContainerManagerPluginBase : FeaturePluginBase, IContainerManager
+    public abstract class ContainerManagerPluginBase : LegacyFeaturePluginBase, IContainerManager
     {
         /// <summary>
         /// Category is always OrchestrationProvider for container managers.

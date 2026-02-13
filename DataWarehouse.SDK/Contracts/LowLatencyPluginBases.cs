@@ -225,7 +225,7 @@ public abstract class LowLatencyStoragePluginBase : StorageProviderPluginBase, I
 /// Provides infrastructure for zero-copy remote memory access via InfiniBand/RoCE.
 /// Requires platform-specific RDMA libraries (libibverbs on Linux, NetworkDirect on Windows).
 /// </summary>
-public abstract class RdmaTransportPluginBase : FeaturePluginBase, IRdmaTransport, IIntelligenceAware
+public abstract class RdmaTransportPluginBase : LegacyFeaturePluginBase, IRdmaTransport, IIntelligenceAware
 {
     #region Intelligence Socket
 
@@ -322,7 +322,7 @@ public abstract class RdmaTransportPluginBase : FeaturePluginBase, IRdmaTranspor
 /// Provides infrastructure for ultra-low overhead async I/O using kernel io_uring.
 /// Requires liburing or direct syscall implementation.
 /// </summary>
-public abstract class IoUringProviderPluginBase : FeaturePluginBase, IIoUringProvider, IIntelligenceAware
+public abstract class IoUringProviderPluginBase : LegacyFeaturePluginBase, IIoUringProvider, IIntelligenceAware
 {
     #region Intelligence Socket
 
@@ -426,7 +426,7 @@ public abstract class IoUringProviderPluginBase : FeaturePluginBase, IIoUringPro
 /// Provides infrastructure for explicit NUMA node memory allocation and thread affinity.
 /// Requires platform-specific NUMA APIs (libnuma on Linux, NUMA API on Windows).
 /// </summary>
-public abstract class NumaAllocatorPluginBase : FeaturePluginBase, INumaAllocator, IIntelligenceAware
+public abstract class NumaAllocatorPluginBase : LegacyFeaturePluginBase, INumaAllocator, IIntelligenceAware
 {
     #region Intelligence Socket
 

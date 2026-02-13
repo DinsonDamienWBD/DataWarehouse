@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
@@ -106,14 +106,14 @@ public interface IDataMeshStrategy
 /// <summary>
 /// Abstract base class for data mesh strategies.
 /// </summary>
-public abstract class DataMeshStrategyBase : IDataMeshStrategy
+public abstract class DataMeshStrategyBase : StrategyBase, IDataMeshStrategy
 {
     private readonly DataMeshStatistics _statistics = new();
     private readonly object _statsLock = new();
-    private bool _initialized;
+    private new bool _initialized;
 
     /// <inheritdoc/>
-    public abstract string StrategyId { get; }
+    public override abstract string StrategyId { get; }
     /// <inheritdoc/>
     public abstract string DisplayName { get; }
     /// <inheritdoc/>
@@ -126,7 +126,7 @@ public abstract class DataMeshStrategyBase : IDataMeshStrategy
     public abstract string[] Tags { get; }
 
     /// <summary>Gets whether the strategy has been initialized.</summary>
-    protected bool IsInitialized => _initialized;
+    protected new bool IsInitialized => _initialized;
 
     /// <inheritdoc/>
     public DataMeshStatistics GetStatistics()
@@ -166,7 +166,7 @@ public abstract class DataMeshStrategyBase : IDataMeshStrategy
     }
 
     /// <inheritdoc/>
-    public virtual async Task InitializeAsync(CancellationToken ct = default)
+    public new virtual async Task InitializeAsync(CancellationToken ct = default)
     {
         if (_initialized) return;
         await InitializeCoreAsync(ct);
@@ -174,7 +174,7 @@ public abstract class DataMeshStrategyBase : IDataMeshStrategy
     }
 
     /// <inheritdoc/>
-    public virtual async Task DisposeAsync()
+    public new async Task DisposeAsync()
     {
         if (!_initialized) return;
         await DisposeCoreAsync();

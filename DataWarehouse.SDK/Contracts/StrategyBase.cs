@@ -19,7 +19,7 @@ namespace DataWarehouse.SDK.Contracts
     public abstract class StrategyBase : IStrategy
     {
         private bool _disposed;
-        private bool _initialized;
+        protected bool _initialized;
         private readonly object _lifecycleLock = new();
 
         /// <summary>

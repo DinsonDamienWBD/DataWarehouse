@@ -24,7 +24,7 @@ namespace DataWarehouse.SDK.Contracts
     /// with configurable consistency levels and conflict resolution strategies.
     /// Derived classes implement region-specific transport and storage mechanisms.
     /// </summary>
-    public abstract class MultiMasterReplicationPluginBase : FeaturePluginBase, DataWarehouse.SDK.Replication.IMultiMasterReplication, IIntelligenceAware
+    public abstract class MultiMasterReplicationPluginBase : LegacyFeaturePluginBase, DataWarehouse.SDK.Replication.IMultiMasterReplication, IIntelligenceAware
     {
         #region Intelligence Socket
 

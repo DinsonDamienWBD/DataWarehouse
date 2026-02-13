@@ -376,7 +376,7 @@ public class BlockInfo
 /// Provides common functionality for implementing blockchain anchoring.
 /// Derived classes implement provider-specific blockchain operations.
 /// </summary>
-public abstract class BlockchainProviderPluginBase : FeaturePluginBase, IBlockchainProvider, IIntelligenceAware
+public abstract class BlockchainProviderPluginBase : LegacyFeaturePluginBase, IBlockchainProvider, IIntelligenceAware
 {
     #region Intelligence Socket
 

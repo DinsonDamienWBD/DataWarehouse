@@ -13,7 +13,7 @@ namespace DataWarehouse.SDK.Contracts;
 /// Provides common infrastructure for detecting virtualization platforms and querying VM information.
 /// Implements caching to avoid repeated expensive detection operations.
 /// </summary>
-public abstract class HypervisorDetectorPluginBase : FeaturePluginBase, IHypervisorDetector, IIntelligenceAware
+public abstract class HypervisorDetectorPluginBase : LegacyFeaturePluginBase, IHypervisorDetector, IIntelligenceAware
 {
     private HypervisorType? _cachedType;
 
@@ -200,7 +200,7 @@ public abstract class HypervisorDetectorPluginBase : FeaturePluginBase, IHypervi
 /// Provides infrastructure for memory ballooning/reclamation in virtualized environments.
 /// Balloon drivers allow the hypervisor to reclaim unused guest memory dynamically.
 /// </summary>
-public abstract class BalloonDriverPluginBase : FeaturePluginBase, IBalloonDriver, IIntelligenceAware
+public abstract class BalloonDriverPluginBase : LegacyFeaturePluginBase, IBalloonDriver, IIntelligenceAware
 {
     #region Intelligence Socket
 
@@ -334,7 +334,7 @@ public abstract class BalloonDriverPluginBase : FeaturePluginBase, IBalloonDrive
 /// Provides infrastructure for creating application-consistent VM snapshots.
 /// Coordinates with hypervisor snapshot mechanisms and guest OS quiescing.
 /// </summary>
-public abstract class VmSnapshotProviderPluginBase : FeaturePluginBase, IVmSnapshotProvider, IIntelligenceAware
+public abstract class VmSnapshotProviderPluginBase : LegacyFeaturePluginBase, IVmSnapshotProvider, IIntelligenceAware
 {
     #region Intelligence Socket
 
@@ -476,7 +476,7 @@ public abstract class VmSnapshotProviderPluginBase : FeaturePluginBase, IVmSnaps
 /// like VMware VADP, Hyper-V VSS, and Proxmox Backup Server.
 /// Enables efficient incremental backups using changed-block tracking.
 /// </summary>
-public abstract class BackupApiPluginBase : FeaturePluginBase, IBackupApiIntegration, IIntelligenceAware
+public abstract class BackupApiPluginBase : LegacyFeaturePluginBase, IBackupApiIntegration, IIntelligenceAware
 {
     #region Intelligence Socket
 

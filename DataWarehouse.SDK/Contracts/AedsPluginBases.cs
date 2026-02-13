@@ -15,7 +15,7 @@ namespace DataWarehouse.SDK.Contracts;
 /// implementation to abstract methods.
 /// </para>
 /// </remarks>
-public abstract class ControlPlaneTransportPluginBase : FeaturePluginBase, IControlPlaneTransport
+public abstract class ControlPlaneTransportPluginBase : LegacyFeaturePluginBase, IControlPlaneTransport
 {
     /// <summary>
     /// Gets the unique transport identifier (e.g., "websocket", "mqtt", "grpc").
@@ -157,7 +157,7 @@ public abstract class ControlPlaneTransportPluginBase : FeaturePluginBase, ICont
 /// implementation to abstract methods.
 /// </para>
 /// </remarks>
-public abstract class DataPlaneTransportPluginBase : FeaturePluginBase, IDataPlaneTransport
+public abstract class DataPlaneTransportPluginBase : LegacyFeaturePluginBase, IDataPlaneTransport
 {
     /// <summary>
     /// Gets the unique transport identifier (e.g., "http3", "quic", "http2").
@@ -315,7 +315,7 @@ public abstract class DataPlaneTransportPluginBase : FeaturePluginBase, IDataPla
 /// Production implementations should use persistent storage (database, message queue, etc.).
 /// </para>
 /// </remarks>
-public abstract class ServerDispatcherPluginBase : FeaturePluginBase, IServerDispatcher
+public abstract class ServerDispatcherPluginBase : LegacyFeaturePluginBase, IServerDispatcher
 {
     /// <summary>
     /// In-memory job storage (use persistent storage in production).
@@ -539,7 +539,7 @@ public abstract class ServerDispatcherPluginBase : FeaturePluginBase, IServerDis
 /// This base class provides event handling and delegates listening logic to abstract methods.
 /// </para>
 /// </remarks>
-public abstract class ClientSentinelPluginBase : FeaturePluginBase, IClientSentinel
+public abstract class ClientSentinelPluginBase : LegacyFeaturePluginBase, IClientSentinel
 {
     /// <inheritdoc />
     public bool IsActive { get; protected set; }
@@ -636,7 +636,7 @@ public abstract class ClientSentinelPluginBase : FeaturePluginBase, IClientSenti
 /// This base class provides validation and delegates execution logic to abstract methods.
 /// </para>
 /// </remarks>
-public abstract class ClientExecutorPluginBase : FeaturePluginBase, IClientExecutor
+public abstract class ClientExecutorPluginBase : LegacyFeaturePluginBase, IClientExecutor
 {
     /// <summary>
     /// Performs the actual execution of an intent manifest.
