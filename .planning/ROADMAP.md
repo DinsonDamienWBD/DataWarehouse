@@ -154,13 +154,13 @@ Plans:
   3. EnforceCodeStyleInBuild produces consistent code style enforcement at build time
   4. `dotnet list package --vulnerable` returns zero known vulnerabilities and all package versions are pinned (no floating ranges)
   5. SBOM generation produces a valid CycloneDX or SPDX artifact for the full solution
-**Plans**: TBD (estimated 3-4 plans)
+**Plans**: 4 plans
 
 Plans:
-- [ ] 22-01: Roslyn analyzer suite integration and build configuration
-- [ ] 22-02: TreatWarningsAsErrors incremental rollout (category-based, leaf projects first)
-- [ ] 22-03: Supply chain security (vulnerability audit, version pinning, SBOM generation)
-- [ ] 22-04: CLI System.CommandLine migration and XML doc enforcement
+- [ ] 22-01-PLAN.md — Roslyn analyzer suite integration and build configuration
+- [ ] 22-02-PLAN.md — TreatWarningsAsErrors incremental rollout
+- [ ] 22-03-PLAN.md — Supply chain security (vulnerability audit, version pinning, SBOM generation)
+- [ ] 22-04-PLAN.md — CLI System.CommandLine migration
 
 #### Phase 23: Memory Safety & Cryptographic Hygiene
 **Goal**: All SDK code handles memory deterministically and uses cryptographic primitives correctly -- no leaked secrets in memory, no timing attacks, no unsafe random sources.
