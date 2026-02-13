@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using System.Reflection;
 using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Contracts.Storage;
+using DataWarehouse.SDK.Contracts.Hierarchy;
 using DataWarehouse.SDK.Contracts.IntelligenceAware;
 using DataWarehouse.SDK.Primitives;
 using DataWarehouse.SDK.Utilities;
@@ -41,7 +42,7 @@ namespace DataWarehouse.Plugins.UltimateStorage;
 /// - Automatic failover
 /// - Compression and deduplication
 /// </summary>
-public sealed class UltimateStoragePlugin : IntelligenceAwareStoragePluginBase, IDataTerminal, IDisposable
+public sealed class UltimateStoragePlugin : DataWarehouse.SDK.Contracts.Hierarchy.StoragePluginBase, IDataTerminal, IDisposable
 {
     private readonly StorageStrategyRegistry _registry;
     private readonly ConcurrentDictionary<string, long> _usageStats = new();
@@ -71,14 +72,15 @@ public sealed class UltimateStoragePlugin : IntelligenceAwareStoragePluginBase, 
     /// <inheritdoc/>
     public override string Version => "1.0.0";
 
-    /// <inheritdoc/>
-    public override string SubCategory => "Storage";
+    /// <summary>Sub-category for discovery.</summary>
+    public string SubCategory => "Storage";
+
+    /// <summary>Quality level (0-100).</summary>
+    public int QualityLevel => 100;
 
     /// <inheritdoc/>
-    public override int QualityLevel => 100;
-
-    /// <inheritdoc/>
-    public override string StorageScheme => _defaultStrategyId;
+    /// <summary>Storage scheme name.</summary>
+    public string StorageScheme => _defaultStrategyId;
 
     #region IDataTerminal Implementation
 
@@ -233,16 +235,16 @@ public sealed class UltimateStoragePlugin : IntelligenceAwareStoragePluginBase, 
     #endregion
 
     /// <inheritdoc/>
-    public override int DefaultOrder => 100;
+    public override int DefaultPipelineOrder => 100;
 
     /// <inheritdoc/>
     public override bool AllowBypass => false;
 
     /// <inheritdoc/>
-    public override string[] RequiredPrecedingStages => ["Encryption"];
+    public override IReadOnlyList<string> RequiredPrecedingStages => ["Encryption"];
 
     /// <inheritdoc/>
-    public override string[] IncompatibleStages => [];
+    public override IReadOnlyList<string> IncompatibleStages => [];
 
     /// <summary>
     /// Semantic description of this plugin for AI discovery.
@@ -485,14 +487,8 @@ public sealed class UltimateStoragePlugin : IntelligenceAwareStoragePluginBase, 
         };
     }
 
-    /// <inheritdoc/>
-    public override Stream OnWrite(Stream input, IKernelContext context, Dictionary<string, object> args)
-    {
-        return OnWriteAsync(input, context, args).GetAwaiter().GetResult();
-    }
-
-    /// <inheritdoc/>
-    protected override async Task<Stream> OnWriteAsync(Stream input, IKernelContext context, Dictionary<string, object> args)
+    /// <summary>Write data via pipeline transform.</summary>
+    public async Task<Stream> OnWriteAsync(Stream input, IKernelContext context, Dictionary<string, object> args)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
 
@@ -542,14 +538,8 @@ public sealed class UltimateStoragePlugin : IntelligenceAwareStoragePluginBase, 
         return new MemoryStream();
     }
 
-    /// <inheritdoc/>
-    public override Stream OnRead(Stream stored, IKernelContext context, Dictionary<string, object> args)
-    {
-        return OnReadAsync(stored, context, args).GetAwaiter().GetResult();
-    }
-
-    /// <inheritdoc/>
-    protected override async Task<Stream> OnReadAsync(Stream stored, IKernelContext context, Dictionary<string, object> args)
+    /// <summary>Read data via pipeline transform.</summary>
+    public async Task<Stream> OnReadAsync(Stream stored, IKernelContext context, Dictionary<string, object> args)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
 
@@ -1317,6 +1307,87 @@ public sealed class UltimateStoragePlugin : IntelligenceAwareStoragePluginBase, 
         }
 
         return options;
+    }
+
+    #endregion
+
+    #region Hierarchy StoragePluginBase Abstract Methods
+
+    /// <inheritdoc/>
+    public override async Task<StorageObjectMetadata> StoreAsync(string key, Stream data, IDictionary<string, string>? metadata = null, CancellationToken ct = default)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        var strategy = await GetStrategyWithFailoverAsync(_defaultStrategyId);
+        using var ms = new MemoryStream();
+        await data.CopyToAsync(ms, ct);
+        var bytes = ms.ToArray();
+        var options = BuildStorageOptions(new Dictionary<string, object>());
+        if (metadata != null)
+        {
+            foreach (var kvp in metadata)
+                options.Metadata[kvp.Key] = kvp.Value;
+        }
+        await strategy.WriteAsync(key, bytes, options, ct);
+        Interlocked.Increment(ref _totalWrites);
+        Interlocked.Add(ref _totalBytesWritten, bytes.Length);
+        return new StorageObjectMetadata { Key = key, Size = bytes.Length, Created = DateTime.UtcNow, Modified = DateTime.UtcNow };
+    }
+
+    /// <inheritdoc/>
+    public override async Task<Stream> RetrieveAsync(string key, CancellationToken ct = default)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        var strategy = await GetStrategyWithFailoverAsync(_defaultStrategyId);
+        var options = BuildStorageOptions(new Dictionary<string, object>());
+        var data = await strategy.ReadAsync(key, options, ct);
+        Interlocked.Increment(ref _totalReads);
+        Interlocked.Add(ref _totalBytesRead, data.Length);
+        return new MemoryStream(data);
+    }
+
+    /// <inheritdoc/>
+    public override async Task DeleteAsync(string key, CancellationToken ct = default)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        var strategy = await GetStrategyWithFailoverAsync(_defaultStrategyId);
+        var options = BuildStorageOptions(new Dictionary<string, object>());
+        await strategy.DeleteAsync(key, options, ct);
+        Interlocked.Increment(ref _totalDeletes);
+    }
+
+    /// <inheritdoc/>
+    public override async Task<bool> ExistsAsync(string key, CancellationToken ct = default)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        var strategy = await GetStrategyWithFailoverAsync(_defaultStrategyId);
+        var options = BuildStorageOptions(new Dictionary<string, object>());
+        return await strategy.ExistsAsync(key, options, ct);
+    }
+
+    /// <inheritdoc/>
+    public override async IAsyncEnumerable<StorageObjectMetadata> ListAsync(string? prefix, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct = default)
+    {
+        // No direct list API on IStorageStrategyExtended; yield empty for now
+        await Task.CompletedTask;
+        yield break;
+    }
+
+    /// <inheritdoc/>
+    public override Task<StorageObjectMetadata> GetMetadataAsync(string key, CancellationToken ct = default)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        return Task.FromResult(new StorageObjectMetadata { Key = key });
+    }
+
+    /// <inheritdoc/>
+    public override Task<StorageHealthInfo> GetHealthAsync(CancellationToken ct = default)
+    {
+        var healthy = _healthStatus.Values.All(h => h.IsHealthy);
+        return Task.FromResult(new StorageHealthInfo
+        {
+            Status = healthy ? DataWarehouse.SDK.Contracts.Storage.HealthStatus.Healthy : DataWarehouse.SDK.Contracts.Storage.HealthStatus.Degraded,
+            LatencyMs = 0
+        });
     }
 
     #endregion

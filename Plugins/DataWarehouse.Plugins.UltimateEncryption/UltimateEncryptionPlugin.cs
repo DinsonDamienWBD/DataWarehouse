@@ -5,8 +5,10 @@ using System.Security.Cryptography;
 using DataWarehouse.SDK.AI;
 using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Contracts.Encryption;
+using DataWarehouse.SDK.Contracts.Hierarchy;
 using DataWarehouse.SDK.Contracts.IntelligenceAware;
 using DataWarehouse.SDK.Primitives;
+using HierarchyEncryptionPluginBase = DataWarehouse.SDK.Contracts.Hierarchy.EncryptionPluginBase;
 using DataWarehouse.SDK.Security;
 using DataWarehouse.SDK.Utilities;
 
@@ -41,7 +43,7 @@ namespace DataWarehouse.Plugins.UltimateEncryption;
 /// - Intelligence-aware cipher recommendations
 /// - Threat assessment integration
 /// </summary>
-public sealed class UltimateEncryptionPlugin : IntelligenceAwareEncryptionPluginBase, IDisposable
+public sealed class UltimateEncryptionPlugin : HierarchyEncryptionPluginBase, IDisposable
 {
     private readonly EncryptionStrategyRegistry _registry;
     private readonly ConcurrentDictionary<string, long> _usageStats = new();
@@ -79,19 +81,28 @@ public sealed class UltimateEncryptionPlugin : IntelligenceAwareEncryptionPlugin
     public override int QualityLevel => 100;
 
     /// <inheritdoc/>
-    public override int DefaultOrder => 90;
+    public override int DefaultPipelineOrder => 90;
 
     /// <inheritdoc/>
     public override bool AllowBypass => false;
 
     /// <inheritdoc/>
-    public override string[] RequiredPrecedingStages => ["Compression"];
+    public override IReadOnlyList<string> RequiredPrecedingStages => ["Compression"];
 
     /// <inheritdoc/>
-    public override string[] IncompatibleStages => [];
+    public override IReadOnlyList<string> IncompatibleStages => [];
+
+    /// <summary>Primary encryption algorithm name.</summary>
+    public string Algorithm => _defaultStrategyId;
 
     /// <inheritdoc/>
-    public override string Algorithm => _defaultStrategyId;
+    public override string AlgorithmId => _defaultStrategyId;
+
+    /// <inheritdoc/>
+    public override int KeySizeBytes => 32; // AES-256 default
+
+    /// <inheritdoc/>
+    public override int IvSizeBytes => 12; // GCM nonce default
 
     /// <summary>
     /// Semantic description of this plugin for AI discovery.
@@ -312,13 +323,7 @@ public sealed class UltimateEncryptionPlugin : IntelligenceAwareEncryptionPlugin
     }
 
     /// <inheritdoc/>
-    public override Stream OnWrite(Stream input, IKernelContext context, Dictionary<string, object> args)
-    {
-        return OnWriteAsync(input, context, args).GetAwaiter().GetResult();
-    }
-
-    /// <inheritdoc/>
-    protected override async Task<Stream> OnWriteAsync(Stream input, IKernelContext context, Dictionary<string, object> args)
+    public override async Task<Stream> OnWriteAsync(Stream input, IKernelContext context, Dictionary<string, object> args, CancellationToken ct = default)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
 
@@ -386,13 +391,7 @@ public sealed class UltimateEncryptionPlugin : IntelligenceAwareEncryptionPlugin
     }
 
     /// <inheritdoc/>
-    public override Stream OnRead(Stream stored, IKernelContext context, Dictionary<string, object> args)
-    {
-        return OnReadAsync(stored, context, args).GetAwaiter().GetResult();
-    }
-
-    /// <inheritdoc/>
-    protected override async Task<Stream> OnReadAsync(Stream stored, IKernelContext context, Dictionary<string, object> args)
+    public override async Task<Stream> OnReadAsync(Stream stored, IKernelContext context, Dictionary<string, object> args, CancellationToken ct = default)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
 
