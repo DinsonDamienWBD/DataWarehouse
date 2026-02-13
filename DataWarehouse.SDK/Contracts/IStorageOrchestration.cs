@@ -240,265 +240,17 @@ namespace DataWarehouse.SDK.Contracts
 
     #endregion
 
-    #region Hybrid Storage - Automatic Indexing Pipeline
 
-    /// <summary>
-    /// Hybrid storage that automatically triggers indexing pipelines.
-    /// On write: Save → SQL metadata → OCR → NoSQL text → Embeddings → Vector DB → Summary
-    /// </summary>
-    public interface IHybridStorage : IStoragePool
-    {
-        HybridStorageConfig Config { get; }
-        void Configure(HybridStorageConfig config);
-        Task<HybridSaveResult> SaveWithIndexingAsync(Uri uri, Stream data, StorageIntent? intent = null, CancellationToken ct = default);
-        Task<IndexingStatus> GetIndexingStatusAsync(Uri uri, CancellationToken ct = default);
-        Task<IndexingStatus> ReindexAsync(Uri uri, CancellationToken ct = default);
-        IStorageSearchOrchestrator SearchOrchestrator { get; }
-    }
-
-    public class HybridStorageConfig
-    {
-        public bool EnableSqlMetadata { get; init; } = true;
-        public bool EnableOcr { get; init; } = true;
-        public bool EnableNoSqlText { get; init; } = true;
-        public bool EnableVectorEmbeddings { get; init; } = true;
-        public bool EnableAiSummary { get; init; } = false;
-        public bool EnableEventTriggers { get; init; } = false;
-        public List<string> OcrFileTypes { get; init; } = new() { ".pdf", ".png", ".jpg", ".jpeg", ".tiff", ".bmp" };
-        public long MaxOcrFileSizeBytes { get; init; } = 50 * 1024 * 1024;
-        public string? EmbeddingModel { get; init; }
-        public string? SummaryModel { get; init; }
-        public List<EventTriggerConfig> EventTriggers { get; init; } = new();
-        /// <summary>Stop indexing pipeline on first error, or continue with remaining stages.</summary>
-        public bool StopOnFirstError { get; init; } = false;
-        /// <summary>Maximum number of versions to retain for point-in-time recovery (0 = unlimited).</summary>
-        public int MaxVersionsToRetain { get; init; } = 100;
-    }
-
-    public class EventTriggerConfig
-    {
-        public string Name { get; init; } = string.Empty;
-        public EventTriggerType Type { get; init; }
-        public string Endpoint { get; init; } = string.Empty;
-        public Dictionary<string, string> Headers { get; init; } = new();
-    }
-
-    public enum EventTriggerType { Webhook, AwsLambda, AzureFunction, GoogleCloudFunction, ServiceBus, EventGrid, Kafka, RabbitMQ }
-
-    public class HybridSaveResult : StorageResult
-    {
-        public string IndexingJobId { get; init; } = string.Empty;
-        public TimeSpan? EstimatedIndexingTime { get; init; }
-        public string[] PlannedIndexingStages { get; init; } = Array.Empty<string>();
-    }
-
-    public class IndexingStatus
-    {
-        public required Uri Uri { get; init; }
-        public IndexingState State { get; init; }
-        public DateTime? StartedAt { get; init; }
-        public DateTime? CompletedAt { get; init; }
-        public DateTime? FailedAt { get; init; }
-        public Dictionary<string, StageStatus> Stages { get; init; } = new();
-        public string? Error { get; init; }
-        /// <summary>Unique identifier for the indexing job.</summary>
-        public string? JobId { get; init; }
-        /// <summary>Currently executing stage name.</summary>
-        public string? CurrentStage { get; init; }
-        /// <summary>List of completed stage names.</summary>
-        public string[] CompletedStages { get; init; } = Array.Empty<string>();
-        /// <summary>Total number of planned stages.</summary>
-        public int TotalStages { get; init; }
-        /// <summary>Errors by stage name.</summary>
-        public Dictionary<string, string> Errors { get; init; } = new();
-        /// <summary>Progress percentage (0.0 to 1.0).</summary>
-        public double Progress { get; init; }
-        /// <summary>Human-readable status message.</summary>
-        public string? Message { get; init; }
-    }
-
-    public enum IndexingState { NotStarted, InProgress, Completed, PartiallyCompleted, Failed, Cancelled }
-
-    public class StageStatus
-    {
-        public string StageName { get; init; } = string.Empty;
-        public bool Completed { get; init; }
-        public bool Skipped { get; init; }
-        public string? Error { get; init; }
-        public TimeSpan? Duration { get; init; }
-    }
-
-    #endregion
-
-    #region Search Orchestrator - Multi-Threaded Search
-
-    /// <summary>
-    /// Orchestrates multi-threaded search across SQL, NoSQL, Vector, and AI.
-    /// Thread A (SQL ~10ms) | Thread B (NoSQL ~50ms) | Thread C (Vector ~200ms) | Thread D (AI ~3-10s)
-    /// </summary>
-    public interface IStorageSearchOrchestrator
-    {
-        Task<SearchResult> SearchAsync(SearchQuery query, CancellationToken ct = default);
-        IAsyncEnumerable<SearchResultBatch> SearchStreamingAsync(SearchQuery query, CancellationToken ct = default);
-        IReadOnlyList<SearchProviderInfo> GetProviders();
-        void Configure(SearchOrchestratorConfig config);
-    }
-
-    public class SearchQuery
-    {
-        public string QueryText { get; init; } = string.Empty;
-        public float[]? QueryVector { get; init; }
-        public Dictionary<string, object>? Filters { get; init; }
-        public DateRange? DateRange { get; init; }
-        public int MaxResultsPerProvider { get; init; } = 20;
-        public int MaxTotalResults { get; init; } = 50;
-        public TimeSpan? ProviderTimeout { get; init; }
-        public SearchProviderType[]? EnabledProviders { get; init; }
-        public bool EnableAiRefinement { get; init; } = true;
-        public string? UserContext { get; init; }
-    }
+    #region Shared Storage Types
 
     public class DateRange { public DateTime? From { get; init; } public DateTime? To { get; init; } }
 
-    public enum SearchProviderType { SqlMetadata, NoSqlKeyword, VectorSemantic, AiAgent }
-
-    public class SearchProviderInfo
-    {
-        public SearchProviderType Type { get; init; }
-        public string Name { get; init; } = string.Empty;
-        public bool IsAvailable { get; init; }
-        public TimeSpan TypicalLatency { get; init; }
-        public string? PluginId { get; init; }
-    }
-
-    public class SearchResult
-    {
-        public int TotalCount { get; init; }
-        public List<SearchResultItem> Items { get; init; } = new();
-        public Dictionary<SearchProviderType, ProviderSearchResult> ProviderResults { get; init; } = new();
-        public string? AiReasoning { get; init; }
-        public TimeSpan Duration { get; init; }
-        public Dictionary<SearchProviderType, string> Errors { get; init; } = new();
-    }
-
-    public class SearchResultBatch
-    {
-        public SearchProviderType Source { get; init; }
-        public List<SearchResultItem> Items { get; init; } = new();
-        public TimeSpan Latency { get; init; }
-        public bool IsFinal { get; init; }
-
-        /// <summary>
-        /// Error message if this provider failed, null on success.
-        /// </summary>
-        public string? Error { get; init; }
-
-        /// <summary>
-        /// Whether this batch contains valid results (no error occurred).
-        /// </summary>
-        public bool Success => Error == null;
-    }
-
-    public class SearchResultItem
-    {
-        public required Uri Uri { get; init; }
-        public string Title { get; init; } = string.Empty;
-        public string? Snippet { get; init; }
-        public double Score { get; init; }
-        public SearchProviderType Source { get; init; }
-        public MatchType MatchType { get; init; }
-        public Dictionary<string, object> Metadata { get; init; } = new();
-    }
-
     public enum MatchType { Exact, Keyword, Fuzzy, Semantic, AiInferred }
-
-    public class ProviderSearchResult
-    {
-        public SearchProviderType Provider { get; init; }
-        public int Count { get; init; }
-        public TimeSpan Latency { get; init; }
-        public List<SearchResultItem> Items { get; init; } = new();
-        public string? Error { get; init; }
-    }
-
-    public class SearchOrchestratorConfig
-    {
-        public TimeSpan DefaultProviderTimeout { get; init; } = TimeSpan.FromSeconds(5);
-        public TimeSpan MaxTotalTimeout { get; init; } = TimeSpan.FromSeconds(30);
-        public bool EnableParallelExecution { get; init; } = true;
-        public SearchMergeStrategy MergeStrategy { get; init; } = SearchMergeStrategy.ScoreWeighted;
-        public Dictionary<SearchProviderType, double> ProviderWeights { get; init; } = new()
-        {
-            [SearchProviderType.SqlMetadata] = 1.0,
-            [SearchProviderType.NoSqlKeyword] = 1.2,
-            [SearchProviderType.VectorSemantic] = 1.5,
-            [SearchProviderType.AiAgent] = 2.0
-        };
-    }
-
-    public enum SearchMergeStrategy { Union, ScoreWeighted, ReciprocalRankFusion, AiRanked }
-
-    #endregion
-
-    #region Real-Time Storage - High-Stakes Data (Government, Healthcare, Banks)
-
-    /// <summary>
-    /// High-performance, maximum-reliability storage for critical data.
-    /// Guarantees: Synchronous multi-site replication, point-in-time recovery,
-    /// immutable audit trail, cryptographic verification, compliance-ready.
-    /// </summary>
-    public interface IRealTimeStorage : IStoragePool
-    {
-        ComplianceMode ComplianceMode { get; }
-        void SetComplianceMode(ComplianceMode mode);
-
-        Task<RealTimeSaveResult> SaveSynchronousAsync(Uri uri, Stream data, RealTimeWriteOptions options, CancellationToken ct = default);
-        Task<RealTimeReadResult> ReadVerifiedAsync(Uri uri, CancellationToken ct = default);
-        Task<Stream> ReadAtPointInTimeAsync(Uri uri, DateTime pointInTime, CancellationToken ct = default);
-        IAsyncEnumerable<AuditEntry> GetAuditTrailAsync(Uri uri, DateTime? from = null, DateTime? to = null, CancellationToken ct = default);
-        Task<IntegrityReport> VerifyIntegrityAsync(Uri uri, CancellationToken ct = default);
-        Task<ReplicationStatus> GetReplicationStatusAsync(CancellationToken ct = default);
-        Task<LockResult> LockAsync(Uri uri, LockReason reason, string authorizedBy, DateTime? expiresAt = null, CancellationToken ct = default);
-        Task ReleaseLockAsync(Uri uri, string authorizedBy, CancellationToken ct = default);
-    }
 
     public enum ComplianceMode { None, HIPAA, Financial, Government, GDPR, Custom }
 
-    public class RealTimeWriteOptions
-    {
-        public int MinimumConfirmations { get; init; } = 2;
-        public bool RequireAllSites { get; init; } = false;
-        public EncryptionLevel Encryption { get; init; } = EncryptionLevel.AES256;
-        public bool GenerateHash { get; init; } = true;
-        public HashAlgorithmType HashAlgorithm { get; init; } = HashAlgorithmType.SHA256;
-        public TimeSpan? RetentionPeriod { get; init; }
-        public string? Classification { get; init; }
-        public string? InitiatedBy { get; init; }
-        public string? Reason { get; init; }
-    }
-
     public enum EncryptionLevel { None, AES128, AES256, AES256WithHSM, Custom }
     public enum HashAlgorithmType { SHA256, SHA384, SHA512, BLAKE2, BLAKE3 }
-
-    public class RealTimeSaveResult : StorageResult
-    {
-        public string[] ConfirmedSites { get; init; } = Array.Empty<string>();
-        public string? DataHash { get; init; }
-        public long VersionNumber { get; init; }
-        public DateTime ReplicatedAt { get; init; }
-        public string AuditId { get; init; } = string.Empty;
-    }
-
-    public class RealTimeReadResult
-    {
-        public bool Success { get; init; }
-        public Stream? Data { get; init; }
-        public bool IntegrityVerified { get; init; }
-        public string? DataHash { get; init; }
-        public long VersionNumber { get; init; }
-        public DateTime LastModified { get; init; }
-        public string? Error { get; init; }
-    }
 
     public class AuditEntry
     {
@@ -513,23 +265,6 @@ namespace DataWarehouse.SDK.Contracts
     }
 
     public enum AuditAction { Created, Read, Updated, Deleted, Locked, Unlocked, AccessGranted, AccessRevoked, Replicated, Verified, Exported }
-
-    public class IntegrityReport
-    {
-        public bool IsValid { get; init; }
-        public required Uri Uri { get; init; }
-        public string ExpectedHash { get; init; } = string.Empty;
-        public Dictionary<string, SiteIntegrity> SiteResults { get; init; } = new();
-        public DateTime VerifiedAt { get; init; }
-    }
-
-    public class SiteIntegrity
-    {
-        public string SiteId { get; init; } = string.Empty;
-        public bool IsValid { get; init; }
-        public string ActualHash { get; init; } = string.Empty;
-        public DateTime LastVerified { get; init; }
-    }
 
     public class ReplicationStatus
     {
@@ -547,17 +282,6 @@ namespace DataWarehouse.SDK.Contracts
         public DateTime LastSyncTime { get; init; }
         public TimeSpan? Lag { get; init; }
         public long PendingBytes { get; init; }
-    }
-
-    public enum LockReason { LegalHold, Investigation, Compliance, Regulatory, Preservation, Custom }
-
-    public class LockResult
-    {
-        public bool Success { get; init; }
-        public string LockId { get; init; } = string.Empty;
-        public DateTime LockedAt { get; init; }
-        public DateTime? ExpiresAt { get; init; }
-        public string? Error { get; init; }
     }
 
     #endregion
