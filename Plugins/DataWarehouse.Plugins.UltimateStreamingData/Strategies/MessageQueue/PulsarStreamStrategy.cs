@@ -362,7 +362,7 @@ internal sealed class PulsarStreamStrategy : StreamingDataStrategyBase, IStreami
     /// <summary>
     /// Configures Intelligence integration via message bus.
     /// </summary>
-    public void ConfigureIntelligence(IMessageBus? messageBus)
+    public override void ConfigureIntelligence(IMessageBus? messageBus)
     {
         // Intelligence can optimize tenant/namespace routing and subscription rebalancing
     }

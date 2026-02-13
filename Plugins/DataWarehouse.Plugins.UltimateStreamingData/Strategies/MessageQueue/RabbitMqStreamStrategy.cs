@@ -329,7 +329,7 @@ internal sealed class RabbitMqStreamStrategy : StreamingDataStrategyBase, IStrea
     /// <summary>
     /// Configures Intelligence integration via message bus.
     /// </summary>
-    public void ConfigureIntelligence(IMessageBus? messageBus)
+    public override void ConfigureIntelligence(IMessageBus? messageBus)
     {
         // Intelligence can optimize routing patterns and dead letter policies
     }

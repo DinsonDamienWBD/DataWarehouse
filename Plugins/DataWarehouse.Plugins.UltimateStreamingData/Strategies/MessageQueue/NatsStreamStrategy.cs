@@ -384,7 +384,7 @@ internal sealed class NatsStreamStrategy : StreamingDataStrategyBase, IStreaming
     /// <summary>
     /// Configures Intelligence integration via message bus.
     /// </summary>
-    public void ConfigureIntelligence(IMessageBus? messageBus)
+    public override void ConfigureIntelligence(IMessageBus? messageBus)
     {
         // Intelligence can optimize subject hierarchy and consumer assignments
     }

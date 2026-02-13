@@ -564,10 +564,11 @@ public sealed class StreamingStrategyRegistry
 
 /// <summary>
 /// Base class for streaming data strategies.
+/// Inherits from <see cref="StrategyBase"/> for unified strategy hierarchy (AD-05).
 /// </summary>
-public abstract class StreamingDataStrategyBase : IStreamingDataStrategy, IInitializable
+public abstract class StreamingDataStrategyBase : StrategyBase, IStreamingDataStrategy, IInitializable
 {
-    private bool _initialized;
+    private new bool _initialized;
     private readonly object _initLock = new();
 
     // Metrics
@@ -577,16 +578,22 @@ public abstract class StreamingDataStrategyBase : IStreamingDataStrategy, IIniti
     private long _cacheHits;
     private long _cacheMisses;
 
-    public abstract string StrategyId { get; }
+    public abstract override string StrategyId { get; }
     public abstract string DisplayName { get; }
+
+    /// <summary>
+    /// Bridges StrategyBase.Name to the domain-specific DisplayName property.
+    /// </summary>
+    public override string Name => DisplayName;
+
     public abstract StreamingCategory Category { get; }
     public abstract StreamingDataCapabilities Capabilities { get; }
     public abstract string SemanticDescription { get; }
     public abstract string[] Tags { get; }
 
-    public bool IsInitialized => _initialized;
+    public new bool IsInitialized => _initialized;
 
-    public virtual Task InitializeAsync(CancellationToken ct = default)
+    public new virtual Task InitializeAsync(CancellationToken ct = default)
     {
         lock (_initLock)
         {

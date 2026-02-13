@@ -363,7 +363,7 @@ internal sealed class CoapStreamStrategy : StreamingDataStrategyBase, IStreaming
     /// <summary>
     /// Configures Intelligence integration via message bus.
     /// </summary>
-    public void ConfigureIntelligence(IMessageBus? messageBus)
+    public override void ConfigureIntelligence(IMessageBus? messageBus)
     {
         // Intelligence can optimize observe registrations and block-wise transfer sizes
     }

@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
+using DataWarehouse.SDK.Contracts;
 
 namespace DataWarehouse.Plugins.UltimateAccessControl
 {
@@ -211,8 +212,9 @@ namespace DataWarehouse.Plugins.UltimateAccessControl
 
     /// <summary>
     /// Base class for access control strategies.
+    /// Inherits from <see cref="StrategyBase"/> for unified strategy hierarchy (AD-05).
     /// </summary>
-    public abstract class AccessControlStrategyBase : IAccessControlStrategy
+    public abstract class AccessControlStrategyBase : StrategyBase, IAccessControlStrategy
     {
         private long _totalEvaluations;
         private long _grantedCount;
@@ -222,8 +224,14 @@ namespace DataWarehouse.Plugins.UltimateAccessControl
         private DateTime _lastEvaluationTime;
         protected Dictionary<string, object> Configuration { get; private set; } = new();
 
-        public abstract string StrategyId { get; }
+        public abstract override string StrategyId { get; }
         public abstract string StrategyName { get; }
+
+        /// <summary>
+        /// Bridges StrategyBase.Name to the domain-specific StrategyName property.
+        /// </summary>
+        public override string Name => StrategyName;
+
         public abstract AccessControlCapabilities Capabilities { get; }
 
         public virtual Task InitializeAsync(Dictionary<string, object> configuration, CancellationToken cancellationToken = default)

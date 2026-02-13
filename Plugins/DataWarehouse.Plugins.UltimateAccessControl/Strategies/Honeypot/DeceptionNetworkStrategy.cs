@@ -755,7 +755,7 @@ public sealed class DeceptionNetworkStrategy : AccessControlStrategyBase, IDispo
         return _eventQueue.TakeLast(count).ToList();
     }
 
-    public void Dispose()
+    public new void Dispose()
     {
         if (_disposed) return;
         _disposed = true;
