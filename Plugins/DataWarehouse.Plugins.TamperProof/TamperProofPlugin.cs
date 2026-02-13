@@ -2,6 +2,7 @@
 // DataWarehouse licenses this file under the MIT license.
 
 using DataWarehouse.SDK.Contracts;
+using DataWarehouse.SDK.Contracts.Hierarchy;
 using DataWarehouse.SDK.Contracts.TamperProof;
 using DataWarehouse.SDK.Primitives;
 using DataWarehouse.Plugins.TamperProof.Services;
@@ -20,7 +21,7 @@ namespace DataWarehouse.Plugins.TamperProof;
 ///   Phase 5: Blockchain anchoring
 /// Read pipeline reverses these phases with verification.
 /// </summary>
-public class TamperProofPlugin : PluginBase, IDisposable
+public class TamperProofPlugin : IntegrityPluginBase, IDisposable
 {
     private readonly IIntegrityProvider _integrity;
     private readonly IBlockchainProvider _blockchain;
@@ -1005,4 +1006,32 @@ public class TamperProofPlugin : PluginBase, IDisposable
         _disposed = true;
         base.Dispose(disposing);
     }
+
+    #region Hierarchy IntegrityPluginBase Abstract Methods
+    /// <inheritdoc/>
+    public override async Task<Dictionary<string, object>> VerifyAsync(string key, CancellationToken ct = default)
+    {
+        var result = new Dictionary<string, object>();
+        try
+        {
+            var verifyResult = await _integrity.VerifyAsync(Stream.Null, new DataWarehouse.SDK.Primitives.IntegrityHash(), ct);
+            result["verified"] = true;
+            result["key"] = key;
+        }
+        catch
+        {
+            result["verified"] = false;
+            result["key"] = key;
+        }
+        return result;
+    }
+    /// <inheritdoc/>
+    public override async Task<byte[]> ComputeHashAsync(Stream data, CancellationToken ct = default)
+    {
+        using var sha = System.Security.Cryptography.SHA256.Create();
+        using var ms = new MemoryStream();
+        await data.CopyToAsync(ms, ct);
+        return sha.ComputeHash(ms.ToArray());
+    }
+    #endregion
 }

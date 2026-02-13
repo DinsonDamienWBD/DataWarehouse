@@ -2,7 +2,9 @@ using System.Collections.Concurrent;
 using System.Reflection;
 using DataWarehouse.SDK.AI;
 using DataWarehouse.SDK.Contracts;
+using DataWarehouse.SDK.Contracts.Hierarchy;
 using DataWarehouse.SDK.Contracts.IntelligenceAware;
+using DataWarehouse.SDK.Contracts.Storage;
 using DataWarehouse.SDK.Primitives;
 using DataWarehouse.SDK.Utilities;
 
@@ -34,7 +36,7 @@ namespace DataWarehouse.Plugins.UltimateDatabaseProtocol;
 /// - Protocol statistics and monitoring
 /// - Intelligence-aware protocol selection
 /// </summary>
-public sealed class UltimateDatabaseProtocolPlugin : IntelligenceAwarePluginBase, IDisposable
+public sealed class UltimateDatabaseProtocolPlugin : DataWarehouse.SDK.Contracts.Hierarchy.StoragePluginBase, IDisposable
 {
     private readonly DatabaseProtocolStrategyRegistry _registry;
     private readonly ConcurrentDictionary<string, long> _usageStats = new();
@@ -515,5 +517,29 @@ public sealed class UltimateDatabaseProtocolPlugin : IntelligenceAwarePluginBase
         base.Dispose(disposing);
     }
 
+    #endregion
+
+    #region Hierarchy StoragePluginBase Abstract Methods
+    /// <inheritdoc/>
+    public override Task<StorageObjectMetadata> StoreAsync(string key, Stream data, IDictionary<string, string>? metadata = null, CancellationToken ct = default)
+        => throw new NotSupportedException("Use protocol-specific strategy methods instead.");
+    /// <inheritdoc/>
+    public override Task<Stream> RetrieveAsync(string key, CancellationToken ct = default)
+        => throw new NotSupportedException("Use protocol-specific strategy methods instead.");
+    /// <inheritdoc/>
+    public override Task DeleteAsync(string key, CancellationToken ct = default)
+        => throw new NotSupportedException("Use protocol-specific strategy methods instead.");
+    /// <inheritdoc/>
+    public override Task<bool> ExistsAsync(string key, CancellationToken ct = default)
+        => throw new NotSupportedException("Use protocol-specific strategy methods instead.");
+    /// <inheritdoc/>
+    public override async IAsyncEnumerable<StorageObjectMetadata> ListAsync(string? prefix, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct = default)
+    { await Task.CompletedTask; yield break; }
+    /// <inheritdoc/>
+    public override Task<StorageObjectMetadata> GetMetadataAsync(string key, CancellationToken ct = default)
+        => Task.FromResult(new StorageObjectMetadata { Key = key });
+    /// <inheritdoc/>
+    public override Task<StorageHealthInfo> GetHealthAsync(CancellationToken ct = default)
+        => Task.FromResult(new StorageHealthInfo { Status = DataWarehouse.SDK.Contracts.Storage.HealthStatus.Healthy });
     #endregion
 }
