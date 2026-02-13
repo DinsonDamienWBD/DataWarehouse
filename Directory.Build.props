@@ -34,8 +34,11 @@
          CS0168: Variable declared but never used (catch block variables)
          CA1416: Platform compatibility (plugins handle platform checks at runtime)
          CA1418: Platform unsupported guard (same as CA1416)
-         CA2024: Channel read/write (intentional async patterns in connectors) -->
-    <NoWarn>$(NoWarn);CS0618;CS0649;CS0219;CS0414;CS0169;CS0162;CS0067;CS0168;CA1416;CA1418;CA2024</NoWarn>
+         CA2024: Channel read/write (intentional async patterns in connectors)
+         NU1608: Dependency constraint violations from upstream packages
+                 (e.g., Nethereum requires older M.E.L.Abstractions,
+                  AWSSDK.SecurityToken requires AWSSDK.Core <4.0) -->
+    <NoWarn>$(NoWarn);CS0618;CS0649;CS0219;CS0414;CS0169;CS0162;CS0067;CS0168;CA1416;CA1418;CA2024;NU1608</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>
