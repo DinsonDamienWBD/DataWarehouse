@@ -439,12 +439,16 @@ public sealed class UltimateRTOSBridgePlugin : IntelligenceAwarePluginBase, IDis
     /// <summary>
     /// Disposes resources.
     /// </summary>
-    public void Dispose()
+    protected override void Dispose(bool disposing)
     {
-        if (_disposed)
+        if (disposing)
+        {
+            if (_disposed)
             return;
 
-        _disposed = true;
-        _strategies.Clear();
+            _disposed = true;
+            _strategies.Clear();
+        }
+        base.Dispose(disposing);
     }
 }

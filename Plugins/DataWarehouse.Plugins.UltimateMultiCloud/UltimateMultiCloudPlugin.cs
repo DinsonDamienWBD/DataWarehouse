@@ -570,12 +570,16 @@ public sealed class UltimateMultiCloudPlugin : IntelligenceAwarePluginBase, IDis
     /// <summary>
     /// Disposes resources.
     /// </summary>
-    public void Dispose()
+    protected override void Dispose(bool disposing)
     {
-        if (_disposed) return;
-        _disposed = true;
-        _providers.Clear();
-        _usageStats.Clear();
+        if (disposing)
+        {
+            if (_disposed) return;
+            _disposed = true;
+            _providers.Clear();
+            _usageStats.Clear();
+        }
+        base.Dispose(disposing);
     }
 }
 

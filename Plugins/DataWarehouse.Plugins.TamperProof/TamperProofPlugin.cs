@@ -975,16 +975,7 @@ public class TamperProofPlugin : PluginBase, IDisposable
     /// <summary>
     /// Disposes resources used by the plugin.
     /// </summary>
-    public void Dispose()
-    {
-        Dispose(true);
-        GC.SuppressFinalize(this);
-    }
-
-    /// <summary>
-    /// Disposes resources.
-    /// </summary>
-    protected virtual void Dispose(bool disposing)
+    protected override void Dispose(bool disposing)
     {
         if (_disposed) return;
 
@@ -1012,5 +1003,6 @@ public class TamperProofPlugin : PluginBase, IDisposable
         }
 
         _disposed = true;
+        base.Dispose(disposing);
     }
 }

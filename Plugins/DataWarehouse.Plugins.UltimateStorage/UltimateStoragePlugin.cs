@@ -1324,12 +1324,16 @@ public sealed class UltimateStoragePlugin : IntelligenceAwareStoragePluginBase, 
     /// <summary>
     /// Disposes resources.
     /// </summary>
-    public void Dispose()
+    protected override void Dispose(bool disposing)
     {
-        if (_disposed) return;
-        _disposed = true;
-        _usageStats.Clear();
-        _healthStatus.Clear();
+        if (disposing)
+        {
+            if (_disposed) return;
+            _disposed = true;
+            _usageStats.Clear();
+            _healthStatus.Clear();
+        }
+        base.Dispose(disposing);
     }
 
     /// <summary>

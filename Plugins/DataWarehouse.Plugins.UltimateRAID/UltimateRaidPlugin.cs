@@ -982,18 +982,22 @@ public sealed class UltimateRaidPlugin : IntelligenceAwarePluginBase, IDisposabl
     /// <summary>
     /// Disposes resources.
     /// </summary>
-    public void Dispose()
+    protected override void Dispose(bool disposing)
     {
-        if (_disposed) return;
-        _disposed = true;
-
-        // Dispose all registered strategies
-        foreach (var strategy in _registry.GetAllStrategies())
+        if (disposing)
         {
-            strategy.Dispose();
-        }
+            if (_disposed) return;
+            _disposed = true;
 
-        _usageStats.Clear();
-        _healthStatus.Clear();
+            // Dispose all registered strategies
+            foreach (var strategy in _registry.GetAllStrategies())
+            {
+            strategy.Dispose();
+            }
+
+            _usageStats.Clear();
+            _healthStatus.Clear();
+        }
+        base.Dispose(disposing);
     }
 }

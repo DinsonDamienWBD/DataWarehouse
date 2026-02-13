@@ -222,23 +222,27 @@ public sealed class UltimateStreamingDataPlugin : IntelligenceAwarePluginBase, I
         UsageByStrategy = _usageStats.ToDictionary(k => k.Key, v => v.Value)
     };
 
-    private void ThrowIfDisposed()
+    private new void ThrowIfDisposed()
     {
         if (_disposed) throw new ObjectDisposedException(nameof(UltimateStreamingDataPlugin));
     }
 
-    public void Dispose()
+    protected override void Dispose(bool disposing)
     {
-        if (_disposed) return;
-        _disposed = true;
-
-        foreach (var strategy in _registry.GetAllStrategies())
+        if (disposing)
         {
+            if (_disposed) return;
+            _disposed = true;
+
+            foreach (var strategy in _registry.GetAllStrategies())
+            {
             if (strategy is IDisposable disposable)
             {
-                disposable.Dispose();
+            disposable.Dispose();
+            }
             }
         }
+        base.Dispose(disposing);
     }
 }
 

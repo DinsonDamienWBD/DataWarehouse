@@ -506,11 +506,15 @@ public sealed class UltimateFilesystemPlugin : FeaturePluginBase, IDisposable
     /// <summary>
     /// Disposes resources.
     /// </summary>
-    public void Dispose()
+    protected override void Dispose(bool disposing)
     {
-        if (_disposed) return;
-        _disposed = true;
-        _usageStats.Clear();
-        _mountCache.Clear();
+        if (disposing)
+        {
+            if (_disposed) return;
+            _disposed = true;
+            _usageStats.Clear();
+            _mountCache.Clear();
+        }
+        base.Dispose(disposing);
     }
 }

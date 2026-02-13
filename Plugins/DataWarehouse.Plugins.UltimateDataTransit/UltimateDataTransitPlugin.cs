@@ -767,18 +767,22 @@ internal sealed class UltimateDataTransitPlugin : FeaturePluginBase, ITransitOrc
     /// <summary>
     /// Releases resources used by the plugin.
     /// </summary>
-    public void Dispose()
+    protected override void Dispose(bool disposing)
     {
-        if (_disposed) return;
-        _disposed = true;
-
-        foreach (var kvp in _activeTransfers)
+        if (disposing)
         {
+            if (_disposed) return;
+            _disposed = true;
+
+            foreach (var kvp in _activeTransfers)
+            {
             kvp.Value.CancellationTokenSource.Cancel();
             kvp.Value.CancellationTokenSource.Dispose();
-        }
+            }
 
-        _activeTransfers.Clear();
+            _activeTransfers.Clear();
+        }
+        base.Dispose(disposing);
     }
 }
 

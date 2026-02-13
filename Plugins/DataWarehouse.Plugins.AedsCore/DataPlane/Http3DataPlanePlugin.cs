@@ -424,7 +424,7 @@ public class Http3DataPlanePlugin : DataPlaneTransportPluginBase
     /// <summary>
     /// Disposes resources.
     /// </summary>
-    protected virtual void Dispose(bool disposing)
+    protected override void Dispose(bool disposing)
     {
         if (disposing)
         {

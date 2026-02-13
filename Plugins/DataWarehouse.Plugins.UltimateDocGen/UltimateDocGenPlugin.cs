@@ -445,10 +445,14 @@ public sealed class UltimateDocGenPlugin : IntelligenceAwarePluginBase, IDisposa
             }
         }).ToList();
 
-    public void Dispose()
+    protected override void Dispose(bool disposing)
     {
-        if (_disposed) return;
-        _disposed = true;
-        _cts?.Cancel(); _cts?.Dispose();
+        if (disposing)
+        {
+            if (_disposed) return;
+            _disposed = true;
+            _cts?.Cancel(); _cts?.Dispose();
+        }
+        base.Dispose(disposing);
     }
 }

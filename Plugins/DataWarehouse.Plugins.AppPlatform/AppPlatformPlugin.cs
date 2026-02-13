@@ -1582,18 +1582,22 @@ public sealed class AppPlatformPlugin : IntelligenceAwarePluginBase, IDisposable
     /// Disposes the plugin and all held resources, including subscriptions
     /// and references to services, strategies, and facades.
     /// </summary>
-    public void Dispose()
+    protected override void Dispose(bool disposing)
     {
-        if (_disposed) return;
-        _disposed = true;
-        DisposeSubscriptions();
-        _registrationService = null;
-        _tokenService = null;
-        _accessPolicyStrategy = null;
-        _contextRouter = null;
-        _aiWorkflowStrategy = null;
-        _observabilityStrategy = null;
-        _serviceFacade = null;
+        if (disposing)
+        {
+            if (_disposed) return;
+            _disposed = true;
+            DisposeSubscriptions();
+            _registrationService = null;
+            _tokenService = null;
+            _accessPolicyStrategy = null;
+            _contextRouter = null;
+            _aiWorkflowStrategy = null;
+            _observabilityStrategy = null;
+            _serviceFacade = null;
+        }
+        base.Dispose(disposing);
     }
 
     /// <summary>

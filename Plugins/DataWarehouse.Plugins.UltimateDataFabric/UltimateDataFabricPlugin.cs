@@ -389,10 +389,14 @@ public sealed class UltimateDataFabricPlugin : IntelligenceAwarePluginBase, IDis
             Tags = s.Characteristics.Tags
         }).ToList();
 
-    public void Dispose()
+    protected override void Dispose(bool disposing)
     {
-        if (_disposed) return;
-        _disposed = true;
-        _cts?.Cancel(); _cts?.Dispose();
+        if (disposing)
+        {
+            if (_disposed) return;
+            _disposed = true;
+            _cts?.Cancel(); _cts?.Dispose();
+        }
+        base.Dispose(disposing);
     }
 }

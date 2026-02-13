@@ -1324,6 +1324,57 @@ namespace DataWarehouse.SDK.Contracts.IntelligenceAware
             metadata["AvailableCapabilities"] = AvailableCapabilities.ToString();
             return metadata;
         }
+
+        #region IDisposable / IAsyncDisposable
+
+        /// <summary>
+        /// Cleans up Intelligence subscriptions and pending requests.
+        /// </summary>
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing)
+            {
+                // Dispose Intelligence subscriptions
+                foreach (var subscription in _intelligenceSubscriptions)
+                {
+                    try { subscription.Dispose(); } catch { }
+                }
+                _intelligenceSubscriptions.Clear();
+
+                // Cancel pending requests
+                foreach (var kvp in _pendingRequests)
+                {
+                    kvp.Value.TrySetCanceled();
+                }
+                _pendingRequests.Clear();
+            }
+
+            base.Dispose(disposing);
+        }
+
+        /// <summary>
+        /// Performs async cleanup of Intelligence resources.
+        /// </summary>
+        protected override async ValueTask DisposeAsyncCore()
+        {
+            // Dispose Intelligence subscriptions
+            foreach (var subscription in _intelligenceSubscriptions)
+            {
+                try { subscription.Dispose(); } catch { }
+            }
+            _intelligenceSubscriptions.Clear();
+
+            // Cancel pending requests
+            foreach (var kvp in _pendingRequests)
+            {
+                kvp.Value.TrySetCanceled();
+            }
+            _pendingRequests.Clear();
+
+            await base.DisposeAsyncCore();
+        }
+
+        #endregion
     }
 
     // ========================================

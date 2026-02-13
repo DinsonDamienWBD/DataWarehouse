@@ -1765,21 +1765,25 @@ public class WasmComputePlugin : WasmFunctionPluginBase
     /// <summary>
     /// Disposes the plugin resources.
     /// </summary>
-    public void Dispose()
+    protected override void Dispose(bool disposing)
     {
-        if (_disposed) return;
-        _disposed = true;
+        if (disposing)
+        {
+            if (_disposed) return;
+            _disposed = true;
 
-        _schedulerTimer?.Dispose();
-        _executionSemaphore.Dispose();
+            _schedulerTimer?.Dispose();
+            _executionSemaphore.Dispose();
 
-        _modules.Clear();
-        _versionHistory.Clear();
-        _chains.Clear();
-        _scheduledFunctions.Clear();
-        _eventSubscriptions.Clear();
-        _metrics.Clear();
-        _executionLogs.Clear();
+            _modules.Clear();
+            _versionHistory.Clear();
+            _chains.Clear();
+            _scheduledFunctions.Clear();
+            _eventSubscriptions.Clear();
+            _metrics.Clear();
+            _executionLogs.Clear();
+        }
+        base.Dispose(disposing);
     }
 
     #endregion

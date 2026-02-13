@@ -456,13 +456,17 @@ public sealed class UltimateDataLakePlugin : IntelligenceAwareDataManagementPlug
     protected override Task OnStartCoreAsync(CancellationToken ct) => Task.CompletedTask;
 
     /// <summary>Disposes resources.</summary>
-    public void Dispose()
+    protected override void Dispose(bool disposing)
     {
-        if (_disposed) return;
-        _disposed = true;
-        _usageStats.Clear();
-        _catalog.Clear();
-        _lineage.Clear();
-        _policies.Clear();
+        if (disposing)
+        {
+            if (_disposed) return;
+            _disposed = true;
+            _usageStats.Clear();
+            _catalog.Clear();
+            _lineage.Clear();
+            _policies.Clear();
+        }
+        base.Dispose(disposing);
     }
 }

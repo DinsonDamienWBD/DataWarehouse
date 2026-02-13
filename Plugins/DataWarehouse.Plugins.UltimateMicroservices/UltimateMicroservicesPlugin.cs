@@ -478,12 +478,16 @@ public sealed class UltimateMicroservicesPlugin : IntelligenceAwarePluginBase, I
     #endregion
 
     /// <inheritdoc/>
-    public void Dispose()
+    protected override void Dispose(bool disposing)
     {
-        if (_disposed) return;
-        _disposed = true;
-        _registeredServices.Clear();
-        _requestHistory.Clear();
+        if (disposing)
+        {
+            if (_disposed) return;
+            _disposed = true;
+            _registeredServices.Clear();
+            _requestHistory.Clear();
+        }
+        base.Dispose(disposing);
     }
 }
 

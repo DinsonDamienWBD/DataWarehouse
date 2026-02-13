@@ -284,9 +284,13 @@ namespace DataWarehouse.SDK.Contracts
         /// <summary>
         /// Disposes resources.
         /// </summary>
-        protected virtual void Dispose()
+        protected override void Dispose(bool disposing)
         {
-            _initializationLock.Dispose();
+            if (disposing)
+            {
+                _initializationLock.Dispose();
+            }
+            base.Dispose(disposing);
         }
     }
 

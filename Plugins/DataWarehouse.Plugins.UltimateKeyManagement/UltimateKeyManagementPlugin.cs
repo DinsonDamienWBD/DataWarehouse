@@ -600,28 +600,32 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement
             return base.OnHandshakeAsync(request);
         }
 
-        public void Dispose()
+        protected override void Dispose(bool disposing)
         {
-            if (_disposed)
+            if (disposing)
+            {
+                if (_disposed)
                 return;
 
-            _disposed = true;
+                _disposed = true;
 
-            StopAsync().GetAwaiter().GetResult();
+                StopAsync().GetAwaiter().GetResult();
 
-            foreach (var strategy in _strategies.Values)
-            {
+                foreach (var strategy in _strategies.Values)
+                {
                 if (strategy is IDisposable disposable)
                 {
-                    disposable.Dispose();
+                disposable.Dispose();
                 }
+                }
+
+                _strategies.Clear();
+                _keyStores.Clear();
+                _envelopeKeyStores.Clear();
+
+                GC.SuppressFinalize(this);
             }
-
-            _strategies.Clear();
-            _keyStores.Clear();
-            _envelopeKeyStores.Clear();
-
-            GC.SuppressFinalize(this);
+            base.Dispose(disposing);
         }
     }
 }

@@ -1055,12 +1055,16 @@ public sealed class UltimateIoTIntegrationPlugin : IntelligenceAwarePluginBase, 
     /// <summary>
     /// Disposes resources.
     /// </summary>
-    public void Dispose()
+    protected override void Dispose(bool disposing)
     {
-        if (_disposed) return;
-        _disposed = true;
-        _deviceStates.Clear();
-        _telemetryBuffers.Clear();
-        _usageStats.Clear();
+        if (disposing)
+        {
+            if (_disposed) return;
+            _disposed = true;
+            _deviceStates.Clear();
+            _telemetryBuffers.Clear();
+            _usageStats.Clear();
+        }
+        base.Dispose(disposing);
     }
 }
