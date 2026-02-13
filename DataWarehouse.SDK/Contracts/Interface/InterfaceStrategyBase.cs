@@ -1,8 +1,7 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
-using DataWarehouse.SDK.AI;
 
 namespace DataWarehouse.SDK.Contracts.Interface;
 
@@ -25,7 +24,7 @@ namespace DataWarehouse.SDK.Contracts.Interface;
 /// requests, and provide their specific protocol and capabilities via the constructor or properties.
 /// </para>
 /// </remarks>
-public abstract class InterfaceStrategyBase : IInterfaceStrategy, IDisposable
+public abstract class InterfaceStrategyBase : StrategyBase, IInterfaceStrategy
 {
     private int _isRunning;
     private bool _disposed;
@@ -130,82 +129,13 @@ public abstract class InterfaceStrategyBase : IInterfaceStrategy, IDisposable
 
     #endregion
 
-    #region Intelligence Integration
-
-    /// <summary>
-    /// Gets the message bus for Intelligence communication.
-    /// </summary>
-    protected IMessageBus? MessageBus { get; private set; }
-
-    /// <summary>
-    /// Configures Intelligence integration for this interface strategy.
-    /// </summary>
-    /// <param name="messageBus">Optional message bus for Intelligence communication.</param>
-    public virtual void ConfigureIntelligence(IMessageBus? messageBus)
-    {
-        MessageBus = messageBus;
-    }
-
-    /// <summary>
-    /// Gets a value indicating whether Intelligence integration is available.
-    /// </summary>
-    protected bool IsIntelligenceAvailable => MessageBus != null;
-
-    /// <summary>
-    /// Gets static knowledge about this interface strategy for Intelligence registration.
-    /// </summary>
-    /// <returns>A KnowledgeObject describing this strategy's capabilities.</returns>
-    public virtual KnowledgeObject GetStrategyKnowledge()
-    {
-        return new KnowledgeObject
-        {
-            Id = $"interface.{Protocol.ToString().ToLowerInvariant()}",
-            Topic = "interface.strategy",
-            SourcePluginId = "sdk.interface",
-            SourcePluginName = Protocol.ToString(),
-            KnowledgeType = "capability",
-            Description = $"{Protocol} interface strategy for API protocol handling",
-            Payload = new Dictionary<string, object>
-            {
-                ["protocol"] = Protocol.ToString(),
-                ["supportsStreaming"] = Capabilities.SupportsStreaming,
-                ["supportsAuthentication"] = Capabilities.SupportsAuthentication,
-                ["supportsBidirectional"] = Capabilities.SupportsBidirectionalStreaming
-            },
-            Tags = new[] { "interface", "protocol", "strategy", Protocol.ToString().ToLowerInvariant() }
-        };
-    }
-
-    /// <summary>
-    /// Gets the registered capability for this interface strategy.
-    /// </summary>
-    /// <returns>A RegisteredCapability describing this strategy.</returns>
-    public virtual RegisteredCapability GetStrategyCapability()
-    {
-        return new RegisteredCapability
-        {
-            CapabilityId = $"interface.{Protocol.ToString().ToLowerInvariant()}",
-            DisplayName = $"{Protocol} Interface",
-            Description = $"{Protocol} interface strategy for API protocol handling",
-            Category = CapabilityCategory.Transport,
-            SubCategory = "Interface",
-            PluginId = "sdk.interface",
-            PluginName = Protocol.ToString(),
-            PluginVersion = "1.0.0",
-            Tags = new[] { "interface", "protocol", Protocol.ToString().ToLowerInvariant() },
-            SemanticDescription = $"Use {Protocol} interface for API communication"
-        };
-    }
-
-    #endregion
-
     #region IDisposable
 
     /// <summary>
     /// Disposes resources used by this interface strategy.
     /// </summary>
     /// <param name="disposing">True if disposing managed resources; false if finalizing.</param>
-    protected virtual void Dispose(bool disposing)
+    protected override void Dispose(bool disposing)
     {
         if (_disposed)
             return;
@@ -217,20 +147,16 @@ public abstract class InterfaceStrategyBase : IInterfaceStrategy, IDisposable
         }
 
         _disposed = true;
+        base.Dispose(disposing);
     }
 
     /// <inheritdoc/>
-    public void Dispose()
+    public new void Dispose()
     {
         Dispose(disposing: true);
         GC.SuppressFinalize(this);
     }
 
-    private void EnsureNotDisposed()
-    {
-        if (_disposed)
-            throw new ObjectDisposedException(GetType().Name);
-    }
 
     #endregion
 }

@@ -85,7 +85,7 @@ public interface IIntegrityProvider
 /// Provides thread-safe, streaming-capable hash computation with efficient buffer management.
 /// Derived classes only need to implement the core hash algorithm.
 /// </summary>
-public abstract class IntegrityProviderPluginBase : FeaturePluginBase, IIntegrityProvider, IIntelligenceAware
+public abstract class IntegrityProviderPluginBase : LegacyFeaturePluginBase, IIntegrityProvider, IIntelligenceAware
 {
     #region Intelligence Socket
 

@@ -1,3 +1,4 @@
+﻿using DataWarehouse.SDK.Contracts;
 using System.Security.Cryptography;
 
 namespace DataWarehouse.SDK.Security
@@ -927,11 +928,11 @@ namespace DataWarehouse.SDK.Security
     /// - Message bus integration for key operation events
     /// - Template methods for storage operations
     /// </summary>
-    public abstract class KeyStoreStrategyBase : IKeyStoreStrategy, IDisposable
+    public abstract class KeyStoreStrategyBase : StrategyBase, IKeyStoreStrategy
     {
         private readonly System.Collections.Concurrent.ConcurrentDictionary<string, CachedKey> _keyCache = new();
         private readonly SemaphoreSlim _initializationLock = new(1, 1);
-        private bool _initialized;
+        private new bool _initialized;
         private bool _disposed;
         private TimeSpan _cacheExpiration = TimeSpan.FromMinutes(5);
         private Contracts.IMessageBus? _messageBus;
@@ -1258,7 +1259,7 @@ namespace DataWarehouse.SDK.Security
         /// <summary>
         /// Disposes resources used by the key store.
         /// </summary>
-        public virtual void Dispose()
+        public new virtual void Dispose()
         {
             if (_disposed)
                 return;

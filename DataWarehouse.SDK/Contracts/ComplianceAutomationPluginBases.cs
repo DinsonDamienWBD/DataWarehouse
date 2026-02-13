@@ -16,7 +16,7 @@ namespace DataWarehouse.SDK.Contracts;
 /// Implementations must specify supported framework and provide control definitions.
 /// Intelligence-aware: Supports AI-driven compliance assessment and remediation suggestions.
 /// </summary>
-public abstract class ComplianceAutomationPluginBase : FeaturePluginBase, IComplianceAutomation
+public abstract class ComplianceAutomationPluginBase : LegacyFeaturePluginBase, IComplianceAutomation
 {
     /// <summary>
     /// The compliance framework this plugin supports.
@@ -305,7 +305,7 @@ public abstract class ComplianceAutomationPluginBase : FeaturePluginBase, ICompl
 /// Implementations must provide data collection, deletion, and consent management.
 /// Intelligence-aware: Supports AI-driven PII detection and data mapping.
 /// </summary>
-public abstract class DataSubjectRightsPluginBase : FeaturePluginBase, IDataSubjectRights
+public abstract class DataSubjectRightsPluginBase : LegacyFeaturePluginBase, IDataSubjectRights
 {
     #region Intelligence Integration
 
@@ -584,7 +584,7 @@ public abstract class DataSubjectRightsPluginBase : FeaturePluginBase, IDataSubj
 /// Implementations must provide audit storage and querying.
 /// Intelligence-aware: Supports AI-driven audit analysis and anomaly detection.
 /// </summary>
-public abstract class ComplianceAuditPluginBase : FeaturePluginBase, IComplianceAudit
+public abstract class ComplianceAuditPluginBase : LegacyFeaturePluginBase, IComplianceAudit
 {
     #region Intelligence Integration
 

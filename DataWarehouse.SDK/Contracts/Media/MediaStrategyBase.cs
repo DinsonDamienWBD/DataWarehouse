@@ -1,9 +1,8 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
-using DataWarehouse.SDK.AI;
 
 namespace DataWarehouse.SDK.Contracts.Media;
 
@@ -26,7 +25,7 @@ namespace DataWarehouse.SDK.Contracts.Media;
 /// thumbnail generation, and streaming, and provide their specific capabilities via the constructor.
 /// </para>
 /// </remarks>
-public abstract class MediaStrategyBase : IMediaStrategy
+public abstract class MediaStrategyBase : StrategyBase, IMediaStrategy
 {
     /// <summary>
     /// Initializes a new instance of the <see cref="MediaStrategyBase"/> class.
@@ -44,12 +43,12 @@ public abstract class MediaStrategyBase : IMediaStrategy
     /// <summary>
     /// Gets the unique identifier for this media strategy.
     /// </summary>
-    public abstract string StrategyId { get; }
+    public override abstract string StrategyId { get; }
 
     /// <summary>
     /// Gets the human-readable name of this media strategy.
     /// </summary>
-    public abstract string Name { get; }
+    public override abstract string Name { get; }
 
     #region IMediaStrategy Implementation
 
@@ -205,76 +204,6 @@ public abstract class MediaStrategyBase : IMediaStrategy
         Stream mediaStream,
         MediaFormat targetFormat,
         CancellationToken cancellationToken);
-
-    #endregion
-
-    #region Intelligence Integration
-
-    /// <summary>
-    /// Gets the message bus for Intelligence communication.
-    /// </summary>
-    protected IMessageBus? MessageBus { get; private set; }
-
-    /// <summary>
-    /// Configures Intelligence integration for this media strategy.
-    /// </summary>
-    /// <param name="messageBus">Optional message bus for Intelligence communication.</param>
-    public virtual void ConfigureIntelligence(IMessageBus? messageBus)
-    {
-        MessageBus = messageBus;
-    }
-
-    /// <summary>
-    /// Gets a value indicating whether Intelligence integration is available.
-    /// </summary>
-    protected bool IsIntelligenceAvailable => MessageBus != null;
-
-    /// <summary>
-    /// Gets static knowledge about this media strategy for Intelligence registration.
-    /// </summary>
-    /// <returns>A KnowledgeObject describing this strategy's capabilities.</returns>
-    public virtual KnowledgeObject GetStrategyKnowledge()
-    {
-        return new KnowledgeObject
-        {
-            Id = $"media.{StrategyId}",
-            Topic = "media.strategy",
-            SourcePluginId = "sdk.media",
-            SourcePluginName = Name,
-            KnowledgeType = "capability",
-            Description = $"{Name} media processing strategy for transcoding, streaming, and metadata",
-            Payload = new Dictionary<string, object>
-            {
-                ["strategyId"] = StrategyId,
-                ["supportsStreaming"] = Capabilities.SupportsStreaming,
-                ["supportsAdaptiveBitrate"] = Capabilities.SupportsAdaptiveBitrate,
-                ["supportsHardwareAcceleration"] = Capabilities.SupportsHardwareAcceleration,
-                ["supportsThumbnails"] = Capabilities.SupportsThumbnailGeneration
-            },
-            Tags = new[] { "media", "transcoding", "streaming", "strategy" }
-        };
-    }
-
-    /// <summary>
-    /// Gets the registered capability for this media strategy.
-    /// </summary>
-    /// <returns>A RegisteredCapability describing this strategy.</returns>
-    public virtual RegisteredCapability GetStrategyCapability()
-    {
-        return new RegisteredCapability
-        {
-            CapabilityId = $"media.{StrategyId}",
-            DisplayName = Name,
-            Description = $"{Name} media processing strategy",
-            Category = CapabilityCategory.DataManagement,
-            SubCategory = "Media",
-            PluginId = "sdk.media",
-            PluginName = Name,
-            PluginVersion = "1.0.0",
-            Tags = new[] { "media", "transcoding", "streaming" },
-            SemanticDescription = $"Use {Name} for media transcoding, streaming, and metadata extraction"
-        };
-    }
 
     #endregion
 }

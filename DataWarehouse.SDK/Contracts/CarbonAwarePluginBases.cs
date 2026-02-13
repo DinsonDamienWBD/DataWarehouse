@@ -10,7 +10,7 @@ namespace DataWarehouse.SDK.Contracts;
 /// Provides caching and common functionality for fetching carbon data.
 /// Intelligence-aware: Supports AI-driven carbon forecasting and optimization.
 /// </summary>
-public abstract class CarbonIntensityProviderPluginBase : FeaturePluginBase, ICarbonIntensityProvider
+public abstract class CarbonIntensityProviderPluginBase : LegacyFeaturePluginBase, ICarbonIntensityProvider
 {
     private readonly Dictionary<string, (CarbonIntensityData Data, DateTimeOffset CachedAt)> _cache = new();
 
@@ -199,7 +199,7 @@ public abstract class CarbonIntensityProviderPluginBase : FeaturePluginBase, ICa
 /// Provides scheduling logic for deferring operations to low-carbon periods.
 /// Intelligence-aware: Supports AI-driven optimal scheduling and workload prediction.
 /// </summary>
-public abstract class CarbonAwareSchedulerPluginBase : FeaturePluginBase, ICarbonAwareScheduler
+public abstract class CarbonAwareSchedulerPluginBase : LegacyFeaturePluginBase, ICarbonAwareScheduler
 {
     /// <summary>
     /// Gets or sets the carbon intensity provider.
@@ -386,7 +386,7 @@ public abstract class CarbonAwareSchedulerPluginBase : FeaturePluginBase, ICarbo
 /// Provides storage and aggregation for carbon usage tracking.
 /// Intelligence-aware: Supports AI-driven carbon trend analysis and optimization recommendations.
 /// </summary>
-public abstract class CarbonReporterPluginBase : FeaturePluginBase, ICarbonReporter
+public abstract class CarbonReporterPluginBase : LegacyFeaturePluginBase, ICarbonReporter
 {
     #region Intelligence Integration
 
@@ -571,7 +571,7 @@ public abstract class CarbonReporterPluginBase : FeaturePluginBase, ICarbonRepor
 /// Provides ranking logic for choosing low-carbon regions.
 /// Intelligence-aware: Supports AI-driven region selection optimization.
 /// </summary>
-public abstract class GreenRegionSelectorPluginBase : FeaturePluginBase, IGreenRegionSelector
+public abstract class GreenRegionSelectorPluginBase : LegacyFeaturePluginBase, IGreenRegionSelector
 {
     /// <summary>
     /// Gets or sets the carbon intensity provider.
@@ -747,7 +747,7 @@ public abstract class GreenRegionSelectorPluginBase : FeaturePluginBase, IGreenR
 /// Integrates with offset marketplaces and registries.
 /// Intelligence-aware: Supports AI-driven offset project recommendations.
 /// </summary>
-public abstract class CarbonOffsetProviderPluginBase : FeaturePluginBase, ICarbonOffsetProvider
+public abstract class CarbonOffsetProviderPluginBase : LegacyFeaturePluginBase, ICarbonOffsetProvider
 {
     #region Intelligence Integration
 

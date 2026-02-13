@@ -119,7 +119,7 @@ public interface IAccessLogProvider
 /// with default implementations for attribution analysis.
 /// Derived classes only need to implement the persistence layer (PersistLogEntryAsync and QueryLogsAsync).
 /// </summary>
-public abstract class AccessLogProviderPluginBase : FeaturePluginBase, IAccessLogProvider, IIntelligenceAware
+public abstract class AccessLogProviderPluginBase : LegacyFeaturePluginBase, IAccessLogProvider, IIntelligenceAware
 {
     #region Intelligence Socket
 

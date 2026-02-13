@@ -1,4 +1,4 @@
-using DataWarehouse.SDK.Primitives;
+﻿using DataWarehouse.SDK.Primitives;
 using System.Collections.Concurrent;
 
 namespace DataWarehouse.SDK.Contracts
@@ -9,7 +9,7 @@ namespace DataWarehouse.SDK.Contracts
     /// Abstract base class for storage pools. Provides common infrastructure
     /// for managing multiple storage providers with pluggable strategies.
     /// </summary>
-    public abstract class StoragePoolBase : FeaturePluginBase, IStoragePool
+    public abstract class StoragePoolBase : LegacyFeaturePluginBase, IStoragePool
     {
         protected readonly ConcurrentDictionary<string, (IStorageProvider Provider, StorageRole Role)> _providers = new();
         protected IStorageStrategy _strategy;
@@ -365,10 +365,10 @@ namespace DataWarehouse.SDK.Contracts
     /// <summary>
     /// Abstract base class for storage strategies.
     /// </summary>
-    public abstract class StorageStrategyBase : IStorageStrategy
+    public abstract class StorageStrategyBase : StrategyBase, IStorageStrategy
     {
-        public abstract string StrategyId { get; }
-        public abstract string Name { get; }
+        public override abstract string StrategyId { get; }
+        public override abstract string Name { get; }
         public abstract StorageStrategyType Type { get; }
 
         public abstract IEnumerable<ProviderWritePlan> PlanWrite(IReadOnlyList<IStorageProvider> providers, StorageIntent? intent, long dataSize);

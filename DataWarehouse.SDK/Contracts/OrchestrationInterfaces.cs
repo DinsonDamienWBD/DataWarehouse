@@ -954,7 +954,7 @@ namespace DataWarehouse.SDK.Contracts
     /// Abstract base class for search orchestrators.
     /// Provides parallel fan-out search with result merging.
     /// </summary>
-    public abstract class SearchOrchestratorPluginBase : FeaturePluginBase, ISearchOrchestrator
+    public abstract class SearchOrchestratorPluginBase : LegacyFeaturePluginBase, ISearchOrchestrator
     {
         private readonly List<ISearchProvider> _providers = new();
         private readonly object _lock = new();
@@ -1119,7 +1119,7 @@ namespace DataWarehouse.SDK.Contracts
     /// Abstract base class for search providers.
     /// Provides common functionality for search indexing and querying.
     /// </summary>
-    public abstract class SearchProviderPluginBase : FeaturePluginBase, ISearchProvider
+    public abstract class SearchProviderPluginBase : LegacyFeaturePluginBase, ISearchProvider
     {
         public override PluginCategory Category => PluginCategory.MetadataIndexingProvider;
 
@@ -1187,7 +1187,7 @@ namespace DataWarehouse.SDK.Contracts
     /// Abstract base class for content processors.
     /// Provides common functionality for text extraction, embedding generation, etc.
     /// </summary>
-    public abstract class ContentProcessorPluginBase : FeaturePluginBase, IContentProcessor
+    public abstract class ContentProcessorPluginBase : LegacyFeaturePluginBase, IContentProcessor
     {
         public override PluginCategory Category => PluginCategory.DataTransformationProvider;
 
@@ -1303,7 +1303,7 @@ namespace DataWarehouse.SDK.Contracts
     /// Abstract base class for write fan-out orchestrators.
     /// Provides parallel write coordination to multiple destinations.
     /// </summary>
-    public abstract class WriteFanOutOrchestratorPluginBase : FeaturePluginBase, IWriteFanOutOrchestrator
+    public abstract class WriteFanOutOrchestratorPluginBase : LegacyFeaturePluginBase, IWriteFanOutOrchestrator
     {
         private readonly List<IWriteDestination> _destinations = new();
         private readonly object _lock = new();
@@ -1518,7 +1518,7 @@ namespace DataWarehouse.SDK.Contracts
     /// Abstract base class for write destinations.
     /// Provides common functionality for destination-specific writes.
     /// </summary>
-    public abstract class WriteDestinationPluginBase : FeaturePluginBase, IWriteDestination
+    public abstract class WriteDestinationPluginBase : LegacyFeaturePluginBase, IWriteDestination
     {
         public override PluginCategory Category => PluginCategory.StorageProvider;
 

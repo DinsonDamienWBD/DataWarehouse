@@ -21,7 +21,7 @@ namespace DataWarehouse.SDK.Contracts;
 /// - Implement GetAllShardsAsync for topology queries
 /// - Override MaxShardsPerNode for capacity planning
 /// </remarks>
-public abstract class ShardManagerPluginBase : FeaturePluginBase, IShardManager, IIntelligenceAware
+public abstract class ShardManagerPluginBase : LegacyFeaturePluginBase, IShardManager, IIntelligenceAware
 {
     #region Intelligence Socket
 
@@ -341,7 +341,7 @@ public abstract class ShardManagerPluginBase : FeaturePluginBase, IShardManager,
 /// Write path: MemTable -> Flush to Level 0 -> Compact to Level 1 -> ... -> Level N
 /// Read path: Check MemTable -> Check Bloom filters -> Read SSTables (newest first)
 /// </remarks>
-public abstract class DistributedMetadataIndexPluginBase : FeaturePluginBase, IDistributedMetadataIndex, IIntelligenceAware
+public abstract class DistributedMetadataIndexPluginBase : LegacyFeaturePluginBase, IDistributedMetadataIndex, IIntelligenceAware
 {
     #region Intelligence Socket
 
@@ -637,7 +637,7 @@ public abstract class DistributedMetadataIndexPluginBase : FeaturePluginBase, ID
 /// - Write-behind: Update cache immediately, async update backing store
 /// - Cache-aside: Application manages cache and backing store separately
 /// </remarks>
-public abstract class DistributedCachePluginBase : FeaturePluginBase, IDistributedCache
+public abstract class DistributedCachePluginBase : LegacyFeaturePluginBase, IDistributedCache
 {
     /// <summary>
     /// Gets raw bytes from cache by key.

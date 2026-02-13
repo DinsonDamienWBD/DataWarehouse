@@ -16,7 +16,7 @@ namespace DataWarehouse.SDK.Contracts
     /// Implements connection lifecycle management, error handling, and capability enforcement.
     /// Intelligence-aware: Supports AI-driven schema discovery and query optimization.
     /// </summary>
-    public abstract class DataConnectorPluginBase : FeaturePluginBase, IDataConnector
+    public abstract class DataConnectorPluginBase : LegacyFeaturePluginBase, IDataConnector
     {
         #region Properties
 

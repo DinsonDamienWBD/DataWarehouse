@@ -14,7 +14,7 @@ namespace DataWarehouse.SDK.Contracts
     /// Provides common infrastructure for implementing IHealthCheck with
     /// automatic registration, caching, and component health aggregation.
     /// </summary>
-    public abstract class HealthProviderPluginBase : FeaturePluginBase, IHealthCheck, IIntelligenceAware
+    public abstract class HealthProviderPluginBase : LegacyFeaturePluginBase, IHealthCheck, IIntelligenceAware
     {
         #region Intelligence Socket
 
@@ -248,7 +248,7 @@ namespace DataWarehouse.SDK.Contracts
     /// Abstract base class for rate limiter plugins.
     /// Provides common token bucket implementation with configurable policies.
     /// </summary>
-    public abstract class RateLimiterPluginBase : FeaturePluginBase, IRateLimiter, IIntelligenceAware
+    public abstract class RateLimiterPluginBase : LegacyFeaturePluginBase, IRateLimiter, IIntelligenceAware
     {
         #region Intelligence Socket
 
@@ -513,7 +513,7 @@ namespace DataWarehouse.SDK.Contracts
     /// Abstract base class for circuit breaker plugins implementing the resilience policy pattern.
     /// Provides automatic failure detection, circuit opening/closing, and statistics tracking.
     /// </summary>
-    public abstract class CircuitBreakerPluginBase : FeaturePluginBase, IResiliencePolicy, IIntelligenceAware
+    public abstract class CircuitBreakerPluginBase : LegacyFeaturePluginBase, IResiliencePolicy, IIntelligenceAware
     {
         #region Intelligence Socket
 
@@ -949,7 +949,7 @@ namespace DataWarehouse.SDK.Contracts
     /// Abstract base class for transaction manager plugins.
     /// Provides common infrastructure for distributed transaction coordination.
     /// </summary>
-    public abstract class TransactionManagerPluginBase : FeaturePluginBase, ITransactionManager, IIntelligenceAware
+    public abstract class TransactionManagerPluginBase : LegacyFeaturePluginBase, ITransactionManager, IIntelligenceAware
     {
         #region Intelligence Socket
 
@@ -1444,7 +1444,7 @@ namespace DataWarehouse.SDK.Contracts
     /// Abstract base class for RAID provider plugins.
     /// Provides common RAID functionality including parity calculation and rebuild logic.
     /// </summary>
-    public abstract class RaidProviderPluginBase : FeaturePluginBase, IRaidProvider, IIntelligenceAware
+    public abstract class RaidProviderPluginBase : LegacyFeaturePluginBase, IRaidProvider, IIntelligenceAware
     {
         #region Intelligence Socket
 
@@ -1733,7 +1733,7 @@ namespace DataWarehouse.SDK.Contracts
     /// Abstract base class for erasure coding provider plugins.
     /// Provides common Reed-Solomon encoding/decoding infrastructure.
     /// </summary>
-    public abstract class ErasureCodingPluginBase : FeaturePluginBase, IErasureCodingProvider, IIntelligenceAware
+    public abstract class ErasureCodingPluginBase : LegacyFeaturePluginBase, IErasureCodingProvider, IIntelligenceAware
     {
         #region Intelligence Socket
 
@@ -2073,7 +2073,7 @@ namespace DataWarehouse.SDK.Contracts
     /// <summary>
     /// Abstract base class for compliance provider plugins.
     /// </summary>
-    public abstract class ComplianceProviderPluginBase : FeaturePluginBase, IComplianceProvider, IIntelligenceAware
+    public abstract class ComplianceProviderPluginBase : LegacyFeaturePluginBase, IComplianceProvider, IIntelligenceAware
     {
         #region Intelligence Socket
 
@@ -2305,7 +2305,7 @@ namespace DataWarehouse.SDK.Contracts
     /// <summary>
     /// Abstract base class for IAM provider plugins.
     /// </summary>
-    public abstract class IAMProviderPluginBase : FeaturePluginBase, IIAMProvider, IIntelligenceAware
+    public abstract class IAMProviderPluginBase : LegacyFeaturePluginBase, IIAMProvider, IIntelligenceAware
     {
         #region Intelligence Socket
 

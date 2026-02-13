@@ -275,7 +275,7 @@ public class LegalHold
 /// Provides common retention validation and legal hold management logic.
 /// Plugin implementers should extend this class and implement the protected abstract methods.
 /// </summary>
-public abstract class WormStorageProviderPluginBase : FeaturePluginBase, IWormStorageProvider, IIntelligenceAware
+public abstract class WormStorageProviderPluginBase : LegacyFeaturePluginBase, IWormStorageProvider, IIntelligenceAware
 {
     #region Intelligence Socket
 

@@ -628,7 +628,7 @@ public class WasmValidationResult
 /// Provides compute-on-storage capabilities using WebAssembly.
 /// Intelligence-aware: Supports AI-driven function optimization and execution planning.
 /// </summary>
-public abstract class WasmFunctionPluginBase : FeaturePluginBase, IWasmRuntime
+public abstract class WasmFunctionPluginBase : LegacyFeaturePluginBase, IWasmRuntime
 {
     private readonly ConcurrentDictionary<string, WasmFunctionMetadata> _functions = new();
     private readonly ConcurrentDictionary<string, WasmFunctionStatistics> _statistics = new();
@@ -1831,7 +1831,7 @@ public static class SchemaInference
 /// Enables SQL queries over object storage data.
 /// Intelligence-aware: Supports AI-driven query optimization and schema inference.
 /// </summary>
-public abstract class DataVirtualizationPluginBase : FeaturePluginBase, IVirtualTableProvider
+public abstract class DataVirtualizationPluginBase : LegacyFeaturePluginBase, IVirtualTableProvider
 {
     private readonly ConcurrentDictionary<string, VirtualTableSchema> _tables = new();
 
@@ -2899,7 +2899,7 @@ public class TranscodingStatistics
 /// Provides automatic media format conversion capabilities.
 /// Intelligence-aware: Supports AI-driven quality optimization and format selection.
 /// </summary>
-public abstract class MediaTranscodingPluginBase : FeaturePluginBase, ITranscodingProvider
+public abstract class MediaTranscodingPluginBase : LegacyFeaturePluginBase, ITranscodingProvider
 {
     private readonly ConcurrentDictionary<string, TranscodingJob> _jobs = new();
     private readonly ConcurrentDictionary<string, TranscodingResult> _results = new();
