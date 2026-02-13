@@ -1,4 +1,6 @@
 using DataWarehouse.SDK.Contracts;
+using DataWarehouse.SDK.Contracts.Hierarchy;
+using DataWarehouse.SDK.Contracts.IntelligenceAware;
 using DataWarehouse.SDK.Distribution;
 using DataWarehouse.SDK.Primitives;
 using Microsoft.Extensions.Logging;
@@ -34,7 +36,7 @@ namespace DataWarehouse.Plugins.AedsCore;
 /// </list>
 /// </para>
 /// </remarks>
-public class ClientCourierPlugin : LegacyFeaturePluginBase
+public class ClientCourierPlugin : PlatformPluginBase
 {
     private readonly ILogger<ClientCourierPlugin> _logger;
     private readonly ConcurrentDictionary<string, WatchedFile> _watchedFiles = new();
@@ -65,6 +67,9 @@ public class ClientCourierPlugin : LegacyFeaturePluginBase
 
     /// <inheritdoc />
     public override string Version => "1.0.0";
+
+    /// <inheritdoc/>
+    public override string PlatformDomain => "AedsCourier";
 
     /// <inheritdoc />
     public override PluginCategory Category => PluginCategory.FeatureProvider;

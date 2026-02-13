@@ -2,6 +2,8 @@ using System.Security.Cryptography;
 using System.Text;
 using DataWarehouse.SDK;
 using DataWarehouse.SDK.Contracts;
+using DataWarehouse.SDK.Contracts.Hierarchy;
+using DataWarehouse.SDK.Contracts.IntelligenceAware;
 using DataWarehouse.SDK.Distribution;
 using DataWarehouse.SDK.Primitives;
 using DataWarehouse.SDK.Utilities;
@@ -57,7 +59,7 @@ public enum DeltaOperation
 /// Implements rsync rolling hash algorithm (Adler-32 based) for content-defined chunking.
 /// Chunk size: 1 KB for signature generation, larger chunks for data transfer.
 /// </remarks>
-public sealed class DeltaSyncPlugin : LegacyFeaturePluginBase
+public sealed class DeltaSyncPlugin : DataManagementPluginBase
 {
     private const int SignatureChunkSize = 1024; // 1 KB for rolling hash
     private const int DataChunkSize = 1_048_576; // 1 MB for data transfer
@@ -77,6 +79,9 @@ public sealed class DeltaSyncPlugin : LegacyFeaturePluginBase
     /// Gets the plugin version.
     /// </summary>
     public override string Version => "1.0.0";
+
+    /// <inheritdoc/>
+    public override string DataManagementDomain => "DeltaSync";
 
     /// <summary>
     /// Gets the plugin category.

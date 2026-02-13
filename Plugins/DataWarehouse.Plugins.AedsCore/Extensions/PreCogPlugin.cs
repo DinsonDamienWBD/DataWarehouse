@@ -1,5 +1,7 @@
 using DataWarehouse.SDK;
 using DataWarehouse.SDK.Contracts;
+using DataWarehouse.SDK.Contracts.Hierarchy;
+using DataWarehouse.SDK.Contracts.IntelligenceAware;
 using DataWarehouse.SDK.Distribution;
 using DataWarehouse.SDK.Primitives;
 using DataWarehouse.SDK.Utilities;
@@ -27,7 +29,7 @@ public record PredictedContent(
 /// Heuristic fallback: time-of-day patterns, historical frequency, user behavior analysis.
 /// AI delegation: publishes to UniversalIntelligence (T90) for ML-based predictions.
 /// </remarks>
-public sealed class PreCogPlugin : LegacyFeaturePluginBase
+public sealed class PreCogPlugin : DataManagementPluginBase
 {
     private readonly ConcurrentDictionary<string, List<DateTimeOffset>> _downloadHistory = new();
     private readonly ConcurrentDictionary<string, int> _prefetchHits = new();
@@ -47,6 +49,9 @@ public sealed class PreCogPlugin : LegacyFeaturePluginBase
     /// Gets the plugin version.
     /// </summary>
     public override string Version => "1.0.0";
+
+    /// <inheritdoc/>
+    public override string DataManagementDomain => "PredictiveAnalytics";
 
     /// <summary>
     /// Gets the plugin category.

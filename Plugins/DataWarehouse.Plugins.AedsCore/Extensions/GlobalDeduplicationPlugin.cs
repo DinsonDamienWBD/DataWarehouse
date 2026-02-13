@@ -1,5 +1,7 @@
 using DataWarehouse.SDK;
 using DataWarehouse.SDK.Contracts;
+using DataWarehouse.SDK.Contracts.Hierarchy;
+using DataWarehouse.SDK.Contracts.IntelligenceAware;
 using DataWarehouse.SDK.Distribution;
 using DataWarehouse.SDK.Primitives;
 using DataWarehouse.SDK.Utilities;
@@ -12,7 +14,7 @@ namespace DataWarehouse.Plugins.AedsCore.Extensions;
 /// Global Deduplication Plugin: Cross-client content hash tracking.
 /// Uses bloom filter for memory-efficient dedup checking with 0.01% false positive rate.
 /// </summary>
-public sealed class GlobalDeduplicationPlugin : LegacyFeaturePluginBase
+public sealed class GlobalDeduplicationPlugin : DataManagementPluginBase
 {
     private readonly ConcurrentDictionary<string, bool> _localHashes = new();
     private const int BloomFilterSize = 100_000; // Support 100K unique hashes
@@ -32,6 +34,9 @@ public sealed class GlobalDeduplicationPlugin : LegacyFeaturePluginBase
     /// Gets the plugin version.
     /// </summary>
     public override string Version => "1.0.0";
+
+    /// <inheritdoc/>
+    public override string DataManagementDomain => "GlobalDedup";
 
     /// <summary>
     /// Gets the plugin category.

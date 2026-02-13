@@ -2,6 +2,8 @@ using System.Collections.Concurrent;
 using System.Security.Cryptography;
 using DataWarehouse.SDK;
 using DataWarehouse.SDK.Contracts;
+using DataWarehouse.SDK.Contracts.Hierarchy;
+using DataWarehouse.SDK.Contracts.IntelligenceAware;
 using DataWarehouse.SDK.Distribution;
 using DataWarehouse.SDK.Primitives;
 using DataWarehouse.SDK.Utilities;
@@ -34,7 +36,7 @@ public record PeerInfo(
 /// a registry of which clients have which content and facilitates peer discovery.
 /// Bandwidth savings: 40-60% reduction in server load for popular content.
 /// </remarks>
-public sealed class SwarmIntelligencePlugin : LegacyFeaturePluginBase
+public sealed class SwarmIntelligencePlugin : OrchestrationPluginBase
 {
     private readonly ConcurrentDictionary<string, HashSet<int>> _localPayloadChunks = new();
     private readonly ConcurrentDictionary<string, DateTimeOffset> _announcements = new();
@@ -56,6 +58,9 @@ public sealed class SwarmIntelligencePlugin : LegacyFeaturePluginBase
     /// Gets the plugin version.
     /// </summary>
     public override string Version => "1.0.0";
+
+    /// <inheritdoc/>
+    public override string OrchestrationMode => "SwarmIntelligence";
 
     /// <summary>
     /// Gets the plugin category.

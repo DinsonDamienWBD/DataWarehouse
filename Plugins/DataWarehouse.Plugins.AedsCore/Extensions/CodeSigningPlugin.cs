@@ -1,5 +1,7 @@
 using DataWarehouse.SDK;
 using DataWarehouse.SDK.Contracts;
+using DataWarehouse.SDK.Contracts.Hierarchy;
+using DataWarehouse.SDK.Contracts.IntelligenceAware;
 using DataWarehouse.SDK.Distribution;
 using DataWarehouse.SDK.Primitives;
 using DataWarehouse.SDK.Utilities;
@@ -20,7 +22,7 @@ public record VerificationResult(bool Valid, string Reason, string KeyId);
 /// Code Signing Plugin: Release key verification for Execute actions.
 /// Supports Ed25519, RSA-PSS-SHA256, ECDSA-P256-SHA256 with X.509 certificate chain validation.
 /// </summary>
-public sealed class CodeSigningPlugin : LegacyFeaturePluginBase
+public sealed class CodeSigningPlugin : SecurityPluginBase
 {
     /// <summary>
     /// Gets the plugin identifier.
@@ -36,6 +38,9 @@ public sealed class CodeSigningPlugin : LegacyFeaturePluginBase
     /// Gets the plugin version.
     /// </summary>
     public override string Version => "1.0.0";
+
+    /// <inheritdoc/>
+    public override string SecurityDomain => "CodeSigning";
 
     /// <summary>
     /// Gets the plugin category.

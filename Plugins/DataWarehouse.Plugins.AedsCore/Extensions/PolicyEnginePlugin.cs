@@ -1,5 +1,7 @@
 using DataWarehouse.SDK;
 using DataWarehouse.SDK.Contracts;
+using DataWarehouse.SDK.Contracts.Hierarchy;
+using DataWarehouse.SDK.Contracts.IntelligenceAware;
 using DataWarehouse.SDK.Distribution;
 using DataWarehouse.SDK.Primitives;
 using System.Collections.Concurrent;
@@ -10,7 +12,7 @@ namespace DataWarehouse.Plugins.AedsCore.Extensions;
 /// Policy Engine Plugin: Client-side policy rule evaluation.
 /// Implements IClientPolicyEngine with expression parser for dynamic rule evaluation.
 /// </summary>
-public sealed class PolicyEnginePlugin : LegacyFeaturePluginBase, IClientPolicyEngine
+public sealed class PolicyEnginePlugin : SecurityPluginBase, IClientPolicyEngine
 {
     private readonly ConcurrentBag<PolicyRule> _rules = new();
 
@@ -28,6 +30,9 @@ public sealed class PolicyEnginePlugin : LegacyFeaturePluginBase, IClientPolicyE
     /// Gets the plugin version.
     /// </summary>
     public override string Version => "1.0.0";
+
+    /// <inheritdoc/>
+    public override string SecurityDomain => "PolicyEngine";
 
     /// <summary>
     /// Gets the plugin category.
