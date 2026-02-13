@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using System.Reflection;
 using DataWarehouse.SDK.AI;
 using DataWarehouse.SDK.Contracts;
+using DataWarehouse.SDK.Contracts.Hierarchy;
 using DataWarehouse.SDK.Contracts.IntelligenceAware;
 using DataWarehouse.SDK.Primitives;
 using DataWarehouse.SDK.Utilities;
@@ -34,7 +35,7 @@ namespace DataWarehouse.Plugins.UltimateDataManagement;
 /// - Performance metrics and monitoring
 /// - Event-driven architecture
 /// </summary>
-public sealed class UltimateDataManagementPlugin : IntelligenceAwareDataManagementPluginBase, IDisposable
+public sealed class UltimateDataManagementPlugin : DataManagementPluginBase, IDisposable
 {
     private readonly DataManagementStrategyRegistry _registry;
     private readonly ConcurrentDictionary<string, long> _usageStats = new();
@@ -58,6 +59,9 @@ public sealed class UltimateDataManagementPlugin : IntelligenceAwareDataManageme
 
     /// <inheritdoc/>
     public override string Version => "1.0.0";
+
+    /// <inheritdoc/>
+    public override string DataManagementDomain => "DataManagement";
 
     /// <inheritdoc/>
     public override PluginCategory Category => PluginCategory.OrchestrationProvider;

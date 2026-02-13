@@ -7,6 +7,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using DataWarehouse.SDK.AI;
 using DataWarehouse.SDK.Contracts;
+using DataWarehouse.SDK.Contracts.Hierarchy;
 using DataWarehouse.SDK.Contracts.IntelligenceAware;
 using DataWarehouse.SDK.Primitives;
 using DataWarehouse.SDK.Utilities;
@@ -49,7 +50,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance
     /// - Continuous Compliance Monitoring: 24/7 monitoring with drift detection and alerting
     /// </para>
     /// </remarks>
-    public sealed class UltimateCompliancePlugin : IntelligenceAwareCompliancePluginBase, IDisposable
+    public sealed class UltimateCompliancePlugin : SecurityPluginBase, IDisposable
     {
         private readonly ConcurrentDictionary<string, IComplianceStrategy> _strategies = new();
         private readonly List<IDisposable> _subscriptions = new();
@@ -69,6 +70,12 @@ namespace DataWarehouse.Plugins.UltimateCompliance
 
         /// <inheritdoc/>
         public override string Version => "1.0.0";
+
+    /// <inheritdoc/>
+    public override string SecurityDomain => "Compliance";
+
+        /// <inheritdoc/>
+        public override PluginCategory Category => PluginCategory.SecurityProvider;
 
         /// <summary>
         /// Gets all registered compliance strategies.

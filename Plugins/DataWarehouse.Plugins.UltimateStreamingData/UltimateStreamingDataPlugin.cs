@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using System.Reflection;
 using DataWarehouse.SDK.AI;
 using DataWarehouse.SDK.Contracts;
+using DataWarehouse.SDK.Contracts.Hierarchy;
 using DataWarehouse.SDK.Contracts.IntelligenceAware;
 using DataWarehouse.SDK.Contracts.Streaming;
 using DataWarehouse.SDK.Primitives;
@@ -32,7 +33,7 @@ namespace DataWarehouse.Plugins.UltimateStreamingData;
 /// - Horizontal scalability
 /// - Performance metrics and monitoring
 /// </summary>
-public sealed class UltimateStreamingDataPlugin : IntelligenceAwarePluginBase, IDisposable
+public sealed class UltimateStreamingDataPlugin : StreamingPluginBase, IDisposable
 {
     private readonly StreamingStrategyRegistry _registry;
     private readonly ConcurrentDictionary<string, long> _usageStats = new();
@@ -226,6 +227,15 @@ public sealed class UltimateStreamingDataPlugin : IntelligenceAwarePluginBase, I
     {
         if (_disposed) throw new ObjectDisposedException(nameof(UltimateStreamingDataPlugin));
     }
+
+    #region Hierarchy StreamingPluginBase Abstract Methods
+    /// <inheritdoc/>
+    public override Task PublishAsync(string topic, Stream data, CancellationToken ct = default)
+        => Task.CompletedTask;
+    /// <inheritdoc/>
+    public override async IAsyncEnumerable<Dictionary<string, object>> SubscribeAsync(string topic, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct = default)
+    { await Task.CompletedTask; yield break; }
+    #endregion
 
     protected override void Dispose(bool disposing)
     {

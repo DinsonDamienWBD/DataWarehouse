@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using DataWarehouse.SDK.AI;
 using DataWarehouse.SDK.Contracts;
+using DataWarehouse.SDK.Contracts.Hierarchy;
 using DataWarehouse.SDK.Contracts.IntelligenceAware;
 using DataWarehouse.SDK.Primitives;
 using DataWarehouse.SDK.Utilities;
@@ -29,7 +30,7 @@ namespace DataWarehouse.Plugins.UltimateDataProtection
     ///   <item>Intelligence: Predictive, anomaly-aware, optimized retention, smart recovery</item>
     /// </list>
     /// </remarks>
-    public sealed class UltimateDataProtectionPlugin : IntelligenceAwarePluginBase
+    public sealed class UltimateDataProtectionPlugin : SecurityPluginBase
     {
         private readonly DataProtectionStrategyRegistry _registry = new();
         private readonly ConcurrentDictionary<string, object> _activeOperations = new();
@@ -42,6 +43,9 @@ namespace DataWarehouse.Plugins.UltimateDataProtection
 
         /// <inheritdoc/>
         public override string Version => "1.0.0";
+
+    /// <inheritdoc/>
+    public override string SecurityDomain => "DataProtection";
 
         /// <inheritdoc/>
         public override PluginCategory Category => PluginCategory.FeatureProvider;

@@ -7,6 +7,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using DataWarehouse.SDK.AI;
 using DataWarehouse.SDK.Contracts;
+using DataWarehouse.SDK.Contracts.Hierarchy;
 using DataWarehouse.SDK.Contracts.IntelligenceAware;
 using DataWarehouse.SDK.Primitives;
 using DataWarehouse.SDK.Utilities;
@@ -36,7 +37,7 @@ namespace DataWarehouse.Plugins.UltimateResilience;
 /// - Intelligence-aware strategy recommendations
 /// - Composable resilience pipelines
 /// </summary>
-public sealed class UltimateResiliencePlugin : IntelligenceAwarePluginBase, IDisposable
+public sealed class UltimateResiliencePlugin : InfrastructurePluginBase, IDisposable
 {
     private readonly ResilienceStrategyRegistry _registry;
     private readonly ConcurrentDictionary<string, long> _usageStats = new();
@@ -56,6 +57,9 @@ public sealed class UltimateResiliencePlugin : IntelligenceAwarePluginBase, IDis
 
     /// <inheritdoc/>
     public override string Version => "1.0.0";
+
+    /// <inheritdoc/>
+    public override string InfrastructureDomain => "Resilience";
 
     /// <inheritdoc/>
     public override PluginCategory Category => PluginCategory.InfrastructureProvider;

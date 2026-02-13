@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using System.Reflection;
 using DataWarehouse.SDK.AI;
 using DataWarehouse.SDK.Contracts;
+using DataWarehouse.SDK.Contracts.Hierarchy;
 using DataWarehouse.SDK.Contracts.IntelligenceAware;
 using DataWarehouse.SDK.Primitives;
 using DataWarehouse.SDK.Utilities;
@@ -29,7 +30,7 @@ namespace DataWarehouse.Plugins.UltimateDataPrivacy;
 /// - Privacy budget management
 /// - Comprehensive audit trails
 /// </summary>
-public sealed class UltimateDataPrivacyPlugin : IntelligenceAwareDataManagementPluginBase, IDisposable
+public sealed class UltimateDataPrivacyPlugin : DataManagementPluginBase, IDisposable
 {
     private readonly DataPrivacyStrategyRegistry _registry;
     private readonly ConcurrentDictionary<string, long> _usageStats = new();
@@ -49,6 +50,9 @@ public sealed class UltimateDataPrivacyPlugin : IntelligenceAwareDataManagementP
     public override string Name => "Ultimate Data Privacy";
     /// <inheritdoc/>
     public override string Version => "1.0.0";
+
+    /// <inheritdoc/>
+    public override string DataManagementDomain => "DataPrivacy";
     /// <inheritdoc/>
     public override PluginCategory Category => PluginCategory.OrchestrationProvider;
 

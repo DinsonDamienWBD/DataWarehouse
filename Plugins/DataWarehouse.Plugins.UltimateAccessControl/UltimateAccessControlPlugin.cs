@@ -7,6 +7,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using DataWarehouse.SDK.AI;
 using DataWarehouse.SDK.Contracts;
+using DataWarehouse.SDK.Contracts.Hierarchy;
 using DataWarehouse.SDK.Contracts.IntelligenceAware;
 using DataWarehouse.SDK.Primitives;
 using DataWarehouse.SDK.Utilities;
@@ -62,7 +63,7 @@ namespace DataWarehouse.Plugins.UltimateAccessControl
     /// All new projects should use UltimateAccessControl exclusively.
     /// </para>
     /// </remarks>
-    public sealed class UltimateAccessControlPlugin : IntelligenceAwareAccessControlPluginBase, IDisposable
+    public sealed class UltimateAccessControlPlugin : SecurityPluginBase, IDisposable
     {
         private readonly ConcurrentDictionary<string, IAccessControlStrategy> _strategies = new();
         private readonly ConcurrentDictionary<string, double> _strategyWeights = new();
@@ -80,6 +81,12 @@ namespace DataWarehouse.Plugins.UltimateAccessControl
 
         /// <inheritdoc/>
         public override string Version => "1.0.0";
+
+    /// <inheritdoc/>
+    public override string SecurityDomain => "AccessControl";
+
+        /// <inheritdoc/>
+        public override PluginCategory Category => PluginCategory.SecurityProvider;
 
         /// <summary>
         /// Gets all registered strategies.

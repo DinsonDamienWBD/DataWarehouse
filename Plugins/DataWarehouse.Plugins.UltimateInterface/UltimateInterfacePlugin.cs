@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using System.Reflection;
 using DataWarehouse.SDK.AI;
 using DataWarehouse.SDK.Contracts;
+using DataWarehouse.SDK.Contracts.Hierarchy;
 using DataWarehouse.SDK.Contracts.IntelligenceAware;
 using DataWarehouse.SDK.Primitives;
 using DataWarehouse.SDK.Utilities;
@@ -56,7 +57,7 @@ namespace DataWarehouse.Plugins.UltimateInterface;
 /// - Message Topics: Protocol-specific topics (e.g., "rest.start") -> Unified "interface.*" prefix (e.g., "interface.start" with strategyId parameter)
 /// - Strategy Selection: Separate plugin instantiation -> Single plugin with strategyId parameter in message payload
 /// </summary>
-public sealed class UltimateInterfacePlugin : IntelligenceAwareInterfacePluginBase, IDisposable
+public sealed class UltimateInterfacePlugin : DataWarehouse.SDK.Contracts.Hierarchy.InterfacePluginBase, IDisposable
 {
     private readonly InterfaceStrategyRegistry _registry;
     private readonly ConcurrentDictionary<string, long> _usageStats = new();
@@ -90,7 +91,10 @@ public sealed class UltimateInterfacePlugin : IntelligenceAwareInterfacePluginBa
     public override PluginCategory Category => PluginCategory.InterfaceProvider;
 
     /// <inheritdoc/>
-    public override string InterfaceProtocol => _defaultStrategyId;
+    public override string Protocol => _defaultStrategyId;
+
+    /// <summary>Interface protocol alias.</summary>
+    public string InterfaceProtocol => _defaultStrategyId;
 
     /// <inheritdoc/>
     public override int? Port => _defaultPort;
@@ -559,6 +563,141 @@ public sealed class UltimateInterfacePlugin : IntelligenceAwareInterfacePluginBa
     #endregion
 
     #region Helper Methods
+
+    #region NLP Intelligence Helpers (migrated from IntelligenceAwareInterfacePluginBase)
+
+    /// <summary>
+    /// Parses natural language input to extract intent and entities.
+    /// Migrated from IntelligenceAwareInterfacePluginBase (Phase 27).
+    /// </summary>
+    private async Task<IntentParseResult?> ParseIntentAsync(
+        string input,
+        string[]? availableIntents = null,
+        IntelligenceContext? context = null,
+        CancellationToken ct = default)
+    {
+        if (!HasCapability(IntelligenceCapabilities.IntentRecognition))
+            return null;
+
+        var payload = new Dictionary<string, object>
+        {
+            ["input"] = input,
+            ["contextId"] = context?.ContextId ?? Guid.NewGuid().ToString("N")
+        };
+
+        if (availableIntents != null)
+            payload["availableIntents"] = availableIntents;
+
+        var response = await SendIntelligenceRequestAsync(
+            IntelligenceTopics.RequestIntent,
+            payload,
+            context?.Timeout,
+            ct);
+
+        if (response?.Success == true && response.Payload is Dictionary<string, object> result)
+        {
+            return new IntentParseResult
+            {
+                Intent = result.TryGetValue("intent", out var i) && i is string intent ? intent : null,
+                Confidence = result.TryGetValue("confidence", out var c) && c is double conf ? conf : 0.0,
+                Entities = result.TryGetValue("entities", out var e) && e is Dictionary<string, object> entities ? entities : new Dictionary<string, object>(),
+                AlternativeIntents = result.TryGetValue("alternatives", out var a) && a is IntentAlternative[] alts ? alts : Array.Empty<IntentAlternative>()
+            };
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// Generates a conversational response to user input.
+    /// Migrated from IntelligenceAwareInterfacePluginBase (Phase 27).
+    /// </summary>
+    private async Task<ConversationResponse?> GenerateConversationResponseAsync(
+        string userInput,
+        ConversationMessage[]? conversationHistory = null,
+        string? systemPrompt = null,
+        IntelligenceContext? context = null,
+        CancellationToken ct = default)
+    {
+        if (!HasCapability(IntelligenceCapabilities.Conversation))
+            return null;
+
+        var payload = new Dictionary<string, object>
+        {
+            ["userInput"] = userInput,
+            ["contextId"] = context?.ContextId ?? Guid.NewGuid().ToString("N"),
+            ["sessionId"] = context?.SessionId ?? Guid.NewGuid().ToString("N")
+        };
+
+        if (conversationHistory != null)
+            payload["history"] = conversationHistory;
+        if (systemPrompt != null)
+            payload["systemPrompt"] = systemPrompt;
+        if (context?.MaxTokens != null)
+            payload["maxTokens"] = context.MaxTokens.Value;
+        if (context?.Temperature != null)
+            payload["temperature"] = context.Temperature.Value;
+
+        var response = await SendIntelligenceRequestAsync(
+            IntelligenceTopics.RequestConversation,
+            payload,
+            context?.Timeout,
+            ct);
+
+        if (response?.Success == true && response.Payload is Dictionary<string, object> result)
+        {
+            return new ConversationResponse
+            {
+                Response = result.TryGetValue("response", out var r) && r is string resp ? resp : string.Empty,
+                Intent = result.TryGetValue("detectedIntent", out var di) && di is string detIntent ? detIntent : null,
+                Entities = result.TryGetValue("entities", out var e) && e is Dictionary<string, object> entities ? entities : null,
+                SuggestedActions = result.TryGetValue("suggestedActions", out var sa) && sa is string[] actions ? actions : null,
+                Confidence = result.TryGetValue("confidence", out var c) && c is double conf ? conf : 1.0
+            };
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// Detects the language of input text.
+    /// Migrated from IntelligenceAwareInterfacePluginBase (Phase 27).
+    /// </summary>
+    private async Task<DataWarehouse.SDK.Contracts.IntelligenceAware.LanguageDetectionResult?> DetectLanguageAsync(
+        string text,
+        IntelligenceContext? context = null,
+        CancellationToken ct = default)
+    {
+        if (!HasCapability(IntelligenceCapabilities.LanguageDetection))
+            return null;
+
+        var payload = new Dictionary<string, object>
+        {
+            ["text"] = text,
+            ["contextId"] = context?.ContextId ?? Guid.NewGuid().ToString("N")
+        };
+
+        var response = await SendIntelligenceRequestAsync(
+            "intelligence.request.language-detection",
+            payload,
+            context?.Timeout,
+            ct);
+
+        if (response?.Success == true && response.Payload is Dictionary<string, object> result)
+        {
+            return new DataWarehouse.SDK.Contracts.IntelligenceAware.LanguageDetectionResult
+            {
+                LanguageCode = result.TryGetValue("languageCode", out var lc) && lc is string code ? code : "unknown",
+                LanguageName = result.TryGetValue("languageName", out var ln) && ln is string name ? name : "Unknown",
+                Confidence = result.TryGetValue("confidence", out var c) && c is double conf ? conf : 0.0,
+                Alternatives = result.TryGetValue("alternatives", out var a) && a is LanguageAlternative[] alts ? alts : Array.Empty<LanguageAlternative>()
+            };
+        }
+
+        return null;
+    }
+
+    #endregion
 
     private IPluginInterfaceStrategy GetStrategyOrThrow(string strategyId)
     {

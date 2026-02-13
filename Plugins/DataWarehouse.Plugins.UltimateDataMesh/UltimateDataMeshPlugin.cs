@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using System.Reflection;
 using DataWarehouse.SDK.AI;
 using DataWarehouse.SDK.Contracts;
+using DataWarehouse.SDK.Contracts.Hierarchy;
 using DataWarehouse.SDK.Contracts.DataMesh;
 using DataWarehouse.SDK.Contracts.IntelligenceAware;
 using DataWarehouse.SDK.Primitives;
@@ -31,7 +32,7 @@ namespace DataWarehouse.Plugins.UltimateDataMesh;
 /// - Cross-domain sharing
 /// - Zero trust security
 /// </summary>
-public sealed class UltimateDataMeshPlugin : IntelligenceAwareDataManagementPluginBase, IDisposable
+public sealed class UltimateDataMeshPlugin : DataManagementPluginBase, IDisposable
 {
     private readonly DataMeshStrategyRegistry _registry;
     private readonly ConcurrentDictionary<string, long> _usageStats = new();
@@ -51,6 +52,9 @@ public sealed class UltimateDataMeshPlugin : IntelligenceAwareDataManagementPlug
     public override string Name => "Ultimate Data Mesh";
     /// <inheritdoc/>
     public override string Version => "1.0.0";
+
+    /// <inheritdoc/>
+    public override string DataManagementDomain => "DataMesh";
     /// <inheritdoc/>
     public override PluginCategory Category => PluginCategory.OrchestrationProvider;
 

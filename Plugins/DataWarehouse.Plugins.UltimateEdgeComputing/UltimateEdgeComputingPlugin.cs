@@ -5,6 +5,7 @@
 using System.Collections.Concurrent;
 using System.Runtime.CompilerServices;
 using DataWarehouse.SDK.Contracts;
+using DataWarehouse.SDK.Contracts.Hierarchy;
 using DataWarehouse.SDK.Primitives;
 using DataWarehouse.SDK.Utilities;
 using EC = DataWarehouse.SDK.Contracts.EdgeComputing;
@@ -23,7 +24,7 @@ namespace DataWarehouse.Plugins.UltimateEdgeComputing;
 /// - 109.7: Edge resource management
 /// - 109.8: Multi-edge orchestration
 /// </summary>
-public sealed class UltimateEdgeComputingPlugin : PluginBase, EC.IEdgeComputingStrategy
+public sealed class UltimateEdgeComputingPlugin : OrchestrationPluginBase, EC.IEdgeComputingStrategy
 {
     private readonly ConcurrentDictionary<string, EC.IEdgeComputingStrategy> _strategies = new();
     private EC.EdgeComputingConfiguration _config = new();
@@ -37,6 +38,9 @@ public sealed class UltimateEdgeComputingPlugin : PluginBase, EC.IEdgeComputingS
 
     /// <summary>Gets the plugin version.</summary>
     public override string Version => "1.0.0";
+
+    /// <inheritdoc/>
+    public override string OrchestrationMode => "EdgeComputing";
 
     /// <summary>Gets the plugin category.</summary>
     public override PluginCategory Category => PluginCategory.FeatureProvider;

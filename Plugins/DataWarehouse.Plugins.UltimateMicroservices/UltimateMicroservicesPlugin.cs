@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using DataWarehouse.SDK.AI;
 using DataWarehouse.SDK.Contracts;
+using DataWarehouse.SDK.Contracts.Hierarchy;
 using DataWarehouse.SDK.Contracts.IntelligenceAware;
 using DataWarehouse.SDK.Primitives;
 using DataWarehouse.SDK.Utilities;
@@ -22,7 +23,7 @@ namespace DataWarehouse.Plugins.UltimateMicroservices;
 ///
 /// Total: 76 production-ready microservices strategies.
 /// </summary>
-public sealed class UltimateMicroservicesPlugin : IntelligenceAwarePluginBase, IDisposable
+public sealed class UltimateMicroservicesPlugin : PlatformPluginBase, IDisposable
 {
     private readonly ConcurrentDictionary<string, MicroservicesStrategyBase> _strategies = new(StringComparer.OrdinalIgnoreCase);
     private readonly ConcurrentDictionary<string, ServiceInstance> _registeredServices = new();
@@ -45,6 +46,9 @@ public sealed class UltimateMicroservicesPlugin : IntelligenceAwarePluginBase, I
 
     /// <inheritdoc/>
     public override string Version => "1.0.0";
+
+    /// <inheritdoc/>
+    public override string PlatformDomain => "Microservices";
 
     /// <inheritdoc/>
     public override PluginCategory Category => PluginCategory.InfrastructureProvider;

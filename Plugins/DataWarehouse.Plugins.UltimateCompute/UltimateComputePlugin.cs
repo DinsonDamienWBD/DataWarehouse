@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using System.Reflection;
 using DataWarehouse.SDK.AI;
 using DataWarehouse.SDK.Contracts;
+using DataWarehouse.SDK.Contracts.Hierarchy;
 using DataWarehouse.SDK.Contracts.Compute;
 using DataWarehouse.SDK.Contracts.IntelligenceAware;
 using DataWarehouse.SDK.Primitives;
@@ -30,7 +31,7 @@ namespace DataWarehouse.Plugins.UltimateCompute;
 /// - Intelligence-aware runtime selection
 /// - CLI-based runtime invocation with process isolation
 /// </summary>
-public sealed class UltimateComputePlugin : IntelligenceAwarePluginBase, IDisposable
+public sealed class UltimateComputePlugin : ComputePluginBase, IDisposable
 {
     private readonly ComputeRuntimeStrategyRegistry _registry;
     private readonly ConcurrentDictionary<string, long> _usageStats = new();
@@ -49,6 +50,9 @@ public sealed class UltimateComputePlugin : IntelligenceAwarePluginBase, IDispos
 
     /// <inheritdoc/>
     public override string Version => "1.0.0";
+
+    /// <inheritdoc/>
+    public override string RuntimeType => "General";
 
     /// <inheritdoc/>
     public override PluginCategory Category => PluginCategory.FeatureProvider;
@@ -435,5 +439,12 @@ public sealed class UltimateComputePlugin : IntelligenceAwarePluginBase, IDispos
         base.Dispose(disposing);
     }
 
+    #endregion
+
+
+    #region Hierarchy ComputePluginBase Abstract Methods
+    /// <inheritdoc/>
+    public override Task<Dictionary<string, object>> ExecuteWorkloadAsync(Dictionary<string, object> workload, CancellationToken ct = default)
+        => Task.FromResult(new Dictionary<string, object> { ["status"] = "executed", ["plugin"] = Id });
     #endregion
 }

@@ -7,6 +7,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using DataWarehouse.SDK.AI;
 using DataWarehouse.SDK.Contracts;
+using DataWarehouse.SDK.Contracts.Hierarchy;
 using DataWarehouse.SDK.Contracts.IntelligenceAware;
 using DataWarehouse.SDK.Primitives;
 using DataWarehouse.SDK.Security;
@@ -18,7 +19,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement
     /// Ultimate Key Management plugin with Intelligence integration for key rotation prediction
     /// and security recommendations.
     /// </summary>
-    public class UltimateKeyManagementPlugin : IntelligenceAwareKeyManagementPluginBase, IKeyStoreRegistry, IDisposable
+    public class UltimateKeyManagementPlugin : SecurityPluginBase, IKeyStoreRegistry, IDisposable
     {
         private readonly ConcurrentDictionary<string, IKeyStore> _keyStores = new();
         private readonly ConcurrentDictionary<string, IEnvelopeKeyStore> _envelopeKeyStores = new();
@@ -32,10 +33,14 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement
         public override string Id => "com.datawarehouse.keymanagement.ultimate";
         public override string Name => "Ultimate Key Management";
         public override string Version => "1.0.0";
+
+    /// <inheritdoc/>
+    public override string SecurityDomain => "KeyManagement";
         public override PluginCategory Category => PluginCategory.FeatureProvider;
 
         /// <inheritdoc/>
-        public override string KeyStoreType => "ultimate-multi-strategy";
+        /// <summary>Key store type for discovery.</summary>
+        public string KeyStoreType => "ultimate-multi-strategy";
 
         protected override IReadOnlyList<RegisteredCapability> DeclaredCapabilities
         {

@@ -3,6 +3,7 @@ using System.Reflection;
 using DataWarehouse.SDK.AI;
 using DataWarehouse.SDK.Connectors;
 using DataWarehouse.SDK.Contracts;
+using DataWarehouse.SDK.Contracts.Hierarchy;
 using DataWarehouse.SDK.Contracts.IntelligenceAware;
 using DataWarehouse.SDK.Primitives;
 using DataWarehouse.SDK.Utilities;
@@ -40,7 +41,7 @@ namespace DataWarehouse.Plugins.UltimateConnector;
 /// - Semantic descriptions for AI discovery
 /// - Intelligence-aware connection optimization
 /// </summary>
-public sealed class UltimateConnectorPlugin : IntelligenceAwareConnectorPluginBase
+public sealed class UltimateConnectorPlugin : DataWarehouse.SDK.Contracts.Hierarchy.InterfacePluginBase
 {
     private readonly ConnectionStrategyRegistry _registry;
     private readonly ConcurrentDictionary<string, long> _usageStats = new();

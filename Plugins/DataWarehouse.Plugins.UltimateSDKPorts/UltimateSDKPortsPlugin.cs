@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using DataWarehouse.SDK.AI;
 using DataWarehouse.SDK.Contracts;
+using DataWarehouse.SDK.Contracts.Hierarchy;
 using DataWarehouse.SDK.Contracts.IntelligenceAware;
 using DataWarehouse.SDK.Primitives;
 using DataWarehouse.SDK.Utilities;
@@ -28,7 +29,7 @@ namespace DataWarehouse.Plugins.UltimateSDKPorts;
 /// - Type mapping and conversion
 /// - Multiple transport support (FFI, gRPC, REST, WebSocket)
 /// </summary>
-public sealed class UltimateSDKPortsPlugin : IntelligenceAwarePluginBase, IDisposable
+public sealed class UltimateSDKPortsPlugin : PlatformPluginBase, IDisposable
 {
     private readonly SDKPortStrategyRegistry _registry = new();
     private readonly ConcurrentDictionary<string, SDKMethod> _globalMethods = new();
@@ -47,6 +48,9 @@ public sealed class UltimateSDKPortsPlugin : IntelligenceAwarePluginBase, IDispo
     public override string Name => "Ultimate SDK Ports";
     /// <inheritdoc/>
     public override string Version => "1.0.0";
+
+    /// <inheritdoc/>
+    public override string PlatformDomain => "SDKPorts";
     /// <inheritdoc/>
     public override PluginCategory Category => PluginCategory.InterfaceProvider;
 

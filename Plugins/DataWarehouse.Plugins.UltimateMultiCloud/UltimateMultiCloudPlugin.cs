@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using System.Reflection;
 using DataWarehouse.SDK.AI;
 using DataWarehouse.SDK.Contracts;
+using DataWarehouse.SDK.Contracts.Hierarchy;
 using DataWarehouse.SDK.Contracts.IntelligenceAware;
 using DataWarehouse.SDK.Primitives;
 using DataWarehouse.SDK.Utilities;
@@ -29,7 +30,7 @@ namespace DataWarehouse.Plugins.UltimateMultiCloud;
 /// - Intelligence-aware cloud placement recommendations
 /// - No vendor lock-in
 /// </summary>
-public sealed class UltimateMultiCloudPlugin : IntelligenceAwarePluginBase, IDisposable
+public sealed class UltimateMultiCloudPlugin : InfrastructurePluginBase, IDisposable
 {
     private readonly MultiCloudStrategyRegistry _registry;
     private readonly ConcurrentDictionary<string, CloudProviderState> _providers = new();
@@ -54,6 +55,9 @@ public sealed class UltimateMultiCloudPlugin : IntelligenceAwarePluginBase, IDis
 
     /// <inheritdoc/>
     public override string Version => "1.0.0";
+
+    /// <inheritdoc/>
+    public override string InfrastructureDomain => "MultiCloud";
 
     /// <inheritdoc/>
     public override PluginCategory Category => PluginCategory.InfrastructureProvider;

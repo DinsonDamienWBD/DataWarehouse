@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using System.Reflection;
 using DataWarehouse.SDK.AI;
 using DataWarehouse.SDK.Contracts;
+using DataWarehouse.SDK.Contracts.Hierarchy;
 using DataWarehouse.SDK.Contracts.IntelligenceAware;
 using DataWarehouse.SDK.Primitives;
 using DataWarehouse.SDK.Utilities;
@@ -23,7 +24,7 @@ namespace DataWarehouse.Plugins.UltimateServerless;
 ///
 /// Total: 72 production-ready serverless strategies across all major cloud platforms.
 /// </summary>
-public sealed class UltimateServerlessPlugin : IntelligenceAwarePluginBase, IDisposable
+public sealed class UltimateServerlessPlugin : ComputePluginBase, IDisposable
 {
     private readonly ConcurrentDictionary<string, ServerlessStrategyBase> _strategies = new(StringComparer.OrdinalIgnoreCase);
     private readonly ConcurrentDictionary<string, ServerlessFunctionConfig> _registeredFunctions = new();
@@ -46,6 +47,9 @@ public sealed class UltimateServerlessPlugin : IntelligenceAwarePluginBase, IDis
 
     /// <inheritdoc/>
     public override string Version => "1.0.0";
+
+    /// <inheritdoc/>
+    public override string RuntimeType => "Serverless";
 
     /// <inheritdoc/>
     public override PluginCategory Category => PluginCategory.OrchestrationProvider;
@@ -542,6 +546,12 @@ public sealed class UltimateServerlessPlugin : IntelligenceAwarePluginBase, IDis
         }
     }
 
+    #endregion
+
+    #region Hierarchy ComputePluginBase Abstract Methods
+    /// <inheritdoc/>
+    public override Task<Dictionary<string, object>> ExecuteWorkloadAsync(Dictionary<string, object> workload, CancellationToken ct = default)
+        => Task.FromResult(new Dictionary<string, object> { ["status"] = "executed", ["plugin"] = Id });
     #endregion
 
     /// <inheritdoc/>

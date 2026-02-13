@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using System.Reflection;
 using DataWarehouse.SDK.AI;
 using DataWarehouse.SDK.Contracts;
+using DataWarehouse.SDK.Contracts.Hierarchy;
 using DataWarehouse.SDK.Contracts.Dashboards;
 using DataWarehouse.SDK.Contracts.IntelligenceAware;
 using DataWarehouse.SDK.Primitives;
@@ -29,7 +30,7 @@ namespace DataWarehouse.Plugins.UniversalDashboards;
 /// - Authentication and connection pooling
 /// - Intelligence-aware strategy selection
 /// </summary>
-public sealed class UniversalDashboardsPlugin : IntelligenceAwarePluginBase, IDisposable
+public sealed class UniversalDashboardsPlugin : DataWarehouse.SDK.Contracts.Hierarchy.InterfacePluginBase, IDisposable
 {
     private readonly ConcurrentDictionary<string, DashboardStrategyBase> _strategies = new(StringComparer.OrdinalIgnoreCase);
     private readonly ConcurrentDictionary<string, long> _usageStats = new();
@@ -51,6 +52,9 @@ public sealed class UniversalDashboardsPlugin : IntelligenceAwarePluginBase, IDi
 
     /// <inheritdoc/>
     public override string Version => "1.0.0";
+
+    /// <inheritdoc/>
+    public override string Protocol => "Dashboard";
 
     /// <inheritdoc/>
     public override PluginCategory Category => PluginCategory.InterfaceProvider;

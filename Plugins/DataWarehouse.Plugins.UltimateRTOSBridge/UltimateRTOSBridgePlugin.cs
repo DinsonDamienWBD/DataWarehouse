@@ -7,6 +7,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using DataWarehouse.SDK.AI;
 using DataWarehouse.SDK.Contracts;
+using DataWarehouse.SDK.Contracts.Hierarchy;
 using DataWarehouse.SDK.Contracts.IntelligenceAware;
 using DataWarehouse.SDK.Primitives;
 using DataWarehouse.SDK.Utilities;
@@ -47,7 +48,7 @@ namespace DataWarehouse.Plugins.UltimateRTOSBridge;
 /// - IEC 62443 (Industrial Security)
 /// </para>
 /// </remarks>
-public sealed class UltimateRTOSBridgePlugin : IntelligenceAwarePluginBase, IDisposable
+public sealed class UltimateRTOSBridgePlugin : StreamingPluginBase, IDisposable
 {
     private readonly ConcurrentDictionary<string, IRtosStrategy> _strategies = new();
     private IRtosStrategy? _defaultStrategy;
@@ -449,4 +450,14 @@ public sealed class UltimateRTOSBridgePlugin : IntelligenceAwarePluginBase, IDis
         }
         base.Dispose(disposing);
     }
+
+
+    #region Hierarchy StreamingPluginBase Abstract Methods
+    /// <inheritdoc/>
+    public override Task PublishAsync(string topic, Stream data, CancellationToken ct = default)
+        => Task.CompletedTask;
+    /// <inheritdoc/>
+    public override async IAsyncEnumerable<Dictionary<string, object>> SubscribeAsync(string topic, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct = default)
+    { await Task.CompletedTask; yield break; }
+    #endregion
 }

@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using DataWarehouse.SDK.AI;
 using DataWarehouse.SDK.Contracts;
+using DataWarehouse.SDK.Contracts.Hierarchy;
 using DataWarehouse.SDK.Contracts.IntelligenceAware;
 using DataWarehouse.SDK.Primitives;
 using DataWarehouse.SDK.Utilities;
@@ -34,7 +35,7 @@ namespace DataWarehouse.Plugins.UltimateWorkflow;
 /// - Comprehensive error handling
 /// - State persistence and recovery
 /// </summary>
-public sealed class UltimateWorkflowPlugin : IntelligenceAwarePluginBase, IDisposable
+public sealed class UltimateWorkflowPlugin : OrchestrationPluginBase, IDisposable
 {
     private readonly WorkflowStrategyRegistry _registry = new();
     private readonly ConcurrentDictionary<string, WorkflowDefinition> _workflows = new();
@@ -55,6 +56,9 @@ public sealed class UltimateWorkflowPlugin : IntelligenceAwarePluginBase, IDispo
 
     /// <inheritdoc/>
     public override string Version => "1.0.0";
+
+    /// <inheritdoc/>
+    public override string OrchestrationMode => "Workflow";
 
     /// <inheritdoc/>
     public override PluginCategory Category => PluginCategory.OrchestrationProvider;
