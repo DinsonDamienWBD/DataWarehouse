@@ -22,10 +22,10 @@ namespace DataWarehouse.SDK.Contracts
     {
         #region Intelligence Socket
 
-        public bool IsIntelligenceAvailable { get; protected set; }
-        public IntelligenceCapabilities AvailableCapabilities { get; protected set; }
+        public new bool IsIntelligenceAvailable { get; protected set; }
+        public new IntelligenceCapabilities AvailableCapabilities { get; protected set; }
 
-        public virtual async Task<bool> DiscoverIntelligenceAsync(CancellationToken ct = default)
+        public new virtual async Task<bool> DiscoverIntelligenceAsync(CancellationToken ct = default)
         {
             if (MessageBus == null) { IsIntelligenceAvailable = false; return false; }
             IsIntelligenceAvailable = false;
@@ -206,10 +206,10 @@ namespace DataWarehouse.SDK.Contracts
     {
         #region Intelligence Socket
 
-        public bool IsIntelligenceAvailable { get; protected set; }
-        public IntelligenceCapabilities AvailableCapabilities { get; protected set; }
+        public new bool IsIntelligenceAvailable { get; protected set; }
+        public new IntelligenceCapabilities AvailableCapabilities { get; protected set; }
 
-        public virtual async Task<bool> DiscoverIntelligenceAsync(CancellationToken ct = default)
+        public new virtual async Task<bool> DiscoverIntelligenceAsync(CancellationToken ct = default)
         {
             if (MessageBus == null) { IsIntelligenceAvailable = false; return false; }
             IsIntelligenceAvailable = false;
@@ -361,10 +361,10 @@ namespace DataWarehouse.SDK.Contracts
     {
         #region Intelligence Socket
 
-        public bool IsIntelligenceAvailable { get; protected set; }
-        public IntelligenceCapabilities AvailableCapabilities { get; protected set; }
+        public new bool IsIntelligenceAvailable { get; protected set; }
+        public new IntelligenceCapabilities AvailableCapabilities { get; protected set; }
 
-        public virtual async Task<bool> DiscoverIntelligenceAsync(CancellationToken ct = default)
+        public new virtual async Task<bool> DiscoverIntelligenceAsync(CancellationToken ct = default)
         {
             if (MessageBus == null) { IsIntelligenceAvailable = false; return false; }
             IsIntelligenceAvailable = false;
@@ -600,10 +600,10 @@ namespace DataWarehouse.SDK.Contracts
     {
         #region Intelligence Socket
 
-        public bool IsIntelligenceAvailable { get; protected set; }
-        public IntelligenceCapabilities AvailableCapabilities { get; protected set; }
+        public new bool IsIntelligenceAvailable { get; protected set; }
+        public new IntelligenceCapabilities AvailableCapabilities { get; protected set; }
 
-        public virtual async Task<bool> DiscoverIntelligenceAsync(CancellationToken ct = default)
+        public new virtual async Task<bool> DiscoverIntelligenceAsync(CancellationToken ct = default)
         {
             if (MessageBus == null) { IsIntelligenceAvailable = false; return false; }
             IsIntelligenceAvailable = false;

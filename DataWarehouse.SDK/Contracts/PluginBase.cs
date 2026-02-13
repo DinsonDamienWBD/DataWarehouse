@@ -1252,7 +1252,7 @@ namespace DataWarehouse.SDK.Contracts
     /// Provides default implementations for common storage operations.
     /// AI-native: Supports intelligent storage decisions based on content analysis.
     /// </summary>
-    public abstract class StorageProviderPluginBase : PluginBase, IStorageProvider
+    public abstract class StorageProviderPluginBase : DataPipelinePluginBase, IStorageProvider
     {
         /// <summary>
         /// Category is always StorageProvider for storage plugins.
@@ -1446,8 +1446,11 @@ namespace DataWarehouse.SDK.Contracts
     /// Provides default implementations for common security operations.
     /// AI-native: Supports intelligent access control based on context.
     /// </summary>
-    public abstract class SecurityProviderPluginBase : PluginBase
+    public abstract class SecurityProviderPluginBase : SecurityPluginBase
     {
+        /// <inheritdoc/>
+        public override string SecurityDomain => "SecurityProvider";
+
         /// <summary>
         /// Category is always SecurityProvider for security plugins.
         /// </summary>

@@ -20,13 +20,13 @@ public abstract class LowLatencyStoragePluginBase : StorageProviderPluginBase, I
 {
     #region Intelligence Socket
 
-    public bool IsIntelligenceAvailable { get; protected set; }
+    public new bool IsIntelligenceAvailable { get; protected set; }
 
     /// <summary>Intelligence capabilities (explicit interface implementation to avoid name conflict with HardwareCapabilities).</summary>
     private IntelligenceCapabilities _intelligenceCapabilities;
     IntelligenceCapabilities IIntelligenceAware.AvailableCapabilities => _intelligenceCapabilities;
 
-    public virtual async Task<bool> DiscoverIntelligenceAsync(CancellationToken ct = default)
+    public new virtual async Task<bool> DiscoverIntelligenceAsync(CancellationToken ct = default)
     {
         if (MessageBus == null) { IsIntelligenceAvailable = false; return false; }
         IsIntelligenceAvailable = false;
@@ -97,7 +97,7 @@ public abstract class LowLatencyStoragePluginBase : StorageProviderPluginBase, I
     /// Default implementation auto-detects common capabilities.
     /// Override to provide platform-specific detection.
     /// </summary>
-    public virtual HardwareCapabilities AvailableCapabilities => DetectHardwareCapabilities();
+    public new virtual HardwareCapabilities AvailableCapabilities => DetectHardwareCapabilities();
 
     /// <summary>
     /// Default I/O queue depth for async operations.
