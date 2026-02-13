@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using System.Text;
 using DataWarehouse.SDK.AI;
 using DataWarehouse.SDK.Contracts;
+using DataWarehouse.SDK.Contracts.Hierarchy;
 using DataWarehouse.SDK.Contracts.IntelligenceAware;
 using DataWarehouse.SDK.Primitives;
 using DataWarehouse.SDK.Utilities;
@@ -278,7 +279,7 @@ public sealed class AIEnhancedDocStrategy : DocGenStrategyBase
 /// - Template customization
 /// - AI-enhanced content generation
 /// </summary>
-public sealed class UltimateDocGenPlugin : IntelligenceAwarePluginBase, IDisposable
+public sealed class UltimateDocGenPlugin : PlatformPluginBase, IDisposable
 {
     private readonly DocGenStrategyRegistry _registry = new();
     private DocGenStrategyBase? _activeStrategy;
@@ -289,6 +290,9 @@ public sealed class UltimateDocGenPlugin : IntelligenceAwarePluginBase, IDisposa
     public override string Id => "com.datawarehouse.docgen.ultimate";
     public override string Name => "Ultimate DocGen";
     public override string Version => "1.0.0";
+
+    /// <inheritdoc/>
+    public override string PlatformDomain => "Documentation";
     public override PluginCategory Category => PluginCategory.InterfaceProvider;
 
     public string SemanticDescription =>

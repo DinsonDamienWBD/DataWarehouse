@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using System.Reflection;
 using DataWarehouse.SDK.AI;
 using DataWarehouse.SDK.Contracts;
+using DataWarehouse.SDK.Contracts.Hierarchy;
 using DataWarehouse.SDK.Contracts.DataFormat;
 using DataWarehouse.SDK.Contracts.IntelligenceAware;
 using DataWarehouse.SDK.Primitives;
@@ -27,7 +28,7 @@ namespace DataWarehouse.Plugins.UltimateDataFormat;
 /// - Bidirectional conversion between formats
 /// - Production-ready error handling
 /// </summary>
-public sealed class UltimateDataFormatPlugin : IntelligenceAwarePluginBase, IDisposable
+public sealed class UltimateDataFormatPlugin : FormatPluginBase, IDisposable
 {
     private readonly ConcurrentDictionary<string, IDataFormatStrategy> _registry = new();
     private readonly ConcurrentDictionary<string, long> _usageStats = new();
@@ -51,6 +52,9 @@ public sealed class UltimateDataFormatPlugin : IntelligenceAwarePluginBase, IDis
 
     /// <inheritdoc/>
     public override string Version => "1.0.0";
+
+    /// <inheritdoc/>
+    public override string FormatFamily => "Universal";
 
     /// <inheritdoc/>
     public override PluginCategory Category => PluginCategory.OrchestrationProvider;

@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using System.Reflection;
 using DataWarehouse.SDK.AI;
 using DataWarehouse.SDK.Contracts;
+using DataWarehouse.SDK.Contracts.Hierarchy;
 using DataWarehouse.SDK.Contracts.IntelligenceAware;
 using DataWarehouse.SDK.Primitives;
 using DataWarehouse.SDK.Utilities;
@@ -29,7 +30,7 @@ namespace DataWarehouse.Plugins.UltimateDataGovernance;
 /// - Real-time policy enforcement
 /// - Comprehensive audit trails
 /// </summary>
-public sealed class UltimateDataGovernancePlugin : IntelligenceAwareDataManagementPluginBase, IDisposable
+public sealed class UltimateDataGovernancePlugin : DataManagementPluginBase, IDisposable
 {
     private readonly DataGovernanceStrategyRegistry _registry;
     private readonly ConcurrentDictionary<string, long> _usageStats = new();
@@ -50,6 +51,9 @@ public sealed class UltimateDataGovernancePlugin : IntelligenceAwareDataManageme
     public override string Name => "Ultimate Data Governance";
     /// <inheritdoc/>
     public override string Version => "1.0.0";
+
+    /// <inheritdoc/>
+    public override string DataManagementDomain => "DataGovernance";
     /// <inheritdoc/>
     public override PluginCategory Category => PluginCategory.OrchestrationProvider;
 

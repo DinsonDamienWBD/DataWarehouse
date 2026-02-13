@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using System.Reflection;
 using DataWarehouse.SDK.Contracts;
+using DataWarehouse.SDK.Contracts.Hierarchy;
 using DataWarehouse.SDK.Contracts.IntelligenceAware;
 using DataWarehouse.SDK.Primitives;
 
@@ -29,7 +30,7 @@ namespace DataWarehouse.Plugins.UltimateDataIntegration;
 /// - Horizontal scalability
 /// - Performance metrics and monitoring
 /// </summary>
-public sealed class UltimateDataIntegrationPlugin : IntelligenceAwarePluginBase, IDisposable
+public sealed class UltimateDataIntegrationPlugin : OrchestrationPluginBase, IDisposable
 {
     private readonly DataIntegrationStrategyRegistry _registry;
     private readonly ConcurrentDictionary<string, long> _usageStats = new();
@@ -70,6 +71,9 @@ public sealed class UltimateDataIntegrationPlugin : IntelligenceAwarePluginBase,
 
     /// <inheritdoc/>
     public override string Version => "1.0.0";
+
+    /// <inheritdoc/>
+    public override string OrchestrationMode => "DataIntegration";
 
     /// <inheritdoc/>
     public override PluginCategory Category => PluginCategory.OrchestrationProvider;

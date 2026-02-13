@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using System.Reflection;
 using DataWarehouse.SDK.AI;
 using DataWarehouse.SDK.Contracts;
+using DataWarehouse.SDK.Contracts.Hierarchy;
 using DataWarehouse.SDK.Contracts.DataLake;
 using DataWarehouse.SDK.Contracts.IntelligenceAware;
 using DataWarehouse.SDK.Primitives;
@@ -33,7 +34,7 @@ namespace DataWarehouse.Plugins.UltimateDataLake;
 /// - Row-level security
 /// - Data masking
 /// </summary>
-public sealed class UltimateDataLakePlugin : IntelligenceAwareDataManagementPluginBase, IDisposable
+public sealed class UltimateDataLakePlugin : DataManagementPluginBase, IDisposable
 {
     private readonly DataLakeStrategyRegistry _registry;
     private readonly ConcurrentDictionary<string, long> _usageStats = new();
@@ -52,6 +53,9 @@ public sealed class UltimateDataLakePlugin : IntelligenceAwareDataManagementPlug
     public override string Name => "Ultimate Data Lake";
     /// <inheritdoc/>
     public override string Version => "1.0.0";
+
+    /// <inheritdoc/>
+    public override string DataManagementDomain => "DataLake";
     /// <inheritdoc/>
     public override PluginCategory Category => PluginCategory.OrchestrationProvider;
 

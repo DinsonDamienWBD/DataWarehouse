@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using DataWarehouse.SDK.AI;
 using DataWarehouse.SDK.Contracts;
+using DataWarehouse.SDK.Contracts.Hierarchy;
 using DataWarehouse.SDK.Contracts.IntelligenceAware;
 using DataWarehouse.SDK.Contracts.Observability;
 using DataWarehouse.SDK.Primitives;
@@ -26,7 +27,7 @@ namespace DataWarehouse.Plugins.UniversalObservability;
 ///   <item>Health: Nagios, Zabbix, Icinga, Consul Health, Kubernetes Probes</item>
 /// </list>
 /// </remarks>
-public sealed class UniversalObservabilityPlugin : IntelligenceAwarePluginBase
+public sealed class UniversalObservabilityPlugin : ObservabilityPluginBase
 {
     private readonly ConcurrentDictionary<string, IObservabilityStrategy> _strategies = new(StringComparer.OrdinalIgnoreCase);
     private IObservabilityStrategy? _activeMetricsStrategy;
@@ -48,6 +49,9 @@ public sealed class UniversalObservabilityPlugin : IntelligenceAwarePluginBase
 
     /// <inheritdoc/>
     public override string Version => "1.0.0";
+
+    /// <inheritdoc/>
+    public override string ObservabilityDomain => "Universal";
 
     /// <inheritdoc/>
     public override PluginCategory Category => PluginCategory.MetricsProvider;

@@ -1,4 +1,5 @@
 using DataWarehouse.SDK.Contracts;
+using DataWarehouse.SDK.Contracts.Hierarchy;
 using DataWarehouse.SDK.Contracts.IntelligenceAware;
 using DataWarehouse.SDK.Primitives;
 using DataWarehouse.SDK.Utilities;
@@ -71,7 +72,7 @@ namespace DataWarehouse.Plugins.AppPlatform;
 /// </list>
 /// </para>
 /// </summary>
-public sealed class AppPlatformPlugin : IntelligenceAwarePluginBase, IDisposable
+public sealed class AppPlatformPlugin : PlatformPluginBase, IDisposable
 {
     /// <summary>
     /// Service for managing application registrations and tenant provisioning.
@@ -130,6 +131,9 @@ public sealed class AppPlatformPlugin : IntelligenceAwarePluginBase, IDisposable
 
     /// <inheritdoc/>
     public override string Version => "1.0.0";
+
+    /// <inheritdoc/>
+    public override string PlatformDomain => "AppPlatform";
 
     /// <inheritdoc/>
     public override PluginCategory Category => PluginCategory.FeatureProvider;

@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using System.Reflection;
 using DataWarehouse.SDK.AI;
 using DataWarehouse.SDK.Contracts;
+using DataWarehouse.SDK.Contracts.Hierarchy;
 using DataWarehouse.SDK.Contracts.IntelligenceAware;
 using DataWarehouse.SDK.Primitives;
 using DataWarehouse.SDK.Utilities;
@@ -29,7 +30,7 @@ namespace DataWarehouse.Plugins.UltimateDataCatalog;
 /// - Real-time and batch metadata ingestion
 /// - Comprehensive audit and compliance support
 /// </summary>
-public sealed class UltimateDataCatalogPlugin : IntelligenceAwareDataManagementPluginBase, IDisposable
+public sealed class UltimateDataCatalogPlugin : DataManagementPluginBase, IDisposable
 {
     private readonly DataCatalogStrategyRegistry _registry;
     private readonly ConcurrentDictionary<string, long> _usageStats = new();
@@ -49,6 +50,9 @@ public sealed class UltimateDataCatalogPlugin : IntelligenceAwareDataManagementP
     public override string Name => "Ultimate Data Catalog";
     /// <inheritdoc/>
     public override string Version => "1.0.0";
+
+    /// <inheritdoc/>
+    public override string DataManagementDomain => "DataCatalog";
     /// <inheritdoc/>
     public override PluginCategory Category => PluginCategory.OrchestrationProvider;
 

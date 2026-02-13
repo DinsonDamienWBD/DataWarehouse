@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using System.Reflection;
 using DataWarehouse.SDK.AI;
 using DataWarehouse.SDK.Contracts;
+using DataWarehouse.SDK.Contracts.Hierarchy;
 using DataWarehouse.SDK.Contracts.IntelligenceAware;
 using DataWarehouse.SDK.Primitives;
 using DataWarehouse.SDK.Utilities;
@@ -30,7 +31,7 @@ namespace DataWarehouse.Plugins.UltimateDeployment;
 /// - Multi-cloud deployment
 /// - Intelligence-aware deployment recommendations
 /// </summary>
-public sealed class UltimateDeploymentPlugin : IntelligenceAwarePluginBase, IDisposable
+public sealed class UltimateDeploymentPlugin : InfrastructurePluginBase, IDisposable
 {
     private readonly ConcurrentDictionary<string, IDeploymentStrategy> _strategies = new(StringComparer.OrdinalIgnoreCase);
     private readonly ConcurrentDictionary<string, DeploymentState> _activeDeployments = new();
@@ -52,6 +53,9 @@ public sealed class UltimateDeploymentPlugin : IntelligenceAwarePluginBase, IDis
 
     /// <inheritdoc/>
     public override string Version => "1.0.0";
+
+    /// <inheritdoc/>
+    public override string InfrastructureDomain => "Deployment";
 
     /// <inheritdoc/>
     public override PluginCategory Category => PluginCategory.OrchestrationProvider;

@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using DataWarehouse.SDK.AI;
 using DataWarehouse.SDK.Contracts;
+using DataWarehouse.SDK.Contracts.Hierarchy;
 using DataWarehouse.SDK.Contracts.IntelligenceAware;
 using DataWarehouse.SDK.Utilities;
 using PluginCategory = DataWarehouse.SDK.Primitives.PluginCategory;
@@ -27,7 +28,7 @@ namespace DataWarehouse.Plugins.UltimateSustainability;
 ///   <item>Cloud Optimization: Spot instances, right-sizing, carbon-aware region selection</item>
 /// </list>
 /// </remarks>
-public sealed class UltimateSustainabilityPlugin : IntelligenceAwarePluginBase
+public sealed class UltimateSustainabilityPlugin : InfrastructurePluginBase
 {
     private readonly SustainabilityStrategyRegistry _registry = new();
     private readonly ConcurrentDictionary<string, ISustainabilityStrategy> _strategies = new(StringComparer.OrdinalIgnoreCase);
@@ -42,6 +43,9 @@ public sealed class UltimateSustainabilityPlugin : IntelligenceAwarePluginBase
 
     /// <inheritdoc/>
     public override string Version => "1.0.0";
+
+    /// <inheritdoc/>
+    public override string InfrastructureDomain => "Sustainability";
 
     /// <inheritdoc/>
     public override PluginCategory Category => PluginCategory.MetricsProvider;
