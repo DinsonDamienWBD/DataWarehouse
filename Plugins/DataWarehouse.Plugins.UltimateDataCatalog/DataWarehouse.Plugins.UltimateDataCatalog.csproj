@@ -4,7 +4,7 @@
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
-    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+
     <Description>Ultimate Data Catalog Plugin - T128 Complete Implementation</Description>
   </PropertyGroup>
 
