@@ -347,10 +347,10 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.CloudKms
         public override void Dispose()
         {
             _httpClient?.Dispose();
-            Array.Clear(_masterSecret, 0, _masterSecret.Length);
+            CryptographicOperations.ZeroMemory(_masterSecret);
             foreach (var key in _keyCache.Values)
             {
-                Array.Clear(key, 0, key.Length);
+                CryptographicOperations.ZeroMemory(key);
             }
             _keyCache.Clear();
             base.Dispose();

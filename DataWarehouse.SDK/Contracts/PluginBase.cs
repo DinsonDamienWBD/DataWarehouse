@@ -6,6 +6,7 @@ using DataWarehouse.SDK.Primitives;
 using DataWarehouse.SDK.Security;
 using DataWarehouse.SDK.Utilities;
 using System;
+using System.Buffers;
 using System.Collections.Concurrent;
 using System.Linq;
 using System.Security.Cryptography;
@@ -72,6 +73,13 @@ namespace DataWarehouse.SDK.Contracts
         /// Set during initialization via InitializeAsync.
         /// </summary>
         protected IMessageBus? MessageBus { get; private set; }
+
+        /// <summary>
+        /// Maximum number of entries in the knowledge cache.
+        /// Override in derived classes to customize. Default: 10,000.
+        /// Set to 0 for unlimited (not recommended).
+        /// </summary>
+        protected virtual int MaxKnowledgeCacheSize => 10_000;
 
         /// <summary>
         /// Unique Plugin ID - must be set by derived classes.
@@ -872,6 +880,16 @@ namespace DataWarehouse.SDK.Contracts
         /// <param name="knowledge">Knowledge object to cache.</param>
         protected void CacheKnowledge(string topic, KnowledgeObject knowledge)
         {
+            // Enforce bounded cache size
+            if (MaxKnowledgeCacheSize > 0 && !_knowledgeCache.ContainsKey(topic) && _knowledgeCache.Count >= MaxKnowledgeCacheSize)
+            {
+                // Evict oldest entry (first key in dictionary -- approximate LRU)
+                var firstKey = _knowledgeCache.Keys.FirstOrDefault();
+                if (firstKey != null)
+                {
+                    _knowledgeCache.TryRemove(firstKey, out _);
+                }
+            }
             _knowledgeCache[topic] = knowledge;
         }
 
@@ -1776,10 +1794,27 @@ namespace DataWarehouse.SDK.Contracts
         private DateTime? _lastIndexRebuild;
 
         /// <summary>
+        /// Maximum number of entries in the index store.
+        /// Override in derived classes to customize. Default: 100,000.
+        /// Set to 0 for unlimited (not recommended).
+        /// </summary>
+        protected virtual int MaxIndexStoreSize => 100_000;
+
+        /// <summary>
         /// Index a document with its metadata.
         /// </summary>
         public virtual Task IndexDocumentAsync(string id, Dictionary<string, object> metadata, CancellationToken ct = default)
         {
+            // Enforce bounded index
+            if (MaxIndexStoreSize > 0 && !_indexStore.ContainsKey(id) && _indexStore.Count >= MaxIndexStoreSize)
+            {
+                var firstKey = _indexStore.Keys.FirstOrDefault();
+                if (firstKey != null)
+                {
+                    _indexStore.TryRemove(firstKey, out _);
+                }
+            }
+
             metadata["_indexed_at"] = DateTime.UtcNow;
             _indexStore[id] = metadata;
             Interlocked.Increment(ref _indexedCount);
@@ -2452,6 +2487,25 @@ namespace DataWarehouse.SDK.Contracts
         protected virtual int MaxCachedKeys => 100;
 
         /// <summary>
+        /// Adds a key to the cache, evicting the oldest entry if at capacity.
+        /// Wipes evicted key material with ZeroMemory.
+        /// </summary>
+        protected void AddToKeyCache(string keyId, CachedKey cachedKey)
+        {
+            // Enforce bounded cache
+            if (KeyCache.Count >= MaxCachedKeys && !KeyCache.ContainsKey(keyId))
+            {
+                // Evict oldest by CachedAt timestamp
+                var oldest = KeyCache.OrderBy(kvp => kvp.Value.CachedAt).FirstOrDefault();
+                if (oldest.Key != null && KeyCache.TryRemove(oldest.Key, out var evicted))
+                {
+                    CryptographicOperations.ZeroMemory(evicted.Key);
+                }
+            }
+            KeyCache[keyId] = cachedKey;
+        }
+
+        /// <summary>
         /// Whether authentication is required for key operations.
         /// </summary>
         protected virtual bool RequireAuthentication => true;
@@ -2585,14 +2639,14 @@ namespace DataWarehouse.SDK.Contracts
                 }
             }
 
-            KeyCache[keyId] = new CachedKey
+            AddToKeyCache(keyId, new CachedKey
             {
                 Key = key,
                 CachedAt = DateTime.UtcNow,
                 ExpiresAt = DateTime.UtcNow.Add(CacheExpiration),
                 AccessCount = 1,
                 LastAccessedAt = DateTime.UtcNow
-            };
+            });
         }
 
         /// <summary>
@@ -2757,7 +2811,7 @@ namespace DataWarehouse.SDK.Contracts
                 // Clear sensitive data from cache
                 foreach (var entry in KeyCache.Values)
                 {
-                    Array.Clear(entry.Key, 0, entry.Key.Length);
+                    CryptographicOperations.ZeroMemory(entry.Key);
                 }
                 KeyCache.Clear();
                 InitLock.Dispose();
@@ -2874,6 +2928,29 @@ namespace DataWarehouse.SDK.Contracts
         /// E.g., "AES-256-GCM", "ChaCha20-Poly1305".
         /// </summary>
         protected abstract string AlgorithmId { get; }
+
+        /// <summary>
+        /// Maximum number of entries in the key access log.
+        /// Override in derived classes to customize. Default: 10,000.
+        /// </summary>
+        protected virtual int MaxKeyAccessLogSize => 10_000;
+
+        /// <summary>
+        /// Records a key access event in the bounded key access log.
+        /// </summary>
+        protected void RecordKeyAccess(string keyId)
+        {
+            if (KeyAccessLog.Count >= MaxKeyAccessLogSize && !KeyAccessLog.ContainsKey(keyId))
+            {
+                // Evict oldest entry
+                var oldest = KeyAccessLog.OrderBy(kvp => kvp.Value).FirstOrDefault();
+                if (oldest.Key != null)
+                {
+                    KeyAccessLog.TryRemove(oldest.Key, out _);
+                }
+            }
+            KeyAccessLog[keyId] = DateTime.UtcNow;
+        }
 
         #endregion
 
@@ -3025,7 +3102,7 @@ namespace DataWarehouse.SDK.Contracts
             var key = await config.KeyStore.GetKeyAsync(keyId, context);
 
             // Log key access
-            KeyAccessLog[keyId] = DateTime.UtcNow;
+            RecordKeyAccess(keyId);
 
             return (key, keyId, null);
         }
@@ -3067,7 +3144,7 @@ namespace DataWarehouse.SDK.Contracts
             };
 
             // Log key access
-            KeyAccessLog[$"envelope:{config.KekKeyId}"] = DateTime.UtcNow;
+            RecordKeyAccess($"envelope:{config.KekKeyId}");
 
             return (dek, $"envelope:{Guid.NewGuid():N}", envelope);
         }
@@ -3090,7 +3167,7 @@ namespace DataWarehouse.SDK.Contracts
 
                 var dek = await envelopeKeyStore.UnwrapKeyAsync(envelope.KekId, envelope.WrappedDek, context);
 
-                KeyAccessLog[$"envelope:{envelope.KekId}"] = DateTime.UtcNow;
+                RecordKeyAccess($"envelope:{envelope.KekId}");
 
                 return dek;
             }
@@ -3106,7 +3183,7 @@ namespace DataWarehouse.SDK.Contracts
 
                 var key = await keyStore.GetKeyAsync(keyId, context);
 
-                KeyAccessLog[keyId] = DateTime.UtcNow;
+                RecordKeyAccess(keyId);
 
                 return key;
             }
@@ -3197,7 +3274,7 @@ namespace DataWarehouse.SDK.Contracts
             finally
             {
                 // Clear key from memory
-                Array.Clear(key, 0, key.Length);
+                CryptographicOperations.ZeroMemory(key);
             }
         }
 
@@ -3237,16 +3314,23 @@ namespace DataWarehouse.SDK.Contracts
                 // Check for envelope header in stream
                 if (await EnvelopeHeader.IsEnvelopeEncryptedAsync(stored))
                 {
-                    // Read and parse envelope header
-                    var headerBuffer = new byte[4096]; // Reasonable max header size
-                    var bytesRead = await stored.ReadAsync(headerBuffer, 0, headerBuffer.Length);
-                    stored.Position = 0;
-
-                    if (EnvelopeHeader.TryDeserialize(headerBuffer, out envelope, out var headerLength))
+                    // Read and parse envelope header (pooled buffer to reduce GC pressure on hot path)
+                    var headerBuffer = ArrayPool<byte>.Shared.Rent(4096);
+                    try
                     {
-                        // Skip header for decryption
-                        stored.Position = headerLength;
-                        iv = envelope!.Iv;
+                        var bytesRead = await stored.ReadAsync(headerBuffer, 0, 4096);
+                        stored.Position = 0;
+
+                        if (EnvelopeHeader.TryDeserialize(headerBuffer, out envelope, out var headerLength))
+                        {
+                            // Skip header for decryption
+                            stored.Position = headerLength;
+                            iv = envelope!.Iv;
+                        }
+                    }
+                    finally
+                    {
+                        ArrayPool<byte>.Shared.Return(headerBuffer, clearArray: true);
                     }
                 }
                 else if (args.TryGetValue("keyId", out var kidObj) && kidObj is string kid)
@@ -3274,7 +3358,7 @@ namespace DataWarehouse.SDK.Contracts
             finally
             {
                 // Clear key from memory
-                Array.Clear(key, 0, key.Length);
+                CryptographicOperations.ZeroMemory(key);
             }
         }
 

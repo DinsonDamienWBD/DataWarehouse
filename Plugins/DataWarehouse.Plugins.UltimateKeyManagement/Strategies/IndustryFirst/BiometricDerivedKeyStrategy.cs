@@ -878,7 +878,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.IndustryFirst
             {
                 if (entry.CachedKey != null)
                 {
-                    Array.Clear(entry.CachedKey, 0, entry.CachedKey.Length);
+                    CryptographicOperations.ZeroMemory(entry.CachedKey);
                 }
             }
 
