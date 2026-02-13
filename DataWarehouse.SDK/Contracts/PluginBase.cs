@@ -235,6 +235,32 @@ namespace DataWarehouse.SDK.Contracts
         }
 
         /// <summary>
+        /// Activates the plugin for distributed coordination.
+        /// Called after all plugins have completed InitializeAsync, when the cluster
+        /// membership is resolved and cross-node capabilities are discovered.
+        /// <para>
+        /// This is Phase 3 of the 3-phase plugin initialization:
+        /// <list type="number">
+        ///   <item><description>Construction: Zero dependencies (constructor)</description></item>
+        ///   <item><description>InitializeAsync: MessageBus available, local setup</description></item>
+        ///   <item><description>ActivateAsync: Distributed coordination available, cross-node discovery</description></item>
+        /// </list>
+        /// </para>
+        /// <para>
+        /// Default implementation is a no-op. Override in plugins that need cluster-level
+        /// coordination (e.g., distributed caching, cross-node replication, federated queries).
+        /// Plugins that do not override this method work exactly as before.
+        /// </para>
+        /// </summary>
+        /// <param name="ct">Cancellation token for the activation operation.</param>
+        /// <returns>A task representing the activation operation.</returns>
+        public virtual Task ActivateAsync(CancellationToken ct = default)
+        {
+            ct.ThrowIfCancellationRequested();
+            return Task.CompletedTask;
+        }
+
+        /// <summary>
         /// Executes the plugin's main processing logic.
         /// Default implementation is a no-op. Override to implement plugin-specific processing.
         /// For FeaturePluginBase derivatives, this maps to StartAsync.
@@ -246,6 +272,23 @@ namespace DataWarehouse.SDK.Contracts
         {
             ct.ThrowIfCancellationRequested();
             return Task.CompletedTask;
+        }
+
+        /// <summary>
+        /// Performs a health check for this plugin.
+        /// Called by the kernel's HealthCheckAggregator to determine plugin health.
+        /// <para>
+        /// Default implementation returns <see cref="HealthStatus.Healthy"/>.
+        /// Override in plugins that need to report degraded or unhealthy status
+        /// based on internal state (e.g., connection failures, resource exhaustion).
+        /// </para>
+        /// </summary>
+        /// <param name="ct">Cancellation token for the health check operation.</param>
+        /// <returns>A <see cref="HealthCheckResult"/> indicating plugin health.</returns>
+        public virtual Task<HealthCheckResult> CheckHealthAsync(CancellationToken ct = default)
+        {
+            ct.ThrowIfCancellationRequested();
+            return Task.FromResult(HealthCheckResult.Healthy($"{Name} is healthy"));
         }
 
         /// <summary>
