@@ -325,10 +325,6 @@ internal sealed class TokenBucket : IDisposable
                 // Re-acquire lock and retry (loop continues)
                 continue;
             }
-            catch (OperationCanceledException)
-            {
-                throw;
-            }
             finally
             {
                 // Only release if still held (not released in the wait path above)

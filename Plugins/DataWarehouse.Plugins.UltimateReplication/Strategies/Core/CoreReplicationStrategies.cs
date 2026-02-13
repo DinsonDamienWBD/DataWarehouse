@@ -7,7 +7,8 @@ using System.Threading;
 using System.Threading.Tasks;
 using DataWarehouse.SDK.Contracts.Replication;
 
-// Extension method for IDictionary
+#pragma warning disable S3903 // Move into named namespace -- intentionally global to avoid ambiguity with CollectionExtensions.GetValueOrDefault
+// Extension method for IDictionary (nullable-aware, distinct from CollectionExtensions)
 internal static class DictionaryExtensions
 {
     public static TValue? GetValueOrDefault<TKey, TValue>(this IDictionary<TKey, TValue>? dict, TKey key, TValue? defaultValue = default) where TKey : notnull
@@ -16,6 +17,7 @@ internal static class DictionaryExtensions
         return dict.TryGetValue(key, out var value) ? value : defaultValue;
     }
 }
+#pragma warning restore S3903
 
 namespace DataWarehouse.Plugins.UltimateReplication.Strategies.Core
 {
