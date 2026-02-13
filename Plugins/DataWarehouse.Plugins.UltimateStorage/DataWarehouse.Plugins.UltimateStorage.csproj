@@ -25,16 +25,16 @@
     <PackageReference Include="Azure.Identity" Version="1.17.1" />
 
     <!-- Google Cloud Storage -->
-    <PackageReference Include="Google.Cloud.Storage.V1" Version="4.14.*" />
+    <PackageReference Include="Google.Cloud.Storage.V1" Version="4.14.0" />
 
     <!-- MinIO (S3-compatible) -->
     <PackageReference Include="Minio" Version="7.0.0" />
 
     <!-- Alibaba Cloud OSS -->
-    <PackageReference Include="Aliyun.OSS.SDK.NetCore" Version="2.14.*" />
+    <PackageReference Include="Aliyun.OSS.SDK.NetCore" Version="2.14.1" />
 
     <!-- Tencent Cloud COS -->
-    <PackageReference Include="Tencent.QCloud.Cos.Sdk" Version="5.4.*" />
+    <PackageReference Include="Tencent.QCloud.Cos.Sdk" Version="5.4.51" />
 
     <!-- Oracle Cloud Infrastructure Object Storage -->
     <PackageReference Include="OCI.DotNetSDK.Objectstorage" Version="127.1.0" />
@@ -45,28 +45,28 @@
   <ItemGroup>
     <!-- MongoDB -->
     <PackageReference Include="MongoDB.Driver" Version="3.6.0" />
-    <PackageReference Include="MongoDB.Driver.GridFS" Version="2.30.*" />
+    <PackageReference Include="MongoDB.Driver.GridFS" Version="2.30.0" />
 
     <!-- PostgreSQL (large objects) -->
-    <PackageReference Include="Npgsql" Version="10.*" />
+    <PackageReference Include="Npgsql" Version="10.0.1" />
   </ItemGroup>
 
   <!-- Distributed & Decentralized Storage -->
   <ItemGroup>
     <!-- IPFS HTTP Client -->
-    <PackageReference Include="Ipfs.Http.Client" Version="0.33.*" />
+    <PackageReference Include="Ipfs.Http.Client" Version="0.33.0" />
 
     <!-- BitTorrent Client -->
-    <PackageReference Include="MonoTorrent" Version="3.0.*" />
+    <PackageReference Include="MonoTorrent" Version="3.0.2" />
   </ItemGroup>
 
   <!-- Network Storage -->
   <ItemGroup>
     <!-- SMB/CIFS support -->
-    <PackageReference Include="SMBLibrary" Version="1.5.*" />
+    <PackageReference Include="SMBLibrary" Version="1.5.5.1" />
 
     <!-- FTP support -->
-    <PackageReference Include="FluentFTP" Version="53.*" />
+    <PackageReference Include="FluentFTP" Version="53.0.2" />
 
     <!-- SFTP/SCP support -->
     <PackageReference Include="SSH.NET" Version="2025.1.0" />
@@ -94,8 +94,8 @@
   <!-- Data Connectors (Phase E) -->
   <ItemGroup>
     <!-- ODBC/Database Connectors -->
-    <PackageReference Include="System.Data.Odbc" Version="10.*" />
-    <PackageReference Include="System.Data.SqlClient" Version="4.9.*" />
+    <PackageReference Include="System.Data.Odbc" Version="10.0.3" />
+    <PackageReference Include="System.Data.SqlClient" Version="4.9.0" />
     <PackageReference Include="MySql.Data" Version="9.6.0" />
     <PackageReference Include="Oracle.ManagedDataAccess.Core" Version="23.26.100" />
 
@@ -103,7 +103,7 @@
     <PackageReference Include="Confluent.Kafka" Version="2.13.0" />
 
     <!-- Additional Dependencies -->
-    <PackageReference Include="System.Linq.Async" Version="7.*" />
+    <PackageReference Include="System.Linq.Async" Version="7.0.0" />
   </ItemGroup>
 
 </Project>

@@ -17,11 +17,8 @@
   </ItemGroup>
 
   <ItemGroup>
-    <!-- HTTP client for API integrations -->
-    <PackageReference Include="System.Net.Http.Json" Version="10.0.3" />
-
-    <!-- WebSocket support for real-time updates -->
-    <PackageReference Include="System.Net.WebSockets.Client" Version="4.3.2" />
+    <!-- System.Net.Http.Json removed: built into .NET 10 runtime (NU1510) -->
+    <!-- System.Net.WebSockets.Client removed: built into .NET 10 runtime (NU1510) -->
 
     <!-- PDF generation -->
     <PackageReference Include="QuestPDF" Version="2025.12.4" />

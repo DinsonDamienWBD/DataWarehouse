@@ -21,7 +21,7 @@
     <PackageReference Include="Npgsql" Version="10.0.1" />
 
     <!-- MySQL protocol support -->
-    <PackageReference Include="MySqlConnector" Version="2.4.1" />
+    <PackageReference Include="MySqlConnector" Version="2.5.0" />
 
     <!-- SQL Server TDS protocol -->
     <PackageReference Include="Microsoft.Data.SqlClient" Version="6.1.4" />
@@ -42,13 +42,12 @@
     <PackageReference Include="Elastic.Clients.Elasticsearch" Version="9.3.0" />
 
     <!-- Neo4j Bolt protocol -->
-    <PackageReference Include="Neo4j.Driver" Version="5.30.0" />
+    <PackageReference Include="Neo4j.Driver" Version="6.0.0" />
 
     <!-- InfluxDB line protocol -->
     <PackageReference Include="InfluxDB.Client" Version="5.0.0" />
 
-    <!-- Generic ADO.NET support -->
-    <PackageReference Include="System.Data.Common" Version="4.3.0" />
+    <!-- System.Data.Common removed: built into .NET 10 runtime (NU1510) -->
   </ItemGroup>
 
 </Project>
