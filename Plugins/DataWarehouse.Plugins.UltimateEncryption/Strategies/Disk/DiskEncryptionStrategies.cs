@@ -69,7 +69,7 @@ public sealed class XtsAes256Strategy : EncryptionStrategyBase
         var key1 = new Span<byte>(key, 0, 32);
         var key2 = new Span<byte>(key, 32, 32);
 
-        return !key1.SequenceEqual(key2);
+        return !(key1.Length == key2.Length && CryptographicOperations.FixedTimeEquals(key1, key2));
     }
 
     /// <inheritdoc/>
@@ -429,7 +429,7 @@ public sealed class AdiantumStrategy : EncryptionStrategyBase
 
         // Step 4: Verify hash
         var computedHash = ComputeNhHash(plaintext, key);
-        if (!hash.SequenceEqual(computedHash))
+        if (!(hash.Length == computedHash.Length && CryptographicOperations.FixedTimeEquals(hash, computedHash)))
         {
             throw new CryptographicException("Adiantum hash verification failed");
         }

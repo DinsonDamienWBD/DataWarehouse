@@ -634,14 +634,12 @@ namespace DataWarehouse.Plugins.UltimateCompliance
         {
             if (disposing)
             {
-                if (_disposed)
-                return;
-
+                if (_disposed) return;
                 _disposed = true;
 
                 foreach (var subscription in _subscriptions)
                 {
-                subscription.Dispose();
+                    subscription.Dispose();
                 }
                 _subscriptions.Clear();
 

@@ -2,6 +2,7 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
+using System.Security.Cryptography;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -130,11 +131,20 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Features
             return Task.CompletedTask;
         }
 
-        private string GenerateCode(MfaMethodType methodType)
+        private static string GenerateCode(MfaMethodType methodType)
         {
-            return methodType == MfaMethodType.Totp
-                ? Random.Shared.Next(100000, 999999).ToString("D6")
-                : Guid.NewGuid().ToString("N").Substring(0, 8).ToUpper();
+            if (methodType == MfaMethodType.Totp)
+            {
+                // Use cryptographically secure RNG for MFA codes
+                var code = RandomNumberGenerator.GetInt32(100000, 1000000);
+                return code.ToString("D6");
+            }
+            else
+            {
+                // Use cryptographically secure random bytes for non-TOTP codes
+                var bytes = RandomNumberGenerator.GetBytes(4);
+                return Convert.ToHexString(bytes);
+            }
         }
 
         private string GetMfaReason(double riskScore, bool isTrusted)

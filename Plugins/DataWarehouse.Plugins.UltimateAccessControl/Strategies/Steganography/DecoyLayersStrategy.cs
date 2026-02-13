@@ -764,11 +764,10 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Steganography
         private byte[] GenerateTextContent(string[] templates, int targetSize)
         {
             var sb = new StringBuilder();
-            var rng = new Random();
 
             while (sb.Length < targetSize)
             {
-                sb.AppendLine(templates[rng.Next(templates.Length)]);
+                sb.AppendLine(templates[RandomNumberGenerator.GetInt32(templates.Length)]);
                 sb.AppendLine();
             }
 

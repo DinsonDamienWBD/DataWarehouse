@@ -59,7 +59,7 @@ public sealed class QuantumSafeIntegrity
             return false;
 
         var computed = CalculateChecksum(data, checksum.Algorithm);
-        return computed.Hash.SequenceEqual(checksum.Hash);
+        return computed.Hash.Length == checksum.Hash.Length && CryptographicOperations.FixedTimeEquals(computed.Hash, checksum.Hash);
     }
 
     /// <summary>
@@ -146,7 +146,7 @@ public sealed class QuantumSafeIntegrity
             currentIndex /= 2;
         }
 
-        var isValid = computedHash.SequenceEqual(tree.RootHash);
+        var isValid = computedHash.Length == tree.RootHash.Length && CryptographicOperations.FixedTimeEquals(computedHash, tree.RootHash);
 
         return new MerkleProofResult
         {

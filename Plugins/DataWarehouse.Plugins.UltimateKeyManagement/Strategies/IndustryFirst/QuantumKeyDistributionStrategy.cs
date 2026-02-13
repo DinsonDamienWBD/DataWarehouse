@@ -318,7 +318,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.IndustryFirst
             var computedHash = SHA256.HashData(keyBytes);
             var expectedHash = Convert.FromBase64String(result.KeyHash);
 
-            if (!computedHash.SequenceEqual(expectedHash))
+            if (!(computedHash.Length == expectedHash.Length && CryptographicOperations.FixedTimeEquals(computedHash, expectedHash)))
             {
                 throw new CryptographicException("Quantum key integrity verification failed.");
             }
