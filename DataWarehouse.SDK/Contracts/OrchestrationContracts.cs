@@ -564,4 +564,91 @@ namespace DataWarehouse.SDK.Contracts
     }
 
     #endregion
+
+    #region Write Fan-Out Orchestrator Base
+
+    /// <summary>
+    /// Abstract base class for write fan-out orchestrator plugins.
+    /// Provides common infrastructure for implementing IWriteFanOutOrchestrator.
+    /// </summary>
+    public abstract class WriteFanOutOrchestratorPluginBase : OrchestrationPluginBase, IWriteFanOutOrchestrator
+    {
+        public override string OrchestrationMode => "WriteFanOut";
+        private readonly List<IWriteDestination> _destinations = new();
+        private readonly object _lock = new();
+        public override PluginCategory Category => PluginCategory.OrchestrationProvider;
+
+        public void RegisterDestination(IWriteDestination destination) { lock (_lock) { _destinations.Add(destination); } }
+        public IReadOnlyList<IWriteDestination> GetDestinations() { lock (_lock) { return _destinations.ToList(); } }
+
+        public virtual async Task<FanOutWriteResult> WriteAsync(string objectId, Stream data, Manifest manifest, FanOutWriteOptions? options = null, CancellationToken ct = default)
+        {
+            var sw = System.Diagnostics.Stopwatch.StartNew();
+            options ??= new FanOutWriteOptions();
+            var destinations = GetDestinations();
+            var requiredDestinations = destinations.Where(d => d.IsRequired).ToList();
+            var optionalDestinations = destinations.Where(d => !d.IsRequired).ToList();
+            var processingResults = await ProcessContentAsync(data, manifest, options, ct);
+            var indexableContent = CreateIndexableContent(objectId, manifest, processingResults);
+            if (data.CanSeek) data.Position = 0;
+            var destinationResults = new ConcurrentDictionary<WriteDestinationType, WriteDestinationResult>();
+
+            var requiredTasks = requiredDestinations.Select(async d => { var result = await WriteToDestinationAsync(d, objectId, indexableContent, ct); destinationResults[d.DestinationType] = result; return result; });
+            var requiredResults = await Task.WhenAll(requiredTasks);
+            var requiredSuccess = requiredResults.All(r => r.Success);
+
+            if (optionalDestinations.Count > 0)
+            {
+                using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+                timeoutCts.CancelAfter(options.NonRequiredTimeout);
+                var optionalTasks = optionalDestinations.Select(async d =>
+                {
+                    try { var result = await WriteToDestinationAsync(d, objectId, indexableContent, timeoutCts.Token); destinationResults[d.DestinationType] = result; }
+                    catch (OperationCanceledException) { destinationResults[d.DestinationType] = new WriteDestinationResult { Success = false, DestinationType = d.DestinationType, ErrorMessage = "Timeout" }; }
+                });
+                if (options.WaitForAll) await Task.WhenAll(optionalTasks);
+                else _ = Task.WhenAll(optionalTasks);
+            }
+
+            sw.Stop();
+            return new FanOutWriteResult { Success = requiredSuccess, ObjectId = objectId, DestinationResults = destinationResults.ToDictionary(kvp => kvp.Key, kvp => kvp.Value), ProcessingResults = processingResults.ToDictionary(kvp => kvp.Key, kvp => kvp.Value), Duration = sw.Elapsed };
+        }
+
+        protected virtual async Task<Dictionary<ContentProcessingType, ContentProcessingResult>> ProcessContentAsync(Stream data, Manifest manifest, FanOutWriteOptions options, CancellationToken ct)
+        {
+            return new Dictionary<ContentProcessingType, ContentProcessingResult>();
+        }
+
+        protected virtual IndexableContent CreateIndexableContent(string objectId, Manifest manifest, Dictionary<ContentProcessingType, ContentProcessingResult> processingResults)
+        {
+            return new IndexableContent
+            {
+                ObjectId = objectId, Filename = manifest.Name, ContentType = manifest.ContentType, Size = manifest.OriginalSize,
+                Metadata = manifest.Metadata?.ToDictionary(kvp => kvp.Key, kvp => (object)kvp.Value),
+                TextContent = processingResults.TryGetValue(ContentProcessingType.TextExtraction, out var textResult) ? textResult.ExtractedText : null,
+                Embeddings = processingResults.TryGetValue(ContentProcessingType.EmbeddingGeneration, out var embResult) ? embResult.Embeddings : null,
+                Summary = processingResults.TryGetValue(ContentProcessingType.Summarization, out var sumResult) ? sumResult.Summary : null
+            };
+        }
+
+        private async Task<WriteDestinationResult> WriteToDestinationAsync(IWriteDestination destination, string objectId, IndexableContent content, CancellationToken ct)
+        {
+            var sw = System.Diagnostics.Stopwatch.StartNew();
+            try { var result = await destination.WriteAsync(objectId, content, ct); sw.Stop(); return new WriteDestinationResult { Success = result.Success, DestinationType = destination.DestinationType, Duration = sw.Elapsed, ErrorMessage = result.ErrorMessage }; }
+            catch (Exception ex) { sw.Stop(); return new WriteDestinationResult { Success = false, DestinationType = destination.DestinationType, Duration = sw.Elapsed, ErrorMessage = ex.Message }; }
+        }
+
+        public override Task StartAsync(CancellationToken ct) => Task.CompletedTask;
+        public override Task StopAsync() => Task.CompletedTask;
+
+        protected override Dictionary<string, object> GetMetadata()
+        {
+            var metadata = base.GetMetadata();
+            metadata["FeatureType"] = "WriteFanOutOrchestrator";
+            metadata["DestinationCount"] = _destinations.Count;
+            return metadata;
+        }
+    }
+
+    #endregion
 }
