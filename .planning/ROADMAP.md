@@ -272,20 +272,21 @@ Plans:
 **Goal**: All 60 plugins use the new base class hierarchies and distributed infrastructure features -- no plugin references another plugin directly, all communication flows through the message bus.
 **Depends on**: Phase 25b (strategy migration), Phase 26 (distributed contracts)
 **Requirements**: UPLT-01, UPLT-02, UPLT-03, UPST-01, UPST-02, UPST-03, DECPL-01, DECPL-02, DECPL-03, DECPL-04, DECPL-05
-**Approach**: Verify first -- many plugins may already use correct base classes from v1.0. Batch migration by plugin category. Static analysis to verify zero cross-plugin references. Decoupling verification is a gate: phase does not complete until every plugin is verified SDK-only.
+**Approach**: Highest-leverage first: re-parent ~60 SDK intermediate bases from LegacyFeaturePluginBase to Hierarchy domain bases (automatically migrates all concrete plugins through intermediate bases). Then migrate remaining plugins by domain in batches. Static analysis to verify zero cross-plugin references. Decoupling verification is a gate: phase does not complete until every plugin is verified SDK-only.
 **Success Criteria** (what must be TRUE):
   1. All Ultimate plugins inherit from their respective feature-specific plugin base classes and use unified strategy hierarchy
   2. All standalone plugins inherit from IntelligenceAwarePluginBase at minimum and use unified strategy base classes
   3. Zero plugins or kernel depend on any other plugin directly -- static analysis confirms SDK-only dependencies
   4. All inter-plugin and plugin-kernel communication uses Commands/Messages via message bus only -- no direct method calls between plugins
   5. All plugins register capabilities and knowledge into the system knowledge bank and leverage distributed infrastructure from SDK base classes
-**Plans**: TBD (estimated 3-5 plans)
+**Plans**: 5 plans
 
 Plans:
-- [ ] 27-01: Ultimate plugin migration to feature-specific base classes (batch 1: Encryption, Compression, Storage, Security)
-- [ ] 27-02: Ultimate plugin migration (batch 2: Observability, Interface, Format, Streaming, Media, Compute)
-- [ ] 27-03: Standalone plugin migration to IntelligenceAwarePluginBase
-- [ ] 27-04: Decoupling verification (static analysis, message bus audit, capability/knowledge registration)
+- [ ] 27-01-PLAN.md — SDK intermediate base re-parenting (~60 bases from LegacyFeaturePluginBase/PluginBase to Hierarchy domain bases)
+- [ ] 27-02-PLAN.md — Ultimate DataPipeline plugin migration (Encryption, Compression, Storage, Replication, Transit, Integrity -- 10 plugins)
+- [ ] 27-03-PLAN.md — Ultimate Feature plugin migration (Security, Interface, DataManagement, Compute, Observability, Streaming, Format, Infrastructure, Orchestration, Platform -- 32 plugins)
+- [ ] 27-04-PLAN.md — Standalone plugin migration + special cases (AirGapBridge, AEDS verification, LegacyFeaturePluginBase direct users -- 16+ plugins)
+- [ ] 27-05-PLAN.md — Decoupling verification (static analysis, message bus audit, capability/knowledge registration, full build)
 
 #### Phase 28: Dead Code Cleanup
 **Goal**: Remove truly unused classes, files, and interfaces that are referenced by nothing. Keep future-ready interfaces for unreleased hardware/technology (quantum crypto, brain-reading encryption, DNA storage, neuromorphic computing). See AD-06.
@@ -393,7 +394,7 @@ Plans:
 | 25a. Strategy Hierarchy Design & API Contracts | v2.0 | 0/5 | Planned | - |
 | 25b. Strategy Migration (~1,727 strategies) | v2.0 | 0/6 | Planned | - |
 | 26. Distributed Contracts & Resilience | v2.0 | 0/5 | Planned | - |
-| 27. Plugin Migration & Decoupling | v2.0 | 0/4 | Not started | - |
+| 27. Plugin Migration & Decoupling | v2.0 | 0/5 | Planned | - |
 | 28. Dead Code Cleanup | v2.0 | 0/4 | Not started | - |
 | 29. Advanced Distributed Coordination | v2.0 | 0/4 | Not started | - |
 | 30. Testing & Final Verification | v2.0 | 0/3 | Not started | - |
