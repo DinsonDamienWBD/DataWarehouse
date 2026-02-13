@@ -5,7 +5,6 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using DataWarehouse.SDK.Contracts.Dashboards;
-using Newtonsoft.Json;
 
 namespace DataWarehouse.Plugins.UniversalDashboards;
 
@@ -632,13 +631,20 @@ public abstract class DashboardStrategyBase : IDashboardStrategy
     /// <summary>
     /// Serializes an object to JSON.
     /// </summary>
+    private static readonly JsonSerializerOptions s_serializeOptions = new()
+    {
+        DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull,
+        WriteIndented = true
+    };
+
+    private static readonly JsonSerializerOptions s_deserializeOptions = new()
+    {
+        PropertyNameCaseInsensitive = true
+    };
+
     protected static string SerializeToJson(object obj)
     {
-        return JsonConvert.SerializeObject(obj, new JsonSerializerSettings
-        {
-            NullValueHandling = NullValueHandling.Ignore,
-            Formatting = Formatting.Indented
-        });
+        return System.Text.Json.JsonSerializer.Serialize(obj, s_serializeOptions);
     }
 
     /// <summary>
@@ -646,7 +652,7 @@ public abstract class DashboardStrategyBase : IDashboardStrategy
     /// </summary>
     protected static T? DeserializeFromJson<T>(string json)
     {
-        return JsonConvert.DeserializeObject<T>(json);
+        return System.Text.Json.JsonSerializer.Deserialize<T>(json, s_deserializeOptions);
     }
 
     /// <summary>

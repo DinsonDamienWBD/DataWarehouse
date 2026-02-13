@@ -1,6 +1,6 @@
 using DataWarehouse.SDK.Hosting;
 using DataWarehouse.Shared.Models;
-using Newtonsoft.Json;
+using System.Text.Json;
 
 namespace DataWarehouse.Shared;
 
@@ -72,8 +72,8 @@ public class InstanceManager
             if (capabilitiesResponse?.Data != null &&
                 capabilitiesResponse.Data.ContainsKey("capabilities"))
             {
-                var capabilitiesJson = JsonConvert.SerializeObject(capabilitiesResponse.Data["capabilities"]);
-                var capabilities = JsonConvert.DeserializeObject<InstanceCapabilities>(capabilitiesJson);
+                var capabilitiesJson = JsonSerializer.Serialize(capabilitiesResponse.Data["capabilities"]);
+                var capabilities = JsonSerializer.Deserialize<InstanceCapabilities>(capabilitiesJson, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
 
                 if (capabilities != null)
                 {
@@ -212,7 +212,7 @@ public class InstanceManager
         Directory.CreateDirectory(profilesDir);
 
         var profilePath = Path.Combine(profilesDir, $"{profile.Id}.json");
-        var json = JsonConvert.SerializeObject(profile, Formatting.Indented);
+        var json = JsonSerializer.Serialize(profile, new JsonSerializerOptions { WriteIndented = true });
         File.WriteAllText(profilePath, json);
     }
 
@@ -236,7 +236,7 @@ public class InstanceManager
             try
             {
                 var json = File.ReadAllText(file);
-                var profile = JsonConvert.DeserializeObject<ConnectionProfile>(json);
+                var profile = JsonSerializer.Deserialize<ConnectionProfile>(json, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
                 if (profile != null)
                     profiles.Add(profile);
             }

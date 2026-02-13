@@ -2,7 +2,7 @@ using DataWarehouse.SDK.Hosting;
 using DataWarehouse.Shared.Models;
 using System.Net.Sockets;
 using System.Text;
-using Newtonsoft.Json;
+using System.Text.Json;
 
 namespace DataWarehouse.Shared;
 
@@ -144,7 +144,7 @@ public class MessageBridge
         try
         {
             // Serialize message to JSON
-            var json = JsonConvert.SerializeObject(message);
+            var json = JsonSerializer.Serialize(message);
             var bytes = Encoding.UTF8.GetBytes(json);
 
             // Send message length prefix (4 bytes)
@@ -184,7 +184,7 @@ public class MessageBridge
 
             // Deserialize response
             var responseJson = Encoding.UTF8.GetString(responseBytes);
-            var response = JsonConvert.DeserializeObject<Message>(responseJson);
+            var response = JsonSerializer.Deserialize<Message>(responseJson, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
 
             return response;
         }
