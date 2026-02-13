@@ -338,12 +338,12 @@ Plans:
   3. New unit tests cover all new/modified base classes (plugin hierarchy, strategy hierarchy, distributed contracts)
   4. Behavioral verification tests confirm existing strategies produce identical results after hierarchy migration
   5. Roslyn analyzer clean pass with zero suppressed warnings without documented justification
-**Plans**: TBD (estimated 2-3 plans)
+**Plans**: 3 plans
 
 Plans:
-- [ ] 30-01: Build validation and existing test suite regression check
-- [ ] 30-02: New unit tests for base classes and behavioral verification suite
-- [ ] 30-03: Distributed infrastructure integration tests with in-memory implementations
+- [ ] 30-01-PLAN.md — Build validation, fix v2.0 compilation errors, existing test suite regression check (TEST-01, TEST-04, TEST-06)
+- [ ] 30-02-PLAN.md — New unit tests for base classes (StrategyBase, plugin hierarchy, domain bases, composable services, input validation) and behavioral equivalence verification (TEST-02, TEST-03)
+- [ ] 30-03-PLAN.md — Distributed infrastructure integration tests: 7 distributed contracts, 5 resilience contracts, 4 observability contracts, 13 in-memory implementations (TEST-05)
 
 #### Phase 31: Unified Interface & Deployment Modes
 **Goal**: CLI and GUI dynamically reflect plugin capabilities at runtime, NLP queries route through the intelligence stack, and DW supports three deployment modes: Standard Client (connect to any instance), Live Mode (in-memory portable), and Install Mode (deploy to local machine from clean or USB source). See AD-09, AD-10.
@@ -397,5 +397,5 @@ Plans:
 | 27. Plugin Migration & Decoupling | v2.0 | 0/5 | Planned | - |
 | 28. Dead Code Cleanup | v2.0 | 0/4 | Planned | - |
 | 29. Advanced Distributed Coordination | v2.0 | 0/4 | Planned | - |
-| 30. Testing & Final Verification | v2.0 | 0/3 | Not started | - |
+| 30. Testing & Final Verification | v2.0 | 0/3 | Planned | - |
 | 31. Unified Interface & Deployment Modes | v2.0 | 0/8 | Not started | - |
