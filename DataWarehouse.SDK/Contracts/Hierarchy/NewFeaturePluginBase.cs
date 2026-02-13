@@ -19,9 +19,9 @@ namespace DataWarehouse.SDK.Contracts.Hierarchy;
 ///   <item>They may expose external interfaces (REST, gRPC) or enforce policies (compliance)</item>
 /// </list>
 /// <para>
-/// This is the NEW FeaturePluginBase under IntelligenceAwarePluginBase (AD-01).
-/// The old FeaturePluginBase : PluginBase has been renamed to LegacyFeaturePluginBase.
-/// Plugins will be migrated from LegacyFeaturePluginBase to this class in Phase 27.
+/// FeaturePluginBase inherits from IntelligenceAwarePluginBase (AD-01).
+/// All service-oriented plugins inherit from this or a domain-specific
+/// Hierarchy base that extends it (e.g., SecurityPluginBase, ComputePluginBase).
 /// </para>
 /// </remarks>
 public abstract class FeaturePluginBase : IntelligenceAwarePluginBase
