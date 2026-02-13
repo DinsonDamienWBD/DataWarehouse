@@ -195,16 +195,16 @@ Plans:
   5. Specialized base class logic (tiering, caching, indexing, hybrid) extracted into composable services accessible by all storage plugins
   6. Every public SDK method validates its inputs (null checks, range checks, format validation, path traversal protection, ReDoS protection)
   7. All 60 existing plugins still compile and pass tests after hierarchy changes
-**Plans**: TBD (estimated 5-7 plans)
+**Plans**: 7 plans
 
 Plans:
-- [ ] 24-01: PluginBase lifecycle, capability registry, and knowledge registry verification
-- [ ] 24-02: IntelligenceAwarePluginBase → DataPipelinePluginBase + FeaturePluginBase two-branch design
-- [ ] 24-03: Domain plugin bases (Encryption, Storage, Security, Interface, Compute, etc.) under correct branch
-- [ ] 24-04: Object storage core unification and PathStorageAdapter translation layer
-- [ ] 24-05: Extract specialized bases into composable services (TierManager, CacheManager, StorageIndex, etc.)
-- [ ] 24-06: Input validation framework (boundary validation, path traversal, size limits, ReDoS)
-- [ ] 24-07: Hierarchy build verification across all 60 plugins
+- [ ] 24-01-PLAN.md — PluginBase lifecycle verification and HIER-02 lifecycle methods
+- [ ] 24-02-PLAN.md — Reparent IntelligenceAwarePluginBase, create two-branch design, fix UltimateIntelligencePlugin
+- [ ] 24-03-PLAN.md — Create 18 domain plugin bases (7 DataPipeline + 11 Feature)
+- [ ] 24-04-PLAN.md — IObjectStorageCore interface and PathStorageAdapter URI translation layer
+- [ ] 24-05-PLAN.md — Extract composable services: ITierManager, ICacheManager, IStorageIndex, IConnectionRegistry
+- [ ] 24-06-PLAN.md — Input validation: Guards class, SizeLimitOptions, Regex timeout audit, PluginIdentity
+- [ ] 24-07-PLAN.md — Full solution build verification across all 60 plugins
 
 #### Phase 25a: Strategy Hierarchy Design & API Contracts
 **Goal**: Design and implement the unified strategy base hierarchy (flat, two-level, NO intelligence layer) and enforce immutable API contracts. See AD-05.
@@ -389,7 +389,7 @@ Plans:
 | 21.5. Pre-Execution Cleanup | v2.0 | 0/3 | Not started | - |
 | 22. Build Safety & Supply Chain | v2.0 | 0/4 | Not started | - |
 | 23. Memory Safety & Crypto Hygiene | v2.0 | 0/4 | Not started | - |
-| 24. Plugin Hierarchy, Storage Core & Validation | v2.0 | 0/7 | Not started | - |
+| 24. Plugin Hierarchy, Storage Core & Validation | v2.0 | 0/7 | Planned | - |
 | 25a. Strategy Hierarchy Design & API Contracts | v2.0 | 0/5 | Planned | - |
 | 25b. Strategy Migration (~1,500 strategies) | v2.0 | 0/6 | Not started | - |
 | 26. Distributed Contracts & Resilience | v2.0 | 0/5 | Not started | - |
