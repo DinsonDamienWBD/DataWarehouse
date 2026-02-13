@@ -228,25 +228,25 @@ Plans:
 - [ ] 25a-05-PLAN.md — Full build verification, test suite, hierarchy grep validation
 
 #### Phase 25b: Strategy Migration
-**Goal**: Migrate all ~1,500 strategy classes to the new hierarchy, remove duplicated boilerplate (intelligence, capability, dispose code), verify behavioral equivalence.
+**Goal**: Migrate all ~1,727 strategy classes to the new hierarchy, remove duplicated boilerplate (intelligence, capability, dispose code), verify behavioral equivalence.
 **Depends on**: Phase 25a (new strategy bases must exist)
 **Requirements**: STRAT-04, STRAT-06
-**Approach**: Mechanical migration, domain by domain, smallest first. For each strategy: change base class, remove duplicated boilerplate (ConfigureIntelligence, GetStrategyKnowledge, GetStrategyCapability, redundant Dispose), verify it compiles. Start with smallest domains (Transit 11, Encryption 12) to prove pattern, end with largest (Connector 280, Compliance 145).
+**Approach**: Research-informed complexity-based grouping (not just count-based). Three waves: Wave 1 verifies SDK-base domains need no changes (Type A -- ~964 strategies across 14 domains, can run in parallel). Wave 2 migrates plugin-local bases (Type B/C -- 6 bases controlling ~763 strategies, requires code changes). Wave 3 removes backward-compat shims and performs final verification. Key findings: >95% of strategies have ZERO intelligence boilerplate; only ~55 files use MessageBus directly; real work is concentrated on 6 plugin-local bases and the ~55 MessageBus-using strategies.
 **Success Criteria** (what must be TRUE):
-  1. All ~1,500 strategies inherit from their correct domain strategy base (no more direct inheritance from fragmented bases)
-  2. Intelligence/capability/knowledge boilerplate removed from all strategy classes (this code now lives only in the plugin)
-  3. Adapter wrappers from 25a removed -- strategies use new bases directly
-  4. All existing plugin strategies produce identical results after migration (behavioral verification tests)
-  5. Build compiles with zero errors across all 60 plugins
-**Plans**: TBD (estimated 5-8 plans)
+  1. All ~1,727 strategies inherit from their correct domain strategy base (no more direct inheritance from fragmented bases)
+  2. Intelligence/capability/knowledge boilerplate removed from plugin-local strategy bases (Compute ~60 lines, DataProtection ~30 lines)
+  3. Backward-compat shim intelligence methods removed from StrategyBase (ConfigureIntelligence, GetStrategyKnowledge, GetStrategyCapability)
+  4. All existing plugin strategies produce identical results after migration (behavioral verification via AD-08)
+  5. Build compiles with zero new errors across all 60 plugins
+**Plans**: 6 plans
 
 Plans:
-- [ ] 25b-01: Migrate smallest domains (Transit 11, Encryption 12, Streaming 17, Media 20)
-- [ ] 25b-02: Migrate medium domains (DataFormat 28, DataProtection 35, StorageProcessing 43, DatabaseStorage 49)
-- [ ] 25b-03: Migrate large domains (Observability 55, Compression 59, Replication 60, Interface 68, KeyManagement 68)
-- [ ] 25b-04: Migrate largest domains (DataManagement 78, Compute 83, Storage 130)
-- [ ] 25b-05: Migrate mega domains (AccessControl 142, Compliance 145, Connector 280)
-- [ ] 25b-06: Remove adapter wrappers, final build verification, behavioral equivalence tests
+- [ ] 25b-01-PLAN.md — Verify smallest SDK-base domains (Transit 11, Media 20, DataFormat 28, StorageProcessing 43 = 102 strategies)
+- [ ] 25b-02-PLAN.md — Verify medium SDK-base domains (Observability 55, DataLake 56, DataMesh 56, Compression 59, Replication 61 = 287 strategies)
+- [ ] 25b-03-PLAN.md — Verify large SDK-base domains with intermediates (KeyManagement 69, RAID 47, Storage 130, DatabaseStorage 49, Connector 280 = 575 strategies)
+- [ ] 25b-04-PLAN.md — Migrate plugin-local bases WITHOUT intelligence (AccessControl 146, Compliance 149, DataManagement 101, Streaming 58 = 454 strategies)
+- [ ] 25b-05-PLAN.md — Migrate plugin-local bases WITH intelligence + verify complex domains (Compute 85, DataProtection 82, Interface 73, Encryption 69 = 309 strategies)
+- [ ] 25b-06-PLAN.md — Remove backward-compat shims, final build verification, comprehensive audit (~1,727 strategies)
 
 #### Phase 26: Distributed Contracts & Resilience
 **Goal**: The SDK defines all distributed infrastructure contracts with security primitives baked in, in-memory single-node implementations for backward compatibility, and resilience/observability contracts that any plugin can use.
@@ -391,7 +391,7 @@ Plans:
 | 23. Memory Safety & Crypto Hygiene | v2.0 | 0/4 | Not started | - |
 | 24. Plugin Hierarchy, Storage Core & Validation | v2.0 | 0/7 | Planned | - |
 | 25a. Strategy Hierarchy Design & API Contracts | v2.0 | 0/5 | Planned | - |
-| 25b. Strategy Migration (~1,500 strategies) | v2.0 | 0/6 | Not started | - |
+| 25b. Strategy Migration (~1,727 strategies) | v2.0 | 0/6 | Planned | - |
 | 26. Distributed Contracts & Resilience | v2.0 | 0/5 | Not started | - |
 | 27. Plugin Migration & Decoupling | v2.0 | 0/4 | Not started | - |
 | 28. Dead Code Cleanup | v2.0 | 0/4 | Not started | - |
