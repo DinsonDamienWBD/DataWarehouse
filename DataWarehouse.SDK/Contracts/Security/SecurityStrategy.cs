@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
@@ -468,7 +468,7 @@ namespace DataWarehouse.SDK.Contracts.Security
     /// Provides common functionality for policy evaluation, audit logging, and statistics tracking.
     /// Thread-safe for concurrent operations.
     /// </summary>
-    public abstract class SecurityStrategyBase : ISecurityStrategy
+    public abstract class SecurityStrategyBase : StrategyBase, ISecurityStrategy
     {
         private long _totalEvaluations;
         private long _allowedCount;
@@ -497,92 +497,16 @@ namespace DataWarehouse.SDK.Contracts.Security
             }
         }
 
-        #region Intelligence Integration
-
-        /// <summary>
-        /// Gets the message bus for Intelligence communication.
-        /// </summary>
-        protected IMessageBus? MessageBus { get; private set; }
-
-        /// <summary>
-        /// Configures Intelligence integration for this security strategy.
-        /// </summary>
-        /// <param name="messageBus">Optional message bus for Intelligence communication.</param>
-        public virtual void ConfigureIntelligence(IMessageBus? messageBus)
-        {
-            MessageBus = messageBus;
-        }
-
-        /// <summary>
-        /// Gets a value indicating whether Intelligence integration is available.
-        /// </summary>
-        protected bool IsIntelligenceAvailable => MessageBus != null;
-
-        /// <summary>
-        /// Gets static knowledge about this security strategy for Intelligence registration.
-        /// </summary>
-        /// <returns>A KnowledgeObject describing this strategy's capabilities.</returns>
-        public virtual KnowledgeObject GetStrategyKnowledge()
-        {
-            return new KnowledgeObject
-            {
-                Id = $"security.{StrategyId}",
-                Topic = "security.strategy",
-                SourcePluginId = "sdk.security",
-                SourcePluginName = StrategyName,
-                KnowledgeType = "capability",
-                Description = $"{StrategyName} security strategy for policy evaluation and access control",
-                Payload = new Dictionary<string, object>
-                {
-                    ["strategyId"] = StrategyId,
-                    ["supportedDomains"] = SupportedDomains.Select(d => d.ToString()).ToArray()
-                },
-                Tags = new[] { "security", "policy", "accesscontrol", "strategy" }
-            };
-        }
-
-        /// <summary>
-        /// Gets the registered capability for this security strategy.
-        /// </summary>
-        /// <returns>A RegisteredCapability describing this strategy.</returns>
-        public virtual RegisteredCapability GetStrategyCapability()
-        {
-            return new RegisteredCapability
-            {
-                CapabilityId = $"security.{StrategyId}",
-                DisplayName = StrategyName,
-                Description = $"{StrategyName} security strategy",
-                Category = CapabilityCategory.Security,
-                SubCategory = "PolicyEvaluation",
-                PluginId = "sdk.security",
-                PluginName = StrategyName,
-                PluginVersion = "1.0.0",
-                Tags = new[] { "security", "authentication", "authorization" },
-                SemanticDescription = $"Use {StrategyName} for security policy evaluation and access control decisions"
-            };
-        }
-
-        /// <summary>
-        /// Requests security optimization suggestions from Intelligence.
-        /// </summary>
-        /// <param name="ct">Cancellation token.</param>
-        /// <returns>Optimization suggestions if available, null otherwise.</returns>
-        protected async Task<object?> RequestSecurityOptimizationAsync(CancellationToken ct = default)
-        {
-            if (!IsIntelligenceAvailable) return null;
-
-            // Send request to Intelligence for security optimization
-            await Task.CompletedTask;
-            return null;
-        }
-
-        #endregion
-
         /// <inheritdoc/>
-        public abstract string StrategyId { get; }
+        public override abstract string StrategyId { get; }
 
         /// <inheritdoc/>
         public abstract string StrategyName { get; }
+
+        /// <summary>
+        /// Gets the human-readable name. Delegates to StrategyName for backward compatibility.
+        /// </summary>
+        public override string Name => StrategyName;
 
         /// <inheritdoc/>
         public abstract IReadOnlyList<SecurityDomain> SupportedDomains { get; }
