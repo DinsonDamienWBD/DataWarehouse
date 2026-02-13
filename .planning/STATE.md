@@ -11,11 +11,11 @@ See: .planning/PROJECT.md (updated 2026-02-12)
 
 Milestone: v2.0 SDK Hardening & Distributed Infrastructure
 Phase: 22 of 29 (Build Safety & Supply Chain)
-Plan: 0 of 4 in current phase
-Status: Ready to plan
-Last activity: 2026-02-12 -- Roadmap created for v2.0 milestone (8 phases, 89 requirements)
+Plan: 1 of 4 in current phase
+Status: Executing
+Last activity: 2026-02-13 -- Phase 21.5 complete (3/3 plans), Phase 22 plan 01 complete
 
-Progress: [░░░░░░░░░░] 0%
+Progress: [####░░░░░░] 12% (4/33 plans)
 
 ## Performance Metrics
 
@@ -25,8 +25,15 @@ Progress: [░░░░░░░░░░] 0%
 - Timeline: 30 days (2026-01-13 to 2026-02-11)
 
 **v2.0:**
-- Total plans completed: 0 / 33 estimated
-- Average duration: -
+- Total plans completed: 4 / 33 estimated
+- Average duration: ~5 min/plan
+
+| Phase | Plan | Duration | Tasks | Files |
+|-------|------|----------|-------|-------|
+| 21.5 | 01 - Type Consolidation | ~8 min | 2 | 18 |
+| 21.5 | 02 - Newtonsoft Migration | ~5 min | 2 | 9 |
+| 21.5 | 03 - Solution Completeness | ~3 min | 2 | 1 |
+| 22 | 01 - Roslyn Analyzers | ~5 min | 3 | 12 |
 
 ## Accumulated Context
 
@@ -37,6 +44,9 @@ Progress: [░░░░░░░░░░] 0%
 - Incremental TreatWarningsAsErrors: category-based rollout to avoid halting 1.1M LOC build
 - IDisposable on PluginBase: 4-phase migration (base addition, analyzer audit, batch migration, enforcement)
 - Strategy bases fragmented (7 separate, no unified root) -- adapter wrappers for backward compatibility
+- SDK.Hosting namespace for host-level types (OperatingMode, ConnectionType, ConnectionTarget, InstallConfiguration, EmbeddedConfiguration) -- distinct from SDK.Primitives.OperatingMode (kernel scaling)
+- ConnectionTarget superset: merged Host/Port/AuthToken/UseTls/TimeoutSeconds (Launcher) with Name/Metadata (Shared), adapted Address->Host
+- System.Text.Json is sole JSON serializer: PropertyNameCaseInsensitive=true for deserialization, WriteIndented=true where formatting needed, JsonIgnoreCondition.WhenWritingNull for null handling
 
 ### SDK Audit Results (2026-02-11)
 
@@ -55,8 +65,14 @@ Progress: [░░░░░░░░░░] 0%
 - IDisposable on PluginBase affects all 60 plugins -- use incremental migration
 - CRDT and SWIM implementations (Phase 28) may need research-phase during planning
 
+### Completed Phases
+
+- [x] **Phase 21.5: Pre-Execution Cleanup** (3/3 plans) -- Type consolidation, Newtonsoft migration, solution completeness
+  - 1 deviation: GUI _Imports.razor needed SDK.Hosting import (Rule 3)
+  - 28 files touched (5 created, 17 modified, 5 deleted, 1 solution updated)
+
 ## Session Continuity
 
-Last session: 2026-02-12
-Stopped at: Roadmap v2.0 created, ready to plan Phase 22
-Resume: `/gsd:plan-phase 22`
+Last session: 2026-02-13
+Stopped at: Completed Phase 21.5 (all 3 plans), Phase 22 plan 01 already done
+Resume: `/gsd:execute-phase 22` (continue from plan 02)

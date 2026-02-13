@@ -65,7 +65,7 @@ All 6 main phases and subphases from the original SDK_REFACTOR_PLAN.md are fully
 
 ### Phases
 
-- [ ] **Phase 21.5: Pre-Execution Cleanup** - Consolidate duplicate types to SDK, standardize JSON serializer, add missing projects to solution, remove dead code
+- [x] **Phase 21.5: Pre-Execution Cleanup** - Consolidate duplicate types to SDK, standardize JSON serializer, add missing projects to solution, remove dead code
 - [ ] **Phase 22: Build Safety & Supply Chain** - Roslyn analyzers, TreatWarningsAsErrors rollout, SBOM, vulnerability audit, CLI fix
 - [ ] **Phase 23: Memory Safety & Cryptographic Hygiene** - IDisposable patterns, secure memory wiping, bounded collections, constant-time comparisons, FIPS compliance
 - [ ] **Phase 24: Plugin Hierarchy, Storage Core & Input Validation** - Two-branch plugin hierarchy (DataPipeline + Feature), object storage core with translation layer, specialized bases to composable services, input validation (AD-01, AD-02, AD-03, AD-04)
