@@ -2,8 +2,10 @@ using System.Collections.Concurrent;
 using DataWarehouse.SDK.AI;
 using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Contracts.Compression;
+using DataWarehouse.SDK.Contracts.Hierarchy;
 using DataWarehouse.SDK.Contracts.IntelligenceAware;
 using DataWarehouse.SDK.Primitives;
+using HierarchyCompressionPluginBase = DataWarehouse.SDK.Contracts.Hierarchy.CompressionPluginBase;
 using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateCompression
@@ -51,7 +53,7 @@ namespace DataWarehouse.Plugins.UltimateCompression
     /// will continue to work during the transition period. Old compression plugins are deprecated
     /// and scheduled for file deletion in Phase 18.</para>
     /// </remarks>
-    public sealed class UltimateCompressionPlugin : IntelligenceAwareCompressionPluginBase
+    public sealed class UltimateCompressionPlugin : HierarchyCompressionPluginBase
     {
         private readonly ConcurrentDictionary<string, ICompressionStrategy> _strategies = new(StringComparer.OrdinalIgnoreCase);
         private ICompressionStrategy? _activeStrategy;
@@ -76,7 +78,7 @@ namespace DataWarehouse.Plugins.UltimateCompression
 
 
         /// <inheritdoc/>
-        public override int DefaultOrder => 50;
+        public override int DefaultPipelineOrder => 50;
 
         /// <inheritdoc/>
         public override bool AllowBypass => true;
@@ -155,11 +157,11 @@ namespace DataWarehouse.Plugins.UltimateCompression
         }
 
         /// <inheritdoc/>
-        public override Stream OnWrite(Stream input, IKernelContext context, Dictionary<string, object> args)
+        public override async Task<Stream> OnWriteAsync(Stream input, IKernelContext context, Dictionary<string, object> args, CancellationToken ct = default)
         {
             // Read input stream to byte array
             using var ms = new MemoryStream();
-            input.CopyTo(ms);
+            await input.CopyToAsync(ms, ct);
             var data = ms.ToArray();
 
             // Select strategy and compress
@@ -171,11 +173,11 @@ namespace DataWarehouse.Plugins.UltimateCompression
         }
 
         /// <inheritdoc/>
-        public override Stream OnRead(Stream stored, IKernelContext context, Dictionary<string, object> args)
+        public override async Task<Stream> OnReadAsync(Stream stored, IKernelContext context, Dictionary<string, object> args, CancellationToken ct = default)
         {
             // Read stored stream to byte array
             using var ms = new MemoryStream();
-            stored.CopyTo(ms);
+            await stored.CopyToAsync(ms, ct);
             var data = ms.ToArray();
 
             // Select strategy and decompress
