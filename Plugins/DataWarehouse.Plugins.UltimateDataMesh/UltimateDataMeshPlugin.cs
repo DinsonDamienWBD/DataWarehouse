@@ -464,15 +464,19 @@ public sealed class UltimateDataMeshPlugin : IntelligenceAwareDataManagementPlug
     protected override Task OnStartCoreAsync(CancellationToken ct) => Task.CompletedTask;
 
     /// <summary>Disposes resources.</summary>
-    public void Dispose()
+    protected override void Dispose(bool disposing)
     {
-        if (_disposed) return;
-        _disposed = true;
-        _usageStats.Clear();
-        _domains.Clear();
-        _products.Clear();
-        _consumers.Clear();
-        _shares.Clear();
-        _policies.Clear();
+        if (disposing)
+        {
+            if (_disposed) return;
+            _disposed = true;
+            _usageStats.Clear();
+            _domains.Clear();
+            _products.Clear();
+            _consumers.Clear();
+            _shares.Clear();
+            _policies.Clear();
+        }
+        base.Dispose(disposing);
     }
 }

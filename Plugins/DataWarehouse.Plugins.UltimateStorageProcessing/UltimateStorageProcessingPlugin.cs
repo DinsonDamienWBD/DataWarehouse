@@ -440,20 +440,24 @@ public sealed class UltimateStorageProcessingPlugin : IntelligenceAwarePluginBas
     /// <summary>
     /// Disposes plugin resources.
     /// </summary>
-    public void Dispose()
+    protected override void Dispose(bool disposing)
     {
-        if (_disposed) return;
-
-        foreach (var strategy in _registry.GetAllStrategies())
+        if (disposing)
         {
+            if (_disposed) return;
+
+            foreach (var strategy in _registry.GetAllStrategies())
+            {
             if (strategy is IDisposable disposable)
             {
-                try { disposable.Dispose(); }
-                catch { /* Ignore disposal errors */ }
+            try { disposable.Dispose(); }
+            catch { /* Ignore disposal errors */ }
             }
-        }
+            }
 
-        _disposed = true;
+            _disposed = true;
+        }
+        base.Dispose(disposing);
     }
 
     #endregion

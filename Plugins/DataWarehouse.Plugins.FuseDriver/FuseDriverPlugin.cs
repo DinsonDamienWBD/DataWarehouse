@@ -795,26 +795,30 @@ public sealed class FuseDriverPlugin : FeaturePluginBase, IDisposable
     /// <summary>
     /// Disposes the plugin.
     /// </summary>
-    public void Dispose()
+    protected override void Dispose(bool disposing)
     {
-        if (_disposed)
+        if (disposing)
+        {
+            if (_disposed)
             return;
 
-        _disposed = true;
+            _disposed = true;
 
-        if (_isMounted)
-        {
+            if (_isMounted)
+            {
             UnmountAsync().GetAwaiter().GetResult();
-        }
+            }
 
-        _cts?.Cancel();
-        _cts?.Dispose();
-        _fuseThread?.Join(TimeSpan.FromSeconds(2));
-        _messageSubscription?.Dispose();
-        _linuxSpecific?.Dispose();
-        _macOsSpecific?.Dispose();
-        _fileSystem?.Dispose();
-        _cacheManager?.Dispose();
+            _cts?.Cancel();
+            _cts?.Dispose();
+            _fuseThread?.Join(TimeSpan.FromSeconds(2));
+            _messageSubscription?.Dispose();
+            _linuxSpecific?.Dispose();
+            _macOsSpecific?.Dispose();
+            _fileSystem?.Dispose();
+            _cacheManager?.Dispose();
+        }
+        base.Dispose(disposing);
     }
 
     #endregion

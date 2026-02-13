@@ -449,7 +449,7 @@ public class ServerDispatcherPlugin : ServerDispatcherPluginBase
     /// <summary>
     /// Disposes resources.
     /// </summary>
-    protected virtual void Dispose(bool disposing)
+    protected override void Dispose(bool disposing)
     {
         if (disposing)
         {

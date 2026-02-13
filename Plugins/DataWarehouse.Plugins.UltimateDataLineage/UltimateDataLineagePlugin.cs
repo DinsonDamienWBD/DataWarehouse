@@ -529,12 +529,16 @@ public sealed class UltimateDataLineagePlugin : FeaturePluginBase, IDisposable
     /// <summary>
     /// Disposes resources.
     /// </summary>
-    public void Dispose()
+    protected override void Dispose(bool disposing)
     {
-        if (_disposed) return;
-        _disposed = true;
-        _usageStats.Clear();
-        _nodes.Clear();
-        _edges.Clear();
+        if (disposing)
+        {
+            if (_disposed) return;
+            _disposed = true;
+            _usageStats.Clear();
+            _nodes.Clear();
+            _edges.Clear();
+        }
+        base.Dispose(disposing);
     }
 }

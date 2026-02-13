@@ -8,6 +8,7 @@ using DataWarehouse.SDK.Utilities;
 using System;
 using System.Collections.Concurrent;
 using System.Linq;
+using System.Security.Cryptography;
 
 namespace DataWarehouse.SDK.Contracts
 {
@@ -17,7 +18,7 @@ namespace DataWarehouse.SDK.Contracts
     /// of implementing IPlugin directly.
     /// AI-native: Includes built-in support for AI-driven operations.
     /// </summary>
-    public abstract class PluginBase : IPlugin
+    public abstract class PluginBase : IPlugin, IDisposable, IAsyncDisposable
     {
         /// <summary>
         /// Knowledge cache for performance optimization.
@@ -55,6 +56,11 @@ namespace DataWarehouse.SDK.Contracts
         /// Whether knowledge has been registered.
         /// </summary>
         private bool _knowledgeRegistered;
+
+        /// <summary>
+        /// Whether this plugin has been disposed.
+        /// </summary>
+        private bool _disposed;
 
         /// <summary>
         /// Lock for knowledge registration.
@@ -943,6 +949,87 @@ namespace DataWarehouse.SDK.Contracts
         }
 
         #endregion
+
+        #region IDisposable / IAsyncDisposable
+
+        /// <summary>
+        /// Gets whether this plugin has been disposed.
+        /// </summary>
+        protected bool IsDisposed => _disposed;
+
+        /// <summary>
+        /// Throws <see cref="ObjectDisposedException"/> if this plugin has been disposed.
+        /// </summary>
+        protected void ThrowIfDisposed()
+        {
+            ObjectDisposedException.ThrowIf(_disposed, this);
+        }
+
+        /// <summary>
+        /// Releases managed and unmanaged resources.
+        /// Override in derived classes to add cleanup logic. Always call base.Dispose(disposing).
+        /// </summary>
+        /// <param name="disposing">true if called from Dispose(); false if called from DisposeAsync().</param>
+        protected virtual void Dispose(bool disposing)
+        {
+            if (_disposed) return;
+
+            if (disposing)
+            {
+                // Dispose knowledge subscriptions
+                foreach (var sub in _knowledgeSubscriptions)
+                {
+                    try { sub.Dispose(); } catch { /* Swallow during cleanup */ }
+                }
+                _knowledgeSubscriptions.Clear();
+
+                // Clear knowledge cache
+                _knowledgeCache.Clear();
+
+                // Clear registration tracking
+                _registeredCapabilityIds.Clear();
+                _registeredKnowledgeIds.Clear();
+            }
+
+            _disposed = true;
+        }
+
+        /// <inheritdoc/>
+        public void Dispose()
+        {
+            Dispose(true);
+            GC.SuppressFinalize(this);
+        }
+
+        /// <summary>
+        /// Performs async cleanup. Override in derived classes for async disposal.
+        /// Always call base.DisposeAsyncCore() at the end of your override.
+        /// </summary>
+        protected virtual async ValueTask DisposeAsyncCore()
+        {
+            // Async cleanup: unregister from system if message bus is available
+            if (MessageBus != null)
+            {
+                try
+                {
+                    await UnregisterFromSystemAsync();
+                }
+                catch
+                {
+                    // Swallow during cleanup -- best effort
+                }
+            }
+        }
+
+        /// <inheritdoc/>
+        public async ValueTask DisposeAsync()
+        {
+            await DisposeAsyncCore();
+            Dispose(false);
+            GC.SuppressFinalize(this);
+        }
+
+        #endregion
     }
 
     /// <summary>
@@ -1667,12 +1754,13 @@ namespace DataWarehouse.SDK.Contracts
         /// <summary>
         /// Dispose cleanup timer.
         /// </summary>
-        protected virtual void Dispose(bool disposing)
+        protected override void Dispose(bool disposing)
         {
             if (disposing)
             {
                 _cleanupTimer?.Dispose();
             }
+            base.Dispose(disposing);
         }
     }
 
@@ -2660,7 +2748,7 @@ namespace DataWarehouse.SDK.Contracts
 
         private bool _disposed;
 
-        protected virtual void Dispose(bool disposing)
+        protected override void Dispose(bool disposing)
         {
             if (_disposed) return;
 
@@ -2676,12 +2764,7 @@ namespace DataWarehouse.SDK.Contracts
             }
 
             _disposed = true;
-        }
-
-        public void Dispose()
-        {
-            Dispose(true);
-            GC.SuppressFinalize(this);
+            base.Dispose(disposing);
         }
 
         #endregion
@@ -2696,7 +2779,7 @@ namespace DataWarehouse.SDK.Contracts
     /// Supports per-user, per-operation configuration for maximum flexibility.
     /// All encryption plugins MUST extend this class.
     /// </summary>
-    public abstract class EncryptionPluginBase : PipelinePluginBase, IDisposable
+    public abstract class EncryptionPluginBase : PipelinePluginBase
     {
         #region Configuration
 
@@ -3464,7 +3547,7 @@ namespace DataWarehouse.SDK.Contracts
 
         private bool _disposed;
 
-        protected virtual void Dispose(bool disposing)
+        protected override void Dispose(bool disposing)
         {
             if (_disposed) return;
 
@@ -3474,12 +3557,7 @@ namespace DataWarehouse.SDK.Contracts
             }
 
             _disposed = true;
-        }
-
-        public void Dispose()
-        {
-            Dispose(true);
-            GC.SuppressFinalize(this);
+            base.Dispose(disposing);
         }
 
         #endregion

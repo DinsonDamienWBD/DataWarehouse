@@ -743,23 +743,27 @@ public sealed class UltimateInterfacePlugin : IntelligenceAwareInterfacePluginBa
     /// <summary>
     /// Disposes resources.
     /// </summary>
-    public void Dispose()
+    protected override void Dispose(bool disposing)
     {
-        if (_disposed) return;
-        _disposed = true;
-
-        // Stop all running strategies
-        foreach (var strategy in _registry.GetAll())
+        if (disposing)
         {
+            if (_disposed) return;
+            _disposed = true;
+
+            // Stop all running strategies
+            foreach (var strategy in _registry.GetAll())
+            {
             try
             {
-                strategy.StopAsync().Wait(TimeSpan.FromSeconds(5));
+            strategy.StopAsync().Wait(TimeSpan.FromSeconds(5));
             }
             catch { /* Ignore disposal errors */ }
-        }
+            }
 
-        _usageStats.Clear();
-        _healthStatus.Clear();
+            _usageStats.Clear();
+            _healthStatus.Clear();
+        }
+        base.Dispose(disposing);
     }
 }
 

@@ -779,17 +779,21 @@ public sealed class UniversalDashboardsPlugin : IntelligenceAwarePluginBase, IDi
     /// <summary>
     /// Disposes resources.
     /// </summary>
-    public void Dispose()
+    protected override void Dispose(bool disposing)
     {
-        if (_disposed) return;
-        _disposed = true;
-
-        foreach (var strategy in _strategies.Values)
+        if (disposing)
         {
+            if (_disposed) return;
+            _disposed = true;
+
+            foreach (var strategy in _strategies.Values)
+            {
             strategy.Dispose();
+            }
+            _strategies.Clear();
+            _usageStats.Clear();
         }
-        _strategies.Clear();
-        _usageStats.Clear();
+        base.Dispose(disposing);
     }
 
     #endregion

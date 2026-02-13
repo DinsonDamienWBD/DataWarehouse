@@ -545,12 +545,16 @@ public sealed class UltimateServerlessPlugin : IntelligenceAwarePluginBase, IDis
     #endregion
 
     /// <inheritdoc/>
-    public void Dispose()
+    protected override void Dispose(bool disposing)
     {
-        if (_disposed) return;
-        _disposed = true;
-        _registeredFunctions.Clear();
-        _invocationHistory.Clear();
+        if (disposing)
+        {
+            if (_disposed) return;
+            _disposed = true;
+            _registeredFunctions.Clear();
+            _invocationHistory.Clear();
+        }
+        base.Dispose(disposing);
     }
 }
 

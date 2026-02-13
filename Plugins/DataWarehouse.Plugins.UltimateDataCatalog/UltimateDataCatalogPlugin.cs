@@ -469,14 +469,18 @@ public sealed class UltimateDataCatalogPlugin : IntelligenceAwareDataManagementP
     protected override Task OnStartCoreAsync(CancellationToken ct) => Task.CompletedTask;
 
     /// <summary>Disposes resources.</summary>
-    public void Dispose()
+    protected override void Dispose(bool disposing)
     {
-        if (_disposed) return;
-        _disposed = true;
-        _usageStats.Clear();
-        _assets.Clear();
-        _relationships.Clear();
-        _glossary.Clear();
+        if (disposing)
+        {
+            if (_disposed) return;
+            _disposed = true;
+            _usageStats.Clear();
+            _assets.Clear();
+            _relationships.Clear();
+            _glossary.Clear();
+        }
+        base.Dispose(disposing);
     }
 }
 

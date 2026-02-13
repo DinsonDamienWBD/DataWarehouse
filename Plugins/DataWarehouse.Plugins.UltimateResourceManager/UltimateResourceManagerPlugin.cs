@@ -534,12 +534,16 @@ public sealed class UltimateResourceManagerPlugin : FeaturePluginBase, IDisposab
     /// <summary>
     /// Disposes resources.
     /// </summary>
-    public void Dispose()
+    protected override void Dispose(bool disposing)
     {
-        if (_disposed) return;
-        _disposed = true;
-        _usageStats.Clear();
-        _quotas.Clear();
-        _activeAllocations.Clear();
+        if (disposing)
+        {
+            if (_disposed) return;
+            _disposed = true;
+            _usageStats.Clear();
+            _quotas.Clear();
+            _activeAllocations.Clear();
+        }
+        base.Dispose(disposing);
     }
 }

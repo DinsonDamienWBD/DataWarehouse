@@ -897,17 +897,21 @@ public sealed class WinFspDriverPlugin : FeaturePluginBase, IDisposable
     /// <summary>
     /// Disposes the plugin and all resources.
     /// </summary>
-    public void Dispose()
+    protected override void Dispose(bool disposing)
     {
-        if (_disposed)
+        if (disposing)
+        {
+            if (_disposed)
             return;
 
-        // Stop the plugin
-        StopAsync().Wait(TimeSpan.FromSeconds(30));
+            // Stop the plugin
+            StopAsync().Wait(TimeSpan.FromSeconds(30));
 
-        _bitLockerIntegration?.Dispose();
-        _mountLock.Dispose();
-        _disposed = true;
+            _bitLockerIntegration?.Dispose();
+            _mountLock.Dispose();
+            _disposed = true;
+        }
+        base.Dispose(disposing);
     }
 
     #endregion

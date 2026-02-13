@@ -28,7 +28,7 @@ namespace DataWarehouse.SDK.Database;
 ///          mysql://inventory/products/SKU123
 /// </summary>
 /// <typeparam name="TConfig">Configuration type for this database (e.g., RelationalDbConfig).</typeparam>
-public abstract class HybridDatabasePluginBase<TConfig> : IndexableStoragePluginBase, IAsyncDisposable
+public abstract class HybridDatabasePluginBase<TConfig> : IndexableStoragePluginBase
     where TConfig : DatabaseConfigBase, new()
 {
     protected readonly TConfig _config;
@@ -664,11 +664,15 @@ public abstract class HybridDatabasePluginBase<TConfig> : IndexableStoragePlugin
 
     #region IAsyncDisposable
 
-    public async ValueTask DisposeAsync()
+    /// <summary>
+    /// Performs async cleanup of database connections and locks.
+    /// </summary>
+    protected override async ValueTask DisposeAsyncCore()
     {
         await _connectionRegistry.DisposeAsync();
         _connectionLock.Dispose();
-        GC.SuppressFinalize(this);
+
+        await base.DisposeAsyncCore();
     }
 
     #endregion

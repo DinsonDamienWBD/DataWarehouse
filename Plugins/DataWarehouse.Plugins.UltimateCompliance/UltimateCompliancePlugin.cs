@@ -630,20 +630,24 @@ namespace DataWarehouse.Plugins.UltimateCompliance
         /// <summary>
         /// Disposes resources.
         /// </summary>
-        public void Dispose()
+        protected override void Dispose(bool disposing)
         {
-            if (_disposed)
+            if (disposing)
+            {
+                if (_disposed)
                 return;
 
-            _disposed = true;
+                _disposed = true;
 
-            foreach (var subscription in _subscriptions)
-            {
+                foreach (var subscription in _subscriptions)
+                {
                 subscription.Dispose();
-            }
-            _subscriptions.Clear();
+                }
+                _subscriptions.Clear();
 
-            _strategies.Clear();
+                _strategies.Clear();
+            }
+            base.Dispose(disposing);
         }
     }
 

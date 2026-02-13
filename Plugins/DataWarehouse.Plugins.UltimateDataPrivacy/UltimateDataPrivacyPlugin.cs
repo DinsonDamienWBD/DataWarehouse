@@ -396,13 +396,17 @@ public sealed class UltimateDataPrivacyPlugin : IntelligenceAwareDataManagementP
     protected override Task OnStartCoreAsync(CancellationToken ct) => Task.CompletedTask;
 
     /// <summary>Disposes resources.</summary>
-    public void Dispose()
+    protected override void Dispose(bool disposing)
     {
-        if (_disposed) return;
-        _disposed = true;
-        _usageStats.Clear();
-        _policies.Clear();
-        _consents.Clear();
+        if (disposing)
+        {
+            if (_disposed) return;
+            _disposed = true;
+            _usageStats.Clear();
+            _policies.Clear();
+            _consents.Clear();
+        }
+        base.Dispose(disposing);
     }
 }
 

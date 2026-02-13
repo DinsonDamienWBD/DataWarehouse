@@ -404,7 +404,7 @@ public sealed class UltimateDatabaseStoragePlugin : IntelligenceAwarePluginBase,
     /// <summary>
     /// Disposes the plugin and all its strategies.
     /// </summary>
-    public async ValueTask DisposeAsync()
+    protected override async ValueTask DisposeAsyncCore()
     {
         if (_disposed)
         {
@@ -426,6 +426,6 @@ public sealed class UltimateDatabaseStoragePlugin : IntelligenceAwarePluginBase,
         _strategyRegistry.Clear();
         _disposed = true;
 
-        GC.SuppressFinalize(this);
+        await base.DisposeAsyncCore();
     }
 }
