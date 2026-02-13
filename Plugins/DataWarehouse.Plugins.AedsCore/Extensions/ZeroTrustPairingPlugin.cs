@@ -11,7 +11,7 @@ namespace DataWarehouse.Plugins.AedsCore.Extensions;
 /// Zero-Trust Pairing Plugin: PIN-based client registration and trust elevation.
 /// Generates cryptographically secure 6-digit PINs valid for 5 minutes.
 /// </summary>
-public sealed class ZeroTrustPairingPlugin : FeaturePluginBase
+public sealed class ZeroTrustPairingPlugin : LegacyFeaturePluginBase
 {
     private readonly Dictionary<string, (string Pin, DateTimeOffset Expires)> _pendingPins = new();
 

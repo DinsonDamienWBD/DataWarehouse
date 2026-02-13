@@ -29,7 +29,7 @@ namespace DataWarehouse.Plugins.AedsCore;
 /// transport plugin to be registered. Gracefully degrades if specific transports are unavailable.
 /// </para>
 /// </remarks>
-public class AedsCorePlugin : FeaturePluginBase
+public class AedsCorePlugin : LegacyFeaturePluginBase
 {
     private readonly ILogger<AedsCorePlugin> _logger;
     private readonly Dictionary<string, IntentManifest> _manifestCache = new();

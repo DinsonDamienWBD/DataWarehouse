@@ -27,7 +27,7 @@ public record PredictedContent(
 /// Heuristic fallback: time-of-day patterns, historical frequency, user behavior analysis.
 /// AI delegation: publishes to UniversalIntelligence (T90) for ML-based predictions.
 /// </remarks>
-public sealed class PreCogPlugin : FeaturePluginBase
+public sealed class PreCogPlugin : LegacyFeaturePluginBase
 {
     private readonly ConcurrentDictionary<string, List<DateTimeOffset>> _downloadHistory = new();
     private readonly ConcurrentDictionary<string, int> _prefetchHits = new();

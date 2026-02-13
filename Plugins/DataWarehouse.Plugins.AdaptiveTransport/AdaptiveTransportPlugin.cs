@@ -35,7 +35,7 @@ namespace DataWarehouse.Plugins.AdaptiveTransport;
 /// - transport.config: Configure transport settings
 /// - transport.stats: Get transport statistics
 /// </summary>
-public sealed class AdaptiveTransportPlugin : FeaturePluginBase
+public sealed class AdaptiveTransportPlugin : LegacyFeaturePluginBase
 {
     private readonly ConcurrentDictionary<string, ConnectionPool> _connectionPools = new();
     private readonly ConcurrentDictionary<string, NetworkQualityMetrics> _endpointMetrics = new();

@@ -30,7 +30,7 @@ namespace DataWarehouse.Plugins.FuseDriver;
 /// - macOS: macFUSE 4.x (install from https://osxfuse.github.io/)
 /// - FreeBSD: FUSE for FreeBSD (optional)
 /// </remarks>
-public sealed class FuseDriverPlugin : FeaturePluginBase, IDisposable
+public sealed class FuseDriverPlugin : LegacyFeaturePluginBase, IDisposable
 {
     private FuseConfig _config;
     private FuseFileSystem? _fileSystem;

@@ -26,7 +26,7 @@ namespace DataWarehouse.Plugins.UltimateDataLineage;
 /// - Compliance-ready audit trails
 /// - Integration with UltimateIntelligence for semantic understanding
 /// </summary>
-public sealed class UltimateDataLineagePlugin : FeaturePluginBase, IDisposable
+public sealed class UltimateDataLineagePlugin : LegacyFeaturePluginBase, IDisposable
 {
     private readonly LineageStrategyRegistry _registry;
     private readonly ConcurrentDictionary<string, LineageNode> _nodes = new();

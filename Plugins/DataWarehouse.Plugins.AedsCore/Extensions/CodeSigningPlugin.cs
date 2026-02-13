@@ -20,7 +20,7 @@ public record VerificationResult(bool Valid, string Reason, string KeyId);
 /// Code Signing Plugin: Release key verification for Execute actions.
 /// Supports Ed25519, RSA-PSS-SHA256, ECDSA-P256-SHA256 with X.509 certificate chain validation.
 /// </summary>
-public sealed class CodeSigningPlugin : FeaturePluginBase
+public sealed class CodeSigningPlugin : LegacyFeaturePluginBase
 {
     /// <summary>
     /// Gets the plugin identifier.

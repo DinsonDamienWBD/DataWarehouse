@@ -775,7 +775,7 @@ public abstract class DatabaseStorageStrategyBase : StorageStrategyBase, IAsyncD
     /// <summary>
     /// Disposes resources used by this storage strategy.
     /// </summary>
-    public virtual void Dispose()
+    public new virtual void Dispose()
     {
         if (_isDisposed)
         {
@@ -791,7 +791,7 @@ public abstract class DatabaseStorageStrategyBase : StorageStrategyBase, IAsyncD
     /// <summary>
     /// Asynchronously disposes resources.
     /// </summary>
-    public async ValueTask DisposeAsync()
+    public new async ValueTask DisposeAsync()
     {
         if (_isDisposed)
         {
@@ -807,7 +807,7 @@ public abstract class DatabaseStorageStrategyBase : StorageStrategyBase, IAsyncD
     /// <summary>
     /// Core disposal logic. Override in derived classes to clean up resources.
     /// </summary>
-    protected virtual async ValueTask DisposeAsyncCore()
+    protected new virtual async ValueTask DisposeAsyncCore()
     {
         if (_isConnected)
         {

@@ -11,7 +11,7 @@ namespace DataWarehouse.Plugins.AedsCore.Extensions;
 /// Notification Plugin: Platform-specific toast/modal notifications.
 /// Supports Windows (native toast), Linux (libnotify), macOS (osascript).
 /// </summary>
-public sealed class NotificationPlugin : FeaturePluginBase
+public sealed class NotificationPlugin : LegacyFeaturePluginBase
 {
     /// <summary>
     /// Gets the plugin identifier.

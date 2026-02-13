@@ -29,7 +29,7 @@ namespace DataWarehouse.Plugins.UltimateResourceManager;
 /// - Preemption support for priority workloads
 /// - Carbon-aware scheduling integration
 /// </summary>
-public sealed class UltimateResourceManagerPlugin : FeaturePluginBase, IDisposable
+public sealed class UltimateResourceManagerPlugin : LegacyFeaturePluginBase, IDisposable
 {
     private readonly ResourceStrategyRegistry _registry;
     private readonly ConcurrentDictionary<string, ResourceQuota> _quotas = new();

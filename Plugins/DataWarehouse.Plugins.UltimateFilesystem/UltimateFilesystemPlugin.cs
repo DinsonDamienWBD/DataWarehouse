@@ -26,7 +26,7 @@ namespace DataWarehouse.Plugins.UltimateFilesystem;
 /// - Container mode for millions of small files
 /// - Integration with ResourceManager for I/O quotas
 /// </summary>
-public sealed class UltimateFilesystemPlugin : FeaturePluginBase, IDisposable
+public sealed class UltimateFilesystemPlugin : LegacyFeaturePluginBase, IDisposable
 {
     private readonly FilesystemStrategyRegistry _registry;
     private readonly ConcurrentDictionary<string, FilesystemMetadata> _mountCache = new();
