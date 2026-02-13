@@ -919,7 +919,7 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Honeypot
 
         #endregion
 
-        public void Dispose()
+        public new void Dispose()
         {
             if (_disposed) return;
             _disposed = true;

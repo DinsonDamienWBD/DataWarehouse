@@ -726,7 +726,7 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Core
 
         #endregion
 
-        public void Dispose()
+        public new void Dispose()
         {
             if (_disposed) return;
             _disposed = true;

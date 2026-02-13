@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using System.Diagnostics;
+using DataWarehouse.SDK.Contracts;
 
 namespace DataWarehouse.Plugins.UltimateDataManagement;
 
@@ -224,17 +225,22 @@ public interface IDataManagementStrategy
 /// Abstract base class for data management strategies.
 /// Provides common functionality including statistics tracking and validation.
 /// </summary>
-public abstract class DataManagementStrategyBase : IDataManagementStrategy
+public abstract class DataManagementStrategyBase : StrategyBase, IDataManagementStrategy
 {
     private readonly DataManagementStatistics _statistics = new();
     private readonly object _statsLock = new();
-    private bool _initialized;
+    private new bool _initialized;
 
     /// <inheritdoc/>
-    public abstract string StrategyId { get; }
+    public abstract override string StrategyId { get; }
 
     /// <inheritdoc/>
     public abstract string DisplayName { get; }
+
+    /// <summary>
+    /// Bridges StrategyBase.Name to the domain-specific DisplayName property.
+    /// </summary>
+    public override string Name => DisplayName;
 
     /// <inheritdoc/>
     public abstract DataManagementCategory Category { get; }
@@ -251,7 +257,7 @@ public abstract class DataManagementStrategyBase : IDataManagementStrategy
     /// <summary>
     /// Gets whether the strategy has been initialized.
     /// </summary>
-    protected bool IsInitialized => _initialized;
+    protected new bool IsInitialized => _initialized;
 
     /// <inheritdoc/>
     public DataManagementStatistics GetStatistics()
@@ -291,7 +297,7 @@ public abstract class DataManagementStrategyBase : IDataManagementStrategy
     }
 
     /// <inheritdoc/>
-    public virtual async Task InitializeAsync(CancellationToken ct = default)
+    public new virtual async Task InitializeAsync(CancellationToken ct = default)
     {
         if (_initialized) return;
         await InitializeCoreAsync(ct);
@@ -299,7 +305,7 @@ public abstract class DataManagementStrategyBase : IDataManagementStrategy
     }
 
     /// <inheritdoc/>
-    public virtual async Task DisposeAsync()
+    public new virtual async Task DisposeAsync()
     {
         if (!_initialized) return;
         await DisposeCoreAsync();

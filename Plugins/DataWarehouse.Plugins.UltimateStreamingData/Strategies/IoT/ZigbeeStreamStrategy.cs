@@ -346,7 +346,7 @@ internal sealed class ZigbeeStreamStrategy : StreamingDataStrategyBase, IStreami
     /// <summary>
     /// Configures Intelligence integration via message bus.
     /// </summary>
-    public void ConfigureIntelligence(IMessageBus? messageBus)
+    public override void ConfigureIntelligence(IMessageBus? messageBus)
     {
         // Intelligence can optimize mesh routing tables and device group assignments
     }

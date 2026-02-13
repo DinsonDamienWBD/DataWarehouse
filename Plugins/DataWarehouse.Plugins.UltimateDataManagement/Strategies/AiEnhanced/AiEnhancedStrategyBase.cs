@@ -207,7 +207,7 @@ public abstract class AiEnhancedStrategyBase : DataManagementStrategyBase, IAiEn
     /// <summary>
     /// Gets or sets the message bus for AI communication.
     /// </summary>
-    protected IMessageBus? MessageBus { get; set; }
+    protected new IMessageBus? MessageBus { get; set; }
 
     /// <summary>
     /// Gets or sets the default Intelligence context.

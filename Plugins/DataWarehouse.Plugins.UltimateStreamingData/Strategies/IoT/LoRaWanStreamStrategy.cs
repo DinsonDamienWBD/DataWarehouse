@@ -312,7 +312,7 @@ internal sealed class LoRaWanStreamStrategy : StreamingDataStrategyBase, IStream
     /// <summary>
     /// Configures Intelligence integration via message bus.
     /// </summary>
-    public void ConfigureIntelligence(IMessageBus? messageBus)
+    public override void ConfigureIntelligence(IMessageBus? messageBus)
     {
         // Intelligence can optimize ADR settings and downlink scheduling
     }

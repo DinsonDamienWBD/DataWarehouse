@@ -380,7 +380,7 @@ internal sealed class KafkaStreamStrategy : StreamingDataStrategyBase, IStreamin
     /// Configures Intelligence integration via message bus for AI-enhanced routing.
     /// </summary>
     /// <param name="messageBus">The message bus for cross-plugin communication.</param>
-    public void ConfigureIntelligence(IMessageBus? messageBus)
+    public override void ConfigureIntelligence(IMessageBus? messageBus)
     {
         // Wire message bus for intelligence-driven partition rebalancing
         // Intelligence can suggest optimal partition counts and consumer assignments

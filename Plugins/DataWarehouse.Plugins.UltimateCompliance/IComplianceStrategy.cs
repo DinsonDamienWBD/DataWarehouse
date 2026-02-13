@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
+using SdkStrategyBase = DataWarehouse.SDK.Contracts.StrategyBase;
 
 namespace DataWarehouse.Plugins.UltimateCompliance
 {
@@ -207,8 +208,10 @@ namespace DataWarehouse.Plugins.UltimateCompliance
 
     /// <summary>
     /// Base class for compliance strategies.
+    /// Inherits from <see cref="SdkStrategyBase"/> for unified strategy hierarchy (AD-05).
+    /// Uses alias to resolve name collision with SDK's ComplianceStrategyBase.
     /// </summary>
-    public abstract class ComplianceStrategyBase : IComplianceStrategy
+    public abstract class ComplianceStrategyBase : SdkStrategyBase, IComplianceStrategy
     {
         private long _totalChecks;
         private long _compliantCount;
@@ -219,8 +222,14 @@ namespace DataWarehouse.Plugins.UltimateCompliance
 
         protected Dictionary<string, object> Configuration { get; private set; } = new();
 
-        public abstract string StrategyId { get; }
+        public abstract override string StrategyId { get; }
         public abstract string StrategyName { get; }
+
+        /// <summary>
+        /// Bridges StrategyBase.Name to the domain-specific StrategyName property.
+        /// </summary>
+        public override string Name => StrategyName;
+
         public abstract string Framework { get; }
 
         public virtual Task InitializeAsync(Dictionary<string, object> configuration, CancellationToken cancellationToken = default)

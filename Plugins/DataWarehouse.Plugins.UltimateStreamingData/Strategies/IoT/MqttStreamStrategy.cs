@@ -349,7 +349,7 @@ internal sealed class MqttStreamStrategy : StreamingDataStrategyBase, IStreaming
     /// <summary>
     /// Configures Intelligence integration via message bus.
     /// </summary>
-    public void ConfigureIntelligence(IMessageBus? messageBus)
+    public override void ConfigureIntelligence(IMessageBus? messageBus)
     {
         // Intelligence can optimize QoS selection and topic hierarchy for IoT fleets
     }
