@@ -66,7 +66,7 @@ All 6 main phases and subphases from the original SDK_REFACTOR_PLAN.md are fully
 ### Phases
 
 - [x] **Phase 21.5: Pre-Execution Cleanup** - Consolidate duplicate types to SDK, standardize JSON serializer, add missing projects to solution, remove dead code
-- [ ] **Phase 22: Build Safety & Supply Chain** - Roslyn analyzers, TreatWarningsAsErrors rollout, SBOM, vulnerability audit, CLI fix
+- [x] **Phase 22: Build Safety & Supply Chain** - Roslyn analyzers, TreatWarningsAsErrors rollout, SBOM, vulnerability audit, CLI fix
 - [ ] **Phase 23: Memory Safety & Cryptographic Hygiene** - IDisposable patterns, secure memory wiping, bounded collections, constant-time comparisons, FIPS compliance
 - [ ] **Phase 24: Plugin Hierarchy, Storage Core & Input Validation** - Two-branch plugin hierarchy (DataPipeline + Feature), object storage core with translation layer, specialized bases to composable services, input validation (AD-01, AD-02, AD-03, AD-04)
 - [ ] **Phase 25a: Strategy Hierarchy Design & API Contracts** - Flat StrategyBase → domain bases (no intelligence layer), API contract safety (AD-05)
@@ -100,40 +100,40 @@ All 6 main phases and subphases from the original SDK_REFACTOR_PLAN.md are fully
 **Verified impact map (files that need updating):**
 ```
 CREATE:
-  DataWarehouse.SDK/Hosting/OperatingMode.cs      ← new file, Launcher values (Install/Connect/Embedded/Service)
-  DataWarehouse.SDK/Hosting/ConnectionTarget.cs    ← new file, Launcher values (Host/Port/LocalPath/AuthToken/UseTls/Timeout + factory methods)
-  DataWarehouse.SDK/Hosting/ConnectionType.cs      ← new file, Launcher values (Local/Remote/Cluster)
+  DataWarehouse.SDK/Hosting/OperatingMode.cs      <- new file, Launcher values (Install/Connect/Embedded/Service)
+  DataWarehouse.SDK/Hosting/ConnectionTarget.cs    <- new file, Launcher values (Host/Port/LocalPath/AuthToken/UseTls/Timeout + factory methods)
+  DataWarehouse.SDK/Hosting/ConnectionType.cs      <- new file, Launcher values (Local/Remote/Cluster)
   DataWarehouse.SDK/Hosting/InstallConfiguration.cs
   DataWarehouse.SDK/Hosting/EmbeddedConfiguration.cs
 
 UPDATE (change namespace import to DataWarehouse.SDK.Hosting):
-  DataWarehouse.Launcher/Integration/DataWarehouseHost.cs  ← uses all types
-  DataWarehouse.Launcher/Integration/InstanceConnection.cs ← uses ConnectionTarget, ConnectionType
+  DataWarehouse.Launcher/Integration/DataWarehouseHost.cs  <- uses all types
+  DataWarehouse.Launcher/Integration/InstanceConnection.cs <- uses ConnectionTarget, ConnectionType
   DataWarehouse.Launcher/Program.cs
   DataWarehouse.Launcher/Adapters/DataWarehouseAdapter.cs
-  DataWarehouse.CLI/Commands/ConnectCommand.cs     ← currently imports DataWarehouse.Integration (example code!)
-  DataWarehouse.CLI/Commands/InstallCommand.cs     ← currently imports DataWarehouse.Integration
-  DataWarehouse.CLI/Commands/EmbeddedCommand.cs    ← currently imports DataWarehouse.Integration
+  DataWarehouse.CLI/Commands/ConnectCommand.cs     <- currently imports DataWarehouse.Integration (example code!)
+  DataWarehouse.CLI/Commands/InstallCommand.cs     <- currently imports DataWarehouse.Integration
+  DataWarehouse.CLI/Commands/EmbeddedCommand.cs    <- currently imports DataWarehouse.Integration
   DataWarehouse.CLI/Commands/StorageCommands.cs
-  DataWarehouse.Shared/InstanceManager.cs          ← has its own ConnectionType/ConnectionTarget (replace entirely)
-  DataWarehouse.Shared/MessageBridge.cs            ← uses Shared's ConnectionType enum
+  DataWarehouse.Shared/InstanceManager.cs          <- has its own ConnectionType/ConnectionTarget (replace entirely)
+  DataWarehouse.Shared/MessageBridge.cs            <- uses Shared's ConnectionType enum
   DataWarehouse.GUI/Components/Pages/Connections.razor
 
-DELETE (dead code — completely unused):
-  DataWarehouse.CLI/Integration/OperatingMode.cs   ← never imported by any CLI command
-  DataWarehouse.CLI/Integration/IKernelAdapter.cs  ← dead code
-  DataWarehouse.CLI/Integration/AdapterFactory.cs  ← dead code
-  DataWarehouse.CLI/Integration/AdapterRunner.cs   ← dead code
-  DataWarehouse.Launcher/Integration/OperatingMode.cs  ← replaced by SDK version
+DELETE (dead code -- completely unused):
+  DataWarehouse.CLI/Integration/OperatingMode.cs   <- never imported by any CLI command
+  DataWarehouse.CLI/Integration/IKernelAdapter.cs  <- dead code
+  DataWarehouse.CLI/Integration/AdapterFactory.cs  <- dead code
+  DataWarehouse.CLI/Integration/AdapterRunner.cs   <- dead code
+  DataWarehouse.Launcher/Integration/OperatingMode.cs  <- replaced by SDK version
 
-UPDATE (example code — keep but change namespace):
-  Metadata/Adapter/OperatingMode.cs                ← update to use DataWarehouse.SDK.Hosting
-  Metadata/Adapter/DataWarehouseHost.cs            ← update to use DataWarehouse.SDK.Hosting
-  Metadata/Adapter/InstanceConnection.cs           ← update to use DataWarehouse.SDK.Hosting
+UPDATE (example code -- keep but change namespace):
+  Metadata/Adapter/OperatingMode.cs                <- update to use DataWarehouse.SDK.Hosting
+  Metadata/Adapter/DataWarehouseHost.cs            <- update to use DataWarehouse.SDK.Hosting
+  Metadata/Adapter/InstanceConnection.cs           <- update to use DataWarehouse.SDK.Hosting
 
 SPECIAL: DataWarehouse.Shared/InstanceManager.cs
-  - Remove inline ConnectionType enum (Local/Remote/InProcess → use SDK's Local/Remote/Cluster)
-  - Remove inline ConnectionTarget class (Address/Port → use SDK's Host/Port/LocalPath/etc.)
+  - Remove inline ConnectionType enum (Local/Remote/InProcess -> use SDK's Local/Remote/Cluster)
+  - Remove inline ConnectionTarget class (Address/Port -> use SDK's Host/Port/LocalPath/etc.)
   - Keep ConnectionProfile class (unique to Shared, not duplicated)
   - Adapt ConnectRemoteAsync/ConnectLocalAsync/ConnectInProcessAsync to use SDK ConnectionTarget
 ```
@@ -173,13 +173,13 @@ Plans:
   3. All public collections have configurable maximum sizes preventing unbounded memory growth
   4. All secret/hash comparisons use CryptographicOperations.FixedTimeEquals -- no timing side channels in authentication or verification paths
   5. All cryptographic random generation uses RandomNumberGenerator, never System.Random -- verified by BannedApiAnalyzers rule
-**Plans**: TBD (estimated 3-4 plans)
+**Plans**: 4 plans
 
 Plans:
-- [ ] 23-01: IDisposable/IAsyncDisposable on PluginBase with proper dispose pattern
-- [ ] 23-02: Secure memory wiping and buffer pooling across SDK
-- [ ] 23-03: Cryptographic hygiene audit (constant-time, RNG, FIPS compliance)
-- [ ] 23-04: Key rotation contracts and algorithm agility framework
+- [ ] 23-01-PLAN.md — IDisposable/IAsyncDisposable on PluginBase with proper dispose pattern (MEM-04, MEM-05)
+- [ ] 23-02-PLAN.md — Secure memory wiping, buffer pooling, bounded collections (MEM-01, MEM-02, MEM-03)
+- [ ] 23-03-PLAN.md — Cryptographic hygiene audit: constant-time comparisons, secure RNG, FIPS compliance (CRYPTO-01, CRYPTO-02, CRYPTO-05)
+- [ ] 23-04-PLAN.md — Key rotation contracts, algorithm agility, message authentication (CRYPTO-03, CRYPTO-04, CRYPTO-06)
 
 #### Phase 24: Plugin Hierarchy, Storage Core & Input Validation
 **Goal**: The plugin base class hierarchy follows the two-branch design (DataPipeline + Feature), object-based storage is the universal core with a path translation layer, specialized bases are extracted into composable services, and all boundaries validate inputs. See AD-01, AD-02, AD-03, AD-04.
