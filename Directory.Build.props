@@ -20,6 +20,9 @@
     <!-- Enforce code analysis -->
     <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
 
+    <!-- NuGet lock files for reproducible builds -->
+    <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
+
     <!-- Suppress warnings that are informational in a plugin-based architecture:
          CS0618: Obsolete API usage (intentional in backward-compat plugin code)
          CS0649: Field never assigned (plugin stub fields initialized at runtime)

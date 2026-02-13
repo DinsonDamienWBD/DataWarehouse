@@ -18,8 +18,8 @@
     <ProjectReference Include="..\..\DataWarehouse.SDK\DataWarehouse.SDK.csproj" />
   </ItemGroup>
   <ItemGroup>
-    <PackageReference Include="Grpc.Net.Client" Version="2.*" />
-    <PackageReference Include="SSH.NET" Version="*" />
-    <PackageReference Include="FluentFTP" Version="*" />
+    <PackageReference Include="Grpc.Net.Client" Version="2.76.0" />
+    <PackageReference Include="SSH.NET" Version="2025.1.0" />
+    <PackageReference Include="FluentFTP" Version="53.0.2" />
   </ItemGroup>
 </Project>

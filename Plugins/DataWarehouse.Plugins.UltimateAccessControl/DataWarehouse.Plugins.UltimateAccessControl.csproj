@@ -14,7 +14,7 @@
 
   <ItemGroup>
     <!-- Image processing for steganography -->
-    <PackageReference Include="SixLabors.ImageSharp" Version="3.1.*" />
+    <PackageReference Include="SixLabors.ImageSharp" Version="3.1.12" />
     <!-- Cryptographic operations -->
     <PackageReference Include="BouncyCastle.Cryptography" Version="2.6.2" />
     <!-- LDAP directory services -->
