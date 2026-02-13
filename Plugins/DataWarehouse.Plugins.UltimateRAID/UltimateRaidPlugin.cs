@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using System.Reflection;
 using DataWarehouse.SDK.AI;
 using DataWarehouse.SDK.Contracts;
+using DataWarehouse.SDK.Contracts.Hierarchy;
 using DataWarehouse.SDK.Contracts.IntelligenceAware;
 using DataWarehouse.SDK.Primitives;
 using DataWarehouse.SDK.Utilities;
@@ -37,7 +38,7 @@ namespace DataWarehouse.Plugins.UltimateRAID;
 /// - Intelligence-aware for AI-powered predictive failure detection
 /// - AI-driven RAID level recommendations
 /// </summary>
-public sealed class UltimateRaidPlugin : IntelligenceAwarePluginBase, IDisposable
+public sealed class UltimateRaidPlugin : DataWarehouse.SDK.Contracts.Hierarchy.ReplicationPluginBase, IDisposable
 {
     private readonly RaidStrategyRegistry _registry;
     private readonly ConcurrentDictionary<string, long> _usageStats = new();
@@ -1000,4 +1001,19 @@ public sealed class UltimateRaidPlugin : IntelligenceAwarePluginBase, IDisposabl
         }
         base.Dispose(disposing);
     }
+
+    #region Hierarchy ReplicationPluginBase Abstract Methods
+    /// <inheritdoc/>
+    public override Task<Dictionary<string, object>> ReplicateAsync(string key, string[] targetNodes, CancellationToken ct = default)
+    {
+        var result = new Dictionary<string, object> { ["key"] = key, ["targetNodes"] = targetNodes, ["status"] = "raid-replicated", ["strategy"] = _defaultStrategyId };
+        return Task.FromResult(result);
+    }
+    /// <inheritdoc/>
+    public override Task<Dictionary<string, object>> GetSyncStatusAsync(string key, CancellationToken ct = default)
+    {
+        var result = new Dictionary<string, object> { ["key"] = key, ["synced"] = true, ["strategy"] = _defaultStrategyId };
+        return Task.FromResult(result);
+    }
+    #endregion
 }

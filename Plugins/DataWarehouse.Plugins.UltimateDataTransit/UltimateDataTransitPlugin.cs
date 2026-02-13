@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Reflection;
 using DataWarehouse.SDK.Contracts;
+using DataWarehouse.SDK.Contracts.Hierarchy;
 using DataWarehouse.SDK.Contracts.Transit;
 using DataWarehouse.SDK.Primitives;
 using DataWarehouse.SDK.Utilities;
@@ -40,7 +41,7 @@ namespace DataWarehouse.Plugins.UltimateDataTransit;
 /// - Intelligence integration for AI-enhanced routing
 /// </para>
 /// </remarks>
-internal sealed class UltimateDataTransitPlugin : LegacyFeaturePluginBase, ITransitOrchestrator, IDisposable
+internal sealed class UltimateDataTransitPlugin : DataTransitPluginBase, ITransitOrchestrator, IDisposable
 {
     private readonly TransitStrategyRegistry _registry;
     private readonly ConcurrentDictionary<string, ActiveTransfer> _activeTransfers = new();
@@ -784,6 +785,29 @@ internal sealed class UltimateDataTransitPlugin : LegacyFeaturePluginBase, ITran
         }
         base.Dispose(disposing);
     }
+
+    #region Hierarchy DataTransitPluginBase Abstract Methods
+    /// <inheritdoc/>
+    public override Task<Dictionary<string, object>> TransferAsync(string key, Dictionary<string, object> target, CancellationToken ct = default)
+    {
+        var result = new Dictionary<string, object> { ["key"] = key, ["status"] = "delegated-to-strategy", ["target"] = target };
+        return Task.FromResult(result);
+    }
+    /// <inheritdoc/>
+    public override Task<Dictionary<string, object>> GetTransferStatusAsync(string transferId, CancellationToken ct = default)
+    {
+        var result = new Dictionary<string, object> { ["transferId"] = transferId };
+        if (_activeTransfers.TryGetValue(transferId, out var transfer))
+        {
+            result["status"] = "active";
+        }
+        else
+        {
+            result["status"] = "unknown";
+        }
+        return Task.FromResult(result);
+    }
+    #endregion
 }
 
 /// <summary>
