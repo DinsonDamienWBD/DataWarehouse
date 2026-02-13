@@ -5,17 +5,17 @@
 See: .planning/PROJECT.md (updated 2026-02-12)
 
 **Core value:** SDK must pass hyperscale/military-level code review -- clean hierarchy, secure by default, distributed-ready, zero warnings.
-**Current focus:** Phase 26 complete -- ready for Phase 27
+**Current focus:** Phase 27 complete -- ready for Phase 28
 
 ## Current Position
 
 Milestone: v2.0 SDK Hardening & Distributed Infrastructure
-Phase: 26 of 29 (Distributed Contracts & Resilience) -- COMPLETE
+Phase: 27 of 29 (Plugin Migration & Decoupling) -- COMPLETE
 Plan: 5 of 5 in current phase (all done)
 Status: Phase complete
-Last activity: 2026-02-14 -- Phase 26 complete (5/5 plans)
+Last activity: 2026-02-14 -- Phase 27 complete (5/5 plans)
 
-Progress: [####################] 90% (35/39 plans)
+Progress: [########################] 100% (40/40 plans)
 
 ## Performance Metrics
 
@@ -25,7 +25,7 @@ Progress: [####################] 90% (35/39 plans)
 - Timeline: 30 days (2026-01-13 to 2026-02-11)
 
 **v2.0:**
-- Total plans completed: 35 / 39 estimated
+- Total plans completed: 40 / 40 estimated
 - Average duration: ~11 min/plan
 
 | Phase | Plan | Duration | Tasks | Files |
@@ -64,6 +64,11 @@ Progress: [####################] 90% (35/39 plans)
 | 26 | 04 - Observability Contracts | ~4 min | 2 | 4 |
 | 26 | 02 - FederatedMessageBus & Multi-Phase Init | ~5 min | 2 | 4 |
 | 26 | 05 - In-Memory Implementations | ~8 min | 2 | 13 |
+| 27 | 01 - Re-parent SDK Intermediate Bases | ~15 min | 2 | 60 |
+| 27 | 02 - DataPipeline Plugin Migration | ~10 min | 2 | 10 |
+| 27 | 03 - Feature Plugin Migration | ~35 min | 2 | 32 |
+| 27 | 04 - Standalone & Special-Case Migration | ~15 min | 2 | 21 |
+| 27 | 05 - Decoupling Verification | ~5 min | 2 | 0 |
 
 ## Accumulated Context
 
@@ -114,6 +119,13 @@ Progress: [####################] 90% (35/39 plans)
 - ISdkActivitySource bridges to System.Diagnostics.ActivitySource (no NuGet needed)
 - 13 in-memory implementations for single-node: production-ready (Rule 13), bounded collections
 - Using aliases resolve type ambiguity (SyncResult, AuditEntry exist in multiple SDK namespaces)
+- Phase 27: PowerShell batch migration for 60+ intermediate bases and 78+ plugin classes
+- FQN for InterfacePluginBase and ReplicationPluginBase to avoid name collision with old SDK classes
+- AirGapBridge Category E: raw IFeaturePlugin -> InfrastructurePluginBase (most complex single migration)
+- StoragePluginBase exact signatures: StoreAsync returns Task<StorageObjectMetadata>, ListAsync returns IAsyncEnumerable, DeleteAsync returns Task (void)
+- NLP method migration: copied ParseIntentAsync/GenerateConversationResponseAsync/DetectLanguageAsync from old base to UltimateInterface plugin
+- 11 AEDS Extension plugins classified by domain: Security (3), Orchestration (2), DataManagement (4), Platform (2)
+- Zero LegacyFeaturePluginBase references across all 61 plugin projects after Phase 27
 
 ### SDK Audit Results (2026-02-14)
 
@@ -128,6 +140,7 @@ Progress: [####################] 90% (35/39 plans)
 - FIPS 140-3 verified: 100% .NET BCL crypto, zero BouncyCastle, zero custom crypto
 - 249 SDK .cs files | 1,400+ public types | 4 PackageReferences | 0 null! suppressions
 - Phase 26: 31 new files (18 contracts + 13 in-memory), 2 modified (PluginBase, InfrastructurePluginBases)
+- Phase 27: 0 new files, 123+ modified (60 SDK bases + 63 plugin files), zero LegacyFeaturePluginBase refs remain
 
 ### Blockers/Concerns
 
@@ -182,9 +195,16 @@ Progress: [####################] 90% (35/39 plans)
   - 26-02: IFederatedMessageBus + FederatedMessageBusBase, PluginBase.ActivateAsync, PluginBase.CheckHealthAsync
   - 26-05: 13 in-memory single-node implementations (all production-ready, bounded, thread-safe)
   - 4 deviations: XML cref fixes (Rule 1), SdkCompatibility on methods (Rule 1), HealthProviderPluginBase override (Rule 1), type ambiguity aliases (Rule 3)
+- [x] **Phase 27: Plugin Migration & Decoupling** (5/5 plans) -- Re-parent 60 SDK bases, migrate 78+ plugins to Hierarchy, zero cross-plugin deps verified
+  - 27-01: ~60 SDK intermediate bases re-parented from IntelligenceAware* to Hierarchy domain bases
+  - 27-02: 10 DataPipeline Ultimate plugins migrated (Encryption, Compression, Storage + 7 more)
+  - 27-03: 32 Feature-branch Ultimate plugins migrated across 10 domains (Security, Interface, DataMgmt, Compute, etc.)
+  - 27-04: AirGapBridge (Category E special case), 9 standalone + 11 AEDS Extension plugins migrated
+  - 27-05: All 8 verification checks PASS, zero LegacyFeaturePluginBase refs, zero new build errors
+  - 12 deviations: StreamingData stubs placement (Rule 1), Serverless stubs placement (Rule 1), AccessControl/Compliance Category (Rule 2), NLP method migration (Rule 3), TamperProof namespace (Rule 1), AdaptiveTransport stubs placement (Rule 1), StoragePluginBase signatures (Rule 1), DateTime fix (Rule 1), 11 AEDS plugins (Rule 2)
 
 ## Session Continuity
 
 Last session: 2026-02-14
-Stopped at: Completed Phase 26 (all 5 plans)
-Resume: `/gsd:plan-phase 27` or `/gsd:execute-phase 27`
+Stopped at: Completed Phase 27 (all 5 plans)
+Resume: `/gsd:plan-phase 28` or `/gsd:execute-phase 28`
