@@ -1,12 +1,9 @@
 using System.Collections.Concurrent;
 using System.Diagnostics;
 using DataWarehouse.SDK.AI;
-using DataWarehouse.SDK.AI.Knowledge;
 using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Utilities;
 using DataWarehouse.Plugins.UltimateIntelligence.Strategies.Features;
-
-using KnowledgeObject = DataWarehouse.SDK.AI.KnowledgeObject;
 
 namespace DataWarehouse.Plugins.UltimateIntelligence;
 

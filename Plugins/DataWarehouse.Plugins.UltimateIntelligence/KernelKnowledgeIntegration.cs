@@ -1,11 +1,8 @@
 using System.Collections.Concurrent;
 using DataWarehouse.SDK.AI;
-using DataWarehouse.SDK.AI.Knowledge;
 using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Utilities;
 
-// Use the KnowledgeObject from SDK.AI which is the main one used throughout the plugin
-using KnowledgeObject = DataWarehouse.SDK.AI.KnowledgeObject;
 using SdkKnowledgeQuery = DataWarehouse.SDK.Contracts.KnowledgeQuery;
 
 namespace DataWarehouse.Plugins.UltimateIntelligence;
