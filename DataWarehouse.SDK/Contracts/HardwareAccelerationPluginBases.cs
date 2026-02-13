@@ -9,6 +9,10 @@ using System.Threading.Tasks;
 
 using DataWarehouse.SDK.Contracts.Hierarchy;
 
+// FUTURE: Hardware acceleration -- interfaces preserved for TPM2, HSM, QAT, and GPU acceleration per AD-06.
+// These types have zero current implementations but define contracts for future
+// hardware-acceleration-capable storage plugins. Do NOT delete during dead code cleanup.
+
 namespace DataWarehouse.SDK.Contracts
 {
     /// <summary>

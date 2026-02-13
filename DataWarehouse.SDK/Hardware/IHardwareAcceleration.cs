@@ -1,6 +1,10 @@
 using System;
 using System.Threading.Tasks;
 
+// FUTURE: Hardware accelerator contracts -- interfaces preserved for pluggable hardware
+// acceleration (TPM2, HSM, QAT, GPU) per AD-06. These types have zero current implementations
+// but define contracts for future hardware-acceleration-capable plugins. Do NOT delete during dead code cleanup.
+
 namespace DataWarehouse.SDK.Hardware
 {
     /// <summary>
