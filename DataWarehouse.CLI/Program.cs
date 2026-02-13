@@ -2,8 +2,7 @@
 // Licensed under the Apache License, Version 2.0.
 
 using System.CommandLine;
-using System.CommandLine.Invocation;
-using System.CommandLine.NamingConventionBinder;
+using System.CommandLine.Parsing;
 using DataWarehouse.CLI.ShellCompletions;
 using DataWarehouse.SDK.AI;
 using DataWarehouse.Shared;
@@ -62,7 +61,7 @@ public static class Program
         }
 
         // Check for natural language mode (quoted argument)
-        if (args.Length == 1 && !args[0].StartsWith("-") && !args[0].Contains('.') && args[0].Contains(' '))
+        if (args.Length == 1 && !args[0].StartsWith('-') && !args[0].Contains('.') && args[0].Contains(' '))
         {
             return await HandleNaturalLanguageAsync(args[0], conversational);
         }
@@ -73,9 +72,10 @@ public static class Program
             return await RunInteractiveModeAsync();
         }
 
-        // Build the command-line parser
+        // Build the command-line parser and invoke
         var rootCommand = BuildRootCommand();
-        return rootCommand.Invoke(args);
+        var parseResult = rootCommand.Parse(args);
+        return await parseResult.InvokeAsync();
     }
 
     /// <summary>
@@ -240,42 +240,39 @@ public static class Program
         var rootCommand = new RootCommand("DataWarehouse CLI - Command-line interface for DataWarehouse management");
 
         // Global options
-        var verboseOption = new Option<bool>("--verbose", "Enable verbose output");
-        verboseOption.AddAlias("-v");
+        var verboseOption = new Option<bool>("--verbose", "-v") { Description = "Enable verbose output" };
 
-        var configOption = new Option<string?>("--config", "Path to configuration file");
-        configOption.AddAlias("-c");
+        var configOption = new Option<string?>("--config", "-c") { Description = "Path to configuration file" };
 
-        var formatOption = new Option<OutputFormat>("--format", () => OutputFormat.Table, "Output format (table, json, yaml, csv)");
-        formatOption.AddAlias("-f");
+        var formatOption = new Option<OutputFormat>("--format", "-f") { Description = "Output format (table, json, yaml, csv)", DefaultValueFactory = _ => OutputFormat.Table };
 
-        var instanceOption = new Option<string?>("--instance", "Saved instance profile to use");
-        instanceOption.AddAlias("-i");
+        var instanceOption = new Option<string?>("--instance", "-i") { Description = "Saved instance profile to use" };
 
-        rootCommand.Add(verboseOption);
-        rootCommand.Add(configOption);
-        rootCommand.Add(formatOption);
-        rootCommand.Add(instanceOption);
+        rootCommand.Options.Add(verboseOption);
+        rootCommand.Options.Add(configOption);
+        rootCommand.Options.Add(formatOption);
+        rootCommand.Options.Add(instanceOption);
 
         // Add command groups
-        rootCommand.Add(CreateStorageCommand(formatOption));
-        rootCommand.Add(CreateBackupCommand(formatOption));
-        rootCommand.Add(CreatePluginCommand(formatOption));
-        rootCommand.Add(CreateHealthCommand(formatOption));
-        rootCommand.Add(CreateConfigCommand(formatOption));
-        rootCommand.Add(CreateRaidCommand(formatOption));
-        rootCommand.Add(CreateAuditCommand(formatOption));
-        rootCommand.Add(CreateServerCommand(formatOption));
-        rootCommand.Add(CreateBenchmarkCommand(formatOption));
-        rootCommand.Add(CreateSystemCommand(formatOption));
-        rootCommand.Add(CreateCompletionsCommand());
-        rootCommand.Add(CreateInteractiveCommand());
-        rootCommand.Add(CreateConnectCommand());
+        rootCommand.Subcommands.Add(CreateStorageCommand(formatOption));
+        rootCommand.Subcommands.Add(CreateBackupCommand(formatOption));
+        rootCommand.Subcommands.Add(CreatePluginCommand(formatOption));
+        rootCommand.Subcommands.Add(CreateHealthCommand(formatOption));
+        rootCommand.Subcommands.Add(CreateConfigCommand(formatOption));
+        rootCommand.Subcommands.Add(CreateRaidCommand(formatOption));
+        rootCommand.Subcommands.Add(CreateAuditCommand(formatOption));
+        rootCommand.Subcommands.Add(CreateServerCommand(formatOption));
+        rootCommand.Subcommands.Add(CreateBenchmarkCommand(formatOption));
+        rootCommand.Subcommands.Add(CreateSystemCommand(formatOption));
+        rootCommand.Subcommands.Add(CreateCompletionsCommand());
+        rootCommand.Subcommands.Add(CreateInteractiveCommand());
+        rootCommand.Subcommands.Add(CreateConnectCommand());
 
         // Default handler
-        rootCommand.Handler = CommandHandler.Create(() =>
+        rootCommand.SetAction((ParseResult parseResult) =>
         {
             ShowWelcome();
+            return 0;
         });
 
         return rootCommand;
@@ -309,17 +306,17 @@ public static class Program
     {
         var command = new Command("storage", "Manage storage pools");
 
-        command.Add(CreateSubCommand("list", "List all storage pools", "storage.list", formatOption));
-        command.Add(CreateSubCommand("create", "Create a new storage pool", "storage.create", formatOption,
-            new Argument<string>("name", "Name of the storage pool"),
-            new Option<string>("--type", () => "Standard", "Pool type"),
-            new Option<long>("--capacity", () => 100L * 1024 * 1024 * 1024, "Capacity in bytes")));
-        command.Add(CreateSubCommand("delete", "Delete a storage pool", "storage.delete", formatOption,
-            new Argument<string>("id", "Storage pool ID"),
-            new Option<bool>("--force", "Force deletion")));
-        command.Add(CreateSubCommand("info", "Show pool information", "storage.info", formatOption,
-            new Argument<string>("id", "Storage pool ID")));
-        command.Add(CreateSubCommand("stats", "Show storage statistics", "storage.stats", formatOption));
+        command.Subcommands.Add(CreateSubCommand("list", "List all storage pools", "storage.list", formatOption));
+        command.Subcommands.Add(CreateSubCommand("create", "Create a new storage pool", "storage.create", formatOption,
+            MakeArg<string>("name", "Name of the storage pool"),
+            MakeOpt<string>("--type", "Pool type", "Standard"),
+            MakeOpt<long>("--capacity", "Capacity in bytes", 100L * 1024 * 1024 * 1024)));
+        command.Subcommands.Add(CreateSubCommand("delete", "Delete a storage pool", "storage.delete", formatOption,
+            MakeArg<string>("id", "Storage pool ID"),
+            MakeOpt<bool>("--force", "Force deletion")));
+        command.Subcommands.Add(CreateSubCommand("info", "Show pool information", "storage.info", formatOption,
+            MakeArg<string>("id", "Storage pool ID")));
+        command.Subcommands.Add(CreateSubCommand("stats", "Show storage statistics", "storage.stats", formatOption));
 
         return command;
     }
@@ -328,22 +325,22 @@ public static class Program
     {
         var command = new Command("backup", "Backup and restore operations");
 
-        command.Add(CreateSubCommand("create", "Create a backup", "backup.create", formatOption,
-            new Argument<string>("name", "Name of the backup"),
-            new Option<string?>("--destination", "Backup destination path"),
-            new Option<bool>("--incremental", "Create incremental backup"),
-            new Option<bool>("--compress", () => true, "Compress backup"),
-            new Option<bool>("--encrypt", "Encrypt backup")));
-        command.Add(CreateSubCommand("list", "List all backups", "backup.list", formatOption));
-        command.Add(CreateSubCommand("restore", "Restore from backup", "backup.restore", formatOption,
-            new Argument<string>("id", "Backup ID"),
-            new Option<string?>("--target", "Target restore location"),
-            new Option<bool>("--verify", () => true, "Verify after restore")));
-        command.Add(CreateSubCommand("verify", "Verify backup integrity", "backup.verify", formatOption,
-            new Argument<string>("id", "Backup ID")));
-        command.Add(CreateSubCommand("delete", "Delete a backup", "backup.delete", formatOption,
-            new Argument<string>("id", "Backup ID"),
-            new Option<bool>("--force", "Force deletion")));
+        command.Subcommands.Add(CreateSubCommand("create", "Create a backup", "backup.create", formatOption,
+            MakeArg<string>("name", "Name of the backup"),
+            MakeOpt<string?>("--destination", "Backup destination path"),
+            MakeOpt<bool>("--incremental", "Create incremental backup"),
+            MakeOpt<bool>("--compress", "Compress backup", true),
+            MakeOpt<bool>("--encrypt", "Encrypt backup")));
+        command.Subcommands.Add(CreateSubCommand("list", "List all backups", "backup.list", formatOption));
+        command.Subcommands.Add(CreateSubCommand("restore", "Restore from backup", "backup.restore", formatOption,
+            MakeArg<string>("id", "Backup ID"),
+            MakeOpt<string?>("--target", "Target restore location"),
+            MakeOpt<bool>("--verify", "Verify after restore", true)));
+        command.Subcommands.Add(CreateSubCommand("verify", "Verify backup integrity", "backup.verify", formatOption,
+            MakeArg<string>("id", "Backup ID")));
+        command.Subcommands.Add(CreateSubCommand("delete", "Delete a backup", "backup.delete", formatOption,
+            MakeArg<string>("id", "Backup ID"),
+            MakeOpt<bool>("--force", "Force deletion")));
 
         return command;
     }
@@ -352,16 +349,16 @@ public static class Program
     {
         var command = new Command("plugin", "Manage plugins");
 
-        command.Add(CreateSubCommand("list", "List all plugins", "plugin.list", formatOption,
-            new Option<string?>("--category", "Filter by category")));
-        command.Add(CreateSubCommand("info", "Show plugin details", "plugin.info", formatOption,
-            new Argument<string>("id", "Plugin ID")));
-        command.Add(CreateSubCommand("enable", "Enable a plugin", "plugin.enable", formatOption,
-            new Argument<string>("id", "Plugin ID")));
-        command.Add(CreateSubCommand("disable", "Disable a plugin", "plugin.disable", formatOption,
-            new Argument<string>("id", "Plugin ID")));
-        command.Add(CreateSubCommand("reload", "Reload a plugin", "plugin.reload", formatOption,
-            new Argument<string>("id", "Plugin ID")));
+        command.Subcommands.Add(CreateSubCommand("list", "List all plugins", "plugin.list", formatOption,
+            MakeOpt<string?>("--category", "Filter by category")));
+        command.Subcommands.Add(CreateSubCommand("info", "Show plugin details", "plugin.info", formatOption,
+            MakeArg<string>("id", "Plugin ID")));
+        command.Subcommands.Add(CreateSubCommand("enable", "Enable a plugin", "plugin.enable", formatOption,
+            MakeArg<string>("id", "Plugin ID")));
+        command.Subcommands.Add(CreateSubCommand("disable", "Disable a plugin", "plugin.disable", formatOption,
+            MakeArg<string>("id", "Plugin ID")));
+        command.Subcommands.Add(CreateSubCommand("reload", "Reload a plugin", "plugin.reload", formatOption,
+            MakeArg<string>("id", "Plugin ID")));
 
         return command;
     }
@@ -370,12 +367,12 @@ public static class Program
     {
         var command = new Command("health", "System health and monitoring");
 
-        command.Add(CreateSubCommand("status", "Show system health status", "health.status", formatOption));
-        command.Add(CreateSubCommand("metrics", "Show system metrics", "health.metrics", formatOption));
-        command.Add(CreateSubCommand("alerts", "Show active alerts", "health.alerts", formatOption,
-            new Option<bool>("--all", "Include acknowledged alerts")));
-        command.Add(CreateSubCommand("check", "Run health check", "health.check", formatOption,
-            new Option<string?>("--component", "Specific component to check")));
+        command.Subcommands.Add(CreateSubCommand("status", "Show system health status", "health.status", formatOption));
+        command.Subcommands.Add(CreateSubCommand("metrics", "Show system metrics", "health.metrics", formatOption));
+        command.Subcommands.Add(CreateSubCommand("alerts", "Show active alerts", "health.alerts", formatOption,
+            MakeOpt<bool>("--all", "Include acknowledged alerts")));
+        command.Subcommands.Add(CreateSubCommand("check", "Run health check", "health.check", formatOption,
+            MakeOpt<string?>("--component", "Specific component to check")));
 
         return command;
     }
@@ -384,18 +381,18 @@ public static class Program
     {
         var command = new Command("config", "Configuration management");
 
-        command.Add(CreateSubCommand("show", "Show current configuration", "config.show", formatOption,
-            new Option<string?>("--section", "Configuration section")));
-        command.Add(CreateSubCommand("set", "Set configuration value", "config.set", formatOption,
-            new Argument<string>("key", "Configuration key"),
-            new Argument<string>("value", "Configuration value")));
-        command.Add(CreateSubCommand("get", "Get configuration value", "config.get", formatOption,
-            new Argument<string>("key", "Configuration key")));
-        command.Add(CreateSubCommand("export", "Export configuration", "config.export", formatOption,
-            new Argument<string>("path", "Export file path")));
-        command.Add(CreateSubCommand("import", "Import configuration", "config.import", formatOption,
-            new Argument<string>("path", "Import file path"),
-            new Option<bool>("--merge", "Merge with existing config")));
+        command.Subcommands.Add(CreateSubCommand("show", "Show current configuration", "config.show", formatOption,
+            MakeOpt<string?>("--section", "Configuration section")));
+        command.Subcommands.Add(CreateSubCommand("set", "Set configuration value", "config.set", formatOption,
+            MakeArg<string>("key", "Configuration key"),
+            MakeArg<string>("value", "Configuration value")));
+        command.Subcommands.Add(CreateSubCommand("get", "Get configuration value", "config.get", formatOption,
+            MakeArg<string>("key", "Configuration key")));
+        command.Subcommands.Add(CreateSubCommand("export", "Export configuration", "config.export", formatOption,
+            MakeArg<string>("path", "Export file path")));
+        command.Subcommands.Add(CreateSubCommand("import", "Import configuration", "config.import", formatOption,
+            MakeArg<string>("path", "Import file path"),
+            MakeOpt<bool>("--merge", "Merge with existing config")));
 
         return command;
     }
@@ -404,17 +401,17 @@ public static class Program
     {
         var command = new Command("raid", "RAID management");
 
-        command.Add(CreateSubCommand("list", "List RAID configurations", "raid.list", formatOption));
-        command.Add(CreateSubCommand("create", "Create a RAID array", "raid.create", formatOption,
-            new Argument<string>("name", "Name of the RAID array"),
-            new Option<string>("--level", () => "5", "RAID level"),
-            new Option<int>("--disks", () => 4, "Number of disks"),
-            new Option<int>("--stripe-size", () => 64, "Stripe size in KB")));
-        command.Add(CreateSubCommand("status", "Show RAID status", "raid.status", formatOption,
-            new Argument<string>("id", "RAID array ID")));
-        command.Add(CreateSubCommand("rebuild", "Start RAID rebuild", "raid.rebuild", formatOption,
-            new Argument<string>("id", "RAID array ID")));
-        command.Add(CreateSubCommand("levels", "List supported RAID levels", "raid.levels", formatOption));
+        command.Subcommands.Add(CreateSubCommand("list", "List RAID configurations", "raid.list", formatOption));
+        command.Subcommands.Add(CreateSubCommand("create", "Create a RAID array", "raid.create", formatOption,
+            MakeArg<string>("name", "Name of the RAID array"),
+            MakeOpt<string>("--level", "RAID level", "5"),
+            MakeOpt<int>("--disks", "Number of disks", 4),
+            MakeOpt<int>("--stripe-size", "Stripe size in KB", 64)));
+        command.Subcommands.Add(CreateSubCommand("status", "Show RAID status", "raid.status", formatOption,
+            MakeArg<string>("id", "RAID array ID")));
+        command.Subcommands.Add(CreateSubCommand("rebuild", "Start RAID rebuild", "raid.rebuild", formatOption,
+            MakeArg<string>("id", "RAID array ID")));
+        command.Subcommands.Add(CreateSubCommand("levels", "List supported RAID levels", "raid.levels", formatOption));
 
         return command;
     }
@@ -423,16 +420,16 @@ public static class Program
     {
         var command = new Command("audit", "Audit log operations");
 
-        command.Add(CreateSubCommand("list", "List audit log entries", "audit.list", formatOption,
-            new Option<int>("--limit", () => 50, "Maximum entries"),
-            new Option<string?>("--category", "Filter by category"),
-            new Option<string?>("--user", "Filter by user"),
-            new Option<DateTime?>("--since", "Show entries since date")));
-        command.Add(CreateSubCommand("export", "Export audit log", "audit.export", formatOption,
-            new Argument<string>("path", "Export file path"),
-            new Option<string>("--format", () => "json", "Export format (json, csv)")));
-        command.Add(CreateSubCommand("stats", "Show audit statistics", "audit.stats", formatOption,
-            new Option<string>("--period", () => "24h", "Time period")));
+        command.Subcommands.Add(CreateSubCommand("list", "List audit log entries", "audit.list", formatOption,
+            MakeOpt<int>("--limit", "Maximum entries", 50),
+            MakeOpt<string?>("--category", "Filter by category"),
+            MakeOpt<string?>("--user", "Filter by user"),
+            MakeOpt<DateTime?>("--since", "Show entries since date")));
+        command.Subcommands.Add(CreateSubCommand("export", "Export audit log", "audit.export", formatOption,
+            MakeArg<string>("path", "Export file path"),
+            MakeOpt<string>("--format", "Export format (json, csv)", "json")));
+        command.Subcommands.Add(CreateSubCommand("stats", "Show audit statistics", "audit.stats", formatOption,
+            MakeOpt<string>("--period", "Time period", "24h")));
 
         return command;
     }
@@ -441,13 +438,13 @@ public static class Program
     {
         var command = new Command("server", "Server management");
 
-        command.Add(CreateSubCommand("start", "Start DataWarehouse server", "server.start", formatOption,
-            new Option<int>("--port", () => 5000, "Server port"),
-            new Option<string>("--mode", () => "Workstation", "Operating mode")));
-        command.Add(CreateSubCommand("stop", "Stop DataWarehouse server", "server.stop", formatOption,
-            new Option<bool>("--graceful", () => true, "Graceful shutdown")));
-        command.Add(CreateSubCommand("status", "Show server status", "server.status", formatOption));
-        command.Add(CreateSubCommand("info", "Show server information", "server.info", formatOption));
+        command.Subcommands.Add(CreateSubCommand("start", "Start DataWarehouse server", "server.start", formatOption,
+            MakeOpt<int>("--port", "Server port", 5000),
+            MakeOpt<string>("--mode", "Operating mode", "Workstation")));
+        command.Subcommands.Add(CreateSubCommand("stop", "Stop DataWarehouse server", "server.stop", formatOption,
+            MakeOpt<bool>("--graceful", "Graceful shutdown", true)));
+        command.Subcommands.Add(CreateSubCommand("status", "Show server status", "server.status", formatOption));
+        command.Subcommands.Add(CreateSubCommand("info", "Show server information", "server.info", formatOption));
 
         return command;
     }
@@ -456,12 +453,12 @@ public static class Program
     {
         var command = new Command("benchmark", "Performance benchmarks");
 
-        command.Add(CreateSubCommand("run", "Run benchmarks", "benchmark.run", formatOption,
-            new Option<string>("--type", () => "all", "Benchmark type"),
-            new Option<int>("--duration", () => 30, "Test duration in seconds"),
-            new Option<string>("--size", () => "1MB", "Test data size")));
-        command.Add(CreateSubCommand("report", "Show benchmark report", "benchmark.report", formatOption,
-            new Option<string?>("--id", "Specific benchmark ID")));
+        command.Subcommands.Add(CreateSubCommand("run", "Run benchmarks", "benchmark.run", formatOption,
+            MakeOpt<string>("--type", "Benchmark type", "all"),
+            MakeOpt<int>("--duration", "Test duration in seconds", 30),
+            MakeOpt<string>("--size", "Test data size", "1MB")));
+        command.Subcommands.Add(CreateSubCommand("report", "Show benchmark report", "benchmark.report", formatOption,
+            MakeOpt<string?>("--id", "Specific benchmark ID")));
 
         return command;
     }
@@ -470,11 +467,10 @@ public static class Program
     {
         var command = new Command("system", "System information");
 
-        command.Add(CreateSubCommand("info", "Get system information", "system.info", formatOption));
-        command.Add(CreateSubCommand("capabilities", "Get instance capabilities", "system.capabilities", formatOption));
-        var helpCommandArg = new Argument<string?>("command", "Command to get help for");
-        helpCommandArg.Arity = ArgumentArity.ZeroOrOne;
-        command.Add(CreateSubCommand("help", "Show help", "help", formatOption, helpCommandArg));
+        command.Subcommands.Add(CreateSubCommand("info", "Get system information", "system.info", formatOption));
+        command.Subcommands.Add(CreateSubCommand("capabilities", "Get instance capabilities", "system.capabilities", formatOption));
+        var helpCommandArg = new Argument<string?>("command") { Description = "Command to get help for", Arity = ArgumentArity.ZeroOrOne };
+        command.Subcommands.Add(CreateSubCommand("help", "Show help", "help", formatOption, helpCommandArg));
 
         return command;
     }
@@ -484,37 +480,41 @@ public static class Program
         var command = new Command("completions", "Generate shell completion scripts");
 
         var bashCmd = new Command("bash", "Generate bash completions");
-        bashCmd.Handler = CommandHandler.Create(() =>
+        bashCmd.SetAction((ParseResult parseResult) =>
         {
             var generator = new ShellCompletionGenerator(_executor!);
             Console.WriteLine(generator.Generate(ShellType.Bash));
+            return 0;
         });
 
         var zshCmd = new Command("zsh", "Generate zsh completions");
-        zshCmd.Handler = CommandHandler.Create(() =>
+        zshCmd.SetAction((ParseResult parseResult) =>
         {
             var generator = new ShellCompletionGenerator(_executor!);
             Console.WriteLine(generator.Generate(ShellType.Zsh));
+            return 0;
         });
 
         var fishCmd = new Command("fish", "Generate fish completions");
-        fishCmd.Handler = CommandHandler.Create(() =>
+        fishCmd.SetAction((ParseResult parseResult) =>
         {
             var generator = new ShellCompletionGenerator(_executor!);
             Console.WriteLine(generator.Generate(ShellType.Fish));
+            return 0;
         });
 
         var pwshCmd = new Command("powershell", "Generate PowerShell completions");
-        pwshCmd.Handler = CommandHandler.Create(() =>
+        pwshCmd.SetAction((ParseResult parseResult) =>
         {
             var generator = new ShellCompletionGenerator(_executor!);
             Console.WriteLine(generator.Generate(ShellType.PowerShell));
+            return 0;
         });
 
-        command.Add(bashCmd);
-        command.Add(zshCmd);
-        command.Add(fishCmd);
-        command.Add(pwshCmd);
+        command.Subcommands.Add(bashCmd);
+        command.Subcommands.Add(zshCmd);
+        command.Subcommands.Add(fishCmd);
+        command.Subcommands.Add(pwshCmd);
 
         return command;
     }
@@ -522,7 +522,11 @@ public static class Program
     private static Command CreateInteractiveCommand()
     {
         var command = new Command("interactive", "Run interactive mode");
-        command.Handler = CommandHandler.Create(async () => await RunInteractiveModeAsync());
+        command.SetAction(async (ParseResult parseResult, CancellationToken token) =>
+        {
+            await RunInteractiveModeAsync();
+            return 0;
+        });
         return command;
     }
 
@@ -530,16 +534,20 @@ public static class Program
     {
         var command = new Command("connect", "Connect to a DataWarehouse instance");
 
-        var hostOption = new Option<string?>("--host", "Remote host address");
-        var portOption = new Option<int>("--port", () => 8080, "Remote port");
-        var localPathOption = new Option<string?>("--local-path", "Path to local instance");
+        var hostOption = new Option<string?>("--host") { Description = "Remote host address" };
+        var portOption = new Option<int>("--port") { Description = "Remote port", DefaultValueFactory = _ => 8080 };
+        var localPathOption = new Option<string?>("--local-path") { Description = "Path to local instance" };
 
-        command.Add(hostOption);
-        command.Add(portOption);
-        command.Add(localPathOption);
+        command.Options.Add(hostOption);
+        command.Options.Add(portOption);
+        command.Options.Add(localPathOption);
 
-        command.Handler = CommandHandler.Create<string?, int, string?>(async (host, port, localPath) =>
+        command.SetAction(async (ParseResult parseResult, CancellationToken token) =>
         {
+            var host = parseResult.GetValue(hostOption);
+            var port = parseResult.GetValue(portOption);
+            var localPath = parseResult.GetValue(localPathOption);
+
             var connected = false;
 
             if (!string.IsNullOrEmpty(host))
@@ -564,10 +572,40 @@ public static class Program
             {
                 AnsiConsole.MarkupLine("[red]Failed to connect.[/]");
             }
+
+            return connected ? 0 : 1;
         });
 
         return command;
     }
+
+    #region Helper Methods
+
+    /// <summary>
+    /// Creates an Argument with the System.CommandLine 2.0 stable API.
+    /// </summary>
+    private static Argument<T> MakeArg<T>(string name, string description)
+    {
+        return new Argument<T>(name) { Description = description };
+    }
+
+    /// <summary>
+    /// Creates an Option with no default value using the System.CommandLine 2.0 stable API.
+    /// </summary>
+    private static Option<T> MakeOpt<T>(string name, string description)
+    {
+        return new Option<T>(name) { Description = description };
+    }
+
+    /// <summary>
+    /// Creates an Option with a default value using the System.CommandLine 2.0 stable API.
+    /// </summary>
+    private static Option<T> MakeOpt<T>(string name, string description, T defaultValue)
+    {
+        return new Option<T>(name) { Description = description, DefaultValueFactory = _ => defaultValue };
+    }
+
+    #endregion
 
     /// <summary>
     /// Creates a subcommand that delegates to the shared CommandExecutor.
@@ -588,43 +626,43 @@ public static class Program
         {
             if (symbol is Argument arg)
             {
-                command.Add(arg);
+                command.Arguments.Add(arg);
                 arguments.Add(arg);
             }
             else if (symbol is Option opt)
             {
-                command.Add(opt);
+                command.Options.Add(opt);
                 options.Add(opt);
             }
         }
 
-        command.Handler = CommandHandler.Create<InvocationContext>(async (context) =>
+        command.SetAction(async (ParseResult parseResult, CancellationToken token) =>
         {
             var parameters = new Dictionary<string, object?>();
 
-            // Extract argument values
+            // Extract argument values via ArgumentResult
             foreach (var arg in arguments)
             {
-                var value = context.ParseResult.GetValueForArgument(arg);
-                if (value != null)
+                var argResult = parseResult.GetResult(arg);
+                if (argResult != null && argResult.Tokens.Count > 0)
                 {
-                    parameters[arg.Name] = value;
+                    parameters[arg.Name] = argResult.Tokens[0].Value;
                 }
             }
 
-            // Extract option values
+            // Extract option values via OptionResult
             foreach (var opt in options)
             {
-                var value = context.ParseResult.GetValueForOption(opt);
-                if (value != null)
+                var optResult = parseResult.GetResult(opt);
+                if (optResult != null && optResult.Tokens.Count > 0)
                 {
-                    var optName = opt.Name.TrimStart('-').Replace("-", "");
-                    parameters[optName] = value;
+                    var optName = opt.Name.TrimStart('-').Replace("-", "", StringComparison.Ordinal);
+                    parameters[optName] = optResult.Tokens[0].Value;
                 }
             }
 
             // Get format
-            var format = context.ParseResult.GetValueForOption(formatOption);
+            var format = parseResult.GetValue(formatOption);
 
             // Execute command
             var result = await _executor!.ExecuteAsync(sharedCommandName, parameters);
@@ -632,7 +670,7 @@ public static class Program
 
             _history?.Add(sharedCommandName, parameters, result.Success);
 
-            context.ExitCode = result.ExitCode;
+            return result.ExitCode;
         });
 
         return command;
