@@ -3,8 +3,8 @@
     <!-- Enable nullable reference types across all projects -->
     <Nullable>enable</Nullable>
 
-    <!-- Treat nullable warnings as errors for production readiness -->
-    <WarningsAsErrors>nullable</WarningsAsErrors>
+    <!-- Treat ALL warnings as errors for production readiness (BUILD-01, BUILD-05) -->
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
 
     <!-- Enable latest C# language features -->
     <LangVersion>latest</LangVersion>
