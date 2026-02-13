@@ -8,7 +8,8 @@ namespace DataWarehouse.Plugins.UltimateDataProtection
 {
     /// <summary>
     /// Abstract base class for data protection strategies.
-    /// Provides common functionality including statistics tracking, Intelligence integration,
+    /// Inherits from <see cref="StrategyBase"/> for unified strategy hierarchy (AD-05).
+    /// Provides common functionality including statistics tracking, progress reporting,
     /// and standardized operation management.
     /// </summary>
     /// <remarks>
@@ -19,12 +20,11 @@ namespace DataWarehouse.Plugins.UltimateDataProtection
     /// <list type="bullet">
     ///   <item>Statistics tracking with thread-safe updates</item>
     ///   <item>Progress reporting infrastructure</item>
-    ///   <item>Intelligence integration for AI-driven recommendations</item>
-    ///   <item>Knowledge object generation for discovery</item>
-    ///   <item>Capability registration support</item>
+    ///   <item>MessageBus-based event publishing (guarded by IsIntelligenceAvailable)</item>
+    ///   <item>AI recommendation and anomaly detection requests</item>
     /// </list>
     /// </remarks>
-    public abstract class DataProtectionStrategyBase : IDataProtectionStrategy
+    public abstract class DataProtectionStrategyBase : StrategyBase, IDataProtectionStrategy
     {
         private readonly DataProtectionStatistics _statistics = new();
         private readonly object _statsLock = new();
@@ -34,19 +34,26 @@ namespace DataWarehouse.Plugins.UltimateDataProtection
 
         /// <summary>
         /// Message bus for Intelligence communication.
+        /// Hides StrategyBase.MessageBus to allow local assignment from ConfigureIntelligence.
         /// </summary>
-        protected IMessageBus? MessageBus { get; private set; }
+        protected new IMessageBus? MessageBus { get; private set; }
 
         /// <summary>
         /// Whether Intelligence integration is available.
+        /// Hides StrategyBase.IsIntelligenceAvailable to check local MessageBus.
         /// </summary>
-        protected bool IsIntelligenceAvailable => MessageBus != null;
+        protected new bool IsIntelligenceAvailable => MessageBus != null;
 
         /// <inheritdoc/>
-        public abstract string StrategyId { get; }
+        public abstract override string StrategyId { get; }
 
         /// <inheritdoc/>
         public abstract string StrategyName { get; }
+
+        /// <summary>
+        /// Bridges StrategyBase.Name to the domain-specific StrategyName property.
+        /// </summary>
+        public override string Name => StrategyName;
 
         /// <inheritdoc/>
         public abstract DataProtectionCategory Category { get; }
@@ -360,57 +367,11 @@ namespace DataWarehouse.Plugins.UltimateDataProtection
 
         #endregion
 
-        #region Intelligence Integration
+        // Intelligence boilerplate (ConfigureIntelligence, GetStrategyKnowledge, GetStrategyCapability)
+        // removed per AD-05 (Phase 25b). StrategyBase shim provides backward-compat.
+        // MessageBus/IsIntelligenceAvailable preserved locally for domain helpers below.
 
-        /// <summary>
-        /// Configures Intelligence integration for this strategy.
-        /// </summary>
-        /// <param name="messageBus">Message bus for AI communication.</param>
-        public virtual void ConfigureIntelligence(IMessageBus? messageBus)
-        {
-            MessageBus = messageBus;
-        }
-
-        /// <summary>
-        /// Gets static knowledge about this strategy for AI discovery.
-        /// </summary>
-        public virtual KnowledgeObject GetStrategyKnowledge()
-        {
-            return new KnowledgeObject
-            {
-                Id = $"dataprotection.strategy.{StrategyId}",
-                Topic = "dataprotection.strategies",
-                SourcePluginId = "com.datawarehouse.dataprotection.ultimate",
-                SourcePluginName = StrategyName,
-                KnowledgeType = "capability",
-                Description = GetStrategyDescription(),
-                Payload = GetKnowledgePayload(),
-                Tags = GetKnowledgeTags(),
-                Confidence = 1.0f,
-                Timestamp = DateTimeOffset.UtcNow
-            };
-        }
-
-        /// <summary>
-        /// Gets the registered capability for this strategy.
-        /// </summary>
-        public virtual RegisteredCapability GetStrategyCapability()
-        {
-            return new RegisteredCapability
-            {
-                CapabilityId = $"dataprotection.{StrategyId}",
-                DisplayName = StrategyName,
-                Description = GetStrategyDescription(),
-                Category = SDK.Contracts.CapabilityCategory.Custom,
-                SubCategory = "DataProtection",
-                PluginId = "com.datawarehouse.dataprotection.ultimate",
-                PluginName = "Ultimate Data Protection",
-                PluginVersion = "1.0.0",
-                Tags = GetKnowledgeTags(),
-                Metadata = GetCapabilityMetadata(),
-                SemanticDescription = GetSemanticDescription()
-            };
-        }
+        #region Intelligence Helpers
 
         /// <summary>
         /// Gets a description for this strategy.
