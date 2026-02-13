@@ -99,7 +99,7 @@ public class SecretReference
     /// </summary>
     public static SecretReference Parse(string uri)
     {
-        var match = Regex.Match(uri, @"^(?<provider>\w+)://(?<path>[^?]+)(?:\?(?<query>.+))?$");
+        var match = Regex.Match(uri, @"^(?<provider>\w+)://(?<path>[^?]+)(?:\?(?<query>.+))?$", RegexOptions.None, TimeSpan.FromMilliseconds(100));
         if (!match.Success)
             throw new ArgumentException($"Invalid secret reference URI: {uri}");
 

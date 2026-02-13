@@ -465,7 +465,7 @@ namespace DataWarehouse.SDK.Services
         private static void EnrichUploadCommand(ParsedCommand command, string input)
         {
             // Parse common upload patterns
-            var pathMatch = Regex.Match(input, @"(?:upload|send|put)\s+(?:file\s+)?[""']?([^""']+)[""']?\s+(?:to\s+)?(\w+)?", RegexOptions.IgnoreCase);
+            var pathMatch = Regex.Match(input, @"(?:upload|send|put)\s+(?:file\s+)?[""']?([^""']+)[""']?\s+(?:to\s+)?(\w+)?", RegexOptions.IgnoreCase, TimeSpan.FromMilliseconds(100));
             if (pathMatch.Success)
             {
                 if (!command.Parameters.ContainsKey("sourcePath"))
@@ -482,7 +482,7 @@ namespace DataWarehouse.SDK.Services
         {
             command.Parameters["searchType"] = "semantic";
             // Extract search terms from common patterns
-            var queryMatch = Regex.Match(input, @"(?:find|search|look for)\s+(?:documents?|files?)?\s*(?:about|for|containing|with)?\s*(.+)", RegexOptions.IgnoreCase);
+            var queryMatch = Regex.Match(input, @"(?:find|search|look for)\s+(?:documents?|files?)?\s*(?:about|for|containing|with)?\s*(.+)", RegexOptions.IgnoreCase, TimeSpan.FromMilliseconds(100));
             if (queryMatch.Success && !command.Parameters.ContainsKey("query"))
             {
                 command.Parameters["query"] = queryMatch.Groups[1].Value.Trim();

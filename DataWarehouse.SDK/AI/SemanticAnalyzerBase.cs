@@ -448,7 +448,7 @@ namespace DataWarehouse.SDK.AI
             var matches = new List<CategoryMatch>();
             var pattern = @"(\w+[\w\s]*):?\s*(\d*\.?\d+)";
 
-            foreach (Match match in Regex.Matches(response, pattern))
+            foreach (Match match in Regex.Matches(response, pattern, RegexOptions.None, TimeSpan.FromMilliseconds(100)))
             {
                 var categoryName = match.Groups[1].Value.Trim();
                 if (float.TryParse(match.Groups[2].Value, NumberStyles.Float, CultureInfo.InvariantCulture, out var confidence))
@@ -479,12 +479,12 @@ namespace DataWarehouse.SDK.AI
         // Standard entity patterns
         private static readonly Dictionary<string, Regex> EntityPatterns = new()
         {
-            ["EMAIL"] = new Regex(@"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b", RegexOptions.Compiled),
-            ["PHONE"] = new Regex(@"\b(?:\+?1[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}\b", RegexOptions.Compiled),
-            ["DATE"] = new Regex(@"\b(?:\d{1,2}[-/]\d{1,2}[-/]\d{2,4}|\d{4}[-/]\d{1,2}[-/]\d{1,2}|(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\.?\s+\d{1,2},?\s+\d{4})\b", RegexOptions.Compiled | RegexOptions.IgnoreCase),
-            ["URL"] = new Regex(@"\bhttps?://[^\s<>""]+\b", RegexOptions.Compiled),
-            ["MONEY"] = new Regex(@"\$\s*\d+(?:,\d{3})*(?:\.\d{2})?\b|\b\d+(?:,\d{3})*(?:\.\d{2})?\s*(?:USD|EUR|GBP|JPY)\b", RegexOptions.Compiled | RegexOptions.IgnoreCase),
-            ["PERCENTAGE"] = new Regex(@"\b\d+(?:\.\d+)?%\b", RegexOptions.Compiled)
+            ["EMAIL"] = new Regex(@"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b", RegexOptions.Compiled, TimeSpan.FromMilliseconds(100)),
+            ["PHONE"] = new Regex(@"\b(?:\+?1[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}\b", RegexOptions.Compiled, TimeSpan.FromMilliseconds(100)),
+            ["DATE"] = new Regex(@"\b(?:\d{1,2}[-/]\d{1,2}[-/]\d{2,4}|\d{4}[-/]\d{1,2}[-/]\d{1,2}|(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\.?\s+\d{1,2},?\s+\d{4})\b", RegexOptions.Compiled | RegexOptions.IgnoreCase, TimeSpan.FromMilliseconds(100)),
+            ["URL"] = new Regex(@"\bhttps?://[^\s<>""]+\b", RegexOptions.Compiled, TimeSpan.FromMilliseconds(100)),
+            ["MONEY"] = new Regex(@"\$\s*\d+(?:,\d{3})*(?:\.\d{2})?\b|\b\d+(?:,\d{3})*(?:\.\d{2})?\s*(?:USD|EUR|GBP|JPY)\b", RegexOptions.Compiled | RegexOptions.IgnoreCase, TimeSpan.FromMilliseconds(100)),
+            ["PERCENTAGE"] = new Regex(@"\b\d+(?:\.\d+)?%\b", RegexOptions.Compiled, TimeSpan.FromMilliseconds(100))
         };
 
         /// <inheritdoc/>
@@ -580,7 +580,7 @@ namespace DataWarehouse.SDK.AI
                 {
                     try
                     {
-                        var regex = new Regex(patternStr, RegexOptions.Compiled);
+                        var regex = new Regex(patternStr, RegexOptions.Compiled, TimeSpan.FromMilliseconds(100));
                         foreach (Match match in regex.Matches(content))
                         {
                             entities.Add(new ExtractedEntity
@@ -685,14 +685,14 @@ One entity per line.";
         // Standard PII patterns
         private static readonly Dictionary<PIIType, Regex> PIIPatterns = new()
         {
-            [PIIType.Email] = new Regex(@"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b", RegexOptions.Compiled),
-            [PIIType.Phone] = new Regex(@"\b(?:\+?1[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}\b", RegexOptions.Compiled),
-            [PIIType.SSN] = new Regex(@"\b\d{3}[-\s]?\d{2}[-\s]?\d{4}\b", RegexOptions.Compiled),
-            [PIIType.CreditCard] = new Regex(@"\b(?:\d{4}[-\s]?){3}\d{4}\b", RegexOptions.Compiled),
-            [PIIType.IPAddress] = new Regex(@"\b(?:\d{1,3}\.){3}\d{1,3}\b", RegexOptions.Compiled),
-            [PIIType.DateOfBirth] = new Regex(@"\b(?:DOB|Date of Birth|Birthday)[:\s]*\d{1,2}[-/]\d{1,2}[-/]\d{2,4}\b", RegexOptions.Compiled | RegexOptions.IgnoreCase),
-            [PIIType.DriversLicense] = new Regex(@"\b(?:DL|Driver'?s?\s*License)[:\s#]*[A-Z0-9]{5,15}\b", RegexOptions.Compiled | RegexOptions.IgnoreCase),
-            [PIIType.Passport] = new Regex(@"\b(?:Passport)[:\s#]*[A-Z0-9]{6,12}\b", RegexOptions.Compiled | RegexOptions.IgnoreCase)
+            [PIIType.Email] = new Regex(@"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b", RegexOptions.Compiled, TimeSpan.FromMilliseconds(100)),
+            [PIIType.Phone] = new Regex(@"\b(?:\+?1[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}\b", RegexOptions.Compiled, TimeSpan.FromMilliseconds(100)),
+            [PIIType.SSN] = new Regex(@"\b\d{3}[-\s]?\d{2}[-\s]?\d{4}\b", RegexOptions.Compiled, TimeSpan.FromMilliseconds(100)),
+            [PIIType.CreditCard] = new Regex(@"\b(?:\d{4}[-\s]?){3}\d{4}\b", RegexOptions.Compiled, TimeSpan.FromMilliseconds(100)),
+            [PIIType.IPAddress] = new Regex(@"\b(?:\d{1,3}\.){3}\d{1,3}\b", RegexOptions.Compiled, TimeSpan.FromMilliseconds(100)),
+            [PIIType.DateOfBirth] = new Regex(@"\b(?:DOB|Date of Birth|Birthday)[:\s]*\d{1,2}[-/]\d{1,2}[-/]\d{2,4}\b", RegexOptions.Compiled | RegexOptions.IgnoreCase, TimeSpan.FromMilliseconds(100)),
+            [PIIType.DriversLicense] = new Regex(@"\b(?:DL|Driver'?s?\s*License)[:\s#]*[A-Z0-9]{5,15}\b", RegexOptions.Compiled | RegexOptions.IgnoreCase, TimeSpan.FromMilliseconds(100)),
+            [PIIType.Passport] = new Regex(@"\b(?:Passport)[:\s#]*[A-Z0-9]{6,12}\b", RegexOptions.Compiled | RegexOptions.IgnoreCase, TimeSpan.FromMilliseconds(100))
         };
 
         /// <inheritdoc/>
@@ -736,7 +736,7 @@ One entity per line.";
                 {
                     try
                     {
-                        var regex = new Regex(customPattern.Pattern, RegexOptions.Compiled);
+                        var regex = new Regex(customPattern.Pattern, RegexOptions.Compiled, TimeSpan.FromMilliseconds(100));
                         foreach (Match match in regex.Matches(content))
                         {
                             var isValid = customPattern.Validator?.Invoke(match.Value) ?? true;
@@ -975,7 +975,7 @@ One per line.";
 
         private bool ValidateSSN(string value)
         {
-            var digits = Regex.Replace(value, @"[^\d]", "");
+            var digits = Regex.Replace(value, @"[^\d]", "", RegexOptions.None, TimeSpan.FromMilliseconds(100));
             if (digits.Length != 9) return false;
             // Reject known invalid patterns
             if (digits.StartsWith("000") || digits.StartsWith("666") || digits.StartsWith("9")) return false;
@@ -985,7 +985,7 @@ One per line.";
 
         private bool ValidateCreditCard(string value)
         {
-            var digits = Regex.Replace(value, @"[^\d]", "");
+            var digits = Regex.Replace(value, @"[^\d]", "", RegexOptions.None, TimeSpan.FromMilliseconds(100));
             if (digits.Length < 13 || digits.Length > 19) return false;
             // Luhn algorithm
             int sum = 0;
@@ -1225,7 +1225,7 @@ One per line.";
 
         private List<string> SplitSentences(string text)
         {
-            return Regex.Split(text, @"(?<=[.!?])\s+")
+            return Regex.Split(text, @"(?<=[.!?])\s+", RegexOptions.None, TimeSpan.FromMilliseconds(100))
                 .Where(s => !string.IsNullOrWhiteSpace(s) && s.Length > 10)
                 .ToList();
         }
@@ -1254,7 +1254,7 @@ One per line.";
         private IReadOnlyList<string> ExtractKeyPhrases(string content)
         {
             // Simple TF-based key phrase extraction
-            var words = Regex.Split(content.ToLowerInvariant(), @"\W+")
+            var words = Regex.Split(content.ToLowerInvariant(), @"\W+", RegexOptions.None, TimeSpan.FromMilliseconds(100))
                 .Where(w => w.Length > 3)
                 .GroupBy(w => w)
                 .OrderByDescending(g => g.Count())
@@ -1427,7 +1427,7 @@ One per line.";
             var languages = new List<DetectedLanguage>();
             var pattern = @"([a-z]{2})[:\s]+(\d+(?:\.\d+)?)[%]?";
 
-            foreach (Match match in Regex.Matches(response.ToLowerInvariant(), pattern))
+            foreach (Match match in Regex.Matches(response.ToLowerInvariant(), pattern, RegexOptions.None, TimeSpan.FromMilliseconds(100)))
             {
                 if (float.TryParse(match.Groups[2].Value, out var percentage))
                 {
@@ -1521,7 +1521,7 @@ One per line.";
         /// </summary>
         protected virtual SentimentResult AnalyzeSentimentLexicon(string content, SentimentOptions options)
         {
-            var words = Regex.Split(content.ToLowerInvariant(), @"\W+");
+            var words = Regex.Split(content.ToLowerInvariant(), @"\W+", RegexOptions.None, TimeSpan.FromMilliseconds(100));
             var totalScore = 0f;
             var matchCount = 0;
 
@@ -1570,11 +1570,11 @@ One per line.";
             else if (responseLower.Contains("positive"))
                 sentiment = Sentiment.Positive;
 
-            var scoreMatch = Regex.Match(response, @"score[:\s]+(-?\d+\.?\d*)", RegexOptions.IgnoreCase);
+            var scoreMatch = Regex.Match(response, @"score[:\s]+(-?\d+\.?\d*)", RegexOptions.IgnoreCase, TimeSpan.FromMilliseconds(100));
             if (scoreMatch.Success && float.TryParse(scoreMatch.Groups[1].Value, out var s))
                 score = Math.Clamp(s, -1f, 1f);
 
-            var confMatch = Regex.Match(response, @"confidence[:\s]+(\d+\.?\d*)", RegexOptions.IgnoreCase);
+            var confMatch = Regex.Match(response, @"confidence[:\s]+(\d+\.?\d*)", RegexOptions.IgnoreCase, TimeSpan.FromMilliseconds(100));
             if (confMatch.Success && float.TryParse(confMatch.Groups[1].Value, out var c))
                 confidence = Math.Clamp(c, 0f, 1f);
 
@@ -1703,7 +1703,7 @@ One per line.";
 
         private string NormalizeForComparison(string text)
         {
-            return Regex.Replace(text.ToLowerInvariant(), @"\s+", " ").Trim();
+            return Regex.Replace(text.ToLowerInvariant(), @"\s+", " ", RegexOptions.None, TimeSpan.FromMilliseconds(100)).Trim();
         }
 
         private float ComputeTextSimilarity(string text1, string text2)
@@ -1902,16 +1902,16 @@ Confidence: [0-1]";
                 intent = "aggregate";
 
             // Extract date ranges
-            var dateMatch = Regex.Match(query, @"(?:from|since|after)\s+(\d{4}[-/]\d{1,2}[-/]\d{1,2}|\w+\s+\d{4})", RegexOptions.IgnoreCase);
+            var dateMatch = Regex.Match(query, @"(?:from|since|after)\s+(\d{4}[-/]\d{1,2}[-/]\d{1,2}|\w+\s+\d{4})", RegexOptions.IgnoreCase, TimeSpan.FromMilliseconds(100));
             if (dateMatch.Success)
                 parameters["dateFrom"] = dateMatch.Groups[1].Value;
 
-            var dateToMatch = Regex.Match(query, @"(?:to|until|before)\s+(\d{4}[-/]\d{1,2}[-/]\d{1,2}|\w+\s+\d{4})", RegexOptions.IgnoreCase);
+            var dateToMatch = Regex.Match(query, @"(?:to|until|before)\s+(\d{4}[-/]\d{1,2}[-/]\d{1,2}|\w+\s+\d{4})", RegexOptions.IgnoreCase, TimeSpan.FromMilliseconds(100));
             if (dateToMatch.Success)
                 parameters["dateTo"] = dateToMatch.Groups[1].Value;
 
             // Extract filters
-            var filterMatch = Regex.Match(query, @"(?:where|with|containing)\s+(.+?)(?:\s+and|\s*$)", RegexOptions.IgnoreCase);
+            var filterMatch = Regex.Match(query, @"(?:where|with|containing)\s+(.+?)(?:\s+and|\s*$)", RegexOptions.IgnoreCase, TimeSpan.FromMilliseconds(100));
             if (filterMatch.Success)
                 parameters["filter"] = filterMatch.Groups[1].Value.Trim();
 
@@ -1955,15 +1955,15 @@ Answer this question in a clear, concise way:
             var confidence = 0.5f;
             var parameters = new Dictionary<string, object>();
 
-            var intentMatch = Regex.Match(response, @"intent[:\s]+(\w+)", RegexOptions.IgnoreCase);
+            var intentMatch = Regex.Match(response, @"intent[:\s]+(\w+)", RegexOptions.IgnoreCase, TimeSpan.FromMilliseconds(100));
             if (intentMatch.Success)
                 intent = intentMatch.Groups[1].Value.ToLowerInvariant();
 
-            var confMatch = Regex.Match(response, @"confidence[:\s]+(\d+\.?\d*)", RegexOptions.IgnoreCase);
+            var confMatch = Regex.Match(response, @"confidence[:\s]+(\d+\.?\d*)", RegexOptions.IgnoreCase, TimeSpan.FromMilliseconds(100));
             if (confMatch.Success && float.TryParse(confMatch.Groups[1].Value, out var c))
                 confidence = Math.Clamp(c, 0f, 1f);
 
-            var paramsMatch = Regex.Match(response, @"parameters[:\s]+(.+?)(?:\n|$)", RegexOptions.IgnoreCase);
+            var paramsMatch = Regex.Match(response, @"parameters[:\s]+(.+?)(?:\n|$)", RegexOptions.IgnoreCase, TimeSpan.FromMilliseconds(100));
             if (paramsMatch.Success)
             {
                 var pairs = paramsMatch.Groups[1].Value.Split(',');

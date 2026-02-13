@@ -241,7 +241,7 @@ public sealed class SmartFolderService : IDisposable
             var name = nameObj?.ToString() ?? "";
             var regex = new Regex(
                 "^" + Regex.Escape(criteria.NamePattern).Replace("\\*", ".*").Replace("\\?", ".") + "$",
-                RegexOptions.IgnoreCase);
+                RegexOptions.IgnoreCase, TimeSpan.FromMilliseconds(100));
 
             if (!regex.IsMatch(name))
                 return false;
@@ -265,7 +265,7 @@ public sealed class SmartFolderService : IDisposable
             ConditionOperator.LessThan => CompareNumeric(value, condition.Value) < 0,
             ConditionOperator.Exists => true,
             ConditionOperator.NotExists => false,
-            ConditionOperator.Regex => Regex.IsMatch(stringValue, condition.Value?.ToString() ?? ""),
+            ConditionOperator.Regex => Regex.IsMatch(stringValue, condition.Value?.ToString() ?? "", RegexOptions.None, TimeSpan.FromMilliseconds(100)),
             _ => false
         };
     }

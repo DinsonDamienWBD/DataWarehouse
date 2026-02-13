@@ -3636,7 +3636,7 @@ namespace DataWarehouse.SDK.Contracts.IntelligenceAware
         /// </summary>
         private static string ComputeQueryHash(string query)
         {
-            var normalizedQuery = System.Text.RegularExpressions.Regex.Replace(query.Trim().ToLowerInvariant(), @"\s+", " ");
+            var normalizedQuery = System.Text.RegularExpressions.Regex.Replace(query.Trim().ToLowerInvariant(), @"\s+", " ", System.Text.RegularExpressions.RegexOptions.None, TimeSpan.FromMilliseconds(100));
             var hashBytes = System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(normalizedQuery));
             return Convert.ToHexString(hashBytes)[..16];
         }

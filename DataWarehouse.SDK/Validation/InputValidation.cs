@@ -455,7 +455,7 @@ public static class SecurityRules
 
         if (options.HasFlag(SanitizationOptions.RemoveScriptTags))
         {
-            result = Regex.Replace(result, @"<script[^>]*>.*?</script>", "", RegexOptions.IgnoreCase | RegexOptions.Singleline);
+            result = Regex.Replace(result, @"<script[^>]*>.*?</script>", "", RegexOptions.IgnoreCase | RegexOptions.Singleline, TimeSpan.FromMilliseconds(100));
         }
 
         if (options.HasFlag(SanitizationOptions.RemoveNullBytes))
