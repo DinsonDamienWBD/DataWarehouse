@@ -333,4 +333,60 @@ namespace DataWarehouse.SDK.AI
         /// </summary>
         public Dictionary<string, object>? Metadata { get; init; }
     }
+
+    /// <summary>
+    /// Describes a plugin capability for AI-driven discovery and invocation.
+    /// </summary>
+    public sealed record KnowledgeCapability
+    {
+        /// <summary>Unique capability identifier (e.g., "semantic.search", "data.compress").</summary>
+        public required string CapabilityId { get; init; }
+
+        /// <summary>Human-readable description of what this capability does.</summary>
+        public required string Description { get; init; }
+
+        /// <summary>Category for semantic grouping.</summary>
+        public string? Category { get; init; }
+
+        /// <summary>Parameter schema (JSON Schema or custom format).</summary>
+        public Dictionary<string, KnowledgeParameterDescriptor> Parameters { get; init; } = new();
+
+        /// <summary>Expected return type description.</summary>
+        public string? ReturnType { get; init; }
+
+        /// <summary>Examples of how to invoke this capability.</summary>
+        public List<KnowledgeCapabilityExample> Examples { get; init; } = new();
+
+        /// <summary>Whether this capability requires explicit user approval.</summary>
+        public bool RequiresApproval { get; init; }
+
+        /// <summary>Estimated execution time range.</summary>
+        public TimeSpan? TypicalDuration { get; init; }
+
+        /// <summary>Tags for semantic search and filtering.</summary>
+        public List<string> Tags { get; init; } = new();
+    }
+
+    /// <summary>
+    /// Describes a parameter for a knowledge capability.
+    /// </summary>
+    public sealed record KnowledgeParameterDescriptor
+    {
+        public required string Name { get; init; }
+        public required string Type { get; init; }
+        public string? Description { get; init; }
+        public bool Required { get; init; }
+        public object? DefaultValue { get; init; }
+        public object? Constraints { get; init; }
+    }
+
+    /// <summary>
+    /// Example invocation of a knowledge capability.
+    /// </summary>
+    public sealed record KnowledgeCapabilityExample
+    {
+        public required string Description { get; init; }
+        public Dictionary<string, object> Parameters { get; init; } = new();
+        public object? ExpectedResult { get; init; }
+    }
 }

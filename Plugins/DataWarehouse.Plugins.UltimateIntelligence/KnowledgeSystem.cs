@@ -3,12 +3,10 @@ using System.Diagnostics;
 using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
-using DataWarehouse.SDK.AI.Knowledge;
+using DataWarehouse.SDK.AI;
 using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Utilities;
 
-// Alias to resolve ambiguity between SDK.AI.KnowledgeObject and SDK.AI.Knowledge.KnowledgeObject
-using KnowledgeObject = DataWarehouse.SDK.AI.KnowledgeObject;
 using SdkKnowledgeRequest = DataWarehouse.SDK.AI.KnowledgeRequest;
 using SdkKnowledgeResponse = DataWarehouse.SDK.AI.KnowledgeResponse;
 using SdkKnowledgeQuery = DataWarehouse.SDK.Contracts.KnowledgeQuery;
