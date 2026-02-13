@@ -1,0 +1,17 @@
+# BannedSymbols.txt - DataWarehouse SDK
+# Phase 22: Minimal initial set targeting clearly dangerous APIs
+# Expand in future phases (Phase 23: Cryptographic Hygiene)
+
+# Deprecated Cryptographic Algorithms (broken, must not use)
+T:System.Security.Cryptography.MD5; Use SHA256 or higher - MD5 is cryptographically broken
+T:System.Security.Cryptography.SHA1; Use SHA256 or higher - SHA1 has known collision attacks
+T:System.Security.Cryptography.DES; Use AES-256 - DES key size is insufficient
+T:System.Security.Cryptography.TripleDES; Use AES-256 - 3DES is deprecated by NIST
+
+# Deprecated Security Types
+T:System.Security.SecureString; Deprecated in .NET Core+ - use CryptographicOperations.ZeroMemory instead
+
+# Insecure Random Number Generation (for security-sensitive contexts)
+# NOTE: System.Random is used legitimately in non-security contexts (benchmarks, tests, simulations)
+# Phase 23 will add BannedApiAnalyzers rules scoped to security-sensitive namespaces
+# For now, this is documented but NOT banned globally to avoid false positives
