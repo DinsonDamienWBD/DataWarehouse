@@ -9,8 +9,9 @@ namespace DataWarehouse.Plugins.UltimateCompute;
 
 /// <summary>
 /// Abstract base class for all compute runtime strategies in the UltimateCompute plugin.
-/// Provides CLI process execution, timing measurement, Intelligence integration, and
-/// standard error handling for all runtime implementations.
+/// Inherits from <see cref="StrategyBase"/> for unified strategy hierarchy (AD-05).
+/// Provides CLI process execution, timing measurement, and standard error handling
+/// for all runtime implementations.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -19,22 +20,25 @@ namespace DataWarehouse.Plugins.UltimateCompute;
 /// <list type="bullet">
 /// <item><description>CLI process runner via <see cref="RunProcessAsync"/> for invoking external runtimes</description></item>
 /// <item><description>Execution timing via <see cref="MeasureExecutionAsync"/> wrapping Stopwatch</description></item>
-/// <item><description>Intelligence integration via <see cref="ConfigureIntelligence"/> and message bus</description></item>
-/// <item><description>Knowledge and capability registration for AI discovery</description></item>
 /// <item><description>Standard error handling patterns for ComputeResult creation</description></item>
 /// </list>
 /// </remarks>
-internal abstract class ComputeRuntimeStrategyBase : IComputeRuntimeStrategy
+internal abstract class ComputeRuntimeStrategyBase : StrategyBase, IComputeRuntimeStrategy
 {
     /// <summary>
     /// Gets the unique strategy identifier used for registry lookup.
     /// </summary>
-    public abstract string StrategyId { get; }
+    public abstract override string StrategyId { get; }
 
     /// <summary>
     /// Gets the human-readable display name for this strategy.
     /// </summary>
     public abstract string StrategyName { get; }
+
+    /// <summary>
+    /// Bridges StrategyBase.Name to the domain-specific StrategyName property.
+    /// </summary>
+    public override string Name => StrategyName;
 
     /// <inheritdoc/>
     public abstract ComputeRuntime Runtime { get; }
@@ -49,7 +53,7 @@ internal abstract class ComputeRuntimeStrategyBase : IComputeRuntimeStrategy
     public abstract Task<ComputeResult> ExecuteAsync(ComputeTask task, CancellationToken cancellationToken = default);
 
     /// <inheritdoc/>
-    public virtual Task InitializeAsync(CancellationToken cancellationToken = default)
+    public new virtual Task InitializeAsync(CancellationToken cancellationToken = default)
     {
         return Task.CompletedTask;
     }
@@ -236,74 +240,9 @@ internal abstract class ComputeRuntimeStrategyBase : IComputeRuntimeStrategy
 
     #endregion
 
-    #region Intelligence Integration
-
-    /// <summary>
-    /// Message bus reference for Intelligence communication.
-    /// </summary>
-    protected IMessageBus? MessageBus { get; private set; }
-
-    /// <summary>
-    /// Configures Intelligence integration for this strategy via the message bus.
-    /// Called by the plugin orchestrator during startup.
-    /// </summary>
-    /// <param name="messageBus">The message bus instance, or null if Intelligence is unavailable.</param>
-    public void ConfigureIntelligence(IMessageBus? messageBus)
-    {
-        MessageBus = messageBus;
-    }
-
-    /// <summary>
-    /// Gets whether Intelligence is available for enhanced decision-making.
-    /// </summary>
-    protected bool IsIntelligenceAvailable => MessageBus != null;
-
-    /// <summary>
-    /// Gets static knowledge about this strategy for AI discovery.
-    /// </summary>
-    /// <returns>A <see cref="KnowledgeObject"/> describing this strategy's capabilities.</returns>
-    public virtual KnowledgeObject GetStrategyKnowledge()
-    {
-        return new KnowledgeObject
-        {
-            Id = $"compute.strategy.{StrategyId}",
-            Topic = "compute-runtime",
-            SourcePluginId = "com.datawarehouse.compute.ultimate",
-            SourcePluginName = StrategyName,
-            KnowledgeType = "capability",
-            Description = $"{StrategyName} compute runtime strategy",
-            Payload = new Dictionary<string, object>
-            {
-                ["runtime"] = Runtime.ToString(),
-                ["supportsStreaming"] = Capabilities.SupportsStreaming,
-                ["supportsSandboxing"] = Capabilities.SupportsSandboxing,
-                ["supportsMultiThreading"] = Capabilities.SupportsMultiThreading,
-                ["memoryIsolation"] = Capabilities.MemoryIsolation.ToString()
-            },
-            Tags = ["compute", "runtime", Runtime.ToString().ToLowerInvariant(), StrategyId]
-        };
-    }
-
-    /// <summary>
-    /// Gets the registered capability descriptor for this strategy.
-    /// </summary>
-    /// <returns>A <see cref="RegisteredCapability"/> for capability registry integration.</returns>
-    public virtual RegisteredCapability GetStrategyCapability()
-    {
-        return new RegisteredCapability
-        {
-            CapabilityId = $"compute.{StrategyId}",
-            DisplayName = StrategyName,
-            Description = $"{StrategyName} compute runtime strategy for {Runtime} execution",
-            Category = SDK.Contracts.CapabilityCategory.Compute,
-            PluginId = "com.datawarehouse.compute.ultimate",
-            PluginName = "Ultimate Compute",
-            PluginVersion = "1.0.0",
-            Tags = ["compute", "runtime", Runtime.ToString().ToLowerInvariant()]
-        };
-    }
-
-    #endregion
+    // Intelligence boilerplate removed per AD-05 (Phase 25b).
+    // ConfigureIntelligence, GetStrategyKnowledge, GetStrategyCapability, MessageBus,
+    // IsIntelligenceAvailable are now provided by StrategyBase backward-compat shim.
 
     #region Helper Methods
 
