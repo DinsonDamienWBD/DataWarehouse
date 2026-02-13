@@ -754,7 +754,7 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Innovations
             using var hmac = new HMACSHA256(keys.ProofKey);
             var expectedProof = hmac.ComputeHash(commitment.ProofReference.MerkleRoot);
 
-            return expectedProof.SequenceEqual(commitment.ProofReference.ProofValue);
+            return expectedProof.Length == commitment.ProofReference.ProofValue.Length && CryptographicOperations.FixedTimeEquals(expectedProof, commitment.ProofReference.ProofValue);
         }
 
         private Task<bool> VerifyCommitmentIntegrityAsync(CommitmentProof commitment, CancellationToken ct)

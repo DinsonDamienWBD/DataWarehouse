@@ -604,26 +604,22 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement
         {
             if (disposing)
             {
-                if (_disposed)
-                return;
-
+                if (_disposed) return;
                 _disposed = true;
 
                 StopAsync().GetAwaiter().GetResult();
 
                 foreach (var strategy in _strategies.Values)
                 {
-                if (strategy is IDisposable disposable)
-                {
-                disposable.Dispose();
-                }
+                    if (strategy is IDisposable disposable)
+                    {
+                        disposable.Dispose();
+                    }
                 }
 
                 _strategies.Clear();
                 _keyStores.Clear();
                 _envelopeKeyStores.Clear();
-
-                GC.SuppressFinalize(this);
             }
             base.Dispose(disposing);
         }

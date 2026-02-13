@@ -901,8 +901,7 @@ public sealed class WinFspDriverPlugin : FeaturePluginBase, IDisposable
     {
         if (disposing)
         {
-            if (_disposed)
-            return;
+            if (_disposed) return;
 
             // Stop the plugin
             StopAsync().Wait(TimeSpan.FromSeconds(30));

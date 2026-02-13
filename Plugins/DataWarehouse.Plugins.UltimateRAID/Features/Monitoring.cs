@@ -2,6 +2,7 @@
 using System.Collections.Concurrent;
 using System.Text;
 using System.Text.Json;
+using System.Security.Cryptography;
 
 namespace DataWarehouse.Plugins.UltimateRAID.Features;
 
@@ -631,7 +632,7 @@ public sealed class IntegrityProof
         if (!_records.TryGetValue(recordId, out var record))
             return false;
 
-        return record.DataHash.SequenceEqual(currentDataHash) &&
+        return record.DataHash.Length == currentDataHash.Length && CryptographicOperations.FixedTimeEquals(record.DataHash, currentDataHash) &&
                VerifySignature(record.DataHash, record.Signature);
     }
 
@@ -672,7 +673,7 @@ public sealed class IntegrityProof
     private bool VerifySignature(byte[] data, byte[] signature)
     {
         var expected = SignData(data);
-        return expected.SequenceEqual(signature);
+        return expected.Length == signature.Length && CryptographicOperations.FixedTimeEquals(expected, signature);
     }
 
     private byte[] ComputeLinkHash(ChainLink link)

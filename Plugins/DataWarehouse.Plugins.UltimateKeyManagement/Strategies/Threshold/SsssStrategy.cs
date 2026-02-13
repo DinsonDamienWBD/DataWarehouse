@@ -403,7 +403,8 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Threshold
 
                 // Verify share hash
                 var providedHash = SHA256.HashData(shareValue);
-                if (!providedHash.SequenceEqual(share.ShareHash ?? Array.Empty<byte>()))
+                var expectedHash = share.ShareHash ?? Array.Empty<byte>();
+                if (!(providedHash.Length == expectedHash.Length && CryptographicOperations.FixedTimeEquals(providedHash, expectedHash)))
                     throw new CryptographicException("Invalid share provided.");
 
                 // Verify identity if required

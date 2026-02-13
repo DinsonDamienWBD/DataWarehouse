@@ -558,10 +558,11 @@ dotnet_diagnostic.S3972.severity = suggestion
 dotnet_diagnostic.S3236.severity = suggestion
 
 # -----------------------------------------------------------------------------
-# CA5351 / CA5350: Do not use broken/weak cryptographic algorithms
-# Justification: MD5/SHA1 usage is for non-security checksums, fingerprinting,
-# and backward compatibility. Not used for security-critical hashing.
-# 38/28 occurrences.
+# CA5351: Do not use broken cryptographic algorithms (MD5)
+# CA5350: Do not use weak cryptographic algorithms (SHA1 for crypto)
+# Kept at suggestion: plugins legitimately use MD5/SHA1 for protocol compat
+# (RADIUS, TACACS+, MySQL auth, S3 presigned URLs, TOTP/HOTP, ETags).
+# SDK enforces ban via BannedSymbols.txt (RS0030). Phase 23 CRYPTO-05 verified.
 # -----------------------------------------------------------------------------
 dotnet_diagnostic.CA5351.severity = suggestion
 dotnet_diagnostic.CA5350.severity = suggestion

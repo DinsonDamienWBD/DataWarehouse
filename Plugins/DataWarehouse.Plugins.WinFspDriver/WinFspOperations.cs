@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using System.Runtime.InteropServices;
+using System.Security.Cryptography;
 using System.Security.Principal;
 
 namespace DataWarehouse.Plugins.WinFspDriver;
@@ -797,7 +798,9 @@ public sealed class WinFspOperations : IDisposable
 
     private static ulong GenerateIndexNumber()
     {
-        return (ulong)DateTime.UtcNow.Ticks ^ (ulong)Random.Shared.NextInt64();
+        Span<byte> bytes = stackalloc byte[8];
+        RandomNumberGenerator.Fill(bytes);
+        return (ulong)DateTime.UtcNow.Ticks ^ BitConverter.ToUInt64(bytes);
     }
 
     private static string NormalizePath(string path)

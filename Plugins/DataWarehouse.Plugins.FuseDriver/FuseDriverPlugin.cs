@@ -799,14 +799,12 @@ public sealed class FuseDriverPlugin : FeaturePluginBase, IDisposable
     {
         if (disposing)
         {
-            if (_disposed)
-            return;
-
+            if (_disposed) return;
             _disposed = true;
 
             if (_isMounted)
             {
-            UnmountAsync().GetAwaiter().GetResult();
+                UnmountAsync().GetAwaiter().GetResult();
             }
 
             _cts?.Cancel();

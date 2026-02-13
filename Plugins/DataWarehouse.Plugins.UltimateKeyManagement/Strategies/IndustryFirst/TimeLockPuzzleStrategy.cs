@@ -414,7 +414,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.IndustryFirst
                     {
                         // Verify result
                         var resultHash = SHA256.HashData(solver.Current.ToByteArrayUnsigned());
-                        if (!resultHash.SequenceEqual(solver.ExpectedResultHash))
+                        if (!(resultHash.Length == solver.ExpectedResultHash.Length && CryptographicOperations.FixedTimeEquals(resultHash, solver.ExpectedResultHash)))
                         {
                             solver.Error = "Puzzle solution verification failed.";
                             return;
@@ -497,7 +497,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.IndustryFirst
                     throw new KeyNotFoundException($"Key '{keyId}' not found.");
 
                 var resultHash = SHA256.HashData(solution.ToByteArrayUnsigned());
-                return resultHash.SequenceEqual(keyData.ExpectedResultHash);
+                return resultHash.Length == keyData.ExpectedResultHash.Length && CryptographicOperations.FixedTimeEquals(resultHash, keyData.ExpectedResultHash);
             }
             finally
             {

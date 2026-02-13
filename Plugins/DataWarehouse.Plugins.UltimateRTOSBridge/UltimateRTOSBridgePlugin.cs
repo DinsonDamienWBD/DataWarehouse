@@ -443,9 +443,7 @@ public sealed class UltimateRTOSBridgePlugin : IntelligenceAwarePluginBase, IDis
     {
         if (disposing)
         {
-            if (_disposed)
-            return;
-
+            if (_disposed) return;
             _disposed = true;
             _strategies.Clear();
         }
