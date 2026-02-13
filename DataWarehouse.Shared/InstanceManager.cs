@@ -1,29 +1,8 @@
+using DataWarehouse.SDK.Hosting;
 using DataWarehouse.Shared.Models;
 using Newtonsoft.Json;
 
 namespace DataWarehouse.Shared;
-
-/// <summary>
-/// Connection target for DataWarehouse instance
-/// </summary>
-public class ConnectionTarget
-{
-    public string Name { get; set; } = string.Empty;
-    public ConnectionType Type { get; set; }
-    public string Address { get; set; } = string.Empty;
-    public int Port { get; set; }
-    public Dictionary<string, string> Metadata { get; set; } = new();
-}
-
-/// <summary>
-/// Type of connection to instance
-/// </summary>
-public enum ConnectionType
-{
-    Local,
-    Remote,
-    InProcess
-}
 
 /// <summary>
 /// Connection profile for saving/loading connections
@@ -183,7 +162,7 @@ public class InstanceManager
         {
             Name = $"Remote ({host}:{port})",
             Type = ConnectionType.Remote,
-            Address = host,
+            Host = host,
             Port = port
         });
     }
@@ -199,7 +178,7 @@ public class InstanceManager
         {
             Name = $"Local ({path})",
             Type = ConnectionType.Local,
-            Address = path,
+            Host = path,
             Port = 0
         });
     }
@@ -214,7 +193,7 @@ public class InstanceManager
         {
             Name = "In-Process",
             Type = ConnectionType.InProcess,
-            Address = "localhost",
+            Host = "localhost",
             Port = 0
         });
     }

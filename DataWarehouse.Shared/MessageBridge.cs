@@ -1,3 +1,4 @@
+using DataWarehouse.SDK.Hosting;
 using DataWarehouse.Shared.Models;
 using System.Net.Sockets;
 using System.Text;
@@ -34,7 +35,7 @@ public class MessageBridge
             {
                 case ConnectionType.Local:
                 case ConnectionType.Remote:
-                    return await ConnectTcpAsync(target.Address, target.Port);
+                    return await ConnectTcpAsync(target.Host, target.Port);
 
                 case ConnectionType.InProcess:
                     // For in-process, we'll just mark as connected
@@ -257,7 +258,7 @@ public class MessageBridge
 
         if (_currentTarget != null)
         {
-            stats["address"] = _currentTarget.Address;
+            stats["host"] = _currentTarget.Host;
             stats["port"] = _currentTarget.Port;
             stats["name"] = _currentTarget.Name;
         }
