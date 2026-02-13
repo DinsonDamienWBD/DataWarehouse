@@ -5,17 +5,17 @@
 See: .planning/PROJECT.md (updated 2026-02-12)
 
 **Core value:** SDK must pass hyperscale/military-level code review -- clean hierarchy, secure by default, distributed-ready, zero warnings.
-**Current focus:** Phase 25a complete -- ready for Phase 25b
+**Current focus:** Phase 25b complete -- ready for Phase 26
 
 ## Current Position
 
 Milestone: v2.0 SDK Hardening & Distributed Infrastructure
-Phase: 25a of 29 (Strategy Hierarchy Design & API Contracts) -- COMPLETE
-Plan: 5 of 5 in current phase (all done)
+Phase: 25b of 29 (Strategy Migration) -- COMPLETE
+Plan: 6 of 6 in current phase (all done)
 Status: Phase complete
-Last activity: 2026-02-14 -- Phase 25a complete (5/5 plans)
+Last activity: 2026-02-14 -- Phase 25b complete (6/6 plans)
 
-Progress: [################░] 73% (24/33 plans)
+Progress: [##################░] 77% (30/39 plans)
 
 ## Performance Metrics
 
@@ -25,8 +25,8 @@ Progress: [################░] 73% (24/33 plans)
 - Timeline: 30 days (2026-01-13 to 2026-02-11)
 
 **v2.0:**
-- Total plans completed: 24 / 33 estimated
-- Average duration: ~12 min/plan
+- Total plans completed: 30 / 39 estimated
+- Average duration: ~11 min/plan
 
 | Phase | Plan | Duration | Tasks | Files |
 |-------|------|----------|-------|-------|
@@ -53,6 +53,12 @@ Progress: [################░] 73% (24/33 plans)
 | 25a | 02 - Domain Base Refactoring | ~45 min | 3 | 19 |
 | 25a | 03 - Backward-Compat Shims | ~90 min | 1 | 83 |
 | 25a | 05 - Build Verification | ~15 min | 1 | 0 |
+| 25b | 01 - Verify Transit/Media/DataFormat/StorageProcessing | ~5 min | 1 | 0 |
+| 25b | 02 - Verify Observability/DataLake/DataMesh/Compression/Replication | ~5 min | 1 | 0 |
+| 25b | 03 - Verify KeyMgmt/RAID/Storage/DatabaseStorage/Connector | ~5 min | 1 | 0 |
+| 25b | 04 - Migrate AccessControl/Compliance/DataMgmt/Streaming | ~8 min | 2 | 15 |
+| 25b | 05 - Migrate Compute/DataProtection, Verify Interface | ~6 min | 2 | 2 |
+| 25b | 06 - Remove Shim + Final Verification | ~8 min | 2 | 5 |
 
 ## Accumulated Context
 
@@ -91,6 +97,10 @@ Progress: [################░] 73% (24/33 plans)
 - Name bridge pattern: domain bases bridge StrategyName/DisplayName to StrategyBase.Name
 - Default StrategyId from GetType().Name for bases that never had identity properties
 - Intelligence region removal was more aggressive than planned -- domain identity properties needed re-addition
+- Using alias for name collision: `using SdkStrategyBase = DataWarehouse.SDK.Contracts.StrategyBase` (Compliance plugin)
+- Pragmatic shim removal: GetStrategyKnowledge/GetStrategyCapability removed, ConfigureIntelligence/MessageBus/IsIntelligenceAvailable preserved (9 overrides + ~55 refs)
+- Capability registration moved from strategy-level to plugin-level (AD-05 compliance)
+- DataProtection MessageBus/IsIntelligenceAvailable uses `new` keyword (9 strategies actively publish events)
 
 ### SDK Audit Results (2026-02-14)
 
@@ -143,9 +153,17 @@ Progress: [################░] 73% (24/33 plans)
   - 25a-03: Backward-compat shims (legacy methods on StrategyBase, re-added domain identity, 69 plugin fixes)
   - 25a-05: Build verification -- 0 new errors, 20 bases inherit StrategyBase, intelligence clean
   - 8 deviations: StrategyId/StrategyName re-addition (Rule 1), GetStrategyDescription helpers (Rule 1), Interface override fix (Rule 3), Dispose hiding (Rule 1), NullLogger .NET 10 (Rule 1), StrategyId hiding (Rule 1), XML cref fix (Rule 3), IsInitialized hiding (Rule 1)
+- [x] **Phase 25b: Strategy Migration** (6/6 plans) -- Verify ~964 Type-A strategies, migrate 6 plugin-local bases, remove intelligence shim
+  - 25b-01: Verified Transit (11), Media (20), DataFormat (28), StorageProcessing (43) = 102 strategies
+  - 25b-02: Verified Observability (55), DataLake (56), DataMesh (56), Compression (59), Replication (61) = 287 strategies
+  - 25b-03: Verified KeyManagement (69), RAID (47), Storage (130), DatabaseStorage (49), Connector (280) = 575 strategies
+  - 25b-04: Migrated AccessControl, Compliance (using alias), DataManagement, Streaming bases (454 strategies)
+  - 25b-05: Migrated Compute (intelligence removed ~60 lines), DataProtection (intelligence removed ~30 lines), verified Interface (73, 45 MessageBus) + Encryption (69) = 309 strategies
+  - 25b-06: Removed GetStrategyKnowledge/GetStrategyCapability from StrategyBase, migrated 4 plugin callers to inline construction, preserved ConfigureIntelligence/MessageBus/IsIntelligenceAvailable
+  - 6 deviations: Dispose hiding in AccessControl (Rule 1), ConfigureIntelligence override in Streaming (Rule 1), DisposeAsync/MessageBus hiding in DataManagement (Rule 1), GetStrategyCapability callers in 4 plugins (Rule 3), CapabilityCategory ambiguity (Rule 1)
 
 ## Session Continuity
 
 Last session: 2026-02-14
-Stopped at: Completed Phase 25a (all 5 plans)
-Resume: `/gsd:plan-phase 25b` or `/gsd:execute-phase 25b`
+Stopped at: Completed Phase 25b (all 6 plans)
+Resume: `/gsd:plan-phase 26` or `/gsd:execute-phase 26`
