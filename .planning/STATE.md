@@ -5,17 +5,17 @@
 See: .planning/PROJECT.md (updated 2026-02-12)
 
 **Core value:** SDK must pass hyperscale/military-level code review -- clean hierarchy, secure by default, distributed-ready, zero warnings.
-**Current focus:** Phase 22 complete -- ready for Phase 23
+**Current focus:** Phase 23 complete -- ready for Phase 24
 
 ## Current Position
 
 Milestone: v2.0 SDK Hardening & Distributed Infrastructure
-Phase: 22 of 29 (Build Safety & Supply Chain) -- COMPLETE
+Phase: 23 of 29 (Memory Safety & Cryptographic Hygiene) -- COMPLETE
 Plan: 4 of 4 in current phase (all done)
 Status: Phase complete
-Last activity: 2026-02-13 -- Phase 22 complete (4/4 plans)
+Last activity: 2026-02-14 -- Phase 23 complete (4/4 plans)
 
-Progress: [########░░] 24% (8/33 plans)
+Progress: [##########░░] 36% (12/33 plans)
 
 ## Performance Metrics
 
@@ -25,8 +25,8 @@ Progress: [########░░] 24% (8/33 plans)
 - Timeline: 30 days (2026-01-13 to 2026-02-11)
 
 **v2.0:**
-- Total plans completed: 8 / 33 estimated
-- Average duration: ~6 min/plan
+- Total plans completed: 12 / 33 estimated
+- Average duration: ~8 min/plan
 
 | Phase | Plan | Duration | Tasks | Files |
 |-------|------|----------|-------|-------|
@@ -37,6 +37,10 @@ Progress: [########░░] 24% (8/33 plans)
 | 22 | 03 - Supply Chain | ~8 min | 2 | 83 |
 | 22 | 04 - CLI Migration | ~6 min | 2 | 1 |
 | 22 | 02 - TreatWarningsAsErrors | ~10 min | 2 | 16 |
+| 23 | 01 - IDisposable/IAsyncDisposable | ~25 min | 2 | 55 |
+| 23 | 03 - Cryptographic Hygiene | ~10 min | 3 | 17 |
+| 23 | 02 - Secure Memory & Bounded Collections | ~12 min | 3 | 7 |
+| 23 | 04 - Key Rotation & Message Auth | ~8 min | 2 | 5 |
 
 ## Accumulated Context
 
@@ -55,22 +59,29 @@ Progress: [########░░] 24% (8/33 plans)
 - NuGet lock files (RestorePackagesWithLockFile) for reproducible builds across all 69 projects
 - CycloneDX for SBOM generation (SDK-only; full-solution blocked by AWSSDK transitive conflicts)
 - System.CommandLine 2.0.3 stable API (SetAction pattern, no NamingConventionBinder)
+- IDisposable on PluginBase only (not IPlugin interface) to avoid breaking all plugin contracts
+- CA5350/CA5351 kept at suggestion level due to legitimate MD5/SHA1 protocol usage in plugins
+- Bounded collections use simple oldest-first eviction heuristic (not full LRU) -- sufficient for Phase 23
+- IKeyRotatable extends IKeyStore directly (not PluginBase) for clean composition
+- IAuthenticatedMessageBus is opt-in per topic via ConfigureAuthentication
+- All Phase 23 crypto contracts are additive -- zero breaking changes to existing interfaces
 
-### SDK Audit Results (2026-02-11)
+### SDK Audit Results (2026-02-14)
 
-- PluginBase (3,777 lines) already has lifecycle, capability registry, knowledge registry
-- IntelligenceAwarePluginBase (1,530 lines) already provides graceful AI degradation
-- 25+ feature-specific plugin bases already exist
-- Plugin isolation already clean: 60/60 plugins reference SDK only, 0 cross-plugin refs
-- PluginBase does NOT implement IDisposable -- needs fixing
-- TreatWarningsAsErrors ENABLED globally (Phase 22-02)
-- No CryptographicOperations.ZeroMemory usage -- needs adding
-- 216 SDK .cs files | 1,300 public types | 4 PackageReferences | 0 null! suppressions
+- PluginBase (~3,900 lines) now implements IDisposable + IAsyncDisposable with full dispose chain
+- All 60+ plugins use override Dispose(bool) with base.Dispose(disposing)
+- CryptographicOperations.ZeroMemory used for all sensitive byte arrays in SDK and key management plugins
+- All public collections bounded: knowledge cache (10K), key cache (100), key access log (10K), index store (100K)
+- ArrayPool used on decrypt hot path for envelope header buffer
+- 11 timing-attack vectors fixed (SequenceEqual to FixedTimeEquals)
+- 3 insecure random sources fixed (System.Random to RandomNumberGenerator in security contexts)
+- IKeyRotationPolicy, ICryptographicAlgorithmRegistry, IAuthenticatedMessageBus contracts added
+- FIPS 140-3 verified: 100% .NET BCL crypto, zero BouncyCastle, zero custom crypto
+- 218 SDK .cs files | 1,300+ public types | 4 PackageReferences | 0 null! suppressions
 
 ### Blockers/Concerns
 
 - Pre-existing CS1729/CS0234 errors in UltimateCompression and AedsCore (upstream API compat, not from our changes)
-- IDisposable on PluginBase affects all 60 plugins -- use incremental migration
 - CRDT and SWIM implementations (Phase 28) may need research-phase during planning
 
 ### Completed Phases
@@ -84,9 +95,15 @@ Progress: [########░░] 24% (8/33 plans)
   - 22-04: System.CommandLine 2.0.3 migration, 8 handlers migrated
   - 22-02: .globalconfig (160+ rules), TreatWarningsAsErrors global, 51100 warnings to 0
   - 3 deviations: Option constructor fix (Rule 1), GetValue API fix (Rule 1), namespace move revert (Rule 1)
+- [x] **Phase 23: Memory Safety & Cryptographic Hygiene** (4/4 plans) -- IDisposable, ZeroMemory, FixedTimeEquals, key rotation contracts
+  - 23-01: IDisposable/IAsyncDisposable on PluginBase, 55 files migrated across 41+ plugins
+  - 23-03: FixedTimeEquals (11 replacements), CSPRNG (3 files), FIPS 140-3 verified
+  - 23-02: ZeroMemory (7 files), 4 bounded collections, ArrayPool on decrypt hot path
+  - 23-04: IKeyRotationPolicy, ICryptographicAlgorithmRegistry, IAuthenticatedMessageBus
+  - 5 deviations: 90 CS0108 batch fix (Rule 1), TamperProof merge (Rule 1), AedsCore override (Rule 1), S3973 braces (Rule 1), CA5350/CA5351 revert (Rule 1)
 
 ## Session Continuity
 
-Last session: 2026-02-13
-Stopped at: Completed Phase 22 (all 4 plans)
-Resume: `/gsd:plan-phase 23` or `/gsd:execute-phase 23`
+Last session: 2026-02-14
+Stopped at: Completed Phase 23 (all 4 plans)
+Resume: `/gsd:plan-phase 24` or `/gsd:execute-phase 24`
