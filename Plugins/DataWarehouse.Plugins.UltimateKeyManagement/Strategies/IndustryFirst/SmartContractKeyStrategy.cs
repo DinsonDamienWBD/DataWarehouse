@@ -667,7 +667,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.IndustryFirst
             if (_disposed) return;
             _disposed = true;
 
-            Array.Clear(_localEncryptionKey, 0, _localEncryptionKey.Length);
+            CryptographicOperations.ZeroMemory(_localEncryptionKey);
             _lock.Dispose();
             base.Dispose();
         }

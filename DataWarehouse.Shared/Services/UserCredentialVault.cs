@@ -503,7 +503,7 @@ public sealed class UserCredentialVault : IUserCredentialVault, IDisposable
     public void Dispose()
     {
         // Clear sensitive data
-        Array.Clear(_masterKey, 0, _masterKey.Length);
+        CryptographicOperations.ZeroMemory(_masterKey);
         Clear();
     }
 

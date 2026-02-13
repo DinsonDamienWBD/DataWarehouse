@@ -1,3 +1,5 @@
+using System.Security.Cryptography;
+
 namespace DataWarehouse.SDK.Security
 {
     /// <summary>
@@ -1261,6 +1263,15 @@ namespace DataWarehouse.SDK.Security
                 return;
 
             _disposed = true;
+
+            // Wipe key material from cache before clearing
+            foreach (var entry in _keyCache.Values)
+            {
+                if (entry.KeyData != null)
+                {
+                    CryptographicOperations.ZeroMemory(entry.KeyData);
+                }
+            }
             _keyCache.Clear();
             _initializationLock.Dispose();
 
