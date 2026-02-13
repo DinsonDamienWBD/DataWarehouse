@@ -5,17 +5,17 @@
 See: .planning/PROJECT.md (updated 2026-02-12)
 
 **Core value:** SDK must pass hyperscale/military-level code review -- clean hierarchy, secure by default, distributed-ready, zero warnings.
-**Current focus:** Phase 27 complete -- ready for Phase 28
+**Current focus:** Phase 28 complete -- ready for Phase 29
 
 ## Current Position
 
 Milestone: v2.0 SDK Hardening & Distributed Infrastructure
-Phase: 27 of 29 (Plugin Migration & Decoupling) -- COMPLETE
-Plan: 5 of 5 in current phase (all done)
+Phase: 28 of 29 (Dead Code Cleanup) -- COMPLETE
+Plan: 4 of 4 in current phase (all done)
 Status: Phase complete
-Last activity: 2026-02-14 -- Phase 27 complete (5/5 plans)
+Last activity: 2026-02-14 -- Phase 28 complete (4/4 plans)
 
-Progress: [########################] 100% (40/40 plans)
+Progress: [########################] 100% (44/44 plans)
 
 ## Performance Metrics
 
@@ -25,7 +25,7 @@ Progress: [########################] 100% (40/40 plans)
 - Timeline: 30 days (2026-01-13 to 2026-02-11)
 
 **v2.0:**
-- Total plans completed: 40 / 40 estimated
+- Total plans completed: 44 / 44 estimated
 - Average duration: ~11 min/plan
 
 | Phase | Plan | Duration | Tasks | Files |
@@ -69,6 +69,10 @@ Progress: [########################] 100% (40/40 plans)
 | 27 | 03 - Feature Plugin Migration | ~35 min | 2 | 32 |
 | 27 | 04 - Standalone & Special-Case Migration | ~15 min | 2 | 21 |
 | 27 | 05 - Decoupling Verification | ~5 min | 2 | 0 |
+| 28 | 01 - Extract Live Types & Future-Ready Docs | ~15 min | 2 | 13 |
+| 28 | 02 - Delete Pure Dead Files | ~25 min | 2 | 27 |
+| 28 | 03 - Dead AI Files & Mixed File Surgery | ~30 min | 2 | 14 |
+| 28 | 04 - Phase 27 Cleanup & Verification | ~15 min | 2 | 3 |
 
 ## Accumulated Context
 
@@ -126,10 +130,16 @@ Progress: [########################] 100% (40/40 plans)
 - NLP method migration: copied ParseIntentAsync/GenerateConversationResponseAsync/DetectLanguageAsync from old base to UltimateInterface plugin
 - 11 AEDS Extension plugins classified by domain: Security (3), Orchestration (2), DataManagement (4), Platform (2)
 - Zero LegacyFeaturePluginBase references across all 61 plugin projects after Phase 27
+- Phase 28: Same-namespace extraction pattern for live types from mixed dead/live files
+- Phase 28: Python scripting for bulk dead code removal from 4000+ line files
+- Phase 28: Cascade-death analysis must independently verify each type (false positives found)
+- Phase 28: 8 live types preserved from dead IStorageOrchestration.cs regions (AuditEntry, HashAlgorithmType, etc.)
+- Phase 28: 6 NLP types extracted to NlpTypes.cs from deleted SpecializedIntelligenceAwareBases.cs
+- Phase 28: IntelligenceAwarePluginBase is LIVE (core of Hierarchy) -- cannot be deleted
 
 ### SDK Audit Results (2026-02-14)
 
-- PluginBase (~3,900 lines) now implements IDisposable + IAsyncDisposable with full dispose chain
+- PluginBase (~3,225 lines after Phase 28 cleanup) implements IDisposable + IAsyncDisposable with full dispose chain
 - All 60+ plugins use override Dispose(bool) with base.Dispose(disposing)
 - CryptographicOperations.ZeroMemory used for all sensitive byte arrays in SDK and key management plugins
 - All public collections bounded: knowledge cache (10K), key cache (100), key access log (10K), index store (100K)
@@ -141,6 +151,7 @@ Progress: [########################] 100% (40/40 plans)
 - 249 SDK .cs files | 1,400+ public types | 4 PackageReferences | 0 null! suppressions
 - Phase 26: 31 new files (18 contracts + 13 in-memory), 2 modified (PluginBase, InfrastructurePluginBases)
 - Phase 27: 0 new files, 123+ modified (60 SDK bases + 63 plugin files), zero LegacyFeaturePluginBase refs remain
+- Phase 28: 33 files deleted, 17 modified, 4 created; 32,555 net LOC removed
 
 ### Blockers/Concerns
 
@@ -203,8 +214,16 @@ Progress: [########################] 100% (40/40 plans)
   - 27-05: All 8 verification checks PASS, zero LegacyFeaturePluginBase refs, zero new build errors
   - 12 deviations: StreamingData stubs placement (Rule 1), Serverless stubs placement (Rule 1), AccessControl/Compliance Category (Rule 2), NLP method migration (Rule 3), TamperProof namespace (Rule 1), AdaptiveTransport stubs placement (Rule 1), StoragePluginBase signatures (Rule 1), DateTime fix (Rule 1), 11 AEDS plugins (Rule 2)
 
+- [x] **Phase 28: Dead Code Cleanup** (4/4 plans) -- Extract live types, delete 33 dead files, remove 27 dead types from mixed files, post-Phase-27 conditional cleanup
+  - 28-01: Extracted 18 live types from mixed files to InfrastructureContracts.cs and OrchestrationContracts.cs; 9 future-ready interfaces documented
+  - 28-02: Deleted 24 pure dead files (~20,567 LOC); recovered 3 live types (WriteFanOutOrchestratorPluginBase, SecurityOperationException, FailClosedCorruptionException)
+  - 28-03: Deleted 5 AI files, consolidated KnowledgeObject; removed 11 dead bases from PluginBase.cs, 5 from StorageOrchestratorBase.cs, 3 regions from IStorageOrchestration.cs
+  - 28-04: Deleted SpecializedIntelligenceAwareBases.cs (4,168 LOC); extracted 6 NLP types; verified CLEAN-01/02/03, AD-06, AD-08
+  - 7 deviations: NewFeaturePluginBase.cs live (Rule 1), WriteFanOutOrchestratorPluginBase recovery (Rule 1), StandardizedExceptions extraction (Rule 1), VectorOperations.cs live (Rule 1), KnowledgeCapability migration (Rule 1), PluginBase.cs Python scripting (Rule 1), NlpTypes extraction (Rule 1)
+  - **Net result: 32,555 LOC removed, 33 files deleted, zero functionality lost**
+
 ## Session Continuity
 
 Last session: 2026-02-14
-Stopped at: Completed Phase 27 (all 5 plans)
-Resume: `/gsd:plan-phase 28` or `/gsd:execute-phase 28`
+Stopped at: Completed Phase 28 (all 4 plans)
+Resume: `/gsd:plan-phase 29` or `/gsd:execute-phase 29`
