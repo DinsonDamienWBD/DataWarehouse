@@ -327,6 +327,7 @@ namespace DataWarehouse.Plugins.UltimateDataProtection
 
         /// <summary>
         /// Gets all strategy knowledge objects for Intelligence registration.
+        /// Per AD-05 (Phase 25b): knowledge construction is now plugin/registry responsibility.
         /// </summary>
         public IEnumerable<KnowledgeObject> GetAllStrategyKnowledge()
         {
@@ -334,13 +335,31 @@ namespace DataWarehouse.Plugins.UltimateDataProtection
             {
                 if (strategy is DataProtectionStrategyBase baseStrategy)
                 {
-                    yield return baseStrategy.GetStrategyKnowledge();
+                    yield return new KnowledgeObject
+                    {
+                        Id = $"dataprotection.strategy.{baseStrategy.StrategyId}",
+                        Topic = "dataprotection.strategies",
+                        SourcePluginId = "com.datawarehouse.dataprotection.ultimate",
+                        SourcePluginName = baseStrategy.StrategyName,
+                        KnowledgeType = "capability",
+                        Description = $"{baseStrategy.StrategyName} data protection strategy providing {baseStrategy.Category} capabilities",
+                        Payload = new Dictionary<string, object>
+                        {
+                            ["strategyId"] = baseStrategy.StrategyId,
+                            ["strategyName"] = baseStrategy.StrategyName,
+                            ["category"] = baseStrategy.Category.ToString()
+                        },
+                        Tags = new[] { "dataprotection", "strategy", baseStrategy.Category.ToString().ToLowerInvariant(), baseStrategy.StrategyId.ToLowerInvariant() },
+                        Confidence = 1.0f,
+                        Timestamp = DateTimeOffset.UtcNow
+                    };
                 }
             }
         }
 
         /// <summary>
         /// Gets all strategy capabilities for capability registration.
+        /// Per AD-05 (Phase 25b): capability construction is now plugin/registry responsibility.
         /// </summary>
         public IEnumerable<RegisteredCapability> GetAllStrategyCapabilities()
         {
@@ -348,7 +367,19 @@ namespace DataWarehouse.Plugins.UltimateDataProtection
             {
                 if (strategy is DataProtectionStrategyBase baseStrategy)
                 {
-                    yield return baseStrategy.GetStrategyCapability();
+                    yield return new RegisteredCapability
+                    {
+                        CapabilityId = $"dataprotection.{baseStrategy.StrategyId}",
+                        DisplayName = baseStrategy.StrategyName,
+                        Description = $"{baseStrategy.StrategyName} data protection strategy providing {baseStrategy.Category} capabilities",
+                        Category = SDK.Contracts.CapabilityCategory.Custom,
+                        SubCategory = "DataProtection",
+                        PluginId = "com.datawarehouse.dataprotection.ultimate",
+                        PluginName = "Ultimate Data Protection",
+                        PluginVersion = "1.0.0",
+                        Tags = new[] { "dataprotection", "strategy", baseStrategy.Category.ToString().ToLowerInvariant() },
+                        SemanticDescription = $"Use {baseStrategy.StrategyName} for {baseStrategy.Category} data protection operations"
+                    };
                 }
             }
         }

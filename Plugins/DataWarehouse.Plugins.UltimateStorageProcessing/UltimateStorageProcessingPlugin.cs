@@ -101,11 +101,24 @@ public sealed class UltimateStorageProcessingPlugin : IntelligenceAwarePluginBas
                 }
             };
 
+            // Per AD-05 (Phase 25b): capability registration is now plugin-level responsibility.
             foreach (var strategy in _registry.GetAllStrategies())
             {
                 if (strategy is StorageProcessingStrategyBase baseStrategy)
                 {
-                    capabilities.Add(baseStrategy.GetStrategyCapability());
+                    capabilities.Add(new RegisteredCapability
+                    {
+                        CapabilityId = $"storageprocessing.{baseStrategy.StrategyId}",
+                        DisplayName = baseStrategy.Name,
+                        Description = baseStrategy.Description,
+                        Category = SDK.Contracts.CapabilityCategory.Custom,
+                        SubCategory = "StorageProcessing",
+                        PluginId = Id,
+                        PluginName = Name,
+                        PluginVersion = Version,
+                        Tags = new[] { "storage-processing", baseStrategy.StrategyId },
+                        SemanticDescription = baseStrategy.Description
+                    });
                 }
             }
 

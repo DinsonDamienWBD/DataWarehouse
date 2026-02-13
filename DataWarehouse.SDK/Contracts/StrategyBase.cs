@@ -2,8 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
-using DataWarehouse.SDK.AI;
-
 namespace DataWarehouse.SDK.Contracts
 {
     /// <summary>
@@ -161,73 +159,37 @@ namespace DataWarehouse.SDK.Contracts
             ObjectDisposedException.ThrowIf(_disposed, this);
         }
 
-        #region Legacy Intelligence Compatibility (Phase 25b removes these)
+        #region Legacy MessageBus Compatibility
 
-        // LEGACY: These methods exist solely for backward compatibility with concrete
-        // strategies that override intelligence methods from the pre-v2.0 hierarchy.
-        // Per AD-05, intelligence belongs at the plugin level, NOT on strategies.
-        // Phase 25b removes these methods after migrating all concrete strategies.
-
-        /// <summary>
-        /// Legacy method for intelligence configuration. No-op in new hierarchy.
-        /// Intelligence belongs at the plugin level per AD-05.
-        /// </summary>
-        // TODO(25b): Remove -- intelligence belongs at plugin level per AD-05
-        public virtual void ConfigureIntelligence(IMessageBus? messageBus) { }
+        // Intelligence interface methods (GetStrategyKnowledge, GetStrategyCapability) removed
+        // per AD-05 (Phase 25b). ConfigureIntelligence, MessageBus, and IsIntelligenceAvailable
+        // are PRESERVED because ~55 strategy files and 9 ConfigureIntelligence overrides
+        // actively reference them. Phase 27 migrates MessageBus to plugin-level injection.
 
         /// <summary>
-        /// Legacy method for strategy knowledge registration. Returns a default
-        /// KnowledgeObject in new hierarchy. Intelligence belongs at the plugin level per AD-05.
+        /// Configures the message bus for strategy-level event publishing.
+        /// Override in domain bases or concrete strategies that need MessageBus access.
         /// </summary>
-        // TODO(25b): Remove -- intelligence belongs at plugin level per AD-05
-        public virtual KnowledgeObject GetStrategyKnowledge()
+        /// <param name="messageBus">The message bus instance, or null to disconnect.</param>
+        public virtual void ConfigureIntelligence(IMessageBus? messageBus)
         {
-            return new KnowledgeObject
-            {
-                Id = $"strategy.{StrategyId}",
-                Topic = "strategy",
-                SourcePluginId = "sdk",
-                SourcePluginName = Name,
-                KnowledgeType = "capability",
-                Description = Description,
-                Payload = new Dictionary<string, object>(),
-                Tags = Array.Empty<string>()
-            };
+            MessageBus = messageBus;
         }
 
         /// <summary>
-        /// Legacy method for strategy capability registration. Returns a default
-        /// RegisteredCapability in new hierarchy. Intelligence belongs at the plugin level per AD-05.
+        /// Message bus for strategy-level event publishing. Always null unless explicitly
+        /// configured via <see cref="ConfigureIntelligence"/>. Strategies that use this
+        /// should guard access with <see cref="IsIntelligenceAvailable"/>.
         /// </summary>
-        // TODO(25b): Remove -- intelligence belongs at plugin level per AD-05
-        public virtual RegisteredCapability GetStrategyCapability()
-        {
-            return new RegisteredCapability
-            {
-                CapabilityId = $"strategy.{StrategyId}",
-                DisplayName = Name,
-                Description = Description,
-                Category = CapabilityCategory.Custom,
-                PluginId = "sdk",
-                PluginName = Name,
-                PluginVersion = "1.0.0",
-                Tags = Array.Empty<string>(),
-                SemanticDescription = Description
-            };
-        }
-
-        /// <summary>
-        /// Legacy message bus property. Always null in new hierarchy.
-        /// Intelligence belongs at the plugin level per AD-05.
-        /// </summary>
-        // TODO(25b): Remove -- intelligence belongs at plugin level per AD-05
+        // TODO(Phase 27): Migrate to plugin-level injection
         protected IMessageBus? MessageBus { get; private set; }
 
         /// <summary>
-        /// Legacy intelligence availability check. Always returns false in new hierarchy.
+        /// Gets whether a message bus is available for event publishing.
+        /// Returns false unless <see cref="ConfigureIntelligence"/> has been called with a non-null bus.
         /// </summary>
-        // TODO(25b): Remove -- intelligence belongs at plugin level per AD-05
-        protected bool IsIntelligenceAvailable => false;
+        // TODO(Phase 27): Migrate to plugin-level injection
+        protected bool IsIntelligenceAvailable => MessageBus != null;
 
         #endregion
     }
