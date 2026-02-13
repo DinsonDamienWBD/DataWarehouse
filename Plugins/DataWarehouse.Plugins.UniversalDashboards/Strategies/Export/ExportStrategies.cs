@@ -1,6 +1,6 @@
 using System.Text;
+using System.Text.Json;
 using DataWarehouse.SDK.Contracts.Dashboards;
-using Newtonsoft.Json;
 
 namespace DataWarehouse.Plugins.UniversalDashboards.Strategies.Export;
 
@@ -369,7 +369,7 @@ public sealed class ScheduledReportsStrategy : DashboardStrategyBase
             throw new KeyNotFoundException($"Schedule {scheduleId} not found");
 
         // Generate report (in production, this would use PDF/Image strategies)
-        var reportContent = JsonConvert.SerializeObject(ConvertToPlatformFormat(dashboard), Formatting.Indented);
+        var reportContent = JsonSerializer.Serialize(ConvertToPlatformFormat(dashboard), new JsonSerializerOptions { WriteIndented = true });
 
         return new ReportResult
         {

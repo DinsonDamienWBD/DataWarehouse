@@ -1,5 +1,5 @@
 using DataWarehouse.Shared.Models;
-using Newtonsoft.Json;
+using System.Text.Json;
 
 namespace DataWarehouse.Shared;
 
@@ -193,8 +193,8 @@ public class CapabilityManager
 
         if (response?.Data != null && response.Data.TryGetValue("capabilities", out var capData))
         {
-            var capJson = JsonConvert.SerializeObject(capData);
-            var caps = JsonConvert.DeserializeObject<InstanceCapabilities>(capJson);
+            var capJson = JsonSerializer.Serialize(capData);
+            var caps = JsonSerializer.Deserialize<InstanceCapabilities>(capJson, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
 
             if (caps != null)
             {

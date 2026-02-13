@@ -28,9 +28,6 @@
 
     <!-- Image processing for exports -->
     <PackageReference Include="SkiaSharp" Version="3.119.2" />
-
-    <!-- JSON handling -->
-    <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
   </ItemGroup>
 
 </Project>
