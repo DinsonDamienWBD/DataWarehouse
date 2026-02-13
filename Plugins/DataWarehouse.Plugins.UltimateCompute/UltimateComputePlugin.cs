@@ -99,11 +99,24 @@ public sealed class UltimateComputePlugin : IntelligenceAwarePluginBase, IDispos
                 }
             };
 
+            // Per AD-05 (Phase 25b): capability registration is now plugin-level responsibility.
             foreach (var strategy in _registry.GetAllStrategies())
             {
                 if (strategy is ComputeRuntimeStrategyBase baseStrategy)
                 {
-                    capabilities.Add(baseStrategy.GetStrategyCapability());
+                    capabilities.Add(new RegisteredCapability
+                    {
+                        CapabilityId = $"compute.{baseStrategy.StrategyId}",
+                        DisplayName = baseStrategy.Name,
+                        Description = baseStrategy.Description,
+                        Category = SDK.Contracts.CapabilityCategory.Custom,
+                        SubCategory = "Compute",
+                        PluginId = Id,
+                        PluginName = Name,
+                        PluginVersion = Version,
+                        Tags = new[] { "compute", baseStrategy.StrategyId },
+                        SemanticDescription = baseStrategy.Description
+                    });
                 }
             }
 

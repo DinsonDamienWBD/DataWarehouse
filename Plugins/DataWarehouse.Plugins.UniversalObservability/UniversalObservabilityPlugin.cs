@@ -293,11 +293,25 @@ public sealed class UniversalObservabilityPlugin : IntelligenceAwarePluginBase
                 }
             };
 
+            // Per AD-05 (Phase 25b): capability registration is now plugin-level responsibility.
+            // Strategy.GetStrategyCapability() removed; plugin constructs capabilities from strategy metadata.
             foreach (var kvp in _strategies)
             {
                 if (kvp.Value is ObservabilityStrategyBase strategy)
                 {
-                    capabilities.Add(strategy.GetStrategyCapability());
+                    capabilities.Add(new RegisteredCapability
+                    {
+                        CapabilityId = $"observability.{strategy.StrategyId}",
+                        DisplayName = strategy.Name,
+                        Description = strategy.Description,
+                        Category = CapabilityCategory.Custom,
+                        SubCategory = "Observability",
+                        PluginId = Id,
+                        PluginName = Name,
+                        PluginVersion = Version,
+                        Tags = new[] { "observability", strategy.StrategyId },
+                        SemanticDescription = strategy.Description
+                    });
                 }
             }
 
