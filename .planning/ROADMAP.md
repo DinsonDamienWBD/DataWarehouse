@@ -291,22 +291,22 @@ Plans:
 #### Phase 28: Dead Code Cleanup
 **Goal**: Remove truly unused classes, files, and interfaces that are referenced by nothing. Keep future-ready interfaces for unreleased hardware/technology (quantum crypto, brain-reading encryption, DNA storage, neuromorphic computing). See AD-06.
 **Depends on**: Phase 27 (plugin migration must be complete -- know what's used before deleting)
-**Requirements**: (new — CLEAN-01 through CLEAN-03)
+**Requirements**: CLEAN-01, CLEAN-02, CLEAN-03
 **Architecture Decisions**: AD-06 (dead code cleanup policy)
-**Approach**: Systematic scan for zero-reference classes/files. For each candidate: verify zero references (grep class name), confirm not future-ready, confirm logic exists elsewhere if useful. Remove in batches by category.
+**Approach**: Systematic scan for zero-reference classes/files. For each candidate: verify zero references (grep class name), confirm not future-ready, confirm logic exists elsewhere if useful. Remove in batches by category. Research identified ~27,000-33,000 LOC across ~40+ files in 5 categories: pure dead files, mixed files, future-ready (keep), superseded code, and post-Phase-27 conditional dead code.
 **Success Criteria** (what must be TRUE):
   1. All classes/files with zero references (no inheritance, no instantiation, no import) that are NOT future-ready interfaces are removed
   2. Superseded implementations (logic reimplemented elsewhere) are removed
   3. Future-ready interfaces for unreleased technology are preserved and documented with clear "FUTURE:" comments
   4. Build compiles with zero errors after cleanup
   5. No functionality is lost -- all removed code verified as either dead or extracted into composable services (AD-03)
-**Plans**: TBD (estimated 3-4 plans)
+**Plans**: 4 plans
 
 Plans:
-- [ ] 28-01: Dead code scan -- identify all zero-reference classes/files across SDK and plugins
-- [ ] 28-02: Categorize candidates (truly dead vs future-ready vs superseded)
-- [ ] 28-03: Remove dead code in batches, preserve future-ready interfaces with documentation
-- [ ] 28-04: Build verification and LOC impact report
+- [ ] 28-01-PLAN.md — Extract live types from mixed files (InfrastructurePluginBases, ProviderInterfaces, OrchestrationInterfaces) + document future-ready interfaces with FUTURE: comments (9 files, AD-06/CLEAN-03)
+- [ ] 28-02-PLAN.md — Delete pure dead files: plugin bases (Cat 1A), services (Cat 1B), infrastructure (Cat 1C), miscellaneous (Cat 1E) -- ~29 files, ~18,000 LOC
+- [ ] 28-03-PLAN.md — Delete dead AI module files (Cat 1D), remove dead types from mixed files (PluginBase.cs, StorageOrchestratorBase.cs), consolidate duplicate KnowledgeObject -- ~8,500 LOC
+- [ ] 28-04-PLAN.md — Conditional post-Phase-27 cleanup (LegacyFeaturePluginBase, IntelligenceAware* bases), full build verification, orphaned using cleanup, LOC impact report
 
 #### Phase 29: Advanced Distributed Coordination
 **Goal**: The SDK has production-ready implementations of cluster membership, consensus, replication, and load balancing -- a multi-node DataWarehouse cluster can form, elect leaders, replicate data, and balance load.
@@ -395,7 +395,7 @@ Plans:
 | 25b. Strategy Migration (~1,727 strategies) | v2.0 | 0/6 | Planned | - |
 | 26. Distributed Contracts & Resilience | v2.0 | 0/5 | Planned | - |
 | 27. Plugin Migration & Decoupling | v2.0 | 0/5 | Planned | - |
-| 28. Dead Code Cleanup | v2.0 | 0/4 | Not started | - |
+| 28. Dead Code Cleanup | v2.0 | 0/4 | Planned | - |
 | 29. Advanced Distributed Coordination | v2.0 | 0/4 | Not started | - |
 | 30. Testing & Final Verification | v2.0 | 0/3 | Not started | - |
 | 31. Unified Interface & Deployment Modes | v2.0 | 0/8 | Not started | - |
