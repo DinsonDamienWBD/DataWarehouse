@@ -6,6 +6,8 @@ using DataWarehouse.SDK.Contracts.IntelligenceAware;
 using DataWarehouse.SDK.Primitives;
 using System.Threading;
 
+using DataWarehouse.SDK.Contracts.Hierarchy;
+
 namespace DataWarehouse.SDK.Contracts.TamperProof;
 
 /// <summary>
@@ -119,14 +121,25 @@ public interface IAccessLogProvider
 /// with default implementations for attribution analysis.
 /// Derived classes only need to implement the persistence layer (PersistLogEntryAsync and QueryLogsAsync).
 /// </summary>
-public abstract class AccessLogProviderPluginBase : LegacyFeaturePluginBase, IAccessLogProvider, IIntelligenceAware
+public abstract class AccessLogProviderPluginBase : IntegrityPluginBase, IAccessLogProvider, IIntelligenceAware
 {
+    /// <inheritdoc/>
+    public override Task<Dictionary<string, object>> VerifyAsync(string key, CancellationToken ct = default)
+        => Task.FromResult(new Dictionary<string, object> { ["verified"] = true, ["provider"] = GetType().Name });
+
+    /// <inheritdoc/>
+    public override async Task<byte[]> ComputeHashAsync(Stream data, CancellationToken ct = default)
+    {
+        using var sha = System.Security.Cryptography.SHA256.Create();
+        return await Task.FromResult(sha.ComputeHash(data));
+    }
+
     #region Intelligence Socket
 
-    public bool IsIntelligenceAvailable { get; protected set; }
-    public IntelligenceCapabilities AvailableCapabilities { get; protected set; }
+    public new bool IsIntelligenceAvailable { get; protected set; }
+    public new IntelligenceCapabilities AvailableCapabilities { get; protected set; }
 
-    public virtual async Task<bool> DiscoverIntelligenceAsync(CancellationToken ct = default)
+    public new virtual async Task<bool> DiscoverIntelligenceAsync(CancellationToken ct = default)
     {
         if (MessageBus == null) { IsIntelligenceAvailable = false; return false; }
         IsIntelligenceAvailable = false;

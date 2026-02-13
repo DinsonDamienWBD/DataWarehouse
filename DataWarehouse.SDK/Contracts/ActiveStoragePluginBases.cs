@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using DataWarehouse.SDK.AI;
 using DataWarehouse.SDK.Primitives;
 using DataWarehouse.SDK.Utilities;
+using DataWarehouse.SDK.Contracts.Hierarchy;
 
 namespace DataWarehouse.SDK.Contracts;
 
@@ -628,11 +629,18 @@ public class WasmValidationResult
 /// Provides compute-on-storage capabilities using WebAssembly.
 /// Intelligence-aware: Supports AI-driven function optimization and execution planning.
 /// </summary>
-public abstract class WasmFunctionPluginBase : LegacyFeaturePluginBase, IWasmRuntime
+public abstract class WasmFunctionPluginBase : ComputePluginBase, IWasmRuntime
 {
     private readonly ConcurrentDictionary<string, WasmFunctionMetadata> _functions = new();
     private readonly ConcurrentDictionary<string, WasmFunctionStatistics> _statistics = new();
     private int _activeExecutions;
+
+    /// <inheritdoc/>
+    public override string RuntimeType => "WASM";
+
+    /// <inheritdoc/>
+    public override Task<Dictionary<string, object>> ExecuteWorkloadAsync(Dictionary<string, object> workload, CancellationToken ct = default)
+        => Task.FromResult(new Dictionary<string, object> { ["status"] = "delegated-to-wasm-runtime" });
 
     /// <summary>
     /// Gets the plugin category. Always DataTransformationProvider for WASM compute plugins.
@@ -1831,9 +1839,12 @@ public static class SchemaInference
 /// Enables SQL queries over object storage data.
 /// Intelligence-aware: Supports AI-driven query optimization and schema inference.
 /// </summary>
-public abstract class DataVirtualizationPluginBase : LegacyFeaturePluginBase, IVirtualTableProvider
+public abstract class DataVirtualizationPluginBase : InterfacePluginBase, IVirtualTableProvider
 {
     private readonly ConcurrentDictionary<string, VirtualTableSchema> _tables = new();
+
+    /// <inheritdoc/>
+    public override string Protocol => "SQL";
 
     /// <summary>
     /// Gets the plugin category. Always InterfaceProvider for virtualization plugins.
@@ -2899,8 +2910,11 @@ public class TranscodingStatistics
 /// Provides automatic media format conversion capabilities.
 /// Intelligence-aware: Supports AI-driven quality optimization and format selection.
 /// </summary>
-public abstract class MediaTranscodingPluginBase : LegacyFeaturePluginBase, ITranscodingProvider
+public abstract class MediaTranscodingPluginBase : MediaPluginBase, ITranscodingProvider
 {
+    /// <inheritdoc/>
+    public override string MediaType => "MultiMedia";
+
     private readonly ConcurrentDictionary<string, TranscodingJob> _jobs = new();
     private readonly ConcurrentDictionary<string, TranscodingResult> _results = new();
     private readonly ConcurrentDictionary<string, TranscodingProfile> _profiles = new();

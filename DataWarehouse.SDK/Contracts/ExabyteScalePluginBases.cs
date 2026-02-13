@@ -7,6 +7,8 @@ using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 
+using DataWarehouse.SDK.Contracts.Hierarchy;
+
 namespace DataWarehouse.SDK.Contracts;
 
 /// <summary>
@@ -21,24 +23,27 @@ namespace DataWarehouse.SDK.Contracts;
 /// - Implement GetAllShardsAsync for topology queries
 /// - Override MaxShardsPerNode for capacity planning
 /// </remarks>
-public abstract class ShardManagerPluginBase : LegacyFeaturePluginBase, IShardManager, IIntelligenceAware
+public abstract class ShardManagerPluginBase : InfrastructurePluginBase, IShardManager, IIntelligenceAware
 {
+    /// <inheritdoc/>
+    public override string InfrastructureDomain => "ShardManagement";
+
     #region Intelligence Socket
 
     /// <summary>
     /// Gets whether Universal Intelligence (T90) is available for AI-assisted sharding decisions.
     /// </summary>
-    public bool IsIntelligenceAvailable { get; protected set; }
+    public new bool IsIntelligenceAvailable { get; protected set; }
 
     /// <summary>
     /// Gets the available Intelligence capabilities.
     /// </summary>
-    public IntelligenceCapabilities AvailableCapabilities { get; protected set; }
+    public new IntelligenceCapabilities AvailableCapabilities { get; protected set; }
 
     /// <summary>
     /// Discovers Intelligence availability. Called during startup.
     /// </summary>
-    public virtual async Task<bool> DiscoverIntelligenceAsync(CancellationToken ct = default)
+    public new virtual async Task<bool> DiscoverIntelligenceAsync(CancellationToken ct = default)
     {
         // Default implementation: check if message bus is available and T90 responds
         if (MessageBus == null)
@@ -341,24 +346,27 @@ public abstract class ShardManagerPluginBase : LegacyFeaturePluginBase, IShardMa
 /// Write path: MemTable -> Flush to Level 0 -> Compact to Level 1 -> ... -> Level N
 /// Read path: Check MemTable -> Check Bloom filters -> Read SSTables (newest first)
 /// </remarks>
-public abstract class DistributedMetadataIndexPluginBase : LegacyFeaturePluginBase, IDistributedMetadataIndex, IIntelligenceAware
+public abstract class DistributedMetadataIndexPluginBase : DataManagementPluginBase, IDistributedMetadataIndex, IIntelligenceAware
 {
+    /// <inheritdoc/>
+    public override string DataManagementDomain => "DistributedMetadataIndex";
+
     #region Intelligence Socket
 
     /// <summary>
     /// Gets whether Universal Intelligence (T90) is available for AI-assisted indexing decisions.
     /// </summary>
-    public bool IsIntelligenceAvailable { get; protected set; }
+    public new bool IsIntelligenceAvailable { get; protected set; }
 
     /// <summary>
     /// Gets the available Intelligence capabilities.
     /// </summary>
-    public IntelligenceCapabilities AvailableCapabilities { get; protected set; }
+    public new IntelligenceCapabilities AvailableCapabilities { get; protected set; }
 
     /// <summary>
     /// Discovers Intelligence availability. Called during startup.
     /// </summary>
-    public virtual async Task<bool> DiscoverIntelligenceAsync(CancellationToken ct = default)
+    public new virtual async Task<bool> DiscoverIntelligenceAsync(CancellationToken ct = default)
     {
         if (MessageBus == null)
         {
@@ -637,8 +645,11 @@ public abstract class DistributedMetadataIndexPluginBase : LegacyFeaturePluginBa
 /// - Write-behind: Update cache immediately, async update backing store
 /// - Cache-aside: Application manages cache and backing store separately
 /// </remarks>
-public abstract class DistributedCachePluginBase : LegacyFeaturePluginBase, IDistributedCache
+public abstract class DistributedCachePluginBase : InfrastructurePluginBase, IDistributedCache
 {
+    /// <inheritdoc/>
+    public override string InfrastructureDomain => "DistributedCache";
+
     /// <summary>
     /// Gets raw bytes from cache by key.
     /// Must be implemented by derived classes to query cache backend.

@@ -8,6 +8,8 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 
+using DataWarehouse.SDK.Contracts.Hierarchy;
+
 namespace DataWarehouse.SDK.Contracts;
 
 /// <summary>
@@ -16,8 +18,11 @@ namespace DataWarehouse.SDK.Contracts;
 /// Implementations must specify supported framework and provide control definitions.
 /// Intelligence-aware: Supports AI-driven compliance assessment and remediation suggestions.
 /// </summary>
-public abstract class ComplianceAutomationPluginBase : LegacyFeaturePluginBase, IComplianceAutomation
+public abstract class ComplianceAutomationPluginBase : SecurityPluginBase, IComplianceAutomation
 {
+    /// <inheritdoc/>
+    public override string SecurityDomain => "ComplianceAutomation";
+
     /// <summary>
     /// The compliance framework this plugin supports.
     /// Each plugin implementation handles one framework (GDPR, HIPAA, PCI-DSS, etc.).
@@ -305,8 +310,11 @@ public abstract class ComplianceAutomationPluginBase : LegacyFeaturePluginBase, 
 /// Implementations must provide data collection, deletion, and consent management.
 /// Intelligence-aware: Supports AI-driven PII detection and data mapping.
 /// </summary>
-public abstract class DataSubjectRightsPluginBase : LegacyFeaturePluginBase, IDataSubjectRights
+public abstract class DataSubjectRightsPluginBase : SecurityPluginBase, IDataSubjectRights
 {
+    /// <inheritdoc/>
+    public override string SecurityDomain => "DataSubjectRights";
+
     #region Intelligence Integration
 
     /// <summary>
@@ -584,8 +592,11 @@ public abstract class DataSubjectRightsPluginBase : LegacyFeaturePluginBase, IDa
 /// Implementations must provide audit storage and querying.
 /// Intelligence-aware: Supports AI-driven audit analysis and anomaly detection.
 /// </summary>
-public abstract class ComplianceAuditPluginBase : LegacyFeaturePluginBase, IComplianceAudit
+public abstract class ComplianceAuditPluginBase : SecurityPluginBase, IComplianceAudit
 {
+    /// <inheritdoc/>
+    public override string SecurityDomain => "ComplianceAudit";
+
     #region Intelligence Integration
 
     /// <summary>

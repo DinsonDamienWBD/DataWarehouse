@@ -7,14 +7,23 @@ using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 
+using DataWarehouse.SDK.Contracts.Hierarchy;
+
 namespace DataWarehouse.SDK.Contracts
 {
     /// <summary>
     /// Abstract base class for hardware accelerator plugins.
     /// Provides common implementation for lifecycle management and statistics tracking.
     /// </summary>
-    public abstract class HardwareAcceleratorPluginBase : LegacyFeaturePluginBase, IHardwareAccelerator, IIntelligenceAware
+    public abstract class HardwareAcceleratorPluginBase : ComputePluginBase, IHardwareAccelerator, IIntelligenceAware
     {
+        /// <inheritdoc/>
+        public override string RuntimeType => "HardwareAccelerator";
+
+        /// <inheritdoc/>
+        public override Task<Dictionary<string, object>> ExecuteWorkloadAsync(Dictionary<string, object> workload, CancellationToken ct = default)
+            => Task.FromResult(new Dictionary<string, object> { ["status"] = "delegated-to-hardware-accelerator" });
+
         private bool _initialized;
         private long _operationsCompleted;
         private long _totalBytesProcessed;
@@ -26,17 +35,17 @@ namespace DataWarehouse.SDK.Contracts
         /// <summary>
         /// Gets whether Universal Intelligence (T90) is available for AI-assisted optimization.
         /// </summary>
-        public bool IsIntelligenceAvailable { get; protected set; }
+        public new bool IsIntelligenceAvailable { get; protected set; }
 
         /// <summary>
         /// Gets the available Intelligence capabilities.
         /// </summary>
-        public IntelligenceCapabilities AvailableCapabilities { get; protected set; }
+        public new IntelligenceCapabilities AvailableCapabilities { get; protected set; }
 
         /// <summary>
         /// Discovers Intelligence availability.
         /// </summary>
-        public virtual async Task<bool> DiscoverIntelligenceAsync(CancellationToken ct = default)
+        public new virtual async Task<bool> DiscoverIntelligenceAsync(CancellationToken ct = default)
         {
             if (MessageBus == null) { IsIntelligenceAvailable = false; return false; }
             IsIntelligenceAvailable = false;
@@ -568,8 +577,11 @@ namespace DataWarehouse.SDK.Contracts
     /// Abstract base class for TPM 2.0 provider plugins.
     /// Provides secure key storage and cryptographic operations using Trusted Platform Module.
     /// </summary>
-    public abstract class Tpm2ProviderPluginBase : LegacyFeaturePluginBase, ITpm2Provider, IIntelligenceAware
+    public abstract class Tpm2ProviderPluginBase : SecurityPluginBase, ITpm2Provider, IIntelligenceAware
     {
+        /// <inheritdoc/>
+        public override string SecurityDomain => "TPM2";
+
         /// <summary>
         /// Gets the category of this plugin. Always returns SecurityProvider for TPM plugins.
         /// </summary>
@@ -583,10 +595,10 @@ namespace DataWarehouse.SDK.Contracts
 
         #region Intelligence Socket
 
-        public bool IsIntelligenceAvailable { get; protected set; }
-        public IntelligenceCapabilities AvailableCapabilities { get; protected set; }
+        public new bool IsIntelligenceAvailable { get; protected set; }
+        public new IntelligenceCapabilities AvailableCapabilities { get; protected set; }
 
-        public virtual async Task<bool> DiscoverIntelligenceAsync(CancellationToken ct = default)
+        public new virtual async Task<bool> DiscoverIntelligenceAsync(CancellationToken ct = default)
         {
             if (MessageBus == null) { IsIntelligenceAvailable = false; return false; }
             IsIntelligenceAvailable = false;
@@ -773,8 +785,11 @@ namespace DataWarehouse.SDK.Contracts
     /// Abstract base class for HSM provider plugins.
     /// Provides PKCS#11-based access to Hardware Security Modules.
     /// </summary>
-    public abstract class HsmProviderPluginBase : LegacyFeaturePluginBase, IHsmProvider, IIntelligenceAware
+    public abstract class HsmProviderPluginBase : SecurityPluginBase, IHsmProvider, IIntelligenceAware
     {
+        /// <inheritdoc/>
+        public override string SecurityDomain => "HSM";
+
         /// <summary>
         /// Gets the category of this plugin. Always returns SecurityProvider for HSM plugins.
         /// </summary>
@@ -792,10 +807,10 @@ namespace DataWarehouse.SDK.Contracts
 
         #region Intelligence Socket
 
-        public bool IsIntelligenceAvailable { get; protected set; }
-        public IntelligenceCapabilities AvailableCapabilities { get; protected set; }
+        public new bool IsIntelligenceAvailable { get; protected set; }
+        public new IntelligenceCapabilities AvailableCapabilities { get; protected set; }
 
-        public virtual async Task<bool> DiscoverIntelligenceAsync(CancellationToken ct = default)
+        public new virtual async Task<bool> DiscoverIntelligenceAsync(CancellationToken ct = default)
         {
             if (MessageBus == null) { IsIntelligenceAvailable = false; return false; }
             IsIntelligenceAvailable = false;

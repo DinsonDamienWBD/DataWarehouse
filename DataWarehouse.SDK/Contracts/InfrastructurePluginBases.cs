@@ -5,6 +5,8 @@ using System.Collections.Concurrent;
 using System.Security.Claims;
 using System.Threading;
 
+using DataWarehouse.SDK.Contracts.Hierarchy;
+
 namespace DataWarehouse.SDK.Contracts
 {
     #region Health Provider
@@ -14,14 +16,17 @@ namespace DataWarehouse.SDK.Contracts
     /// Provides common infrastructure for implementing IHealthCheck with
     /// automatic registration, caching, and component health aggregation.
     /// </summary>
-    public abstract class HealthProviderPluginBase : LegacyFeaturePluginBase, IHealthCheck, IIntelligenceAware
+    public abstract class HealthProviderPluginBase : InfrastructurePluginBase, IHealthCheck, IIntelligenceAware
     {
+        /// <inheritdoc/>
+        public override string InfrastructureDomain => "Health";
+
         #region Intelligence Socket
 
-        public bool IsIntelligenceAvailable { get; protected set; }
-        public IntelligenceCapabilities AvailableCapabilities { get; protected set; }
+        public new bool IsIntelligenceAvailable { get; protected set; }
+        public new IntelligenceCapabilities AvailableCapabilities { get; protected set; }
 
-        public virtual async Task<bool> DiscoverIntelligenceAsync(CancellationToken ct = default)
+        public new virtual async Task<bool> DiscoverIntelligenceAsync(CancellationToken ct = default)
         {
             if (MessageBus == null) { IsIntelligenceAvailable = false; return false; }
             IsIntelligenceAvailable = false;
@@ -248,14 +253,17 @@ namespace DataWarehouse.SDK.Contracts
     /// Abstract base class for rate limiter plugins.
     /// Provides common token bucket implementation with configurable policies.
     /// </summary>
-    public abstract class RateLimiterPluginBase : LegacyFeaturePluginBase, IRateLimiter, IIntelligenceAware
+    public abstract class RateLimiterPluginBase : InfrastructurePluginBase, IRateLimiter, IIntelligenceAware
     {
+        /// <inheritdoc/>
+        public override string InfrastructureDomain => "RateLimiting";
+
         #region Intelligence Socket
 
-        public bool IsIntelligenceAvailable { get; protected set; }
-        public IntelligenceCapabilities AvailableCapabilities { get; protected set; }
+        public new bool IsIntelligenceAvailable { get; protected set; }
+        public new IntelligenceCapabilities AvailableCapabilities { get; protected set; }
 
-        public virtual async Task<bool> DiscoverIntelligenceAsync(CancellationToken ct = default)
+        public new virtual async Task<bool> DiscoverIntelligenceAsync(CancellationToken ct = default)
         {
             if (MessageBus == null) { IsIntelligenceAvailable = false; return false; }
             IsIntelligenceAvailable = false;
@@ -513,14 +521,17 @@ namespace DataWarehouse.SDK.Contracts
     /// Abstract base class for circuit breaker plugins implementing the resilience policy pattern.
     /// Provides automatic failure detection, circuit opening/closing, and statistics tracking.
     /// </summary>
-    public abstract class CircuitBreakerPluginBase : LegacyFeaturePluginBase, IResiliencePolicy, IIntelligenceAware
+    public abstract class CircuitBreakerPluginBase : InfrastructurePluginBase, IResiliencePolicy, IIntelligenceAware
     {
+        /// <inheritdoc/>
+        public override string InfrastructureDomain => "CircuitBreaker";
+
         #region Intelligence Socket
 
-        public bool IsIntelligenceAvailable { get; protected set; }
-        public IntelligenceCapabilities AvailableCapabilities { get; protected set; }
+        public new bool IsIntelligenceAvailable { get; protected set; }
+        public new IntelligenceCapabilities AvailableCapabilities { get; protected set; }
 
-        public virtual async Task<bool> DiscoverIntelligenceAsync(CancellationToken ct = default)
+        public new virtual async Task<bool> DiscoverIntelligenceAsync(CancellationToken ct = default)
         {
             if (MessageBus == null) { IsIntelligenceAvailable = false; return false; }
             IsIntelligenceAvailable = false;
@@ -949,14 +960,17 @@ namespace DataWarehouse.SDK.Contracts
     /// Abstract base class for transaction manager plugins.
     /// Provides common infrastructure for distributed transaction coordination.
     /// </summary>
-    public abstract class TransactionManagerPluginBase : LegacyFeaturePluginBase, ITransactionManager, IIntelligenceAware
+    public abstract class TransactionManagerPluginBase : InfrastructurePluginBase, ITransactionManager, IIntelligenceAware
     {
+        /// <inheritdoc/>
+        public override string InfrastructureDomain => "TransactionManagement";
+
         #region Intelligence Socket
 
-        public bool IsIntelligenceAvailable { get; protected set; }
-        public IntelligenceCapabilities AvailableCapabilities { get; protected set; }
+        public new bool IsIntelligenceAvailable { get; protected set; }
+        public new IntelligenceCapabilities AvailableCapabilities { get; protected set; }
 
-        public virtual async Task<bool> DiscoverIntelligenceAsync(CancellationToken ct = default)
+        public new virtual async Task<bool> DiscoverIntelligenceAsync(CancellationToken ct = default)
         {
             if (MessageBus == null) { IsIntelligenceAvailable = false; return false; }
             IsIntelligenceAvailable = false;
@@ -1444,14 +1458,17 @@ namespace DataWarehouse.SDK.Contracts
     /// Abstract base class for RAID provider plugins.
     /// Provides common RAID functionality including parity calculation and rebuild logic.
     /// </summary>
-    public abstract class RaidProviderPluginBase : LegacyFeaturePluginBase, IRaidProvider, IIntelligenceAware
+    public abstract class RaidProviderPluginBase : InfrastructurePluginBase, IRaidProvider, IIntelligenceAware
     {
+        /// <inheritdoc/>
+        public override string InfrastructureDomain => "RAID";
+
         #region Intelligence Socket
 
-        public bool IsIntelligenceAvailable { get; protected set; }
-        public IntelligenceCapabilities AvailableCapabilities { get; protected set; }
+        public new bool IsIntelligenceAvailable { get; protected set; }
+        public new IntelligenceCapabilities AvailableCapabilities { get; protected set; }
 
-        public virtual async Task<bool> DiscoverIntelligenceAsync(CancellationToken ct = default)
+        public new virtual async Task<bool> DiscoverIntelligenceAsync(CancellationToken ct = default)
         {
             if (MessageBus == null) { IsIntelligenceAvailable = false; return false; }
             IsIntelligenceAvailable = false;
@@ -1733,14 +1750,17 @@ namespace DataWarehouse.SDK.Contracts
     /// Abstract base class for erasure coding provider plugins.
     /// Provides common Reed-Solomon encoding/decoding infrastructure.
     /// </summary>
-    public abstract class ErasureCodingPluginBase : LegacyFeaturePluginBase, IErasureCodingProvider, IIntelligenceAware
+    public abstract class ErasureCodingPluginBase : InfrastructurePluginBase, IErasureCodingProvider, IIntelligenceAware
     {
+        /// <inheritdoc/>
+        public override string InfrastructureDomain => "ErasureCoding";
+
         #region Intelligence Socket
 
-        public bool IsIntelligenceAvailable { get; protected set; }
-        public IntelligenceCapabilities AvailableCapabilities { get; protected set; }
+        public new bool IsIntelligenceAvailable { get; protected set; }
+        public new IntelligenceCapabilities AvailableCapabilities { get; protected set; }
 
-        public virtual async Task<bool> DiscoverIntelligenceAsync(CancellationToken ct = default)
+        public new virtual async Task<bool> DiscoverIntelligenceAsync(CancellationToken ct = default)
         {
             if (MessageBus == null) { IsIntelligenceAvailable = false; return false; }
             IsIntelligenceAvailable = false;
@@ -2073,14 +2093,17 @@ namespace DataWarehouse.SDK.Contracts
     /// <summary>
     /// Abstract base class for compliance provider plugins.
     /// </summary>
-    public abstract class ComplianceProviderPluginBase : LegacyFeaturePluginBase, IComplianceProvider, IIntelligenceAware
+    public abstract class ComplianceProviderPluginBase : SecurityPluginBase, IComplianceProvider, IIntelligenceAware
     {
+        /// <inheritdoc/>
+        public override string SecurityDomain => "Compliance";
+
         #region Intelligence Socket
 
-        public bool IsIntelligenceAvailable { get; protected set; }
-        public IntelligenceCapabilities AvailableCapabilities { get; protected set; }
+        public new bool IsIntelligenceAvailable { get; protected set; }
+        public new IntelligenceCapabilities AvailableCapabilities { get; protected set; }
 
-        public virtual async Task<bool> DiscoverIntelligenceAsync(CancellationToken ct = default)
+        public new virtual async Task<bool> DiscoverIntelligenceAsync(CancellationToken ct = default)
         {
             if (MessageBus == null) { IsIntelligenceAvailable = false; return false; }
             IsIntelligenceAvailable = false;
@@ -2305,14 +2328,17 @@ namespace DataWarehouse.SDK.Contracts
     /// <summary>
     /// Abstract base class for IAM provider plugins.
     /// </summary>
-    public abstract class IAMProviderPluginBase : LegacyFeaturePluginBase, IIAMProvider, IIntelligenceAware
+    public abstract class IAMProviderPluginBase : SecurityPluginBase, IIAMProvider, IIntelligenceAware
     {
+        /// <inheritdoc/>
+        public override string SecurityDomain => "IAM";
+
         #region Intelligence Socket
 
-        public bool IsIntelligenceAvailable { get; protected set; }
-        public IntelligenceCapabilities AvailableCapabilities { get; protected set; }
+        public new bool IsIntelligenceAvailable { get; protected set; }
+        public new IntelligenceCapabilities AvailableCapabilities { get; protected set; }
 
-        public virtual async Task<bool> DiscoverIntelligenceAsync(CancellationToken ct = default)
+        public new virtual async Task<bool> DiscoverIntelligenceAsync(CancellationToken ct = default)
         {
             if (MessageBus == null) { IsIntelligenceAvailable = false; return false; }
             IsIntelligenceAvailable = false;

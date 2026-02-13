@@ -8,6 +8,8 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 
+using DataWarehouse.SDK.Contracts.Hierarchy;
+
 namespace DataWarehouse.SDK.Contracts
 {
     /// <summary>
@@ -16,8 +18,11 @@ namespace DataWarehouse.SDK.Contracts
     /// Implements connection lifecycle management, error handling, and capability enforcement.
     /// Intelligence-aware: Supports AI-driven schema discovery and query optimization.
     /// </summary>
-    public abstract class DataConnectorPluginBase : LegacyFeaturePluginBase, IDataConnector
+    public abstract class DataConnectorPluginBase : InterfacePluginBase, IDataConnector
     {
+        /// <inheritdoc/>
+        public override string Protocol => "DataConnector";
+
         #region Properties
 
         /// <summary>

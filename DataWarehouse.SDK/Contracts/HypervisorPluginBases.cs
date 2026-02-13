@@ -6,6 +6,8 @@ using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 
+using DataWarehouse.SDK.Contracts.Hierarchy;
+
 namespace DataWarehouse.SDK.Contracts;
 
 /// <summary>
@@ -13,8 +15,15 @@ namespace DataWarehouse.SDK.Contracts;
 /// Provides common infrastructure for detecting virtualization platforms and querying VM information.
 /// Implements caching to avoid repeated expensive detection operations.
 /// </summary>
-public abstract class HypervisorDetectorPluginBase : LegacyFeaturePluginBase, IHypervisorDetector, IIntelligenceAware
+public abstract class HypervisorDetectorPluginBase : ComputePluginBase, IHypervisorDetector, IIntelligenceAware
 {
+    /// <inheritdoc/>
+    public override string RuntimeType => "HypervisorDetector";
+
+    /// <inheritdoc/>
+    public override Task<Dictionary<string, object>> ExecuteWorkloadAsync(Dictionary<string, object> workload, CancellationToken ct = default)
+        => Task.FromResult(new Dictionary<string, object> { ["status"] = "delegated-to-hypervisor-detector" });
+
     private HypervisorType? _cachedType;
 
     #region Intelligence Socket
@@ -22,17 +31,17 @@ public abstract class HypervisorDetectorPluginBase : LegacyFeaturePluginBase, IH
     /// <summary>
     /// Gets whether Universal Intelligence (T90) is available for AI-assisted VM analysis.
     /// </summary>
-    public bool IsIntelligenceAvailable { get; protected set; }
+    public new bool IsIntelligenceAvailable { get; protected set; }
 
     /// <summary>
     /// Gets the available Intelligence capabilities.
     /// </summary>
-    public IntelligenceCapabilities AvailableCapabilities { get; protected set; }
+    public new IntelligenceCapabilities AvailableCapabilities { get; protected set; }
 
     /// <summary>
     /// Discovers Intelligence availability.
     /// </summary>
-    public virtual async Task<bool> DiscoverIntelligenceAsync(CancellationToken ct = default)
+    public new virtual async Task<bool> DiscoverIntelligenceAsync(CancellationToken ct = default)
     {
         if (MessageBus == null) { IsIntelligenceAvailable = false; return false; }
         IsIntelligenceAvailable = false;
@@ -200,14 +209,21 @@ public abstract class HypervisorDetectorPluginBase : LegacyFeaturePluginBase, IH
 /// Provides infrastructure for memory ballooning/reclamation in virtualized environments.
 /// Balloon drivers allow the hypervisor to reclaim unused guest memory dynamically.
 /// </summary>
-public abstract class BalloonDriverPluginBase : LegacyFeaturePluginBase, IBalloonDriver, IIntelligenceAware
+public abstract class BalloonDriverPluginBase : ComputePluginBase, IBalloonDriver, IIntelligenceAware
 {
+    /// <inheritdoc/>
+    public override string RuntimeType => "BalloonDriver";
+
+    /// <inheritdoc/>
+    public override Task<Dictionary<string, object>> ExecuteWorkloadAsync(Dictionary<string, object> workload, CancellationToken ct = default)
+        => Task.FromResult(new Dictionary<string, object> { ["status"] = "delegated-to-balloon-driver" });
+
     #region Intelligence Socket
 
-    public bool IsIntelligenceAvailable { get; protected set; }
-    public IntelligenceCapabilities AvailableCapabilities { get; protected set; }
+    public new bool IsIntelligenceAvailable { get; protected set; }
+    public new IntelligenceCapabilities AvailableCapabilities { get; protected set; }
 
-    public virtual async Task<bool> DiscoverIntelligenceAsync(CancellationToken ct = default)
+    public new virtual async Task<bool> DiscoverIntelligenceAsync(CancellationToken ct = default)
     {
         if (MessageBus == null) { IsIntelligenceAvailable = false; return false; }
         IsIntelligenceAvailable = false;
@@ -334,14 +350,21 @@ public abstract class BalloonDriverPluginBase : LegacyFeaturePluginBase, IBalloo
 /// Provides infrastructure for creating application-consistent VM snapshots.
 /// Coordinates with hypervisor snapshot mechanisms and guest OS quiescing.
 /// </summary>
-public abstract class VmSnapshotProviderPluginBase : LegacyFeaturePluginBase, IVmSnapshotProvider, IIntelligenceAware
+public abstract class VmSnapshotProviderPluginBase : ComputePluginBase, IVmSnapshotProvider, IIntelligenceAware
 {
+    /// <inheritdoc/>
+    public override string RuntimeType => "VmSnapshot";
+
+    /// <inheritdoc/>
+    public override Task<Dictionary<string, object>> ExecuteWorkloadAsync(Dictionary<string, object> workload, CancellationToken ct = default)
+        => Task.FromResult(new Dictionary<string, object> { ["status"] = "delegated-to-vm-snapshot" });
+
     #region Intelligence Socket
 
-    public bool IsIntelligenceAvailable { get; protected set; }
-    public IntelligenceCapabilities AvailableCapabilities { get; protected set; }
+    public new bool IsIntelligenceAvailable { get; protected set; }
+    public new IntelligenceCapabilities AvailableCapabilities { get; protected set; }
 
-    public virtual async Task<bool> DiscoverIntelligenceAsync(CancellationToken ct = default)
+    public new virtual async Task<bool> DiscoverIntelligenceAsync(CancellationToken ct = default)
     {
         if (MessageBus == null) { IsIntelligenceAvailable = false; return false; }
         IsIntelligenceAvailable = false;
@@ -476,14 +499,21 @@ public abstract class VmSnapshotProviderPluginBase : LegacyFeaturePluginBase, IV
 /// like VMware VADP, Hyper-V VSS, and Proxmox Backup Server.
 /// Enables efficient incremental backups using changed-block tracking.
 /// </summary>
-public abstract class BackupApiPluginBase : LegacyFeaturePluginBase, IBackupApiIntegration, IIntelligenceAware
+public abstract class BackupApiPluginBase : ComputePluginBase, IBackupApiIntegration, IIntelligenceAware
 {
+    /// <inheritdoc/>
+    public override string RuntimeType => "BackupApi";
+
+    /// <inheritdoc/>
+    public override Task<Dictionary<string, object>> ExecuteWorkloadAsync(Dictionary<string, object> workload, CancellationToken ct = default)
+        => Task.FromResult(new Dictionary<string, object> { ["status"] = "delegated-to-backup-api" });
+
     #region Intelligence Socket
 
-    public bool IsIntelligenceAvailable { get; protected set; }
-    public IntelligenceCapabilities AvailableCapabilities { get; protected set; }
+    public new bool IsIntelligenceAvailable { get; protected set; }
+    public new IntelligenceCapabilities AvailableCapabilities { get; protected set; }
 
-    public virtual async Task<bool> DiscoverIntelligenceAsync(CancellationToken ct = default)
+    public new virtual async Task<bool> DiscoverIntelligenceAsync(CancellationToken ct = default)
     {
         if (MessageBus == null) { IsIntelligenceAvailable = false; return false; }
         IsIntelligenceAvailable = false;

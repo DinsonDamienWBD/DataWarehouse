@@ -16,6 +16,8 @@ using MMWriteOptions = DataWarehouse.SDK.Replication.WriteOptions;
 using MMReadOptions = DataWarehouse.SDK.Replication.ReadOptions;
 using MMReadResult = DataWarehouse.SDK.Replication.ReadResult;
 
+using DataWarehouse.SDK.Contracts.Hierarchy;
+
 namespace DataWarehouse.SDK.Contracts
 {
     /// <summary>
@@ -24,14 +26,14 @@ namespace DataWarehouse.SDK.Contracts
     /// with configurable consistency levels and conflict resolution strategies.
     /// Derived classes implement region-specific transport and storage mechanisms.
     /// </summary>
-    public abstract class MultiMasterReplicationPluginBase : LegacyFeaturePluginBase, DataWarehouse.SDK.Replication.IMultiMasterReplication, IIntelligenceAware
+    public abstract class MultiMasterReplicationPluginBase : ReplicationPluginBase, DataWarehouse.SDK.Replication.IMultiMasterReplication, IIntelligenceAware
     {
         #region Intelligence Socket
 
-        public bool IsIntelligenceAvailable { get; protected set; }
-        public IntelligenceCapabilities AvailableCapabilities { get; protected set; }
+        public new bool IsIntelligenceAvailable { get; protected set; }
+        public new IntelligenceCapabilities AvailableCapabilities { get; protected set; }
 
-        public virtual async Task<bool> DiscoverIntelligenceAsync(CancellationToken ct = default)
+        public new virtual async Task<bool> DiscoverIntelligenceAsync(CancellationToken ct = default)
         {
             if (MessageBus == null) { IsIntelligenceAvailable = false; return false; }
             IsIntelligenceAvailable = false;

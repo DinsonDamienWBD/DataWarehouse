@@ -7,6 +7,8 @@ using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 
+using DataWarehouse.SDK.Contracts.Hierarchy;
+
 namespace DataWarehouse.SDK.Contracts;
 
 /// <summary>
@@ -225,14 +227,17 @@ public abstract class LowLatencyStoragePluginBase : StorageProviderPluginBase, I
 /// Provides infrastructure for zero-copy remote memory access via InfiniBand/RoCE.
 /// Requires platform-specific RDMA libraries (libibverbs on Linux, NetworkDirect on Windows).
 /// </summary>
-public abstract class RdmaTransportPluginBase : LegacyFeaturePluginBase, IRdmaTransport, IIntelligenceAware
+public abstract class RdmaTransportPluginBase : InfrastructurePluginBase, IRdmaTransport, IIntelligenceAware
 {
+    /// <inheritdoc/>
+    public override string InfrastructureDomain => "RDMA";
+
     #region Intelligence Socket
 
-    public bool IsIntelligenceAvailable { get; protected set; }
-    public IntelligenceCapabilities AvailableCapabilities { get; protected set; }
+    public new bool IsIntelligenceAvailable { get; protected set; }
+    public new IntelligenceCapabilities AvailableCapabilities { get; protected set; }
 
-    public virtual async Task<bool> DiscoverIntelligenceAsync(CancellationToken ct = default)
+    public new virtual async Task<bool> DiscoverIntelligenceAsync(CancellationToken ct = default)
     {
         if (MessageBus == null) { IsIntelligenceAvailable = false; return false; }
         IsIntelligenceAvailable = false;
@@ -322,14 +327,17 @@ public abstract class RdmaTransportPluginBase : LegacyFeaturePluginBase, IRdmaTr
 /// Provides infrastructure for ultra-low overhead async I/O using kernel io_uring.
 /// Requires liburing or direct syscall implementation.
 /// </summary>
-public abstract class IoUringProviderPluginBase : LegacyFeaturePluginBase, IIoUringProvider, IIntelligenceAware
+public abstract class IoUringProviderPluginBase : InfrastructurePluginBase, IIoUringProvider, IIntelligenceAware
 {
+    /// <inheritdoc/>
+    public override string InfrastructureDomain => "IoUring";
+
     #region Intelligence Socket
 
-    public bool IsIntelligenceAvailable { get; protected set; }
-    public IntelligenceCapabilities AvailableCapabilities { get; protected set; }
+    public new bool IsIntelligenceAvailable { get; protected set; }
+    public new IntelligenceCapabilities AvailableCapabilities { get; protected set; }
 
-    public virtual async Task<bool> DiscoverIntelligenceAsync(CancellationToken ct = default)
+    public new virtual async Task<bool> DiscoverIntelligenceAsync(CancellationToken ct = default)
     {
         if (MessageBus == null) { IsIntelligenceAvailable = false; return false; }
         IsIntelligenceAvailable = false;
@@ -426,14 +434,17 @@ public abstract class IoUringProviderPluginBase : LegacyFeaturePluginBase, IIoUr
 /// Provides infrastructure for explicit NUMA node memory allocation and thread affinity.
 /// Requires platform-specific NUMA APIs (libnuma on Linux, NUMA API on Windows).
 /// </summary>
-public abstract class NumaAllocatorPluginBase : LegacyFeaturePluginBase, INumaAllocator, IIntelligenceAware
+public abstract class NumaAllocatorPluginBase : InfrastructurePluginBase, INumaAllocator, IIntelligenceAware
 {
+    /// <inheritdoc/>
+    public override string InfrastructureDomain => "NUMA";
+
     #region Intelligence Socket
 
-    public bool IsIntelligenceAvailable { get; protected set; }
-    public IntelligenceCapabilities AvailableCapabilities { get; protected set; }
+    public new bool IsIntelligenceAvailable { get; protected set; }
+    public new IntelligenceCapabilities AvailableCapabilities { get; protected set; }
 
-    public virtual async Task<bool> DiscoverIntelligenceAsync(CancellationToken ct = default)
+    public new virtual async Task<bool> DiscoverIntelligenceAsync(CancellationToken ct = default)
     {
         if (MessageBus == null) { IsIntelligenceAvailable = false; return false; }
         IsIntelligenceAvailable = false;
