@@ -255,44 +255,33 @@ internal sealed class QuantumSafeApiStrategy : SdkInterface.InterfaceStrategyBas
         if (request.Body.Length == 0)
             return (400, new { error = "Request body required for encryption" });
 
-        // Route to Encryption plugin if available
-        if (IsIntelligenceAvailable && MessageBus != null)
+        // Delegate to Encryption plugin via message bus
+        if (!IsIntelligenceAvailable || MessageBus == null)
         {
-            await Task.CompletedTask; // Placeholder for actual encryption call
+            return (503, new { error = "Encryption service not available" });
         }
 
-        // Fallback: Real AES-256-GCM encryption
-        const int KeySize = 32;
-        const int NonceSize = 12;
-        const int TagSize = 16;
+        var plaintext = request.Body.ToArray();
 
-        byte[] key = new byte[KeySize];
-        RandomNumberGenerator.Fill(key);
-
-        byte[] nonce = new byte[NonceSize];
-        RandomNumberGenerator.Fill(nonce);
-
-        byte[] plaintext = request.Body.ToArray();
-        byte[] ciphertext = new byte[plaintext.Length];
-        byte[] tag = new byte[TagSize];
-
-        using (var aesGcm = new AesGcm(key, TagSize))
+        var message = new SDK.Utilities.PluginMessage
         {
-            aesGcm.Encrypt(nonce, plaintext, ciphertext, tag);
-        }
+            Type = "encryption.encrypt",
+            SourcePluginId = "UltimateInterface",
+            Payload = new Dictionary<string, object>
+            {
+                ["data"] = plaintext
+            }
+        };
 
-        // Combine nonce + ciphertext + tag for transmission
-        byte[] combined = new byte[NonceSize + ciphertext.Length + TagSize];
-        Buffer.BlockCopy(nonce, 0, combined, 0, NonceSize);
-        Buffer.BlockCopy(ciphertext, 0, combined, NonceSize, ciphertext.Length);
-        Buffer.BlockCopy(tag, 0, combined, NonceSize + ciphertext.Length, TagSize);
+        await MessageBus.PublishAndWaitAsync("encryption.encrypt", message, cancellationToken);
 
-        string ciphertextBase64 = Convert.ToBase64String(combined);
-        string keyBase64 = Convert.ToBase64String(key);
+        var encrypted = (byte[])message.Payload["result"];
+        var generatedKey = message.Payload.ContainsKey("generatedKey")
+            ? (byte[])message.Payload["generatedKey"]
+            : null;
 
-        // Zero sensitive data
-        CryptographicOperations.ZeroMemory(key);
-        CryptographicOperations.ZeroMemory(plaintext);
+        string ciphertextBase64 = Convert.ToBase64String(encrypted);
+        string? keyBase64 = generatedKey != null ? Convert.ToBase64String(generatedKey) : null;
 
         return (200, new
         {
@@ -301,7 +290,7 @@ internal sealed class QuantumSafeApiStrategy : SdkInterface.InterfaceStrategyBas
             ciphertext = ciphertextBase64,
             key = keyBase64, // In production, this would be securely exchanged
             plaintextSize = request.Body.Length,
-            ciphertextSize = combined.Length,
+            ciphertextSize = encrypted.Length,
             timestamp = DateTimeOffset.UtcNow.ToString("O")
         });
     }
@@ -317,66 +306,61 @@ internal sealed class QuantumSafeApiStrategy : SdkInterface.InterfaceStrategyBas
         if (request.Body.Length == 0)
             return (400, new { error = "Ciphertext required for decryption" });
 
-        // Route to Encryption plugin if available
-        if (IsIntelligenceAvailable && MessageBus != null)
+        // Delegate to Encryption plugin via message bus
+        if (!IsIntelligenceAvailable || MessageBus == null)
         {
-            await Task.CompletedTask; // Placeholder for actual decryption call
+            return (503, new { error = "Encryption service not available" });
         }
-
-        // Fallback: Real AES-256-GCM decryption
-        // For demo purposes, we expect the request body to contain the combined (nonce+ciphertext+tag) data
-        // In production, the key would be securely retrieved, not passed in the request
-        const int NonceSize = 12;
-        const int TagSize = 16;
-
-        byte[] combined = request.Body.ToArray();
-        if (combined.Length < NonceSize + TagSize)
-        {
-            return (400, new { error = "Invalid ciphertext format" });
-        }
-
-        byte[] nonce = new byte[NonceSize];
-        byte[] tag = new byte[TagSize];
-        byte[] ciphertext = new byte[combined.Length - NonceSize - TagSize];
-
-        Buffer.BlockCopy(combined, 0, nonce, 0, NonceSize);
-        Buffer.BlockCopy(combined, NonceSize, ciphertext, 0, ciphertext.Length);
-        Buffer.BlockCopy(combined, NonceSize + ciphertext.Length, tag, 0, TagSize);
 
         // In production, retrieve the actual key securely
-        // For now, generate a placeholder (this would fail to decrypt real data)
-        byte[] key = new byte[32];
-        RandomNumberGenerator.Fill(key);
+        var keyBase64 = request.Headers?.GetValueOrDefault("X-Encryption-Key");
+        if (string.IsNullOrEmpty(keyBase64))
+        {
+            return (400, new { error = "X-Encryption-Key header required for decryption" });
+        }
 
-        byte[] plaintext;
+        byte[] key;
         try
         {
-            plaintext = new byte[ciphertext.Length];
-            using (var aesGcm = new AesGcm(key, TagSize))
+            key = Convert.FromBase64String(keyBase64);
+        }
+        catch (FormatException)
+        {
+            return (400, new { error = "Invalid encryption key format" });
+        }
+
+        var ciphertext = request.Body.ToArray();
+
+        var message = new SDK.Utilities.PluginMessage
+        {
+            Type = "encryption.decrypt",
+            SourcePluginId = "UltimateInterface",
+            Payload = new Dictionary<string, object>
             {
-                aesGcm.Decrypt(nonce, ciphertext, tag, plaintext);
+                ["data"] = ciphertext,
+                ["key"] = key
             }
-        }
-        catch (CryptographicException)
+        };
+
+        try
         {
-            CryptographicOperations.ZeroMemory(key);
-            return (400, new { error = "Decryption failed - invalid key or corrupted data" });
+            await MessageBus.PublishAndWaitAsync("encryption.decrypt", message, cancellationToken);
+            var plaintext = (byte[])message.Payload["result"];
+            string plaintextBase64 = Convert.ToBase64String(plaintext);
+
+            return (200, new
+            {
+                operation = "decrypt",
+                algorithm,
+                plaintext = plaintextBase64,
+                ciphertextSize = request.Body.Length,
+                timestamp = DateTimeOffset.UtcNow.ToString("O")
+            });
         }
-
-        string plaintextBase64 = Convert.ToBase64String(plaintext);
-
-        // Zero sensitive data
-        CryptographicOperations.ZeroMemory(key);
-        CryptographicOperations.ZeroMemory(plaintext);
-
-        return (200, new
+        catch (Exception ex)
         {
-            operation = "decrypt",
-            algorithm,
-            plaintext = plaintextBase64,
-            ciphertextSize = request.Body.Length,
-            timestamp = DateTimeOffset.UtcNow.ToString("O")
-        });
+            return (400, new { error = $"Decryption failed: {ex.Message}" });
+        }
     }
 
     /// <summary>
