@@ -5,9 +5,12 @@ using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Contracts.Hierarchy;
 using DataWarehouse.SDK.Contracts.TamperProof;
 using DataWarehouse.SDK.Primitives;
+using DataWarehouse.SDK.Utilities;
 using DataWarehouse.Plugins.TamperProof.Services;
+using DataWarehouse.Plugins.TamperProof.Hashing;
 using Microsoft.Extensions.Logging;
 using System.Collections.Concurrent;
+using System.Security.Cryptography;
 
 namespace DataWarehouse.Plugins.TamperProof;
 
@@ -974,6 +977,35 @@ public class TamperProofPlugin : IntegrityPluginBase, IDisposable
     }
 
     /// <summary>
+    /// Handles incoming message bus messages for TamperProof operations.
+    /// </summary>
+    public override async Task OnMessageAsync(PluginMessage message)
+    {
+        try
+        {
+            switch (message.Type)
+            {
+                case "integrity.hash.compute":
+                    await HandleHashComputeAsync(message, CancellationToken.None);
+                    break;
+
+                case "integrity.hash.verify":
+                    await HandleHashVerifyAsync(message, CancellationToken.None);
+                    break;
+
+                default:
+                    _logger.LogDebug("TamperProof received unknown message type: {Type}", message.Type);
+                    break;
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error handling message of type {Type}", message.Type);
+            message.Payload["error"] = $"Message handling failed: {ex.Message}";
+        }
+    }
+
+    /// <summary>
     /// Disposes resources used by the plugin.
     /// </summary>
     protected override void Dispose(bool disposing)
@@ -1038,5 +1070,97 @@ public class TamperProofPlugin : IntegrityPluginBase, IDisposable
         await data.CopyToAsync(ms, ct);
         return sha.ComputeHash(ms.ToArray());
     }
+    #endregion
+
+    #region Message Bus Handlers
+
+    /// <summary>
+    /// Handles integrity.hash.compute message bus topic.
+    /// Computes a hash of provided data using the specified algorithm.
+    /// </summary>
+    /// <param name="message">The message containing data and algorithm.</param>
+    /// <param name="ct">Cancellation token.</param>
+    private async Task HandleHashComputeAsync(PluginMessage message, CancellationToken ct)
+    {
+        try
+        {
+            if (!message.Payload.TryGetValue("data", out var dataObj) || dataObj is not byte[] data)
+            {
+                message.Payload["error"] = "Missing or invalid 'data' field";
+                return;
+            }
+
+            var algorithm = message.Payload.TryGetValue("algorithm", out var algObj) && algObj is string algStr
+                ? algStr
+                : "SHA256";
+
+            _logger.LogDebug("Computing hash using algorithm {Algorithm}", algorithm);
+
+            IHashProvider provider = HashProviderFactory.Create(algorithm);
+            using var ms = new MemoryStream(data);
+            var hash = await provider.ComputeHashAsync(ms, ct);
+
+            message.Payload["hash"] = hash;
+            message.Payload["algorithm"] = provider.AlgorithmName;
+
+            _logger.LogDebug("Hash computed successfully using {Algorithm}", provider.AlgorithmName);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to compute hash");
+            message.Payload["error"] = $"Hash computation failed: {ex.Message}";
+        }
+    }
+
+    /// <summary>
+    /// Handles integrity.hash.verify message bus topic.
+    /// Verifies a hash against provided data using constant-time comparison.
+    /// </summary>
+    /// <param name="message">The message containing data, expectedHash, and algorithm.</param>
+    /// <param name="ct">Cancellation token.</param>
+    private async Task HandleHashVerifyAsync(PluginMessage message, CancellationToken ct)
+    {
+        try
+        {
+            if (!message.Payload.TryGetValue("data", out var dataObj) || dataObj is not byte[] data)
+            {
+                message.Payload["error"] = "Missing or invalid 'data' field";
+                message.Payload["valid"] = false;
+                return;
+            }
+
+            if (!message.Payload.TryGetValue("expectedHash", out var expectedHashObj) || expectedHashObj is not byte[] expectedHash)
+            {
+                message.Payload["error"] = "Missing or invalid 'expectedHash' field";
+                message.Payload["valid"] = false;
+                return;
+            }
+
+            var algorithm = message.Payload.TryGetValue("algorithm", out var algObj) && algObj is string algStr
+                ? algStr
+                : "SHA256";
+
+            _logger.LogDebug("Verifying hash using algorithm {Algorithm}", algorithm);
+
+            IHashProvider provider = HashProviderFactory.Create(algorithm);
+            using var ms = new MemoryStream(data);
+            var actualHash = await provider.ComputeHashAsync(ms, ct);
+
+            // Constant-time comparison to prevent timing attacks
+            bool isValid = CryptographicOperations.FixedTimeEquals(actualHash, expectedHash);
+
+            message.Payload["valid"] = isValid;
+
+            _logger.LogDebug("Hash verification {Result} using {Algorithm}",
+                isValid ? "succeeded" : "failed", provider.AlgorithmName);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to verify hash");
+            message.Payload["error"] = $"Hash verification failed: {ex.Message}";
+            message.Payload["valid"] = false;
+        }
+    }
+
     #endregion
 }
