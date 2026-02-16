@@ -369,7 +369,7 @@ Complete the stub implementations in DataWarehouseHost (CopyFiles, RegisterServi
   5. `dw live` starts an in-memory DW instance that CLI/GUI can connect to; all data vanishes on shutdown
   6. `dw install --path <path> --service --autostart` creates a working DW installation with registered service and autostart on Windows, Linux, and macOS
   7. `dw install --from-usb <source> --path <target>` clones a portable DW instance to local disk with remapped paths and registered service
-**Plans**: 8 plans
+**Plans**: 7 plans
 
 Plans:
 - [ ] 31-01-PLAN.md — DynamicCommandRegistry: subscribe to capability events, auto-generate commands, refactor CommandExecutor and CapabilityManager (CLI-02, CLI-04, CLI-05)
@@ -468,11 +468,18 @@ Phase 39 + Phase 41
 **Plans**: 5 plans
 
 Plans:
-- [ ] 32-01-PLAN.md — StorageAddress discriminated union type with variants for all address kinds, implicit conversions from string/Uri for backward compatibility
-- [ ] 32-02-PLAN.md — IHardwareProbe interface and platform-specific implementations (WMI/Windows, sysfs/Linux, IOKit/macOS)
-- [ ] 32-03-PLAN.md — IPlatformCapabilityRegistry with cached hardware inventory, refresh mechanism, and query API
-- [ ] 32-04-PLAN.md — Dynamic driver loading: IDriverLoader, assembly scanning, hot-plug event subscription
-- [ ] 32-05-PLAN.md — Migrate existing storage strategies to StorageAddress, backward compatibility verification
+- [ ] 32-01-PLAN.md — StorageAddress discriminated union type (9 variants, implicit string/Uri conversions, ToKey()/ToUri()/ToPath()) (HAL-01)
+- [ ] 32-02-PLAN.md — IHardwareProbe + platform implementations: Windows/WMI, Linux/sysfs, macOS/system_profiler, NullHardwareProbe fallback (HAL-02)
+- [ ] 32-03-PLAN.md — IPlatformCapabilityRegistry: cached query API, TTL, auto-refresh on hardware changes, debounced events (HAL-03)
+- [ ] 32-04-PLAN.md — IDriverLoader + DriverLoader: [StorageDriver] attribute, assembly scanning, PluginAssemblyLoadContext isolation, hot-plug (HAL-04)
+- [ ] 32-05-PLAN.md — StorageAddress overloads on StorageStrategyBase, IObjectStorageCore, StoragePluginBase, IStorageProvider -- backward-compatible migration (HAL-05)
+
+Wave structure:
+```
+Wave 1: 32-01 (StorageAddress type) + 32-02 (IHardwareProbe) — parallel, no dependencies
+Wave 2: 32-03 (Registry, depends on 32-02) + 32-04 (DriverLoader, depends on 32-02) — parallel
+Wave 3: 32-05 (Integration, depends on 32-01 + 32-02 + 32-03 + 32-04)
+```
 
 #### Phase 33: Virtual Disk Engine
 **Goal**: Build a complete virtual disk engine in the SDK — a real filesystem-like storage layer with block allocation, metadata management, write-ahead logging, crash recovery, B-Tree indexes, copy-on-write semantics, and integrity verification. This is the foundation that makes DataWarehouse a storage ENGINE, not just a storage API.
@@ -488,7 +495,7 @@ Plans:
   6. Copy-on-Write engine enables zero-cost snapshots and efficient clones without data duplication
   7. Block-level checksumming (CRC32C or xxHash) detects silent data corruption on every read
   8. All VDE components integrate with existing UltimateStorage strategies as a new storage backend
-**Plans**: 8 plans
+**Plans**: 7 plans
 
 Plans:
 - [ ] 33-01-PLAN.md — Block allocation engine: bitmap allocator, extent trees, free space management, defragmentation hints
@@ -562,7 +569,7 @@ Plans:
   6. Camera/media frame grabber abstraction captures frames from connected cameras with configurable resolution, format, and frame rate
   7. Real-time signal/interrupt handling enables edge plugins to respond to hardware interrupts with bounded latency
   8. Sensor network mesh support provides Zigbee, LoRA, and BLE abstractions for multi-hop sensor networks
-**Plans**: 8 plans
+**Plans**: 7 plans
 
 Plans:
 - [ ] 36-01-PLAN.md — GPIO/I2C/SPI bus abstraction: System.Device.Gpio wrappers, pin mapping, bus configuration, edge plugin integration
@@ -697,7 +704,7 @@ Plans:
 
 | Phase | Milestone | Plans | Status | Completed |
 |-------|-----------|-------|--------|-----------|
-| 32. StorageAddress & Hardware Discovery | v3.0 | 0/5 | Not started | - |
+| 32. StorageAddress & Hardware Discovery | v3.0 | 5/5 | Planned | - |
 | 33. Virtual Disk Engine | v3.0 | 0/8 | Not started | - |
 | 34. Federated Object Storage & Translation | v3.0 | 0/7 | Not started | - |
 | 35. Hardware Accelerator & Hypervisor | v3.0 | 0/7 | Not started | - |
