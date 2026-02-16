@@ -21,11 +21,11 @@ Note: Phase 30 (3 plans) was subsumed into v3.0 Phase 41 (Comprehensive Audit & 
 
 ### Phase 31.1 Pre-v3.0 Production Readiness Cleanup -- IN PROGRESS
 Phase: 31.1 (inserted post-v2.0)
-Plan: 1 of 5 complete
-Status: Security fixes and build errors resolved; wiring fixes deferred to 31.1-02
-Last activity: 2026-02-16 -- Plan 31.1-01 complete (2/3 tasks)
+Plan: 2 of 5 complete
+Status: UltimateInterface bus integration complete, DataFormat driver pattern verified, PLUGIN-CATALOG updated
+Last activity: 2026-02-16 -- Plan 31.1-03 complete (Tasks 1, 2, 4 complete; Task 3 deferred)
 
-Progress: [####--------------------] 20% (1/5 plans)
+Progress: [########--------------------] 40% (2/5 plans)
 
 ### v3.0 Universal Platform -- PLANNED
 Phase: 0 of 10 (not started)
@@ -107,6 +107,7 @@ Phase 30 NOTE: v2.0 Phase 30 (Testing & Final Verification) has been moved and e
 | 31 | 07 - USB Installer | ~5 min | 2 | 3 |
 | 31 | 08 - PlatformServiceManager + CLI Parity | ~8 min | 2 | 6 |
 | 31.1 | 01 - Security Fixes + Build Errors | ~9 min | 2 | 10 |
+| 31.1 | 03 - Interface Bus + DataFormat | ~25 min | 2 | 14 |
 
 ## Accumulated Context
 
@@ -185,6 +186,8 @@ Phase 30 NOTE: v2.0 Phase 30 (Testing & Final Verification) has been moved and e
 - Phase 31: Live mode = EmbeddedConfiguration with PersistData=false (ephemeral data, like Linux Live CD)
 - Phase 31: USB path remapping handles forward-slash, backslash, and escaped-backslash JSON path references
 - Phase 31.1-01: Replaced 4 fake encryption methods with production AES-256-GCM; fixed 13 build errors (SharpCompress v0.45.1 factory methods, MQTTnet v5.x ReadOnlySequence); deferred P2 wiring fixes to 31.1-02
+- Phase 31.1-03: Driver-required pattern for UltimateDataFormat advanced formats (Parquet, Arrow, HDF5, etc.) is production-ready approach — detection works via magic bytes, parsing requires optional NuGet package installation (mirrors ODBC/JDBC driver model)
+- Phase 31.1-03: All 13 UltimateInterface strategies now use production MessageBus integration (32 bus calls replaced: REST → storage.read/write/delete, RealTime → streaming.subscribe/publish, Security → cache/metering/encryption topics)
 
 ### SDK Audit Results (2026-02-14)
 
