@@ -1,4 +1,5 @@
 using DataWarehouse.SDK.Contracts;
+using DataWarehouse.SDK.Edge.Memory;
 using DataWarehouse.SDK.Primitives;
 using DataWarehouse.SDK.Utilities;
 using System.Collections.Concurrent;
@@ -279,6 +280,21 @@ namespace DataWarehouse.Kernel.Plugins
                 {
                     Success = false,
                     Error = $"Security validation failed: {string.Join("; ", securityResult.Errors)}"
+                };
+            }
+
+            // Memory budget check (EDGE-06) - Phase 36
+            // When BoundedMemoryRuntime is enabled, plugin loading checks available memory budget.
+            // Plugins are rejected if estimated memory requirement exceeds available budget.
+            var estimatedPluginMemory = 10 * 1024 * 1024; // 10MB estimate per plugin
+            if (!BoundedMemoryRuntime.Instance.CanAllocate(estimatedPluginMemory))
+            {
+                return new PluginLoadResult
+                {
+                    Success = false,
+                    Error = $"Insufficient memory budget to load plugin from {assemblyPath}. " +
+                        $"Current usage: {BoundedMemoryRuntime.Instance.CurrentMemoryUsage:N0} bytes, " +
+                        $"Estimated requirement: {estimatedPluginMemory:N0} bytes"
                 };
             }
 
