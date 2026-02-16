@@ -607,59 +607,50 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Advanced
             return new byte[1024 * 1024]; // Placeholder
         }
 
-        private Task<byte[]> EncryptBackupAsync(byte[] data, byte[] key, CancellationToken ct)
+        private async Task<byte[]> EncryptBackupAsync(byte[] data, byte[] key, CancellationToken ct)
         {
-            // Production AES-256-GCM encryption
-            const int NonceSize = 12;
-            const int TagSize = 16;
-
-            byte[] nonce = new byte[NonceSize];
-            RandomNumberGenerator.Fill(nonce);
-
-            byte[] ciphertext = new byte[data.Length];
-            byte[] tag = new byte[TagSize];
-
-            using (var aesGcm = new AesGcm(key, TagSize))
+            // Delegate to UltimateEncryption plugin via message bus
+            if (!IsIntelligenceAvailable || MessageBus == null)
             {
-                aesGcm.Encrypt(nonce, data, ciphertext, tag);
+                throw new InvalidOperationException("Encryption service not available");
             }
 
-            // Combine nonce + ciphertext + tag
-            byte[] result = new byte[NonceSize + ciphertext.Length + TagSize];
-            Buffer.BlockCopy(nonce, 0, result, 0, NonceSize);
-            Buffer.BlockCopy(ciphertext, 0, result, NonceSize, ciphertext.Length);
-            Buffer.BlockCopy(tag, 0, result, NonceSize + ciphertext.Length, TagSize);
+            var message = new SDK.Utilities.PluginMessage
+            {
+                Type = "encryption.encrypt",
+                SourcePluginId = "UltimateDataProtection",
+                Payload = new Dictionary<string, object>
+                {
+                    ["data"] = data,
+                    ["key"] = key
+                }
+            };
 
-            return Task.FromResult(result);
+            await MessageBus.PublishAndWaitAsync("encryption.encrypt", message, ct);
+            return (byte[])message.Payload["result"];
         }
 
-        private Task<byte[]> DecryptBackupAsync(byte[] encryptedData, byte[] key, CancellationToken ct)
+        private async Task<byte[]> DecryptBackupAsync(byte[] encryptedData, byte[] key, CancellationToken ct)
         {
-            // Production AES-256-GCM decryption
-            const int NonceSize = 12;
-            const int TagSize = 16;
-
-            if (encryptedData.Length < NonceSize + TagSize)
+            // Delegate to UltimateEncryption plugin via message bus
+            if (!IsIntelligenceAvailable || MessageBus == null)
             {
-                throw new CryptographicException("Invalid encrypted data format");
+                throw new InvalidOperationException("Encryption service not available");
             }
 
-            byte[] nonce = new byte[NonceSize];
-            byte[] tag = new byte[TagSize];
-            byte[] ciphertext = new byte[encryptedData.Length - NonceSize - TagSize];
-
-            Buffer.BlockCopy(encryptedData, 0, nonce, 0, NonceSize);
-            Buffer.BlockCopy(encryptedData, NonceSize, ciphertext, 0, ciphertext.Length);
-            Buffer.BlockCopy(encryptedData, NonceSize + ciphertext.Length, tag, 0, TagSize);
-
-            byte[] plaintext = new byte[ciphertext.Length];
-
-            using (var aesGcm = new AesGcm(key, TagSize))
+            var message = new SDK.Utilities.PluginMessage
             {
-                aesGcm.Decrypt(nonce, ciphertext, tag, plaintext);
-            }
+                Type = "encryption.decrypt",
+                SourcePluginId = "UltimateDataProtection",
+                Payload = new Dictionary<string, object>
+                {
+                    ["data"] = encryptedData,
+                    ["key"] = key
+                }
+            };
 
-            return Task.FromResult(plaintext);
+            await MessageBus.PublishAndWaitAsync("encryption.decrypt", message, ct);
+            return (byte[])message.Payload["result"];
         }
 
         private Task StoreKeySharesAsync(string backupId, List<KeyShare> shares, CancellationToken ct)

@@ -518,30 +518,25 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Advanced
 
         private async Task<byte[]> EncryptBackupDataAsync(byte[] data, byte[] key, CancellationToken ct)
         {
-            await Task.CompletedTask;
-
-            // Production AES-256-GCM encryption
-            const int NonceSize = 12;
-            const int TagSize = 16;
-
-            byte[] nonce = new byte[NonceSize];
-            RandomNumberGenerator.Fill(nonce);
-
-            byte[] ciphertext = new byte[data.Length];
-            byte[] tag = new byte[TagSize];
-
-            using (var aesGcm = new AesGcm(key, TagSize))
+            // Delegate to UltimateEncryption plugin via message bus
+            if (!IsIntelligenceAvailable || MessageBus == null)
             {
-                aesGcm.Encrypt(nonce, data, ciphertext, tag);
+                throw new InvalidOperationException("Encryption service not available");
             }
 
-            // Combine nonce + ciphertext + tag
-            byte[] result = new byte[NonceSize + ciphertext.Length + TagSize];
-            Buffer.BlockCopy(nonce, 0, result, 0, NonceSize);
-            Buffer.BlockCopy(ciphertext, 0, result, NonceSize, ciphertext.Length);
-            Buffer.BlockCopy(tag, 0, result, NonceSize + ciphertext.Length, TagSize);
+            var message = new SDK.Utilities.PluginMessage
+            {
+                Type = "encryption.encrypt",
+                SourcePluginId = "UltimateDataProtection",
+                Payload = new Dictionary<string, object>
+                {
+                    ["data"] = data,
+                    ["key"] = key
+                }
+            };
 
-            return result;
+            await MessageBus.PublishAndWaitAsync("encryption.encrypt", message, ct);
+            return (byte[])message.Payload["result"];
         }
 
         private async Task<string> CreatePackageSignatureAsync(byte[] data, CancellationToken ct)
@@ -629,9 +624,27 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Advanced
 
         private async Task<byte[]> DecryptBackupDataAsync(byte[] encryptedData, string keyMaterial, CancellationToken ct)
         {
-            // In production, decrypt using AES-256-GCM or ChaCha20-Poly1305
-            await Task.CompletedTask;
-            return encryptedData;
+            // Delegate to UltimateEncryption plugin via message bus
+            if (!IsIntelligenceAvailable || MessageBus == null)
+            {
+                throw new InvalidOperationException("Encryption service not available");
+            }
+
+            var key = DeriveEncryptionKey(keyMaterial);
+
+            var message = new SDK.Utilities.PluginMessage
+            {
+                Type = "encryption.decrypt",
+                SourcePluginId = "UltimateDataProtection",
+                Payload = new Dictionary<string, object>
+                {
+                    ["data"] = encryptedData,
+                    ["key"] = key
+                }
+            };
+
+            await MessageBus.PublishAndWaitAsync("encryption.decrypt", message, ct);
+            return (byte[])message.Payload["result"];
         }
 
         private async Task<long> RestoreFilesFromDataAsync(
