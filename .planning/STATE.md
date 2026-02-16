@@ -5,17 +5,17 @@
 See: .planning/PROJECT.md (updated 2026-02-12)
 
 **Core value:** SDK must pass hyperscale/military-level code review -- clean hierarchy, secure by default, distributed-ready, zero warnings.
-**Current focus:** Phase 28 complete -- ready for Phase 29
+**Current focus:** Phase 29 complete -- all distributed coordination algorithms implemented
 
 ## Current Position
 
 Milestone: v2.0 SDK Hardening & Distributed Infrastructure
-Phase: 28 of 29 (Dead Code Cleanup) -- COMPLETE
+Phase: 29 of 29 (Advanced Distributed Coordination) -- COMPLETE
 Plan: 4 of 4 in current phase (all done)
-Status: Phase complete
-Last activity: 2026-02-14 -- Phase 28 complete (4/4 plans)
+Status: v2.0 MILESTONE COMPLETE
+Last activity: 2026-02-16 -- Phase 29 complete (4/4 plans)
 
-Progress: [########################] 100% (44/44 plans)
+Progress: [########################] 100% (48/48 plans)
 
 ## Performance Metrics
 
@@ -25,7 +25,7 @@ Progress: [########################] 100% (44/44 plans)
 - Timeline: 30 days (2026-01-13 to 2026-02-11)
 
 **v2.0:**
-- Total plans completed: 44 / 44 estimated
+- Total plans completed: 48 / 48 estimated
 - Average duration: ~11 min/plan
 
 | Phase | Plan | Duration | Tasks | Files |
@@ -73,6 +73,10 @@ Progress: [########################] 100% (44/44 plans)
 | 28 | 02 - Delete Pure Dead Files | ~25 min | 2 | 27 |
 | 28 | 03 - Dead AI Files & Mixed File Surgery | ~30 min | 2 | 14 |
 | 28 | 04 - Phase 27 Cleanup & Verification | ~15 min | 2 | 3 |
+| 29 | 01 - SWIM Gossip Membership + P2P Gossip | ~8 min | 2 | 3 |
+| 29 | 04 - Consistent Hash Ring + Load Balancers | ~4 min | 2 | 3 |
+| 29 | 02 - Raft Consensus Leader Election | ~6 min | 2 | 3 |
+| 29 | 03 - CRDT Conflict Resolution | ~6 min | 2 | 3 |
 
 ## Accumulated Context
 
@@ -136,6 +140,12 @@ Progress: [########################] 100% (44/44 plans)
 - Phase 28: 8 live types preserved from dead IStorageOrchestration.cs regions (AuditEntry, HashAlgorithmType, etc.)
 - Phase 28: 6 NLP types extracted to NlpTypes.cs from deleted SpecializedIntelligenceAwareBases.cs
 - Phase 28: IntelligenceAwarePluginBase is LIVE (core of Hierarchy) -- cannot be deleted
+- Phase 29: SWIM incarnation numbers for self-refutation (node suspected -> increment incarnation -> broadcast Alive)
+- Phase 29: GCounter merge uses Math.Max per node (NOT sum) for CRDT idempotency
+- Phase 29: Raft election timeout randomized via RandomNumberGenerator.GetInt32 (CRYPTO-02 compliance)
+- Phase 29: Non-generic ICrdtType interface for runtime dispatch from CrdtRegistry (instead of self-referential generic)
+- Phase 29: CrdtRegistry made public for DI, ICrdtType-returning methods kept internal
+- Phase 29: Source-generated JSON contexts (SwimJsonContext, RaftJsonContext, GossipJsonContext) for AOT-friendly serialization
 
 ### SDK Audit Results (2026-02-14)
 
@@ -152,6 +162,7 @@ Progress: [########################] 100% (44/44 plans)
 - Phase 26: 31 new files (18 contracts + 13 in-memory), 2 modified (PluginBase, InfrastructurePluginBases)
 - Phase 27: 0 new files, 123+ modified (60 SDK bases + 63 plugin files), zero LegacyFeaturePluginBase refs remain
 - Phase 28: 33 files deleted, 17 modified, 4 created; 32,555 net LOC removed
+- Phase 29: 12 files created (0 modified, 0 deleted); 3,911 LOC added in DataWarehouse.SDK/Infrastructure/Distributed/
 
 ### Blockers/Concerns
 
@@ -222,8 +233,16 @@ Progress: [########################] 100% (44/44 plans)
   - 7 deviations: NewFeaturePluginBase.cs live (Rule 1), WriteFanOutOrchestratorPluginBase recovery (Rule 1), StandardizedExceptions extraction (Rule 1), VectorOperations.cs live (Rule 1), KnowledgeCapability migration (Rule 1), PluginBase.cs Python scripting (Rule 1), NlpTypes extraction (Rule 1)
   - **Net result: 32,555 LOC removed, 33 files deleted, zero functionality lost**
 
+- [x] **Phase 29: Advanced Distributed Coordination** (4/4 plans) -- SWIM membership, Raft consensus, CRDT replication, consistent hashing, resource-aware load balancing
+  - 29-01: SwimClusterMembership (IClusterMembership with SWIM probe/suspect/dead), GossipReplicator (IGossipProtocol with bounded epidemic propagation)
+  - 29-04: ConsistentHashRing (IConsistentHashRing with 150 virtual nodes, XxHash32), ConsistentHashLoadBalancer, ResourceAwareLoadBalancer
+  - 29-02: RaftConsensusEngine (IConsensusEngine with leader election, log replication, heartbeat), RaftPersistentState, RaftLogEntry
+  - 29-03: SdkGCounter, SdkPNCounter, SdkLWWRegister, SdkORSet (4 CRDT types), CrdtRegistry, CrdtReplicationSync (IReplicationSync)
+  - 2 deviations: PluginCategory/HandshakeResponse fix (Rule 1), CrdtRegistry accessibility fix (Rule 3)
+  - **Net result: 3,911 LOC added, 12 files created, zero new warnings, zero new NuGet dependencies**
+
 ## Session Continuity
 
-Last session: 2026-02-14
-Stopped at: Completed Phase 28 (all 4 plans)
-Resume: `/gsd:plan-phase 29` or `/gsd:execute-phase 29`
+Last session: 2026-02-16
+Stopped at: Completed Phase 29 (all 4 plans) -- v2.0 MILESTONE COMPLETE
+Resume: All 29 phases complete. Next: Phase 30+ or new milestone planning.
