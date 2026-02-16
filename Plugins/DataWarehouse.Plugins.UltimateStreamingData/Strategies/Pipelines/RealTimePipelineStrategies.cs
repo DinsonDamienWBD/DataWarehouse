@@ -1082,15 +1082,57 @@ public sealed class StreamEnrichmentPipelineStrategy : StreamingDataStrategyBase
         return $"{source.SourceId}:{keyValue}";
     }
 
-    private Task<Dictionary<string, object>> DatabaseLookupAsync(
+    private async Task<Dictionary<string, object>> DatabaseLookupAsync(
         EnrichmentSource source, BaseRecord record, CancellationToken ct)
     {
-        // Simulated database lookup
-        return Task.FromResult(new Dictionary<string, object>
+        // Delegate database lookup to UltimateStorage via message bus
+        if (MessageBus == null || !IsIntelligenceAvailable)
         {
-            ["_db_enriched"] = true,
-            ["_lookup_timestamp"] = DateTime.UtcNow
-        });
+            return new Dictionary<string, object>
+            {
+                ["_db_enriched"] = false,
+                ["_error"] = "Message bus not available"
+            };
+        }
+
+        try
+        {
+            var message = new DataWarehouse.SDK.Utilities.PluginMessage
+            {
+                Type = "storage.query",
+                Payload = new Dictionary<string, object>
+                {
+                    ["SourceId"] = source.SourceId,
+                    ["RecordId"] = record.RecordId,
+                    ["QueryConfig"] = source.Config,
+                    ["RequestedAt"] = DateTime.UtcNow
+                }
+            };
+
+            await MessageBus.SendAsync("storage.query", message, ct);
+
+            // Extract result from message payload
+            if (message.Payload.TryGetValue("Result", out var resultObj) && resultObj is Dictionary<string, object> result)
+            {
+                result["_db_enriched"] = true;
+                result["_lookup_timestamp"] = DateTime.UtcNow;
+                return result;
+            }
+
+            return new Dictionary<string, object>
+            {
+                ["_db_enriched"] = false,
+                ["_lookup_timestamp"] = DateTime.UtcNow
+            };
+        }
+        catch
+        {
+            return new Dictionary<string, object>
+            {
+                ["_db_enriched"] = false,
+                ["_lookup_timestamp"] = DateTime.UtcNow
+            };
+        }
     }
 
     private Task<Dictionary<string, object>> ApiLookupAsync(
@@ -1113,16 +1155,58 @@ public sealed class StreamEnrichmentPipelineStrategy : StreamingDataStrategyBase
         });
     }
 
-    private Task<Dictionary<string, object>> MlInferenceAsync(
+    private async Task<Dictionary<string, object>> MlInferenceAsync(
         EnrichmentSource source, BaseRecord record, CancellationToken ct)
     {
-        // Simulated ML inference
-        return Task.FromResult(new Dictionary<string, object>
+        // Delegate ML inference to UltimateIntelligence via message bus
+        if (MessageBus == null || !IsIntelligenceAvailable)
         {
-            ["_ml_score"] = 0.85,
-            ["_ml_model"] = source.Config.ModelId ?? "default",
-            ["_inference_latency_ms"] = 5.2
-        });
+            return new Dictionary<string, object>
+            {
+                ["_ml_score"] = 0.0,
+                ["_ml_model"] = source.Config.ModelId ?? "default",
+                ["_error"] = "Message bus not available"
+            };
+        }
+
+        try
+        {
+            var startTime = DateTime.UtcNow;
+            var message = new DataWarehouse.SDK.Utilities.PluginMessage
+            {
+                Type = "intelligence.infer",
+                Payload = new Dictionary<string, object>
+                {
+                    ["ModelId"] = source.Config.ModelId ?? "default",
+                    ["RecordData"] = record.Data ?? new Dictionary<string, object>(),
+                    ["RequestedAt"] = startTime
+                }
+            };
+
+            await MessageBus.SendAsync("intelligence.infer", message, ct);
+
+            // Extract inference result from message payload
+            var score = message.Payload.TryGetValue("Score", out var scoreObj)
+                ? Convert.ToDouble(scoreObj)
+                : 0.0;
+            var latencyMs = (DateTime.UtcNow - startTime).TotalMilliseconds;
+
+            return new Dictionary<string, object>
+            {
+                ["_ml_score"] = score,
+                ["_ml_model"] = source.Config.ModelId ?? "default",
+                ["_inference_latency_ms"] = latencyMs
+            };
+        }
+        catch
+        {
+            return new Dictionary<string, object>
+            {
+                ["_ml_score"] = 0.0,
+                ["_ml_model"] = source.Config.ModelId ?? "default",
+                ["_inference_latency_ms"] = 0.0
+            };
+        }
     }
 
     private Dictionary<string, object> GetStaticEnrichment(EnrichmentSource source, BaseRecord record)
