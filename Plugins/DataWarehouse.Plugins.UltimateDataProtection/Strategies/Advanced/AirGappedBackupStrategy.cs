@@ -518,9 +518,30 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Advanced
 
         private async Task<byte[]> EncryptBackupDataAsync(byte[] data, byte[] key, CancellationToken ct)
         {
-            // In production, use AES-256-GCM or ChaCha20-Poly1305
             await Task.CompletedTask;
-            return data; // Placeholder
+
+            // Production AES-256-GCM encryption
+            const int NonceSize = 12;
+            const int TagSize = 16;
+
+            byte[] nonce = new byte[NonceSize];
+            RandomNumberGenerator.Fill(nonce);
+
+            byte[] ciphertext = new byte[data.Length];
+            byte[] tag = new byte[TagSize];
+
+            using (var aesGcm = new AesGcm(key, TagSize))
+            {
+                aesGcm.Encrypt(nonce, data, ciphertext, tag);
+            }
+
+            // Combine nonce + ciphertext + tag
+            byte[] result = new byte[NonceSize + ciphertext.Length + TagSize];
+            Buffer.BlockCopy(nonce, 0, result, 0, NonceSize);
+            Buffer.BlockCopy(ciphertext, 0, result, NonceSize, ciphertext.Length);
+            Buffer.BlockCopy(tag, 0, result, NonceSize + ciphertext.Length, TagSize);
+
+            return result;
         }
 
         private async Task<string> CreatePackageSignatureAsync(byte[] data, CancellationToken ct)
