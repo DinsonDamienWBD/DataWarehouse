@@ -264,6 +264,17 @@ public sealed class CommandExecutor
         Register(new LiveStopCommand());
         Register(new LiveStatusCommand());
 
+        // Service management commands
+        Register(new ServiceStatusCommand());
+        Register(new ServiceStartCommand());
+        Register(new ServiceStopCommand());
+        Register(new ServiceRestartCommand());
+        Register(new ServiceUninstallCommand());
+
+        // Connection commands
+        Register(new ConnectCommand());
+        Register(new DisconnectCommand());
+
         // System commands
         Register(new SystemInfoCommand());
         Register(new SystemCapabilitiesCommand());

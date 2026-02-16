@@ -1,5 +1,6 @@
 using DataWarehouse.SDK.Hosting;
 using DataWarehouse.Shared.Commands;
+using DataWarehouse.Shared.Services;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using System.Diagnostics;
@@ -642,75 +643,30 @@ public sealed class DataWarehouseHost : IAsyncDisposable, IServerHost
     }
 
     /// <summary>
-    /// Registers a platform-specific system service using PlatformServiceManager
-    /// when available, falling back to direct registration.
+    /// Registers a platform-specific system service by delegating to PlatformServiceManager.
+    /// This ensures a single source of truth for service management logic, accessible
+    /// to both the Launcher and CLI.
     /// </summary>
     private async Task RegisterServiceAsync(InstallConfiguration config, CancellationToken ct)
     {
-        var exePath = Path.Combine(config.InstallPath, "DataWarehouse.Launcher.exe");
+        var exePath = OperatingSystem.IsWindows()
+            ? Path.Combine(config.InstallPath, "DataWarehouse.Launcher.exe")
+            : Path.Combine(config.InstallPath, "DataWarehouse.Launcher");
 
-        if (OperatingSystem.IsWindows())
+        _logger.LogInformation("Registering system service via PlatformServiceManager...");
+
+        var registration = new ServiceRegistration
         {
-            _logger.LogInformation("Registering Windows service...");
-            await RunProcessAsync("sc",
-                $"create DataWarehouse binPath= \"{exePath}\" DisplayName= \"DataWarehouse Service\" start= auto",
-                ct);
+            Name = OperatingSystem.IsMacOS() ? "com.datawarehouse" : "DataWarehouse",
+            DisplayName = "DataWarehouse Service",
+            ExecutablePath = exePath,
+            WorkingDirectory = config.InstallPath,
+            AutoStart = config.AutoStart,
+            Description = "DataWarehouse data management service"
+        };
 
-            if (config.AutoStart)
-            {
-                await RunProcessAsync("sc", "config DataWarehouse start= auto", ct);
-            }
-        }
-        else if (OperatingSystem.IsLinux())
-        {
-            _logger.LogInformation("Creating systemd service file...");
-            var unitContent = $@"[Unit]
-Description=DataWarehouse Service
-After=network.target
-
-[Service]
-Type=simple
-ExecStart={Path.Combine(config.InstallPath, "DataWarehouse.Launcher")}
-WorkingDirectory={config.InstallPath}
-Restart=always
-RestartSec=10
-
-[Install]
-WantedBy=multi-user.target
-";
-            await File.WriteAllTextAsync("/etc/systemd/system/datawarehouse.service", unitContent, ct);
-            await RunProcessAsync("systemctl", "daemon-reload", ct);
-
-            if (config.AutoStart)
-            {
-                await RunProcessAsync("systemctl", "enable datawarehouse", ct);
-            }
-        }
-        else if (OperatingSystem.IsMacOS())
-        {
-            _logger.LogInformation("Creating launchd plist...");
-            var plistContent = $@"<?xml version=""1.0"" encoding=""UTF-8""?>
-<!DOCTYPE plist PUBLIC ""-//Apple//DTD PLIST 1.0//EN"" ""http://www.apple.com/DTDs/PropertyList-1.0.dtd"">
-<plist version=""1.0"">
-<dict>
-    <key>Label</key>
-    <string>com.datawarehouse</string>
-    <key>ProgramArguments</key>
-    <array>
-        <string>{Path.Combine(config.InstallPath, "DataWarehouse.Launcher")}</string>
-    </array>
-    <key>WorkingDirectory</key>
-    <string>{config.InstallPath}</string>
-    <key>RunAtLoad</key>
-    <{(config.AutoStart ? "true" : "false")}/>
-    <key>KeepAlive</key>
-    <true/>
-</dict>
-</plist>";
-            var plistPath = "/Library/LaunchDaemons/com.datawarehouse.plist";
-            await File.WriteAllTextAsync(plistPath, plistContent, ct);
-            await RunProcessAsync("launchctl", $"load {plistPath}", ct);
-        }
+        await PlatformServiceManager.RegisterServiceAsync(registration, ct);
+        _logger.LogInformation("System service registered successfully");
     }
 
     /// <summary>
