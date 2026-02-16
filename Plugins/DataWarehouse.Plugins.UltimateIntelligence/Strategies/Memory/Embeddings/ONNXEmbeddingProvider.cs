@@ -352,12 +352,19 @@ public sealed class ONNXEmbeddingProvider : EmbeddingProviderBase
         // using var results = _session.Run(inputs);
         // var output = results.First().AsTensor<float>();
 
-        // Simulated output for demonstration
-        var random = new Random(tokens.GetHashCode());
+        // Deterministic hash-based pseudo-embeddings (Phase 36-04 will build proper WASI-NN + ONNX Runtime)
         var embedding = new float[_dimensions];
+        using var sha256 = System.Security.Cryptography.SHA256.Create();
+        var tokenBytes = new byte[tokens.Length * 4];
+        Buffer.BlockCopy(tokens, 0, tokenBytes, 0, tokenBytes.Length);
+        var hash = sha256.ComputeHash(tokenBytes);
+
+        // Generate deterministic pseudo-embedding from hash
         for (int i = 0; i < _dimensions; i++)
         {
-            embedding[i] = (float)(random.NextDouble() * 2 - 1);
+            var hashIndex = (i * 2) % hash.Length;
+            var value = (hash[hashIndex] << 8 | hash[(hashIndex + 1) % hash.Length]) / 65535.0f;
+            embedding[i] = (float)(value * 2 - 1); // Map [0,1] to [-1,1]
         }
 
         // Normalize the embedding
