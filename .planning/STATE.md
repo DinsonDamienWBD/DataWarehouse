@@ -19,10 +19,18 @@ Progress: [########################] 100% (56/56 applicable plans)
 
 Note: Phase 30 (3 plans) was subsumed into v3.0 Phase 41 (Comprehensive Audit & Testing). All v2.0 implementation phases (21.5 through 31) are complete.
 
+### Phase 31.1 Pre-v3.0 Production Readiness Cleanup -- IN PROGRESS
+Phase: 31.1 (inserted post-v2.0)
+Plan: 1 of 5 complete
+Status: Security fixes and build errors resolved; wiring fixes deferred to 31.1-02
+Last activity: 2026-02-16 -- Plan 31.1-01 complete (2/3 tasks)
+
+Progress: [####--------------------] 20% (1/5 plans)
+
 ### v3.0 Universal Platform -- PLANNED
 Phase: 0 of 10 (not started)
 Plan: 0 of 64 total plans
-Status: Requirements and roadmap defined; awaiting v2.0 completion
+Status: Requirements and roadmap defined; awaiting Phase 31.1 completion
 Defined: 2026-02-16
 Updated: 2026-02-16 (added Phases 38-40: Feature Composition + Medium/Large Implementations; renumbered audit to Phase 41)
 
@@ -98,6 +106,7 @@ Phase 30 NOTE: v2.0 Phase 30 (Testing & Final Verification) has been moved and e
 | 31 | 05 - Live Mode + USB Detection | ~6 min | 2 | 4 |
 | 31 | 07 - USB Installer | ~5 min | 2 | 3 |
 | 31 | 08 - PlatformServiceManager + CLI Parity | ~8 min | 2 | 6 |
+| 31.1 | 01 - Security Fixes + Build Errors | ~9 min | 2 | 10 |
 
 ## Accumulated Context
 
@@ -175,6 +184,7 @@ Phase 30 NOTE: v2.0 Phase 30 (Testing & Final Verification) has been moved and e
 - Phase 31: PlatformServiceManager in Shared (not Launcher) so both CLI and Launcher access same service management code
 - Phase 31: Live mode = EmbeddedConfiguration with PersistData=false (ephemeral data, like Linux Live CD)
 - Phase 31: USB path remapping handles forward-slash, backslash, and escaped-backslash JSON path references
+- Phase 31.1-01: Replaced 4 fake encryption methods with production AES-256-GCM; fixed 13 build errors (SharpCompress v0.45.1 factory methods, MQTTnet v5.x ReadOnlySequence); deferred P2 wiring fixes to 31.1-02
 
 ### SDK Audit Results (2026-02-14)
 
