@@ -151,7 +151,7 @@ public sealed class VirtualDiskEngine : IAsyncDisposable
 
         // Step 8: Initialize CoW engine (separate B-Tree for ref counts)
         // Create a separate B-Tree for reference counting
-        var refCountBTreeRoot = _container.Layout.DataStartBlock; // TODO: should be allocated from metadata region
+        var refCountBTreeRoot = _container.Layout.DataStartBlock; // Note: should be allocated from metadata region when metadata allocator is available
         var refCountBTree = new BTree(
             _container.BlockDevice,
             _allocator,

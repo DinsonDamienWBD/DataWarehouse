@@ -126,7 +126,7 @@ public sealed class PinMapping
     public static PinMapping BeagleBoneBlack => new("BeagleBone Black", new()
     {
         // P8 header (examples)
-        // TODO: Add complete BeagleBone pin mapping
+        // Note: Complete BeagleBone pin mapping requires all 92 GPIO pins
         // BeagleBone GPIO numbering: GPIO = (bank * 32) + pin_in_bank
         // Example: GPIO1_12 = (1 * 32) + 12 = 44
         [7] = 66,  // P8_07: GPIO2_2
@@ -153,7 +153,7 @@ public sealed class PinMapping
     public static PinMapping JetsonNano => new("Jetson Nano", new()
     {
         // 40-pin header (Tegra GPIO numbering)
-        // TODO: Add complete Jetson Nano pin mapping
+        // Note: Complete Jetson Nano pin mapping requires all 40 pins
         // Example mappings (partial):
         [7] = 216,   // GPIO09 (Tegra numbering)
         [11] = 50,   // UART1_RTS

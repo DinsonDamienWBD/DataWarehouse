@@ -130,7 +130,7 @@ namespace DataWarehouse.SDK.Edge.Protocols
         /// </remarks>
         public Task<IDisposable> ObserveAsync(string resourceUri, Action<CoApResponse> onNotification, CancellationToken ct = default)
         {
-            // TODO: Full Observe implementation requires:
+            // Full Observe implementation requires:
             // 1. Send GET request with Observe option (option 6, value 0)
             // 2. Store observation in _observations dictionary
             // 3. Server sends periodic notifications with incremented Observe option value

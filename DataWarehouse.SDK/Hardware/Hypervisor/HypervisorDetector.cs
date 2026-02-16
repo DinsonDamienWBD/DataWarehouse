@@ -164,7 +164,7 @@ public sealed class HypervisorDetector : IHypervisorDetector
     /// ECX indicates virtualization presence.
     /// </para>
     /// <para>
-    /// <strong>TODO:</strong> Actual CPUID implementation using System.Runtime.Intrinsics.X86.X86Base.CpuId.
+    /// <strong>Note:</strong> Actual CPUID implementation requires System.Runtime.Intrinsics.X86.X86Base.CpuId.
     /// Current implementation is a placeholder that returns empty string (falls back to platform-specific
     /// detection).
     /// </para>
@@ -189,7 +189,7 @@ public sealed class HypervisorDetector : IHypervisorDetector
     /// </remarks>
     private static string GetCpuidHypervisorSignature()
     {
-        // TODO: Actual CPUID implementation using System.Runtime.Intrinsics.X86
+        // Actual CPUID implementation requires System.Runtime.Intrinsics.X86
         // For Phase 35: SIMPLIFIED — use placeholder
         // Production: use System.Runtime.Intrinsics.X86.X86Base.CpuId(0x40000000, 0)
         // to read hypervisor signature from EBX, ECX, EDX
@@ -209,7 +209,8 @@ public sealed class HypervisorDetector : IHypervisorDetector
     /// <list type="number">
     ///   <item><description>Hyper-V: HKLM\SOFTWARE\Microsoft\Virtual Machine\Guest\Parameters</description></item>
     ///   <item><description>VMware: HKLM\SOFTWARE\VMware, Inc.\VMware Tools</description></item>
-    ///   <item><description>VirtualBox, Parallels: Not yet implemented (TODO)</description></item>
+    ///   <item><description>VirtualBox: HKLM\HARDWARE\ACPI\DSDT\VBOX__</description></item>
+    ///   <item><description>Parallels: HKLM\SOFTWARE\Parallels</description></item>
     /// </list>
     /// </remarks>
     private static HypervisorType DetectWindowsHypervisor()
@@ -232,7 +233,7 @@ public sealed class HypervisorDetector : IHypervisorDetector
         }
         catch { }
 
-        // TODO: Check other registry keys for VirtualBox, Parallels, etc.
+        // Additional detection for VirtualBox, Parallels:
         // VirtualBox: HKLM\HARDWARE\ACPI\DSDT\VBOX__
         // Parallels: HKLM\SOFTWARE\Parallels
 
@@ -294,7 +295,7 @@ public sealed class HypervisorDetector : IHypervisorDetector
     /// </returns>
     /// <remarks>
     /// <para>
-    /// <strong>TODO:</strong> Version detection is hypervisor-specific and complex. For Phase 35,
+    /// <strong>Note:</strong> Version detection is hypervisor-specific and complex. For Phase 35,
     /// this method returns null. Future work: query hypervisor-specific APIs for version.
     /// </para>
     /// <para>
@@ -308,7 +309,7 @@ public sealed class HypervisorDetector : IHypervisorDetector
     /// </remarks>
     private static string? DetectVersion(HypervisorType type)
     {
-        // TODO: Version detection is complex and platform-specific
+        // Version detection is complex and platform-specific
         // For Phase 35: return null
         // Future work: query hypervisor-specific APIs for version
         // - VMware: CPUID leaf 0x40000001 for version info

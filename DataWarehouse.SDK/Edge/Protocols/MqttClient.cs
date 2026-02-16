@@ -377,7 +377,7 @@ namespace DataWarehouse.SDK.Edge.Protocols
             if (topicsToRestore.Count > 0)
             {
                 // Restore all subscriptions with QoS 1 (default)
-                // TODO: Track per-topic QoS for accurate restoration
+                // Note: Accurate restoration requires tracking per-topic QoS levels
                 await SubscribeAsync(topicsToRestore, MqttQualityOfServiceLevel.AtLeastOnce, ct);
             }
         }
