@@ -11,6 +11,7 @@ using System.Net.Security;
 using System.Net.Sockets;
 using System.Security.Cryptography;
 using System.Text.Json;
+using DataWarehouse.Plugins.AdaptiveTransport.BandwidthMonitor;
 
 namespace DataWarehouse.Plugins.AdaptiveTransport;
 
@@ -36,6 +37,9 @@ namespace DataWarehouse.Plugins.AdaptiveTransport;
 /// - transport.switch: Force protocol switch
 /// - transport.config: Configure transport settings
 /// - transport.stats: Get transport statistics
+/// - transport.bandwidth.measure: Measure bandwidth to endpoint
+/// - transport.bandwidth.classify: Get current link classification
+/// - transport.bandwidth.parameters: Get adaptive sync parameters
 /// </summary>
 public sealed class AdaptiveTransportPlugin : StreamingPluginBase
 {
@@ -53,6 +57,7 @@ public sealed class AdaptiveTransportPlugin : StreamingPluginBase
     private long _totalBytesReceived;
 #pragma warning restore CS0649
     private long _totalSwitches;
+    private BandwidthAwareSyncMonitor? _bandwidthMonitor;
 
     /// <inheritdoc/>
     public override string Id => "datawarehouse.plugins.transport.adaptive";
@@ -107,7 +112,10 @@ public sealed class AdaptiveTransportPlugin : StreamingPluginBase
             new() { Name = "transport.quality", DisplayName = "Network Quality", Description = "Get network quality metrics" },
             new() { Name = "transport.switch", DisplayName = "Switch Protocol", Description = "Force protocol switch" },
             new() { Name = "transport.config", DisplayName = "Configure", Description = "Configure transport settings" },
-            new() { Name = "transport.stats", DisplayName = "Statistics", Description = "Get transport statistics" }
+            new() { Name = "transport.stats", DisplayName = "Statistics", Description = "Get transport statistics" },
+            new() { Name = "transport.bandwidth.measure", DisplayName = "Measure Bandwidth", Description = "Measure bandwidth to endpoint" },
+            new() { Name = "transport.bandwidth.classify", DisplayName = "Classify Link", Description = "Get current link classification" },
+            new() { Name = "transport.bandwidth.parameters", DisplayName = "Sync Parameters", Description = "Get adaptive sync parameters" }
         };
     }
 
@@ -145,6 +153,15 @@ public sealed class AdaptiveTransportPlugin : StreamingPluginBase
             case "transport.stats":
                 HandleStats(message);
                 break;
+            case "transport.bandwidth.measure":
+                await HandleBandwidthMeasureAsync(message);
+                break;
+            case "transport.bandwidth.classify":
+                HandleBandwidthClassify(message);
+                break;
+            case "transport.bandwidth.parameters":
+                HandleBandwidthParameters(message);
+                break;
             default:
                 await base.OnMessageAsync(message);
                 break;
@@ -162,6 +179,16 @@ public sealed class AdaptiveTransportPlugin : StreamingPluginBase
 
         // Start network quality monitoring
         _qualityMonitorTimer.Change(TimeSpan.Zero, _config.QualityCheckInterval);
+
+        // Start bandwidth monitor if configured
+        if (_config.MonitoredEndpoints.Length > 0)
+        {
+            EnsureBandwidthMonitor();
+            if (_bandwidthMonitor != null)
+            {
+                await _bandwidthMonitor.StartAsync(ct);
+            }
+        }
     }
 
     /// <inheritdoc/>
@@ -169,6 +196,12 @@ public sealed class AdaptiveTransportPlugin : StreamingPluginBase
     {
         _isRunning = false;
         _qualityMonitorTimer.Change(Timeout.Infinite, Timeout.Infinite);
+
+        // Stop bandwidth monitor
+        if (_bandwidthMonitor != null)
+        {
+            await _bandwidthMonitor.StopAsync();
+        }
 
         // Close all connection pools
         foreach (var pool in _connectionPools.Values)
@@ -1308,6 +1341,122 @@ public sealed class AdaptiveTransportPlugin : StreamingPluginBase
             SuggestedAckTimeout = TimeSpan.FromMilliseconds(metrics.AverageLatencyMs * 3),
             SuggestedRetries = metrics.PacketLossPercent > 10 ? 15 : 10,
             UseStoreForward = metrics.PacketLossPercent > 20 || metrics.Quality == NetworkQuality.Unusable
+        };
+    }
+
+    #endregion
+
+    #region Bandwidth Monitoring
+
+    /// <summary>
+    /// Ensures the bandwidth monitor is initialized (lazy initialization).
+    /// </summary>
+    private void EnsureBandwidthMonitor()
+    {
+        if (_bandwidthMonitor != null)
+            return;
+
+        var endpoint = _config.MonitoredEndpoints.FirstOrDefault() ?? "8.8.8.8:80";
+        var options = new BandwidthMonitorOptions(
+            ProbeIntervalMs: (int)_config.QualityCheckInterval.TotalMilliseconds,
+            ProbeEndpoint: endpoint,
+            EnableAutoAdjust: _config.AutoSwitchEnabled,
+            HysteresisThreshold: 0.7);
+
+        _bandwidthMonitor = new BandwidthAwareSyncMonitor(options);
+    }
+
+    private async Task HandleBandwidthMeasureAsync(PluginMessage message)
+    {
+        EnsureBandwidthMonitor();
+
+        var endpoint = GetString(message.Payload, "endpoint");
+        if (string.IsNullOrWhiteSpace(endpoint))
+        {
+            message.Payload["error"] = "endpoint parameter required";
+            return;
+        }
+
+        try
+        {
+            var probe = new BandwidthProbe();
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+            var measurement = await probe.MeasureAsync(endpoint, cts.Token);
+
+            message.Payload["result"] = new Dictionary<string, object>
+            {
+                ["timestamp"] = measurement.Timestamp,
+                ["downloadBytesPerSecond"] = measurement.DownloadBytesPerSecond,
+                ["uploadBytesPerSecond"] = measurement.UploadBytesPerSecond,
+                ["latencyMs"] = measurement.LatencyMs,
+                ["jitterMs"] = measurement.JitterMs,
+                ["packetLossPercent"] = measurement.PacketLossPercent
+            };
+        }
+        catch (Exception ex)
+        {
+            message.Payload["error"] = ex.Message;
+        }
+    }
+
+    private void HandleBandwidthClassify(PluginMessage message)
+    {
+        EnsureBandwidthMonitor();
+
+        var classification = _bandwidthMonitor?.GetCurrentClassification();
+        if (classification == null)
+        {
+            message.Payload["result"] = new Dictionary<string, object>
+            {
+                ["class"] = "Unknown",
+                ["message"] = "No classification available yet"
+            };
+            return;
+        }
+
+        message.Payload["result"] = new Dictionary<string, object>
+        {
+            ["class"] = classification.Class.ToString(),
+            ["confidence"] = classification.Confidence,
+            ["classifiedAt"] = classification.ClassifiedAt,
+            ["measurement"] = new Dictionary<string, object>
+            {
+                ["downloadBytesPerSecond"] = classification.MeasuredBandwidth.DownloadBytesPerSecond,
+                ["uploadBytesPerSecond"] = classification.MeasuredBandwidth.UploadBytesPerSecond,
+                ["latencyMs"] = classification.MeasuredBandwidth.LatencyMs,
+                ["jitterMs"] = classification.MeasuredBandwidth.JitterMs,
+                ["packetLossPercent"] = classification.MeasuredBandwidth.PacketLossPercent
+            }
+        };
+    }
+
+    private void HandleBandwidthParameters(PluginMessage message)
+    {
+        EnsureBandwidthMonitor();
+
+        var parameters = _bandwidthMonitor?.GetCurrentParameters();
+        if (parameters == null)
+        {
+            message.Payload["result"] = new Dictionary<string, object>
+            {
+                ["message"] = "No parameters available yet"
+            };
+            return;
+        }
+
+        message.Payload["result"] = new Dictionary<string, object>
+        {
+            ["mode"] = parameters.Mode.ToString(),
+            ["maxConcurrency"] = parameters.MaxConcurrency,
+            ["chunkSizeBytes"] = parameters.ChunkSizeBytes,
+            ["compressionEnabled"] = parameters.CompressionEnabled,
+            ["retryPolicy"] = new Dictionary<string, object>
+            {
+                ["maxRetries"] = parameters.RetryPolicy.MaxRetries,
+                ["initialBackoffMs"] = parameters.RetryPolicy.InitialBackoffMs,
+                ["maxBackoffMs"] = parameters.RetryPolicy.MaxBackoffMs,
+                ["backoffMultiplier"] = parameters.RetryPolicy.BackoffMultiplier
+            }
         };
     }
 

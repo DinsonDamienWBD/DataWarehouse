@@ -8,6 +8,7 @@ using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Contracts.Hierarchy;
 using DataWarehouse.SDK.Primitives;
 using DataWarehouse.SDK.Utilities;
+using DataWarehouse.Plugins.UltimateEdgeComputing.Strategies.FederatedLearning;
 using EC = DataWarehouse.SDK.Contracts.EdgeComputing;
 
 namespace DataWarehouse.Plugins.UltimateEdgeComputing;
@@ -100,6 +101,9 @@ public sealed class UltimateEdgeComputingPlugin : OrchestrationPluginBase, EC.IE
     /// <summary>Gets the multi-edge orchestrator. Available after InitializeAsync.</summary>
     public EC.IMultiEdgeOrchestrator? Orchestrator { get; private set; }
 
+    /// <summary>Gets the federated learning orchestrator. Available after InitializeAsync.</summary>
+    public FederatedLearningOrchestrator? FederatedLearning { get; private set; }
+
     /// <summary>Initializes the edge computing strategy with configuration.</summary>
     public async Task InitializeAsync(EC.EdgeComputingConfiguration config, CancellationToken ct = default)
     {
@@ -124,6 +128,22 @@ public sealed class UltimateEdgeComputingPlugin : OrchestrationPluginBase, EC.IE
 
         RegisterStrategies(nodeManager, dataSynchronizer, offlineManager, cloudCommunicator,
             analyticsEngine, securityManager, resourceManager, orchestrator);
+
+        // Initialize federated learning orchestrator
+        var trainingConfig = new TrainingConfig(
+            Epochs: 5,
+            BatchSize: 32,
+            LearningRate: 0.01,
+            MinParticipation: 0.5,
+            StragglerTimeoutMs: 30000,
+            MaxRounds: 100);
+        var privacyConfig = new PrivacyConfig(
+            Epsilon: 1.0,
+            Delta: 1e-5,
+            ClipNorm: 1.0,
+            EnablePrivacy: false);
+        FederatedLearning = new FederatedLearningOrchestrator(trainingConfig, privacyConfig);
+
         _initialized = true;
         await Task.CompletedTask;
     }
