@@ -138,10 +138,19 @@ internal sealed class GenericWebhookStrategy : SdkInterface.InterfaceStrategyBas
         if (_eventRoutingTable.TryGetValue(eventType, out var topic))
         {
             // Route via message bus
-            if (IsIntelligenceAvailable)
+            if (IsIntelligenceAvailable && MessageBus != null)
             {
-                // In production, this would send to the mapped topic
-                // await MessageBus.PublishAsync(topic, payload, cancellationToken);
+                // Create message with webhook payload
+                var message = new DataWarehouse.SDK.Utilities.PluginMessage
+                {
+                    Type = eventType,
+                    SourcePluginId = "ultimate-interface-webhook",
+                    Payload = new Dictionary<string, object>
+                    {
+                        ["webhook_payload"] = payload.ToString() ?? "{}"
+                    }
+                };
+                await MessageBus.PublishAsync(topic, message, cancellationToken);
             }
         }
 
