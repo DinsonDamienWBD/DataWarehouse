@@ -1,3 +1,4 @@
+using System.Reflection;
 using System.Security.Cryptography;
 using DataWarehouse.Plugins.UltimateCompression.Strategies.LzFamily;
 using DataWarehouse.SDK.Contracts.Compression;
@@ -135,7 +136,7 @@ public class UltimateCompressionStrategyTests
     public void CompressionStrategyBase_ShouldDefineCharacteristics()
     {
         var type = typeof(CompressionStrategyBase);
-        type.GetProperty("Characteristics").Should().NotBeNull();
+        type.GetProperty("Characteristics", BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly).Should().NotBeNull();
     }
 
     [Fact]
