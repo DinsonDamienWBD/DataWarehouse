@@ -54,6 +54,9 @@ namespace DataWarehouse.SDK.Hardware
         QatAccelerator = 4096,
 
         /// <summary>Serial or UART port.</summary>
-        SerialPort = 8192
+        SerialPort = 8192,
+
+        /// <summary>SCSI controller (including paravirtualized variants).</summary>
+        ScsiController = 16384
     }
 }
