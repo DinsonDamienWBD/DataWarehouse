@@ -124,18 +124,8 @@ public class InstanceManager
     {
         if (!_isConnected)
         {
-            // For demo/development mode, return mock response
-            return new Message
-            {
-                Id = Guid.NewGuid().ToString(),
-                Type = MessageType.Response,
-                Command = command,
-                Data = new Dictionary<string, object>
-                {
-                    ["success"] = true,
-                    ["message"] = $"Command '{command}' executed (development mode)"
-                }
-            };
+            throw new InvalidOperationException(
+                "Not connected to a DataWarehouse instance. Use 'dw connect' to connect to an instance first.");
         }
 
         var message = new Message
