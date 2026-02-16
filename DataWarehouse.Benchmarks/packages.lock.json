@@ -190,8 +190,8 @@
       },
       "System.CodeDom": {
         "type": "Transitive",
-        "resolved": "9.0.5",
-        "contentHash": "cuzLM2MWutf9ZBEMPYYfd0DXwYdvntp7VCT6a/wvbKCa2ZuvGmW74xi+YBa2mrfEieAXqM4TNKlMmSnfAfpUoQ=="
+        "resolved": "10.0.3",
+        "contentHash": "+G1mBhHJp8taiDcHK1gmckOZ884n9JeIrS1dzFYZhSa8oTiIF+EagIyAyCOQzdBbbES7eb9AkjGBlUZqqoCaeg=="
       },
       "System.IO.Hashing": {
         "type": "Transitive",
@@ -200,10 +200,10 @@
       },
       "System.Management": {
         "type": "Transitive",
-        "resolved": "9.0.5",
-        "contentHash": "n6o9PZm9p25+zAzC3/48K0oHnaPKTInRrxqFq1fi/5TPbMLjuoCm/h//mS3cUmSy+9AO1Z+qsC/Ilt/ZFatv5Q==",
+        "resolved": "10.0.3",
+        "contentHash": "VyK/nnG1ZgwP/wY8HGrNrdha7kenyI+bkfE0miywiRaWVwqtenuYshA6pmP6Xm7lPsTE2ZRZ+BkzmUVg/VZtTg==",
         "dependencies": {
-          "System.CodeDom": "9.0.5"
+          "System.CodeDom": "10.0.3"
         }
       },
       "System.Reflection.TypeExtensions": {
@@ -217,7 +217,8 @@
           "Microsoft.Extensions.Logging.Abstractions": "[10.0.3, )",
           "Microsoft.Json.Schema": "[2.3.0, )",
           "Newtonsoft.Json": "[13.0.4, )",
-          "System.IO.Hashing": "[10.0.3, )"
+          "System.IO.Hashing": "[10.0.3, )",
+          "System.Management": "[10.0.3, )"
         }
       }
     }
