@@ -4,18 +4,30 @@
 
 See: .planning/PROJECT.md (updated 2026-02-12)
 
-**Core value:** SDK must pass hyperscale/military-level code review -- clean hierarchy, secure by default, distributed-ready, zero warnings.
-**Current focus:** Phase 29 complete -- all distributed coordination algorithms implemented
+**Core value:** Universal platform that addresses any storage medium on any hardware -- from bare-metal NVMe to Raspberry Pi GPIO -- with federated routing and production-grade audit.
+**Current focus:** v2.0 COMPLETE (56/56 plans). v3.0 Universal Platform milestone planned and ready for execution.
 
 ## Current Position
 
-Milestone: v2.0 SDK Hardening & Distributed Infrastructure
-Phase: 29 of 29 (Advanced Distributed Coordination) -- COMPLETE
-Plan: 4 of 4 in current phase (all done)
-Status: v2.0 MILESTONE COMPLETE
-Last activity: 2026-02-16 -- Phase 29 complete (4/4 plans)
+### v2.0 SDK Hardening & Distributed Infrastructure -- COMPLETE
+Phase: 31 of 31 execution complete (Phase 30 subsumed into v3.0 Phase 38)
+Plan: 56 of 59 total plans complete (3 Phase 30 plans moved to v3.0 Phase 38)
+Status: ALL v2.0 IMPLEMENTATION COMPLETE
+Last activity: 2026-02-16 -- Phase 31 complete (8/8 plans)
 
-Progress: [########################] 100% (48/48 plans)
+Progress: [########################] 100% (56/56 applicable plans)
+
+Note: Phase 30 (3 plans) was subsumed into v3.0 Phase 38 (Comprehensive Audit & Testing). All v2.0 implementation phases (21.5 through 31) are complete.
+
+### v3.0 Universal Platform -- PLANNED
+Phase: 0 of 7 (not started)
+Plan: 0 of 49 total plans
+Status: Requirements and roadmap defined; awaiting v2.0 completion
+Defined: 2026-02-16
+
+Progress: [------------------------] 0% (0/49 plans)
+
+Phase 30 NOTE: v2.0 Phase 30 (Testing & Final Verification) has been moved and expanded into v3.0 Phase 38 (Comprehensive Production Audit & Testing). Phase 38 includes the original Phase 30 test plans (38-01, 38-02, 38-03) plus 6 new comprehensive audit perspectives (38-04 through 38-09).
 
 ## Performance Metrics
 
@@ -25,8 +37,8 @@ Progress: [########################] 100% (48/48 plans)
 - Timeline: 30 days (2026-01-13 to 2026-02-11)
 
 **v2.0:**
-- Total plans completed: 48 / 48 estimated
-- Average duration: ~11 min/plan
+- Total plans completed: 56 / 56 applicable (Phase 30 moved to v3.0)
+- Average duration: ~10 min/plan
 
 | Phase | Plan | Duration | Tasks | Files |
 |-------|------|----------|-------|-------|
@@ -77,6 +89,14 @@ Progress: [########################] 100% (48/48 plans)
 | 29 | 04 - Consistent Hash Ring + Load Balancers | ~4 min | 2 | 3 |
 | 29 | 02 - Raft Consensus Leader Election | ~6 min | 2 | 3 |
 | 29 | 03 - CRDT Conflict Resolution | ~6 min | 2 | 3 |
+| 31 | 03 - Foundation (IServerHost, Channel messaging) | ~8 min | 2 | 4 |
+| 31 | 01 - DynamicCommandRegistry | ~6 min | 2 | 5 |
+| 31 | 02 - NLP Message Bus Routing | ~5 min | 2 | 2 |
+| 31 | 04 - Launcher HTTP API | ~10 min | 2 | 4 |
+| 31 | 06 - Real Install Pipeline | ~12 min | 2 | 4 |
+| 31 | 05 - Live Mode + USB Detection | ~6 min | 2 | 4 |
+| 31 | 07 - USB Installer | ~5 min | 2 | 3 |
+| 31 | 08 - PlatformServiceManager + CLI Parity | ~8 min | 2 | 6 |
 
 ## Accumulated Context
 
@@ -146,6 +166,14 @@ Progress: [########################] 100% (48/48 plans)
 - Phase 29: Non-generic ICrdtType interface for runtime dispatch from CrdtRegistry (instead of self-referential generic)
 - Phase 29: CrdtRegistry made public for DI, ICrdtType-returning methods kept internal
 - Phase 29: Source-generated JSON contexts (SwimJsonContext, RaftJsonContext, GossipJsonContext) for AOT-friendly serialization
+- Phase 31: Channel<T>-based in-process messaging for real message delivery (replaces mock SendInProcessAsync)
+- Phase 31: IServerHost interface in Shared with static ServerHostRegistry avoids Shared->Launcher circular dependency
+- Phase 31: DynamicCommandRegistry uses ConcurrentDictionary + message bus subscription for runtime command discovery
+- Phase 31: ASP.NET Core minimal APIs via FrameworkReference (not NuGet) for .NET 10 Launcher HTTP endpoints
+- Phase 31: SHA256 with RandomNumberGenerator salt for admin password hashing + CryptographicOperations.ZeroMemory
+- Phase 31: PlatformServiceManager in Shared (not Launcher) so both CLI and Launcher access same service management code
+- Phase 31: Live mode = EmbeddedConfiguration with PersistData=false (ephemeral data, like Linux Live CD)
+- Phase 31: USB path remapping handles forward-slash, backslash, and escaped-backslash JSON path references
 
 ### SDK Audit Results (2026-02-14)
 
@@ -163,6 +191,7 @@ Progress: [########################] 100% (48/48 plans)
 - Phase 27: 0 new files, 123+ modified (60 SDK bases + 63 plugin files), zero LegacyFeaturePluginBase refs remain
 - Phase 28: 33 files deleted, 17 modified, 4 created; 32,555 net LOC removed
 - Phase 29: 12 files created (0 modified, 0 deleted); 3,911 LOC added in DataWarehouse.SDK/Infrastructure/Distributed/
+- Phase 31: 12 files created, 10 modified; ~3,000 LOC added across Shared/Commands, Shared/Services, Launcher/Integration, CLI
 
 ### Blockers/Concerns
 
@@ -241,8 +270,59 @@ Progress: [########################] 100% (48/48 plans)
   - 2 deviations: PluginCategory/HandshakeResponse fix (Rule 1), CrdtRegistry accessibility fix (Rule 3)
   - **Net result: 3,911 LOC added, 12 files created, zero new warnings, zero new NuGet dependencies**
 
+- [x] **Phase 31: Unified Interface & Deployment Modes** (8/8 plans) -- Dynamic commands, NLP routing, HTTP API, real install, live mode, USB install, platform services, CLI parity
+  - 31-03: Channel-based in-process messaging, IServerHost interface and ServerHostRegistry
+  - 31-01: DynamicCommandRegistry with ConcurrentDictionary, message bus subscription, dynamic CapabilityManager features
+  - 31-02: NlpMessageBusRouter with graceful degradation chain (pattern -> bus -> AI -> help)
+  - 31-04: ASP.NET Core minimal API (FrameworkReference), /api/v1/* endpoints, ServiceHost HTTP integration
+  - 31-06: Real CopyFilesAsync, SHA256 password hashing, sc create/systemd/launchd service registration, CLI install command
+  - 31-05: PortableMediaDetector (USB detection, port scanning), LiveStart/Stop/Status commands, CLI auto-discovery
+  - 31-07: UsbInstaller (validation, tree copy, path remapping in JSON, post-install verification)
+  - 31-08: PlatformServiceManager (unified sc/systemd/launchd), ServiceManagement commands, ConnectCommand, feature parity
+  - 5 deviations: NU1510 PackageReference conflicts (Rule 1), CS4010 async lambda (Rule 1), Results.ServiceUnavailable (Rule 1), CS1988 ref in async (Rule 1), InstanceManager API mismatch (Rule 1)
+  - **Net result: 12 files created, 10 files modified; real production install pipeline, live mode, USB install, platform service management**
+
+## v3.0 Milestone Plan
+
+### Phases Overview
+
+| Phase | Name | Requirements | Plans | Depends On | Status |
+|-------|------|-------------|-------|------------|--------|
+| 32 | StorageAddress & Hardware Discovery | HAL-01 to HAL-05 | 5 | v2.0 complete | Not started |
+| 33 | Virtual Disk Engine | VDE-01 to VDE-08 | 8 | Phase 32 | Not started |
+| 34 | Federated Object Storage & Translation | FOS-01 to FOS-07 | 7 | Phase 32, 33 | Not started |
+| 35 | Hardware Accelerator & Hypervisor | HW-01 to HW-07 | 7 | Phase 32 | Not started |
+| 36 | Edge/IoT Hardware Integration | EDGE-01 to EDGE-08 | 8 | Phase 32 | Not started |
+| 37 | Multi-Environment Deployment | ENV-01 to ENV-05 | 5 | Phase 34, 35, 36 | Not started |
+| 38 | Comprehensive Audit & Testing | TEST-01-06, AUDIT-01-06 | 9 | ALL prior | Not started |
+| **Total** | | **56 requirements** | **49 plans** | | |
+
+### Dependency Graph
+
+```
+32 ──► 33 ──► 34 ──► 37 ──► 38
+ ├──► 35 ──────────► 37
+ └──► 36 ──────────► 37
+```
+
+### Parallelism Opportunities
+- Phase 33 + Phase 35 + Phase 36 can overlap (all depend only on Phase 32)
+- Phase 35 and Phase 36 are fully independent
+- Phase 34 must wait for both Phase 32 and Phase 33
+- Phase 37 must wait for Phase 34, 35, and 36
+- Phase 38 is the final sequential gate
+
+### Key Technical Decisions (v3.0)
+
+- StorageAddress is a discriminated union / tagged type (not a class hierarchy)
+- VDE is a real storage engine, not a wrapper around existing filesystems
+- Federation uses Raft consensus from Phase 29 for manifest replication
+- All hardware integrations are optional -- graceful fallback to software
+- Phase 38 subsumes v2.0 Phase 30 -- no separate v2.0 testing phase
+- Audit perspectives are stakeholder-specific (SRE, user, SMB, hyperscale, scientific, government)
+
 ## Session Continuity
 
 Last session: 2026-02-16
-Stopped at: Completed Phase 29 (all 4 plans) -- v2.0 MILESTONE COMPLETE
-Resume: All 29 phases complete. Next: Phase 30+ or new milestone planning.
+Stopped at: v2.0 COMPLETE -- Phase 31 executed (8/8 plans, all 56 applicable v2.0 plans done)
+Resume: v3.0 Universal Platform ready for execution. Begin with Phase 32 (StorageAddress & Hardware Discovery).
