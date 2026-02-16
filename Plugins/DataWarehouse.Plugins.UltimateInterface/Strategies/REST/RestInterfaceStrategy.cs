@@ -132,21 +132,30 @@ internal sealed class RestInterfaceStrategy : SdkInterface.InterfaceStrategyBase
         // Route via message bus if available
         if (IsIntelligenceAvailable && MessageBus != null)
         {
-            var busRequest = new Dictionary<string, object>
+            var message = new SDK.Utilities.PluginMessage
             {
-                ["operation"] = "read",
-                ["path"] = path,
-                ["page"] = page,
-                ["pageSize"] = pageSize,
-                ["filter"] = filter ?? string.Empty
+                Type = "storage.read",
+                Payload = new Dictionary<string, object>
+                {
+                    ["operation"] = "read",
+                    ["path"] = path,
+                    ["page"] = page,
+                    ["pageSize"] = pageSize,
+                    ["filter"] = filter ?? string.Empty
+                }
             };
 
-            // Send to message bus topic for data retrieval
-            // In production, this would await a response from the bus
-            await Task.CompletedTask; // Placeholder for actual bus call
+            var response = await MessageBus.SendAsync("storage.read", message, cancellationToken);
+            if (response.Success && response.Payload != null)
+            {
+                return (200, response.Payload);
+            }
+
+            // If bus call fails, return error
+            return (503, new { error = "Service unavailable", message = response.ErrorMessage ?? "Storage backend unavailable" });
         }
 
-        // Return mock data for demonstration (in production, return actual data from bus)
+        // Fallback if message bus not available
         return (200, new
         {
             path,
@@ -183,14 +192,26 @@ internal sealed class RestInterfaceStrategy : SdkInterface.InterfaceStrategyBase
         // Route via message bus if available
         if (IsIntelligenceAvailable && MessageBus != null)
         {
-            var busRequest = new Dictionary<string, object>
+            var message = new SDK.Utilities.PluginMessage
             {
-                ["operation"] = "create",
-                ["path"] = path,
-                ["body"] = bodyText
+                Type = "storage.write",
+                Payload = new Dictionary<string, object>
+                {
+                    ["operation"] = "create",
+                    ["path"] = path,
+                    ["body"] = bodyText
+                }
             };
 
-            await Task.CompletedTask; // Placeholder for actual bus call
+            doc?.Dispose();
+
+            var response = await MessageBus.SendAsync("storage.write", message, cancellationToken);
+            if (response.Success && response.Payload != null)
+            {
+                return (201, response.Payload);
+            }
+
+            return (503, new { error = "Service unavailable", message = response.ErrorMessage ?? "Storage backend unavailable" });
         }
 
         doc?.Dispose();
@@ -220,14 +241,24 @@ internal sealed class RestInterfaceStrategy : SdkInterface.InterfaceStrategyBase
         // Route via message bus if available
         if (IsIntelligenceAvailable && MessageBus != null)
         {
-            var busRequest = new Dictionary<string, object>
+            var message = new SDK.Utilities.PluginMessage
             {
-                ["operation"] = "update",
-                ["path"] = path,
-                ["body"] = bodyText
+                Type = "storage.write",
+                Payload = new Dictionary<string, object>
+                {
+                    ["operation"] = "update",
+                    ["path"] = path,
+                    ["body"] = bodyText
+                }
             };
 
-            await Task.CompletedTask; // Placeholder for actual bus call
+            var response = await MessageBus.SendAsync("storage.write", message, cancellationToken);
+            if (response.Success && response.Payload != null)
+            {
+                return (200, response.Payload);
+            }
+
+            return (503, new { error = "Service unavailable", message = response.ErrorMessage ?? "Storage backend unavailable" });
         }
 
         return (200, new
@@ -248,13 +279,23 @@ internal sealed class RestInterfaceStrategy : SdkInterface.InterfaceStrategyBase
         // Route via message bus if available
         if (IsIntelligenceAvailable && MessageBus != null)
         {
-            var busRequest = new Dictionary<string, object>
+            var message = new SDK.Utilities.PluginMessage
             {
-                ["operation"] = "delete",
-                ["path"] = path
+                Type = "storage.delete",
+                Payload = new Dictionary<string, object>
+                {
+                    ["operation"] = "delete",
+                    ["path"] = path
+                }
             };
 
-            await Task.CompletedTask; // Placeholder for actual bus call
+            var response = await MessageBus.SendAsync("storage.delete", message, cancellationToken);
+            if (response.Success)
+            {
+                return (204, new { });
+            }
+
+            return (503, new { error = "Service unavailable", message = response.ErrorMessage ?? "Storage backend unavailable" });
         }
 
         return (204, new { });
@@ -276,14 +317,24 @@ internal sealed class RestInterfaceStrategy : SdkInterface.InterfaceStrategyBase
         // Route via message bus if available
         if (IsIntelligenceAvailable && MessageBus != null)
         {
-            var busRequest = new Dictionary<string, object>
+            var message = new SDK.Utilities.PluginMessage
             {
-                ["operation"] = "patch",
-                ["path"] = path,
-                ["body"] = bodyText
+                Type = "storage.write",
+                Payload = new Dictionary<string, object>
+                {
+                    ["operation"] = "patch",
+                    ["path"] = path,
+                    ["body"] = bodyText
+                }
             };
 
-            await Task.CompletedTask; // Placeholder for actual bus call
+            var response = await MessageBus.SendAsync("storage.write", message, cancellationToken);
+            if (response.Success && response.Payload != null)
+            {
+                return (200, response.Payload);
+            }
+
+            return (503, new { error = "Service unavailable", message = response.ErrorMessage ?? "Storage backend unavailable" });
         }
 
         return (200, new

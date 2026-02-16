@@ -158,7 +158,18 @@ internal sealed class SocketIoStrategy : SdkInterface.InterfaceStrategyBase, IPl
         // Subscribe to message bus if available
         if (IsIntelligenceAvailable && MessageBus != null)
         {
-            await Task.CompletedTask; // Placeholder for actual bus subscription
+            var message = new SDK.Utilities.PluginMessage
+            {
+                Type = "streaming.subscribe",
+                Payload = new Dictionary<string, object>
+                {
+                    ["operation"] = "subscribe",
+                    ["sessionId"] = sessionId,
+                    ["protocol"] = "socket.io"
+                }
+            };
+
+            await MessageBus.PublishAsync("streaming.subscribe", message, cancellationToken);
         }
 
         return new SdkInterface.InterfaceResponse(
@@ -255,7 +266,17 @@ internal sealed class SocketIoStrategy : SdkInterface.InterfaceStrategyBase, IPl
         // Route via message bus if available
         if (IsIntelligenceAvailable && MessageBus != null)
         {
-            await Task.CompletedTask; // Placeholder
+            var message = new SDK.Utilities.PluginMessage
+            {
+                Type = "streaming.connect",
+                Payload = new Dictionary<string, object>
+                {
+                    ["operation"] = "connect",
+                    ["sessionId"] = connection.SessionId,
+                    ["namespace"] = ns.Name
+                }
+            };
+            await MessageBus.PublishAsync("streaming.connect", message, cancellationToken);
         }
 
         // Send connected event
@@ -282,14 +303,18 @@ internal sealed class SocketIoStrategy : SdkInterface.InterfaceStrategyBase, IPl
             // Route via message bus if available
             if (IsIntelligenceAvailable && MessageBus != null)
             {
-                var busRequest = new Dictionary<string, object>
+                var message = new SDK.Utilities.PluginMessage
                 {
-                    ["operation"] = "socket-io-event",
-                    ["namespace"] = ns.Name,
-                    ["event"] = eventName,
-                    ["data"] = eventData
+                    Type = "streaming.publish",
+                    Payload = new Dictionary<string, object>
+                    {
+                        ["operation"] = "socket-io-event",
+                        ["namespace"] = ns.Name,
+                        ["event"] = eventName,
+                        ["data"] = eventData
+                    }
                 };
-                await Task.CompletedTask; // Placeholder
+                await MessageBus.PublishAsync("streaming.publish", message, cancellationToken);
             }
 
             // Broadcast to namespace

@@ -102,14 +102,18 @@ internal sealed class ServerSentEventsStrategy : SdkInterface.InterfaceStrategyB
             // Subscribe to message bus if available
             if (IsIntelligenceAvailable && MessageBus != null)
             {
-                var subscribeRequest = new Dictionary<string, object>
+                var message = new SDK.Utilities.PluginMessage
                 {
-                    ["operation"] = "subscribe",
-                    ["topic"] = topic,
-                    ["streamId"] = streamId,
-                    ["lastEventId"] = lastEventId ?? string.Empty
+                    Type = "streaming.subscribe",
+                    Payload = new Dictionary<string, object>
+                    {
+                        ["operation"] = "subscribe",
+                        ["topic"] = topic,
+                        ["streamId"] = streamId,
+                        ["lastEventId"] = lastEventId ?? string.Empty
+                    }
                 };
-                await Task.CompletedTask; // Placeholder for actual bus subscription
+                await MessageBus.PublishAsync("streaming.subscribe", message, cancellationToken);
             }
 
             // Build SSE response
@@ -192,15 +196,19 @@ internal sealed class ServerSentEventsStrategy : SdkInterface.InterfaceStrategyB
         // Route via message bus if available
         if (IsIntelligenceAvailable && MessageBus != null)
         {
-            var busRequest = new Dictionary<string, object>
+            var message = new SDK.Utilities.PluginMessage
             {
-                ["operation"] = "publish",
-                ["topic"] = topic,
-                ["eventType"] = eventType,
-                ["data"] = eventJson,
-                ["eventId"] = eventId
+                Type = "streaming.publish",
+                Payload = new Dictionary<string, object>
+                {
+                    ["operation"] = "publish",
+                    ["topic"] = topic,
+                    ["eventType"] = eventType,
+                    ["data"] = eventJson,
+                    ["eventId"] = eventId
+                }
             };
-            await Task.CompletedTask; // Placeholder for actual bus publish
+            await MessageBus.PublishAsync("streaming.publish", message, cancellationToken);
         }
 
         // Send to matching streams

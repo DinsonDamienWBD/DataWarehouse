@@ -127,7 +127,25 @@ internal sealed class HateoasStrategy : SdkInterface.InterfaceStrategyBase, IPlu
         // Route via message bus if available
         if (IsIntelligenceAvailable && MessageBus != null)
         {
-            await Task.CompletedTask; // Placeholder for actual bus call
+            var message = new SDK.Utilities.PluginMessage
+            {
+                Type = "storage.read",
+                Payload = new Dictionary<string, object>
+                {
+                    ["operation"] = "read",
+                    ["path"] = path,
+                    ["page"] = page,
+                    ["pageSize"] = pageSize
+                }
+            };
+
+            var busResponse = await MessageBus.SendAsync("storage.read", message, cancellationToken);
+            if (busResponse.Success && busResponse.Payload != null)
+            {
+                return (200, busResponse.Payload);
+            }
+
+            return (503, CreateErrorResponse("Service Unavailable", busResponse.ErrorMessage ?? "Storage backend unavailable"));
         }
 
         var segments = path.Split('/', StringSplitOptions.RemoveEmptyEntries);
@@ -187,10 +205,29 @@ internal sealed class HateoasStrategy : SdkInterface.InterfaceStrategyBase, IPlu
         if (body.Length == 0)
             return (400, CreateErrorResponse("Bad Request", "Request body is required"));
 
+        var bodyText = Encoding.UTF8.GetString(body.Span);
+
         // Route via message bus if available
         if (IsIntelligenceAvailable && MessageBus != null)
         {
-            await Task.CompletedTask; // Placeholder for actual bus call
+            var message = new SDK.Utilities.PluginMessage
+            {
+                Type = "storage.write",
+                Payload = new Dictionary<string, object>
+                {
+                    ["operation"] = "create",
+                    ["path"] = path,
+                    ["body"] = bodyText
+                }
+            };
+
+            var busResponse = await MessageBus.SendAsync("storage.write", message, cancellationToken);
+            if (busResponse.Success && busResponse.Payload != null)
+            {
+                return (201, busResponse.Payload);
+            }
+
+            return (503, CreateErrorResponse("Service Unavailable", busResponse.ErrorMessage ?? "Storage backend unavailable"));
         }
 
         var resourceId = Guid.NewGuid().ToString();
@@ -216,10 +253,29 @@ internal sealed class HateoasStrategy : SdkInterface.InterfaceStrategyBase, IPlu
         if (body.Length == 0)
             return (400, CreateErrorResponse("Bad Request", "Request body is required"));
 
+        var bodyText = Encoding.UTF8.GetString(body.Span);
+
         // Route via message bus if available
         if (IsIntelligenceAvailable && MessageBus != null)
         {
-            await Task.CompletedTask; // Placeholder for actual bus call
+            var message = new SDK.Utilities.PluginMessage
+            {
+                Type = "storage.write",
+                Payload = new Dictionary<string, object>
+                {
+                    ["operation"] = "update",
+                    ["path"] = path,
+                    ["body"] = bodyText
+                }
+            };
+
+            var busResponse = await MessageBus.SendAsync("storage.write", message, cancellationToken);
+            if (busResponse.Success && busResponse.Payload != null)
+            {
+                return (200, busResponse.Payload);
+            }
+
+            return (503, CreateErrorResponse("Service Unavailable", busResponse.ErrorMessage ?? "Storage backend unavailable"));
         }
 
         var segments = path.Split('/', StringSplitOptions.RemoveEmptyEntries);
@@ -246,10 +302,29 @@ internal sealed class HateoasStrategy : SdkInterface.InterfaceStrategyBase, IPlu
         if (body.Length == 0)
             return (400, CreateErrorResponse("Bad Request", "Request body is required"));
 
+        var bodyText = Encoding.UTF8.GetString(body.Span);
+
         // Route via message bus if available
         if (IsIntelligenceAvailable && MessageBus != null)
         {
-            await Task.CompletedTask; // Placeholder for actual bus call
+            var message = new SDK.Utilities.PluginMessage
+            {
+                Type = "storage.write",
+                Payload = new Dictionary<string, object>
+                {
+                    ["operation"] = "patch",
+                    ["path"] = path,
+                    ["body"] = bodyText
+                }
+            };
+
+            var busResponse = await MessageBus.SendAsync("storage.write", message, cancellationToken);
+            if (busResponse.Success && busResponse.Payload != null)
+            {
+                return (200, busResponse.Payload);
+            }
+
+            return (503, CreateErrorResponse("Service Unavailable", busResponse.ErrorMessage ?? "Storage backend unavailable"));
         }
 
         var segments = path.Split('/', StringSplitOptions.RemoveEmptyEntries);
@@ -275,7 +350,23 @@ internal sealed class HateoasStrategy : SdkInterface.InterfaceStrategyBase, IPlu
         // Route via message bus if available
         if (IsIntelligenceAvailable && MessageBus != null)
         {
-            await Task.CompletedTask; // Placeholder for actual bus call
+            var message = new SDK.Utilities.PluginMessage
+            {
+                Type = "storage.delete",
+                Payload = new Dictionary<string, object>
+                {
+                    ["operation"] = "delete",
+                    ["path"] = path
+                }
+            };
+
+            var busResponse = await MessageBus.SendAsync("storage.delete", message, cancellationToken);
+            if (busResponse.Success)
+            {
+                return (204, new { });
+            }
+
+            return (503, CreateErrorResponse("Service Unavailable", busResponse.ErrorMessage ?? "Storage backend unavailable"));
         }
 
         return (204, new { });

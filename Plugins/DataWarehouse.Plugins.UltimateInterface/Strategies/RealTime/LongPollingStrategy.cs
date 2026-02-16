@@ -99,13 +99,17 @@ internal sealed class LongPollingStrategy : SdkInterface.InterfaceStrategyBase, 
             // Subscribe to message bus if available
             if (IsIntelligenceAvailable && MessageBus != null)
             {
-                var subscribeRequest = new Dictionary<string, object>
+                var message = new SDK.Utilities.PluginMessage
                 {
-                    ["operation"] = "subscribe",
-                    ["topic"] = topic,
-                    ["clientId"] = clientId
+                    Type = "streaming.subscribe",
+                    Payload = new Dictionary<string, object>
+                    {
+                        ["operation"] = "subscribe",
+                        ["topic"] = topic,
+                        ["clientId"] = clientId
+                    }
                 };
-                await Task.CompletedTask; // Placeholder for actual bus subscription
+                await MessageBus.PublishAsync("streaming.subscribe", message, cancellationToken);
             }
 
             // Check if there's already new data
@@ -223,13 +227,17 @@ internal sealed class LongPollingStrategy : SdkInterface.InterfaceStrategyBase, 
         // Route via message bus if available
         if (IsIntelligenceAvailable && MessageBus != null)
         {
-            var busRequest = new Dictionary<string, object>
+            var message = new SDK.Utilities.PluginMessage
             {
-                ["operation"] = "publish",
-                ["topic"] = topic,
-                ["data"] = json
+                Type = "streaming.publish",
+                Payload = new Dictionary<string, object>
+                {
+                    ["operation"] = "publish",
+                    ["topic"] = topic,
+                    ["data"] = json
+                }
             };
-            await Task.CompletedTask; // Placeholder for actual bus publish
+            await MessageBus.PublishAsync("streaming.publish", message, cancellationToken);
         }
     }
 

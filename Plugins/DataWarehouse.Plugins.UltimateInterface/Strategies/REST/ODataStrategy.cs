@@ -130,18 +130,29 @@ internal sealed class ODataStrategy : SdkInterface.InterfaceStrategyBase, IPlugi
         // Route via message bus if available
         if (IsIntelligenceAvailable && MessageBus != null)
         {
-            var busRequest = new Dictionary<string, object>
+            var message = new SDK.Utilities.PluginMessage
             {
-                ["operation"] = "query",
-                ["path"] = path,
-                ["filter"] = options.Filter ?? string.Empty,
-                ["select"] = options.Select ?? string.Empty,
-                ["orderby"] = options.OrderBy ?? string.Empty,
-                ["top"] = options.Top,
-                ["skip"] = options.Skip
+                Type = "storage.query",
+                Payload = new Dictionary<string, object>
+                {
+                    ["operation"] = "query",
+                    ["path"] = path,
+                    ["filter"] = options.Filter ?? string.Empty,
+                    ["select"] = options.Select ?? string.Empty,
+                    ["orderby"] = options.OrderBy ?? string.Empty,
+                    ["top"] = options.Top,
+                    ["skip"] = options.Skip,
+                    ["count"] = options.Count
+                }
             };
 
-            await Task.CompletedTask; // Placeholder for actual bus call
+            var busResponse = await MessageBus.SendAsync("storage.query", message, cancellationToken);
+            if (busResponse.Success && busResponse.Payload != null)
+            {
+                return (200, busResponse.Payload);
+            }
+
+            return (503, CreateErrorResponse("Service Unavailable", busResponse.ErrorMessage ?? "Storage backend unavailable"));
         }
 
         var segments = path.Split('/', StringSplitOptions.RemoveEmptyEntries);
@@ -196,10 +207,29 @@ internal sealed class ODataStrategy : SdkInterface.InterfaceStrategyBase, IPlugi
         if (body.Length == 0)
             return (400, CreateErrorResponse("Bad Request", "Request body is required"));
 
+        var bodyText = Encoding.UTF8.GetString(body.Span);
+
         // Route via message bus if available
         if (IsIntelligenceAvailable && MessageBus != null)
         {
-            await Task.CompletedTask; // Placeholder for actual bus call
+            var message = new SDK.Utilities.PluginMessage
+            {
+                Type = "storage.write",
+                Payload = new Dictionary<string, object>
+                {
+                    ["operation"] = "create",
+                    ["path"] = path,
+                    ["body"] = bodyText
+                }
+            };
+
+            var busResponse = await MessageBus.SendAsync("storage.write", message, cancellationToken);
+            if (busResponse.Success && busResponse.Payload != null)
+            {
+                return (201, busResponse.Payload);
+            }
+
+            return (503, CreateErrorResponse("Service Unavailable", busResponse.ErrorMessage ?? "Storage backend unavailable"));
         }
 
         var entityId = Guid.NewGuid().ToString();
@@ -225,10 +255,29 @@ internal sealed class ODataStrategy : SdkInterface.InterfaceStrategyBase, IPlugi
         if (body.Length == 0)
             return (400, CreateErrorResponse("Bad Request", "Request body is required"));
 
+        var bodyText = Encoding.UTF8.GetString(body.Span);
+
         // Route via message bus if available
         if (IsIntelligenceAvailable && MessageBus != null)
         {
-            await Task.CompletedTask; // Placeholder for actual bus call
+            var message = new SDK.Utilities.PluginMessage
+            {
+                Type = "storage.write",
+                Payload = new Dictionary<string, object>
+                {
+                    ["operation"] = "update",
+                    ["path"] = path,
+                    ["body"] = bodyText
+                }
+            };
+
+            var busResponse = await MessageBus.SendAsync("storage.write", message, cancellationToken);
+            if (busResponse.Success && busResponse.Payload != null)
+            {
+                return (200, busResponse.Payload);
+            }
+
+            return (503, CreateErrorResponse("Service Unavailable", busResponse.ErrorMessage ?? "Storage backend unavailable"));
         }
 
         var segments = path.Split('/', StringSplitOptions.RemoveEmptyEntries);
@@ -255,10 +304,29 @@ internal sealed class ODataStrategy : SdkInterface.InterfaceStrategyBase, IPlugi
         if (body.Length == 0)
             return (400, CreateErrorResponse("Bad Request", "Request body is required"));
 
+        var bodyText = Encoding.UTF8.GetString(body.Span);
+
         // Route via message bus if available
         if (IsIntelligenceAvailable && MessageBus != null)
         {
-            await Task.CompletedTask; // Placeholder for actual bus call
+            var message = new SDK.Utilities.PluginMessage
+            {
+                Type = "storage.write",
+                Payload = new Dictionary<string, object>
+                {
+                    ["operation"] = "patch",
+                    ["path"] = path,
+                    ["body"] = bodyText
+                }
+            };
+
+            var busResponse = await MessageBus.SendAsync("storage.write", message, cancellationToken);
+            if (busResponse.Success && busResponse.Payload != null)
+            {
+                return (200, busResponse.Payload);
+            }
+
+            return (503, CreateErrorResponse("Service Unavailable", busResponse.ErrorMessage ?? "Storage backend unavailable"));
         }
 
         var segments = path.Split('/', StringSplitOptions.RemoveEmptyEntries);
@@ -284,7 +352,23 @@ internal sealed class ODataStrategy : SdkInterface.InterfaceStrategyBase, IPlugi
         // Route via message bus if available
         if (IsIntelligenceAvailable && MessageBus != null)
         {
-            await Task.CompletedTask; // Placeholder for actual bus call
+            var message = new SDK.Utilities.PluginMessage
+            {
+                Type = "storage.delete",
+                Payload = new Dictionary<string, object>
+                {
+                    ["operation"] = "delete",
+                    ["path"] = path
+                }
+            };
+
+            var busResponse = await MessageBus.SendAsync("storage.delete", message, cancellationToken);
+            if (busResponse.Success)
+            {
+                return (204, new { });
+            }
+
+            return (503, CreateErrorResponse("Service Unavailable", busResponse.ErrorMessage ?? "Storage backend unavailable"));
         }
 
         return (204, new { });

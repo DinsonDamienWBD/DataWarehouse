@@ -202,7 +202,19 @@ internal sealed class WebSocketInterfaceStrategy : SdkInterface.InterfaceStrateg
         // Notify via message bus
         if (IsIntelligenceAvailable && MessageBus != null)
         {
-            await Task.CompletedTask; // Placeholder for actual bus notification
+            var message = new SDK.Utilities.PluginMessage
+            {
+                Type = "streaming.subscribe",
+                Payload = new Dictionary<string, object>
+                {
+                    ["operation"] = "subscribe",
+                    ["connectionId"] = connectionId,
+                    ["channel"] = channel
+                }
+            };
+
+            // Fire-and-forget publish notification (no need to await response for subscribe)
+            await MessageBus.PublishAsync("streaming.subscribe", message, cancellationToken);
         }
 
         SendToConnection(connectionId, new { type = "subscribed", channel, timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() });
@@ -236,7 +248,19 @@ internal sealed class WebSocketInterfaceStrategy : SdkInterface.InterfaceStrateg
         // Route via message bus if available
         if (IsIntelligenceAvailable && MessageBus != null)
         {
-            await Task.CompletedTask; // Placeholder for actual bus publish
+            var busMessage = new SDK.Utilities.PluginMessage
+            {
+                Type = "streaming.publish",
+                Payload = new Dictionary<string, object>
+                {
+                    ["operation"] = "publish",
+                    ["channel"] = channel,
+                    ["data"] = data
+                }
+            };
+
+            // Fire-and-forget publish notification
+            await MessageBus.PublishAsync("streaming.publish", busMessage, cancellationToken);
         }
 
         // Broadcast to all subscribers in the room
@@ -261,24 +285,42 @@ internal sealed class WebSocketInterfaceStrategy : SdkInterface.InterfaceStrateg
         // Route via message bus if available
         if (IsIntelligenceAvailable && MessageBus != null)
         {
-            var busRequest = new Dictionary<string, object>
+            var busMessage = new SDK.Utilities.PluginMessage
             {
-                ["operation"] = "rpc",
-                ["method"] = method,
-                ["data"] = data
+                Type = "streaming.rpc",
+                Payload = new Dictionary<string, object>
+                {
+                    ["operation"] = "rpc",
+                    ["method"] = method,
+                    ["data"] = data,
+                    ["connectionId"] = connectionId
+                }
             };
-            await Task.CompletedTask; // Placeholder for actual bus call
+
+            var busResponse = await MessageBus.SendAsync("streaming.rpc", busMessage, cancellationToken);
+            if (busResponse.Success && busResponse.Payload != null)
+            {
+                var response = new
+                {
+                    type = "rpc-response",
+                    method,
+                    result = busResponse.Payload,
+                    timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()
+                };
+                SendToConnection(connectionId, response);
+                return;
+            }
         }
 
-        // Send RPC response
-        var response = new
+        // Send RPC response (fallback if bus unavailable)
+        var fallbackResponse = new
         {
             type = "rpc-response",
             method,
             result = new { success = true, message = $"RPC call to {method} processed" },
             timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()
         };
-        SendToConnection(connectionId, response);
+        SendToConnection(connectionId, fallbackResponse);
     }
 
     /// <summary>

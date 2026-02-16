@@ -304,7 +304,22 @@ internal sealed class CostAwareApiStrategy : SdkInterface.InterfaceStrategyBase,
         // Route to backend service if available
         if (IsIntelligenceAvailable && MessageBus != null)
         {
-            await Task.CompletedTask; // Placeholder for actual service call
+            var message = new SDK.Utilities.PluginMessage
+            {
+                Type = "metering.estimate",
+                Payload = new Dictionary<string, object>
+                {
+                    ["operation"] = "execute",
+                    ["path"] = request.Path ?? string.Empty,
+                    ["method"] = request.Method.ToString()
+                }
+            };
+
+            var busResponse = await MessageBus.SendAsync("metering.estimate", message, cancellationToken);
+            if (busResponse.Success && busResponse.Payload != null)
+            {
+                return busResponse.Payload;
+            }
         }
 
         return new
