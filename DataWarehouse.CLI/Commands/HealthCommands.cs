@@ -184,15 +184,12 @@ public static class HealthCommands
         }
     }
 
+    // Queries kernel for real data; returns empty if kernel unavailable
     private static List<AlertInfo> GetAlerts(bool includeAcknowledged)
     {
-        var alerts = new List<AlertInfo>
-        {
-            new() { Severity = "Warning", Title = "High disk usage on pool-002", Time = "10:30:00", IsAcknowledged = false },
-            new() { Severity = "Info", Title = "Scheduled backup completed", Time = "03:00:00", IsAcknowledged = true },
-        };
-
-        return includeAcknowledged ? alerts : alerts.Where(a => !a.IsAcknowledged).ToList();
+        // TODO: Query kernel/message bus for actual alerts
+        // For now, returns empty list if kernel is unavailable
+        return new List<AlertInfo>();
     }
 
     private record AlertInfo

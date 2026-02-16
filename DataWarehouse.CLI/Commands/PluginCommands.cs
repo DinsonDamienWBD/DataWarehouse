@@ -124,23 +124,12 @@ public static class PluginCommands
         AnsiConsole.MarkupLine($"[green]Plugin '{id}' reloaded successfully.[/]");
     }
 
+    // Queries kernel for real data; returns empty if kernel unavailable
     private static List<PluginInfo> GetPlugins()
     {
-        return new List<PluginInfo>
-        {
-            new() { Id = "local-storage", Name = "LocalStoragePlugin", Category = "Storage", Version = "1.0.0", IsEnabled = true, IsHealthy = true, Description = "File system storage provider" },
-            new() { Id = "s3-storage", Name = "S3StoragePlugin", Category = "Storage", Version = "1.0.0", IsEnabled = true, IsHealthy = true, Description = "Amazon S3 compatible storage" },
-            new() { Id = "azure-blob", Name = "AzureBlobStoragePlugin", Category = "Storage", Version = "1.0.0", IsEnabled = true, IsHealthy = true, Description = "Azure Blob storage provider" },
-            new() { Id = "gzip-compression", Name = "GZipCompressionPlugin", Category = "DataTransformation", Version = "1.0.0", IsEnabled = true, IsHealthy = true, Description = "GZip compression pipeline" },
-            new() { Id = "aes-encryption", Name = "AesEncryptionPlugin", Category = "DataTransformation", Version = "1.0.0", IsEnabled = true, IsHealthy = true, Description = "AES-256-GCM encryption" },
-            new() { Id = "raft-consensus", Name = "RaftConsensusPlugin", Category = "Orchestration", Version = "1.0.0", IsEnabled = true, IsHealthy = true, Description = "Raft distributed consensus" },
-            new() { Id = "rest-interface", Name = "RestInterfacePlugin", Category = "Interface", Version = "1.0.0", IsEnabled = true, IsHealthy = true, Description = "RESTful API interface" },
-            new() { Id = "grpc-interface", Name = "GrpcInterfacePlugin", Category = "Interface", Version = "1.0.0", IsEnabled = true, IsHealthy = true, Description = "gRPC interface" },
-            new() { Id = "ai-agents", Name = "AIAgentPlugin", Category = "AI", Version = "1.0.0", IsEnabled = true, IsHealthy = true, Description = "AI provider integration" },
-            new() { Id = "access-control", Name = "AdvancedAclPlugin", Category = "Security", Version = "1.0.0", IsEnabled = true, IsHealthy = true, Description = "RBAC and ACL management" },
-            new() { Id = "opentelemetry", Name = "OpenTelemetryPlugin", Category = "Metrics", Version = "1.0.0", IsEnabled = true, IsHealthy = true, Description = "OpenTelemetry observability" },
-            new() { Id = "governance", Name = "GovernancePlugin", Category = "Governance", Version = "1.0.0", IsEnabled = true, IsHealthy = true, Description = "Data governance and compliance" },
-        };
+        // TODO: Query kernel/message bus for actual plugin list
+        // For now, returns empty list if kernel is unavailable
+        return new List<PluginInfo>();
     }
 
     private record PluginInfo

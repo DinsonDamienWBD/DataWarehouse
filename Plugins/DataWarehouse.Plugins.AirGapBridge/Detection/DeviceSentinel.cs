@@ -569,7 +569,10 @@ public sealed class WindowsHardwareDetector : IHardwareDetector
         }
     }
 
-    public void Dispose() { }
+    public void Dispose()
+    {
+        // No resources to dispose in this implementation
+    }
 }
 
 /// <summary>
@@ -658,7 +661,10 @@ public sealed class LinuxHardwareDetector : IHardwareDetector
         }
     }
 
-    public void Dispose() { }
+    public void Dispose()
+    {
+        // No resources to dispose in this implementation
+    }
 }
 
 /// <summary>
@@ -743,7 +749,10 @@ public sealed class MacOSHardwareDetector : IHardwareDetector
         }
     }
 
-    public void Dispose() { }
+    public void Dispose()
+    {
+        // No resources to dispose in this implementation
+    }
 }
 
 /// <summary>
@@ -806,5 +815,8 @@ public sealed class GenericHardwareDetector : IHardwareDetector
         }
     }
 
-    public void Dispose() { }
+    public void Dispose()
+    {
+        // No resources to dispose in this implementation
+    }
 }

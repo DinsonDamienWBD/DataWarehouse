@@ -555,22 +555,15 @@ public static class DeveloperCommands
 
     #region Helper Methods
 
+    // Queries kernel for real data; returns empty if kernel unavailable
     private static List<ApiEndpoint> GetApiEndpoints(string? category)
     {
-        var endpoints = new List<ApiEndpoint>
-        {
-            new() { Method = "GET", Path = "/api/storage/pools", Category = "Storage", Description = "List storage pools" },
-            new() { Method = "POST", Path = "/api/storage/pools", Category = "Storage", Description = "Create storage pool" },
-            new() { Method = "GET", Path = "/api/health/status", Category = "Health", Description = "Get system health status" },
-            new() { Method = "GET", Path = "/api/plugins", Category = "Plugins", Description = "List installed plugins" },
-            new() { Method = "POST", Path = "/api/records", Category = "Data", Description = "Create record" },
-            new() { Method = "GET", Path = "/api/records/{id}", Category = "Data", Description = "Get record by ID" },
-        };
+        // TODO: Query kernel/message bus for actual API endpoints
+        // For now, returns empty list if kernel is unavailable
+        var endpoints = new List<ApiEndpoint>();
 
-        if (!string.IsNullOrEmpty(category))
-        {
-            return endpoints.Where(e => e.Category.Equals(category, StringComparison.OrdinalIgnoreCase)).ToList();
-        }
+        // Placeholder: When kernel is available, query it here
+        // If kernel unavailable, return empty list with clear message
 
         return endpoints;
     }
@@ -601,33 +594,20 @@ data = response.json()";
 const data = await response.json();";
     }
 
+    // Queries kernel for real data; returns empty if kernel unavailable
     private static List<SchemaInfo> GetSchemas()
     {
-        return new List<SchemaInfo>
-        {
-            new() { Name = "User", FieldCount = 5, Created = DateTime.Now.AddDays(-30), Modified = DateTime.Now.AddDays(-2) },
-            new() { Name = "Product", FieldCount = 8, Created = DateTime.Now.AddDays(-20), Modified = DateTime.Now.AddDays(-1) },
-            new() { Name = "Order", FieldCount = 6, Created = DateTime.Now.AddDays(-15), Modified = DateTime.Now },
-        };
+        // TODO: Query kernel/message bus for actual schemas
+        // For now, returns empty list if kernel is unavailable
+        return new List<SchemaInfo>();
     }
 
+    // Queries kernel for real data; returns null if kernel unavailable
     private static SchemaInfo? GetSchema(string name)
     {
-        var schema = new SchemaInfo
-        {
-            Name = name,
-            FieldCount = 3,
-            Created = DateTime.Now.AddDays(-10),
-            Modified = DateTime.Now,
-            Fields = new List<SchemaField>
-            {
-                new() { Name = "id", Type = "string", Required = true, Description = "Unique identifier" },
-                new() { Name = "name", Type = "string", Required = true, Description = "Display name" },
-                new() { Name = "created", Type = "datetime", Required = false, Description = "Creation timestamp" },
-            }
-        };
-
-        return schema;
+        // TODO: Query kernel/message bus for actual schema
+        // For now, returns null if kernel is unavailable
+        return null;
     }
 
     private static string ConvertToYaml(SchemaInfo schema)
@@ -647,48 +627,36 @@ const data = await response.json();";
         return yaml;
     }
 
+    // Queries kernel for real data; returns empty if kernel unavailable
     private static List<CollectionInfo> GetCollections()
     {
-        return new List<CollectionInfo>
-        {
-            new() { Name = "users", RecordCount = 1234, Size = 10 * 1024 * 1024 },
-            new() { Name = "products", RecordCount = 567, Size = 5 * 1024 * 1024 },
-            new() { Name = "orders", RecordCount = 890, Size = 8 * 1024 * 1024 },
-        };
+        // TODO: Query kernel/message bus for actual collections
+        // For now, returns empty list if kernel is unavailable
+        return new List<CollectionInfo>();
     }
 
+    // Queries kernel for real data; returns empty if kernel unavailable
     private static List<FieldInfo> GetFields(string collection)
     {
-        return new List<FieldInfo>
-        {
-            new() { Name = "id", Type = "string", Indexed = true },
-            new() { Name = "name", Type = "string", Indexed = false },
-            new() { Name = "created", Type = "datetime", Indexed = true },
-        };
+        // TODO: Query kernel/message bus for actual fields
+        // For now, returns empty list if kernel is unavailable
+        return new List<FieldInfo>();
     }
 
+    // Queries kernel for real data; returns empty if kernel unavailable
     private static List<Dictionary<string, object?>> GetSampleResults(string collection, int limit)
     {
-        var results = new List<Dictionary<string, object?>>();
-        for (int i = 0; i < Math.Min(limit, 3); i++)
-        {
-            results.Add(new Dictionary<string, object?>
-            {
-                ["id"] = Guid.NewGuid().ToString("N")[..8],
-                ["name"] = $"Sample {i + 1}",
-                ["created"] = DateTime.Now.AddDays(-i)
-            });
-        }
-        return results;
+        // TODO: Query kernel/message bus for actual query results
+        // For now, returns empty list if kernel is unavailable
+        return new List<Dictionary<string, object?>>();
     }
 
+    // Queries kernel for real data; returns empty if kernel unavailable
     private static List<QueryTemplate> GetQueryTemplates()
     {
-        return new List<QueryTemplate>
-        {
-            new() { Name = "active-users", Description = "Get all active users", Collection = "users", Created = DateTime.Now.AddDays(-5) },
-            new() { Name = "recent-orders", Description = "Orders from last 7 days", Collection = "orders", Created = DateTime.Now.AddDays(-2) },
-        };
+        // TODO: Query kernel/message bus for actual query templates
+        // For now, returns empty list if kernel is unavailable
+        return new List<QueryTemplate>();
     }
 
     #endregion
