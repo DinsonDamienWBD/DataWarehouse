@@ -166,32 +166,40 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.ThreatDetection
             try
             {
                 // Step 1: Send request to Intelligence plugin via message bus
-                var request = new AnalysisRequest
+                var message = new DataWarehouse.SDK.Utilities.PluginMessage
                 {
-                    DataType = "user-behavior",
-                    Payload = snapshot,
-                    AnalysisType = "anomaly-detection"
+                    Type = "intelligence.analyze.behavior",
+                    SourcePluginId = "ultimate-access-control",
+                    Payload = new Dictionary<string, object>
+                    {
+                        ["dataType"] = "user-behavior",
+                        ["analysisType"] = "anomaly-detection",
+                        ["snapshot"] = snapshot
+                    }
                 };
 
-                // Note: In production, would use message bus request-response pattern
-                // For now, simulate the pattern - Intelligence plugin integration will be completed separately
-                AnalysisResponse? aiResponse = null; // Placeholder for message bus response
+                var messageResponse = await _messageBus.SendAsync(
+                    "intelligence.analyze.behavior",
+                    message,
+                    TimeSpan.FromSeconds(5),
+                    cancellationToken);
 
                 // Step 2: Fallback when AI unavailable (Success check)
-                if (aiResponse == null || !aiResponse.Success)
+                if (messageResponse == null || !messageResponse.Success)
                 {
                     _logger.LogWarning("Intelligence plugin unavailable for UEBA (Success=false), using rule-based fallback");
                     return null;
                 }
 
-                // Parse AI result
+                // Parse AI result from message response payload
+                var payload = messageResponse.Payload as Dictionary<string, object>;
                 return new AnomalyResult
                 {
-                    IsAnomaly = aiResponse.IsAnomaly,
-                    Score = aiResponse.AnomalyScore,
-                    AnomalyType = aiResponse.AnomalyType ?? "ai-detected",
-                    Details = aiResponse.Details ?? "AI-detected anomaly",
-                    Confidence = aiResponse.Confidence
+                    IsAnomaly = payload?.ContainsKey("isAnomaly") == true && (bool)payload["isAnomaly"],
+                    Score = payload?.ContainsKey("anomalyScore") == true ? Convert.ToDouble(payload["anomalyScore"]) : 0.0,
+                    AnomalyType = payload?.ContainsKey("anomalyType") == true ? payload["anomalyType"]?.ToString() ?? "ai-detected" : "ai-detected",
+                    Details = payload?.ContainsKey("details") == true ? payload["details"]?.ToString() ?? "AI-detected anomaly" : "AI-detected anomaly",
+                    Confidence = payload?.ContainsKey("confidence") == true ? Convert.ToDouble(payload["confidence"]) : 0.5
                 };
             }
             catch (TimeoutException ex)

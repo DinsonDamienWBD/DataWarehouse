@@ -184,38 +184,54 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.ThreatDetection
 
             try
             {
-                // Step 1: Send request to Intelligence plugin for AI enrichment
-                var request = new EnrichmentRequest
+                // Step 1: Send request to Intelligence plugin for AI enrichment via message bus
+                var message = new DataWarehouse.SDK.Utilities.PluginMessage
                 {
-                    DataType = "threat-indicator",
-                    Indicators = indicators,
-                    EnrichmentType = "threat-correlation"
+                    Type = "intelligence.enrich.threat",
+                    SourcePluginId = "ultimate-access-control",
+                    Payload = new Dictionary<string, object>
+                    {
+                        ["dataType"] = "threat-indicator",
+                        ["enrichmentType"] = "threat-correlation",
+                        ["indicators"] = indicators
+                    }
                 };
 
-                // Note: In production, would use message bus request-response pattern
-                // For now, simulate the pattern - Intelligence plugin integration will be completed separately
-                EnrichmentResponse? aiResponse = null; // Placeholder for message bus response
+                var messageResponse = await _messageBus.SendAsync(
+                    "intelligence.enrich.threat",
+                    message,
+                    TimeSpan.FromSeconds(5),
+                    cancellationToken);
 
                 // Step 2: Fallback when AI unavailable (Success check)
-                if (aiResponse == null || !aiResponse.Success)
+                if (messageResponse == null || !messageResponse.Success)
                 {
                     _logger.LogWarning("Intelligence plugin unavailable for threat enrichment (Success=false), using rule-based fallback");
                     return null;
                 }
 
-                // Parse AI enrichment result
+                // Parse AI enrichment result from message response payload
+                var payload = messageResponse.Payload as Dictionary<string, object>;
+                var enrichedIndicators = payload?.ContainsKey("enrichedIndicators") == true
+                    ? payload["enrichedIndicators"] as List<object> ?? new List<object>()
+                    : new List<object>();
+
                 return new EnrichmentResult
                 {
-                    Matches = aiResponse.EnrichedIndicators.Select(ei => new IndicatorMatch
+                    Matches = enrichedIndicators.Select(ei =>
                     {
-                        Indicator = ei.OriginalIndicator,
-                        ThreatType = ei.ThreatType,
-                        Severity = ei.Severity,
-                        Confidence = ei.Confidence,
-                        Description = ei.Description
+                        var dict = ei as Dictionary<string, object>;
+                        return new IndicatorMatch
+                        {
+                            Indicator = dict?.ContainsKey("originalIndicator") == true ? dict["originalIndicator"]?.ToString() ?? "" : "",
+                            ThreatType = dict?.ContainsKey("threatType") == true ? dict["threatType"]?.ToString() ?? "Unknown" : "Unknown",
+                            Severity = dict?.ContainsKey("severity") == true ? Convert.ToInt32(dict["severity"]) : 3,
+                            Confidence = dict?.ContainsKey("confidence") == true ? Convert.ToDouble(dict["confidence"]) : 0.5,
+                            Description = dict?.ContainsKey("description") == true ? dict["description"]?.ToString() ?? "" : ""
+                        };
                     }).ToList(),
                     Source = "Intelligence-AI",
-                    Confidence = aiResponse.Confidence
+                    Confidence = payload?.ContainsKey("confidence") == true ? Convert.ToDouble(payload["confidence"]) : 0.5
                 };
             }
             catch (TimeoutException ex)
