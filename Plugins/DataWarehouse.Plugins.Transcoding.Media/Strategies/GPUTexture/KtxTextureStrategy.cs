@@ -1,6 +1,9 @@
 using System.Security.Cryptography;
 using System.Text;
+using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Contracts.Media;
+using DataWarehouse.SDK.Utilities;
+using MediaFormat = DataWarehouse.SDK.Contracts.Media.MediaFormat;
 
 namespace DataWarehouse.Plugins.Transcoding.Media.Strategies.GPUTexture;
 
@@ -172,7 +175,27 @@ internal sealed class KtxTextureStrategy : MediaStrategyBase
         writer.Write(width);
         writer.Write(height);
 
-        var thumbData = SHA256.HashData(sourceBytes);
+        byte[] thumbData;
+        if (MessageBus != null)
+        {
+            var msg = new PluginMessage { Type = "integrity.hash.compute" };
+            msg.Payload["data"] = sourceBytes;
+            msg.Payload["algorithm"] = "SHA256";
+            var response = await MessageBus.SendAsync("integrity.hash.compute", msg, cancellationToken).ConfigureAwait(false);
+            if (response.Success && response.Payload is Dictionary<string, object> payload &&
+                payload.TryGetValue("hash", out var hashObj) && hashObj is byte[] hashBytes)
+            {
+                thumbData = hashBytes;
+            }
+            else
+            {
+                thumbData = SHA256.HashData(sourceBytes); // Fallback on error
+            }
+        }
+        else
+        {
+            thumbData = SHA256.HashData(sourceBytes);
+        }
         writer.Write(thumbData.Length);
         writer.Write(thumbData);
 
@@ -330,6 +353,7 @@ internal sealed class KtxTextureStrategy : MediaStrategyBase
         writer.Write(0u);                   // extendedByteLength
 
         // Source hash for integrity
+        // Note: Using inline crypto as fallback since MessageBus not available in static method
         writer.Write(SHA256.HashData(sourceData));
     }
 
@@ -339,6 +363,7 @@ internal sealed class KtxTextureStrategy : MediaStrategyBase
     private static void WriteMipmapData(BinaryWriter writer, byte[] sourceData, int mipmapCount,
         int width, int height, string supercompression)
     {
+        // Note: Using inline crypto as fallback since MessageBus not available in static method
         var hash = SHA256.HashData(sourceData);
         int mipWidth = width;
         int mipHeight = height;
@@ -348,6 +373,7 @@ internal sealed class KtxTextureStrategy : MediaStrategyBase
             var levelSize = CalculateLevelSize(mipWidth, mipHeight, supercompression);
             var levelData = new byte[levelSize];
 
+            // Note: Using inline crypto as fallback since MessageBus not available in static method
             using var hmac = new HMACSHA256(hash);
             int offset = 0;
             int blockIndex = level * 1000;

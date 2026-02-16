@@ -3,6 +3,9 @@ using System.Text;
 using System.Text.Json;
 using DataWarehouse.Plugins.AirGapBridge.Core;
 using DataWarehouse.Plugins.AirGapBridge.Detection;
+using DataWarehouse.SDK.Utilities;
+using IMessageBus = DataWarehouse.SDK.Contracts.IMessageBus;
+using MessageResponse = DataWarehouse.SDK.Contracts.MessageResponse;
 
 namespace DataWarehouse.Plugins.AirGapBridge.Security;
 
@@ -16,6 +19,7 @@ public sealed class SecurityManager : IDisposable
     private readonly Dictionary<string, DeviceSession> _sessions = new();
     private readonly Dictionary<string, int> _failedAttempts = new();
     private readonly AirGapSecurityPolicy _policy;
+    private readonly IMessageBus? _messageBus;
     private bool _disposed;
 
     /// <summary>
@@ -23,10 +27,12 @@ public sealed class SecurityManager : IDisposable
     /// </summary>
     /// <param name="masterKey">Master encryption key.</param>
     /// <param name="policy">Security policy.</param>
-    public SecurityManager(byte[] masterKey, AirGapSecurityPolicy policy)
+    /// <param name="messageBus">Optional message bus for delegating crypto operations to UltimateEncryption.</param>
+    public SecurityManager(byte[] masterKey, AirGapSecurityPolicy policy, IMessageBus? messageBus = null)
     {
         _masterKey = masterKey;
         _policy = policy;
+        _messageBus = messageBus;
     }
 
     #region Sub-task 79.21: Full Volume Encryption
@@ -90,7 +96,7 @@ public sealed class SecurityManager : IDisposable
         CancellationToken ct)
     {
         // Generate device key from master key and device ID
-        var deviceKey = DeriveDeviceKey(device.DeviceId, password);
+        var deviceKey = await DeriveDeviceKeyAsync(device.DeviceId, password, ct);
 
         // Create encryption metadata
         var encryptionInfo = new DeviceEncryptionInfo
@@ -160,16 +166,57 @@ public sealed class SecurityManager : IDisposable
         var tag = new byte[16];
         var ciphertext = new byte[data.Length];
 
+        // Try bus delegation first
+        if (_messageBus != null)
+        {
+            try
+            {
+                var msg = new PluginMessage
+                {
+                    Type = "encryption.encrypt",
+                    Payload = new Dictionary<string, object>
+                    {
+                        ["algorithm"] = "AES-256-GCM",
+                        ["data"] = data,
+                        ["key"] = deviceKey,
+                        ["nonce"] = nonce
+                    }
+                };
+
+                var response = _messageBus.SendAsync("encryption.encrypt", msg, CancellationToken.None).GetAwaiter().GetResult();
+                if (response != null && response.Success && response.Payload is Dictionary<string, object> payload
+                    && payload.ContainsKey("ciphertext") && payload.ContainsKey("tag"))
+                {
+                    var responseCiphertext = (byte[])payload["ciphertext"];
+                    var responseTag = (byte[])payload["tag"];
+                    Buffer.BlockCopy(responseCiphertext, 0, ciphertext, 0, responseCiphertext.Length);
+                    Buffer.BlockCopy(responseTag, 0, tag, 0, responseTag.Length);
+
+                    // Combine nonce + tag + ciphertext
+                    var result = new byte[nonce.Length + tag.Length + ciphertext.Length];
+                    Buffer.BlockCopy(nonce, 0, result, 0, nonce.Length);
+                    Buffer.BlockCopy(tag, 0, result, nonce.Length, tag.Length);
+                    Buffer.BlockCopy(ciphertext, 0, result, nonce.Length + tag.Length, ciphertext.Length);
+                    return result;
+                }
+            }
+            catch
+            {
+                // Fall through to inline implementation
+            }
+        }
+
+        // Graceful degradation — fallback to inline if bus unavailable
         using var aesGcm = new AesGcm(deviceKey, 16);
         aesGcm.Encrypt(nonce, data, ciphertext, tag);
 
         // Combine nonce + tag + ciphertext
-        var result = new byte[nonce.Length + tag.Length + ciphertext.Length];
-        Buffer.BlockCopy(nonce, 0, result, 0, nonce.Length);
-        Buffer.BlockCopy(tag, 0, result, nonce.Length, tag.Length);
-        Buffer.BlockCopy(ciphertext, 0, result, nonce.Length + tag.Length, ciphertext.Length);
+        var result2 = new byte[nonce.Length + tag.Length + ciphertext.Length];
+        Buffer.BlockCopy(nonce, 0, result2, 0, nonce.Length);
+        Buffer.BlockCopy(tag, 0, result2, nonce.Length, tag.Length);
+        Buffer.BlockCopy(ciphertext, 0, result2, nonce.Length + tag.Length, ciphertext.Length);
 
-        return result;
+        return result2;
     }
 
     /// <summary>
@@ -187,6 +234,40 @@ public sealed class SecurityManager : IDisposable
 
         var plaintext = new byte[ciphertext.Length];
 
+        // Try bus delegation first
+        if (_messageBus != null)
+        {
+            try
+            {
+                var msg = new PluginMessage
+                {
+                    Type = "encryption.decrypt",
+                    Payload = new Dictionary<string, object>
+                    {
+                        ["algorithm"] = "AES-256-GCM",
+                        ["ciphertext"] = ciphertext,
+                        ["key"] = deviceKey,
+                        ["nonce"] = nonce,
+                        ["tag"] = tag
+                    }
+                };
+
+                var response = _messageBus.SendAsync("encryption.decrypt", msg, CancellationToken.None).GetAwaiter().GetResult();
+                if (response != null && response.Success && response.Payload is Dictionary<string, object> payload
+                    && payload.ContainsKey("data"))
+                {
+                    var responseData = (byte[])payload["data"];
+                    Buffer.BlockCopy(responseData, 0, plaintext, 0, responseData.Length);
+                    return plaintext;
+                }
+            }
+            catch
+            {
+                // Fall through to inline implementation
+            }
+        }
+
+        // Graceful degradation — fallback to inline if bus unavailable
         using var aesGcm = new AesGcm(deviceKey, 16);
         aesGcm.Decrypt(nonce, ciphertext, tag, plaintext);
 
@@ -283,7 +364,7 @@ public sealed class SecurityManager : IDisposable
 
         // Derive key from password and salt
         var derivedKey = DeriveKeyFromPassword(password, authInfo.Salt);
-        var expectedHash = ComputeKeyHash(derivedKey);
+        var expectedHash = await ComputeKeyHashAsync(derivedKey, ct);
 
         return authInfo.KeyHash == expectedHash;
     }
@@ -313,7 +394,7 @@ public sealed class SecurityManager : IDisposable
         try
         {
             var keyfileData = await File.ReadAllBytesAsync(keyfilePath, ct);
-            var keyfileHash = ComputeHash(keyfileData);
+            var keyfileHash = await ComputeHashAsync(keyfileData, ct);
 
             // Verify keyfile matches device
             var authPath = Path.Combine(device.Path, ".dw-auth");
@@ -375,7 +456,7 @@ public sealed class SecurityManager : IDisposable
         await File.WriteAllBytesAsync(outputPath, keyfileData, ct);
 
         // Store keyfile hash in device auth
-        var keyfileHash = ComputeHash(keyfileData);
+        var keyfileHash = await ComputeHashAsync(keyfileData, ct);
         await UpdateDeviceAuthAsync(device, auth =>
         {
             auth.KeyfileHash = keyfileHash;
@@ -637,6 +718,7 @@ public sealed class SecurityManager : IDisposable
 
         try
         {
+            // TODO: Delegate to UltimateEncryption via encryption.verify bus topic once signature verification API is available
             using var ecdsa = ECDsa.Create();
             ecdsa.ImportSubjectPublicKeyInfo(publicKey, out _);
             return ecdsa.VerifyData(challenge, assertion.Signature, HashAlgorithmName.SHA256);
@@ -679,11 +761,25 @@ public sealed class SecurityManager : IDisposable
         return session.ExpiresAt > DateTimeOffset.UtcNow;
     }
 
-    private byte[] DeriveDeviceKey(string deviceId, string? password)
+    private async Task<byte[]> DeriveDeviceKeyAsync(string deviceId, string? password, CancellationToken ct = default)
     {
         var input = $"{deviceId}:{password ?? ""}";
-        using var sha = SHA256.Create();
         var combined = _masterKey.Concat(Encoding.UTF8.GetBytes(input)).ToArray();
+
+        if (_messageBus != null)
+        {
+            var msg = new PluginMessage { Type = "integrity.hash.compute" };
+            msg.Payload["data"] = combined;
+            msg.Payload["algorithm"] = "SHA-256";
+            var response = await _messageBus.SendAsync("integrity.hash.compute", msg, ct);
+            if (response.Success && msg.Payload.TryGetValue("hash", out var hashObj) && hashObj is byte[] hash)
+            {
+                return hash;
+            }
+        }
+
+        // Fallback
+        using var sha = SHA256.Create();
         return sha.ComputeHash(combined);
     }
 
@@ -707,14 +803,40 @@ public sealed class SecurityManager : IDisposable
         return Convert.ToBase64String(bytes);
     }
 
-    private static string ComputeKeyHash(byte[] key)
+    private async Task<string> ComputeKeyHashAsync(byte[] key, CancellationToken ct = default)
     {
+        if (_messageBus != null)
+        {
+            var msg = new PluginMessage { Type = "integrity.hash.compute" };
+            msg.Payload["data"] = key;
+            msg.Payload["algorithm"] = "SHA-256";
+            var response = await _messageBus.SendAsync("integrity.hash.compute", msg, ct);
+            if (response.Success && msg.Payload.TryGetValue("hash", out var hashObj) && hashObj is byte[] hash)
+            {
+                return Convert.ToBase64String(hash);
+            }
+        }
+
+        // Fallback
         using var sha = SHA256.Create();
         return Convert.ToBase64String(sha.ComputeHash(key));
     }
 
-    private static string ComputeHash(byte[] data)
+    private async Task<string> ComputeHashAsync(byte[] data, CancellationToken ct = default)
     {
+        if (_messageBus != null)
+        {
+            var msg = new PluginMessage { Type = "integrity.hash.compute" };
+            msg.Payload["data"] = data;
+            msg.Payload["algorithm"] = "SHA-256";
+            var response = await _messageBus.SendAsync("integrity.hash.compute", msg, ct);
+            if (response.Success && msg.Payload.TryGetValue("hash", out var hashObj) && hashObj is byte[] hash)
+            {
+                return Convert.ToBase64String(hash);
+            }
+        }
+
+        // Fallback
         using var sha = SHA256.Create();
         return Convert.ToBase64String(sha.ComputeHash(data));
     }

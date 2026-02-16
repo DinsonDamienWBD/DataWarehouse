@@ -4,6 +4,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using DataWarehouse.SDK.Contracts;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.Transcoding.Media;
 
@@ -1006,10 +1007,43 @@ public class MediaTranscodingPlugin : MediaTranscodingPluginBase
 
     private string GenerateCacheKey(string sourcePath, string profileId)
     {
-        // Use source file hash + profile ID for cache key
+        // Use source file hash + profile ID for cache key (sync version for backward compatibility)
         using var sha = SHA256.Create();
         var input = $"{sourcePath}|{profileId}|{GetFileModifiedTime(sourcePath)}";
         var hash = sha.ComputeHash(Encoding.UTF8.GetBytes(input));
+        return Convert.ToHexString(hash);
+    }
+
+    private async Task<string> GenerateCacheKeyAsync(string sourcePath, string profileId, CancellationToken cancellationToken = default)
+    {
+        // Use source file hash + profile ID for cache key (async version with bus delegation)
+        var input = $"{sourcePath}|{profileId}|{GetFileModifiedTime(sourcePath)}";
+        var inputBytes = Encoding.UTF8.GetBytes(input);
+
+        byte[] hash;
+        if (MessageBus != null)
+        {
+            var msg = new PluginMessage { Type = "integrity.hash.compute" };
+            msg.Payload["data"] = inputBytes;
+            msg.Payload["algorithm"] = "SHA256";
+            var response = await MessageBus.SendAsync("integrity.hash.compute", msg, cancellationToken).ConfigureAwait(false);
+            if (response.Success && response.Payload is Dictionary<string, object> payload &&
+                payload.TryGetValue("hash", out var hashObj) && hashObj is byte[] hashBytes)
+            {
+                hash = hashBytes;
+            }
+            else
+            {
+                using var sha = SHA256.Create();
+                hash = sha.ComputeHash(inputBytes); // Fallback on error
+            }
+        }
+        else
+        {
+            using var sha = SHA256.Create();
+            hash = sha.ComputeHash(inputBytes);
+        }
+
         return Convert.ToHexString(hash);
     }
 

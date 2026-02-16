@@ -484,6 +484,67 @@ dw install --from-usb "E:\" --path "C:\DataWarehouse" --autostart --service
 
 ---
 
+## AD-11: Capability Delegation — No Inline Duplication of Ultimate Plugin Features
+
+**Decided:** 2026-02-17
+**Context:** Audit of all 60+ plugins revealed widespread inline implementations of capabilities that should be delegated to their owning Ultimate plugins via message bus.
+
+**Decision:** Every cross-cutting capability has exactly ONE owning plugin. All other plugins MUST delegate to that owner via message bus. No plugin may implement inline versions of capabilities owned by another plugin.
+
+**Rationale:** When plugins implement their own crypto, hashing, transport, or other cross-cutting capabilities inline:
+1. **Security inconsistency** — different plugins may use different key sizes, algorithms, or modes
+2. **Audit difficulty** — crypto/hashing code scattered across 60+ plugins cannot be centrally audited
+3. **Algorithm upgrades** — upgrading SHA-256 to SHA-3 requires touching every plugin instead of one
+4. **Violation of microkernel** — the entire point of the plugin architecture is that each capability is owned by ONE plugin
+
+**Capability Ownership Registry:**
+
+| Capability | Owner Plugin | Bus Topics | Notes |
+|------------|-------------|------------|-------|
+| Encryption/Decryption | UltimateEncryption | `encryption.encrypt`, `encryption.decrypt` | AES-GCM, ChaCha20, RSA, ECDSA, 30+ algorithms |
+| Hashing/Integrity | UltimateDataIntegrity | `integrity.hash.compute`, `integrity.hash.verify` | SHA-2, SHA-3, Keccak, HMAC, BLAKE, 15+ providers |
+| Blockchain/Anchoring | UltimateBlockchain | `blockchain.anchor`, `blockchain.verify`, `blockchain.chain` | Merkle trees, chain validation |
+| Tamper-Proof Orchestration | TamperProof | `tamperproof.*` | Orchestrates integrity + blockchain + WORM |
+| Data Transport | UltimateDataTransit | `transit.transfer.request` | HTTP/2, HTTP/3, gRPC, FTP, SFTP, SCP, P2P |
+| AI/ML Inference | UltimateIntelligence | `intelligence.*` | 12 AI providers |
+| Key Management | UltimateKeyManagement | `keymanagement.*` | 30+ key strategies |
+| Storage I/O | UltimateStorage | `storage.*` | 130+ backends |
+| Access Control | UltimateAccessControl | `accesscontrol.*` | 9 models, MFA, Zero Trust |
+| Compression | UltimateCompression | `compression.*` | 40+ algorithms |
+| Observability | UniversalObservability | `observability.*` | Metrics, traces, logs |
+
+**Delegation Pattern:**
+```csharp
+// WRONG — inline crypto in a non-crypto plugin
+using var aes = new AesGcm(key, 16);
+aes.Encrypt(nonce, plaintext, ciphertext, tag);
+
+// RIGHT — delegate to UltimateEncryption via bus
+var msg = new PluginMessage("encryption.encrypt");
+msg.Payload["data"] = plaintext;
+msg.Payload["key"] = key;
+var response = await MessageBus.PublishAndWaitAsync("encryption.encrypt", msg, ct);
+var encrypted = (byte[])response.Payload["result"];
+```
+
+**Exceptions (inline allowed):**
+1. **Protocol-specific signatures** — AWS Signature V4 (HMACSHA256) in observability strategies is protocol-mandated and cannot be delegated
+2. **Boot-time operations** — if the message bus is not yet available during plugin initialization, limited inline crypto for self-verification is acceptable (must be documented)
+3. **Performance-critical tight loops** — if profiling proves bus delegation adds unacceptable latency (>1ms per call in a loop of >10,000 iterations), inline with documented justification and matching algorithm to the owner plugin
+
+**Enforcement:**
+- All executing agents MUST search for existing capabilities before implementing inline
+- Code review must flag any new `Aes.Create()`, `SHA256.Create()`, `new HttpClient()`, `new TcpClient()` outside the owning plugin
+- Build-time: Roslyn analyzer rule planned for v3.0+ to enforce at compile time
+
+**Audit Results (Phase 31.2 baseline):**
+- ~73 inline crypto sites found outside UltimateEncryption
+- ~196+ inline hashing sites found outside TamperProof/UltimateDataIntegrity
+- ~166+ transport duplications found outside UltimateDataTransit
+- Phase 31.2 will remediate ALL of these
+
+---
+
 ## Summary Table (Updated)
 
 | ID | Decision | Impact |
@@ -498,7 +559,8 @@ dw install --from-usb "E:\" --path "C:\DataWarehouse" --autostart --service
 | AD-08 | ZERO REGRESSION — preserve all v1.0 logic | Protects 30 days of implementation work |
 | AD-09 | Unified UI — Shared ↔ UltimateInterface | 100% CLI/GUI feature parity, dynamic capability reflection |
 | AD-10 | Three deployment modes (Client/Live/Install) | Portable, installable, and client-server DW |
+| AD-11 | Capability delegation — no inline duplication | Centralized crypto, hashing, transport; auditable and upgradeable |
 
 ---
-*Decided: 2026-02-12*
+*Decided: 2026-02-12 (AD-01 through AD-10), 2026-02-17 (AD-11)*
 *Participants: User (architect), Claude (analysis)*

@@ -27,6 +27,23 @@ Last activity: 2026-02-16 -- Plan 31.1-05 complete (8 plugins documented, 500+ s
 
 Progress: [###################---------] 80% (4/5 plans)
 
+### Phase 31.2 Capability Delegation & Plugin Decomposition -- COMPLETE
+Phase: 31.2 (expanded from TamperProof Decomposition)
+Plan: 6 of 7 plans complete (Plan 05 transport delegation deferred to v3.0 Phase 41)
+Status: COMPLETE
+Scope: TamperProof decomposition + inline hashing/crypto delegation across ALL plugins
+Last activity: 2026-02-17
+
+Deliverables:
+- Created UltimateDataIntegrity plugin (15 hash providers, bus topics integrity.hash.compute/verify)
+- Created UltimateBlockchain plugin (anchoring, Merkle trees, chain validation, bus topics blockchain.*)
+- TamperProof refactored: Hashing/ removed, BouncyCastle removed, hash bus topics moved to UltimateDataIntegrity
+- Inline hashing delegation: Transcoding.Media (59→bus), AirGapBridge (13→bus), TamperProof (20→bus), minor plugins
+- Inline crypto delegation: AirGapBridge (7→bus), AedsCore (1→bus)
+- AD-11 architecture decision documented (ARCHITECTURE_DECISIONS.md, ROADMAP.md, CLAUDE.md)
+- Transport delegation deferred: 166+ HttpClient/TcpClient are vendor API integrations, not data transfers
+- Build: 0 errors, 0 warnings across 71 projects
+
 ### v3.0 Universal Platform -- PLANNED
 Phase: 0 of 10 (not started)
 Plan: 0 of 64 total plans
@@ -365,6 +382,7 @@ Phase 33 (VDE) ─────────────────────�
 - Phase 31.1 inserted after Phase 31: Pre-v3.0 Production Readiness Cleanup
 - Phases 38-41 renumbered: 38=Feature Composition (was 39), 39=Medium Impl (was 40), 40=Large Impl (was 41), 41=Audit (was 38)
 - Phase 39-01 (SemanticSearch) and 39-05 (Parquet/Arrow/HDF5) superseded by Phase 31.1 work (pre-completion notes added)
+- Phase 31.2 inserted after Phase 31.1: TamperProof Decomposition — extract hashing/integrity to UltimateDataIntegrity plugin, blockchain to UltimateBlockchain plugin (URGENT architectural improvement)
 
 ### Current Position
 

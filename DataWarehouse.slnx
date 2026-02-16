@@ -33,6 +33,7 @@
     <Project Path="Plugins/DataWarehouse.Plugins.TamperProof/DataWarehouse.Plugins.TamperProof.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.Transcoding.Media/DataWarehouse.Plugins.Transcoding.Media.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.UltimateAccessControl/DataWarehouse.Plugins.UltimateAccessControl.csproj" />
+    <Project Path="Plugins/DataWarehouse.Plugins.UltimateBlockchain/DataWarehouse.Plugins.UltimateBlockchain.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.UltimateCompliance/DataWarehouse.Plugins.UltimateCompliance.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.UltimateCompression/DataWarehouse.Plugins.UltimateCompression.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.UltimateCompute/DataWarehouse.Plugins.UltimateCompute.csproj" />
@@ -44,6 +45,7 @@
     <Project Path="Plugins/DataWarehouse.Plugins.UltimateDataFormat/DataWarehouse.Plugins.UltimateDataFormat.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.UltimateDataGovernance/DataWarehouse.Plugins.UltimateDataGovernance.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.UltimateDataIntegration/DataWarehouse.Plugins.UltimateDataIntegration.csproj" />
+    <Project Path="Plugins/DataWarehouse.Plugins.UltimateDataIntegrity/DataWarehouse.Plugins.UltimateDataIntegrity.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.UltimateDataLake/DataWarehouse.Plugins.UltimateDataLake.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.UltimateDataLineage/DataWarehouse.Plugins.UltimateDataLineage.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.UltimateDataManagement/DataWarehouse.Plugins.UltimateDataManagement.csproj" />

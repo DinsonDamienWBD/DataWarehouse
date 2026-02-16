@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using System.Text;
 using DataWarehouse.SDK.Contracts.Media;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.Transcoding.Media.Strategies.Image;
 
@@ -139,7 +140,26 @@ internal sealed class JpegImageStrategy : MediaStrategyBase
         writer.Write(paramsBytes);
 
         // Source data hash for integrity
-        var sourceHash = SHA256.HashData(sourceBytes);
+        byte[] sourceHash;
+        if (MessageBus != null)
+        {
+            var msg = new PluginMessage { Type = "integrity.hash.compute" };
+            msg.Payload["data"] = sourceBytes;
+            msg.Payload["algorithm"] = "SHA256";
+            var response = await MessageBus.SendAsync("integrity.hash.compute", msg, cancellationToken).ConfigureAwait(false);
+            if (response.Success && response.Payload is Dictionary<string, object> payload && payload.TryGetValue("hash", out var hashObj) && hashObj is byte[] hash)
+            {
+                sourceHash = hash;
+            }
+            else
+            {
+                sourceHash = SHA256.HashData(sourceBytes); // Fallback on error
+            }
+        }
+        else
+        {
+            sourceHash = SHA256.HashData(sourceBytes);
+        }
         writer.Write(sourceHash);
 
         // Write compressed image data
@@ -215,7 +235,26 @@ internal sealed class JpegImageStrategy : MediaStrategyBase
         writer.Write(paramsBytes);
 
         // Source reference
-        var sourceHash = SHA256.HashData(sourceBytes);
+        byte[] sourceHash;
+        if (MessageBus != null)
+        {
+            var msg = new PluginMessage { Type = "integrity.hash.compute" };
+            msg.Payload["data"] = sourceBytes;
+            msg.Payload["algorithm"] = "SHA256";
+            var response = await MessageBus.SendAsync("integrity.hash.compute", msg, cancellationToken).ConfigureAwait(false);
+            if (response.Success && response.Payload is Dictionary<string, object> payload && payload.TryGetValue("hash", out var hashObj) && hashObj is byte[] hash)
+            {
+                sourceHash = hash;
+            }
+            else
+            {
+                sourceHash = SHA256.HashData(sourceBytes); // Fallback on error
+            }
+        }
+        else
+        {
+            sourceHash = SHA256.HashData(sourceBytes);
+        }
         writer.Write(sourceHash);
 
         writer.Write((byte)0xFF);
@@ -420,6 +459,7 @@ internal sealed class JpegImageStrategy : MediaStrategyBase
         var compressed = new byte[estimatedSize];
 
         // Generate deterministic compressed data from source using SHA-256 based CSPRNG
+        // Note: Using inline crypto as fallback since MessageBus not available in static method
         var hash = SHA256.HashData(sourceData);
         using var hmac = new HMACSHA256(hash);
 

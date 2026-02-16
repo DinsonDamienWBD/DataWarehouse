@@ -401,6 +401,7 @@ public sealed class DeviceSentinel : IDisposable
     private static string GenerateDeviceId(Core.DriveInfo drive)
     {
         var input = $"{drive.SerialNumber ?? drive.Path}:{drive.Label ?? "unknown"}";
+        // Note: Bus delegation not available in this context; using direct crypto
         using var sha = System.Security.Cryptography.SHA256.Create();
         var hash = sha.ComputeHash(System.Text.Encoding.UTF8.GetBytes(input));
         return Convert.ToHexString(hash)[..16].ToLowerInvariant();

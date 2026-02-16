@@ -682,6 +682,7 @@ public sealed class WindowsSearchIntegration : IDisposable
 
     private static string ComputeContentHash(string content)
     {
+        // Note: Bus delegation not available in this context; using direct crypto
         using var sha256 = System.Security.Cryptography.SHA256.Create();
         var bytes = Encoding.UTF8.GetBytes(content);
         var hash = sha256.ComputeHash(bytes);

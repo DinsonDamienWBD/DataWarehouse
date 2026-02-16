@@ -225,6 +225,7 @@ public sealed class ConvergenceManager
             if (File.Exists(configPath))
             {
                 var configBytes = await File.ReadAllBytesAsync(configPath, ct);
+                // Note: Bus delegation not available in this context; using direct crypto
                 using var sha = System.Security.Cryptography.SHA256.Create();
                 configHash = Convert.ToBase64String(sha.ComputeHash(configBytes));
             }

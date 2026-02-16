@@ -758,6 +758,66 @@ Plans:
 
 This section is the single source of truth for execution ordering, parallelism constraints, and architectural invariants. Sub-agents MUST read this before executing any plan.
 
+### Phase 31.2: Capability Delegation & Plugin Decomposition (EXPANDED)
+
+**Goal:** Enforce architectural invariants across ALL plugins: extract inline crypto/hashing/transport into capability-owning Ultimate plugins, replace with message bus delegation. Decompose monolithic plugins. Clean slate for v3.0.
+**Depends on:** Phase 31.1
+**Plans:** 7 plans
+
+**Scope:**
+
+**Stream A — TamperProof Decomposition (Plans 01-02):**
+1. Create `UltimateDataIntegrity` plugin extending `IntegrityProviderPluginBase` — owns all hash computation (15 providers, SHA2/SHA3/Keccak/HMAC), handles `integrity.hash.compute`/`integrity.hash.verify` bus topics. Move hashing code from TamperProof.
+2. Create `UltimateBlockchain` plugin extending `BlockchainProviderPluginBase` — owns blockchain anchoring, Merkle trees, chain validation. Move blockchain code from TamperProof.
+3. Refactor `TamperProof` to extend `TamperProofProviderPluginBase` — pure orchestrator that delegates hashing to UltimateDataIntegrity and blockchain to UltimateBlockchain via message bus
+4. BouncyCastle NuGet dependency moves from TamperProof to UltimateDataIntegrity
+
+**Stream B — Inline Hashing Delegation (Plan 03):**
+Replace ~150+ inline SHA256/HMAC calls across ALL plugins with `integrity.hash.compute`/`integrity.hash.verify` bus delegation to UltimateDataIntegrity:
+- TamperProof (60+ sites) — internal calls become bus delegation after decomposition
+- Transcoding.Media (59 sites) — SHA256.HashData/HMACSHA256 in all codec/format strategies
+- AirGapBridge (13 sites) — SHA256/HMACSHA256 in PackageManager, SecurityManager, SetupWizard
+- UniversalObservability (11 sites) — HMACSHA256 for AWS Signature V4 (KEEP — protocol-specific)
+- DataMarketplace (3 sites), PluginMarketplace (2 sites), AppPlatform (1 site), Compute.Wasm (1 site)
+- UniversalDashboards (1 site), WinFspDriver (1 site)
+
+**Stream C — Inline Crypto Delegation (Plan 04):**
+Replace ~8 inline crypto calls with `encryption.encrypt`/`encryption.decrypt` bus delegation to UltimateEncryption:
+- AirGapBridge (7 sites) — AesGcm/ECDsa in PackageManager, SecurityManager, AirGapTypes
+- AedsCore (1 site) — RSA.Create in ZeroTrustPairingPlugin
+
+**Stream D — Transport Delegation (Plan 05) — DEFERRED TO v3.0 Phase 41:**
+The 166+ HttpClient/TcpClient/UDP/WebSocket instances are primarily vendor-specific API integrations (metrics push to Prometheus, log forwarding to Papertrail, webhook calls), NOT data transfers. UltimateDataTransit's `transit.transfer.request` is for file/data transfers, not general HTTP API calls. Transport delegation is LIMITED to actual data transfer operations. Vendor-specific API integrations remain inline (same exception as AWS Signature V4).
+
+**Stream E — Build Verification & Cleanup (Plans 06-07):**
+- Full solution build with zero errors/warnings
+- Verify all ~1,039+ tests pass
+- Update PLUGIN-CATALOG.md files for modified plugins
+- Mark Phase 31.2 complete
+
+**Architectural Rules:**
+- **NO direct plugin dependencies** — all delegation through message bus only, plugins reference ONLY SDK
+- Before migrating ANY capability, CHECK if the target Ultimate plugin already handles it (don't duplicate)
+- AWS Signature V4 HMACSHA256 in UniversalObservability is PROTOCOL-SPECIFIC — keep inline (not general-purpose hashing)
+- Content fingerprinting (DataMarketplace, Compute.Wasm) is OPTIONAL delegation — delegate for consistency but not security-critical
+
+Plans:
+- [ ] 31.2-01-PLAN.md — Create UltimateDataIntegrity plugin (extract hashing from TamperProof, 15 providers, bus topics)
+- [ ] 31.2-02-PLAN.md — Create UltimateBlockchain plugin + refactor TamperProof to pure orchestrator
+- [ ] 31.2-03-PLAN.md — Inline hashing delegation across all plugins (~150+ sites → bus calls)
+- [ ] 31.2-04-PLAN.md — Inline crypto delegation across all plugins (~8 sites → bus calls)
+- [ ] 31.2-05-PLAN.md — Transport delegation across all plugins (~166+ sites → bus calls)
+- [ ] 31.2-06-PLAN.md — AdaptiveTransport merge/eliminate + Raft transport evaluation
+- [ ] 31.2-07-PLAN.md — Full build verification, test pass, catalog updates
+
+Wave structure:
+```
+Wave 1: 31.2-01 (UltimateDataIntegrity) + 31.2-02 (UltimateBlockchain + TamperProof refactor) — parallel
+Wave 2: 31.2-03 (hashing delegation) + 31.2-04 (crypto delegation) — parallel, depend on Wave 1
+Wave 3: 31.2-05 (transport delegation) + 31.2-06 (AdaptiveTransport/Raft) — parallel
+Wave 4: 31.2-07 (build verification) — depends on all prior waves
+```
+
 ### Phase 31.1 Execution (Current)
 
 **Dependency chain:** `31.1-01 → { 31.1-02 ∥ 31.1-03 ∥ 31.1-04 ∥ 31.1-05 }`
@@ -819,13 +879,19 @@ All executing agents MUST follow these rules:
 6. **Graceful degradation:** External service backends (Redis, Postgres, S3, etc.) MUST fall back to bounded in-memory alternatives when unavailable, with warning log.
 7. **No new NuGet without justification:** Plans 31.1-01 through 31.1-05 should not add NuGet packages EXCEPT where explicitly noted (Parquet.Net, Apache.Arrow in 31.1-03).
 8. **Bounded collections:** All in-memory collections must have configurable max size (MEM-03).
-9. **Capability delegation — no inline duplicates:** Before implementing ANY capability inline, CHECK if an existing plugin already owns it. If it does, delegate via message bus. Key ownership:
+9. **Capability delegation — no inline duplicates (AD-11):** Every cross-cutting capability has ONE owning plugin. ALL other plugins MUST delegate to that owner via message bus. No exceptions except protocol-specific signatures (e.g., AWS Sig V4). See ARCHITECTURE_DECISIONS.md AD-11 for the full Capability Ownership Registry. Key ownership:
    - **Encryption/Decryption** → UltimateEncryption via `encryption.encrypt` / `encryption.decrypt`
-   - **Hashing/Integrity** → TamperProof via `integrity.hash.compute` / `integrity.hash.verify`
+   - **Hashing/Integrity** → UltimateDataIntegrity via `integrity.hash.compute` / `integrity.hash.verify`
+   - **Blockchain/Anchoring** → UltimateBlockchain via `blockchain.anchor` / `blockchain.verify`
+   - **Transport (HTTP/TCP/UDP/WebSocket/gRPC)** → UltimateDataTransit via `transit.transfer.request`
    - **AI/ML inference** → UltimateIntelligence via `intelligence.*` topics
    - **Storage I/O** → UltimateStorage via `storage.*` topics
    - **Key management** → UltimateKeyManagement via `keymanagement.*` topics
+   - **Compression** → UltimateCompression via `compression.*` topics
+   - **Access Control** → UltimateAccessControl via `accesscontrol.*` topics
+   - **Exception:** AWS Signature V4 HMAC in observability strategies is protocol-specific (keep inline)
    - Never duplicate a capability that another plugin already provides. Never `System.Random` in security contexts.
+   - **Enforcement:** Any new `Aes.Create()`, `SHA256.Create()`, `new HttpClient()`, `new TcpClient()`, `RSA.Create()`, `ECDsa.Create()` outside the owning plugin is a violation. Search first, delegate always.
 10. **Zero regression (AD-08):** All existing strategies must produce identical results. All 1,039+ tests must pass.
 11. **Coding style:** Follow existing patterns in the codebase. Use `async/await`, `CancellationToken`, `ILogger` consistently. Strategy classes use `StrategyBase` domain bases.
 12. **Build gate:** After each plan execution, `dotnet build DataWarehouse.slnx` must succeed with zero NEW errors.

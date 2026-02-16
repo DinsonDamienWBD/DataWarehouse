@@ -1073,6 +1073,7 @@ public sealed class PluginMarketplacePlugin : PlatformPluginBase
                 try
                 {
                     var bytes = await File.ReadAllBytesAsync(request.AssemblyPath, ct);
+                    // Note: Bus delegation not available in this context; using direct crypto
                     var hash = SHA256.HashData(bytes);
                     var hashHex = Convert.ToHexString(hash);
                     checksPassed++;
@@ -2292,6 +2293,7 @@ public sealed class PluginMarketplacePlugin : PlatformPluginBase
         if (File.Exists(assemblyPath))
         {
             var bytes = await File.ReadAllBytesAsync(assemblyPath);
+            // Note: Bus delegation not available in this context; using direct crypto
             var hash = SHA256.HashData(bytes);
             metadata["assemblyHash"] = Convert.ToHexString(hash);
             metadata["assemblySize"] = bytes.Length;

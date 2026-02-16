@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using System.Text;
 using DataWarehouse.SDK.Contracts.Media;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.Transcoding.Media.Strategies.RAW;
 
@@ -133,7 +134,27 @@ internal sealed class Cr2RawStrategy : MediaStrategyBase
         }
 
         // Source integrity hash
-        writer.Write(SHA256.HashData(sourceBytes));
+        byte[] sourceHash;
+        if (MessageBus != null)
+        {
+            var msg = new PluginMessage { Type = "integrity.hash.compute" };
+            msg.Payload["data"] = sourceBytes;
+            msg.Payload["algorithm"] = "SHA256";
+            var response = await MessageBus.SendAsync("integrity.hash.compute", msg, cancellationToken).ConfigureAwait(false);
+            if (response.Success && response.Payload is Dictionary<string, object> payload && payload.TryGetValue("hash", out var hashObj) && hashObj is byte[] hash)
+            {
+                sourceHash = hash;
+            }
+            else
+            {
+                sourceHash = SHA256.HashData(sourceBytes); // Fallback on error
+            }
+        }
+        else
+        {
+            sourceHash = SHA256.HashData(sourceBytes);
+        }
+        writer.Write(sourceHash);
 
         await writer.BaseStream.FlushAsync(cancellationToken).ConfigureAwait(false);
         outputStream.Position = 0;
@@ -207,7 +228,26 @@ internal sealed class Cr2RawStrategy : MediaStrategyBase
         else
         {
             // Generate from sensor data hash
-            var thumbData = SHA256.HashData(sourceBytes);
+            byte[] thumbData;
+            if (MessageBus != null)
+            {
+                var msg = new PluginMessage { Type = "integrity.hash.compute" };
+                msg.Payload["data"] = sourceBytes;
+                msg.Payload["algorithm"] = "SHA256";
+                var response = await MessageBus.SendAsync("integrity.hash.compute", msg, cancellationToken).ConfigureAwait(false);
+                if (response.Success && response.Payload is Dictionary<string, object> payload && payload.TryGetValue("hash", out var hashObj) && hashObj is byte[] hash)
+                {
+                    thumbData = hash;
+                }
+                else
+                {
+                    thumbData = SHA256.HashData(sourceBytes); // Fallback on error
+                }
+            }
+            else
+            {
+                thumbData = SHA256.HashData(sourceBytes);
+            }
             writer.Write(thumbData.Length);
             writer.Write(thumbData);
         }
@@ -394,6 +434,7 @@ internal sealed class Cr2RawStrategy : MediaStrategyBase
         byte[] sourceData, long sensorDataOffset, (double r, double g, double b) whiteBalance)
     {
         // AHD demosaicing + WB correction + sRGB gamma
+        // Note: Using inline crypto as fallback since MessageBus not available in static method
         var hash = SHA256.HashData(sourceData);
         var wbBytes = BitConverter.GetBytes(whiteBalance.r);
 
