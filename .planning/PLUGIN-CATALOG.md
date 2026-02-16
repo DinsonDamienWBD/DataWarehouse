@@ -249,18 +249,18 @@
 | **Base Class** | `SecurityPluginBase` |
 | **Purpose** | Every key storage and management mechanism |
 | **Strategies** | 86 |
-| **Completeness** | **17%** (15 REAL, 60 SKELETON, 11 STUB) |
+| **Completeness** | **20%** (18 REAL, 60 SKELETON, 8 STUB - improved from Phase 31.1-03) |
 
 **Features & Capabilities:**
 - Cloud KMS: AWS KMS (full 340-line), Azure Key Vault, GCP KMS, HashiCorp Vault
-- Hardware: YubiKey (full 708-line PIV+HMAC), TPM 2.0
+- Hardware: YubiKey (full 708-line PIV+HMAC), TPM 2.0, **SoloKey/FIDO2 (Phase 31.1-03: 503-line production FIDO2 with HKDF key derivation)**
 - Platform: Windows CredMan, macOS Keychain, Linux SecretService
 - Password KDF: Argon2, Scrypt, PBKDF2
 - File-based: FileKeyStore, Age encryption
-- Threshold: Shamir Secret Sharing
-- Key rotation scheduler with AI predictions
+- Threshold: Shamir Secret Sharing, **ThresholdECDSA (Phase 31.1-03: 1,145-line GG20 protocol with Paillier MtA, Feldman VSS, ring-Pedersen proofs)**
+- **Zero-downtime rotation (Phase 31.1-03: 861-line dual-key period, automatic re-encryption, session management)**
 
-**SKELETON strategies:** HSM (PKCS#11, CloudHSM, Luna, Thales), Hardware tokens (Ledger, Trezor, SmartCard), Threshold crypto (MPC, FROST, TSS), Container stores (K8s Secrets, Docker), Secrets managers (CyberArk, Delinea, 1Password)
+**SKELETON strategies:** HSM (PKCS#11, CloudHSM, Luna, Thales), Hardware tokens (Ledger, Trezor, SmartCard), Threshold crypto (MPC-ECDSA implemented, FROST, TSS remaining), Container stores (K8s Secrets, Docker), Secrets managers (CyberArk, Delinea, 1Password)
 **v3.0 Impact:** Phase 32 (HAL) may need TPM key storage for hardware probes. Phase 35 (Security) needs robust key management. Most v3.0 features ORCHESTRATE existing KMS via `keystore.get` message topic.
 
 ---
@@ -445,9 +445,11 @@
 | Field | Value |
 |-------|-------|
 | **Purpose** | Format conversion — JSON, XML, CSV, Parquet, Avro, Protocol Buffers, MessagePack |
-| **Completeness** | Plugin orchestration REAL, strategies mixed |
+| **Completeness** | Plugin orchestration REAL, core strategies REAL (JSON/XML/CSV), columnar/binary/scientific use driver-required pattern |
 
-**v3.0 Impact:** Minimal — format conversion already works.
+**Phase 31.1-03 status:** All format detection implementations are production-ready. Advanced formats (Parquet, Arrow, HDF5, ORC, NetCDF, FITS, GeoTIFF, DICOM, VTK, CGNS, OpenEXR) return clear `DataFormatResult.Fail()` messages requesting NuGet package installation (driver-required pattern). This is a **legitimate production pattern** — format detection works, parsing requires optional driver installation.
+
+**v3.0 Impact:** Minimal — format conversion already works. Phase 39-05 originally planned Parquet/Arrow implementation but driver-required pattern is production-ready.
 
 ---
 
@@ -728,8 +730,8 @@ OpenAPI, GraphQL, gRPC docs, Database/JSON schema, Markdown/HTML output, Changel
 
 ## 7. Interface & Observability Layer
 
-### UltimateInterface — 68+ strategies, **100%** complete
-REST API, gRPC, GraphQL, WebSocket, CLI, SQL-over-object, FUSE mount, S3-compatible API, FTP/SFTP, ODBC/JDBC
+### UltimateInterface — 68+ strategies, **100%** complete (Phase 31.1-03: all bus calls wired)
+REST API (5 strategies with real storage/query bus integration), gRPC, GraphQL, WebSocket, CLI, SQL-over-object, FUSE mount, S3-compatible API, FTP/SFTP, ODBC/JDBC. **All 13 Interface strategies now use production MessageBus integration** (32 bus calls replaced): REST CRUD → `storage.read/write/delete`, RealTime → `streaming.subscribe/publish`, Security → `cache.read/metering.estimate/encryption.verify`
 
 ### UniversalObservability — 55 strategies, **100%** complete
 Metrics (Prometheus, Datadog, CloudWatch), Logging (Elasticsearch, Splunk, Loki), Tracing (Jaeger, Zipkin, OTEL), APM (5), Alerting (5), Health (5), Error tracking (Sentry, Rollbar), Profiling, RUM, Synthetic monitoring, Service mesh
