@@ -275,6 +275,7 @@ public class Http2DataPlanePlugin : DataPlaneTransportPluginBase
         {
             _httpClient?.Dispose();
         }
+        base.Dispose(disposing);
     }
 
     /// <summary>

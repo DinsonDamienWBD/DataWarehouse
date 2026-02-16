@@ -493,5 +493,6 @@ public class MqttControlPlanePlugin : ControlPlaneTransportPluginBase
             _connectionCts?.Dispose();
             _mqttClient?.Dispose();
         }
+        base.Dispose(disposing);
     }
 }

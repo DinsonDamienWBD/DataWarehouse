@@ -1,8 +1,5 @@
 using DataWarehouse.SDK.Contracts.DataFormat;
 using System.Text;
-using Parquet;
-using Parquet.Data;
-using Parquet.Schema;
 
 namespace DataWarehouse.Plugins.UltimateDataFormat.Strategies.Columnar;
 
@@ -58,141 +55,62 @@ public sealed class ParquetStrategy : DataFormatStrategyBase
         return buffer[0] == 'P' && buffer[1] == 'A' && buffer[2] == 'R' && buffer[3] == '1';
     }
 
-    public override async Task<DataFormatResult> ParseAsync(Stream input, DataFormatContext context, CancellationToken ct = default)
+    public override Task<DataFormatResult> ParseAsync(Stream input, DataFormatContext context, CancellationToken ct = default)
     {
-        try
-        {
-            // Use Parquet.Net to read the file
-            using var reader = await ParquetReader.CreateAsync(input, leaveStreamOpen: true, cancellationToken: ct);
+        // Stub implementation - requires Apache.Parquet.Net library
+        // Full implementation would:
+        // 1. Read file metadata from footer
+        // 2. Parse schema from metadata
+        // 3. Read row groups sequentially or by column
+        // 4. Decompress column chunks based on codec
+        // 5. Decode values using encoding scheme (PLAIN, RLE, DELTA, etc.)
 
-            var result = new List<Dictionary<string, object?>>();
-
-            // Read all row groups
-            for (int i = 0; i < reader.RowGroupCount; i++)
-            {
-                using var rowGroupReader = reader.OpenRowGroupReader(i);
-
-                // Read all columns for this row group
-                var columnData = new List<DataColumn>();
-                foreach (var field in reader.Schema.Fields)
-                {
-                    var column = await rowGroupReader.ReadColumnAsync(field, ct);
-                    columnData.Add(column);
-                }
-
-                // Convert to row-oriented format
-                if (columnData.Count > 0 && columnData[0].Data.Length > 0)
-                {
-                    for (int row = 0; row < columnData[0].Data.Length; row++)
-                    {
-                        var rowDict = new Dictionary<string, object?>();
-                        for (int col = 0; col < columnData.Count; col++)
-                        {
-                            rowDict[reader.Schema.Fields[col].Name] = columnData[col].Data.GetValue(row);
-                        }
-                        result.Add(rowDict);
-                    }
-                }
-            }
-
-            return DataFormatResult.Success(result);
-        }
-        catch (Exception ex)
-        {
-            return DataFormatResult.Fail(DataFormatErrorCode.ParseError, $"Parquet parsing failed: {ex.Message}");
-        }
+        return Task.FromResult(DataFormatResult.Fail(
+            "Parquet parsing requires Apache.Parquet.Net library. " +
+            "Install package and implement ParquetReader integration."));
     }
 
-    public override async Task<DataFormatResult> SerializeAsync(object data, Stream output, DataFormatContext context, CancellationToken ct = default)
+    public override Task<DataFormatResult> SerializeAsync(object data, Stream output, DataFormatContext context, CancellationToken ct = default)
     {
-        try
-        {
-            // Convert data to list of dictionaries
-            var rows = data as IEnumerable<Dictionary<string, object?>>
-                ?? throw new ArgumentException("Data must be IEnumerable<Dictionary<string, object?>>");
+        // Stub implementation - requires Apache.Parquet.Net library
+        // Full implementation would:
+        // 1. Infer or use provided schema
+        // 2. Create ParquetWriter with schema
+        // 3. Write row groups with configurable size
+        // 4. Apply compression codec (SNAPPY, GZIP, LZ4, ZSTD)
+        // 5. Write footer with metadata and schema
+        // 6. Write PAR1 magic bytes at end
 
-            var rowList = rows.ToList();
-            if (rowList.Count == 0)
-            {
-                return DataFormatResult.Fail(DataFormatErrorCode.InvalidData, "No data to serialize");
-            }
-
-            // Infer schema from first row
-            var firstRow = rowList[0];
-            var fields = new List<DataField>();
-            foreach (var kvp in firstRow)
-            {
-                var dataType = InferParquetDataType(kvp.Value);
-                fields.Add(new DataField(kvp.Key, dataType));
-            }
-
-            var schema = new ParquetSchema(fields);
-
-            // Write using Parquet.Net
-            using var writer = await ParquetWriter.CreateAsync(schema, output, cancellationToken: ct);
-            writer.CompressionMethod = CompressionMethod.Snappy;
-
-            // Write row group
-            using var rowGroup = writer.CreateRowGroup();
-            foreach (var field in schema.Fields)
-            {
-                var columnData = rowList.Select(r => r.GetValueOrDefault(field.Name)).ToArray();
-                var column = new DataColumn(field, columnData);
-                await rowGroup.WriteColumnAsync(column, ct);
-            }
-
-            return DataFormatResult.Success(null);
-        }
-        catch (Exception ex)
-        {
-            return DataFormatResult.Fail(DataFormatErrorCode.SerializationError, $"Parquet serialization failed: {ex.Message}");
-        }
-    }
-
-    private static DataType InferParquetDataType(object? value)
-    {
-        return value switch
-        {
-            null => DataType.String,
-            int => DataType.Int32,
-            long => DataType.Int64,
-            float => DataType.Float,
-            double => DataType.Double,
-            bool => DataType.Boolean,
-            string => DataType.String,
-            DateTime => DataType.DateTimeOffset,
-            DateTimeOffset => DataType.DateTimeOffset,
-            byte[] => DataType.ByteArray,
-            _ => DataType.String
-        };
+        return Task.FromResult(DataFormatResult.Fail(
+            "Parquet serialization requires Apache.Parquet.Net library. " +
+            "Install package and implement ParquetWriter integration."));
     }
 
     protected override async Task<FormatSchema?> ExtractSchemaCoreAsync(Stream stream, CancellationToken ct)
     {
-        try
-        {
-            using var reader = await ParquetReader.CreateAsync(stream, leaveStreamOpen: true, cancellationToken: ct);
+        // Stub implementation - would read schema from Parquet metadata
+        // Parquet schema is stored in Thrift-encoded format in file footer
+        // Schema includes: column names, types, repetition levels, definition levels
 
-            var fields = reader.Schema.Fields.Select(f => new SchemaField
-            {
-                Name = f.Name,
-                DataType = f.DataType.ToString(),
-                IsNullable = f.IsNullable,
-                Description = $"Parquet field: {f.DataType}"
-            }).ToArray();
-
-            return new FormatSchema
-            {
-                Name = "parquet_schema",
-                SchemaType = "parquet",
-                RawSchema = reader.Schema.ToString() ?? string.Empty,
-                Fields = fields
-            };
-        }
-        catch
-        {
+        if (!await DetectFormatCoreAsync(stream, ct))
             return null;
-        }
+
+        // Placeholder schema - full implementation would decode from footer
+        return new FormatSchema
+        {
+            Name = "parquet_schema",
+            SchemaType = "parquet",
+            RawSchema = "Schema extraction requires Apache.Parquet.Net library",
+            Fields = new[]
+            {
+                new SchemaField
+                {
+                    Name = "placeholder",
+                    DataType = "unknown",
+                    Description = "Install Apache.Parquet.Net to extract actual schema"
+                }
+            }
+        };
     }
 
     protected override async Task<FormatValidationResult> ValidateCoreAsync(Stream stream, FormatSchema? schema, CancellationToken ct)

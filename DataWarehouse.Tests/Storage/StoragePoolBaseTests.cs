@@ -328,6 +328,7 @@ public class StoragePoolBaseTests
 
         public override string Id => "test-storage-pool";
         public override string PoolId => "test-pool";
+        public override string InfrastructureDomain => "Storage";
 
         public override void AddProvider(IStorageProvider provider, StorageRole role = StorageRole.Primary)
         {

@@ -430,6 +430,7 @@ public class Http3DataPlanePlugin : DataPlaneTransportPluginBase
         {
             _httpClient?.Dispose();
         }
+        base.Dispose(disposing);
     }
 
     /// <summary>

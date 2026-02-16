@@ -1,5 +1,6 @@
 using DataWarehouse.Kernel;
 using DataWarehouse.SDK.Contracts;
+using DataWarehouse.SDK.Contracts.Hierarchy;
 using DataWarehouse.SDK.Primitives;
 using FluentAssertions;
 using Xunit;

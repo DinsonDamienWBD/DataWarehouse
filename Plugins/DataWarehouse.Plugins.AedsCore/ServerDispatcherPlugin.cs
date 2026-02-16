@@ -455,5 +455,6 @@ public class ServerDispatcherPlugin : ServerDispatcherPluginBase
         {
             _queueLock?.Dispose();
         }
+        base.Dispose(disposing);
     }
 }
