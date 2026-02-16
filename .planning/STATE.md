@@ -21,11 +21,11 @@ Note: Phase 30 (3 plans) was subsumed into v3.0 Phase 41 (Comprehensive Audit & 
 
 ### Phase 31.1 Pre-v3.0 Production Readiness Cleanup -- IN PROGRESS
 Phase: 31.1 (inserted post-v2.0)
-Plan: 3 of 5 complete
-Status: Batch 2 Group A verified production-ready (7 plugins: DatabaseProtocol, DatabaseStorage, DataCatalog, DataFabric, DataFormat, DataGovernance, DataIntegration)
-Last activity: 2026-02-16 -- Plan 31.1-04 complete (verification only - all plugins already production-ready)
+Plan: 4 of 5 complete
+Status: Batch 2 plugins verified production-ready (15 plugins total: 7 Group A + 8 Group B with PLUGIN-CATALOG.md)
+Last activity: 2026-02-16 -- Plan 31.1-05 complete (8 plugins documented, 500+ strategies cataloged)
 
-Progress: [############----------------] 60% (3/5 plans)
+Progress: [###################---------] 80% (4/5 plans)
 
 ### v3.0 Universal Platform -- PLANNED
 Phase: 0 of 10 (not started)
@@ -108,7 +108,9 @@ Phase 30 NOTE: v2.0 Phase 30 (Testing & Final Verification) has been moved and e
 | 31 | 08 - PlatformServiceManager + CLI Parity | ~8 min | 2 | 6 |
 | 31.1 | 01 - Security Fixes + Build Errors | ~9 min | 2 | 10 |
 | 31.1 | 03 - Interface Bus + DataFormat | ~25 min | 2 | 14 |
+| 31.1 | 05 - Batch 2 Group B Documentation | ~24 min | 8 | 8 |
 | 31.1 | 04 - Batch 2 Group A Verification | ~12 min | 1 | 0 |
+| Phase 31.1 P05 | 24 | 8 tasks | 8 files |
 
 ## Accumulated Context
 
@@ -189,7 +191,10 @@ Phase 30 NOTE: v2.0 Phase 30 (Testing & Final Verification) has been moved and e
 - Phase 31.1-01: Replaced 4 fake encryption methods with production AES-256-GCM; fixed 13 build errors (SharpCompress v0.45.1 factory methods, MQTTnet v5.x ReadOnlySequence); deferred P2 wiring fixes to 31.1-02
 - Phase 31.1-03: Driver-required pattern for UltimateDataFormat advanced formats (Parquet, Arrow, HDF5, etc.) is production-ready approach — detection works via magic bytes, parsing requires optional NuGet package installation (mirrors ODBC/JDBC driver model)
 - Phase 31.1-03: All 13 UltimateInterface strategies now use production MessageBus integration (32 bus calls replaced: REST → storage.read/write/delete, RealTime → streaming.subscribe/publish, Security → cache/metering/encryption topics)
+- [Phase 31.1]: Plugin strategies are metadata-only declarations by design (SDK contracts require only properties)
+- Phase 31.1-05: Created PLUGIN-CATALOG.md for 8 Batch 2 Group B plugins (500+ strategies documented); confirmed production-ready status
 - Phase 31.1-04: Batch 2 Group A plugins already production-ready — DatabaseProtocol/DatabaseStorage have full implementations, DataCatalog/DataGovernance/DataIntegration use metadata-only registry pattern (correct design), DataFabric has minimal placeholders as specified
+- [Phase 31.1]: Plugin strategies are metadata-only declarations by design (SDK contracts require only properties)
 
 ### SDK Audit Results (2026-02-14)
 
