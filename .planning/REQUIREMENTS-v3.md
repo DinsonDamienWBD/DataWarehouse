@@ -5,6 +5,31 @@
 
 > **CRITICAL: ZERO REGRESSION (AD-08) STILL APPLIES** -- All v1.0 and v2.0 functionality MUST be preserved. All 60+ plugins, ~1,727 strategies, 1,039+ tests, and all distributed infrastructure MUST continue to work throughout v3.0 development.
 
+## Architectural Decisions (v3.0)
+
+### AD-11: VDE as Default Storage Mode
+VDE container is the **recommended default** for all local/on-premise deployments. Benefits: single WAL (no double-journaling), block-level checksumming, CoW snapshots, B-Tree indexing, no per-object inode overhead. Direct OS filesystem access remains available as `legacy-direct` strategy for backward compatibility and simple deployments. VDE containers use DirectIO to bypass OS page cache.
+
+### AD-12: Layer Bypass by Storage Class
+Not all storage paths go through all layers. The stack adapts based on `StorageAddress` type:
+
+| Storage Class | Translation | UltimateStorage | UltimateFilesystem | UltimateVDE | HAL | Physical |
+|---|---|---|---|---|---|---|
+| **Local/VM (default)** | Yes (if federated) | Yes (selects VDE) | Yes (DirectIO for container) | **Yes (default)** | Yes (probes media) | OS FS → disk |
+| **Bare-metal** | Yes (if federated) | Yes (selects VDE) | No (VDE talks to device directly) | **Yes** | Yes (probes NVMe) | Raw block device |
+| **Cloud (S3/Azure/GCS)** | Yes (UUID→location) | Yes (selects cloud strategy) | **No** | **No** | **No** | HTTP API → cloud |
+| **Direct NVMe (SPDK)** | Yes (if federated) | Yes (selects NVMe passthrough) | **No** | Optional (for indexing) | Yes (discovers NVMe NS) | ioctl/SPDK → NVMe |
+| **Network (SMB/NFS)** | Yes (if federated) | Yes (selects network strategy) | **No** | **No** | **No** | Network protocol |
+| **Legacy direct** | Yes (if federated) | Yes (selects local-file) | Yes (POSIX/DirectIO) | **No** | Optional | OS FS → disk |
+
+### AD-13: Plugin Base Feature Rules
+All plugins MUST use these PluginBase features when implementing new functionality:
+1. **Knowledge Bank** — Register domain knowledge via `RegisterKnowledge()`/`ShareKnowledge()` so other plugins can discover capabilities
+2. **Capability Registration** — Register capabilities with `CapabilityManager` at startup so the kernel knows what each plugin can do
+3. **Intelligence Hooks** — Implement `IIntelligenceAware` when the plugin benefits from AI-driven optimization (tiering, prediction, anomaly detection)
+4. **Health Check** — Override `CheckHealthAsync()` to report meaningful health (not just default Healthy)
+5. **Lifecycle** — Use `OnStartCoreAsync()`/`OnStopCoreAsync()` for proper startup/shutdown sequencing
+
 ## v3.0 Requirements
 
 ### Hardware Abstraction Layer (Phase 32)
@@ -47,8 +72,8 @@
 - [ ] **VDE-07: Block-Level Checksumming** — Per-block CRC32C or xxHash checksum stored alongside each block. Every read verifies checksum. Silent data corruption detected and reported via health monitoring. Checksum verification adds <5% overhead to sequential reads.
   - Success: Write block, flip one bit in storage, read block — corruption detected and reported. Sequential read throughput within 5% of non-checksummed reads.
 
-- [ ] **VDE-08: VDE Storage Integration** — Virtual Disk Engine registers as an `UltimateStorage` backend strategy. Accessible via `StorageAddress.FromContainer("path/to/container.dwvd")`. All VDE features (snapshots, CoW, checksumming) available through standard storage strategy interface.
-  - Success: `StorageManager.Store(key, data, backend: "vde")` stores data in VDE container. All standard storage operations (store, retrieve, delete, list) work through VDE backend.
+- [ ] **VDE-08: UltimateVDE Plugin & Storage Integration** — VDE is its own `UltimateVDE` plugin (single-responsibility: block management). The VDE engine lives in `DataWarehouse.SDK/Storage/VirtualDisk/` as shared infrastructure. UltimateVDE registers as a storage backend via `IStorageStrategy` (strategyId: `vde-container`). UltimateFilesystem delegates to VDE via message bus for bare-metal deployments (replacing the `ContainerPackedStrategy` stub). Layering: UltimateStorage → UltimateFilesystem → UltimateVDE → raw block device / container file. Accessible via `StorageAddress.FromContainer("path/to/container.dwvd")`.
+  - Success: `StorageManager.Store(key, data, backend: "vde-container")` stores data in VDE container. UltimateFilesystem routes bare-metal I/O through VDE. All standard storage operations (store, retrieve, delete, list) work through VDE backend. UltimateVDE plugin exposes `vde.*` message bus topics.
 
 ### Federated Object Storage (Phase 34)
 
@@ -241,13 +266,14 @@ These requirements are carried forward from v2.0 into Phase 38 sub-plans 38-01 t
 | IMPL-08 | Phase 41 | Large Implementations | Not started |
 | IMPL-09 | Phase 41 | Large Implementations | Not started |
 | IMPL-10 | Phase 41 | Large Implementations | Not started |
+| IMPL-11 | Phase 40 | Medium Implementations | Not started |
 
 **Coverage:**
-- v3.0 new requirements: 65 total (HAL-01 to HAL-05, VDE-01 to VDE-08, FOS-01 to FOS-07, HW-01 to HW-07, EDGE-01 to EDGE-08, ENV-01 to ENV-05, AUDIT-01 to AUDIT-06, COMP-01 to COMP-05, IMPL-01 to IMPL-10)
+- v3.0 new requirements: 66 total (HAL-01 to HAL-05, VDE-01 to VDE-08, FOS-01 to FOS-07, HW-01 to HW-07, EDGE-01 to EDGE-08, ENV-01 to ENV-05, AUDIT-01 to AUDIT-06, COMP-01 to COMP-05, IMPL-01 to IMPL-11)
 - v2.0 requirements carried into Phase 38: 6 (TEST-01 to TEST-06)
-- Total requirements in v3.0 scope: 71
+- Total requirements in v3.0 scope: 72
 - Categories: 11 (Hardware Abstraction, Virtual Disk Engine, Federated Object Storage, Hardware Accelerator, Edge/IoT Hardware, Multi-Environment, Comprehensive Audit, Testing, Feature Composition, Medium Implementations, Large Implementations)
-- All mapped to phases: 71/71
+- All mapped to phases: 72/72
 - Unmapped: 0
 
 ### Feature Composition & Orchestration (Phase 39)
@@ -287,6 +313,9 @@ These requirements are carried forward from v2.0 into Phase 38 sub-plans 38-01 t
 - [ ] **IMPL-06: Digital Twin Continuous Sync** — Extend existing DeviceTwin with continuous real-time synchronization from physical sensors to digital model, state projection (predict future state), and what-if simulation capability.
   - Success: Physical sensor updates temperature every second → digital twin reflects value within 100ms. State projection predicts "temperature will exceed threshold in 15 minutes." What-if simulation: "if we increase airflow, temperature drops by X." DeviceTwin class extended with Sync/Project/Simulate methods.
 
+- [ ] **IMPL-11: Production FUSE Driver** — Replace the stub sleep loop in FuseDriver's `FuseMainLoop` with real native libfuse3 P/Invoke dispatch on Linux and macFUSE dispatch on macOS. All POSIX operations (GetAttr, Read, Write, Create, xattr, symlinks, hardlinks, fallocate, sparse files, POSIX locking) are already implemented — they just need to be wired to the actual FUSE dispatch loop. WinFspDriver is already production-ready; FUSE must match it.
+  - Success: On Linux, `dw mount /mnt/datawarehouse` creates a real FUSE mount. `ls`, `cat`, `cp`, `mkdir`, `ln -s`, `touch`, `chmod` all work. Write a file → data persists to storage backend. `umount` cleanly unmounts. On macOS, same via macFUSE. All existing FuseFileSystem POSIX operations callable from real FUSE dispatch.
+
 ### Large Implementations (Phase 41)
 
 - [ ] **IMPL-07: Exabyte Metadata Engine** — Replace ExascaleMetadataStrategy stub with a real distributed metadata store. Use LSM-Tree or distributed B-Tree for O(log n) operations at 10^15 object scale. Integrate with Phase 34 manifest service.
@@ -305,7 +334,7 @@ These requirements are carried forward from v2.0 into Phase 38 sub-plans 38-01 t
 
 | Feature | Reason |
 |---------|--------|
-| Custom filesystem kernel module | User-space only (FUSE/SPDK) -- no kernel development |
+| Custom filesystem kernel module | User-space only (FUSE/WinFSP/SPDK) -- FUSE is now production-ready in v3.0, but no kernel-mode drivers |
 | Real FPGA/ASIC bitstream generation | Use vendor SDKs via IHardwareAccelerator abstraction |
 | Manufacturing/hardware provisioning | Software platform only -- hardware provisioned externally |
 | Mobile (iOS/Android) deployment | Focus on server/edge/desktop -- mobile deferred to v4.0 |

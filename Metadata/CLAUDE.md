@@ -1,5 +1,8 @@
 # CLAUDE.md - AI Assistant Context for DataWarehouse
 
+> **IMPORTANT: For comprehensive architecture understanding, ALL agents MUST also read `.planning/PLUGIN-CATALOG.md`.**
+> It contains: all 60+ plugin details, production flow diagrams (Write/Read/Search pipelines showing where every plugin slots in), background job mappings, plugin lifecycle & knowledge registration patterns, message bus topic conventions, CLI/GUI integration, intelligence hook patterns, and v3.0 planned items. Consult it before any research, planning, or implementation work.
+
 ## Project Overview
 
 DataWarehouse is a production-grade, AI-native data warehouse SDK built in C#. It uses a plugin-based architecture where all components communicate via messages rather than direct function calls.
