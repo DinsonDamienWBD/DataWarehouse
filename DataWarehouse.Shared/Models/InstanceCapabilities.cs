@@ -111,6 +111,17 @@ public class InstanceCapabilities
     public Dictionary<string, string> Metadata { get; set; } = new();
 
     /// <summary>
+    /// Dynamic features registered at runtime via plugins.
+    /// Prefer checking DynamicFeatures over the legacy bool properties.
+    /// </summary>
+    public HashSet<string> DynamicFeatures { get; set; } = new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// Per-plugin capability lists for tracking what each plugin provides.
+    /// </summary>
+    public List<string> LoadedPluginCapabilities { get; set; } = new();
+
+    /// <summary>
     /// Checks if a specific feature flag is enabled
     /// </summary>
     /// <param name="featureName">Name of the feature</param>
@@ -118,5 +129,15 @@ public class InstanceCapabilities
     public bool HasFeature(string featureName)
     {
         return FeatureFlags.TryGetValue(featureName, out var enabled) && enabled;
+    }
+
+    /// <summary>
+    /// Checks if a dynamic feature is available.
+    /// </summary>
+    /// <param name="feature">The feature name to check.</param>
+    /// <returns>True if the dynamic feature is registered.</returns>
+    public bool HasDynamicFeature(string feature)
+    {
+        return DynamicFeatures.Contains(feature);
     }
 }

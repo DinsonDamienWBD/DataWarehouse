@@ -16,8 +16,9 @@ public class CommandDefinition
 }
 
 /// <summary>
-/// Registry of all available commands with their requirements
+/// Registry of all available commands with their requirements.
 /// </summary>
+[Obsolete("Use DynamicCommandRegistry for runtime capability reflection. This static registry is retained for backward compatibility.")]
 public class CommandRegistry
 {
     private static readonly List<CommandDefinition> _commands = new()
@@ -328,5 +329,23 @@ public class CommandRegistry
 
         var availableCommands = GetAvailableCommandsForCapabilities(capabilities);
         return availableCommands.Any(c => c.Name.Equals(commandName, StringComparison.OrdinalIgnoreCase));
+    }
+
+    /// <summary>
+    /// Converts the static CommandDefinition list to DynamicCommandDefinition format
+    /// for initial seeding of the DynamicCommandRegistry.
+    /// </summary>
+    /// <returns>Enumerable of DynamicCommandDefinition records.</returns>
+    public static IEnumerable<DynamicCommandDefinition> ToDynamicDefinitions()
+    {
+        return _commands.Select(c => new DynamicCommandDefinition
+        {
+            Name = c.Name,
+            Description = c.Description,
+            Category = c.Category,
+            RequiredFeatures = new List<string>(c.RequiredFeatures),
+            IsCore = c.IsCore,
+            SourcePlugin = null
+        });
     }
 }
