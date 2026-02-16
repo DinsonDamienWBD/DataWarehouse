@@ -410,10 +410,23 @@
         "resolved": "10.0.31",
         "contentHash": "tYgvabLjfgFcrisXmH3KzCxvN0Z4/MgopqObJCtjgMQAKPq+3FhyoFt/TH0c4vsDe0zw0C81FRs3jiFYXXHP0g=="
       },
+      "System.CodeDom": {
+        "type": "Transitive",
+        "resolved": "10.0.3",
+        "contentHash": "+G1mBhHJp8taiDcHK1gmckOZ884n9JeIrS1dzFYZhSa8oTiIF+EagIyAyCOQzdBbbES7eb9AkjGBlUZqqoCaeg=="
+      },
       "System.IO.Hashing": {
         "type": "Transitive",
         "resolved": "10.0.3",
         "contentHash": "La6ICwsdTKhVX+LKN+pvFjQRR3LhLwq3uKdi2knjLzRyPYBSydF4cjXidYxIiTcDD6XVYdsBWQEI8ZxiZ/OdIg=="
+      },
+      "System.Management": {
+        "type": "Transitive",
+        "resolved": "10.0.3",
+        "contentHash": "VyK/nnG1ZgwP/wY8HGrNrdha7kenyI+bkfE0miywiRaWVwqtenuYshA6pmP6Xm7lPsTE2ZRZ+BkzmUVg/VZtTg==",
+        "dependencies": {
+          "System.CodeDom": "10.0.3"
+        }
       },
       "YamlDotNet": {
         "type": "Transitive",
@@ -426,7 +439,8 @@
           "Microsoft.Extensions.Logging.Abstractions": "[10.0.3, )",
           "Microsoft.Json.Schema": "[2.3.0, )",
           "Newtonsoft.Json": "[13.0.4, )",
-          "System.IO.Hashing": "[10.0.3, )"
+          "System.IO.Hashing": "[10.0.3, )",
+          "System.Management": "[10.0.3, )"
         }
       },
       "datawarehouse.shared": {
@@ -437,6 +451,15 @@
         }
       }
     },
-    "net10.0-windows10.0.17763/win-x64": {}
+    "net10.0-windows10.0.17763/win-x64": {
+      "System.Management": {
+        "type": "Transitive",
+        "resolved": "10.0.3",
+        "contentHash": "VyK/nnG1ZgwP/wY8HGrNrdha7kenyI+bkfE0miywiRaWVwqtenuYshA6pmP6Xm7lPsTE2ZRZ+BkzmUVg/VZtTg==",
+        "dependencies": {
+          "System.CodeDom": "10.0.3"
+        }
+      }
+    }
   }
 }
