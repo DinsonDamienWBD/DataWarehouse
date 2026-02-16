@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Net.Http;
+using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using DataWarehouse.SDK.Connectors;
@@ -40,6 +41,64 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Healthcare
             var url = string.IsNullOrEmpty(query) ? $"/{resourceType}" : $"/{resourceType}?{query}";
             var response = await client.GetAsync(url, ct);
             return await response.Content.ReadAsStringAsync(ct);
+        }
+
+        /// <summary>
+        /// Deserializes a FHIR resource from JSON and extracts key metadata.
+        /// </summary>
+        /// <param name="json">JSON string containing a FHIR resource.</param>
+        /// <param name="ct">Cancellation token.</param>
+        /// <returns>Wrapped FHIR resource with extracted metadata and full JSON content.</returns>
+        /// <exception cref="ArgumentException">Thrown if the JSON is invalid or missing required fields.</exception>
+        public async Task<FhirResourceWrapper> DeserializeResourceAsync(string json, CancellationToken ct = default)
+        {
+            await Task.CompletedTask; // Make async for consistency
+            ct.ThrowIfCancellationRequested();
+
+            if (string.IsNullOrWhiteSpace(json))
+                throw new ArgumentException("JSON cannot be empty", nameof(json));
+
+            JsonDocument document;
+            try
+            {
+                document = JsonDocument.Parse(json);
+            }
+            catch (JsonException ex)
+            {
+                throw new ArgumentException("Invalid JSON format", nameof(json), ex);
+            }
+
+            var root = document.RootElement;
+
+            // Extract resourceType (required)
+            if (!root.TryGetProperty("resourceType", out var resourceTypeElement))
+                throw new ArgumentException("FHIR resource must have a 'resourceType' property");
+
+            string resourceType = resourceTypeElement.GetString() ?? "UNKNOWN";
+
+            // Extract id (required)
+            string id = root.TryGetProperty("id", out var idElement) ? idElement.GetString() ?? "UNKNOWN" : "UNKNOWN";
+
+            // Extract meta (optional)
+            string? versionId = null;
+            DateTimeOffset? lastUpdated = null;
+
+            if (root.TryGetProperty("meta", out var metaElement))
+            {
+                if (metaElement.TryGetProperty("versionId", out var versionIdElement))
+                    versionId = versionIdElement.GetString();
+
+                if (metaElement.TryGetProperty("lastUpdated", out var lastUpdatedElement))
+                {
+                    string? lastUpdatedStr = lastUpdatedElement.GetString();
+                    if (!string.IsNullOrEmpty(lastUpdatedStr) && DateTimeOffset.TryParse(lastUpdatedStr, out var parsed))
+                        lastUpdated = parsed;
+                }
+            }
+
+            var meta = new FhirMeta(versionId, lastUpdated);
+
+            return new FhirResourceWrapper(resourceType, id, meta, root.Clone());
         }
     }
 }
