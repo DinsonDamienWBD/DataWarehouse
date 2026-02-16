@@ -994,8 +994,15 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Innovations
 
         private async Task<bool> VerifyPackageIntegrityAsync(SneakernetPackage package, CancellationToken ct)
         {
-            await Task.CompletedTask;
-            return true;
+            // Production SHA-256 integrity verification
+            var encryptedData = await ReadPhysicalMediaAsync(package, ct);
+            var computedHash = ComputeHash(encryptedData);
+
+            // Constant-time comparison to prevent timing attacks
+            return CryptographicOperations.FixedTimeEquals(
+                System.Text.Encoding.UTF8.GetBytes(computedHash),
+                System.Text.Encoding.UTF8.GetBytes(package.PackageHash)
+            );
         }
 
         private async Task<long> RestoreFilesAsync(

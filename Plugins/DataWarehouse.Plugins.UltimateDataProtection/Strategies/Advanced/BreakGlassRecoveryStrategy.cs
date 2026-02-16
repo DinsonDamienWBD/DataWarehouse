@@ -609,14 +609,57 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Advanced
 
         private Task<byte[]> EncryptBackupAsync(byte[] data, byte[] key, CancellationToken ct)
         {
-            // In production, use AES-256-GCM
-            return Task.FromResult(data);
+            // Production AES-256-GCM encryption
+            const int NonceSize = 12;
+            const int TagSize = 16;
+
+            byte[] nonce = new byte[NonceSize];
+            RandomNumberGenerator.Fill(nonce);
+
+            byte[] ciphertext = new byte[data.Length];
+            byte[] tag = new byte[TagSize];
+
+            using (var aesGcm = new AesGcm(key, TagSize))
+            {
+                aesGcm.Encrypt(nonce, data, ciphertext, tag);
+            }
+
+            // Combine nonce + ciphertext + tag
+            byte[] result = new byte[NonceSize + ciphertext.Length + TagSize];
+            Buffer.BlockCopy(nonce, 0, result, 0, NonceSize);
+            Buffer.BlockCopy(ciphertext, 0, result, NonceSize, ciphertext.Length);
+            Buffer.BlockCopy(tag, 0, result, NonceSize + ciphertext.Length, TagSize);
+
+            return Task.FromResult(result);
         }
 
         private Task<byte[]> DecryptBackupAsync(byte[] encryptedData, byte[] key, CancellationToken ct)
         {
-            // In production, use AES-256-GCM
-            return Task.FromResult(encryptedData);
+            // Production AES-256-GCM decryption
+            const int NonceSize = 12;
+            const int TagSize = 16;
+
+            if (encryptedData.Length < NonceSize + TagSize)
+            {
+                throw new CryptographicException("Invalid encrypted data format");
+            }
+
+            byte[] nonce = new byte[NonceSize];
+            byte[] tag = new byte[TagSize];
+            byte[] ciphertext = new byte[encryptedData.Length - NonceSize - TagSize];
+
+            Buffer.BlockCopy(encryptedData, 0, nonce, 0, NonceSize);
+            Buffer.BlockCopy(encryptedData, NonceSize, ciphertext, 0, ciphertext.Length);
+            Buffer.BlockCopy(encryptedData, NonceSize + ciphertext.Length, tag, 0, TagSize);
+
+            byte[] plaintext = new byte[ciphertext.Length];
+
+            using (var aesGcm = new AesGcm(key, TagSize))
+            {
+                aesGcm.Decrypt(nonce, ciphertext, tag, plaintext);
+            }
+
+            return Task.FromResult(plaintext);
         }
 
         private Task StoreKeySharesAsync(string backupId, List<KeyShare> shares, CancellationToken ct)
