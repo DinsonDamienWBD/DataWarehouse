@@ -373,10 +373,11 @@ public sealed class QatAccelerator : IQatAccelerator, IDisposable
         ArgumentNullException.ThrowIfNull(data);
         ArgumentNullException.ThrowIfNull(key);
 
-        // TODO Phase 35-02: Implement QAT encryption using cpaCySymPerformOp
-        // For now, return stub indicating feature not yet implemented
-        throw new NotImplementedException(
-            "QAT encryption will be implemented in Phase 35-02 with full cryptographic API integration.");
+        // Phase 35: QAT encryption not yet implemented
+        // Production implementation requires cpaCySymPerformOp with full CPA mechanism setup
+        throw new InvalidOperationException(
+            "QAT encryption not yet implemented. Full QAT cryptographic API integration " +
+            "(cpaCySymPerformOp, session setup) is deferred to future phases.");
     }
 
     /// <inheritdoc />
@@ -392,9 +393,11 @@ public sealed class QatAccelerator : IQatAccelerator, IDisposable
         ArgumentNullException.ThrowIfNull(data);
         ArgumentNullException.ThrowIfNull(key);
 
-        // TODO Phase 35-02: Implement QAT decryption using cpaCySymPerformOp
-        throw new NotImplementedException(
-            "QAT decryption will be implemented in Phase 35-02 with full cryptographic API integration.");
+        // Phase 35: QAT decryption not yet implemented
+        // Production implementation requires cpaCySymPerformOp with full CPA mechanism setup
+        throw new InvalidOperationException(
+            "QAT decryption not yet implemented. Full QAT cryptographic API integration " +
+            "(cpaCySymPerformOp, session setup) is deferred to future phases.");
     }
 
     /// <inheritdoc />

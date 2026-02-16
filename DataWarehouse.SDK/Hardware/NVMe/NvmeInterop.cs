@@ -97,8 +97,8 @@ internal static partial class NvmeInterop
         /// <summary>Offset to data-from-device buffer (relative to structure start).</summary>
         public uint DataFromDeviceBufferOffset;
 
-        /// <summary>Command-specific parameter (NVMe namespace ID for I/O commands).</summary>
-        public uint CommandSpecific;
+        /// <summary>Command-specific length in bytes.</summary>
+        public uint CommandSpecificLength;
 
         /// <summary>Reserved (set to 0).</summary>
         public uint Reserved0;
@@ -122,7 +122,7 @@ internal static partial class NvmeInterop
         uint nInBufferSize,
         IntPtr lpOutBuffer,
         uint nOutBufferSize,
-        out uint lpBytesReturned,
+        ref uint lpBytesReturned,
         IntPtr lpOverlapped);
 
     /// <summary>
@@ -194,61 +194,61 @@ internal static partial class NvmeInterop
     /// Total size: 72 bytes.
     /// </remarks>
     [StructLayout(LayoutKind.Sequential)]
-    internal struct nvme_admin_cmd
+    internal struct NvmeAdminCmd
     {
         /// <summary>Opcode (admin command).</summary>
-        public byte opcode;
+        public byte Opcode;
 
         /// <summary>Flags (FUSE, PRINFO).</summary>
-        public byte flags;
+        public byte Flags;
 
-        /// <summary>Reserved.</summary>
-        public ushort rsvd1;
+        /// <summary>Command ID (assigned by driver).</summary>
+        public ushort CommandId;
 
         /// <summary>Namespace ID (0 for controller-level commands).</summary>
-        public uint nsid;
+        public uint Nsid;
 
         /// <summary>Reserved (CDW2).</summary>
-        public uint cdw2;
+        public uint Reserved0;
 
         /// <summary>Reserved (CDW3).</summary>
-        public uint cdw3;
+        public uint Reserved1;
 
         /// <summary>Metadata pointer (physical address).</summary>
-        public ulong metadata;
+        public ulong Metadata;
 
         /// <summary>Data pointer (physical address or virtual if kernel maps it).</summary>
-        public ulong addr;
+        public ulong Addr;
 
         /// <summary>Metadata length in bytes.</summary>
-        public uint metadata_len;
+        public uint MetadataLen;
 
         /// <summary>Data length in bytes.</summary>
-        public uint data_len;
+        public uint DataLen;
 
         /// <summary>Command dword 10.</summary>
-        public uint cdw10;
+        public uint Cdw10;
 
         /// <summary>Command dword 11.</summary>
-        public uint cdw11;
+        public uint Cdw11;
 
         /// <summary>Command dword 12.</summary>
-        public uint cdw12;
+        public uint Cdw12;
 
         /// <summary>Command dword 13.</summary>
-        public uint cdw13;
+        public uint Cdw13;
 
         /// <summary>Command dword 14.</summary>
-        public uint cdw14;
+        public uint Cdw14;
 
         /// <summary>Command dword 15.</summary>
-        public uint cdw15;
+        public uint Cdw15;
 
         /// <summary>Timeout in milliseconds.</summary>
-        public uint timeout_ms;
+        public uint TimeoutMs;
 
         /// <summary>Result (completion queue DW0, returned by kernel).</summary>
-        public uint result;
+        public uint Result;
     }
 
     /// <summary>
@@ -264,10 +264,10 @@ internal static partial class NvmeInterop
     internal static partial int Close(int fd);
 
     /// <summary>
-    /// Executes an ioctl command on a file descriptor.
+    /// Executes an ioctl command on a file descriptor for admin commands.
     /// </summary>
     [LibraryImport("libc", EntryPoint = "ioctl", SetLastError = true)]
-    internal static partial int Ioctl(int fd, int request, ref nvme_admin_cmd arg);
+    internal static partial int Ioctl(int fd, int request, ref NvmeAdminCmd arg);
 
     /// <summary>Open for read/write access.</summary>
     internal const int O_RDWR = 2;
