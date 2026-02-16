@@ -85,6 +85,30 @@ public sealed class PathStorageAdapter : IListableStorage
         }
     }
 
+    #region StorageAddress Support (HAL-05)
+
+    /// <summary>
+    /// Converts a StorageAddress to a normalized file path.
+    /// For FilePathAddress: returns the normalized path directly.
+    /// For other variants: uses ToKey() and applies key-to-path translation.
+    /// </summary>
+    public static string ToNormalizedPath(StorageAddress address)
+    {
+        return address switch
+        {
+            FilePathAddress fp => NormalizePath(fp.Path),
+            _ => NormalizePath(address.ToKey())
+        };
+    }
+
+    /// <summary>
+    /// Creates a StorageAddress from a file system path.
+    /// Convenience method for callers transitioning from string paths to StorageAddress.
+    /// </summary>
+    public static StorageAddress FromPath(string path) => StorageAddress.FromFilePath(path);
+
+    #endregion
+
     #region URI/Key Translation
 
     /// <summary>Converts a URI to a storage key.</summary>

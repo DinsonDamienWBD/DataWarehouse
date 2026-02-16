@@ -1,4 +1,5 @@
-﻿using System.Security.Cryptography;
+﻿using DataWarehouse.SDK.Storage;
+using System.Security.Cryptography;
 
 namespace DataWarehouse.SDK.Contracts
 {
@@ -61,5 +62,25 @@ namespace DataWarehouse.SDK.Contracts
         /// <param name="uri"></param>
         /// <returns></returns>
         Task<bool> ExistsAsync(Uri uri);
+
+        #region StorageAddress Overloads (HAL-05)
+
+        /// <summary>Save data using a StorageAddress. Default: delegates via ToUri().</summary>
+        Task SaveAsync(StorageAddress address, Stream data)
+            => SaveAsync(address.ToUri(), data);
+
+        /// <summary>Load data using a StorageAddress. Default: delegates via ToUri().</summary>
+        Task<Stream> LoadAsync(StorageAddress address)
+            => LoadAsync(address.ToUri());
+
+        /// <summary>Delete data using a StorageAddress. Default: delegates via ToUri().</summary>
+        Task DeleteAsync(StorageAddress address)
+            => DeleteAsync(address.ToUri());
+
+        /// <summary>Check existence using a StorageAddress. Default: delegates via ToUri().</summary>
+        Task<bool> ExistsAsync(StorageAddress address)
+            => ExistsAsync(address.ToUri());
+
+        #endregion
     }
 }

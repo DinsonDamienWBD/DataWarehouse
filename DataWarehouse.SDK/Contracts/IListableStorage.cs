@@ -1,4 +1,6 @@
-﻿namespace DataWarehouse.SDK.Contracts
+﻿using DataWarehouse.SDK.Storage;
+
+namespace DataWarehouse.SDK.Contracts
 {
     /// <summary>
     /// Represents a file found during a storage scan
@@ -21,5 +23,9 @@
         /// <param name="ct"></param>
         /// <returns></returns>
         IAsyncEnumerable<StorageListItem> ListFilesAsync(string prefix = "", CancellationToken ct = default);
+
+        /// <summary>Lists files using a StorageAddress prefix. Default: delegates via ToKey().</summary>
+        IAsyncEnumerable<StorageListItem> ListFilesAsync(StorageAddress prefix, CancellationToken ct = default)
+            => ListFilesAsync(prefix.ToKey(), ct);
     }
 }

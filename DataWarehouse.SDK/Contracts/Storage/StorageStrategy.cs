@@ -1,4 +1,5 @@
 ﻿using DataWarehouse.SDK.AI;
+using DataWarehouse.SDK.Storage;
 using DataWarehouse.SDK.Utilities;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -96,6 +97,30 @@ namespace DataWarehouse.SDK.Contracts.Storage
         /// <param name="ct">Cancellation token.</param>
         /// <returns>Available capacity in bytes, or null if capacity information is not available.</returns>
         Task<long?> GetAvailableCapacityAsync(CancellationToken ct = default);
+
+        #region StorageAddress Overloads (HAL-05)
+
+        /// <summary>Stores data using a StorageAddress. Default: delegates to string-key overload via ToKey().</summary>
+        Task<StorageObjectMetadata> StoreAsync(StorageAddress address, Stream data, IDictionary<string, string>? metadata = null, CancellationToken ct = default)
+            => StoreAsync(address.ToKey(), data, metadata, ct);
+
+        /// <summary>Retrieves data using a StorageAddress. Default: delegates to string-key overload via ToKey().</summary>
+        Task<Stream> RetrieveAsync(StorageAddress address, CancellationToken ct = default)
+            => RetrieveAsync(address.ToKey(), ct);
+
+        /// <summary>Deletes an object using a StorageAddress. Default: delegates to string-key overload via ToKey().</summary>
+        Task DeleteAsync(StorageAddress address, CancellationToken ct = default)
+            => DeleteAsync(address.ToKey(), ct);
+
+        /// <summary>Checks existence using a StorageAddress. Default: delegates to string-key overload via ToKey().</summary>
+        Task<bool> ExistsAsync(StorageAddress address, CancellationToken ct = default)
+            => ExistsAsync(address.ToKey(), ct);
+
+        /// <summary>Gets metadata using a StorageAddress. Default: delegates to string-key overload via ToKey().</summary>
+        Task<StorageObjectMetadata> GetMetadataAsync(StorageAddress address, CancellationToken ct = default)
+            => GetMetadataAsync(address.ToKey(), ct);
+
+        #endregion
     }
 
     #endregion
@@ -564,6 +589,38 @@ namespace DataWarehouse.SDK.Contracts.Storage
         {
             return await GetAvailableCapacityAsyncCore(ct);
         }
+
+        #endregion
+
+        #region StorageAddress Overloads (HAL-05)
+
+        /// <summary>Stores data using a StorageAddress. Override for native StorageAddress support.</summary>
+        public virtual Task<StorageObjectMetadata> StoreAsync(StorageAddress address, Stream data, IDictionary<string, string>? metadata = null, CancellationToken ct = default)
+            => StoreAsync(address.ToKey(), data, metadata, ct);
+
+        /// <summary>Retrieves data using a StorageAddress. Override for native StorageAddress support.</summary>
+        public virtual Task<Stream> RetrieveAsync(StorageAddress address, CancellationToken ct = default)
+            => RetrieveAsync(address.ToKey(), ct);
+
+        /// <summary>Deletes an object using a StorageAddress. Override for native StorageAddress support.</summary>
+        public virtual Task DeleteAsync(StorageAddress address, CancellationToken ct = default)
+            => DeleteAsync(address.ToKey(), ct);
+
+        /// <summary>Checks existence using a StorageAddress. Override for native StorageAddress support.</summary>
+        public virtual Task<bool> ExistsAsync(StorageAddress address, CancellationToken ct = default)
+            => ExistsAsync(address.ToKey(), ct);
+
+        /// <summary>Lists objects using a StorageAddress prefix. Override for native StorageAddress support.</summary>
+        public virtual IAsyncEnumerable<StorageObjectMetadata> ListAsync(StorageAddress? prefix, CancellationToken ct = default)
+            => ListAsync(prefix?.ToKey(), ct);
+
+        /// <summary>Gets metadata using a StorageAddress. Override for native StorageAddress support.</summary>
+        public virtual Task<StorageObjectMetadata> GetMetadataAsync(StorageAddress address, CancellationToken ct = default)
+            => GetMetadataAsync(address.ToKey(), ct);
+
+        /// <summary>Gets available capacity using a StorageAddress context. Override for native StorageAddress support.</summary>
+        public virtual Task<long?> GetAvailableCapacityAsync(StorageAddress address, CancellationToken ct = default)
+            => GetAvailableCapacityAsync(ct);
 
         #endregion
 
