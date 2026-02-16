@@ -110,8 +110,8 @@ public sealed class FuseDriverPlugin : DataWarehouse.SDK.Contracts.Hierarchy.Int
     {
         _kernelContext = request.Context;
 
-        // Get message bus for inter-plugin communication
-        _messageBus = GetMessageBus(request);
+        // Use message bus from base class for inter-plugin communication
+        _messageBus = MessageBus;
 
         // Validate platform support
         if (!IsPlatformSupported)
@@ -677,10 +677,8 @@ public sealed class FuseDriverPlugin : DataWarehouse.SDK.Contracts.Hierarchy.Int
 
     private void SubscribeToMessages()
     {
-        if (_messageBus == null)
-            return;
-
-        _messageSubscription = _messageBus.Subscribe("filesystem.*", async msg =>
+        // Use base class MessageBus property (null check removed - MessageBus is guaranteed available after initialization)
+        _messageSubscription = _messageBus?.Subscribe("filesystem.*", async msg =>
         {
             await OnMessageAsync(msg);
         });
@@ -688,9 +686,7 @@ public sealed class FuseDriverPlugin : DataWarehouse.SDK.Contracts.Hierarchy.Int
 
     private async Task PublishEventAsync(string topic, object payload)
     {
-        if (_messageBus == null)
-            return;
-
+        // Use base class MessageBus property (null check removed - safe to use null-conditional operator)
         try
         {
             var payloadDict = new Dictionary<string, object>();
@@ -719,12 +715,6 @@ public sealed class FuseDriverPlugin : DataWarehouse.SDK.Contracts.Hierarchy.Int
         }
     }
 
-    private IMessageBus? GetMessageBus(HandshakeRequest request)
-    {
-        // Message bus may be provided via config or other mechanisms
-        // For now, return null as message bus is optional
-        return null;
-    }
 
     private IReadOnlyDictionary<string, object> GetCapabilitiesMap()
     {
