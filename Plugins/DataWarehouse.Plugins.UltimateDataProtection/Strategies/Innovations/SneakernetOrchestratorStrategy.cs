@@ -994,15 +994,42 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Innovations
 
         private async Task<bool> VerifyPackageIntegrityAsync(SneakernetPackage package, CancellationToken ct)
         {
-            // Production SHA-256 integrity verification
-            var encryptedData = await ReadPhysicalMediaAsync(package, ct);
-            var computedHash = ComputeHash(encryptedData);
+            if (MessageBus == null)
+            {
+                throw new InvalidOperationException(
+                    "MessageBus is not available. Hash verification requires message bus integration with TamperProof plugin.");
+            }
 
-            // Constant-time comparison to prevent timing attacks
-            return CryptographicOperations.FixedTimeEquals(
-                System.Text.Encoding.UTF8.GetBytes(computedHash),
-                System.Text.Encoding.UTF8.GetBytes(package.PackageHash)
-            );
+            // Delegate hash verification to TamperProof plugin via message bus
+            var encryptedData = await ReadPhysicalMediaAsync(package, ct);
+            var expectedHashBytes = Convert.FromHexString(package.PackageHash);
+
+            var message = new SDK.Utilities.PluginMessage
+            {
+                Type = "integrity.hash.verify",
+                Payload = new Dictionary<string, object>
+                {
+                    ["data"] = encryptedData,
+                    ["expectedHash"] = expectedHashBytes,
+                    ["algorithm"] = "SHA256"
+                }
+            };
+
+            await MessageBus.PublishAndWaitAsync("integrity.hash.verify", message, ct);
+
+            // Check if verification succeeded
+            if (message.Payload.TryGetValue("valid", out var validObj) && validObj is bool isValid)
+            {
+                return isValid;
+            }
+
+            // If error occurred, log it and return false
+            if (message.Payload.TryGetValue("error", out var errorObj) && errorObj is string errorMsg)
+            {
+                throw new InvalidOperationException($"Hash verification failed: {errorMsg}");
+            }
+
+            return false;
         }
 
         private async Task<long> RestoreFilesAsync(
