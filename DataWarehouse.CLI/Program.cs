@@ -287,6 +287,8 @@ public static class Program
         rootCommand.Subcommands.Add(CreateConnectCommand());
         rootCommand.Subcommands.Add(CreateInstallCommand(formatOption));
         rootCommand.Subcommands.Add(CreateLiveCommand(formatOption));
+        rootCommand.Subcommands.Add(CreateServiceCommand(formatOption));
+        rootCommand.Subcommands.Add(CreateDisconnectCommand(formatOption));
 
         // Default handler
         rootCommand.SetAction((ParseResult parseResult) =>
@@ -318,6 +320,9 @@ public static class Program
         AnsiConsole.MarkupLine("  [cyan]system[/]      - System information");
         AnsiConsole.MarkupLine("  [cyan]install[/]     - Install DataWarehouse locally");
         AnsiConsole.MarkupLine("  [cyan]live[/]        - Live mode (in-memory, no persistence)");
+        AnsiConsole.MarkupLine("  [cyan]service[/]     - Service management");
+        AnsiConsole.MarkupLine("  [cyan]connect[/]     - Connect to an instance");
+        AnsiConsole.MarkupLine("  [cyan]disconnect[/]  - Disconnect from current instance");
         AnsiConsole.MarkupLine("  [cyan]completions[/] - Generate shell completions");
         AnsiConsole.MarkupLine("\nUse [cyan]dw [command] --help[/] for more information.");
     }
@@ -559,44 +564,57 @@ public static class Program
         var hostOption = new Option<string?>("--host") { Description = "Remote host address" };
         var portOption = new Option<int>("--port") { Description = "Remote port", DefaultValueFactory = _ => 8080 };
         var localPathOption = new Option<string?>("--local-path") { Description = "Path to local instance" };
+        var tlsOption = new Option<bool>("--tls") { Description = "Use TLS for connection" };
+        var authTokenOption = new Option<string?>("--auth-token") { Description = "Authentication token" };
 
         command.Options.Add(hostOption);
         command.Options.Add(portOption);
         command.Options.Add(localPathOption);
+        command.Options.Add(tlsOption);
+        command.Options.Add(authTokenOption);
 
         command.SetAction(async (ParseResult parseResult, CancellationToken token) =>
         {
-            var host = parseResult.GetValue(hostOption);
-            var port = parseResult.GetValue(portOption);
-            var localPath = parseResult.GetValue(localPathOption);
+            var parameters = new Dictionary<string, object?>
+            {
+                ["host"] = parseResult.GetValue(hostOption),
+                ["port"] = parseResult.GetValue(portOption),
+                ["localPath"] = parseResult.GetValue(localPathOption),
+                ["useTls"] = parseResult.GetValue(tlsOption),
+                ["authToken"] = parseResult.GetValue(authTokenOption)
+            };
 
-            var connected = false;
-
-            if (!string.IsNullOrEmpty(host))
-            {
-                connected = await _instanceManager!.ConnectRemoteAsync(host, port);
-            }
-            else if (!string.IsNullOrEmpty(localPath))
-            {
-                connected = await _instanceManager!.ConnectLocalAsync(localPath);
-            }
-            else
-            {
-                connected = await _instanceManager!.ConnectInProcessAsync();
-            }
-
-            if (connected)
-            {
-                await _capabilityManager!.RefreshCapabilitiesAsync();
-                AnsiConsole.MarkupLine("[green]Connected to DataWarehouse instance.[/]");
-            }
-            else
-            {
-                AnsiConsole.MarkupLine("[red]Failed to connect.[/]");
-            }
-
-            return connected ? 0 : 1;
+            var result = await _executor!.ExecuteAsync("connect", parameters);
+            _renderer.Render(result);
+            _history?.Add("connect", parameters, result.Success);
+            return result.ExitCode;
         });
+
+        return command;
+    }
+
+    private static Command CreateDisconnectCommand(Option<OutputFormat> formatOption)
+    {
+        var command = new Command("disconnect", "Disconnect from the current instance");
+        command.SetAction(async (ParseResult parseResult, CancellationToken token) =>
+        {
+            var format = parseResult.GetValue(formatOption);
+            var result = await _executor!.ExecuteAsync("disconnect", new Dictionary<string, object?>());
+            _renderer.Render(result, format);
+            return result.ExitCode;
+        });
+        return command;
+    }
+
+    private static Command CreateServiceCommand(Option<OutputFormat> formatOption)
+    {
+        var command = new Command("service", "Service management");
+
+        command.Subcommands.Add(CreateSubCommand("status", "Show service status", "service.status", formatOption));
+        command.Subcommands.Add(CreateSubCommand("start", "Start the DataWarehouse service", "service.start", formatOption));
+        command.Subcommands.Add(CreateSubCommand("stop", "Stop the DataWarehouse service", "service.stop", formatOption));
+        command.Subcommands.Add(CreateSubCommand("restart", "Restart the DataWarehouse service", "service.restart", formatOption));
+        command.Subcommands.Add(CreateSubCommand("uninstall", "Uninstall the DataWarehouse service", "service.uninstall", formatOption));
 
         return command;
     }
