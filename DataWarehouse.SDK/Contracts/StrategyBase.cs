@@ -180,15 +180,15 @@ namespace DataWarehouse.SDK.Contracts
         /// Message bus for strategy-level event publishing. Always null unless explicitly
         /// configured via <see cref="ConfigureIntelligence"/>. Strategies that use this
         /// should guard access with <see cref="IsIntelligenceAvailable"/>.
+        /// Phase 27 will migrate this to plugin-level dependency injection.
         /// </summary>
-        // TODO(Phase 27): Migrate to plugin-level injection
         protected IMessageBus? MessageBus { get; private set; }
 
         /// <summary>
         /// Gets whether a message bus is available for event publishing.
         /// Returns false unless <see cref="ConfigureIntelligence"/> has been called with a non-null bus.
+        /// Phase 27 will migrate this to plugin-level dependency injection.
         /// </summary>
-        // TODO(Phase 27): Migrate to plugin-level injection
         protected bool IsIntelligenceAvailable => MessageBus != null;
 
         #endregion

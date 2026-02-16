@@ -476,15 +476,17 @@ namespace DataWarehouse.SDK.Contracts.Replication
                     $"Maximum replica count is {Capabilities.MaxReplicaCount}, got {nodeCount}");
         }
 
-        #region Legacy Intelligence Helpers (Phase 25b removes these)
+        #region Intelligence Helper Methods
 
-        // TODO(25b): Remove -- intelligence belongs at plugin level per AD-05
-        /// <summary>Legacy: Gets a description for this strategy.</summary>
+        /// <summary>
+        /// Gets a description for this strategy. Used by plugins for intelligence registration.
+        /// </summary>
         protected virtual string GetStrategyDescription() =>
             $"{StrategyName} strategy with {ConsistencyModel} consistency and {Capabilities.MinReplicaCount}-{Capabilities.MaxReplicaCount} replicas";
 
-        // TODO(25b): Remove -- intelligence belongs at plugin level per AD-05
-        /// <summary>Legacy: Gets the knowledge payload for this strategy.</summary>
+        /// <summary>
+        /// Gets the knowledge payload for this strategy. Used by plugins for intelligence registration.
+        /// </summary>
         protected virtual Dictionary<string, object> GetKnowledgePayload() => new()
         {
             ["consistencyModel"] = ConsistencyModel.ToString(),
@@ -497,8 +499,9 @@ namespace DataWarehouse.SDK.Contracts.Replication
             ["conflictResolutionMethods"] = Capabilities.ConflictResolutionMethods.Select(m => m.ToString()).ToArray()
         };
 
-        // TODO(25b): Remove -- intelligence belongs at plugin level per AD-05
-        /// <summary>Legacy: Gets tags for this strategy.</summary>
+        /// <summary>
+        /// Gets tags for this strategy. Used by plugins for intelligence registration.
+        /// </summary>
         protected virtual string[] GetKnowledgeTags() => new[]
         {
             "strategy",
@@ -507,16 +510,18 @@ namespace DataWarehouse.SDK.Contracts.Replication
             Capabilities.SupportsMultiMaster ? "multi-master" : "single-master"
         };
 
-        // TODO(25b): Remove -- intelligence belongs at plugin level per AD-05
-        /// <summary>Legacy: Gets capability metadata for this strategy.</summary>
+        /// <summary>
+        /// Gets capability metadata for this strategy. Used by plugins for intelligence registration.
+        /// </summary>
         protected virtual Dictionary<string, object> GetCapabilityMetadata() => new()
         {
             ["consistencyModel"] = ConsistencyModel.ToString(),
             ["supportsMultiMaster"] = Capabilities.SupportsMultiMaster
         };
 
-        // TODO(25b): Remove -- intelligence belongs at plugin level per AD-05
-        /// <summary>Legacy: Gets the semantic description for AI-driven discovery.</summary>
+        /// <summary>
+        /// Gets the semantic description for AI-driven discovery. Used by plugins for intelligence registration.
+        /// </summary>
         protected virtual string GetSemanticDescription() =>
             $"Use {StrategyName} for {ConsistencyModel} consistency with {(Capabilities.SupportsMultiMaster ? "multi-master" : "single-master")} topology";
 

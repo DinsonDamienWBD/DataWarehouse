@@ -994,15 +994,17 @@ namespace DataWarehouse.SDK.Contracts.Compression
             }
         }
 
-        #region Legacy Intelligence Helpers (Phase 25b removes these)
+        #region Intelligence Helper Methods
 
-        // TODO(25b): Remove -- intelligence belongs at plugin level per AD-05
-        /// <summary>Legacy: Gets a description for this strategy.</summary>
+        /// <summary>
+        /// Gets a description for this strategy. Used by plugins for intelligence registration.
+        /// </summary>
         protected virtual string GetStrategyDescription() =>
             $"{StrategyName} compression strategy with {Characteristics.TypicalCompressionRatio:P0} typical ratio";
 
-        // TODO(25b): Remove -- intelligence belongs at plugin level per AD-05
-        /// <summary>Legacy: Gets the knowledge payload for this strategy.</summary>
+        /// <summary>
+        /// Gets the knowledge payload for this strategy. Used by plugins for intelligence registration.
+        /// </summary>
         protected virtual Dictionary<string, object> GetKnowledgePayload() => new()
         {
             ["algorithm"] = Characteristics.AlgorithmName,
@@ -1014,8 +1016,9 @@ namespace DataWarehouse.SDK.Contracts.Compression
             ["supportsParallel"] = Characteristics.SupportsParallelCompression
         };
 
-        // TODO(25b): Remove -- intelligence belongs at plugin level per AD-05
-        /// <summary>Legacy: Gets tags for this strategy.</summary>
+        /// <summary>
+        /// Gets tags for this strategy. Used by plugins for intelligence registration.
+        /// </summary>
         protected virtual string[] GetKnowledgeTags() => new[]
         {
             "strategy",
@@ -1024,8 +1027,9 @@ namespace DataWarehouse.SDK.Contracts.Compression
             Level.ToString().ToLowerInvariant()
         };
 
-        // TODO(25b): Remove -- intelligence belongs at plugin level per AD-05
-        /// <summary>Legacy: Gets capability metadata for this strategy.</summary>
+        /// <summary>
+        /// Gets capability metadata for this strategy. Used by plugins for intelligence registration.
+        /// </summary>
         protected virtual Dictionary<string, object> GetCapabilityMetadata() => new()
         {
             ["algorithm"] = Characteristics.AlgorithmName,
@@ -1033,8 +1037,9 @@ namespace DataWarehouse.SDK.Contracts.Compression
             ["typicalRatio"] = Characteristics.TypicalCompressionRatio
         };
 
-        // TODO(25b): Remove -- intelligence belongs at plugin level per AD-05
-        /// <summary>Legacy: Gets the semantic description for AI-driven discovery.</summary>
+        /// <summary>
+        /// Gets the semantic description for AI-driven discovery. Used by plugins for intelligence registration.
+        /// </summary>
         protected virtual string GetSemanticDescription() =>
             $"Use {StrategyName} for {Level} compression with {Characteristics.TypicalCompressionRatio:P0} typical ratio";
 

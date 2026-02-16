@@ -852,15 +852,17 @@ namespace DataWarehouse.SDK.Contracts.RAID
             return result;
         }
 
-        #region Legacy Intelligence Helpers (Phase 25b removes these)
+        #region Intelligence Helper Methods
 
-        // TODO(25b): Remove -- intelligence belongs at plugin level per AD-05
-        /// <summary>Legacy: Gets a description for this strategy.</summary>
+        /// <summary>
+        /// Gets a description for this strategy. Used by plugins for intelligence registration.
+        /// </summary>
         protected virtual string GetStrategyDescription() =>
             $"{StrategyName} strategy with {Capabilities.RedundancyLevel} disk fault tolerance and {Capabilities.CapacityEfficiency:P0} capacity efficiency";
 
-        // TODO(25b): Remove -- intelligence belongs at plugin level per AD-05
-        /// <summary>Legacy: Gets the knowledge payload for this strategy.</summary>
+        /// <summary>
+        /// Gets the knowledge payload for this strategy. Used by plugins for intelligence registration.
+        /// </summary>
         protected virtual Dictionary<string, object> GetKnowledgePayload() => new()
         {
             ["level"] = Level.ToString(),
@@ -875,8 +877,9 @@ namespace DataWarehouse.SDK.Contracts.RAID
             ["supportsOnlineExpansion"] = Capabilities.SupportsOnlineExpansion
         };
 
-        // TODO(25b): Remove -- intelligence belongs at plugin level per AD-05
-        /// <summary>Legacy: Gets tags for this strategy.</summary>
+        /// <summary>
+        /// Gets tags for this strategy. Used by plugins for intelligence registration.
+        /// </summary>
         protected virtual string[] GetKnowledgeTags() => new[]
         {
             "strategy",
@@ -885,8 +888,9 @@ namespace DataWarehouse.SDK.Contracts.RAID
             $"redundancy-{Capabilities.RedundancyLevel}"
         };
 
-        // TODO(25b): Remove -- intelligence belongs at plugin level per AD-05
-        /// <summary>Legacy: Gets capability metadata for this strategy.</summary>
+        /// <summary>
+        /// Gets capability metadata for this strategy. Used by plugins for intelligence registration.
+        /// </summary>
         protected virtual Dictionary<string, object> GetCapabilityMetadata() => new()
         {
             ["level"] = Level.ToString(),
@@ -894,8 +898,9 @@ namespace DataWarehouse.SDK.Contracts.RAID
             ["capacityEfficiency"] = Capabilities.CapacityEfficiency
         };
 
-        // TODO(25b): Remove -- intelligence belongs at plugin level per AD-05
-        /// <summary>Legacy: Gets the semantic description for AI-driven discovery.</summary>
+        /// <summary>
+        /// Gets the semantic description for AI-driven discovery. Used by plugins for intelligence registration.
+        /// </summary>
         protected virtual string GetSemanticDescription() =>
             $"Use {StrategyName} for {Capabilities.RedundancyLevel}-disk fault tolerance with {Capabilities.CapacityEfficiency:P0} capacity efficiency";
 
