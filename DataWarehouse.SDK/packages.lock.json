@@ -50,6 +50,12 @@
         "resolved": "10.19.0.132793",
         "contentHash": "vDQSFE+KU5pXfVNzz4R4CA0ZGuLO35Sn+a7z2nyV9EM/nHsvl+WFGZ61Uk9eTdbhta1YXzqCMXB2B+6dn6ykVA=="
       },
+      "System.Device.Gpio": {
+        "type": "Direct",
+        "requested": "[3.2.0, )",
+        "resolved": "3.2.0",
+        "contentHash": "jaL93IC1S2wZfCSLWt8/1lQCp/pDAzDNE5dfLq+pubEhCp0BjDZze6rJMu2KdOuCOeRxHmBuhtWrIRlrTKFsTg=="
+      },
       "System.IO.Hashing": {
         "type": "Direct",
         "requested": "[10.0.3, )",

@@ -4,6 +4,7 @@
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <!-- CS1591: Missing XML doc comments - SDK has 1,300+ public types across 216 files;
          comprehensive XML docs are a Phase 23+ deliverable. GenerateDocumentationFile is enabled
@@ -24,6 +25,7 @@
     <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.3" />
     <PackageReference Include="Microsoft.Json.Schema" Version="2.3.0" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
+    <PackageReference Include="System.Device.Gpio" Version="3.2.0" />
     <PackageReference Include="System.IO.Hashing" Version="10.0.3" />
     <PackageReference Include="System.Management" Version="10.0.3" Condition="$([MSBuild]::IsOSPlatform('Windows'))" />
   </ItemGroup>
