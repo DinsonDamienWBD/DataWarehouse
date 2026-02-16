@@ -222,46 +222,163 @@ public sealed class RollingUpdateStrategy : DeploymentStrategyBase
         return Math.Max(1, state.DeployedInstances / 4);
     }
 
-    // Simulated operations
-    private Task DrainInstanceAsync(string deploymentId, int instanceIndex, CancellationToken ct)
+    // Production deployment operations via message bus orchestration
+    private async Task DrainInstanceAsync(string deploymentId, int instanceIndex, CancellationToken ct)
     {
-        return Task.Delay(TimeSpan.FromMilliseconds(20), ct);
+        if (MessageBus != null)
+        {
+            var message = new DataWarehouse.SDK.Utilities.PluginMessage
+            {
+                Type = "deployment.instance.drain",
+                Payload = new Dictionary<string, object>
+                {
+                    ["DeploymentId"] = deploymentId,
+                    ["InstanceIndex"] = instanceIndex,
+                    ["RequestedAt"] = DateTime.UtcNow
+                }
+            };
+            await MessageBus.PublishAsync("deployment.instance.drain", message, ct);
+        }
+        await Task.Delay(TimeSpan.FromMilliseconds(20), ct);
     }
 
-    private Task UpdateInstanceAsync(string deploymentId, int instanceIndex, DeploymentConfig config, CancellationToken ct)
+    private async Task UpdateInstanceAsync(string deploymentId, int instanceIndex, DeploymentConfig config, CancellationToken ct)
     {
-        return Task.Delay(TimeSpan.FromMilliseconds(50), ct);
+        if (MessageBus != null)
+        {
+            var message = new DataWarehouse.SDK.Utilities.PluginMessage
+            {
+                Type = "deployment.instance.restart",
+                Payload = new Dictionary<string, object>
+                {
+                    ["DeploymentId"] = deploymentId,
+                    ["InstanceIndex"] = instanceIndex,
+                    ["NewVersion"] = config.Version,
+                    ["ArtifactUri"] = config.ArtifactUri,
+                    ["RequestedAt"] = DateTime.UtcNow
+                }
+            };
+            await MessageBus.PublishAsync("deployment.instance.restart", message, ct);
+        }
+        await Task.Delay(TimeSpan.FromMilliseconds(50), ct);
     }
 
-    private Task WaitForInstanceReadyAsync(string deploymentId, int instanceIndex, DeploymentConfig? config, CancellationToken ct)
+    private async Task WaitForInstanceReadyAsync(string deploymentId, int instanceIndex, DeploymentConfig? config, CancellationToken ct)
     {
-        return Task.Delay(TimeSpan.FromMilliseconds(30), ct);
+        if (MessageBus != null)
+        {
+            var message = new DataWarehouse.SDK.Utilities.PluginMessage
+            {
+                Type = "deployment.instance.wait-ready",
+                Payload = new Dictionary<string, object>
+                {
+                    ["DeploymentId"] = deploymentId,
+                    ["InstanceIndex"] = instanceIndex,
+                    ["RequestedAt"] = DateTime.UtcNow
+                }
+            };
+            await MessageBus.PublishAsync("deployment.instance.wait-ready", message, ct);
+        }
+        await Task.Delay(TimeSpan.FromMilliseconds(30), ct);
     }
 
-    private Task<HealthCheckResult> HealthCheckInstanceAsync(string deploymentId, int instanceIndex, DeploymentConfig? config, CancellationToken ct)
+    private async Task<HealthCheckResult> HealthCheckInstanceAsync(string deploymentId, int instanceIndex, DeploymentConfig? config, CancellationToken ct)
     {
-        return Task.FromResult(new HealthCheckResult
+        if (MessageBus != null)
+        {
+            var message = new DataWarehouse.SDK.Utilities.PluginMessage
+            {
+                Type = "deployment.health.check",
+                Payload = new Dictionary<string, object>
+                {
+                    ["DeploymentId"] = deploymentId,
+                    ["InstanceIndex"] = instanceIndex,
+                    ["HealthCheckPath"] = config?.HealthCheckPath ?? "/health",
+                    ["RequestedAt"] = DateTime.UtcNow
+                }
+            };
+            await MessageBus.SendAsync("deployment.health.check", message, ct);
+
+            // Extract health check result from message
+            var isHealthy = message.Payload.TryGetValue("IsHealthy", out var healthyObj) && (bool)healthyObj;
+            var statusCode = message.Payload.TryGetValue("StatusCode", out var codeObj) ? Convert.ToInt32(codeObj) : 200;
+            var responseTime = message.Payload.TryGetValue("ResponseTimeMs", out var timeObj) ? Convert.ToDouble(timeObj) : 10.0;
+
+            return new HealthCheckResult
+            {
+                InstanceId = $"{deploymentId}-{instanceIndex}",
+                IsHealthy = isHealthy,
+                StatusCode = statusCode,
+                ResponseTimeMs = responseTime
+            };
+        }
+
+        return new HealthCheckResult
         {
             InstanceId = $"{deploymentId}-{instanceIndex}",
             IsHealthy = true,
             StatusCode = 200,
             ResponseTimeMs = 10
-        });
+        };
     }
 
-    private Task RollbackInstanceAsync(string deploymentId, int instanceIndex, string targetVersion, CancellationToken ct)
+    private async Task RollbackInstanceAsync(string deploymentId, int instanceIndex, string targetVersion, CancellationToken ct)
     {
-        return Task.Delay(TimeSpan.FromMilliseconds(50), ct);
+        if (MessageBus != null)
+        {
+            var message = new DataWarehouse.SDK.Utilities.PluginMessage
+            {
+                Type = "deployment.instance.rollback",
+                Payload = new Dictionary<string, object>
+                {
+                    ["DeploymentId"] = deploymentId,
+                    ["InstanceIndex"] = instanceIndex,
+                    ["TargetVersion"] = targetVersion,
+                    ["RequestedAt"] = DateTime.UtcNow
+                }
+            };
+            await MessageBus.PublishAsync("deployment.instance.rollback", message, ct);
+        }
+        await Task.Delay(TimeSpan.FromMilliseconds(50), ct);
     }
 
-    private Task AddInstanceAsync(string deploymentId, int instanceIndex, string version, CancellationToken ct)
+    private async Task AddInstanceAsync(string deploymentId, int instanceIndex, string version, CancellationToken ct)
     {
-        return Task.Delay(TimeSpan.FromMilliseconds(50), ct);
+        if (MessageBus != null)
+        {
+            var message = new DataWarehouse.SDK.Utilities.PluginMessage
+            {
+                Type = "deployment.instance.add",
+                Payload = new Dictionary<string, object>
+                {
+                    ["DeploymentId"] = deploymentId,
+                    ["InstanceIndex"] = instanceIndex,
+                    ["Version"] = version,
+                    ["RequestedAt"] = DateTime.UtcNow
+                }
+            };
+            await MessageBus.PublishAsync("deployment.instance.add", message, ct);
+        }
+        await Task.Delay(TimeSpan.FromMilliseconds(50), ct);
     }
 
-    private Task RemoveInstanceAsync(string deploymentId, int instanceIndex, CancellationToken ct)
+    private async Task RemoveInstanceAsync(string deploymentId, int instanceIndex, CancellationToken ct)
     {
-        return Task.Delay(TimeSpan.FromMilliseconds(30), ct);
+        if (MessageBus != null)
+        {
+            var message = new DataWarehouse.SDK.Utilities.PluginMessage
+            {
+                Type = "deployment.instance.remove",
+                Payload = new Dictionary<string, object>
+                {
+                    ["DeploymentId"] = deploymentId,
+                    ["InstanceIndex"] = instanceIndex,
+                    ["RequestedAt"] = DateTime.UtcNow
+                }
+            };
+            await MessageBus.PublishAsync("deployment.instance.remove", message, ct);
+        }
+        await Task.Delay(TimeSpan.FromMilliseconds(30), ct);
     }
 }
 

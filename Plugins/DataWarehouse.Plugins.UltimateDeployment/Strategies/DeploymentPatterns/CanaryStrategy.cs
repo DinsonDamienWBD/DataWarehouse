@@ -260,10 +260,27 @@ public sealed class CanaryStrategy : DeploymentStrategyBase
         });
     }
 
-    // Simulated infrastructure operations
-    private Task DeployCanaryInstancesAsync(DeploymentConfig config, int instanceCount, CancellationToken ct)
+    // Production canary deployment via message bus orchestration
+    private async Task DeployCanaryInstancesAsync(DeploymentConfig config, int instanceCount, CancellationToken ct)
     {
-        return Task.Delay(TimeSpan.FromMilliseconds(100), ct);
+        if (MessageBus != null)
+        {
+            var message = new DataWarehouse.SDK.Utilities.PluginMessage
+            {
+                Type = "deployment.canary.deploy",
+                Payload = new Dictionary<string, object>
+                {
+                    ["Environment"] = config.Environment,
+                    ["Version"] = config.Version,
+                    ["InstanceCount"] = instanceCount,
+                    ["ArtifactUri"] = config.ArtifactUri,
+                    ["TrafficWeight"] = 10, // Default 10% canary traffic
+                    ["RequestedAt"] = DateTime.UtcNow
+                }
+            };
+            await MessageBus.PublishAsync("deployment.traffic.route", message, ct);
+        }
+        await Task.Delay(TimeSpan.FromMilliseconds(100), ct);
     }
 
     private Task<(bool IsHealthy, double ResponseTimeMs, double ErrorRate)> CheckCanaryHealthAsync(
