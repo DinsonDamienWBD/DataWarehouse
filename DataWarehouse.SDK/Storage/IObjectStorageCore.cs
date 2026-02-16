@@ -44,4 +44,28 @@ public interface IObjectStorageCore
 
     /// <summary>Gets available storage capacity in bytes.</summary>
     Task<long?> GetAvailableCapacityAsync(CancellationToken ct = default);
+
+    #region StorageAddress Overloads (HAL-05)
+
+    /// <summary>Stores data using a StorageAddress. Default: delegates via ToKey().</summary>
+    Task<StorageObjectMetadata> StoreAsync(StorageAddress address, Stream data, IDictionary<string, string>? metadata = null, CancellationToken ct = default)
+        => StoreAsync(address.ToKey(), data, metadata, ct);
+
+    /// <summary>Retrieves data using a StorageAddress. Default: delegates via ToKey().</summary>
+    Task<Stream> RetrieveAsync(StorageAddress address, CancellationToken ct = default)
+        => RetrieveAsync(address.ToKey(), ct);
+
+    /// <summary>Deletes an object using a StorageAddress. Default: delegates via ToKey().</summary>
+    Task DeleteAsync(StorageAddress address, CancellationToken ct = default)
+        => DeleteAsync(address.ToKey(), ct);
+
+    /// <summary>Checks existence using a StorageAddress. Default: delegates via ToKey().</summary>
+    Task<bool> ExistsAsync(StorageAddress address, CancellationToken ct = default)
+        => ExistsAsync(address.ToKey(), ct);
+
+    /// <summary>Gets metadata using a StorageAddress. Default: delegates via ToKey().</summary>
+    Task<StorageObjectMetadata> GetMetadataAsync(StorageAddress address, CancellationToken ct = default)
+        => GetMetadataAsync(address.ToKey(), ct);
+
+    #endregion
 }

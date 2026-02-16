@@ -2,6 +2,7 @@ using DataWarehouse.SDK.AI;
 using DataWarehouse.SDK.Contracts.IntelligenceAware;
 using DataWarehouse.SDK.Performance;
 using DataWarehouse.SDK.Primitives;
+using DataWarehouse.SDK.Storage;
 using System;
 using System.Collections.Generic;
 using System.Threading;
@@ -162,6 +163,26 @@ public abstract class LowLatencyStoragePluginBase : StorageProviderPluginBase, I
     /// <returns>Async task representing the write operation.</returns>
     public ValueTask WriteDirectAsync(string key, ReadOnlyMemory<byte> data, bool sync = false, CancellationToken ct = default)
         => WriteWithoutCacheAsync(key, data, sync, ct);
+
+    #region StorageAddress Overloads (HAL-05)
+
+    /// <summary>Read without cache using a StorageAddress. Override for native StorageAddress support.</summary>
+    protected virtual ValueTask<ReadOnlyMemory<byte>> ReadWithoutCacheAsync(StorageAddress address, CancellationToken ct)
+        => ReadWithoutCacheAsync(address.ToKey(), ct);
+
+    /// <summary>Write without cache using a StorageAddress. Override for native StorageAddress support.</summary>
+    protected virtual ValueTask WriteWithoutCacheAsync(StorageAddress address, ReadOnlyMemory<byte> data, bool sync, CancellationToken ct)
+        => WriteWithoutCacheAsync(address.ToKey(), data, sync, ct);
+
+    /// <summary>Direct memory read using a StorageAddress. Delegates to ReadWithoutCacheAsync(StorageAddress).</summary>
+    public ValueTask<ReadOnlyMemory<byte>> ReadDirectAsync(StorageAddress address, CancellationToken ct = default)
+        => ReadWithoutCacheAsync(address, ct);
+
+    /// <summary>Direct memory write using a StorageAddress. Delegates to WriteWithoutCacheAsync(StorageAddress).</summary>
+    public ValueTask WriteDirectAsync(StorageAddress address, ReadOnlyMemory<byte> data, bool sync = false, CancellationToken ct = default)
+        => WriteWithoutCacheAsync(address, data, sync, ct);
+
+    #endregion
 
     /// <summary>
     /// Pre-warm data into the fastest available tier.
