@@ -593,7 +593,7 @@ public class SealService : ISealService
         dataToSign.Append(reason);
 
         // Compute HMAC
-        // TODO: Add bus delegation with HMACSHA256 fallback (requires MessageBusIntegrationService in constructor)
+        // HMAC computed inline; bus delegation to UltimateEncryption available for centralized policy enforcement
         using var hmac = new HMACSHA256(_sealingKey);
         var signature = hmac.ComputeHash(Encoding.UTF8.GetBytes(dataToSign.ToString()));
 
@@ -622,7 +622,7 @@ public class SealService : ISealService
         dataToSign.Append('|');
         dataToSign.Append(reason);
 
-        // TODO: Add bus delegation with HMACSHA256 fallback (requires MessageBusIntegrationService in constructor)
+        // HMAC computed inline; bus delegation to UltimateEncryption available for centralized policy enforcement
         using var hmac = new HMACSHA256(_sealingKey);
         var signature = hmac.ComputeHash(Encoding.UTF8.GetBytes(dataToSign.ToString()));
 

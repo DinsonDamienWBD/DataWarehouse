@@ -550,8 +550,7 @@ public sealed class InodeTable : IInodeTable, IDisposable
             }
         }
 
-        // TODO: Handle indirect blocks when direct pointers are full
-        throw new InvalidOperationException("Inode has no available direct block pointers. Indirect blocks not yet implemented.");
+        throw new NotSupportedException($"Inode has no available direct block pointers. Indirect block support is not yet implemented. Current limit: {Inode.DirectBlockCount} direct blocks.");
     }
 
     /// <summary>

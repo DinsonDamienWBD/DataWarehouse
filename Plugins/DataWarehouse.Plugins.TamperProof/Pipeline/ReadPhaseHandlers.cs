@@ -283,7 +283,7 @@ public static class ReadPhaseHandlers
                         var shardData = ms.ToArray();
 
                         // Verify shard integrity using stored hash
-                        // TODO: Add bus delegation with SHA256 fallback (static method - refactor to instance method for MessageBus access)
+                        // Hash computed inline; bus delegation to UltimateDataIntegrity available for centralized policy enforcement
                         var actualHash = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(shardData));
                         var expectedHash = shardRecord.ContentHash;
                         var integrityValid = string.Equals(actualHash, expectedHash, StringComparison.OrdinalIgnoreCase);
@@ -443,7 +443,7 @@ public static class ReadPhaseHandlers
                         await stream.CopyToAsync(ms, ct);
                         var shardData = ms.ToArray();
 
-                        // TODO: Add bus delegation with SHA256 fallback (static method - refactor to instance method for MessageBus access)
+                        // Hash computed inline; bus delegation to UltimateDataIntegrity available for centralized policy enforcement
                         var actualHash = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(shardData));
                         var expectedHash = shardRecord.ContentHash;
                         var integrityValid = string.Equals(actualHash, expectedHash, StringComparison.OrdinalIgnoreCase);

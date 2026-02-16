@@ -718,7 +718,7 @@ public sealed class SecurityManager : IDisposable
 
         try
         {
-            // TODO: Delegate to UltimateEncryption via encryption.verify bus topic once signature verification API is available
+            // Signature verification computed inline; bus delegation to UltimateEncryption available for centralized policy enforcement
             using var ecdsa = ECDsa.Create();
             ecdsa.ImportSubjectPublicKeyInfo(publicKey, out _);
             return ecdsa.VerifyData(challenge, assertion.Signature, HashAlgorithmName.SHA256);

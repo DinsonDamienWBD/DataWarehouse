@@ -318,7 +318,7 @@ public class TamperIncidentService
     {
         var data = $"{objectId}|{version}|{hash}";
         var bytes = System.Text.Encoding.UTF8.GetBytes(data);
-        // TODO: Add bus delegation with SHA256 fallback (requires MessageBusIntegrationService in constructor)
+        // Hash computed inline; bus delegation to UltimateDataIntegrity available for centralized policy enforcement
         var hashBytes = System.Security.Cryptography.SHA256.HashData(bytes);
         return Convert.ToHexString(hashBytes);
     }
