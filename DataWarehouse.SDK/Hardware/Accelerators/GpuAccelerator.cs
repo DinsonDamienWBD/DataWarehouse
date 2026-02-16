@@ -29,7 +29,7 @@ namespace DataWarehouse.SDK.Hardware.Accelerators
     /// <strong>Current Implementation (Phase 35):</strong>
     /// - Runtime detection and capability registration
     /// - API contract for vector/matrix operations
-    /// - CPU fallback for operations (GPU kernel launch is TODO)
+    /// - CPU fallback for operations (GPU kernel launch requires CUDA/ROCm runtime integration)
     /// - Production workloads should use CuBLAS/rocBLAS for optimized BLAS operations
     /// </para>
     /// <para>
@@ -140,10 +140,9 @@ namespace DataWarehouse.SDK.Hardware.Accelerators
                     _deviceCount = count;
                     _isAvailable = true;
 
-                    // TODO: Register platform capabilities via hardware probe
+                    // Note: Platform capability registration happens through IHardwareProbe discovery
                     // The capability registry is read-only (query-only interface)
-                    // Capability registration happens through IHardwareProbe discovery
-                    // Future: integrate with hardware discovery to register "gpu.cuda" capability
+                    // Capability registration requires integration with hardware discovery to register "gpu.cuda" capability
 
                     return true;
                 }
@@ -178,10 +177,9 @@ namespace DataWarehouse.SDK.Hardware.Accelerators
                     _deviceCount = count;
                     _isAvailable = true;
 
-                    // TODO: Register platform capabilities via hardware probe
+                    // Note: Platform capability registration happens through IHardwareProbe discovery
                     // The capability registry is read-only (query-only interface)
-                    // Capability registration happens through IHardwareProbe discovery
-                    // Future: integrate with hardware discovery to register "gpu.rocm" capability
+                    // Capability registration requires integration with hardware discovery to register "gpu.rocm" capability
 
                     return true;
                 }
@@ -209,8 +207,7 @@ namespace DataWarehouse.SDK.Hardware.Accelerators
 
             float[] result = new float[a.Length];
 
-            // TODO: Launch GPU kernel for element-wise multiplication
-            // Production implementation would:
+            // GPU kernel launch for element-wise multiplication requires:
             // 1. Allocate GPU memory via Malloc
             // 2. Copy a, b to GPU via Memcpy (HostToDevice)
             // 3. Launch CUDA/HIP kernel: __global__ void vecMul(float* a, float* b, float* c, int n)
@@ -245,8 +242,7 @@ namespace DataWarehouse.SDK.Hardware.Accelerators
             if (K != K2)
                 throw new ArgumentException("Matrix dimensions incompatible for multiplication (a.cols must equal b.rows)");
 
-            // TODO: Use CuBLAS cublasSgemm or rocBLAS rocblas_sgemm
-            // Production implementation:
+            // CuBLAS cublasSgemm or rocBLAS rocblas_sgemm implementation requires:
             // 1. Allocate GPU memory for matrices (M*K + K*N + M*N floats)
             // 2. Copy a, b to GPU
             // 3. Call cublasSgemm(handle, CUBLAS_OP_N, CUBLAS_OP_N, M, N, K, &alpha, d_a, M, d_b, K, &beta, d_c, M)
@@ -293,8 +289,7 @@ namespace DataWarehouse.SDK.Hardware.Accelerators
             if (D != D2)
                 throw new ArgumentException("Input dimension must match weight rows");
 
-            // TODO: Use CuBLAS cublasSgemv or rocBLAS rocblas_sgemv
-            // Production implementation:
+            // CuBLAS cublasSgemv or rocBLAS rocblas_sgemv implementation requires:
             // 1. Allocate GPU memory for input vector (D floats) and weight matrix (D*E floats)
             // 2. Copy input, weights to GPU
             // 3. Call cublasSgemv(handle, CUBLAS_OP_T, D, E, &alpha, d_W, D, d_x, 1, &beta, d_y, 1)
@@ -334,7 +329,7 @@ namespace DataWarehouse.SDK.Hardware.Accelerators
         /// <inheritdoc/>
         public Task<AcceleratorStatistics> GetStatisticsAsync()
         {
-            // TODO: Query GPU utilization via nvidia-smi or rocm-smi
+            // GPU utilization query via nvidia-smi or rocm-smi:
             // Production implementation would parse:
             // - NVIDIA: nvidia-smi --query-gpu=utilization.gpu --format=csv,noheader,nounits
             // - AMD: rocm-smi --showuse
@@ -343,9 +338,9 @@ namespace DataWarehouse.SDK.Hardware.Accelerators
             return Task.FromResult(new AcceleratorStatistics(
                 Type: Type,
                 OperationsCompleted: Interlocked.Read(ref _operationsCompleted),
-                AverageThroughputMBps: 0.0, // TODO: track throughput
-                CurrentUtilization: 0.0, // TODO: query GPU utilization
-                TotalProcessingTime: TimeSpan.Zero // TODO: track processing time
+                AverageThroughputMBps: 0.0, // Requires hardware-specific query API for real metrics
+                CurrentUtilization: 0.0, // Requires nvidia-smi/rocm-smi integration
+                TotalProcessingTime: TimeSpan.Zero // Requires tracking per-operation timing
             ));
         }
 

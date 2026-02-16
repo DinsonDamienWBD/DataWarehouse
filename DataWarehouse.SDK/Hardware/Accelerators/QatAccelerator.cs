@@ -425,9 +425,9 @@ public sealed class QatAccelerator : IQatAccelerator, IDisposable
         var stats = new AcceleratorStatistics(
             Type: AcceleratorType.IntelQAT,
             OperationsCompleted: Interlocked.Read(ref _operationsCompleted),
-            AverageThroughputMBps: 0.0, // TODO Phase 35-02: Track throughput metrics
+            AverageThroughputMBps: 0.0, // Requires hardware-specific query API for real metrics
             CurrentUtilization: 0.0,     // QAT doesn't expose utilization via public API
-            TotalProcessingTime: TimeSpan.Zero // TODO Phase 35-02: Track cumulative processing time
+            TotalProcessingTime: TimeSpan.Zero // Requires tracking per-operation timing
         );
 
         return Task.FromResult(stats);

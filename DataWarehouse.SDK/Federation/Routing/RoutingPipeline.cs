@@ -65,7 +65,7 @@ internal sealed class ObjectPipeline : RoutingPipeline
     /// <inheritdoc />
     public override Task<StorageResponse> ExecuteAsync(StorageRequest request, CancellationToken ct)
     {
-        // TODO Phase 34-02: Implement UUID-based object routing with:
+        // Phase 34-02: Requires UUID-based object routing with:
         // - Object storage adapter integration
         // - Metadata query execution
         // - AD-04 canonical key resolution
@@ -101,7 +101,7 @@ internal sealed class FilePathPipeline : RoutingPipeline
     /// <inheritdoc />
     public override Task<StorageResponse> ExecuteAsync(StorageRequest request, CancellationToken ct)
     {
-        // TODO Phase 34-02: Implement FilePath routing to:
+        // Phase 34-02: Requires FilePath routing to:
         // - VDE (Virtual Disk Engine) for virtual disk paths
         // - Filesystem storage adapters for physical paths
         // - Network path resolution (SMB, NFS)

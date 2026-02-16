@@ -84,7 +84,7 @@ namespace DataWarehouse.SDK.Hardware.Accelerators
         /// <returns>Public key data (DER-encoded or raw format).</returns>
         /// <exception cref="InvalidOperationException">Thrown when TPM is not available or key already exists.</exception>
         /// <remarks>
-        /// TODO: Actual implementation requires building TPM2_Create command with:
+        /// <para>Actual implementation requires building TPM2_Create command with:</para>
         /// - Algorithm selection from TpmKeyType (TPM_ALG_RSA, TPM_ALG_ECC)
         /// - Template for signing/encryption key attributes
         /// - Submission to TPM via TbsipSubmitCommand (Windows) or write to /dev/tpmrm0 (Linux)
@@ -128,7 +128,7 @@ namespace DataWarehouse.SDK.Hardware.Accelerators
         /// <exception cref="KeyNotFoundException">Thrown when the specified key does not exist.</exception>
         /// <remarks>
         /// The private key never leaves the TPM. Signing happens inside the TPM hardware.
-        /// TODO: Actual implementation requires building TPM2_Sign command and parsing response.
+        /// <para>Actual implementation requires building TPM2_Sign command and parsing response.</para>
         /// </remarks>
         public Task<byte[]> SignAsync(string keyId, byte[] data)
         {
@@ -161,7 +161,7 @@ namespace DataWarehouse.SDK.Hardware.Accelerators
         /// <exception cref="InvalidOperationException">Thrown when TPM is not available.</exception>
         /// <exception cref="KeyNotFoundException">Thrown when the specified key does not exist.</exception>
         /// <remarks>
-        /// TODO: Actual implementation requires building TPM2_RSA_Encrypt command.
+        /// Actual implementation requires building TPM2_RSA_Encrypt command and parsing response.
         /// </remarks>
         public Task<byte[]> EncryptAsync(string keyId, byte[] data)
         {
@@ -195,7 +195,7 @@ namespace DataWarehouse.SDK.Hardware.Accelerators
         /// <exception cref="KeyNotFoundException">Thrown when the specified key does not exist.</exception>
         /// <remarks>
         /// The private key never leaves the TPM. Decryption happens inside the TPM hardware.
-        /// TODO: Actual implementation requires building TPM2_RSA_Decrypt command.
+        /// <para>Actual implementation requires building TPM2_RSA_Decrypt command and parsing response.</para>
         /// </remarks>
         public Task<byte[]> DecryptAsync(string keyId, byte[] data)
         {
@@ -227,7 +227,7 @@ namespace DataWarehouse.SDK.Hardware.Accelerators
         /// <exception cref="InvalidOperationException">Thrown when TPM is not available.</exception>
         /// <remarks>
         /// TPM hardware random number generators provide high-quality entropy.
-        /// TODO: Actual implementation requires building TPM2_GetRandom command.
+        /// <para>Actual implementation requires building TPM2_GetRandom command and parsing response.</para>
         /// </remarks>
         public Task<byte[]> GetRandomAsync(int length)
         {

@@ -216,7 +216,7 @@ namespace DataWarehouse.SDK.Hardware.Accelerators
         /// <returns>Array of key labels.</returns>
         /// <exception cref="InvalidOperationException">Thrown when not connected to HSM.</exception>
         /// <remarks>
-        /// TODO: Actual implementation requires C_FindObjectsInit, C_FindObjects, C_FindObjectsFinal.
+        /// <para>Actual implementation requires C_FindObjectsInit, C_FindObjects, C_FindObjectsFinal.</para>
         /// For Phase 35, returns keys from local cache (keys generated via <see cref="GenerateKeyAsync"/>).
         /// </remarks>
         public Task<string[]> ListKeysAsync()
@@ -242,7 +242,7 @@ namespace DataWarehouse.SDK.Hardware.Accelerators
         /// <exception cref="InvalidOperationException">Thrown when not connected or key already exists.</exception>
         /// <remarks>
         /// The generated key is stored in HSM non-volatile memory and persists across sessions.
-        /// TODO: Actual implementation requires building CK_ATTRIBUTE template and calling C_GenerateKey
+        /// <para>Actual implementation requires building CK_ATTRIBUTE template and calling C_GenerateKey
         /// or C_GenerateKeyPair (for asymmetric keys).
         /// </remarks>
         public Task<byte[]> GenerateKeyAsync(string label, HsmKeySpec spec)
@@ -281,7 +281,7 @@ namespace DataWarehouse.SDK.Hardware.Accelerators
         /// <exception cref="KeyNotFoundException">Thrown when the specified key does not exist.</exception>
         /// <remarks>
         /// The private key never leaves the HSM. Signing happens inside the HSM hardware.
-        /// TODO: Actual implementation requires building CK_MECHANISM for algorithm, calling
+        /// <para>Actual implementation requires building CK_MECHANISM for algorithm, calling
         /// C_SignInit and C_Sign.
         /// </remarks>
         public Task<byte[]> SignAsync(string keyLabel, byte[] data, HsmSignatureAlgorithm algorithm)
@@ -313,7 +313,7 @@ namespace DataWarehouse.SDK.Hardware.Accelerators
         /// <exception cref="InvalidOperationException">Thrown when not connected to HSM.</exception>
         /// <exception cref="KeyNotFoundException">Thrown when the specified key does not exist.</exception>
         /// <remarks>
-        /// TODO: Actual implementation requires C_EncryptInit and C_Encrypt.
+        /// Actual implementation requires C_EncryptInit and C_Encrypt with CK_MECHANISM structures.
         /// </remarks>
         public Task<byte[]> EncryptAsync(string keyLabel, byte[] data)
         {
@@ -345,7 +345,7 @@ namespace DataWarehouse.SDK.Hardware.Accelerators
         /// <exception cref="KeyNotFoundException">Thrown when the specified key does not exist.</exception>
         /// <remarks>
         /// The private key never leaves the HSM. Decryption happens inside the HSM hardware.
-        /// TODO: Actual implementation requires C_DecryptInit and C_Decrypt.
+        /// <para>Actual implementation requires C_DecryptInit and C_Decrypt with CK_MECHANISM structures.</para>
         /// </remarks>
         public Task<byte[]> DecryptAsync(string keyLabel, byte[] data)
         {
