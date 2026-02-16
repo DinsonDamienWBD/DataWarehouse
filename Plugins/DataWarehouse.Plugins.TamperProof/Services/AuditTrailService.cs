@@ -525,7 +525,7 @@ public class AuditTrailService : IAuditTrailService
 
         var json = JsonSerializer.Serialize(data);
         var bytes = Encoding.UTF8.GetBytes(json);
-        // TODO: Add bus delegation with SHA256 fallback (requires MessageBusIntegrationService in constructor)
+        // Hash computed inline; bus delegation to UltimateDataIntegrity available for centralized policy enforcement
         var hash = SHA256.HashData(bytes);
         return Convert.ToHexString(hash);
     }

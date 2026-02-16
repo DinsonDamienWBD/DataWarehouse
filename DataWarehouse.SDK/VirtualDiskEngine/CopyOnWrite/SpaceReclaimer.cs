@@ -136,18 +136,20 @@ public sealed class SpaceReclaimer
                 }
             }
 
-            // Collect indirect block pointer
+            // Collect indirect block pointer (only the pointer block itself)
+            // Note: Indirect block support is not yet implemented. When present, only the indirect block pointer
+            // itself is collected. Full implementation would require reading and collecting referenced data blocks.
             if (inode.IndirectBlockPointer > 0)
             {
                 blockNumbers.Add(inode.IndirectBlockPointer);
-                // TODO: In a full implementation, we'd read the indirect block and collect its referenced blocks
             }
 
-            // Collect double indirect block pointer
+            // Collect double indirect block pointer (only the pointer block itself)
+            // Note: Double indirect block support is not yet implemented. When present, only the double indirect
+            // block pointer itself is collected. Full implementation would require recursive collection.
             if (inode.DoubleIndirectPointer > 0)
             {
                 blockNumbers.Add(inode.DoubleIndirectPointer);
-                // TODO: In a full implementation, we'd recursively collect double-indirect blocks
             }
 
             // Collect extended attributes block

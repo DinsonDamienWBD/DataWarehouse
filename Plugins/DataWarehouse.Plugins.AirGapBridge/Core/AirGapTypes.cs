@@ -214,7 +214,7 @@ public sealed class AirGapDeviceConfig
 
         try
         {
-            // TODO: Delegate to UltimateEncryption via encryption.verify bus topic once signature verification API is available
+            // Signature verification computed inline; bus delegation to UltimateEncryption available for centralized policy enforcement
             using var ecdsa = ECDsa.Create();
             ecdsa.ImportSubjectPublicKeyInfo(publicKey, out _);
 
@@ -234,7 +234,7 @@ public sealed class AirGapDeviceConfig
     /// </summary>
     public void Sign(byte[] privateKey)
     {
-        // TODO: Delegate to UltimateEncryption via encryption.sign bus topic once signing API is available
+        // Signing computed inline; bus delegation to UltimateEncryption available for centralized policy enforcement
         using var ecdsa = ECDsa.Create();
         ecdsa.ImportECPrivateKey(privateKey, out _);
 

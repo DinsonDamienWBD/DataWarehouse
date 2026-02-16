@@ -258,12 +258,15 @@ public sealed class VirtualDiskEngine : IAsyncDisposable
                 }
 
                 // Update inode with block pointers
+                if (blockPointers.Count > Inode.DirectBlockCount)
+                {
+                    throw new NotSupportedException($"Files exceeding direct block limit require indirect block support. Current limit: {Inode.DirectBlockCount} blocks ({Inode.DirectBlockCount * _options.BlockSize} bytes).");
+                }
+
                 for (int i = 0; i < blockPointers.Count && i < Inode.DirectBlockCount; i++)
                 {
                     fileInode.DirectBlockPointers[i] = blockPointers[i];
                 }
-
-                // TODO: Handle indirect blocks for large files (beyond DirectBlockCount)
 
                 fileInode.Size = totalBytesRead;
                 fileInode.ModifiedUtc = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
@@ -378,7 +381,10 @@ public sealed class VirtualDiskEngine : IAsyncDisposable
                 remainingBytes -= bytesToWrite;
             }
 
-            // TODO: Handle indirect blocks for large files
+            if (remainingBytes > 0)
+            {
+                throw new NotSupportedException($"Files exceeding direct block limit require indirect block support. Current limit: {Inode.DirectBlockCount} blocks ({Inode.DirectBlockCount * _options.BlockSize} bytes).");
+            }
 
             resultStream.Position = 0;
             return resultStream;

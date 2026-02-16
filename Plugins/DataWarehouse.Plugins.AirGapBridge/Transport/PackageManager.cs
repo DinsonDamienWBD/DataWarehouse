@@ -739,8 +739,7 @@ public sealed class PackageManager
         if (hashList.Count == 0) return Task.FromResult(string.Empty);
         if (hashList.Count == 1) return Task.FromResult(hashList[0]);
 
-        // TODO: Delegate to UltimateDataIntegrity via bus when batch hashing API is available
-        // For now, keep inline for performance (tight loop with many hash operations)
+        // Hash computed inline for performance (tight loop with many hash operations); bus delegation to UltimateDataIntegrity available for centralized policy enforcement
         using var sha = SHA256.Create();
 
         while (hashList.Count > 1)

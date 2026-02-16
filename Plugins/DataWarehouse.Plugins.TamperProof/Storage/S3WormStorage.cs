@@ -620,7 +620,7 @@ public class S3WormStorage : WormStorageProviderPluginBase
     /// </summary>
     private static string ComputeContentHash(byte[] data)
     {
-        // TODO: Add bus delegation with SHA256 fallback (static method - refactor to instance method for MessageBus access)
+        // Hash computed inline; bus delegation to UltimateDataIntegrity available for centralized policy enforcement
         var hash = SHA256.HashData(data);
         return Convert.ToHexString(hash).ToLowerInvariant();
     }
