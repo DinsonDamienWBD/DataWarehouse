@@ -52,7 +52,7 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Transform
                 return Array.Empty<byte>();
 
             using var output = new MemoryStream();
-            using (var bzip2 = new BZip2Stream(output, SharpCompress.Compressors.CompressionMode.Compress, false))
+            using (var bzip2 = BZip2Stream.Create(output, SharpCompress.Compressors.CompressionMode.Compress, false, false))
             {
                 bzip2.Write(input, 0, input.Length);
             }
@@ -70,7 +70,7 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Transform
                 throw new InvalidDataException("Invalid BZip2 header magic");
 
             using var inputStream = new MemoryStream(input);
-            using var bzip2 = new BZip2Stream(inputStream, SharpCompress.Compressors.CompressionMode.Decompress, false);
+            using var bzip2 = BZip2Stream.Create(inputStream, SharpCompress.Compressors.CompressionMode.Decompress, false, false);
             using var output = new MemoryStream();
 
             bzip2.CopyTo(output);
@@ -83,7 +83,7 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Transform
             if (output == null)
                 throw new ArgumentNullException(nameof(output));
 
-            return new BZip2Stream(output, SharpCompress.Compressors.CompressionMode.Compress, false);
+            return BZip2Stream.Create(output, SharpCompress.Compressors.CompressionMode.Compress, false, false);
         }
 
         /// <inheritdoc/>
@@ -92,7 +92,7 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Transform
             if (input == null)
                 throw new ArgumentNullException(nameof(input));
 
-            return new BZip2Stream(input, SharpCompress.Compressors.CompressionMode.Decompress, false);
+            return BZip2Stream.Create(input, SharpCompress.Compressors.CompressionMode.Decompress, false, false);
         }
 
         /// <inheritdoc/>

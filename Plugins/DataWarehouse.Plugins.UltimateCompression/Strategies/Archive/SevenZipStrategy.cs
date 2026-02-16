@@ -63,7 +63,7 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Archive
 
             // LZMA encoder: SharpCompress's LzmaStream for compression
             var props = new LzmaEncoderProperties();
-            using (var lzmaEncoder = new LzmaStream(props, false, lzmaStream))
+            using (var lzmaEncoder = LzmaStream.Create(props, false, lzmaStream))
             {
                 lzmaEncoder.Write(input, 0, input.Length);
             }
@@ -108,7 +108,7 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Archive
             // LzmaStream for decompression: read first 5 bytes as properties, then decompress
             byte[] props = new byte[5];
             compressedStream.Read(props, 0, 5);
-            using var lzmaDecoder = new LzmaStream(props, compressedStream, originalLength);
+            using var lzmaDecoder = LzmaStream.Create(props, compressedStream, originalLength, false);
             using var decompressedStream = new MemoryStream();
 
             lzmaDecoder.CopyTo(decompressedStream);
