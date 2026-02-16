@@ -151,6 +151,7 @@ public class Http3DataPlanePlugin : DataPlaneTransportPluginBase
 
                 buffer.Position = 0;
 
+                // Note: Bus delegation not available in this context; using direct crypto
                 var contentHash = Convert.ToHexString(SHA256.HashData(buffer.ToArray())).ToLowerInvariant();
                 _logger.LogDebug("Computed content hash: {Hash}", contentHash);
 

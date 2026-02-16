@@ -687,6 +687,7 @@ public class ComplianceReportingService : IComplianceReportingService
         }
 
         var bytes = Encoding.UTF8.GetBytes(sb.ToString());
+        // TODO: Add bus delegation with SHA256 fallback (requires MessageBusIntegrationService in constructor)
         var hash = SHA256.HashData(bytes);
         return Convert.ToHexString(hash);
     }
@@ -734,6 +735,7 @@ public class ComplianceReportingService : IComplianceReportingService
                     var combined = new byte[leaves[i].Length + leaves[i + 1].Length];
                     Buffer.BlockCopy(leaves[i], 0, combined, 0, leaves[i].Length);
                     Buffer.BlockCopy(leaves[i + 1], 0, combined, leaves[i].Length, leaves[i + 1].Length);
+                    // TODO: Add bus delegation with SHA256 fallback (requires MessageBusIntegrationService in constructor)
                     newLevel.Add(SHA256.HashData(combined));
                 }
                 else
@@ -742,6 +744,7 @@ public class ComplianceReportingService : IComplianceReportingService
                     var combined = new byte[leaves[i].Length * 2];
                     Buffer.BlockCopy(leaves[i], 0, combined, 0, leaves[i].Length);
                     Buffer.BlockCopy(leaves[i], 0, combined, leaves[i].Length, leaves[i].Length);
+                    // TODO: Add bus delegation with SHA256 fallback (requires MessageBusIntegrationService in constructor)
                     newLevel.Add(SHA256.HashData(combined));
                 }
             }
@@ -754,12 +757,14 @@ public class ComplianceReportingService : IComplianceReportingService
     private byte[] ComputeProofHash(IntegrityProof proof)
     {
         var data = $"{proof.BlockId}|{proof.ContentHash}|{proof.Timestamp:O}|{proof.HasBlockchainAnchor}|{proof.RetentionValid}";
+        // TODO: Add bus delegation with SHA256 fallback (requires MessageBusIntegrationService in constructor)
         return SHA256.HashData(Encoding.UTF8.GetBytes(data));
     }
 
     private string ComputeBlockHash(Guid blockId)
     {
         // Placeholder - in production, would compute actual content hash
+        // TODO: Add bus delegation with SHA256 fallback (requires MessageBusIntegrationService in constructor)
         return Convert.ToHexString(SHA256.HashData(blockId.ToByteArray()));
     }
 
@@ -772,6 +777,7 @@ public class ComplianceReportingService : IComplianceReportingService
 
         // Derive signing key from config (in production, use proper key management)
         var keyMaterial = Encoding.UTF8.GetBytes($"attestation-key-{_config.WormMode}");
+        // TODO: Add bus delegation with SHA256 fallback (requires MessageBusIntegrationService in constructor)
         using var hmac = new HMACSHA256(SHA256.HashData(keyMaterial));
 
         var signature = hmac.ComputeHash(payloadBytes);

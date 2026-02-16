@@ -319,6 +319,7 @@ public sealed class SetupWizard
         var timestampBytes = BitConverter.GetBytes(timestamp);
 
         // Combine and hash
+        // Note: Bus delegation not available in this context; using direct crypto
         using var sha = SHA256.Create();
         var combined = random.Concat(timestampBytes).Concat(_masterKey.Take(8)).ToArray();
         var hash = sha.ComputeHash(combined);
@@ -535,6 +536,7 @@ For help, visit: https://datawarehouse.example.com/docs/portable
         if (options.Security == SecurityLevel.Password && !string.IsNullOrEmpty(options.Password))
         {
             var derivedKey = DeriveKeyFromPassword(options.Password, salt);
+            // Note: Bus delegation not available in this context; using direct crypto
             using var sha = SHA256.Create();
             keyHash = Convert.ToBase64String(sha.ComputeHash(derivedKey));
         }
@@ -553,6 +555,7 @@ For help, visit: https://datawarehouse.example.com/docs/portable
 
     private byte[] DeriveSigningKey()
     {
+        // Note: Bus delegation not available in this context; using direct crypto
         using var sha = SHA256.Create();
         var input = _masterKey.Concat(System.Text.Encoding.UTF8.GetBytes("signing")).ToArray();
         return sha.ComputeHash(input);

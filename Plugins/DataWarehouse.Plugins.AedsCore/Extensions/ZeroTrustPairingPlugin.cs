@@ -158,10 +158,42 @@ public sealed class ZeroTrustPairingPlugin : SecurityPluginBase
 
     private (string PublicKey, string PrivateKey) GenerateKeyPair()
     {
+        // Try bus delegation first
+        if (MessageBus != null)
+        {
+            try
+            {
+                var msg = new PluginMessage
+                {
+                    Type = "encryption.generate-keypair",
+                    Payload = new Dictionary<string, object>
+                    {
+                        ["algorithm"] = "RSA",
+                        ["keySize"] = 2048
+                    }
+                };
+
+                var response = MessageBus.SendAsync("encryption.generate-keypair", msg, CancellationToken.None).GetAwaiter().GetResult();
+                if (response != null && response.Success && response.Payload is Dictionary<string, object> payload
+                    && payload.ContainsKey("publicKey") && payload.ContainsKey("privateKey"))
+                {
+                    var publicKey = (string)payload["publicKey"];
+                    var privateKey = (string)payload["privateKey"];
+                    return (publicKey, privateKey);
+                }
+            }
+            catch
+            {
+                // Fall through to inline implementation
+            }
+        }
+
+        // Graceful degradation — fallback to inline if bus unavailable
+        // Note: RSA key generation - encryption.generate-key should be used when MessageBus is available
         using var rsa = RSA.Create(2048);
-        var publicKey = Convert.ToBase64String(rsa.ExportSubjectPublicKeyInfo());
-        var privateKey = Convert.ToBase64String(rsa.ExportPkcs8PrivateKey());
-        return (publicKey, privateKey);
+        var publicKey2 = Convert.ToBase64String(rsa.ExportSubjectPublicKeyInfo());
+        var privateKey2 = Convert.ToBase64String(rsa.ExportPkcs8PrivateKey());
+        return (publicKey2, privateKey2);
     }
 
     /// <inheritdoc />

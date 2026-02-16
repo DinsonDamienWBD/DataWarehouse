@@ -676,6 +676,7 @@ public abstract class DashboardStrategyBase : IDashboardStrategy
     /// </summary>
     protected static string ComputeHash(string input)
     {
+        // Note: Bus delegation not available in this context; using direct crypto
         var bytes = SHA256.HashData(Encoding.UTF8.GetBytes(input));
         return Convert.ToHexString(bytes)[..16].ToLowerInvariant();
     }

@@ -4,7 +4,7 @@
 using System.Security.Cryptography;
 using Org.BouncyCastle.Crypto.Digests;
 
-namespace DataWarehouse.Plugins.TamperProof.Hashing;
+namespace DataWarehouse.Plugins.UltimateDataIntegrity.Hashing;
 
 /// <summary>
 /// Interface for hash algorithm providers supporting multiple computation modes.

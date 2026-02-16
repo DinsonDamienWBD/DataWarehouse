@@ -167,10 +167,10 @@ public sealed class AirGapBridgePlugin : InfrastructurePluginBase, IDisposable
         _deviceSentinel.DeviceRemoved += OnDeviceRemoved;
         _deviceSentinel.InstanceDetected += OnInstanceDetectedInternal;
 
-        _packageManager = new PackageManager(_masterKey, _instanceId);
+        _packageManager = new PackageManager(_masterKey, _instanceId, MessageBus);
         _storageProvider = new StorageExtensionProvider(_offlineIndexPath!);
         _pocketInstanceManager = new PocketInstanceManager(_instanceId);
-        _securityManager = new SecurityManager(_masterKey, _securityPolicy);
+        _securityManager = new SecurityManager(_masterKey, _securityPolicy, MessageBus);
         _setupWizard = new SetupWizard(_instanceId, Name, _masterKey);
         _convergenceManager = new ConvergenceManager(_instanceId, 1);
 
@@ -668,7 +668,7 @@ public sealed class AirGapBridgePlugin : InfrastructurePluginBase, IDisposable
         if (_securityManager != null)
         {
             _securityManager.Dispose();
-            _securityManager = new SecurityManager(_masterKey, _securityPolicy);
+            _securityManager = new SecurityManager(_masterKey, _securityPolicy, MessageBus);
         }
     }
 

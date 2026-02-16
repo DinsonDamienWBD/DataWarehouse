@@ -232,6 +232,7 @@ internal sealed class ServiceTokenService
     /// <returns>Base64-encoded SHA-256 hash.</returns>
     private static string ComputeHash(string input)
     {
+        // Note: Bus delegation not available in this context; using direct crypto
         var hashBytes = SHA256.HashData(Encoding.UTF8.GetBytes(input));
         return Convert.ToBase64String(hashBytes);
     }

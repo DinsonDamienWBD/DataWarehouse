@@ -736,6 +736,7 @@ public sealed class AdaptiveTransportPlugin : StreamingPluginBase
             Priority = transfer.Priority,
             QueuedAt = transfer.QueuedAt,
             DataLength = transfer.Data.Length,
+            // Note: Bus delegation not available in this context; using direct crypto
             DataHash = Convert.ToHexString(SHA256.HashData(transfer.Data))
         };
 

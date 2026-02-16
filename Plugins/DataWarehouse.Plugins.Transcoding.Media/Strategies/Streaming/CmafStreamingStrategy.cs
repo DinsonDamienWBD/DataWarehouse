@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using System.Text;
 using DataWarehouse.SDK.Contracts.Media;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.Transcoding.Media.Strategies.Streaming;
 
@@ -139,7 +140,28 @@ internal sealed class CmafStreamingStrategy : MediaStrategyBase
         Stream mediaStream, MediaFormat targetFormat, CancellationToken cancellationToken)
     {
         var sourceBytes = await ReadStreamFullyAsync(mediaStream, cancellationToken).ConfigureAwait(false);
-        var streamHash = Convert.ToHexString(SHA256.HashData(sourceBytes))[..16].ToLowerInvariant();
+
+        byte[] hashBytes;
+        if (MessageBus != null)
+        {
+            var msg = new PluginMessage { Type = "integrity.hash.compute" };
+            msg.Payload["data"] = sourceBytes;
+            msg.Payload["algorithm"] = "SHA256";
+            var response = await MessageBus.SendAsync("integrity.hash.compute", msg, cancellationToken).ConfigureAwait(false);
+            if (response.Success && response.Payload is Dictionary<string, object> payload && payload.TryGetValue("hash", out var hashObj) && hashObj is byte[] hash)
+            {
+                hashBytes = hash;
+            }
+            else
+            {
+                hashBytes = SHA256.HashData(sourceBytes); // Fallback on error
+            }
+        }
+        else
+        {
+            hashBytes = SHA256.HashData(sourceBytes);
+        }
+        var streamHash = Convert.ToHexString(hashBytes)[..16].ToLowerInvariant();
 
         return targetFormat switch
         {
@@ -312,6 +334,7 @@ internal sealed class CmafStreamingStrategy : MediaStrategyBase
         writer.Write(argsBytes);
 
         // Write source integrity hash
+        // Note: Using inline crypto as fallback since MessageBus not available in static method
         var sourceHash = SHA256.HashData(sourceBytes);
         writer.Write(sourceHash.Length);
         writer.Write(sourceHash);

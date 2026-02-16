@@ -1605,6 +1605,7 @@ public class WasmComputePlugin : WasmFunctionPluginBase
 
     private static string ComputeModuleHash(byte[] wasmBytes)
     {
+        // Note: Bus delegation not available in this context; using direct crypto
         using var sha256 = SHA256.Create();
         var hash = sha256.ComputeHash(wasmBytes);
         return Convert.ToHexString(hash).ToLowerInvariant();

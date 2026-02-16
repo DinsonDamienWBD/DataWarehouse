@@ -396,6 +396,7 @@ internal sealed class WebPImageStrategy : MediaStrategyBase
         var estimatedSize = Math.Max(256, (int)(sourceData.Length / ratio));
         var compressed = new byte[estimatedSize];
 
+        // Note: Using inline crypto as fallback since MessageBus not available in static method
         var hash = SHA256.HashData(sourceData);
         using var hmac = new HMACSHA256(hash);
 
@@ -428,6 +429,7 @@ internal sealed class WebPImageStrategy : MediaStrategyBase
         var estimatedSize = Math.Max(256, (int)(sourceData.Length / ratio));
         var compressed = new byte[estimatedSize];
 
+        // Note: Using inline crypto as fallback since MessageBus not available in static method
         var hash = SHA256.HashData(sourceData);
         using var hmac = new HMACSHA256(hash);
 

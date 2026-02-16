@@ -2,6 +2,9 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using DataWarehouse.Plugins.AirGapBridge.Core;
+using DataWarehouse.SDK.Utilities;
+using IMessageBus = DataWarehouse.SDK.Contracts.IMessageBus;
+using MessageResponse = DataWarehouse.SDK.Contracts.MessageResponse;
 
 namespace DataWarehouse.Plugins.AirGapBridge.Transport;
 
@@ -13,19 +16,22 @@ public sealed class PackageManager
 {
     private readonly byte[] _encryptionKey;
     private readonly string _instanceId;
+    private readonly IMessageBus? _messageBus;
 
     /// <summary>
     /// Creates a new package manager.
     /// </summary>
     /// <param name="encryptionKey">Master encryption key (256-bit).</param>
     /// <param name="instanceId">Local instance identifier.</param>
-    public PackageManager(byte[] encryptionKey, string instanceId)
+    /// <param name="messageBus">Optional message bus for delegating crypto operations to UltimateEncryption.</param>
+    public PackageManager(byte[] encryptionKey, string instanceId, IMessageBus? messageBus = null)
     {
         if (encryptionKey.Length != 32)
             throw new ArgumentException("Encryption key must be 256 bits (32 bytes)", nameof(encryptionKey));
 
         _encryptionKey = encryptionKey;
         _instanceId = instanceId;
+        _messageBus = messageBus;
     }
 
     #region Sub-task 79.5: Package Creator
@@ -55,8 +61,29 @@ public sealed class PackageManager
             var (ciphertext, nonce, tag) = EncryptData(blob.Data);
 
             // Compute hash of encrypted data
-            using var sha = SHA256.Create();
-            var hash = Convert.ToBase64String(sha.ComputeHash(ciphertext));
+            byte[] hashBytes;
+            if (_messageBus != null)
+            {
+                var msg = new PluginMessage { Type = "integrity.hash.compute" };
+                msg.Payload["data"] = ciphertext;
+                msg.Payload["algorithm"] = "SHA256";
+                var response = await _messageBus.SendAsync("integrity.hash.compute", msg, ct);
+                if (response.Success && msg.Payload.TryGetValue("hash", out var hashObj) && hashObj is byte[] responseHash)
+                {
+                    hashBytes = responseHash;
+                }
+                else
+                {
+                    using var sha = SHA256.Create();
+                    hashBytes = sha.ComputeHash(ciphertext);
+                }
+            }
+            else
+            {
+                using var sha = SHA256.Create();
+                hashBytes = sha.ComputeHash(ciphertext);
+            }
+            var hash = Convert.ToBase64String(hashBytes);
 
             shards.Add(new EncryptedShard
             {
@@ -74,7 +101,7 @@ public sealed class PackageManager
         }
 
         // Compute merkle root
-        var merkleRoot = ComputeMerkleRoot(shards.Select(s => s.Hash));
+        var merkleRoot = await ComputeMerkleRootAsync(shards.Select(s => s.Hash), ct);
 
         var manifest = new PackageManifest
         {
@@ -98,7 +125,7 @@ public sealed class PackageManager
         };
 
         // Sign the package
-        SignPackage(package);
+        await SignPackageAsync(package, ct);
 
         return package;
     }
@@ -149,7 +176,7 @@ public sealed class PackageManager
         };
 
         // Re-sign with processing info
-        SignPackage(package);
+        await SignPackageAsync(package, ct);
 
         return package;
     }
@@ -192,7 +219,7 @@ public sealed class PackageManager
     /// Verifies a package signature.
     /// Implements sub-task 79.7.
     /// </summary>
-    public bool VerifyPackageSignature(DwPackage package, byte[]? trustedPublicKey = null)
+    public async Task<bool> VerifyPackageSignatureAsync(DwPackage package, byte[]? trustedPublicKey = null, CancellationToken ct = default)
     {
         if (string.IsNullOrEmpty(package.Signature))
             return false;
@@ -201,8 +228,31 @@ public sealed class PackageManager
         {
             // Compute expected signature
             var dataToSign = GetPackageSignableData(package);
-            using var hmac = new HMACSHA256(_encryptionKey);
-            var expectedSignature = Convert.ToBase64String(hmac.ComputeHash(dataToSign));
+
+            byte[] hmacBytes;
+            if (_messageBus != null)
+            {
+                var msg = new PluginMessage { Type = "integrity.hash.compute" };
+                msg.Payload["data"] = dataToSign;
+                msg.Payload["algorithm"] = "HMAC_SHA256";
+                msg.Payload["key"] = _encryptionKey;
+                var response = await _messageBus.SendAsync("integrity.hash.compute", msg, ct);
+                if (response.Success && msg.Payload.TryGetValue("hash", out var hashObj) && hashObj is byte[] responseHash)
+                {
+                    hmacBytes = responseHash;
+                }
+                else
+                {
+                    using var hmac = new HMACSHA256(_encryptionKey);
+                    hmacBytes = hmac.ComputeHash(dataToSign);
+                }
+            }
+            else
+            {
+                using var hmac = new HMACSHA256(_encryptionKey);
+                hmacBytes = hmac.ComputeHash(dataToSign);
+            }
+            var expectedSignature = Convert.ToBase64String(hmacBytes);
 
             return package.Signature == expectedSignature;
         }
@@ -227,8 +277,29 @@ public sealed class PackageManager
             if (ct.IsCancellationRequested) break;
 
             // Verify hash
-            using var sha = SHA256.Create();
-            var computedHash = Convert.ToBase64String(sha.ComputeHash(shard.Data));
+            byte[] hashBytes;
+            if (_messageBus != null)
+            {
+                var msg = new PluginMessage { Type = "integrity.hash.compute" };
+                msg.Payload["data"] = shard.Data;
+                msg.Payload["algorithm"] = "SHA256";
+                var response = await _messageBus.SendAsync("integrity.hash.compute", msg, ct);
+                if (response.Success && msg.Payload.TryGetValue("hash", out var hashObj) && hashObj is byte[] responseHash)
+                {
+                    hashBytes = responseHash;
+                }
+                else
+                {
+                    using var sha = SHA256.Create();
+                    hashBytes = sha.ComputeHash(shard.Data);
+                }
+            }
+            else
+            {
+                using var sha = SHA256.Create();
+                hashBytes = sha.ComputeHash(shard.Data);
+            }
+            var computedHash = Convert.ToBase64String(hashBytes);
             if (computedHash != shard.Hash)
             {
                 throw new CryptographicException($"Shard {shard.Index} hash mismatch");
@@ -264,7 +335,7 @@ public sealed class PackageManager
         try
         {
             // Verify signature
-            if (!VerifyPackageSignature(package))
+            if (!await VerifyPackageSignatureAsync(package, ct: ct))
             {
                 return new ImportResult
                 {
@@ -275,7 +346,7 @@ public sealed class PackageManager
             }
 
             // Verify merkle root
-            var computedMerkle = ComputeMerkleRoot(package.Shards.Select(s => s.Hash));
+            var computedMerkle = await ComputeMerkleRootAsync(package.Shards.Select(s => s.Hash), ct);
             if (computedMerkle != package.Manifest.MerkleRoot)
             {
                 return new ImportResult
@@ -532,6 +603,41 @@ public sealed class PackageManager
         var tag = new byte[16]; // 128-bit tag
         var ciphertext = new byte[plaintext.Length];
 
+        // Try bus delegation first
+        if (_messageBus != null)
+        {
+            try
+            {
+                var msg = new PluginMessage
+                {
+                    Type = "encryption.encrypt",
+                    Payload = new Dictionary<string, object>
+                    {
+                        ["algorithm"] = "AES-256-GCM",
+                        ["data"] = plaintext,
+                        ["key"] = _encryptionKey,
+                        ["nonce"] = nonce
+                    }
+                };
+
+                var response = _messageBus.SendAsync("encryption.encrypt", msg, CancellationToken.None).GetAwaiter().GetResult();
+                if (response != null && response.Success && response.Payload is Dictionary<string, object> payload
+                    && payload.ContainsKey("ciphertext") && payload.ContainsKey("tag"))
+                {
+                    var responseCiphertext = (byte[])payload["ciphertext"];
+                    var responseTag = (byte[])payload["tag"];
+                    Buffer.BlockCopy(responseCiphertext, 0, ciphertext, 0, responseCiphertext.Length);
+                    Buffer.BlockCopy(responseTag, 0, tag, 0, responseTag.Length);
+                    return (ciphertext, nonce, tag);
+                }
+            }
+            catch
+            {
+                // Fall through to inline implementation
+            }
+        }
+
+        // Graceful degradation — fallback to inline if bus unavailable
         using var aesGcm = new AesGcm(_encryptionKey, 16);
         aesGcm.Encrypt(nonce, plaintext, ciphertext, tag);
 
@@ -542,17 +648,74 @@ public sealed class PackageManager
     {
         var plaintext = new byte[ciphertext.Length];
 
+        // Try bus delegation first
+        if (_messageBus != null)
+        {
+            try
+            {
+                var msg = new PluginMessage
+                {
+                    Type = "encryption.decrypt",
+                    Payload = new Dictionary<string, object>
+                    {
+                        ["algorithm"] = "AES-256-GCM",
+                        ["ciphertext"] = ciphertext,
+                        ["key"] = _encryptionKey,
+                        ["nonce"] = nonce,
+                        ["tag"] = tag
+                    }
+                };
+
+                var response = _messageBus.SendAsync("encryption.decrypt", msg, CancellationToken.None).GetAwaiter().GetResult();
+                if (response != null && response.Success && response.Payload is Dictionary<string, object> payload
+                    && payload.ContainsKey("data"))
+                {
+                    var responseData = (byte[])payload["data"];
+                    Buffer.BlockCopy(responseData, 0, plaintext, 0, responseData.Length);
+                    return plaintext;
+                }
+            }
+            catch
+            {
+                // Fall through to inline implementation
+            }
+        }
+
+        // Graceful degradation — fallback to inline if bus unavailable
         using var aesGcm = new AesGcm(_encryptionKey, 16);
         aesGcm.Decrypt(nonce, ciphertext, tag, plaintext);
 
         return plaintext;
     }
 
-    private void SignPackage(DwPackage package)
+    private async Task SignPackageAsync(DwPackage package, CancellationToken ct = default)
     {
         var dataToSign = GetPackageSignableData(package);
-        using var hmac = new HMACSHA256(_encryptionKey);
-        package.Signature = Convert.ToBase64String(hmac.ComputeHash(dataToSign));
+
+        byte[] hmacBytes;
+        if (_messageBus != null)
+        {
+            var msg = new PluginMessage { Type = "integrity.hash.compute" };
+            msg.Payload["data"] = dataToSign;
+            msg.Payload["algorithm"] = "HMAC_SHA256";
+            msg.Payload["key"] = _encryptionKey;
+            var response = await _messageBus.SendAsync("integrity.hash.compute", msg, ct);
+            if (response.Success && msg.Payload.TryGetValue("hash", out var hashObj) && hashObj is byte[] responseHash)
+            {
+                hmacBytes = responseHash;
+            }
+            else
+            {
+                using var hmac = new HMACSHA256(_encryptionKey);
+                hmacBytes = hmac.ComputeHash(dataToSign);
+            }
+        }
+        else
+        {
+            using var hmac = new HMACSHA256(_encryptionKey);
+            hmacBytes = hmac.ComputeHash(dataToSign);
+        }
+        package.Signature = Convert.ToBase64String(hmacBytes);
     }
 
     private static byte[] GetPackageSignableData(DwPackage package)
@@ -570,12 +733,14 @@ public sealed class PackageManager
         return Encoding.UTF8.GetBytes(json);
     }
 
-    private static string ComputeMerkleRoot(IEnumerable<string> hashes)
+    private Task<string> ComputeMerkleRootAsync(IEnumerable<string> hashes, CancellationToken ct = default)
     {
         var hashList = hashes.ToList();
-        if (hashList.Count == 0) return string.Empty;
-        if (hashList.Count == 1) return hashList[0];
+        if (hashList.Count == 0) return Task.FromResult(string.Empty);
+        if (hashList.Count == 1) return Task.FromResult(hashList[0]);
 
+        // TODO: Delegate to UltimateDataIntegrity via bus when batch hashing API is available
+        // For now, keep inline for performance (tight loop with many hash operations)
         using var sha = SHA256.Create();
 
         while (hashList.Count > 1)
@@ -594,7 +759,7 @@ public sealed class PackageManager
             hashList = newLevel;
         }
 
-        return hashList[0];
+        return Task.FromResult(hashList[0]);
     }
 
     #endregion

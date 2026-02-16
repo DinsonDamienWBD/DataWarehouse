@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using System.Text;
 using DataWarehouse.SDK.Contracts.Media;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.Transcoding.Media.Strategies.Video;
 
@@ -221,7 +222,7 @@ internal sealed class VvcCodecStrategy : MediaStrategyBase
     /// <summary>
     /// Writes the transcoding package to the output stream with encoder availability metadata.
     /// </summary>
-    private static async Task WriteTranscodePackageAsync(
+    private async Task WriteTranscodePackageAsync(
         MemoryStream outputStream, string ffmpegArgs, byte[] sourceBytes,
         VvcEncoderStatus encoderStatus, CancellationToken cancellationToken)
     {
@@ -244,7 +245,26 @@ internal sealed class VvcCodecStrategy : MediaStrategyBase
         writer.Write(argsBytes);
 
         // Write source hash for integrity
-        var sourceHash = SHA256.HashData(sourceBytes);
+        byte[] sourceHash;
+        if (MessageBus != null)
+        {
+            var msg = new PluginMessage { Type = "integrity.hash.compute" };
+            msg.Payload["data"] = sourceBytes;
+            msg.Payload["algorithm"] = "SHA256";
+            var response = await MessageBus.SendAsync("integrity.hash.compute", msg, cancellationToken).ConfigureAwait(false);
+            if (response.Success && response.Payload is Dictionary<string, object> payload && payload.TryGetValue("hash", out var hashObj) && hashObj is byte[] hash)
+            {
+                sourceHash = hash;
+            }
+            else
+            {
+                sourceHash = SHA256.HashData(sourceBytes); // Fallback on error
+            }
+        }
+        else
+        {
+            sourceHash = SHA256.HashData(sourceBytes);
+        }
         writer.Write(sourceHash.Length);
         writer.Write(sourceHash);
 

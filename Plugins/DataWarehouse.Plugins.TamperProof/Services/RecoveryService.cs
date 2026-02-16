@@ -606,6 +606,7 @@ public class RecoveryService
                             var shardData = ms.ToArray();
 
                             // Verify this shard is valid
+                            // TODO: Add bus delegation with SHA256 fallback (requires MessageBusIntegrationService in constructor)
                             var actualHash = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(shardData));
                             if (string.Equals(actualHash, shardRecord.ContentHash, StringComparison.OrdinalIgnoreCase))
                             {
@@ -708,6 +709,7 @@ public class RecoveryService
                 await stream.CopyToAsync(ms, ct);
                 var shardData = ms.ToArray();
 
+                // TODO: Add bus delegation with SHA256 fallback (requires MessageBusIntegrationService in constructor)
                 var actualHash = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(shardData));
 
                 if (string.Equals(actualHash, shardRecord.ContentHash, StringComparison.OrdinalIgnoreCase))

@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using System.Text;
 using DataWarehouse.SDK.Contracts.Media;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.Transcoding.Media.Strategies.Streaming;
 
@@ -149,7 +150,28 @@ internal sealed class HlsStreamingStrategy : MediaStrategyBase
 
         // Generate a unique stream identifier for manifest addressing
         var sourceBytes = await ReadStreamFullyAsync(mediaStream, cancellationToken).ConfigureAwait(false);
-        var streamHash = Convert.ToHexString(SHA256.HashData(sourceBytes))[..16].ToLowerInvariant();
+
+        byte[] hashBytes;
+        if (MessageBus != null)
+        {
+            var msg = new PluginMessage { Type = "integrity.hash.compute" };
+            msg.Payload["data"] = sourceBytes;
+            msg.Payload["algorithm"] = "SHA256";
+            var response = await MessageBus.SendAsync("integrity.hash.compute", msg, cancellationToken).ConfigureAwait(false);
+            if (response.Success && response.Payload is Dictionary<string, object> payload && payload.TryGetValue("hash", out var hashObj) && hashObj is byte[] hash)
+            {
+                hashBytes = hash;
+            }
+            else
+            {
+                hashBytes = SHA256.HashData(sourceBytes); // Fallback on error
+            }
+        }
+        else
+        {
+            hashBytes = SHA256.HashData(sourceBytes);
+        }
+        var streamHash = Convert.ToHexString(hashBytes)[..16].ToLowerInvariant();
 
         return new Uri($"/streams/hls/{streamHash}/master.m3u8", UriKind.Relative);
     }
@@ -239,7 +261,7 @@ internal sealed class HlsStreamingStrategy : MediaStrategyBase
     /// Writes the complete HLS package to the output stream as a structured archive containing
     /// master playlist, variant playlists, FFmpeg arguments, and source data reference.
     /// </summary>
-    private static async Task WriteHlsPackageAsync(
+    private async Task WriteHlsPackageAsync(
         MemoryStream outputStream, string masterPlaylist,
         Dictionary<string, string> variantPlaylists, string ffmpegArgs,
         byte[] sourceBytes, CancellationToken cancellationToken)
@@ -273,7 +295,26 @@ internal sealed class HlsStreamingStrategy : MediaStrategyBase
         writer.Write(argsBytes);
 
         // Write source data hash for integrity verification
-        var sourceHash = SHA256.HashData(sourceBytes);
+        byte[] sourceHash;
+        if (MessageBus != null)
+        {
+            var msg = new PluginMessage { Type = "integrity.hash.compute" };
+            msg.Payload["data"] = sourceBytes;
+            msg.Payload["algorithm"] = "SHA256";
+            var response = await MessageBus.SendAsync("integrity.hash.compute", msg, cancellationToken).ConfigureAwait(false);
+            if (response.Success && response.Payload is Dictionary<string, object> payload && payload.TryGetValue("hash", out var hashObj) && hashObj is byte[] hash)
+            {
+                sourceHash = hash;
+            }
+            else
+            {
+                sourceHash = SHA256.HashData(sourceBytes); // Fallback on error
+            }
+        }
+        else
+        {
+            sourceHash = SHA256.HashData(sourceBytes);
+        }
         writer.Write(sourceHash.Length);
         writer.Write(sourceHash);
 

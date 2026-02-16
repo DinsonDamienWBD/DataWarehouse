@@ -414,6 +414,7 @@ internal sealed class AvifImageStrategy : MediaStrategyBase
         compressed[0] = 0x12; // OBU type: Sequence Header
         compressed[1] = 0x00; // OBU size LSB
 
+        // Note: Using inline crypto as fallback since MessageBus not available in static method
         var hash = SHA256.HashData(sourceData);
         using var hmac = new HMACSHA256(hash);
 

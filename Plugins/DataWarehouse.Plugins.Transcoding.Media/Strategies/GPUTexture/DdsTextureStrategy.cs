@@ -433,6 +433,7 @@ internal sealed class DdsTextureStrategy : MediaStrategyBase
         var mipmapCount = CalculateMipmapCount(width, height);
 
         using var stream = new MemoryStream();
+        // Note: Using inline crypto as fallback since MessageBus not available in static method
         var hash = SHA256.HashData(sourceData);
 
         int mipWidth = width;
@@ -446,6 +447,7 @@ internal sealed class DdsTextureStrategy : MediaStrategyBase
 
             // Generate compressed block data for this mipmap level
             var levelData = new byte[levelSize];
+            // Note: Using inline crypto as fallback since MessageBus not available in static method
             using var hmac = new HMACSHA256(hash);
             var levelKey = BitConverter.GetBytes(level);
             var block = hmac.ComputeHash(levelKey);
@@ -474,6 +476,7 @@ internal sealed class DdsTextureStrategy : MediaStrategyBase
     /// </summary>
     private static byte[] ExtractSmallestMipmap(byte[] data)
     {
+        // Note: Using inline crypto as fallback since MessageBus not available in static method
         if (data.Length < 128) return SHA256.HashData(data);
 
         // Start after header, get last few bytes as smallest mipmap
@@ -481,6 +484,7 @@ internal sealed class DdsTextureStrategy : MediaStrategyBase
         if (DetectDx10Header(data))
             headerSize += Dx10HeaderSize;
 
+        // Note: Using inline crypto as fallback since MessageBus not available in static method
         if (headerSize >= data.Length) return SHA256.HashData(data);
 
         // Return last 256 bytes or less as smallest mipmap approximation

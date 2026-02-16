@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using System.Text;
 using DataWarehouse.SDK.Contracts.Media;
+using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.Transcoding.Media.Strategies.Video;
 
@@ -150,7 +151,27 @@ internal sealed class Vp9CodecStrategy : MediaStrategyBase
         writer.Write(argsBytes.Length);
         writer.Write(argsBytes);
         writer.Write(sourceBytes.Length);
-        var sourceHash = SHA256.HashData(sourceBytes);
+
+        byte[] sourceHash;
+        if (MessageBus != null)
+        {
+            var msg = new PluginMessage { Type = "integrity.hash.compute" };
+            msg.Payload["data"] = sourceBytes;
+            msg.Payload["algorithm"] = "SHA256";
+            var response = await MessageBus.SendAsync("integrity.hash.compute", msg, cancellationToken).ConfigureAwait(false);
+            if (response.Success && response.Payload is Dictionary<string, object> payload && payload.TryGetValue("hash", out var hashObj) && hashObj is byte[] hash)
+            {
+                sourceHash = hash;
+            }
+            else
+            {
+                sourceHash = SHA256.HashData(sourceBytes);
+            }
+        }
+        else
+        {
+            sourceHash = SHA256.HashData(sourceBytes);
+        }
         writer.Write(sourceHash.Length);
         writer.Write(sourceHash);
         await writer.BaseStream.FlushAsync(cancellationToken).ConfigureAwait(false);
@@ -233,7 +254,7 @@ internal sealed class Vp9CodecStrategy : MediaStrategyBase
     /// <summary>
     /// Writes the transcoding package to the output stream.
     /// </summary>
-    private static async Task WriteTranscodePackageAsync(
+    private async Task WriteTranscodePackageAsync(
         MemoryStream outputStream, string ffmpegArgs, byte[] sourceBytes,
         bool twoPass, CancellationToken cancellationToken)
     {
@@ -248,7 +269,26 @@ internal sealed class Vp9CodecStrategy : MediaStrategyBase
         writer.Write(argsBytes.Length);
         writer.Write(argsBytes);
 
-        var sourceHash = SHA256.HashData(sourceBytes);
+        byte[] sourceHash;
+        if (MessageBus != null)
+        {
+            var msg = new PluginMessage { Type = "integrity.hash.compute" };
+            msg.Payload["data"] = sourceBytes;
+            msg.Payload["algorithm"] = "SHA256";
+            var response = await MessageBus.SendAsync("integrity.hash.compute", msg, cancellationToken).ConfigureAwait(false);
+            if (response.Success && response.Payload is Dictionary<string, object> payload && payload.TryGetValue("hash", out var hashObj) && hashObj is byte[] hash)
+            {
+                sourceHash = hash;
+            }
+            else
+            {
+                sourceHash = SHA256.HashData(sourceBytes);
+            }
+        }
+        else
+        {
+            sourceHash = SHA256.HashData(sourceBytes);
+        }
         writer.Write(sourceHash.Length);
         writer.Write(sourceHash);
 

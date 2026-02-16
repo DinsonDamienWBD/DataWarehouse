@@ -641,6 +641,56 @@ For each new ENCRYPTION plugin:
 
 ---
 
+## RULE 15: Capability Delegation — No Inline Duplication (AD-11)
+
+> **ABSOLUTE RULE:** Every cross-cutting capability has exactly ONE owning plugin. ALL other plugins MUST delegate to that owner via message bus. No plugin may implement inline versions of capabilities owned by another plugin.
+
+### Capability Ownership Registry
+
+| Capability | Owner Plugin | Bus Topics |
+|------------|-------------|------------|
+| Encryption/Decryption | UltimateEncryption | `encryption.encrypt`, `encryption.decrypt` |
+| Hashing/Integrity | UltimateDataIntegrity | `integrity.hash.compute`, `integrity.hash.verify` |
+| Blockchain/Anchoring | UltimateBlockchain | `blockchain.anchor`, `blockchain.verify` |
+| Data Transport | UltimateDataTransit | `transit.transfer.request` |
+| AI/ML Inference | UltimateIntelligence | `intelligence.*` |
+| Key Management | UltimateKeyManagement | `keymanagement.*` |
+| Storage I/O | UltimateStorage | `storage.*` |
+| Compression | UltimateCompression | `compression.*` |
+| Access Control | UltimateAccessControl | `accesscontrol.*` |
+
+### Delegation Pattern
+
+```csharp
+// WRONG — inline crypto in a non-crypto plugin
+using var aes = new AesGcm(key, 16);
+aes.Encrypt(nonce, plaintext, ciphertext, tag);
+
+// RIGHT — delegate to UltimateEncryption via message bus
+var msg = new PluginMessage("encryption.encrypt");
+msg.Payload["data"] = plaintext;
+msg.Payload["key"] = key;
+var response = await MessageBus.PublishAndWaitAsync("encryption.encrypt", msg, ct);
+var encrypted = (byte[])response.Payload["result"];
+```
+
+### Forbidden Inline Patterns Outside Owning Plugin
+
+| Pattern | Owning Plugin |
+|---------|--------------|
+| `Aes.Create()`, `new AesGcm(...)`, `RSA.Create()`, `ECDsa.Create()` | UltimateEncryption |
+| `SHA256.Create()`, `SHA256.HashData()`, `new HMACSHA256(...)` | UltimateDataIntegrity |
+| `new HttpClient()`, `new TcpClient()`, `new UdpClient()` | UltimateDataTransit |
+| `new Socket(...)`, `ClientWebSocket`, `GrpcChannel.ForAddress(...)` | UltimateDataTransit |
+
+### Exceptions (inline allowed)
+
+1. **Protocol-specific signatures** — AWS Signature V4 HMACSHA256 in observability is protocol-mandated
+2. **Boot-time self-verification** — if message bus not yet available during init (must document)
+3. **Profiled tight loops** — only with documented proof that bus latency is unacceptable (>1ms * >10K iterations)
+
+---
+
 ## INTER-PLUGIN COMMUNICATION RULES
 
 > **CRITICAL RULE:** Plugins ONLY reference the SDK. All inter-plugin communication uses the message bus.
