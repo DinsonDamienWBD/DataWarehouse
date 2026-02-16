@@ -174,7 +174,18 @@ internal sealed class SignalRStrategy : SdkInterface.InterfaceStrategyBase, IPlu
         // Subscribe to message bus if available
         if (IsIntelligenceAvailable && MessageBus != null)
         {
-            await Task.CompletedTask; // Placeholder for actual bus subscription
+            var message = new SDK.Utilities.PluginMessage
+            {
+                Type = "streaming.subscribe",
+                Payload = new Dictionary<string, object>
+                {
+                    ["operation"] = "subscribe",
+                    ["connectionId"] = connectionId,
+                    ["protocol"] = "signalr"
+                }
+            };
+
+            await MessageBus.PublishAsync("streaming.subscribe", message, cancellationToken);
         }
 
         var responseJson = JsonSerializer.Serialize(negotiateResponse);
@@ -264,7 +275,12 @@ internal sealed class SignalRStrategy : SdkInterface.InterfaceStrategyBase, IPlu
                 ["arguments"] = arguments,
                 ["invocationId"] = invocationId ?? string.Empty
             };
-            await Task.CompletedTask; // Placeholder
+            var message = new SDK.Utilities.PluginMessage
+            {
+                Type = "streaming.publish",
+                Payload = busRequest
+            };
+            await MessageBus.PublishAsync("streaming.publish", message, cancellationToken);
         }
 
         // Send completion message if invocation ID was provided
@@ -288,7 +304,12 @@ internal sealed class SignalRStrategy : SdkInterface.InterfaceStrategyBase, IPlu
         // Route via message bus if available
         if (IsIntelligenceAvailable && MessageBus != null)
         {
-            await Task.CompletedTask; // Placeholder
+            var message = new SDK.Utilities.PluginMessage
+            {
+                Type = "streaming.publish",
+                Payload = busRequest
+            };
+            await MessageBus.PublishAsync("streaming.publish", message, cancellationToken);
         }
     }
 
@@ -317,7 +338,12 @@ internal sealed class SignalRStrategy : SdkInterface.InterfaceStrategyBase, IPlu
                 ["arguments"] = arguments,
                 ["invocationId"] = invocationId
             };
-            await Task.CompletedTask; // Placeholder
+            var message = new SDK.Utilities.PluginMessage
+            {
+                Type = "streaming.publish",
+                Payload = busRequest
+            };
+            await MessageBus.PublishAsync("streaming.publish", message, cancellationToken);
         }
 
         // In production, start streaming response

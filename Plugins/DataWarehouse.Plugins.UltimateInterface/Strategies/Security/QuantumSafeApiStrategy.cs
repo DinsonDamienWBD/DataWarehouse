@@ -228,7 +228,23 @@ internal sealed class QuantumSafeApiStrategy : SdkInterface.InterfaceStrategyBas
         // Route to Encryption plugin if available
         if (IsIntelligenceAvailable && MessageBus != null)
         {
-            await Task.CompletedTask; // Placeholder for actual verification call
+            var message = new SDK.Utilities.PluginMessage
+            {
+                Type = "encryption.verify",
+                Payload = new Dictionary<string, object>
+                {
+                    ["operation"] = "verify",
+                    ["algorithm"] = algorithm,
+                    ["signature"] = signature,
+                    ["message"] = request.Body.ToArray()
+                }
+            };
+
+            var busResponse = await MessageBus.SendAsync("encryption.verify", message, cancellationToken);
+            if (busResponse.Success && busResponse.Payload != null)
+            {
+                return (200, busResponse.Payload);
+            }
         }
 
         // Fallback: Mock verification

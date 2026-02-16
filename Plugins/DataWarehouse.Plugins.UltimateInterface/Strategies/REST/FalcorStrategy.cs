@@ -147,13 +147,23 @@ internal sealed class FalcorStrategy : SdkInterface.InterfaceStrategyBase, IPlug
         // Route via message bus if available
         if (IsIntelligenceAvailable && MessageBus != null)
         {
-            var busRequest = new Dictionary<string, object>
+            var message = new SDK.Utilities.PluginMessage
             {
-                ["operation"] = "falcor.get",
-                ["paths"] = request.Paths ?? Array.Empty<object>()
+                Type = "storage.graph.query",
+                Payload = new Dictionary<string, object>
+                {
+                    ["operation"] = "falcor.get",
+                    ["paths"] = request.Paths ?? Array.Empty<object>()
+                }
             };
 
-            await Task.CompletedTask; // Placeholder for actual bus call
+            var busResponse = await MessageBus.SendAsync("storage.graph.query", message, cancellationToken);
+            if (busResponse.Success && busResponse.Payload != null)
+            {
+                return busResponse.Payload;
+            }
+
+            return CreateErrorGraph("Service Unavailable", busResponse.ErrorMessage ?? "Storage backend unavailable");
         }
 
         // Build JSON Graph response from requested paths
@@ -178,13 +188,23 @@ internal sealed class FalcorStrategy : SdkInterface.InterfaceStrategyBase, IPlug
         // Route via message bus if available
         if (IsIntelligenceAvailable && MessageBus != null)
         {
-            var busRequest = new Dictionary<string, object>
+            var message = new SDK.Utilities.PluginMessage
             {
-                ["operation"] = "falcor.set",
-                ["jsonGraphEnvelope"] = request.JsonGraphEnvelope ?? new { }
+                Type = "storage.graph.write",
+                Payload = new Dictionary<string, object>
+                {
+                    ["operation"] = "falcor.set",
+                    ["jsonGraphEnvelope"] = request.JsonGraphEnvelope ?? new { }
+                }
             };
 
-            await Task.CompletedTask; // Placeholder for actual bus call
+            var busResponse = await MessageBus.SendAsync("storage.graph.write", message, cancellationToken);
+            if (busResponse.Success && busResponse.Payload != null)
+            {
+                return busResponse.Payload;
+            }
+
+            return CreateErrorGraph("Service Unavailable", busResponse.ErrorMessage ?? "Storage backend unavailable");
         }
 
         // Return the updated JSON Graph
@@ -202,14 +222,24 @@ internal sealed class FalcorStrategy : SdkInterface.InterfaceStrategyBase, IPlug
         // Route via message bus if available
         if (IsIntelligenceAvailable && MessageBus != null)
         {
-            var busRequest = new Dictionary<string, object>
+            var message = new SDK.Utilities.PluginMessage
             {
-                ["operation"] = "falcor.call",
-                ["callPath"] = request.CallPath ?? Array.Empty<object>(),
-                ["arguments"] = request.Arguments ?? Array.Empty<object>()
+                Type = "storage.graph.call",
+                Payload = new Dictionary<string, object>
+                {
+                    ["operation"] = "falcor.call",
+                    ["callPath"] = request.CallPath ?? Array.Empty<object>(),
+                    ["arguments"] = request.Arguments ?? Array.Empty<object>()
+                }
             };
 
-            await Task.CompletedTask; // Placeholder for actual bus call
+            var busResponse = await MessageBus.SendAsync("storage.graph.call", message, cancellationToken);
+            if (busResponse.Success && busResponse.Payload != null)
+            {
+                return busResponse.Payload;
+            }
+
+            return CreateErrorGraph("Service Unavailable", busResponse.ErrorMessage ?? "Storage backend unavailable");
         }
 
         // Return a result graph

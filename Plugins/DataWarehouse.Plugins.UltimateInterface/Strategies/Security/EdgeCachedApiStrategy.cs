@@ -204,7 +204,22 @@ internal sealed class EdgeCachedApiStrategy : SdkInterface.InterfaceStrategyBase
         // Route to backend service if available
         if (IsIntelligenceAvailable && MessageBus != null)
         {
-            await Task.CompletedTask; // Placeholder for actual service call
+            var message = new SDK.Utilities.PluginMessage
+            {
+                Type = "cache.read",
+                Payload = new Dictionary<string, object>
+                {
+                    ["operation"] = "read",
+                    ["path"] = request.Path ?? string.Empty,
+                    ["method"] = request.Method.ToString()
+                }
+            };
+
+            var busResponse = await MessageBus.SendAsync("cache.read", message, cancellationToken);
+            if (busResponse.Success && busResponse.Payload != null)
+            {
+                return busResponse.Payload;
+            }
         }
 
         // Fallback: Generate mock response
