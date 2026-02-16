@@ -1601,17 +1601,23 @@ github.com,deploy-bot,ghp_xxxxxxxxxxxx,CI/CD deploy token
 
         private static byte[] GenerateCredentialsJson()
         {
+            var prodDbPass = $"HoneypotSecret_{Guid.NewGuid():N}"[..20];
+            var prodRedisPass = $"HoneypotSecret_{Guid.NewGuid():N}"[..20];
+            var awsAccessKey = $"AKIA{Guid.NewGuid():N}"[..20].ToUpperInvariant();
+            var awsSecretKey = $"HoneypotSecret_{Guid.NewGuid():N}"[..40];
+            var stagingDbPass = $"HoneypotSecret_{Guid.NewGuid():N}"[..20];
+
             var creds = new
             {
                 production = new
                 {
-                    database = new { host = "db.internal", user = "app", password = "Pr0d#Db2024!" },
-                    redis = new { host = "redis.internal", password = "R3d!s$ecret" },
-                    aws = new { accessKey = "AKIAIOSFODNN7EXAMPLE", secretKey = "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY" }
+                    database = new { host = "db.internal", user = "app", password = prodDbPass },
+                    redis = new { host = "redis.internal", password = prodRedisPass },
+                    aws = new { accessKey = awsAccessKey, secretKey = awsSecretKey }
                 },
                 staging = new
                 {
-                    database = new { host = "staging-db.internal", user = "app", password = "St@g!ng2024" }
+                    database = new { host = "staging-db.internal", user = "app", password = stagingDbPass }
                 }
             };
             return Encoding.UTF8.GetBytes(JsonSerializer.Serialize(creds, new JsonSerializerOptions { WriteIndented = true }));
@@ -1629,15 +1635,23 @@ github.com,deploy-bot,ghp_xxxxxxxxxxxx,CI/CD deploy token
 
         private static byte[] GenerateEnvFile()
         {
-            var env = @"# Production Environment - CONFIDENTIAL
+            var dbPass = $"HoneypotSecret_{Guid.NewGuid():N}"[..20];
+            var redisPass = $"HoneypotSecret_{Guid.NewGuid():N}"[..20];
+            var awsKey = $"AKIA{Guid.NewGuid():N}"[..20].ToUpperInvariant();
+            var awsSecret = $"HoneypotSecret_{Guid.NewGuid():N}"[..40];
+            var jwtSecret = $"HoneypotSecret_{Guid.NewGuid():N}"[..40];
+            var stripeKey = $"HoneypotSecret_{Guid.NewGuid():N}"[..20];
+            var sendgridKey = $"HoneypotSecret_{Guid.NewGuid():N}"[..32];
+
+            var env = $@"# Production Environment - CONFIDENTIAL
 NODE_ENV=production
-DATABASE_URL=postgresql://admin:Pr0d#P@ss123@db.prod.internal:5432/maindb
-REDIS_URL=redis://:R3d!sS3cr3t@redis.prod.internal:6379
-AWS_ACCESS_KEY_ID=AKIAIOSFODNN7EXAMPLE
-AWS_SECRET_ACCESS_KEY=wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY
-JWT_SECRET=super-secret-jwt-key-do-not-share-2024
-STRIPE_SECRET_KEY=sk_live_51Example123456789
-SENDGRID_API_KEY=SG.xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+DATABASE_URL=postgresql://admin:{dbPass}@db.prod.internal:5432/maindb
+REDIS_URL=redis://:{redisPass}@redis.prod.internal:6379
+AWS_ACCESS_KEY_ID={awsKey}
+AWS_SECRET_ACCESS_KEY={awsSecret}
+JWT_SECRET={jwtSecret}
+STRIPE_SECRET_KEY=sk_live_{stripeKey}
+SENDGRID_API_KEY=SG.{sendgridKey}
 ";
             return Encoding.UTF8.GetBytes(env);
         }
@@ -1697,14 +1711,19 @@ INSERT INTO users VALUES (2, 'ceo@company.com', '$2b$12$xyz123...', '\xabcdef012
 
         private static byte[] GenerateAwsCredentials()
         {
-            var creds = @"[default]
-aws_access_key_id = AKIAIOSFODNN7EXAMPLE
-aws_secret_access_key = wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY
+            var defaultKey = $"AKIA{Guid.NewGuid():N}"[..20].ToUpperInvariant();
+            var defaultSecret = $"HoneypotSecret_{Guid.NewGuid():N}"[..40];
+            var prodKey = $"AKIA{Guid.NewGuid():N}"[..20].ToUpperInvariant();
+            var prodSecret = $"HoneypotSecret_{Guid.NewGuid():N}"[..40];
+
+            var creds = $@"[default]
+aws_access_key_id = {defaultKey}
+aws_secret_access_key = {defaultSecret}
 region = us-east-1
 
 [production]
-aws_access_key_id = AKIAI44QH8DHBEXAMPLE
-aws_secret_access_key = je7MtGbClwBF/2Zp9Utk/h3yCo8nvbEXAMPLEKEY
+aws_access_key_id = {prodKey}
+aws_secret_access_key = {prodSecret}
 region = us-west-2
 ";
             return Encoding.UTF8.GetBytes(creds);
@@ -1755,10 +1774,7 @@ users:
 
         private static string GenerateAwsAccessKey()
         {
-            var key = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32))
-                .Replace("+", "").Replace("/", "").Replace("=", "");
-            key = key.Length > 16 ? key[..16] : key;
-            return "AKIA" + key;
+            return $"AKIA{Guid.NewGuid():N}"[..20].ToUpperInvariant();
         }
 
         private static string GenerateAzureCredential()

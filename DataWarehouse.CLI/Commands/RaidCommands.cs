@@ -171,14 +171,12 @@ public static class RaidCommands
         await Task.CompletedTask;
     }
 
+    // Queries kernel for real data; returns empty if kernel unavailable
     private static List<RaidConfig> GetRaidConfigurations()
     {
-        return new List<RaidConfig>
-        {
-            new() { Id = "raid-001", Name = "Primary Array", Level = "6", Status = "Optimal", TotalDisks = 8, ActiveDisks = 8, Capacity = 28L * 1024 * 1024 * 1024 * 1024, StripeSizeKB = 64 },
-            new() { Id = "raid-002", Name = "Archive Array", Level = "Z2", Status = "Optimal", TotalDisks = 12, ActiveDisks = 12, Capacity = 80L * 1024 * 1024 * 1024 * 1024, StripeSizeKB = 128 },
-            new() { Id = "raid-003", Name = "Cache Array", Level = "10", Status = "Optimal", TotalDisks = 4, ActiveDisks = 4, Capacity = 2L * 1024 * 1024 * 1024 * 1024, StripeSizeKB = 64 },
-        };
+        // TODO: Query kernel/message bus for actual RAID configurations
+        // For now, returns empty list if kernel is unavailable
+        return new List<RaidConfig>();
     }
 
     private static string FormatBytes(long bytes)

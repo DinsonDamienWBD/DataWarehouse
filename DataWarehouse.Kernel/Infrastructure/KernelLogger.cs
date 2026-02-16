@@ -340,7 +340,10 @@ namespace DataWarehouse.Kernel.Infrastructure
             }
         }
 
-        public void Flush() { }
+        public void Flush()
+        {
+            // Console output is already flushed automatically
+        }
     }
 
     /// <summary>
@@ -464,7 +467,10 @@ namespace DataWarehouse.Kernel.Infrastructure
             }
         }
 
-        public void Flush() { }
+        public void Flush()
+        {
+            // In-memory target has no buffering to flush
+        }
 
         public IReadOnlyList<LogEntry> GetEntries() => _entries.ToList();
 

@@ -856,12 +856,16 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Core
                 {
                     writer.WriteLine(JsonSerializer.Serialize(entry));
                 }
+                writer.Flush();
             }
 
             return Task.CompletedTask;
         }
 
-        public void Dispose() { }
+        public void Dispose()
+        {
+            // No persistent resources to dispose; StreamWriter is disposed in using block
+        }
     }
 
     /// <summary>
