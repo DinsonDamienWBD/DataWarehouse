@@ -46,6 +46,24 @@ public static class Program
         var learningStorePath = GetLearningStorePath();
         _nlp = new NaturalLanguageProcessor(_aiRegistry, learningStorePath);
 
+        // USB/portable media auto-detection (DEPLOY-04)
+        if (PortableMediaDetector.IsRunningFromRemovableMedia())
+        {
+            AnsiConsole.MarkupLine("[yellow]Running from portable media. Data paths adapted.[/]");
+        }
+
+        // Auto-discover local live instances
+        var liveInstanceUrl = PortableMediaDetector.FindLocalLiveInstance();
+        if (liveInstanceUrl != null && !_instanceManager.IsConnected)
+        {
+            var parts = new Uri(liveInstanceUrl);
+            var autoConnected = await _instanceManager.ConnectRemoteAsync(parts.Host, parts.Port);
+            if (autoConnected)
+            {
+                AnsiConsole.MarkupLine($"[green]Auto-connected to live instance at {liveInstanceUrl}[/]");
+            }
+        }
+
         // Check for conversational mode flag
         var conversational = args.Contains("--conversational") || args.Contains("-c");
         if (conversational)
@@ -268,6 +286,7 @@ public static class Program
         rootCommand.Subcommands.Add(CreateInteractiveCommand());
         rootCommand.Subcommands.Add(CreateConnectCommand());
         rootCommand.Subcommands.Add(CreateInstallCommand(formatOption));
+        rootCommand.Subcommands.Add(CreateLiveCommand(formatOption));
 
         // Default handler
         rootCommand.SetAction((ParseResult parseResult) =>
@@ -298,6 +317,7 @@ public static class Program
         AnsiConsole.MarkupLine("  [cyan]benchmark[/]   - Performance benchmarks");
         AnsiConsole.MarkupLine("  [cyan]system[/]      - System information");
         AnsiConsole.MarkupLine("  [cyan]install[/]     - Install DataWarehouse locally");
+        AnsiConsole.MarkupLine("  [cyan]live[/]        - Live mode (in-memory, no persistence)");
         AnsiConsole.MarkupLine("  [cyan]completions[/] - Generate shell completions");
         AnsiConsole.MarkupLine("\nUse [cyan]dw [command] --help[/] for more information.");
     }
@@ -577,6 +597,57 @@ public static class Program
 
             return connected ? 0 : 1;
         });
+
+        return command;
+    }
+
+    private static Command CreateLiveCommand(Option<OutputFormat> formatOption)
+    {
+        var command = new Command("live", "Live mode commands (in-memory, no persistence)");
+
+        // dw live start
+        var startCommand = new Command("start", "Start a live DataWarehouse instance");
+        var portOption = new Option<int>("--port") { Description = "HTTP port", DefaultValueFactory = _ => 8080 };
+        var memoryOption = new Option<int>("--memory") { Description = "Maximum memory in MB", DefaultValueFactory = _ => 256 };
+        startCommand.Options.Add(portOption);
+        startCommand.Options.Add(memoryOption);
+        startCommand.SetAction(async (ParseResult parseResult, CancellationToken token) =>
+        {
+            var parameters = new Dictionary<string, object?>
+            {
+                ["port"] = parseResult.GetValue(portOption),
+                ["memory"] = parseResult.GetValue(memoryOption)
+            };
+            var format = parseResult.GetValue(formatOption);
+            var result = await _executor!.ExecuteAsync("live.start", parameters);
+            _renderer.Render(result, format);
+            _history?.Add("live.start", parameters, result.Success);
+            return result.ExitCode;
+        });
+
+        // dw live stop
+        var stopCommand = new Command("stop", "Stop the live instance");
+        stopCommand.SetAction(async (ParseResult parseResult, CancellationToken token) =>
+        {
+            var format = parseResult.GetValue(formatOption);
+            var result = await _executor!.ExecuteAsync("live.stop", new Dictionary<string, object?>());
+            _renderer.Render(result, format);
+            return result.ExitCode;
+        });
+
+        // dw live status
+        var statusCommand = new Command("status", "Show live instance status");
+        statusCommand.SetAction(async (ParseResult parseResult, CancellationToken token) =>
+        {
+            var format = parseResult.GetValue(formatOption);
+            var result = await _executor!.ExecuteAsync("live.status", new Dictionary<string, object?>());
+            _renderer.Render(result, format);
+            return result.ExitCode;
+        });
+
+        command.Subcommands.Add(startCommand);
+        command.Subcommands.Add(stopCommand);
+        command.Subcommands.Add(statusCommand);
 
         return command;
     }

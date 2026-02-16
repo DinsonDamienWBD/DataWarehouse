@@ -258,6 +258,11 @@ public sealed class CommandExecutor
         Register(new InstallCommand());
         Register(new InstallStatusCommand());
 
+        // Live mode commands
+        Register(new LiveStartCommand());
+        Register(new LiveStopCommand());
+        Register(new LiveStatusCommand());
+
         // System commands
         Register(new SystemInfoCommand());
         Register(new SystemCapabilitiesCommand());
