@@ -18,6 +18,7 @@ public sealed class ServiceHost : IAsyncDisposable
     private readonly ILogger<ServiceHost> _logger;
     private readonly ILoggerFactory _loggerFactory;
     private readonly AdapterRunner _runner;
+    private LauncherHttpServer? _httpServer;
     private bool _disposed;
 
     /// <summary>
@@ -59,8 +60,30 @@ public sealed class ServiceHost : IAsyncDisposable
             }
         };
 
-        // Run the adapter (blocks until shutdown)
-        return await _runner.RunAsync(adapterOptions, "DataWarehouse", cancellationToken);
+        // Start HTTP server if enabled
+        var httpPort = options.HttpPort > 0 ? options.HttpPort : 8080;
+        if (options.EnableHttp)
+        {
+            _httpServer = new LauncherHttpServer(_runner, _loggerFactory);
+            await _httpServer.StartAsync(httpPort, cancellationToken);
+            _logger.LogInformation("HTTP API available at http://0.0.0.0:{Port}/api/v1/", httpPort);
+        }
+
+        try
+        {
+            // Run the adapter (blocks until shutdown)
+            return await _runner.RunAsync(adapterOptions, "DataWarehouse", cancellationToken);
+        }
+        finally
+        {
+            // Stop HTTP server when kernel shuts down
+            if (_httpServer != null)
+            {
+                await _httpServer.StopAsync();
+                await _httpServer.DisposeAsync();
+                _httpServer = null;
+            }
+        }
     }
 
     /// <summary>
@@ -78,6 +101,12 @@ public sealed class ServiceHost : IAsyncDisposable
         _disposed = true;
 
         _logger.LogInformation("Disposing service host");
+
+        if (_httpServer != null)
+        {
+            await _httpServer.DisposeAsync();
+        }
+
         await _runner.DisposeAsync();
     }
 }

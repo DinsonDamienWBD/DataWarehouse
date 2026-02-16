@@ -259,6 +259,18 @@ public sealed class ServiceOptions
     public bool ShowHelp { get; set; }
 
     /// <summary>
+    /// Whether to enable the HTTP API server.
+    /// </summary>
+    public bool EnableHttp { get; set; } = true;
+
+    /// <summary>
+    /// Port for the HTTP API server.
+    /// Configurable via appsettings.json ("Http:Port"), command-line ("--http-port"),
+    /// or environment variable ("DW_HTTP_PORT").
+    /// </summary>
+    public int HttpPort { get; set; } = 8080;
+
+    /// <summary>
     /// Creates options from configuration.
     /// </summary>
     public static ServiceOptions FromConfiguration(IConfiguration configuration)
