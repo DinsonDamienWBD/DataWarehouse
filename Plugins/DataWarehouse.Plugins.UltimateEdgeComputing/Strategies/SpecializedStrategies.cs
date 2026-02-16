@@ -161,6 +161,55 @@ internal sealed class IoTGatewayStrategy : IEdgeComputingStrategy
         // Protocol translation logic would go here
         return Task.FromResult(data);
     }
+
+    /// <summary>
+    /// Processes and fuses sensor data from multiple sources.
+    /// This is a simplified local implementation - full sensor fusion is in UltimateIoTIntegration plugin.
+    /// </summary>
+    /// <param name="sensorReadings">Dictionary of sensor readings (sensorId -> values).</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>Fused sensor result.</returns>
+    public async Task<SimpleFusedSensorResult> ProcessFusedSensorDataAsync(
+        Dictionary<string, double[]> sensorReadings,
+        CancellationToken ct = default)
+    {
+        await Task.Delay(5, ct);
+
+        if (sensorReadings.Count == 0)
+        {
+            throw new ArgumentException("At least one sensor reading is required", nameof(sensorReadings));
+        }
+
+        // Simple fusion: compute average across all sensors for each dimension
+        var firstReading = sensorReadings.Values.First();
+        int valueDim = firstReading.Length;
+        var fusedValue = new double[valueDim];
+
+        for (int dim = 0; dim < valueDim; dim++)
+        {
+            double sum = 0.0;
+            int count = 0;
+
+            foreach (var reading in sensorReadings.Values)
+            {
+                if (reading.Length == valueDim)
+                {
+                    sum += reading[dim];
+                    count++;
+                }
+            }
+
+            fusedValue[dim] = count > 0 ? sum / count : 0.0;
+        }
+
+        return new SimpleFusedSensorResult
+        {
+            FusedValue = fusedValue,
+            SensorCount = sensorReadings.Count,
+            Timestamp = DateTime.UtcNow,
+            Algorithm = "SimpleAverage"
+        };
+    }
 }
 
 /// <summary>
@@ -172,6 +221,18 @@ public sealed class SensorDataResult
     public bool Processed { get; init; }
     public DateTime Timestamp { get; init; }
     public Dictionary<string, double> AggregatedValues { get; init; } = new();
+}
+
+/// <summary>
+/// Simple fused sensor result (local implementation).
+/// For advanced fusion algorithms, use the SensorFusionEngine in UltimateIoTIntegration plugin.
+/// </summary>
+public sealed class SimpleFusedSensorResult
+{
+    public required double[] FusedValue { get; init; }
+    public int SensorCount { get; init; }
+    public DateTime Timestamp { get; init; }
+    public string Algorithm { get; init; } = "SimpleAverage";
 }
 
 #endregion
