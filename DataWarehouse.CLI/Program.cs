@@ -267,6 +267,7 @@ public static class Program
         rootCommand.Subcommands.Add(CreateCompletionsCommand());
         rootCommand.Subcommands.Add(CreateInteractiveCommand());
         rootCommand.Subcommands.Add(CreateConnectCommand());
+        rootCommand.Subcommands.Add(CreateInstallCommand(formatOption));
 
         // Default handler
         rootCommand.SetAction((ParseResult parseResult) =>
@@ -296,6 +297,7 @@ public static class Program
         AnsiConsole.MarkupLine("  [cyan]server[/]      - Server management");
         AnsiConsole.MarkupLine("  [cyan]benchmark[/]   - Performance benchmarks");
         AnsiConsole.MarkupLine("  [cyan]system[/]      - System information");
+        AnsiConsole.MarkupLine("  [cyan]install[/]     - Install DataWarehouse locally");
         AnsiConsole.MarkupLine("  [cyan]completions[/] - Generate shell completions");
         AnsiConsole.MarkupLine("\nUse [cyan]dw [command] --help[/] for more information.");
     }
@@ -575,6 +577,76 @@ public static class Program
 
             return connected ? 0 : 1;
         });
+
+        return command;
+    }
+
+    private static Command CreateInstallCommand(Option<OutputFormat> formatOption)
+    {
+        var command = new Command("install", "Install DataWarehouse locally");
+
+        var pathOption = new Option<string>("--path") { Description = "Installation directory", Required = true };
+        var serviceOption = new Option<bool>("--service") { Description = "Register as system service" };
+        var autostartOption = new Option<bool>("--autostart") { Description = "Enable autostart on boot" };
+        var adminPasswordOption = new Option<string?>("--admin-password") { Description = "Admin password (generated if not provided)" };
+        var fromUsbOption = new Option<string?>("--from-usb") { Description = "Source path for USB installation" };
+        var copyDataOption = new Option<bool>("--copy-data") { Description = "Copy data files from USB source", DefaultValueFactory = _ => true };
+
+        command.Options.Add(pathOption);
+        command.Options.Add(serviceOption);
+        command.Options.Add(autostartOption);
+        command.Options.Add(adminPasswordOption);
+        command.Options.Add(fromUsbOption);
+        command.Options.Add(copyDataOption);
+
+        command.SetAction(async (ParseResult parseResult, CancellationToken token) =>
+        {
+            var path = parseResult.GetValue(pathOption);
+            var fromUsb = parseResult.GetValue(fromUsbOption);
+            var parameters = new Dictionary<string, object?>
+            {
+                ["path"] = path,
+                ["service"] = parseResult.GetValue(serviceOption),
+                ["autostart"] = parseResult.GetValue(autostartOption),
+                ["adminPassword"] = parseResult.GetValue(adminPasswordOption)
+            };
+
+            string commandName;
+            if (!string.IsNullOrEmpty(fromUsb))
+            {
+                commandName = "install.from-usb";
+                parameters["source"] = fromUsb;
+                parameters["copyData"] = parseResult.GetValue(copyDataOption);
+            }
+            else
+            {
+                commandName = "install";
+            }
+
+            var format = parseResult.GetValue(formatOption);
+            var result = await _executor!.ExecuteAsync(commandName, parameters);
+            _renderer.Render(result, format);
+            _history?.Add(commandName, parameters, result.Success);
+            return result.ExitCode;
+        });
+
+        // Add verify subcommand
+        var verifyCommand = new Command("verify", "Verify a DataWarehouse installation");
+        var verifyPathOption = new Option<string>("--path") { Description = "Installation path to verify", Required = true };
+        verifyCommand.Options.Add(verifyPathOption);
+        verifyCommand.SetAction(async (ParseResult parseResult, CancellationToken token) =>
+        {
+            var parameters = new Dictionary<string, object?>
+            {
+                ["path"] = parseResult.GetValue(verifyPathOption)
+            };
+            var format = parseResult.GetValue(formatOption);
+            var result = await _executor!.ExecuteAsync("install.verify", parameters);
+            _renderer.Render(result, format);
+            return result.ExitCode;
+        });
+
+        command.Subcommands.Add(verifyCommand);
 
         return command;
     }

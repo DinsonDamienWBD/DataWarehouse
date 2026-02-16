@@ -254,6 +254,10 @@ public sealed class CommandExecutor
         Register(new BenchmarkRunCommand());
         Register(new BenchmarkReportCommand());
 
+        // Install commands
+        Register(new InstallCommand());
+        Register(new InstallStatusCommand());
+
         // System commands
         Register(new SystemInfoCommand());
         Register(new SystemCapabilitiesCommand());
