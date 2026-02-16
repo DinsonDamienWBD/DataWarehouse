@@ -3,8 +3,8 @@ using DataWarehouse.SDK.Distribution;
 using DataWarehouse.SDK.Primitives;
 using Microsoft.Extensions.Logging;
 using MQTTnet;
-using MQTTnet.Client;
 using MQTTnet.Protocol;
+using System.Buffers;
 using System.Runtime.CompilerServices;
 using System.Text;
 using System.Text.Json;
@@ -88,7 +88,7 @@ public class MqttControlPlanePlugin : ControlPlaneTransportPluginBase
             SingleWriter = false
         });
 
-        var factory = new MqttFactory();
+        var factory = new MqttClientFactory();
         _mqttClient = factory.CreateMqttClient();
 
         _mqttClient.ApplicationMessageReceivedAsync += OnMessageReceivedAsync;
@@ -237,7 +237,11 @@ public class MqttControlPlanePlugin : ControlPlaneTransportPluginBase
         try
         {
             var topic = args.ApplicationMessage.Topic;
-            var payload = Encoding.UTF8.GetString(args.ApplicationMessage.PayloadSegment);
+            // In MQTTnet v5, Payload is ReadOnlySequence<byte>
+            var payloadSequence = args.ApplicationMessage.Payload;
+            var payload = Encoding.UTF8.GetString(payloadSequence.IsSingleSegment
+                ? payloadSequence.FirstSpan
+                : payloadSequence.ToArray());
 
             _logger.LogDebug("Received MQTT message on topic {Topic}", topic);
 

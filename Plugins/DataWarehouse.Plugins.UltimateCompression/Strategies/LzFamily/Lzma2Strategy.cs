@@ -244,7 +244,7 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.LzFamily
             {
                 // Try using SharpCompress's LzmaStream with default properties
                 var props = new LzmaEncoderProperties();
-                using var lzmaStream = new LzmaStream(props, false, outputStream);
+                using var lzmaStream = LzmaStream.Create(props, false, outputStream);
                 lzmaStream.Write(block, 0, block.Length);
             }
             catch
@@ -269,7 +269,7 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.LzFamily
                 if (inputStream.Read(properties, 0, 5) != 5)
                     throw new InvalidDataException("Failed to read LZMA properties from block.");
 
-                using var lzmaStream = new LzmaStream(properties, inputStream, originalLength);
+                using var lzmaStream = LzmaStream.Create(properties, inputStream, originalLength, false);
                 lzmaStream.CopyTo(outputStream);
             }
             catch

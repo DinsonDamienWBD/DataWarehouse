@@ -60,7 +60,7 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Archive
 
             // Use LZMA stream for the actual compression
             var props = new LzmaEncoderProperties();
-            using (var lzmaStream = new LzmaStream(props, false, output))
+            using (var lzmaStream = LzmaStream.Create(props, false, output))
             {
                 lzmaStream.Write(input, 0, input.Length);
             }
@@ -136,7 +136,7 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Archive
 
                 // Compress with LZMA
                 var props = new LzmaEncoderProperties();
-                using (var lzmaStream = new LzmaStream(props, false, _output))
+                using (var lzmaStream = LzmaStream.Create(props, false, _output))
                 {
                     lzmaStream.Write(input, 0, input.Length);
                 }
