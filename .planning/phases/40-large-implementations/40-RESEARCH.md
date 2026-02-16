@@ -1,4 +1,4 @@
-# Phase 41: Large Implementations - Research
+# Phase 40: Large Implementations - Research
 
 **Researched:** 2026-02-16
 **Domain:** New capability construction -- distributed metadata, sensor fusion, federated learning, bandwidth-aware sync
@@ -6,7 +6,7 @@
 
 ## Summary
 
-Phase 41 builds four genuinely new capabilities that require significant new logic, algorithms, and data structures. Unlike Phase 40 (replacing stubs), Phase 41 requires implementing entire subsystems from scratch. The existing code provides integration points (strategy base classes, message bus, plugin infrastructure) but zero actual implementation of the target algorithms.
+Phase 40 builds four genuinely new capabilities that require significant new logic, algorithms, and data structures. Unlike Phase 40 (replacing stubs), Phase 40 requires implementing entire subsystems from scratch. The existing code provides integration points (strategy base classes, message bus, plugin infrastructure) but zero actual implementation of the target algorithms.
 
 **IMPL-07 (Exabyte Metadata)** has a completely empty stub strategy -- returns empty MemoryStreams and does no real work. **IMPL-08 (Sensor Fusion)** has no Kalman/complementary filter code anywhere in the codebase. **IMPL-09 (Federated Learning)** has SDK contracts that declare `SupportsFederatedLearning = true` but zero FL implementation. **IMPL-10 (Bandwidth-Aware Sync)** has AdaptiveTransport with network quality monitoring but no sync parameter adjustment logic.
 
@@ -201,25 +201,25 @@ Build a full FL orchestrator with these components:
 ### Wave Ordering
 
 **Wave 1 (Algorithmically self-contained):**
-- 41-02: Sensor Fusion (IMPL-08) -- pure algorithms, no distributed complexity
-- 41-04: Bandwidth-Aware Sync (IMPL-10) -- extends existing AdaptiveTransport
+- 40-02: Sensor Fusion (IMPL-08) -- pure algorithms, no distributed complexity
+- 40-04: Bandwidth-Aware Sync (IMPL-10) -- extends existing AdaptiveTransport
 
 **Wave 2 (Distributed systems):**
-- 41-01: Exabyte Metadata Engine (IMPL-07) -- LSM-Tree + Raft distribution
-- 41-03: Federated Learning (IMPL-09) -- distributed orchestration across edge nodes
+- 40-01: Exabyte Metadata Engine (IMPL-07) -- LSM-Tree + Raft distribution
+- 40-03: Federated Learning (IMPL-09) -- distributed orchestration across edge nodes
 
 ### Dependencies Between Plans
 
 | Plan | Depends On | Reason |
 |------|-----------|--------|
-| 41-01 | Phase 33 (VDE, for WAL/B-Tree patterns) + Phase 34 (manifest service) | Reuses VDE patterns for disk structures; integrates with manifest |
-| 41-02 | Phase 36 (Edge/IoT, for sensor infrastructure) | Integrates with IoT sensor data streams |
-| 41-03 | Phase 36 (Edge, for edge node communication) | Needs edge node infrastructure for model distribution |
-| 41-04 | Phase 40 IMPL-02 (if clustering needed) | Can use cluster discovery for multi-node sync |
+| 40-01 | Phase 33 (VDE, for WAL/B-Tree patterns) + Phase 34 (manifest service) | Reuses VDE patterns for disk structures; integrates with manifest |
+| 40-02 | Phase 36 (Edge/IoT, for sensor infrastructure) | Integrates with IoT sensor data streams |
+| 40-03 | Phase 36 (Edge, for edge node communication) | Needs edge node infrastructure for model distribution |
+| 40-04 | Phase 40 IMPL-02 (if clustering needed) | Can use cluster discovery for multi-node sync |
 
 **Cross-phase dependencies matter here.** Phases 33 and 36 must be complete before 41 starts.
 
-**Within Phase 41:** 41-02 and 41-04 are independent of each other and of 41-01/41-03. The recommended order is: 41-02, 41-04 (Wave 1) then 41-01, 41-03 (Wave 2).
+**Within Phase 40:** 40-02 and 40-04 are independent of each other and of 40-01/40-03. The recommended order is: 40-02, 40-04 (Wave 1) then 40-01, 40-03 (Wave 2).
 
 ## Risk Assessment
 

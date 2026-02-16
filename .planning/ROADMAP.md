@@ -420,23 +420,23 @@ Plans:
 Phase 32 (StorageAddress & Hardware Discovery)
     ├──► Phase 33 (Virtual Disk Engine) — depends on StorageAddress for block addressing
     │       └──► Phase 34 (Federated Object Storage) — depends on VDE for local storage + Phase 32 for addressing
-    │               ├──► Phase 39 (Feature Composition) — depends on Phase 34 for Data DNA federation
+    │               ├──► Phase 38 (Feature Composition) — depends on Phase 34 for Data DNA federation
     │               └──► Phase 37 (Multi-Environment Deployment) — depends on federation + all hardware layers
     ├──► Phase 35 (Hardware Accelerator & Hypervisor) — depends on Phase 32 hardware probe
     │       └──► Phase 37 (Multi-Environment Deployment)
     └──► Phase 36 (Edge/IoT Hardware) — depends on Phase 32 hardware probe + platform registry
             ├──► Phase 37 (Multi-Environment Deployment)
-            ├──► Phase 40 (Medium Implementations) — depends on Phase 36 for edge infrastructure + Phase 32 HAL
-            └──► Phase 41 (Large Implementations) — depends on Phase 36 for sensor fusion/FL + Phase 33 VDE
+            ├──► Phase 39 (Medium Implementations) — depends on Phase 36 for edge infrastructure + Phase 32 HAL
+            └──► Phase 40 (Large Implementations) — depends on Phase 36 for sensor fusion/FL + Phase 33 VDE
 
 Phase 33 (VDE) + Phase 36 (Edge)
-    └──► Phase 41 (Large Implementations) — depends on VDE for metadata engine, Edge for sensor/FL
+    └──► Phase 40 (Large Implementations) — depends on VDE for metadata engine, Edge for sensor/FL
 
-Phase 40 (Medium Implementations)
-    └──► Phase 41 (Large Implementations)
+Phase 39 (Medium Implementations)
+    └──► Phase 40 (Large Implementations)
 
-Phase 39 + Phase 41
-    └──► Phase 38 (Comprehensive Audit) — depends on ALL prior phases (final gate, validates 15 already-implemented features)
+Phase 38 + Phase 40
+    └──► Phase 41 (Comprehensive Audit) — depends on ALL prior phases (final gate, validates 15 already-implemented features)
 ```
 
 ### Phases
@@ -447,10 +447,10 @@ Phase 39 + Phase 41
 - [ ] **Phase 35: Hardware Accelerator & Hypervisor Integration** — QAT/GPU acceleration, TPM2/HSM providers, hypervisor detection, balloon driver, NUMA-aware allocation, NVMe passthrough
 - [ ] **Phase 36: Edge/IoT Hardware Integration** — GPIO/I2C/SPI abstraction, MQTT/CoAP clients, WASI-NN host, Flash Translation Layer, memory-constrained runtime, sensor mesh support
 - [ ] **Phase 37: Multi-Environment Deployment Hardening** — Hosted optimization, hypervisor acceleration, bare metal SPDK, hyperscale cloud automation, edge device profiles
-- [ ] **Phase 38: Comprehensive Production Audit & Testing** — Build validation, unit tests, integration tests, plus 6 comprehensive audit perspectives (SRE/Security, Individual User, SMB, Hyperscale, Scientific/CERN, Government/Military)
-- [ ] **Phase 39: Feature Composition & Orchestration** — Wire existing strategies into higher-level features: self-evolving schema, Data DNA provenance, cross-org data rooms, autonomous operations, supply chain attestation
-- [ ] **Phase 40: Medium Implementations** — Implement features where framework exists: semantic search with vector index, zero-config cluster discovery, real ZK-SNARK/STARK verification, medical/scientific format parsers, digital twin continuous sync
-- [ ] **Phase 41: Large Implementations** — Build genuinely new capabilities: exabyte metadata engine, sensor fusion algorithms, federated learning orchestrator, bandwidth-aware sync monitor
+- [ ] **Phase 38: Feature Composition & Orchestration** — Wire existing strategies into higher-level features: self-evolving schema, Data DNA provenance, cross-org data rooms, autonomous operations, supply chain attestation
+- [ ] **Phase 39: Medium Implementations** — Implement features where framework exists: semantic search with vector index, zero-config cluster discovery, real ZK-SNARK/STARK verification, medical/scientific format parsers, digital twin continuous sync
+- [ ] **Phase 40: Large Implementations** — Build genuinely new capabilities: exabyte metadata engine, sensor fusion algorithms, federated learning orchestrator, bandwidth-aware sync monitor
+- [ ] **Phase 41: Comprehensive Production Audit & Testing** — Build validation, unit tests, integration tests, plus 6 comprehensive audit perspectives (SRE/Security, Individual User, SMB, Hyperscale, Scientific/CERN, Government/Military)
 
 ### Phase Details
 
@@ -609,34 +609,7 @@ Plans:
 - [ ] 37-04-PLAN.md — Hyperscale cloud automation: cloud provider APIs (AWS/Azure/GCP), auto-provisioning, auto-scaling policies, cost optimization
 - [ ] 37-05-PLAN.md — Edge deployment profiles: memory ceiling, plugin selection, flash optimization, bandwidth constraints, offline resilience
 
-#### Phase 38: Comprehensive Production Audit & Testing
-**Goal**: The entire DataWarehouse codebase (v1.0 + v2.0 + v3.0) passes comprehensive verification from 9 distinct perspectives — build validation, unit testing, integration testing, SRE/Security audit, individual user audit, SMB deployment audit, hyperscale audit, scientific computing audit, and government/military audit. This is the FINAL gate before v3.0 ships.
-**Depends on**: All prior v3.0 phases (32-37) + v2.0 Phase 30 testing (moved and expanded here)
-**Requirements**: TEST-01, TEST-02, TEST-03, TEST-04, TEST-05, TEST-06 (from original Phase 30) + AUDIT-01, AUDIT-02, AUDIT-03, AUDIT-04, AUDIT-05, AUDIT-06
-**Approach**: Phase 30 (v2.0 Testing) is subsumed into Phase 38. The original 3 test plans become 38-01 through 38-03. Six additional audit perspectives (38-04 through 38-09) each examine the entire codebase from a specific stakeholder viewpoint, producing structured findings tables. All audits look for: placeholders/mocks, logic gaps, happy-path fallacy, environmental leaks, technical debt.
-**Success Criteria** (what must be TRUE):
-  1. Full solution builds with zero errors and zero compiler warnings across all v1.0, v2.0, and v3.0 code
-  2. All existing tests pass + new tests cover all v3.0 components (VDE, federation, hardware, edge)
-  3. Behavioral verification confirms all v2.0 strategies produce identical results (AD-08)
-  4. Distributed infrastructure integration tests cover federation, hardware discovery, edge protocols
-  5. SRE/Security audit finds zero critical or high-severity issues; all findings have documented remediation
-  6. All 6 stakeholder audits (individual, SMB, hyperscale, scientific, government) produce findings tables with zero P0 (blocking) issues remaining
-**Plans**: 9 plans
-
-Sub-plans:
-- [ ] 38-01-PLAN.md — Build validation + existing test regression (original Phase 30-01: TEST-01, TEST-04, TEST-06)
-- [ ] 38-02-PLAN.md — New unit tests for v2.0 base classes + behavioral equivalence (original Phase 30-02: TEST-02, TEST-03)
-- [ ] 38-03-PLAN.md — Distributed infrastructure integration tests (original Phase 30-03: TEST-05) + v3.0 federation/hardware/edge integration tests
-- [ ] 38-04-PLAN.md — SRE/Security 3-pass audit: skeleton hunt (find stubs/mocks/placeholders), architectural integrity (verify contracts match implementations), security & scale (penetration posture, threat model validation) (AUDIT-01)
-- [ ] 38-05-PLAN.md — Individual user perspective audit: first-run experience, crash scenarios, NotImplementedException hunt, base-level feature failures, error message quality (AUDIT-02)
-- [ ] 38-06-PLAN.md — SMB deployment audit: advanced deployment scenarios, missing features for 10-100 user businesses, backup/restore, monitoring, upgrade paths (AUDIT-03)
-- [ ] 38-07-PLAN.md — Hyperscale audit: Google/AWS/Azure-level deployment readiness, 10K+ node clusters, petabyte-scale, latency SLAs, auto-remediation (AUDIT-04)
-- [ ] 38-08-PLAN.md — Scientific/CERN audit: research computing requirements, data integrity at scale, reproducibility, long-term archival, high-throughput data acquisition (AUDIT-05)
-- [ ] 38-09-PLAN.md — Government/Military audit: security clearance requirements, air-gap operations, FIPS 140-3 validation, Common Criteria, black-ops hardening, TEMPEST considerations (AUDIT-06)
-
-All audits produce output tables: `| File | Severity (P0-P3) | Issue | Recommendation |`
-
-#### Phase 39: Feature Composition & Orchestration
+#### Phase 38: Feature Composition & Orchestration
 **Goal**: Wire existing strategy implementations together into higher-level features via orchestration layers. Build feedback loops and cross-strategy workflows that compose existing capabilities into production-ready features.
 **Depends on**: Phase 34 (Federated Object Storage — needed for Data DNA federation)
 **Wave**: Can run in parallel with Phase 37 (no file overlap)
@@ -651,13 +624,13 @@ All audits produce output tables: `| File | Severity (P0-P3) | Issue | Recommend
 **Plans**: 5 plans
 
 Plans:
-- [ ] 39-01-PLAN.md — Self-Evolving Schema feedback loop: connect UltimateIntelligence pattern detection → SchemaEvolution → LivingCatalog with auto-propose/approve workflow
-- [ ] 39-02-PLAN.md — Data DNA provenance certificates: compose SelfTrackingDataStrategy hash chain + TamperProof blockchain anchoring into ProvenanceCertificate with verifiable chain
-- [ ] 39-03-PLAN.md — Cross-Org Data Room orchestrator: lifecycle manager for EphemeralSharing + Geofencing + ZeroTrust + DataMarketplace (create, invite, expiry, audit, destruct)
-- [ ] 39-04-PLAN.md — Autonomous Operations auto-remediation engine: subscribe to observability alerts, trigger SelfHealing/AutoTiering/DataGravity, log all actions
-- [ ] 39-05-PLAN.md — Supply Chain attestation framework: SLSA/in-toto format for TamperProof + BuildStrategies, verify binary against source (SLSA Level 2)
+- [ ] 38-01-PLAN.md — Self-Evolving Schema feedback loop: connect UltimateIntelligence pattern detection → SchemaEvolution → LivingCatalog with auto-propose/approve workflow
+- [ ] 38-02-PLAN.md — Data DNA provenance certificates: compose SelfTrackingDataStrategy hash chain + TamperProof blockchain anchoring into ProvenanceCertificate with verifiable chain
+- [ ] 38-03-PLAN.md — Cross-Org Data Room orchestrator: lifecycle manager for EphemeralSharing + Geofencing + ZeroTrust + DataMarketplace (create, invite, expiry, audit, destruct)
+- [ ] 38-04-PLAN.md — Autonomous Operations auto-remediation engine: subscribe to observability alerts, trigger SelfHealing/AutoTiering/DataGravity, log all actions
+- [ ] 38-05-PLAN.md — Supply Chain attestation framework: SLSA/in-toto format for TamperProof + BuildStrategies, verify binary against source (SLSA Level 2)
 
-#### Phase 40: Medium Implementations
+#### Phase 39: Medium Implementations
 **Goal**: Implement features where the framework exists but core logic is missing. Replace stubs with real algorithms, integrate real libraries, complete half-finished features.
 **Depends on**: Phase 36 (Edge/IoT — some features build on edge infrastructure), Phase 32 (HAL — for hardware abstraction)
 **Wave**: After Phase 36
@@ -673,17 +646,17 @@ Plans:
 **Plans**: 6 plans
 
 Plans:
-- [ ] 40-01-PLAN.md — Semantic search with vector index: integrate embedding generation (UltimateIntelligence), HNSW/IVF vector index, similarity search, replace SemanticSearchStrategy stub
-- [ ] 40-02-PLAN.md — Zero-config mDNS cluster discovery: mDNS/DNS-SD service announcement/discovery, auto-negotiate cluster membership via Raft, <30s join time
-- [ ] 40-03-PLAN.md — Real ZK-SNARK/STARK verification: integrate ZK proof library, replace length-check stub in ZkProofAccessStrategy with real proof gen/verify (<5s gen, <100ms verify)
-- [ ] 40-04-PLAN.md — Medical format parsers: add DICOM pixel data parser, HL7 segment parser, FHIR resource deserializer to existing connector strategies (structured objects, not blobs)
-- [ ] 40-05-PLAN.md — Scientific format parsing: integrate Apache.Parquet.Net, HDF.PInvoke, Apache.Arrow NuGet packages, replace stub ParseAsync with real columnar/hierarchical parsing
-- [ ] 40-06-PLAN.md — Digital Twin continuous sync: extend DeviceTwin with real-time sensor sync (<100ms), state projection (predict future), what-if simulation
+- [ ] 39-01-PLAN.md — Semantic search with vector index: integrate embedding generation (UltimateIntelligence), HNSW/IVF vector index, similarity search, replace SemanticSearchStrategy stub
+- [ ] 39-02-PLAN.md — Zero-config mDNS cluster discovery: mDNS/DNS-SD service announcement/discovery, auto-negotiate cluster membership via Raft, <30s join time
+- [ ] 39-03-PLAN.md — Real ZK-SNARK/STARK verification: integrate ZK proof library, replace length-check stub in ZkProofAccessStrategy with real proof gen/verify (<5s gen, <100ms verify)
+- [ ] 39-04-PLAN.md — Medical format parsers: add DICOM pixel data parser, HL7 segment parser, FHIR resource deserializer to existing connector strategies (structured objects, not blobs)
+- [ ] 39-05-PLAN.md — Scientific format parsing: integrate Apache.Parquet.Net, HDF.PInvoke, Apache.Arrow NuGet packages, replace stub ParseAsync with real columnar/hierarchical parsing
+- [ ] 39-06-PLAN.md — Digital Twin continuous sync: extend DeviceTwin with real-time sensor sync (<100ms), state projection (predict future), what-if simulation
 
-#### Phase 41: Large Implementations
+#### Phase 40: Large Implementations
 **Goal**: Build genuinely new capabilities that don't exist in the codebase. These are complex features requiring significant new logic, algorithms, and infrastructure.
-**Depends on**: Phase 40 (Medium Implementations), Phase 33 (VDE — for metadata engine), Phase 36 (Edge — for sensor fusion and federated learning)
-**Wave**: After Phase 40
+**Depends on**: Phase 39 (Medium Implementations), Phase 33 (VDE — for metadata engine), Phase 36 (Edge — for sensor fusion and federated learning)
+**Wave**: After Phase 39
 **Requirements**: IMPL-07, IMPL-08, IMPL-09, IMPL-10
 **Approach**: For each capability: design the algorithm/architecture, implement from scratch using appropriate data structures, integrate with existing SDK contracts, performance-test at target scale. All implementations are production-ready (Rule 13) — no mocks, stubs, or placeholders.
 **Success Criteria** (what must be TRUE):
@@ -694,21 +667,48 @@ Plans:
 **Plans**: 4 plans
 
 Plans:
-- [ ] 41-01-PLAN.md — Exabyte metadata engine: distributed LSM-Tree or B-Tree metadata store, O(log n) at 10^15 scale, Raft distribution, >100K ops/sec, integrate with Phase 34 manifest
-- [ ] 41-02-PLAN.md — Sensor fusion algorithms: Kalman filter, complementary filter, weighted averaging, voting, temporal alignment — integrate with UltimateIoTIntegration
-- [ ] 41-03-PLAN.md — Federated learning orchestrator: model distribution, local training, gradient aggregation (FedAvg/FedSGD), convergence detection, differential privacy, integrate with UltimateEdgeComputing
-- [ ] 41-04-PLAN.md — Bandwidth-aware sync monitor: real-time link quality measurement, dynamic sync parameter adjustment (delta for low-BW, full for high-BW), <5s detection, wire into EdgeComputing delta sync + AdaptiveTransport
+- [ ] 40-01-PLAN.md — Exabyte metadata engine: distributed LSM-Tree or B-Tree metadata store, O(log n) at 10^15 scale, Raft distribution, >100K ops/sec, integrate with Phase 34 manifest
+- [ ] 40-02-PLAN.md — Sensor fusion algorithms: Kalman filter, complementary filter, weighted averaging, voting, temporal alignment — integrate with UltimateIoTIntegration
+- [ ] 40-03-PLAN.md — Federated learning orchestrator: model distribution, local training, gradient aggregation (FedAvg/FedSGD), convergence detection, differential privacy, integrate with UltimateEdgeComputing
+- [ ] 40-04-PLAN.md — Bandwidth-aware sync monitor: real-time link quality measurement, dynamic sync parameter adjustment (delta for low-BW, full for high-BW), <5s detection, wire into EdgeComputing delta sync + AdaptiveTransport
+
+#### Phase 41: Comprehensive Production Audit & Testing
+**Goal**: The entire DataWarehouse codebase (v1.0 + v2.0 + v3.0) passes comprehensive verification from 9 distinct perspectives — build validation, unit testing, integration testing, SRE/Security audit, individual user audit, SMB deployment audit, hyperscale audit, scientific computing audit, and government/military audit. This is the FINAL gate before v3.0 ships.
+**Depends on**: All prior v3.0 phases (32-40) + v2.0 Phase 30 testing (moved and expanded here)
+**Requirements**: TEST-01, TEST-02, TEST-03, TEST-04, TEST-05, TEST-06 (from original Phase 30) + AUDIT-01, AUDIT-02, AUDIT-03, AUDIT-04, AUDIT-05, AUDIT-06
+**Approach**: Phase 30 (v2.0 Testing) is subsumed into Phase 41. The original 3 test plans become 41-01 through 41-03. Six additional audit perspectives (41-04 through 41-09) each examine the entire codebase from a specific stakeholder viewpoint, producing structured findings tables. All audits look for: placeholders/mocks, logic gaps, happy-path fallacy, environmental leaks, technical debt.
+**Success Criteria** (what must be TRUE):
+  1. Full solution builds with zero errors and zero compiler warnings across all v1.0, v2.0, and v3.0 code
+  2. All existing tests pass + new tests cover all v3.0 components (VDE, federation, hardware, edge)
+  3. Behavioral verification confirms all v2.0 strategies produce identical results (AD-08)
+  4. Distributed infrastructure integration tests cover federation, hardware discovery, edge protocols
+  5. SRE/Security audit finds zero critical or high-severity issues; all findings have documented remediation
+  6. All 6 stakeholder audits (individual, SMB, hyperscale, scientific, government) produce findings tables with zero P0 (blocking) issues remaining
+**Plans**: 9 plans
+
+Sub-plans:
+- [ ] 41-01-PLAN.md — Build validation + existing test regression (original Phase 30-01: TEST-01, TEST-04, TEST-06)
+- [ ] 41-02-PLAN.md — New unit tests for v2.0 base classes + behavioral equivalence (original Phase 30-02: TEST-02, TEST-03)
+- [ ] 41-03-PLAN.md — Distributed infrastructure integration tests (original Phase 30-03: TEST-05) + v3.0 federation/hardware/edge integration tests
+- [ ] 41-04-PLAN.md — SRE/Security 3-pass audit: skeleton hunt (find stubs/mocks/placeholders), architectural integrity (verify contracts match implementations), security & scale (penetration posture, threat model validation) (AUDIT-01)
+- [ ] 41-05-PLAN.md — Individual user perspective audit: first-run experience, crash scenarios, NotImplementedException hunt, base-level feature failures, error message quality (AUDIT-02)
+- [ ] 41-06-PLAN.md — SMB deployment audit: advanced deployment scenarios, missing features for 10-100 user businesses, backup/restore, monitoring, upgrade paths (AUDIT-03)
+- [ ] 41-07-PLAN.md — Hyperscale audit: Google/AWS/Azure-level deployment readiness, 10K+ node clusters, petabyte-scale, latency SLAs, auto-remediation (AUDIT-04)
+- [ ] 41-08-PLAN.md — Scientific/CERN audit: research computing requirements, data integrity at scale, reproducibility, long-term archival, high-throughput data acquisition (AUDIT-05)
+- [ ] 41-09-PLAN.md — Government/Military audit: security clearance requirements, air-gap operations, FIPS 140-3 validation, Common Criteria, black-ops hardening, TEMPEST considerations (AUDIT-06)
+
+All audits produce output tables: `| File | Severity (P0-P3) | Issue | Recommendation |`
 
 ### v3.0 Progress
 
-**Execution Order:** 32 → 33 → 34 → 35 (after 32) → 36 (after 32) → 37 (after 34+35+36) → 39 (after 34) → 40 (after 36+32) → 41 (after 40+33+36) → 38 (after ALL, FINAL)
+**Execution Order:** 32 → 33 → 34 → 35 (after 32) → 36 (after 32) → 37 (after 34+35+36) → 38 (after 34) → 39 (after 36+32) → 40 (after 39+33+36) → 41 (after ALL, FINAL)
 
 **Parallelism opportunities:**
 - Phase 33, 35, 36 can run in parallel after Phase 32 completes (all depend only on Phase 32)
-- Phase 39 and Phase 37 can run in parallel after Phase 34 completes (no file overlap)
-- Phase 40 starts after Phase 36 completes
-- Phase 41 starts after Phase 40 completes
-- Phase 38 is the final sequential gate (depends on ALL prior phases)
+- Phase 38 and Phase 37 can run in parallel after Phase 34 completes (no file overlap)
+- Phase 39 starts after Phase 36 completes
+- Phase 40 starts after Phase 39 completes
+- Phase 41 is the final sequential gate (depends on ALL prior phases)
 
 | Phase | Milestone | Plans | Status | Completed |
 |-------|-----------|-------|--------|-----------|
@@ -718,10 +718,10 @@ Plans:
 | 35. Hardware Accelerator & Hypervisor | v3.0 | 0/7 | Not started | - |
 | 36. Edge/IoT Hardware Integration | v3.0 | 0/8 | Not started | - |
 | 37. Multi-Environment Deployment | v3.0 | 0/5 | Not started | - |
-| 38. Comprehensive Audit & Testing | v3.0 | 0/9 | Not started | - |
-| 39. Feature Composition & Orchestration | v3.0 | 0/5 | Not started | - |
-| 40. Medium Implementations | v3.0 | 0/6 | Not started | - |
-| 41. Large Implementations | v3.0 | 0/4 | Not started | - |
+| 38. Feature Composition & Orchestration | v3.0 | 0/5 | Not started | - |
+| 39. Medium Implementations | v3.0 | 0/6 | Not started | - |
+| 40. Large Implementations | v3.0 | 0/4 | Not started | - |
+| 41. Comprehensive Audit & Testing | v3.0 | 0/9 | Not started | - |
 
 ### Phase 31.1: Pre-v3.0 Production Readiness Cleanup (INSERTED)
 
@@ -729,6 +729,7 @@ Plans:
 **Depends on:** Phase 31
 **Requirements:** PROD-READY-01 (zero stubs), PROD-READY-02 (zero disconnected wiring), PROD-READY-03 (zero simulated backends), PROD-READY-04 (zero fake crypto)
 **Plans:** 5 plans
+**Stage:** PLANNED (research complete, 5 plans written with TARGET annotations) — ready to execute
 
 **Scope:** 17 plugins with gaps (P0-P4) + 15 Batch 2 Data Management plugins (skeleton strategies) + UltimateDeployment infrastructure = ~32 plugins total, ~750+ method implementations
 
@@ -738,3 +739,87 @@ Plans:
 - [ ] 31.1-03-PLAN.md — UltimateInterface bus calls (30+), UltimateDataFormat stubs (14 strategies), scattered fixes across 7 plugins, PLUGIN-CATALOG sync
 - [ ] 31.1-04-PLAN.md — Batch 2 Data Management Group A: DatabaseProtocol, DatabaseStorage, DataCatalog, DataFabric, DataFormat, DataGovernance, DataIntegration (7 plugins, ~338 strategies)
 - [ ] 31.1-05-PLAN.md — Batch 2 Data Management Group B: DataLake, DataLineage, DataManagement, DataMesh, DataPrivacy, DataProtection, DataQuality, DataTransit (8 plugins, ~367 strategies) + UltimateDeployment infrastructure (4 methods)
+
+**Phase 31.1 Execution Dependencies & Parallelism:**
+```
+31.1-01 (Security + Build + Wiring)     ← MUST execute first (fixes build errors that block all other work)
+    ├──► 31.1-02 (Simulated Backends)   ← after 01 (needs clean build)
+    ├──► 31.1-03 (Interface + Format)   ← after 01 (needs clean build); can run PARALLEL with 02
+    ├──► 31.1-04 (Batch 2 Group A)      ← after 01; can run PARALLEL with 02 and 03
+    └──► 31.1-05 (Batch 2 Group B)      ← after 01; can run PARALLEL with 02, 03, and 04
+```
+**Why 01 first:** 31.1-01 fixes 13 build errors (SharpCompress + MQTTnet) and 4 fake-crypto P0 security issues. All other plans need a clean build baseline.
+**Why 02-05 parallel:** Each plan targets different plugins with zero file overlap. No cross-dependencies between them.
+**Recommended execution:** Run 01 first, then 02+03+04+05 in parallel (max 2-3 concurrent agents per memory rules).
+
+---
+
+## Execution Guide: Dependencies, Parallelism & Architectural Rules
+
+This section is the single source of truth for execution ordering, parallelism constraints, and architectural invariants. Sub-agents MUST read this before executing any plan.
+
+### Phase 31.1 Execution (Current)
+
+**Dependency chain:** `31.1-01 → { 31.1-02 ∥ 31.1-03 ∥ 31.1-04 ∥ 31.1-05 }`
+
+| Plan | Plugins Touched | Parallel With | Must Wait For |
+|------|-----------------|---------------|---------------|
+| 31.1-01 | UltimateInterface, UltimateDataProtection, UltimateCompression, AedsCore, TamperProof, FuseDriver, UltimateAccessControl | None (runs first) | Nothing |
+| 31.1-02 | UltimateIntelligence, TamperProof, UltimateDataProtection, UltimateStreamingData, UltimateRAID, UltimateDeployment | 03, 04, 05 | 01 |
+| 31.1-03 | UltimateInterface, UltimateDataFormat, UltimateKeyManagement, UltimateSustainability, UltimateCompliance, AirGapBridge, DataMarketplace, UltimateServerless, Transcoding.Media, UltimateDatabaseProtocol | 02, 04, 05 | 01 |
+| 31.1-04 | UltimateDatabaseProtocol, UltimateDatabaseStorage, UltimateDataCatalog, UltimateDataFabric, UltimateDataFormat, UltimateDataGovernance, UltimateDataIntegration | 02, 03, 05 | 01 |
+| 31.1-05 | UltimateDataLake, UltimateDataLineage, UltimateDataManagement, UltimateDataMesh, UltimateDataPrivacy, UltimateDataProtection, UltimateDataQuality, UltimateDataTransit | 02, 03, 04 | 01 |
+
+**File overlap notes:**
+- 31.1-03 and 31.1-04 both touch UltimateDatabaseProtocol and UltimateDataFormat — **31.1-03 fixes compression providers** (System.IO.Compression), **31.1-04 implements protocol strategies**. Different files within the same plugin, safe to parallelize.
+- 31.1-02 and 31.1-05 both touch UltimateDataProtection — **31.1-02 handles innovation strategies** (AirGapped, BreakGlass), **31.1-05 handles core backup strategies** (Full, Incremental, CDP). Different strategy files, safe to parallelize.
+
+### v3.0 Execution
+
+**Dependency chain:**
+```
+Phase 32 (StorageAddress + Hardware Discovery)
+    ├──► Phase 33 (VDE)  ──► Phase 34 (Federation) ──┬──► Phase 38 (Feature Composition)
+    │                                                  └──► Phase 37 (Multi-Env Deployment)
+    ├──► Phase 35 (Hardware Accelerators)  ──────────────► Phase 37
+    └──► Phase 36 (Edge/IoT)  ───────────────────────┬──► Phase 37
+                                                      ├──► Phase 39 (Medium Implementations)
+                                                      └──► Phase 40 (Large Implementations)
+Phase 33 (VDE) ──────────────────────────────────────────► Phase 40 (metadata engine needs VDE)
+
+Phase 37 + Phase 38 + Phase 40
+    └──► Phase 41 (Comprehensive Audit) — FINAL GATE, depends on ALL phases 32-40
+```
+
+**Parallelism waves:**
+
+| Wave | Phases | Can Run In Parallel | Depends On |
+|------|--------|---------------------|------------|
+| 1 | 32 (StorageAddress) | — | 31.1 complete |
+| 2 | 33 (VDE), 35 (Hardware), 36 (Edge/IoT) | All three in parallel | 32 |
+| 3 | 34 (Federation) | — | 32, 33 |
+| 4 | 37 (Multi-Env), 38 (Feature Composition), 39 (Medium Impl) | All three in parallel | 37 needs 34+35+36; 38 needs 34; 39 needs 36+32 |
+| 5 | 40 (Large Implementations) | — | 39, 33, 36 |
+| 6 | 41 (Comprehensive Audit & Testing) | — | ALL (32-40) |
+
+**Within-phase parallelism (wave structure in each phase):**
+- Phase 32: Wave 1 (32-01 + 32-02 parallel) → Wave 2 (32-03 + 32-04 parallel) → Wave 3 (32-05)
+- Phase 33: Wave 1 (33-01) → Wave 2 (33-02 + 33-03 + 33-04 parallel) → Wave 3 (33-05) → Wave 4 (33-06) → Wave 5 (33-07)
+- Phases 34-41: See individual plan files for internal wave structure
+
+### Architectural Invariants (Sub-Agent Rules)
+
+All executing agents MUST follow these rules:
+
+1. **Plugin isolation:** Plugins reference ONLY the SDK via `<ProjectReference>`. Never add cross-plugin references.
+2. **Message bus communication:** Cross-plugin operations use `MessageBus.RequestAsync` / `MessageBus.PublishAsync`. Never call another plugin directly.
+3. **Base classes mandatory:** Never implement SDK interfaces directly — always extend the appropriate base class.
+4. **Strategy pattern:** All domain logic lives in strategies. Strategies are workers (no intelligence, no orchestration).
+5. **No simulations (Rule 13):** Everything must be production-ready. No mocks, stubs, placeholders, `Task.Delay` fakes, `new byte[1024]` simulations, or `return true` shortcuts.
+6. **Graceful degradation:** External service backends (Redis, Postgres, S3, etc.) MUST fall back to bounded in-memory alternatives when unavailable, with warning log.
+7. **No new NuGet without justification:** Plans 31.1-01 through 31.1-05 should not add NuGet packages EXCEPT where explicitly noted (Parquet.Net, Apache.Arrow in 31.1-03).
+8. **Bounded collections:** All in-memory collections must have configurable max size (MEM-03).
+9. **Real crypto only:** Use `Aes.Create()` + GCM mode for encryption, `SHA256.Create()` for hashing, `RandomNumberGenerator` for randomness. Never `System.Random` in security contexts.
+10. **Zero regression (AD-08):** All existing strategies must produce identical results. All 1,039+ tests must pass.
+11. **Coding style:** Follow existing patterns in the codebase. Use `async/await`, `CancellationToken`, `ILogger` consistently. Strategy classes use `StrategyBase` domain bases.
+12. **Build gate:** After each plan execution, `dotnet build DataWarehouse.slnx` must succeed with zero NEW errors.

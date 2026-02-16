@@ -10,25 +10,25 @@ See: .planning/PROJECT.md (updated 2026-02-12)
 ## Current Position
 
 ### v2.0 SDK Hardening & Distributed Infrastructure -- COMPLETE
-Phase: 31 of 31 execution complete (Phase 30 subsumed into v3.0 Phase 38)
-Plan: 56 of 59 total plans complete (3 Phase 30 plans moved to v3.0 Phase 38)
+Phase: 31 of 31 execution complete (Phase 30 subsumed into v3.0 Phase 41)
+Plan: 56 of 59 total plans complete (3 Phase 30 plans moved to v3.0 Phase 41)
 Status: ALL v2.0 IMPLEMENTATION COMPLETE
 Last activity: 2026-02-16 -- Phase 31 complete (8/8 plans)
 
 Progress: [########################] 100% (56/56 applicable plans)
 
-Note: Phase 30 (3 plans) was subsumed into v3.0 Phase 38 (Comprehensive Audit & Testing). All v2.0 implementation phases (21.5 through 31) are complete.
+Note: Phase 30 (3 plans) was subsumed into v3.0 Phase 41 (Comprehensive Audit & Testing). All v2.0 implementation phases (21.5 through 31) are complete.
 
 ### v3.0 Universal Platform -- PLANNED
 Phase: 0 of 10 (not started)
 Plan: 0 of 64 total plans
 Status: Requirements and roadmap defined; awaiting v2.0 completion
 Defined: 2026-02-16
-Updated: 2026-02-16 (added Phases 39-41: Feature Composition + Medium/Large Implementations)
+Updated: 2026-02-16 (added Phases 38-40: Feature Composition + Medium/Large Implementations; renumbered audit to Phase 41)
 
 Progress: [------------------------] 0% (0/64 plans)
 
-Phase 30 NOTE: v2.0 Phase 30 (Testing & Final Verification) has been moved and expanded into v3.0 Phase 38 (Comprehensive Production Audit & Testing). Phase 38 includes the original Phase 30 test plans (38-01, 38-02, 38-03) plus 6 new comprehensive audit perspectives (38-04 through 38-09).
+Phase 30 NOTE: v2.0 Phase 30 (Testing & Final Verification) has been moved and expanded into v3.0 Phase 41 (Comprehensive Production Audit & Testing). Phase 41 includes the original Phase 30 test plans (41-01, 41-02, 41-03) plus 6 new comprehensive audit perspectives (41-04 through 41-09).
 
 ## Performance Metrics
 
@@ -295,39 +295,39 @@ Phase 30 NOTE: v2.0 Phase 30 (Testing & Final Verification) has been moved and e
 | 35 | Hardware Accelerator & Hypervisor | HW-01 to HW-07 | 7 | Phase 32 | Not started |
 | 36 | Edge/IoT Hardware Integration | EDGE-01 to EDGE-08 | 8 | Phase 32 | Not started |
 | 37 | Multi-Environment Deployment | ENV-01 to ENV-05 | 5 | Phase 34, 35, 36 | Not started |
-| 38 | Comprehensive Audit & Testing | TEST-01-06, AUDIT-01-06 | 9 | ALL prior | Not started |
-| 39 | Feature Composition & Orchestration | COMP-01 to COMP-05 | 5 | Phase 34 | Not started |
-| 40 | Medium Implementations | IMPL-01 to IMPL-06 | 6 | Phase 36, 32 | Not started |
-| 41 | Large Implementations | IMPL-07 to IMPL-10 | 4 | Phase 40, 33, 36 | Not started |
+| 38 | Feature Composition & Orchestration | COMP-01 to COMP-05 | 5 | Phase 34 | Not started |
+| 39 | Medium Implementations | IMPL-01 to IMPL-06 | 6 | Phase 36, 32 | Not started |
+| 40 | Large Implementations | IMPL-07 to IMPL-10 | 4 | Phase 39, 33, 36 | Not started |
+| 41 | Comprehensive Audit & Testing | TEST-01-06, AUDIT-01-06 | 9 | ALL prior | Not started |
 | **Total** | | **71 requirements** | **64 plans** | | |
 
 ### Dependency Graph
 
 ```
-32 ──► 33 ──► 34 ──┬──► 37 ──► 38
+32 ──► 33 ──► 34 ──┬──► 37 ──► 41
  ├──► 35 ─────────┤      ▲      ▲
- └──► 36 ─────────┴──► 40 ──► 41 ──┘
-                  └──► 39 ──────────┘
+ └──► 36 ─────────┴──► 39 ──► 40 ──┘
+                  └──► 38 ──────────┘
 ```
 
 Detailed:
 ```
 Phase 32 (HAL)
-    ├──► Phase 33 (VDE) ──► Phase 34 (FOS) ──┬──► Phase 39 (Feature Composition) ──► Phase 38
-    │                                         └──► Phase 37 (Multi-Env) ──────────► Phase 38
+    ├──► Phase 33 (VDE) ──► Phase 34 (FOS) ──┬──► Phase 38 (Feature Composition) ──► Phase 41
+    │                                         └──► Phase 37 (Multi-Env) ──────────► Phase 41
     ├──► Phase 35 (Hardware) ────────────────────► Phase 37
     └──► Phase 36 (Edge) ─────────────────────┬──► Phase 37
-                                              ├──► Phase 40 (Medium Impl) ──► Phase 41 ──► Phase 38
-                                              └──► Phase 41 (Large Impl) ──────────────► Phase 38
-Phase 33 (VDE) ──────────────────────────────────► Phase 41 (metadata engine)
+                                              ├──► Phase 39 (Medium Impl) ──► Phase 40 ──► Phase 41
+                                              └──► Phase 40 (Large Impl) ──────────────► Phase 41
+Phase 33 (VDE) ──────────────────────────────────► Phase 40 (metadata engine)
 ```
 
 ### Parallelism Opportunities
 - Phase 33 + Phase 35 + Phase 36 can run in parallel after Phase 32 (all depend only on Phase 32)
-- Phase 39 and Phase 37 can run in parallel after Phase 34 (no file overlap)
-- Phase 40 starts after Phase 36 completes
-- Phase 41 starts after Phase 40 completes (also needs Phase 33 and Phase 36)
-- Phase 38 is the final sequential gate (depends on ALL prior phases including 39, 40, 41)
+- Phase 38 and Phase 37 can run in parallel after Phase 34 (no file overlap)
+- Phase 39 starts after Phase 36 completes
+- Phase 40 starts after Phase 39 completes (also needs Phase 33 and Phase 36)
+- Phase 41 is the final sequential gate (depends on ALL prior phases including 38, 39, 40)
 
 ### Key Technical Decisions (v3.0)
 
@@ -335,15 +335,26 @@ Phase 33 (VDE) ─────────────────────�
 - VDE is a real storage engine, not a wrapper around existing filesystems
 - Federation uses Raft consensus from Phase 29 for manifest replication
 - All hardware integrations are optional -- graceful fallback to software
-- Phase 38 subsumes v2.0 Phase 30 -- no separate v2.0 testing phase
+- Phase 41 subsumes v2.0 Phase 30 -- no separate v2.0 testing phase
 - Audit perspectives are stakeholder-specific (SRE, user, SMB, hyperscale, scientific, government)
 
 ## Session Continuity
 
 ### Roadmap Evolution
 
-- Phase 31.1 inserted after Phase 31: Pre-v3.0 Production Readiness Cleanup (INSERTED) — Eliminate all remaining stubs/skeletons/placeholders across all 60 plugins, verify proper wiring, ensure 100% production readiness before v3.0
+- Phase 31.1 inserted after Phase 31: Pre-v3.0 Production Readiness Cleanup
+- Phases 38-41 renumbered: 38=Feature Composition (was 39), 39=Medium Impl (was 40), 40=Large Impl (was 41), 41=Audit (was 38)
+- Phase 39-01 (SemanticSearch) and 39-05 (Parquet/Arrow/HDF5) superseded by Phase 31.1 work (pre-completion notes added)
+
+### Current Position
+
+**Phase 31.1** — Stage: **EXECUTE** (research complete, 5 plans written, ready to execute)
+
+Next action: `/gsd:execute-phase 31.1`
+- Execute 31.1-01 first (security fixes + build errors + wiring)
+- Then 31.1-02 through 31.1-05 in parallel (max 2-3 concurrent agents)
+- See ROADMAP.md "Execution Guide" section for full dependency map and architectural rules
 
 Last session: 2026-02-16
-Stopped at: Phase 31.1 inserted — ready for research and planning
-Resume: Execute Phase 31.1 research → plan → execute cycle via GSD workflow
+Stopped at: Phase 31.1 plans finalized with TARGET annotations, v3.0 overlap resolved, phase renumbering complete
+Resume: Execute Phase 31.1 plans

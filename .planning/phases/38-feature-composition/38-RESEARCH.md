@@ -1,4 +1,4 @@
-# Phase 39: Feature Composition & Orchestration - Research
+# Phase 38: Feature Composition & Orchestration - Research
 
 **Researched:** 2026-02-16
 **Domain:** Cross-strategy composition, orchestration layers, message bus wiring
@@ -159,27 +159,27 @@ All composition uses the **message bus** for inter-plugin communication. Each or
 ### Wave Ordering
 
 **Wave 1 (Independent - can run in parallel):**
-- 39-02: Data DNA Provenance Certificates (COMP-02) -- self-contained, lineage + blockchain
-- 39-05: Supply Chain Attestation (COMP-05) -- self-contained, tamperproof + build
+- 38-02: Data DNA Provenance Certificates (COMP-02) -- self-contained, lineage + blockchain
+- 38-05: Supply Chain Attestation (COMP-05) -- self-contained, tamperproof + build
 
 **Wave 2 (Depends on intelligence integration patterns from Wave 1):**
-- 39-01: Self-Evolving Schema (COMP-01) -- needs intelligence message bus pattern
-- 39-04: Autonomous Operations (COMP-04) -- needs observability event subscription pattern
+- 38-01: Self-Evolving Schema (COMP-01) -- needs intelligence message bus pattern
+- 38-04: Autonomous Operations (COMP-04) -- needs observability event subscription pattern
 
 **Wave 3 (Most complex, multi-plugin orchestration):**
-- 39-03: Cross-Org Data Rooms (COMP-03) -- orchestrates 4+ strategies across plugins
+- 38-03: Cross-Org Data Rooms (COMP-03) -- orchestrates 4+ strategies across plugins
 
 ### Dependencies Between Plans
 
 | Plan | Depends On | Reason |
 |------|-----------|--------|
-| 39-01 | None (but benefits from 39-02 pattern) | Can establish message bus subscription patterns |
-| 39-02 | None | Self-contained: lineage + tamperproof |
-| 39-03 | None (but most complex) | Multi-plugin orchestration |
-| 39-04 | None | Observability subscription + rules engine |
-| 39-05 | None (but benefits from 39-02 pattern) | SLSA format + tamperproof |
+| 38-01 | None (but benefits from 38-02 pattern) | Can establish message bus subscription patterns |
+| 38-02 | None | Self-contained: lineage + tamperproof |
+| 38-03 | None (but most complex) | Multi-plugin orchestration |
+| 38-04 | None | Observability subscription + rules engine |
+| 38-05 | None (but benefits from 38-02 pattern) | SLSA format + tamperproof |
 
-**Recommended order:** 39-02, 39-05, 39-01, 39-04, 39-03
+**Recommended order:** 38-02, 38-05, 38-01, 38-04, 38-03
 
 ## Risk Assessment
 
