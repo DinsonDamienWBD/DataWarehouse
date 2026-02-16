@@ -54,33 +54,33 @@ namespace DataWarehouse.Tests.Infrastructure
         [Fact]
         public void IStorageStrategy_DefinesStoreAsyncMethod()
         {
-            var method = typeof(IStorageStrategy).GetMethod("StoreAsync");
-            Assert.NotNull(method);
-            Assert.Equal(typeof(Task<StorageObjectMetadata>), method!.ReturnType);
+            var methods = typeof(IStorageStrategy).GetMethods().Where(m => m.Name == "StoreAsync");
+            Assert.NotEmpty(methods);
+            Assert.Contains(methods, m => m.ReturnType == typeof(Task<StorageObjectMetadata>));
         }
 
         [Fact]
         public void IStorageStrategy_DefinesRetrieveAsyncMethod()
         {
-            var method = typeof(IStorageStrategy).GetMethod("RetrieveAsync");
-            Assert.NotNull(method);
-            Assert.Equal(typeof(Task<System.IO.Stream>), method!.ReturnType);
+            var methods = typeof(IStorageStrategy).GetMethods().Where(m => m.Name == "RetrieveAsync");
+            Assert.NotEmpty(methods);
+            Assert.Contains(methods, m => m.ReturnType == typeof(Task<System.IO.Stream>));
         }
 
         [Fact]
         public void IStorageStrategy_DefinesDeleteAsyncMethod()
         {
-            var method = typeof(IStorageStrategy).GetMethod("DeleteAsync");
-            Assert.NotNull(method);
-            Assert.Equal(typeof(Task), method!.ReturnType);
+            var methods = typeof(IStorageStrategy).GetMethods().Where(m => m.Name == "DeleteAsync");
+            Assert.NotEmpty(methods);
+            Assert.Contains(methods, m => m.ReturnType == typeof(Task));
         }
 
         [Fact]
         public void IStorageStrategy_DefinesExistsAsyncMethod()
         {
-            var method = typeof(IStorageStrategy).GetMethod("ExistsAsync");
-            Assert.NotNull(method);
-            Assert.Equal(typeof(Task<bool>), method!.ReturnType);
+            var methods = typeof(IStorageStrategy).GetMethods().Where(m => m.Name == "ExistsAsync");
+            Assert.NotEmpty(methods);
+            Assert.Contains(methods, m => m.ReturnType == typeof(Task<bool>));
         }
 
         [Fact]
