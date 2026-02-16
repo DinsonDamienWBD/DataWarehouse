@@ -9,8 +9,8 @@ namespace DataWarehouse.Plugins.AedsCore.DataPlane;
 /// </summary>
 /// <remarks>
 /// <para>
-/// WebTransport is not yet supported in .NET 9 System.Net.Quic API.
-/// This plugin is a stub awaiting future .NET release with WebTransport support.
+/// WebTransport requires runtime support not yet available in .NET 10. All operations throw
+/// NotSupportedException with guidance to use QUIC or HTTP/3 transports instead.
 /// </para>
 /// <para>
 /// <strong>Status:</strong> Tracked in dotnet/runtime GitHub repository. WebTransport API is under
@@ -18,16 +18,17 @@ namespace DataWarehouse.Plugins.AedsCore.DataPlane;
 /// </para>
 /// <para>
 /// <strong>Workaround:</strong> Use QUIC or HTTP/3 data plane transports for production deployments.
-/// Both provide similar performance characteristics and are fully supported in .NET 9.
+/// Both provide similar performance characteristics and are fully supported in .NET 10.
 /// </para>
 /// </remarks>
+[DataWarehouse.SDK.Contracts.SdkCompatibility("3.0.0", Notes = "Phase 36: Pending .NET WebTransport API availability")]
 public class WebTransportDataPlanePlugin : DataPlaneTransportPluginBase
 {
     /// <inheritdoc />
     public override string Id => "com.datawarehouse.aeds.dataplane.webtransport";
 
     /// <inheritdoc />
-    public override string Name => "WebTransport Data Plane (STUB)";
+    public override string Name => "WebTransport Data Plane (Pending Runtime Support)";
 
     /// <inheritdoc />
     public override string Version => "0.1.0";

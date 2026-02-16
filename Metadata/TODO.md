@@ -1473,7 +1473,7 @@ public abstract class ClientExecutorPluginBase : FeaturePluginBase, IClientExecu
 | Task | Plugin | Base Class | Description | Status |
 |------|--------|------------|-------------|--------|
 | AEDS-C1 | `AedsCorePlugin` | `FeaturePluginBase` | Core orchestration, manifest validation, job queue | [~] Incomplete |
-| AEDS-C2 | `IntentManifestSignerPlugin` | `FeaturePluginBase` | Ed25519/RSA signing for manifests | [ ] |
+| AEDS-C2 | `IntentManifestSignerPlugin` | `FeaturePluginBase` | Ed25519/RSA signing for manifests | [x] Complete — Rule 15 compliant, all crypto delegated to UltimateEncryption |
 | AEDS-C3 | `ServerDispatcherPlugin` | `ServerDispatcherPluginBase` | Default server-side job dispatch | [~] Incomplete |
 | AEDS-C4 | `ClientCourierPlugin` | `FeaturePluginBase` | Combines Sentinel + Executor + Watchdog | [~] Incomplete |
 
@@ -1481,16 +1481,16 @@ public abstract class ClientExecutorPluginBase : FeaturePluginBase, IClientExecu
 
 | Task | Plugin | Base Class | Description | Status |
 |------|--------|------------|-------------|--------|
-| AEDS-CP1 | `WebSocketControlPlanePlugin` | `ControlPlaneTransportPluginBase` | WebSocket/SignalR transport | [ ] |
-| AEDS-CP2 | `MqttControlPlanePlugin` | `ControlPlaneTransportPluginBase` | MQTT 5.0 transport | [ ] |
-| AEDS-CP3 | `GrpcStreamingControlPlanePlugin` | `ControlPlaneTransportPluginBase` | gRPC bidirectional streaming | [ ] |
+| AEDS-CP1 | `WebSocketControlPlanePlugin` | `ControlPlaneTransportPluginBase` | WebSocket/SignalR transport | [x] Complete |
+| AEDS-CP2 | `MqttControlPlanePlugin` | `ControlPlaneTransportPluginBase` | MQTT 5.0 transport | [x] Complete |
+| AEDS-CP3 | `GrpcStreamingControlPlanePlugin` | `ControlPlaneTransportPluginBase` | gRPC bidirectional streaming | [x] Complete |
 
 ###### Data Plane Transport Plugins (User Picks)
 
 | Task | Plugin | Base Class | Description | Status |
 |------|--------|------------|-------------|--------|
-| AEDS-DP1 | `Http3DataPlanePlugin` | `DataPlaneTransportPluginBase` | HTTP/3 over QUIC | [ ] |
-| AEDS-DP2 | `QuicDataPlanePlugin` | `DataPlaneTransportPluginBase` | Raw QUIC streams | [ ] |
+| AEDS-DP1 | `Http3DataPlanePlugin` | `DataPlaneTransportPluginBase` | HTTP/3 over QUIC | [x] Complete |
+| AEDS-DP2 | `QuicDataPlanePlugin` | `DataPlaneTransportPluginBase` | Raw QUIC streams | [x] Complete |
 | AEDS-DP3 | `Http2DataPlanePlugin` | `DataPlaneTransportPluginBase` | HTTP/2 fallback | [x] Complete |
 | AEDS-DP4 | `WebTransportDataPlanePlugin` | `DataPlaneTransportPluginBase` | WebTransport for browsers | [ ] |
 
