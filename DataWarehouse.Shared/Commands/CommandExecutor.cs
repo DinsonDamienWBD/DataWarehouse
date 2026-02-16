@@ -257,6 +257,7 @@ public sealed class CommandExecutor
         // Install commands
         Register(new InstallCommand());
         Register(new InstallStatusCommand());
+        Register(new InstallFromUsbCommand());
 
         // Live mode commands
         Register(new LiveStartCommand());
