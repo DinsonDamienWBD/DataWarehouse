@@ -26,6 +26,12 @@
           "Newtonsoft.Json": "9.0.1"
         }
       },
+      "MQTTnet": {
+        "type": "Direct",
+        "requested": "[4.3.7.1207, )",
+        "resolved": "4.3.7.1207",
+        "contentHash": "ah7aHXoedWp5m5a4zy2u4phOEVj0QFYzOb5tFKQeV8RRBrxp+1QREF4ymZuG8D+hzB2dhtrrG81WxTFv0PzOeQ=="
+      },
       "Newtonsoft.Json": {
         "type": "Direct",
         "requested": "[13.0.4, )",
