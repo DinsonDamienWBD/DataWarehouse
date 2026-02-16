@@ -275,12 +275,12 @@ internal sealed class SignalRStrategy : SdkInterface.InterfaceStrategyBase, IPlu
                 ["arguments"] = arguments,
                 ["invocationId"] = invocationId ?? string.Empty
             };
-            var message = new SDK.Utilities.PluginMessage
+            var busMessage = new SDK.Utilities.PluginMessage
             {
                 Type = "streaming.publish",
                 Payload = busRequest
             };
-            await MessageBus.PublishAsync("streaming.publish", message, cancellationToken);
+            await MessageBus.PublishAsync("streaming.publish", busMessage, cancellationToken);
         }
 
         // Send completion message if invocation ID was provided
@@ -304,12 +304,18 @@ internal sealed class SignalRStrategy : SdkInterface.InterfaceStrategyBase, IPlu
         // Route via message bus if available
         if (IsIntelligenceAvailable && MessageBus != null)
         {
-            var message = new SDK.Utilities.PluginMessage
+            var busRequest = new Dictionary<string, object>
+            {
+                ["operation"] = "signalr-stream-item",
+                ["invocationId"] = invocationId ?? string.Empty,
+                ["item"] = item
+            };
+            var busMessage = new SDK.Utilities.PluginMessage
             {
                 Type = "streaming.publish",
                 Payload = busRequest
             };
-            await MessageBus.PublishAsync("streaming.publish", message, cancellationToken);
+            await MessageBus.PublishAsync("streaming.publish", busMessage, cancellationToken);
         }
     }
 
@@ -338,12 +344,12 @@ internal sealed class SignalRStrategy : SdkInterface.InterfaceStrategyBase, IPlu
                 ["arguments"] = arguments,
                 ["invocationId"] = invocationId
             };
-            var message = new SDK.Utilities.PluginMessage
+            var busMessage = new SDK.Utilities.PluginMessage
             {
                 Type = "streaming.publish",
                 Payload = busRequest
             };
-            await MessageBus.PublishAsync("streaming.publish", message, cancellationToken);
+            await MessageBus.PublishAsync("streaming.publish", busMessage, cancellationToken);
         }
 
         // In production, start streaming response

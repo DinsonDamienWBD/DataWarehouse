@@ -164,7 +164,7 @@ internal sealed class SocketIoStrategy : SdkInterface.InterfaceStrategyBase, IPl
                 Payload = new Dictionary<string, object>
                 {
                     ["operation"] = "subscribe",
-                    ["sessionId"] = sessionId,
+                    ["sessionId"] = sid,
                     ["protocol"] = "socket.io"
                 }
             };
