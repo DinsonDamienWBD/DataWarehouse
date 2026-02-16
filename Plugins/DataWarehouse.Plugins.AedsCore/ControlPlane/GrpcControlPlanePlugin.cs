@@ -463,6 +463,7 @@ public class GrpcControlPlanePlugin : ControlPlaneTransportPluginBase
             _streamCall?.Dispose();
             _channel?.Dispose();
         }
+        base.Dispose(disposing);
     }
 }
 

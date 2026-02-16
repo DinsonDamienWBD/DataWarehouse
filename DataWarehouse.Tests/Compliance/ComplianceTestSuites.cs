@@ -7,6 +7,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Xunit;
 using DataWarehouse.SDK.Infrastructure;
+using DataWarehouse.SDK.Compliance;
 
 namespace DataWarehouse.Tests.Compliance
 {
@@ -130,11 +131,13 @@ namespace DataWarehouse.Tests.Compliance
             Assert.True(securityConfig.MinimumTlsVersion >= System.Security.Authentication.SslProtocols.Tls12);
 
             // Must not allow weak protocols
-            Assert.False(securityConfig.AllowedProtocols.HasFlag(System.Security.Authentication.SslProtocols.Ssl3));
+#pragma warning disable CA5397 // Testing that deprecated protocols are NOT allowed
 #pragma warning disable SYSLIB0039 // TLS 1.0/1.1 referenced intentionally in compliance test
+            Assert.False(securityConfig.AllowedProtocols.HasFlag(System.Security.Authentication.SslProtocols.Ssl3));
             Assert.False(securityConfig.AllowedProtocols.HasFlag(System.Security.Authentication.SslProtocols.Tls));
             Assert.False(securityConfig.AllowedProtocols.HasFlag(System.Security.Authentication.SslProtocols.Tls11));
 #pragma warning restore SYSLIB0039
+#pragma warning restore CA5397
         }
 
         [Fact]
@@ -367,7 +370,7 @@ namespace DataWarehouse.Tests.Compliance
         [Fact]
         public void Requirement10_LogRetention_MustBeOneYear()
         {
-            var retentionPolicy = new AuditRetentionPolicy(ComplianceFramework.PCI_DSS);
+            var retentionPolicy = new AuditRetentionPolicy(ComplianceFramework.PciDss);
 
             // PCI-DSS requires 1 year retention, 3 months immediately available
             Assert.True(retentionPolicy.MinimumRetention >= TimeSpan.FromDays(365));
@@ -1046,8 +1049,8 @@ namespace DataWarehouse.Tests.Compliance
             MinimumRetention = framework switch
             {
                 ComplianceFramework.HIPAA => TimeSpan.FromDays(6 * 365),
-                ComplianceFramework.PCI_DSS => TimeSpan.FromDays(365),
-                ComplianceFramework.SOX => TimeSpan.FromDays(7 * 365),
+                ComplianceFramework.PciDss => TimeSpan.FromDays(365),
+                ComplianceFramework.Sox => TimeSpan.FromDays(7 * 365),
                 _ => TimeSpan.FromDays(365)
             };
             ImmediateAccessPeriod = TimeSpan.FromDays(90);

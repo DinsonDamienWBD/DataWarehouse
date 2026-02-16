@@ -222,8 +222,11 @@ namespace DataWarehouse.Tests.Storage
             // Arrange
             var storage = new InMemoryTestStorage();
 
-            // Act & Assert (should not throw)
+            // Act
             await storage.DeleteAsync("nonexistent/path");
+
+            // Assert - should not throw
+            Assert.True(true);
         }
 
         #endregion

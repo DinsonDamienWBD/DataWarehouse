@@ -450,5 +450,6 @@ public class ClientCourierPlugin : PlatformPluginBase
             }
             _watchers.Clear();
         }
+        base.Dispose(disposing);
     }
 }

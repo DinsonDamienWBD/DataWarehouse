@@ -504,5 +504,6 @@ public class WebSocketControlPlanePlugin : ControlPlaneTransportPluginBase
             _connectionCts?.Dispose();
             _webSocket?.Dispose();
         }
+        base.Dispose(disposing);
     }
 }

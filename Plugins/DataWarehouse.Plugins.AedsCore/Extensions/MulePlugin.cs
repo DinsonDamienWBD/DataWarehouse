@@ -118,8 +118,8 @@ public sealed class MulePlugin : DataManagementPluginBase
         if (index == null || !index.TryGetValue("manifestIds", out var manifestIdsObj))
             return 0;
 
-        var manifestIds = manifestIdsObj as JsonElement? != null
-            ? ((JsonElement)manifestIdsObj).EnumerateArray().Select(e => e.GetString() ?? string.Empty).ToArray()
+        var manifestIds = manifestIdsObj is JsonElement element
+            ? element.EnumerateArray().Select(e => e.GetString() ?? string.Empty).ToArray()
             : Array.Empty<string>();
 
         foreach (var manifestId in manifestIds.Where(id => !string.IsNullOrEmpty(id)))

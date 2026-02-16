@@ -397,6 +397,7 @@ public class AedsCorePlugin : OrchestrationPluginBase
         {
             _lock?.Dispose();
         }
+        base.Dispose(disposing);
     }
 }
 
