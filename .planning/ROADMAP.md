@@ -498,14 +498,22 @@ Wave 3: 32-05 (Integration, depends on 32-01 + 32-02 + 32-03 + 32-04)
 **Plans**: 7 plans
 
 Plans:
-- [ ] 33-01-PLAN.md — Block allocation engine: bitmap allocator, extent trees, free space management, defragmentation hints
-- [ ] 33-02-PLAN.md — Inode/metadata management: inode table, directory entries, namespace tree, extended attributes, hard/soft links
-- [ ] 33-03-PLAN.md — Write-Ahead Log (WAL): journal structure, write ordering, crash recovery replay, checkpoint mechanism
-- [ ] 33-04-PLAN.md — Container file format: superblock design, magic bytes, version migration, integrity header, format validation
-- [ ] 33-05-PLAN.md — B-Tree on-disk index: node layout, split/merge, bulk loading, range queries, concurrent access
-- [ ] 33-06-PLAN.md — Copy-on-Write engine: CoW block references, snapshot creation/deletion, clone operation, space reclamation
-- [ ] 33-07-PLAN.md — Block-level checksumming: per-block CRC32C/xxHash, read-time verification, corruption detection and reporting
-- [ ] 33-08-PLAN.md — VDE integration: register as UltimateStorage backend strategy, StorageAddress support, performance benchmarks
+- [ ] 33-01-PLAN.md — Container format + block allocator: IBlockDevice, dual superblock, ContainerFile, BitmapAllocator, ExtentTree, FreeSpaceManager (VDE-01 + VDE-04)
+- [ ] 33-02-PLAN.md — Inode table + metadata: InodeStructure, DirectoryEntry, IInodeTable, InodeTable, NamespaceTree (VDE-02)
+- [ ] 33-03-PLAN.md — Write-Ahead Log: JournalEntry, WalTransaction, IWriteAheadLog, WriteAheadLog, CheckpointManager (VDE-03)
+- [ ] 33-04-PLAN.md — Block-level checksumming: IBlockChecksummer, BlockChecksummer (XxHash3), ChecksumTable, CorruptionDetector (VDE-07)
+- [ ] 33-05-PLAN.md — B-Tree on-disk index: IBTreeIndex, BTree, BTreeNode, BulkLoader (VDE-05)
+- [ ] 33-06-PLAN.md — Copy-on-Write engine: ICowEngine, CowBlockManager, SnapshotManager, SpaceReclaimer (VDE-06)
+- [ ] 33-07-PLAN.md — VDE engine facade + storage strategy: VirtualDiskEngine, VdeStorageStrategy, VdeOptions, VdeHealthReport (VDE-08)
+
+Wave structure:
+```
+Wave 1: 33-01 (Container + Allocator) -- foundation, no dependencies
+Wave 2: 33-02 (Inodes) + 33-03 (WAL) + 33-04 (Checksums) -- parallel, all depend only on 33-01
+Wave 3: 33-05 (B-Tree) -- depends on 33-01 + 33-03 + 33-04
+Wave 4: 33-06 (CoW) -- depends on 33-01 through 33-05
+Wave 5: 33-07 (Integration) -- depends on all prior plans
+```
 
 #### Phase 34: Federated Object Storage & Translation Layer
 **Goal**: Build a federated object storage layer that routes requests across multiple storage nodes using both object-language (UUID-based) and filepath-language (path-based) addressing, with permission-aware and location-aware routing, cross-node replication awareness, and a manifest/catalog service that tracks where every object lives.
@@ -705,7 +713,7 @@ Plans:
 | Phase | Milestone | Plans | Status | Completed |
 |-------|-----------|-------|--------|-----------|
 | 32. StorageAddress & Hardware Discovery | v3.0 | 5/5 | Planned | - |
-| 33. Virtual Disk Engine | v3.0 | 0/8 | Not started | - |
+| 33. Virtual Disk Engine | v3.0 | 0/7 | Planned | - |
 | 34. Federated Object Storage & Translation | v3.0 | 0/7 | Not started | - |
 | 35. Hardware Accelerator & Hypervisor | v3.0 | 0/7 | Not started | - |
 | 36. Edge/IoT Hardware Integration | v3.0 | 0/8 | Not started | - |
