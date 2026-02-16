@@ -104,19 +104,17 @@ namespace DataWarehouse.SDK.Hardware.Accelerators
                 if (_keyHandles.ContainsKey(keyId))
                     throw new InvalidOperationException($"Key '{keyId}' already exists in TPM.");
 
-                // SIMPLIFIED for Phase 35: Return placeholder public key
+                // Phase 35: TPM2 command marshaling not yet implemented
                 // Production implementation would:
                 // 1. Build TPM2_Create command with algorithm from TpmKeyType
                 // 2. Submit command via TbsipSubmitCommand (Windows) or write to _tpmDevice (Linux)
                 // 3. Parse response to extract public key and TPM handle
                 // 4. Store handle in _keyHandles[keyId]
 
-                byte[] publicKey = new byte[256]; // Placeholder RSA 2048 public key
-                Random.Shared.NextBytes(publicKey); // TODO: actual TPM2_Create command
-
-                _keyHandles[keyId] = publicKey; // Store handle (simplified)
-
-                return Task.FromResult(publicKey);
+                throw new InvalidOperationException(
+                    "TPM2 key generation not yet implemented. Full TPM2 command marshaling " +
+                    "(TPM2_Create, TPM2_Sign, etc.) requires integration with a TPM Software Stack library " +
+                    "and is deferred to future phases.");
             }
         }
 
@@ -147,13 +145,10 @@ namespace DataWarehouse.SDK.Hardware.Accelerators
                 if (!_keyHandles.ContainsKey(keyId))
                     throw new KeyNotFoundException($"Key '{keyId}' not found in TPM.");
 
-                // SIMPLIFIED: Return placeholder signature
-                // Production: build TPM2_Sign command, submit to TPM, parse signature
-
-                byte[] signature = new byte[256];
-                Random.Shared.NextBytes(signature); // TODO: actual TPM2_Sign command
-
-                return Task.FromResult(signature);
+                // Phase 35: TPM2 command marshaling not yet implemented
+                throw new InvalidOperationException(
+                    "TPM2 signing not yet implemented. Full TPM2_Sign command marshaling " +
+                    "requires integration with a TPM Software Stack library and is deferred to future phases.");
             }
         }
 
@@ -183,13 +178,10 @@ namespace DataWarehouse.SDK.Hardware.Accelerators
                 if (!_keyHandles.ContainsKey(keyId))
                     throw new KeyNotFoundException($"Key '{keyId}' not found in TPM.");
 
-                // SIMPLIFIED: Return placeholder ciphertext
-                // Production: build TPM2_RSA_Encrypt command
-
-                byte[] ciphertext = new byte[data.Length + 32]; // padding
-                Random.Shared.NextBytes(ciphertext); // TODO: actual TPM2_RSA_Encrypt
-
-                return Task.FromResult(ciphertext);
+                // Phase 35: TPM2 command marshaling not yet implemented
+                throw new InvalidOperationException(
+                    "TPM2 encryption not yet implemented. Full TPM2_RSA_Encrypt command marshaling " +
+                    "requires integration with a TPM Software Stack library and is deferred to future phases.");
             }
         }
 
@@ -220,16 +212,10 @@ namespace DataWarehouse.SDK.Hardware.Accelerators
                 if (!_keyHandles.ContainsKey(keyId))
                     throw new KeyNotFoundException($"Key '{keyId}' not found in TPM.");
 
-                // SIMPLIFIED: Return placeholder plaintext
-                // Production: build TPM2_RSA_Decrypt command
-
-                byte[] plaintext = new byte[data.Length - 32]; // remove padding
-                if (plaintext.Length > 0)
-                {
-                    Random.Shared.NextBytes(plaintext); // TODO: actual TPM2_RSA_Decrypt
-                }
-
-                return Task.FromResult(plaintext);
+                // Phase 35: TPM2 command marshaling not yet implemented
+                throw new InvalidOperationException(
+                    "TPM2 decryption not yet implemented. Full TPM2_RSA_Decrypt command marshaling " +
+                    "requires integration with a TPM Software Stack library and is deferred to future phases.");
             }
         }
 
@@ -252,13 +238,10 @@ namespace DataWarehouse.SDK.Hardware.Accelerators
 
             ArgumentOutOfRangeException.ThrowIfNegativeOrZero(length, nameof(length));
 
-            // SIMPLIFIED: Use Random.Shared as placeholder
-            // Production: build TPM2_GetRandom command, submit to TPM
-
-            byte[] random = new byte[length];
-            Random.Shared.NextBytes(random); // TODO: actual TPM2_GetRandom command
-
-            return Task.FromResult(random);
+            // Phase 35: TPM2 command marshaling not yet implemented
+            throw new InvalidOperationException(
+                "TPM2 random number generation not yet implemented. Full TPM2_GetRandom command marshaling " +
+                "requires integration with a TPM Software Stack library and is deferred to future phases.");
         }
 
         /// <summary>

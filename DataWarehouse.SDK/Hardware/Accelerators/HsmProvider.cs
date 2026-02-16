@@ -258,15 +258,15 @@ namespace DataWarehouse.SDK.Hardware.Accelerators
                 if (_keyHandles.ContainsKey(label))
                     throw new InvalidOperationException($"Key '{label}' already exists in HSM.");
 
-                // SIMPLIFIED: Store placeholder handle
-                // Production: build CK_ATTRIBUTE template, call C_GenerateKey or C_GenerateKeyPair
+                // Phase 35: PKCS#11 mechanism/template marshaling not yet implemented
+                // Production implementation would:
+                // 1. Build CK_ATTRIBUTE template for key spec (algorithm, key size, token/session flags)
+                // 2. Call C_GenerateKey (symmetric) or C_GenerateKeyPair (asymmetric)
+                // 3. Store returned object handle
 
-                uint keyHandle = (uint)(_keyHandles.Count + 1); // Fake handle
-                _keyHandles[label] = keyHandle;
-
-                // Return placeholder key ID
-                byte[] keyId = BitConverter.GetBytes(keyHandle);
-                return Task.FromResult(keyId);
+                throw new InvalidOperationException(
+                    "HSM key generation not yet implemented. Full PKCS#11 mechanism/template marshaling " +
+                    "requires building CK_MECHANISM and CK_ATTRIBUTE structures and is deferred to future phases.");
             }
         }
 
@@ -297,13 +297,10 @@ namespace DataWarehouse.SDK.Hardware.Accelerators
                 if (!_keyHandles.ContainsKey(keyLabel))
                     throw new KeyNotFoundException($"Key '{keyLabel}' not found in HSM.");
 
-                // SIMPLIFIED: Return placeholder signature
-                // Production: build CK_MECHANISM for algorithm, call C_SignInit, C_Sign
-
-                byte[] signature = new byte[256]; // RSA-2048 signature size
-                Random.Shared.NextBytes(signature); // TODO: actual C_Sign
-
-                return Task.FromResult(signature);
+                // Phase 35: PKCS#11 mechanism/template marshaling not yet implemented
+                throw new InvalidOperationException(
+                    "HSM signing not yet implemented. Full PKCS#11 C_SignInit/C_Sign operations " +
+                    "require building CK_MECHANISM structures and are deferred to future phases.");
             }
         }
 
@@ -331,13 +328,10 @@ namespace DataWarehouse.SDK.Hardware.Accelerators
                 if (!_keyHandles.ContainsKey(keyLabel))
                     throw new KeyNotFoundException($"Key '{keyLabel}' not found in HSM.");
 
-                // SIMPLIFIED: Return placeholder ciphertext
-                // Production: call C_EncryptInit, C_Encrypt
-
-                byte[] ciphertext = new byte[data.Length + 16]; // AES block padding
-                Random.Shared.NextBytes(ciphertext); // TODO: actual C_Encrypt
-
-                return Task.FromResult(ciphertext);
+                // Phase 35: PKCS#11 mechanism/template marshaling not yet implemented
+                throw new InvalidOperationException(
+                    "HSM encryption not yet implemented. Full PKCS#11 C_EncryptInit/C_Encrypt operations " +
+                    "require building CK_MECHANISM structures and are deferred to future phases.");
             }
         }
 
@@ -366,16 +360,10 @@ namespace DataWarehouse.SDK.Hardware.Accelerators
                 if (!_keyHandles.ContainsKey(keyLabel))
                     throw new KeyNotFoundException($"Key '{keyLabel}' not found in HSM.");
 
-                // SIMPLIFIED: Return placeholder plaintext
-                // Production: call C_DecryptInit, C_Decrypt
-
-                byte[] plaintext = new byte[data.Length - 16]; // Remove padding
-                if (plaintext.Length > 0)
-                {
-                    Random.Shared.NextBytes(plaintext); // TODO: actual C_Decrypt
-                }
-
-                return Task.FromResult(plaintext);
+                // Phase 35: PKCS#11 mechanism/template marshaling not yet implemented
+                throw new InvalidOperationException(
+                    "HSM decryption not yet implemented. Full PKCS#11 C_DecryptInit/C_Decrypt operations " +
+                    "require building CK_MECHANISM structures and are deferred to future phases.");
             }
         }
 
