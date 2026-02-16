@@ -819,7 +819,14 @@ All executing agents MUST follow these rules:
 6. **Graceful degradation:** External service backends (Redis, Postgres, S3, etc.) MUST fall back to bounded in-memory alternatives when unavailable, with warning log.
 7. **No new NuGet without justification:** Plans 31.1-01 through 31.1-05 should not add NuGet packages EXCEPT where explicitly noted (Parquet.Net, Apache.Arrow in 31.1-03).
 8. **Bounded collections:** All in-memory collections must have configurable max size (MEM-03).
-9. **Real crypto only:** Use `Aes.Create()` + GCM mode for encryption, `SHA256.Create()` for hashing, `RandomNumberGenerator` for randomness. Never `System.Random` in security contexts.
+9. **Capability delegation — no inline duplicates:** Before implementing ANY capability inline, CHECK if an existing plugin already owns it. If it does, delegate via message bus. Key ownership:
+   - **Encryption/Decryption** → UltimateEncryption via `encryption.encrypt` / `encryption.decrypt`
+   - **Hashing/Integrity** → TamperProof via `integrity.hash.compute` / `integrity.hash.verify`
+   - **AI/ML inference** → UltimateIntelligence via `intelligence.*` topics
+   - **Storage I/O** → UltimateStorage via `storage.*` topics
+   - **Key management** → UltimateKeyManagement via `keymanagement.*` topics
+   - Never duplicate a capability that another plugin already provides. Never `System.Random` in security contexts.
 10. **Zero regression (AD-08):** All existing strategies must produce identical results. All 1,039+ tests must pass.
 11. **Coding style:** Follow existing patterns in the codebase. Use `async/await`, `CancellationToken`, `ILogger` consistently. Strategy classes use `StrategyBase` domain bases.
 12. **Build gate:** After each plan execution, `dotnet build DataWarehouse.slnx` must succeed with zero NEW errors.
+13. **Verify before implementing:** Before writing ANY inline implementation, search the codebase for existing capability providers. Ask: "Does another plugin already do this?" If yes, delegate via message bus. If no, implement in the plugin that SHOULD own it and expose via bus topics.
