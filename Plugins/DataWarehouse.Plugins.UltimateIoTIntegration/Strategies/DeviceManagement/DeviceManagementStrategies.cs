@@ -136,6 +136,10 @@ public class DeviceRegistryStrategy : DeviceManagementStrategyBase
 /// </summary>
 public class DeviceTwinStrategy : DeviceManagementStrategyBase
 {
+    private ContinuousSyncService? _syncService;
+    private StateProjectionEngine? _projectionEngine;
+    private WhatIfSimulator? _simulator;
+
     public override string StrategyId => "device-twin";
     public override string StrategyName => "Device Twin";
     public override string Description => "Manages device twins for desired and reported state synchronization";
@@ -211,6 +215,80 @@ public class DeviceTwinStrategy : DeviceManagementStrategyBase
     public override Task<DeviceInfo?> GetDeviceAsync(string deviceId, CancellationToken ct = default)
     {
         return Task.FromResult<DeviceInfo?>(null);
+    }
+
+    /// <summary>
+    /// Synchronizes sensor data with the device twin in real-time.
+    /// </summary>
+    /// <param name="deviceId">Device identifier.</param>
+    /// <param name="sensorData">Sensor readings to synchronize.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>Synchronization result with latency metrics.</returns>
+    public async Task<SyncResult> SyncAsync(
+        string deviceId,
+        Dictionary<string, object> sensorData,
+        CancellationToken ct = default)
+    {
+        _syncService ??= new ContinuousSyncService();
+
+        // Ensure device is registered for sync
+        if (!DeviceTwins.TryGetValue(deviceId, out var twin))
+        {
+            twin = new DeviceTwin
+            {
+                DeviceId = deviceId,
+                DesiredProperties = new(),
+                ReportedProperties = new(),
+                Version = 1,
+                LastUpdated = DateTimeOffset.UtcNow
+            };
+            DeviceTwins[deviceId] = twin;
+        }
+
+        // Register twin if not already registered
+        if (!_syncService.GetRegisteredDevices().Contains(deviceId))
+        {
+            _syncService.RegisterTwin(deviceId, twin);
+        }
+
+        return await _syncService.SyncSensorDataAsync(deviceId, sensorData, ct);
+    }
+
+    /// <summary>
+    /// Projects device state into the future using historical data.
+    /// </summary>
+    /// <param name="deviceId">Device identifier.</param>
+    /// <param name="horizon">Time horizon for projection.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>Projected state with confidence metrics.</returns>
+    public Task<ProjectedState> ProjectAsync(
+        string deviceId,
+        TimeSpan horizon,
+        CancellationToken ct = default)
+    {
+        _syncService ??= new ContinuousSyncService();
+        _projectionEngine ??= new StateProjectionEngine(_syncService);
+
+        return _projectionEngine.ProjectStateAsync(deviceId, horizon, ct);
+    }
+
+    /// <summary>
+    /// Simulates the impact of parameter changes on device behavior.
+    /// </summary>
+    /// <param name="deviceId">Device identifier.</param>
+    /// <param name="parameterChanges">Parameters to modify in simulation.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>Simulation result with predicted outcomes.</returns>
+    public Task<SimulationResult> SimulateAsync(
+        string deviceId,
+        Dictionary<string, object> parameterChanges,
+        CancellationToken ct = default)
+    {
+        _syncService ??= new ContinuousSyncService();
+        _projectionEngine ??= new StateProjectionEngine(_syncService);
+        _simulator ??= new WhatIfSimulator(_syncService, _projectionEngine);
+
+        return _simulator.SimulateAsync(deviceId, parameterChanges, ct);
     }
 }
 

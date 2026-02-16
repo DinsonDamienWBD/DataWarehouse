@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Net.Sockets;
 using System.Threading;
 using System.Threading.Tasks;
@@ -72,6 +73,63 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Healthcare
         {
             // HL7 v2 does not support FHIR queries - provide guidance
             return Task.FromResult("{\"error\":\"HL7 v2 uses MLLP messaging, not FHIR REST. Use FhirR4ConnectionStrategy for FHIR queries.\"}");
+        }
+
+        /// <summary>
+        /// Parses an HL7 v2.x message into structured segments and extracts key metadata.
+        /// </summary>
+        /// <param name="hl7Message">Raw HL7 v2.x message string.</param>
+        /// <param name="ct">Cancellation token.</param>
+        /// <returns>Parsed HL7 message with segments, message type, and control ID.</returns>
+        /// <exception cref="ArgumentException">Thrown if the message is invalid or missing the MSH segment.</exception>
+        public async Task<Hl7ParsedMessage> ParseHl7MessageAsync(string hl7Message, CancellationToken ct = default)
+        {
+            await Task.CompletedTask; // Make async for consistency
+            ct.ThrowIfCancellationRequested();
+
+            if (string.IsNullOrWhiteSpace(hl7Message))
+                throw new ArgumentException("HL7 message cannot be empty", nameof(hl7Message));
+
+            // Split message into segments (typically delimited by \r or \n)
+            var segmentStrings = hl7Message.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
+
+            if (segmentStrings.Length == 0 || !segmentStrings[0].StartsWith("MSH"))
+                throw new ArgumentException("HL7 message must start with MSH segment");
+
+            var segments = new List<Hl7Segment>();
+            string messageType = "UNKNOWN";
+            string messageControlId = "UNKNOWN";
+
+            foreach (var segmentString in segmentStrings)
+            {
+                ct.ThrowIfCancellationRequested();
+
+                // Split segment into fields using '|' delimiter
+                var fields = segmentString.Split('|');
+                if (fields.Length == 0)
+                    continue;
+
+                string segmentId = fields[0];
+                segments.Add(new Hl7Segment(segmentId, fields));
+
+                // Extract metadata from MSH segment
+                if (segmentId == "MSH" && fields.Length >= 12)
+                {
+                    // MSH-9: Message Type (e.g., ADT^A01)
+                    if (fields.Length > 8)
+                        messageType = fields[8];
+
+                    // MSH-10: Message Control ID
+                    if (fields.Length > 9)
+                        messageControlId = fields[9];
+                }
+            }
+
+            return new Hl7ParsedMessage(
+                messageType,
+                messageControlId,
+                segments.ToArray(),
+                hl7Message);
         }
     }
 }
