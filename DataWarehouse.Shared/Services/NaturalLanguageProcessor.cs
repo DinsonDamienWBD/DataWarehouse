@@ -178,6 +178,7 @@ public sealed class NaturalLanguageProcessor : IDisposable
     };
 
     private readonly IAIProviderRegistry? _aiRegistry;
+    private readonly NlpMessageBusRouter? _messageBusRouter;
     private readonly ConversationContextManager _contextManager;
     private readonly CLILearningStore _learningStore;
     private readonly double _aiConfidenceThreshold;
@@ -195,6 +196,26 @@ public sealed class NaturalLanguageProcessor : IDisposable
         double aiConfidenceThreshold = 0.6)
     {
         _aiRegistry = aiRegistry;
+        _contextManager = new ConversationContextManager();
+        _learningStore = new CLILearningStore(learningStorePath);
+        _aiConfidenceThreshold = aiConfidenceThreshold;
+    }
+
+    /// <summary>
+    /// Creates a new NaturalLanguageProcessor with message bus routing support.
+    /// </summary>
+    /// <param name="aiRegistry">Optional AI provider registry for fallback processing.</param>
+    /// <param name="learningStorePath">Optional path for persisting learned patterns.</param>
+    /// <param name="aiConfidenceThreshold">Minimum pattern confidence before AI fallback (default 0.6).</param>
+    /// <param name="messageBusRouter">Optional message bus router for server-side NLP.</param>
+    public NaturalLanguageProcessor(
+        IAIProviderRegistry? aiRegistry,
+        string? learningStorePath,
+        double aiConfidenceThreshold,
+        NlpMessageBusRouter? messageBusRouter)
+    {
+        _aiRegistry = aiRegistry;
+        _messageBusRouter = messageBusRouter;
         _contextManager = new ConversationContextManager();
         _learningStore = new CLILearningStore(learningStorePath);
         _aiConfidenceThreshold = aiConfidenceThreshold;
@@ -325,7 +346,26 @@ public sealed class NaturalLanguageProcessor : IDisposable
             return patternResult;
         }
 
-        // Check if AI is available
+        // Try message bus router (server-side intelligence) before local AI
+        if (_messageBusRouter?.IsAvailable == true)
+        {
+            try
+            {
+                var routerResult = await _messageBusRouter.RouteQueryAsync(input, ct);
+                if (routerResult != null && routerResult.Confidence >= _aiConfidenceThreshold)
+                {
+                    // Record for learning
+                    _learningStore.RecordSuccess(input, routerResult.CommandName, routerResult.Parameters);
+                    return routerResult;
+                }
+            }
+            catch
+            {
+                // Router failed -- fall through to local AI
+            }
+        }
+
+        // Check if local AI is available
         if (_aiRegistry == null)
         {
             return patternResult; // Return best pattern match if no AI
@@ -337,7 +377,7 @@ public sealed class NaturalLanguageProcessor : IDisposable
             return patternResult;
         }
 
-        // Fall back to AI interpretation
+        // Fall back to local AI interpretation
         try
         {
             return await ProcessWithAIAsync(input, provider, ct);
@@ -347,6 +387,30 @@ public sealed class NaturalLanguageProcessor : IDisposable
             // AI failed - return pattern result
             return patternResult;
         }
+    }
+
+    /// <summary>
+    /// Processes input always through the message bus, bypassing pattern matching.
+    /// Falls back to ProcessWithAIFallbackAsync if the router is unavailable.
+    /// </summary>
+    /// <param name="input">Natural language input.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>Parsed command intent from server-side or local processing.</returns>
+    public async Task<CommandIntent> ProcessWithMessageBusAsync(string input, CancellationToken ct = default)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+        if (_messageBusRouter?.IsAvailable == true)
+        {
+            var result = await _messageBusRouter.RouteQueryAsync(input, ct);
+            if (result != null)
+            {
+                return result;
+            }
+        }
+
+        // Fall back to standard processing
+        return await ProcessWithAIFallbackAsync(input, ct);
     }
 
     /// <summary>
@@ -615,6 +679,38 @@ Rules:
 
         // Find matching commands based on keywords
         var suggestedCommands = FindMatchingCommands(query);
+
+        // Try message bus knowledge query first (server-side Knowledge Bank)
+        if (_messageBusRouter?.IsAvailable == true)
+        {
+            try
+            {
+                var knowledgeResult = await _messageBusRouter.RouteKnowledgeQueryAsync(query, ct);
+                if (knowledgeResult != null)
+                {
+                    return new AIHelpResult
+                    {
+                        Answer = knowledgeResult.Answer,
+                        SuggestedCommands = knowledgeResult.RelatedCapabilities.Count > 0
+                            ? knowledgeResult.RelatedCapabilities
+                            : suggestedCommands,
+                        Examples = GenerateExamples(suggestedCommands),
+                        UsedAI = true
+                    };
+                }
+
+                // Try capability lookup as degraded fallback
+                var capabilities = await _messageBusRouter.RouteCapabilityLookupAsync(query, ct);
+                if (capabilities != null && capabilities.Count > 0)
+                {
+                    suggestedCommands = capabilities.Take(5).ToList();
+                }
+            }
+            catch
+            {
+                // Router failed -- fall through to local AI or basic help
+            }
+        }
 
         // If no AI, return pattern-based suggestions
         if (_aiRegistry == null)
