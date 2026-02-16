@@ -3,6 +3,7 @@ using DataWarehouse.SDK.Contracts.Hierarchy;
 using DataWarehouse.SDK.Contracts.IntelligenceAware;
 using DataWarehouse.SDK.Distribution;
 using DataWarehouse.SDK.Primitives;
+using DataWarehouse.SDK.Utilities;
 using Microsoft.Extensions.Logging;
 
 namespace DataWarehouse.Plugins.AedsCore;
@@ -211,6 +212,10 @@ public class AedsCorePlugin : OrchestrationPluginBase
     /// <para>
     /// <strong>Supported Algorithms:</strong> Ed25519, RSA-PSS-SHA256, ECDSA-P256-SHA256
     /// </para>
+    /// <para>
+    /// This method delegates to the IntentManifestSignerPlugin or CodeSigningPlugin via message bus.
+    /// If no verification handler responds, it falls back to structural validation with a warning.
+    /// </para>
     /// </remarks>
     public async Task<bool> VerifySignatureAsync(IntentManifest manifest, CancellationToken ct = default)
     {
@@ -225,26 +230,89 @@ public class AedsCorePlugin : OrchestrationPluginBase
 
         try
         {
-            // Cryptographic verification: currently performs structural validation only.
-            // Full signature verification requires UltimateKeyManagement integration (T94).
+            // Delegate to verification plugin via message bus
+            if (MessageBus != null)
+            {
+                var request = new PluginMessage
+                {
+                    Type = "aeds.manifest.verify",
+                    SourcePluginId = Id,
+                    Payload = new Dictionary<string, object>
+                    {
+                        ["manifest"] = manifest
+                    }
+                };
+
+                try
+                {
+                    var response = await MessageBus.SendAsync(
+                        "aeds.manifest.verify",
+                        request,
+                        TimeSpan.FromSeconds(10),
+                        ct);
+
+                    if (response.Success && response.Payload != null)
+                    {
+                        if (response.Payload is Dictionary<string, object> responsePayload &&
+                            responsePayload.TryGetValue("valid", out var validObj) &&
+                            validObj is bool isValid)
+                        {
+                            if (isValid)
+                            {
+                                _logger.LogInformation(
+                                    "Signature verification succeeded for manifest {ManifestId} (algorithm: {Algorithm})",
+                                    manifest.ManifestId,
+                                    manifest.Signature.Algorithm);
+                            }
+                            else
+                            {
+                                _logger.LogWarning(
+                                    "Signature verification failed for manifest {ManifestId}",
+                                    manifest.ManifestId);
+                            }
+
+                            return isValid;
+                        }
+                    }
+
+                    // If we get here, the response format was unexpected
+                    _logger.LogWarning(
+                        "Unexpected response format from verification service for manifest {ManifestId}",
+                        manifest.ManifestId);
+                }
+                catch (TimeoutException)
+                {
+                    _logger.LogWarning(
+                        "Verification service timeout for manifest {ManifestId}, falling back to structural validation",
+                        manifest.ManifestId);
+                }
+            }
+
+            // Fallback: structural validation only
+            _logger.LogWarning(
+                "No verification handler available for manifest {ManifestId}, performing structural validation only",
+                manifest.ManifestId);
+
             var hasSignature = !string.IsNullOrEmpty(manifest.Signature.Value);
             var hasKeyId = !string.IsNullOrEmpty(manifest.Signature.KeyId);
             var hasAlgorithm = !string.IsNullOrEmpty(manifest.Signature.Algorithm);
 
-            var isValid = hasSignature && hasKeyId && hasAlgorithm;
+            var structurallyValid = hasSignature && hasKeyId && hasAlgorithm;
 
-            if (isValid)
+            if (structurallyValid)
             {
-                _logger.LogInformation("Signature verification succeeded for manifest {ManifestId} (algorithm: {Algorithm})",
-                    manifest.ManifestId, manifest.Signature.Algorithm);
+                _logger.LogWarning(
+                    "Manifest {ManifestId} passed structural validation only (cryptographic verification unavailable)",
+                    manifest.ManifestId);
             }
             else
             {
-                _logger.LogWarning("Signature verification failed for manifest {ManifestId}: incomplete signature data",
+                _logger.LogWarning(
+                    "Manifest {ManifestId} failed structural validation: incomplete signature data",
                     manifest.ManifestId);
             }
 
-            return isValid;
+            return structurallyValid;
         }
         catch (Exception ex)
         {
