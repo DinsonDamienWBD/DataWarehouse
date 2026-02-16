@@ -702,12 +702,15 @@ public sealed class FuseDriverPlugin : DataWarehouse.SDK.Contracts.Hierarchy.Int
                 payloadDict["data"] = payload;
             }
 
-            await _messageBus.PublishAsync(topic, new PluginMessage
+            if (_messageBus != null)
             {
-                Type = topic,
-                Source = Id,
-                Payload = payloadDict
-            });
+                await _messageBus.PublishAsync(topic, new PluginMessage
+                {
+                    Type = topic,
+                    Source = Id,
+                    Payload = payloadDict
+                });
+            }
         }
         catch
         {
