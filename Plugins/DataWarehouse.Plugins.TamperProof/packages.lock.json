@@ -48,15 +48,48 @@
           "Newtonsoft.Json": "9.0.1"
         }
       },
+      "Microsoft.ML.OnnxRuntime": {
+        "type": "Transitive",
+        "resolved": "1.20.1",
+        "contentHash": "NzUD79BC6R7TKROLyB3XCzXTpbNZ1YfOdVbult7hoFvd/xyRecOMiRO5HTzkPXvaFlcvZ91+WNCiroAPzUE7Dw==",
+        "dependencies": {
+          "Microsoft.ML.OnnxRuntime.Managed": "1.20.1"
+        }
+      },
+      "Microsoft.ML.OnnxRuntime.Managed": {
+        "type": "Transitive",
+        "resolved": "1.20.1",
+        "contentHash": "+EVcEcKdq3gkw6iu8TYl2coJxfPnMi1YQc6eZ80BGNlw6mbBCxNGe6h4udDCwENYWsXFvYjoBc6412t40tl4ew=="
+      },
+      "MQTTnet": {
+        "type": "Transitive",
+        "resolved": "4.3.7.1207",
+        "contentHash": "ah7aHXoedWp5m5a4zy2u4phOEVj0QFYzOb5tFKQeV8RRBrxp+1QREF4ymZuG8D+hzB2dhtrrG81WxTFv0PzOeQ=="
+      },
       "Newtonsoft.Json": {
         "type": "Transitive",
         "resolved": "13.0.4",
         "contentHash": "pdgNNMai3zv51W5aq268sujXUyx7SNdE2bj1wZcWjAQrKMFZV260lbqYop1d2GM67JI1huLRwxo9ZqnfF/lC6A=="
       },
+      "OpenCvSharp4": {
+        "type": "Transitive",
+        "resolved": "4.10.0.20240615",
+        "contentHash": "cX3cwyKaDFknbreKInp2nB91AqEci9OwippbXOKehrUoETTeiIYY3j1EwVwshb5k+o/EkJyoYUvq9vh3nbZupw=="
+      },
+      "OpenCvSharp4.runtime.win": {
+        "type": "Transitive",
+        "resolved": "4.10.0.20240615",
+        "contentHash": "+BmRAXnKdwJxJ8qzjrXXK/bbQ/KpEwe9RM+X+/wf9hQ+ULPY1BP7k31LQTQRiEpPLGZGWfJUF2bchkW9cqT8cw=="
+      },
       "System.CodeDom": {
         "type": "Transitive",
         "resolved": "10.0.3",
         "contentHash": "+G1mBhHJp8taiDcHK1gmckOZ884n9JeIrS1dzFYZhSa8oTiIF+EagIyAyCOQzdBbbES7eb9AkjGBlUZqqoCaeg=="
+      },
+      "System.Device.Gpio": {
+        "type": "Transitive",
+        "resolved": "3.2.0",
+        "contentHash": "jaL93IC1S2wZfCSLWt8/1lQCp/pDAzDNE5dfLq+pubEhCp0BjDZze6rJMu2KdOuCOeRxHmBuhtWrIRlrTKFsTg=="
       },
       "System.IO.Hashing": {
         "type": "Transitive",
@@ -74,9 +107,14 @@
       "datawarehouse.sdk": {
         "type": "Project",
         "dependencies": {
+          "MQTTnet": "[4.3.7.1207, )",
           "Microsoft.Extensions.Logging.Abstractions": "[10.0.3, )",
           "Microsoft.Json.Schema": "[2.3.0, )",
+          "Microsoft.ML.OnnxRuntime": "[1.20.1, )",
           "Newtonsoft.Json": "[13.0.4, )",
+          "OpenCvSharp4": "[4.10.0.20240615, )",
+          "OpenCvSharp4.runtime.win": "[4.10.0.20240615, )",
+          "System.Device.Gpio": "[3.2.0, )",
           "System.IO.Hashing": "[10.0.3, )",
           "System.Management": "[10.0.3, )"
         }
