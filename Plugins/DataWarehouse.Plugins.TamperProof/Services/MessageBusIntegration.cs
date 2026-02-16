@@ -1,7 +1,9 @@
 // Licensed to the DataWarehouse under one or more agreements.
 // DataWarehouse licenses this file under the MIT license.
 
+using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Contracts.TamperProof;
+using DataWarehouse.SDK.Utilities;
 using Microsoft.Extensions.Logging;
 
 namespace DataWarehouse.Plugins.TamperProof.Services;
@@ -12,7 +14,7 @@ namespace DataWarehouse.Plugins.TamperProof.Services;
 /// </summary>
 public class MessageBusIntegrationService
 {
-    private readonly IMessageBusClient? _messageBus;
+    private readonly IMessageBus? _messageBus;
     private readonly ILogger<MessageBusIntegrationService> _logger;
     private readonly TamperProofConfiguration _config;
 
@@ -25,11 +27,11 @@ public class MessageBusIntegrationService
     /// <summary>
     /// Creates a new message bus integration service.
     /// </summary>
-    /// <param name="messageBus">Optional message bus client.</param>
+    /// <param name="messageBus">Optional SDK message bus.</param>
     /// <param name="config">TamperProof configuration.</param>
     /// <param name="logger">Logger instance.</param>
     public MessageBusIntegrationService(
-        IMessageBusClient? messageBus,
+        IMessageBus? messageBus,
         TamperProofConfiguration config,
         ILogger<MessageBusIntegrationService> logger)
     {
@@ -65,32 +67,48 @@ public class MessageBusIntegrationService
 
         try
         {
-            var request = new EncryptionRequest
+            var requestId = Guid.NewGuid();
+            var message = new PluginMessage
             {
-                RequestId = Guid.NewGuid(),
-                Data = data,
-                KeyId = keyId,
-                AlgorithmHint = algorithmHint,
-                RequestedAt = DateTimeOffset.UtcNow
+                Type = $"{EncryptionTopic}.encrypt",
+                Payload = new Dictionary<string, object>
+                {
+                    ["RequestId"] = requestId,
+                    ["Data"] = data,
+                    ["KeyId"] = keyId,
+                    ["AlgorithmHint"] = algorithmHint ?? "",
+                    ["RequestedAt"] = DateTimeOffset.UtcNow
+                }
             };
 
             _logger.LogDebug("Sending encryption request {RequestId} to {Topic}",
-                request.RequestId, EncryptionTopic);
+                requestId, EncryptionTopic);
 
-            var response = await _messageBus.RequestAsync<EncryptionRequest, EncryptionResponse>(
-                $"{EncryptionTopic}.encrypt",
-                request,
-                TimeSpan.FromSeconds(30),
-                ct);
+            await _messageBus.PublishAndWaitAsync($"{EncryptionTopic}.encrypt", message, ct);
 
-            if (response?.Success == true)
+            // Extract response from message payload
+            var success = message.Payload.TryGetValue("Success", out var successObj) && (bool)successObj;
+            var encryptedData = message.Payload.TryGetValue("EncryptedData", out var dataObj) ? (byte[])dataObj : null;
+            var algorithm = message.Payload.TryGetValue("Algorithm", out var algObj) ? (string)algObj : null;
+            var errorMessage = message.Payload.TryGetValue("ErrorMessage", out var errObj) ? (string)errObj : null;
+
+            var response = new EncryptionResponse
             {
-                _logger.LogDebug("Encryption request {RequestId} completed successfully", request.RequestId);
+                RequestId = requestId,
+                Success = success,
+                EncryptedData = encryptedData,
+                Algorithm = algorithm,
+                ErrorMessage = errorMessage
+            };
+
+            if (response.Success)
+            {
+                _logger.LogDebug("Encryption request {RequestId} completed successfully", requestId);
             }
             else
             {
                 _logger.LogWarning("Encryption request {RequestId} failed: {Error}",
-                    request.RequestId, response?.ErrorMessage ?? "No response");
+                    requestId, errorMessage ?? "No response");
             }
 
             return response;
@@ -122,24 +140,36 @@ public class MessageBusIntegrationService
 
         try
         {
-            var request = new DecryptionRequest
+            var requestId = Guid.NewGuid();
+            var message = new PluginMessage
             {
-                RequestId = Guid.NewGuid(),
-                EncryptedData = encryptedData,
-                KeyId = keyId,
-                RequestedAt = DateTimeOffset.UtcNow
+                Type = $"{EncryptionTopic}.decrypt",
+                Payload = new Dictionary<string, object>
+                {
+                    ["RequestId"] = requestId,
+                    ["EncryptedData"] = encryptedData,
+                    ["KeyId"] = keyId,
+                    ["RequestedAt"] = DateTimeOffset.UtcNow
+                }
             };
 
             _logger.LogDebug("Sending decryption request {RequestId} to {Topic}",
-                request.RequestId, EncryptionTopic);
+                requestId, EncryptionTopic);
 
-            var response = await _messageBus.RequestAsync<DecryptionRequest, DecryptionResponse>(
-                $"{EncryptionTopic}.decrypt",
-                request,
-                TimeSpan.FromSeconds(30),
-                ct);
+            await _messageBus.PublishAndWaitAsync($"{EncryptionTopic}.decrypt", message, ct);
 
-            return response;
+            // Extract response from message payload
+            var success = message.Payload.TryGetValue("Success", out var successObj) && (bool)successObj;
+            var decryptedData = message.Payload.TryGetValue("DecryptedData", out var dataObj) ? (byte[])dataObj : null;
+            var errorMessage = message.Payload.TryGetValue("ErrorMessage", out var errObj) ? (string)errObj : null;
+
+            return new DecryptionResponse
+            {
+                RequestId = requestId,
+                Success = success,
+                DecryptedData = decryptedData,
+                ErrorMessage = errorMessage
+            };
         }
         catch (Exception ex)
         {
@@ -168,24 +198,36 @@ public class MessageBusIntegrationService
 
         try
         {
-            var request = new KeyGenerationRequest
+            var requestId = Guid.NewGuid();
+            var message = new PluginMessage
             {
-                RequestId = Guid.NewGuid(),
-                Purpose = keyPurpose,
-                KeyType = keyType,
-                RequestedAt = DateTimeOffset.UtcNow
+                Type = $"{KeyManagementTopic}.generate",
+                Payload = new Dictionary<string, object>
+                {
+                    ["RequestId"] = requestId,
+                    ["Purpose"] = keyPurpose,
+                    ["KeyType"] = keyType,
+                    ["RequestedAt"] = DateTimeOffset.UtcNow
+                }
             };
 
             _logger.LogDebug("Sending key generation request {RequestId} to {Topic}",
-                request.RequestId, KeyManagementTopic);
+                requestId, KeyManagementTopic);
 
-            var response = await _messageBus.RequestAsync<KeyGenerationRequest, KeyGenerationResponse>(
-                $"{KeyManagementTopic}.generate",
-                request,
-                TimeSpan.FromSeconds(30),
-                ct);
+            await _messageBus.PublishAndWaitAsync($"{KeyManagementTopic}.generate", message, ct);
 
-            return response;
+            // Extract response from message payload
+            var success = message.Payload.TryGetValue("Success", out var successObj) && (bool)successObj;
+            var keyId = message.Payload.TryGetValue("KeyId", out var keyIdObj) ? (string)keyIdObj : null;
+            var errorMessage = message.Payload.TryGetValue("ErrorMessage", out var errObj) ? (string)errObj : null;
+
+            return new KeyGenerationResponse
+            {
+                RequestId = requestId,
+                Success = success,
+                KeyId = keyId,
+                ErrorMessage = errorMessage
+            };
         }
         catch (Exception ex)
         {
@@ -212,20 +254,34 @@ public class MessageBusIntegrationService
 
         try
         {
-            var request = new KeyRetrievalRequest
+            var requestId = Guid.NewGuid();
+            var message = new PluginMessage
             {
-                RequestId = Guid.NewGuid(),
-                KeyId = keyId,
-                RequestedAt = DateTimeOffset.UtcNow
+                Type = $"{KeyManagementTopic}.retrieve",
+                Payload = new Dictionary<string, object>
+                {
+                    ["RequestId"] = requestId,
+                    ["KeyId"] = keyId,
+                    ["RequestedAt"] = DateTimeOffset.UtcNow
+                }
             };
 
-            var response = await _messageBus.RequestAsync<KeyRetrievalRequest, KeyRetrievalResponse>(
-                $"{KeyManagementTopic}.retrieve",
-                request,
-                TimeSpan.FromSeconds(30),
-                ct);
+            await _messageBus.PublishAndWaitAsync($"{KeyManagementTopic}.retrieve", message, ct);
 
-            return response;
+            // Extract response from message payload
+            var success = message.Payload.TryGetValue("Success", out var successObj) && (bool)successObj;
+            var keyMaterial = message.Payload.TryGetValue("KeyMaterial", out var keyMatObj) ? (byte[])keyMatObj : null;
+            var keyType = message.Payload.TryGetValue("KeyType", out var keyTypeObj) ? (string)keyTypeObj : null;
+            var errorMessage = message.Payload.TryGetValue("ErrorMessage", out var errObj) ? (string)errObj : null;
+
+            return new KeyRetrievalResponse
+            {
+                RequestId = requestId,
+                Success = success,
+                KeyMaterial = keyMaterial,
+                KeyType = keyType,
+                ErrorMessage = errorMessage
+            };
         }
         catch (Exception ex)
         {
@@ -256,22 +312,38 @@ public class MessageBusIntegrationService
 
         try
         {
-            var request = new WormAccessValidationRequest
+            var requestId = Guid.NewGuid();
+            var message = new PluginMessage
             {
-                RequestId = Guid.NewGuid(),
-                ObjectId = objectId,
-                Principal = principal,
-                AccessType = accessType,
-                RequestedAt = DateTimeOffset.UtcNow
+                Type = $"{AccessControlTopic}.worm.validate",
+                Payload = new Dictionary<string, object>
+                {
+                    ["RequestId"] = requestId,
+                    ["ObjectId"] = objectId,
+                    ["Principal"] = principal,
+                    ["AccessType"] = accessType,
+                    ["RequestedAt"] = DateTimeOffset.UtcNow
+                }
             };
 
-            var response = await _messageBus.RequestAsync<WormAccessValidationRequest, WormAccessValidationResponse>(
-                $"{AccessControlTopic}.worm.validate",
-                request,
-                TimeSpan.FromSeconds(10),
-                ct);
+            await _messageBus.PublishAndWaitAsync($"{AccessControlTopic}.worm.validate", message, ct);
 
-            return response;
+            // Extract response from message payload
+            var allowed = message.Payload.TryGetValue("Allowed", out var allowedObj) && (bool)allowedObj;
+            var denialReason = message.Payload.TryGetValue("DenialReason", out var reasonObj) ? (string)reasonObj : null;
+            var retentionExpiresAt = message.Payload.TryGetValue("RetentionExpiresAt", out var retObj)
+                ? (DateTimeOffset?)retObj : null;
+            var hasLegalHold = message.Payload.TryGetValue("HasLegalHold", out var holdObj)
+                ? (bool?)holdObj : null;
+
+            return new WormAccessValidationResponse
+            {
+                RequestId = requestId,
+                Allowed = allowed,
+                DenialReason = denialReason,
+                RetentionExpiresAt = retentionExpiresAt,
+                HasLegalHold = hasLegalHold
+            };
         }
         catch (Exception ex)
         {
@@ -301,24 +373,31 @@ public class MessageBusIntegrationService
 
         try
         {
-            var alert = new TamperAlert
+            var alertId = Guid.NewGuid();
+            var severity = DetermineAlertSeverity(incident);
+
+            var message = new PluginMessage
             {
-                AlertId = Guid.NewGuid(),
-                IncidentId = incident.IncidentId,
-                ObjectId = incident.ObjectId,
-                Severity = DetermineAlertSeverity(incident),
-                Message = $"Tampering detected on object {incident.ObjectId}",
-                IncidentDetails = incident,
-                PublishedAt = DateTimeOffset.UtcNow
+                Type = _config.Alerts.MessageBusTopic,
+                Payload = new Dictionary<string, object>
+                {
+                    ["AlertId"] = alertId,
+                    ["IncidentId"] = incident.IncidentId,
+                    ["ObjectId"] = incident.ObjectId,
+                    ["Severity"] = severity.ToString(),
+                    ["Message"] = $"Tampering detected on object {incident.ObjectId}",
+                    ["IncidentDetails"] = incident,
+                    ["PublishedAt"] = DateTimeOffset.UtcNow
+                }
             };
 
             await _messageBus.PublishAsync(
                 _config.Alerts.MessageBusTopic,
-                alert,
+                message,
                 ct);
 
             _logger.LogInformation("Published tamper alert {AlertId} for incident {IncidentId}",
-                alert.AlertId, incident.IncidentId);
+                alertId, incident.IncidentId);
         }
         catch (Exception ex)
         {
@@ -346,18 +425,23 @@ public class MessageBusIntegrationService
 
         try
         {
-            var notification = new RecoveryNotification
+            var notificationId = Guid.NewGuid();
+            var message = new PluginMessage
             {
-                NotificationId = Guid.NewGuid(),
-                ObjectId = objectId,
-                RecoverySource = recoverySource,
-                Success = success,
-                NotifiedAt = DateTimeOffset.UtcNow
+                Type = $"{TamperProofIncidentsTopic}.recovery",
+                Payload = new Dictionary<string, object>
+                {
+                    ["NotificationId"] = notificationId,
+                    ["ObjectId"] = objectId,
+                    ["RecoverySource"] = recoverySource,
+                    ["Success"] = success,
+                    ["NotifiedAt"] = DateTimeOffset.UtcNow
+                }
             };
 
             await _messageBus.PublishAsync(
                 $"{TamperProofIncidentsTopic}.recovery",
-                notification,
+                message,
                 ct);
 
             _logger.LogDebug("Published recovery notification for object {ObjectId}", objectId);
@@ -387,26 +471,6 @@ public class MessageBusIntegrationService
 }
 
 #region Message Bus Contracts
-
-/// <summary>
-/// Interface for message bus client.
-/// </summary>
-public interface IMessageBusClient
-{
-    /// <summary>
-    /// Sends a request and waits for a response.
-    /// </summary>
-    Task<TResponse?> RequestAsync<TRequest, TResponse>(
-        string topic,
-        TRequest request,
-        TimeSpan timeout,
-        CancellationToken ct = default);
-
-    /// <summary>
-    /// Publishes a message to a topic.
-    /// </summary>
-    Task PublishAsync<T>(string topic, T message, CancellationToken ct = default);
-}
 
 /// <summary>
 /// Request to encrypt data via UltimateEncryption.
