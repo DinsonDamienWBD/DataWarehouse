@@ -2,6 +2,7 @@ using DataWarehouse.SDK.Utilities;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -99,6 +100,21 @@ namespace DataWarehouse.SDK.Contracts.IntelligenceAware
         /// Whether discovery has been attempted.
         /// </summary>
         private volatile bool _discoveryAttempted;
+
+        /// <summary>
+        /// Pending typed message handlers registered before message bus injection.
+        /// </summary>
+        private readonly List<PendingHandler> _pendingHandlers = new();
+
+        /// <summary>
+        /// Tracks all registered typed handler metadata for discovery.
+        /// </summary>
+        private readonly List<(Type RequestType, Type? ResponseType)> _registeredHandlerTypes = new();
+
+        /// <summary>
+        /// Subscriptions created for typed handlers (disposed on cleanup).
+        /// </summary>
+        private readonly List<IDisposable> _typedHandlerSubscriptions = new();
 
         /// <summary>
         /// Gets whether Universal Intelligence (T90) is currently available.
@@ -1342,23 +1358,202 @@ namespace DataWarehouse.SDK.Contracts.IntelligenceAware
             return metadata;
         }
 
+        // ========================================
+        // Typed Message Handler Registration (KS3)
+        // ========================================
+
+        /// <summary>
+        /// Registers a strongly-typed request/response handler that auto-subscribes to the message bus.
+        /// The topic is derived from <c>typeof(TRequest).FullName</c>.
+        /// If the message bus is not yet injected, the handler is stored and subscribed later
+        /// via <see cref="InjectKernelServices"/>.
+        /// </summary>
+        /// <typeparam name="TRequest">The request DTO type. Its <c>FullName</c> becomes the subscription topic.</typeparam>
+        /// <typeparam name="TResponse">The response DTO type, serialized back to the message bus.</typeparam>
+        /// <param name="handler">The handler function that processes the request and returns a response.</param>
+        protected void RegisterHandler<TRequest, TResponse>(Func<TRequest, CancellationToken, Task<TResponse>> handler)
+            where TRequest : class
+            where TResponse : class
+        {
+            ArgumentNullException.ThrowIfNull(handler);
+
+            var topic = typeof(TRequest).FullName ?? typeof(TRequest).Name;
+            _registeredHandlerTypes.Add((typeof(TRequest), typeof(TResponse)));
+
+            Func<PluginMessage, Task> busHandler = async msg =>
+            {
+                try
+                {
+                    TRequest? request = DeserializeFromMessage<TRequest>(msg);
+                    if (request == null) return;
+
+                    var response = await handler(request, CancellationToken.None).ConfigureAwait(false);
+
+                    if (MessageBus != null && msg.CorrelationId != null)
+                    {
+                        await MessageBus.PublishAsync($"{topic}.response", new PluginMessage
+                        {
+                            Type = $"{topic}.response",
+                            CorrelationId = msg.CorrelationId,
+                            Source = Id,
+                            Payload = new Dictionary<string, object>
+                            {
+                                ["success"] = true,
+                                ["body"] = response
+                            }
+                        }).ConfigureAwait(false);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    if (MessageBus != null && msg.CorrelationId != null)
+                    {
+                        await MessageBus.PublishAsync($"{topic}.response", new PluginMessage
+                        {
+                            Type = $"{topic}.response",
+                            CorrelationId = msg.CorrelationId,
+                            Source = Id,
+                            Payload = new Dictionary<string, object>
+                            {
+                                ["success"] = false,
+                                ["error"] = ex.Message
+                            }
+                        }).ConfigureAwait(false);
+                    }
+                }
+            };
+
+            SubscribeOrDefer(topic, busHandler);
+        }
+
+        /// <summary>
+        /// Registers a strongly-typed fire-and-forget notification handler that auto-subscribes to the message bus.
+        /// The topic is derived from <c>typeof(TNotification).FullName</c>.
+        /// If the message bus is not yet injected, the handler is stored and subscribed later
+        /// via <see cref="InjectKernelServices"/>.
+        /// </summary>
+        /// <typeparam name="TNotification">The notification DTO type. Its <c>FullName</c> becomes the subscription topic.</typeparam>
+        /// <param name="handler">The handler function that processes the notification.</param>
+        protected void RegisterHandler<TNotification>(Func<TNotification, CancellationToken, Task> handler)
+            where TNotification : class
+        {
+            ArgumentNullException.ThrowIfNull(handler);
+
+            var topic = typeof(TNotification).FullName ?? typeof(TNotification).Name;
+            _registeredHandlerTypes.Add((typeof(TNotification), null));
+
+            Func<PluginMessage, Task> busHandler = async msg =>
+            {
+                try
+                {
+                    TNotification? notification = DeserializeFromMessage<TNotification>(msg);
+                    if (notification == null) return;
+
+                    await handler(notification, CancellationToken.None).ConfigureAwait(false);
+                }
+                catch
+                {
+                    // Fire-and-forget: swallow exceptions to prevent bus disruption
+                }
+            };
+
+            SubscribeOrDefer(topic, busHandler);
+        }
+
+        /// <summary>
+        /// Gets the list of registered typed message handlers for discovery.
+        /// Each entry contains the request type and optional response type (null for fire-and-forget).
+        /// </summary>
+        public IReadOnlyList<(Type RequestType, Type? ResponseType)> GetRegisteredHandlers()
+        {
+            return _registeredHandlerTypes.AsReadOnly();
+        }
+
+        /// <summary>
+        /// Overrides <see cref="PluginBase.InjectKernelServices"/> to subscribe any pending
+        /// typed message handlers that were registered before the message bus was available.
+        /// </summary>
+        public override void InjectKernelServices(
+            IMessageBus? messageBus,
+            IPluginCapabilityRegistry? capabilityRegistry,
+            IKnowledgeLake? knowledgeLake)
+        {
+            base.InjectKernelServices(messageBus, capabilityRegistry, knowledgeLake);
+
+            if (messageBus != null && _pendingHandlers.Count > 0)
+            {
+                foreach (var pending in _pendingHandlers)
+                {
+                    var sub = messageBus.Subscribe(pending.Topic, pending.Handler);
+                    _typedHandlerSubscriptions.Add(sub);
+                }
+                _pendingHandlers.Clear();
+            }
+        }
+
+        /// <summary>
+        /// Subscribes to the message bus immediately if available, otherwise defers.
+        /// </summary>
+        private void SubscribeOrDefer(string topic, Func<PluginMessage, Task> busHandler)
+        {
+            if (MessageBus != null)
+            {
+                var sub = MessageBus.Subscribe(topic, busHandler);
+                _typedHandlerSubscriptions.Add(sub);
+            }
+            else
+            {
+                _pendingHandlers.Add(new PendingHandler(topic, busHandler));
+            }
+        }
+
+        /// <summary>
+        /// Deserializes a typed object from a <see cref="PluginMessage"/> payload.
+        /// Checks the "body" key first, then falls back to deserializing the entire payload.
+        /// </summary>
+        private static T? DeserializeFromMessage<T>(PluginMessage msg) where T : class
+        {
+            if (msg.Payload.TryGetValue("body", out var bodyObj))
+            {
+                if (bodyObj is T typedBody)
+                    return typedBody;
+                if (bodyObj is JsonElement jsonElement)
+                    return jsonElement.Deserialize<T>();
+                if (bodyObj is string jsonStr)
+                    return JsonSerializer.Deserialize<T>(jsonStr);
+            }
+
+            // Fall back to deserializing the entire payload
+            return JsonSerializer.Deserialize<T>(JsonSerializer.Serialize(msg.Payload));
+        }
+
+        /// <summary>
+        /// Internal record for deferred handler registration.
+        /// </summary>
+        private sealed record PendingHandler(string Topic, Func<PluginMessage, Task> Handler);
+
         #region IDisposable / IAsyncDisposable
 
         /// <summary>
-        /// Cleans up Intelligence subscriptions and pending requests.
+        /// Cleans up Intelligence subscriptions, typed handler subscriptions, and pending requests.
         /// </summary>
         protected override void Dispose(bool disposing)
         {
             if (disposing)
             {
-                // Dispose Intelligence subscriptions
                 foreach (var subscription in _intelligenceSubscriptions)
                 {
                     try { subscription.Dispose(); } catch { }
                 }
                 _intelligenceSubscriptions.Clear();
 
-                // Cancel pending requests
+                foreach (var subscription in _typedHandlerSubscriptions)
+                {
+                    try { subscription.Dispose(); } catch { }
+                }
+                _typedHandlerSubscriptions.Clear();
+                _pendingHandlers.Clear();
+
                 foreach (var kvp in _pendingRequests)
                 {
                     kvp.Value.TrySetCanceled();
@@ -1370,18 +1565,23 @@ namespace DataWarehouse.SDK.Contracts.IntelligenceAware
         }
 
         /// <summary>
-        /// Performs async cleanup of Intelligence resources.
+        /// Performs async cleanup of Intelligence resources and typed handler subscriptions.
         /// </summary>
         protected override async ValueTask DisposeAsyncCore()
         {
-            // Dispose Intelligence subscriptions
             foreach (var subscription in _intelligenceSubscriptions)
             {
                 try { subscription.Dispose(); } catch { }
             }
             _intelligenceSubscriptions.Clear();
 
-            // Cancel pending requests
+            foreach (var subscription in _typedHandlerSubscriptions)
+            {
+                try { subscription.Dispose(); } catch { }
+            }
+            _typedHandlerSubscriptions.Clear();
+            _pendingHandlers.Clear();
+
             foreach (var kvp in _pendingRequests)
             {
                 kvp.Value.TrySetCanceled();
