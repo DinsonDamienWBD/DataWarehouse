@@ -2158,3 +2158,117 @@ StrategyBase (root)
 All lifecycle methods use `override` (never `new`). All property names bridge to `StrategyBase.Name`.
 
 **Note:** Phase 41.1 is part of the v3.0 rollout and focuses on architectural correctness, kill-shot fixes, and hierarchy alignment before major feature implementations in subsequent phases.
+
+---
+
+## Configuration System (v3.0)
+
+### DataWarehouseConfiguration
+Unified configuration object consolidating ALL settings across the entire DataWarehouse system.
+
+**Configuration Sections** (13 total):
+- **Security**: Encryption, auth, audit, TLS, MFA, RBAC, zero-trust, FIPS, quantum-safe, HSM, cert pinning, tamper-proof logging
+- **Storage**: Encrypt-at-rest, compression, deduplication, caching, indexing, versioning, cache size, max connections, backend, data directory
+- **Network**: TLS, HTTP/2, HTTP/3, compression, listen port, max connections, timeouts, bind address
+- **Replication**: Multi-master, CRDT, replication factor, consistency level, sync interval, conflict resolution
+- **Encryption**: In-transit, at-rest, envelope encryption, key rotation, algorithms, key store backend
+- **Compression**: Auto-select, compression level, algorithms
+- **Observability**: Metrics, tracing, logging, health checks, anomaly detection, log levels, intervals
+- **Compute**: GPU, parallel processing, worker threads, I/O threads, scheduling strategies
+- **Resilience**: Circuit breaker, retry, bulkhead, self-healing, max retries, thresholds, timeouts
+- **Deployment**: Air-gap mode, multi-cloud, edge, embedded, environment type
+- **DataManagement**: Catalog, governance, quality, lineage, multi-tenancy
+- **MessageBus**: Persistent messages, ordered delivery, max queue size, delivery timeout
+- **Plugins**: Auto-load, hot reload, max plugins, plugin directory
+
+### Configuration Presets (6 levels)
+Preset files are COMPLETE living system state files containing EVERY setting, not just overrides.
+
+1. **unsafe**: Zero security, maximum performance (dev/testing ONLY) -- No encryption, no auth, no audit, no TLS
+2. **minimal**: Basic auth, no encryption, no audit -- RBAC enabled, basic auth scheme
+3. **standard**: AES-256, RBAC, basic audit, TLS required -- Default production-ready configuration
+4. **secure**: Quantum-safe crypto, MFA, full audit, encrypted-at-rest, certificate pinning -- Key rotation 30 days, tracing enabled
+5. **paranoid**: FIPS 140-3, HSM keys, air-gap ready, tamper-proof logging, zero-trust -- Critical settings locked (cannot be overridden)
+6. **god-tier**: Everything enabled (ML anomaly detection, adaptive security, self-healing, auto-rotation) -- Multi-master replication (RF=5, QUORUM), GPU, multi-cloud, edge
+
+### Hardware Probe Integration
+`PresetSelector` uses `IHardwareProbe` to auto-select best-fit preset at install time:
+
+**Decision Logic**:
+- HSM/TPM detected -> **paranoid**
+- GPU + 128GB+ RAM -> **god-tier**
+- 16+ cores, 32+ GB RAM -> **secure**
+- 4-16 cores, 8-32 GB RAM -> **standard**
+- < 4 cores, < 8 GB RAM -> **minimal**
+
+Integrated into CLI install flow for automatic hardware-aware configuration.
+
+### Configuration Injection
+All plugins and strategies receive `DataWarehouseConfiguration` via property injection:
+
+```csharp
+// In PluginBase:
+protected DataWarehouseConfiguration SystemConfiguration { get; private set; }
+
+// In StrategyBase:
+protected DataWarehouseConfiguration SystemConfiguration { get; private set; }
+
+// Kernel calls during registration:
+plugin.InjectConfiguration(kernelConfig);
+```
+
+### Per-Item Override Control
+Each setting wrapped in `ConfigurationItem<T>`:
+
+```csharp
+public class ConfigurationItem<T>
+{
+    public T Value { get; set; }
+    public bool AllowUserToOverride { get; set; } = true;
+    public string? LockedByPolicy { get; set; }
+    public string? Description { get; set; }
+}
+```
+
+Paranoid and God-Tier presets lock critical security settings with `AllowUserToOverride = false`.
+
+### Runtime Configuration Changes
+`ConfigurationChangeApi` enforces override policies with write-back and audit:
+
+```csharp
+var api = new ConfigurationChangeApi(config, messageBus, configFilePath, auditLog);
+var success = await api.TryUpdateConfigurationAsync("Security.EncryptionEnabled", true, "admin", "Enable encryption");
+```
+
+Changes trigger: (1) AllowUserToOverride check, (2) in-memory update, (3) XML file write-back, (4) audit log entry, (5) MessageTopics.ConfigChanged event.
+
+### Bidirectional File Persistence
+Config file is a COMPLETE living system state (analogy: Windows Answer File + Settings/Control Panel):
+
+1. **Deploy**: Preset XML copied to `./config/datawarehouse-config.xml`
+2. **Startup**: `ConfigurationSerializer.LoadFromFile()` loads config (creates default if missing)
+3. **Runtime**: Every change written back via `SaveToFile()`
+4. **Persist**: Same config file used across restarts
+
+### Configuration Audit Trail
+`ConfigurationAuditLog` provides append-only audit trail at `./config/config-audit.log`:
+
+```csharp
+public record AuditEntry(DateTime Timestamp, string User, string SettingPath, string? OldValue, string? NewValue, string? Reason);
+```
+
+Features: Append-only (immutable history), JSON format (one entry per line), query support with filters (path prefix, date range, user).
+
+### XML Preset Files (Embedded Resources)
+6 preset templates embedded in SDK assembly:
+- `DataWarehouse.SDK.Primitives.Configuration.Presets.unsafe.xml`
+- `DataWarehouse.SDK.Primitives.Configuration.Presets.minimal.xml`
+- `DataWarehouse.SDK.Primitives.Configuration.Presets.standard.xml`
+- `DataWarehouse.SDK.Primitives.Configuration.Presets.secure.xml`
+- `DataWarehouse.SDK.Primitives.Configuration.Presets.paranoid.xml`
+- `DataWarehouse.SDK.Primitives.Configuration.Presets.god-tier.xml`
+
+### Dashboard API Endpoints
+- `GET /api/configuration/unified` -- Returns full DataWarehouseConfiguration
+- `POST /api/configuration/unified/update` -- Updates setting with override enforcement, write-back, audit
+- `GET /api/configuration/unified/audit` -- Query audit trail with filters
