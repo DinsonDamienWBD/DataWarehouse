@@ -358,6 +358,10 @@ Audit findings resolved:
 - Phase 41.1-06: Enhanced existing ConsensusPluginBase in PluginBase.cs (not creating duplicate in Hierarchy folder) with Multi-Raft records
 - Phase 41.1-06: Separate IReplicationClusterMembership for DVV (lightweight) vs existing IClusterMembership (full distributed)
 - Phase 41.1-06: Jump consistent hash O(ln n) for Multi-Raft group routing; Paxos/PBFT/ZAB stubs per plan scope
+- Phase 41.1-04: Extraction over deletion for URI-based storage chain: HybridDatabase/HybridStorage/InMemoryStorage deeply depend on URI-based APIs incompatible with key-based hierarchy StoragePluginBase
+- Phase 41.1-04: InterfacePluginBase kept as forwarding shim (LegacyInterfacePluginBase.cs) — 5 consumers still use SDK.Contracts namespace version
+- Phase 41.1-04: Opt-in caching/indexing pattern: StoragePluginBase uses EnableCaching()/EnableIndexing() instead of inheritance chain
+- Phase 41.1-04: PluginBase.cs reduced from 3310 to 1161 lines — 14 legacy classes deleted/extracted
 
 ### SDK Audit Results (2026-02-14)
 
@@ -534,11 +538,11 @@ Phase 33 (VDE) ─────────────────────�
 ### Current Position
 
 **Phase 41.1** — Stage: **EXECUTE** (7 plans, 2 waves)
-Plan: 6 of 7 complete
+Plan: 7 of 7 (plan 04 complete, plans 05+07 remaining)
 Status: IN PROGRESS
 
-Progress: [####################----] 86% (6/7 plans)
+Progress: [####################----] 86% (6/7 plans complete; plan 04 done, 05+07 pending)
 
 Last session: 2026-02-17
-Stopped at: Completed 41.1-06-PLAN.md (KS7 DVV + KS8 Multi-Raft Consensus)
-Resume: Execute 41.1-07-PLAN.md
+Stopped at: Completed 41.1-04-PLAN.md (FIX-10/11/12/13 Legacy Base Deletion)
+Resume: Execute 41.1-05-PLAN.md or 41.1-07-PLAN.md
