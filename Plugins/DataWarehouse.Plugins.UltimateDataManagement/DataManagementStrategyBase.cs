@@ -376,7 +376,7 @@ public abstract class DataManagementStrategyBase : StrategyBase, IDataManagement
     /// <summary>
     /// Throws if the strategy has not been initialized.
     /// </summary>
-    protected void ThrowIfNotInitialized()
+    protected new void ThrowIfNotInitialized()
     {
         if (!_initialized)
             throw new InvalidOperationException($"Strategy '{StrategyId}' has not been initialized.");
