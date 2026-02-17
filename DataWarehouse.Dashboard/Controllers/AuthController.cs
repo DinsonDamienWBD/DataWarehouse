@@ -24,31 +24,8 @@ public class AuthController : ControllerBase
 
     static AuthController()
     {
-        // Initialize default admin user (in production, use secure storage)
-        _users["admin"] = new UserCredential
-        {
-            UserId = "admin-001",
-            Username = "admin",
-            // In production, store hashed passwords. This is for demo only.
-            PasswordHash = HashPassword("admin"),
-            Roles = new[] { UserRoles.Admin, UserRoles.Operator, UserRoles.User }
-        };
-
-        _users["operator"] = new UserCredential
-        {
-            UserId = "operator-001",
-            Username = "operator",
-            PasswordHash = HashPassword("operator"),
-            Roles = new[] { UserRoles.Operator, UserRoles.User }
-        };
-
-        _users["user"] = new UserCredential
-        {
-            UserId = "user-001",
-            Username = "user",
-            PasswordHash = HashPassword("user"),
-            Roles = new[] { UserRoles.User }
-        };
+        // DO NOT initialize default users with hardcoded passwords in production.
+        // Users must be explicitly configured via secure configuration.
     }
 
     public AuthController(
@@ -289,16 +266,49 @@ public class AuthController : ControllerBase
 
     private static string HashPassword(string password)
     {
-        // In production, use a proper password hashing algorithm like Argon2 or bcrypt
-        using var sha256 = System.Security.Cryptography.SHA256.Create();
-        var bytes = System.Text.Encoding.UTF8.GetBytes(password + "DataWarehouse_Salt_2024");
-        var hash = sha256.ComputeHash(bytes);
-        return Convert.ToBase64String(hash);
+        var salt = new byte[32];
+        using var rng = System.Security.Cryptography.RandomNumberGenerator.Create();
+        rng.GetBytes(salt);
+
+        var hash = System.Security.Cryptography.Rfc2898DeriveBytes.Pbkdf2(
+            System.Text.Encoding.UTF8.GetBytes(password),
+            salt,
+            100_000,
+            System.Security.Cryptography.HashAlgorithmName.SHA256,
+            32);
+
+        // Combine salt and hash for storage
+        var combined = new byte[salt.Length + hash.Length];
+        Buffer.BlockCopy(salt, 0, combined, 0, salt.Length);
+        Buffer.BlockCopy(hash, 0, combined, salt.Length, hash.Length);
+        return Convert.ToBase64String(combined);
     }
 
-    private static bool VerifyPassword(string password, string hash)
+    private static bool VerifyPassword(string password, string storedHash)
     {
-        return HashPassword(password) == hash;
+        try
+        {
+            var combined = Convert.FromBase64String(storedHash);
+            if (combined.Length != 64) return false; // 32 salt + 32 hash
+
+            var salt = new byte[32];
+            var hash = new byte[32];
+            Buffer.BlockCopy(combined, 0, salt, 0, 32);
+            Buffer.BlockCopy(combined, 32, hash, 0, 32);
+
+            var computedHash = System.Security.Cryptography.Rfc2898DeriveBytes.Pbkdf2(
+                System.Text.Encoding.UTF8.GetBytes(password),
+                salt,
+                100_000,
+                System.Security.Cryptography.HashAlgorithmName.SHA256,
+                32);
+
+            return System.Security.Cryptography.CryptographicOperations.FixedTimeEquals(computedHash, hash);
+        }
+        catch
+        {
+            return false;
+        }
     }
 
     private sealed class UserCredential

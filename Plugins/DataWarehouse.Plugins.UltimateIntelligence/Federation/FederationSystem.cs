@@ -601,6 +601,8 @@ public sealed class InstanceRegistry : IAsyncDisposable
     {
         var handler = new HttpClientHandler();
 
+        // SECURITY: TLS certificate validation is always enabled by default.
+        // Only bypass validation if explicitly configured to false.
         if (!config.ValidateServerCertificate)
         {
             handler.ServerCertificateCustomValidationCallback = (_, _, _, _) => true;

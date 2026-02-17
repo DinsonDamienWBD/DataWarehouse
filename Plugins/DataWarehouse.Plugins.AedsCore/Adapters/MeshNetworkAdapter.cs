@@ -25,7 +25,7 @@ namespace DataWarehouse.Plugins.AedsCore.Adapters;
 /// </para>
 /// </remarks>
 [SdkCompatibility("3.0.0", Notes = "Phase 36: Mesh network adapter for AEDS (EDGE-08)")]
-public sealed class MeshNetworkAdapter : IDisposable
+public sealed class MeshNetworkAdapter : IDisposable, IAsyncDisposable
 {
     private readonly IMeshNetwork _meshNetwork;
     private readonly MeshSettings _settings;
@@ -126,7 +126,21 @@ public sealed class MeshNetworkAdapter : IDisposable
     public void Dispose()
     {
         _topologyTimer?.Dispose();
-        _meshNetwork?.DisposeAsync().AsTask().Wait();
+        // Don't call async dispose from sync Dispose
+        // User must call DisposeAsync() for proper cleanup
+    }
+
+    /// <summary>
+    /// Asynchronously disposes the mesh network adapter.
+    /// </summary>
+    public async ValueTask DisposeAsync()
+    {
+        _topologyTimer?.Dispose();
+        if (_meshNetwork != null)
+        {
+            await _meshNetwork.DisposeAsync();
+        }
+        GC.SuppressFinalize(this);
     }
 }
 

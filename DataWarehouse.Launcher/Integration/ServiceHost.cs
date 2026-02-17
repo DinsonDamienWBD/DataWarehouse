@@ -68,7 +68,8 @@ public sealed class ServiceHost : IAsyncDisposable
         if (options.EnableHttp)
         {
             _httpServer = new LauncherHttpServer(_runner, _loggerFactory);
-            await _httpServer.StartAsync(httpPort, cancellationToken);
+            // API key will be generated automatically if not provided
+            await _httpServer.StartAsync(httpPort, apiKey: null, cancellationToken);
             _logger.LogInformation("HTTP API available at http://0.0.0.0:{Port}/api/v1/", httpPort);
         }
 

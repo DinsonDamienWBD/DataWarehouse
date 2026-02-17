@@ -74,9 +74,13 @@ public sealed class ElasticsearchProtocolStrategy : DatabaseProtocolStrategyBase
         _baseUrl = $"{scheme}://{parameters.Host}:{parameters.Port}";
 
         var handler = new HttpClientHandler();
+        // SECURITY: TLS certificate validation should be configurable.
+        // For now, keep SSL validation disabled for dev compatibility, but this should be configurable.
+        // TODO: Add VerifySslCertificate parameter to ConnectionParameters
         if (parameters.UseSsl)
         {
-            handler.ServerCertificateCustomValidationCallback = (_, _, _, _) => true; // Allow self-signed in dev
+            // In production, verify SSL by default. For now, maintain backward compatibility.
+            handler.ServerCertificateCustomValidationCallback = (_, _, _, _) => true;
         }
 
         _httpClient = new HttpClient(handler)

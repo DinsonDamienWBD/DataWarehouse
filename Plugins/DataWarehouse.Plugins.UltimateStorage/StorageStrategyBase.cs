@@ -148,7 +148,8 @@ namespace DataWarehouse.Plugins.UltimateStorage
                 return;
             }
 
-            DisposeCoreAsync().GetAwaiter().GetResult();
+            // No sync resources to dispose in base class
+            // Derived classes should override if they have sync resources
 
             _isDisposed = true;
             GC.SuppressFinalize(this);

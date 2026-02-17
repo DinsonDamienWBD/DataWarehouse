@@ -168,6 +168,9 @@ namespace DataWarehouse.Plugins.UltimateCompression
             var strategy = _activeStrategy ?? SelectBestStrategy(data.AsSpan(0, Math.Min(data.Length, 4096)));
             var compressed = strategy.Compress(data);
 
+            // Store the algorithm name in args for decompression
+            args["compression.algorithm"] = strategy.Characteristics.AlgorithmName;
+
             // Return compressed stream
             return new MemoryStream(compressed);
         }
@@ -180,8 +183,21 @@ namespace DataWarehouse.Plugins.UltimateCompression
             await stored.CopyToAsync(ms, ct);
             var data = ms.ToArray();
 
-            // Select strategy and decompress
-            var strategy = _activeStrategy ?? SelectBestStrategy(data.AsSpan(0, Math.Min(data.Length, 4096)));
+            // Use stored algorithm from metadata instead of guessing via entropy
+            ICompressionStrategy? strategy = null;
+            if (args.TryGetValue("compression.algorithm", out var algorithmObj) && algorithmObj is string algorithmName)
+            {
+                strategy = GetStrategy(algorithmName);
+            }
+
+            // Fallback to active strategy or default
+            strategy ??= _activeStrategy ?? GetStrategy("Zstd") ?? _strategies.Values.FirstOrDefault();
+
+            if (strategy == null)
+            {
+                throw new InvalidOperationException("No compression strategy available for decompression");
+            }
+
             var decompressed = strategy.Decompress(data);
 
             // Return decompressed stream

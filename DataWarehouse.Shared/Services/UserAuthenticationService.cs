@@ -65,10 +65,12 @@ public sealed class UserAuthenticationService : IUserAuthenticationService, IDis
     {
         _config = config ?? throw new ArgumentNullException(nameof(config));
 
-        // Add default admin user for development
+        // Security: Do NOT create default admin user with hardcoded password.
+        // In production, admin users must be explicitly configured.
         if (_config.CreateDefaultAdminUser)
         {
-            AddUser("admin", "Admin User", "admin@localhost", "admin", new[] { "admin" });
+            throw new InvalidOperationException(
+                "CreateDefaultAdminUser is disabled for security. Configure admin users explicitly via secure configuration.");
         }
     }
 

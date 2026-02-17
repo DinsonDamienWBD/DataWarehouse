@@ -21,6 +21,7 @@ public sealed class LauncherHttpServer : IAsyncDisposable
     private WebApplication? _app;
     private bool _disposed;
     private DateTime? _startTime;
+    private string? _apiKey;
 
     /// <summary>
     /// Creates a new LauncherHttpServer.
@@ -54,13 +55,26 @@ public sealed class LauncherHttpServer : IAsyncDisposable
     /// Starts the HTTP server on the given port.
     /// </summary>
     /// <param name="port">The port to listen on.</param>
+    /// <param name="apiKey">Optional API key for authentication. If not provided, one will be generated.</param>
     /// <param name="ct">Cancellation token.</param>
-    public async Task StartAsync(int port, CancellationToken ct = default)
+    public async Task StartAsync(int port, string? apiKey = null, CancellationToken ct = default)
     {
         if (IsRunning)
         {
             _logger.LogWarning("HTTP server is already running on port {Port}", Port);
             return;
+        }
+
+        // Set or generate API key
+        if (string.IsNullOrEmpty(apiKey))
+        {
+            _apiKey = GenerateApiKey();
+            _logger.LogWarning("Generated API key for LauncherHttpServer: {ApiKey}", _apiKey);
+            _logger.LogWarning("IMPORTANT: Save this API key - it will not be shown again");
+        }
+        else
+        {
+            _apiKey = apiKey;
         }
 
         var builder = WebApplication.CreateSlimBuilder();
@@ -74,7 +88,7 @@ public sealed class LauncherHttpServer : IAsyncDisposable
         Port = port;
         IsRunning = true;
         _startTime = DateTime.UtcNow;
-        _logger.LogInformation("HTTP server started on port {Port}", port);
+        _logger.LogInformation("HTTP server started on port {Port} with API key authentication", port);
     }
 
     /// <summary>
@@ -82,6 +96,29 @@ public sealed class LauncherHttpServer : IAsyncDisposable
     /// </summary>
     private void MapEndpoints(WebApplication app)
     {
+        // API Key authentication middleware
+        app.Use(async (context, next) =>
+        {
+            // Skip authentication for health endpoint
+            if (context.Request.Path.StartsWithSegments("/api/v1/health"))
+            {
+                await next();
+                return;
+            }
+
+            // Check for API key in Authorization header
+            if (!context.Request.Headers.TryGetValue("Authorization", out var authHeader) ||
+                !authHeader.ToString().StartsWith("Bearer ") ||
+                authHeader.ToString().Substring(7) != _apiKey)
+            {
+                context.Response.StatusCode = 401;
+                await context.Response.WriteAsJsonAsync(new { error = "Unauthorized", message = "Valid API key required" });
+                return;
+            }
+
+            await next();
+        });
+
         // GET /api/v1/info -- instance information
         app.MapGet("/api/v1/info", () =>
         {
@@ -182,6 +219,14 @@ public sealed class LauncherHttpServer : IAsyncDisposable
         _disposed = true;
 
         await StopAsync();
+    }
+
+    private static string GenerateApiKey()
+    {
+        var keyBytes = new byte[32];
+        using var rng = System.Security.Cryptography.RandomNumberGenerator.Create();
+        rng.GetBytes(keyBytes);
+        return $"dwl_{Convert.ToBase64String(keyBytes).Replace("+", "").Replace("/", "").Replace("=", "")}";
     }
 }
 
