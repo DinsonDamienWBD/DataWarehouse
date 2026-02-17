@@ -291,6 +291,7 @@ public sealed class UltimateIntelligencePlugin : PipelinePluginBase
     }
 
     /// <inheritdoc/>
+    [Obsolete("Use OnWriteAsync instead. Sync-over-async causes threadpool starvation under load.")]
     public override Stream OnWrite(Stream input, IKernelContext context, Dictionary<string, object> args)
     {
         // Intelligence plugin typically does not transform data directly
@@ -299,6 +300,7 @@ public sealed class UltimateIntelligencePlugin : PipelinePluginBase
     }
 
     /// <inheritdoc/>
+    [Obsolete("Use OnReadAsync instead. Sync-over-async causes threadpool starvation under load.")]
     public override Stream OnRead(Stream stored, IKernelContext context, Dictionary<string, object> args)
     {
         // Intelligence plugin typically does not transform data directly

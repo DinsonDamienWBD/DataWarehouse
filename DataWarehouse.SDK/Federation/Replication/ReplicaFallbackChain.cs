@@ -1,6 +1,8 @@
 using DataWarehouse.SDK.Federation.Topology;
+using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 
 namespace DataWarehouse.SDK.Federation.Replication;
 
@@ -22,7 +24,8 @@ namespace DataWarehouse.SDK.Federation.Replication;
 internal static class ReplicaFallbackChain
 {
     /// <summary>
-    /// Builds a fallback chain for a failed replica.
+    /// Asynchronously builds a fallback chain for a failed replica.
+    /// Preferred over <see cref="Build"/> to avoid sync-over-async topology lookups.
     /// </summary>
     /// <param name="failedNodeId">The node ID that failed to serve the read.</param>
     /// <param name="allReplicas">All replica node IDs for the object.</param>
@@ -32,18 +35,37 @@ internal static class ReplicaFallbackChain
     /// A list of node IDs ordered by preference (highest proximity score first). The failed
     /// node is excluded. Returns an empty list if no other replicas are available.
     /// </returns>
+    public static async Task<List<string>> BuildAsync(
+        string failedNodeId,
+        IReadOnlyList<string> allReplicas,
+        NodeTopology self,
+        ITopologyProvider topologyProvider)
+    {
+        var replicas = allReplicas.Where(id => id != failedNodeId).ToList();
+
+        // Score replicas by proximity
+        var scored = new List<(string NodeId, double Score)>();
+        foreach (var replicaId in replicas)
+        {
+            var topology = await topologyProvider.GetNodeTopologyAsync(replicaId);
+            if (topology == null) continue;
+
+            var score = ProximityCalculator.CalculateProximityScore(self, topology, RoutingPolicy.LatencyOptimized);
+            scored.Add((replicaId, score));
+        }
+
+        // Sort by score descending (highest score = nearest replica)
+        return scored.OrderByDescending(x => x.Score).Select(x => x.NodeId).ToList();
+    }
+
+    /// <summary>
+    /// Builds a fallback chain for a failed replica (synchronous).
+    /// </summary>
     /// <remarks>
-    /// <para>
-    /// This method filters out the failed node, queries topology metadata for each remaining
-    /// replica, scores them by proximity, and returns a sorted list.
-    /// </para>
-    /// <para>
-    /// <strong>Synchronous Topology Lookup:</strong> This method uses blocking synchronous
-    /// calls to <see cref="ITopologyProvider.GetNodeTopologyAsync"/>. This is acceptable
-    /// because fallback chain construction happens on the fallback path (after a failure),
-    /// not on the hot path for initial selection.
-    /// </para>
+    /// This method uses blocking synchronous calls to topology provider.
+    /// Prefer <see cref="BuildAsync"/> in async contexts to avoid threadpool starvation.
     /// </remarks>
+    [Obsolete("Use BuildAsync instead. This method uses sync-over-async which can cause threadpool starvation.")]
     public static List<string> Build(
         string failedNodeId,
         IReadOnlyList<string> allReplicas,
@@ -56,7 +78,6 @@ internal static class ReplicaFallbackChain
         var scored = new List<(string NodeId, double Score)>();
         foreach (var replicaId in replicas)
         {
-            // Blocking call acceptable on fallback path
             var topology = topologyProvider.GetNodeTopologyAsync(replicaId).Result;
             if (topology == null) continue;
 

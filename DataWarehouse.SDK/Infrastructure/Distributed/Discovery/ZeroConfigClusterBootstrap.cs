@@ -13,7 +13,7 @@ namespace DataWarehouse.SDK.Infrastructure.Distributed.Discovery
     /// to SWIM cluster membership for automatic node joining.
     /// </summary>
     [SdkCompatibility("3.0.0", Notes = "Phase 40: Zero-config cluster bootstrap")]
-    public sealed class ZeroConfigClusterBootstrap : IDisposable
+    public sealed class ZeroConfigClusterBootstrap : IDisposable, IAsyncDisposable
     {
         private readonly IClusterMembership _membership;
         private readonly MdnsServiceDiscovery _discovery;
@@ -202,6 +202,19 @@ namespace DataWarehouse.SDK.Infrastructure.Distributed.Discovery
             }
         }
 
+        /// <summary>
+        /// Asynchronously disposes cluster bootstrap resources.
+        /// Preferred over <see cref="Dispose"/> to avoid sync-over-async.
+        /// </summary>
+        public async ValueTask DisposeAsync()
+        {
+            await StopAsync();
+            _joinLock.Dispose();
+        }
+
+        /// <summary>
+        /// Synchronously disposes cluster bootstrap resources. Prefer <see cref="DisposeAsync"/>.
+        /// </summary>
         public void Dispose()
         {
             StopAsync().GetAwaiter().GetResult();

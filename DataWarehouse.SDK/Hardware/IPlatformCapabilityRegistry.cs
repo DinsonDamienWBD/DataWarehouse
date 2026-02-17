@@ -118,6 +118,36 @@ namespace DataWarehouse.SDK.Hardware
         int GetDeviceCount(HardwareDeviceType typeFilter);
 
         /// <summary>
+        /// Asynchronously checks if the platform has the specified capability.
+        /// Preferred over <see cref="HasCapability"/> to avoid sync-over-async on cold start.
+        /// </summary>
+        Task<bool> HasCapabilityAsync(string capabilityKey, CancellationToken ct = default);
+
+        /// <summary>
+        /// Asynchronously gets all hardware devices matching the specified type filter.
+        /// Preferred over <see cref="GetDevices"/> to avoid sync-over-async on cold start.
+        /// </summary>
+        Task<IReadOnlyList<HardwareDevice>> GetDevicesAsync(HardwareDeviceType typeFilter, CancellationToken ct = default);
+
+        /// <summary>
+        /// Asynchronously gets all discovered hardware devices regardless of type.
+        /// Preferred over <see cref="GetAllDevices"/> to avoid sync-over-async on cold start.
+        /// </summary>
+        Task<IReadOnlyList<HardwareDevice>> GetAllDevicesAsync(CancellationToken ct = default);
+
+        /// <summary>
+        /// Asynchronously gets all discovered capability keys.
+        /// Preferred over <see cref="GetCapabilities"/> to avoid sync-over-async on cold start.
+        /// </summary>
+        Task<IReadOnlyList<string>> GetCapabilitiesAsync(CancellationToken ct = default);
+
+        /// <summary>
+        /// Asynchronously gets the count of devices matching the specified type filter.
+        /// Preferred over <see cref="GetDeviceCount"/> to avoid sync-over-async on cold start.
+        /// </summary>
+        Task<int> GetDeviceCountAsync(HardwareDeviceType typeFilter, CancellationToken ct = default);
+
+        /// <summary>
         /// Forces an immediate hardware re-discovery and rebuilds the capability cache.
         /// </summary>
         /// <param name="ct">Cancellation token.</param>

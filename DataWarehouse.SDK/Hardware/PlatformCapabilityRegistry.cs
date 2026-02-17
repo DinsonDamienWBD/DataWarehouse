@@ -337,6 +337,89 @@ namespace DataWarehouse.SDK.Hardware
         }
 
         /// <inheritdoc/>
+        public async Task<bool> HasCapabilityAsync(string capabilityKey, CancellationToken ct = default)
+        {
+            if (string.IsNullOrEmpty(capabilityKey))
+                throw new ArgumentException("Capability key cannot be null or empty.", nameof(capabilityKey));
+
+            ObjectDisposedException.ThrowIf(_disposed, this);
+
+            if (_lastRefresh == DateTimeOffset.MinValue)
+                await RefreshAsync(ct);
+
+            if (IsCacheStale())
+                _ = RefreshAsync(ct);
+
+            _cacheLock.EnterReadLock();
+            try { return _capabilities.Contains(capabilityKey); }
+            finally { _cacheLock.ExitReadLock(); }
+        }
+
+        /// <inheritdoc/>
+        public async Task<IReadOnlyList<HardwareDevice>> GetDevicesAsync(HardwareDeviceType typeFilter, CancellationToken ct = default)
+        {
+            ObjectDisposedException.ThrowIf(_disposed, this);
+
+            if (_lastRefresh == DateTimeOffset.MinValue)
+                await RefreshAsync(ct);
+
+            if (IsCacheStale())
+                _ = RefreshAsync(ct);
+
+            _cacheLock.EnterReadLock();
+            try { return _devices.Where(d => d.Type.HasFlag(typeFilter)).ToList().AsReadOnly(); }
+            finally { _cacheLock.ExitReadLock(); }
+        }
+
+        /// <inheritdoc/>
+        public async Task<IReadOnlyList<HardwareDevice>> GetAllDevicesAsync(CancellationToken ct = default)
+        {
+            ObjectDisposedException.ThrowIf(_disposed, this);
+
+            if (_lastRefresh == DateTimeOffset.MinValue)
+                await RefreshAsync(ct);
+
+            if (IsCacheStale())
+                _ = RefreshAsync(ct);
+
+            _cacheLock.EnterReadLock();
+            try { return _devices; }
+            finally { _cacheLock.ExitReadLock(); }
+        }
+
+        /// <inheritdoc/>
+        public async Task<IReadOnlyList<string>> GetCapabilitiesAsync(CancellationToken ct = default)
+        {
+            ObjectDisposedException.ThrowIf(_disposed, this);
+
+            if (_lastRefresh == DateTimeOffset.MinValue)
+                await RefreshAsync(ct);
+
+            if (IsCacheStale())
+                _ = RefreshAsync(ct);
+
+            _cacheLock.EnterReadLock();
+            try { return _capabilities.ToList().AsReadOnly(); }
+            finally { _cacheLock.ExitReadLock(); }
+        }
+
+        /// <inheritdoc/>
+        public async Task<int> GetDeviceCountAsync(HardwareDeviceType typeFilter, CancellationToken ct = default)
+        {
+            ObjectDisposedException.ThrowIf(_disposed, this);
+
+            if (_lastRefresh == DateTimeOffset.MinValue)
+                await RefreshAsync(ct);
+
+            if (IsCacheStale())
+                _ = RefreshAsync(ct);
+
+            _cacheLock.EnterReadLock();
+            try { return _devices.Count(d => d.Type.HasFlag(typeFilter)); }
+            finally { _cacheLock.ExitReadLock(); }
+        }
+
+        /// <inheritdoc/>
         public void Dispose()
         {
             if (_disposed)
