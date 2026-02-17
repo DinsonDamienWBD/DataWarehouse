@@ -2,6 +2,7 @@ using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Contracts.Hierarchy;
 using DataWarehouse.SDK.Contracts.IntelligenceAware;
 using DataWarehouse.SDK.Distribution;
+using DataWarehouse.SDK.Hosting;
 using DataWarehouse.SDK.Primitives;
 using Microsoft.Extensions.Logging;
 using System.Collections.Concurrent;
@@ -36,6 +37,7 @@ namespace DataWarehouse.Plugins.AedsCore;
 /// </list>
 /// </para>
 /// </remarks>
+[PluginProfile(ServiceProfileType.Client)]
 public class ClientCourierPlugin : PlatformPluginBase
 {
     private readonly ILogger<ClientCourierPlugin> _logger;

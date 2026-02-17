@@ -1,5 +1,6 @@
 using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Distribution;
+using DataWarehouse.SDK.Hosting;
 using DataWarehouse.SDK.Primitives;
 using Microsoft.Extensions.Logging;
 using MQTTnet;
@@ -40,6 +41,7 @@ namespace DataWarehouse.Plugins.AedsCore.ControlPlane;
 /// requiring lightweight pub/sub messaging with broker-based routing.
 /// </para>
 /// </remarks>
+[PluginProfile(ServiceProfileType.Server)]
 public class MqttControlPlanePlugin : ControlPlaneTransportPluginBase
 {
     private readonly ILogger<MqttControlPlanePlugin> _logger;

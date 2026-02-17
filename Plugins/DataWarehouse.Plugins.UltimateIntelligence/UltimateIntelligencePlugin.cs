@@ -3,6 +3,7 @@ using System.Text.Json;
 using System.Threading;
 using DataWarehouse.SDK.AI;
 using DataWarehouse.SDK.Contracts;
+using DataWarehouse.SDK.Hosting;
 using DataWarehouse.SDK.Primitives;
 using DataWarehouse.SDK.Utilities;
 using DataWarehouse.Plugins.UltimateIntelligence.Strategies.Memory;
@@ -24,6 +25,7 @@ namespace DataWarehouse.Plugins.UltimateIntelligence;
 ///   <item>Features: Semantic Search, Content Classification, Anomaly Detection, Access Prediction, Failure Prediction, Psychometric Indexing</item>
 /// </list>
 /// </remarks>
+[PluginProfile(ServiceProfileType.Server)]
 public sealed class UltimateIntelligencePlugin : DataWarehouse.SDK.Contracts.Hierarchy.DataTransformationPluginBase
 {
     private readonly ConcurrentDictionary<string, IIntelligenceStrategy> _allStrategies = new(StringComparer.OrdinalIgnoreCase);

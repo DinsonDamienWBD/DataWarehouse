@@ -4,6 +4,7 @@ using DataWarehouse.SDK.AI;
 using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Contracts.Hierarchy;
 using DataWarehouse.SDK.Contracts.IntelligenceAware;
+using DataWarehouse.SDK.Hosting;
 using DataWarehouse.SDK.Primitives;
 using DataWarehouse.SDK.Utilities;
 using CapabilityCategory = DataWarehouse.SDK.Contracts.CapabilityCategory;
@@ -38,6 +39,7 @@ namespace DataWarehouse.Plugins.UltimateRAID;
 /// - Intelligence-aware for AI-powered predictive failure detection
 /// - AI-driven RAID level recommendations
 /// </summary>
+[PluginProfile(ServiceProfileType.Server)]
 public sealed class UltimateRaidPlugin : DataWarehouse.SDK.Contracts.Hierarchy.ReplicationPluginBase, IDisposable
 {
     private readonly RaidStrategyRegistry _registry;

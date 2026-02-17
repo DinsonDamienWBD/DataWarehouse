@@ -1,5 +1,6 @@
 using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Distribution;
+using DataWarehouse.SDK.Hosting;
 using DataWarehouse.SDK.Primitives;
 using Microsoft.Extensions.Logging;
 using System.Collections.Concurrent;
@@ -30,6 +31,7 @@ namespace DataWarehouse.Plugins.AedsCore;
 /// clients, and channels to a database or distributed cache.
 /// </para>
 /// </remarks>
+[PluginProfile(ServiceProfileType.Server)]
 public class ServerDispatcherPlugin : ServerDispatcherPluginBase
 {
     private readonly ILogger<ServerDispatcherPlugin> _logger;

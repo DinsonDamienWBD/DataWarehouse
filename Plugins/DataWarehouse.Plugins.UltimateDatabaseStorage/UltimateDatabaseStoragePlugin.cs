@@ -3,6 +3,7 @@ using DataWarehouse.SDK.Contracts.Hierarchy;
 using DataWarehouse.SDK.Contracts.IntelligenceAware;
 using DataWarehouse.SDK.Contracts.Storage;
 using DataWarehouse.SDK.Database;
+using DataWarehouse.SDK.Hosting;
 using DataWarehouse.SDK.Primitives;
 using DataWarehouse.SDK.Utilities;
 using System.Reflection;
@@ -74,6 +75,7 @@ namespace DataWarehouse.Plugins.UltimateDatabaseStorage;
 /// - Health monitoring and diagnostics
 /// - Intelligence-aware optimizations
 /// </summary>
+[PluginProfile(ServiceProfileType.Server)]
 public sealed class UltimateDatabaseStoragePlugin : DataWarehouse.SDK.Contracts.Hierarchy.StoragePluginBase, IAsyncDisposable
 {
     private readonly DatabaseStorageStrategyRegistry _strategyRegistry;

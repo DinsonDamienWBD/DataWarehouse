@@ -4,6 +4,7 @@ using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Contracts.Storage;
 using DataWarehouse.SDK.Contracts.Hierarchy;
 using DataWarehouse.SDK.Contracts.IntelligenceAware;
+using DataWarehouse.SDK.Hosting;
 using DataWarehouse.SDK.Primitives;
 using DataWarehouse.SDK.Utilities;
 using System.Runtime.CompilerServices;
@@ -42,6 +43,7 @@ namespace DataWarehouse.Plugins.UltimateStorage;
 /// - Automatic failover
 /// - Compression and deduplication
 /// </summary>
+[PluginProfile(ServiceProfileType.Server)]
 public sealed class UltimateStoragePlugin : DataWarehouse.SDK.Contracts.Hierarchy.StoragePluginBase, IDataTerminal, IDisposable
 {
     private readonly StorageStrategyRegistry _registry;

@@ -1,5 +1,6 @@
 using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Distribution;
+using DataWarehouse.SDK.Hosting;
 using DataWarehouse.SDK.Primitives;
 using Microsoft.Extensions.Logging;
 using System.Net.WebSockets;
@@ -34,6 +35,7 @@ namespace DataWarehouse.Plugins.AedsCore.ControlPlane;
 /// for incoming messages. If no message received for 90 seconds, triggers reconnection.
 /// </para>
 /// </remarks>
+[PluginProfile(ServiceProfileType.Server)]
 public class WebSocketControlPlanePlugin : ControlPlaneTransportPluginBase
 {
     private readonly ILogger<WebSocketControlPlanePlugin> _logger;
