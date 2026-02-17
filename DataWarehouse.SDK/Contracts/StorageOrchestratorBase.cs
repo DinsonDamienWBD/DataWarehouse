@@ -360,12 +360,15 @@ namespace DataWarehouse.SDK.Contracts
 
     #endregion
 
-    #region Storage Strategy Base
+    #region Storage Orchestration Strategy Base
 
     /// <summary>
-    /// Abstract base class for storage strategies.
+    /// Abstract base class for storage orchestration strategies that plan write/read
+    /// distribution across multiple storage providers (e.g., Simple, Mirrored, WAL).
+    /// Distinct from <see cref="Storage.StorageStrategyBase"/> which handles individual
+    /// storage backend operations (Store, Retrieve, Delete).
     /// </summary>
-    public abstract class StorageStrategyBase : StrategyBase, IStorageStrategy
+    public abstract class StorageOrchestrationStrategyBase : StrategyBase, IStorageStrategy
     {
         public override abstract string StrategyId { get; }
         public override abstract string Name { get; }
@@ -402,7 +405,7 @@ namespace DataWarehouse.SDK.Contracts
     }
 
     /// <summary>Simple single-provider strategy.</summary>
-    public class SimpleStrategy : StorageStrategyBase
+    public class SimpleStrategy : StorageOrchestrationStrategyBase
     {
         public override string StrategyId => "simple";
         public override string Name => "Simple";
@@ -417,7 +420,7 @@ namespace DataWarehouse.SDK.Contracts
     }
 
     /// <summary>Mirrored strategy (RAID 1) - writes to all providers.</summary>
-    public class MirroredStrategy : StorageStrategyBase
+    public class MirroredStrategy : StorageOrchestrationStrategyBase
     {
         public override string StrategyId => "mirrored";
         public override string Name => "Mirrored (RAID 1)";
@@ -451,7 +454,7 @@ namespace DataWarehouse.SDK.Contracts
         }
     }
     /// <summary>Write-ahead log strategy for durability.</summary>
-    public class WriteAheadLogStrategy : StorageStrategyBase
+    public class WriteAheadLogStrategy : StorageOrchestrationStrategyBase
     {
         public override string StrategyId => "wal";
         public override string Name => "Write-Ahead Log";
