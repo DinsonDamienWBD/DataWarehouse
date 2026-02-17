@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <Description>Ultimate Consensus plugin for DataWarehouse providing Multi-Raft consensus with multiple Raft groups, consistent hashing for group routing, leader election, log replication, snapshot/restore, and cluster health monitoring.</Description>
+    <Authors>DataWarehouse Team</Authors>
+    <Company>DataWarehouse</Company>
+    <Product>DataWarehouse Ultimate Consensus Plugin</Product>
+    <Copyright>Copyright (c) DataWarehouse. All rights reserved.</Copyright>
+    <Version>1.0.0</Version>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
+    <LangVersion>latest</LangVersion>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\DataWarehouse.SDK\DataWarehouse.SDK.csproj" />
+  </ItemGroup>
+</Project>
