@@ -45,6 +45,7 @@
     <ProjectReference Include="..\Plugins\DataWarehouse.Plugins.UltimateStorage\DataWarehouse.Plugins.UltimateStorage.csproj" />
     <ProjectReference Include="..\Plugins\DataWarehouse.Plugins.UltimateRAID\DataWarehouse.Plugins.UltimateRAID.csproj" />
     <ProjectReference Include="..\Plugins\DataWarehouse.Plugins.UltimateReplication\DataWarehouse.Plugins.UltimateReplication.csproj" />
+    <ProjectReference Include="..\Plugins\DataWarehouse.Plugins.UltimateConsensus\DataWarehouse.Plugins.UltimateConsensus.csproj" />
     <ProjectReference Include="..\Plugins\DataWarehouse.Plugins.UltimateKeyManagement\DataWarehouse.Plugins.UltimateKeyManagement.csproj" />
     <ProjectReference Include="..\Plugins\DataWarehouse.Plugins.UltimateInterface\DataWarehouse.Plugins.UltimateInterface.csproj" />
     <ProjectReference Include="..\Plugins\DataWarehouse.Plugins.UltimateIntelligence\DataWarehouse.Plugins.UltimateIntelligence.csproj" />
