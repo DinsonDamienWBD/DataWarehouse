@@ -83,6 +83,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Enterprise
         private int _timeoutSeconds = 300;
         private int _maxRetries = 3;
         private int _retryDelayMs = 1000;
+        private bool _validateCertificate = true;
 
         // Store metadata cache
         private StoreMetadata? _cachedStoreMetadata;
@@ -151,15 +152,19 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Enterprise
             _timeoutSeconds = GetConfiguration<int>("TimeoutSeconds", 300);
             _maxRetries = GetConfiguration<int>("MaxRetries", 3);
             _retryDelayMs = GetConfiguration<int>("RetryDelayMs", 1000);
+            _validateCertificate = GetConfiguration<bool>("ValidateCertificate", true);
 
             // Normalize endpoint
             _endpoint = _endpoint.TrimEnd('/');
 
             // Create HTTP client with custom handler for authentication
-            var handler = new HttpClientHandler
+            var handler = new HttpClientHandler();
+            // SECURITY: TLS certificate validation is enabled by default.
+            // Only bypass when explicitly configured to false.
+            if (!_validateCertificate)
             {
-                ServerCertificateCustomValidationCallback = (message, cert, chain, errors) => true // Allow self-signed certs
-            };
+                handler.ServerCertificateCustomValidationCallback = (message, cert, chain, errors) => true;
+            }
 
             _httpClient = new HttpClient(handler)
             {

@@ -66,8 +66,5 @@ namespace DataWarehouse.SDK.Infrastructure.InMemory
             ct.ThrowIfCancellationRequested();
             return Task.FromResult<IReadOnlyList<TierInfo>>(new[] { _defaultTier });
         }
-
-        // Suppress CS0067
-        private void SuppressWarning() => OnTierEvent?.Invoke(null!);
     }
 }

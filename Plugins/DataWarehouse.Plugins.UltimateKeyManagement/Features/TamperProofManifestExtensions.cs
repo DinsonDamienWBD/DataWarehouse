@@ -453,7 +453,7 @@ public static class TamperProofManifestExtensions
         {
             foreach (var prop in paramsElement.EnumerateObject())
             {
-                algorithmParams[prop.Name] = ConvertJsonElement(prop.Value);
+                algorithmParams[prop.Name] = ConvertJsonElement(prop.Value) ?? null!; // Dictionary<string, object> can store null
             }
         }
 
@@ -546,7 +546,7 @@ public static class TamperProofManifestExtensions
     /// <summary>
     /// Converts a JsonElement to a primitive CLR type.
     /// </summary>
-    private static object ConvertJsonElement(JsonElement element)
+    private static object? ConvertJsonElement(JsonElement element)
     {
         return element.ValueKind switch
         {
@@ -554,7 +554,7 @@ public static class TamperProofManifestExtensions
             JsonValueKind.Number => element.TryGetInt64(out var l) ? l : element.GetDouble(),
             JsonValueKind.True => true,
             JsonValueKind.False => false,
-            JsonValueKind.Null => null!,
+            JsonValueKind.Null => null,
             JsonValueKind.Array => element.EnumerateArray().Select(ConvertJsonElement).ToList(),
             JsonValueKind.Object => element.EnumerateObject()
                 .ToDictionary(p => p.Name, p => ConvertJsonElement(p.Value)),

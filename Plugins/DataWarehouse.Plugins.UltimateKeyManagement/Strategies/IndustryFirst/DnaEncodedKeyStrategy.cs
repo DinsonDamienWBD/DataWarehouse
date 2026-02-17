@@ -42,8 +42,8 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.IndustryFirst
     public sealed class DnaEncodedKeyStrategy : KeyStoreStrategyBase
     {
         private DnaConfig _config = new();
-        private HttpClient _synthesisClient = null!;
-        private HttpClient _sequencingClient = null!;
+        private HttpClient _synthesisClient = null!; // Initialized in InitializeStorage
+        private HttpClient _sequencingClient = null!; // Initialized in InitializeStorage
         private readonly Dictionary<string, DnaKeyEntry> _keyStore = new();
         private string _currentKeyId = "default";
         private readonly SemaphoreSlim _lock = new(1, 1);

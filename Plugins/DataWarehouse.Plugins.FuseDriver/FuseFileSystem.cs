@@ -243,8 +243,9 @@ public sealed class FuseFileSystem : IDisposable
 
         if (data == null || data.Length == 0)
         {
-            // Try loading from storage provider
-            data = LoadFromStorageAsync(path).GetAwaiter().GetResult();
+            // Cannot be async: FUSE callback interface requires synchronous signature.
+            // Using Task.Run to prevent sync context deadlock.
+            data = Task.Run(() => LoadFromStorageAsync(path)).GetAwaiter().GetResult();
             if (data == null)
             {
                 return 0; // EOF
@@ -365,7 +366,9 @@ public sealed class FuseFileSystem : IDisposable
         // Flush dirty data to storage
         if (handle.IsDirty && handle.Node != null)
         {
-            SaveToStorageAsync(path, handle.Node.Data ?? Array.Empty<byte>()).GetAwaiter().GetResult();
+            // Cannot be async: FUSE callback interface requires synchronous signature.
+            // Using Task.Run to prevent sync context deadlock.
+            Task.Run(() => SaveToStorageAsync(path, handle.Node.Data ?? Array.Empty<byte>())).GetAwaiter().GetResult();
         }
 
         return 0;
@@ -466,7 +469,9 @@ public sealed class FuseFileSystem : IDisposable
         parent.Ctime = DateTime.UtcNow;
 
         // Delete from storage
-        DeleteFromStorageAsync(path).GetAwaiter().GetResult();
+        // Cannot be async: FUSE callback interface requires synchronous signature.
+        // Using Task.Run to prevent sync context deadlock.
+        Task.Run(() => DeleteFromStorageAsync(path)).GetAwaiter().GetResult();
 
         return 0;
     }
@@ -907,7 +912,9 @@ public sealed class FuseFileSystem : IDisposable
 
         if (handle.IsDirty)
         {
-            SaveToStorageAsync(path, handle.Node.Data ?? Array.Empty<byte>()).GetAwaiter().GetResult();
+            // Cannot be async: FUSE callback interface requires synchronous signature.
+            // Using Task.Run to prevent sync context deadlock.
+            Task.Run(() => SaveToStorageAsync(path, handle.Node.Data ?? Array.Empty<byte>())).GetAwaiter().GetResult();
             handle.IsDirty = false;
         }
 
@@ -1681,7 +1688,9 @@ public sealed class FuseFileSystem : IDisposable
         // Flush all dirty handles
         foreach (var handle in _openHandles.Values.Where(h => h.IsDirty && h.Node != null))
         {
-            SaveToStorageAsync(handle.Node!.Path, handle.Node.Data ?? Array.Empty<byte>()).GetAwaiter().GetResult();
+            // Cannot be async: FUSE callback interface requires synchronous signature.
+            // Using Task.Run to prevent sync context deadlock.
+            Task.Run(() => SaveToStorageAsync(handle.Node!.Path, handle.Node.Data ?? Array.Empty<byte>())).GetAwaiter().GetResult();
         }
 
         _openHandles.Clear();

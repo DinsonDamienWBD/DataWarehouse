@@ -58,7 +58,7 @@ public sealed class PackageManager
             if (ct.IsCancellationRequested) break;
 
             // Encrypt the blob data
-            var (ciphertext, nonce, tag) = EncryptData(blob.Data);
+            var (ciphertext, nonce, tag) = await EncryptDataAsync(blob.Data);
 
             // Compute hash of encrypted data
             byte[] hashBytes;
@@ -306,7 +306,7 @@ public sealed class PackageManager
             }
 
             // Decrypt
-            var plaintext = DecryptData(shard.Data, shard.Nonce, shard.Tag);
+            var plaintext = await DecryptDataAsync(shard.Data, shard.Nonce, shard.Tag);
 
             blobs.Add(new BlobData
             {
@@ -595,7 +595,7 @@ public sealed class PackageManager
 
     #region Encryption Helpers
 
-    private (byte[] ciphertext, byte[] nonce, byte[] tag) EncryptData(byte[] plaintext)
+    private async Task<(byte[] ciphertext, byte[] nonce, byte[] tag)> EncryptDataAsync(byte[] plaintext)
     {
         var nonce = new byte[12]; // 96-bit nonce for AES-GCM
         RandomNumberGenerator.Fill(nonce);
@@ -620,7 +620,7 @@ public sealed class PackageManager
                     }
                 };
 
-                var response = _messageBus.SendAsync("encryption.encrypt", msg, CancellationToken.None).GetAwaiter().GetResult();
+                var response = await _messageBus.SendAsync("encryption.encrypt", msg, CancellationToken.None);
                 if (response != null && response.Success && response.Payload is Dictionary<string, object> payload
                     && payload.ContainsKey("ciphertext") && payload.ContainsKey("tag"))
                 {
@@ -644,7 +644,7 @@ public sealed class PackageManager
         return (ciphertext, nonce, tag);
     }
 
-    private byte[] DecryptData(byte[] ciphertext, byte[] nonce, byte[] tag)
+    private async Task<byte[]> DecryptDataAsync(byte[] ciphertext, byte[] nonce, byte[] tag)
     {
         var plaintext = new byte[ciphertext.Length];
 
@@ -666,7 +666,7 @@ public sealed class PackageManager
                     }
                 };
 
-                var response = _messageBus.SendAsync("encryption.decrypt", msg, CancellationToken.None).GetAwaiter().GetResult();
+                var response = await _messageBus.SendAsync("encryption.decrypt", msg, CancellationToken.None);
                 if (response != null && response.Success && response.Payload is Dictionary<string, object> payload
                     && payload.ContainsKey("data"))
                 {

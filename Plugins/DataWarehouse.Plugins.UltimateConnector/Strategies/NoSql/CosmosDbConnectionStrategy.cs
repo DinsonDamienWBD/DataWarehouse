@@ -14,6 +14,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.NoSql
     public class CosmosDbConnectionStrategy : DatabaseConnectionStrategyBase
     {
         private HttpClient? _httpClient;
+        private bool _verifySsl = true;
 
         public override string StrategyId => "cosmosdb";
         public override string DisplayName => "Azure Cosmos DB";
@@ -37,10 +38,13 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.NoSql
 
         protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct)
         {
-            // SECURITY: For production, TLS certificate validation should be enabled by default.
-            // Maintaining backward compatibility for now.
-            // TODO: Add VerifySsl configuration option
-            var handler = new HttpClientHandler { ServerCertificateCustomValidationCallback = (_, _, _, _) => true };
+            var handler = new HttpClientHandler();
+            // SECURITY: TLS certificate validation is enabled by default.
+            // Only bypass when explicitly configured to false.
+            if (!_verifySsl)
+            {
+                handler.ServerCertificateCustomValidationCallback = (_, _, _, _) => true;
+            }
             _httpClient = new HttpClient(handler)
             {
                 BaseAddress = new Uri(config.ConnectionString.StartsWith("http") ? config.ConnectionString : $"https://{config.ConnectionString}"),

@@ -253,7 +253,7 @@ public sealed class JsonSchemaRegenerationStrategy : RegenerationStrategyBase
         JsonElement? schema,
         CancellationToken ct)
     {
-        var result = new Dictionary<string, object>();
+        var result = new Dictionary<string, object?>();
 
         // Extract key-value pairs from encoded data
         var kvPairs = Regex.Matches(encodedData, @"[""']?(\w+)[""']?\s*[=:]\s*[""']?([^""',\r\n}]+)[""']?");
@@ -277,7 +277,7 @@ public sealed class JsonSchemaRegenerationStrategy : RegenerationStrategyBase
         return JsonSerializer.Serialize(result, new JsonSerializerOptions { WriteIndented = true });
     }
 
-    private static object InferValue(string valueStr, JsonElement? schema, string key)
+    private static object? InferValue(string valueStr, JsonElement? schema, string key)
     {
         // Try to infer type from schema
         if (schema.HasValue && schema.Value.TryGetProperty("properties", out var props))
@@ -291,7 +291,7 @@ public sealed class JsonSchemaRegenerationStrategy : RegenerationStrategyBase
                     "integer" when int.TryParse(valueStr, out var i) => i,
                     "number" when double.TryParse(valueStr, out var d) => d,
                     "boolean" when bool.TryParse(valueStr, out var b) => b,
-                    "null" => (object)null!,
+                    "null" => null,
                     _ => valueStr
                 };
             }
@@ -301,7 +301,7 @@ public sealed class JsonSchemaRegenerationStrategy : RegenerationStrategyBase
         if (int.TryParse(valueStr, out var intVal)) return intVal;
         if (double.TryParse(valueStr, out var dblVal)) return dblVal;
         if (bool.TryParse(valueStr, out var boolVal)) return boolVal;
-        if (valueStr.Equals("null", StringComparison.OrdinalIgnoreCase)) return (object)null!;
+        if (valueStr.Equals("null", StringComparison.OrdinalIgnoreCase)) return null;
 
         // Check for date formats
         if (DateTime.TryParse(valueStr, out var dateVal))

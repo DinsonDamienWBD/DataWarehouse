@@ -104,7 +104,7 @@ public sealed record TrainingSample
     public float[] Features { get; init; } = Array.Empty<float>();
 
     /// <summary>Target label or value.</summary>
-    public object Target { get; init; } = null!;
+    public required object Target { get; init; }
 
     /// <summary>Sample weight for importance.</summary>
     public double Weight { get; init; } = 1.0;
@@ -245,7 +245,7 @@ public sealed record FeedbackRecord
     public string Query { get; init; } = "";
 
     /// <summary>Model's prediction.</summary>
-    public object ModelPrediction { get; init; } = null!;
+    public required object ModelPrediction { get; init; }
 
     /// <summary>User's correction.</summary>
     public Correction? UserCorrection { get; init; }
@@ -269,7 +269,7 @@ public sealed record FeedbackRecord
 public sealed record Correction
 {
     /// <summary>Corrected output value.</summary>
-    public object CorrectedOutput { get; init; } = null!;
+    public required object CorrectedOutput { get; init; }
 
     /// <summary>Explanation of correction.</summary>
     public string? Explanation { get; init; }

@@ -172,7 +172,7 @@ public sealed class JournalEntry
     /// <returns>True if deserialization and checksum validation succeeded, false otherwise.</returns>
     public static bool Deserialize(ReadOnlySpan<byte> buffer, out JournalEntry entry, out int bytesRead)
     {
-        entry = null!;
+        entry = null!; // Out parameter - will be assigned before returning true
         bytesRead = 0;
 
         if (buffer.Length < HeaderSize)

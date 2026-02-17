@@ -54,8 +54,8 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.IndustryFirst
     public sealed class SmartContractKeyStrategy : KeyStoreStrategyBase
     {
         private SmartContractConfig _config = new();
-        private Web3 _web3 = null!;
-        private Account _account = null!;
+        private Web3 _web3 = null!; // Initialized in InitializeStorage
+        private Account _account = null!; // Initialized in InitializeStorage
         private string _contractAddress = "";
         private readonly Dictionary<string, SmartContractKeyEntry> _keyStore = new();
         private string _currentKeyId = "default";

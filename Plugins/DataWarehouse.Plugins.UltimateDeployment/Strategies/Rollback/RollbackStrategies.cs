@@ -952,7 +952,7 @@ public sealed class VersionPinningStrategy : DeploymentStrategyBase
             {
                 ["versionPinningEnabled"] = true,
                 ["isPinned"] = isPinned,
-                ["pinnedVersion"] = isPinned ? existingPin!.Version : null!
+                ["pinnedVersion"] = isPinned ? existingPin!.Version : null! // Dictionary<string, object> can store null
             }
         };
     }
