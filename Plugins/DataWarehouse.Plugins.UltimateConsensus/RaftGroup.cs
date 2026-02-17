@@ -89,7 +89,7 @@ public sealed class RaftGroup
     /// <summary>
     /// Next log index to assign.
     /// </summary>
-    private long _nextLogIndex = 1;
+    private long _nextLogIndex;
 
     /// <summary>
     /// Creates a new Raft group.
