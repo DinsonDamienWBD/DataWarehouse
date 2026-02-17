@@ -2053,10 +2053,33 @@ var analysis = await MessageBus.SendAsync("intelligence.request", new PluginMess
 
 **Upcoming (remaining kill shots):**
 
-3. **KS5 — NativeKeyHandle for Key Memory**
-   - Secure key material handling with native memory
-   - Prevents key material from entering managed heap
-   - Integrates with `UltimateKeyManagement` and encryption plugins
+3. **KS5 — NativeKeyHandle for Key Memory** -- COMPLETE (41.1-05)
+   - `NativeKeyHandle` sealed class in `SDK/Security/`: secure native memory key handles
+     - `NativeMemory.AllocZeroed` for allocation outside GC heap
+     - `NativeMemory.Clear` + `NativeMemory.Free` on Dispose (guaranteed secure wipe)
+     - `KeySpan` property returns `Span<byte>` (zero-copy, no managed heap allocation)
+     - Finalizer safety net for missed Dispose calls
+     - `FromBytes(byte[])` and `FromBytes(ReadOnlySpan<byte>)` factory methods
+   - `IKeyStore.GetKeyNativeAsync` DIM: wraps `GetKeyAsync` → `NativeKeyHandle.FromBytes` with `ZeroMemory` on intermediate byte[]
+   - `KeyStoreStrategyBase.GetKeyNativeAsync` virtual method for native-first overrides
+   - `EncryptionPluginBase.GetKeyNativeAsync` helper delegating to `DefaultKeyStore`
+   - `SecurityPluginBase.GetKeyNativeAsync` helper with `IKeyStore? KeyStore` property
+   - `UltimateKeyManagement`: `protected override GetKeyNativeAsync` iterates registered key stores
+   - `UltimateEncryption`: `GetKeyFromKeyStoreNativeAsync` for zero-copy key access
+
+4. **KS3 — Typed Message Handler Registration** -- COMPLETE (41.1-05)
+   - `IntelligenceAwarePluginBase` enhanced with typed handler registration API:
+     - `RegisterHandler<TRequest, TResponse>(handler)`: request/response pattern with auto-topic from `typeof(TRequest).FullName`
+     - `RegisterHandler<TNotification>(handler)`: fire-and-forget pattern
+     - `GetRegisteredHandlers()`: discovery of registered handler types
+     - Deferred subscription: handlers registered before MessageBus injection are queued in `_pendingHandlers`
+     - `InjectKernelServices` override subscribes all pending handlers when bus becomes available
+     - JSON deserialization via `DeserializeFromMessage<T>` from `PluginMessage.Payload`
+     - Response published back to `{topic}.Response` topic with correlation
+     - Proper cleanup in Dispose/DisposeAsyncCore
+   - Plugin examples:
+     - `UltimateAccessControl`: `RegisterHandler<AccessEvaluationRequest, AccessEvaluationResponse>`
+     - `UltimateCompliance`: `RegisterHandler<ComplianceCheckRequest, ComplianceCheckResponse>`
 
 2. **KS6 + KS10 — Tenant-Scoped Storage in DataManagementPluginBase** -- COMPLETE (41.1-02)
    - Multi-tenancy at the base class level via `ConcurrentDictionary<string, ConcurrentDictionary<string, object>>` tenant cache
