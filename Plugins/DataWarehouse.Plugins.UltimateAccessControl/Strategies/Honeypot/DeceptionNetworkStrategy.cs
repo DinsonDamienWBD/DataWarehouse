@@ -494,7 +494,7 @@ public sealed class DeceptionNetworkStrategy : AccessControlStrategyBase, IDispo
             }),
             ThreatLureType.FakeApiKey => $"sk_live_{Convert.ToBase64String(RandomNumberGenerator.GetBytes(24))[..32]}",
             ThreatLureType.FakeToken => GenerateFakeJwt(),
-            ThreatLureType.FakeConnectionString => "Server=db.internal;Database=production;User Id=sa;Password=P@ssw0rd;",
+            ThreatLureType.FakeConnectionString => GenerateFakeConnectionString(),
             _ => "Confidential data - do not share"
         };
     }
@@ -505,6 +505,12 @@ public sealed class DeceptionNetworkStrategy : AccessControlStrategyBase, IDispo
         var payload = Convert.ToBase64String(Encoding.UTF8.GetBytes("{\"sub\":\"admin\",\"role\":\"superuser\"}"));
         var signature = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32));
         return $"{header}.{payload}.{signature}";
+    }
+
+    private string GenerateFakeConnectionString()
+    {
+        var randomPassword = Convert.ToBase64String(RandomNumberGenerator.GetBytes(16))[..22];
+        return $"Server=db.internal;Database=production;User Id=sa;Password={randomPassword};";
     }
 
     #endregion
