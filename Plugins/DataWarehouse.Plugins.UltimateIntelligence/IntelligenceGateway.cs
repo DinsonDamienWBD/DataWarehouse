@@ -384,6 +384,14 @@ public sealed class IntelligenceRequest
     /// Gets or sets the session ID for session-bound requests.
     /// </summary>
     public string? SessionId { get; set; }
+
+    /// <summary>
+    /// The identity of the principal on whose behalf this intelligence request is made.
+    /// When an AI agent processes this request, the AI's own privileges are IRRELEVANT.
+    /// Access control ALWAYS uses Identity.EffectivePrincipalId (the original user).
+    /// The AI agent should be appended to DelegationChain for audit purposes.
+    /// </summary>
+    public DataWarehouse.SDK.Security.CommandIdentity? Identity { get; init; }
 }
 
 /// <summary>

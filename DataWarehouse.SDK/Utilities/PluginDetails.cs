@@ -212,6 +212,13 @@ namespace DataWarehouse.SDK.Utilities
         public DateTime? ExpiresAt { get; set; }
 
         /// <summary>
+        /// The identity of the principal on whose behalf this message is being sent.
+        /// UNIVERSAL ENFORCEMENT: Every message MUST carry this identity.
+        /// Access control uses Identity.EffectivePrincipalId (never ActorId) for authorization.
+        /// </summary>
+        public DataWarehouse.SDK.Security.CommandIdentity? Identity { get; init; }
+
+        /// <summary>
         /// Creates a new PluginMessage with the specified type and payload.
         /// </summary>
         public static PluginMessage Create(string type, Dictionary<string, object>? payload = null, string? correlationId = null)

@@ -24,5 +24,12 @@
         /// Is system admin
         /// </summary>
         bool IsSystemAdmin { get; }
+
+        /// <summary>
+        /// The full command identity for multi-level access verification.
+        /// When available, this provides the complete hierarchy context
+        /// (System → Tenant → Instance → UserGroup → User) for access decisions.
+        /// </summary>
+        CommandIdentity? CommandIdentity => null; // Default interface method for backward compatibility
     }
 }

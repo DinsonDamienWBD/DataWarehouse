@@ -104,6 +104,14 @@ public sealed record CommandContext
     public IReadOnlyDictionary<string, object?> ExtendedData { get; init; } = ImmutableDictionary<string, object?>.Empty;
 
     /// <summary>
+    /// The identity of the principal executing this command.
+    /// UNIVERSAL ENFORCEMENT: Every command MUST carry this identity.
+    /// Access control evaluates Identity.EffectivePrincipalId, never Identity.ActorId.
+    /// When an AI agent executes on behalf of a user, this carries the USER's identity.
+    /// </summary>
+    public DataWarehouse.SDK.Security.CommandIdentity? Identity { get; init; }
+
+    /// <summary>
     /// Gets a typed parameter value, or default if not found.
     /// </summary>
     public T GetParameter<T>(string name, T defaultValue = default!)
