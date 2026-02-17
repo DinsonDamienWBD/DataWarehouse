@@ -37,7 +37,7 @@ namespace DataWarehouse.Plugins.UltimateResilience;
 /// - Intelligence-aware strategy recommendations
 /// - Composable resilience pipelines
 /// </summary>
-public sealed class UltimateResiliencePlugin : InfrastructurePluginBase, IDisposable
+public sealed class UltimateResiliencePlugin : ResiliencePluginBase, IDisposable
 {
     private readonly ResilienceStrategyRegistry _registry;
     private readonly ConcurrentDictionary<string, long> _usageStats = new();
@@ -57,9 +57,6 @@ public sealed class UltimateResiliencePlugin : InfrastructurePluginBase, IDispos
 
     /// <inheritdoc/>
     public override string Version => "1.0.0";
-
-    /// <inheritdoc/>
-    public override string InfrastructureDomain => "Resilience";
 
     /// <inheritdoc/>
     public override PluginCategory Category => PluginCategory.InfrastructureProvider;
@@ -636,6 +633,68 @@ public sealed class UltimateResiliencePlugin : InfrastructurePluginBase, IDispos
             },
             Tags = new[] { "statistics", "resilience", "usage" }
         };
+    }
+
+    #endregion
+
+    #region ResiliencePluginBase Implementation
+
+    /// <inheritdoc/>
+    public override async Task<T> ExecuteWithResilienceAsync<T>(
+        Func<CancellationToken, Task<T>> action,
+        string policyName,
+        CancellationToken ct)
+    {
+        ct.ThrowIfCancellationRequested();
+
+        var strategy = _registry.GetStrategy(policyName);
+        if (strategy == null)
+        {
+            throw new ArgumentException($"Resilience policy '{policyName}' not found in registry.", nameof(policyName));
+        }
+
+        Interlocked.Increment(ref _totalExecutions);
+        IncrementUsageStats(policyName);
+
+        try
+        {
+            var result = await action(ct).ConfigureAwait(false);
+            Interlocked.Increment(ref _successfulExecutions);
+            return result;
+        }
+        catch (Exception)
+        {
+            Interlocked.Increment(ref _failedExecutions);
+            throw;
+        }
+    }
+
+    /// <inheritdoc/>
+    public override Task<ResilienceHealthInfo> GetResilienceHealthAsync(CancellationToken ct)
+    {
+        ct.ThrowIfCancellationRequested();
+
+        var circuitBreakers = _registry.GetStrategiesByCategory("CircuitBreaker");
+        var allStrategies = _registry.GetAllStrategies();
+        var policyStates = new Dictionary<string, string>();
+
+        int activeBreakers = 0;
+        foreach (var cb in circuitBreakers)
+        {
+            var stats = cb.GetStatistics();
+            var state = stats.CurrentState ?? "Unknown";
+            policyStates[cb.StrategyId] = state;
+
+            if (state is "Open" or "HalfOpen")
+            {
+                activeBreakers++;
+            }
+        }
+
+        return Task.FromResult(new ResilienceHealthInfo(
+            allStrategies.Count,
+            activeBreakers,
+            policyStates));
     }
 
     #endregion
