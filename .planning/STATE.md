@@ -519,16 +519,17 @@ Phase 33 (VDE) ─────────────────────�
 - Phases 38-41 renumbered: 38=Feature Composition (was 39), 39=Medium Impl (was 40), 40=Large Impl (was 41), 41=Audit (was 38)
 - Phase 39-01 (SemanticSearch) and 39-05 (Parquet/Arrow/HDF5) superseded by Phase 31.1 work (pre-completion notes added)
 - Phase 31.2 inserted after Phase 31.1: TamperProof Decomposition — extract hashing/integrity to UltimateDataIntegrity plugin, blockchain to UltimateBlockchain plugin (URGENT architectural improvement)
+- Phase 41.1 inserted after Phase 41: Architecture Kill Shots (10 Critical Fixes from Hostile Audit) (URGENT)
 
 ### Current Position
 
-**Phase 31.1** — Stage: **EXECUTE** (research complete, 5 plans written, ready to execute)
+**Phase 41.1** — Stage: **PLAN** (kill shots analyzed, decisions made, plans needed)
 
-Next action: `/gsd:execute-phase 31.1`
-- Execute 31.1-01 first (security fixes + build errors + wiring)
-- Then 31.1-02 through 31.1-05 in parallel (max 2-3 concurrent agents)
-- See ROADMAP.md "Execution Guide" section for full dependency map and architectural rules
+Next action: `/gsd:plan-phase 41.1`
+- 10 kill shots from hostile architecture audit, all verified and decisions made
+- Covers: sync-over-async, kernel wiring, message handler base class, NativeKeyHandle, persistent storage, vector clocks, Multi-Raft consensus, lineage stubs, tenant isolation
+- Also includes: old hierarchy cleanup, plugin consolidation (UltimateConsensus), PLUGIN-CATALOG update
 
-Last session: 2026-02-16
-Stopped at: Phase 31.1 plans finalized with TARGET annotations, v3.0 overlap resolved, phase renumbering complete
-Resume: Execute Phase 31.1 plans
+Last session: 2026-02-17
+Stopped at: All 10 kill shots discussed, decisions documented, phase inserted
+Resume: Plan and execute Phase 41.1
