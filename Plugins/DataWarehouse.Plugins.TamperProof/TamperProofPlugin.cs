@@ -1003,29 +1003,44 @@ public class TamperProofPlugin : IntegrityPluginBase, IDisposable
 
         if (disposing)
         {
-            _logger.LogDebug("Disposing TamperProofPlugin");
+            _logger.LogDebug("Disposing TamperProofPlugin (sync)");
 
             // Unsubscribe from events
             _backgroundScanner.ViolationDetected -= OnIntegrityViolationDetected;
 
-            // Stop and dispose the background scanner
-            try
-            {
-                _backgroundScanner.StopAsync().GetAwaiter().GetResult();
-            }
-            catch (Exception ex)
-            {
-                _logger.LogWarning(ex, "Error stopping background scanner during disposal");
-            }
-
+            // Synchronous cleanup only
             _backgroundScanner.Dispose();
-
-            // Dispose semaphore
             _batchLock.Dispose();
         }
 
         _disposed = true;
         base.Dispose(disposing);
+    }
+
+    protected override async ValueTask DisposeAsyncCore()
+    {
+        if (_disposed) return;
+
+        _logger.LogDebug("Disposing TamperProofPlugin (async)");
+
+        // Unsubscribe from events
+        _backgroundScanner.ViolationDetected -= OnIntegrityViolationDetected;
+
+        // Async cleanup: stop scanner gracefully
+        try
+        {
+            await _backgroundScanner.DisposeAsync().ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Error stopping background scanner during async disposal");
+        }
+
+        // Dispose semaphore
+        _batchLock.Dispose();
+
+        _disposed = true;
+        await base.DisposeAsyncCore().ConfigureAwait(false);
     }
 
     #region Hierarchy IntegrityPluginBase Abstract Methods
