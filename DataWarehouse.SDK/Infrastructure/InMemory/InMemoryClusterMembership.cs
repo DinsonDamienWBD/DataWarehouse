@@ -68,8 +68,5 @@ namespace DataWarehouse.SDK.Infrastructure.InMemory
             ct.ThrowIfCancellationRequested();
             return Task.FromResult(string.Equals(nodeId, _self.NodeId, StringComparison.Ordinal));
         }
-
-        // Suppress CS0067: event is never used (single-node mode has no membership changes)
-        private void SuppressWarning() => OnMembershipChanged?.Invoke(null!);
     }
 }

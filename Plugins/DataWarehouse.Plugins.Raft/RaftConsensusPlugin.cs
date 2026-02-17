@@ -217,7 +217,8 @@ namespace DataWarehouse.Plugins.Raft
             meta["State"] = _state.ToString();
             meta["LeaderId"] = _leaderId ?? "none";
             meta["PeerCount"] = _peers.Count;
-            meta["LogLength"] = _logStore?.GetLastIndexAsync().GetAwaiter().GetResult() ?? 0;
+            // Cannot be async: Override of base synchronous GetMetadata(). Using Task.Run to prevent sync context deadlock.
+            meta["LogLength"] = _logStore != null ? Task.Run(() => _logStore.GetLastIndexAsync()).GetAwaiter().GetResult() : 0;
             meta["CommitIndex"] = _commitIndex;
             return meta;
         }
@@ -1052,14 +1053,15 @@ namespace DataWarehouse.Plugins.Raft
                 await StepDownAsync(term);
             }
 
+            // Check if candidate's log is at least as up-to-date (must be done outside lock due to async)
+            var myLastLogIndex = await GetLastLogIndexAsync();
+            var myLastLogTerm = await GetLastLogTermAsync();
+
             lock (_stateLock)
             {
                 // Vote if haven't voted or already voted for this candidate
                 var canVote = _votedFor == null || _votedFor == candidateId;
 
-                // Check if candidate's log is at least as up-to-date
-                var myLastLogIndex = GetLastLogIndexAsync().GetAwaiter().GetResult();
-                var myLastLogTerm = GetLastLogTermAsync().GetAwaiter().GetResult();
                 var logOk = lastLogTerm > myLastLogTerm ||
                            (lastLogTerm == myLastLogTerm && lastLogIndex >= myLastLogIndex);
 

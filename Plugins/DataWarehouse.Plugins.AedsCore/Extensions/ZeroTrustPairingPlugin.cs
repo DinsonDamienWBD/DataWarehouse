@@ -73,7 +73,7 @@ public sealed class ZeroTrustPairingPlugin : SecurityPluginBase
 
         var pin = GeneratePairingPIN();
         var clientId = Guid.NewGuid().ToString("N");
-        var keyPair = GenerateKeyPair();
+        var keyPair = await GenerateKeyPairAsync();
 
         if (MessageBus != null)
         {
@@ -156,7 +156,7 @@ public sealed class ZeroTrustPairingPlugin : SecurityPluginBase
         return true;
     }
 
-    private (string PublicKey, string PrivateKey) GenerateKeyPair()
+    private async Task<(string PublicKey, string PrivateKey)> GenerateKeyPairAsync()
     {
         // Try bus delegation first
         if (MessageBus != null)
@@ -173,7 +173,7 @@ public sealed class ZeroTrustPairingPlugin : SecurityPluginBase
                     }
                 };
 
-                var response = MessageBus.SendAsync("encryption.generate-keypair", msg, CancellationToken.None).GetAwaiter().GetResult();
+                var response = await MessageBus.SendAsync("encryption.generate-keypair", msg, CancellationToken.None);
                 if (response != null && response.Success && response.Payload is Dictionary<string, object> payload
                     && payload.ContainsKey("publicKey") && payload.ContainsKey("privateKey"))
                 {

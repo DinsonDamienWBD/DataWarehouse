@@ -30,6 +30,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.CloudPlatform
             var endpoint = GetConfiguration(config, "Endpoint", $"https://s3.{region}.amazonaws.com");
 
             // Load credentials from config, then fall back to environment variables
+            // Note: null! used because GetConfiguration<string> returns non-nullable but accepts nullable default
             var accessKey = GetConfiguration<string>(config, "AccessKeyId", null!)
                 ?? Environment.GetEnvironmentVariable("AWS_ACCESS_KEY_ID")
                 ?? throw new InvalidOperationException(

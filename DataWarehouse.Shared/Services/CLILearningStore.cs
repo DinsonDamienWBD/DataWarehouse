@@ -579,7 +579,8 @@ public sealed class CLILearningStore : IDisposable
 
         if (_isDirty && !string.IsNullOrEmpty(_persistencePath))
         {
-            SaveAsync().GetAwaiter().GetResult();
+            // Cannot be async: IDisposable.Dispose() pattern. Using Task.Run to prevent sync context deadlock.
+            Task.Run(() => SaveAsync()).GetAwaiter().GetResult();
         }
 
         _persistenceTimer?.Dispose();

@@ -60,12 +60,5 @@ namespace DataWarehouse.SDK.Infrastructure.InMemory
             ct.ThrowIfCancellationRequested();
             return Task.FromResult<IReadOnlyList<GossipMessage>>(Array.Empty<GossipMessage>());
         }
-
-        // Suppress CS0067: events are never used in single-node mode
-        private void SuppressWarning()
-        {
-            OnPeerEvent?.Invoke(null!);
-            OnGossipReceived?.Invoke(null!);
-        }
     }
 }

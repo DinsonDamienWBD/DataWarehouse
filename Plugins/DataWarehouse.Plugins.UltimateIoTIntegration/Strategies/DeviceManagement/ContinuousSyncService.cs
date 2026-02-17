@@ -95,7 +95,7 @@ internal class DeviceSyncState
     /// <summary>
     /// Reference to the device twin.
     /// </summary>
-    public DeviceTwin Twin { get; set; } = null!;
+    public required DeviceTwin Twin { get; set; }
 
     /// <summary>
     /// Property value history (property name -> list of timestamped values).

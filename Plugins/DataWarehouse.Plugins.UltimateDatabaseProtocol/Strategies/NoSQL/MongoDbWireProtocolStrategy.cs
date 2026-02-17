@@ -661,7 +661,7 @@ public sealed class MongoDbWireProtocolStrategy : DatabaseProtocolStrategyBase
             0x07 => new Guid(reader.ReadBytes(12).Concat(new byte[4]).ToArray()), // ObjectId (simplified)
             0x08 => reader.ReadByte() != 0, // Boolean
             0x09 => DateTimeOffset.FromUnixTimeMilliseconds(reader.ReadInt64()).DateTime, // DateTime
-            0x0A => null!, // Null
+            0x0A => null!, // BSON Null type - legitimate null value
             0x10 => reader.ReadInt32(), // Int32
             0x11 => reader.ReadUInt64(), // Timestamp
             0x12 => reader.ReadInt64(), // Int64

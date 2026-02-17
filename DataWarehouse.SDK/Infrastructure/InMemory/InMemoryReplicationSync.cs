@@ -56,8 +56,5 @@ namespace DataWarehouse.SDK.Infrastructure.InMemory
                 ResolvedValue = conflict.LocalValue
             });
         }
-
-        // Suppress CS0067
-        private void SuppressWarning() => OnSyncEvent?.Invoke(null!);
     }
 }

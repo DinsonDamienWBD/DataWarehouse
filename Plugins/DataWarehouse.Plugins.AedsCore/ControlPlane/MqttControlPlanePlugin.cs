@@ -207,16 +207,19 @@ public class MqttControlPlanePlugin : ControlPlaneTransportPluginBase
 
                 await _mqttClient.ConnectAsync(_mqttOptions, ct);
 
+                List<string> topicsToSubscribe;
                 lock (_subscriptionLock)
                 {
-                    foreach (var topic in _subscribedTopics.ToList())
-                    {
-                        var subscribeOptions = new MqttClientSubscribeOptionsBuilder()
-                            .WithTopicFilter(topic, MqttQualityOfServiceLevel.AtLeastOnce)
-                            .Build();
+                    topicsToSubscribe = _subscribedTopics.ToList();
+                }
 
-                        _mqttClient.SubscribeAsync(subscribeOptions, ct).GetAwaiter().GetResult();
-                    }
+                foreach (var topic in topicsToSubscribe)
+                {
+                    var subscribeOptions = new MqttClientSubscribeOptionsBuilder()
+                        .WithTopicFilter(topic, MqttQualityOfServiceLevel.AtLeastOnce)
+                        .Build();
+
+                    await _mqttClient.SubscribeAsync(subscribeOptions, ct);
                 }
 
                 _reconnectAttempt = 0;
@@ -444,17 +447,20 @@ public class MqttControlPlanePlugin : ControlPlaneTransportPluginBase
         {
             try
             {
+                List<string> topicsToUnsubscribe;
                 lock (_subscriptionLock)
                 {
-                    foreach (var topic in _subscribedTopics.ToList())
-                    {
-                        var unsubscribeOptions = new MqttClientUnsubscribeOptionsBuilder()
-                            .WithTopicFilter(topic)
-                            .Build();
-
-                        _mqttClient.UnsubscribeAsync(unsubscribeOptions).GetAwaiter().GetResult();
-                    }
+                    topicsToUnsubscribe = _subscribedTopics.ToList();
                     _subscribedTopics.Clear();
+                }
+
+                foreach (var topic in topicsToUnsubscribe)
+                {
+                    var unsubscribeOptions = new MqttClientUnsubscribeOptionsBuilder()
+                        .WithTopicFilter(topic)
+                        .Build();
+
+                    await _mqttClient.UnsubscribeAsync(unsubscribeOptions);
                 }
 
                 var disconnectOptions = new MqttClientDisconnectOptionsBuilder()

@@ -428,11 +428,11 @@ public sealed class RedisRespProtocolStrategy : DatabaseProtocolStrategyBase
         return content;
     }
 
-    private async Task<List<object?>> ReadArrayAsync(int count, CancellationToken ct)
+    private async Task<List<object?>?> ReadArrayAsync(int count, CancellationToken ct)
     {
         if (count == -1)
         {
-            return null!;
+            return null;
         }
 
         var result = new List<object?>(count);

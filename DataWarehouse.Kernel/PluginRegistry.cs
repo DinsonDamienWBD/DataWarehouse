@@ -237,16 +237,16 @@ namespace DataWarehouse.Kernel
             return ordered.First();
         }
 
-        private Dictionary<string, object> GetPluginMetadata(IPlugin plugin)
+        private async Task<Dictionary<string, object>> GetPluginMetadataAsync(IPlugin plugin)
         {
             try
             {
-                var response = plugin.OnHandshakeAsync(new HandshakeRequest
+                var response = await plugin.OnHandshakeAsync(new HandshakeRequest
                 {
                     KernelId = "registry",
                     ProtocolVersion = "1.0",
                     Timestamp = DateTime.UtcNow
-                }).GetAwaiter().GetResult();
+                });
 
                 return response.Metadata ?? new Dictionary<string, object>();
             }
@@ -254,6 +254,14 @@ namespace DataWarehouse.Kernel
             {
                 return new Dictionary<string, object>();
             }
+        }
+
+        [Obsolete("Use GetPluginMetadataAsync instead")]
+        private Dictionary<string, object> GetPluginMetadata(IPlugin plugin)
+        {
+            // Cannot be async: Called from sync context during plugin registration.
+            // Using Task.Run to prevent sync context deadlock.
+            return Task.Run(() => GetPluginMetadataAsync(plugin)).GetAwaiter().GetResult();
         }
     }
 }

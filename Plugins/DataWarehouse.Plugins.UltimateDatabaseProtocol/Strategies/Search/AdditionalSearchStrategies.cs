@@ -13,6 +13,7 @@ public sealed class SolrProtocolStrategy : DatabaseProtocolStrategyBase
     private HttpClient? _httpClient;
     private string _collection = "";
     private string _baseUrl = "";
+    private bool _verifySsl = true;
 
     /// <inheritdoc/>
     public override string StrategyId => "solr-rest";
@@ -65,10 +66,12 @@ public sealed class SolrProtocolStrategy : DatabaseProtocolStrategyBase
     protected override async Task AuthenticateAsync(ConnectionParameters parameters, CancellationToken ct)
     {
         var handler = new HttpClientHandler();
-        if (parameters.UseSsl)
+        // SECURITY: TLS certificate validation is enabled by default.
+        // Only bypass when explicitly configured to false.
+        if (parameters.UseSsl && !_verifySsl)
         {
             handler.ServerCertificateCustomValidationCallback =
-                (message, cert, chain, errors) => true; // Configure properly in production
+                (message, cert, chain, errors) => true;
         }
 
         _httpClient = new HttpClient(handler) { BaseAddress = new Uri(_baseUrl) };

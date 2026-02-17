@@ -37,7 +37,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.IndustryFirst
     public sealed class QuantumKeyDistributionStrategy : KeyStoreStrategyBase
     {
         private QkdConfig _config = new();
-        private HttpClient _httpClient = null!;
+        private HttpClient _httpClient = null!; // Initialized in InitializeStorage
         private readonly Dictionary<string, QkdKeyEntry> _keyStore = new();
         private string _currentKeyId = "default";
         private readonly SemaphoreSlim _lock = new(1, 1);

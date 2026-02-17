@@ -68,8 +68,8 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.IndustryFirst
     public sealed class StellarAnchorsStrategy : KeyStoreStrategyBase
     {
         private StellarConfig _config = new();
-        private Server _stellarServer = null!;
-        private KeyPair _masterKeyPair = null!;
+        private Server _stellarServer = null!; // Initialized in InitializeStorage
+        private KeyPair _masterKeyPair = null!; // Initialized in InitializeStorage
         private readonly Dictionary<string, StellarKeyEntry> _keyStore = new();
         private string _currentKeyId = "default";
         private readonly SemaphoreSlim _lock = new(1, 1);

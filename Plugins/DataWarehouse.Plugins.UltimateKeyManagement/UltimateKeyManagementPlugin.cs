@@ -644,7 +644,8 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement
                 if (_disposed) return;
                 _disposed = true;
 
-                StopAsync().GetAwaiter().GetResult();
+                // Cannot be async: Override of base Dispose(bool). Using Task.Run to prevent sync context deadlock.
+                Task.Run(() => StopAsync()).GetAwaiter().GetResult();
 
                 foreach (var strategy in _strategies.Values)
                 {

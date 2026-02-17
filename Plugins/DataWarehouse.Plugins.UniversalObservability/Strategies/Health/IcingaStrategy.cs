@@ -20,6 +20,7 @@ public sealed class IcingaStrategy : ObservabilityStrategyBase
     private string _apiUrl = "https://localhost:5665";
     private string _username = "root";
     private string _password = "";
+    private bool _verifySsl = true;
 
     /// <inheritdoc/>
     public override string StrategyId => "icinga";
@@ -38,13 +39,13 @@ public sealed class IcingaStrategy : ObservabilityStrategyBase
         SupportsAlerting: true,
         SupportedExporters: new[] { "Icinga", "Graphite", "InfluxDB" }))
     {
-        _httpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(30) };
-
-        // Accept self-signed certificates (for development)
-        var handler = new HttpClientHandler
+        var handler = new HttpClientHandler();
+        // SECURITY: TLS certificate validation is enabled by default.
+        // Only bypass when explicitly configured to false.
+        if (!_verifySsl)
         {
-            ServerCertificateCustomValidationCallback = (_, _, _, _) => true
-        };
+            handler.ServerCertificateCustomValidationCallback = (_, _, _, _) => true;
+        }
         _httpClient = new HttpClient(handler) { Timeout = TimeSpan.FromSeconds(30) };
     }
 
@@ -54,11 +55,13 @@ public sealed class IcingaStrategy : ObservabilityStrategyBase
     /// <param name="apiUrl">Icinga API URL.</param>
     /// <param name="username">API username.</param>
     /// <param name="password">API password.</param>
-    public void Configure(string apiUrl, string username, string password)
+    /// <param name="verifySsl">Whether to verify SSL certificates. Default is true.</param>
+    public void Configure(string apiUrl, string username, string password, bool verifySsl = true)
     {
         _apiUrl = apiUrl;
         _username = username;
         _password = password;
+        _verifySsl = verifySsl;
 
         var credentials = Convert.ToBase64String(Encoding.ASCII.GetBytes($"{username}:{password}"));
         _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Basic", credentials);

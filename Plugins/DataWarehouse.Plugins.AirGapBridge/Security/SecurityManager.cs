@@ -158,7 +158,7 @@ public sealed class SecurityManager : IDisposable
     /// <summary>
     /// Encrypts data for storage on device.
     /// </summary>
-    public byte[] EncryptData(byte[] data, byte[] deviceKey)
+    public async Task<byte[]> EncryptDataAsync(byte[] data, byte[] deviceKey)
     {
         var nonce = new byte[12];
         RandomNumberGenerator.Fill(nonce);
@@ -183,7 +183,7 @@ public sealed class SecurityManager : IDisposable
                     }
                 };
 
-                var response = _messageBus.SendAsync("encryption.encrypt", msg, CancellationToken.None).GetAwaiter().GetResult();
+                var response = await _messageBus.SendAsync("encryption.encrypt", msg, CancellationToken.None);
                 if (response != null && response.Success && response.Payload is Dictionary<string, object> payload
                     && payload.ContainsKey("ciphertext") && payload.ContainsKey("tag"))
                 {
@@ -220,9 +220,18 @@ public sealed class SecurityManager : IDisposable
     }
 
     /// <summary>
+    /// Encrypts data for storage on device (synchronous wrapper).
+    /// </summary>
+    [Obsolete("Use EncryptDataAsync instead")]
+    public byte[] EncryptData(byte[] data, byte[] deviceKey)
+    {
+        return Task.Run(() => EncryptDataAsync(data, deviceKey)).GetAwaiter().GetResult();
+    }
+
+    /// <summary>
     /// Decrypts data from device.
     /// </summary>
-    public byte[] DecryptData(byte[] encryptedData, byte[] deviceKey)
+    public async Task<byte[]> DecryptDataAsync(byte[] encryptedData, byte[] deviceKey)
     {
         var nonce = new byte[12];
         var tag = new byte[16];
@@ -252,7 +261,7 @@ public sealed class SecurityManager : IDisposable
                     }
                 };
 
-                var response = _messageBus.SendAsync("encryption.decrypt", msg, CancellationToken.None).GetAwaiter().GetResult();
+                var response = await _messageBus.SendAsync("encryption.decrypt", msg, CancellationToken.None);
                 if (response != null && response.Success && response.Payload is Dictionary<string, object> payload
                     && payload.ContainsKey("data"))
                 {
@@ -272,6 +281,15 @@ public sealed class SecurityManager : IDisposable
         aesGcm.Decrypt(nonce, ciphertext, tag, plaintext);
 
         return plaintext;
+    }
+
+    /// <summary>
+    /// Decrypts data from device (synchronous wrapper).
+    /// </summary>
+    [Obsolete("Use DecryptDataAsync instead")]
+    public byte[] DecryptData(byte[] encryptedData, byte[] deviceKey)
+    {
+        return Task.Run(() => DecryptDataAsync(encryptedData, deviceKey)).GetAwaiter().GetResult();
     }
 
     #endregion

@@ -9,11 +9,28 @@ namespace DataWarehouse.CLI.Commands;
 /// </summary>
 public static class StorageCommands
 {
-    private static readonly Lazy<DataWarehouseKernel> _kernel = new(() =>
-        KernelBuilder.Create()
-            .WithKernelId("cli-client")
-            .WithOperatingMode(OperatingMode.Workstation)
-            .BuildAndInitializeAsync(CancellationToken.None).GetAwaiter().GetResult());
+    private static DataWarehouseKernel? _kernelInstance;
+    private static readonly SemaphoreSlim _kernelLock = new(1, 1);
+
+    private static async Task<DataWarehouseKernel> GetKernelAsync()
+    {
+        if (_kernelInstance != null)
+            return _kernelInstance;
+
+        await _kernelLock.WaitAsync();
+        try
+        {
+            _kernelInstance ??= await KernelBuilder.Create()
+                .WithKernelId("cli-client")
+                .WithOperatingMode(OperatingMode.Workstation)
+                .BuildAndInitializeAsync(CancellationToken.None);
+            return _kernelInstance;
+        }
+        finally
+        {
+            _kernelLock.Release();
+        }
+    }
 
     public static async Task ListPoolsAsync()
     {

@@ -64,8 +64,5 @@ namespace DataWarehouse.SDK.Infrastructure.InMemory
                 TargetNodeCount = 1
             });
         }
-
-        // Suppress CS0067
-        private void SuppressWarning() => OnScalingEvent?.Invoke(null!);
     }
 }

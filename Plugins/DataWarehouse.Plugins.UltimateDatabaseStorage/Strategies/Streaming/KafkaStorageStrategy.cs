@@ -235,17 +235,17 @@ public sealed class KafkaStorageStrategy : DatabaseStorageStrategyBase
         var metadata = await GetMetadataCoreAsync(key, ct);
         var size = metadata.Size;
 
-        // Tombstone message for compaction
+        // Tombstone message for compaction (Kafka supports null values for tombstones)
         await _producer!.ProduceAsync($"{_topicPrefix}-data", new Message<string, byte[]>
         {
             Key = key,
-            Value = null! // Null value = tombstone
+            Value = null! // Null value = tombstone - suppressed because Kafka API expects this
         }, ct);
 
         await _producer.ProduceAsync(_metadataTopic, new Message<string, byte[]>
         {
             Key = key,
-            Value = null!
+            Value = null! // Null value = tombstone - suppressed because Kafka API expects this
         }, ct);
 
         return size;
