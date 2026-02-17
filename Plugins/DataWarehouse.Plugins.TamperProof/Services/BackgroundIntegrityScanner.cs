@@ -54,7 +54,7 @@ public interface IBackgroundIntegrityScanner
 /// Background service that continuously scans for integrity violations.
 /// Implements batched scanning to avoid memory pressure and supports resumable scans.
 /// </summary>
-public class BackgroundIntegrityScanner : IBackgroundIntegrityScanner, IDisposable
+public class BackgroundIntegrityScanner : IBackgroundIntegrityScanner, IDisposable, IAsyncDisposable
 {
     private readonly RecoveryService _recoveryService;
     private readonly IStorageProvider _metadataStorage;
@@ -605,31 +605,43 @@ public class BackgroundIntegrityScanner : IBackgroundIntegrityScanner, IDisposab
     /// <inheritdoc/>
     public void Dispose()
     {
-        Dispose(true);
+        Dispose(disposing: true);
         GC.SuppressFinalize(this);
     }
 
-    /// <summary>
-    /// Disposes resources.
-    /// </summary>
+    public async ValueTask DisposeAsync()
+    {
+        await DisposeAsyncCore().ConfigureAwait(false);
+        Dispose(disposing: false);
+        GC.SuppressFinalize(this);
+    }
+
     protected virtual void Dispose(bool disposing)
     {
         if (_disposed) return;
 
         if (disposing)
         {
-            try
-            {
-                StopAsync().GetAwaiter().GetResult();
-            }
-            catch (Exception ex)
-            {
-                _logger.LogWarning(ex, "Error stopping scanner during disposal");
-            }
-
             _cts?.Dispose();
         }
 
+        _disposed = true;
+    }
+
+    protected virtual async ValueTask DisposeAsyncCore()
+    {
+        if (_disposed) return;
+
+        try
+        {
+            await StopAsync().ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Error stopping scanner during disposal");
+        }
+
+        _cts?.Dispose();
         _disposed = true;
     }
 }

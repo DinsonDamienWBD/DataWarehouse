@@ -8,7 +8,7 @@ namespace DataWarehouse.Plugins.AirGapBridge.Storage;
 /// Provides storage extension functionality for air-gap devices.
 /// Implements sub-tasks 79.11, 79.12, 79.13, 79.14, 79.15.
 /// </summary>
-public sealed class StorageExtensionProvider : IDisposable
+public sealed class StorageExtensionProvider : IDisposable, IAsyncDisposable
 {
     private readonly ConcurrentDictionary<string, MountedStorage> _mountedStorages = new();
     private readonly ConcurrentDictionary<string, OfflineIndexEntry> _offlineIndex = new();
@@ -481,11 +481,30 @@ public sealed class StorageExtensionProvider : IDisposable
 
     public void Dispose()
     {
+        Dispose(disposing: true);
+        GC.SuppressFinalize(this);
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        await DisposeAsyncCore().ConfigureAwait(false);
+        Dispose(disposing: false);
+        GC.SuppressFinalize(this);
+    }
+
+    private void Dispose(bool disposing)
+    {
         if (_disposed) return;
         _disposed = true;
+        // Synchronous cleanup only (none needed currently)
+    }
+
+    private async ValueTask DisposeAsyncCore()
+    {
+        if (_disposed) return;
 
         // Save offline index before disposing
-        SaveOfflineIndexAsync().GetAwaiter().GetResult();
+        await SaveOfflineIndexAsync().ConfigureAwait(false);
     }
 }
 
