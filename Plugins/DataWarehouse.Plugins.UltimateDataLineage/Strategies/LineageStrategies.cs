@@ -202,38 +202,6 @@ public sealed class SqlTransformationStrategy : LineageStrategyBase
         "SQL transformation tracker that parses SQL statements to extract column-level " +
         "lineage, understanding JOINs, aggregations, and CTEs.";
     public override string[] Tags => ["sql", "transformation", "column-level", "parsing"];
-
-    public override Task<LineageGraph> GetUpstreamAsync(string nodeId, int maxDepth = 10, CancellationToken ct = default)
-    {
-        return Task.FromResult(new LineageGraph
-        {
-            RootNodeId = nodeId,
-            Nodes = Array.Empty<LineageNode>(),
-            Edges = Array.Empty<LineageEdge>()
-        });
-    }
-
-    public override Task<LineageGraph> GetDownstreamAsync(string nodeId, int maxDepth = 10, CancellationToken ct = default)
-    {
-        return Task.FromResult(new LineageGraph
-        {
-            RootNodeId = nodeId,
-            Nodes = Array.Empty<LineageNode>(),
-            Edges = Array.Empty<LineageEdge>()
-        });
-    }
-
-    public override Task<ImpactAnalysisResult> AnalyzeImpactAsync(string nodeId, string changeType, CancellationToken ct = default)
-    {
-        return Task.FromResult(new ImpactAnalysisResult
-        {
-            SourceNodeId = nodeId,
-            ChangeType = changeType,
-            DirectlyImpacted = Array.Empty<string>(),
-            IndirectlyImpacted = Array.Empty<string>(),
-            ImpactScore = 0
-        });
-    }
 }
 
 /// <summary>
@@ -255,38 +223,6 @@ public sealed class EtlPipelineStrategy : LineageStrategyBase
         "ETL pipeline lineage tracker for batch and streaming data pipelines, " +
         "capturing extract-transform-load operations with scheduling metadata.";
     public override string[] Tags => ["etl", "pipeline", "batch", "streaming", "scheduling"];
-
-    public override Task<LineageGraph> GetUpstreamAsync(string nodeId, int maxDepth = 10, CancellationToken ct = default)
-    {
-        return Task.FromResult(new LineageGraph
-        {
-            RootNodeId = nodeId,
-            Nodes = Array.Empty<LineageNode>(),
-            Edges = Array.Empty<LineageEdge>()
-        });
-    }
-
-    public override Task<LineageGraph> GetDownstreamAsync(string nodeId, int maxDepth = 10, CancellationToken ct = default)
-    {
-        return Task.FromResult(new LineageGraph
-        {
-            RootNodeId = nodeId,
-            Nodes = Array.Empty<LineageNode>(),
-            Edges = Array.Empty<LineageEdge>()
-        });
-    }
-
-    public override Task<ImpactAnalysisResult> AnalyzeImpactAsync(string nodeId, string changeType, CancellationToken ct = default)
-    {
-        return Task.FromResult(new ImpactAnalysisResult
-        {
-            SourceNodeId = nodeId,
-            ChangeType = changeType,
-            DirectlyImpacted = Array.Empty<string>(),
-            IndirectlyImpacted = Array.Empty<string>(),
-            ImpactScore = 0
-        });
-    }
 }
 
 /// <summary>
@@ -308,38 +244,6 @@ public sealed class ApiConsumptionStrategy : LineageStrategyBase
         "API consumption tracker that monitors which applications, services, and users " +
         "access data through APIs, enabling consumer-based impact analysis.";
     public override string[] Tags => ["api", "consumption", "access", "consumer"];
-
-    public override Task<LineageGraph> GetUpstreamAsync(string nodeId, int maxDepth = 10, CancellationToken ct = default)
-    {
-        return Task.FromResult(new LineageGraph
-        {
-            RootNodeId = nodeId,
-            Nodes = Array.Empty<LineageNode>(),
-            Edges = Array.Empty<LineageEdge>()
-        });
-    }
-
-    public override Task<LineageGraph> GetDownstreamAsync(string nodeId, int maxDepth = 10, CancellationToken ct = default)
-    {
-        return Task.FromResult(new LineageGraph
-        {
-            RootNodeId = nodeId,
-            Nodes = Array.Empty<LineageNode>(),
-            Edges = Array.Empty<LineageEdge>()
-        });
-    }
-
-    public override Task<ImpactAnalysisResult> AnalyzeImpactAsync(string nodeId, string changeType, CancellationToken ct = default)
-    {
-        return Task.FromResult(new ImpactAnalysisResult
-        {
-            SourceNodeId = nodeId,
-            ChangeType = changeType,
-            DirectlyImpacted = Array.Empty<string>(),
-            IndirectlyImpacted = Array.Empty<string>(),
-            ImpactScore = 0
-        });
-    }
 }
 
 /// <summary>
@@ -361,36 +265,4 @@ public sealed class ReportConsumptionStrategy : LineageStrategyBase
         "Report and BI consumption tracker for dashboards, reports, and analytics, " +
         "linking datasets to business intelligence artifacts.";
     public override string[] Tags => ["report", "bi", "dashboard", "analytics", "consumption"];
-
-    public override Task<LineageGraph> GetUpstreamAsync(string nodeId, int maxDepth = 10, CancellationToken ct = default)
-    {
-        return Task.FromResult(new LineageGraph
-        {
-            RootNodeId = nodeId,
-            Nodes = Array.Empty<LineageNode>(),
-            Edges = Array.Empty<LineageEdge>()
-        });
-    }
-
-    public override Task<LineageGraph> GetDownstreamAsync(string nodeId, int maxDepth = 10, CancellationToken ct = default)
-    {
-        return Task.FromResult(new LineageGraph
-        {
-            RootNodeId = nodeId,
-            Nodes = Array.Empty<LineageNode>(),
-            Edges = Array.Empty<LineageEdge>()
-        });
-    }
-
-    public override Task<ImpactAnalysisResult> AnalyzeImpactAsync(string nodeId, string changeType, CancellationToken ct = default)
-    {
-        return Task.FromResult(new ImpactAnalysisResult
-        {
-            SourceNodeId = nodeId,
-            ChangeType = changeType,
-            DirectlyImpacted = Array.Empty<string>(),
-            IndirectlyImpacted = Array.Empty<string>(),
-            ImpactScore = 0
-        });
-    }
 }
