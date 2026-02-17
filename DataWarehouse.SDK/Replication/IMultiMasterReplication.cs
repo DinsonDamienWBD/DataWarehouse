@@ -116,6 +116,7 @@ namespace DataWarehouse.SDK.Replication
     /// Immutable record - operations return new instances.
     /// </summary>
     /// <param name="Clocks">Dictionary mapping node IDs to logical clock values.</param>
+    [Obsolete("Use DottedVersionVector for membership-aware causality tracking with automatic dead-node pruning. Remove in v4.0.")]
     public record VectorClock(Dictionary<string, long> Clocks)
     {
         /// <summary>
