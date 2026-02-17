@@ -22,7 +22,7 @@ namespace DataWarehouse.SDK.Contracts
     /// Derived classes must implement subject label resolution and validation logic specific to their environment.
     /// Reference: Bell-LaPadula Model (1973), DoD 5200.28-STD.
     /// </summary>
-    public abstract class MandatoryAccessControlPluginBase : SecurityProviderPluginBase, IMandatoryAccessControl, IIntelligenceAware
+    public abstract class MandatoryAccessControlPluginBase : Hierarchy.SecurityPluginBase, IMandatoryAccessControl, IIntelligenceAware
     {
         #region Intelligence Socket
 
@@ -206,7 +206,7 @@ namespace DataWarehouse.SDK.Contracts
     /// Derived classes must implement the actual downgrade/sanitization logic appropriate for their domain.
     /// Reference: TCSEC (Orange Book), Common Criteria, DoDI 8500.01.
     /// </summary>
-    public abstract class MultiLevelSecurityPluginBase : SecurityProviderPluginBase, IMultiLevelSecurity, IIntelligenceAware
+    public abstract class MultiLevelSecurityPluginBase : Hierarchy.SecurityPluginBase, IMultiLevelSecurity, IIntelligenceAware
     {
         #region Intelligence Socket
 
@@ -361,7 +361,7 @@ namespace DataWarehouse.SDK.Contracts
     /// Critical for nuclear command and control, cryptographic operations, and classification changes.
     /// Reference: DoD Directive 5210.41, NIST SP 800-53 AC-5 (Separation of Duties).
     /// </summary>
-    public abstract class TwoPersonIntegrityPluginBase : SecurityProviderPluginBase, ITwoPersonIntegrity, IIntelligenceAware
+    public abstract class TwoPersonIntegrityPluginBase : Hierarchy.SecurityPluginBase, ITwoPersonIntegrity, IIntelligenceAware
     {
         #region Intelligence Socket
 
@@ -600,7 +600,7 @@ namespace DataWarehouse.SDK.Contracts
     /// - Physical media: Coordinate with destruction facility
     /// Reference: DoD 5220.22-M (deprecated but still used), NIST SP 800-88 Rev 1.
     /// </summary>
-    public abstract class SecureDestructionPluginBase : SecurityProviderPluginBase, ISecureDestruction, IIntelligenceAware
+    public abstract class SecureDestructionPluginBase : Hierarchy.SecurityPluginBase, ISecureDestruction, IIntelligenceAware
     {
         #region Intelligence Socket
 

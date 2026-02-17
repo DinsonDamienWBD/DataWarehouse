@@ -315,14 +315,14 @@ namespace DataWarehouse.SDK.Contracts
     /// - Capability advertisement
     /// </para>
     /// </remarks>
-    public abstract class TransitEncryptionPluginBase : PipelinePluginBase, ITransitEncryption, IIntelligenceAware
+    public abstract class TransitEncryptionPluginBase : Hierarchy.DataTransformationPluginBase, ITransitEncryption, IIntelligenceAware
     {
         #region Intelligence Socket
 
-        public bool IsIntelligenceAvailable { get; protected set; }
-        public IntelligenceCapabilities AvailableCapabilities { get; protected set; }
+        public new bool IsIntelligenceAvailable { get; protected set; }
+        public new IntelligenceCapabilities AvailableCapabilities { get; protected set; }
 
-        public virtual async Task<bool> DiscoverIntelligenceAsync(CancellationToken ct = default)
+        public new virtual async Task<bool> DiscoverIntelligenceAsync(CancellationToken ct = default)
         {
             if (MessageBus == null) { IsIntelligenceAvailable = false; return false; }
             IsIntelligenceAvailable = false;
@@ -396,7 +396,7 @@ namespace DataWarehouse.SDK.Contracts
         public override string SubCategory => "TransitEncryption";
 
         /// <summary>Default pipeline order (transit runs after at-rest stages).</summary>
-        public override int DefaultOrder => 300;
+        public override int DefaultPipelineOrder => 300;
 
         /// <summary>Whether bypass is allowed.</summary>
         public override bool AllowBypass => true;
@@ -406,10 +406,10 @@ namespace DataWarehouse.SDK.Contracts
         /// <summary>
         /// Async bridge: delegates to EncryptForTransitAsync for pipeline integration.
         /// </summary>
-        protected override async Task<Stream> OnWriteAsync(Stream input, IKernelContext context, Dictionary<string, object> args)
+        public override async Task<Stream> OnWriteAsync(Stream input, IKernelContext context, Dictionary<string, object> args, CancellationToken ct = default)
         {
             using var ms = new System.IO.MemoryStream();
-            await input.CopyToAsync(ms);
+            await input.CopyToAsync(ms, ct);
             var data = ms.ToArray();
             var options = new TransitEncryptionOptions();
             // Extract security context from args if available
@@ -423,10 +423,10 @@ namespace DataWarehouse.SDK.Contracts
         /// <summary>
         /// Async bridge: delegates to DecryptFromTransitAsync for pipeline integration.
         /// </summary>
-        protected override async Task<Stream> OnReadAsync(Stream stored, IKernelContext context, Dictionary<string, object> args)
+        public override async Task<Stream> OnReadAsync(Stream stored, IKernelContext context, Dictionary<string, object> args, CancellationToken ct = default)
         {
             using var ms = new System.IO.MemoryStream();
-            await stored.CopyToAsync(ms);
+            await stored.CopyToAsync(ms, ct);
             var data = ms.ToArray();
             var metadata = new Dictionary<string, object>();
             // Extract encryption metadata from args if available

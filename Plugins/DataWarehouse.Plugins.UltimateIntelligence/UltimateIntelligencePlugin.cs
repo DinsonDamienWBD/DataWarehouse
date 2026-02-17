@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using System.Text.Json;
+using System.Threading;
 using DataWarehouse.SDK.AI;
 using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Primitives;
@@ -23,7 +24,7 @@ namespace DataWarehouse.Plugins.UltimateIntelligence;
 ///   <item>Features: Semantic Search, Content Classification, Anomaly Detection, Access Prediction, Failure Prediction, Psychometric Indexing</item>
 /// </list>
 /// </remarks>
-public sealed class UltimateIntelligencePlugin : PipelinePluginBase
+public sealed class UltimateIntelligencePlugin : DataWarehouse.SDK.Contracts.Hierarchy.DataTransformationPluginBase
 {
     private readonly ConcurrentDictionary<string, IIntelligenceStrategy> _allStrategies = new(StringComparer.OrdinalIgnoreCase);
     private readonly ConcurrentDictionary<IntelligenceStrategyCategory, ConcurrentDictionary<string, IIntelligenceStrategy>> _strategiesByCategory = new();
@@ -52,7 +53,7 @@ public sealed class UltimateIntelligencePlugin : PipelinePluginBase
     public override string SubCategory => "AI";
 
     /// <inheritdoc/>
-    public override int DefaultOrder => 30;
+    public override int DefaultPipelineOrder => 30;
 
     /// <inheritdoc/>
     public override bool AllowBypass => true;
@@ -291,20 +292,18 @@ public sealed class UltimateIntelligencePlugin : PipelinePluginBase
     }
 
     /// <inheritdoc/>
-    [Obsolete("Use OnWriteAsync instead. Sync-over-async causes threadpool starvation under load.")]
-    public override Stream OnWrite(Stream input, IKernelContext context, Dictionary<string, object> args)
+    public override Task<Stream> OnWriteAsync(Stream input, IKernelContext context, Dictionary<string, object> args, CancellationToken ct = default)
     {
         // Intelligence plugin typically does not transform data directly
         // It provides AI capabilities to other plugins
-        return input;
+        return Task.FromResult(input);
     }
 
     /// <inheritdoc/>
-    [Obsolete("Use OnReadAsync instead. Sync-over-async causes threadpool starvation under load.")]
-    public override Stream OnRead(Stream stored, IKernelContext context, Dictionary<string, object> args)
+    public override Task<Stream> OnReadAsync(Stream stored, IKernelContext context, Dictionary<string, object> args, CancellationToken ct = default)
     {
         // Intelligence plugin typically does not transform data directly
-        return stored;
+        return Task.FromResult(stored);
     }
 
     /// <summary>
