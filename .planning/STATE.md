@@ -267,6 +267,7 @@ Audit findings resolved:
 | Phase 41.1 P03 | 14min | 21 tasks | 8 files |
 | Phase 41.1 P06 | 23min | 9 tasks | 20 files |
 | Phase 41.1 P07 | 20min | 6 tasks | 20 files |
+| Phase 41.1 P05 | 35min | 11 tasks | 10 files |
 
 ## Accumulated Context
 
@@ -366,6 +367,9 @@ Audit findings resolved:
 - Phase 41.1-07: SystemConfiguration property name (not Configuration) in PluginBase to avoid TamperProofProviderPluginBase collision
 - Phase 41.1-07: Safe XML deserialization with DtdProcessing.Prohibit (CA5369 compliance)
 - Phase 41.1-07: GC.GetGCMemoryInfo for RAM estimation when hardware probe lacks memory device info
+- Phase 41.1-05: Default Interface Method (DIM) for IKeyStore.GetKeyNativeAsync — avoids breaking existing implementers
+- Phase 41.1-05: Typed handler topic auto-naming from typeof(TRequest).FullName — convention-based, no manual topic strings
+- Phase 41.1-05: Deferred subscription pattern — handlers queued before MessageBus injection, subscribed in InjectKernelServices
 
 ### SDK Audit Results (2026-02-14)
 
@@ -542,11 +546,10 @@ Phase 33 (VDE) ─────────────────────�
 ### Current Position
 
 **Phase 41.1** — Stage: **EXECUTE** (7 plans, 2 waves)
-Plan: 7 of 7 (plan 07 complete, plan 05 remaining)
-Status: IN PROGRESS
+Plan: 7 of 7 complete
+Status: COMPLETE
 
-Progress: [#######################-] 96% (6.5/7 plans; plan 07 done, 05 pending)
+Progress: [########################] 100% (7/7 plans)
 
-Last session: 2026-02-17
-Stopped at: Completed 41.1-07-PLAN.md (CFG-17/18/19/20 Unified Configuration System)
-Resume: Execute 41.1-05-PLAN.md
+Last session: 2026-02-18
+Stopped at: Completed 41.1-05-PLAN.md (KS5 NativeKeyHandle + KS3 Typed Message Handlers)
