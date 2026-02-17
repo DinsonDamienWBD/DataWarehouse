@@ -283,6 +283,9 @@ Audit findings resolved:
 | Phase 45 P04 | 1min | 8 tasks | 0 files |
 | Phase 46 P01 | 5min | 1 task | 1 file |
 | Phase 46 P02 | 5min | 1 task | 1 file |
+| Phase 46 P03 | 5min | 1 task | 1 file |
+| Phase 46 P04 | 5min | 1 task | 1 file |
+| Phase 46 P05 | 5min | 1 task | 1 file |
 
 ## Accumulated Context
 
@@ -406,6 +409,9 @@ Audit findings resolved:
 - [Phase 45]: Tier 5-6 CONDITIONAL PASS: FIPS/TamperProof/MLS/Compliance/AirGap/mTLS verified; HSM crypto ops and secure deletion wiring are implementation gaps (not architectural)
 - [Phase 46.01] Pipeline performance: streaming compression APIs are strong, but encryption byte[] interface causes 3x memory overhead for large payloads; Brotli Q11 default is 10-25x slower than LZ4/Zstd; compression stats use lock instead of Interlocked; async compression defaults to Task.Run wrapper
 - [Phase 46.02] Storage IO performance: VDE single write lock (SemaphoreSlim 1,1) serializes ALL writes — major concurrency bottleneck; BitmapAllocator O(N) under fragmentation (ExtentTree O(log N) exists but NOT integrated); RAID parity uses scalar XOR (no SIMD); MemoryStream full-buffer reads waste memory for large objects; direct block pointers only (no indirect)
+- [Phase 46.03] Distributed performance: ORSet unbounded tag growth is latent memory leak under sustained add/remove; Raft stateLock (SemaphoreSlim 1,1) serializes heartbeat path (4 lock acquisitions per 50ms for 5-node cluster); SWIM GetMembers() allocates on every call at 20x/sec; CRDT serialization uses reflection-based JSON (unlike Raft/SWIM source-gen); consistent hash ring is well-optimized (binary search, cached keys, RWLock)
+- [Phase 46.04] Network/transport performance: TCP and QUIC create new connections per send (no reuse despite ConnectionPool existing); Reliable UDP lacks congestion control (burst pattern amplifies congestion); ConnectionPool is dead code (never queried by send methods); bandwidth monitor has proper hysteresis and serialized probing; protocol switching takes 3-4s due to 3 confirmation samples
+- [Phase 46.05] Memory profiling: ArrayPool usage is consistently excellent across VDE, encryption, storage (20 files); BoundedMemoryRuntime provides proper edge memory ceiling; all distributed components properly implement IDisposable with event unsubscription; one gap: AdaptiveTransportPlugin lacks IDisposable (relies on StopAsync); no memory leaks detected in event handler or closure patterns
 - [Phase 45]: Tier 7 hyperscale CONDITIONAL PASS (5/8): federation+CRDT+geo-replication+transport PASS; Multi-Raft single-group only, cloud adapters are stubs (no SDK deps), auto-scaler only InMemoryAutoScaler, multi-tenant context-level only
 
 ### SDK Audit Results (2026-02-14)
@@ -695,11 +701,11 @@ Deliverables (44-09):
 
 ### Phase 46: Performance Benchmarks -- IN PROGRESS
 Phase: 46 (Layer 4 - Performance Benchmarks)
-Plan: 2 of 5 complete
-Status: IN PROGRESS
+Plan: 5 of 5 complete
+Status: COMPLETE
 Last activity: 2026-02-18
 
-Progress: [############            ] 40% (2/5 plans)
+Progress: [########################] 100% (5/5 plans)
 
 Deliverables (46-01):
 - Static code analysis of data pipeline performance (write/read pipeline)
@@ -720,6 +726,37 @@ Deliverables (46-02):
 - RAID rebuild estimate: 10GB @ ~50-100 MB/s = 100-200 seconds (within 5-minute target)
 - Generated 46-02-SUMMARY.md (403 lines)
 
+Deliverables (46-03):
+- Static code analysis of distributed systems performance (Raft, SWIM, CRDT, consistent hash ring)
+- Raft: 150-300ms election timeout, 50ms heartbeat, 50-entry replication batch, source-gen JSON
+- SWIM: 1000ms probe period, 500ms ping timeout, 3 indirect probers, Fisher-Yates selection
+- CRDT: GCounter O(N), PNCounter O(N), LWWRegister O(1), ORSet O(E*T) merge complexity
+- ConsistentHashRing: 150 virtual nodes, XxHash32, binary search O(log(N*V)), ReaderWriterLockSlim
+- Critical: ORSet unbounded tag growth, ORSet full-copy merge, Raft stateLock serializes heartbeat path
+- Moderate: GetMembers allocates per call at heartbeat frequency, CRDT uses reflection-based JSON
+- Generated 46-03-SUMMARY.md (225 lines)
+
+Deliverables (46-04):
+- Static code analysis of network and transport layer performance (TCP, QUIC, Reliable UDP, Store-Forward)
+- TCP: no connection reuse (new TcpClient per send), no Nagle disable, no keep-alive
+- QUIC: no connection reuse (new QuicConnection per send), pool exists but unused, cert validation disabled
+- Reliable UDP: CRC32 integrity, selective retransmission, but no congestion control, fixed ACK timeout
+- Bandwidth monitor: hysteresis-based link classification, serialized probing, 3-sample confirmation
+- Connection pool: structurally exists but never queried by any send method (dead code for TCP/QUIC)
+- Critical: no connection reuse (TCP/QUIC), no UDP congestion control, connection pool dead code
+- Generated 46-04-SUMMARY.md (246 lines)
+
+Deliverables (46-05):
+- Static code analysis of memory management and resource profiling
+- Bounded collections: Channel.CreateBounded used consistently across 15+ locations; BoundedConcurrentDictionary in MessageBus
+- ArrayPool: 20 files using ArrayPool correctly on hot paths (VDE, encryption, storage, edge memory)
+- LOH risk: well-mitigated via ArrayPool; remaining risk in JSON serialization SerializeToUtf8Bytes
+- BoundedMemoryRuntime: 128MB default ceiling, 85% GC threshold, custom ArrayPool(1MB, 50 buckets)
+- IDisposable: 71 files implementing correctly; one gap in AdaptiveTransportPlugin (no Dispose, relies on StopAsync)
+- Memory leaks: no event handler leaks detected; all Raft/SWIM/CRDT properly unsubscribe in Dispose
+- No critical issues; moderate: GC.GetTotalMemory on every Rent(), aggressive blocking Gen2 GC
+- Generated 46-05-SUMMARY.md (299 lines)
+
 ### Phases Overview
 
 | Phase | Name | Layer | Plans | Status |
@@ -728,7 +765,7 @@ Deliverables (46-02):
 | 43 | Full Solution Automated Scan | Layer 1 | 5 | In Progress (4/5) |
 | 44 | Domain-by-Domain Deep Audit | Layer 2 | 9 | Complete |
 | 45 | Tier-by-Tier Integration Verification | Layer 3 | 4 | Complete |
-| 46 | Performance Benchmarks | Layer 4 | 5 | In Progress (2/5) |
+| 46 | Performance Benchmarks | Layer 4 | 5 | Complete |
 | 47 | Full Penetration Test Cycle | Layer 5 | 5 | Not started |
 | 48 | Comprehensive Test Suite | Layer 6 | 4 | Not started |
 | 49 | Fix Wave 1 | Fix Cycle | 5-10 | Not started |
@@ -808,5 +845,5 @@ Plan: 0 of ~50 started
 Status: Milestone created, GSD planning in progress
 
 Last session: 2026-02-18
-Previous: Phase 46 Plans 01-02 complete (static code analysis of pipeline + storage performance)
-Next: Phase 46 Plans 03-05 (Distributed/Replication, Network/Transport, Memory/GC Performance)
+Previous: Phase 46 Plans 03-05 complete (distributed, network, memory performance analysis)
+Next: Phase 47 (Full Penetration Test Cycle)
