@@ -241,12 +241,6 @@ public abstract class DataMeshStrategyBase : StrategyBase, IDataMeshStrategy
         lock (_statsLock) { _statistics.TotalDataRequests++; }
     }
 
-    /// <summary>Throws if the strategy has not been initialized.</summary>
-    protected void ThrowIfNotInitialized()
-    {
-        if (!IsInitialized)
-            throw new InvalidOperationException($"Strategy '{StrategyId}' has not been initialized.");
-    }
 }
 
 #region Domain and Data Product Types

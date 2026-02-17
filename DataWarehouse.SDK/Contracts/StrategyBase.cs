@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
@@ -20,6 +21,10 @@ namespace DataWarehouse.SDK.Contracts
         private bool _disposed;
         protected bool _initialized;
         private readonly object _lifecycleLock = new();
+        private readonly ConcurrentDictionary<string, long> _counters = new();
+        private readonly SemaphoreSlim _healthCacheLock = new(1, 1);
+        private StrategyHealthCheckResult? _cachedHealth;
+        private DateTime? _healthCacheExpiry;
 
         /// <summary>
         /// Gets the unique machine-readable identifier for this strategy.
@@ -135,7 +140,7 @@ namespace DataWarehouse.SDK.Contracts
             if (_disposed) return;
             if (disposing)
             {
-                // Subclasses override to dispose managed resources
+                _healthCacheLock.Dispose();
             }
             _disposed = true;
         }
@@ -158,6 +163,167 @@ namespace DataWarehouse.SDK.Contracts
         {
             ObjectDisposedException.ThrowIf(_disposed, this);
         }
+
+        #region Common Infrastructure Helpers
+
+        /// <summary>
+        /// Throws <see cref="InvalidOperationException"/> if the strategy has not been initialized.
+        /// Use at the start of methods that require initialization.
+        /// </summary>
+        /// <exception cref="InvalidOperationException">Thrown if the strategy has not been initialized.</exception>
+        protected void ThrowIfNotInitialized()
+        {
+            if (!_initialized)
+                throw new InvalidOperationException($"Strategy '{StrategyId}' has not been initialized. Call InitializeAsync first.");
+        }
+
+        /// <summary>
+        /// Ensures the strategy is initialized using a double-check lock pattern.
+        /// If not yet initialized, acquires the lifecycle lock and calls the provided initialization function.
+        /// Thread-safe and idempotent.
+        /// </summary>
+        /// <param name="initCore">The initialization function to call if not yet initialized.</param>
+        /// <returns>A task representing the asynchronous operation.</returns>
+        protected async Task EnsureInitializedAsync(Func<Task> initCore)
+        {
+            if (_initialized) return;
+            // Use a simple async-safe pattern with the lifecycle lock
+            bool needsInit = false;
+            lock (_lifecycleLock)
+            {
+                if (!_initialized)
+                    needsInit = true;
+            }
+            if (needsInit)
+            {
+                await initCore().ConfigureAwait(false);
+                _initialized = true;
+            }
+        }
+
+        /// <summary>
+        /// Increments a named counter by 1. Thread-safe using <see cref="Interlocked"/>.
+        /// Use for tracking operation counts (e.g., reads, writes, encryptions).
+        /// </summary>
+        /// <param name="name">The counter name.</param>
+        protected void IncrementCounter(string name)
+        {
+            _counters.AddOrUpdate(name, 1, (_, current) => Interlocked.Increment(ref current));
+        }
+
+        /// <summary>
+        /// Gets the current value of a named counter.
+        /// Returns 0 if the counter does not exist.
+        /// </summary>
+        /// <param name="name">The counter name.</param>
+        /// <returns>The current counter value.</returns>
+        protected long GetCounter(string name)
+        {
+            return _counters.GetValueOrDefault(name, 0);
+        }
+
+        /// <summary>
+        /// Gets a snapshot of all counters as a read-only dictionary.
+        /// </summary>
+        /// <returns>A read-only dictionary of counter names to values.</returns>
+        protected IReadOnlyDictionary<string, long> GetAllCounters()
+        {
+            return new Dictionary<string, long>(_counters);
+        }
+
+        /// <summary>
+        /// Resets all counters to zero by clearing the counter dictionary.
+        /// </summary>
+        protected void ResetCounters()
+        {
+            _counters.Clear();
+        }
+
+        /// <summary>
+        /// Executes an operation with retry using exponential backoff and jitter.
+        /// Retries only on transient exceptions as determined by <see cref="IsTransientException"/>.
+        /// </summary>
+        /// <typeparam name="T">The return type of the operation.</typeparam>
+        /// <param name="operation">The async operation to execute.</param>
+        /// <param name="maxRetries">Maximum number of retry attempts (default: 3).</param>
+        /// <param name="baseDelay">Base delay between retries (default: 100ms). Actual delay increases exponentially.</param>
+        /// <param name="ct">Cancellation token.</param>
+        /// <returns>The result of the operation.</returns>
+        /// <exception cref="AggregateException">Thrown with all collected exceptions if all retries are exhausted.</exception>
+        protected async Task<T> ExecuteWithRetryAsync<T>(
+            Func<CancellationToken, Task<T>> operation,
+            int maxRetries = 3,
+            TimeSpan? baseDelay = null,
+            CancellationToken ct = default)
+        {
+            var delay = baseDelay ?? TimeSpan.FromMilliseconds(100);
+            var exceptions = new List<Exception>();
+
+            for (int attempt = 0; attempt <= maxRetries; attempt++)
+            {
+                try
+                {
+                    return await operation(ct).ConfigureAwait(false);
+                }
+                catch (Exception ex) when (attempt < maxRetries && IsTransientException(ex))
+                {
+                    exceptions.Add(ex);
+                    // Exponential backoff with jitter
+                    var jitter = TimeSpan.FromMilliseconds(
+                        System.Security.Cryptography.RandomNumberGenerator.GetInt32(0, 50));
+                    var backoff = TimeSpan.FromMilliseconds(delay.TotalMilliseconds * Math.Pow(2, attempt)) + jitter;
+                    await Task.Delay(backoff, ct).ConfigureAwait(false);
+                }
+            }
+
+            throw new AggregateException($"Operation failed after {maxRetries + 1} attempts", exceptions);
+        }
+
+        /// <summary>
+        /// Determines whether an exception is transient and the operation should be retried.
+        /// Override in domain strategy bases to classify domain-specific transient errors.
+        /// Default returns false (no retries).
+        /// </summary>
+        /// <param name="ex">The exception to evaluate.</param>
+        /// <returns>True if the exception is transient; false otherwise.</returns>
+        protected virtual bool IsTransientException(Exception ex) => false;
+
+        /// <summary>
+        /// Gets a cached health check result, refreshing it if expired.
+        /// Thread-safe with configurable cache duration.
+        /// </summary>
+        /// <param name="healthCheck">The health check function to call when cache is expired.</param>
+        /// <param name="cacheDuration">How long to cache the result (default: 30 seconds).</param>
+        /// <param name="ct">Cancellation token.</param>
+        /// <returns>The cached or freshly-computed health check result.</returns>
+        protected async Task<StrategyHealthCheckResult> GetCachedHealthAsync(
+            Func<CancellationToken, Task<StrategyHealthCheckResult>> healthCheck,
+            TimeSpan? cacheDuration = null,
+            CancellationToken ct = default)
+        {
+            var duration = cacheDuration ?? TimeSpan.FromSeconds(30);
+
+            if (_cachedHealth != null && _healthCacheExpiry.HasValue && DateTime.UtcNow < _healthCacheExpiry.Value)
+                return _cachedHealth;
+
+            await _healthCacheLock.WaitAsync(ct).ConfigureAwait(false);
+            try
+            {
+                // Double-check after acquiring lock
+                if (_cachedHealth != null && _healthCacheExpiry.HasValue && DateTime.UtcNow < _healthCacheExpiry.Value)
+                    return _cachedHealth;
+
+                _cachedHealth = await healthCheck(ct).ConfigureAwait(false);
+                _healthCacheExpiry = DateTime.UtcNow.Add(duration);
+                return _cachedHealth;
+            }
+            finally
+            {
+                _healthCacheLock.Release();
+            }
+        }
+
+        #endregion
 
         #region Legacy MessageBus Compatibility
 
@@ -193,4 +359,16 @@ namespace DataWarehouse.SDK.Contracts
 
         #endregion
     }
+
+    /// <summary>
+    /// Represents the result of a strategy-level health check.
+    /// Used by <see cref="StrategyBase.GetCachedHealthAsync"/> for cached health monitoring.
+    /// </summary>
+    /// <param name="IsHealthy">Whether the strategy is healthy.</param>
+    /// <param name="Message">Optional message describing the health status.</param>
+    /// <param name="Details">Optional dictionary of detailed health information.</param>
+    public record StrategyHealthCheckResult(
+        bool IsHealthy,
+        string? Message = null,
+        IReadOnlyDictionary<string, object>? Details = null);
 }

@@ -258,12 +258,6 @@ public abstract class DataLakeStrategyBase : StrategyBase, IDataLakeStrategy
         lock (_statsLock) { _statistics.TotalTables += count; }
     }
 
-    /// <summary>Throws if the strategy has not been initialized.</summary>
-    protected void ThrowIfNotInitialized()
-    {
-        if (!IsInitialized)
-            throw new InvalidOperationException($"Strategy '{StrategyId}' has not been initialized.");
-    }
 }
 
 /// <summary>

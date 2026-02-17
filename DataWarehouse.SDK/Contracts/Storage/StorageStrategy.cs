@@ -481,7 +481,7 @@ namespace DataWarehouse.SDK.Contracts.Storage
         /// </summary>
         /// <param name="exception">The exception to evaluate.</param>
         /// <returns>True if the operation should be retried, false otherwise.</returns>
-        protected virtual bool IsTransientException(Exception exception)
+        protected override bool IsTransientException(Exception exception)
         {
             return exception is IOException
                 || exception is TimeoutException
