@@ -1823,8 +1823,14 @@ These run continuously without direct user request:
    ├── Plugin responds: Success, PluginId, PluginName, Category, Version
    └── Plugin internally: loads strategies (auto-discovery or manual registration)
 
+2b. KERNEL SERVICE INJECTION (InjectKernelServices — KS2 fix, Phase 41.1-01)
+   ├── Kernel calls pluginBase.InjectKernelServices(_messageBus, capabilityRegistry, knowledgeLake)
+   ├── Runs AFTER handshake success, BEFORE registry registration
+   ├── Injects: IMessageBus, IPluginCapabilityRegistry (nullable), IKnowledgeLake (nullable)
+   └── Without this call, plugins silently fail to receive kernel services
+
 3. INITIALIZATION (InitializeAsync from PluginBase)
-   ├── MessageBus is injected (base class property)
+   ├── MessageBus is already injected (via InjectKernelServices in step 2b)
    ├── Plugin subscribes to message topics
    ├── Plugin registers message handlers (OnMessageAsync)
    └── Plugin calls ConfigureIntelligence(MessageBus) on strategies that need AI
@@ -1963,10 +1969,30 @@ var analysis = await MessageBus.SendAsync("intelligence.request", new PluginMess
   - Strategies: Raft, Paxos variants, PBFT, ZAB
   - Created by merging consensus strategies from UltimateResilience + Raft plugin
 
-### Architecture Kill Shots (Upcoming in Phase 41.1)
-The following improvements are planned or in progress:
+### Architecture Kill Shots (Phase 41.1)
 
-1. **KS5 — NativeKeyHandle for Key Memory**
+**COMPLETED in 41.1-01:**
+
+1. **KS2 — Kernel DI Wiring (InjectKernelServices)** -- COMPLETE
+   - `RegisterPluginAsync` now calls `pluginBase.InjectKernelServices(_messageBus, null, null)` after handshake success
+   - Without this, plugins silently failed to receive IMessageBus/IStorageEngine
+   - Both kernel registration paths (direct + KernelBuilder) now inject services
+
+2. **KS1 — Sync-Over-Async Pipeline Wrapper Removal** -- COMPLETE
+   - All sync-over-async wrappers removed from SDK pipeline hot paths
+   - `PluginBase.OnWrite/OnRead` marked `[Obsolete]` — use `OnWriteAsync/OnReadAsync`
+   - `TransitEncryptionPluginBases` converted to override `OnWriteAsync/OnReadAsync` (fully async)
+   - `PluginBase.CleanupExpiredAsync` converted to true async (`await DeleteAsync` instead of `.Wait()`)
+   - `IPlatformCapabilityRegistry` extended with async alternatives (`HasCapabilityAsync`, `GetDevicesAsync`, `GetAllDevicesAsync`, `GetCapabilitiesAsync`, `GetDeviceCountAsync`)
+   - `HsmProvider`, `MdnsServiceDiscovery`, `ZeroConfigClusterBootstrap` now implement `IAsyncDisposable`
+   - `StorageConnectionRegistry.DisposeAsync` uses new `DisposeConnectionAsync` (no more `.Wait()`)
+   - `ReplicaFallbackChain.BuildAsync` added, sync `Build` marked `[Obsolete]`, caller updated
+   - `IKeyStore.GetKey` marked `[Obsolete("Use GetKeyAsync")]`
+   - Remaining `.GetAwaiter().GetResult()` only in `[Obsolete]` legacy methods and sync `Dispose` paths (which have `IAsyncDisposable` alternatives)
+
+**Upcoming (remaining kill shots):**
+
+3. **KS5 — NativeKeyHandle for Key Memory**
    - Secure key material handling with native memory
    - Prevents key material from entering managed heap
    - Integrates with `UltimateKeyManagement` and encryption plugins
