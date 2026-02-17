@@ -12,6 +12,96 @@ namespace DataWarehouse.Shared.Services;
 /// </summary>
 public static class PlatformServiceManager
 {
+    private const string BaseServiceName = "DataWarehouse";
+
+    /// <summary>
+    /// Gets the platform-appropriate service name for the given profile.
+    /// </summary>
+    /// <param name="profile">The service profile (e.g., "server", "client").</param>
+    /// <returns>
+    /// Platform-specific service name:
+    /// - Windows: "DataWarehouse-Server" or "DataWarehouse-Client"
+    /// - Linux: "datawarehouse-server" or "datawarehouse-client"
+    /// - macOS: "com.datawarehouse.server" or "com.datawarehouse.client"
+    /// </returns>
+    public static string GetProfileServiceName(string? profile = null)
+    {
+        var profileSuffix = string.IsNullOrWhiteSpace(profile) ? "" : $"-{profile.Trim()}";
+
+        if (OperatingSystem.IsWindows())
+        {
+            return string.IsNullOrWhiteSpace(profile)
+                ? BaseServiceName
+                : $"{BaseServiceName}-{char.ToUpperInvariant(profile[0])}{profile[1..].ToLowerInvariant()}";
+        }
+        else if (OperatingSystem.IsMacOS())
+        {
+            var suffix = string.IsNullOrWhiteSpace(profile) ? "" : $".{profile.ToLowerInvariant()}";
+            return $"com.datawarehouse{suffix}";
+        }
+        else
+        {
+            // Linux
+            return string.IsNullOrWhiteSpace(profile)
+                ? "datawarehouse"
+                : $"datawarehouse-{profile.ToLowerInvariant()}";
+        }
+    }
+
+    /// <summary>
+    /// Gets the display name for a profile-aware service.
+    /// </summary>
+    /// <param name="profile">The service profile.</param>
+    /// <returns>Human-readable display name including profile.</returns>
+    public static string GetProfileDisplayName(string? profile = null)
+    {
+        if (string.IsNullOrWhiteSpace(profile))
+            return "DataWarehouse Service";
+
+        var capitalizedProfile = char.ToUpperInvariant(profile[0]) + profile[1..].ToLowerInvariant();
+        return $"DataWarehouse {capitalizedProfile} Service";
+    }
+
+    /// <summary>
+    /// Gets the description for a profile-aware service.
+    /// </summary>
+    /// <param name="profile">The service profile.</param>
+    /// <returns>Service description including profile information.</returns>
+    public static string GetProfileDescription(string? profile = null)
+    {
+        return profile?.ToLowerInvariant() switch
+        {
+            "server" => "DataWarehouse server daemon - full plugin set (storage, intelligence, dispatchers)",
+            "client" => "DataWarehouse client daemon - minimal plugin set (courier, watchdog, policy)",
+            _ => "DataWarehouse service daemon - unified storage and data management platform"
+        };
+    }
+
+    /// <summary>
+    /// Creates a <see cref="ServiceRegistration"/> pre-configured for the given profile.
+    /// </summary>
+    /// <param name="executablePath">Full path to the service executable.</param>
+    /// <param name="profile">The service profile (server, client, or null for default).</param>
+    /// <param name="workingDirectory">Optional working directory.</param>
+    /// <param name="autoStart">Whether to start automatically on boot.</param>
+    /// <returns>A populated <see cref="ServiceRegistration"/>.</returns>
+    public static ServiceRegistration CreateProfileRegistration(
+        string executablePath,
+        string? profile = null,
+        string? workingDirectory = null,
+        bool autoStart = true)
+    {
+        return new ServiceRegistration
+        {
+            Name = GetProfileServiceName(profile),
+            DisplayName = GetProfileDisplayName(profile),
+            ExecutablePath = executablePath,
+            WorkingDirectory = workingDirectory,
+            AutoStart = autoStart,
+            Description = GetProfileDescription(profile)
+        };
+    }
+
     /// <summary>
     /// Gets the current status of a system service.
     /// </summary>
