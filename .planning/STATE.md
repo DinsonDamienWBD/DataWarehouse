@@ -270,6 +270,7 @@ Audit findings resolved:
 | Phase 41.1 P07 | 20min | 6 tasks | 20 files |
 | Phase 41.1 P05 | 35min | 11 tasks | 10 files |
 | Phase 42 P02 | 9 | 6 tasks | 10 files |
+| Phase 42 P04 | 21min | 6 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -376,6 +377,8 @@ Audit findings resolved:
 - Phase 41.1-05: Default Interface Method (DIM) for IKeyStore.GetKeyNativeAsync — avoids breaking existing implementers
 - Phase 41.1-05: Typed handler topic auto-naming from typeof(TRequest).FullName — convention-based, no manual topic strings
 - Phase 41.1-05: Deferred subscription pattern — handlers queued before MessageBus injection, subscribed in InjectKernelServices
+- [Phase 42]: CLI/GUI identified as CRITICAL PRIORITY blocking issue (6% completion insufficient for v4.0 certification) — CLI and GUI are user-facing entry points; current implementation insufficient for production
+- [Phase 42]: Sequential execution strategy: CLI first (12 weeks) -> GUI (14 weeks) -> Cloud polish (16 weeks) -> Integration (8 weeks) — CLI and GUI share common backend services; completing CLI first establishes patterns for GUI
 
 ### SDK Audit Results (2026-02-14)
 
