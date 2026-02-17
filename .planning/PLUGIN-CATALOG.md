@@ -2018,6 +2018,39 @@ var analysis = await MessageBus.SendAsync("intelligence.request", new PluginMess
    - `SimpleStrategy`, `MirroredStrategy`, `WriteAheadLogStrategy` now inherit from `StorageOrchestrationStrategyBase`
    - DisplayName vs StrategyName: Both retained as interface-specific properties. All bridges to `StrategyBase.Name` (canonical). Renaming interface properties would break 900+ plugin strategies. Decision: document, not change.
 
+**COMPLETED in 41.1-04 (FIX-10, FIX-11, FIX-12, FIX-13):**
+
+9. **FIX-10 — SelectOptimalAlgorithmAsync migrated to DataTransformationPluginBase** -- COMPLETE (41.1-04)
+   - Method moved from leaf plugin classes to `DataTransformationPluginBase` in SDK hierarchy
+   - Default implementation returns `Name` property; leaf classes can override for richer selection logic
+   - `QualityLevel` already existed on the hierarchy class; pattern now consolidates at the base
+
+10. **FIX-12 — Legacy EncryptionPluginBase key management ported to v3.0 hierarchy** -- COMPLETE (41.1-04)
+    - `IKeyStore`, `IEnvelopeKeyStore`, `IKeyStoreRegistry` references added to hierarchy `EncryptionPluginBase`
+    - `KeyManagementMode`, `DefaultKeyManagementMode`, `ConfigProvider`, statistics fields ported
+    - `ResolveEffectiveKeyStoreAsync`, `ResolveEffectiveKeyManagementModeAsync`, `WrapDekAsync`, `UnwrapDekAsync` added
+    - `GenerateSecureDek` and `GetEncryptionStatisticsAsync` methods added
+    - `UniqueKeysUsed` and `LastKeyAccess` added to `EncryptionStatistics` for full compatibility
+
+11. **FIX-13 — Legacy storage chain features ported to new StoragePluginBase** -- COMPLETE (41.1-04)
+    - `StoragePluginBase` (hierarchy) enhanced with opt-in caching and indexing via `EnableCaching()`/`EnableIndexing()`
+    - Cache: TTL, eviction, statistics, cleanup timer all built into base class (activated by single method call)
+    - Index: document indexing, full-text search, metadata query, rebuild -- all opt-in
+    - URI-based legacy chain (StorageProviderPluginBase -> ListableStoragePluginBase -> CacheableStoragePluginBase -> IndexableStoragePluginBase) extracted to standalone `LegacyStoragePluginBases.cs` (consumers not yet migrated)
+
+12. **FIX-11 — Legacy base classes deleted from PluginBase.cs** -- COMPLETE (41.1-04)
+    - PluginBase.cs reduced from 3,310 lines to 1,161 lines (~2,150 lines removed)
+    - **Pure-deleted** (consumers fully migrated): `DataTransformationPluginBase`, `SecurityProviderPluginBase`, `PipelinePluginBase`, `ReplicationPluginBase`, `AccessControlPluginBase`, `EncryptionPluginBase`, `CompressionPluginBase`, `EncryptionStatistics`, `TieredStoragePluginBase`
+    - **Extracted to standalone files** (consumers require URI-based API or aren't migratable yet):
+      - `LegacyStoragePluginBases.cs`: StorageProviderPluginBase, ListableStoragePluginBase, CacheableStoragePluginBase, IndexableStoragePluginBase
+      - `LegacyConsensusPluginBase.cs`: ConsensusPluginBase, ClusterState
+      - `LegacyContainerManagerPluginBase.cs`: ContainerManagerPluginBase
+      - `LegacyInterfacePluginBase.cs`: InterfacePluginBase (shim to hierarchy version)
+    - Kernel PipelineOrchestrator updated: `PipelinePluginBase` -> `DataPipelinePluginBase`
+    - UltimateStorage migration service updated: `PipelinePluginBase` -> `DataTransformationPluginBase`
+    - SDK intermediate bases migrated: TransitEncryptionPluginBases, MilitarySecurityPluginBases, LowLatencyPluginBases -> v3.0 hierarchy bases
+    - UltimateIntelligencePlugin migrated from PipelinePluginBase to DataTransformationPluginBase
+
 **Upcoming (remaining kill shots):**
 
 3. **KS5 — NativeKeyHandle for Key Memory**
@@ -2076,18 +2109,29 @@ var analysis = await MessageBus.SendAsync("intelligence.request", new PluginMess
    - 13 stub strategies eliminated — now inherit working BFS from base class
    - 5 strategies with custom implementations retain their overrides
 
-### Updated Hierarchy (v3.0 + Phase 41.1)
+### Updated Hierarchy (v3.0 + Phase 41.1-04)
 ```
 IntelligenceAwarePluginBase
   ├─ FeaturePluginBase
   │   ├─ SecurityPluginBase
+  │   │   └─ (MilitarySecurityPluginBases migrated here)
   │   ├─ InfrastructurePluginBase
   │   │   ├─ ResiliencePluginBase → UltimateResilience
-  │   │   └─ ConsensusPluginBase → UltimateConsensus
+  │   │   └─ ConsensusPluginBase → UltimateConsensus, Raft (extracted to LegacyConsensusPluginBase.cs)
+  │   ├─ ComputePluginBase
+  │   │   └─ ContainerManagerPluginBase (extracted to LegacyContainerManagerPluginBase.cs)
+  │   ├─ InterfacePluginBase (shim in LegacyInterfacePluginBase.cs)
   │   └─ DataManagementPluginBase (tenant-scoped storage: GetDataAsync/SetDataAsync)
   └─ DataPipelinePluginBase
-      └─ DataTransformationPluginBase
-          └─ EncryptionPluginBase
+      ├─ StorageProviderPluginBase (extracted to LegacyStoragePluginBases.cs, URI-based)
+      │   └─ ListableStoragePluginBase → CacheableStoragePluginBase → IndexableStoragePluginBase
+      └─ DataTransformationPluginBase (SelectOptimalAlgorithmAsync added)
+          ├─ EncryptionPluginBase (full key management from FIX-12)
+          ├─ CompressionPluginBase
+          └─ TransitEncryptionPluginBase (migrated from PipelinePluginBase)
+
+PluginBase.cs: 1,161 lines (main class only, legacy block deleted)
+Legacy extractions: 4 standalone files for classes with unmigrated consumers
 ```
 
 **Strategy Hierarchy (v3.0 + Phase 41.1-03):**
