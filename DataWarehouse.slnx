@@ -38,6 +38,7 @@
     <Project Path="Plugins/DataWarehouse.Plugins.UltimateCompression/DataWarehouse.Plugins.UltimateCompression.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.UltimateCompute/DataWarehouse.Plugins.UltimateCompute.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.UltimateConnector/DataWarehouse.Plugins.UltimateConnector.csproj" />
+    <Project Path="Plugins/DataWarehouse.Plugins.UltimateConsensus/DataWarehouse.Plugins.UltimateConsensus.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.UltimateDatabaseProtocol/DataWarehouse.Plugins.UltimateDatabaseProtocol.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.UltimateDatabaseStorage/DataWarehouse.Plugins.UltimateDatabaseStorage.csproj" />
     <Project Path="Plugins/DataWarehouse.Plugins.UltimateDataCatalog/DataWarehouse.Plugins.UltimateDataCatalog.csproj" />
