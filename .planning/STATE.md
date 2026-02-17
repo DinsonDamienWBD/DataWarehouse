@@ -5,7 +5,7 @@
 See: .planning/PROJECT.md (updated 2026-02-12)
 
 **Core value:** Universal platform that addresses any storage medium on any hardware -- from bare-metal NVMe to Raspberry Pi GPIO -- with federated routing and production-grade audit.
-**Current focus:** v2.0 COMPLETE (56/56 plans). v3.0 Universal Platform milestone planned and ready for execution.
+**Current focus:** v3.0 COMPLETE (64/64 plans + 8/8 Phase 41.1 kill shots). v4.0 Universal Production Certification starting.
 
 ## Current Position
 
@@ -482,6 +482,24 @@ Audit findings resolved:
   - 5 deviations: NU1510 PackageReference conflicts (Rule 1), CS4010 async lambda (Rule 1), Results.ServiceUnavailable (Rule 1), CS1988 ref in async (Rule 1), InstanceManager API mismatch (Rule 1)
   - **Net result: 12 files created, 10 files modified; real production install pipeline, live mode, USB install, platform service management**
 
+## v4.0 Universal Production Certification
+
+### Phases Overview
+
+| Phase | Name | Layer | Plans | Status |
+|-------|------|-------|-------|--------|
+| 42 | Feature Verification Matrix | Layer 0 | 4-8 | Not started |
+| 43 | Full Solution Automated Scan | Layer 1 | 3-5 | Not started |
+| 44 | Domain-by-Domain Deep Audit | Layer 2 | 9 | Not started |
+| 45 | Tier-by-Tier Integration Verification | Layer 3 | 4 | Not started |
+| 46 | Performance Benchmarks | Layer 4 | 5 | Not started |
+| 47 | Full Penetration Test Cycle | Layer 5 | 5 | Not started |
+| 48 | Comprehensive Test Suite | Layer 6 | 4 | Not started |
+| 49 | Fix Wave 1 | Fix Cycle | 5-10 | Not started |
+| 50 | Fix Wave 2 + Re-audit | Fix Cycle | 5-10 | Not started |
+| 51 | Certification Authority Final Audit | Layer 7 | 3 | Not started |
+| **Total** | | | **~50-63 plans** | |
+
 ## v3.0 Milestone Plan
 
 ### Phases Overview
@@ -549,11 +567,10 @@ Phase 33 (VDE) ─────────────────────�
 
 ### Current Position
 
-**Phase 41.1** — Stage: **EXECUTE** (8 plans, 3 waves)
-Plan: 8 of 8 complete
-Status: COMPLETE
-
-Progress: [########################] 100% (8/8 plans)
+**v4.0 Universal Production Certification** — Stage: **PLANNING** (10 phases: 42-51)
+Plan: 0 of ~50 started
+Status: Milestone created, GSD planning in progress
 
 Last session: 2026-02-17
-Stopped at: Completed 41.1-08-PLAN.md (Unified Service Binary with Profile-Based Plugin Loading)
+Previous: Phase 41.1 COMPLETE (8/8 plans, 3 waves — all architecture kill shots resolved)
+Next: GSD plan-phase for v4.0 phases 42-51
