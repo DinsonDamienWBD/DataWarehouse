@@ -25,8 +25,9 @@ public abstract class EncryptionPluginBase : DataTransformationPluginBase
     /// <summary>Algorithm identifier (e.g., "AES-256-GCM").</summary>
     public abstract string AlgorithmId { get; }
 
-    /// <summary>AI hook: Select optimal algorithm based on data characteristics.</summary>
-    protected virtual Task<string> SelectOptimalAlgorithmAsync(Dictionary<string, object> context, CancellationToken ct = default)
+    /// <inheritdoc/>
+    /// <remarks>Default returns <see cref="AlgorithmId"/> for encryption-specific selection.</remarks>
+    protected override Task<string> SelectOptimalAlgorithmAsync(Dictionary<string, object> context, CancellationToken ct = default)
         => Task.FromResult(AlgorithmId);
 
     /// <summary>AI hook: Evaluate key strength.</summary>

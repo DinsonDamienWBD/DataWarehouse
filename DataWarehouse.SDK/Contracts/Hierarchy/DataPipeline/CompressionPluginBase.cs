@@ -19,8 +19,9 @@ public abstract class CompressionPluginBase : DataTransformationPluginBase
     /// <summary>Compression level (1-22, higher = better compression, slower).</summary>
     public virtual int CompressionLevel => 6;
 
-    /// <summary>AI hook: Select optimal compression algorithm for data type.</summary>
-    protected virtual Task<string> SelectOptimalAlgorithmAsync(Dictionary<string, object> context, CancellationToken ct = default)
+    /// <inheritdoc/>
+    /// <remarks>Default returns <see cref="CompressionAlgorithm"/> for compression-specific selection.</remarks>
+    protected override Task<string> SelectOptimalAlgorithmAsync(Dictionary<string, object> context, CancellationToken ct = default)
         => Task.FromResult(CompressionAlgorithm);
 
     /// <summary>AI hook: Predict compression ratio before compressing.</summary>
