@@ -728,10 +728,13 @@ All audits produce output tables: `| File | Severity (P0-P3) | Issue | Recommend
 **Goal:** Fix 10 critical architecture issues discovered by hostile 6-persona audit. Covers: async pipeline (KS1), kernel DI wiring (KS2), typed message handlers (KS3+4), native key memory (KS5), tenant-scoped storage (KS6+10), scalable vector clocks (KS7), Multi-Raft consensus consolidation (KS8), lineage default implementations (KS9).
 **Depends on:** Phase 41
 **Requirements:** KILLSHOT-01 through KILLSHOT-10 (see phase REQUIREMENTS.md)
-**Plans:** TBD (run /gsd:plan-phase 41.1 to break down)
+**Plans:** 4 plans
 
 Plans:
-- [ ] TBD (run /gsd:plan-phase 41.1 to break down)
+- [ ] 41.1-01-PLAN.md -- KS2 Kernel DI wiring + KS1 async pipeline sync wrapper removal
+- [ ] 41.1-02-PLAN.md -- KS9 lineage BFS defaults + KS6+10 tenant-scoped storage
+- [ ] 41.1-03-PLAN.md -- KS5 NativeKeyHandle + KS3 typed message handlers
+- [ ] 41.1-04-PLAN.md -- KS7 DottedVersionVector + KS8 Multi-Raft consensus
 
 ### Phase 31.1: Pre-v3.0 Production Readiness Cleanup (INSERTED)
 
