@@ -800,11 +800,7 @@ public sealed class FuseDriverPlugin : DataWarehouse.SDK.Contracts.Hierarchy.Int
             if (_disposed) return;
             _disposed = true;
 
-            if (_isMounted)
-            {
-                UnmountAsync().GetAwaiter().GetResult();
-            }
-
+            // Synchronous cleanup only
             _cts?.Cancel();
             _cts?.Dispose();
             _fuseThread?.Join(TimeSpan.FromSeconds(2));
@@ -815,6 +811,33 @@ public sealed class FuseDriverPlugin : DataWarehouse.SDK.Contracts.Hierarchy.Int
             _cacheManager?.Dispose();
         }
         base.Dispose(disposing);
+    }
+
+    /// <summary>
+    /// Asynchronously disposes the plugin.
+    /// </summary>
+    protected override async ValueTask DisposeAsyncCore()
+    {
+        if (_disposed) return;
+        _disposed = true;
+
+        // Unmount asynchronously if mounted
+        if (_isMounted)
+        {
+            await UnmountAsync().ConfigureAwait(false);
+        }
+
+        // Synchronous cleanup
+        _cts?.Cancel();
+        _cts?.Dispose();
+        _fuseThread?.Join(TimeSpan.FromSeconds(2));
+        _messageSubscription?.Dispose();
+        _linuxSpecific?.Dispose();
+        _macOsSpecific?.Dispose();
+        _fileSystem?.Dispose();
+        _cacheManager?.Dispose();
+
+        await base.DisposeAsyncCore().ConfigureAwait(false);
     }
 
     #endregion
