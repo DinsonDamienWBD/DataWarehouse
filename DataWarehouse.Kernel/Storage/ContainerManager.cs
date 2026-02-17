@@ -336,10 +336,19 @@ namespace DataWarehouse.Kernel.Storage
         /// <summary>
         /// Checks if a subject has at least the specified access level.
         /// </summary>
+        public async Task<bool> HasAccessAsync(ISecurityContext context, string containerId, ContainerAccessLevel requiredLevel)
+        {
+            var level = await GetAccessLevelAsync(context, containerId, context.UserId);
+            return level >= requiredLevel;
+        }
+
+        /// <summary>
+        /// Checks if a subject has at least the specified access level (synchronous wrapper).
+        /// </summary>
+        [Obsolete("Use HasAccessAsync for async context")]
         public bool HasAccess(ISecurityContext context, string containerId, ContainerAccessLevel requiredLevel)
         {
-            var level = GetAccessLevelAsync(context, containerId, context.UserId).GetAwaiter().GetResult();
-            return level >= requiredLevel;
+            return HasAccessAsync(context, containerId, requiredLevel).GetAwaiter().GetResult();
         }
 
         #endregion

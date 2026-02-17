@@ -42,7 +42,7 @@ public static class PortableMediaDetector
     /// </summary>
     /// <param name="portsToCheck">Ports to check (defaults to 8080, 8081, 9090).</param>
     /// <returns>URL of the first found live instance, or null if none found.</returns>
-    public static string? FindLocalLiveInstance(int[]? portsToCheck = null)
+    public static async Task<string?> FindLocalLiveInstanceAsync(int[]? portsToCheck = null)
     {
         portsToCheck ??= [8080, 8081, 9090];
 
@@ -56,7 +56,7 @@ public static class PortableMediaDetector
             try
             {
                 var url = $"http://localhost:{port}/api/v1/info";
-                var response = client.GetAsync(url).GetAwaiter().GetResult();
+                var response = await client.GetAsync(url);
 
                 if (response.IsSuccessStatusCode)
                 {
@@ -70,6 +70,15 @@ public static class PortableMediaDetector
         }
 
         return null;
+    }
+
+    /// <summary>
+    /// Scans local ports for a running DataWarehouse live instance (synchronous wrapper).
+    /// </summary>
+    [Obsolete("Use FindLocalLiveInstanceAsync for async context")]
+    public static string? FindLocalLiveInstance(int[]? portsToCheck = null)
+    {
+        return FindLocalLiveInstanceAsync(portsToCheck).GetAwaiter().GetResult();
     }
 
     /// <summary>

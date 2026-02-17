@@ -36,8 +36,8 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.CloudPlatform
             };
 
             // Validate credentials are present
-            var accessKey = GetConfiguration<string>(config, "AccessKeyId", null!);
-            var secretKey = GetConfiguration<string>(config, "SecretAccessKey", null!);
+            var accessKey = GetConfiguration<string>(config, "AccessKeyId", string.Empty);
+            var secretKey = GetConfiguration<string>(config, "SecretAccessKey", string.Empty);
 
             if (string.IsNullOrEmpty(accessKey) || string.IsNullOrEmpty(secretKey))
                 throw new InvalidOperationException("AWS AccessKeyId and SecretAccessKey are required.");

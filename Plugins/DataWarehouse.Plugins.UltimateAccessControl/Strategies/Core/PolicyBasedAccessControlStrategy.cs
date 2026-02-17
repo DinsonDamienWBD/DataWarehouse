@@ -448,7 +448,7 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Core
                 PolicyOperator.Contains => value?.ToString()?.Contains(expected?.ToString() ?? "") ?? false,
                 PolicyOperator.StartsWith => value?.ToString()?.StartsWith(expected?.ToString() ?? "") ?? false,
                 PolicyOperator.EndsWith => value?.ToString()?.EndsWith(expected?.ToString() ?? "") ?? false,
-                PolicyOperator.Matches => Regex.IsMatch(value?.ToString() ?? "", expected?.ToString() ?? ""),
+                PolicyOperator.Matches => Regex.IsMatch(value?.ToString() ?? "", expected?.ToString() ?? "", RegexOptions.None, TimeSpan.FromSeconds(1)),
                 PolicyOperator.GreaterThan => Compare(value, expected) > 0,
                 PolicyOperator.LessThan => Compare(value, expected) < 0,
                 PolicyOperator.GreaterThanOrEqual => Compare(value, expected) >= 0,
@@ -524,7 +524,7 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Core
                     r == "*" ||
                     context.ResourceId.Equals(r, StringComparison.OrdinalIgnoreCase) ||
                     (r.EndsWith("/*") && context.ResourceId.StartsWith(r[..^2], StringComparison.OrdinalIgnoreCase)) ||
-                    Regex.IsMatch(context.ResourceId, r));
+                    Regex.IsMatch(context.ResourceId, r, RegexOptions.None, TimeSpan.FromSeconds(1)));
 
                 if (!matches) return false;
             }

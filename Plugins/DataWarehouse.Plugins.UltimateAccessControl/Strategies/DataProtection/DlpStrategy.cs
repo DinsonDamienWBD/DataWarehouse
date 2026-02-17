@@ -146,7 +146,7 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.DataProtection
 
             foreach (var rule in _rules.Values)
             {
-                var regex = new Regex(rule.Pattern, RegexOptions.IgnoreCase);
+                var regex = new Regex(rule.Pattern, RegexOptions.IgnoreCase, TimeSpan.FromSeconds(1));
                 var matches = regex.Matches(content);
 
                 foreach (Match match in matches)
