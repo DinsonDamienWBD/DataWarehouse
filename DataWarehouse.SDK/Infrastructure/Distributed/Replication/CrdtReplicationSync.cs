@@ -50,7 +50,7 @@ namespace DataWarehouse.SDK.Infrastructure.Distributed
     internal sealed class CrdtDataItem
     {
         public string Key { get; set; } = string.Empty;
-        public ICrdtType Value { get; set; } = null!;
+        public required ICrdtType Value { get; set; }
         public DataWarehouse.SDK.Replication.VectorClock Clock { get; set; } = new(new Dictionary<string, long>());
         public DateTimeOffset LastModified { get; set; }
     }

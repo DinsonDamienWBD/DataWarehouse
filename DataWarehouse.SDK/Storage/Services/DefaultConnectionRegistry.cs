@@ -186,7 +186,7 @@ public sealed class DefaultConnectionRegistry<TConfig> : IConnectionRegistry<TCo
     private record RegistrationEntry
     {
         public string Name { get; init; } = string.Empty;
-        public TConfig Config { get; init; } = null!;
+        public required TConfig Config { get; init; }
         public DateTimeOffset RegisteredAt { get; init; }
     }
 }

@@ -44,7 +44,7 @@ namespace DataWarehouse.SDK.Infrastructure.Distributed
     /// </summary>
     internal sealed class SwimMemberState
     {
-        public ClusterNode Node { get; set; } = null!;
+        public required ClusterNode Node { get; set; }
         public ClusterNodeStatus Status { get; set; }
         public int IncarnationNumber { get; set; }
         public DateTimeOffset LastPingAt { get; set; }
