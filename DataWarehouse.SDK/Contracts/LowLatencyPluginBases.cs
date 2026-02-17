@@ -21,7 +21,7 @@ namespace DataWarehouse.SDK.Contracts;
 /// Provides infrastructure for sub-millisecond storage operations with hardware acceleration.
 /// Implements common patterns for direct I/O, pre-warming, and latency tracking.
 /// </summary>
-public abstract class LowLatencyStoragePluginBase : StorageProviderPluginBase, ILowLatencyStorage, IIntelligenceAware
+public abstract class LowLatencyStoragePluginBase : Hierarchy.DataPipelinePluginBase, ILowLatencyStorage, IIntelligenceAware
 {
     #region Intelligence Socket
 
