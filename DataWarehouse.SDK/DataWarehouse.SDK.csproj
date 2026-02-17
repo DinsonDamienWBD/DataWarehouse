@@ -35,4 +35,8 @@
     <PackageReference Include="System.Management" Version="10.0.3" Condition="$([MSBuild]::IsOSPlatform('Windows'))" />
   </ItemGroup>
 
+  <ItemGroup>
+    <EmbeddedResource Include="Primitives\Configuration\Presets\*.xml" />
+  </ItemGroup>
+
 </Project>
