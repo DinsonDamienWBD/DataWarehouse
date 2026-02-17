@@ -25,8 +25,6 @@ namespace DataWarehouse.SDK.Contracts.Observability;
 /// </remarks>
 public abstract class ObservabilityStrategyBase : StrategyBase, IObservabilityStrategy
 {
-    private bool _disposed;
-    private new bool _initialized;
     private readonly SemaphoreSlim _initializationLock = new(1, 1);
 
     /// <summary>
@@ -54,10 +52,6 @@ public abstract class ObservabilityStrategyBase : StrategyBase, IObservabilitySt
     /// <inheritdoc/>
     public ObservabilityCapabilities Capabilities { get; }
 
-    /// <summary>
-    /// Gets a value indicating whether this strategy has been initialized.
-    /// </summary>
-    protected new bool IsInitialized => _initialized;
 
     /// <inheritdoc/>
     public async Task MetricsAsync(IEnumerable<MetricValue> metrics, CancellationToken cancellationToken = default)
@@ -103,7 +97,7 @@ public abstract class ObservabilityStrategyBase : StrategyBase, IObservabilitySt
     {
         EnsureNotDisposed();
 
-        if (!_initialized)
+        if (!IsInitialized)
         {
             return new HealthCheckResult(
                 IsHealthy: false,
@@ -170,32 +164,27 @@ public abstract class ObservabilityStrategyBase : StrategyBase, IObservabilitySt
     /// <param name="disposing">True if disposing managed resources; false if finalizing.</param>
     protected override void Dispose(bool disposing)
     {
-        if (_disposed)
-            return;
-
         if (disposing)
         {
             _initializationLock.Dispose();
         }
 
         base.Dispose(disposing);
-        _disposed = true;
     }
 
 
     private async Task EnsureInitializedAsync(CancellationToken cancellationToken)
     {
-        if (_initialized)
+        if (IsInitialized)
             return;
 
         await _initializationLock.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
-            if (_initialized)
+            if (IsInitialized)
                 return;
 
-            await InitializeAsyncCore(cancellationToken).ConfigureAwait(false);
-            _initialized = true;
+            await InitializeAsync(cancellationToken).ConfigureAwait(false);
         }
         finally
         {
