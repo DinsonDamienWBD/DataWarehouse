@@ -266,6 +266,7 @@ Audit findings resolved:
 | Phase 31.1 P05 | 24 | 8 tasks | 8 files |
 | Phase 41.1 P03 | 14min | 21 tasks | 8 files |
 | Phase 41.1 P06 | 23min | 9 tasks | 20 files |
+| Phase 41.1 P08 | 25min | 12 tasks | 20 files |
 | Phase 41.1 P07 | 20min | 6 tasks | 20 files |
 | Phase 41.1 P05 | 35min | 11 tasks | 10 files |
 
@@ -364,6 +365,9 @@ Audit findings resolved:
 - Phase 41.1-04: InterfacePluginBase kept as forwarding shim (LegacyInterfacePluginBase.cs) — 5 consumers still use SDK.Contracts namespace version
 - Phase 41.1-04: Opt-in caching/indexing pattern: StoragePluginBase uses EnableCaching()/EnableIndexing() instead of inheritance chain
 - Phase 41.1-04: PluginBase.cs reduced from 3310 to 1161 lines — 14 legacy classes deleted/extracted
+- Phase 41.1-08: ServiceProfileType.Auto is default profile — auto-detects from available plugin types (ServerDispatcher=server, ClientCourier=client, both=both)
+- Phase 41.1-08: 9 plugins explicitly annotated (4 Server AEDS + 4 Server heavy + 1 Client AEDS), all other plugins default to Both (no annotation needed)
+- Phase 41.1-08: LineageStrategyBase abstract methods changed to virtual with BFS implementations (pre-existing build break from concurrent plan)
 - Phase 41.1-07: SystemConfiguration property name (not Configuration) in PluginBase to avoid TamperProofProviderPluginBase collision
 - Phase 41.1-07: Safe XML deserialization with DtdProcessing.Prohibit (CA5369 compliance)
 - Phase 41.1-07: GC.GetGCMemoryInfo for RAM estimation when hardware probe lacks memory device info
@@ -545,11 +549,11 @@ Phase 33 (VDE) ─────────────────────�
 
 ### Current Position
 
-**Phase 41.1** — Stage: **EXECUTE** (7 plans, 2 waves)
-Plan: 7 of 7 complete
+**Phase 41.1** — Stage: **EXECUTE** (8 plans, 3 waves)
+Plan: 8 of 8 complete
 Status: COMPLETE
 
-Progress: [########################] 100% (7/7 plans)
+Progress: [########################] 100% (8/8 plans)
 
-Last session: 2026-02-18
-Stopped at: Completed 41.1-05-PLAN.md (KS5 NativeKeyHandle + KS3 Typed Message Handlers)
+Last session: 2026-02-17
+Stopped at: Completed 41.1-08-PLAN.md (Unified Service Binary with Profile-Based Plugin Loading)
