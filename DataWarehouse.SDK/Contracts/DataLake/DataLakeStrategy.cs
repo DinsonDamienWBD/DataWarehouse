@@ -127,7 +127,6 @@ public abstract class DataLakeStrategyBase : StrategyBase, IDataLakeStrategy
 {
     private readonly DataLakeStatistics _statistics = new();
     private readonly object _statsLock = new();
-    private new bool _initialized;
 
     /// <inheritdoc/>
     public override abstract string StrategyId { get; }
@@ -143,9 +142,6 @@ public abstract class DataLakeStrategyBase : StrategyBase, IDataLakeStrategy
     public abstract string SemanticDescription { get; }
     /// <inheritdoc/>
     public abstract string[] Tags { get; }
-
-    /// <summary>Gets whether the strategy has been initialized.</summary>
-    protected new bool IsInitialized => _initialized;
 
     /// <inheritdoc/>
     public DataLakeStatistics GetStatistics()
@@ -184,20 +180,24 @@ public abstract class DataLakeStrategyBase : StrategyBase, IDataLakeStrategy
         }
     }
 
-    /// <inheritdoc/>
-    public new virtual async Task InitializeAsync(CancellationToken ct = default)
+    /// <summary>Core initialization logic delegated from StrategyBase lifecycle.</summary>
+    protected override async Task InitializeAsyncCore(CancellationToken cancellationToken)
     {
-        if (_initialized) return;
-        await InitializeCoreAsync(ct);
-        _initialized = true;
+        await InitializeCoreAsync(cancellationToken);
     }
 
     /// <inheritdoc/>
-    public new async Task DisposeAsync()
+    async Task IDataLakeStrategy.InitializeAsync(CancellationToken ct)
     {
-        if (!_initialized) return;
+        await InitializeAsync(ct);
+    }
+
+    /// <inheritdoc/>
+    async Task IDataLakeStrategy.DisposeAsync()
+    {
+        if (!IsInitialized) return;
         await DisposeCoreAsync();
-        _initialized = false;
+        await ShutdownAsync();
     }
 
     /// <summary>Core initialization logic.</summary>
@@ -261,7 +261,7 @@ public abstract class DataLakeStrategyBase : StrategyBase, IDataLakeStrategy
     /// <summary>Throws if the strategy has not been initialized.</summary>
     protected void ThrowIfNotInitialized()
     {
-        if (!_initialized)
+        if (!IsInitialized)
             throw new InvalidOperationException($"Strategy '{StrategyId}' has not been initialized.");
     }
 }
