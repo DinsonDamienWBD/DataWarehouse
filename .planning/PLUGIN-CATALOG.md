@@ -1990,6 +1990,34 @@ var analysis = await MessageBus.SendAsync("intelligence.request", new PluginMess
    - `IKeyStore.GetKey` marked `[Obsolete("Use GetKeyAsync")]`
    - Remaining `.GetAwaiter().GetResult()` only in `[Obsolete]` legacy methods and sync `Dispose` paths (which have `IAsyncDisposable` alternatives)
 
+**COMPLETED in 41.1-03 (FIX-14, FIX-15, FIX-16):**
+
+6. **FIX-14 — Strategy Base Lifecycle Shadowing Fixed** -- COMPLETE (41.1-03)
+   - `DataMeshStrategyBase`: Removed `private new bool _initialized` shadowing `StrategyBase._initialized`; `InitializeAsync`/`DisposeAsync` now use explicit interface implementation + `InitializeAsyncCore` override (not `new` keyword hiding)
+   - `DataLakeStrategyBase`: Same fix as DataMeshStrategyBase — removed shadowed field and `new` keyword hiding
+   - `ObservabilityStrategyBase`: Removed `private new bool _initialized` and `private bool _disposed` shadowing base fields; `EnsureInitializedAsync` now delegates to `base.InitializeAsync`; `Dispose` delegates to base for disposed tracking
+   - `KeyStoreStrategyBase`: Removed `private new bool _initialized`; all init checks use `base.IsInitialized`
+   - Zero remaining lifecycle shadowing bugs across all strategy bases
+
+7. **FIX-15 — StrategyBase Common Infrastructure Methods** -- COMPLETE (41.1-03)
+   - Added 8 protected helper methods to `StrategyBase`:
+     - `ThrowIfNotInitialized()` — throws `InvalidOperationException` if not initialized
+     - `EnsureInitializedAsync(Func<Task>)` — double-check lock pattern for lazy init
+     - `IncrementCounter(string)` — thread-safe counter increment via `ConcurrentDictionary`
+     - `GetCounter(string)` / `GetAllCounters()` / `ResetCounters()` — counter access
+     - `ExecuteWithRetryAsync<T>(...)` — exponential backoff with jitter (`RandomNumberGenerator`), virtual `IsTransientException` predicate
+     - `GetCachedHealthAsync(...)` — thread-safe health check caching with configurable TTL (default 30s)
+   - Added `StrategyHealthCheckResult` record (distinct from Observability `HealthCheckResult` to avoid collision)
+   - Added `IsTransientException(Exception)` virtual method (default: false)
+   - `StorageStrategyBase.IsTransientException` changed from `virtual` to `override`
+   - Audit of 30 strategy bases: all use domain-specific typed `Interlocked` counters which is optimal; no generic duplicate counter dictionaries found; existing patterns preserved (domain-optimal, not generic duplicates)
+   - `StorageStrategyBase` retry jitter fixed: `Random.Shared` replaced with `RandomNumberGenerator.GetInt32` (CRYPTO-02)
+
+8. **FIX-16 — Naming Collision and Consistency** -- COMPLETE (41.1-03)
+   - `StorageStrategyBase` naming collision resolved: orchestration version in `StorageOrchestratorBase.cs` renamed to `StorageOrchestrationStrategyBase` (distinct from `Storage.StorageStrategyBase` for backend operations)
+   - `SimpleStrategy`, `MirroredStrategy`, `WriteAheadLogStrategy` now inherit from `StorageOrchestrationStrategyBase`
+   - DisplayName vs StrategyName: Both retained as interface-specific properties. All bridges to `StrategyBase.Name` (canonical). Renaming interface properties would break 900+ plugin strategies. Decision: document, not change.
+
 **Upcoming (remaining kill shots):**
 
 3. **KS5 — NativeKeyHandle for Key Memory**
@@ -2035,5 +2063,28 @@ IntelligenceAwarePluginBase
       └─ DataTransformationPluginBase
           └─ EncryptionPluginBase
 ```
+
+**Strategy Hierarchy (v3.0 + Phase 41.1-03):**
+```
+StrategyBase (root)
+  ├── ThrowIfNotInitialized(), EnsureInitializedAsync(), IncrementCounter()
+  ├── ExecuteWithRetryAsync<T>(), GetCachedHealthAsync(), IsTransientException()
+  ├── CompressionStrategyBase        (StrategyName -> Name)
+  ├── EncryptionStrategyBase         (StrategyName -> Name)
+  ├── StorageStrategyBase            (Storage/; Store/Retrieve/Delete + retry + health cache)
+  ├── StorageOrchestrationStrategyBase (renamed from StorageStrategyBase; PlanWrite/PlanRead)
+  ├── DataMeshStrategyBase           (DisplayName -> Name; lifecycle override, no shadowing)
+  ├── DataLakeStrategyBase           (DisplayName -> Name; lifecycle override, no shadowing)
+  ├── ObservabilityStrategyBase      (no shadowed fields; delegates to base lifecycle)
+  ├── KeyStoreStrategyBase           (no shadowed fields; uses base IsInitialized)
+  ├── SecurityStrategyBase           (StrategyName -> Name)
+  ├── ComplianceStrategyBase         (StrategyName -> Name)
+  ├── ConnectionStrategyBase         (DisplayName -> Name)
+  ├── DataTransitStrategyBase
+  ├── RaidStrategyBase               (StrategyName -> Name)
+  ├── ReplicationStrategyBase        (StrategyName -> Name)
+  └── ... (30 total domain strategy bases)
+```
+All lifecycle methods use `override` (never `new`). All property names bridge to `StrategyBase.Name`.
 
 **Note:** Phase 41.1 is part of the v3.0 rollout and focuses on architectural correctness, kill-shot fixes, and hierarchy alignment before major feature implementations in subsequent phases.
