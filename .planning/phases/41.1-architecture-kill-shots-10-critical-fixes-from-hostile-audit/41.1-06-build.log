@@ -1,0 +1,43 @@
+  Determining projects to restore...
+  All projects are up-to-date for restore.
+C:\Program Files\dotnet\sdk\10.0.200-preview.0.26103.119\Sdks\Microsoft.NET.Sdk\targets\Microsoft.NET.RuntimeIdentifierInference.targets(383,5): message NETSDK1057: You are using a preview version of .NET. See: https://aka.ms/dotnet-support-policy [C:\Temp\DataWarehouse\DataWarehouse\DataWarehouse.SDK\DataWarehouse.SDK.csproj]
+  DataWarehouse.SDK -> C:\Temp\DataWarehouse\DataWarehouse\DataWarehouse.SDK\bin\Debug\net10.0\DataWarehouse.SDK.dll
+
+Build succeeded.
+    0 Warning(s)
+    0 Error(s)
+
+Time Elapsed 00:00:01.11
+  Determining projects to restore...
+  All projects are up-to-date for restore.
+C:\Program Files\dotnet\sdk\10.0.200-preview.0.26103.119\Sdks\Microsoft.NET.Sdk\targets\Microsoft.NET.RuntimeIdentifierInference.targets(383,5): message NETSDK1057: You are using a preview version of .NET. See: https://aka.ms/dotnet-support-policy [C:\Temp\DataWarehouse\DataWarehouse\Plugins\DataWarehouse.Plugins.UltimateConsensus\DataWarehouse.Plugins.UltimateConsensus.csproj]
+  DataWarehouse.SDK -> C:\Temp\DataWarehouse\DataWarehouse\DataWarehouse.SDK\bin\Debug\net10.0\DataWarehouse.SDK.dll
+  DataWarehouse.Plugins.UltimateConsensus -> C:\Temp\DataWarehouse\DataWarehouse\Plugins\DataWarehouse.Plugins.UltimateConsensus\bin\Debug\net10.0\DataWarehouse.Plugins.UltimateConsensus.dll
+
+Build succeeded.
+    0 Warning(s)
+    0 Error(s)
+
+Time Elapsed 00:00:01.01
+  Determining projects to restore...
+  All projects are up-to-date for restore.
+C:\Program Files\dotnet\sdk\10.0.200-preview.0.26103.119\Sdks\Microsoft.NET.Sdk\targets\Microsoft.NET.RuntimeIdentifierInference.targets(383,5): message NETSDK1057: You are using a preview version of .NET. See: https://aka.ms/dotnet-support-policy [C:\Temp\DataWarehouse\DataWarehouse\Plugins\DataWarehouse.Plugins.UltimateResilience\DataWarehouse.Plugins.UltimateResilience.csproj]
+  DataWarehouse.SDK -> C:\Temp\DataWarehouse\DataWarehouse\DataWarehouse.SDK\bin\Debug\net10.0\DataWarehouse.SDK.dll
+  DataWarehouse.Plugins.UltimateResilience -> C:\Temp\DataWarehouse\DataWarehouse\Plugins\DataWarehouse.Plugins.UltimateResilience\bin\Debug\net10.0\DataWarehouse.Plugins.UltimateResilience.dll
+
+Build succeeded.
+    0 Warning(s)
+    0 Error(s)
+
+Time Elapsed 00:00:01.42
+  Determining projects to restore...
+  All projects are up-to-date for restore.
+C:\Program Files\dotnet\sdk\10.0.200-preview.0.26103.119\Sdks\Microsoft.NET.Sdk\targets\Microsoft.NET.RuntimeIdentifierInference.targets(383,5): message NETSDK1057: You are using a preview version of .NET. See: https://aka.ms/dotnet-support-policy [C:\Temp\DataWarehouse\DataWarehouse\Plugins\DataWarehouse.Plugins.Raft\DataWarehouse.Plugins.Raft.csproj]
+  DataWarehouse.SDK -> C:\Temp\DataWarehouse\DataWarehouse\DataWarehouse.SDK\bin\Debug\net10.0\DataWarehouse.SDK.dll
+  DataWarehouse.Plugins.Raft -> C:\Temp\DataWarehouse\DataWarehouse\Plugins\DataWarehouse.Plugins.Raft\bin\Debug\net10.0\DataWarehouse.Plugins.Raft.dll
+
+Build succeeded.
+    0 Warning(s)
+    0 Error(s)
+
+Time Elapsed 00:00:01.41
