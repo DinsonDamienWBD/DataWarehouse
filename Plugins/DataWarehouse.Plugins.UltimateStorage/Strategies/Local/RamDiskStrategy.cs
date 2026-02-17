@@ -64,7 +64,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Local
         /// <summary>
         /// Initializes the RAM disk storage strategy.
         /// </summary>
-        protected override Task InitializeCoreAsync(CancellationToken ct)
+        protected override async Task InitializeCoreAsync(CancellationToken ct)
         {
             // Load configuration
             _maxMemoryBytes = GetConfiguration<long>("MaxMemoryBytes", 1L * 1024 * 1024 * 1024);
@@ -92,7 +92,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Local
             {
                 var expirationInterval = TimeSpan.FromSeconds(30);
                 _expirationTimer = new Timer(
-                    _ => CleanupExpiredEntriesAsync().GetAwaiter().GetResult(),
+                    _ => _ = Task.Run(async () => await CleanupExpiredEntriesAsync().ConfigureAwait(false)),
                     null,
                     expirationInterval,
                     expirationInterval);
@@ -103,7 +103,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Local
             {
                 var pressureInterval = TimeSpan.FromSeconds(10);
                 _memoryPressureTimer = new Timer(
-                    _ => CheckMemoryPressureAsync().GetAwaiter().GetResult(),
+                    _ => _ = Task.Run(async () => await CheckMemoryPressureAsync().ConfigureAwait(false)),
                     null,
                     pressureInterval,
                     pressureInterval);
@@ -112,20 +112,18 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Local
             // Load snapshot if path is provided
             if (!string.IsNullOrEmpty(_snapshotPath) && File.Exists(_snapshotPath))
             {
-                RestoreFromSnapshotAsync(ct).GetAwaiter().GetResult();
+                await RestoreFromSnapshotAsync(ct).ConfigureAwait(false);
             }
 
             // Start auto-snapshot timer if enabled
             if (_autoSnapshot && !string.IsNullOrEmpty(_snapshotPath))
             {
                 _autoSnapshotTimer = new Timer(
-                    _ => SaveSnapshotAsync(CancellationToken.None).GetAwaiter().GetResult(),
+                    _ => _ = Task.Run(async () => await SaveSnapshotAsync(CancellationToken.None).ConfigureAwait(false)),
                     null,
                     _autoSnapshotInterval,
                     _autoSnapshotInterval);
             }
-
-            return Task.CompletedTask;
         }
 
         #region Core Storage Operations
