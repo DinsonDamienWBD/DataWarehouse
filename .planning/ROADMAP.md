@@ -723,6 +723,16 @@ All audits produce output tables: `| File | Severity (P0-P3) | Issue | Recommend
 | 40. Large Implementations | v3.0 | 4/4 | COMPLETE | 2026-02-17 |
 | 41. Comprehensive Audit & Testing | v3.0 | 2/2 | COMPLETE | 2026-02-17 |
 
+### Phase 41.1: Architecture Kill Shots (10 Critical Fixes from Hostile Audit) (INSERTED)
+
+**Goal:** Fix 10 critical architecture issues discovered by hostile 6-persona audit. Covers: async pipeline (KS1), kernel DI wiring (KS2), typed message handlers (KS3+4), native key memory (KS5), tenant-scoped storage (KS6+10), scalable vector clocks (KS7), Multi-Raft consensus consolidation (KS8), lineage default implementations (KS9).
+**Depends on:** Phase 41
+**Requirements:** KILLSHOT-01 through KILLSHOT-10 (see phase REQUIREMENTS.md)
+**Plans:** TBD (run /gsd:plan-phase 41.1 to break down)
+
+Plans:
+- [ ] TBD (run /gsd:plan-phase 41.1 to break down)
+
 ### Phase 31.1: Pre-v3.0 Production Readiness Cleanup (INSERTED)
 
 **Goal:** Eliminate all remaining stubs, placeholders, simulated backends, and wiring gaps across all 60 plugins. Ensure 100% production readiness before v3.0 begins. FutureHardware (5 strategies) intentionally kept as forward-compatibility placeholders. UltimateResilience chaos engineering simulation is by-design.
