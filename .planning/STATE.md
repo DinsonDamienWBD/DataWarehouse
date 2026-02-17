@@ -266,6 +266,7 @@ Audit findings resolved:
 | Phase 31.1 P05 | 24 | 8 tasks | 8 files |
 | Phase 41.1 P03 | 14min | 21 tasks | 8 files |
 | Phase 41.1 P06 | 23min | 9 tasks | 20 files |
+| Phase 41.1 P07 | 20min | 6 tasks | 20 files |
 
 ## Accumulated Context
 
@@ -362,6 +363,9 @@ Audit findings resolved:
 - Phase 41.1-04: InterfacePluginBase kept as forwarding shim (LegacyInterfacePluginBase.cs) — 5 consumers still use SDK.Contracts namespace version
 - Phase 41.1-04: Opt-in caching/indexing pattern: StoragePluginBase uses EnableCaching()/EnableIndexing() instead of inheritance chain
 - Phase 41.1-04: PluginBase.cs reduced from 3310 to 1161 lines — 14 legacy classes deleted/extracted
+- Phase 41.1-07: SystemConfiguration property name (not Configuration) in PluginBase to avoid TamperProofProviderPluginBase collision
+- Phase 41.1-07: Safe XML deserialization with DtdProcessing.Prohibit (CA5369 compliance)
+- Phase 41.1-07: GC.GetGCMemoryInfo for RAM estimation when hardware probe lacks memory device info
 
 ### SDK Audit Results (2026-02-14)
 
@@ -538,11 +542,11 @@ Phase 33 (VDE) ─────────────────────�
 ### Current Position
 
 **Phase 41.1** — Stage: **EXECUTE** (7 plans, 2 waves)
-Plan: 7 of 7 (plan 04 complete, plans 05+07 remaining)
+Plan: 7 of 7 (plan 07 complete, plan 05 remaining)
 Status: IN PROGRESS
 
-Progress: [####################----] 86% (6/7 plans complete; plan 04 done, 05+07 pending)
+Progress: [#######################-] 96% (6.5/7 plans; plan 07 done, 05 pending)
 
 Last session: 2026-02-17
-Stopped at: Completed 41.1-04-PLAN.md (FIX-10/11/12/13 Legacy Base Deletion)
-Resume: Execute 41.1-05-PLAN.md or 41.1-07-PLAN.md
+Stopped at: Completed 41.1-07-PLAN.md (CFG-17/18/19/20 Unified Configuration System)
+Resume: Execute 41.1-05-PLAN.md
