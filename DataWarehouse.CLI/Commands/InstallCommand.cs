@@ -1,11 +1,14 @@
 using Spectre.Console;
 using DataWarehouse.Integration;
+using DataWarehouse.SDK.Hardware;
+using DataWarehouse.SDK.Primitives.Configuration;
 using Microsoft.Extensions.Logging.Abstractions;
 
 namespace DataWarehouse.CLI.Commands;
 
 /// <summary>
 /// Install command - Installs and initializes a new DataWarehouse instance.
+/// Integrates hardware probe to auto-select best-fit configuration preset.
 /// </summary>
 public static class InstallCommand
 {
@@ -23,6 +26,16 @@ public static class InstallCommand
                 {
                     var host = new DataWarehouseHost(NullLoggerFactory.Instance);
 
+                    // Detect hardware and select best-fit configuration preset
+                    ctx.Status("[cyan]Detecting hardware capabilities...[/]");
+                    ctx.Spinner(Spinner.Known.Dots);
+
+                    using var probe = HardwareProbeFactory.Create();
+                    var (presetName, suggestedConfig) = await PresetSelector.SelectPresetAsync(probe);
+
+                    AnsiConsole.MarkupLine($"  Hardware suggests [yellow]{presetName}[/] preset (CPU: {Environment.ProcessorCount} cores)");
+
+                    // Store preset in install config
                     var config = new InstallConfiguration
                     {
                         InstallPath = path,
@@ -32,6 +45,11 @@ public static class InstallCommand
                         CreateService = createService,
                         AutoStart = autoStart
                     };
+                    config.InitialConfig["configPreset"] = presetName;
+
+                    // Save selected configuration to install path
+                    var configFilePath = Path.Combine(path, "config", "datawarehouse-config.xml");
+                    ConfigurationSerializer.SaveToFile(suggestedConfig, configFilePath);
 
                     var progress = new Progress<InstallProgress>(p =>
                     {
