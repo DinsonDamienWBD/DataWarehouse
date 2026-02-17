@@ -2032,15 +2032,41 @@ var analysis = await MessageBus.SendAsync("intelligence.request", new PluginMess
    - `GetTenantDataKeysAsync` / `ClearTenantDataAsync` for tenant data management
    - All 7 data management plugins (governance, catalog, quality, lineage, lake, mesh, privacy) inherit tenant isolation automatically
 
-3. **KS7 — Scalable Vector Clocks (DVV/ITC)**
-   - Dotted Version Vectors (DVV) for distributed versioning
-   - Interval Tree Clocks (ITC) for scalable causality tracking
-   - Critical for distributed conflict resolution
+3. **KS7 — DVV Vector Clocks** -- COMPLETE (41.1-06)
+   - `IReplicationClusterMembership` interface in `SDK/Replication/`: GetActiveNodes(), RegisterNodeAdded/Removed callbacks
+   - `DottedVersionVector` class in `SDK/Replication/`: membership-aware causality tracking
+     - `Increment(nodeId)`: bump version, generate unique dot
+     - `HappensBefore(other)`: detect causal ordering
+     - `Merge(other)`: point-wise maximum of all entries
+     - `IsConcurrent(other)`: detect true conflicts (neither happens-before)
+     - `PruneDeadNodes()`: remove entries for departed nodes (auto via membership callbacks)
+     - `ToImmutableDictionary()` / `FromDictionary()`: serialization roundtrip
+   - VectorClock (record in `IMultiMasterReplication.cs`): [Obsolete] - migrate to DVV
+   - VectorClock (class in `ReplicationStrategy.cs`): [Obsolete] - migrate to DVV
+   - Thread-safe: ConcurrentDictionary internals, Interlocked for atomic operations
+   - 12 tests passing (causality, merge, concurrent, pruning, callbacks, roundtrip)
 
-4. **KS8 — Multi-Raft in ConsensusPluginBase**
-   - Multiple Raft groups for horizontal scalability
-   - Per-tenant or per-namespace consensus groups
-   - Default configuration in `UltimateConsensus`
+4. **KS8 — Multi-Raft Consensus Consolidation** -- COMPLETE (41.1-06)
+   - `ConsensusPluginBase` enhanced with new records and methods:
+     - `ConsensusResult(Success, LeaderId, LogIndex, Error)` record
+     - `ConsensusState(State, LeaderId, CommitIndex, LastApplied)` record
+     - `ClusterHealthInfo(TotalNodes, HealthyNodes, NodeStates)` record
+     - `ProposeAsync(byte[], CancellationToken)`: route-aware proposal
+     - `IsLeaderAsync(CancellationToken)`: async leader check
+     - `GetStateAsync(CancellationToken)`: full state reporting
+     - `GetClusterHealthAsync(CancellationToken)`: aggregated health
+   - `ResiliencePluginBase` in `SDK/Contracts/Hierarchy/Feature/`:
+     - `ExecuteWithResilienceAsync<T>(action, policyName, ct)`: abstract
+     - `GetResilienceHealthAsync(ct)`: virtual with ResilienceHealthInfo record
+   - `UltimateConsensus` plugin: Multi-Raft with consistent hashing
+     - `ConcurrentDictionary<int, RaftGroup>` for multiple Raft groups
+     - `ConsistentHash` (jump hash) for key-to-group routing
+     - `RaftGroup`: leader election, log replication, snapshot/restore
+     - `IRaftStrategy` interface: Raft (full), Paxos/PBFT/ZAB (stubs)
+     - Message bus topics: consensus.propose/status/health
+   - `UltimateResilience` refactored to extend `ResiliencePluginBase`
+   - `Raft` plugin marked [Obsolete] (replaced by UltimateConsensus)
+   - 16 tests passing (init, propose, leader election, state, health, strategies)
 
 5. **KS9 — Default BFS in LineageStrategyBase** -- COMPLETE (41.1-02)
    - LineageStrategyBase provides virtual BFS implementations for GetUpstreamAsync, GetDownstreamAsync, AnalyzeImpactAsync
