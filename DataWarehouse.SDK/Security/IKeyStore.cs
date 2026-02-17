@@ -932,7 +932,6 @@ namespace DataWarehouse.SDK.Security
     {
         private readonly System.Collections.Concurrent.ConcurrentDictionary<string, CachedKey> _keyCache = new();
         private readonly SemaphoreSlim _initializationLock = new(1, 1);
-        private new bool _initialized;
         private bool _disposed;
         private TimeSpan _cacheExpiration = TimeSpan.FromMinutes(5);
         private Contracts.IMessageBus? _messageBus;
@@ -967,13 +966,13 @@ namespace DataWarehouse.SDK.Security
         /// </summary>
         public async Task InitializeAsync(Dictionary<string, object> configuration, CancellationToken cancellationToken = default)
         {
-            if (_initialized)
+            if (IsInitialized)
                 return;
 
             await _initializationLock.WaitAsync(cancellationToken).ConfigureAwait(false);
             try
             {
-                if (_initialized)
+                if (IsInitialized)
                     return;
 
                 Configuration = configuration ?? new Dictionary<string, object>();
@@ -1014,7 +1013,7 @@ namespace DataWarehouse.SDK.Security
         /// </summary>
         public virtual Task<bool> HealthCheckAsync(CancellationToken cancellationToken = default)
         {
-            return Task.FromResult(_initialized && !_disposed);
+            return Task.FromResult(IsInitialized && !_disposed);
         }
 
         /// <summary>
@@ -1258,7 +1257,7 @@ namespace DataWarehouse.SDK.Security
         /// </summary>
         private void EnsureInitialized()
         {
-            if (!_initialized)
+            if (!IsInitialized)
             {
                 throw new InvalidOperationException($"Key store '{GetType().Name}' has not been initialized. Call InitializeAsync first.");
             }
