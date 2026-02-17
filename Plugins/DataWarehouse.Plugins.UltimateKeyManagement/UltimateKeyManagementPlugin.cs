@@ -463,6 +463,38 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement
             return _envelopeKeyStores.Keys.ToList().AsReadOnly();
         }
 
+        /// <summary>
+        /// Retrieves a key as a <see cref="NativeKeyHandle"/> for native-first secure access.
+        /// Routes to the appropriate strategy by looking up registered key stores.
+        /// The managed byte[] intermediate is zeroed immediately after copying to native memory.
+        /// </summary>
+        /// <param name="keyId">The key identifier (may be prefixed with strategy ID).</param>
+        /// <param name="context">Security context for ACL validation.</param>
+        /// <param name="ct">Cancellation token.</param>
+        /// <returns>A <see cref="NativeKeyHandle"/> with key material in unmanaged memory.</returns>
+        protected override async Task<NativeKeyHandle> GetKeyNativeAsync(string keyId, ISecurityContext context, CancellationToken ct = default)
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(keyId);
+            ArgumentNullException.ThrowIfNull(context);
+
+            // Try each registered key store until we find one that can provide the key
+            foreach (var kvp in _keyStores)
+            {
+                try
+                {
+                    // Use the DIM on IKeyStore which wraps GetKeyAsync -> NativeKeyHandle
+                    return await kvp.Value.GetKeyNativeAsync(keyId, context, ct).ConfigureAwait(false);
+                }
+                catch (Exception)
+                {
+                    // This store doesn't have the key, try next
+                    continue;
+                }
+            }
+
+            throw new InvalidOperationException($"Key '{keyId}' not found in any registered key store.");
+        }
+
         public override async Task OnMessageAsync(PluginMessage message)
         {
             if (message.Type == "keymanagement.configure")

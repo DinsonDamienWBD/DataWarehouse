@@ -791,6 +791,36 @@ public sealed class UltimateEncryptionPlugin : HierarchyEncryptionPluginBase, ID
         return await keyStore.GetKeyAsync(keyId, securityContext);
     }
 
+    /// <summary>
+    /// Retrieves a key from the key store as a <see cref="NativeKeyHandle"/> for secure zero-copy access.
+    /// The key material is held in unmanaged memory and securely wiped on Dispose.
+    /// Prefer this over <see cref="GetKeyFromKeyStoreAsync"/> for crypto operations to minimize
+    /// managed heap exposure of key material.
+    /// </summary>
+    /// <param name="keyId">The key identifier.</param>
+    /// <param name="context">Kernel context for plugin discovery.</param>
+    /// <param name="args">Operation arguments (may contain securityContext).</param>
+    /// <returns>A <see cref="NativeKeyHandle"/> containing the key. Caller must dispose.</returns>
+    private async Task<NativeKeyHandle> GetKeyFromKeyStoreNativeAsync(string keyId, IKernelContext context, Dictionary<string, object> args)
+    {
+        var keyStore = context.GetPlugins<IPlugin>()
+            .OfType<IKeyStore>()
+            .FirstOrDefault()
+            ?? throw new InvalidOperationException("No key store available. Provide 'key' directly or configure a key store.");
+
+        ISecurityContext securityContext;
+        if (args.TryGetValue("securityContext", out var scObj) && scObj is ISecurityContext sc)
+        {
+            securityContext = sc;
+        }
+        else
+        {
+            securityContext = new DefaultSecurityContext();
+        }
+
+        return await keyStore.GetKeyNativeAsync(keyId, securityContext);
+    }
+
     #endregion
 
     #region Knowledge & Capability Registry Integration
