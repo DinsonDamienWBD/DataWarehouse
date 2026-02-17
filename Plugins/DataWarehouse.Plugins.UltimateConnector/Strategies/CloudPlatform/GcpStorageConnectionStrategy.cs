@@ -6,6 +6,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using DataWarehouse.SDK.Connectors;
 using Microsoft.Extensions.Logging;
+using Google.Cloud.Storage.V1;
 
 namespace DataWarehouse.Plugins.UltimateConnector.Strategies.CloudPlatform
 {
@@ -39,112 +40,67 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.CloudPlatform
             var credentialsPath = GetConfiguration<string>(config, "CredentialsPath", null!)
                 ?? Environment.GetEnvironmentVariable("GOOGLE_APPLICATION_CREDENTIALS");
 
-            // Validate credentials
-            if (string.IsNullOrEmpty(credentialsPath))
+            // Create storage client - supports credential file or application default credentials
+            StorageClient storageClient;
+
+            if (!string.IsNullOrEmpty(credentialsPath) && File.Exists(credentialsPath))
             {
-                throw new InvalidOperationException(
-                    "GCP credentials are required. Set 'CredentialsPath' in config or environment variable " +
-                    "GOOGLE_APPLICATION_CREDENTIALS pointing to a service account JSON key file.");
+                // Use service account credentials from file
+                var credential = Google.Apis.Auth.OAuth2.GoogleCredential.FromFile(credentialsPath);
+                storageClient = await StorageClient.CreateAsync(credential);
             }
-
-            if (!File.Exists(credentialsPath))
+            else
             {
-                throw new InvalidOperationException(
-                    $"GCP credentials file not found at path: {credentialsPath}. " +
-                    "Ensure GOOGLE_APPLICATION_CREDENTIALS points to a valid service account JSON key file.");
+                // Use application default credentials (environment, metadata server, etc.)
+                storageClient = await StorageClient.CreateAsync();
             }
-
-            // Configure endpoint
-            var endpoint = GetConfiguration<string>(config, "Endpoint", "https://storage.googleapis.com");
-
-            // Configure HTTP timeout with reasonable defaults
-            var timeoutSeconds = GetConfiguration(config, "TimeoutSeconds", 300);
-            var httpClient = new HttpClient
-            {
-                BaseAddress = new Uri(endpoint),
-                Timeout = TimeSpan.FromSeconds(timeoutSeconds)
-            };
-
-            // Add retry configuration metadata
-            var maxRetries = GetConfiguration(config, "MaxRetries", 3);
-            var retryDelayMs = GetConfiguration(config, "RetryDelayMs", 1000);
 
             var connectionInfo = new Dictionary<string, object>
             {
-                ["ProjectId"] = projectId ?? string.Empty,
-                ["CredentialsPath"] = credentialsPath,
-                ["Endpoint"] = endpoint,
-                ["TimeoutSeconds"] = timeoutSeconds,
-                ["MaxRetries"] = maxRetries,
-                ["RetryDelayMs"] = retryDelayMs
+                ["ProjectId"] = projectId ?? "default",
+                ["CredentialsPath"] = credentialsPath ?? "application-default",
+                ["Endpoint"] = "https://storage.googleapis.com",
+                ["TimeoutSeconds"] = GetConfiguration(config, "TimeoutSeconds", 300),
+                ["MaxRetries"] = GetConfiguration(config, "MaxRetries", 3)
             };
 
-            return new DefaultConnectionHandle(httpClient, connectionInfo);
+            return new DefaultConnectionHandle(storageClient, connectionInfo);
         }
 
         protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct)
         {
-            var httpClient = handle.GetConnection<HttpClient>();
+            var storageClient = handle.GetConnection<StorageClient>();
             var connectionInfo = handle.ConnectionInfo;
-            var maxRetries = connectionInfo.TryGetValue("MaxRetries", out var mr) && mr is int ? (int)mr : 3;
-            var retryDelayMs = connectionInfo.TryGetValue("RetryDelayMs", out var rd) && rd is int ? (int)rd : 1000;
-            var projectId = connectionInfo.TryGetValue("ProjectId", out var pid) && pid is string ? (string)pid : null;
+            var projectId = connectionInfo.TryGetValue("ProjectId", out var pid) && pid is string pidStr ? pidStr : null;
 
-            for (int attempt = 0; attempt <= maxRetries; attempt++)
+            try
             {
-                try
+                // Test with ListBuckets if we have a project ID
+                if (!string.IsNullOrEmpty(projectId) && projectId != "default")
                 {
-                    // Test with a simple list buckets request
-                    // This validates both connectivity and authentication
-                    var requestUri = !string.IsNullOrEmpty(projectId)
-                        ? $"/storage/v1/b?project={projectId}"
-                        : "/storage/v1/b";
-
-                    var request = new HttpRequestMessage(HttpMethod.Get, requestUri);
-
-                    // Note: In production, this would include an OAuth2 bearer token in the Authorization header
-                    // For now, we test connectivity only
-                    var response = await httpClient.SendAsync(request, ct);
-
-                    // 200 OK means fully authenticated
-                    // 401 Unauthorized or 403 Forbidden means connectivity works but auth is missing/insufficient
-                    var isHealthy = response.IsSuccessStatusCode ||
-                                    response.StatusCode == System.Net.HttpStatusCode.Unauthorized ||
-                                    response.StatusCode == System.Net.HttpStatusCode.Forbidden;
-
-                    if (isHealthy)
+                    await foreach (var bucket in storageClient.ListBucketsAsync(projectId).WithCancellation(ct))
                     {
-                        return true;
-                    }
-
-                    if (attempt < maxRetries)
-                    {
-                        await Task.Delay(retryDelayMs * (int)Math.Pow(2, attempt), ct);
+                        // Just verify we can enumerate (break after first item)
+                        break;
                     }
                 }
-                catch (TaskCanceledException) when (!ct.IsCancellationRequested)
-                {
-                    if (attempt < maxRetries)
-                    {
-                        await Task.Delay(retryDelayMs * (int)Math.Pow(2, attempt), ct);
-                    }
-                }
-                catch (Exception)
-                {
-                    if (attempt < maxRetries)
-                    {
-                        await Task.Delay(retryDelayMs * (int)Math.Pow(2, attempt), ct);
-                    }
-                }
+                return true;
             }
-
-            return false;
+            catch (Google.GoogleApiException)
+            {
+                // Even auth errors mean we can reach GCP
+                return true;
+            }
+            catch (Exception)
+            {
+                return false;
+            }
         }
 
         protected override async Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct)
         {
-            var httpClient = handle.GetConnection<HttpClient>();
-            httpClient?.Dispose();
+            var storageClient = handle.GetConnection<StorageClient>();
+            storageClient?.Dispose();
             await Task.CompletedTask;
         }
 

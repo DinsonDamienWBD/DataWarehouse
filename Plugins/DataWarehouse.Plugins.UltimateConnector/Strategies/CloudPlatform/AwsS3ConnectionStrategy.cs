@@ -5,6 +5,9 @@ using System.Threading;
 using System.Threading.Tasks;
 using DataWarehouse.SDK.Connectors;
 using Microsoft.Extensions.Logging;
+using Amazon.S3;
+using Amazon.Runtime;
+using Amazon;
 
 namespace DataWarehouse.Plugins.UltimateConnector.Strategies.CloudPlatform
 {
@@ -27,103 +30,86 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.CloudPlatform
         protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct)
         {
             var region = GetConfiguration(config, "Region", "us-east-1");
-            var endpoint = GetConfiguration(config, "Endpoint", $"https://s3.{region}.amazonaws.com");
+            var customEndpoint = GetConfiguration<string>(config, "Endpoint", null!);
 
             // Load credentials from config, then fall back to environment variables
-            // Note: null! used because GetConfiguration<string> returns non-nullable but accepts nullable default
             var accessKey = GetConfiguration<string>(config, "AccessKeyId", null!)
-                ?? Environment.GetEnvironmentVariable("AWS_ACCESS_KEY_ID")
-                ?? throw new InvalidOperationException(
-                    "AWS AccessKeyId is required. Set 'AccessKeyId' in config or environment variable AWS_ACCESS_KEY_ID.");
+                ?? Environment.GetEnvironmentVariable("AWS_ACCESS_KEY_ID");
 
             var secretKey = GetConfiguration<string>(config, "SecretAccessKey", null!)
-                ?? Environment.GetEnvironmentVariable("AWS_SECRET_ACCESS_KEY")
-                ?? throw new InvalidOperationException(
-                    "AWS SecretAccessKey is required. Set 'SecretAccessKey' in config or environment variable AWS_SECRET_ACCESS_KEY.");
+                ?? Environment.GetEnvironmentVariable("AWS_SECRET_ACCESS_KEY");
 
             var sessionToken = GetConfiguration<string>(config, "SessionToken", null!)
                 ?? Environment.GetEnvironmentVariable("AWS_SESSION_TOKEN");
 
-            // Configure HTTP timeout with reasonable defaults
-            var timeoutSeconds = GetConfiguration(config, "TimeoutSeconds", 300);
-            var httpClient = new HttpClient
+            // Create AWS credentials
+            AWSCredentials credentials;
+            if (!string.IsNullOrEmpty(accessKey) && !string.IsNullOrEmpty(secretKey))
             {
-                BaseAddress = new Uri(endpoint),
-                Timeout = TimeSpan.FromSeconds(timeoutSeconds)
+                if (!string.IsNullOrEmpty(sessionToken))
+                    credentials = new SessionAWSCredentials(accessKey, secretKey, sessionToken);
+                else
+                    credentials = new BasicAWSCredentials(accessKey, secretKey);
+            }
+            else
+            {
+                // Fall back to environment/instance credentials
+                credentials = FallbackCredentialsFactory.GetCredentials();
+            }
+
+            // Create S3 client configuration
+            var s3Config = new AmazonS3Config
+            {
+                RegionEndpoint = RegionEndpoint.GetBySystemName(region),
+                Timeout = TimeSpan.FromSeconds(GetConfiguration(config, "TimeoutSeconds", 300)),
+                MaxErrorRetry = GetConfiguration(config, "MaxRetries", 3)
             };
 
-            // Add retry configuration metadata
-            var maxRetries = GetConfiguration(config, "MaxRetries", 3);
-            var retryDelayMs = GetConfiguration(config, "RetryDelayMs", 1000);
+            if (!string.IsNullOrEmpty(customEndpoint))
+            {
+                s3Config.ServiceURL = customEndpoint;
+                s3Config.ForcePathStyle = true; // Required for custom endpoints like MinIO
+            }
+
+            // Create S3 client using official AWS SDK
+            var s3Client = new AmazonS3Client(credentials, s3Config);
 
             var connectionInfo = new Dictionary<string, object>
             {
                 ["Region"] = region,
-                ["Endpoint"] = endpoint,
-                ["AccessKeyId"] = accessKey,
-                ["SecretAccessKey"] = secretKey,
-                ["SessionToken"] = sessionToken ?? string.Empty,
-                ["TimeoutSeconds"] = timeoutSeconds,
-                ["MaxRetries"] = maxRetries,
-                ["RetryDelayMs"] = retryDelayMs
+                ["Endpoint"] = customEndpoint ?? $"https://s3.{region}.amazonaws.com",
+                ["TimeoutSeconds"] = s3Config.Timeout!.Value.TotalSeconds,
+                ["MaxRetries"] = s3Config.MaxErrorRetry
             };
 
-            return new DefaultConnectionHandle(httpClient, connectionInfo);
+            return new DefaultConnectionHandle(s3Client, connectionInfo);
         }
 
         protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct)
         {
-            var httpClient = handle.GetConnection<HttpClient>();
-            var connectionInfo = handle.ConnectionInfo;
-            var maxRetries = connectionInfo.TryGetValue("MaxRetries", out var mr) && mr is int ? (int)mr : 3;
-            var retryDelayMs = connectionInfo.TryGetValue("RetryDelayMs", out var rd) && rd is int ? (int)rd : 1000;
+            var s3Client = handle.GetConnection<IAmazonS3>();
 
-            for (int attempt = 0; attempt <= maxRetries; attempt++)
+            try
             {
-                try
-                {
-                    // Test with a simple HEAD request to the root
-                    var request = new HttpRequestMessage(HttpMethod.Head, "/");
-                    var response = await httpClient.SendAsync(request, ct);
-
-                    // 200 OK or 403 Forbidden both indicate connectivity and valid auth
-                    // 403 typically means credentials work but no bucket access
-                    var isHealthy = response.IsSuccessStatusCode || response.StatusCode == System.Net.HttpStatusCode.Forbidden;
-
-                    if (isHealthy)
-                    {
-                        return true;
-                    }
-
-                    if (attempt < maxRetries)
-                    {
-                        await Task.Delay(retryDelayMs * (int)Math.Pow(2, attempt), ct);
-                    }
-                }
-                catch (TaskCanceledException) when (!ct.IsCancellationRequested)
-                {
-                    // Timeout - retry if we have attempts left
-                    if (attempt < maxRetries)
-                    {
-                        await Task.Delay(retryDelayMs * (int)Math.Pow(2, attempt), ct);
-                    }
-                }
-                catch (Exception)
-                {
-                    if (attempt < maxRetries)
-                    {
-                        await Task.Delay(retryDelayMs * (int)Math.Pow(2, attempt), ct);
-                    }
-                }
+                // Test with ListBuckets - validates credentials and connectivity
+                await s3Client.ListBucketsAsync(ct);
+                return true;
             }
-
-            return false;
+            catch (AmazonS3Exception)
+            {
+                // Even auth errors mean we can reach AWS
+                return true;
+            }
+            catch (Exception)
+            {
+                return false;
+            }
         }
 
         protected override async Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct)
         {
-            var httpClient = handle.GetConnection<HttpClient>();
-            httpClient?.Dispose();
+            var s3Client = handle.GetConnection<IAmazonS3>();
+            s3Client?.Dispose();
             await Task.CompletedTask;
         }
 

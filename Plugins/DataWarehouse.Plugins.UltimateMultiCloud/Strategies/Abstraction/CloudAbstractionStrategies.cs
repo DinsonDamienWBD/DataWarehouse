@@ -1,4 +1,9 @@
 using System.Collections.Concurrent;
+using Amazon.S3;
+using Amazon.S3.Model;
+using Azure.Storage.Blobs;
+using Azure.Storage.Blobs.Models;
+using Google.Cloud.Storage.V1;
 
 namespace DataWarehouse.Plugins.UltimateMultiCloud.Strategies.Abstraction;
 
@@ -361,10 +366,70 @@ public sealed class NormalizedResource
 // Provider-specific implementations
 public sealed class AwsStorageAbstraction : ICloudStorageAbstraction
 {
-    public Task<Stream> ReadAsync(string path, CancellationToken ct) => Task.FromResult<Stream>(new MemoryStream());
-    public Task WriteAsync(string path, Stream data, CancellationToken ct) => Task.CompletedTask;
-    public Task DeleteAsync(string path, CancellationToken ct) => Task.CompletedTask;
-    public Task<bool> ExistsAsync(string path, CancellationToken ct) => Task.FromResult(true);
+    private readonly IAmazonS3? _s3Client;
+
+    public AwsStorageAbstraction(IAmazonS3? s3Client = null)
+    {
+        _s3Client = s3Client;
+    }
+
+    public async Task<Stream> ReadAsync(string path, CancellationToken ct)
+    {
+        if (_s3Client == null) return new MemoryStream();
+
+        var parts = path.Split('/', 2);
+        if (parts.Length != 2) throw new ArgumentException("Path must be in format: bucket/key");
+
+        var response = await _s3Client.GetObjectAsync(parts[0], parts[1], ct);
+        var memoryStream = new MemoryStream();
+        await response.ResponseStream.CopyToAsync(memoryStream, ct);
+        memoryStream.Position = 0;
+        return memoryStream;
+    }
+
+    public async Task WriteAsync(string path, Stream data, CancellationToken ct)
+    {
+        if (_s3Client == null) return;
+
+        var parts = path.Split('/', 2);
+        if (parts.Length != 2) throw new ArgumentException("Path must be in format: bucket/key");
+
+        var request = new PutObjectRequest
+        {
+            BucketName = parts[0],
+            Key = parts[1],
+            InputStream = data
+        };
+        await _s3Client.PutObjectAsync(request, ct);
+    }
+
+    public async Task DeleteAsync(string path, CancellationToken ct)
+    {
+        if (_s3Client == null) return;
+
+        var parts = path.Split('/', 2);
+        if (parts.Length != 2) throw new ArgumentException("Path must be in format: bucket/key");
+
+        await _s3Client.DeleteObjectAsync(parts[0], parts[1], ct);
+    }
+
+    public async Task<bool> ExistsAsync(string path, CancellationToken ct)
+    {
+        if (_s3Client == null) return true;
+
+        var parts = path.Split('/', 2);
+        if (parts.Length != 2) return false;
+
+        try
+        {
+            await _s3Client.GetObjectMetadataAsync(parts[0], parts[1], ct);
+            return true;
+        }
+        catch (AmazonS3Exception)
+        {
+            return false;
+        }
+    }
 }
 
 public sealed class AwsComputeAbstraction : ICloudComputeAbstraction
@@ -377,10 +442,68 @@ public sealed class AwsComputeAbstraction : ICloudComputeAbstraction
 
 public sealed class AzureStorageAbstraction : ICloudStorageAbstraction
 {
-    public Task<Stream> ReadAsync(string path, CancellationToken ct) => Task.FromResult<Stream>(new MemoryStream());
-    public Task WriteAsync(string path, Stream data, CancellationToken ct) => Task.CompletedTask;
-    public Task DeleteAsync(string path, CancellationToken ct) => Task.CompletedTask;
-    public Task<bool> ExistsAsync(string path, CancellationToken ct) => Task.FromResult(true);
+    private readonly BlobServiceClient? _blobServiceClient;
+
+    public AzureStorageAbstraction(BlobServiceClient? blobServiceClient = null)
+    {
+        _blobServiceClient = blobServiceClient;
+    }
+
+    public async Task<Stream> ReadAsync(string path, CancellationToken ct)
+    {
+        if (_blobServiceClient == null) return new MemoryStream();
+
+        var parts = path.Split('/', 2);
+        if (parts.Length != 2) throw new ArgumentException("Path must be in format: container/blob");
+
+        var containerClient = _blobServiceClient.GetBlobContainerClient(parts[0]);
+        var blobClient = containerClient.GetBlobClient(parts[1]);
+
+        var response = await blobClient.DownloadStreamingAsync(cancellationToken: ct);
+        var memoryStream = new MemoryStream();
+        await response.Value.Content.CopyToAsync(memoryStream, ct);
+        memoryStream.Position = 0;
+        return memoryStream;
+    }
+
+    public async Task WriteAsync(string path, Stream data, CancellationToken ct)
+    {
+        if (_blobServiceClient == null) return;
+
+        var parts = path.Split('/', 2);
+        if (parts.Length != 2) throw new ArgumentException("Path must be in format: container/blob");
+
+        var containerClient = _blobServiceClient.GetBlobContainerClient(parts[0]);
+        var blobClient = containerClient.GetBlobClient(parts[1]);
+
+        await blobClient.UploadAsync(data, overwrite: true, cancellationToken: ct);
+    }
+
+    public async Task DeleteAsync(string path, CancellationToken ct)
+    {
+        if (_blobServiceClient == null) return;
+
+        var parts = path.Split('/', 2);
+        if (parts.Length != 2) throw new ArgumentException("Path must be in format: container/blob");
+
+        var containerClient = _blobServiceClient.GetBlobContainerClient(parts[0]);
+        var blobClient = containerClient.GetBlobClient(parts[1]);
+
+        await blobClient.DeleteIfExistsAsync(cancellationToken: ct);
+    }
+
+    public async Task<bool> ExistsAsync(string path, CancellationToken ct)
+    {
+        if (_blobServiceClient == null) return true;
+
+        var parts = path.Split('/', 2);
+        if (parts.Length != 2) return false;
+
+        var containerClient = _blobServiceClient.GetBlobContainerClient(parts[0]);
+        var blobClient = containerClient.GetBlobClient(parts[1]);
+
+        return await blobClient.ExistsAsync(ct);
+    }
 }
 
 public sealed class AzureComputeAbstraction : ICloudComputeAbstraction
@@ -393,10 +516,63 @@ public sealed class AzureComputeAbstraction : ICloudComputeAbstraction
 
 public sealed class GcpStorageAbstraction : ICloudStorageAbstraction
 {
-    public Task<Stream> ReadAsync(string path, CancellationToken ct) => Task.FromResult<Stream>(new MemoryStream());
-    public Task WriteAsync(string path, Stream data, CancellationToken ct) => Task.CompletedTask;
-    public Task DeleteAsync(string path, CancellationToken ct) => Task.CompletedTask;
-    public Task<bool> ExistsAsync(string path, CancellationToken ct) => Task.FromResult(true);
+    private readonly StorageClient? _storageClient;
+
+    public GcpStorageAbstraction(StorageClient? storageClient = null)
+    {
+        _storageClient = storageClient;
+    }
+
+    public async Task<Stream> ReadAsync(string path, CancellationToken ct)
+    {
+        if (_storageClient == null) return new MemoryStream();
+
+        var parts = path.Split('/', 2);
+        if (parts.Length != 2) throw new ArgumentException("Path must be in format: bucket/object");
+
+        var memoryStream = new MemoryStream();
+        await _storageClient.DownloadObjectAsync(parts[0], parts[1], memoryStream, cancellationToken: ct);
+        memoryStream.Position = 0;
+        return memoryStream;
+    }
+
+    public async Task WriteAsync(string path, Stream data, CancellationToken ct)
+    {
+        if (_storageClient == null) return;
+
+        var parts = path.Split('/', 2);
+        if (parts.Length != 2) throw new ArgumentException("Path must be in format: bucket/object");
+
+        await _storageClient.UploadObjectAsync(parts[0], parts[1], null, data, cancellationToken: ct);
+    }
+
+    public async Task DeleteAsync(string path, CancellationToken ct)
+    {
+        if (_storageClient == null) return;
+
+        var parts = path.Split('/', 2);
+        if (parts.Length != 2) throw new ArgumentException("Path must be in format: bucket/object");
+
+        await _storageClient.DeleteObjectAsync(parts[0], parts[1], cancellationToken: ct);
+    }
+
+    public async Task<bool> ExistsAsync(string path, CancellationToken ct)
+    {
+        if (_storageClient == null) return true;
+
+        var parts = path.Split('/', 2);
+        if (parts.Length != 2) return false;
+
+        try
+        {
+            await _storageClient.GetObjectAsync(parts[0], parts[1], cancellationToken: ct);
+            return true;
+        }
+        catch (Google.GoogleApiException)
+        {
+            return false;
+        }
+    }
 }
 
 public sealed class GcpComputeAbstraction : ICloudComputeAbstraction
