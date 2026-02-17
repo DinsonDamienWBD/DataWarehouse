@@ -29,24 +29,42 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.CloudPlatform
             var region = GetConfiguration(config, "Region", "us-east-1");
             var endpoint = GetConfiguration(config, "Endpoint", $"https://s3.{region}.amazonaws.com");
 
+            // Load credentials from config, then fall back to environment variables
+            var accessKey = GetConfiguration<string>(config, "AccessKeyId", null!)
+                ?? Environment.GetEnvironmentVariable("AWS_ACCESS_KEY_ID")
+                ?? throw new InvalidOperationException(
+                    "AWS AccessKeyId is required. Set 'AccessKeyId' in config or environment variable AWS_ACCESS_KEY_ID.");
+
+            var secretKey = GetConfiguration<string>(config, "SecretAccessKey", null!)
+                ?? Environment.GetEnvironmentVariable("AWS_SECRET_ACCESS_KEY")
+                ?? throw new InvalidOperationException(
+                    "AWS SecretAccessKey is required. Set 'SecretAccessKey' in config or environment variable AWS_SECRET_ACCESS_KEY.");
+
+            var sessionToken = GetConfiguration<string>(config, "SessionToken", null!)
+                ?? Environment.GetEnvironmentVariable("AWS_SESSION_TOKEN");
+
+            // Configure HTTP timeout with reasonable defaults
+            var timeoutSeconds = GetConfiguration(config, "TimeoutSeconds", 300);
             var httpClient = new HttpClient
             {
                 BaseAddress = new Uri(endpoint),
-                Timeout = config.Timeout
+                Timeout = TimeSpan.FromSeconds(timeoutSeconds)
             };
 
-            // Validate credentials are present
-            var accessKey = GetConfiguration<string>(config, "AccessKeyId", string.Empty);
-            var secretKey = GetConfiguration<string>(config, "SecretAccessKey", string.Empty);
-
-            if (string.IsNullOrEmpty(accessKey) || string.IsNullOrEmpty(secretKey))
-                throw new InvalidOperationException("AWS AccessKeyId and SecretAccessKey are required.");
+            // Add retry configuration metadata
+            var maxRetries = GetConfiguration(config, "MaxRetries", 3);
+            var retryDelayMs = GetConfiguration(config, "RetryDelayMs", 1000);
 
             var connectionInfo = new Dictionary<string, object>
             {
                 ["Region"] = region,
                 ["Endpoint"] = endpoint,
-                ["AccessKeyId"] = accessKey
+                ["AccessKeyId"] = accessKey,
+                ["SecretAccessKey"] = secretKey,
+                ["SessionToken"] = sessionToken ?? string.Empty,
+                ["TimeoutSeconds"] = timeoutSeconds,
+                ["MaxRetries"] = maxRetries,
+                ["RetryDelayMs"] = retryDelayMs
             };
 
             return new DefaultConnectionHandle(httpClient, connectionInfo);
@@ -55,15 +73,50 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.CloudPlatform
         protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct)
         {
             var httpClient = handle.GetConnection<HttpClient>();
-            try
+            var connectionInfo = handle.ConnectionInfo;
+            var maxRetries = connectionInfo.TryGetValue("MaxRetries", out var mr) && mr is int ? (int)mr : 3;
+            var retryDelayMs = connectionInfo.TryGetValue("RetryDelayMs", out var rd) && rd is int ? (int)rd : 1000;
+
+            for (int attempt = 0; attempt <= maxRetries; attempt++)
             {
-                var response = await httpClient.GetAsync("/", ct);
-                return response.IsSuccessStatusCode || response.StatusCode == System.Net.HttpStatusCode.Forbidden; // 403 means auth works but no buckets
+                try
+                {
+                    // Test with a simple HEAD request to the root
+                    var request = new HttpRequestMessage(HttpMethod.Head, "/");
+                    var response = await httpClient.SendAsync(request, ct);
+
+                    // 200 OK or 403 Forbidden both indicate connectivity and valid auth
+                    // 403 typically means credentials work but no bucket access
+                    var isHealthy = response.IsSuccessStatusCode || response.StatusCode == System.Net.HttpStatusCode.Forbidden;
+
+                    if (isHealthy)
+                    {
+                        return true;
+                    }
+
+                    if (attempt < maxRetries)
+                    {
+                        await Task.Delay(retryDelayMs * (int)Math.Pow(2, attempt), ct);
+                    }
+                }
+                catch (TaskCanceledException) when (!ct.IsCancellationRequested)
+                {
+                    // Timeout - retry if we have attempts left
+                    if (attempt < maxRetries)
+                    {
+                        await Task.Delay(retryDelayMs * (int)Math.Pow(2, attempt), ct);
+                    }
+                }
+                catch (Exception)
+                {
+                    if (attempt < maxRetries)
+                    {
+                        await Task.Delay(retryDelayMs * (int)Math.Pow(2, attempt), ct);
+                    }
+                }
             }
-            catch
-            {
-                return false;
-            }
+
+            return false;
         }
 
         protected override async Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct)
