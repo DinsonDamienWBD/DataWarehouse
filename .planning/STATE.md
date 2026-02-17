@@ -342,6 +342,8 @@ Audit findings resolved:
 - Phase 31: Live mode = EmbeddedConfiguration with PersistData=false (ephemeral data, like Linux Live CD)
 - Phase 31: USB path remapping handles forward-slash, backslash, and escaped-backslash JSON path references
 - Phase 31.1-01: Replaced 4 fake encryption methods with production AES-256-GCM; fixed 13 build errors (SharpCompress v0.45.1 factory methods, MQTTnet v5.x ReadOnlySequence); deferred P2 wiring fixes to 31.1-02
+- Phase 41.1-02: GetCurrentTenantId() virtual method in DataManagementPluginBase instead of direct ISecurityContext coupling — hierarchy doesn't expose SecurityContext property, virtual method is more flexible
+- Phase 41.1-02: LineageStrategyBase already had BFS implementations — removed 13 stub overrides that shadowed base class (447 lines deleted, 0 new logic needed)
 - Phase 31.1-03: Driver-required pattern for UltimateDataFormat advanced formats (Parquet, Arrow, HDF5, etc.) is production-ready approach — detection works via magic bytes, parsing requires optional NuGet package installation (mirrors ODBC/JDBC driver model)
 - Phase 31.1-03: All 13 UltimateInterface strategies now use production MessageBus integration (32 bus calls replaced: REST → storage.read/write/delete, RealTime → streaming.subscribe/publish, Security → cache/metering/encryption topics)
 - [Phase 31.1]: Plugin strategies are metadata-only declarations by design (SDK contracts require only properties)
@@ -523,13 +525,12 @@ Phase 33 (VDE) ─────────────────────�
 
 ### Current Position
 
-**Phase 41.1** — Stage: **PLAN** (kill shots analyzed, decisions made, plans needed)
+**Phase 41.1** — Stage: **EXECUTE** (7 plans, 2 waves)
+Plan: 2 of 7 complete
+Status: IN PROGRESS
 
-Next action: `/gsd:plan-phase 41.1`
-- 10 kill shots from hostile architecture audit, all verified and decisions made
-- Covers: sync-over-async, kernel wiring, message handler base class, NativeKeyHandle, persistent storage, vector clocks, Multi-Raft consensus, lineage stubs, tenant isolation
-- Also includes: old hierarchy cleanup, plugin consolidation (UltimateConsensus), PLUGIN-CATALOG update
+Progress: [######------------------] 29% (2/7 plans)
 
 Last session: 2026-02-17
-Stopped at: All 10 kill shots discussed, decisions documented, phase inserted
-Resume: Plan and execute Phase 41.1
+Stopped at: Completed 41.1-02-PLAN.md (KS9 lineage BFS + KS6+10 tenant storage)
+Resume: Execute 41.1-03-PLAN.md
