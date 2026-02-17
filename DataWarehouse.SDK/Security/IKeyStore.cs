@@ -142,6 +142,35 @@ namespace DataWarehouse.SDK.Security
         Task<string> GetCurrentKeyIdAsync();
 
         /// <summary>
+        /// Asynchronously retrieves a key as a <see cref="NativeKeyHandle"/> for secure zero-copy access.
+        /// The returned handle holds key material in unmanaged memory with guaranteed secure wipe on Dispose.
+        /// </summary>
+        /// <param name="keyId">The key identifier.</param>
+        /// <param name="context">Security context for ACL validation.</param>
+        /// <param name="ct">Cancellation token.</param>
+        /// <returns>
+        /// A <see cref="NativeKeyHandle"/> containing the key material in unmanaged memory.
+        /// The caller MUST dispose the handle when done to trigger secure wipe.
+        /// </returns>
+        /// <remarks>
+        /// Default implementation wraps <see cref="GetKeyAsync"/> and converts the byte[] to a NativeKeyHandle,
+        /// zeroing the intermediate byte[] immediately. Override for native-first implementations that avoid
+        /// the managed byte[] intermediate entirely.
+        /// </remarks>
+        async Task<NativeKeyHandle> GetKeyNativeAsync(string keyId, ISecurityContext context, CancellationToken ct = default)
+        {
+            var keyBytes = await GetKeyAsync(keyId, context).ConfigureAwait(false);
+            try
+            {
+                return NativeKeyHandle.FromBytes(keyBytes);
+            }
+            finally
+            {
+                System.Security.Cryptography.CryptographicOperations.ZeroMemory(keyBytes);
+            }
+        }
+
+        /// <summary>
         /// Synchronously retrieves a key by ID.
         /// LEGACY: Prefer GetKeyAsync for new implementations.
         /// </summary>
@@ -1153,6 +1182,33 @@ namespace DataWarehouse.SDK.Security
         public virtual Task<KeyMetadata?> GetKeyMetadataAsync(string keyId, ISecurityContext context, CancellationToken cancellationToken = default)
         {
             return Task.FromResult<KeyMetadata?>(null);
+        }
+
+        /// <summary>
+        /// Retrieves a key as a <see cref="NativeKeyHandle"/> for secure zero-copy access.
+        /// Default delegates to the <see cref="IKeyStore"/> default interface method.
+        /// Override for native-first implementations that skip the managed byte[] intermediate.
+        /// </summary>
+        /// <param name="keyId">The key identifier.</param>
+        /// <param name="context">Security context for ACL validation.</param>
+        /// <param name="ct">Cancellation token.</param>
+        /// <returns>A <see cref="NativeKeyHandle"/> containing the key. Caller must dispose.</returns>
+        /// <remarks>
+        /// Native-first implementations should allocate unmanaged memory directly from
+        /// the backing store, avoiding any managed byte[] allocation. This eliminates
+        /// the risk of key material being copied by GC compaction.
+        /// </remarks>
+        public virtual async Task<NativeKeyHandle> GetKeyNativeAsync(string keyId, ISecurityContext context, CancellationToken ct = default)
+        {
+            var keyBytes = await GetKeyAsync(keyId, context).ConfigureAwait(false);
+            try
+            {
+                return NativeKeyHandle.FromBytes(keyBytes);
+            }
+            finally
+            {
+                System.Security.Cryptography.CryptographicOperations.ZeroMemory(keyBytes);
+            }
         }
 
         /// <summary>
