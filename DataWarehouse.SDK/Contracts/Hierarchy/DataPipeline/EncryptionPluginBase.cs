@@ -614,6 +614,27 @@ public abstract class EncryptionPluginBase : DataTransformationPluginBase
 
     #endregion
 
+    #region Native Key Access
+
+    /// <summary>
+    /// Retrieves a key as a <see cref="NativeKeyHandle"/> for secure zero-copy crypto operations.
+    /// Delegates to <see cref="IKeyStore.GetKeyNativeAsync"/> on the default key store.
+    /// The caller MUST dispose the returned handle to trigger secure wipe.
+    /// </summary>
+    /// <param name="keyId">The key identifier.</param>
+    /// <param name="context">Security context for ACL validation.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>A <see cref="NativeKeyHandle"/> containing the key material in unmanaged memory.</returns>
+    /// <exception cref="InvalidOperationException">Thrown if no key store is configured.</exception>
+    protected virtual Task<NativeKeyHandle> GetKeyNativeAsync(string keyId, ISecurityContext context, CancellationToken ct = default)
+    {
+        var keyStore = DefaultKeyStore
+            ?? throw new InvalidOperationException("No key store configured. Call SetDefaultKeyStore first.");
+        return keyStore.GetKeyNativeAsync(keyId, context, ct);
+    }
+
+    #endregion
+
     #region Core Crypto Methods (Algorithm-Specific)
 
     /// <summary>
