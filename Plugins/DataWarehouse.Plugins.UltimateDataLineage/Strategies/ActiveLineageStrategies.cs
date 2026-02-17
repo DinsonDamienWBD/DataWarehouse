@@ -503,19 +503,6 @@ internal sealed class RealTimeLineageCaptureStrategy : LineageStrategyBase
         });
     }
 
-    /// <inheritdoc/>
-    public override Task<ImpactAnalysisResult> AnalyzeImpactAsync(string nodeId, string changeType, CancellationToken ct = default)
-    {
-        // Impact analysis not in capabilities for this strategy
-        return Task.FromResult(new ImpactAnalysisResult
-        {
-            SourceNodeId = nodeId,
-            ChangeType = changeType,
-            DirectlyImpacted = Array.Empty<string>(),
-            IndirectlyImpacted = Array.Empty<string>(),
-            ImpactScore = 0
-        });
-    }
 }
 
 /// <summary>
@@ -710,20 +697,6 @@ internal sealed class LineageInferenceStrategy : LineageStrategyBase
             Edges = edges.AsReadOnly(),
             Depth = 1,
             DownstreamCount = candidates.Count
-        });
-    }
-
-    /// <inheritdoc/>
-    public override Task<ImpactAnalysisResult> AnalyzeImpactAsync(string nodeId, string changeType, CancellationToken ct = default)
-    {
-        // Impact analysis not supported by inference strategy
-        return Task.FromResult(new ImpactAnalysisResult
-        {
-            SourceNodeId = nodeId,
-            ChangeType = changeType,
-            DirectlyImpacted = Array.Empty<string>(),
-            IndirectlyImpacted = Array.Empty<string>(),
-            ImpactScore = 0
         });
     }
 
@@ -1274,20 +1247,6 @@ internal sealed class LineageVisualizationStrategy : LineageStrategyBase
             Edges = edges.AsReadOnly(),
             Depth = maxDepth,
             DownstreamCount = Math.Max(0, nodes.Count - 1)
-        });
-    }
-
-    /// <inheritdoc/>
-    public override Task<ImpactAnalysisResult> AnalyzeImpactAsync(string nodeId, string changeType, CancellationToken ct = default)
-    {
-        // Impact analysis not supported by visualization strategy
-        return Task.FromResult(new ImpactAnalysisResult
-        {
-            SourceNodeId = nodeId,
-            ChangeType = changeType,
-            DirectlyImpacted = Array.Empty<string>(),
-            IndirectlyImpacted = Array.Empty<string>(),
-            ImpactScore = 0
         });
     }
 
