@@ -48,6 +48,7 @@
 11. [v3.0 Orchestration vs Implementation Map](#v30-orchestration-vs-implementation-map)
 12. [Production Flow Diagrams](#production-flow-diagrams) — Where every plugin slots into real operations
 13. [Plugin Registration & Lifecycle](#plugin-registration--lifecycle) — Knowledge bank, capabilities, intelligence hooks
+14. [Phase 41.1 Architecture Changes](#phase-411-architecture-changes-kill-shots) — Kill shots, new base classes, plugin consolidation
 
 ---
 
@@ -343,9 +344,9 @@
 | Field | Value |
 |-------|-------|
 | **Plugin Class** | `UltimateResiliencePlugin` |
-| **Base Class** | `InfrastructurePluginBase` |
+| **Base Class** | `ResiliencePluginBase` |
 | **Purpose** | Every resilience pattern — circuit breakers, retry, bulkhead, chaos engineering |
-| **Strategies** | 70+ |
+| **Strategies** | 60+ |
 | **Completeness** | **16%** (11 REAL, 48 SKELETON, 11 STUB) |
 
 **Features & Capabilities:**
@@ -355,9 +356,33 @@
 - Bulkhead (1 real): Thread pool isolation
 - Timeout (1 real): Simple timeout
 - Fallback (1 real): Cache fallback
-- (Skeleton) Load balancing, Raft/Paxos consensus, Chaos frameworks, DR orchestration
+- (Skeleton) Load balancing, Chaos frameworks, DR orchestration
 
-**v3.0 Impact:** Phase 36 (Resilience) will heavily orchestrate these strategies. Distributed features need real load balancing and consensus. **IMPORTANT to flesh out before v3.0.**
+**Phase 41.1 Changes:** Consensus strategies (Raft, Paxos, PBFT, ZAB) moved to UltimateConsensus plugin. Now extends `ResiliencePluginBase` instead of `InfrastructurePluginBase`.
+
+**v3.0 Impact:** Phase 36 (Resilience) will heavily orchestrate these strategies. Distributed features need real load balancing. **IMPORTANT to flesh out before v3.0.**
+
+---
+
+### UltimateConsensus
+| Field | Value |
+|-------|-------|
+| **Plugin Class** | `UltimateConsensusPlugin` |
+| **Base Class** | `ConsensusPluginBase` |
+| **Purpose** | Distributed consensus algorithms — Raft, Paxos, PBFT, ZAB with Multi-Raft by default |
+| **Strategies** | 10+ (Raft variants, Paxos, PBFT, ZAB, etc.) |
+| **Completeness** | **100%** (Raft complete from absorbed plugin, others in progress) |
+
+**Features & Capabilities:**
+- Raft consensus (100%): Leader election, log replication, distributed locking, snapshots, TCP RPC
+- Multi-Raft (Phase 41.1): Multiple Raft groups for scalability
+- Paxos variants (in progress): Basic Paxos, Multi-Paxos, Fast Paxos
+- Byzantine fault tolerance: PBFT
+- ZooKeeper Atomic Broadcast (ZAB)
+
+**Phase 41.1 Changes:** Created by consolidating consensus strategies from UltimateResilience + absorbing standalone `DataWarehouse.Plugins.Raft` plugin. Multi-Raft support added as default configuration.
+
+**v3.0 Impact:** Phase 34 (Federated Storage) and Phase 36 (Resilience) will use consensus for distributed coordination, metadata replication, and leader election.
 
 ---
 
@@ -487,7 +512,33 @@
 | Field | Value |
 |-------|-------|
 | **Purpose** | Data lineage tracking — graph-based provenance, impact analysis |
-| **Completeness** | Plugin orchestration REAL, strategies mixed |
+| **Base Class** | `DataManagementPluginBase` (tenant-scoped storage) |
+| **Strategies** | 18 total (5 custom BFS, 13 base-class BFS, 1 metadata-only) |
+| **Completeness** | **100%** — All strategies have working BFS traversal |
+
+**Phase 41.1 Changes (KS9):** LineageStrategyBase now provides default BFS implementations for `GetUpstreamAsync`, `GetDownstreamAsync`, and `AnalyzeImpactAsync`. 13 of 18 strategies that previously returned empty arrays now inherit working BFS graph traversal from the base class. 5 strategies with custom implementations (InMemoryGraph, SelfTracking, RealTimeCapture, ImpactAnalysisEngine, LineageVisualization) retain their specialized overrides. LineageInference uses Jaccard-based schema similarity (custom Get*, inherits base AnalyzeImpact).
+
+**Strategy Breakdown:**
+| Strategy | File | Custom Overrides | Notes |
+|----------|------|-----------------|-------|
+| InMemoryGraphStrategy | LineageStrategies.cs | Track, GetUp, GetDown, Analyze | Uses _upstreamLinks/_downstreamLinks |
+| SqlTransformationStrategy | LineageStrategies.cs | None (metadata only) | Inherits all base BFS |
+| EtlPipelineStrategy | LineageStrategies.cs | None | Inherits base BFS (was stub) |
+| ApiConsumptionStrategy | LineageStrategies.cs | None | Inherits base BFS (was stub) |
+| ReportConsumptionStrategy | LineageStrategies.cs | None | Inherits base BFS (was stub) |
+| BlastRadiusStrategy | AdvancedLineageStrategies.cs | None | Inherits base BFS (was stub with fake data) |
+| DagVisualizationStrategy | AdvancedLineageStrategies.cs | None | Inherits base BFS (was stub) |
+| CryptoProvenanceStrategy | AdvancedLineageStrategies.cs | Track (SHA256 hash chain) | Inherits base BFS (was stub) |
+| AuditTrailStrategy | AdvancedLineageStrategies.cs | None | Inherits base BFS (was stub) |
+| GdprLineageStrategy | AdvancedLineageStrategies.cs | None | Inherits base BFS (was stub) |
+| MlPipelineLineageStrategy | AdvancedLineageStrategies.cs | None | Inherits base BFS (was stub) |
+| SchemaEvolutionStrategy | AdvancedLineageStrategies.cs | None | Inherits base BFS (was stub) |
+| ExternalSourceStrategy | AdvancedLineageStrategies.cs | None | Inherits base BFS (was stub) |
+| SelfTrackingDataStrategy | ActiveLineageStrategies.cs | Track, GetUp, GetDown, Analyze | Uses _objectHistory + _provenance records |
+| RealTimeLineageCaptureStrategy | ActiveLineageStrategies.cs | Track, GetUp, GetDown | Uses _upstreamLinks/_downstreamLinks |
+| LineageInferenceStrategy | ActiveLineageStrategies.cs | GetUp, GetDown (Jaccard) | Schema-based inference |
+| ImpactAnalysisEngineStrategy | ActiveLineageStrategies.cs | Track, GetUp, GetDown, Analyze | Weighted criticality scoring |
+| LineageVisualizationStrategy | ActiveLineageStrategies.cs | Track, GetUp, GetDown, Export* | DOT/Mermaid/JSON export |
 
 **v3.0 Impact:** Orchestration — lineage tracking for federated operations.
 
@@ -754,8 +805,8 @@ Carbon awareness, Energy optimization, Battery awareness, Thermal management, Re
 ### TamperProof — Orchestrator, **~95%** (wiring gaps)
 5-phase write/read pipeline orchestrating UltimateEncryption (encryption), UltimateKeyManagement (keys), UltimateStorage (WORM/S3), UltimateRAID (sharding). Has `MessageBusIntegrationService` with proper encrypt/decrypt/key delegation. Gaps: (1) IMessageBus not injected in main plugin class (alerts commented), (2) WORM backend has local simulation fallback instead of always delegating to UltimateStorage's S3 strategy, (3) RAID sharding uses inline XOR instead of delegating to UltimateRAID. **Fix = wiring, not implementation.** Belongs in v3.0 orchestration phase.
 
-### Raft — Algorithm, **100%** complete
-Full Raft consensus: leader election, log replication, distributed locking, snapshots, TCP RPC (~1,700 lines)
+### Raft — Algorithm, **ABSORBED into UltimateConsensus (Phase 41.1)**
+Full Raft consensus: leader election, log replication, distributed locking, snapshots, TCP RPC (~1,700 lines). Now a strategy within UltimateConsensus plugin alongside Paxos, PBFT, ZAB.
 
 ### AedsCore — Orchestration, **100%** complete
 AEDS manifest validation, signature verification, job queue priority, caching. Related plugins: ClientCourier, ServerDispatcher, data plane transports.
@@ -796,7 +847,7 @@ Strategy pattern correct with Blue/Green, Canary, Rolling, A/B, K8s, Docker, Ter
 | 3 | UltimateIoTIntegration | 50+ strategies | 0 | 50+ | Full implementation from scratch |
 | 4 | UltimateCompression | 54 strategies | 8 | 54 | Skeleton → production |
 | 5 | UltimateEncryption | 58 strategies | 12 | 58 | Skeleton → production + stubs |
-| 6 | UltimateResilience | 59 strategies | 11 | 59 | Skeleton → production + stubs |
+| 6 | UltimateResilience | 60 strategies | 11 | 60 | Skeleton → production + stubs (consensus moved to UltimateConsensus) |
 | 7 | UltimateKeyManagement | 71 strategies | 15 | 71 | Skeleton → production + stubs |
 | 8 | UltimateIntelligence | ~75 strategies | 15 | 75 | Skeleton → production + stubs |
 | — | *UltimateDeployment* | *~63 strategies* | *2* | *63* | *v3.0 orchestration wiring (not pre-v3.0)* |
@@ -1307,6 +1358,8 @@ Fleshing out all gap plugins ensures v3.0 phases can focus on orchestration rath
     │  ║  ├── IntelligencePluginBase  intelligence plugins         ║
     │  ║  ├── ComputePluginBase ───── compute plugins              ║
     │  ║  ├── InfrastructurePluginBase infrastructure plugins      ║
+    │  ║  │   ├── ResiliencePluginBase (Phase 41.1)                ║
+    │  ║  │   └── ConsensusPluginBase (Phase 41.1)                 ║
     │  ║  ├── InterfacePluginBase ─── interface plugins            ║
     │  ║  ├── OrchestrationPluginBase orchestration plugins        ║
     │  ║  ├── StreamingPluginBase ─── streaming plugins            ║
@@ -1879,3 +1932,82 @@ var analysis = await MessageBus.SendAsync("intelligence.request", new PluginMess
     }
 });
 ```
+
+---
+
+## Phase 41.1 Architecture Changes (Kill Shots)
+
+**Phase 41.1** (Architecture Kill Shots) introduces critical architectural improvements and hierarchy refinements:
+
+### New SDK Base Classes
+1. **`ResiliencePluginBase`** (extends `InfrastructurePluginBase`)
+   - Base for all resilience plugins
+   - `UltimateResilience` migrated to extend this class
+   - Provides common resilience patterns and abstractions
+
+2. **`ConsensusPluginBase`** (extends `InfrastructurePluginBase`)
+   - Base for all consensus algorithms
+   - `UltimateConsensus` implements this class
+   - Provides distributed consensus primitives and state management
+
+### Plugin Consolidation
+- **`DataWarehouse.Plugins.Raft`** → **ABSORBED into `UltimateConsensus`**
+  - Standalone Raft plugin merged into UltimateConsensus as a strategy
+  - All ~1,700 lines of Raft implementation preserved
+  - Now part of unified consensus plugin alongside Paxos, PBFT, ZAB
+
+### New Plugin
+- **`UltimateConsensus`** (extends `ConsensusPluginBase`)
+  - Consolidates all consensus implementations as strategies
+  - Multi-Raft support by default (KS8)
+  - Strategies: Raft, Paxos variants, PBFT, ZAB
+  - Created by merging consensus strategies from UltimateResilience + Raft plugin
+
+### Architecture Kill Shots (Upcoming in Phase 41.1)
+The following improvements are planned or in progress:
+
+1. **KS5 — NativeKeyHandle for Key Memory**
+   - Secure key material handling with native memory
+   - Prevents key material from entering managed heap
+   - Integrates with `UltimateKeyManagement` and encryption plugins
+
+2. **KS6 + KS10 — Tenant-Scoped Storage in DataManagementPluginBase** -- COMPLETE (41.1-02)
+   - Multi-tenancy at the base class level via `ConcurrentDictionary<string, ConcurrentDictionary<string, object>>` tenant cache
+   - `GetDataAsync<T>` / `SetDataAsync<T>` with cache-first + `LoadFromStorageAsync`/`SaveToStorageAsync` virtual persistence hooks
+   - `GetCurrentTenantId()` virtual method defaults to "default" when no security context available
+   - `GetTenantDataKeysAsync` / `ClearTenantDataAsync` for tenant data management
+   - All 7 data management plugins (governance, catalog, quality, lineage, lake, mesh, privacy) inherit tenant isolation automatically
+
+3. **KS7 — Scalable Vector Clocks (DVV/ITC)**
+   - Dotted Version Vectors (DVV) for distributed versioning
+   - Interval Tree Clocks (ITC) for scalable causality tracking
+   - Critical for distributed conflict resolution
+
+4. **KS8 — Multi-Raft in ConsensusPluginBase**
+   - Multiple Raft groups for horizontal scalability
+   - Per-tenant or per-namespace consensus groups
+   - Default configuration in `UltimateConsensus`
+
+5. **KS9 — Default BFS in LineageStrategyBase** -- COMPLETE (41.1-02)
+   - LineageStrategyBase provides virtual BFS implementations for GetUpstreamAsync, GetDownstreamAsync, AnalyzeImpactAsync
+   - GetUpstreamAsync: BFS following edges WHERE TargetNodeId == currentId (walking upstream)
+   - GetDownstreamAsync: BFS following edges WHERE SourceNodeId == currentId (walking downstream)
+   - AnalyzeImpactAsync: BFS downstream, depth=1 as DirectlyImpacted, depth>1 as IndirectlyImpacted, ImpactScore = min(100, direct*10 + indirect*3)
+   - 13 stub strategies eliminated — now inherit working BFS from base class
+   - 5 strategies with custom implementations retain their overrides
+
+### Updated Hierarchy (v3.0 + Phase 41.1)
+```
+IntelligenceAwarePluginBase
+  ├─ FeaturePluginBase
+  │   ├─ SecurityPluginBase
+  │   ├─ InfrastructurePluginBase
+  │   │   ├─ ResiliencePluginBase → UltimateResilience
+  │   │   └─ ConsensusPluginBase → UltimateConsensus
+  │   └─ DataManagementPluginBase (tenant-scoped storage: GetDataAsync/SetDataAsync)
+  └─ DataPipelinePluginBase
+      └─ DataTransformationPluginBase
+          └─ EncryptionPluginBase
+```
+
+**Note:** Phase 41.1 is part of the v3.0 rollout and focuses on architectural correctness, kill-shot fixes, and hierarchy alignment before major feature implementations in subsequent phases.
