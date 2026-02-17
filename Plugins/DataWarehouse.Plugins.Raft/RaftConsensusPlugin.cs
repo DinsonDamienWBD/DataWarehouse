@@ -29,6 +29,7 @@ namespace DataWarehouse.Plugins.Raft
     /// - raft.cluster.join: Join a node to the cluster
     /// - raft.cluster.leave: Remove a node from the cluster
     /// </summary>
+    [Obsolete("Replaced by UltimateConsensus with Multi-Raft. Remove in v4.0.")]
     public sealed class RaftConsensusPlugin : ConsensusPluginBase
     {
         public override string Id => "datawarehouse.raft";
