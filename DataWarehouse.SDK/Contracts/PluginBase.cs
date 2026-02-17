@@ -2,6 +2,7 @@
 using DataWarehouse.SDK.Contracts.Compression;
 using DataWarehouse.SDK.Contracts.Encryption;
 using DataWarehouse.SDK.Primitives;
+using DataWarehouse.SDK.Primitives.Configuration;
 using DataWarehouse.SDK.Security;
 using DataWarehouse.SDK.Utilities;
 using System;
@@ -800,6 +801,24 @@ namespace DataWarehouse.SDK.Contracts
         public virtual void SetMessageBus(IMessageBus? messageBus)
         {
             MessageBus = messageBus;
+        }
+
+        /// <summary>
+        /// Gets the unified system-wide configuration for this plugin instance.
+        /// Injected by the kernel during plugin registration.
+        /// All plugins receive the same global configuration object.
+        /// Named SystemConfiguration to avoid collision with domain-specific Configuration properties
+        /// (e.g., TamperProofConfiguration in TamperProofProviderPluginBase).
+        /// </summary>
+        protected DataWarehouseConfiguration SystemConfiguration { get; private set; } = ConfigurationPresets.CreateStandard();
+
+        /// <summary>
+        /// Injects the unified system configuration into this plugin.
+        /// Called by the kernel during plugin registration.
+        /// </summary>
+        public void InjectConfiguration(DataWarehouseConfiguration config)
+        {
+            SystemConfiguration = config ?? throw new ArgumentNullException(nameof(config));
         }
 
         /// <summary>

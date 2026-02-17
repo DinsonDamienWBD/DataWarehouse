@@ -4,6 +4,7 @@ using DataWarehouse.Kernel.Pipeline;
 using DataWarehouse.Kernel.Plugins;
 using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Primitives;
+using DataWarehouse.SDK.Primitives.Configuration;
 using DataWarehouse.SDK.Services;
 using DataWarehouse.SDK.Utilities;
 using Microsoft.Extensions.Logging;
@@ -41,6 +42,21 @@ namespace DataWarehouse.Kernel
         private IStorageProvider? _cacheStorage;
         private bool _isInitialized;
         private bool _isDisposed;
+
+        /// <summary>Default path for the unified configuration file.</summary>
+        private const string DefaultConfigPath = "./config/datawarehouse-config.xml";
+
+        /// <summary>Default path for the configuration audit log.</summary>
+        private const string AuditLogPath = "./config/config-audit.log";
+
+        /// <summary>The unified configuration loaded at startup.</summary>
+        private DataWarehouseConfiguration? _currentConfiguration;
+
+        /// <summary>Audit log for configuration changes.</summary>
+        private ConfigurationAuditLog? _auditLog;
+
+        /// <summary>Gets the current unified configuration.</summary>
+        public DataWarehouseConfiguration CurrentConfiguration => _currentConfiguration ?? ConfigurationPresets.CreateStandard();
 
         /// <summary>
         /// Unique identifier for this kernel instance.
@@ -100,6 +116,12 @@ namespace DataWarehouse.Kernel
                 if (_isInitialized) return;
 
                 _logger?.LogInformation("Initializing DataWarehouse Kernel {KernelId}", KernelId);
+
+                // Load unified configuration from file (or create default if missing)
+                _currentConfiguration = ConfigurationSerializer.LoadFromFile(DefaultConfigPath);
+                _auditLog = new ConfigurationAuditLog(AuditLogPath);
+                _logger?.LogInformation("Configuration loaded from {Path}, preset: {Preset}",
+                    DefaultConfigPath, _currentConfiguration.PresetName);
 
                 // Publish startup event
                 await _messageBus.PublishAsync(SystemStartup, new PluginMessage
@@ -165,6 +187,12 @@ namespace DataWarehouse.Kernel
                 if (plugin is PluginBase pluginBase)
                 {
                     pluginBase.InjectKernelServices(_messageBus, null, null);
+
+                    // Inject unified configuration
+                    if (_currentConfiguration != null)
+                    {
+                        pluginBase.InjectConfiguration(_currentConfiguration);
+                    }
                 }
 
                 _registry.Register(plugin);
