@@ -112,6 +112,20 @@ namespace DataWarehouse.SDK.Hardware
         /// <inheritdoc/>
         public event EventHandler<PlatformCapabilityChangedEventArgs>? OnCapabilityChanged;
 
+        /// <summary>
+        /// Initializes the capability registry by performing an initial hardware probe and capability derivation.
+        /// </summary>
+        /// <remarks>
+        /// This method must be called before accessing any capability query methods (HasCapability, GetDevices, etc.).
+        /// Failure to initialize will result in InvalidOperationException on first access.
+        /// </remarks>
+        /// <param name="cancellationToken">Cancellation token.</param>
+        /// <returns>A task representing the asynchronous initialization operation.</returns>
+        public async Task InitializeAsync(CancellationToken cancellationToken = default)
+        {
+            await RefreshAsync(cancellationToken).ConfigureAwait(false);
+        }
+
         /// <inheritdoc/>
         public bool HasCapability(string capabilityKey)
         {
@@ -122,10 +136,11 @@ namespace DataWarehouse.SDK.Hardware
 
             ObjectDisposedException.ThrowIf(_disposed, this);
 
-            // Cold start: if cache is uninitialized, do a synchronous refresh
+            // Cold start: if cache is uninitialized, throw - caller should call InitializeAsync() first
             if (_lastRefresh == DateTimeOffset.MinValue)
             {
-                RefreshAsync().GetAwaiter().GetResult();
+                throw new InvalidOperationException(
+                    "PlatformCapabilityRegistry has not been initialized. Call InitializeAsync() before accessing capabilities.");
             }
 
             // Check staleness and trigger background refresh if needed
@@ -150,10 +165,11 @@ namespace DataWarehouse.SDK.Hardware
         {
             ObjectDisposedException.ThrowIf(_disposed, this);
 
-            // Cold start check
+            // Cold start check: throw if not initialized
             if (_lastRefresh == DateTimeOffset.MinValue)
             {
-                RefreshAsync().GetAwaiter().GetResult();
+                throw new InvalidOperationException(
+                    "PlatformCapabilityRegistry has not been initialized. Call InitializeAsync() before accessing capabilities.");
             }
 
             // Check staleness and trigger background refresh if needed
@@ -178,10 +194,11 @@ namespace DataWarehouse.SDK.Hardware
         {
             ObjectDisposedException.ThrowIf(_disposed, this);
 
-            // Cold start check
+            // Cold start check: throw if not initialized
             if (_lastRefresh == DateTimeOffset.MinValue)
             {
-                RefreshAsync().GetAwaiter().GetResult();
+                throw new InvalidOperationException(
+                    "PlatformCapabilityRegistry has not been initialized. Call InitializeAsync() before accessing capabilities.");
             }
 
             // Check staleness and trigger background refresh if needed
@@ -206,10 +223,11 @@ namespace DataWarehouse.SDK.Hardware
         {
             ObjectDisposedException.ThrowIf(_disposed, this);
 
-            // Cold start check
+            // Cold start check: throw if not initialized
             if (_lastRefresh == DateTimeOffset.MinValue)
             {
-                RefreshAsync().GetAwaiter().GetResult();
+                throw new InvalidOperationException(
+                    "PlatformCapabilityRegistry has not been initialized. Call InitializeAsync() before accessing capabilities.");
             }
 
             // Check staleness and trigger background refresh if needed
@@ -234,10 +252,11 @@ namespace DataWarehouse.SDK.Hardware
         {
             ObjectDisposedException.ThrowIf(_disposed, this);
 
-            // Cold start check
+            // Cold start check: throw if not initialized
             if (_lastRefresh == DateTimeOffset.MinValue)
             {
-                RefreshAsync().GetAwaiter().GetResult();
+                throw new InvalidOperationException(
+                    "PlatformCapabilityRegistry has not been initialized. Call InitializeAsync() before accessing capabilities.");
             }
 
             // Check staleness and trigger background refresh if needed
