@@ -1,3 +1,4 @@
+using DataWarehouse.SDK.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 
@@ -44,6 +45,7 @@ public sealed class ServiceHost : IAsyncDisposable
         _logger.LogInformation("Starting DataWarehouse service");
         _logger.LogInformation("Kernel ID: {KernelId}", options.KernelId);
         _logger.LogInformation("Kernel Mode: {KernelMode}", options.KernelMode);
+        _logger.LogInformation("Service Profile: {Profile}", options.Profile);
         _logger.LogInformation("Plugin Path: {PluginPath}", options.PluginPath);
 
         // Configure adapter options for service mode
@@ -56,7 +58,8 @@ public sealed class ServiceHost : IAsyncDisposable
             CustomConfig =
             {
                 ["RunAsService"] = true,
-                ["KernelMode"] = options.KernelMode
+                ["KernelMode"] = options.KernelMode,
+                ["ServiceProfile"] = options.Profile
             }
         };
 
