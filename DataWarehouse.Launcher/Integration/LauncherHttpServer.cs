@@ -1,6 +1,7 @@
 // Copyright (c) DataWarehouse Contributors. All rights reserved.
 // Licensed under the Apache License, Version 2.0.
 
+using System.Collections.Concurrent;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
@@ -22,6 +23,10 @@ public sealed class LauncherHttpServer : IAsyncDisposable
     private bool _disposed;
     private DateTime? _startTime;
     private string? _apiKey;
+
+    // Rate limiting: max 100 requests per minute per IP
+    private static readonly ConcurrentDictionary<string, (int Count, DateTime Window)> _rateLimits = new();
+    private const int MaxRequestsPerMinute = 100;
 
     /// <summary>
     /// Creates a new LauncherHttpServer.
@@ -96,6 +101,41 @@ public sealed class LauncherHttpServer : IAsyncDisposable
     /// </summary>
     private void MapEndpoints(WebApplication app)
     {
+        // Rate limiting middleware - MUST come before API key check
+        app.Use(async (context, next) =>
+        {
+            var clientIp = context.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+            var now = DateTime.UtcNow;
+
+            // Clean up old entries for this IP if window expired
+            if (_rateLimits.TryGetValue(clientIp, out var existing) && existing.Window.AddMinutes(1) < now)
+            {
+                _rateLimits.TryRemove(clientIp, out _);
+            }
+
+            // Update or create rate limit entry
+            var limit = _rateLimits.AddOrUpdate(clientIp,
+                _ => (1, now),
+                (_, current) => current.Window.AddMinutes(1) < now ? (1, now) : (current.Count + 1, current.Window));
+
+            // Check if rate limit exceeded
+            if (limit.Count > MaxRequestsPerMinute)
+            {
+                context.Response.StatusCode = 429; // Too Many Requests
+                context.Response.Headers["Retry-After"] = "60";
+                await context.Response.WriteAsJsonAsync(new
+                {
+                    error = "Rate limit exceeded",
+                    message = "Maximum 100 requests per minute allowed",
+                    retryAfterSeconds = 60
+                });
+                _logger.LogWarning("Rate limit exceeded for IP {ClientIp}: {Count} requests in current window", clientIp, limit.Count);
+                return;
+            }
+
+            await next();
+        });
+
         // API Key authentication middleware
         app.Use(async (context, next) =>
         {

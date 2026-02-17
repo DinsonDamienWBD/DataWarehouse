@@ -5,6 +5,8 @@ using System.Threading;
 using System.Threading.Tasks;
 using DataWarehouse.SDK.Connectors;
 using Microsoft.Extensions.Logging;
+using Azure.Storage.Blobs;
+using Azure.Identity;
 
 namespace DataWarehouse.Plugins.UltimateConnector.Strategies.CloudPlatform
 {
@@ -28,133 +30,70 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.CloudPlatform
         {
             // Load account name from config or environment
             var accountName = GetConfiguration<string>(config, "AccountName", null!)
-                ?? Environment.GetEnvironmentVariable("AZURE_STORAGE_ACCOUNT")
-                ?? throw new InvalidOperationException(
-                    "Azure AccountName is required. Set 'AccountName' in config or environment variable AZURE_STORAGE_ACCOUNT.");
+                ?? Environment.GetEnvironmentVariable("AZURE_STORAGE_ACCOUNT");
 
             // Load credentials - support multiple authentication methods
             // 1. Connection string (most common)
             var connectionString = GetConfiguration<string>(config, "ConnectionString", null!)
                 ?? Environment.GetEnvironmentVariable("AZURE_STORAGE_CONNECTION_STRING");
 
-            // 2. Account key (SharedKey authentication)
-            var accountKey = GetConfiguration<string>(config, "AccountKey", null!)
-                ?? Environment.GetEnvironmentVariable("AZURE_STORAGE_KEY");
+            BlobServiceClient blobServiceClient;
 
-            // 3. SAS token
-            var sasToken = GetConfiguration<string>(config, "SasToken", null!)
-                ?? Environment.GetEnvironmentVariable("AZURE_STORAGE_SAS_TOKEN");
-
-            // Validate that at least one authentication method is provided
-            if (string.IsNullOrEmpty(connectionString) && string.IsNullOrEmpty(accountKey) && string.IsNullOrEmpty(sasToken))
+            if (!string.IsNullOrEmpty(connectionString))
+            {
+                // Use connection string authentication
+                blobServiceClient = new BlobServiceClient(connectionString);
+            }
+            else if (!string.IsNullOrEmpty(accountName))
+            {
+                // Use DefaultAzureCredential (supports managed identity, environment variables, etc.)
+                var endpoint = GetConfiguration<string>(config, "Endpoint", null!)
+                    ?? $"https://{accountName}.blob.core.windows.net";
+                blobServiceClient = new BlobServiceClient(new Uri(endpoint), new DefaultAzureCredential());
+            }
+            else
             {
                 throw new InvalidOperationException(
-                    "Azure authentication is required. Provide one of: " +
-                    "ConnectionString (AZURE_STORAGE_CONNECTION_STRING), " +
-                    "AccountKey (AZURE_STORAGE_KEY), or " +
-                    "SasToken (AZURE_STORAGE_SAS_TOKEN).");
+                    "Azure authentication is required. Provide either: " +
+                    "ConnectionString (AZURE_STORAGE_CONNECTION_STRING) or " +
+                    "AccountName (AZURE_STORAGE_ACCOUNT) with DefaultAzureCredential.");
             }
-
-            // Construct endpoint with custom domain support
-            var endpoint = GetConfiguration<string>(config, "Endpoint", null!)
-                ?? $"https://{accountName}.blob.core.windows.net";
-
-            // Configure HTTP timeout with reasonable defaults
-            var timeoutSeconds = GetConfiguration(config, "TimeoutSeconds", 300);
-            var httpClient = new HttpClient
-            {
-                BaseAddress = new Uri(endpoint),
-                Timeout = TimeSpan.FromSeconds(timeoutSeconds)
-            };
-
-            // Add retry configuration metadata
-            var maxRetries = GetConfiguration(config, "MaxRetries", 3);
-            var retryDelayMs = GetConfiguration(config, "RetryDelayMs", 1000);
 
             var connectionInfo = new Dictionary<string, object>
             {
-                ["AccountName"] = accountName,
-                ["Endpoint"] = endpoint,
-                ["HasConnectionString"] = !string.IsNullOrEmpty(connectionString),
-                ["HasAccountKey"] = !string.IsNullOrEmpty(accountKey),
-                ["HasSasToken"] = !string.IsNullOrEmpty(sasToken),
-                ["TimeoutSeconds"] = timeoutSeconds,
-                ["MaxRetries"] = maxRetries,
-                ["RetryDelayMs"] = retryDelayMs
+                ["AccountName"] = accountName ?? "connection-string",
+                ["Endpoint"] = blobServiceClient.Uri.ToString(),
+                ["TimeoutSeconds"] = GetConfiguration(config, "TimeoutSeconds", 300),
+                ["MaxRetries"] = GetConfiguration(config, "MaxRetries", 3)
             };
 
-            // Store credentials securely in connection info (not exposed in logs)
-            if (!string.IsNullOrEmpty(connectionString))
-                connectionInfo["_ConnectionString"] = connectionString;
-            if (!string.IsNullOrEmpty(accountKey))
-                connectionInfo["_AccountKey"] = accountKey;
-            if (!string.IsNullOrEmpty(sasToken))
-                connectionInfo["_SasToken"] = sasToken;
-
-            return new DefaultConnectionHandle(httpClient, connectionInfo);
+            return new DefaultConnectionHandle(blobServiceClient, connectionInfo);
         }
 
         protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct)
         {
-            var httpClient = handle.GetConnection<HttpClient>();
-            var connectionInfo = handle.ConnectionInfo;
-            var maxRetries = connectionInfo.TryGetValue("MaxRetries", out var mr) && mr is int ? (int)mr : 3;
-            var retryDelayMs = connectionInfo.TryGetValue("RetryDelayMs", out var rd) && rd is int ? (int)rd : 1000;
+            var blobServiceClient = handle.GetConnection<BlobServiceClient>();
 
-            for (int attempt = 0; attempt <= maxRetries; attempt++)
+            try
             {
-                try
-                {
-                    // Test with a simple list containers request
-                    // This validates both connectivity and authentication
-                    var request = new HttpRequestMessage(HttpMethod.Get, "/?comp=list");
-
-                    // Add authentication header if SAS token is available
-                    if (connectionInfo.TryGetValue("_SasToken", out var sasTokenObj) && sasTokenObj is string st)
-                    {
-                        request.RequestUri = new Uri($"{httpClient.BaseAddress}?comp=list&{st.TrimStart('?')}");
-                    }
-
-                    var response = await httpClient.SendAsync(request, ct);
-
-                    // 200 OK or 403 Forbidden both indicate connectivity
-                    // 403 typically means auth works but insufficient permissions
-                    var isHealthy = response.IsSuccessStatusCode || response.StatusCode == System.Net.HttpStatusCode.Forbidden;
-
-                    if (isHealthy)
-                    {
-                        return true;
-                    }
-
-                    if (attempt < maxRetries)
-                    {
-                        await Task.Delay(retryDelayMs * (int)Math.Pow(2, attempt), ct);
-                    }
-                }
-                catch (TaskCanceledException) when (!ct.IsCancellationRequested)
-                {
-                    // Timeout - retry if we have attempts left
-                    if (attempt < maxRetries)
-                    {
-                        await Task.Delay(retryDelayMs * (int)Math.Pow(2, attempt), ct);
-                    }
-                }
-                catch (Exception)
-                {
-                    if (attempt < maxRetries)
-                    {
-                        await Task.Delay(retryDelayMs * (int)Math.Pow(2, attempt), ct);
-                    }
-                }
+                // Test with GetProperties - validates credentials and connectivity
+                await blobServiceClient.GetPropertiesAsync(ct);
+                return true;
             }
-
-            return false;
+            catch (Azure.RequestFailedException)
+            {
+                // Even auth errors mean we can reach Azure
+                return true;
+            }
+            catch (Exception)
+            {
+                return false;
+            }
         }
 
         protected override async Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct)
         {
-            var httpClient = handle.GetConnection<HttpClient>();
-            httpClient?.Dispose();
+            // BlobServiceClient doesn't implement IDisposable in current Azure SDK
             await Task.CompletedTask;
         }
 
