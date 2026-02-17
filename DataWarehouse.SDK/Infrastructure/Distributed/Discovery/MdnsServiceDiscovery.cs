@@ -17,7 +17,7 @@ namespace DataWarehouse.SDK.Infrastructure.Distributed.Discovery
     /// Implements RFC 6762 multicast DNS for zero-configuration service announcement and discovery.
     /// </summary>
     [SdkCompatibility("3.0.0", Notes = "Phase 40: Zero-config mDNS discovery")]
-    public sealed class MdnsServiceDiscovery : IDisposable
+    public sealed class MdnsServiceDiscovery : IDisposable, IAsyncDisposable
     {
         private const string ServiceType = "_datawarehouse._tcp.local";
         private const string MulticastAddressV4 = "224.0.0.251";
@@ -443,6 +443,18 @@ namespace DataWarehouse.SDK.Infrastructure.Distributed.Discovery
             }
         }
 
+        /// <summary>
+        /// Asynchronously disposes mDNS discovery resources.
+        /// Preferred over <see cref="Dispose"/> to avoid sync-over-async.
+        /// </summary>
+        public async ValueTask DisposeAsync()
+        {
+            await StopAsync();
+        }
+
+        /// <summary>
+        /// Synchronously disposes mDNS discovery resources. Prefer <see cref="DisposeAsync"/>.
+        /// </summary>
         public void Dispose()
         {
             StopAsync().GetAwaiter().GetResult();

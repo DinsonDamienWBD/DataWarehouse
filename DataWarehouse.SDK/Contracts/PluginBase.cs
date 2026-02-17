@@ -1180,25 +1180,23 @@ namespace DataWarehouse.SDK.Contracts
 
         /// <summary>
         /// Transform data during write operations (e.g., encrypt, compress).
-        /// LEGACY: Prefer OnWriteAsync for new implementations. This method calls OnWriteAsync synchronously.
-        /// Must be implemented by derived classes OR override OnWriteAsync instead.
+        /// LEGACY: Use OnWriteAsync instead. This sync wrapper causes threadpool starvation under load.
         /// </summary>
+        [Obsolete("Use OnWriteAsync instead. Sync-over-async causes threadpool starvation under load.")]
         public virtual Stream OnWrite(Stream input, IKernelContext context, Dictionary<string, object> args)
         {
-            // Default implementation calls async version synchronously
-            // Derived classes should override OnWriteAsync for proper async support
+            // Legacy sync bridge — callers should migrate to OnWriteAsync
             return OnWriteAsync(input, context, args).GetAwaiter().GetResult();
         }
 
         /// <summary>
         /// Transform data during read operations (e.g., decrypt, decompress).
-        /// LEGACY: Prefer OnReadAsync for new implementations. This method calls OnReadAsync synchronously.
-        /// Must be implemented by derived classes OR override OnReadAsync instead.
+        /// LEGACY: Use OnReadAsync instead. This sync wrapper causes threadpool starvation under load.
         /// </summary>
+        [Obsolete("Use OnReadAsync instead. Sync-over-async causes threadpool starvation under load.")]
         public virtual Stream OnRead(Stream stored, IKernelContext context, Dictionary<string, object> args)
         {
-            // Default implementation calls async version synchronously
-            // Derived classes should override OnReadAsync for proper async support
+            // Legacy sync bridge — callers should migrate to OnReadAsync
             return OnReadAsync(stored, context, args).GetAwaiter().GetResult();
         }
 
@@ -1608,7 +1606,7 @@ namespace DataWarehouse.SDK.Contracts
         /// <summary>
         /// Remove all expired entries.
         /// </summary>
-        public virtual Task<int> CleanupExpiredAsync(CancellationToken ct = default)
+        public virtual async Task<int> CleanupExpiredAsync(CancellationToken ct = default)
         {
             var now = DateTime.UtcNow;
             var expiredKeys = _cacheMetadata
@@ -1622,12 +1620,12 @@ namespace DataWarehouse.SDK.Contracts
                 if (ct.IsCancellationRequested) break;
                 if (_cacheMetadata.TryRemove(key, out _))
                 {
-                    try { DeleteAsync(new Uri(key)).Wait(); } catch { }
+                    try { await DeleteAsync(new Uri(key)); } catch { }
                     count++;
                 }
             }
 
-            return Task.FromResult(count);
+            return count;
         }
 
         /// <summary>

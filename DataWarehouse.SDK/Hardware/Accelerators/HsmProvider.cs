@@ -70,7 +70,7 @@ namespace DataWarehouse.SDK.Hardware.Accelerators
     /// </para>
     /// </remarks>
     [SdkCompatibility("3.0.0", Notes = "Phase 35: PKCS#11 HSM provider (HW-04)")]
-    public sealed class HsmProvider : IHsmProvider, IDisposable
+    public sealed class HsmProvider : IHsmProvider, IDisposable, IAsyncDisposable
     {
         private IntPtr _pkcs11Library = IntPtr.Zero;
         private Pkcs11Wrapper.CK_FUNCTION_LIST _functions;
@@ -368,11 +368,21 @@ namespace DataWarehouse.SDK.Hardware.Accelerators
         }
 
         /// <summary>
-        /// Disposes HSM resources and closes connection.
+        /// Asynchronously disposes HSM resources and closes connection.
+        /// Preferred over <see cref="Dispose"/> to avoid sync-over-async.
+        /// </summary>
+        public async ValueTask DisposeAsync()
+        {
+            await DisconnectAsync();
+        }
+
+        /// <summary>
+        /// Synchronously disposes HSM resources. Prefer <see cref="DisposeAsync"/>.
         /// </summary>
         public void Dispose()
         {
-            DisconnectAsync().GetAwaiter().GetResult();
+            // Fire-and-forget in sync dispose path — DisposeAsync is preferred
+            DisconnectAsync().ContinueWith(_ => { }, TaskContinuationOptions.ExecuteSynchronously);
         }
     }
 }

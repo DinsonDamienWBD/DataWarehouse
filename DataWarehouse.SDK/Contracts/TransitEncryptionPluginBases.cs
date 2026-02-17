@@ -401,32 +401,32 @@ namespace DataWarehouse.SDK.Contracts
         /// <summary>Whether bypass is allowed.</summary>
         public override bool AllowBypass => true;
 
-        #region IDataTransformation Bridge (OnWrite/OnRead)
+        #region IDataTransformation Bridge (OnWriteAsync/OnReadAsync)
 
         /// <summary>
-        /// Bridge: delegates to EncryptForTransitAsync for pipeline integration.
+        /// Async bridge: delegates to EncryptForTransitAsync for pipeline integration.
         /// </summary>
-        public override Stream OnWrite(Stream input, IKernelContext context, Dictionary<string, object> args)
+        protected override async Task<Stream> OnWriteAsync(Stream input, IKernelContext context, Dictionary<string, object> args)
         {
             using var ms = new System.IO.MemoryStream();
-            input.CopyTo(ms);
+            await input.CopyToAsync(ms);
             var data = ms.ToArray();
             var options = new TransitEncryptionOptions();
             // Extract security context from args if available
             ISecurityContext secCtx = args.TryGetValue("securityContext", out var ctxObj) && ctxObj is ISecurityContext sc
                 ? sc
                 : new DefaultTransitSecurityContext();
-            var result = EncryptForTransitAsync(data, options, secCtx).GetAwaiter().GetResult();
+            var result = await EncryptForTransitAsync(data, options, secCtx);
             return new System.IO.MemoryStream(result.Ciphertext);
         }
 
         /// <summary>
-        /// Bridge: delegates to DecryptFromTransitAsync for pipeline integration.
+        /// Async bridge: delegates to DecryptFromTransitAsync for pipeline integration.
         /// </summary>
-        public override Stream OnRead(Stream stored, IKernelContext context, Dictionary<string, object> args)
+        protected override async Task<Stream> OnReadAsync(Stream stored, IKernelContext context, Dictionary<string, object> args)
         {
             using var ms = new System.IO.MemoryStream();
-            stored.CopyTo(ms);
+            await stored.CopyToAsync(ms);
             var data = ms.ToArray();
             var metadata = new Dictionary<string, object>();
             // Extract encryption metadata from args if available
@@ -435,7 +435,7 @@ namespace DataWarehouse.SDK.Contracts
             ISecurityContext secCtx = args.TryGetValue("securityContext", out var ctxObj2) && ctxObj2 is ISecurityContext sc2
                 ? sc2
                 : new DefaultTransitSecurityContext();
-            var result = DecryptFromTransitAsync(data, metadata, secCtx).GetAwaiter().GetResult();
+            var result = await DecryptFromTransitAsync(data, metadata, secCtx);
             return new System.IO.MemoryStream(result.Plaintext);
         }
 

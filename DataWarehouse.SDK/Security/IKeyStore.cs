@@ -1031,6 +1031,7 @@ namespace DataWarehouse.SDK.Security
         /// Synchronously retrieves a key by ID (legacy method).
         /// Default implementation calls GetKeyAsync synchronously.
         /// </summary>
+        [Obsolete("Use GetKeyAsync instead. Sync-over-async causes threadpool starvation under load.")]
         public virtual byte[] GetKey(string keyId)
         {
             return GetKeyAsync(keyId, CreateSystemContext()).GetAwaiter().GetResult();
