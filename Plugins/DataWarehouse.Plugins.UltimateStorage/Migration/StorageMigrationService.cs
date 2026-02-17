@@ -52,7 +52,7 @@ public sealed class StorageMigrationService
         {
             if (IsStoragePlugin(plugin))
             {
-                var subCategory = plugin is PipelinePluginBase pipelinePlugin ? pipelinePlugin.SubCategory : "Unknown";
+                var subCategory = plugin is DataWarehouse.SDK.Contracts.Hierarchy.DataTransformationPluginBase dtPlugin ? dtPlugin.SubCategory : "Unknown";
 
                 var info = new StoragePluginInfo
                 {
@@ -333,10 +333,10 @@ public sealed class StorageMigrationService
     /// </summary>
     private static bool IsStoragePlugin(IPlugin plugin)
     {
-        // Check if plugin has SubCategory property (pipeline plugins)
-        if (plugin is PipelinePluginBase pipelinePlugin)
+        // Check if plugin has SubCategory property (data transformation plugins)
+        if (plugin is DataWarehouse.SDK.Contracts.Hierarchy.DataTransformationPluginBase dtPlugin)
         {
-            return pipelinePlugin.SubCategory?.Equals("Storage", StringComparison.OrdinalIgnoreCase) == true;
+            return dtPlugin.SubCategory?.Equals("Storage", StringComparison.OrdinalIgnoreCase) == true;
         }
 
         // Fallback: check ID contains "storage"

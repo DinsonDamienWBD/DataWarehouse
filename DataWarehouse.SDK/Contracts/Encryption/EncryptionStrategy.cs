@@ -325,6 +325,16 @@ namespace DataWarehouse.SDK.Contracts.Encryption
         public long AuthenticationFailures { get; init; }
 
         /// <summary>
+        /// Number of unique encryption keys used across all operations.
+        /// </summary>
+        public int UniqueKeysUsed { get; init; }
+
+        /// <summary>
+        /// Timestamp of the most recent key access.
+        /// </summary>
+        public DateTime LastKeyAccess { get; init; }
+
+        /// <summary>
         /// Timestamp when statistics tracking started.
         /// </summary>
         public DateTime StartTime { get; init; }

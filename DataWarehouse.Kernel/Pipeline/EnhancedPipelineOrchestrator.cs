@@ -689,7 +689,7 @@ public sealed class EnhancedPipelineOrchestrator : IPipelineOrchestrator
         return _registeredStages.Select(kvp =>
         {
             var plugin = kvp.Value as IPlugin;
-            var pipelinePlugin = kvp.Value as PipelinePluginBase;
+            var pipelinePlugin = kvp.Value as DataWarehouse.SDK.Contracts.Hierarchy.DataPipelinePluginBase;
 
             return new PipelineStageInfo
             {
@@ -697,10 +697,10 @@ public sealed class EnhancedPipelineOrchestrator : IPipelineOrchestrator
                 Name = plugin?.Name ?? kvp.Key,
                 SubCategory = kvp.Value.SubCategory,
                 QualityLevel = kvp.Value.QualityLevel,
-                DefaultOrder = pipelinePlugin?.DefaultOrder ?? 100,
+                DefaultOrder = pipelinePlugin?.DefaultPipelineOrder ?? 100,
                 AllowBypass = pipelinePlugin?.AllowBypass ?? false,
-                RequiredPrecedingStages = pipelinePlugin?.RequiredPrecedingStages ?? Array.Empty<string>(),
-                IncompatibleStages = pipelinePlugin?.IncompatibleStages ?? Array.Empty<string>(),
+                RequiredPrecedingStages = pipelinePlugin?.RequiredPrecedingStages?.ToArray() ?? Array.Empty<string>(),
+                IncompatibleStages = pipelinePlugin?.IncompatibleStages?.ToArray() ?? Array.Empty<string>(),
                 Description = plugin?.Name ?? "Pipeline stage"
             };
         }).ToList();
