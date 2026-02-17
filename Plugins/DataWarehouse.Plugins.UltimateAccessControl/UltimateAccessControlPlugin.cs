@@ -457,6 +457,26 @@ namespace DataWarehouse.Plugins.UltimateAccessControl
         /// <inheritdoc/>
         protected override Task OnStartCoreAsync(CancellationToken ct)
         {
+            // Register typed message handler for access evaluation requests (KS3 pattern)
+            RegisterHandler<AccessEvaluationRequest, AccessEvaluationResponse>(
+                async (request, cancellationToken) =>
+                {
+                    var context = new AccessContext
+                    {
+                        ResourceId = request.ResourceId,
+                        Action = request.Action,
+                        SubjectId = request.SubjectId
+                    };
+
+                    var decision = await EvaluateAccessAsync(context, request.StrategyId);
+                    return new AccessEvaluationResponse
+                    {
+                        Allowed = decision.IsGranted,
+                        Reason = decision.Reason,
+                        StrategyId = request.StrategyId ?? _defaultStrategy?.StrategyId ?? ""
+                    };
+                });
+
             return Task.CompletedTask;
         }
 
@@ -678,5 +698,34 @@ namespace DataWarehouse.Plugins.UltimateAccessControl
             }
             base.Dispose(disposing);
         }
+    }
+
+    /// <summary>
+    /// Typed request DTO for access evaluation via message bus (KS3).
+    /// Topic: <c>DataWarehouse.Plugins.UltimateAccessControl.AccessEvaluationRequest</c>
+    /// </summary>
+    public sealed class AccessEvaluationRequest
+    {
+        /// <summary>Subject (user or service) requesting access.</summary>
+        public string SubjectId { get; init; } = "";
+        /// <summary>Resource being accessed.</summary>
+        public string ResourceId { get; init; } = "";
+        /// <summary>Action being performed.</summary>
+        public string Action { get; init; } = "";
+        /// <summary>Optional strategy to use for evaluation.</summary>
+        public string? StrategyId { get; init; }
+    }
+
+    /// <summary>
+    /// Typed response DTO for access evaluation via message bus (KS3).
+    /// </summary>
+    public sealed class AccessEvaluationResponse
+    {
+        /// <summary>Whether access is granted.</summary>
+        public bool Allowed { get; init; }
+        /// <summary>Reason for the decision.</summary>
+        public string Reason { get; init; } = "";
+        /// <summary>Strategy that made the decision.</summary>
+        public string StrategyId { get; init; } = "";
     }
 }

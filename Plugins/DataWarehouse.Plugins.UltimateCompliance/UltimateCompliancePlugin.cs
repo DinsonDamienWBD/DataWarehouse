@@ -388,6 +388,28 @@ namespace DataWarehouse.Plugins.UltimateCompliance
         /// <inheritdoc/>
         protected override Task OnStartCoreAsync(CancellationToken ct)
         {
+            // Register typed message handler for compliance check requests (KS3 pattern)
+            RegisterHandler<ComplianceCheckRequest, ComplianceCheckResponse>(
+                async (request, cancellationToken) =>
+                {
+                    var context = new ComplianceContext
+                    {
+                        OperationType = "ComplianceCheck",
+                        DataClassification = "Standard",
+                        ResourceId = request.DataId
+                    };
+                    var result = await CheckComplianceAsync(context, request.Framework, cancellationToken);
+                    return new ComplianceCheckResponse
+                    {
+                        DataId = request.DataId,
+                        Framework = result.Framework,
+                        OverallCompliant = result.IsCompliant,
+                        OverallStatus = result.Status.ToString(),
+                        TotalViolations = result.Violations.Count,
+                        CheckedAt = DateTime.UtcNow
+                    };
+                });
+
             return Task.CompletedTask;
         }
 
@@ -684,6 +706,37 @@ namespace DataWarehouse.Plugins.UltimateCompliance
         /// <summary>
         /// Timestamp when checks were performed.
         /// </summary>
+        public DateTime CheckedAt { get; init; }
+    }
+
+    /// <summary>
+    /// Typed request DTO for compliance checks via message bus (KS3).
+    /// Topic: <c>DataWarehouse.Plugins.UltimateCompliance.ComplianceCheckRequest</c>
+    /// </summary>
+    public sealed class ComplianceCheckRequest
+    {
+        /// <summary>ID of the data to check.</summary>
+        public string DataId { get; init; } = "";
+        /// <summary>Compliance framework to check against (e.g., "SOC2", "GDPR", "HIPAA").</summary>
+        public string Framework { get; init; } = "SOC2";
+    }
+
+    /// <summary>
+    /// Typed response DTO for compliance checks via message bus (KS3).
+    /// </summary>
+    public sealed class ComplianceCheckResponse
+    {
+        /// <summary>ID of the data that was checked.</summary>
+        public string DataId { get; init; } = "";
+        /// <summary>Framework used for checking.</summary>
+        public string Framework { get; init; } = "";
+        /// <summary>Whether all checks passed.</summary>
+        public bool OverallCompliant { get; init; }
+        /// <summary>Overall compliance status.</summary>
+        public string OverallStatus { get; init; } = "";
+        /// <summary>Total number of violations.</summary>
+        public int TotalViolations { get; init; }
+        /// <summary>When checks were performed.</summary>
         public DateTime CheckedAt { get; init; }
     }
 }
