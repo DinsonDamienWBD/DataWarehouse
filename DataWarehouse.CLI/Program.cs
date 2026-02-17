@@ -608,13 +608,22 @@ public static class Program
 
     private static Command CreateServiceCommand(Option<OutputFormat> formatOption)
     {
-        var command = new Command("service", "Service management");
+        var command = new Command("service", "Service management (profile-aware)");
 
-        command.Subcommands.Add(CreateSubCommand("status", "Show service status", "service.status", formatOption));
-        command.Subcommands.Add(CreateSubCommand("start", "Start the DataWarehouse service", "service.start", formatOption));
-        command.Subcommands.Add(CreateSubCommand("stop", "Stop the DataWarehouse service", "service.stop", formatOption));
-        command.Subcommands.Add(CreateSubCommand("restart", "Restart the DataWarehouse service", "service.restart", formatOption));
-        command.Subcommands.Add(CreateSubCommand("uninstall", "Uninstall the DataWarehouse service", "service.uninstall", formatOption));
+        command.Subcommands.Add(CreateSubCommand("status", "Show service status", "service.status", formatOption,
+            MakeOpt<string>("--profile", "Service profile (server, client, auto)", "auto")));
+        command.Subcommands.Add(CreateSubCommand("install", "Install DataWarehouse as a system service", "service.install", formatOption,
+            MakeOpt<string>("--profile", "Service profile: server, client (required)", "server"),
+            MakeOpt<string?>("--path", "Path to DataWarehouse executable"),
+            MakeOpt<bool>("--auto-start", "Start service automatically on boot", true)));
+        command.Subcommands.Add(CreateSubCommand("start", "Start the DataWarehouse service", "service.start", formatOption,
+            MakeOpt<string>("--profile", "Service profile (server, client, auto)", "auto")));
+        command.Subcommands.Add(CreateSubCommand("stop", "Stop the DataWarehouse service", "service.stop", formatOption,
+            MakeOpt<string>("--profile", "Service profile (server, client, auto)", "auto")));
+        command.Subcommands.Add(CreateSubCommand("restart", "Restart the DataWarehouse service", "service.restart", formatOption,
+            MakeOpt<string>("--profile", "Service profile (server, client, auto)", "auto")));
+        command.Subcommands.Add(CreateSubCommand("uninstall", "Uninstall the DataWarehouse service", "service.uninstall", formatOption,
+            MakeOpt<string>("--profile", "Service profile (server, client, auto)", "auto")));
 
         return command;
     }
