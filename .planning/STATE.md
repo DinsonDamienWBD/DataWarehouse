@@ -273,6 +273,8 @@ Audit findings resolved:
 | Phase 42 P04 | 21min | 6 tasks | 5 files |
 | Phase 42 P06 | 13min | 6 tasks | 5 files |
 | Phase 44 P01 | 4min | 1 task | 1 file |
+| Phase 44 P05 | 4min | 1 task | 1 file |
+| Phase 44 P03 | 342 | 1 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -386,6 +388,8 @@ Audit findings resolved:
 - [Phase 42.06] v4.0 significant items scope: Implement only Tier 5-7 + S/M effort features (70 features, 314h) — customer tier impact is PRIMARY driver, defer 560+ features to v5.0 (L/XL effort OR Tier 1-3); pattern-based documentation provides 52x efficiency vs full implementation
 - [Phase 42]: Sequential execution strategy: CLI first (12 weeks) -> GUI (14 weeks) -> Cloud polish (16 weeks) -> Integration (8 weeks) — CLI and GUI share common backend services; completing CLI first establishes patterns for GUI
 - [Phase 43-02]: Security audit pattern-based scanning: grep + sampling (10-20%) more efficient than full AST for initial audit (5 min vs 30+ min, 80-95% confidence); CVSS 3.1 scoring aligns with v4.0 certification; honeypot credentials must be randomized (even fake secrets defeat purpose if predictable); Random.Shared acceptable for UI/test, RandomNumberGenerator for security; zero BinaryFormatter confirms Phase 23 success
+- [Phase 44.03]: Domain 4 audit: 3 medium findings (mock transcoding, PNG compression bug, no metadata preservation); healthcare formats production-ready; driver-required pattern confirmed for scientific formats
+- [Phase 44.05]: Domains 6-7 (Hardware, Edge, IoT) audit complete: 0 critical/high, 4 medium findings (NUMA/QAT defer to multi-socket testing, NVMe VM detection conservative, memory exception vs cache eviction); hardware probes production-ready (Windows WMI, Linux sysfs, macOS system_profiler); GPIO/I2C/SPI bus controllers verified (System.Device.* wrappers); bounded memory runtime verified (ceiling enforcement, ArrayPool); sensor fusion verified (Kalman filter 6-DOF, complementary filter, temporal alignment); graceful degradation policy: zero crashes when hardware absent, conservative fallback to software (CORRECT for v4.0)
 
 ### SDK Audit Results (2026-02-14)
 
@@ -610,11 +614,11 @@ Deliverables (43-04):
 
 ### Phase 44: Domain-by-Domain Deep Audit -- IN PROGRESS
 Phase: 44 (Layer 2 - Domain Deep Audit)
-Plan: 1 of 9 complete
+Plan: 2 of 9 complete
 Status: IN PROGRESS
 Last activity: 2026-02-17
 
-Progress: [##......................] 11% (1/9 plans)
+Progress: [####....................] 22% (2/9 plans)
 
 Deliverables (44-01):
 - Hostile audit of Domains 1-2 (Data Pipeline, Storage) complete
@@ -628,13 +632,25 @@ Deliverables (44-01):
 - Overall: PRODUCTION-READY with 3 minor fixes recommended
 - Generated AUDIT-FINDINGS-02-domains-1-2.md (979 lines, 37,632 bytes)
 
+Deliverables (44-05):
+- Hostile audit of Domains 6-7 (Hardware, Edge, IoT) complete
+- Hardware probes verified: Windows (WMI: Win32_PnPEntity, Win32_DiskDrive, Win32_VideoController), Linux (sysfs: /sys/bus/pci, /sys/class/nvme, /sys/class/gpio), macOS (system_profiler)
+- NVMe/NUMA/QAT graceful fallback verified: hardware detection → software fallback, zero crashes when absent
+- GPIO/I2C/SPI bus controllers verified: System.Device.* wrappers with full functionality (pin operations, interrupts, transactions)
+- Bounded memory runtime verified: ceiling enforcement, ArrayPool integration, proactive GC management
+- Sensor fusion verified: Kalman filter (6-DOF state, covariance tracking), complementary filter, temporal alignment
+- 15 files audited (~3,375 LOC): hardware probes, accelerators, bus controllers, memory runtime, sensor fusion
+- Findings: 0 critical, 0 high, 4 medium (NUMA/QAT defer to multi-socket testing, NVMe VM detection, memory exception vs eviction), 7 low (macOS events, outlier detection, docs)
+- Overall: PRODUCTION-READY with minor gaps (NUMA/QAT conservatively defer to software fallback)
+- Generated AUDIT-FINDINGS-02-domains-6-7.md (674 lines)
+
 ### Phases Overview
 
 | Phase | Name | Layer | Plans | Status |
 |-------|------|-------|-------|--------|
 | 42 | Feature Verification Matrix | Layer 0 | 6 | Complete |
 | 43 | Full Solution Automated Scan | Layer 1 | 5 | In Progress (4/5) |
-| 44 | Domain-by-Domain Deep Audit | Layer 2 | 9 | In Progress (1/9) |
+| 44 | Domain-by-Domain Deep Audit | Layer 2 | 9 | In Progress (2/9) |
 | 45 | Tier-by-Tier Integration Verification | Layer 3 | 4 | Not started |
 | 46 | Performance Benchmarks | Layer 4 | 5 | Not started |
 | 47 | Full Penetration Test Cycle | Layer 5 | 5 | Not started |
