@@ -161,6 +161,12 @@ namespace DataWarehouse.Kernel
 
             if (response.Success)
             {
+                // Inject kernel services so plugins can use IMessageBus, IStorageEngine, etc.
+                if (plugin is PluginBase pluginBase)
+                {
+                    pluginBase.InjectKernelServices(_messageBus, null, null);
+                }
+
                 _registry.Register(plugin);
 
                 // Register with pipeline if it's a transformation plugin
