@@ -125,7 +125,7 @@ namespace DataWarehouse.Kernel.Pipeline
             return [.. _stages.Select(kvp =>
             {
                 var plugin = kvp.Value as IPlugin;
-                var pipelinePlugin = kvp.Value as PipelinePluginBase;
+                var pipelinePlugin = kvp.Value as DataWarehouse.SDK.Contracts.Hierarchy.DataPipelinePluginBase;
 
                 return new PipelineStageInfo
                 {
@@ -133,10 +133,10 @@ namespace DataWarehouse.Kernel.Pipeline
                     Name = plugin?.Name ?? kvp.Key,
                     SubCategory = kvp.Value.SubCategory,
                     QualityLevel = kvp.Value.QualityLevel,
-                    DefaultOrder = pipelinePlugin?.DefaultOrder ?? 100,
+                    DefaultOrder = pipelinePlugin?.DefaultPipelineOrder ?? 100,
                     AllowBypass = pipelinePlugin?.AllowBypass ?? false,
-                    RequiredPrecedingStages = pipelinePlugin?.RequiredPrecedingStages ?? [],
-                    IncompatibleStages = pipelinePlugin?.IncompatibleStages ?? [],
+                    RequiredPrecedingStages = pipelinePlugin?.RequiredPrecedingStages?.ToArray() ?? [],
+                    IncompatibleStages = pipelinePlugin?.IncompatibleStages?.ToArray() ?? [],
                     Description = plugin?.Name ?? "Pipeline stage"
                 };
             })];
