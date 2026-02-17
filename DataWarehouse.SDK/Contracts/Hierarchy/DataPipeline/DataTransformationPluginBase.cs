@@ -24,6 +24,17 @@ public abstract class DataTransformationPluginBase : DataPipelinePluginBase
     /// <summary>Quality level (1-100) for sorting and selection.</summary>
     public virtual int QualityLevel => 50;
 
+    /// <summary>
+    /// AI hook: Select optimal algorithm based on data characteristics and context.
+    /// Override in derived classes to provide algorithm-specific selection logic.
+    /// Default returns SubCategory as a generic fallback.
+    /// </summary>
+    /// <param name="context">Context information for algorithm selection (data type, size, performance hints).</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The selected algorithm identifier.</returns>
+    protected virtual Task<string> SelectOptimalAlgorithmAsync(Dictionary<string, object> context, CancellationToken ct = default)
+        => Task.FromResult(SubCategory);
+
     /// <summary>Transform data during write operations.</summary>
     public virtual Task<Stream> OnWriteAsync(Stream input, IKernelContext context, Dictionary<string, object> args, CancellationToken ct = default)
         => Task.FromResult(input);
