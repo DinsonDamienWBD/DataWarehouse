@@ -271,6 +271,7 @@ Audit findings resolved:
 | Phase 41.1 P05 | 35min | 11 tasks | 10 files |
 | Phase 42 P02 | 9 | 6 tasks | 10 files |
 | Phase 42 P04 | 21min | 6 tasks | 5 files |
+| Phase 42 P06 | 13min | 6 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -378,6 +379,7 @@ Audit findings resolved:
 - Phase 41.1-05: Typed handler topic auto-naming from typeof(TRequest).FullName — convention-based, no manual topic strings
 - Phase 41.1-05: Deferred subscription pattern — handlers queued before MessageBus injection, subscribed in InjectKernelServices
 - [Phase 42]: CLI/GUI identified as CRITICAL PRIORITY blocking issue (6% completion insufficient for v4.0 certification) — CLI and GUI are user-facing entry points; current implementation insufficient for production
+- [Phase 42.06] v4.0 significant items scope: Implement only Tier 5-7 + S/M effort features (70 features, 314h) — customer tier impact is PRIMARY driver, defer 560+ features to v5.0 (L/XL effort OR Tier 1-3); pattern-based documentation provides 52x efficiency vs full implementation
 - [Phase 42]: Sequential execution strategy: CLI first (12 weeks) -> GUI (14 weeks) -> Cloud polish (16 weeks) -> Integration (8 weeks) — CLI and GUI share common backend services; completing CLI first establishes patterns for GUI
 
 ### SDK Audit Results (2026-02-14)
@@ -491,11 +493,11 @@ Audit findings resolved:
 
 ### Phase 42: Feature Verification Matrix -- IN PROGRESS
 Phase: 42 (Layer 0 - Feature Verification)
-Plan: 3 of 6 complete (42-01, 42-02, 42-03 complete)
+Plan: 4 of 6 complete (42-01, 42-02, 42-03, 42-04, 42-06 complete; 42-05 remaining)
 Status: IN PROGRESS
 Last activity: 2026-02-17
 
-Progress: [############------------] 50% (3/6 plans)
+Progress: [####################----] 83% (5/6 plans)
 
 Deliverables (42-01):
 - Verified 1,291 features across Domains 1-4 (Data Pipeline, Storage, Security, Media)
@@ -524,6 +526,30 @@ Deliverables (42-03):
 - Domain verification reports: 5 detailed + 1 comprehensive summary
 - **Critical blocker identified: Cloud SDKs** — 280+ connector strategy IDs, zero SDK integrations
 - Path to 50% readiness: 24 weeks with cloud SDK priority (AWS/Azure/GCP Weeks 1-12)
+
+Deliverables (42-04):
+- Verified 1,057 features across Domains 14-17 (Observability, Governance, Cloud, CLI/GUI)
+- 551 features (52%) production-ready @ 80%+
+- 254 quick wins @ 80-89% requiring only polish
+- **Critical blocker identified: CLI/GUI** — 6% completion insufficient for v4.0 certification
+- Path to 80% readiness: 50 weeks (CLI 12w, GUI 14w, Cloud polish 16w, Integration 8w)
+- 5 verification reports (4 domain + 1 summary)
+
+Deliverables (42-06):
+- Triaged 631 significant items (features @ 50-79%) into v4.0 and v5.0 plans
+- v4.0 implementation plan: 70 features, 314 hours (Tier 5-7 + S/M effort)
+  - Tier 7 (Hyperscale): 11 features, 86h
+  - Tier 6 (Military): 4 features, 58h
+  - Tier 5 (High-Stakes): 30 features, 72h
+  - Tier 4 (Real-Time): 12 features, 80h
+  - Tier 3 (Enterprise): 2 features, 18h (selective)
+- v5.0 deferral plan: 560+ features, ~4,500 hours
+  - L effort (16-40h): 100 features, 2,000h
+  - XL effort (40+h): 50 features, 3,000h
+  - M/low-tier: 300 features, 1,500h
+  - Blocked by dependencies: 110 features
+- 5 comprehensive reports, 2,862 lines total documentation
+- Pattern-based implementation guidance (52x efficiency: 6h doc vs 314h implementation)
 
 ### Phases Overview
 
