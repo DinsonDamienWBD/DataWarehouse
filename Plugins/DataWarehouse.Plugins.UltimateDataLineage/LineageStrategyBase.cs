@@ -255,11 +255,107 @@ public abstract class LineageStrategyBase : ILineageStrategy
     }
 
     /// <inheritdoc/>
-    public abstract Task<LineageGraph> GetUpstreamAsync(string nodeId, int maxDepth = 10, CancellationToken ct = default);
+    public virtual Task<LineageGraph> GetUpstreamAsync(string nodeId, int maxDepth = 10, CancellationToken ct = default)
+    {
+        ThrowIfNotInitialized();
+        var visited = new HashSet<string>();
+        var resultNodes = new List<LineageNode>();
+        var resultEdges = new List<LineageEdge>();
+        var queue = new Queue<(string Id, int Depth)>();
+        queue.Enqueue((nodeId, 0));
+
+        while (queue.Count > 0)
+        {
+            var (current, depth) = queue.Dequeue();
+            if (!visited.Add(current) || depth > maxDepth) continue;
+            if (_nodes.TryGetValue(current, out var node)) resultNodes.Add(node);
+            foreach (var edge in _edges.Values.Where(e => e.TargetNodeId == current))
+            {
+                resultEdges.Add(edge);
+                queue.Enqueue((edge.SourceNodeId, depth + 1));
+            }
+        }
+
+        return Task.FromResult(new LineageGraph
+        {
+            RootNodeId = nodeId,
+            Nodes = resultNodes.AsReadOnly(),
+            Edges = resultEdges.AsReadOnly(),
+            Depth = maxDepth,
+            UpstreamCount = resultNodes.Count,
+            DownstreamCount = 0
+        });
+    }
+
     /// <inheritdoc/>
-    public abstract Task<LineageGraph> GetDownstreamAsync(string nodeId, int maxDepth = 10, CancellationToken ct = default);
+    public virtual Task<LineageGraph> GetDownstreamAsync(string nodeId, int maxDepth = 10, CancellationToken ct = default)
+    {
+        ThrowIfNotInitialized();
+        var visited = new HashSet<string>();
+        var resultNodes = new List<LineageNode>();
+        var resultEdges = new List<LineageEdge>();
+        var queue = new Queue<(string Id, int Depth)>();
+        queue.Enqueue((nodeId, 0));
+
+        while (queue.Count > 0)
+        {
+            var (current, depth) = queue.Dequeue();
+            if (!visited.Add(current) || depth > maxDepth) continue;
+            if (_nodes.TryGetValue(current, out var node)) resultNodes.Add(node);
+            foreach (var edge in _edges.Values.Where(e => e.SourceNodeId == current))
+            {
+                resultEdges.Add(edge);
+                queue.Enqueue((edge.TargetNodeId, depth + 1));
+            }
+        }
+
+        return Task.FromResult(new LineageGraph
+        {
+            RootNodeId = nodeId,
+            Nodes = resultNodes.AsReadOnly(),
+            Edges = resultEdges.AsReadOnly(),
+            Depth = maxDepth,
+            UpstreamCount = 0,
+            DownstreamCount = resultNodes.Count
+        });
+    }
+
     /// <inheritdoc/>
-    public abstract Task<ImpactAnalysisResult> AnalyzeImpactAsync(string nodeId, string changeType, CancellationToken ct = default);
+    public virtual Task<ImpactAnalysisResult> AnalyzeImpactAsync(string nodeId, string changeType, CancellationToken ct = default)
+    {
+        ThrowIfNotInitialized();
+        var directlyImpacted = _edges.Values
+            .Where(e => e.SourceNodeId == nodeId)
+            .Select(e => e.TargetNodeId)
+            .Distinct()
+            .ToList();
+
+        var indirectlyImpacted = new HashSet<string>();
+        var queue = new Queue<string>(directlyImpacted);
+        while (queue.Count > 0)
+        {
+            var current = queue.Dequeue();
+            foreach (var edge in _edges.Values.Where(e => e.SourceNodeId == current))
+            {
+                if (indirectlyImpacted.Add(edge.TargetNodeId) && !directlyImpacted.Contains(edge.TargetNodeId))
+                    queue.Enqueue(edge.TargetNodeId);
+            }
+        }
+        indirectlyImpacted.ExceptWith(directlyImpacted);
+
+        var totalImpacted = directlyImpacted.Count + indirectlyImpacted.Count;
+        var totalNodes = _nodes.Count;
+        var score = totalNodes > 0 ? (int)(100.0 * totalImpacted / totalNodes) : 0;
+
+        return Task.FromResult(new ImpactAnalysisResult
+        {
+            SourceNodeId = nodeId,
+            ChangeType = changeType,
+            DirectlyImpacted = directlyImpacted.AsReadOnly(),
+            IndirectlyImpacted = indirectlyImpacted.ToList().AsReadOnly(),
+            ImpactScore = Math.Min(score, 100)
+        });
+    }
 
     /// <summary>Adds a node to the lineage graph.</summary>
     protected void AddNode(LineageNode node) => _nodes[node.NodeId] = node;

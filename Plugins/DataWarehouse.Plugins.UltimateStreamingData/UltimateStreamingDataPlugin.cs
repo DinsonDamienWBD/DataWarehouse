@@ -613,7 +613,7 @@ public abstract class StreamingDataStrategyBase : StrategyBase, IStreamingDataSt
         return Task.CompletedTask;
     }
 
-    protected void ThrowIfNotInitialized()
+    protected new void ThrowIfNotInitialized()
     {
         if (!_initialized)
             throw new InvalidOperationException($"Strategy {StrategyId} is not initialized.");
