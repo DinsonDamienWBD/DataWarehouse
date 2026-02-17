@@ -265,6 +265,7 @@ Audit findings resolved:
 | 31.1 | 04 - Batch 2 Group A Verification | ~12 min | 1 | 0 |
 | Phase 31.1 P05 | 24 | 8 tasks | 8 files |
 | Phase 41.1 P03 | 14min | 21 tasks | 8 files |
+| Phase 41.1 P06 | 23min | 9 tasks | 20 files |
 
 ## Accumulated Context
 
@@ -354,6 +355,9 @@ Audit findings resolved:
 - [Phase 41.1]: Domain strategy bases use typed Interlocked counters (optimal) — no refactoring to generic ConcurrentDictionary needed
 - [Phase 41.1]: DisplayName vs StrategyName kept as interface-specific — all bridge to StrategyBase.Name; renaming would break 900+ strategies
 - [Phase 41.1]: StorageOrchestrationStrategyBase renamed from StorageStrategyBase in StorageOrchestratorBase.cs to resolve naming collision
+- Phase 41.1-06: Enhanced existing ConsensusPluginBase in PluginBase.cs (not creating duplicate in Hierarchy folder) with Multi-Raft records
+- Phase 41.1-06: Separate IReplicationClusterMembership for DVV (lightweight) vs existing IClusterMembership (full distributed)
+- Phase 41.1-06: Jump consistent hash O(ln n) for Multi-Raft group routing; Paxos/PBFT/ZAB stubs per plan scope
 
 ### SDK Audit Results (2026-02-14)
 
@@ -530,12 +534,11 @@ Phase 33 (VDE) ─────────────────────�
 ### Current Position
 
 **Phase 41.1** — Stage: **EXECUTE** (7 plans, 2 waves)
-Plan: 3 of 7 complete
+Plan: 6 of 7 complete
 Status: IN PROGRESS
 
-Progress: [##########--------------] 43% (3/7 plans)
+Progress: [####################----] 86% (6/7 plans)
 
 Last session: 2026-02-17
-Stopped at: Completed 41.1-03-PLAN.md (FIX-14/15/16 strategy lifecycle, infrastructure, naming)
-Resume: Execute 41.1-04-PLAN.md
-Resume: Execute 41.1-03-PLAN.md
+Stopped at: Completed 41.1-06-PLAN.md (KS7 DVV + KS8 Multi-Raft Consensus)
+Resume: Execute 41.1-07-PLAN.md
