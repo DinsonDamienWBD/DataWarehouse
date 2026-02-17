@@ -158,6 +158,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
                 };
 
                 // Configure certificate validation
+                // SECURITY: TLS certificate validation is enabled by default (_validateServerCertificate = true).
                 if (!_validateServerCertificate)
                 {
                     handler.ServerCertificateCustomValidationCallback = (message, cert, chain, errors) => true;

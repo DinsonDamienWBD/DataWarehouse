@@ -45,7 +45,7 @@ namespace DataWarehouse.Plugins.UltimateStreamingData.Strategies
     /// </para>
     /// </remarks>
     [SdkCompatibility("3.0.0", Notes = "Phase 36: MQTT streaming strategy (EDGE-02)")]
-    public sealed class MqttStreamingStrategy : StreamingStrategyBase
+    public sealed class MqttStreamingStrategy : StreamingStrategyBase, IAsyncDisposable
     {
         private readonly IMqttClient _mqttClient;
         private readonly MqttConnectionSettings _connectionSettings;
@@ -301,11 +301,29 @@ namespace DataWarehouse.Plugins.UltimateStreamingData.Strategies
 
             if (disposing)
             {
-                _mqttClient?.DisposeAsync().AsTask().Wait();
+                // Don't call async dispose from sync Dispose
+                // User must call DisposeAsync() for proper cleanup
             }
 
             _disposed = true;
             base.Dispose(disposing);
+        }
+
+        /// <summary>
+        /// Asynchronously disposes the MQTT streaming strategy.
+        /// </summary>
+        public new async ValueTask DisposeAsync()
+        {
+            if (_disposed) return;
+
+            if (_mqttClient != null)
+            {
+                await _mqttClient.DisposeAsync();
+            }
+
+            _disposed = true;
+            Dispose(false);
+            GC.SuppressFinalize(this);
         }
     }
 }

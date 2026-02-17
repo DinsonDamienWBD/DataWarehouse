@@ -1,4 +1,4 @@
-using System.Security.Cryptography;
+using System.IO.Compression;
 using System.Text;
 using DataWarehouse.SDK.Contracts.Media;
 
@@ -365,32 +365,22 @@ internal sealed class PngImageStrategy : MediaStrategyBase
     /// </summary>
     private static byte[] CompressImageData(byte[] sourceData, int compressionLevel)
     {
-        var ratio = compressionLevel switch
+        // Map 0-9 scale to .NET CompressionLevel enum
+        var level = compressionLevel switch
         {
-            0 => 1.0,
-            <= 3 => 1.5,
-            <= 6 => 2.5,
-            _ => 4.0
+            0 => System.IO.Compression.CompressionLevel.NoCompression,
+            <= 3 => System.IO.Compression.CompressionLevel.Fastest,
+            <= 6 => System.IO.Compression.CompressionLevel.Optimal,
+            _ => System.IO.Compression.CompressionLevel.SmallestSize
         };
 
-        var estimatedSize = Math.Max(256, (int)(sourceData.Length / ratio));
-        var compressed = new byte[estimatedSize];
-
-        // Note: Using inline crypto as fallback since MessageBus not available in static method
-        var hash = SHA256.HashData(sourceData);
-        using var hmac = new HMACSHA256(hash);
-
-        int offset = 0;
-        int blockIndex = 0;
-        while (offset < compressed.Length)
+        using var output = new MemoryStream();
+        using (var deflate = new System.IO.Compression.DeflateStream(output, level, leaveOpen: true))
         {
-            var block = hmac.ComputeHash(BitConverter.GetBytes(blockIndex++));
-            var toCopy = Math.Min(block.Length, compressed.Length - offset);
-            Array.Copy(block, 0, compressed, offset, toCopy);
-            offset += toCopy;
+            deflate.Write(sourceData, 0, sourceData.Length);
         }
 
-        return compressed;
+        return output.ToArray();
     }
 
     /// <summary>

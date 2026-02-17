@@ -782,7 +782,9 @@ public abstract class DatabaseStorageStrategyBase : StorageStrategyBase, IAsyncD
             return;
         }
 
-        DisposeAsyncCore().GetAwaiter().GetResult();
+        // Dispose sync resources only
+        _connectionLock?.Dispose();
+        _operationLock?.Dispose();
 
         _isDisposed = true;
         GC.SuppressFinalize(this);
@@ -814,8 +816,7 @@ public abstract class DatabaseStorageStrategyBase : StorageStrategyBase, IAsyncD
             await DisconnectAsync();
         }
 
-        _connectionLock?.Dispose();
-        _operationLock?.Dispose();
+        Dispose(false);
     }
 
     #endregion

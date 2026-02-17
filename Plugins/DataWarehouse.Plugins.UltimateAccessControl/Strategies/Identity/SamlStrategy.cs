@@ -89,8 +89,14 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Identity
                 var assertionBytes = Convert.FromBase64String(assertionBase64);
                 var assertionXml = Encoding.UTF8.GetString(assertionBytes);
 
-                var doc = new XmlDocument { PreserveWhitespace = true };
-                doc.LoadXml(assertionXml);
+                var doc = new XmlDocument { PreserveWhitespace = true, XmlResolver = null };
+                var settings = new XmlReaderSettings
+                {
+                    DtdProcessing = DtdProcessing.Prohibit,
+                    XmlResolver = null
+                };
+                using var reader = XmlReader.Create(new System.IO.StringReader(assertionXml), settings);
+                doc.Load(reader);
 
                 // Validate signature if certificate is configured
                 if (_certificate != null)

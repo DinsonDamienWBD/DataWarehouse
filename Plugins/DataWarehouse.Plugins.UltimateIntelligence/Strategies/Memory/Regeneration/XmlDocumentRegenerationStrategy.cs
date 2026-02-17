@@ -343,7 +343,8 @@ public sealed class XmlDocumentRegenerationStrategy : RegenerationStrategyBase
             var settings = new XmlReaderSettings
             {
                 ValidationType = ValidationType.Schema,
-                DtdProcessing = DtdProcessing.Parse
+                DtdProcessing = DtdProcessing.Prohibit,
+                XmlResolver = null
             };
 
             // Add schema

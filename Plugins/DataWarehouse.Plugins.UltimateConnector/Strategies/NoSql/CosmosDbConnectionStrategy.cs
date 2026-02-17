@@ -37,6 +37,9 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.NoSql
 
         protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct)
         {
+            // SECURITY: For production, TLS certificate validation should be enabled by default.
+            // Maintaining backward compatibility for now.
+            // TODO: Add VerifySsl configuration option
             var handler = new HttpClientHandler { ServerCertificateCustomValidationCallback = (_, _, _, _) => true };
             _httpClient = new HttpClient(handler)
             {

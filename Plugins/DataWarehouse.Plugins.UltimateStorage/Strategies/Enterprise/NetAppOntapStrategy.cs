@@ -149,6 +149,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Enterprise
             _basePath = _basePath.TrimEnd('/');
 
             // Create HTTP client with custom handler for certificate validation
+            // SECURITY: TLS certificate validation is enabled by default (_validateCertificate = true).
             var handler = new HttpClientHandler();
             if (!_validateCertificate)
             {

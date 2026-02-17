@@ -27,7 +27,7 @@ namespace DataWarehouse.Plugins.Transcoding.Media.Strategies.Camera;
 /// </para>
 /// </remarks>
 [SdkCompatibility("3.0.0", Notes = "Phase 36: Camera frame source strategy (EDGE-07)")]
-public sealed class CameraFrameSource : MediaStrategyBase
+public sealed class CameraFrameSource : MediaStrategyBase, IAsyncDisposable
 {
     private readonly ICameraDevice _camera;
     private readonly CameraSettings _settings;
@@ -118,8 +118,22 @@ public sealed class CameraFrameSource : MediaStrategyBase
     {
         if (disposing)
         {
-            _camera?.DisposeAsync().AsTask().Wait();
+            // Don't call async dispose from sync Dispose
+            // User must call DisposeAsync() for proper cleanup
         }
         base.Dispose(disposing);
+    }
+
+    /// <summary>
+    /// Asynchronously disposes the camera frame source.
+    /// </summary>
+    public new async ValueTask DisposeAsync()
+    {
+        if (_camera != null)
+        {
+            await _camera.DisposeAsync();
+        }
+        Dispose(false);
+        GC.SuppressFinalize(this);
     }
 }
