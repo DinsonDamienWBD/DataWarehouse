@@ -60,6 +60,14 @@ namespace DataWarehouse.SDK.Contracts.IntelligenceAware
         /// </summary>
         public string? SessionId { get; init; }
 
+        /// <summary>
+        /// The identity of the principal on whose behalf this intelligence operation is performed.
+        /// When an AI agent processes this operation, the AI's own privileges are IRRELEVANT.
+        /// Access control ALWAYS uses Identity.EffectivePrincipalId (the original user).
+        /// The AI agent should be appended to DelegationChain for audit purposes.
+        /// </summary>
+        public DataWarehouse.SDK.Security.CommandIdentity? Identity { get; init; }
+
         // ========================================
         // Capability Requirements
         // ========================================

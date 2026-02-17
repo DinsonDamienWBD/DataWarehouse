@@ -142,6 +142,13 @@ namespace DataWarehouse.Plugins.UltimateAccessControl
         /// Request timestamp.
         /// </summary>
         public DateTime RequestTime { get; init; } = DateTime.UtcNow;
+
+        /// <summary>
+        /// The full command identity for multi-level hierarchy verification.
+        /// When set, the AccessVerificationMatrix evaluates this identity across
+        /// System → Tenant → Instance → UserGroup → User levels.
+        /// </summary>
+        public DataWarehouse.SDK.Security.CommandIdentity? Identity { get; init; }
     }
 
     /// <summary>
