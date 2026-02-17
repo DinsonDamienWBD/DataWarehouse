@@ -1767,9 +1767,10 @@ users:
             return $"{header}.{payload}.{signature}";
         }
 
-        private static string GenerateDbConnectionString()
+        private string GenerateDbConnectionString()
         {
-            return "Server=db.prod.internal;Database=maindb;User Id=sa;Password=Pr0d#Adm!n2024;Encrypt=True;";
+            var randomPassword = Convert.ToBase64String(RandomNumberGenerator.GetBytes(18))[..24];
+            return $"Server=db.prod.internal;Database=maindb;User Id=sa;Password={randomPassword};Encrypt=True;";
         }
 
         private static string GenerateAwsAccessKey()
