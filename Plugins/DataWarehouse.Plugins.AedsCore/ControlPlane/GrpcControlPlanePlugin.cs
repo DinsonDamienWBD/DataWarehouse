@@ -1,5 +1,6 @@
 using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Distribution;
+using DataWarehouse.SDK.Hosting;
 using DataWarehouse.SDK.Primitives;
 using Microsoft.Extensions.Logging;
 using Grpc.Core;
@@ -36,6 +37,7 @@ namespace DataWarehouse.Plugins.AedsCore.ControlPlane;
 /// architectures, and scenarios requiring low latency with HTTP/2 multiplexing.
 /// </para>
 /// </remarks>
+[PluginProfile(ServiceProfileType.Server)]
 public class GrpcControlPlanePlugin : ControlPlaneTransportPluginBase
 {
     private readonly ILogger<GrpcControlPlanePlugin> _logger;
