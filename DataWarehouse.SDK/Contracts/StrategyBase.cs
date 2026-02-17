@@ -1,3 +1,4 @@
+using DataWarehouse.SDK.Primitives.Configuration;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
@@ -52,6 +53,22 @@ namespace DataWarehouse.SDK.Contracts
         /// </summary>
         public virtual IReadOnlyDictionary<string, object> Characteristics { get; }
             = new Dictionary<string, object>();
+
+        /// <summary>
+        /// Gets the unified system-wide configuration for this strategy instance.
+        /// Injected by the owning plugin during strategy initialization.
+        /// Strategies can read configuration values but do not own them.
+        /// </summary>
+        protected DataWarehouseConfiguration SystemConfiguration { get; private set; } = ConfigurationPresets.CreateStandard();
+
+        /// <summary>
+        /// Injects the unified system configuration into this strategy.
+        /// Called by the owning plugin during strategy initialization.
+        /// </summary>
+        internal void InjectConfiguration(DataWarehouseConfiguration config)
+        {
+            SystemConfiguration = config ?? throw new ArgumentNullException(nameof(config));
+        }
 
         /// <summary>
         /// Initializes the strategy, acquiring any resources needed for operation.

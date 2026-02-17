@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using DataWarehouse.Dashboard.Services;
 using DataWarehouse.Dashboard.Security;
+using DataWarehouse.SDK.Primitives.Configuration;
 
 namespace DataWarehouse.Dashboard.Controllers;
 
@@ -185,4 +186,70 @@ public class ConfigurationController : ControllerBase
         _logger.LogInformation("Plugin {PluginId} configuration updated", pluginId);
         return Ok(new { message = "Plugin configuration updated" });
     }
+
+    // --- Unified Configuration System (v3.0) ---
+
+    /// <summary>
+    /// Gets the unified DataWarehouseConfiguration with all settings.
+    /// </summary>
+    [HttpGet("unified")]
+    [ProducesResponseType(typeof(DataWarehouseConfiguration), StatusCodes.Status200OK)]
+    public ActionResult<DataWarehouseConfiguration> GetUnifiedConfiguration()
+    {
+        var config = ConfigurationSerializer.LoadFromFile("./config/datawarehouse-config.xml");
+        return Ok(config);
+    }
+
+    /// <summary>
+    /// Updates a specific configuration setting with AllowUserToOverride enforcement,
+    /// bidirectional file persistence, and audit logging.
+    /// </summary>
+    [HttpPost("unified/update")]
+    [Authorize(Policy = AuthorizationPolicies.AdminOnly)]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<ActionResult> UpdateUnifiedConfiguration([FromBody] UnifiedConfigUpdateRequest request)
+    {
+        var configFilePath = "./config/datawarehouse-config.xml";
+        var config = ConfigurationSerializer.LoadFromFile(configFilePath);
+        var auditLog = new ConfigurationAuditLog("./config/config-audit.log");
+
+        var api = new ConfigurationChangeApi(
+            config,
+            messageBus: null,
+            configFilePath: configFilePath,
+            auditLog: auditLog);
+
+        var success = await api.TryUpdateConfigurationAsync(
+            request.Path,
+            request.Value,
+            User.Identity?.Name ?? "Anonymous",
+            request.Reason);
+
+        if (success)
+        {
+            _logger.LogInformation("Unified config updated: {Path} by {User}",
+                request.Path, User.Identity?.Name ?? "Anonymous");
+            return Ok(new { message = "Configuration updated successfully (written to file + audit log)" });
+        }
+
+        return BadRequest(new { error = "Configuration change blocked by policy or invalid path" });
+    }
+
+    /// <summary>
+    /// Gets the configuration audit trail.
+    /// </summary>
+    [HttpGet("unified/audit")]
+    [ProducesResponseType(typeof(IReadOnlyList<ConfigurationAuditLog.AuditEntry>), StatusCodes.Status200OK)]
+    public async Task<ActionResult<IReadOnlyList<ConfigurationAuditLog.AuditEntry>>> GetAuditTrail(
+        [FromQuery] string? settingPath = null,
+        [FromQuery] string? user = null)
+    {
+        var auditLog = new ConfigurationAuditLog("./config/config-audit.log");
+        var entries = await auditLog.QueryChangesAsync(settingPathPrefix: settingPath, user: user);
+        return Ok(entries);
+    }
+
+    /// <summary>Request body for unified configuration updates.</summary>
+    public record UnifiedConfigUpdateRequest(string Path, object Value, string? Reason);
 }
