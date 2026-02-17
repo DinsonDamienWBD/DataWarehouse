@@ -1006,7 +1006,7 @@ public sealed class UltimateEncryptionPlugin : HierarchyEncryptionPluginBase, ID
     /// <summary>
     /// Default security context for internal operations.
     /// </summary>
-    private sealed class DefaultSecurityContext : ISecurityContext
+    private new sealed class DefaultSecurityContext : ISecurityContext
     {
         public string UserId => Environment.UserName;
         public string? TenantId => "default";
