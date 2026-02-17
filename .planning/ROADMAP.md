@@ -723,18 +723,23 @@ All audits produce output tables: `| File | Severity (P0-P3) | Issue | Recommend
 | 40. Large Implementations | v3.0 | 4/4 | COMPLETE | 2026-02-17 |
 | 41. Comprehensive Audit & Testing | v3.0 | 2/2 | COMPLETE | 2026-02-17 |
 
-### Phase 41.1: Architecture Kill Shots (10 Critical Fixes from Hostile Audit) (INSERTED)
+### Phase 41.1: Architecture Kill Shots — 20 Critical Fixes (INSERTED)
 
-**Goal:** Fix 10 critical architecture issues discovered by hostile 6-persona audit. Covers: async pipeline (KS1), kernel DI wiring (KS2), typed message handlers (KS3+4), native key memory (KS5), tenant-scoped storage (KS6+10), scalable vector clocks (KS7), Multi-Raft consensus consolidation (KS8), lineage default implementations (KS9).
+**Goal:** Fix 20 critical architecture issues: 9 kill shots from hostile audit + 7 plugin/strategy hierarchy fixes + 4 configuration system items. Covers: async pipeline (KS1), kernel DI (KS2), typed handlers (KS3), NativeKeyHandle (KS5), tenant storage (KS6+10), DVV clocks (KS7), Multi-Raft (KS8), lineage BFS (KS9), plugin hierarchy optimization (FIX-10-13), strategy base fixes (FIX-14-16), unified config system with presets/audit (CFG-17-20). Every plan includes DOC-21 living documentation sync.
 **Depends on:** Phase 41
-**Requirements:** KILLSHOT-01 through KILLSHOT-10 (see phase REQUIREMENTS.md)
-**Plans:** 4 plans
+**Requirements:** KS1-KS9, FIX-10-FIX-16, CFG-17-CFG-20, DOC-21 (see phase REQUIREMENTS.md)
+**Plans:** 7 plans, 2 waves
 
-Plans:
+Wave 1 (independent, foundational):
 - [ ] 41.1-01-PLAN.md -- KS2 Kernel DI wiring + KS1 async pipeline sync wrapper removal
 - [ ] 41.1-02-PLAN.md -- KS9 lineage BFS defaults + KS6+10 tenant-scoped storage
-- [ ] 41.1-03-PLAN.md -- KS5 NativeKeyHandle + KS3 typed message handlers
-- [ ] 41.1-04-PLAN.md -- KS7 DottedVersionVector + KS8 Multi-Raft consensus
+- [ ] 41.1-03-PLAN.md -- FIX-14/15/16 strategy base lifecycle fixes + StrategyBase enhancement
+- [ ] 41.1-04-PLAN.md -- FIX-10/11/12/13 plugin hierarchy optimization + legacy deletion
+
+Wave 2 (depends on Wave 1):
+- [ ] 41.1-05-PLAN.md -- KS5 NativeKeyHandle + KS3 typed message handlers (depends: 01, 04)
+- [ ] 41.1-06-PLAN.md -- KS7 DottedVersionVector + KS8 Multi-Raft consensus (depends: 01)
+- [ ] 41.1-07-PLAN.md -- CFG-17/18/19/20 unified config system + audit trail (depends: 04)
 
 ### Phase 31.1: Pre-v3.0 Production Readiness Cleanup (INSERTED)
 
