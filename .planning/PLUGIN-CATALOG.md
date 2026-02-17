@@ -2182,6 +2182,66 @@ All lifecycle methods use `override` (never `new`). All property names bridge to
 
 **Note:** Phase 41.1 is part of the v3.0 rollout and focuses on architectural correctness, kill-shot fixes, and hierarchy alignment before major feature implementations in subsequent phases.
 
+### Profile-Based Plugin Loading (Phase 41.1-08)
+
+The Launcher is a **single unified binary** that runs as a daemon on both server and client machines. Plugin loading is filtered by the active **service profile**:
+
+**ServiceProfileType enum** (`DataWarehouse.SDK.Hosting.ServiceProfileType`):
+- `Server` — Full plugin set (dispatchers, storage, intelligence, databases, RAID)
+- `Client` — Minimal plugin set (courier, watchdog, policy engine)
+- `Both` — Loaded in all profiles (default when no attribute)
+- `Auto` — Auto-detects from available plugin types
+- `None` — Never loaded automatically (diagnostic plugins)
+
+**PluginProfileAttribute** (`DataWarehouse.SDK.Hosting.PluginProfileAttribute`):
+- `[PluginProfile(ServiceProfileType.Server)]` — Server-only plugin
+- `[PluginProfile(ServiceProfileType.Client)]` — Client-only plugin
+- No attribute = `Both` (loaded in all profiles)
+- `GetProfile(Type)` static helper returns profile for any type
+
+**PluginProfileLoader** (`DataWarehouse.Launcher.PluginProfileLoader`):
+- `FilterPluginsByProfile(plugins, profile)` — Filters discovered types before loading
+- Auto-detection: has ServerDispatcher = Server, has ClientCourier = Client, both = Both
+
+**Profile-Annotated Plugins:**
+| Plugin | Profile | Reason |
+|--------|---------|--------|
+| ServerDispatcherPlugin | Server | Server-side job management |
+| GrpcControlPlanePlugin | Server | Server-side gRPC listener |
+| MqttControlPlanePlugin | Server | Server-side MQTT listener |
+| WebSocketControlPlanePlugin | Server | Server-side WebSocket listener |
+| ClientCourierPlugin | Client | Client-side sentinel/executor/watchdog |
+| UltimateStoragePlugin | Server | Heavy storage backends |
+| UltimateRaidPlugin | Server | RAID array management |
+| UltimateDatabaseStoragePlugin | Server | Database storage backends |
+| UltimateIntelligencePlugin | Server | AI/ML providers |
+| All other plugins | Both (default) | Shared infrastructure |
+
+**PlatformServiceManager** profile-aware registration:
+- Windows: `DataWarehouse-Server` / `DataWarehouse-Client`
+- Linux: `datawarehouse-server.service` / `datawarehouse-client.service`
+- macOS: `com.datawarehouse.server` / `com.datawarehouse.client`
+
+**CLI service commands** (`dw service install --profile server|client`):
+- `dw service install --profile server` — Install server daemon
+- `dw service install --profile client` — Install client daemon
+- `dw service status --profile server` — Check server service status
+- All service commands accept `--profile` flag
+
+**Configuration** (`appsettings.json`):
+```json
+{
+  "Profile": "auto",
+  "PluginProfiles": {
+    "ServerWhitelist": [],
+    "ServerBlacklist": [],
+    "ClientWhitelist": [],
+    "ClientBlacklist": []
+  }
+}
+```
+Can also be set via `--profile server|client|auto` CLI flag or `DW_PROFILE=server` env var.
+
 ---
 
 ## Configuration System (v3.0)
