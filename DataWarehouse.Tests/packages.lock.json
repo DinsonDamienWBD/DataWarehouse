@@ -1792,6 +1792,12 @@
           "ZstdSharp.Port": "[0.8.7, )"
         }
       },
+      "datawarehouse.plugins.ultimateconsensus": {
+        "type": "Project",
+        "dependencies": {
+          "DataWarehouse.SDK": "[1.0.0, )"
+        }
+      },
       "datawarehouse.plugins.ultimateencryption": {
         "type": "Project",
         "dependencies": {
