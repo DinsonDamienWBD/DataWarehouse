@@ -67,16 +67,16 @@ All 6 main phases and subphases from the original SDK_REFACTOR_PLAN.md are fully
 
 - [x] **Phase 21.5: Pre-Execution Cleanup** - Consolidate duplicate types to SDK, standardize JSON serializer, add missing projects to solution, remove dead code
 - [x] **Phase 22: Build Safety & Supply Chain** - Roslyn analyzers, TreatWarningsAsErrors rollout, SBOM, vulnerability audit, CLI fix
-- [ ] **Phase 23: Memory Safety & Cryptographic Hygiene** - IDisposable patterns, secure memory wiping, bounded collections, constant-time comparisons, FIPS compliance
-- [ ] **Phase 24: Plugin Hierarchy, Storage Core & Input Validation** - Two-branch plugin hierarchy (DataPipeline + Feature), object storage core with translation layer, specialized bases to composable services, input validation (AD-01, AD-02, AD-03, AD-04)
-- [ ] **Phase 25a: Strategy Hierarchy Design & API Contracts** - Flat StrategyBase → domain bases (no intelligence layer), API contract safety (AD-05)
-- [ ] **Phase 25b: Strategy Migration** - Migrate ~1,500 strategies to new bases, remove duplicated boilerplate, domain by domain
-- [ ] **Phase 26: Distributed Contracts & Resilience** - All distributed SDK contracts, security primitives, multi-phase init, in-memory implementations, circuit breakers, observability
-- [ ] **Phase 27: Plugin Migration & Decoupling Verification** - All Ultimate and standalone plugins updated to new hierarchies, decoupling enforced
-- [ ] **Phase 28: Dead Code Cleanup** - Remove truly unused classes/files, keep future-ready interfaces for unreleased hardware/technology (AD-06)
-- [ ] **Phase 29: Advanced Distributed Coordination** - SWIM gossip, Raft consensus, CRDT replication, FederatedMessageBus, load balancing implementations
-- [ ] **Phase 30: Testing & Final Verification** - Full build validation, behavioral verification, distributed integration tests, analyzer clean pass
-- [ ] **Phase 31: Unified Interface & Deployment Modes** - Dynamic CLI/GUI capability reflection, NLP query routing, three deployment modes (Client/Live/Install), platform-specific service management
+- [x] **Phase 23: Memory Safety & Cryptographic Hygiene** - IDisposable patterns, secure memory wiping, bounded collections, constant-time comparisons, FIPS compliance
+- [x] **Phase 24: Plugin Hierarchy, Storage Core & Input Validation** - Two-branch plugin hierarchy (DataPipeline + Feature), object storage core with translation layer, specialized bases to composable services, input validation (AD-01, AD-02, AD-03, AD-04)
+- [x] **Phase 25a: Strategy Hierarchy Design & API Contracts** - Flat StrategyBase → domain bases (no intelligence layer), API contract safety (AD-05)
+- [x] **Phase 25b: Strategy Migration** - Migrate ~1,500 strategies to new bases, remove duplicated boilerplate, domain by domain
+- [x] **Phase 26: Distributed Contracts & Resilience** - All distributed SDK contracts, security primitives, multi-phase init, in-memory implementations, circuit breakers, observability
+- [x] **Phase 27: Plugin Migration & Decoupling Verification** - All Ultimate and standalone plugins updated to new hierarchies, decoupling enforced
+- [x] **Phase 28: Dead Code Cleanup** - Remove truly unused classes/files, keep future-ready interfaces for unreleased hardware/technology (AD-06)
+- [x] **Phase 29: Advanced Distributed Coordination** - SWIM gossip, Raft consensus, CRDT replication, FederatedMessageBus, load balancing implementations
+- [x] **Phase 30: Testing & Final Verification** - Full build validation, behavioral verification, distributed integration tests, analyzer clean pass
+- [x] **Phase 31: Unified Interface & Deployment Modes** - Dynamic CLI/GUI capability reflection, NLP query routing, three deployment modes (Client/Live/Install), platform-specific service management
 
 ### Phase Details
 
@@ -441,16 +441,121 @@ Phase 38 + Phase 40
 
 ### Phases
 
-- [ ] **Phase 32: StorageAddress Abstraction & Hardware Discovery** — Universal StorageAddress type, hardware probe/discovery, platform capability registry, dynamic driver loading
-- [ ] **Phase 33: Virtual Disk Engine** — Block allocation, inode/metadata management, WAL with crash recovery, container file format, B-Tree indexes, CoW engine, block-level checksumming
-- [ ] **Phase 34: Federated Object Storage & Translation Layer** — Dual-head router, UUID object addressing, permission-aware routing, federation orchestrator, manifest/catalog service
-- [ ] **Phase 35: Hardware Accelerator & Hypervisor Integration** — QAT/GPU acceleration, TPM2/HSM providers, hypervisor detection, balloon driver, NUMA-aware allocation, NVMe passthrough
-- [ ] **Phase 36: Edge/IoT Hardware Integration** — GPIO/I2C/SPI abstraction, MQTT/CoAP clients, WASI-NN host, Flash Translation Layer, memory-constrained runtime, sensor mesh support
-- [ ] **Phase 37: Multi-Environment Deployment Hardening** — Hosted optimization, hypervisor acceleration, bare metal SPDK, hyperscale cloud automation, edge device profiles
+- [x] **Phase 32: StorageAddress Abstraction & Hardware Discovery** — Universal StorageAddress type, hardware probe/discovery, platform capability registry, dynamic driver loading
+- [x] **Phase 33: Virtual Disk Engine** — Block allocation, inode/metadata management, WAL with crash recovery, container file format, B-Tree indexes, CoW engine, block-level checksumming
+- [x] **Phase 34: Federated Object Storage & Translation Layer** — Dual-head router, UUID object addressing, permission-aware routing, federation orchestrator, manifest/catalog service
+- [x] **Phase 35: Hardware Accelerator & Hypervisor Integration** — QAT/GPU acceleration, TPM2/HSM providers, hypervisor detection, balloon driver, NUMA-aware allocation, NVMe passthrough
+- [x] **Phase 36: Edge/IoT Hardware Integration** — GPIO/I2C/SPI abstraction, MQTT/CoAP clients, WASI-NN host, Flash Translation Layer, memory-constrained runtime, sensor mesh support
+- [x] **Phase 37: Multi-Environment Deployment Hardening** — Hosted optimization, hypervisor acceleration, bare metal SPDK, hyperscale cloud automation, edge device profiles
 - [x] **Phase 38: Feature Composition & Orchestration** — Wire existing strategies into higher-level features: self-evolving schema, Data DNA provenance, cross-org data rooms, autonomous operations, supply chain attestation
 - [x] **Phase 39: Medium Implementations** — Implement features where framework exists: semantic search with vector index, zero-config cluster discovery, real ZK-SNARK/STARK verification, medical/scientific format parsers, digital twin continuous sync
 - [x] **Phase 40: Large Implementations** — Build genuinely new capabilities: exabyte metadata engine, sensor fusion algorithms, federated learning orchestrator, bandwidth-aware sync monitor
 - [x] **Phase 41: Comprehensive Production Audit & Testing** — Build validation, integration tests, P1 audit fixes (0 errors, 0 warnings, 1062 tests, 0 TODOs)
+
+---
+
+## Milestone: v4.0 Universal Production Certification
+
+> 10 phases (42-51) | 8 execution layers + Certification Authority final audit | Approach: audit → fix → re-audit until zero findings, then certify
+> Full design document: `.planning/v4.0-MILESTONE-DRAFT.md`
+
+**Milestone Goal:** Certify the ENTIRE DataWarehouse solution as production-ready for ALL 7 customer tiers (Individual → Hyperscale Military) across ALL 17 capability domains. Primarily verification and fixing, with gap-closure implementations where features are EXPECTED but incomplete. The milestone completes when a Certification Authority hostile audit returns zero actionable findings.
+
+> **CRITICAL DIRECTIVE — ZERO REGRESSION (AD-08) STILL APPLIES:**
+> All v1.0, v2.0, and v3.0 functionality MUST be preserved. All 63+ plugins, ~1,727 strategies, 1,062+ tests, and all distributed/hardware infrastructure MUST continue to work throughout v4.0 development.
+
+**Ordering Rationale:** Feature verification first (discover gaps), automated scans (find defects), domain audits (verify each capability), tier verification (end-to-end customer flows), benchmarking (performance baseline), penetration testing (security), test coverage (quality), fix cycles (remediate), then final certification (prove it's done).
+
+### Dependency Graph
+
+```
+Phase 42 (Feature Verification) ──► Phase 43 (Automated Scan) ──► Phase 44 (Domain Audit)
+    ──► Phase 45 (Tier Verification) ──► Phase 46 (Benchmarks) ──► Phase 47 (Pentest)
+    ──► Phase 48 (Test Coverage) ──► Phase 49-50 (Fix Cycles) ──► Phase 51 (Certification Authority)
+```
+
+### Phases
+
+- [ ] **Phase 42: Feature Verification Matrix** (Layer 0) — Score 3,808 features (2,958 code-derived + 850 aspirational) with production readiness % (0-100%), close high-% gaps
+- [ ] **Phase 43: Full Solution Automated Scan** (Layer 1) — Systematic pattern scans across 71 projects: sync-over-async, NotImplementedException, TODO/HACK, fake crypto, error swallowing, unbounded collections, missing cancellation/dispose
+- [ ] **Phase 44: Domain-by-Domain Deep Audit** (Layer 2) — Hostile review of all 17 capability domains: trace data flows, verify strategy wiring, test failure modes, check integration (9 audit plans covering all domains)
+- [ ] **Phase 45: Tier-by-Tier Integration Verification** (Layer 3) — End-to-end verification per customer tier: Individual/SMB standard preset, Enterprise/Real-Time streaming, Regulated/Military paranoid preset, Hyperscale god-tier preset
+- [ ] **Phase 46: Performance Benchmarks** (Layer 4) — BenchmarkDotNet baselines for all hot paths: data pipeline throughput, storage/IO latency, distributed system latency, network transport, memory profiling
+- [ ] **Phase 47: Full Penetration Test Cycle** (Layer 5) — OWASP Top 10, cryptographic verification, network security, AEDS attack surface, data security, infrastructure security
+- [ ] **Phase 48: Comprehensive Test Suite** (Layer 6) — Unit test coverage (80%+ SDK/Kernel), integration tests, edge case/failure mode tests, cross-platform verification
+- [ ] **Phase 49: Fix Wave 1** — Remediate all P0/P1 findings from Phases 42-48
+- [ ] **Phase 50: Fix Wave 2 + Re-audit** — Remediate remaining P2 findings, re-run all audits, verify convergence
+- [ ] **Phase 51: Certification Authority Final Audit** — Independent hostile audit acting as Certification Authority: thorough analysis of entire codebase, all 63 plugins, all 17 domains, all 7 tiers. If certified, DW is production-ready. Blame falls on the certifier if anything goes wrong.
+
+### Phase Details
+
+#### Phase 42: Feature Verification Matrix
+**Goal**: Score every feature in the Feature Verification Matrix (3,808 items) with production readiness percentage. Close all 80-99% gaps (quick wins). Triage 50-79% features. Defer 0-49% to v5.0+.
+**Depends on**: v3.0 + Phase 41.1 complete
+**Plans**: 4-8 plans (one per domain cluster)
+**Input**: `Metadata/FeatureVerificationMatrix.md`
+**Output**: `FEATURE-VERIFICATION.md` — per-feature readiness % with evidence
+
+#### Phase 43: Full Solution Automated Scan
+**Goal**: Run systematic code pattern scans across ALL 71 projects to find defects that manual review would miss.
+**Depends on**: Phase 42
+**Plans**: 3-5 plans (scan categories)
+**Output**: `AUDIT-FINDINGS-01.md` — numbered list, severity (P0/P1/P2), affected tier(s), domain(s)
+
+#### Phase 44: Domain-by-Domain Deep Audit
+**Goal**: Hostile reviewer reads actual plugin code, traces data flows end-to-end, checks every strategy for production readiness, verifies integration wiring, tests failure modes.
+**Depends on**: Phase 43
+**Plans**: 9 plans (one per domain cluster: Pipeline+Storage, Security, Media, Distributed, Hardware+Edge, AEDS+Service+AirGap+FS, Compute+Transport+Intelligence, CLI/GUI, Observability+Governance+Cloud)
+**Output**: `AUDIT-FINDINGS-02.md` — domain-specific findings with root cause
+
+#### Phase 45: Tier-by-Tier Integration Verification
+**Goal**: Deploy with each tier's preset and verify end-to-end flows work for that customer type.
+**Depends on**: Phase 44
+**Plans**: 4 plans (Tier 1-2, Tier 3-4, Tier 5-6, Tier 7)
+**Output**: `TIER-VERIFICATION.md` — per-tier pass/fail with evidence
+
+#### Phase 46: Performance Benchmarks
+**Goal**: BenchmarkDotNet baselines for every hot path. Establish performance baseline for future regression detection.
+**Depends on**: Phase 44
+**Plans**: 5 plans (pipeline, storage/IO, distributed, network, memory)
+**Output**: `BENCHMARK-BASELINE.md`
+
+#### Phase 47: Full Penetration Test Cycle
+**Goal**: Systematic security testing across all attack surfaces.
+**Depends on**: Phase 44
+**Plans**: 5 plans (OWASP Top 10, crypto, network+AEDS, data security, infrastructure)
+**Output**: `PENTEST-FINDINGS.md`
+
+#### Phase 48: Comprehensive Test Suite
+**Goal**: Fill test coverage gaps. Every plugin has tests, every strategy verified, 80%+ SDK coverage.
+**Depends on**: Phase 44
+**Plans**: 4 plans (unit tests, integration tests, edge cases, cross-platform)
+**Output**: `TEST-COVERAGE.md`
+
+#### Phase 49: Fix Wave 1
+**Goal**: Remediate all P0/P1 findings from Phases 42-48.
+**Depends on**: Phases 42-48
+**Plans**: 5-10 plans (grouped by severity and domain)
+
+#### Phase 50: Fix Wave 2 + Re-audit
+**Goal**: Remediate remaining P2 findings, re-run all automated scans, verify convergence toward zero findings.
+**Depends on**: Phase 49
+**Plans**: 5-10 plans
+
+#### Phase 51: Certification Authority Final Audit
+**Goal**: Act as an independent Certification Authority. Conduct the most thorough hostile audit possible across the ENTIRE codebase. If the audit passes, formally certify DataWarehouse as production-ready. The certifier accepts accountability — if anything goes wrong post-certification, part of the blame falls on the certifier.
+**Depends on**: Phase 50 (all fix waves complete, re-audit clean)
+**Plans**: 3 plans
+**Approach**:
+1. **Plan 51-01: Full Codebase Certification Audit** — Read every plugin, every strategy registration, every bus wiring, every configuration path. Trace 10 critical end-to-end flows. Check every domain against its success criteria. Check every tier against its preset. Document findings as PASS/FAIL with evidence.
+2. **Plan 51-02: Remediation** — Fix any remaining findings from the certification audit. This is the LAST chance to fix issues.
+3. **Plan 51-03: Formal Certification** — Issue the formal certification document: `CERTIFICATION.md`. Lists every domain, tier, and capability audited. States CERTIFIED or NOT CERTIFIED with evidence. The certifier signs off on production readiness.
+**Output**: `CERTIFICATION.md` — formal production readiness certification
+**Success Criteria**: CERTIFIED across all 17 domains, all 7 tiers, all 63 plugins
+
+### Phase Details (continued in v4.0-MILESTONE-DRAFT.md)
+
+Full domain definitions, tier requirements, scan patterns, and audit plans are in `.planning/v4.0-MILESTONE-DRAFT.md`.
 
 ### Phase Details
 
