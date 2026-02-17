@@ -706,7 +706,7 @@ namespace DataWarehouse.SDK.Contracts.Storage
                     // Exponential backoff with jitter
                     var delay = TimeSpan.FromMilliseconds(
                         RetryBaseDelay.TotalMilliseconds * Math.Pow(2, attempt - 1) +
-                        Random.Shared.Next(0, 100));
+                        System.Security.Cryptography.RandomNumberGenerator.GetInt32(0, 100));
 
                     await Task.Delay(delay, ct);
                 }
