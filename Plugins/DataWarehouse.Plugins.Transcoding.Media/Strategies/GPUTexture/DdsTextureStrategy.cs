@@ -81,7 +81,7 @@ internal sealed class DdsTextureStrategy : MediaStrategyBase
         Stream inputStream, TranscodeOptions options, CancellationToken cancellationToken)
     {
         var sourceBytes = await ReadStreamFullyAsync(inputStream, cancellationToken).ConfigureAwait(false);
-        var outputStream = new MemoryStream();
+        var outputStream = new MemoryStream(1024 * 1024);
 
         var compressionFormat = DetermineCompressionFormat(options);
         var generateMipmaps = true;
@@ -162,7 +162,7 @@ internal sealed class DdsTextureStrategy : MediaStrategyBase
         Stream videoStream, TimeSpan timeOffset, int width, int height, CancellationToken cancellationToken)
     {
         var sourceBytes = await ReadStreamFullyAsync(videoStream, cancellationToken).ConfigureAwait(false);
-        var outputStream = new MemoryStream();
+        var outputStream = new MemoryStream(1024 * 1024);
 
         using var writer = new BinaryWriter(outputStream, Encoding.UTF8, leaveOpen: true);
         writer.Write(Encoding.UTF8.GetBytes("DDSTHUMB"));
@@ -432,7 +432,7 @@ internal sealed class DdsTextureStrategy : MediaStrategyBase
         var blockSize = GetBlockSize(format);
         var mipmapCount = CalculateMipmapCount(width, height);
 
-        using var stream = new MemoryStream();
+        using var stream = new MemoryStream(sourceData.Length);
         // Note: Using inline crypto as fallback since MessageBus not available in static method
         var hash = SHA256.HashData(sourceData);
 
@@ -503,7 +503,7 @@ internal sealed class DdsTextureStrategy : MediaStrategyBase
         if (stream is MemoryStream ms && ms.TryGetBuffer(out var buffer))
             return buffer.ToArray();
 
-        using var copy = new MemoryStream();
+        using var copy = new MemoryStream(65536);
         await stream.CopyToAsync(copy, cancellationToken).ConfigureAwait(false);
         return copy.ToArray();
     }

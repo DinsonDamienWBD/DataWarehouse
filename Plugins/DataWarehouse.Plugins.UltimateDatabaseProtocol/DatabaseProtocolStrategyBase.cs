@@ -461,7 +461,7 @@ public interface IDatabaseProtocolStrategy
 /// Provides common functionality for connection management, statistics tracking,
 /// protocol encoding/decoding, and intelligence integration.
 /// </summary>
-public abstract class DatabaseProtocolStrategyBase : IDatabaseProtocolStrategy, IDisposable
+public abstract class DatabaseProtocolStrategyBase : IDatabaseProtocolStrategy, IDisposable, IAsyncDisposable
 {
     // Statistics tracking
     private long _connectionsEstablished;
@@ -1129,11 +1129,21 @@ public abstract class DatabaseProtocolStrategyBase : IDatabaseProtocolStrategy, 
 
         if (disposing)
         {
-            // Sync bridge: Dispose cannot be async without IAsyncDisposable
-            Task.Run(() => DisconnectAsync()).GetAwaiter().GetResult();
+            // Call async dispose and block (safer than GetAwaiter().GetResult())
+            DisposeAsync().AsTask().Wait();
         }
 
         _disposed = true;
+    }
+
+    /// <inheritdoc/>
+    public async ValueTask DisposeAsync()
+    {
+        if (_disposed) return;
+
+        await DisconnectAsync().ConfigureAwait(false);
+        _disposed = true;
+        GC.SuppressFinalize(this);
     }
 
     #endregion

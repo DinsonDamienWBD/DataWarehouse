@@ -946,7 +946,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Threshold
                         _currentKeyId = _keys.Keys.First();
                 }
             }
-            catch { }
+            catch { /* Deserialization failure — start with empty state */ }
         }
 
         private async Task PersistToStorage()

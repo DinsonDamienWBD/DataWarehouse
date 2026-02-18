@@ -517,7 +517,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Extended
                             {
                                 chunk = await ReadFromDiskAsync(disk, chunkOffset, chunkLength, cancellationToken);
                             }
-                            catch { }
+                            catch { /* Disk read failure — try other copies in RAID-10 */ }
                         }
                     }
                 }
@@ -789,7 +789,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Extended
                             {
                                 chunk = await ReadFromDiskAsync(disk, chunkOffset, chunkLength, cancellationToken);
                             }
-                            catch { }
+                            catch { /* Disk read failure — try other copies in RAID-10 */ }
                         }
                     }
                 }
@@ -1219,7 +1219,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Extended
                             chunk = await ReadFromDiskAsync(disk, chunkOffset, chunkLength, cancellationToken);
                             break;
                         }
-                        catch { }
+                        catch { /* Disk read failure — try next copy in RAID-100 */ }
                     }
                 }
 
@@ -1461,7 +1461,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Extended
                             chunk = await ReadFromDiskAsync(disk, chunkOffset, chunkLength, cancellationToken);
                             break;
                         }
-                        catch { }
+                        catch { /* Disk read failure — try next copy in RAID-100 */ }
                     }
                 }
 
@@ -1700,7 +1700,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Extended
                             chunk = await ReadFromDiskAsync(disk, chunkOffset, chunkLength, cancellationToken);
                             break;
                         }
-                        catch { }
+                        catch { /* Disk read failure — try next copy in RAID-100 */ }
                     }
                 }
 

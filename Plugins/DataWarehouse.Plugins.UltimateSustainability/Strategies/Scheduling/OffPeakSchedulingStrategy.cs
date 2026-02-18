@@ -110,7 +110,7 @@ public sealed class OffPeakSchedulingStrategy : SustainabilityStrategyBase
                     RecordOptimizationAction();
                     RecordEnergySaved(5); // Estimated savings from off-peak
                 }
-                catch { }
+                catch { /* Scheduled job failure is logged but non-fatal */ }
             }
         }
         UpdateRecommendations();

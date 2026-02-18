@@ -123,7 +123,7 @@ internal sealed class H264CodecStrategy : MediaStrategyBase
             sourceBytes,
             async () =>
             {
-                var outputStream = new MemoryStream();
+                var outputStream = new MemoryStream(1024 * 1024);
                 await WriteTranscodePackageAsync(outputStream, ffmpegArgs, sourceBytes, encoder, cancellationToken)
                     .ConfigureAwait(false);
                 outputStream.Position = 0;
@@ -164,7 +164,7 @@ internal sealed class H264CodecStrategy : MediaStrategyBase
         Stream videoStream, TimeSpan timeOffset, int width, int height, CancellationToken cancellationToken)
     {
         var sourceBytes = await ReadStreamFullyAsync(videoStream, cancellationToken).ConfigureAwait(false);
-        var outputStream = new MemoryStream();
+        var outputStream = new MemoryStream(1024 * 1024);
 
         // Build FFmpeg thumbnail extraction arguments
         var ffmpegArgs = $"-i pipe:0 -ss {timeOffset.TotalSeconds:F3} -vframes 1 " +
@@ -388,7 +388,7 @@ internal sealed class H264CodecStrategy : MediaStrategyBase
         if (stream is MemoryStream ms && ms.TryGetBuffer(out var buffer))
             return buffer.ToArray();
 
-        using var copy = new MemoryStream();
+        using var copy = new MemoryStream(65536);
         await stream.CopyToAsync(copy, cancellationToken).ConfigureAwait(false);
         return copy.ToArray();
     }

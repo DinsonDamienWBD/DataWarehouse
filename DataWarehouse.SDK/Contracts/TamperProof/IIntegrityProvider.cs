@@ -239,7 +239,7 @@ public abstract class IntegrityProviderPluginBase : IntegrityPluginBase, IIntegr
                 // For large or non-seekable streams, use chunked reading
                 using var memoryOwner = MemoryPool<byte>.Shared.Rent(StreamBufferSize);
                 var buffer = memoryOwner.Memory;
-                using var ms = new MemoryStream();
+                using var ms = new MemoryStream(65536);
 
                 int bytesRead;
                 while ((bytesRead = await data.ReadAsync(buffer, ct)) > 0)

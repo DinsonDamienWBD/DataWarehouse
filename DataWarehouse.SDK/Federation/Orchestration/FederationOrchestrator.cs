@@ -219,7 +219,10 @@ public sealed class FederationOrchestrator : IFederationOrchestrator, ITopologyP
                 await CheckNodeHealthAsync(ct).ConfigureAwait(false);
             }
         }
-        catch (OperationCanceledException) { }
+        catch (OperationCanceledException)
+        {
+            /* Cancellation is expected during shutdown */
+        }
     }
 
     private async Task CheckNodeHealthAsync(CancellationToken ct)

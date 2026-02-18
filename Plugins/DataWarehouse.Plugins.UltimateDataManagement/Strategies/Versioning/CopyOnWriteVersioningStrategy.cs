@@ -368,7 +368,7 @@ public sealed class CopyOnWriteVersioningStrategy : VersioningStrategyBase
     {
         ct.ThrowIfCancellationRequested();
 
-        using var ms = new MemoryStream();
+        using var ms = new MemoryStream(65536);
         data.CopyTo(ms);
         var bytes = ms.ToArray();
 
@@ -415,7 +415,7 @@ public sealed class CopyOnWriteVersioningStrategy : VersioningStrategyBase
             ?? throw new KeyNotFoundException($"Version '{versionId}' not found for object '{objectId}'.");
 
         // Reconstruct data from blocks
-        using var ms = new MemoryStream();
+        using var ms = new MemoryStream(65536);
         foreach (var hash in blockHashes)
         {
             if (!_blockPool.TryGetValue(hash, out var block))

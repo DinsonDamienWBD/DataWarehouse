@@ -236,7 +236,7 @@ public sealed class HuggingFaceEmbeddingProvider : EmbeddingProviderBase
                         estimatedTime = (int)timeProp.GetDouble();
                     }
                 }
-                catch { }
+                catch { /* JSON parsing failure — use defaults */ }
             }
 
             var isTransient = statusCode >= 500 || statusCode == 429 || isModelLoading;

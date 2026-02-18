@@ -627,8 +627,8 @@ public sealed class ConnectionPoolManager<TConnection> : IDisposable, IAsyncDisp
             if (_disposed) return;
             _disposed = true;
 
-            // Sync bridge: Dispose cannot be async without IAsyncDisposable
-            Task.Run(() => ClearAsync()).GetAwaiter().GetResult();
+            // Call async dispose and block (safer than GetAwaiter().GetResult())
+            DisposeAsync().AsTask().Wait();
             _acquireSemaphore.Dispose();
             _createLock.Dispose();
         }

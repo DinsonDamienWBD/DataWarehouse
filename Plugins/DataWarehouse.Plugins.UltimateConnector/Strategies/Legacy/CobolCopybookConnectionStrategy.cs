@@ -1,4 +1,5 @@
 using System;
+using System.Buffers;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
@@ -46,9 +47,16 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Legacy
                 var offset = parts.Length > 1 ? int.Parse(parts[1]) : 0;
                 var length = parts.Length > 2 ? int.Parse(parts[2]) : 80; // Standard COBOL record length
                 stream.Seek(offset, System.IO.SeekOrigin.Begin);
-                var buffer = new byte[length];
-                var bytesRead = await stream.ReadAsync(buffer, ct);
-                return System.Text.Encoding.ASCII.GetString(buffer, 0, bytesRead);
+                var buffer = ArrayPool<byte>.Shared.Rent(length);
+                try
+                {
+                    var bytesRead = await stream.ReadAsync(buffer.AsMemory(0, length), ct);
+                    return System.Text.Encoding.ASCII.GetString(buffer, 0, bytesRead);
+                }
+                finally
+                {
+                    ArrayPool<byte>.Shared.Return(buffer);
+                }
             }
 
             return $"{{\"status\":\"unsupported\",\"operation\":\"{operation}\"}}";

@@ -292,7 +292,7 @@ public sealed class AwsBedrockProviderStrategy : AIProviderStrategyBase
                 return new AIStreamChunk { IsFinal = true, FinishReason = "stop" };
             }
         }
-        catch { }
+        catch { /* JSON parsing failure — return null */ }
         return null;
     }
 

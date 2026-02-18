@@ -607,7 +607,7 @@ public sealed class RedshiftProtocolStrategy : DatabaseProtocolStrategyBase
             ["application_name"] = "DataWarehouse"
         };
 
-        using var ms = new MemoryStream();
+        using var ms = new MemoryStream(4096);
         using var bw = new BinaryWriter(ms);
 
         var version = System.Buffers.Binary.BinaryPrimitives.ReverseEndianness(ProtocolVersion3);
@@ -1203,7 +1203,7 @@ public sealed class SynapseProtocolStrategy : DatabaseProtocolStrategyBase
 
     private byte[] BuildPreLoginPacket()
     {
-        using var ms = new MemoryStream();
+        using var ms = new MemoryStream(4096);
         using var bw = new BinaryWriter(ms);
 
         // Version token
@@ -1305,7 +1305,7 @@ public sealed class SynapseProtocolStrategy : DatabaseProtocolStrategyBase
         var serverName = parameters.Host;
         var database = parameters.Database ?? "master";
 
-        using var ms = new MemoryStream();
+        using var ms = new MemoryStream(4096);
         using var bw = new BinaryWriter(ms);
 
         // Calculate offsets
@@ -1420,7 +1420,7 @@ public sealed class SynapseProtocolStrategy : DatabaseProtocolStrategyBase
 
     private async Task SendTdsPacketAsync(byte packetType, byte[] data, CancellationToken ct)
     {
-        using var ms = new MemoryStream();
+        using var ms = new MemoryStream(4096);
         using var bw = new BinaryWriter(ms);
 
         var packetLength = (ushort)(8 + data.Length);
@@ -1463,7 +1463,7 @@ public sealed class SynapseProtocolStrategy : DatabaseProtocolStrategyBase
         var unicodeQuery = Encoding.Unicode.GetBytes(query);
 
         // Headers
-        using var ms = new MemoryStream();
+        using var ms = new MemoryStream(4096);
         using var bw = new BinaryWriter(ms);
 
         var totalHeadersLength = 22;

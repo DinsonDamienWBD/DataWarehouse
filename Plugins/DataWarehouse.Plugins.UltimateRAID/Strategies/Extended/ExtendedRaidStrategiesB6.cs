@@ -841,7 +841,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Extended
             if (dataDisk.HealthStatus == SdkDiskHealthStatus.Healthy)
             {
                 try { return await ReadFromDiskAsync(dataDisk, offset, length, cancellationToken); }
-                catch { }
+                catch { /* Data disk read failure — fall back to protection disk */ }
             }
             return await ReadFromDiskAsync(protectionDisk, offset, length, cancellationToken);
         }

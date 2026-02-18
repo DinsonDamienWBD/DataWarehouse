@@ -93,7 +93,7 @@ public sealed record UserPreference
 /// Stores and retrieves learned patterns, corrections, and user preferences.
 /// Enables the CLI to improve over time based on user interactions.
 /// </summary>
-public sealed class CLILearningStore : IDisposable
+public sealed class CLILearningStore : IDisposable, IAsyncDisposable
 {
     private readonly ConcurrentDictionary<string, LearnedPattern> _patterns = new();
     private readonly ConcurrentDictionary<string, SynonymMapping> _synonyms = new();
@@ -579,8 +579,24 @@ public sealed class CLILearningStore : IDisposable
 
         if (_isDirty && !string.IsNullOrEmpty(_persistencePath))
         {
-            // Sync bridge: Dispose cannot be async without IAsyncDisposable
-            Task.Run(() => SaveAsync()).GetAwaiter().GetResult();
+            // Call async dispose and block (safer than GetAwaiter().GetResult())
+            DisposeAsync().AsTask().Wait();
+            return;
+        }
+
+        _persistenceTimer?.Dispose();
+        _persistenceLock.Dispose();
+    }
+
+    /// <inheritdoc/>
+    public async ValueTask DisposeAsync()
+    {
+        if (_disposed) return;
+        _disposed = true;
+
+        if (_isDirty && !string.IsNullOrEmpty(_persistencePath))
+        {
+            await SaveAsync().ConfigureAwait(false);
         }
 
         _persistenceTimer?.Dispose();

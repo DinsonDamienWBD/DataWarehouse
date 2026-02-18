@@ -159,7 +159,7 @@ internal sealed class VersionlessApiStrategy : SdkInterface.InterfaceStrategyBas
                     return "2023.02";
                 }
             }
-            catch { }
+            catch { /* Parsing failure — default to latest */ }
         }
 
         // Default to latest version

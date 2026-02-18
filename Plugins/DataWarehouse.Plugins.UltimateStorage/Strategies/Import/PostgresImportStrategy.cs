@@ -58,7 +58,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Import
         {
             EnsureInitialized();
             IncrementOperationCounter(StorageOperationType.Retrieve);
-            return Task.FromResult<Stream>(new MemoryStream());
+            return Task.FromResult<Stream>(new MemoryStream(0));
         }
 
         protected override Task DeleteAsyncCore(string key, CancellationToken ct)

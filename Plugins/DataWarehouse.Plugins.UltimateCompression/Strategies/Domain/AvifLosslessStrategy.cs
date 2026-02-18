@@ -83,8 +83,8 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Domain
                 grid[i / width, i % width] = input[i];
 
             // Process blocks with prediction
-            var residuals = new MemoryStream();
-            var modes = new MemoryStream();
+            var residuals = new MemoryStream(65536);
+            var modes = new MemoryStream(4096);
 
             for (int by = 0; by < height; by += DefaultBlockSize)
             {

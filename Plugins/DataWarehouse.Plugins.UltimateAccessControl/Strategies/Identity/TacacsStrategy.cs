@@ -155,7 +155,7 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Identity
 
         private byte[] BuildAuthenticationStartPacket(uint sessionId, string username)
         {
-            using var ms = new MemoryStream();
+            using var ms = new MemoryStream(4096);
             using var writer = new BinaryWriter(ms);
 
             // TACACS+ Header (12 bytes)

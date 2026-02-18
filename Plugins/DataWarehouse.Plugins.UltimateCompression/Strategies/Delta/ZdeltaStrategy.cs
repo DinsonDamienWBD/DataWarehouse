@@ -1,4 +1,5 @@
 using System;
+using System.Buffers;
 using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.IO;
@@ -223,10 +224,17 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Delta
                 if (op == OpLiteral)
                 {
                     int length = ReadVarint(stream);
-                    var data = new byte[length];
-                    if (stream.Read(data, 0, length) != length)
-                        throw new InvalidDataException("Unexpected end of literal data.");
-                    output.Write(data, 0, length);
+                    var data = ArrayPool<byte>.Shared.Rent(length);
+                    try
+                    {
+                        if (stream.Read(data, 0, length) != length)
+                            throw new InvalidDataException("Unexpected end of literal data.");
+                        output.Write(data, 0, length);
+                    }
+                    finally
+                    {
+                        ArrayPool<byte>.Shared.Return(data);
+                    }
                 }
                 else if (op == OpCopy)
                 {

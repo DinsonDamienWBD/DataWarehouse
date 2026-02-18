@@ -506,7 +506,7 @@ public sealed class PosixPermissions
         if (Acl.Count == 0)
             return Array.Empty<byte>();
 
-        using var ms = new MemoryStream();
+        using var ms = new MemoryStream(4096);
         using var writer = new BinaryWriter(ms);
 
         // POSIX ACL version

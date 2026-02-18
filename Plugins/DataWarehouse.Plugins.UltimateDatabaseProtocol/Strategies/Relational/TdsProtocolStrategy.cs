@@ -191,7 +191,7 @@ public sealed class TdsProtocolStrategy : DatabaseProtocolStrategyBase
         var headerSize = (options.Count + 1) * 5; // Each option: token(1) + offset(2) + length(2), plus terminator
         var offset = headerSize;
 
-        using var ms = new MemoryStream();
+        using var ms = new MemoryStream(4096);
 
         // Write option headers
         foreach (var (token, data) in options)
@@ -334,7 +334,7 @@ public sealed class TdsProtocolStrategy : DatabaseProtocolStrategyBase
         offset += databaseLength * 2;
 
         // Build packet
-        using var ms = new MemoryStream();
+        using var ms = new MemoryStream(4096);
         using var writer = new BinaryWriter(ms, Encoding.Unicode);
 
         // Length (will be filled in later)
@@ -1087,7 +1087,7 @@ public sealed class TdsProtocolStrategy : DatabaseProtocolStrategyBase
 
     private async Task<(byte packetType, byte[] payload)> ReadTdsPacketAsync(CancellationToken ct)
     {
-        using var ms = new MemoryStream();
+        using var ms = new MemoryStream(4096);
         byte packetType = 0;
 
         while (true)

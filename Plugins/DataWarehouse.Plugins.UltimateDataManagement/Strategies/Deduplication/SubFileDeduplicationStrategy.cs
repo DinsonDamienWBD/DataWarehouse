@@ -117,7 +117,7 @@ public sealed class SubFileDeduplicationStrategy : DeduplicationStrategyBase
         var sw = Stopwatch.StartNew();
 
         // Read data
-        using var memoryStream = new MemoryStream();
+        using var memoryStream = new MemoryStream(65536);
         await data.CopyToAsync(memoryStream, ct);
         var fileBytes = memoryStream.ToArray();
         var totalSize = fileBytes.Length;

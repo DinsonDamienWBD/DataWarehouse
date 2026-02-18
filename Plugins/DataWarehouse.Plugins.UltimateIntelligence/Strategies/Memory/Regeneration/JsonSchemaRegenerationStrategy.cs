@@ -228,7 +228,7 @@ public sealed class JsonSchemaRegenerationStrategy : RegenerationStrategyBase
                 JsonDocument.Parse(json);
                 return json;
             }
-            catch { }
+            catch { /* Parsing failure — try other formats */ }
         }
 
         // Find JSON array
@@ -242,7 +242,7 @@ public sealed class JsonSchemaRegenerationStrategy : RegenerationStrategyBase
                 JsonDocument.Parse(json);
                 return json;
             }
-            catch { }
+            catch { /* Parsing failure — try other formats */ }
         }
 
         return string.Empty;
@@ -349,7 +349,7 @@ public sealed class JsonSchemaRegenerationStrategy : RegenerationStrategyBase
             Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping
         };
 
-        var stream = new MemoryStream();
+        var stream = new MemoryStream(65536);
         await using (var writer = new Utf8JsonWriter(stream, new JsonWriterOptions
         {
             Indented = options.PreserveFormatting,

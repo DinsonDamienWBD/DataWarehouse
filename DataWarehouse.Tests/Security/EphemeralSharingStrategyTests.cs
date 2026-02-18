@@ -957,7 +957,7 @@ namespace DataWarehouse.Tests.Security
             decision.Metadata.Should().ContainKey("evidence_exfiltrated");
 
             // Cleanup
-            try { System.IO.Directory.Delete(deadDropPath, true); } catch { }
+            try { System.IO.Directory.Delete(deadDropPath, true); } catch { /* Best-effort cleanup — failure is non-fatal */ }
         }
 
         [Fact]

@@ -489,7 +489,7 @@ public sealed class BiTemporalVersioningStrategy : VersioningStrategyBase
 
         ct.ThrowIfCancellationRequested();
 
-        using var ms = new MemoryStream();
+        using var ms = new MemoryStream(65536);
         await data.CopyToAsync(ms, ct);
         var bytes = ms.ToArray();
 

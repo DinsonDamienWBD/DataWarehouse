@@ -595,7 +595,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.DevCiCd
             catch
             {
                 // Best effort secure deletion
-                try { File.Delete(filePath); } catch { }
+                try { File.Delete(filePath); } catch { /* Best-effort cleanup — failure is non-fatal */ }
             }
         }
 

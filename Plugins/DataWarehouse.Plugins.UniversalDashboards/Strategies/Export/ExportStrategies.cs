@@ -81,7 +81,7 @@ public sealed class PdfGenerationStrategy : DashboardStrategyBase
         options ??= new PdfExportOptions();
 
         // Generate PDF using QuestPDF
-        using var ms = new MemoryStream();
+        using var ms = new MemoryStream(65536);
 
         // Build document structure (simplified - actual implementation would use QuestPDF fluent API)
         var pdfContent = new StringBuilder();

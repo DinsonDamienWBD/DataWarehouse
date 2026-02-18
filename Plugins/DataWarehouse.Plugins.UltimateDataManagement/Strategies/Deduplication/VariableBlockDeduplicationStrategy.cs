@@ -135,7 +135,7 @@ public sealed class VariableBlockDeduplicationStrategy : DeduplicationStrategyBa
         var maxSize = context.MaxChunkSize > 0 ? context.MaxChunkSize : _maxChunkSize;
 
         // Read all data for chunking
-        using var memoryStream = new MemoryStream();
+        using var memoryStream = new MemoryStream(65536);
         await data.CopyToAsync(memoryStream, ct);
         var dataBytes = memoryStream.ToArray();
         var totalSize = dataBytes.Length;

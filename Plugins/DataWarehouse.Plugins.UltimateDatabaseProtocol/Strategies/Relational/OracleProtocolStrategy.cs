@@ -124,7 +124,7 @@ public sealed class OracleTnsProtocolStrategy : DatabaseProtocolStrategyBase
 
     private byte[] BuildConnectPacket(byte[] connectData)
     {
-        using var ms = new MemoryStream();
+        using var ms = new MemoryStream(4096);
         using var bw = new BinaryWriter(ms);
 
         var totalLength = 58 + connectData.Length; // Header + connect data
@@ -219,7 +219,7 @@ public sealed class OracleTnsProtocolStrategy : DatabaseProtocolStrategyBase
     private async Task SendProtocolNegotiationAsync(CancellationToken ct)
     {
         // Build native security negotiation packet
-        using var ms = new MemoryStream();
+        using var ms = new MemoryStream(4096);
         using var bw = new BinaryWriter(ms);
 
         bw.Write((byte)0x01); // Protocol negotiation
@@ -236,7 +236,7 @@ public sealed class OracleTnsProtocolStrategy : DatabaseProtocolStrategyBase
     private async Task SendDataTypeNegotiationAsync(CancellationToken ct)
     {
         // TTI (Two-Task Interface) data type negotiation
-        using var ms = new MemoryStream();
+        using var ms = new MemoryStream(4096);
         using var bw = new BinaryWriter(ms);
 
         bw.Write((byte)0x02); // Data type rep
@@ -259,7 +259,7 @@ public sealed class OracleTnsProtocolStrategy : DatabaseProtocolStrategyBase
         var password = parameters.Password ?? "";
 
         // Send authentication start (O5LOGON style)
-        using var authMs = new MemoryStream();
+        using var authMs = new MemoryStream(1024);
         using var authBw = new BinaryWriter(authMs);
 
         authBw.Write((byte)0x03); // Authentication
@@ -286,7 +286,7 @@ public sealed class OracleTnsProtocolStrategy : DatabaseProtocolStrategyBase
         var passwordVerifier = ComputePasswordVerifier(username, password, serverSessionKey, authVfrData);
 
         // Send auth response
-        using var respMs = new MemoryStream();
+        using var respMs = new MemoryStream(4096);
         using var respBw = new BinaryWriter(respMs);
 
         respBw.Write((byte)0x03); // Authentication
@@ -333,7 +333,7 @@ public sealed class OracleTnsProtocolStrategy : DatabaseProtocolStrategyBase
     {
         _sequenceNumber++;
 
-        using var ms = new MemoryStream();
+        using var ms = new MemoryStream(4096);
         using var bw = new BinaryWriter(ms);
 
         var totalLength = 10 + data.Length; // TNS header (8) + data flags (2) + data
@@ -375,7 +375,7 @@ public sealed class OracleTnsProtocolStrategy : DatabaseProtocolStrategyBase
         CancellationToken ct)
     {
         // Build TTI execute packet
-        using var ms = new MemoryStream();
+        using var ms = new MemoryStream(4096);
         using var bw = new BinaryWriter(ms);
 
         var queryBytes = Encoding.UTF8.GetBytes(query);
@@ -524,7 +524,7 @@ public sealed class OracleTnsProtocolStrategy : DatabaseProtocolStrategyBase
         try
         {
             // Send logoff
-            using var ms = new MemoryStream();
+            using var ms = new MemoryStream(4096);
             using var bw = new BinaryWriter(ms);
 
             bw.Write((byte)0x03); // TTI function
@@ -632,7 +632,7 @@ public sealed class Db2DrdaProtocolStrategy : DatabaseProtocolStrategyBase
 
     private byte[] BuildExcsatRequest()
     {
-        using var ms = new MemoryStream();
+        using var ms = new MemoryStream(4096);
         using var bw = new BinaryWriter(ms);
 
         // External name
@@ -658,7 +658,7 @@ public sealed class Db2DrdaProtocolStrategy : DatabaseProtocolStrategyBase
 
     private static byte[] BuildManagerLevels()
     {
-        using var ms = new MemoryStream();
+        using var ms = new MemoryStream(4096);
         using var bw = new BinaryWriter(ms);
 
         // SQLAM (SQL Application Manager) level 7
@@ -710,7 +710,7 @@ public sealed class Db2DrdaProtocolStrategy : DatabaseProtocolStrategyBase
 
     private byte[] BuildAccsecRequest(ConnectionParameters parameters)
     {
-        using var ms = new MemoryStream();
+        using var ms = new MemoryStream(4096);
         using var bw = new BinaryWriter(ms);
 
         // Security mechanism (USRIDPWD = 3)
@@ -737,7 +737,7 @@ public sealed class Db2DrdaProtocolStrategy : DatabaseProtocolStrategyBase
 
     private byte[] BuildSecchkRequest(ConnectionParameters parameters, ushort secmec)
     {
-        using var ms = new MemoryStream();
+        using var ms = new MemoryStream(4096);
         using var bw = new BinaryWriter(ms);
 
         // Security mechanism
@@ -771,7 +771,7 @@ public sealed class Db2DrdaProtocolStrategy : DatabaseProtocolStrategyBase
 
     private byte[] BuildAccrdbRequest(ConnectionParameters parameters)
     {
-        using var ms = new MemoryStream();
+        using var ms = new MemoryStream(4096);
         using var bw = new BinaryWriter(ms);
 
         // RDB name
@@ -802,7 +802,7 @@ public sealed class Db2DrdaProtocolStrategy : DatabaseProtocolStrategyBase
 
     private static byte[] BuildDrdaObject(ushort codePoint, byte[] data)
     {
-        using var ms = new MemoryStream();
+        using var ms = new MemoryStream(4096);
         using var bw = new BinaryWriter(ms);
 
         var totalLength = (ushort)(4 + data.Length);
@@ -824,7 +824,7 @@ public sealed class Db2DrdaProtocolStrategy : DatabaseProtocolStrategyBase
 
     private async Task SendDrdaChainAsync(byte[] objectData, CancellationToken ct)
     {
-        using var ms = new MemoryStream();
+        using var ms = new MemoryStream(4096);
         using var bw = new BinaryWriter(ms);
 
         _correlationId++;
@@ -897,7 +897,7 @@ public sealed class Db2DrdaProtocolStrategy : DatabaseProtocolStrategyBase
 
     private byte[] BuildSqlRequest(string sql)
     {
-        using var ms = new MemoryStream();
+        using var ms = new MemoryStream(4096);
         using var bw = new BinaryWriter(ms);
 
         // Package name

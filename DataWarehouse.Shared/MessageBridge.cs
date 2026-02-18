@@ -1,5 +1,6 @@
 using DataWarehouse.SDK.Hosting;
 using DataWarehouse.Shared.Models;
+using System.Buffers;
 using System.Collections.Concurrent;
 using System.Net.Sockets;
 using System.Text;
@@ -394,33 +395,47 @@ public class MessageBridge
                 return null;
 
             // Read response length prefix
-            var responseLengthBytes = new byte[4];
-            var bytesRead = await _networkStream.ReadAsync(responseLengthBytes, 0, 4);
-            if (bytesRead != 4)
-                return null;
-
-            var responseLength = BitConverter.ToInt32(responseLengthBytes, 0);
-
-            // Read response body
-            var responseBytes = new byte[responseLength];
-            var totalRead = 0;
-            while (totalRead < responseLength)
+            var responseLengthBytes = ArrayPool<byte>.Shared.Rent(4);
+            try
             {
-                bytesRead = await _networkStream.ReadAsync(
-                    responseBytes, totalRead, responseLength - totalRead);
-                if (bytesRead == 0)
-                    break;
-                totalRead += bytesRead;
+                var bytesRead = await _networkStream.ReadAsync(responseLengthBytes, 0, 4);
+                if (bytesRead != 4)
+                    return null;
+
+                var responseLength = BitConverter.ToInt32(responseLengthBytes, 0);
+
+                // Read response body
+                var responseBytes = ArrayPool<byte>.Shared.Rent(responseLength);
+                try
+                {
+                    var totalRead = 0;
+                    while (totalRead < responseLength)
+                    {
+                        bytesRead = await _networkStream.ReadAsync(
+                            responseBytes, totalRead, responseLength - totalRead);
+                        if (bytesRead == 0)
+                            break;
+                        totalRead += bytesRead;
+                    }
+
+                    if (totalRead != responseLength)
+                        return null;
+
+                    // Deserialize response
+                    var responseJson = Encoding.UTF8.GetString(responseBytes, 0, responseLength);
+                    var response = JsonSerializer.Deserialize<Message>(responseJson, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+
+                    return response;
+                }
+                finally
+                {
+                    ArrayPool<byte>.Shared.Return(responseBytes);
+                }
             }
-
-            if (totalRead != responseLength)
-                return null;
-
-            // Deserialize response
-            var responseJson = Encoding.UTF8.GetString(responseBytes);
-            var response = JsonSerializer.Deserialize<Message>(responseJson, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
-
-            return response;
+            finally
+            {
+                ArrayPool<byte>.Shared.Return(responseLengthBytes);
+            }
         }
         catch
         {

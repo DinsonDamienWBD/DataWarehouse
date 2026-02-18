@@ -217,8 +217,8 @@ namespace DataWarehouse.SDK.Infrastructure.Distributed.Discovery
         /// </summary>
         public void Dispose()
         {
-            // Sync bridge: Dispose cannot be async without IAsyncDisposable
-            Task.Run(() => StopAsync()).GetAwaiter().GetResult();
+            // Call async dispose and block (safer than GetAwaiter().GetResult())
+            DisposeAsync().AsTask().Wait();
             _joinLock.Dispose();
         }
     }

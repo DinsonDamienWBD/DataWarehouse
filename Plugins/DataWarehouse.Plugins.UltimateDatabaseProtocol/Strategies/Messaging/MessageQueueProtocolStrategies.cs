@@ -102,7 +102,7 @@ public sealed class KafkaProtocolStrategy : DatabaseProtocolStrategyBase
         var authBytes = Encoding.UTF8.GetBytes($"\0{parameters.Username}\0{parameters.Password}");
 
         // Send SASL handshake
-        using var ms = new MemoryStream();
+        using var ms = new MemoryStream(4096);
         using var bw = new BinaryWriter(ms);
 
         WriteString(bw, mechanism);
@@ -112,7 +112,7 @@ public sealed class KafkaProtocolStrategy : DatabaseProtocolStrategyBase
         await ReadResponseAsync(ct);
 
         // Send SASL authenticate
-        using var authMs = new MemoryStream();
+        using var authMs = new MemoryStream(1024);
         using var authBw = new BinaryWriter(authMs);
 
         authBw.Write(BinaryPrimitives.ReverseEndianness(authBytes.Length));
@@ -125,7 +125,7 @@ public sealed class KafkaProtocolStrategy : DatabaseProtocolStrategyBase
 
     private async Task RefreshMetadataAsync(CancellationToken ct)
     {
-        using var ms = new MemoryStream();
+        using var ms = new MemoryStream(4096);
         using var bw = new BinaryWriter(ms);
 
         // Topics array (null = all topics)
@@ -177,13 +177,13 @@ public sealed class KafkaProtocolStrategy : DatabaseProtocolStrategyBase
 
     private byte[] BuildApiVersionsRequest()
     {
-        using var ms = new MemoryStream();
+        using var ms = new MemoryStream(4096);
         return BuildRequest(ApiApiVersionsRequest, 0, ms.ToArray());
     }
 
     private byte[] BuildRequest(short apiKey, short apiVersion, byte[] payload)
     {
-        using var ms = new MemoryStream();
+        using var ms = new MemoryStream(4096);
         using var bw = new BinaryWriter(ms);
 
         // Request header
@@ -288,7 +288,7 @@ public sealed class KafkaProtocolStrategy : DatabaseProtocolStrategyBase
         var message = parts.Length > 2 ? parts[2] : parameters?.GetValueOrDefault("message")?.ToString() ?? "";
         var key = parameters?.GetValueOrDefault("key")?.ToString();
 
-        using var ms = new MemoryStream();
+        using var ms = new MemoryStream(4096);
         using var bw = new BinaryWriter(ms);
 
         // Transactional ID (null)
@@ -324,7 +324,7 @@ public sealed class KafkaProtocolStrategy : DatabaseProtocolStrategyBase
 
     private static byte[] BuildRecordBatch(string? key, string message)
     {
-        using var ms = new MemoryStream();
+        using var ms = new MemoryStream(4096);
         using var bw = new BinaryWriter(ms);
 
         // Simplified record batch format
@@ -385,7 +385,7 @@ public sealed class KafkaProtocolStrategy : DatabaseProtocolStrategyBase
         var partition = int.TryParse(parameters?.GetValueOrDefault("partition")?.ToString(), out var p) ? p : 0;
         var offset = long.TryParse(parameters?.GetValueOrDefault("offset")?.ToString(), out var o) ? o : 0L;
 
-        using var ms = new MemoryStream();
+        using var ms = new MemoryStream(4096);
         using var bw = new BinaryWriter(ms);
 
         bw.Write(BinaryPrimitives.ReverseEndianness(-1)); // Replica ID
@@ -463,7 +463,7 @@ public sealed class KafkaProtocolStrategy : DatabaseProtocolStrategyBase
         var numPartitions = int.TryParse(parameters?.GetValueOrDefault("partitions")?.ToString(), out var np) ? np : 1;
         var replicationFactor = int.TryParse(parameters?.GetValueOrDefault("replication")?.ToString(), out var rf) ? rf : 1;
 
-        using var ms = new MemoryStream();
+        using var ms = new MemoryStream(4096);
         using var bw = new BinaryWriter(ms);
 
         // Topics array
@@ -492,7 +492,7 @@ public sealed class KafkaProtocolStrategy : DatabaseProtocolStrategyBase
     {
         var topic = parts.Length > 2 ? parts[2] : "";
 
-        using var ms = new MemoryStream();
+        using var ms = new MemoryStream(4096);
         using var bw = new BinaryWriter(ms);
 
         bw.Write(BinaryPrimitives.ReverseEndianness(1));
@@ -661,7 +661,7 @@ public sealed class RabbitMqProtocolStrategy : DatabaseProtocolStrategyBase
 
     private byte[] BuildConnectionStartOk(ConnectionParameters parameters)
     {
-        using var ms = new MemoryStream();
+        using var ms = new MemoryStream(4096);
         using var bw = new BinaryWriter(ms);
 
         // Client properties (table)
@@ -688,7 +688,7 @@ public sealed class RabbitMqProtocolStrategy : DatabaseProtocolStrategyBase
 
     private byte[] BuildConnectionTuneOk()
     {
-        using var ms = new MemoryStream();
+        using var ms = new MemoryStream(4096);
         using var bw = new BinaryWriter(ms);
 
         bw.Write(BinaryPrimitives.ReverseEndianness((ushort)2047)); // Channel max
@@ -700,7 +700,7 @@ public sealed class RabbitMqProtocolStrategy : DatabaseProtocolStrategyBase
 
     private byte[] BuildConnectionOpen()
     {
-        using var ms = new MemoryStream();
+        using var ms = new MemoryStream(4096);
         using var bw = new BinaryWriter(ms);
 
         WriteShortString(bw, _virtualHost);
@@ -712,7 +712,7 @@ public sealed class RabbitMqProtocolStrategy : DatabaseProtocolStrategyBase
 
     private async Task SendMethodFrameAsync(ushort channel, ushort classId, ushort methodId, byte[] payload, CancellationToken ct)
     {
-        using var ms = new MemoryStream();
+        using var ms = new MemoryStream(4096);
         using var bw = new BinaryWriter(ms);
 
         // Frame header
@@ -755,7 +755,7 @@ public sealed class RabbitMqProtocolStrategy : DatabaseProtocolStrategyBase
 
     private static void WriteTable(BinaryWriter bw, Dictionary<string, object> table)
     {
-        using var tableMs = new MemoryStream();
+        using var tableMs = new MemoryStream(4096);
         using var tableBw = new BinaryWriter(tableMs);
 
         foreach (var kvp in table)
@@ -819,7 +819,7 @@ public sealed class RabbitMqProtocolStrategy : DatabaseProtocolStrategyBase
         var message = parts.Length > 2 ? parts[2] : parameters?.GetValueOrDefault("message")?.ToString() ?? "";
 
         // Basic.Publish
-        using var ms = new MemoryStream();
+        using var ms = new MemoryStream(4096);
         using var bw = new BinaryWriter(ms);
 
         bw.Write((ushort)0); // Reserved
@@ -846,13 +846,13 @@ public sealed class RabbitMqProtocolStrategy : DatabaseProtocolStrategyBase
 
     private async Task SendContentHeaderAsync(ushort channel, ushort classId, ulong bodySize, CancellationToken ct)
     {
-        using var ms = new MemoryStream();
+        using var ms = new MemoryStream(4096);
         using var bw = new BinaryWriter(ms);
 
         bw.Write(FrameHeader);
         bw.Write(BinaryPrimitives.ReverseEndianness(channel));
 
-        using var payloadMs = new MemoryStream();
+        using var payloadMs = new MemoryStream(4096);
         using var payloadBw = new BinaryWriter(payloadMs);
 
         payloadBw.Write(BinaryPrimitives.ReverseEndianness(classId));
@@ -870,7 +870,7 @@ public sealed class RabbitMqProtocolStrategy : DatabaseProtocolStrategyBase
 
     private async Task SendContentBodyAsync(ushort channel, byte[] body, CancellationToken ct)
     {
-        using var ms = new MemoryStream();
+        using var ms = new MemoryStream(4096);
         using var bw = new BinaryWriter(ms);
 
         bw.Write(FrameBody);
@@ -891,7 +891,7 @@ public sealed class RabbitMqProtocolStrategy : DatabaseProtocolStrategyBase
         var queue = parts.Length > 1 ? parts[1] : parameters?.GetValueOrDefault("queue")?.ToString() ?? "";
 
         // Basic.Get
-        using var ms = new MemoryStream();
+        using var ms = new MemoryStream(4096);
         using var bw = new BinaryWriter(ms);
 
         bw.Write((ushort)0); // Reserved
@@ -945,7 +945,7 @@ public sealed class RabbitMqProtocolStrategy : DatabaseProtocolStrategyBase
 
         if (type == "QUEUE")
         {
-            using var ms = new MemoryStream();
+            using var ms = new MemoryStream(4096);
             using var bw = new BinaryWriter(ms);
 
             bw.Write((ushort)0); // Reserved
@@ -960,7 +960,7 @@ public sealed class RabbitMqProtocolStrategy : DatabaseProtocolStrategyBase
         {
             var exchangeType = parameters?.GetValueOrDefault("type")?.ToString() ?? "direct";
 
-            using var ms = new MemoryStream();
+            using var ms = new MemoryStream(4096);
             using var bw = new BinaryWriter(ms);
 
             bw.Write((ushort)0); // Reserved
@@ -991,7 +991,7 @@ public sealed class RabbitMqProtocolStrategy : DatabaseProtocolStrategyBase
 
         if (type == "QUEUE")
         {
-            using var ms = new MemoryStream();
+            using var ms = new MemoryStream(4096);
             using var bw = new BinaryWriter(ms);
 
             bw.Write((ushort)0);
@@ -1003,7 +1003,7 @@ public sealed class RabbitMqProtocolStrategy : DatabaseProtocolStrategyBase
         }
         else if (type == "EXCHANGE")
         {
-            using var ms = new MemoryStream();
+            using var ms = new MemoryStream(4096);
             using var bw = new BinaryWriter(ms);
 
             bw.Write((ushort)0);
@@ -1031,7 +1031,7 @@ public sealed class RabbitMqProtocolStrategy : DatabaseProtocolStrategyBase
         var exchange = parameters?.GetValueOrDefault("exchange")?.ToString() ?? "";
         var routingKey = parameters?.GetValueOrDefault("routing_key")?.ToString() ?? "";
 
-        using var ms = new MemoryStream();
+        using var ms = new MemoryStream(4096);
         using var bw = new BinaryWriter(ms);
 
         bw.Write((ushort)0);
@@ -1090,7 +1090,7 @@ public sealed class RabbitMqProtocolStrategy : DatabaseProtocolStrategyBase
         try
         {
             // Channel.Close
-            using var ms = new MemoryStream();
+            using var ms = new MemoryStream(4096);
             using var bw = new BinaryWriter(ms);
             bw.Write((ushort)200);
             WriteShortString(bw, "Normal shutdown");

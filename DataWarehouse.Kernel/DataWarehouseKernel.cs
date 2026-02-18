@@ -344,7 +344,10 @@ namespace DataWarehouse.Kernel
                 {
                     await job(linkedCts.Token);
                 }
-                catch (OperationCanceledException) { }
+                catch (OperationCanceledException)
+                {
+                    /* Cancellation is expected during shutdown */
+                }
                 catch (Exception ex)
                 {
                     _logger?.LogError(ex, "Background job {JobId} failed", jobId);

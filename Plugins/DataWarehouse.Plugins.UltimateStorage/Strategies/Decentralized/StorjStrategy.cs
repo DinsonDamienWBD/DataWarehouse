@@ -878,7 +878,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Decentralized
             }
 
             // Build encrypted package: [salt(32)][nonce(12)][tag(16)][ciphertext]
-            var encryptedStream = new MemoryStream();
+            var encryptedStream = new MemoryStream(65536);
             await encryptedStream.WriteAsync(salt, 0, salt.Length, ct);
             await encryptedStream.WriteAsync(nonce, 0, nonce.Length, ct);
             await encryptedStream.WriteAsync(tag, 0, tag.Length, ct);

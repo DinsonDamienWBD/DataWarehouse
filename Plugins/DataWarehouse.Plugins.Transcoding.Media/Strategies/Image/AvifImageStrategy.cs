@@ -78,7 +78,7 @@ internal sealed class AvifImageStrategy : MediaStrategyBase
         Stream inputStream, TranscodeOptions options, CancellationToken cancellationToken)
     {
         var sourceBytes = await ReadStreamFullyAsync(inputStream, cancellationToken).ConfigureAwait(false);
-        var outputStream = new MemoryStream();
+        var outputStream = new MemoryStream(1024 * 1024);
 
         var quality = DetermineQuality(options);
         var speed = DefaultSpeed;
@@ -149,7 +149,7 @@ internal sealed class AvifImageStrategy : MediaStrategyBase
         Stream videoStream, TimeSpan timeOffset, int width, int height, CancellationToken cancellationToken)
     {
         var sourceBytes = await ReadStreamFullyAsync(videoStream, cancellationToken).ConfigureAwait(false);
-        var outputStream = new MemoryStream();
+        var outputStream = new MemoryStream(1024 * 1024);
 
         using var writer = new BinaryWriter(outputStream, Encoding.UTF8, leaveOpen: true);
 
@@ -176,7 +176,7 @@ internal sealed class AvifImageStrategy : MediaStrategyBase
     /// </summary>
     private static byte[] BuildAvifFtypBox()
     {
-        using var ms = new MemoryStream();
+        using var ms = new MemoryStream(256);
         using var w = new BinaryWriter(ms);
 
         var brands = new[] { "avif", "mif1", "miaf", "MA1A" };
@@ -209,7 +209,7 @@ internal sealed class AvifImageStrategy : MediaStrategyBase
     /// </summary>
     private static void WriteMetaBox(BinaryWriter writer, int width, int height, int bitDepth, bool isHdr)
     {
-        using var metaStream = new MemoryStream();
+        using var metaStream = new MemoryStream(4096);
         using var metaWriter = new BinaryWriter(metaStream);
 
         // hdlr box (handler reference)
@@ -439,7 +439,7 @@ internal sealed class AvifImageStrategy : MediaStrategyBase
         if (stream is MemoryStream ms && ms.TryGetBuffer(out var buffer))
             return buffer.ToArray();
 
-        using var copy = new MemoryStream();
+        using var copy = new MemoryStream(65536);
         await stream.CopyToAsync(copy, cancellationToken).ConfigureAwait(false);
         return copy.ToArray();
     }

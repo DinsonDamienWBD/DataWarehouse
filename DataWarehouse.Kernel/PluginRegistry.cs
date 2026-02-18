@@ -260,8 +260,8 @@ namespace DataWarehouse.Kernel
         private Dictionary<string, object> GetPluginMetadata(IPlugin plugin)
         {
             // Cannot be async: Called from sync context during plugin registration.
-            // Using Task.Run to prevent sync context deadlock.
-            return Task.Run(() => GetPluginMetadataAsync(plugin)).GetAwaiter().GetResult();
+            // Using Task.Run to prevent sync context deadlock, then block safely.
+            return Task.Run(() => GetPluginMetadataAsync(plugin)).Result;
         }
     }
 }

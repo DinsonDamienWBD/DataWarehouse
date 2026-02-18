@@ -786,7 +786,7 @@ public sealed class JsonRegenerationStrategy : RegenerationStrategy
                 var doc = JsonDocument.Parse(json);
                 return Task.FromResult(JsonSerializer.Serialize(doc, new JsonSerializerOptions { WriteIndented = true }));
             }
-            catch { }
+            catch { /* Parsing failure — try other formats */ }
         }
 
         // Try array
@@ -801,7 +801,7 @@ public sealed class JsonRegenerationStrategy : RegenerationStrategy
                 var doc = JsonDocument.Parse(json);
                 return Task.FromResult(JsonSerializer.Serialize(doc, new JsonSerializerOptions { WriteIndented = true }));
             }
-            catch { }
+            catch { /* Parsing failure — try other formats */ }
         }
 
         return Task.FromResult(context);

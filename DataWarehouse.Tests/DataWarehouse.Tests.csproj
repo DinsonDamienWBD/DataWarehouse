@@ -52,6 +52,9 @@
     <ProjectReference Include="..\Plugins\DataWarehouse.Plugins.UltimateIntelligence\DataWarehouse.Plugins.UltimateIntelligence.csproj" />
     <ProjectReference Include="..\Plugins\DataWarehouse.Plugins.TamperProof\DataWarehouse.Plugins.TamperProof.csproj" />
     <ProjectReference Include="..\Plugins\DataWarehouse.Plugins.Transcoding.Media\DataWarehouse.Plugins.Transcoding.Media.csproj" />
+    <ProjectReference Include="..\Plugins\DataWarehouse.Plugins.UltimateFilesystem\DataWarehouse.Plugins.UltimateFilesystem.csproj" />
+    <ProjectReference Include="..\Plugins\DataWarehouse.Plugins.UniversalObservability\DataWarehouse.Plugins.UniversalObservability.csproj" />
+    <ProjectReference Include="..\Plugins\DataWarehouse.Plugins.UniversalDashboards\DataWarehouse.Plugins.UniversalDashboards.csproj" />
   </ItemGroup>
 
 </Project>

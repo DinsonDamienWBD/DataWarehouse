@@ -235,7 +235,7 @@ public sealed class CassandraCqlProtocolStrategy : DatabaseProtocolStrategyBase
         CancellationToken ct)
     {
         // Build QUERY frame
-        using var ms = new MemoryStream();
+        using var ms = new MemoryStream(4096);
         using var writer = new BinaryWriter(ms);
 
         // Query string (long string)
@@ -625,7 +625,7 @@ public sealed class CassandraCqlProtocolStrategy : DatabaseProtocolStrategyBase
 
     private static byte[] EncodeStringMap(Dictionary<string, string> map)
     {
-        using var ms = new MemoryStream();
+        using var ms = new MemoryStream(4096);
         using var writer = new BinaryWriter(ms);
 
         writer.Write(BigEndian((short)map.Count));

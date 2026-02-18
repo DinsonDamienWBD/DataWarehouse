@@ -343,7 +343,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
                 catch
                 {
                     // Clean up on failure
-                    try { _fileStore.CloseFile(fileHandle); } catch { }
+                    try { _fileStore.CloseFile(fileHandle); } catch { /* Best-effort cleanup — failure is non-fatal */ }
                     throw;
                 }
             }
@@ -432,7 +432,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
             catch
             {
                 // Clean up on failure
-                try { _fileStore.CloseFile(fileHandle); } catch { }
+                try { _fileStore.CloseFile(fileHandle); } catch { /* Best-effort cleanup — failure is non-fatal */ }
                 throw;
             }
         }
@@ -687,7 +687,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
                 }
                 finally
                 {
-                    try { _fileStore.CloseFile(fileHandle); } catch { }
+                    try { _fileStore.CloseFile(fileHandle); } catch { /* Best-effort cleanup — failure is non-fatal */ }
                 }
 
                 return null;
@@ -1077,7 +1077,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
                 }
                 catch
                 {
-                    try { _fileStore.CloseFile(fileHandle); } catch { }
+                    try { _fileStore.CloseFile(fileHandle); } catch { /* Best-effort cleanup — failure is non-fatal */ }
                 }
 
                 return null;

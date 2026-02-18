@@ -959,7 +959,7 @@ public sealed class WriteAheadLog : IAsyncDisposable
             {
                 foreach (var file in walFiles.Take(walFiles.Count - 10))
                 {
-                    try { File.Delete(file); } catch { }
+                    try { File.Delete(file); } catch { /* Best-effort cleanup — failure is non-fatal */ }
                 }
             }
         }

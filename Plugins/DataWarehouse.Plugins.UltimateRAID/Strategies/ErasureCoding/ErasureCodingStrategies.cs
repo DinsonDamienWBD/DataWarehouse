@@ -120,7 +120,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.ErasureCoding
                             availableChunks[diskIndex] = chunk;
                         }
                     }
-                    catch { }
+                    catch { /* Disk read failure — erasure coding will reconstruct */ }
                 }
             }).ToList();
 
@@ -1058,7 +1058,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.ErasureCoding
                         var chunk = await SimulateReadFromDisk(disk, offset, stripe.ChunkSize, cancellationToken);
                         lock (availableChunks) { availableChunks[diskIndex] = chunk; }
                     }
-                    catch { }
+                    catch { /* Disk read failure — erasure coding will reconstruct */ }
                 }
             }).ToList();
 

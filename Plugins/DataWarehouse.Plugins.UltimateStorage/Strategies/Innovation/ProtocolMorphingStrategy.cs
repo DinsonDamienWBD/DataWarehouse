@@ -87,7 +87,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
                     }
                 }
             }
-            catch { }
+            catch { /* Persistence failure is non-fatal */ }
         }
 
         private async Task SaveProtocolMetadataAsync(CancellationToken ct)
@@ -98,7 +98,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
                 var json = System.Text.Json.JsonSerializer.Serialize(_objectProtocols.ToDictionary(kvp => kvp.Key, kvp => kvp.Value));
                 await File.WriteAllTextAsync(metaPath, json, ct);
             }
-            catch { }
+            catch { /* Persistence failure is non-fatal */ }
         }
 
         protected override async ValueTask DisposeCoreAsync()
@@ -152,7 +152,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
 
             foreach (var adapter in _protocolAdapters.Values)
             {
-                try { await adapter.DeleteAsync(key, ct); } catch { }
+                try { await adapter.DeleteAsync(key, ct); } catch { /* Best-effort deletion across all protocols */ }
             }
 
             _objectProtocols.TryRemove(key, out _);

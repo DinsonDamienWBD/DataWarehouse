@@ -98,7 +98,7 @@ internal sealed class ScpRsyncTransitStrategy : DataTransitStrategyBase
             byte[] sourceData;
             if (request.DataStream != null)
             {
-                using var ms = new MemoryStream();
+                using var ms = new MemoryStream(65536);
                 await request.DataStream.CopyToAsync(ms, cts.Token);
                 sourceData = ms.ToArray();
             }
@@ -258,7 +258,7 @@ internal sealed class ScpRsyncTransitStrategy : DataTransitStrategyBase
 
         // Compare source blocks against destination checksums
         var sourceBlockCount = (sourceData.Length + BlockSize - 1) / BlockSize;
-        using var changedBlocks = new MemoryStream();
+        using var changedBlocks = new MemoryStream(65536);
         var changedBlockIndices = new List<int>();
 
         for (var i = 0; i < sourceBlockCount; i++)
@@ -333,7 +333,7 @@ internal sealed class ScpRsyncTransitStrategy : DataTransitStrategyBase
             client.Connect();
 
             var remotePath = endpoint.Uri.AbsolutePath;
-            using var ms = new MemoryStream();
+            using var ms = new MemoryStream(65536);
             client.Download(remotePath, ms);
             client.Disconnect();
 

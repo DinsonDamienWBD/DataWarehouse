@@ -93,7 +93,7 @@ public sealed class PostProcessDeduplicationStrategy : DeduplicationStrategyBase
         var sw = Stopwatch.StartNew();
 
         // Read data
-        using var memoryStream = new MemoryStream();
+        using var memoryStream = new MemoryStream(65536);
         await data.CopyToAsync(memoryStream, ct);
         var dataBytes = memoryStream.ToArray();
         var originalSize = dataBytes.Length;
@@ -155,7 +155,7 @@ public sealed class PostProcessDeduplicationStrategy : DeduplicationStrategyBase
         {
             _isProcessing = true;
             // Sync bridge: Timer callback cannot be async
-            Task.Run(() => ProcessBatchInternalAsync(CancellationToken.None)).GetAwaiter().GetResult();
+            Task.Run(() => ProcessBatchInternalAsync(CancellationToken.None)).Wait();
         }
         finally
         {

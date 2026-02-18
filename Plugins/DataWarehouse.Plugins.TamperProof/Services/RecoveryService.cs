@@ -5,6 +5,7 @@ using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Contracts.TamperProof;
 using DataWarehouse.SDK.Infrastructure;
 using Microsoft.Extensions.Logging;
+using System.Buffers;
 using PluginWormProvider = DataWarehouse.Plugins.TamperProof.IWormStorageProvider;
 
 namespace DataWarehouse.Plugins.TamperProof.Services;
@@ -452,9 +453,18 @@ public class RecoveryService
             var length = Math.Min(shardSize, wormData.Length - start);
             if (length > 0)
             {
-                var shard = new byte[length];
-                Array.Copy(wormData, start, shard, 0, length);
-                shards.Add(shard);
+                var shard = ArrayPool<byte>.Shared.Rent(length);
+                try
+                {
+                    Array.Copy(wormData, start, shard, 0, length);
+                    var shardCopy = new byte[length];
+                    Array.Copy(shard, shardCopy, length);
+                    shards.Add(shardCopy);
+                }
+                finally
+                {
+                    ArrayPool<byte>.Shared.Return(shard);
+                }
             }
         }
 
@@ -601,7 +611,7 @@ public class RecoveryService
                         using var stream = await _dataStorage.LoadAsync(uri);
                         if (stream != null)
                         {
-                            using var ms = new MemoryStream();
+                            using var ms = new MemoryStream(65536);
                             await stream.CopyToAsync(ms, ct);
                             var shardData = ms.ToArray();
 
@@ -705,7 +715,7 @@ public class RecoveryService
                     continue;
                 }
 
-                using var ms = new MemoryStream();
+                using var ms = new MemoryStream(65536);
                 await stream.CopyToAsync(ms, ct);
                 var shardData = ms.ToArray();
 

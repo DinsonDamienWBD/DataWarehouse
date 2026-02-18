@@ -33,7 +33,7 @@ namespace DataWarehouse.Tests.Transcoding
                 packageWriter: async () =>
                 {
                     packageWriterCalled = true;
-                    return new MemoryStream();
+                    return new MemoryStream(4096);
                 });
 
             // If FFmpeg is available and succeeds, package writer should NOT be called
@@ -126,7 +126,7 @@ namespace DataWarehouse.Tests.Transcoding
                 await FfmpegTranscodeHelper.ExecuteOrPackageAsync(
                     ffmpegArgs: "-f lavfi -i testsrc=duration=10 -f null -",
                     sourceBytes: Array.Empty<byte>(),
-                    packageWriter: async () => new MemoryStream(),
+                    packageWriter: async () => new MemoryStream(4096),
                     cancellationToken: cts.Token);
             });
         }
@@ -142,7 +142,7 @@ namespace DataWarehouse.Tests.Transcoding
                 packageWriter: async () =>
                 {
                     packageWriterCalled = true;
-                    return new MemoryStream();
+                    return new MemoryStream(4096);
                 });
 
             // Should eventually fall back to package (either FFmpeg fails or not available)

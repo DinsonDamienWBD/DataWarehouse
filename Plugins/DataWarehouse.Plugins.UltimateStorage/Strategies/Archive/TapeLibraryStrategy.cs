@@ -1237,7 +1237,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Archive
                 {
                     process.Kill();
                 }
-                catch { }
+                catch { /* Best-effort process termination — failure is non-fatal */ }
                 throw new TimeoutException($"Command '{command} {arguments}' timed out after {timeout.Value.TotalSeconds} seconds");
             }
 
@@ -1269,7 +1269,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Archive
                 {
                     await UnloadTapeAsync(CancellationToken.None);
                 }
-                catch { }
+                catch { /* Best-effort cleanup — failure is non-fatal */ }
             }
 
             // Close tape handle

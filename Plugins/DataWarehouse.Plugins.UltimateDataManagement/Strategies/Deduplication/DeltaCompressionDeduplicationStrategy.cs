@@ -96,7 +96,7 @@ public sealed class DeltaCompressionDeduplicationStrategy : DeduplicationStrateg
         var sw = Stopwatch.StartNew();
 
         // Read data
-        using var memoryStream = new MemoryStream();
+        using var memoryStream = new MemoryStream(65536);
         await data.CopyToAsync(memoryStream, ct);
         var newData = memoryStream.ToArray();
         var totalSize = newData.Length;
@@ -314,7 +314,7 @@ public sealed class DeltaCompressionDeduplicationStrategy : DeduplicationStrateg
     {
         // Simple XOR-based delta for demonstration
         // In production, use a proper delta algorithm like xdelta or bsdiff
-        using var deltaStream = new MemoryStream();
+        using var deltaStream = new MemoryStream(65536);
         using var writer = new BinaryWriter(deltaStream);
 
         // Write header
@@ -414,7 +414,7 @@ public sealed class DeltaCompressionDeduplicationStrategy : DeduplicationStrateg
 
     private byte[]? ReconstructFromChunks(List<ChunkRef> chunkRefs)
     {
-        using var stream = new MemoryStream();
+        using var stream = new MemoryStream(65536);
 
         foreach (var chunkRef in chunkRefs.OrderBy(c => c.Offset))
         {

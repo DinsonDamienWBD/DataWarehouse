@@ -678,7 +678,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Threshold
         private byte[] TaggedHash(string tag, byte[] data)
         {
             var tagHash = SHA256.HashData(Encoding.UTF8.GetBytes(tag));
-            using var ms = new MemoryStream();
+            using var ms = new MemoryStream(4096);
             ms.Write(tagHash);
             ms.Write(tagHash);
             ms.Write(data);
@@ -687,7 +687,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Threshold
 
         private BigInteger ComputeChallenge(byte[] Rx, byte[] Px, byte[] message)
         {
-            using var ms = new MemoryStream();
+            using var ms = new MemoryStream(4096);
             ms.Write(Rx);
             ms.Write(Px);
             ms.Write(message);
@@ -697,7 +697,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Threshold
 
         private byte[] ComputeCommitmentHash(ECPoint D, ECPoint E)
         {
-            using var ms = new MemoryStream();
+            using var ms = new MemoryStream(4096);
             ms.Write(D.GetEncoded(false));
             ms.Write(E.GetEncoded(false));
             return SHA256.HashData(ms.ToArray());
@@ -711,7 +711,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Threshold
             var factors = new Dictionary<int, BigInteger>();
 
             // Encode commitments for binding factor computation
-            using var ms = new MemoryStream();
+            using var ms = new MemoryStream(4096);
             ms.Write(message);
             foreach (var idx in signerIndices.OrderBy(x => x))
             {
@@ -724,7 +724,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Threshold
 
             foreach (var idx in signerIndices)
             {
-                using var factorInput = new MemoryStream();
+                using var factorInput = new MemoryStream(4096);
                 factorInput.Write(encodedCommitments);
                 factorInput.Write(BitConverter.GetBytes(idx));
                 var hash = SHA256.HashData(factorInput.ToArray());
@@ -740,7 +740,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Threshold
             var R = DomainParams.G.Multiply(k);
             var P = DomainParams.G.Multiply(secret);
 
-            using var ms = new MemoryStream();
+            using var ms = new MemoryStream(4096);
             ms.Write(R.GetEncoded(false));
             ms.Write(P.GetEncoded(false));
             var challenge = new BigInteger(1, SHA256.HashData(ms.ToArray())).Mod(DomainParams.N);
@@ -767,7 +767,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Threshold
             Array.Copy(proof, 65, responseBytes, 0, 32);
             var response = new BigInteger(1, responseBytes);
 
-            using var ms = new MemoryStream();
+            using var ms = new MemoryStream(4096);
             ms.Write(RBytes);
             ms.Write(publicKey.GetEncoded(false));
             var challenge = new BigInteger(1, SHA256.HashData(ms.ToArray())).Mod(DomainParams.N);
@@ -907,7 +907,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Threshold
                 var tag = new byte[16];
                 aes.Encrypt(nonce, dataKey, ciphertext, tag);
 
-                using var ms = new MemoryStream();
+                using var ms = new MemoryStream(4096);
                 var ephemeralBytes = ephemeralPub.GetEncoded(false);
                 ms.Write(BitConverter.GetBytes(ephemeralBytes.Length));
                 ms.Write(ephemeralBytes);
@@ -1031,7 +1031,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Threshold
                         _currentKeyId = _keys.Keys.First();
                 }
             }
-            catch { }
+            catch { /* Deserialization failure — start with empty state */ }
         }
 
         private async Task PersistKeysToStorage()

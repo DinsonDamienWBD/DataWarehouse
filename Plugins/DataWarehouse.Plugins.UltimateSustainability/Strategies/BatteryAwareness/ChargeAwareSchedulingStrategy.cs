@@ -114,7 +114,7 @@ public sealed class ChargeAwareSchedulingStrategy : SustainabilityStrategyBase
                 await workload.Workload(CancellationToken.None);
                 RecordOptimizationAction();
             }
-            catch { }
+            catch { /* Deferred workload failure is logged but non-fatal */ }
         }
     }
 

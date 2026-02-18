@@ -218,7 +218,7 @@ namespace DataWarehouse.Plugins.Raft
             meta["LeaderId"] = _leaderId ?? "none";
             meta["PeerCount"] = _peers.Count;
             // Sync bridge: GetMetadata is synchronous in base class
-            meta["LogLength"] = _logStore != null ? Task.Run(() => _logStore.GetLastIndexAsync()).GetAwaiter().GetResult() : 0;
+            meta["LogLength"] = _logStore != null ? Task.Run(() => _logStore.GetLastIndexAsync()).Result : 0;
             meta["CommitIndex"] = _commitIndex;
             return meta;
         }

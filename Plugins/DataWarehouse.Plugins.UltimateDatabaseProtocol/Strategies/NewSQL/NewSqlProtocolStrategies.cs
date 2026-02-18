@@ -67,7 +67,7 @@ public sealed class CockroachDbProtocolStrategy : DatabaseProtocolStrategyBase
             ["application_name"] = "DataWarehouse"
         };
 
-        using var ms = new MemoryStream();
+        using var ms = new MemoryStream(4096);
         using var bw = new BinaryWriter(ms);
 
         // Write protocol version
@@ -662,7 +662,7 @@ public sealed class TiDbProtocolStrategy : DatabaseProtocolStrategyBase
 
     private byte[] CreateHandshakeResponse(string username, string password, string database)
     {
-        using var ms = new MemoryStream();
+        using var ms = new MemoryStream(4096);
         using var bw = new BinaryWriter(ms);
 
         // Client capabilities
@@ -1045,7 +1045,7 @@ public sealed class YugabyteDbProtocolStrategy : DatabaseProtocolStrategyBase
             ["application_name"] = "DataWarehouse"
         };
 
-        using var ms = new MemoryStream();
+        using var ms = new MemoryStream(4096);
         using var bw = new BinaryWriter(ms);
 
         bw.Write(BinaryPrimitives.ReverseEndianness(ProtocolVersion3));
@@ -1408,7 +1408,7 @@ public sealed class VoltDbProtocolStrategy : DatabaseProtocolStrategyBase
     protected override async Task PerformHandshakeAsync(ConnectionParameters parameters, CancellationToken ct)
     {
         // VoltDB login message
-        using var ms = new MemoryStream();
+        using var ms = new MemoryStream(4096);
         using var bw = new BinaryWriter(ms);
 
         // Service name
@@ -1485,7 +1485,7 @@ public sealed class VoltDbProtocolStrategy : DatabaseProtocolStrategyBase
         _clientHandle++;
 
         // Build procedure call
-        using var ms = new MemoryStream();
+        using var ms = new MemoryStream(4096);
         using var bw = new BinaryWriter(ms);
 
         bw.Write((byte)0); // Version

@@ -464,7 +464,7 @@ public sealed class TimePointVersioningStrategy : VersioningStrategyBase
 
         private static byte[] ComputeSimpleDelta(byte[] from, byte[] to)
         {
-            using var ms = new MemoryStream();
+            using var ms = new MemoryStream(65536);
             using var writer = new BinaryWriter(ms);
 
             writer.Write(from.Length);
@@ -536,7 +536,7 @@ public sealed class TimePointVersioningStrategy : VersioningStrategyBase
     {
         ct.ThrowIfCancellationRequested();
 
-        using var ms = new MemoryStream();
+        using var ms = new MemoryStream(65536);
         data.CopyTo(ms);
         var bytes = ms.ToArray();
 

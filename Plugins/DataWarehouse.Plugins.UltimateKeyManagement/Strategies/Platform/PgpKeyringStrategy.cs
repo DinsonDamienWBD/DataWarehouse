@@ -344,7 +344,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Platform
                 if (encKey == null)
                     throw new InvalidOperationException("No encryption key found in keyring.");
 
-                using var outputStream = new MemoryStream();
+                using var outputStream = new MemoryStream(65536);
                 using (var armoredStream = new ArmoredOutputStream(outputStream))
                 {
                     var compressedData = Compress(data);
@@ -410,7 +410,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Platform
                 if (message is PgpLiteralData literalData)
                 {
                     using var literalStream = literalData.GetInputStream();
-                    using var output = new MemoryStream();
+                    using var output = new MemoryStream(65536);
                     literalStream.CopyTo(output);
                     return output.ToArray();
                 }
@@ -421,7 +421,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Platform
 
         private byte[] Compress(byte[] data)
         {
-            using var compressedOut = new MemoryStream();
+            using var compressedOut = new MemoryStream(65536);
             var compressedDataGenerator = new PgpCompressedDataGenerator(CompressionAlgorithmTag.Zip);
 
             using (var compressedStream = compressedDataGenerator.Open(compressedOut))

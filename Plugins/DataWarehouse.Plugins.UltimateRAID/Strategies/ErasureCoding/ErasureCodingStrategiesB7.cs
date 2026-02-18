@@ -539,7 +539,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.ErasureCoding
                         var neighbors = GetNeighbors(i, degree);
                         availableSymbols.Add(new EncodedSymbol { Index = i, Data = data, Degree = degree, Neighbors = neighbors });
                     }
-                    catch { }
+                    catch { /* Disk read failure — fountain codes will reconstruct */ }
                 }
             }
 

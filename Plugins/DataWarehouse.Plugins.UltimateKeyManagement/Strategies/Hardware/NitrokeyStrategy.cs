@@ -603,7 +603,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Hardware
                             keys.Add($"secret:{label}");
                         }
                     }
-                    catch { }
+                    catch { /* Attribute read failure — skip this key */ }
                 }
 
                 // Find all key pairs
@@ -623,7 +623,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Hardware
                             keys.Add($"keypair:{label}");
                         }
                     }
-                    catch { }
+                    catch { /* Attribute read failure — skip this key */ }
                 }
 
                 return keys.AsReadOnly();
@@ -760,7 +760,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Hardware
                     {
                         if (_loggedIn)
                         {
-                            try { _session.Logout(); } catch { }
+                            try { _session.Logout(); } catch { /* Best-effort cleanup — failure is non-fatal */ }
                         }
                         _session.Dispose();
                     }

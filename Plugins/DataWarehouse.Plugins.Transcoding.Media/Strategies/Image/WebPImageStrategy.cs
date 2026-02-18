@@ -77,7 +77,7 @@ internal sealed class WebPImageStrategy : MediaStrategyBase
         Stream inputStream, TranscodeOptions options, CancellationToken cancellationToken)
     {
         var sourceBytes = await ReadStreamFullyAsync(inputStream, cancellationToken).ConfigureAwait(false);
-        var outputStream = new MemoryStream();
+        var outputStream = new MemoryStream(1024 * 1024);
 
         var quality = DetermineQuality(options);
         var isLossless = options.VideoCodec?.Equals("webp-lossless", StringComparison.OrdinalIgnoreCase) ?? false;
@@ -169,7 +169,7 @@ internal sealed class WebPImageStrategy : MediaStrategyBase
         Stream videoStream, TimeSpan timeOffset, int width, int height, CancellationToken cancellationToken)
     {
         var sourceBytes = await ReadStreamFullyAsync(videoStream, cancellationToken).ConfigureAwait(false);
-        var outputStream = new MemoryStream();
+        var outputStream = new MemoryStream(1024 * 1024);
 
         using var writer = new BinaryWriter(outputStream, Encoding.UTF8, leaveOpen: true);
 
@@ -221,7 +221,7 @@ internal sealed class WebPImageStrategy : MediaStrategyBase
     /// </summary>
     private static void WriteVp8Chunk(BinaryWriter writer, byte[] sourceData, int width, int height, int quality)
     {
-        using var chunkStream = new MemoryStream();
+        using var chunkStream = new MemoryStream(4096);
         using var chunkWriter = new BinaryWriter(chunkStream);
 
         // VP8 bitstream header (simplified frame header)
@@ -246,7 +246,7 @@ internal sealed class WebPImageStrategy : MediaStrategyBase
     /// </summary>
     private static void WriteVp8LChunk(BinaryWriter writer, byte[] sourceData, int width, int height, int quality)
     {
-        using var chunkStream = new MemoryStream();
+        using var chunkStream = new MemoryStream(4096);
         using var chunkWriter = new BinaryWriter(chunkStream);
 
         // VP8L signature byte
@@ -454,7 +454,7 @@ internal sealed class WebPImageStrategy : MediaStrategyBase
         if (stream is MemoryStream ms && ms.TryGetBuffer(out var buffer))
             return buffer.ToArray();
 
-        using var copy = new MemoryStream();
+        using var copy = new MemoryStream(65536);
         await stream.CopyToAsync(copy, cancellationToken).ConfigureAwait(false);
         return copy.ToArray();
     }

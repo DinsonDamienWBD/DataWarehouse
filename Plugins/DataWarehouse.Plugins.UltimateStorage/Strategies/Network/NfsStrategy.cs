@@ -488,7 +488,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
                     catch
                     {
                         // Clean up temp file on failure
-                        try { File.Delete(tempPath); } catch { }
+                        try { File.Delete(tempPath); } catch { /* Best-effort cleanup — failure is non-fatal */ }
                         throw;
                     }
 
@@ -1223,7 +1223,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
                     if (_lockHandle != null)
                     {
                         // Sync bridge: Dispose cannot be async without IAsyncDisposable
-                        Task.Run(() => _strategy.ReleaseFileLockAsync(_lockHandle, CancellationToken.None)).GetAwaiter().GetResult();
+                        Task.Run(() => _strategy.ReleaseFileLockAsync(_lockHandle, CancellationToken.None)).Wait();
                     }
                 }
                 _disposed = true;

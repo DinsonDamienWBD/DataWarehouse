@@ -453,7 +453,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Threshold
                 aes.Encrypt(nonce, dataKey, ciphertext, tag);
 
                 // Combine: ephemeralPublic || nonce || tag || ciphertext
-                using var ms = new MemoryStream();
+                using var ms = new MemoryStream(4096);
                 var ephemeralBytes = ephemeralPublic.GetEncoded(false);
                 ms.Write(BitConverter.GetBytes(ephemeralBytes.Length));
                 ms.Write(ephemeralBytes);

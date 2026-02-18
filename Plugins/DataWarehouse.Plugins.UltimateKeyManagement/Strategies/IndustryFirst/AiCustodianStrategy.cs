@@ -824,7 +824,7 @@ Provide your access decision in the following JSON format:
                         _currentKeyId = _keys.Keys.First();
                 }
             }
-            catch { }
+            catch { /* Deserialization failure — start with empty state */ }
         }
 
         private async Task PersistKeysToStorage()

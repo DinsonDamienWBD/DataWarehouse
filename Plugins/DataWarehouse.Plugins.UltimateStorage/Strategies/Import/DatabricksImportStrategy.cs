@@ -25,7 +25,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Import
             return Task.FromResult(new StorageObjectMetadata { Key = key, Size = data.Length, Created = DateTime.UtcNow, Modified = DateTime.UtcNow, Tier = Tier });
         }
 
-        protected override Task<Stream> RetrieveAsyncCore(string key, CancellationToken ct) { IncrementOperationCounter(StorageOperationType.Retrieve); return Task.FromResult<Stream>(new MemoryStream()); }
+        protected override Task<Stream> RetrieveAsyncCore(string key, CancellationToken ct) { IncrementOperationCounter(StorageOperationType.Retrieve); return Task.FromResult<Stream>(new MemoryStream(0)); }
         protected override Task DeleteAsyncCore(string key, CancellationToken ct) { IncrementOperationCounter(StorageOperationType.Delete); return Task.CompletedTask; }
         protected override Task<bool> ExistsAsyncCore(string key, CancellationToken ct) { IncrementOperationCounter(StorageOperationType.Exists); return Task.FromResult(true); }
         protected override IAsyncEnumerable<StorageObjectMetadata> ListAsyncCore(string? prefix, CancellationToken ct) { IncrementOperationCounter(StorageOperationType.List); return AsyncEnumerable.Empty<StorageObjectMetadata>(); }

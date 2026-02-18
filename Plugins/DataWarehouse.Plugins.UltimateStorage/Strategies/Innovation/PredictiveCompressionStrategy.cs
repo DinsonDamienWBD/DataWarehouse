@@ -598,7 +598,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
 
         private async Task<byte[]> CompressDataAsync(byte[] data, CompressionAlgorithm algorithm, int level, CancellationToken ct)
         {
-            using var outputStream = new MemoryStream();
+            using var outputStream = new MemoryStream(65536);
 
             switch (algorithm)
             {
@@ -631,7 +631,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
         private async Task<byte[]> DecompressDataAsync(byte[] compressedData, CompressionAlgorithm algorithm, CancellationToken ct)
         {
             using var inputStream = new MemoryStream(compressedData);
-            using var outputStream = new MemoryStream();
+            using var outputStream = new MemoryStream(65536);
 
             switch (algorithm)
             {

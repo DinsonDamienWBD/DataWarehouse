@@ -698,7 +698,7 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Steganography
             aes.Key = _encryptionKey;
             aes.GenerateIV();
 
-            using var ms = new MemoryStream();
+            using var ms = new MemoryStream(65536);
             ms.Write(aes.IV, 0, aes.IV.Length);
 
             using (var cs = new CryptoStream(ms, aes.CreateEncryptor(), CryptoStreamMode.Write))
@@ -723,7 +723,7 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Steganography
             Array.Copy(encryptedData, 0, iv, 0, 16);
             aes.IV = iv;
 
-            using var ms = new MemoryStream();
+            using var ms = new MemoryStream(65536);
             using (var cs = new CryptoStream(ms, aes.CreateDecryptor(), CryptoStreamMode.Write))
             {
                 cs.Write(encryptedData, 16, encryptedData.Length - 16);

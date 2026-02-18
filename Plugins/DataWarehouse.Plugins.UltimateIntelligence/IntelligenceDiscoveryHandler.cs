@@ -59,7 +59,7 @@ public sealed class IntelligenceDiscoveryHandler : IDisposable
         // Dispose all subscriptions
         foreach (var sub in _subscriptions)
         {
-            try { sub.Dispose(); } catch { }
+            try { sub.Dispose(); } catch { /* Best-effort cleanup — failure is non-fatal */ }
         }
         _subscriptions.Clear();
     }
@@ -320,7 +320,7 @@ public sealed class IntelligenceDiscoveryHandler : IDisposable
 
         foreach (var sub in _subscriptions)
         {
-            try { sub.Dispose(); } catch { }
+            try { sub.Dispose(); } catch { /* Best-effort cleanup — failure is non-fatal */ }
         }
         _subscriptions.Clear();
     }

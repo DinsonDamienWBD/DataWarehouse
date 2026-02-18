@@ -5,6 +5,7 @@ using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Contracts.TamperProof;
 using DataWarehouse.Plugins.TamperProof.Services;
 using Microsoft.Extensions.Logging;
+using System.Buffers;
 
 namespace DataWarehouse.Plugins.TamperProof;
 
@@ -109,7 +110,7 @@ public static class WritePhaseHandlers
         try
         {
             // Read original data
-            using var ms = new MemoryStream();
+            using var ms = new MemoryStream(65536);
             await data.CopyToAsync(ms, ct);
             var originalData = ms.ToArray();
 
@@ -127,7 +128,7 @@ public static class WritePhaseHandlers
                 using var inputStream = new MemoryStream(currentData);
                 using var outputStream = await orchestrator.ApplyPipelineAsync(inputStream, ct);
 
-                using var resultMs = new MemoryStream();
+                using var resultMs = new MemoryStream(currentData.Length);
                 await outputStream.CopyToAsync(resultMs, ct);
                 currentData = resultMs.ToArray();
 
@@ -298,7 +299,8 @@ public static class WritePhaseHandlers
             return Array.Empty<byte>();
         }
 
-        var chaff = new byte[length];
+        var chaff = ArrayPool<byte>.Shared.Rent(length);
+        var result = new byte[length];
 
         // Build a byte frequency distribution from the reference data
         // This makes the chaff statistically similar to the actual content
@@ -353,7 +355,9 @@ public static class WritePhaseHandlers
             }
         }
 
-        return chaff;
+        Array.Copy(chaff, result, length);
+        ArrayPool<byte>.Shared.Return(chaff);
+        return result;
     }
 
     /// <summary>
@@ -449,9 +453,18 @@ public static class WritePhaseHandlers
             {
                 var start = i * shardSize;
                 var length = Math.Min(shardSize, data.Length - start);
-                var shard = new byte[length];
-                Array.Copy(data, start, shard, 0, length);
-                shards.Add(shard);
+                var shard = ArrayPool<byte>.Shared.Rent(length);
+                try
+                {
+                    Array.Copy(data, start, shard, 0, length);
+                    var shardCopy = new byte[length];
+                    Array.Copy(shard, shardCopy, length);
+                    shards.Add(shardCopy);
+                }
+                finally
+                {
+                    ArrayPool<byte>.Shared.Return(shard);
+                }
             }
 
             // Create parity shards (simple XOR for now, would use Reed-Solomon in production)

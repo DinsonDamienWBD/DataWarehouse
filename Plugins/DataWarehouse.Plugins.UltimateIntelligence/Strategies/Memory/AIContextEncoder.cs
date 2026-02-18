@@ -293,7 +293,7 @@ public sealed class SemanticVectorEncoder : IAIContextEncoder
     {
         var json = JsonSerializer.SerializeToUtf8Bytes(payload);
 
-        using var output = new MemoryStream();
+        using var output = new MemoryStream(65536);
         using (var compressor = new BrotliStream(output, CompressionLevel.Optimal, leaveOpen: true))
         {
             await compressor.WriteAsync(json, ct);
@@ -306,7 +306,7 @@ public sealed class SemanticVectorEncoder : IAIContextEncoder
     {
         using var input = new MemoryStream(compressed);
         using var decompressor = new BrotliStream(input, CompressionMode.Decompress);
-        using var output = new MemoryStream();
+        using var output = new MemoryStream(65536);
 
         await decompressor.CopyToAsync(output, ct);
         output.Position = 0;

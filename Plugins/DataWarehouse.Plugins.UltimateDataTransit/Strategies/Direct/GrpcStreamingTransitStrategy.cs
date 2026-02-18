@@ -145,7 +145,7 @@ internal sealed class GrpcStreamingTransitStrategy : DataTransitStrategyBase
             // Build gRPC-framed payload: chunk the data into gRPC frames
             // gRPC frame: [1 byte compressed flag][4 bytes message length (big-endian)][message bytes]
             const int chunkSize = 65536; // 64KB chunks
-            using var framedStream = new MemoryStream();
+            using var framedStream = new MemoryStream(65536);
             var readBuffer = new byte[chunkSize];
             int bytesRead;
 

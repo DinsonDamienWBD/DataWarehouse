@@ -246,7 +246,7 @@ public class SerializationBenchmarks
     public byte[] MessagePackSerialize()
     {
         // Using manual serialization as MessagePack NuGet may not be available
-        using var ms = new MemoryStream();
+        using var ms = new MemoryStream(4096);
         using var writer = new BinaryWriter(ms);
         writer.Write(_simpleObject.Id.ToByteArray());
         writer.Write(_simpleObject.Name ?? "");
@@ -459,7 +459,7 @@ public class CompressionBenchmarks
     [Benchmark(Description = "GZip Compress 1MB (compressible)")]
     public byte[] GzipCompressCompressible()
     {
-        using var output = new MemoryStream();
+        using var output = new MemoryStream(1024 * 1024);
         using (var gzip = new System.IO.Compression.GZipStream(output, System.IO.Compression.CompressionLevel.Optimal))
         {
             gzip.Write(_compressibleData);
@@ -470,7 +470,7 @@ public class CompressionBenchmarks
     [Benchmark(Description = "GZip Compress 1MB (random)")]
     public byte[] GzipCompressRandom()
     {
-        using var output = new MemoryStream();
+        using var output = new MemoryStream(1024 * 1024);
         using (var gzip = new System.IO.Compression.GZipStream(output, System.IO.Compression.CompressionLevel.Optimal))
         {
             gzip.Write(_randomData);
@@ -481,7 +481,7 @@ public class CompressionBenchmarks
     [Benchmark(Description = "Brotli Compress 1MB (compressible)")]
     public byte[] BrotliCompressCompressible()
     {
-        using var output = new MemoryStream();
+        using var output = new MemoryStream(1024 * 1024);
         using (var brotli = new System.IO.Compression.BrotliStream(output, System.IO.Compression.CompressionLevel.Optimal))
         {
             brotli.Write(_compressibleData);
@@ -492,7 +492,7 @@ public class CompressionBenchmarks
     [Benchmark(Description = "Deflate Compress 1MB (compressible)")]
     public byte[] DeflateCompressCompressible()
     {
-        using var output = new MemoryStream();
+        using var output = new MemoryStream(1024 * 1024);
         using (var deflate = new System.IO.Compression.DeflateStream(output, System.IO.Compression.CompressionLevel.Optimal))
         {
             deflate.Write(_compressibleData);

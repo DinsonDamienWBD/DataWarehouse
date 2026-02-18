@@ -256,7 +256,7 @@ public sealed class LinearVersioningStrategy : VersioningStrategyBase
     {
         ct.ThrowIfCancellationRequested();
 
-        using var ms = new MemoryStream();
+        using var ms = new MemoryStream(65536);
         data.CopyTo(ms);
         var bytes = ms.ToArray();
 
@@ -375,7 +375,7 @@ public sealed class LinearVersioningStrategy : VersioningStrategyBase
     private static byte[] ComputeSimpleDelta(byte[] from, byte[] to)
     {
         // Simple delta: store length prefix + XOR for overlapping bytes + additional bytes
-        using var ms = new MemoryStream();
+        using var ms = new MemoryStream(65536);
         using var writer = new BinaryWriter(ms);
 
         writer.Write(from.Length);

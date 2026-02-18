@@ -122,7 +122,7 @@ public sealed class UltimateStoragePlugin : DataWarehouse.SDK.Contracts.Hierarch
 
         // Read stream to bytes
         byte[] data;
-        using (var ms = new MemoryStream())
+        using (var ms = new MemoryStream(65536))
         {
             await input.CopyToAsync(ms, ct);
             data = ms.ToArray();
@@ -537,7 +537,7 @@ public sealed class UltimateStoragePlugin : DataWarehouse.SDK.Contracts.Hierarch
         }
 
         // Return empty stream (data is now in backend)
-        return new MemoryStream();
+        return new MemoryStream(0);
     }
 
     /// <summary>Read data via pipeline transform.</summary>

@@ -175,7 +175,7 @@ public sealed class FfmpegExecutor
         var stderrBuilder = new StringBuilder();
 
         using var process = new Process { StartInfo = psi };
-        using var stdoutMemory = new MemoryStream();
+        using var stdoutMemory = new MemoryStream(1024 * 1024);
 
         // Capture stderr asynchronously (FFmpeg writes progress/diagnostics here)
         process.ErrorDataReceived += (sender, args) =>

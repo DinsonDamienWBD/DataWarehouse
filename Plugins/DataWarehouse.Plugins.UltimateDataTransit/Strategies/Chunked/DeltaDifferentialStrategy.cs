@@ -465,7 +465,7 @@ internal sealed class DeltaDifferentialStrategy : DataTransitStrategyBase
         var deltaUri = new Uri(destination.Uri, $"delta/{transferId}");
 
         // Serialize delta instructions as binary payload
-        using var payloadStream = new MemoryStream();
+        using var payloadStream = new MemoryStream(65536);
         using var writer = new BinaryWriter(payloadStream, System.Text.Encoding.UTF8, leaveOpen: true);
 
         // Write instruction count
@@ -587,7 +587,7 @@ internal sealed class DeltaDifferentialStrategy : DataTransitStrategyBase
                 request.DataStream.Position = 0;
             }
 
-            using var memStream = new MemoryStream();
+            using var memStream = new MemoryStream(65536);
             await request.DataStream.CopyToAsync(memStream, ct);
             return memStream.ToArray();
         }

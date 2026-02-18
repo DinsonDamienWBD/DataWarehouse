@@ -853,7 +853,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Decentralized
         private async Task<byte[]> CompressDataAsync(byte[] data, CancellationToken ct)
         {
             using var inputStream = new MemoryStream(data);
-            using var outputStream = new MemoryStream();
+            using var outputStream = new MemoryStream(65536);
             using var gzipStream = new System.IO.Compression.GZipStream(outputStream, System.IO.Compression.CompressionLevel.Optimal);
 
             await inputStream.CopyToAsync(gzipStream, 81920, ct);
@@ -869,7 +869,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Decentralized
         {
             using var inputStream = new MemoryStream(compressedData);
             using var gzipStream = new System.IO.Compression.GZipStream(inputStream, System.IO.Compression.CompressionMode.Decompress);
-            var outputStream = new MemoryStream();
+            var outputStream = new MemoryStream(65536);
 
             await gzipStream.CopyToAsync(outputStream, 81920, ct);
             outputStream.Position = 0;

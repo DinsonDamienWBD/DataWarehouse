@@ -75,7 +75,7 @@ public sealed class InlineDeduplicationStrategy : DeduplicationStrategyBase
         var sw = Stopwatch.StartNew();
 
         // Read all data into memory for hashing
-        using var memoryStream = new MemoryStream();
+        using var memoryStream = new MemoryStream(65536);
         await data.CopyToAsync(memoryStream, _bufferSize, ct);
         var dataBytes = memoryStream.ToArray();
         var originalSize = dataBytes.Length;

@@ -277,7 +277,7 @@ public sealed class DataWarehouseWriteFanOutOrchestrator : WriteFanOutOrchestrat
             data.Position = 0;
         }
 
-        using (var ms = new MemoryStream())
+        using (var ms = new MemoryStream(65536))
         {
             await data.CopyToAsync(ms, ct);
             dataBytes = ms.ToArray();

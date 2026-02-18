@@ -68,7 +68,7 @@ internal sealed class PartitionedQueryStrategy : ComputeRuntimeStrategyBase
                         var sorted = result.StandardOutput.Split('\n', StringSplitOptions.RemoveEmptyEntries).OrderBy(l => l).ToList();
                         partitionResults[idx] = sorted;
                     }
-                    finally { try { File.Delete(codePath); } catch { } }
+                    finally { try { File.Delete(codePath); } catch { /* Best-effort cleanup — failure is non-fatal */ } }
                 });
 
             // Merge-sort across partitions

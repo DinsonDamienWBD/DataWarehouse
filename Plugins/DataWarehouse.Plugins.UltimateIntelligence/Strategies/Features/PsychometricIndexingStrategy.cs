@@ -374,7 +374,7 @@ Return JSON:
                 }
             }
         }
-        catch { }
+        catch { /* Parsing failure — return analysis with defaults */ }
 
         return analysis;
     }
@@ -400,7 +400,7 @@ Return JSON:
                 };
             }
         }
-        catch { }
+        catch { /* Parsing failure — return null */ }
 
         return null;
     }

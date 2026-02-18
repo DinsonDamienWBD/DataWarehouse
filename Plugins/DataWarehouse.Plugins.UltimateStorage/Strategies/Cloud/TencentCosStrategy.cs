@@ -259,7 +259,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Cloud
             }
             finally
             {
-                try { if (File.Exists(tempFile)) File.Delete(tempFile); } catch { }
+                try { if (File.Exists(tempFile)) File.Delete(tempFile); } catch { /* Best-effort cleanup — failure is non-fatal */ }
             }
         }
 
@@ -305,7 +305,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Cloud
             }
             finally
             {
-                try { if (File.Exists(tempFile)) File.Delete(tempFile); } catch { }
+                try { if (File.Exists(tempFile)) File.Delete(tempFile); } catch { /* Best-effort cleanup — failure is non-fatal */ }
             }
         }
 
@@ -329,7 +329,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Cloud
 
                 if (!result.IsSuccessful())
                 {
-                    try { if (File.Exists(tempFile)) File.Delete(tempFile); } catch { }
+                    try { if (File.Exists(tempFile)) File.Delete(tempFile); } catch { /* Best-effort cleanup — failure is non-fatal */ }
                     throw new FileNotFoundException($"Object '{key}' not found");
                 }
 
@@ -341,7 +341,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Cloud
                 }
                 ms.Position = 0;
 
-                try { if (File.Exists(tempFile)) File.Delete(tempFile); } catch { }
+                try { if (File.Exists(tempFile)) File.Delete(tempFile); } catch { /* Best-effort cleanup — failure is non-fatal */ }
 
                 IncrementBytesRetrieved(ms.Length);
                 IncrementOperationCounter(StorageOperationType.Retrieve);
@@ -361,7 +361,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Cloud
                 var meta = await GetMetadataAsyncCore(key, ct);
                 size = meta.Size;
             }
-            catch { }
+            catch { /* Metadata fetch failure — delete anyway */ }
 
             await ExecuteWithRetryAsync(async () =>
             {
@@ -647,7 +647,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Cloud
                         versioningRequest.IsEnableVersionConfig(true);
                         _cosClient.PutBucketVersioning(versioningRequest);
                     }
-                    catch { }
+                    catch { /* Versioning setup failure is non-fatal */ }
                 }
 
                 // Global acceleration needs to be configured separately via console or API

@@ -66,7 +66,7 @@ public sealed class ClickHouseProtocolStrategy : DatabaseProtocolStrategyBase
     protected override async Task PerformHandshakeAsync(ConnectionParameters parameters, CancellationToken ct)
     {
         // Send client hello
-        using var ms = new MemoryStream();
+        using var ms = new MemoryStream(4096);
         using var bw = new BinaryWriter(ms);
 
         WriteVarUInt(bw, ClientHello);
@@ -122,7 +122,7 @@ public sealed class ClickHouseProtocolStrategy : DatabaseProtocolStrategyBase
         CancellationToken ct)
     {
         // Send query
-        using var ms = new MemoryStream();
+        using var ms = new MemoryStream(4096);
         using var bw = new BinaryWriter(ms);
 
         WriteVarUInt(bw, ClientQuery);
@@ -156,7 +156,7 @@ public sealed class ClickHouseProtocolStrategy : DatabaseProtocolStrategyBase
         await ActiveStream!.WriteAsync(ms.ToArray(), ct);
 
         // Send empty data block to signal end of data
-        using var dataMs = new MemoryStream();
+        using var dataMs = new MemoryStream(4096);
         using var dataBw = new BinaryWriter(dataMs);
         WriteVarUInt(dataBw, ClientData);
         WriteString(dataBw, ""); // Temporary table name
@@ -345,7 +345,7 @@ public sealed class ClickHouseProtocolStrategy : DatabaseProtocolStrategyBase
     {
         try
         {
-            using var ms = new MemoryStream();
+            using var ms = new MemoryStream(4096);
             using var bw = new BinaryWriter(ms);
             WriteVarUInt(bw, ClientPing);
 

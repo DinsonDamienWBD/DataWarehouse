@@ -380,7 +380,7 @@ Return JSON:
                 profile.ClassificationConfidence = 0.8;
             }
         }
-        catch { }
+        catch { /* Parsing failure — return profile with defaults */ }
 
         return profile;
     }
@@ -420,7 +420,7 @@ Return JSON:
                     prediction.Confidence = conf.GetDouble();
             }
         }
-        catch { }
+        catch { /* Parsing failure — return prediction with defaults */ }
 
         return prediction;
     }
@@ -675,7 +675,7 @@ Return JSON:
                     recommendation.CostSavingsEstimate = savings.GetDouble();
             }
         }
-        catch { }
+        catch { /* Parsing failure — return recommendation with defaults */ }
 
         return recommendation;
     }
@@ -715,7 +715,7 @@ Return JSON:
                     prediction.ChangeTiming = timing.GetString();
             }
         }
-        catch { }
+        catch { /* Parsing failure — return prediction with defaults */ }
 
         return prediction;
     }

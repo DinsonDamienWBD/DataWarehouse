@@ -1,6 +1,7 @@
 using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Contracts.Distributed;
 using System;
+using System.Buffers;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
@@ -408,28 +409,42 @@ namespace DataWarehouse.SDK.Infrastructure.Distributed
             var stream = client.GetStream();
 
             // Read 4-byte length prefix
-            var lengthBuffer = new byte[4];
-            var bytesRead = await stream.ReadAsync(lengthBuffer.AsMemory(0, 4), ct);
-            if (bytesRead != 4)
-                throw new IOException("Connection closed unexpectedly");
-
-            var length = BitConverter.ToInt32(lengthBuffer, 0);
-            if (length <= 0 || length > 100 * 1024 * 1024) // Max 100 MB
-                throw new InvalidDataException($"Invalid message length: {length}");
-
-            // Read payload
-            var payload = new byte[length];
-            var totalRead = 0;
-            while (totalRead < length)
+            var lengthBuffer = ArrayPool<byte>.Shared.Rent(4);
+            try
             {
-                bytesRead = await stream.ReadAsync(payload.AsMemory(totalRead, length - totalRead), ct);
-                if (bytesRead == 0)
-                    throw new IOException("Connection closed before message was fully received");
-                totalRead += bytesRead;
-            }
+                var bytesRead = await stream.ReadAsync(lengthBuffer.AsMemory(0, 4), ct);
+                if (bytesRead != 4)
+                    throw new IOException("Connection closed unexpectedly");
 
-            var json = System.Text.Encoding.UTF8.GetString(payload);
-            return JsonSerializer.Deserialize<P2PMessage>(json) ?? throw new InvalidDataException("Failed to deserialize message");
+                var length = BitConverter.ToInt32(lengthBuffer, 0);
+                if (length <= 0 || length > 100 * 1024 * 1024) // Max 100 MB
+                    throw new InvalidDataException($"Invalid message length: {length}");
+
+                // Read payload
+                var payload = ArrayPool<byte>.Shared.Rent(length);
+                try
+                {
+                    var totalRead = 0;
+                    while (totalRead < length)
+                    {
+                        bytesRead = await stream.ReadAsync(payload.AsMemory(totalRead, length - totalRead), ct);
+                        if (bytesRead == 0)
+                            throw new IOException("Connection closed before message was fully received");
+                        totalRead += bytesRead;
+                    }
+
+                    var json = System.Text.Encoding.UTF8.GetString(payload, 0, length);
+                    return JsonSerializer.Deserialize<P2PMessage>(json) ?? throw new InvalidDataException("Failed to deserialize message");
+                }
+                finally
+                {
+                    ArrayPool<byte>.Shared.Return(payload);
+                }
+            }
+            finally
+            {
+                ArrayPool<byte>.Shared.Return(lengthBuffer);
+            }
         }
 
         /// <summary>
