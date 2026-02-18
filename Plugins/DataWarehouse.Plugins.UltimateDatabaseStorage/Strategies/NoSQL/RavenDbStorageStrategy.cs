@@ -170,7 +170,8 @@ public sealed class RavenDbStorageStrategy : DatabaseStorageStrategyBase
             throw new InvalidOperationException($"Document has no data attachment: {key}");
         }
 
-        using var ms = new MemoryStream();
+        var capacity = attachment.Stream.CanSeek && attachment.Stream.Length > 0 ? (int)attachment.Stream.Length : 0;
+        using var ms = new MemoryStream(capacity);
         await attachment.Stream.CopyToAsync(ms, ct);
         return ms.ToArray();
     }

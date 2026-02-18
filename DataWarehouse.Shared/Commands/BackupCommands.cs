@@ -99,22 +99,23 @@ public sealed class BackupCreateCommand : ICommand
             return CommandResult.Fail(response.Error);
         }
 
+        // TODO: Parse actual response data when DataProtection plugin implements backup.create
         var backup = new BackupInfo
         {
             Id = backupId,
             Name = name,
             Type = incremental ? "Incremental" : "Full",
             Status = "Completed",
-            Size = 2300L * 1024 * 1024, // 2.3 GB sample
+            Size = 0, // Will be populated by actual backup operation
             CreatedAt = DateTime.UtcNow,
             Destination = destination,
             IsCompressed = compress,
             IsEncrypted = encrypt,
-            FileCount = 12456,
-            DurationSeconds = 45.0
+            FileCount = 0,
+            DurationSeconds = 0.0
         };
 
-        return CommandResult.Ok(backup, $"Backup '{name}' created successfully with ID: {backupId}");
+        return CommandResult.Ok(backup, $"Backup '{name}' initiated with ID: {backupId}");
     }
 }
 
@@ -146,15 +147,10 @@ public sealed class BackupListCommand : ICommand
         var response = await context.InstanceManager.ExecuteAsync("backup.list",
             new Dictionary<string, object>(), cancellationToken);
 
-        var backups = new List<BackupInfo>
-        {
-            new() { Id = "backup-20260118-030000", Name = "Daily Backup", Type = "Full", Size = 5200L * 1024 * 1024, CreatedAt = new DateTime(2026, 1, 18, 3, 0, 0, DateTimeKind.Utc), Status = "Verified" },
-            new() { Id = "backup-20260117-030000", Name = "Daily Backup", Type = "Full", Size = 5100L * 1024 * 1024, CreatedAt = new DateTime(2026, 1, 17, 3, 0, 0, DateTimeKind.Utc), Status = "Verified" },
-            new() { Id = "backup-20260116-030000", Name = "Daily Backup", Type = "Full", Size = 5000L * 1024 * 1024, CreatedAt = new DateTime(2026, 1, 16, 3, 0, 0, DateTimeKind.Utc), Status = "Verified" },
-            new() { Id = "backup-20260115-120000", Name = "Pre-Update", Type = "Full", Size = 4900L * 1024 * 1024, CreatedAt = new DateTime(2026, 1, 15, 12, 0, 0, DateTimeKind.Utc), Status = "Verified" },
-        };
+        // TODO: Parse actual backup list when DataProtection plugin implements backup.list
+        var backups = new List<BackupInfo>();
 
-        return CommandResult.Table(backups, $"Found {backups.Count} backup(s)");
+        return CommandResult.Table(backups, "Backup listing not yet implemented - DataProtection plugin integration pending");
     }
 }
 
@@ -205,14 +201,15 @@ public sealed class BackupRestoreCommand : ICommand
             return CommandResult.Fail(response.Error);
         }
 
+        // TODO: Parse actual restore results when DataProtection plugin implements backup.restore
         return CommandResult.Ok(new
         {
             BackupId = id,
             Target = target ?? "default",
             Verified = verify,
-            FilesRestored = 12456,
-            DurationSeconds = 90.0
-        }, $"Backup '{id}' restored successfully.");
+            FilesRestored = 0,
+            DurationSeconds = 0.0
+        }, $"Backup '{id}' restore initiated.");
     }
 }
 
@@ -256,14 +253,15 @@ public sealed class BackupVerifyCommand : ICommand
             return CommandResult.Fail(response.Error);
         }
 
+        // TODO: Parse actual verification results when DataProtection plugin implements backup.verify
         return CommandResult.Ok(new
         {
             BackupId = id,
-            Status = "Verified",
-            FilesChecked = 12456,
-            Checksum = "SHA256:a1b2c3d4e5f6...",
-            Integrity = 100.0
-        }, $"Backup '{id}' verification passed.");
+            Status = "Unknown",
+            FilesChecked = 0,
+            Checksum = "",
+            Integrity = 0.0
+        }, $"Backup '{id}' verification initiated.");
     }
 }
 

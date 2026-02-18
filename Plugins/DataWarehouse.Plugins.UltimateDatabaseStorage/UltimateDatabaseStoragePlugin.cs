@@ -288,7 +288,8 @@ public sealed class UltimateDatabaseStoragePlugin : DataWarehouse.SDK.Contracts.
         }
 
         using var stream = await strategy.RetrieveAsync(key);
-        using var ms = new MemoryStream();
+        var capacity = stream.CanSeek && stream.Length > 0 ? (int)stream.Length : 0;
+        using var ms = new MemoryStream(capacity);
         await stream.CopyToAsync(ms);
         var data = ms.ToArray();
         // Response would be sent via message context

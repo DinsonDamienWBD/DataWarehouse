@@ -265,7 +265,8 @@ public sealed class DynamoDbStorageStrategy : DatabaseStorageStrategyBase
         {
             if (item.TryGetValue("Data", out var dataAttr))
             {
-                using var ms = new MemoryStream();
+                var dataCapacity = dataAttr.B.CanSeek && dataAttr.B.Length > 0 ? (int)dataAttr.B.Length : 0;
+                using var ms = new MemoryStream(dataCapacity);
                 await dataAttr.B.CopyToAsync(ms, ct);
                 return ms.ToArray();
             }
@@ -274,7 +275,9 @@ public sealed class DynamoDbStorageStrategy : DatabaseStorageStrategyBase
 
         // Retrieve chunked data
         var chunkCount = int.Parse(item["ChunkCount"].N);
-        using var resultStream = new MemoryStream();
+        var totalSize = item.TryGetValue("TotalSize", out var sizeAttr) ? long.Parse(sizeAttr.N) : 0;
+        var capacity = totalSize > 0 ? (int)Math.Min(totalSize, int.MaxValue) : 0;
+        using var resultStream = new MemoryStream(capacity);
 
         for (int i = 0; i < chunkCount; i++)
         {

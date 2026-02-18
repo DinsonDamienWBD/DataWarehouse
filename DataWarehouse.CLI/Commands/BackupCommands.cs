@@ -73,8 +73,6 @@ public static class BackupCommands
 
         AnsiConsole.MarkupLine($"\n[green]Backup completed successfully![/]");
         AnsiConsole.MarkupLine($"  Backup ID: [cyan]{backupId}[/]");
-        AnsiConsole.MarkupLine($"  Size: [cyan]2.3 GB[/]");
-        AnsiConsole.MarkupLine($"  Duration: [cyan]45 seconds[/]");
     }
 
     public static async Task ListBackupsAsync()
@@ -84,21 +82,8 @@ public static class BackupCommands
             {
                 await Task.Delay(300);
 
-                var table = new Table()
-                    .Border(TableBorder.Rounded)
-                    .AddColumn("ID")
-                    .AddColumn("Name")
-                    .AddColumn("Type")
-                    .AddColumn("Size")
-                    .AddColumn("Created")
-                    .AddColumn("Status");
-
-                table.AddRow("backup-20260118-030000", "Daily Backup", "Full", "5.2 GB", "2026-01-18 03:00", "[green]Verified[/]");
-                table.AddRow("backup-20260117-030000", "Daily Backup", "Full", "5.1 GB", "2026-01-17 03:00", "[green]Verified[/]");
-                table.AddRow("backup-20260116-030000", "Daily Backup", "Full", "5.0 GB", "2026-01-16 03:00", "[green]Verified[/]");
-                table.AddRow("backup-20260115-120000", "Pre-Update", "Full", "4.9 GB", "2026-01-15 12:00", "[green]Verified[/]");
-
-                AnsiConsole.Write(table);
+                // TODO: Query actual backups from DataProtection plugin via message bus
+                AnsiConsole.MarkupLine("[yellow]Backup listing not yet implemented - connect to DataProtection plugin.[/]");
             });
     }
 
@@ -170,9 +155,6 @@ public static class BackupCommands
             });
 
         AnsiConsole.MarkupLine($"\n[green]Backup verification passed![/]");
-        AnsiConsole.MarkupLine("  Files checked: [cyan]12,456[/]");
-        AnsiConsole.MarkupLine("  Checksum: [cyan]SHA256:a1b2c3d4...[/]");
-        AnsiConsole.MarkupLine("  Integrity: [green]100%[/]");
     }
 
     public static async Task DeleteBackupAsync(string id, bool force)

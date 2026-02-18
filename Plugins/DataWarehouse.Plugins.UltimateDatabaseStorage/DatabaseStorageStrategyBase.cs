@@ -276,7 +276,8 @@ public abstract class DatabaseStorageStrategyBase : StorageStrategyBase, IAsyncD
         try
         {
             // Read stream into bytes
-            using var ms = new MemoryStream();
+            var capacity = data.CanSeek && data.Length > 0 ? (int)data.Length : 0;
+            using var ms = new MemoryStream(capacity);
             await data.CopyToAsync(ms, 81920, ct);
             var content = ms.ToArray();
 
@@ -596,13 +597,14 @@ public abstract class DatabaseStorageStrategyBase : StorageStrategyBase, IAsyncD
             try
             {
                 using var stream = await RetrieveAsync(key, ct);
-                using var ms = new MemoryStream();
+                var capacity = stream.CanSeek && stream.Length > 0 ? (int)stream.Length : 0;
+                using var ms = new MemoryStream(capacity);
                 await stream.CopyToAsync(ms, ct);
                 results[key] = ms.ToArray();
             }
             catch
             {
-                // Skip failed retrievals
+                // Skip failed retrievals in batch operation
             }
         }
 

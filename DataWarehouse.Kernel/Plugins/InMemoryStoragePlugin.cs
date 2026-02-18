@@ -280,7 +280,9 @@ namespace DataWarehouse.Kernel.Plugins
 
             var key = GetKey(uri);
 
-            using var ms = new MemoryStream();
+            // Pre-allocate capacity if stream length is known
+            var capacity = data.CanSeek && data.Length > 0 ? (int)data.Length : 0;
+            using var ms = new MemoryStream(capacity);
             await data.CopyToAsync(ms);
             var bytes = ms.ToArray();
             var newSize = bytes.LongLength;

@@ -316,7 +316,8 @@ public class S3WormStorage : WormStorageProviderPluginBase
         try
         {
             // Read data and compute hash
-            using var ms = new MemoryStream();
+            var capacity = data.CanSeek && data.Length > 0 ? (int)data.Length : 0;
+            using var ms = new MemoryStream(capacity);
             await data.CopyToAsync(ms, ct);
             var bytes = ms.ToArray();
             var contentHash = ComputeContentHash(bytes);
