@@ -1,9 +1,13 @@
+using System.Collections.Concurrent;
+
 namespace DataWarehouse.Plugins.UltimateDataGovernance.Strategies.PolicyManagement;
 
 #region Policy Definition Strategy
 
 public sealed class PolicyDefinitionStrategy : DataGovernanceStrategyBase
 {
+    private readonly ConcurrentDictionary<string, PolicyDefinition> _policies = new();
+
     public override string StrategyId => "policy-definition";
     public override string DisplayName => "Policy Definition";
     public override GovernanceCategory Category => GovernanceCategory.PolicyManagement;
@@ -17,6 +21,48 @@ public sealed class PolicyDefinitionStrategy : DataGovernanceStrategyBase
     };
     public override string SemanticDescription => "Define and manage governance policies with templates, rules, and metadata";
     public override string[] Tags => ["policy", "definition", "templates", "rules"];
+
+    public PolicyDefinition? GetPolicy(string policyId) => _policies.TryGetValue(policyId, out var policy) ? policy : null;
+
+    public PolicyDefinition DefinePolicy(string policyId, string name, string description, Dictionary<string, object> rules)
+    {
+        var policy = new PolicyDefinition
+        {
+            PolicyId = policyId,
+            Name = name,
+            Description = description,
+            Rules = rules,
+            CreatedAt = DateTimeOffset.UtcNow,
+            Version = 1,
+            IsActive = false
+        };
+        _policies[policyId] = policy;
+        return policy;
+    }
+
+    public bool UpdatePolicy(string policyId, Dictionary<string, object> rules)
+    {
+        if (!_policies.TryGetValue(policyId, out var policy)) return false;
+        var updated = policy with { Rules = rules, Version = policy.Version + 1, ModifiedAt = DateTimeOffset.UtcNow };
+        _policies[policyId] = updated;
+        return true;
+    }
+
+    public bool DeletePolicy(string policyId) => _policies.TryRemove(policyId, out _);
+
+    public IReadOnlyList<PolicyDefinition> GetAllPolicies() => _policies.Values.ToList().AsReadOnly();
+}
+
+public sealed record PolicyDefinition
+{
+    public required string PolicyId { get; init; }
+    public required string Name { get; init; }
+    public string? Description { get; init; }
+    public Dictionary<string, object> Rules { get; init; } = new();
+    public DateTimeOffset CreatedAt { get; init; }
+    public DateTimeOffset? ModifiedAt { get; init; }
+    public int Version { get; init; }
+    public bool IsActive { get; init; }
 }
 
 #endregion
@@ -25,6 +71,9 @@ public sealed class PolicyDefinitionStrategy : DataGovernanceStrategyBase
 
 public sealed class PolicyEnforcementStrategy : DataGovernanceStrategyBase
 {
+    private readonly ConcurrentDictionary<string, PolicyDefinition> _activePolicies = new();
+    private readonly ConcurrentDictionary<string, List<PolicyViolation>> _violations = new();
+
     public override string StrategyId => "policy-enforcement";
     public override string DisplayName => "Policy Enforcement";
     public override GovernanceCategory Category => GovernanceCategory.PolicyManagement;
@@ -38,6 +87,91 @@ public sealed class PolicyEnforcementStrategy : DataGovernanceStrategyBase
     };
     public override string SemanticDescription => "Enforce governance policies with real-time validation and violation tracking";
     public override string[] Tags => ["policy", "enforcement", "validation", "compliance"];
+
+    public void LoadPolicy(PolicyDefinition policy)
+    {
+        if (policy.IsActive)
+        {
+            _activePolicies[policy.PolicyId] = policy;
+        }
+    }
+
+    public PolicyEnforcementResult EvaluatePolicy(string policyId, string resourceId, Dictionary<string, object> context)
+    {
+        if (!_activePolicies.TryGetValue(policyId, out var policy))
+        {
+            return new PolicyEnforcementResult
+            {
+                PolicyId = policyId,
+                ResourceId = resourceId,
+                IsAllowed = true,
+                Reason = "Policy not found or not active"
+            };
+        }
+
+        // Simple rule evaluation: check if context satisfies policy rules
+        var violations = new List<string>();
+        foreach (var (key, value) in policy.Rules)
+        {
+            if (context.TryGetValue(key, out var contextValue))
+            {
+                if (!Equals(value, contextValue))
+                {
+                    violations.Add($"Rule '{key}' violated: expected '{value}', got '{contextValue}'");
+                }
+            }
+            else
+            {
+                violations.Add($"Required field '{key}' missing from context");
+            }
+        }
+
+        var isAllowed = violations.Count == 0;
+
+        if (!isAllowed)
+        {
+            var violation = new PolicyViolation
+            {
+                PolicyId = policyId,
+                ResourceId = resourceId,
+                Timestamp = DateTimeOffset.UtcNow,
+                Violations = violations
+            };
+
+            if (!_violations.ContainsKey(resourceId))
+            {
+                _violations[resourceId] = new List<PolicyViolation>();
+            }
+            _violations[resourceId].Add(violation);
+        }
+
+        return new PolicyEnforcementResult
+        {
+            PolicyId = policyId,
+            ResourceId = resourceId,
+            IsAllowed = isAllowed,
+            Reason = isAllowed ? "Policy satisfied" : string.Join("; ", violations)
+        };
+    }
+
+    public IReadOnlyList<PolicyViolation> GetViolations(string resourceId) =>
+        _violations.TryGetValue(resourceId, out var list) ? list.AsReadOnly() : Array.Empty<PolicyViolation>();
+}
+
+public sealed record PolicyEnforcementResult
+{
+    public required string PolicyId { get; init; }
+    public required string ResourceId { get; init; }
+    public bool IsAllowed { get; init; }
+    public string Reason { get; init; } = string.Empty;
+}
+
+public sealed record PolicyViolation
+{
+    public required string PolicyId { get; init; }
+    public required string ResourceId { get; init; }
+    public DateTimeOffset Timestamp { get; init; }
+    public List<string> Violations { get; init; } = new();
 }
 
 #endregion
