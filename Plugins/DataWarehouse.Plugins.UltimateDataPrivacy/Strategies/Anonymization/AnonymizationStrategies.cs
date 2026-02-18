@@ -1,3 +1,5 @@
+using System.Collections.Concurrent;
+
 namespace DataWarehouse.Plugins.UltimateDataPrivacy.Strategies.Anonymization;
 
 public sealed class KAnonymityStrategy : DataPrivacyStrategyBase
@@ -8,6 +10,47 @@ public sealed class KAnonymityStrategy : DataPrivacyStrategyBase
     public override DataPrivacyCapabilities Capabilities => new() { SupportsAsync = true, SupportsBatch = true, SupportsReversible = false, SupportsFormatPreserving = false };
     public override string SemanticDescription => "K-anonymity anonymization ensuring each record is indistinguishable from k-1 others";
     public override string[] Tags => ["anonymization", "k-anonymity", "privacy-protection"];
+
+    public AnonymizationResult Anonymize(List<Dictionary<string, object>> records, string[] quasiIdentifiers, int k)
+    {
+        if (k < 2) throw new ArgumentException("k must be at least 2", nameof(k));
+
+        // Group records by quasi-identifier combinations
+        var groups = records.GroupBy(r => string.Join("|", quasiIdentifiers.Select(qi => r.GetValueOrDefault(qi, "NULL")?.ToString() ?? "NULL"))).ToList();
+
+        var suppressedCount = 0;
+        var anonymizedRecords = new List<Dictionary<string, object>>();
+
+        foreach (var group in groups)
+        {
+            if (group.Count() < k)
+            {
+                // Suppress groups smaller than k
+                suppressedCount += group.Count();
+            }
+            else
+            {
+                // Keep groups with at least k members
+                anonymizedRecords.AddRange(group);
+            }
+        }
+
+        return new AnonymizationResult
+        {
+            OriginalCount = records.Count,
+            AnonymizedCount = anonymizedRecords.Count,
+            SuppressedCount = suppressedCount,
+            AnonymizedRecords = anonymizedRecords
+        };
+    }
+}
+
+public sealed record AnonymizationResult
+{
+    public int OriginalCount { get; init; }
+    public int AnonymizedCount { get; init; }
+    public int SuppressedCount { get; init; }
+    public List<Dictionary<string, object>> AnonymizedRecords { get; init; } = new();
 }
 
 public sealed class LDiversityStrategy : DataPrivacyStrategyBase
@@ -18,6 +61,42 @@ public sealed class LDiversityStrategy : DataPrivacyStrategyBase
     public override DataPrivacyCapabilities Capabilities => new() { SupportsAsync = true, SupportsBatch = true, SupportsReversible = false, SupportsFormatPreserving = false };
     public override string SemanticDescription => "L-diversity anonymization ensuring sensitive attributes have diverse values";
     public override string[] Tags => ["anonymization", "l-diversity", "attribute-diversity"];
+
+    public AnonymizationResult Anonymize(List<Dictionary<string, object>> records, string[] quasiIdentifiers, string sensitiveAttribute, int l)
+    {
+        if (l < 2) throw new ArgumentException("l must be at least 2", nameof(l));
+
+        // Group by quasi-identifiers
+        var groups = records.GroupBy(r => string.Join("|", quasiIdentifiers.Select(qi => r.GetValueOrDefault(qi, "NULL")?.ToString() ?? "NULL"))).ToList();
+
+        var suppressedCount = 0;
+        var anonymizedRecords = new List<Dictionary<string, object>>();
+
+        foreach (var group in groups)
+        {
+            // Count distinct sensitive values in this equivalence class
+            var distinctSensitiveValues = group.Select(r => r.GetValueOrDefault(sensitiveAttribute, "NULL")?.ToString() ?? "NULL").Distinct().Count();
+
+            if (distinctSensitiveValues < l)
+            {
+                // Suppress groups with insufficient diversity
+                suppressedCount += group.Count();
+            }
+            else
+            {
+                // Keep groups with at least l distinct sensitive values
+                anonymizedRecords.AddRange(group);
+            }
+        }
+
+        return new AnonymizationResult
+        {
+            OriginalCount = records.Count,
+            AnonymizedCount = anonymizedRecords.Count,
+            SuppressedCount = suppressedCount,
+            AnonymizedRecords = anonymizedRecords
+        };
+    }
 }
 
 public sealed class TClosenessStrategy : DataPrivacyStrategyBase
@@ -28,6 +107,60 @@ public sealed class TClosenessStrategy : DataPrivacyStrategyBase
     public override DataPrivacyCapabilities Capabilities => new() { SupportsAsync = true, SupportsBatch = true, SupportsReversible = false, SupportsFormatPreserving = false };
     public override string SemanticDescription => "T-closeness anonymization ensuring attribute distribution is close to global distribution";
     public override string[] Tags => ["anonymization", "t-closeness", "distribution"];
+
+    public AnonymizationResult Anonymize(List<Dictionary<string, object>> records, string[] quasiIdentifiers, string sensitiveAttribute, double t)
+    {
+        if (t <= 0 || t > 1) throw new ArgumentException("t must be between 0 and 1", nameof(t));
+
+        // Calculate global distribution of sensitive attribute
+        var globalDistribution = records
+            .GroupBy(r => r.GetValueOrDefault(sensitiveAttribute, "NULL")?.ToString() ?? "NULL")
+            .ToDictionary(g => g.Key, g => (double)g.Count() / records.Count);
+
+        // Group by quasi-identifiers
+        var groups = records.GroupBy(r => string.Join("|", quasiIdentifiers.Select(qi => r.GetValueOrDefault(qi, "NULL")?.ToString() ?? "NULL"))).ToList();
+
+        var suppressedCount = 0;
+        var anonymizedRecords = new List<Dictionary<string, object>>();
+
+        foreach (var group in groups)
+        {
+            var groupList = group.ToList();
+
+            // Calculate local distribution in this equivalence class
+            var localDistribution = groupList
+                .GroupBy(r => r.GetValueOrDefault(sensitiveAttribute, "NULL")?.ToString() ?? "NULL")
+                .ToDictionary(g => g.Key, g => (double)g.Count() / groupList.Count);
+
+            // Calculate Earth Mover's Distance (simplified as sum of absolute differences)
+            var distance = globalDistribution.Keys.Union(localDistribution.Keys)
+                .Sum(key =>
+                {
+                    var globalProb = globalDistribution.GetValueOrDefault(key, 0);
+                    var localProb = localDistribution.GetValueOrDefault(key, 0);
+                    return Math.Abs(globalProb - localProb);
+                }) / 2.0; // Divide by 2 because we count differences twice
+
+            if (distance > t)
+            {
+                // Suppress groups with distribution too different from global
+                suppressedCount += groupList.Count;
+            }
+            else
+            {
+                // Keep groups with distribution within threshold
+                anonymizedRecords.AddRange(groupList);
+            }
+        }
+
+        return new AnonymizationResult
+        {
+            OriginalCount = records.Count,
+            AnonymizedCount = anonymizedRecords.Count,
+            SuppressedCount = suppressedCount,
+            AnonymizedRecords = anonymizedRecords
+        };
+    }
 }
 
 public sealed class DataSuppressionStrategy : DataPrivacyStrategyBase
