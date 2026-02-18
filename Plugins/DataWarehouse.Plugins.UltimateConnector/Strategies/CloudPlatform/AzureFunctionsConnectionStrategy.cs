@@ -19,7 +19,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.CloudPlatform
         public AzureFunctionsConnectionStrategy(ILogger? logger = null) : base(logger) { }
         protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct)
         {
-            var appName = GetConfiguration<string>(config, "AppName", null!);
+            var appName = GetConfiguration<string>(config, "AppName", string.Empty);
             var endpoint = $"https://{appName}.azurewebsites.net";
             var httpClient = new HttpClient { BaseAddress = new Uri(endpoint), Timeout = config.Timeout };
             return new DefaultConnectionHandle(httpClient, new Dictionary<string, object> { ["AppName"] = appName, ["Endpoint"] = endpoint });

@@ -22,7 +22,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Messaging
         public AzureEventGridConnectionStrategy(ILogger? logger = null) : base(logger) { }
         protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct)
         {
-            var topic = GetConfiguration<string>(config, "Topic", null!);
+            var topic = GetConfiguration<string>(config, "Topic", string.Empty);
             var endpoint = $"https://{topic}.eventgrid.azure.net";
             var httpClient = new HttpClient { BaseAddress = new Uri(endpoint), Timeout = config.Timeout };
             var sasKey = config.AuthCredential;

@@ -19,7 +19,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.CloudPlatform
         public AzureDataLakeConnectionStrategy(ILogger? logger = null) : base(logger) { }
         protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct)
         {
-            var account = GetConfiguration<string>(config, "Account", null!);
+            var account = GetConfiguration<string>(config, "Account", string.Empty);
             var endpoint = $"https://{account}.dfs.core.windows.net";
             var httpClient = new HttpClient { BaseAddress = new Uri(endpoint), Timeout = config.Timeout };
             return new DefaultConnectionHandle(httpClient, new Dictionary<string, object> { ["Account"] = account, ["Endpoint"] = endpoint });

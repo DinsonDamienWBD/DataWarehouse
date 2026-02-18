@@ -310,7 +310,7 @@ public sealed class VariableBlockDeduplicationStrategy : DeduplicationStrategyBa
         if (!_objectMaps.TryGetValue(objectId, out var chunkMap))
             return null;
 
-        var memoryStream = new MemoryStream();
+        var memoryStream = new MemoryStream(chunkMap.Chunks.Sum(c => c.Size));
 
         foreach (var chunk in chunkMap.Chunks.OrderBy(c => c.Offset))
         {

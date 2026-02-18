@@ -199,7 +199,7 @@ namespace DataWarehouse.SDK.Edge.Protocols
             // |1 1 1 1 1 1 1 1|    Payload (if any) ...
             // +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 
-            using var ms = new MemoryStream();
+            using var ms = new MemoryStream(256); // CoAP messages typically <256 bytes
 
             // Header (4 bytes)
             byte ver = 1; // CoAP version 1
