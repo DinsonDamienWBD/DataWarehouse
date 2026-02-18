@@ -1,6 +1,9 @@
 using System;
 using System.Buffers.Binary;
 using System.IO;
+using System.Threading;
+using System.Threading.Tasks;
+using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Contracts.Compression;
 
 namespace DataWarehouse.Plugins.UltimateCompression.Strategies.EntropyCoding
@@ -33,6 +36,10 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.EntropyCoding
         private const int TableLog = 11; // 2^11 = 2048 states
         private const int TableSize = 1 << TableLog;
         private const int MaxSymbolValue = 255;
+        private const int MaxInputSize = 100 * 1024 * 1024; // 100MB limit
+
+        private int _tableLogSize = 11;
+        private int _precision = 11;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="AnsStrategy"/> class
@@ -60,8 +67,72 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.EntropyCoding
         };
 
         /// <inheritdoc/>
+        protected override async Task InitializeAsyncCore(CancellationToken cancellationToken)
+        {
+            // Validate configuration parameters
+            if (_tableLogSize < 8 || _tableLogSize > 16)
+                throw new ArgumentException($"Table log size must be between 8 and 16. Got: {_tableLogSize}");
+
+            if (_precision < 10 || _precision > 16)
+                throw new ArgumentException($"Precision must be between 10 and 16. Got: {_precision}");
+
+            await base.InitializeAsyncCore(cancellationToken).ConfigureAwait(false);
+        }
+
+        /// <inheritdoc/>
+        protected override async Task ShutdownAsyncCore(CancellationToken cancellationToken)
+        {
+            // No resources to clean up for ANS
+            await base.ShutdownAsyncCore(cancellationToken).ConfigureAwait(false);
+        }
+
+        /// <inheritdoc/>
+        protected override async ValueTask DisposeAsyncCore()
+        {
+            // Clean disposal pattern
+            await base.DisposeAsyncCore().ConfigureAwait(false);
+        }
+
+        /// <summary>
+        /// Performs health check by verifying round-trip compression with test data.
+        /// </summary>
+        public async Task<StrategyHealthCheckResult> CheckHealthAsync(CancellationToken ct = default)
+        {
+            return await GetCachedHealthAsync(async (cancellationToken) =>
+            {
+                try
+                {
+                    // Round-trip test with known data
+                    var testData = new byte[] { 100, 100, 101, 102, 100, 101 };
+                    var compressed = CompressCore(testData);
+                    var decompressed = DecompressCore(compressed);
+
+                    if (testData.Length != decompressed.Length)
+                        return new StrategyHealthCheckResult(false, "Round-trip length mismatch");
+
+                    for (int i = 0; i < testData.Length; i++)
+                    {
+                        if (testData[i] != decompressed[i])
+                            return new StrategyHealthCheckResult(false, "Round-trip data mismatch");
+                    }
+
+                    return new StrategyHealthCheckResult(true);
+                }
+                catch (Exception ex)
+                {
+                    return new StrategyHealthCheckResult(false, $"Health check failed: {ex.Message}");
+                }
+            }, TimeSpan.FromSeconds(60), ct).ConfigureAwait(false);
+        }
+
+        /// <inheritdoc/>
         protected override byte[] CompressCore(byte[] input)
         {
+            IncrementCounter("ans.compress");
+
+            if (input.Length > MaxInputSize)
+                throw new ArgumentException($"Input size exceeds maximum of {MaxInputSize} bytes");
+
             using var output = new MemoryStream(input.Length + 256);
             output.Write(Magic, 0, 4);
 
@@ -111,6 +182,11 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.EntropyCoding
         /// <inheritdoc/>
         protected override byte[] DecompressCore(byte[] input)
         {
+            IncrementCounter("ans.decompress");
+
+            if (input.Length > MaxInputSize)
+                throw new ArgumentException($"Input size exceeds maximum of {MaxInputSize} bytes");
+
             using var stream = new MemoryStream(input);
 
             var magicBuf = new byte[4];
