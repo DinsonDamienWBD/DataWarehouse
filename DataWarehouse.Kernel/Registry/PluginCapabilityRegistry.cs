@@ -61,35 +61,54 @@ public sealed class PluginCapabilityRegistry : IPluginCapabilityRegistry, IDispo
         ArgumentNullException.ThrowIfNull(capability);
         ArgumentException.ThrowIfNullOrWhiteSpace(capability.CapabilityId);
 
-        var added = _capabilities.TryAdd(capability.CapabilityId, capability);
-
-        if (added)
-        {
-            Interlocked.Increment(ref _totalRegistrations);
-
-            // Index by category
-            _byCategory.GetOrAdd(capability.Category, _ => new ConcurrentBag<string>())
-                .Add(capability.CapabilityId);
-
-            // Index by plugin
-            _byPlugin.GetOrAdd(capability.PluginId, _ => new ConcurrentBag<string>())
-                .Add(capability.CapabilityId);
-
-            // Index by tags
-            foreach (var tag in capability.Tags)
+        // IDEMPOTENT: Use AddOrUpdate instead of TryAdd to handle reload scenarios
+        // If capability already exists, update it (in case plugin was reloaded)
+        var isNew = false;
+        _capabilities.AddOrUpdate(
+            capability.CapabilityId,
+            // Add factory: new capability
+            addValueFactory: key =>
             {
-                _byTag.GetOrAdd(tag.ToLowerInvariant(), _ => new ConcurrentBag<string>())
-                    .Add(capability.CapabilityId);
+                isNew = true;
+                Interlocked.Increment(ref _totalRegistrations);
+                return capability;
+            },
+            // Update factory: existing capability (plugin reload)
+            updateValueFactory: (key, existing) =>
+            {
+                // If the plugin ID matches, this is a safe update (same plugin re-registering)
+                // If plugin ID differs, this is a conflict - log and replace
+                isNew = existing.PluginId != capability.PluginId;
+                return capability;
             }
+        );
 
-            // Notify handlers
-            NotifyRegistered(capability);
+        // Always index on registration (handles both new and update)
+        // ConcurrentBag doesn't support removal, so duplicates are OK
+        // Discovery methods filter by existence in _capabilities dictionary
 
-            // Publish to message bus
-            PublishCapabilityChanged(capability.CapabilityId, "registered");
+        // Index by category
+        _byCategory.GetOrAdd(capability.Category, _ => new ConcurrentBag<string>())
+            .Add(capability.CapabilityId);
+
+        // Index by plugin
+        _byPlugin.GetOrAdd(capability.PluginId, _ => new ConcurrentBag<string>())
+            .Add(capability.CapabilityId);
+
+        // Index by tags
+        foreach (var tag in capability.Tags)
+        {
+            _byTag.GetOrAdd(tag.ToLowerInvariant(), _ => new ConcurrentBag<string>())
+                .Add(capability.CapabilityId);
         }
 
-        return Task.FromResult(added);
+        // Always notify (both new and update)
+        NotifyRegistered(capability);
+
+        // Publish to message bus
+        PublishCapabilityChanged(capability.CapabilityId, isNew ? "registered" : "updated");
+
+        return Task.FromResult(isNew);
     }
 
     /// <inheritdoc/>

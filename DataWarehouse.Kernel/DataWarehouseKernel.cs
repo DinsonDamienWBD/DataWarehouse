@@ -2,6 +2,7 @@ using DataWarehouse.Kernel.Configuration;
 using DataWarehouse.Kernel.Messaging;
 using DataWarehouse.Kernel.Pipeline;
 using DataWarehouse.Kernel.Plugins;
+using DataWarehouse.Kernel.Registry;
 using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Primitives;
 using DataWarehouse.SDK.Primitives.Configuration;
@@ -33,6 +34,7 @@ namespace DataWarehouse.Kernel
         private readonly PluginRegistry _registry;
         private readonly DefaultMessageBus _messageBus;
         private readonly DefaultPipelineOrchestrator _pipelineOrchestrator;
+        private readonly PluginCapabilityRegistry _capabilityRegistry;
         private readonly ILogger<DataWarehouseKernel>? _logger;
         private readonly CancellationTokenSource _shutdownCts = new();
         private readonly ConcurrentDictionary<string, Task> _backgroundJobs = new();
@@ -89,6 +91,12 @@ namespace DataWarehouse.Kernel
         public PluginRegistry Plugins => _registry;
 
         /// <summary>
+        /// Capability registry for dynamic capability discovery.
+        /// Enables dynamic endpoint generation and capability-based routing.
+        /// </summary>
+        public IPluginCapabilityRegistry CapabilityRegistry => _capabilityRegistry;
+
+        /// <summary>
         /// Creates a new DataWarehouse Kernel instance.
         /// Use KernelBuilder for fluent configuration.
         /// </summary>
@@ -103,6 +111,9 @@ namespace DataWarehouse.Kernel
 
             _messageBus = new DefaultMessageBus(logger);
             _pipelineOrchestrator = new DefaultPipelineOrchestrator(_registry, _messageBus, logger);
+
+            // Create capability registry with message bus integration
+            _capabilityRegistry = new PluginCapabilityRegistry(_messageBus);
         }
 
         /// <summary>
@@ -186,7 +197,7 @@ namespace DataWarehouse.Kernel
                 // Inject kernel services so plugins can use IMessageBus, IStorageEngine, etc.
                 if (plugin is PluginBase pluginBase)
                 {
-                    pluginBase.InjectKernelServices(_messageBus, null, null);
+                    pluginBase.InjectKernelServices(_messageBus, _capabilityRegistry, null);
 
                     // Inject unified configuration
                     if (_currentConfiguration != null)

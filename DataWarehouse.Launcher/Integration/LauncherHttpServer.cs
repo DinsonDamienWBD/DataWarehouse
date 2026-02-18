@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
+using DataWarehouse.Shared;
 
 namespace DataWarehouse.Launcher.Integration;
 
@@ -13,6 +14,7 @@ namespace DataWarehouse.Launcher.Integration;
 /// HTTP server that exposes REST API endpoints for the DataWarehouse Launcher.
 /// Uses ASP.NET Core minimal APIs to provide /api/v1/* endpoints compatible
 /// with RemoteInstanceConnection's protocol.
+/// DYNAMIC ENDPOINTS: Endpoints are generated dynamically from the capability register.
 /// </summary>
 public sealed class LauncherHttpServer : IAsyncDisposable
 {
@@ -23,6 +25,7 @@ public sealed class LauncherHttpServer : IAsyncDisposable
     private bool _disposed;
     private DateTime? _startTime;
     private string? _apiKey;
+    private DynamicEndpointGenerator? _endpointGenerator;
 
     // Rate limiting: max 100 requests per minute per IP
     private static readonly ConcurrentDictionary<string, (int Count, DateTime Window)> _rateLimits = new();
@@ -80,6 +83,15 @@ public sealed class LauncherHttpServer : IAsyncDisposable
         else
         {
             _apiKey = apiKey;
+        }
+
+        // Initialize dynamic endpoint generator if capability registry is available
+        var capabilityRegistry = _runner.CurrentAdapter?.GetCapabilityRegistry();
+        if (capabilityRegistry != null)
+        {
+            _endpointGenerator = new DynamicEndpointGenerator(capabilityRegistry);
+            _endpointGenerator.OnEndpointChanged += HandleEndpointChanged;
+            _logger.LogInformation("Dynamic endpoint generation enabled - endpoints will reflect capability register");
         }
 
         var builder = WebApplication.CreateSlimBuilder();
@@ -172,7 +184,7 @@ public sealed class LauncherHttpServer : IAsyncDisposable
             });
         });
 
-        // GET /api/v1/capabilities -- capability discovery
+        // GET /api/v1/capabilities -- capability discovery (DYNAMIC from capability register)
         app.MapGet("/api/v1/capabilities", () =>
         {
             var adapter = _runner.CurrentAdapter;
@@ -182,13 +194,31 @@ public sealed class LauncherHttpServer : IAsyncDisposable
             }
 
             var stats = adapter.GetStats();
+
+            // Include dynamic capabilities from endpoint generator
+            var dynamicCapabilities = _endpointGenerator?.GetEndpoints()
+                .Select(e => new
+                {
+                    id = e.EndpointId,
+                    path = e.Path,
+                    method = e.HttpMethod,
+                    displayName = e.DisplayName,
+                    description = e.Description,
+                    category = e.Category.ToString(),
+                    plugin = e.PluginName,
+                    tags = e.Tags
+                })
+                .ToArray() ?? Array.Empty<object>();
+
             return Results.Ok(new
             {
                 kernelId = stats.KernelId,
                 state = stats.State.ToString(),
                 pluginCount = stats.PluginCount,
                 operationsProcessed = stats.OperationsProcessed,
-                uptime = stats.Uptime.TotalSeconds
+                uptime = stats.Uptime.TotalSeconds,
+                dynamicEndpoints = dynamicCapabilities,
+                dynamicEndpointCount = dynamicCapabilities.Length
             });
         });
 
@@ -238,6 +268,21 @@ public sealed class LauncherHttpServer : IAsyncDisposable
     }
 
     /// <summary>
+    /// Handles endpoint changes from the capability register.
+    /// </summary>
+    private void HandleEndpointChanged(EndpointChangeEvent evt)
+    {
+        _logger.LogInformation("Capability register change: {ChangeType} affecting {Count} endpoints",
+            evt.ChangeType, evt.Endpoints.Count);
+
+        foreach (var endpoint in evt.Endpoints)
+        {
+            _logger.LogDebug("  {ChangeType}: {Method} {Path} ({DisplayName})",
+                evt.ChangeType, endpoint.HttpMethod, endpoint.Path, endpoint.DisplayName);
+        }
+    }
+
+    /// <summary>
     /// Stops the HTTP server.
     /// </summary>
     public async Task StopAsync()
@@ -249,6 +294,11 @@ public sealed class LauncherHttpServer : IAsyncDisposable
             await _app.DisposeAsync();
             _app = null;
         }
+
+        // Dispose endpoint generator
+        _endpointGenerator?.Dispose();
+        _endpointGenerator = null;
+
         IsRunning = false;
     }
 

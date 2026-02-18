@@ -37,6 +37,7 @@
   <ItemGroup>
     <ProjectReference Include="..\DataWarehouse.SDK\DataWarehouse.SDK.csproj" />
     <ProjectReference Include="..\DataWarehouse.Kernel\DataWarehouse.Kernel.csproj" />
+    <ProjectReference Include="..\DataWarehouse.Shared\DataWarehouse.Shared.csproj" />
     <ProjectReference Include="..\Plugins\DataWarehouse.Plugins.UltimateAccessControl\DataWarehouse.Plugins.UltimateAccessControl.csproj" />
     <ProjectReference Include="..\Plugins\DataWarehouse.Plugins.UltimateCompliance\DataWarehouse.Plugins.UltimateCompliance.csproj" />
     <ProjectReference Include="..\Plugins\DataWarehouse.Plugins.Raft\DataWarehouse.Plugins.Raft.csproj" />
@@ -50,6 +51,7 @@
     <ProjectReference Include="..\Plugins\DataWarehouse.Plugins.UltimateInterface\DataWarehouse.Plugins.UltimateInterface.csproj" />
     <ProjectReference Include="..\Plugins\DataWarehouse.Plugins.UltimateIntelligence\DataWarehouse.Plugins.UltimateIntelligence.csproj" />
     <ProjectReference Include="..\Plugins\DataWarehouse.Plugins.TamperProof\DataWarehouse.Plugins.TamperProof.csproj" />
+    <ProjectReference Include="..\Plugins\DataWarehouse.Plugins.Transcoding.Media\DataWarehouse.Plugins.Transcoding.Media.csproj" />
   </ItemGroup>
 
 </Project>

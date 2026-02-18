@@ -2,6 +2,7 @@ using System.Security.Cryptography;
 using System.Text;
 using DataWarehouse.SDK.Contracts.Media;
 using DataWarehouse.SDK.Utilities;
+using DataWarehouse.Plugins.Transcoding.Media.Execution;
 
 namespace DataWarehouse.Plugins.Transcoding.Media.Strategies.Video;
 
@@ -104,11 +105,18 @@ internal sealed class Vp9CodecStrategy : MediaStrategyBase
         var useTwoPass = options.TwoPass || options.TargetBitrate.HasValue;
         var ffmpegArgs = BuildFfmpegArguments(cqLevel, resolution, frameRate, audioCodec, useTwoPass, options);
 
-        await WriteTranscodePackageAsync(outputStream, ffmpegArgs, sourceBytes, useTwoPass, cancellationToken)
-            .ConfigureAwait(false);
-
-        outputStream.Position = 0;
-        return outputStream;
+        return await FfmpegTranscodeHelper.ExecuteOrPackageAsync(
+            ffmpegArgs,
+            sourceBytes,
+            async () =>
+            {
+                var outputStream = new MemoryStream();
+                await WriteTranscodePackageAsync(outputStream, ffmpegArgs, sourceBytes, useTwoPass, cancellationToken)
+                    .ConfigureAwait(false);
+                outputStream.Position = 0;
+                return outputStream;
+            },
+            cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>

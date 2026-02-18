@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
+using DataWarehouse.SDK.Contracts;
 
 namespace DataWarehouse.Launcher.Integration;
 
@@ -121,6 +122,16 @@ public sealed class EmbeddedAdapter : IKernelAdapter
             CpuUsagePercent = 0,
             MemoryUsedBytes = GC.GetTotalMemory(false)
         };
+    }
+
+    /// <summary>
+    /// Gets the capability registry for dynamic endpoint generation.
+    /// Embedded adapter doesn't have a full kernel, so returns null.
+    /// </summary>
+    public IPluginCapabilityRegistry? GetCapabilityRegistry()
+    {
+        // Embedded adapter is lightweight and doesn't include capability registry
+        return null;
     }
 
     public ValueTask DisposeAsync()

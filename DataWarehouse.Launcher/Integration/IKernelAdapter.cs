@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Logging;
+using DataWarehouse.SDK.Contracts;
 
 namespace DataWarehouse.Launcher.Integration;
 
@@ -48,6 +49,12 @@ public interface IKernelAdapter : IAsyncDisposable
     /// Gets kernel statistics and metrics.
     /// </summary>
     KernelStats GetStats();
+
+    /// <summary>
+    /// Gets the capability registry for dynamic endpoint generation.
+    /// Returns null if capability registry is not available in this adapter.
+    /// </summary>
+    IPluginCapabilityRegistry? GetCapabilityRegistry();
 
     /// <summary>
     /// Event raised when the kernel state changes.

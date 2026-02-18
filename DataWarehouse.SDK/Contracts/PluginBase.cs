@@ -653,6 +653,7 @@ namespace DataWarehouse.SDK.Contracts
 
         /// <summary>
         /// Registers capabilities with the central capability registry.
+        /// IDEMPOTENT: Safe to call multiple times. Only registers capabilities that aren't already registered.
         /// </summary>
         protected virtual async Task RegisterCapabilitiesAsync(CancellationToken ct = default)
         {
@@ -666,6 +667,14 @@ namespace DataWarehouse.SDK.Contracts
                 var capabilities = GetCapabilityRegistrations();
                 foreach (var capability in capabilities)
                 {
+                    // Skip if already registered by this plugin (idempotent protection)
+                    if (_registeredCapabilityIds.Contains(capability.CapabilityId))
+                    {
+                        continue;
+                    }
+
+                    // RegisterAsync in PluginCapabilityRegistry uses TryAdd which is idempotent
+                    // Returns true if added, false if already exists
                     if (await CapabilityRegistry.RegisterAsync(capability, ct))
                     {
                         _registeredCapabilityIds.Add(capability.CapabilityId);
