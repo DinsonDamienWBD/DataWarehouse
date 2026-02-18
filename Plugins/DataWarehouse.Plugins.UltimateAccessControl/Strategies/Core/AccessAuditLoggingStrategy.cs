@@ -734,8 +734,8 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Core
             _flushTimer?.Dispose();
             _retentionTimer?.Dispose();
 
-            // Final flush
-            ForceFlushAsync().GetAwaiter().GetResult();
+            // Sync bridge: Dispose cannot be async without IAsyncDisposable
+            Task.Run(() => ForceFlushAsync()).GetAwaiter().GetResult();
 
             foreach (var destination in _destinations.OfType<IDisposable>())
             {

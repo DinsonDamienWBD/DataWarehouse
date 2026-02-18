@@ -1391,7 +1391,7 @@ public sealed class NatsProtocolStrategy : DatabaseProtocolStrategyBase
             {
                 await _writer.WriteLineAsync("QUIT");
             }
-            catch { }
+            catch { /* Non-critical operation */ }
         }
     }
 

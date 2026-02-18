@@ -51,7 +51,7 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Transform
             if (input == null || input.Length == 0)
                 return Array.Empty<byte>();
 
-            using var output = new MemoryStream();
+            using var output = new MemoryStream(input.Length + 256);
             using (var bzip2 = BZip2Stream.Create(output, SharpCompress.Compressors.CompressionMode.Compress, false, false))
             {
                 bzip2.Write(input, 0, input.Length);
@@ -71,7 +71,7 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Transform
 
             using var inputStream = new MemoryStream(input);
             using var bzip2 = BZip2Stream.Create(inputStream, SharpCompress.Compressors.CompressionMode.Decompress, false, false);
-            using var output = new MemoryStream();
+            using var output = new MemoryStream(input.Length + 256);
 
             bzip2.CopyTo(output);
             return output.ToArray();

@@ -61,7 +61,7 @@ internal sealed class ScatterGatherStrategy : ComputeRuntimeStrategyBase
                     }
                     finally
                     {
-                        try { File.Delete(codePath); } catch { }
+                        try { File.Delete(codePath); } catch { /* Best-effort cleanup */ }
                     }
                 });
 

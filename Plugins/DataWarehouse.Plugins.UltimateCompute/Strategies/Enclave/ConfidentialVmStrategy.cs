@@ -80,7 +80,7 @@ internal sealed class ConfidentialVmStrategy : ComputeRuntimeStrategyBase
             }
             finally
             {
-                try { File.Delete(codePath); } catch { }
+                try { File.Delete(codePath); } catch { /* Best-effort cleanup */ }
             }
         }, cancellationToken);
     }

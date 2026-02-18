@@ -391,7 +391,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
                 var fileSize = fileInfo?.StandardInformation?.EndOfFile ?? 0;
 
                 // Read entire file into memory stream
-                var memoryStream = new MemoryStream();
+                var memoryStream = new MemoryStream(65536);
                 var buffer = new byte[_maxBufferSize];
                 long offset = 0;
 

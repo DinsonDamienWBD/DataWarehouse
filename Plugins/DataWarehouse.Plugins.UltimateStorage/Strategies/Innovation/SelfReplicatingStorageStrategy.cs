@@ -145,7 +145,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
             EnsureInitialized();
 
             // Read data for replication
-            using var ms = new MemoryStream();
+            using var ms = new MemoryStream(65536);
             await data.CopyToAsync(ms, ct);
             var dataBytes = ms.ToArray();
 

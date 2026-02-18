@@ -229,7 +229,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Decentralized
             ValidateStream(data);
 
             // Read stream into memory
-            using var ms = new MemoryStream();
+            using var ms = new MemoryStream(65536);
             await data.CopyToAsync(ms, 81920, ct);
             ms.Position = 0;
             var dataSize = ms.Length;
@@ -800,7 +800,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Decentralized
             var response = await _httpClient!.SendAsync(request, linkedCts.Token);
             response.EnsureSuccessStatusCode();
 
-            var ms = new MemoryStream();
+            var ms = new MemoryStream(65536);
             await response.Content.CopyToAsync(ms, linkedCts.Token);
             ms.Position = 0;
 

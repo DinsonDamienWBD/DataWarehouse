@@ -145,7 +145,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.OpenStack
             var filePath = GetFilePathInShare(key);
 
             // Read data into memory
-            using var ms = new MemoryStream();
+            using var ms = new MemoryStream(65536);
             await data.CopyToAsync(ms, 81920, ct);
             var content = ms.ToArray();
 
@@ -197,7 +197,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.OpenStack
 
             // In real implementation, this would read from mounted filesystem
             // Here we simulate returning empty stream for demonstration
-            var ms = new MemoryStream();
+            var ms = new MemoryStream(65536);
 
             // Update statistics
             IncrementBytesRetrieved(ms.Length);

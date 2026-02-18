@@ -356,7 +356,7 @@ public sealed class PredictiveCacheStrategy : CachingStrategyBase
 
         foreach (var sub in _subscriptions)
         {
-            try { sub.Dispose(); } catch { }
+            try { sub.Dispose(); } catch { /* Best-effort cleanup */ }
         }
 
         _cache.Clear();

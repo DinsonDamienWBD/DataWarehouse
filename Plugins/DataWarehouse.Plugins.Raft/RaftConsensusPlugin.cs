@@ -217,7 +217,7 @@ namespace DataWarehouse.Plugins.Raft
             meta["State"] = _state.ToString();
             meta["LeaderId"] = _leaderId ?? "none";
             meta["PeerCount"] = _peers.Count;
-            // Cannot be async: Override of base synchronous GetMetadata(). Using Task.Run to prevent sync context deadlock.
+            // Sync bridge: GetMetadata is synchronous in base class
             meta["LogLength"] = _logStore != null ? Task.Run(() => _logStore.GetLastIndexAsync()).GetAwaiter().GetResult() : 0;
             meta["CommitIndex"] = _commitIndex;
             return meta;

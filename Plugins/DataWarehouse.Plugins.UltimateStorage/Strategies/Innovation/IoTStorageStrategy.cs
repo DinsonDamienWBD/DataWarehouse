@@ -64,7 +64,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
             var deviceId = key.Split('/')[0];
             var shard = GetShardForDevice(deviceId);
 
-            using var ms = new MemoryStream();
+            using var ms = new MemoryStream(65536);
             await data.CopyToAsync(ms, ct);
             var telemetryData = ms.ToArray();
 

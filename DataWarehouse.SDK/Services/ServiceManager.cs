@@ -463,7 +463,7 @@ public sealed class ServiceManager : IDisposable, IAsyncDisposable
         {
             if (managed.Instance is IDisposable disposable)
             {
-                try { disposable.Dispose(); } catch { }
+                try { disposable.Dispose(); } catch { /* Best-effort cleanup */ }
             }
         }
 
@@ -471,7 +471,7 @@ public sealed class ServiceManager : IDisposable, IAsyncDisposable
         {
             if (singleton is IDisposable disposable)
             {
-                try { disposable.Dispose(); } catch { }
+                try { disposable.Dispose(); } catch { /* Best-effort cleanup */ }
             }
         }
 

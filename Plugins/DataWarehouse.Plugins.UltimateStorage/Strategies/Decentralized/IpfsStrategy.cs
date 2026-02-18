@@ -150,7 +150,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Decentralized
             ValidateStream(data);
 
             // Read stream into memory (IPFS client requires seekable stream)
-            using var ms = new MemoryStream();
+            using var ms = new MemoryStream(65536);
             await data.CopyToAsync(ms, 81920, ct);
             ms.Position = 0;
             var dataSize = ms.Length;
@@ -277,7 +277,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Decentralized
             }
 
             // Read into memory stream for consistent behavior
-            var ms = new MemoryStream();
+            var ms = new MemoryStream(65536);
             await contentStream.CopyToAsync(ms, 81920, ct);
             ms.Position = 0;
             contentStream.Dispose();

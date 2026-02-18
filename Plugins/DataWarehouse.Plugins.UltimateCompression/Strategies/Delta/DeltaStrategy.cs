@@ -58,7 +58,7 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Delta
         /// <inheritdoc/>
         protected override byte[] CompressCore(byte[] input)
         {
-            using var output = new MemoryStream();
+            using var output = new MemoryStream(input.Length + 256);
             output.Write(Magic, 0, 4);
 
             var lenBytes = new byte[4];

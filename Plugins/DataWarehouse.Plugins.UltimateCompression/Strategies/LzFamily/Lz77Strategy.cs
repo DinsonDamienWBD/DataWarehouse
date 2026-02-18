@@ -241,7 +241,7 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.LzFamily
 
         private static byte[] CreateLiteralBlock(byte[] input)
         {
-            using var output = new MemoryStream();
+            using var output = new MemoryStream(input.Length + 256);
             var writer = new BinaryWriter(output);
             writer.Write(input.Length);
             if (input.Length > 0)

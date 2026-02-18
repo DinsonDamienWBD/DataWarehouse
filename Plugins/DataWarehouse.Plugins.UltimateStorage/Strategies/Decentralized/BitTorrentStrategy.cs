@@ -363,7 +363,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Decentralized
                 // Verify torrent manager exists and file is complete
                 if (_torrents.TryGetValue(key, out var manager) && manager.Complete)
                 {
-                    var ms = new MemoryStream();
+                    var ms = new MemoryStream(65536);
                     using (var fileStream = File.OpenRead(filePath))
                     {
                         await fileStream.CopyToAsync(ms, 81920, ct);

@@ -78,7 +78,7 @@ internal sealed class MetalStrategy : ComputeRuntimeStrategyBase
             }
             finally
             {
-                try { File.Delete(metalPath); File.Delete(airPath); File.Delete(metalLibPath); } catch { }
+                try { File.Delete(metalPath); File.Delete(airPath); File.Delete(metalLibPath); } catch { /* Best-effort cleanup */ }
             }
         }, cancellationToken);
     }

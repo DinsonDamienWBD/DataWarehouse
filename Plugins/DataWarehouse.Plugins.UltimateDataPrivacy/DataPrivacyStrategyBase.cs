@@ -79,7 +79,7 @@ public sealed class DataPrivacyStrategyRegistry
                     count++;
                 }
             }
-            catch { }
+            catch { /* Non-critical operation */ }
         }
 
         return count;

@@ -331,7 +331,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
             }
 
             // Download to memory stream
-            var memoryStream = new MemoryStream();
+            var memoryStream = new MemoryStream(65536);
 
             var success = await _ftpClient.DownloadStream(
                 memoryStream,

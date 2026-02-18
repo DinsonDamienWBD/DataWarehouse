@@ -54,7 +54,8 @@ public sealed class ClaudeProviderStrategy : AIProviderStrategyBase
         Tags = new[] { "anthropic", "claude", "claude-3", "opus", "sonnet", "haiku" }
     };
 
-    public ClaudeProviderStrategy() : this(new HttpClient()) { }
+    private static readonly HttpClient SharedHttpClient = new HttpClient();
+    public ClaudeProviderStrategy() : this(SharedHttpClient) { }
 
     public ClaudeProviderStrategy(HttpClient httpClient)
     {

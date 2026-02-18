@@ -47,7 +47,7 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.LzFamily
         /// <inheritdoc/>
         protected override byte[] CompressCore(byte[] input)
         {
-            using var outputStream = new MemoryStream();
+            using var outputStream = new MemoryStream(input.Length + 256);
 
             // LZMA header: magic bytes + uncompressed size
             outputStream.WriteByte(0x4C); // 'L'

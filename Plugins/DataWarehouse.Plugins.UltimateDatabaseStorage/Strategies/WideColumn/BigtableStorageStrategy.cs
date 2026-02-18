@@ -55,9 +55,9 @@ public sealed class BigtableStorageStrategy : DatabaseStorageStrategyBase
 
     protected override async Task InitializeCoreAsync(CancellationToken ct)
     {
-        _projectId = GetConfiguration<string>("ProjectId", null!)
+        _projectId = GetConfiguration<string?>("ProjectId", null)
             ?? throw new InvalidOperationException("ProjectId is required");
-        _instanceId = GetConfiguration<string>("InstanceId", null!)
+        _instanceId = GetConfiguration<string?>("InstanceId", null)
             ?? throw new InvalidOperationException("InstanceId is required");
         _tableId = GetConfiguration("TableId", "storage");
         _columnFamily = GetConfiguration("ColumnFamily", "cf");

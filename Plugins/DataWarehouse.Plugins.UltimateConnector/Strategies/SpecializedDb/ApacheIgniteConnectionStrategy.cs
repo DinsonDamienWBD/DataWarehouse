@@ -51,7 +51,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SpecializedDb
                 }
                 return results;
             }
-            catch { return new List<Dictionary<string, object?>>(); }
+            catch { return new List<Dictionary<string, object?>>(); /* Query failed - return empty */ }
         }
         public override async Task<int> ExecuteNonQueryAsync(IConnectionHandle handle, string command, Dictionary<string, object?>? parameters = null, CancellationToken ct = default)
         {
@@ -62,7 +62,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SpecializedDb
                 var response = await _httpClient.GetAsync($"/ignite?cmd=qryfldexe&qry={encodedCmd}", ct);
                 return response.IsSuccessStatusCode ? 1 : 0;
             }
-            catch { return 0; }
+            catch { return 0; /* Operation failed - return zero */ }
         }
         public override async Task<IReadOnlyList<DataSchema>> GetSchemaAsync(IConnectionHandle handle, CancellationToken ct = default)
         {
@@ -84,7 +84,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SpecializedDb
                 }
                 return schemas.Count > 0 ? schemas : new List<DataSchema> { new DataSchema("default", new[] { new DataSchemaField("key", "Object", false, null, null) }, new[] { "key" }, new Dictionary<string, object> { ["type"] = "cache" }) };
             }
-            catch { return new List<DataSchema>(); }
+            catch { return new List<DataSchema>(); /* Schema query failed - return empty */ }
         }
         private (string host, int port) ParseHostPort(string connectionString, int defaultPort) { var clean = connectionString.Replace("http://", "").Split('/')[0]; var parts = clean.Split(':'); return (parts[0], parts.Length > 1 && int.TryParse(parts[1], out var p) ? p : defaultPort); }
     }

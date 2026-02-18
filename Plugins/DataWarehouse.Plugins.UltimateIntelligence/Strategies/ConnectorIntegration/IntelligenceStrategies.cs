@@ -180,10 +180,12 @@ public sealed class ZeroDayConnectorGeneratorStrategy : FeatureStrategyBase
         Tags = new[] { "connector", "generation", "openapi", "swagger", "codegen", "hot-swap" }
     };
 
+    private static readonly HttpClient SharedHttpClient = new HttpClient();
+
     /// <summary>
     /// Initializes a new instance of <see cref="ZeroDayConnectorGeneratorStrategy"/>.
     /// </summary>
-    public ZeroDayConnectorGeneratorStrategy() : this(new HttpClient()) { }
+    public ZeroDayConnectorGeneratorStrategy() : this(SharedHttpClient) { }
 
     /// <summary>
     /// Initializes a new instance with a custom HTTP client.
@@ -2678,10 +2680,12 @@ public sealed class ApiArchaeologistStrategy : FeatureStrategyBase
         Tags = new[] { "api", "discovery", "fuzzing", "undocumented", "hidden", "archaeology" }
     };
 
+    private static readonly HttpClient SharedHttpClient = new HttpClient();
+
     /// <summary>
     /// Initializes a new instance of <see cref="ApiArchaeologistStrategy"/>.
     /// </summary>
-    public ApiArchaeologistStrategy() : this(new HttpClient()) { }
+    public ApiArchaeologistStrategy() : this(SharedHttpClient) { }
 
     /// <summary>
     /// Initializes with custom HTTP client.

@@ -157,7 +157,7 @@ public sealed class FoundationDbStorageStrategy : DatabaseStorageStrategyBase
             if (countSlice.IsPresent)
             {
                 var chunks = BitConverter.ToInt32(countSlice.ToArray(), 0);
-                using var ms = new MemoryStream();
+                using var ms = new MemoryStream(65536);
 
                 for (int i = 0; i < chunks; i++)
                 {

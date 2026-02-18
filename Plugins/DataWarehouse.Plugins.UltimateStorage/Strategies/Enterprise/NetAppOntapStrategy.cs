@@ -201,7 +201,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Enterprise
             var fullPath = GetFullPath(key);
 
             // Read data into memory
-            using var ms = new MemoryStream();
+            using var ms = new MemoryStream(65536);
             await data.CopyToAsync(ms, 81920, ct);
             var content = ms.ToArray();
 
@@ -262,7 +262,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Enterprise
             // API: PUT /s3/{bucket}/{key}
             var fullPath = $"/s3/{_s3Bucket}/{key}";
 
-            using var ms = new MemoryStream();
+            using var ms = new MemoryStream(65536);
             await data.CopyToAsync(ms, 81920, ct);
             var content = ms.ToArray();
 
@@ -326,7 +326,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Enterprise
             var request = new HttpRequestMessage(HttpMethod.Get, $"/api/storage/volumes/{volumeUuid}/files/{encodedPath}");
             var response = await SendWithRetryAsync(request, ct);
 
-            var ms = new MemoryStream();
+            var ms = new MemoryStream(65536);
             await response.Content.CopyToAsync(ms, ct);
             ms.Position = 0;
 
@@ -344,7 +344,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Enterprise
             var request = new HttpRequestMessage(HttpMethod.Get, fullPath);
             var response = await SendWithRetryAsync(request, ct);
 
-            var ms = new MemoryStream();
+            var ms = new MemoryStream(65536);
             await response.Content.CopyToAsync(ms, ct);
             ms.Position = 0;
 

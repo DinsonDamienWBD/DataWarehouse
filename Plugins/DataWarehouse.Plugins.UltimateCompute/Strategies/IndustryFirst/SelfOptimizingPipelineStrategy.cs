@@ -112,7 +112,7 @@ internal sealed class SelfOptimizingPipelineStrategy : ComputeRuntimeStrategyBas
             }
             finally
             {
-                try { File.Delete(codePath); } catch { }
+                try { File.Delete(codePath); } catch { /* Best-effort cleanup */ }
             }
 
             sw.Stop();

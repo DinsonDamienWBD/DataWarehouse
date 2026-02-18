@@ -82,7 +82,7 @@ internal sealed class PrestoTrinoStrategy : ComputeRuntimeStrategyBase
             }
             finally
             {
-                try { File.Delete(sqlPath); } catch { }
+                try { File.Delete(sqlPath); } catch { /* Best-effort cleanup */ }
             }
         }, cancellationToken);
     }

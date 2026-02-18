@@ -143,14 +143,14 @@ public sealed partial class FullTextIndexStrategy : IndexingStrategyBase
     }
 
     /// <inheritdoc/>
-    protected override Task<IndexResult> IndexCoreAsync(string objectId, IndexableContent content, CancellationToken ct)
+    protected override async Task<IndexResult> IndexCoreAsync(string objectId, IndexableContent content, CancellationToken ct)
     {
         var sw = System.Diagnostics.Stopwatch.StartNew();
 
         // Remove existing document if re-indexing
         if (_documents.ContainsKey(objectId))
         {
-            RemoveCoreAsync(objectId, ct).GetAwaiter().GetResult();
+            await RemoveCoreAsync(objectId, ct);
         }
 
         var text = content.TextContent ?? "";
@@ -196,7 +196,7 @@ public sealed partial class FullTextIndexStrategy : IndexingStrategyBase
         Interlocked.Add(ref _totalTokens, terms.Count);
         sw.Stop();
 
-        return Task.FromResult(IndexResult.Ok(1, terms.Count, sw.Elapsed));
+        return IndexResult.Ok(1, terms.Count, sw.Elapsed);
     }
 
     /// <inheritdoc/>

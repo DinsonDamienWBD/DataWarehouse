@@ -222,7 +222,7 @@ public sealed class HypervisorDetector : IHypervisorDetector
             if (key is not null)
                 return HypervisorType.HyperV;
         }
-        catch { }
+        catch { /* Platform detection - failure is acceptable */ }
 
         // Check VMware registry key
         try
@@ -231,7 +231,7 @@ public sealed class HypervisorDetector : IHypervisorDetector
             if (key is not null)
                 return HypervisorType.VMware;
         }
-        catch { }
+        catch { /* Platform detection - failure is acceptable */ }
 
         // Additional detection for VirtualBox, Parallels:
         // VirtualBox: HKLM\HARDWARE\ACPI\DSDT\VBOX__

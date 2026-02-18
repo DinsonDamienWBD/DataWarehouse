@@ -334,7 +334,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Cloud
                 }
 
                 // Read file into memory stream
-                var ms = new MemoryStream();
+                var ms = new MemoryStream(65536);
                 using (var fs = File.OpenRead(tempFile))
                 {
                     await fs.CopyToAsync(ms, 81920, ct);

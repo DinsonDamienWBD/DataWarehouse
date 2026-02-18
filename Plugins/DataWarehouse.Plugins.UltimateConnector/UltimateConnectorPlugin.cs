@@ -190,14 +190,14 @@ public sealed class UltimateConnectorPlugin : DataWarehouse.SDK.Contracts.Hierar
     }
 
     /// <inheritdoc/>
-    public override Task<HandshakeResponse> OnHandshakeAsync(HandshakeRequest request)
+    public override async Task<HandshakeResponse> OnHandshakeAsync(HandshakeRequest request)
     {
-        var response = base.OnHandshakeAsync(request).GetAwaiter().GetResult();
+        var response = await base.OnHandshakeAsync(request);
 
         response.Metadata["RegisteredStrategies"] = _registry.Count.ToString();
         response.Metadata["SemanticDescription"] = SemanticDescription;
 
-        return Task.FromResult(response);
+        return response;
     }
 
     /// <inheritdoc/>

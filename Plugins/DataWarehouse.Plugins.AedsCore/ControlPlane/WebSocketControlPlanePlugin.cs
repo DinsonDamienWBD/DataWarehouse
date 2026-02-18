@@ -456,12 +456,12 @@ public class WebSocketControlPlanePlugin : ControlPlaneTransportPluginBase
 
         if (_heartbeatTask != null)
         {
-            try { await _heartbeatTask; } catch { }
+            try { await _heartbeatTask; } catch { /* Best-effort task cleanup */ }
         }
 
         if (_receiveTask != null)
         {
-            try { await _receiveTask; } catch { }
+            try { await _receiveTask; } catch { /* Best-effort task cleanup */ }
         }
 
         if (_webSocket?.State == WebSocketState.Open)

@@ -132,7 +132,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Cloud
             var startTime = DateTime.UtcNow;
 
             // Read data into memory for upload
-            using var ms = new MemoryStream();
+            using var ms = new MemoryStream(65536);
             await data.CopyToAsync(ms, ct);
             var content = ms.ToArray();
 
@@ -217,7 +217,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Cloud
             var response = await _httpClient!.SendAsync(request, ct);
             response.EnsureSuccessStatusCode();
 
-            var ms = new MemoryStream();
+            var ms = new MemoryStream(65536);
             await response.Content.CopyToAsync(ms, ct);
             ms.Position = 0;
 

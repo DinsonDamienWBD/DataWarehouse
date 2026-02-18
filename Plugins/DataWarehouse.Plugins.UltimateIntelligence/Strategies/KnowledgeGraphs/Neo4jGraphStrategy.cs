@@ -40,7 +40,9 @@ public sealed class Neo4jGraphStrategy : KnowledgeGraphStrategyBase
         Tags = new[] { "neo4j", "graph-db", "cypher", "native-graph", "production" }
     };
 
-    public Neo4jGraphStrategy() : this(new HttpClient()) { }
+    private static readonly HttpClient SharedHttpClient = new HttpClient();
+
+    public Neo4jGraphStrategy() : this(SharedHttpClient) { }
 
     public Neo4jGraphStrategy(HttpClient httpClient)
     {

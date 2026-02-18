@@ -317,7 +317,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Cloud
             var response = await _client!.GetObject(request);
 
             // Copy to memory stream for consistent behavior
-            var ms = new MemoryStream();
+            var ms = new MemoryStream(65536);
             await response.InputStream.CopyToAsync(ms, _streamingBufferSize, ct);
             ms.Position = 0;
 

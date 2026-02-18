@@ -243,7 +243,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
             await EnsureTenantExistsAsync(tenantId);
 
             // Read data
-            using var ms = new MemoryStream();
+            using var ms = new MemoryStream(65536);
             await data.CopyToAsync(ms, ct);
             var fileData = ms.ToArray();
             var originalSize = fileData.Length;
@@ -573,7 +573,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
             aes.GenerateIV();
 
             using var encryptor = aes.CreateEncryptor();
-            using var ms = new MemoryStream();
+            using var ms = new MemoryStream(65536);
             ms.Write(aes.IV, 0, aes.IV.Length);
 
             using (var cs = new CryptoStream(ms, encryptor, CryptoStreamMode.Write))

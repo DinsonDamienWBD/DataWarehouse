@@ -78,7 +78,7 @@ internal sealed class VulkanComputeStrategy : ComputeRuntimeStrategyBase
             }
             finally
             {
-                try { File.Delete(shaderPath); File.Delete(spirvPath); } catch { }
+                try { File.Delete(shaderPath); File.Delete(spirvPath); } catch { /* Best-effort cleanup */ }
             }
         }, cancellationToken);
     }

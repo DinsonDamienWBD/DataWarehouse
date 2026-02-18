@@ -211,7 +211,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
         private async Task<StorageObjectMetadata> StoreSingleObjectAsync(string objectName, Stream data, IDictionary<string, string>? metadata, CancellationToken ct)
         {
             // Read data into memory
-            using var ms = new MemoryStream();
+            using var ms = new MemoryStream(65536);
             await data.CopyToAsync(ms, _ioSizeBytes, ct);
             var content = ms.ToArray();
 
@@ -415,7 +415,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
             }
 
             var response = await SendWithRetryAsync(request, ct);
-            var ms = new MemoryStream();
+            var ms = new MemoryStream(65536);
             await response.Content.CopyToAsync(ms, ct);
             ms.Position = 0;
 

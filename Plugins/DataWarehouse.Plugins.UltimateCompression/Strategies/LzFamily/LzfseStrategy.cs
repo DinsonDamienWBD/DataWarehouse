@@ -278,7 +278,7 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.LzFamily
             }
 
             // Simple entropy encoding: build symbol-to-code mapping
-            using var output = new MemoryStream();
+            using var output = new MemoryStream(data.Length + 256);
             output.WriteByte(0x02); // encoded marker
 
             // Write frequency table (compact)
@@ -363,7 +363,7 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.LzFamily
 
         private static byte[] CreateUncompressedBlock(byte[] input)
         {
-            using var output = new MemoryStream();
+            using var output = new MemoryStream(input.Length + 256);
             var writer = new BinaryWriter(output);
             writer.Write(0x4C5A4655u); // 'LZFU' magic for uncompressed
             writer.Write(input.Length);

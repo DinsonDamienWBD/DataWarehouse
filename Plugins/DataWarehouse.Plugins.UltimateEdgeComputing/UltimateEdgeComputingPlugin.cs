@@ -459,7 +459,7 @@ internal sealed class OfflineOperationManagerImpl : EC.IOfflineOperationManager
         {
             total++;
             try { await Task.Delay(10, ct); successful++; }
-            catch { failed.Add(operation.OperationId); }
+            catch { failed.Add(operation.OperationId); /* Operation failed - track it */ }
         }
         return new EC.OperationBatchResult { TotalOperations = total, SuccessfulOperations = successful, FailedOperations = failed.Count, Duration = DateTime.UtcNow - startTime, FailedOperationIds = failed.ToArray() };
     }

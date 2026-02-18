@@ -215,7 +215,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Decentralized
             var endpoint = GetEndpointUrl(key);
 
             // Read data into memory
-            using var ms = new MemoryStream();
+            using var ms = new MemoryStream(65536);
             await data.CopyToAsync(ms, 81920, ct);
             var content = ms.ToArray();
 
@@ -358,7 +358,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Decentralized
             await SignRequestAsync(request, null, ct);
             var response = await SendWithRetryAsync(request, ct);
 
-            var ms = new MemoryStream();
+            var ms = new MemoryStream(65536);
             await response.Content.CopyToAsync(ms, ct);
             ms.Position = 0;
 
@@ -849,7 +849,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Decentralized
             }
 
             // Read the entire stream
-            using var ms = new MemoryStream();
+            using var ms = new MemoryStream(65536);
             await data.CopyToAsync(ms, 81920, ct);
             var plainBytes = ms.ToArray();
 
@@ -899,7 +899,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Decentralized
             }
 
             // Read the entire encrypted stream
-            using var ms = new MemoryStream();
+            using var ms = new MemoryStream(65536);
             await encryptedData.CopyToAsync(ms, 81920, ct);
             var encryptedBytes = ms.ToArray();
 

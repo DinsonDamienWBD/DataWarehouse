@@ -348,7 +348,8 @@ namespace DataWarehouse.Kernel.Storage
         [Obsolete("Use HasAccessAsync for async context")]
         public bool HasAccess(ISecurityContext context, string containerId, ContainerAccessLevel requiredLevel)
         {
-            return HasAccessAsync(context, containerId, requiredLevel).GetAwaiter().GetResult();
+            // Sync bridge: obsolete sync API wrapper
+            return Task.Run(() => HasAccessAsync(context, containerId, requiredLevel)).GetAwaiter().GetResult();
         }
 
         #endregion

@@ -192,23 +192,25 @@ public sealed class InMemoryCacheStrategy : CachingStrategyBase
     }
 
     /// <inheritdoc/>
-    protected override Task InvalidateByTagsCoreAsync(string[] tags, CancellationToken ct)
+    protected override async Task InvalidateByTagsCoreAsync(string[] tags, CancellationToken ct)
     {
         foreach (var tag in tags)
         {
+            string[] keysToRemove;
             lock (_tagLock)
             {
-                if (_tagIndex.TryGetValue(tag, out var keys))
+                if (!_tagIndex.TryGetValue(tag, out var keys))
                 {
-                    foreach (var key in keys.ToArray())
-                    {
-                        RemoveCoreAsync(key, ct).GetAwaiter().GetResult();
-                    }
+                    continue;
                 }
+                keysToRemove = keys.ToArray();
+            }
+
+            foreach (var key in keysToRemove)
+            {
+                await RemoveCoreAsync(key, ct);
             }
         }
-
-        return Task.CompletedTask;
     }
 
     /// <inheritdoc/>

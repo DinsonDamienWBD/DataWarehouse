@@ -1042,7 +1042,7 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Generative
         /// </summary>
         public byte[] Serialize()
         {
-            using var ms = new MemoryStream();
+            using var ms = new MemoryStream(4096);
             using var writer = new BinaryWriter(ms);
 
             writer.Write((byte)ContentType);
@@ -1375,7 +1375,7 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Generative
             var regions = SegmentIntoRegions(data, importanceMap);
 
             // Compress each region with appropriate method
-            using var output = new MemoryStream();
+            using var output = new MemoryStream(data.Length + 256);
             using var writer = new BinaryWriter(output);
 
             // Header: region count
@@ -1528,7 +1528,7 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Generative
         private static byte[] CompressLossless(byte[] data)
         {
             // Simple RLE compression
-            using var output = new MemoryStream();
+            using var output = new MemoryStream(data.Length + 256);
             int i = 0;
             while (i < data.Length)
             {
@@ -1554,7 +1554,7 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Generative
 
         private static byte[] DecompressLossless(byte[] data)
         {
-            using var output = new MemoryStream();
+            using var output = new MemoryStream(data.Length + 256);
             int i = 0;
             while (i < data.Length)
             {
@@ -1581,7 +1581,7 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Generative
         {
             // Simplified generative compression for hybrid mode
             // Uses delta encoding with prediction
-            using var output = new MemoryStream();
+            using var output = new MemoryStream(data.Length + 256);
             output.WriteByte((byte)(data.Length >> 24));
             output.WriteByte((byte)(data.Length >> 16));
             output.WriteByte((byte)(data.Length >> 8));
@@ -2112,7 +2112,7 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Generative
             var prompt = _promptGenerator.GeneratePrompt(input, analysisResult.ContentType);
             var promptData = prompt.Serialize();
 
-            using var output = new MemoryStream();
+            using var output = new MemoryStream(4096);
 
             // Write header
             output.Write(Magic, 0, 4);
@@ -2262,7 +2262,7 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Generative
 
         private byte[] WrapWithHeader(byte[] data, ContentAnalysisResult analysis, GenerativeCompressionMode mode, ContentPrompt? prompt)
         {
-            using var output = new MemoryStream();
+            using var output = new MemoryStream(data.Length + 256);
             output.Write(Magic, 0, 4);
             output.WriteByte(Version);
             output.WriteByte((byte)mode);
@@ -2533,7 +2533,7 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Generative
 
             public byte[] Serialize()
             {
-                using var ms = new MemoryStream();
+                using var ms = new MemoryStream(4096);
                 using var writer = new BinaryWriter(ms);
 
                 int prevPred = 2048;
@@ -2813,7 +2813,7 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Generative
                 _input = input;
                 _leaveOpen = leaveOpen;
 
-                using var buffer = new MemoryStream();
+                using var buffer = new MemoryStream(4096);
                 input.CopyTo(buffer);
                 var compressed = buffer.ToArray();
                 if (compressed.Length > 0)
@@ -2823,7 +2823,7 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Generative
                 }
                 else
                 {
-                    _decompressed = new MemoryStream();
+                    _decompressed = new MemoryStream(4096);
                 }
             }
 

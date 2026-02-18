@@ -39,7 +39,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SpecializedDb
         {
             if (_httpClient == null) return false;
             try { var response = await _httpClient.GetAsync("/health", ct); return response.IsSuccessStatusCode; }
-            catch { return false; }
+            catch { return false; /* Connection validation - failure acceptable */ }
         }
 
         protected override async Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct)
@@ -86,7 +86,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SpecializedDb
                 }
                 return results;
             }
-            catch { return new List<Dictionary<string, object?>>(); }
+            catch { return new List<Dictionary<string, object?>>(); /* Query failed - return empty */ }
         }
 
         public override async Task<int> ExecuteNonQueryAsync(IConnectionHandle handle, string command, Dictionary<string, object?>? parameters = null, CancellationToken ct = default)
@@ -99,7 +99,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SpecializedDb
                 var response = await _httpClient.PostAsync("/query/sql", content, ct);
                 return response.IsSuccessStatusCode ? 1 : 0;
             }
-            catch { return 0; }
+            catch { return 0; /* Operation failed - return zero */ }
         }
 
         public override async Task<IReadOnlyList<DataSchema>> GetSchemaAsync(IConnectionHandle handle, CancellationToken ct = default)
@@ -122,7 +122,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SpecializedDb
                 }
                 return schemas;
             }
-            catch { return new List<DataSchema>(); }
+            catch { return new List<DataSchema>(); /* Schema query failed - return empty */ }
         }
 
         private (string host, int port) ParseHostPort(string connectionString, int defaultPort)

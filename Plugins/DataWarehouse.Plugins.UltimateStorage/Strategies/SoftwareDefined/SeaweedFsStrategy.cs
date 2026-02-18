@@ -300,7 +300,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
             // Use S3-compatible API (simplified implementation)
             var endpoint = $"{_s3Endpoint}/{_collection}/{key}";
 
-            using var ms = new MemoryStream();
+            using var ms = new MemoryStream(65536);
             await data.CopyToAsync(ms, 81920, ct);
             var content = ms.ToArray();
 
@@ -383,7 +383,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
             var request = new HttpRequestMessage(HttpMethod.Get, downloadUrl);
             var response = await SendWithRetryAsync(request, ct);
 
-            var ms = new MemoryStream();
+            var ms = new MemoryStream(65536);
             await response.Content.CopyToAsync(ms, ct);
             ms.Position = 0;
 
@@ -396,7 +396,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
 
         private async Task<Stream> RetrieveChunkedFileAsync(List<ChunkInfo> chunks, CancellationToken ct)
         {
-            var ms = new MemoryStream();
+            var ms = new MemoryStream(65536);
 
             foreach (var chunk in chunks.OrderBy(c => c.Index))
             {
@@ -422,7 +422,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
             await SignS3RequestAsync(request, null, ct);
             var response = await SendWithRetryAsync(request, ct);
 
-            var ms = new MemoryStream();
+            var ms = new MemoryStream(65536);
             await response.Content.CopyToAsync(ms, ct);
             ms.Position = 0;
 
@@ -836,7 +836,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
             var uploadUrl = $"http://{assignment.PublicUrl}/{assignment.Fid}";
 
             // Read data into memory
-            using var ms = new MemoryStream();
+            using var ms = new MemoryStream(65536);
             await data.CopyToAsync(ms, 81920, ct);
             var content = ms.ToArray();
 

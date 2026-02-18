@@ -431,7 +431,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
             try
             {
                 // Read data into memory
-                using var memoryStream = new MemoryStream();
+                using var memoryStream = new MemoryStream(65536);
                 await data.CopyToAsync(memoryStream, ct);
                 var dataBytes = memoryStream.ToArray();
                 var dataSize = dataBytes.Length;

@@ -100,14 +100,14 @@ public sealed class MetadataIndexStrategy : IndexingStrategyBase
     }
 
     /// <inheritdoc/>
-    protected override Task<IndexResult> IndexCoreAsync(string objectId, IndexableContent content, CancellationToken ct)
+    protected override async Task<IndexResult> IndexCoreAsync(string objectId, IndexableContent content, CancellationToken ct)
     {
         var sw = System.Diagnostics.Stopwatch.StartNew();
 
         // Remove existing if re-indexing
         if (_documents.ContainsKey(objectId))
         {
-            RemoveCoreAsync(objectId, ct).GetAwaiter().GetResult();
+            await RemoveCoreAsync(objectId, ct);
         }
 
         var doc = new IndexedMetadata
@@ -154,7 +154,7 @@ public sealed class MetadataIndexStrategy : IndexingStrategyBase
         }
 
         sw.Stop();
-        return Task.FromResult(IndexResult.Ok(1, content.Metadata?.Count ?? 0, sw.Elapsed));
+        return IndexResult.Ok(1, content.Metadata?.Count ?? 0, sw.Elapsed);
     }
 
     /// <inheritdoc/>

@@ -216,7 +216,7 @@ internal sealed class EncryptionInTransitLayer : IDataTransitStrategy
         CancellationToken ct)
     {
         // Read plaintext into memory for AES-GCM (operates on byte arrays)
-        using var plaintextStream = new MemoryStream();
+        using var plaintextStream = new MemoryStream(4096);
         await source.CopyToAsync(plaintextStream, ct).ConfigureAwait(false);
         var plaintext = plaintextStream.ToArray();
 
@@ -231,7 +231,7 @@ internal sealed class EncryptionInTransitLayer : IDataTransitStrategy
         aesGcm.Encrypt(nonce, plaintext, ciphertext, tag);
 
         // Build output stream: [nonce][tag][ciphertext]
-        var outputStream = new MemoryStream();
+        var outputStream = new MemoryStream(4096);
         await outputStream.WriteAsync(nonce.AsMemory(), ct).ConfigureAwait(false);
         await outputStream.WriteAsync(tag.AsMemory(), ct).ConfigureAwait(false);
         await outputStream.WriteAsync(ciphertext.AsMemory(), ct).ConfigureAwait(false);

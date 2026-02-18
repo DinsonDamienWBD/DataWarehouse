@@ -359,7 +359,7 @@ public sealed class RocksDbMemoryStore : IPersistentMemoryStore
     }
 
     /// <inheritdoc/>
-    public Task CompactAsync(CancellationToken ct = default)
+    public async Task CompactAsync(CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
 
@@ -371,7 +371,7 @@ public sealed class RocksDbMemoryStore : IPersistentMemoryStore
 
         foreach (var id in expiredIds)
         {
-            DeleteAsync(id, ct).GetAwaiter().GetResult();
+            await DeleteAsync(id, ct);
         }
 
         // Clean up empty scope indices
@@ -390,8 +390,6 @@ public sealed class RocksDbMemoryStore : IPersistentMemoryStore
 
         Interlocked.Increment(ref _compactionCount);
         _lastCompaction = DateTimeOffset.UtcNow;
-
-        return Task.CompletedTask;
     }
 
     /// <inheritdoc/>

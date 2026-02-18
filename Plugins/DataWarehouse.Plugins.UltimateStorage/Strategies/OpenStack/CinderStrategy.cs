@@ -912,7 +912,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.OpenStack
             // 5. Unmount and detach
 
             // For simulation purposes, we'll store a hash of the data in metadata
-            using var ms = new MemoryStream();
+            using var ms = new MemoryStream(65536);
             await data.CopyToAsync(ms, 81920, ct);
             var dataBytes = ms.ToArray();
 

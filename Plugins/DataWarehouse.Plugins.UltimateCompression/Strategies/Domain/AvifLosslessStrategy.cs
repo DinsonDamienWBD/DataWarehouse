@@ -61,7 +61,7 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Domain
         /// <inheritdoc/>
         protected override byte[] CompressCore(byte[] input)
         {
-            using var output = new MemoryStream();
+            using var output = new MemoryStream(input.Length + 256);
             using var writer = new BinaryWriter(output);
 
             // Write header
@@ -210,7 +210,7 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Domain
         private static byte[] RangeEncode(byte[] input)
         {
             // Simplified range coding implementation
-            using var output = new MemoryStream();
+            using var output = new MemoryStream(input.Length + 256);
             using var writer = new BinaryWriter(output);
 
             uint low = 0;
@@ -475,7 +475,7 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Domain
             {
                 if (_decompressedData == null)
                 {
-                    using var ms = new MemoryStream();
+                    using var ms = new MemoryStream(4096);
                     _input.CopyTo(ms);
                     _decompressedData = _strategy.DecompressCore(ms.ToArray());
                 }

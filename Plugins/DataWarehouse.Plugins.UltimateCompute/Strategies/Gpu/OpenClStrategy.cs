@@ -100,7 +100,7 @@ internal sealed class OpenClStrategy : ComputeRuntimeStrategyBase
             }
             finally
             {
-                try { File.Delete(clPath); File.Delete(hostPath); File.Delete(binPath); } catch { }
+                try { File.Delete(clPath); File.Delete(hostPath); File.Delete(binPath); } catch { /* Best-effort cleanup */ }
             }
         }, cancellationToken);
     }

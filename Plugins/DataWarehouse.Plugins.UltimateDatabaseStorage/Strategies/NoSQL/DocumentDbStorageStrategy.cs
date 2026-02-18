@@ -59,8 +59,8 @@ public sealed class DocumentDbStorageStrategy : DatabaseStorageStrategyBase
         _consistencyLevel = Enum.Parse<ConsistencyLevel>(GetConfiguration("ConsistencyLevel", "Session"));
 
         var connectionString = GetConnectionString();
-        var endpoint = GetConfiguration<string>("Endpoint", null!);
-        var key = GetConfiguration<string>("AccountKey", null!);
+        var endpoint = GetConfiguration<string?>("Endpoint", null);
+        var key = GetConfiguration<string?>("AccountKey", null);
 
         if (!string.IsNullOrEmpty(connectionString))
         {

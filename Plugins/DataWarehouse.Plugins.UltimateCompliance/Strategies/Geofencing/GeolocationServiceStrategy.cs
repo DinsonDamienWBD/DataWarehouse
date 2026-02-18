@@ -217,7 +217,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Geofencing
         }
 
         /// <inheritdoc/>
-        protected override Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken)
+        protected override async Task<ComplianceResult> CheckComplianceCoreAsync(ComplianceContext context, CancellationToken cancellationToken)
         {
             var violations = new List<ComplianceViolation>();
             var recommendations = new List<string>();
@@ -226,7 +226,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Geofencing
             if (context.Attributes.TryGetValue("NodeIpAddresses", out var ipsObj) &&
                 ipsObj is IEnumerable<string> ipAddresses)
             {
-                var resolvedLocations = BatchResolveAsync(ipAddresses, cancellationToken).GetAwaiter().GetResult();
+                var resolvedLocations = await BatchResolveAsync(ipAddresses, cancellationToken);
 
                 foreach (var (ip, location) in resolvedLocations)
                 {
@@ -259,8 +259,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Geofencing
                 {
                     if (nodeIps.TryGetValue(nodeId, out var nodeIp))
                     {
-                        var verification = VerifyNodeLocationAsync(nodeId, nodeIp, claimedCountry, cancellationToken)
-                            .GetAwaiter().GetResult();
+                        var verification = await VerifyNodeLocationAsync(nodeId, nodeIp, claimedCountry, cancellationToken);
 
                         if (!verification.IsValid)
                         {
@@ -282,7 +281,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Geofencing
                         violations.Any(v => v.Severity >= ViolationSeverity.High) ? ComplianceStatus.NonCompliant :
                         ComplianceStatus.PartiallyCompliant;
 
-            return Task.FromResult(new ComplianceResult
+            return new ComplianceResult
             {
                 IsCompliant = isCompliant,
                 Framework = Framework,
@@ -294,7 +293,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Geofencing
                     ["CacheStats"] = GetCacheStats(),
                     ["ProvidersActive"] = _providers.Count(p => p.IsEnabled)
                 }
-            });
+            };
         }
 
         private GeolocationResult CalculateConsensus(string ipAddress, List<GeolocationResult> results)

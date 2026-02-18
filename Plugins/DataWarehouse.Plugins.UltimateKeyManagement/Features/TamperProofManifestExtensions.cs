@@ -453,7 +453,7 @@ public static class TamperProofManifestExtensions
         {
             foreach (var prop in paramsElement.EnumerateObject())
             {
-                algorithmParams[prop.Name] = ConvertJsonElement(prop.Value) ?? null!; // Dictionary<string, object> can store null
+                algorithmParams[prop.Name] = ConvertJsonElement(prop.Value) ?? null!; // Dictionary<string, object?> stores null for JSON null values
             }
         }
 

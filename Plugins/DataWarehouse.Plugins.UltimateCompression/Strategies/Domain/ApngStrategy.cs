@@ -92,7 +92,7 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Domain
             }
 
             // Compress filtered data with Deflate
-            using var output = new MemoryStream();
+            using var output = new MemoryStream(input.Length + 256);
             using var writer = new BinaryWriter(output);
 
             // Header: magic + original length + row count
@@ -347,7 +347,7 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Domain
             private void EnsureDecompressed()
             {
                 if (_data != null) return;
-                using var ms = new MemoryStream();
+                using var ms = new MemoryStream(4096);
                 _input.CopyTo(ms);
                 _data = _decompressFunc(ms.ToArray());
             }

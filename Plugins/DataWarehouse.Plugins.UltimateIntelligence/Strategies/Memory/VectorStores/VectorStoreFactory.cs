@@ -47,6 +47,7 @@ public sealed class VectorStoreFactory : IAsyncDisposable
 {
     private readonly VectorStoreRegistry _registry;
     private readonly HttpClient _httpClient;
+    private static readonly HttpClient SharedHttpClient = new HttpClient();
     private readonly Dictionary<string, IProductionVectorStore> _instances = new();
     private readonly object _lock = new();
 
@@ -58,7 +59,7 @@ public sealed class VectorStoreFactory : IAsyncDisposable
     public VectorStoreFactory(VectorStoreRegistry? registry = null, HttpClient? httpClient = null)
     {
         _registry = registry ?? VectorStoreRegistry.Instance;
-        _httpClient = httpClient ?? new HttpClient();
+        _httpClient = httpClient ?? SharedHttpClient;
     }
 
     /// <summary>

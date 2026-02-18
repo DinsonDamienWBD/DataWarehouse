@@ -154,7 +154,8 @@ public sealed class PostProcessDeduplicationStrategy : DeduplicationStrategyBase
         try
         {
             _isProcessing = true;
-            ProcessBatchInternalAsync(CancellationToken.None).GetAwaiter().GetResult();
+            // Sync bridge: Timer callback cannot be async
+            Task.Run(() => ProcessBatchInternalAsync(CancellationToken.None)).GetAwaiter().GetResult();
         }
         finally
         {

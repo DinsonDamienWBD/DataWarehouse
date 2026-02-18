@@ -536,6 +536,7 @@ public sealed class CircuitBreakerFallbackStrategy<TResult> : ResilienceStrategy
         CancellationToken cancellationToken)
     {
         var startTime = DateTimeOffset.UtcNow;
+        bool isCircuitOpen;
 
         lock (_stateLock)
         {
@@ -544,16 +545,25 @@ public sealed class CircuitBreakerFallbackStrategy<TResult> : ResilienceStrategy
                 if (DateTimeOffset.UtcNow >= _openedAt + _openDuration)
                 {
                     _state = State.HalfOpen;
+                    isCircuitOpen = false;
                 }
                 else
                 {
                     // Circuit is open - return fallback immediately
                     RecordFallback();
                     RecordCircuitBreakerRejection();
-
-                    return GetFallbackResult<T>(startTime, context, cancellationToken, isCircuitOpen: true);
+                    isCircuitOpen = true;
                 }
             }
+            else
+            {
+                isCircuitOpen = false;
+            }
+        }
+
+        if (isCircuitOpen)
+        {
+            return await GetFallbackResultAsync<T>(startTime, context, cancellationToken, isCircuitOpen: true);
         }
 
         try
@@ -588,11 +598,11 @@ public sealed class CircuitBreakerFallbackStrategy<TResult> : ResilienceStrategy
             }
 
             RecordFallback();
-            return GetFallbackResult<T>(startTime, context, cancellationToken, isCircuitOpen: false);
+            return await GetFallbackResultAsync<T>(startTime, context, cancellationToken, isCircuitOpen: false);
         }
     }
 
-    private ResilienceResult<T> GetFallbackResult<T>(
+    private async Task<ResilienceResult<T>> GetFallbackResultAsync<T>(
         DateTimeOffset startTime,
         ResilienceContext? context,
         CancellationToken cancellationToken,
@@ -602,7 +612,7 @@ public sealed class CircuitBreakerFallbackStrategy<TResult> : ResilienceStrategy
         {
             try
             {
-                var fallbackResult = _fallbackOperation(context, cancellationToken).GetAwaiter().GetResult();
+                var fallbackResult = await _fallbackOperation(context, cancellationToken);
                 if (fallbackResult is T typedFallback)
                 {
                     return new ResilienceResult<T>

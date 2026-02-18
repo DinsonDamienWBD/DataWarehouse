@@ -217,7 +217,7 @@ namespace DataWarehouse.SDK.Infrastructure.Distributed.Discovery
         /// </summary>
         public void Dispose()
         {
-            // Cannot be async: IDisposable.Dispose() pattern. Using Task.Run to prevent sync context deadlock.
+            // Sync bridge: Dispose cannot be async without IAsyncDisposable
             Task.Run(() => StopAsync()).GetAwaiter().GetResult();
             _joinLock.Dispose();
         }

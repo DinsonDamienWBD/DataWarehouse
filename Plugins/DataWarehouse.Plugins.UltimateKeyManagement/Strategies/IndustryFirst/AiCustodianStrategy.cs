@@ -60,7 +60,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.IndustryFirst
     public sealed class AiCustodianStrategy : KeyStoreStrategyBase
     {
         private AiCustodianConfig _config = new();
-        private HttpClient _llmClient = null!; // Initialized in InitializeStorage
+        private HttpClient _llmClient = null!; // Initialized in InitializeStorage before first use
         private readonly Dictionary<string, AiProtectedKeyData> _keys = new();
         private readonly Dictionary<string, AccessHistory> _accessHistories = new();
         private readonly List<PendingEscalation> _pendingEscalations = new();

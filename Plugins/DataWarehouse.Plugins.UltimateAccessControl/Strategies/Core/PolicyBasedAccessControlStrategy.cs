@@ -339,7 +339,8 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Core
 
         private PolicyEvaluationDetail EvaluatePolicyDetailedSync(PolicyDefinition policy, AccessContext context)
         {
-            return EvaluatePolicyDetailedAsync(policy, context, CancellationToken.None).GetAwaiter().GetResult();
+            // Sync bridge: internal sync wrapper for policy evaluation
+            return Task.Run(() => EvaluatePolicyDetailedAsync(policy, context, CancellationToken.None)).GetAwaiter().GetResult();
         }
 
         private async Task<RuleEvaluationResult> EvaluateRuleAsync(
@@ -470,7 +471,7 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Core
                     var converted = Convert.ChangeType(b, a.GetType());
                     return ca.CompareTo(converted);
                 }
-                catch { }
+                catch { /* Best-effort policy enforcement - non-critical */ }
             }
             return 0;
         }

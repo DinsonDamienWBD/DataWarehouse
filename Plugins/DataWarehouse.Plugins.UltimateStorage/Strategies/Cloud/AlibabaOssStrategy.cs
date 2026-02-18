@@ -330,7 +330,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Cloud
 
             return await ExecuteWithRetryAsync(async () =>
             {
-                var ms = new MemoryStream();
+                var ms = new MemoryStream(65536);
 
                 var getRequest = new GetObjectRequest(_bucketName, key);
                 var ossObject = await Task.Run(() => _client!.GetObject(getRequest), ct);

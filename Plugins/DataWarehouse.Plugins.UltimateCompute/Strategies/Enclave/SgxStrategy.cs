@@ -82,7 +82,7 @@ internal sealed class SgxStrategy : ComputeRuntimeStrategyBase
             }
             finally
             {
-                try { File.Delete(enclavePath); File.Delete($"{enclavePath}.signed"); File.Delete(configPath); } catch { }
+                try { File.Delete(enclavePath); File.Delete($"{enclavePath}.signed"); File.Delete(configPath); } catch { /* Best-effort cleanup */ }
             }
         }, cancellationToken);
     }

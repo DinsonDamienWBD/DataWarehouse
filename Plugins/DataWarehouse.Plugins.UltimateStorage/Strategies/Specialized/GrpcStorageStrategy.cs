@@ -259,7 +259,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Specialized
         /// </summary>
         private async Task<StorageObjectMetadata> StoreWithUnaryCallAsync(string key, Stream data, IDictionary<string, string>? metadata, CancellationToken ct)
         {
-            using var ms = new MemoryStream();
+            using var ms = new MemoryStream(65536);
             await data.CopyToAsync(ms, 81920, ct);
             var content = ms.ToArray();
 
@@ -385,7 +385,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Specialized
 
             using var call = _client!.RetrieveStreaming(request, headers, deadline, ct);
 
-            var ms = new MemoryStream();
+            var ms = new MemoryStream(65536);
 
             await foreach (var response in call.ResponseStream.ReadAllAsync(ct))
             {

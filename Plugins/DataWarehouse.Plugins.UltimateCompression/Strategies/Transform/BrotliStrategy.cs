@@ -81,7 +81,7 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Transform
                 else if (status == OperationStatus.DestinationTooSmall)
                 {
                     // Fallback to stream-based compression if buffer estimate was wrong
-                    using var outputStream = new MemoryStream();
+                    using var outputStream = new MemoryStream(input.Length + 256);
                     using (var brotli = new BrotliStream(outputStream, System.IO.Compression.CompressionLevel.Optimal, leaveOpen: true))
                     {
                         brotli.Write(input, 0, input.Length);

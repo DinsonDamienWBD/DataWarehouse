@@ -89,9 +89,9 @@ internal sealed class NitroEnclavesStrategy : ComputeRuntimeStrategyBase
             {
                 if (enclaveId != null)
                 {
-                    try { await RunProcessAsync("nitro-cli", $"terminate-enclave --enclave-id {enclaveId}", timeout: TimeSpan.FromSeconds(10)); } catch { }
+                    try { await RunProcessAsync("nitro-cli", $"terminate-enclave --enclave-id {enclaveId}", timeout: TimeSpan.FromSeconds(10)); } catch { /* Best-effort cleanup */ }
                 }
-                try { File.Delete(dockerfilePath); File.Delete(eifPath); } catch { }
+                try { File.Delete(dockerfilePath); File.Delete(eifPath); } catch { /* Best-effort cleanup */ }
             }
         }, cancellationToken);
     }

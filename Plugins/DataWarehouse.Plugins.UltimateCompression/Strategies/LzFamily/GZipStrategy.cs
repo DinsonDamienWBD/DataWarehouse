@@ -47,7 +47,7 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.LzFamily
         /// <inheritdoc/>
         protected override byte[] CompressCore(byte[] input)
         {
-            using var output = new MemoryStream();
+            using var output = new MemoryStream(input.Length + 256);
             using (var gzip = new GZipStream(output, System.IO.Compression.CompressionLevel.Optimal, leaveOpen: true))
             {
                 gzip.Write(input, 0, input.Length);
@@ -60,7 +60,7 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.LzFamily
         {
             using var inputStream = new MemoryStream(input);
             using var gzip = new GZipStream(inputStream, System.IO.Compression.CompressionMode.Decompress);
-            using var output = new MemoryStream();
+            using var output = new MemoryStream(input.Length + 256);
             gzip.CopyTo(output);
             return output.ToArray();
         }

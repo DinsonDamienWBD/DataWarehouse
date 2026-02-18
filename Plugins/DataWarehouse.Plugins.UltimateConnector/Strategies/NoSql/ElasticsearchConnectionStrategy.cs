@@ -69,7 +69,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.NoSql
                 var response = await _httpClient.GetAsync("/_cluster/health", ct);
                 return response.IsSuccessStatusCode;
             }
-            catch { return false; }
+            catch { return false; /* Connection validation - failure acceptable */ }
         }
 
         protected override async Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct)

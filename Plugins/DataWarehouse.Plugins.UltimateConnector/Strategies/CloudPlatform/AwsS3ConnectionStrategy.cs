@@ -30,16 +30,16 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.CloudPlatform
         protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct)
         {
             var region = GetConfiguration(config, "Region", "us-east-1");
-            var customEndpoint = GetConfiguration<string>(config, "Endpoint", null!);
+            var customEndpoint = GetConfiguration<string?>(config, "Endpoint", null);
 
             // Load credentials from config, then fall back to environment variables
-            var accessKey = GetConfiguration<string>(config, "AccessKeyId", null!)
+            var accessKey = GetConfiguration<string?>(config, "AccessKeyId", null)
                 ?? Environment.GetEnvironmentVariable("AWS_ACCESS_KEY_ID");
 
-            var secretKey = GetConfiguration<string>(config, "SecretAccessKey", null!)
+            var secretKey = GetConfiguration<string?>(config, "SecretAccessKey", null)
                 ?? Environment.GetEnvironmentVariable("AWS_SECRET_ACCESS_KEY");
 
-            var sessionToken = GetConfiguration<string>(config, "SessionToken", null!)
+            var sessionToken = GetConfiguration<string?>(config, "SessionToken", null)
                 ?? Environment.GetEnvironmentVariable("AWS_SESSION_TOKEN");
 
             // Create AWS credentials

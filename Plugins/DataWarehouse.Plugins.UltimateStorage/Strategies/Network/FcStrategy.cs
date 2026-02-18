@@ -514,7 +514,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
             // Read object size from metadata or calculate from blocks
             var objectSize = await GetObjectSizeAsync(key, ct);
 
-            var memoryStream = new MemoryStream();
+            var memoryStream = new MemoryStream(65536);
             var buffer = new byte[_blockSize];
             long currentOffset = offset;
             long totalBytesRead = 0;

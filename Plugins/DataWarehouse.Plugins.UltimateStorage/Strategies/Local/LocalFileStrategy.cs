@@ -177,7 +177,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Local
             // For sequential media (tape, optical), read entire file into memory
             if (GetOptimalAccessPattern() == AccessPattern.Sequential)
             {
-                var ms = new MemoryStream();
+                var ms = new MemoryStream(65536);
                 try
                 {
                     await fs.CopyToAsync(ms, bufferSize, ct);

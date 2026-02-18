@@ -293,7 +293,7 @@ namespace DataWarehouse.SDK.Contracts
                 if (ct.IsCancellationRequested) break;
                 if (_cacheMetadata.TryRemove(key, out _))
                 {
-                    try { await DeleteAsync(new Uri(key)); } catch { }
+                    try { await DeleteAsync(new Uri(key)); } catch { /* Best-effort cleanup */ }
                     count++;
                 }
             }

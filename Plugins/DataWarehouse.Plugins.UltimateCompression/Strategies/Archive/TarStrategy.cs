@@ -52,7 +52,7 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Archive
         /// <inheritdoc/>
         protected override byte[] CompressCore(byte[] input)
         {
-            using var output = new MemoryStream();
+            using var output = new MemoryStream(input.Length + 256);
 
             // Write TAR header
             WriteTarHeader(output, DefaultFileName, input.Length);
@@ -314,7 +314,7 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Archive
                 if (_decompressedData != null)
                     return;
 
-                using var ms = new MemoryStream();
+                using var ms = new MemoryStream(4096);
                 _input.CopyTo(ms);
                 _decompressedData = _strategy.DecompressCore(ms.ToArray());
             }

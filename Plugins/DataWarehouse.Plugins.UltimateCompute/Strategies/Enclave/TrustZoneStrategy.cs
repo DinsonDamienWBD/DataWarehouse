@@ -76,7 +76,7 @@ internal sealed class TrustZoneStrategy : ComputeRuntimeStrategyBase
             }
             finally
             {
-                try { File.Delete(taPath); } catch { }
+                try { File.Delete(taPath); } catch { /* Best-effort cleanup */ }
             }
         }, cancellationToken);
     }

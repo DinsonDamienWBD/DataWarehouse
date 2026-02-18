@@ -312,7 +312,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
             ValidateComplianceRequirements(key, region, metadata);
 
             // Read data into memory
-            using var ms = new MemoryStream();
+            using var ms = new MemoryStream(65536);
             await data.CopyToAsync(ms, ct);
             var dataBytes = ms.ToArray();
 

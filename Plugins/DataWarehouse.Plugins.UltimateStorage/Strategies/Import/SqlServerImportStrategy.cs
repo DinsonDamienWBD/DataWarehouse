@@ -82,7 +82,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Import
 
         protected override Task<Stream> RetrieveAsyncCore(string key, CancellationToken ct)
         {
-            var stream = new MemoryStream();
+            var stream = new MemoryStream(4096);
             IncrementOperationCounter(StorageOperationType.Retrieve);
             return Task.FromResult<Stream>(stream);
         }

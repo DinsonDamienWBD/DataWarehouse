@@ -22,7 +22,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Messaging
         public GooglePubSubConnectionStrategy(ILogger? logger = null) : base(logger) { }
         protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct)
         {
-            var projectId = GetConfiguration<string>(config, "ProjectId", null!);
+            var projectId = GetConfiguration<string?>(config, "ProjectId", null);
             var httpClient = new HttpClient { BaseAddress = new Uri("https://pubsub.googleapis.com"), Timeout = config.Timeout };
             if (!string.IsNullOrEmpty(config.AuthCredential))
                 httpClient.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", config.AuthCredential);

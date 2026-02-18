@@ -579,7 +579,7 @@ public sealed class CLILearningStore : IDisposable
 
         if (_isDirty && !string.IsNullOrEmpty(_persistencePath))
         {
-            // Cannot be async: IDisposable.Dispose() pattern. Using Task.Run to prevent sync context deadlock.
+            // Sync bridge: Dispose cannot be async without IAsyncDisposable
             Task.Run(() => SaveAsync()).GetAwaiter().GetResult();
         }
 

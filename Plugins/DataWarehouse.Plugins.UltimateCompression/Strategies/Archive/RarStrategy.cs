@@ -56,7 +56,7 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Archive
         /// <inheritdoc/>
         protected override byte[] CompressCore(byte[] input)
         {
-            using var output = new MemoryStream();
+            using var output = new MemoryStream(input.Length + 256); // Estimate: input size + header overhead
             using var writer = new BinaryWriter(output);
 
             // Write RAR-compatible header
@@ -100,7 +100,7 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Archive
 
             // Decompress using Deflate
             using var deflateStream = new DeflateStream(stream, SysCompressionMode.Decompress, leaveOpen: true);
-            using var decompressed = new MemoryStream();
+            using var decompressed = new MemoryStream(originalSize > 0 ? originalSize : 4096);
 
             deflateStream.CopyTo(decompressed);
             byte[] result = decompressed.ToArray();
@@ -300,7 +300,7 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Archive
                 if (_decompressedData != null)
                     return;
 
-                using var ms = new MemoryStream();
+                using var ms = new MemoryStream(4096);
                 _input.CopyTo(ms);
                 _decompressedData = _strategy.DecompressCore(ms.ToArray());
             }

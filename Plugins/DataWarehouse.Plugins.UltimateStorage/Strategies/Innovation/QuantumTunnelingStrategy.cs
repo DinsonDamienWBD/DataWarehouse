@@ -81,7 +81,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
         {
             EnsureInitialized();
 
-            using var ms = new MemoryStream();
+            using var ms = new MemoryStream(65536);
             await data.CopyToAsync(ms, ct);
             var dataBytes = ms.ToArray();
 
@@ -313,7 +313,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
                 }
             }
 
-            using var ms = new MemoryStream();
+            using var ms = new MemoryStream(65536);
             foreach (var chunk in chunks)
             {
                 await ms.WriteAsync(chunk, ct);

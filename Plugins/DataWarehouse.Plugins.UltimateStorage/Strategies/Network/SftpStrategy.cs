@@ -478,6 +478,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
                 return; // No throttling
             }
 
+            TimeSpan? sleepTime = null;
             lock (_bandwidthLock)
             {
                 _bytesTransferredSinceThrottle += bytesTransferred;
@@ -492,17 +493,16 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
                 else if (_bytesTransferredSinceThrottle >= _maxBytesPerSecond)
                 {
                     // We've exceeded the limit, calculate sleep time
-                    var sleepTime = TimeSpan.FromSeconds(1.0) - elapsed;
-                    if (sleepTime.TotalMilliseconds > 0)
-                    {
-                        Task.Delay(sleepTime, ct).GetAwaiter().GetResult();
-                    }
+                    sleepTime = TimeSpan.FromSeconds(1.0) - elapsed;
                     _bytesTransferredSinceThrottle = 0;
                     _lastThrottleTime = DateTime.UtcNow;
                 }
             }
 
-            await Task.CompletedTask;
+            if (sleepTime.HasValue && sleepTime.Value.TotalMilliseconds > 0)
+            {
+                await Task.Delay(sleepTime.Value, ct);
+            }
         }
 
         #endregion
@@ -627,7 +627,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
             }, ct);
 
             // Download to memory stream with bandwidth throttling
-            var memoryStream = new MemoryStream();
+            var memoryStream = new MemoryStream(65536);
 
             await Task.Run(async () =>
             {
@@ -900,7 +900,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
                 var parentPath = GetRemoteDirectory(remotePath);
                 if (!string.IsNullOrEmpty(parentPath) && parentPath != "/")
                 {
-                    EnsureDirectoryExistsAsync(parentPath, ct).GetAwaiter().GetResult();
+                    EnsureDirectoryExistsAsync(parentPath, ct).Wait(ct);
                 }
 
                 // Create directory
@@ -963,7 +963,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
                         if (file.IsDirectory)
                         {
                             // Recursively enumerate subdirectory
-                            EnumerateFilesRecursiveAsync(file.FullName, prefix, results, ct).GetAwaiter().GetResult();
+                            EnumerateFilesRecursiveAsync(file.FullName, prefix, results, ct).Wait(ct);
                         }
                         else
                         {
@@ -988,7 +988,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
                                 continue;
 
                             // Load custom metadata if available
-                            var customMetadata = LoadMetadataFileAsync(fullPath, ct).GetAwaiter().GetResult();
+                            var customMetadata = LoadMetadataFileAsync(fullPath, ct).Result;
 
                             results.Add(new StorageObjectMetadata
                             {

@@ -250,7 +250,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Archive
                 return await blobClient.DownloadAsync(ct);
             }, ct);
 
-            var memoryStream = new MemoryStream();
+            var memoryStream = new MemoryStream(65536);
             await response.Value.Content.CopyToAsync(memoryStream, ct);
             memoryStream.Position = 0;
 

@@ -40,7 +40,7 @@ public sealed class SplunkHecConnectionStrategy : ObservabilityConnectionStrateg
 
     protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct)
     {
-        try { var response = await handle.GetConnection<HttpClient>().GetAsync("/services/collector/health", ct); return response.IsSuccessStatusCode; } catch { return false; }
+        try { var response = await handle.GetConnection<HttpClient>().GetAsync("/services/collector/health", ct); return response.IsSuccessStatusCode; } catch { return false; /* Connection validation - failure acceptable */ }
     }
 
     protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct)

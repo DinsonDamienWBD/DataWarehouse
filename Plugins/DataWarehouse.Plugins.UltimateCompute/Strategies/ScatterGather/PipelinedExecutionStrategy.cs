@@ -89,7 +89,7 @@ internal sealed class PipelinedExecutionStrategy : ComputeRuntimeStrategyBase
                     finally
                     {
                         outputChannel.Writer.Complete();
-                        try { File.Delete(codePath); } catch { }
+                        try { File.Delete(codePath); } catch { /* Best-effort cleanup */ }
                     }
                 }, cancellationToken);
             }

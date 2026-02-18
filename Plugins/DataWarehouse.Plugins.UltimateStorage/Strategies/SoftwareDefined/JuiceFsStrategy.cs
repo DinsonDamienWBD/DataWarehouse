@@ -249,7 +249,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
             var endpoint = $"{_s3Endpoint}/{_bucket}/{key}";
 
             // Read data into memory
-            using var ms = new MemoryStream();
+            using var ms = new MemoryStream(65536);
             await data.CopyToAsync(ms, _writeBufferSizeBytes, ct);
             var content = ms.ToArray();
 
@@ -300,7 +300,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
             var endpoint = $"{_webDavUrl}/{key}";
 
             // Read data into memory
-            using var ms = new MemoryStream();
+            using var ms = new MemoryStream(65536);
             await data.CopyToAsync(ms, _writeBufferSizeBytes, ct);
             var content = ms.ToArray();
 
@@ -350,7 +350,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
             // Use JuiceFS Gateway API (similar to MinIO/S3)
             var endpoint = $"{_gatewayUrl}/{_volumeName}/{key}";
 
-            using var ms = new MemoryStream();
+            using var ms = new MemoryStream(65536);
             await data.CopyToAsync(ms, _writeBufferSizeBytes, ct);
             var content = ms.ToArray();
 
@@ -467,7 +467,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
             await SignS3RequestAsync(request, null, ct);
             var response = await SendWithRetryAsync(request, ct);
 
-            var ms = new MemoryStream();
+            var ms = new MemoryStream(65536);
             await response.Content.CopyToAsync(ms, ct);
             ms.Position = 0;
 
@@ -492,7 +492,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
 
             var response = await SendWithRetryAsync(request, ct);
 
-            var ms = new MemoryStream();
+            var ms = new MemoryStream(65536);
             await response.Content.CopyToAsync(ms, ct);
             ms.Position = 0;
 
@@ -510,7 +510,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
 
             var response = await SendWithRetryAsync(request, ct);
 
-            var ms = new MemoryStream();
+            var ms = new MemoryStream(65536);
             await response.Content.CopyToAsync(ms, ct);
             ms.Position = 0;
 
@@ -530,7 +530,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
                 throw new FileNotFoundException($"File not found: {key}", filePath);
             }
 
-            var ms = new MemoryStream();
+            var ms = new MemoryStream(65536);
             await using (var fileStream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read, _readBufferSizeBytes, useAsync: true))
             {
                 await fileStream.CopyToAsync(ms, _readBufferSizeBytes, ct);

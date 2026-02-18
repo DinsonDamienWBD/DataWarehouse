@@ -85,8 +85,8 @@ internal sealed class NsjailStrategy : ComputeRuntimeStrategyBase
             }
             finally
             {
-                try { File.Delete(codePath); } catch { }
-                try { File.Delete(configPath); } catch { }
+                try { File.Delete(codePath); } catch { /* Best-effort cleanup */ }
+                try { File.Delete(configPath); } catch { /* Best-effort cleanup */ }
             }
         }, cancellationToken);
     }

@@ -197,7 +197,7 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Transform
             {
                 _baseStream = output ?? throw new ArgumentNullException(nameof(output));
                 _leaveOpen = leaveOpen;
-                _buffer = new MemoryStream();
+                _buffer = new MemoryStream(4096);
             }
 
             public override bool CanRead => false;

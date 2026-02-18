@@ -78,7 +78,7 @@ internal sealed class RunscStrategy : ComputeRuntimeStrategyBase
                     stdin: task.InputData.Length > 0 ? task.GetInputDataAsString() : null,
                     timeout: timeout, cancellationToken: cancellationToken);
 
-                try { await RunProcessAsync("runsc", $"--rootless delete {containerId}", timeout: TimeSpan.FromSeconds(10)); } catch { }
+                try { await RunProcessAsync("runsc", $"--rootless delete {containerId}", timeout: TimeSpan.FromSeconds(10)); } catch { /* Best-effort cleanup */ }
 
                 if (result.ExitCode != 0)
                     throw new InvalidOperationException($"runsc exited with code {result.ExitCode}: {result.StandardError}");
@@ -87,7 +87,7 @@ internal sealed class RunscStrategy : ComputeRuntimeStrategyBase
             }
             finally
             {
-                try { Directory.Delete(bundleDir, true); } catch { }
+                try { Directory.Delete(bundleDir, true); } catch { /* Best-effort cleanup */ }
             }
         }, cancellationToken);
     }

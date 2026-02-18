@@ -52,7 +52,7 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Archive
         protected override byte[] CompressCore(byte[] input)
         {
             using var inputStream = new MemoryStream(input);
-            using var output = new MemoryStream();
+            using var output = new MemoryStream(input.Length + 256);
 
             // XZ compression using SharpCompress - create XZ format manually
             // Write XZ header
@@ -73,7 +73,7 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Archive
         {
             using var inputStream = new MemoryStream(input);
             using var xzStream = new XZStream(inputStream);
-            using var output = new MemoryStream();
+            using var output = new MemoryStream(input.Length + 256);
 
             xzStream.CopyTo(output);
             return output.ToArray();
