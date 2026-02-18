@@ -2,6 +2,9 @@ using System;
 using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.IO;
+using System.Threading;
+using System.Threading.Tasks;
+using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Contracts.Compression;
 
 namespace DataWarehouse.Plugins.UltimateCompression.Strategies.LzFamily
@@ -21,6 +24,9 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.LzFamily
     {
         private const int MaxDictSize = 4096;
         private const int CodeBits = 12;
+        private const int MaxInputSize = 100 * 1024 * 1024; // 100 MB
+
+        private int _configuredDictSize = MaxDictSize;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="Lz78Strategy"/> class
@@ -28,6 +34,84 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.LzFamily
         /// </summary>
         public Lz78Strategy() : base(CompressionLevel.Default)
         {
+        }
+
+        /// <inheritdoc/>
+        protected override async Task InitializeAsyncCore(CancellationToken cancellationToken)
+        {
+            await base.InitializeAsyncCore(cancellationToken).ConfigureAwait(false);
+
+            // Load and validate LZ78 configuration
+            if (SystemConfiguration.PluginSettings.TryGetValue("UltimateCompression:LZ78:DictionarySize", out var dictSizeObj)
+                && dictSizeObj is int dictSize)
+            {
+                if (dictSize < 256 || dictSize > 65536)
+                    throw new ArgumentException($"LZ78 dictionary size must be between 256 and 65536, got {dictSize}");
+                _configuredDictSize = dictSize;
+            }
+        }
+
+        /// <summary>
+        /// Performs a health check by executing a small compression round-trip test.
+        /// Result is cached for 60 seconds.
+        /// </summary>
+        public async Task<StrategyHealthCheckResult> CheckHealthAsync(CancellationToken cancellationToken = default)
+        {
+            return await GetCachedHealthAsync(async ct =>
+            {
+                try
+                {
+                    // Round-trip test: compress + decompress 16 bytes of test data
+                    var testData = new byte[] { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16 };
+                    var compressed = CompressCore(testData);
+                    var decompressed = DecompressCore(compressed);
+
+                    if (decompressed.Length != testData.Length)
+                    {
+                        return new StrategyHealthCheckResult(
+                            false,
+                            $"Health check failed: decompressed length {decompressed.Length} != original {testData.Length}");
+                    }
+
+                    for (int i = 0; i < testData.Length; i++)
+                    {
+                        if (decompressed[i] != testData[i])
+                        {
+                            return new StrategyHealthCheckResult(
+                                false,
+                                $"Health check failed: byte mismatch at position {i}");
+                        }
+                    }
+
+                    return new StrategyHealthCheckResult(
+                        true,
+                        "LZ78 strategy healthy",
+                        new Dictionary<string, object>
+                        {
+                            ["DictionarySize"] = _configuredDictSize,
+                            ["CompressOperations"] = GetCounter("lz78.compress"),
+                            ["DecompressOperations"] = GetCounter("lz78.decompress")
+                        });
+                }
+                catch (Exception ex)
+                {
+                    return new StrategyHealthCheckResult(false, $"Health check failed: {ex.Message}");
+                }
+            }, TimeSpan.FromSeconds(60), cancellationToken).ConfigureAwait(false);
+        }
+
+        /// <inheritdoc/>
+        protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
+        {
+            // No resources to clean up in LZ78
+            return base.ShutdownAsyncCore(cancellationToken);
+        }
+
+        /// <inheritdoc/>
+        protected override ValueTask DisposeAsyncCore()
+        {
+            // No async resources to dispose
+            return base.DisposeAsyncCore();
         }
 
         /// <inheritdoc/>
@@ -50,6 +134,13 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.LzFamily
         /// <inheritdoc/>
         protected override byte[] CompressCore(byte[] input)
         {
+            // Strategy-specific counter
+            IncrementCounter("lz78.compress");
+
+            // Edge case: maximum input size guard
+            if (input.Length > MaxInputSize)
+                throw new ArgumentException($"Input exceeds maximum size of {MaxInputSize / (1024 * 1024)} MB");
+
             using var output = new MemoryStream(input.Length + 256);
             var writer = new BinaryWriter(output);
 
@@ -115,6 +206,10 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.LzFamily
         /// <inheritdoc/>
         protected override byte[] DecompressCore(byte[] input)
         {
+            // Strategy-specific counter
+            IncrementCounter("lz78.decompress");
+
+            // Edge case: validate header
             if (input.Length < 4)
                 throw new InvalidDataException("LZ78 compressed data is too short.");
 
@@ -122,8 +217,8 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.LzFamily
             var reader = new BinaryReader(stream);
 
             int uncompressedLen = reader.ReadInt32();
-            if (uncompressedLen < 0 || uncompressedLen > 256 * 1024 * 1024)
-                throw new InvalidDataException("Invalid LZ78 uncompressed length.");
+            if (uncompressedLen < 0 || uncompressedLen > MaxInputSize)
+                throw new InvalidDataException($"Invalid LZ78 uncompressed length: {uncompressedLen}");
 
             var output = new List<byte>(uncompressedLen);
             var bitReader = new BitReader(stream);

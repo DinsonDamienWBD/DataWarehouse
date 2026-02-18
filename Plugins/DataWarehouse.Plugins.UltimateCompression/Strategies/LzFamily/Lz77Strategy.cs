@@ -1,6 +1,10 @@
 using System;
 using System.Buffers.Binary;
+using System.Collections.Generic;
 using System.IO;
+using System.Threading;
+using System.Threading.Tasks;
+using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Contracts.Compression;
 
 namespace DataWarehouse.Plugins.UltimateCompression.Strategies.LzFamily
@@ -25,6 +29,10 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.LzFamily
         private const int HashSize = 1 << HashBits;
         private const int HashMask = HashSize - 1;
         private const int MaxChainLength = 128;
+        private const int MaxInputSize = 100 * 1024 * 1024; // 100 MB
+
+        private int _configuredWindowSize = WindowSize;
+        private int _configuredMaxChainLength = MaxChainLength;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="Lz77Strategy"/> class
@@ -32,6 +40,93 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.LzFamily
         /// </summary>
         public Lz77Strategy() : base(CompressionLevel.Default)
         {
+        }
+
+        /// <inheritdoc/>
+        protected override async Task InitializeAsyncCore(CancellationToken cancellationToken)
+        {
+            await base.InitializeAsyncCore(cancellationToken).ConfigureAwait(false);
+
+            // Load and validate LZ77 configuration
+            if (SystemConfiguration.PluginSettings.TryGetValue("UltimateCompression:LZ77:WindowSize", out var windowSizeObj)
+                && windowSizeObj is int windowSize)
+            {
+                if (windowSize < 1024 || windowSize > 65536 || (windowSize & (windowSize - 1)) != 0)
+                    throw new ArgumentException($"LZ77 window size must be a power of 2 between 1024 and 65536, got {windowSize}");
+                _configuredWindowSize = windowSize;
+            }
+
+            if (SystemConfiguration.PluginSettings.TryGetValue("UltimateCompression:LZ77:MaxChainLength", out var maxChainLenObj)
+                && maxChainLenObj is int maxChainLen)
+            {
+                if (maxChainLen < 1 || maxChainLen > 4096)
+                    throw new ArgumentException($"LZ77 max chain length must be between 1 and 4096, got {maxChainLen}");
+                _configuredMaxChainLength = maxChainLen;
+            }
+        }
+
+        /// <summary>
+        /// Performs a health check by executing a small compression round-trip test.
+        /// Result is cached for 60 seconds.
+        /// </summary>
+        public async Task<StrategyHealthCheckResult> CheckHealthAsync(CancellationToken cancellationToken = default)
+        {
+            return await GetCachedHealthAsync(async ct =>
+            {
+                try
+                {
+                    // Round-trip test: compress + decompress 16 bytes of test data
+                    var testData = new byte[] { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16 };
+                    var compressed = CompressCore(testData);
+                    var decompressed = DecompressCore(compressed);
+
+                    if (decompressed.Length != testData.Length)
+                    {
+                        return new StrategyHealthCheckResult(
+                            false,
+                            $"Health check failed: decompressed length {decompressed.Length} != original {testData.Length}");
+                    }
+
+                    for (int i = 0; i < testData.Length; i++)
+                    {
+                        if (decompressed[i] != testData[i])
+                        {
+                            return new StrategyHealthCheckResult(
+                                false,
+                                $"Health check failed: byte mismatch at position {i}");
+                        }
+                    }
+
+                    return new StrategyHealthCheckResult(
+                        true,
+                        "LZ77 strategy healthy",
+                        new Dictionary<string, object>
+                        {
+                            ["WindowSize"] = _configuredWindowSize,
+                            ["MaxChainLength"] = _configuredMaxChainLength,
+                            ["CompressOperations"] = GetCounter("lz77.compress"),
+                            ["DecompressOperations"] = GetCounter("lz77.decompress")
+                        });
+                }
+                catch (Exception ex)
+                {
+                    return new StrategyHealthCheckResult(false, $"Health check failed: {ex.Message}");
+                }
+            }, TimeSpan.FromSeconds(60), cancellationToken).ConfigureAwait(false);
+        }
+
+        /// <inheritdoc/>
+        protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
+        {
+            // No resources to clean up in LZ77
+            return base.ShutdownAsyncCore(cancellationToken);
+        }
+
+        /// <inheritdoc/>
+        protected override ValueTask DisposeAsyncCore()
+        {
+            // No async resources to dispose
+            return base.DisposeAsyncCore();
         }
 
         /// <inheritdoc/>
@@ -54,6 +149,13 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.LzFamily
         /// <inheritdoc/>
         protected override byte[] CompressCore(byte[] input)
         {
+            // Strategy-specific counter
+            IncrementCounter("lz77.compress");
+
+            // Edge case: maximum input size guard
+            if (input.Length > MaxInputSize)
+                throw new ArgumentException($"Input exceeds maximum size of {MaxInputSize / (1024 * 1024)} MB");
+
             if (input.Length < MinMatch)
                 return CreateLiteralBlock(input);
 
@@ -141,6 +243,10 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.LzFamily
         /// <inheritdoc/>
         protected override byte[] DecompressCore(byte[] input)
         {
+            // Strategy-specific counter
+            IncrementCounter("lz77.decompress");
+
+            // Edge case: validate header
             if (input.Length < 4)
                 throw new InvalidDataException("LZ77 compressed data is too short.");
 
@@ -148,8 +254,8 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.LzFamily
             var reader = new BinaryReader(stream);
 
             int uncompressedLen = reader.ReadInt32();
-            if (uncompressedLen < 0 || uncompressedLen > 256 * 1024 * 1024)
-                throw new InvalidDataException("Invalid LZ77 uncompressed length.");
+            if (uncompressedLen < 0 || uncompressedLen > MaxInputSize)
+                throw new InvalidDataException($"Invalid LZ77 uncompressed length: {uncompressedLen}");
 
             var output = new byte[uncompressedLen];
             int op = 0;
