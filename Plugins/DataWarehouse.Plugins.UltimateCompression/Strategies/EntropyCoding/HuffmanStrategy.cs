@@ -3,6 +3,9 @@ using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
+using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Contracts.Compression;
 
 namespace DataWarehouse.Plugins.UltimateCompression.Strategies.EntropyCoding
@@ -31,6 +34,10 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.EntropyCoding
     {
         private static readonly byte[] Magic = { 0x48, 0x55, 0x46, 0x46 }; // "HUFF"
         private const int MaxCodeLength = 15;
+        private const int MaxInputSize = 100 * 1024 * 1024; // 100MB limit
+
+        private int _maxTreeDepth = 15;
+        private int _maxSymbolCount = 256;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="HuffmanStrategy"/> class
@@ -58,8 +65,72 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.EntropyCoding
         };
 
         /// <inheritdoc/>
+        protected override async Task InitializeAsyncCore(CancellationToken cancellationToken)
+        {
+            // Validate configuration parameters
+            if (_maxTreeDepth < 8 || _maxTreeDepth > 32)
+                throw new ArgumentException($"Max tree depth must be between 8 and 32. Got: {_maxTreeDepth}");
+
+            if (_maxSymbolCount < 2 || _maxSymbolCount > 65536)
+                throw new ArgumentException($"Max symbol count must be between 2 and 65536. Got: {_maxSymbolCount}");
+
+            await base.InitializeAsyncCore(cancellationToken).ConfigureAwait(false);
+        }
+
+        /// <inheritdoc/>
+        protected override async Task ShutdownAsyncCore(CancellationToken cancellationToken)
+        {
+            // No resources to clean up for Huffman
+            await base.ShutdownAsyncCore(cancellationToken).ConfigureAwait(false);
+        }
+
+        /// <inheritdoc/>
+        protected override async ValueTask DisposeAsyncCore()
+        {
+            // Clean disposal pattern
+            await base.DisposeAsyncCore().ConfigureAwait(false);
+        }
+
+        /// <summary>
+        /// Performs health check by verifying round-trip compression with test data.
+        /// </summary>
+        public async Task<StrategyHealthCheckResult> CheckHealthAsync(CancellationToken ct = default)
+        {
+            return await GetCachedHealthAsync(async (cancellationToken) =>
+            {
+                try
+                {
+                    // Round-trip test with known data
+                    var testData = new byte[] { 1, 1, 1, 2, 2, 3 };
+                    var compressed = CompressCore(testData);
+                    var decompressed = DecompressCore(compressed);
+
+                    if (testData.Length != decompressed.Length)
+                        return new StrategyHealthCheckResult(false, "Round-trip length mismatch");
+
+                    for (int i = 0; i < testData.Length; i++)
+                    {
+                        if (testData[i] != decompressed[i])
+                            return new StrategyHealthCheckResult(false, "Round-trip data mismatch");
+                    }
+
+                    return new StrategyHealthCheckResult(true);
+                }
+                catch (Exception ex)
+                {
+                    return new StrategyHealthCheckResult(false, $"Health check failed: {ex.Message}");
+                }
+            }, TimeSpan.FromSeconds(60), ct).ConfigureAwait(false);
+        }
+
+        /// <inheritdoc/>
         protected override byte[] CompressCore(byte[] input)
         {
+            IncrementCounter("huffman.compress");
+
+            if (input.Length > MaxInputSize)
+                throw new ArgumentException($"Input size exceeds maximum of {MaxInputSize} bytes");
+
             if (input.Length == 0)
                 return CreateEmptyCompressedBlock();
 
@@ -102,6 +173,11 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.EntropyCoding
         /// <inheritdoc/>
         protected override byte[] DecompressCore(byte[] input)
         {
+            IncrementCounter("huffman.decompress");
+
+            if (input.Length > MaxInputSize)
+                throw new ArgumentException($"Input size exceeds maximum of {MaxInputSize} bytes");
+
             using var stream = new MemoryStream(input);
 
             var magicBuf = new byte[4];

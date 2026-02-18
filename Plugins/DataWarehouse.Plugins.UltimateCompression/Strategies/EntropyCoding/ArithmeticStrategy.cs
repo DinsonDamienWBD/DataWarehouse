@@ -1,6 +1,9 @@
 using System;
 using System.Buffers.Binary;
 using System.IO;
+using System.Threading;
+using System.Threading.Tasks;
+using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Contracts.Compression;
 using SdkCompressionLevel = DataWarehouse.SDK.Contracts.Compression.CompressionLevel;
 
@@ -33,6 +36,10 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.EntropyCoding
         private static readonly byte[] Magic = { 0x41, 0x52, 0x49, 0x54 }; // "ARIT"
         private const int InitialFrequency = 1;
         private const int MaxFrequency = 16383; // Keep total under 2^14 for precision
+        private const int MaxInputSize = 100 * 1024 * 1024; // 100MB limit
+
+        private int _precisionBits = 32;
+        private int _modelUpdateFrequency = 1;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="ArithmeticStrategy"/> class
@@ -60,8 +67,72 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.EntropyCoding
         };
 
         /// <inheritdoc/>
+        protected override async Task InitializeAsyncCore(CancellationToken cancellationToken)
+        {
+            // Validate configuration parameters
+            if (_precisionBits < 16 || _precisionBits > 64)
+                throw new ArgumentException($"Precision bits must be between 16 and 64. Got: {_precisionBits}");
+
+            if (_modelUpdateFrequency < 1 || _modelUpdateFrequency > 10000)
+                throw new ArgumentException($"Model update frequency must be between 1 and 10000. Got: {_modelUpdateFrequency}");
+
+            await base.InitializeAsyncCore(cancellationToken).ConfigureAwait(false);
+        }
+
+        /// <inheritdoc/>
+        protected override async Task ShutdownAsyncCore(CancellationToken cancellationToken)
+        {
+            // No resources to clean up for Arithmetic coding
+            await base.ShutdownAsyncCore(cancellationToken).ConfigureAwait(false);
+        }
+
+        /// <inheritdoc/>
+        protected override async ValueTask DisposeAsyncCore()
+        {
+            // Clean disposal pattern
+            await base.DisposeAsyncCore().ConfigureAwait(false);
+        }
+
+        /// <summary>
+        /// Performs health check by verifying round-trip compression with test data.
+        /// </summary>
+        public async Task<StrategyHealthCheckResult> CheckHealthAsync(CancellationToken ct = default)
+        {
+            return await GetCachedHealthAsync(async (cancellationToken) =>
+            {
+                try
+                {
+                    // Round-trip test with varied data
+                    var testData = new byte[] { 10, 20, 10, 30, 10, 20 };
+                    var compressed = CompressCore(testData);
+                    var decompressed = DecompressCore(compressed);
+
+                    if (testData.Length != decompressed.Length)
+                        return new StrategyHealthCheckResult(false, "Round-trip length mismatch");
+
+                    for (int i = 0; i < testData.Length; i++)
+                    {
+                        if (testData[i] != decompressed[i])
+                            return new StrategyHealthCheckResult(false, "Round-trip data mismatch");
+                    }
+
+                    return new StrategyHealthCheckResult(true);
+                }
+                catch (Exception ex)
+                {
+                    return new StrategyHealthCheckResult(false, $"Health check failed: {ex.Message}");
+                }
+            }, TimeSpan.FromSeconds(60), ct).ConfigureAwait(false);
+        }
+
+        /// <inheritdoc/>
         protected override byte[] CompressCore(byte[] input)
         {
+            IncrementCounter("arithmetic.compress");
+
+            if (input.Length > MaxInputSize)
+                throw new ArgumentException($"Input size exceeds maximum of {MaxInputSize} bytes");
+
             using var output = new MemoryStream(input.Length + 256);
             output.Write(Magic, 0, 4);
 
@@ -90,6 +161,11 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.EntropyCoding
         /// <inheritdoc/>
         protected override byte[] DecompressCore(byte[] input)
         {
+            IncrementCounter("arithmetic.decompress");
+
+            if (input.Length > MaxInputSize)
+                throw new ArgumentException($"Input size exceeds maximum of {MaxInputSize} bytes");
+
             using var stream = new MemoryStream(input);
 
             var magicBuf = new byte[4];

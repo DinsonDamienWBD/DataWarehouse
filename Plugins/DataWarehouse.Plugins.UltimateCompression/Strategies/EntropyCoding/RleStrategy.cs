@@ -1,6 +1,9 @@
 using System;
 using System.Buffers.Binary;
 using System.IO;
+using System.Threading;
+using System.Threading.Tasks;
+using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Contracts.Compression;
 
 namespace DataWarehouse.Plugins.UltimateCompression.Strategies.EntropyCoding
@@ -32,6 +35,10 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.EntropyCoding
         private static readonly byte[] Magic = { 0x52, 0x4C, 0x45, 0x31 }; // "RLE1"
         private const byte EscapeByte = 0xFF;
         private const int MinRunLength = 3;
+        private const int MaxInputSize = 100 * 1024 * 1024; // 100MB limit
+
+        private int _minRunLength = 1;
+        private int _maxRunLength = 255;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="RleStrategy"/> class
@@ -59,8 +66,79 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.EntropyCoding
         };
 
         /// <inheritdoc/>
+        protected override async Task InitializeAsyncCore(CancellationToken cancellationToken)
+        {
+            // Validate configuration parameters
+            if (_minRunLength < 1 || _minRunLength > 255)
+                throw new ArgumentException($"Min run length must be between 1 and 255. Got: {_minRunLength}");
+
+            if (_maxRunLength < 1 || _maxRunLength > 65535)
+                throw new ArgumentException($"Max run length must be between 1 and 65535. Got: {_maxRunLength}");
+
+            if (_maxRunLength < _minRunLength)
+                throw new ArgumentException($"Max run length ({_maxRunLength}) must be >= min run length ({_minRunLength})");
+
+            await base.InitializeAsyncCore(cancellationToken).ConfigureAwait(false);
+        }
+
+        /// <inheritdoc/>
+        protected override async Task ShutdownAsyncCore(CancellationToken cancellationToken)
+        {
+            // No resources to clean up for RLE
+            await base.ShutdownAsyncCore(cancellationToken).ConfigureAwait(false);
+        }
+
+        /// <inheritdoc/>
+        protected override async ValueTask DisposeAsyncCore()
+        {
+            // Clean disposal pattern
+            await base.DisposeAsyncCore().ConfigureAwait(false);
+        }
+
+        /// <summary>
+        /// Performs health check by verifying round-trip compression with test data.
+        /// </summary>
+        public async Task<StrategyHealthCheckResult> CheckHealthAsync(CancellationToken ct = default)
+        {
+            return await GetCachedHealthAsync(async (cancellationToken) =>
+            {
+                try
+                {
+                    // Round-trip test with known run data
+                    var testData = new byte[] { 5, 5, 5, 5, 7, 8, 8, 8 };
+                    var compressed = CompressCore(testData);
+                    var decompressed = DecompressCore(compressed);
+
+                    if (testData.Length != decompressed.Length)
+                        return new StrategyHealthCheckResult(false, "Round-trip length mismatch");
+
+                    for (int i = 0; i < testData.Length; i++)
+                    {
+                        if (testData[i] != decompressed[i])
+                            return new StrategyHealthCheckResult(false, "Round-trip data mismatch");
+                    }
+
+                    return new StrategyHealthCheckResult(true);
+                }
+                catch (Exception ex)
+                {
+                    return new StrategyHealthCheckResult(false, $"Health check failed: {ex.Message}");
+                }
+            }, TimeSpan.FromSeconds(60), ct).ConfigureAwait(false);
+        }
+
+        /// <inheritdoc/>
         protected override byte[] CompressCore(byte[] input)
         {
+            IncrementCounter("rle.compress");
+
+            if (input.Length > MaxInputSize)
+                throw new ArgumentException($"Input size exceeds maximum of {MaxInputSize} bytes");
+
+            // RLE needs at least 1 byte to be useful
+            if (input.Length < 1)
+                return CreateEmptyCompressedBlock();
+
             using var output = new MemoryStream(input.Length + 256);
             output.Write(Magic, 0, 4);
 
@@ -105,9 +183,22 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.EntropyCoding
             return output.ToArray();
         }
 
+        private static byte[] CreateEmptyCompressedBlock()
+        {
+            using var ms = new MemoryStream(8);
+            ms.Write(Magic, 0, 4);
+            ms.Write(new byte[4], 0, 4); // length = 0
+            return ms.ToArray();
+        }
+
         /// <inheritdoc/>
         protected override byte[] DecompressCore(byte[] input)
         {
+            IncrementCounter("rle.decompress");
+
+            if (input.Length > MaxInputSize)
+                throw new ArgumentException($"Input size exceeds maximum of {MaxInputSize} bytes");
+
             using var stream = new MemoryStream(input);
 
             var magicBuf = new byte[4];
