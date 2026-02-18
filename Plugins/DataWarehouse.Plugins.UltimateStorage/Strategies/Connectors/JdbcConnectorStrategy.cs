@@ -188,6 +188,12 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Connectors
             using var command = new OdbcCommand(parts.query, connection);
             command.CommandTimeout = _commandTimeout;
 
+            // Add parameter if identifier is present
+            if (!string.IsNullOrEmpty(parts.identifier))
+            {
+                command.Parameters.AddWithValue("@id", parts.identifier);
+            }
+
             using var reader = await command.ExecuteReaderAsync(ct);
             var stream = new MemoryStream();
 
@@ -223,7 +229,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Connectors
             ValidateKey(key);
 
             var parts = ParseJdbcKey(key);
-            var deleteQuery = $"DELETE FROM {parts.table} WHERE id = '{parts.identifier}'";
+            ValidateTableName(parts.table);
+
+            var deleteQuery = $"DELETE FROM {parts.table} WHERE id = ?";
 
             using var connection = new OdbcConnection(_connectionString);
             await connection.OpenAsync(ct);
@@ -234,6 +242,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Connectors
             {
                 using var command = new OdbcCommand(deleteQuery, connection, transaction);
                 command.CommandTimeout = _commandTimeout;
+                command.Parameters.AddWithValue("@id", parts.identifier);
                 await command.ExecuteNonQueryAsync(ct);
 
                 transaction?.Commit();
@@ -252,7 +261,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Connectors
             ValidateKey(key);
 
             var parts = ParseJdbcKey(key);
-            var countQuery = $"SELECT COUNT(*) FROM {parts.table} WHERE id = '{parts.identifier}'";
+            ValidateTableName(parts.table);
+
+            var countQuery = $"SELECT COUNT(*) FROM {parts.table} WHERE id = ?";
 
             try
             {
@@ -260,6 +271,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Connectors
                 await connection.OpenAsync(ct);
 
                 using var command = new OdbcCommand(countQuery, connection);
+                command.Parameters.AddWithValue("@id", parts.identifier);
                 var count = Convert.ToInt32(await command.ExecuteScalarAsync(ct));
 
                 IncrementOperationCounter(StorageOperationType.Exists);
@@ -308,6 +320,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Connectors
             ValidateKey(key);
 
             var parts = ParseJdbcKey(key);
+            ValidateTableName(parts.table);
 
             using var connection = new OdbcConnection(_connectionString);
             await connection.OpenAsync(ct);
@@ -389,11 +402,30 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Connectors
 
             var table = parts[0];
             var identifier = parts.Length > 1 ? parts[1] : string.Empty;
+            ValidateTableName(table);
+
             var query = string.IsNullOrEmpty(identifier)
                 ? $"SELECT * FROM {table}"
-                : $"SELECT * FROM {table} WHERE id = '{identifier}'";
+                : $"SELECT * FROM {table} WHERE id = ?";
 
             return (table, identifier, query);
+        }
+
+        /// <summary>
+        /// Validates table name to prevent SQL injection.
+        /// </summary>
+        private static void ValidateTableName(string tableName)
+        {
+            if (string.IsNullOrWhiteSpace(tableName))
+            {
+                throw new ArgumentException("Table name cannot be null or empty.", nameof(tableName));
+            }
+
+            // Allow only alphanumeric characters and underscores
+            if (!System.Text.RegularExpressions.Regex.IsMatch(tableName, @"^[a-zA-Z_][a-zA-Z0-9_]*$"))
+            {
+                throw new ArgumentException($"Invalid table name '{tableName}'. Only alphanumeric characters and underscores are allowed.", nameof(tableName));
+            }
         }
 
         private async Task<string> ReadStreamAsync(Stream stream, CancellationToken ct)

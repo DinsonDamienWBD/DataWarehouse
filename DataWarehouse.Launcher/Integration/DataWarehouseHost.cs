@@ -602,22 +602,31 @@ public sealed class DataWarehouseHost : IAsyncDisposable, IServerHost
     {
         var securityPath = Path.Combine(config.InstallPath, "config", "security.json");
 
-        // Generate salt and hash password
+        // Validate admin password is configured
+        if (string.IsNullOrWhiteSpace(config.AdminPassword))
+        {
+            throw new ArgumentException("AdminPassword must be configured and cannot be empty.", nameof(config));
+        }
+
+        // Generate salt and hash password using PBKDF2
         var salt = new byte[32];
         RandomNumberGenerator.Fill(salt);
         var saltBase64 = Convert.ToBase64String(salt);
 
-        var passwordBytes = Encoding.UTF8.GetBytes(config.AdminPassword ?? "admin");
-        var saltedPassword = new byte[passwordBytes.Length + salt.Length];
-        Buffer.BlockCopy(passwordBytes, 0, saltedPassword, 0, passwordBytes.Length);
-        Buffer.BlockCopy(salt, 0, saltedPassword, passwordBytes.Length, salt.Length);
+        var passwordBytes = Encoding.UTF8.GetBytes(config.AdminPassword);
 
-        var hashBytes = SHA256.HashData(saltedPassword);
+        // Use PBKDF2 with SHA256, 100000 iterations, 32 bytes output
+        var hashBytes = Rfc2898DeriveBytes.Pbkdf2(
+            passwordBytes,
+            salt,
+            100000,
+            HashAlgorithmName.SHA256,
+            32);
         var hashBase64 = Convert.ToBase64String(hashBytes);
 
         // Wipe password from memory
         CryptographicOperations.ZeroMemory(passwordBytes);
-        CryptographicOperations.ZeroMemory(saltedPassword);
+        CryptographicOperations.ZeroMemory(hashBytes);
 
         var securityConfig = new Dictionary<string, object>
         {

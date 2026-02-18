@@ -747,7 +747,7 @@ public sealed class LabelPropagationCommunityDetection : GraphAnalyticsAlgorithm
     {
         var vertices = adjacency.Keys.ToList();
         var n = vertices.Count;
-        var random = new Random();
+        var random = Random.Shared;
 
         // Initialize each vertex with unique label
         var labels = new Dictionary<string, int>();
@@ -764,7 +764,7 @@ public sealed class LabelPropagationCommunityDetection : GraphAnalyticsAlgorithm
             changed = false;
 
             // Shuffle vertices
-            var shuffled = vertices.OrderBy(_ => random.Next()).ToList();
+            var shuffled = vertices.OrderBy(_ => Random.Shared.Next()).ToList();
 
             foreach (var v in shuffled)
             {
@@ -785,7 +785,7 @@ public sealed class LabelPropagationCommunityDetection : GraphAnalyticsAlgorithm
                 // Find most frequent label
                 var maxCount = labelCounts.Values.Max();
                 var maxLabels = labelCounts.Where(kv => kv.Value == maxCount).Select(kv => kv.Key).ToList();
-                var newLabel = maxLabels[random.Next(maxLabels.Count)];
+                var newLabel = maxLabels[Random.Shared.Next(maxLabels.Count)];
 
                 if (newLabel != labels[v])
                 {

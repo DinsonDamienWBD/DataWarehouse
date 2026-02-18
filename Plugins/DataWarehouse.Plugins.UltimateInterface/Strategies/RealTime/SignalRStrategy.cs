@@ -190,12 +190,17 @@ internal sealed class SignalRStrategy : SdkInterface.InterfaceStrategyBase, IPlu
 
         var responseJson = JsonSerializer.Serialize(negotiateResponse);
 
+        // Get the request origin for proper CORS handling
+        var origin = request.Headers.TryGetValue("Origin", out var originValue) ? originValue : request.Headers.GetValueOrDefault("Referer", "");
+        var allowOrigin = string.IsNullOrEmpty(origin) ? "" : origin;
+
         return new SdkInterface.InterfaceResponse(
             StatusCode: 200,
             Headers: new Dictionary<string, string>
             {
                 ["Content-Type"] = "application/json",
-                ["Access-Control-Allow-Origin"] = "*"
+                ["Access-Control-Allow-Origin"] = allowOrigin,
+                ["Vary"] = "Origin"
             },
             Body: Encoding.UTF8.GetBytes(responseJson)
         );

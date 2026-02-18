@@ -190,7 +190,6 @@ public class AuditLogService : IAuditLogService
 
     private void GenerateSampleLogs()
     {
-        var random = new Random();
         var categories = new[] { "Storage", "Plugin", "Security", "Config", "User" };
         var actions = new[] { "Create", "Read", "Update", "Delete", "Login", "Logout", "Configure", "Enable", "Disable" };
         var users = new[] { "admin", "system", "user1", "user2", "service-account" };
@@ -199,15 +198,15 @@ public class AuditLogService : IAuditLogService
         {
             var entry = new AuditLogEntry
             {
-                Timestamp = DateTime.UtcNow.AddMinutes(-random.Next(0, 1440)),
-                Category = categories[random.Next(categories.Length)],
-                Action = actions[random.Next(actions.Length)],
-                UserName = users[random.Next(users.Length)],
-                UserId = $"user-{random.Next(1, 6)}",
+                Timestamp = DateTime.UtcNow.AddMinutes(-Random.Shared.Next(0, 1440)),
+                Category = categories[Random.Shared.Next(categories.Length)],
+                Action = actions[Random.Shared.Next(actions.Length)],
+                UserName = users[Random.Shared.Next(users.Length)],
+                UserId = $"user-{Random.Shared.Next(1, 6)}",
                 Message = $"Sample audit log entry #{i + 1}",
-                Severity = (AuditSeverity)random.Next(0, 5),
-                Success = random.Next(10) > 1, // 90% success rate
-                Duration = TimeSpan.FromMilliseconds(random.Next(10, 5000))
+                Severity = (AuditSeverity)Random.Shared.Next(0, 5),
+                Success = Random.Shared.Next(10) > 1, // 90% success rate
+                Duration = TimeSpan.FromMilliseconds(Random.Shared.Next(10, 5000))
             };
 
             _logs.Enqueue(entry);

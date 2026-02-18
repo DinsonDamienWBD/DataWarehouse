@@ -89,18 +89,23 @@ public abstract class IoTStrategyBase : IIoTStrategyBase
     /// <summary>
     /// Publishes a message to the message bus.
     /// </summary>
-    protected async void PublishMessage(string topic, PluginMessage message)
+    protected Task PublishMessage(string topic, PluginMessage message)
     {
         if (MessageBus != null)
         {
-            try
+            return Task.Run(async () =>
             {
-                await MessageBus.PublishAsync(topic, message);
-            }
-            catch
-            {
-                // Gracefully handle message bus unavailability
-            }
+                try
+                {
+                    await MessageBus.PublishAsync(topic, message);
+                }
+                catch (Exception ex)
+                {
+                    // Gracefully handle message bus unavailability
+                    System.Diagnostics.Debug.WriteLine($"IoT message publish failed: {ex.Message}");
+                }
+            });
         }
+        return Task.CompletedTask;
     }
 }

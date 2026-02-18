@@ -161,7 +161,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.CrossCutting
                 _isReconnecting = true;
             }
 
-            var random = new Random();
+            var random = Random.Shared;
 
             try
             {
@@ -206,7 +206,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.CrossCutting
                     {
                         var baseDelay = _config.BaseDelay.TotalMilliseconds * Math.Pow(2, attempt - 1);
                         var maxDelay = _config.MaxDelay.TotalMilliseconds;
-                        var jitter = random.NextDouble() * _config.JitterFactor * baseDelay;
+                        var jitter = Random.Shared.NextDouble() * _config.JitterFactor * baseDelay;
                         var delay = Math.Min(baseDelay + jitter, maxDelay);
 
                         _logger?.LogWarning(ex,

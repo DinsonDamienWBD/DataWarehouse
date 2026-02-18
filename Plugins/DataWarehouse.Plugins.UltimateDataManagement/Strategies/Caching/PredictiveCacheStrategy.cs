@@ -427,49 +427,53 @@ public sealed class PredictiveCacheStrategy : CachingStrategyBase
         }
     }
 
-    private async void ExecutePrefetch(object? state)
+    private void ExecutePrefetch(object? state)
     {
-        if (_prefetchLoader == null || _lastAccessedKey == null)
-            return;
-
-        try
+        // Timer callbacks must be void, so we use Task.Run for async work
+        _ = Task.Run(async () =>
         {
-            var predictions = GetAccessPredictions(_lastAccessedKey, 3);
+            if (_prefetchLoader == null || _lastAccessedKey == null)
+                return;
 
-            foreach (var prediction in predictions)
+            try
             {
-                if (prediction.Probability >= _prefetchThreshold && !_cache.ContainsKey(prediction.Key))
+                var predictions = GetAccessPredictions(_lastAccessedKey, 3);
+
+                foreach (var prediction in predictions)
                 {
-                    try
+                    if (prediction.Probability >= _prefetchThreshold && !_cache.ContainsKey(prediction.Key))
                     {
-                        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
-                        var value = await _prefetchLoader(prediction.Key, cts.Token);
-
-                        if (value != null)
+                        try
                         {
-                            await SetCoreAsync(prediction.Key, value, new CacheOptions
-                            {
-                                TTL = TimeSpan.FromMinutes(5),
-                                Priority = CachePriority.Low
-                            }, CancellationToken.None);
+                            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+                            var value = await _prefetchLoader(prediction.Key, cts.Token);
 
-                            if (_cache.TryGetValue(prediction.Key, out var entry))
+                            if (value != null)
                             {
-                                entry.IsPrefetched = true;
+                                await SetCoreAsync(prediction.Key, value, new CacheOptions
+                                {
+                                    TTL = TimeSpan.FromMinutes(5),
+                                    Priority = CachePriority.Low
+                                }, CancellationToken.None);
+
+                                if (_cache.TryGetValue(prediction.Key, out var entry))
+                                {
+                                    entry.IsPrefetched = true;
+                                }
                             }
                         }
-                    }
-                    catch
-                    {
-                        // Prefetch failures are non-fatal
+                        catch
+                        {
+                            // Prefetch failures are non-fatal
+                        }
                     }
                 }
             }
-        }
-        catch
-        {
-            // Timer callback failures should not propagate
-        }
+            catch
+            {
+                // Timer callback failures should not propagate
+            }
+        });
     }
 
     private void SubscribeToIntelligence()

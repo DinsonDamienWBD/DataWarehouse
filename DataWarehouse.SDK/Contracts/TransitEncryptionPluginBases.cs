@@ -726,7 +726,7 @@ namespace DataWarehouse.SDK.Contracts
         /// </summary>
         protected virtual async Task<byte[]> CompressDataAsync(byte[] data, CancellationToken cancellationToken)
         {
-            using var output = new MemoryStream();
+            using var output = new MemoryStream(data.Length / 2); // Estimate compressed size as ~50% of original
             using (var gzip = new System.IO.Compression.GZipStream(output, System.IO.Compression.CompressionLevel.Optimal))
             {
                 await gzip.WriteAsync(data, cancellationToken).ConfigureAwait(false);
@@ -742,7 +742,7 @@ namespace DataWarehouse.SDK.Contracts
         {
             using var input = new MemoryStream(compressedData);
             using var gzip = new System.IO.Compression.GZipStream(input, System.IO.Compression.CompressionMode.Decompress);
-            using var output = new MemoryStream();
+            using var output = new MemoryStream(compressedData.Length * 2); // Estimate decompressed size as ~2x compressed
             await gzip.CopyToAsync(output, cancellationToken).ConfigureAwait(false);
             return output.ToArray();
         }

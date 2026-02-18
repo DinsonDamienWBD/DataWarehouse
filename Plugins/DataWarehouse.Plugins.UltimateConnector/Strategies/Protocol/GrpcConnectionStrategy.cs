@@ -57,8 +57,33 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Protocol
             var client = new HttpClient(handler) { BaseAddress = new Uri(endpoint) };
             client.DefaultRequestVersion = new Version(2, 0);
 
-            var response = await client.GetAsync("/", ct);
-            response.EnsureSuccessStatusCode();
+            // Use proper gRPC health check endpoint instead of HTTP GET
+            // Try the standard gRPC health checking protocol endpoint
+            var healthRequest = new HttpRequestMessage(HttpMethod.Post, "/grpc.health.v1.Health/Check");
+            healthRequest.Version = new Version(2, 0);
+            healthRequest.Headers.Add("content-type", "application/grpc");
+
+            try
+            {
+                var response = await client.SendAsync(healthRequest, ct);
+                // For gRPC, we expect HTTP 200 with grpc-status header, or at least HTTP/2 connection success
+                // Even if the health endpoint isn't implemented, HTTP/2 connection success is sufficient
+                if (response.Version.Major < 2)
+                {
+                    throw new InvalidOperationException("gRPC requires HTTP/2 protocol support");
+                }
+            }
+            catch (HttpRequestException)
+            {
+                // If health check fails, try a simple connection test
+                var testRequest = new HttpRequestMessage(HttpMethod.Post, "/");
+                testRequest.Version = new Version(2, 0);
+                var testResponse = await client.SendAsync(testRequest, ct);
+                if (testResponse.Version.Major < 2)
+                {
+                    throw new InvalidOperationException("gRPC requires HTTP/2 protocol support");
+                }
+            }
 
             var info = new Dictionary<string, object>
             {
@@ -74,8 +99,19 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Protocol
         protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct)
         {
             var client = handle.GetConnection<HttpClient>();
-            var response = await client.GetAsync("/", ct);
-            return response.IsSuccessStatusCode;
+            var healthRequest = new HttpRequestMessage(HttpMethod.Post, "/grpc.health.v1.Health/Check");
+            healthRequest.Version = new Version(2, 0);
+            healthRequest.Headers.Add("content-type", "application/grpc");
+
+            try
+            {
+                var response = await client.SendAsync(healthRequest, ct);
+                return response.Version.Major >= 2;
+            }
+            catch
+            {
+                return false;
+            }
         }
 
         /// <inheritdoc/>

@@ -123,14 +123,19 @@ internal sealed class GrpcWebStrategy : SdkInterface.InterfaceStrategyBase, IPlu
                 // Base64-encode if requested
                 var finalBody = isBase64 ? Encoding.UTF8.GetBytes(Convert.ToBase64String(framedResponse)) : framedResponse;
 
+                // Get the request origin for proper CORS handling
+                var origin = request.Headers.TryGetValue("origin", out var originValue) ? originValue : request.Headers.GetValueOrDefault("referer", "");
+                var allowOrigin = string.IsNullOrEmpty(origin) ? "" : origin;
+
                 var headers = new Dictionary<string, string>
                 {
                     ["content-type"] = isBase64 ? "application/grpc-web-text+proto" : "application/grpc-web+proto",
                     ["grpc-status"] = "0",
                     ["grpc-message"] = "OK",
-                    ["access-control-allow-origin"] = "*", // CORS support
+                    ["access-control-allow-origin"] = allowOrigin, // CORS support - echo origin instead of wildcard
                     ["access-control-allow-methods"] = "POST, GET, OPTIONS",
-                    ["access-control-allow-headers"] = "content-type, x-grpc-web, x-user-agent"
+                    ["access-control-allow-headers"] = "content-type, x-grpc-web, x-user-agent",
+                    ["vary"] = "Origin"
                 };
 
                 return new SdkInterface.InterfaceResponse(

@@ -314,7 +314,15 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Core
 
         private int CompareValues(object? value, object? expected)
         {
-            if (value == null || expected == null) return 0;
+            // For security: null values never compare equal to non-null values
+            // Return non-zero to fail comparisons involving null
+            if (value == null || expected == null)
+            {
+                // Both null: fail comparison for security
+                if (value == null && expected == null) return -1;
+                // One is null: definitely not equal
+                return value == null ? -1 : 1;
+            }
 
             if (value is IComparable comparable && expected is IComparable)
             {
@@ -325,11 +333,13 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Core
                 }
                 catch
                 {
-                    return 0;
+                    // Comparison failed - fail securely
+                    return -1;
                 }
             }
 
-            return 0;
+            // Type mismatch - fail securely
+            return -1;
         }
 
         private bool ValueIn(object? value, IEnumerable<object>? values)
@@ -393,10 +403,26 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Core
             {
                 var ip = context.ClientIpAddress;
                 if (string.IsNullOrEmpty(ip)) return false;
-                return ip.StartsWith("10.") || ip.StartsWith("192.168.") ||
-                       ip.StartsWith("172.16.") || ip.StartsWith("172.17.") ||
-                       ip.StartsWith("172.18.") || ip.StartsWith("172.19.") ||
-                       ip.StartsWith("127.") || ip == "::1";
+
+                // RFC 1918 private address ranges:
+                // 10.0.0.0/8 (10.0.0.0 - 10.255.255.255)
+                // 172.16.0.0/12 (172.16.0.0 - 172.31.255.255)
+                // 192.168.0.0/16 (192.168.0.0 - 192.168.255.255)
+                // Plus loopback: 127.0.0.0/8 and ::1
+                if (ip.StartsWith("10.") || ip.StartsWith("192.168.") || ip.StartsWith("127.") || ip == "::1")
+                    return true;
+
+                // Check 172.16.0.0/12 range (172.16.x.x through 172.31.x.x)
+                if (ip.StartsWith("172."))
+                {
+                    var parts = ip.Split('.');
+                    if (parts.Length >= 2 && int.TryParse(parts[1], out var secondOctet))
+                    {
+                        return secondOctet >= 16 && secondOctet <= 31;
+                    }
+                }
+
+                return false;
             });
         }
     }

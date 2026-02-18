@@ -84,11 +84,11 @@ public class DeviceAuthenticationStrategy : IoTSecurityStrategyBase
 
     public override Task<SecurityAssessment> AssessSecurityAsync(string deviceId, CancellationToken ct = default)
     {
-        var random = new Random();
+        // Using Random.Shared for thread-safety;
         return Task.FromResult(new SecurityAssessment
         {
             DeviceId = deviceId,
-            SecurityScore = random.Next(60, 100),
+            SecurityScore = Random.Shared.Next(60, 100),
             ThreatLevel = ThreatLevel.Low,
             Findings = new List<SecurityFinding>
             {
@@ -204,11 +204,11 @@ public class SecurityAssessmentStrategy : IoTSecurityStrategyBase
 
     public override Task<SecurityAssessment> AssessSecurityAsync(string deviceId, CancellationToken ct = default)
     {
-        var random = new Random();
+        // Using Random.Shared for thread-safety;
         var findings = new List<SecurityFinding>();
 
         // Check various security aspects
-        if (random.NextDouble() > 0.7)
+        if (Random.Shared.NextDouble() > 0.7)
         {
             findings.Add(new SecurityFinding
             {
@@ -220,7 +220,7 @@ public class SecurityAssessmentStrategy : IoTSecurityStrategyBase
             });
         }
 
-        if (random.NextDouble() > 0.8)
+        if (Random.Shared.NextDouble() > 0.8)
         {
             findings.Add(new SecurityFinding
             {
@@ -232,7 +232,7 @@ public class SecurityAssessmentStrategy : IoTSecurityStrategyBase
             });
         }
 
-        if (random.NextDouble() > 0.9)
+        if (Random.Shared.NextDouble() > 0.9)
         {
             findings.Add(new SecurityFinding
             {
@@ -308,11 +308,11 @@ public class ThreatDetectionStrategy : IoTSecurityStrategyBase
 
     public override Task<ThreatDetectionResult> DetectThreatsAsync(ThreatDetectionRequest request, CancellationToken ct = default)
     {
-        var random = new Random();
+        // Using Random.Shared for thread-safety;
         var threats = new List<DetectedThreat>();
 
         // Simulate threat detection
-        if (random.NextDouble() > 0.85)
+        if (Random.Shared.NextDouble() > 0.85)
         {
             threats.Add(new DetectedThreat
             {
@@ -325,7 +325,7 @@ public class ThreatDetectionStrategy : IoTSecurityStrategyBase
             });
         }
 
-        if (random.NextDouble() > 0.95)
+        if (Random.Shared.NextDouble() > 0.95)
         {
             threats.Add(new DetectedThreat
             {
@@ -392,10 +392,10 @@ public class CertificateManagementStrategy : IoTSecurityStrategyBase
 
     public override Task<SecurityAssessment> AssessSecurityAsync(string deviceId, CancellationToken ct = default)
     {
-        var random = new Random();
+        // Using Random.Shared for thread-safety;
         var findings = new List<SecurityFinding>();
 
-        if (random.NextDouble() > 0.7)
+        if (Random.Shared.NextDouble() > 0.7)
         {
             findings.Add(new SecurityFinding
             {

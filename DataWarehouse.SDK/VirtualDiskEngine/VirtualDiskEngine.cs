@@ -348,7 +348,7 @@ public sealed class VirtualDiskEngine : IAsyncDisposable
         }
 
         // Read all blocks and build stream
-        var resultStream = new MemoryStream();
+        var resultStream = new MemoryStream((int)inode.Size);
         byte[] buffer = ArrayPool<byte>.Shared.Rent(_options.BlockSize);
         try
         {

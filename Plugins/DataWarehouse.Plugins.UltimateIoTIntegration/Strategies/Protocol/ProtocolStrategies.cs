@@ -221,9 +221,9 @@ public class ModbusProtocolStrategy : ProtocolStrategyBase
     public override Task<ModbusResponse> ReadModbusAsync(string address, int slaveId, int registerAddress, int count, ModbusFunction function, CancellationToken ct = default)
     {
         var registers = new ushort[count];
-        var random = new Random();
+        var random = Random.Shared;
         for (int i = 0; i < count; i++)
-            registers[i] = (ushort)random.Next(0, 65535);
+            registers[i] = (ushort)Random.Shared.Next(0, 65535);
 
         return Task.FromResult(new ModbusResponse
         {
@@ -278,7 +278,7 @@ public class OpcUaProtocolStrategy : ProtocolStrategyBase
         while (!ct.IsCancellationRequested)
         {
             await Task.Delay(1000, ct); // OPC-UA subscription publish
-            yield return Encoding.UTF8.GetBytes($"{{\"nodeId\":\"{topic}\",\"value\":{new Random().NextDouble() * 100}}}");
+            yield return Encoding.UTF8.GetBytes($"{{\"nodeId\":\"{topic}\",\"value\":{Random.Shared.NextDouble() * 100}}}");
         }
     }
 
@@ -295,7 +295,7 @@ public class OpcUaProtocolStrategy : ProtocolStrategyBase
 
     public override Task<object?> ReadOpcUaAsync(string endpoint, string nodeId, CancellationToken ct = default)
     {
-        return Task.FromResult<object?>(new Random().NextDouble() * 100);
+        return Task.FromResult<object?>(Random.Shared.NextDouble() * 100);
     }
 }
 

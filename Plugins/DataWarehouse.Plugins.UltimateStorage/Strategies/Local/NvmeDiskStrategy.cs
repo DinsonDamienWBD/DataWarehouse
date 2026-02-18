@@ -771,20 +771,20 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Local
             // - macOS: IOKit SMARTLib
 
             // Placeholder with simulated SMART data
-            var random = new Random();
+            var random = Random.Shared;
             var smartLog = new NvmeSmartLog
             {
-                Temperature = 45 + random.Next(-5, 10), // 40-55°C typical
-                AvailableSpare = (byte)(95 + random.Next(0, 5)), // 95-100%
+                Temperature = 45 + Random.Shared.Next(-5, 10), // 40-55°C typical
+                AvailableSpare = (byte)(95 + Random.Shared.Next(0, 5)), // 95-100%
                 AvailableSpareThreshold = 10,
-                PercentageUsed = (byte)random.Next(5, 30), // 5-30% wear
-                DataUnitsRead = (ulong)(random.NextInt64(1000000, 10000000)),
-                DataUnitsWritten = (ulong)(random.NextInt64(500000, 5000000)),
-                HostReadCommands = (ulong)(random.NextInt64(10000000, 100000000)),
-                HostWriteCommands = (ulong)(random.NextInt64(5000000, 50000000)),
-                PowerCycles = (ulong)random.Next(100, 1000),
-                PowerOnHours = (ulong)random.Next(1000, 10000),
-                UnsafeShutdowns = (ulong)random.Next(0, 10),
+                PercentageUsed = (byte)Random.Shared.Next(5, 30), // 5-30% wear
+                DataUnitsRead = (ulong)(Random.Shared.NextInt64(1000000, 10000000)),
+                DataUnitsWritten = (ulong)(Random.Shared.NextInt64(500000, 5000000)),
+                HostReadCommands = (ulong)(Random.Shared.NextInt64(10000000, 100000000)),
+                HostWriteCommands = (ulong)(Random.Shared.NextInt64(5000000, 50000000)),
+                PowerCycles = (ulong)Random.Shared.Next(100, 1000),
+                PowerOnHours = (ulong)Random.Shared.Next(1000, 10000),
+                UnsafeShutdowns = (ulong)Random.Shared.Next(0, 10),
                 MediaErrors = 0,
                 ErrorLogEntries = 0,
                 WarningTemperatureTime = 0,

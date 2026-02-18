@@ -283,7 +283,7 @@ public sealed class UndoManager : IDisposable
             OperationRecorded?.Invoke(this, operation);
         }
 
-        SaveOperationsAsync();
+        _ = Task.Run(async () => await SaveOperationsAsync());
         return Task.FromResult(true);
     }
 
@@ -429,7 +429,7 @@ public sealed class UndoManager : IDisposable
             _operations.Clear();
         }
 
-        SaveOperationsAsync();
+        _ = Task.Run(async () => await SaveOperationsAsync());
         return Task.CompletedTask;
     }
 
@@ -449,7 +449,7 @@ public sealed class UndoManager : IDisposable
 
         if (removed > 0)
         {
-            SaveOperationsAsync();
+            _ = Task.Run(async () => await SaveOperationsAsync());
         }
 
         return Task.FromResult(removed);
@@ -526,7 +526,7 @@ public sealed class UndoManager : IDisposable
                     operation.IsRolledBack = true;
                 }
 
-                SaveOperationsAsync();
+                _ = Task.Run(async () => await SaveOperationsAsync());
                 OperationUndone?.Invoke(this, operation);
 
                 return UndoResult.Ok(operation, $"Undone: {operation.Description ?? operation.Command}");
@@ -673,7 +673,7 @@ public sealed class UndoManager : IDisposable
         }
     }
 
-    private async void SaveOperationsAsync()
+    private async Task SaveOperationsAsync()
     {
         try
         {
@@ -689,9 +689,10 @@ public sealed class UndoManager : IDisposable
             var json = JsonSerializer.Serialize(snapshot, _jsonOptions);
             await File.WriteAllTextAsync(filePath, json);
         }
-        catch
+        catch (Exception ex)
         {
-            // Ignore save errors
+            // Log save errors but don't throw
+            System.Diagnostics.Debug.WriteLine($"UndoManager save failed: {ex.Message}");
         }
     }
 

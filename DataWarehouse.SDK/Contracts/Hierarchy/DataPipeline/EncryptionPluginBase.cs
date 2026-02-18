@@ -294,7 +294,7 @@ public abstract class EncryptionPluginBase : DataTransformationPluginBase
 
             // Prepend envelope header to encrypted data
             var headerBytes = envelope.Serialize();
-            var result = new MemoryStream();
+            var result = new MemoryStream(headerBytes.Length + (int)encryptedData.Length);
             await result.WriteAsync(headerBytes, ct).ConfigureAwait(false);
             await encryptedData.CopyToAsync(result, ct).ConfigureAwait(false);
             result.Position = 0;

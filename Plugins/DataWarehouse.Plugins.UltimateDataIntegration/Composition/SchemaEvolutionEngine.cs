@@ -446,27 +446,30 @@ namespace DataWarehouse.Plugins.UltimateDataIntegration.Composition
         /// Requests pattern detection from UltimateIntelligence via message bus.
         /// Gracefully handles unavailable intelligence plugin.
         /// </summary>
-        private async void RequestPatternDetection()
+        private Task RequestPatternDetection()
         {
-            try
+            return Task.Run(async () =>
             {
-                var message = PluginMessage.Create("intelligence.connector.detect-anomaly", new Dictionary<string, object>
+                try
                 {
-                    ["source"] = "SchemaEvolutionEngine",
-                    ["timestamp"] = DateTimeOffset.UtcNow
-                });
+                    var message = PluginMessage.Create("intelligence.connector.detect-anomaly", new Dictionary<string, object>
+                    {
+                        ["source"] = "SchemaEvolutionEngine",
+                        ["timestamp"] = DateTimeOffset.UtcNow
+                    });
 
-                // Fire-and-forget pattern detection request
-                // If intelligence plugin is unavailable, this will timeout/fail silently
-                await _messageBus.PublishAsync("intelligence.connector.detect-anomaly", message);
+                    // Fire-and-forget pattern detection request
+                    // If intelligence plugin is unavailable, this will timeout/fail silently
+                    await _messageBus.PublishAsync("intelligence.connector.detect-anomaly", message);
 
-                _logger?.LogDebug("Pattern detection request sent");
-            }
-            catch (Exception ex)
-            {
-                // Graceful degradation: log warning and continue
-                _logger?.LogWarning(ex, "Pattern detection request failed (intelligence plugin may be unavailable)");
-            }
+                    _logger?.LogDebug("Pattern detection request sent");
+                }
+                catch (Exception ex)
+                {
+                    // Graceful degradation: log warning and continue
+                    _logger?.LogWarning(ex, "Pattern detection request failed (intelligence plugin may be unavailable)");
+                }
+            });
         }
 
         /// <summary>

@@ -409,15 +409,13 @@ namespace DataWarehouse.Plugins.Raft
 
         private async Task RunElectionLoopAsync(CancellationToken ct)
         {
-            var random = new Random();
-
             while (!ct.IsCancellationRequested)
             {
                 try
                 {
                     // Random election timeout
                     var timeout = TimeSpan.FromMilliseconds(
-                        random.Next(
+                        Random.Shared.Next(
                             (int)_electionTimeoutMin.TotalMilliseconds,
                             (int)_electionTimeoutMax.TotalMilliseconds
                         )

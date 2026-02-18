@@ -172,13 +172,18 @@ internal sealed class SocketIoStrategy : SdkInterface.InterfaceStrategyBase, IPl
             await MessageBus.PublishAsync("streaming.subscribe", message, cancellationToken);
         }
 
+        // Get the request origin for proper CORS handling
+        var origin = request.Headers.TryGetValue("Origin", out var originValue) ? originValue : request.Headers.GetValueOrDefault("Referer", "");
+        var allowOrigin = string.IsNullOrEmpty(origin) ? "" : origin;
+
         return new SdkInterface.InterfaceResponse(
             StatusCode: 200,
             Headers: new Dictionary<string, string>
             {
                 ["Content-Type"] = "application/json",
-                ["Access-Control-Allow-Origin"] = "*",
-                ["Access-Control-Allow-Credentials"] = "true"
+                ["Access-Control-Allow-Origin"] = allowOrigin,
+                ["Access-Control-Allow-Credentials"] = "true",
+                ["Vary"] = "Origin"
             },
             Body: Encoding.UTF8.GetBytes($"0{handshakeJson}") // 0 = open packet
         );

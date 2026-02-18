@@ -21,13 +21,13 @@ public abstract class IoTAnalyticsStrategyBase : IoTStrategyBase, IIoTAnalyticsS
     public virtual Task<Dictionary<string, double>> ComputeAggregationsAsync(string deviceId, string[] metrics, TimeSpan window, CancellationToken ct = default)
     {
         var result = new Dictionary<string, double>();
-        var random = new Random();
+        var random = Random.Shared;
         foreach (var metric in metrics)
         {
-            result[$"{metric}_avg"] = random.NextDouble() * 100;
-            result[$"{metric}_min"] = random.NextDouble() * 50;
-            result[$"{metric}_max"] = random.NextDouble() * 150;
-            result[$"{metric}_count"] = random.Next(100, 1000);
+            result[$"{metric}_avg"] = Random.Shared.NextDouble() * 100;
+            result[$"{metric}_min"] = Random.Shared.NextDouble() * 50;
+            result[$"{metric}_max"] = Random.Shared.NextDouble() * 150;
+            result[$"{metric}_count"] = Random.Shared.Next(100, 1000);
         }
         return Task.FromResult(result);
     }
@@ -45,20 +45,20 @@ public class AnomalyDetectionStrategy : IoTAnalyticsStrategyBase
 
     public override Task<AnomalyDetectionResult> DetectAnomaliesAsync(AnomalyDetectionRequest request, CancellationToken ct = default)
     {
-        var random = new Random();
-        var anomalyCount = random.Next(0, 5);
+        var random = Random.Shared;
+        var anomalyCount = Random.Shared.Next(0, 5);
         var anomalies = new List<DetectedAnomaly>();
 
         for (int i = 0; i < anomalyCount; i++)
         {
             anomalies.Add(new DetectedAnomaly
             {
-                Timestamp = DateTimeOffset.UtcNow.AddMinutes(-random.Next(1, 60)),
+                Timestamp = DateTimeOffset.UtcNow.AddMinutes(-Random.Shared.Next(1, 60)),
                 MetricName = request.MetricName ?? "temperature",
                 ExpectedValue = 25.0,
-                ActualValue = 25.0 + (random.NextDouble() - 0.5) * 20,
-                Deviation = random.NextDouble() * 3,
-                Severity = (AnomalySeverity)random.Next(1, 5)
+                ActualValue = 25.0 + (Random.Shared.NextDouble() - 0.5) * 20,
+                Deviation = Random.Shared.NextDouble() * 3,
+                Severity = (AnomalySeverity)Random.Shared.Next(1, 5)
             });
         }
 
@@ -67,7 +67,7 @@ public class AnomalyDetectionStrategy : IoTAnalyticsStrategyBase
             Success = true,
             AnomaliesDetected = anomalyCount,
             Severity = anomalies.Any() ? anomalies.Max(a => a.Severity) : AnomalySeverity.None,
-            Confidence = 0.85 + random.NextDouble() * 0.15,
+            Confidence = 0.85 + Random.Shared.NextDouble() * 0.15,
             Anomalies = anomalies
         });
     }
@@ -75,15 +75,15 @@ public class AnomalyDetectionStrategy : IoTAnalyticsStrategyBase
     public override Task<PredictionResult> PredictAsync(PredictionRequest request, CancellationToken ct = default)
     {
         var predictions = new List<PredictedValue>();
-        var random = new Random();
-        var baseValue = random.NextDouble() * 50 + 20;
+        var random = Random.Shared;
+        var baseValue = Random.Shared.NextDouble() * 50 + 20;
 
         for (int i = 0; i < request.HorizonMinutes; i += 5)
         {
             predictions.Add(new PredictedValue
             {
                 Timestamp = DateTimeOffset.UtcNow.AddMinutes(i),
-                Value = baseValue + (random.NextDouble() - 0.5) * 10,
+                Value = baseValue + (Random.Shared.NextDouble() - 0.5) * 10,
                 LowerBound = baseValue - 10,
                 UpperBound = baseValue + 10
             });
@@ -94,7 +94,7 @@ public class AnomalyDetectionStrategy : IoTAnalyticsStrategyBase
             Success = true,
             MetricName = request.MetricName,
             Predictions = predictions,
-            Confidence = 0.8 + random.NextDouble() * 0.15
+            Confidence = 0.8 + Random.Shared.NextDouble() * 0.15
         });
     }
 
@@ -145,26 +145,26 @@ public class PredictiveAnalyticsStrategy : IoTAnalyticsStrategyBase
     public override Task<AnomalyDetectionResult> DetectAnomaliesAsync(AnomalyDetectionRequest request, CancellationToken ct = default)
     {
         // ML-based anomaly detection
-        var random = new Random();
+        var random = Random.Shared;
         return Task.FromResult(new AnomalyDetectionResult
         {
             Success = true,
-            AnomaliesDetected = random.Next(0, 3),
+            AnomaliesDetected = Random.Shared.Next(0, 3),
             Severity = AnomalySeverity.Low,
-            Confidence = 0.9 + random.NextDouble() * 0.1
+            Confidence = 0.9 + Random.Shared.NextDouble() * 0.1
         });
     }
 
     public override Task<PredictionResult> PredictAsync(PredictionRequest request, CancellationToken ct = default)
     {
         var predictions = new List<PredictedValue>();
-        var random = new Random();
-        var trend = random.NextDouble() * 0.5 - 0.25;
-        var baseValue = random.NextDouble() * 50 + 20;
+        var random = Random.Shared;
+        var trend = Random.Shared.NextDouble() * 0.5 - 0.25;
+        var baseValue = Random.Shared.NextDouble() * 50 + 20;
 
         for (int i = 0; i < request.HorizonMinutes; i += 5)
         {
-            var value = baseValue + trend * i + (random.NextDouble() - 0.5) * 5;
+            var value = baseValue + trend * i + (Random.Shared.NextDouble() - 0.5) * 5;
             predictions.Add(new PredictedValue
             {
                 Timestamp = DateTimeOffset.UtcNow.AddMinutes(i),
@@ -179,19 +179,19 @@ public class PredictiveAnalyticsStrategy : IoTAnalyticsStrategyBase
             Success = true,
             MetricName = request.MetricName,
             Predictions = predictions,
-            Confidence = 0.85 + random.NextDouble() * 0.1
+            Confidence = 0.85 + Random.Shared.NextDouble() * 0.1
         });
     }
 
     public override Task<StreamAnalyticsResult> AnalyzeStreamAsync(StreamAnalyticsQuery query, CancellationToken ct = default)
     {
-        var random = new Random();
+        var random = Random.Shared;
         return Task.FromResult(new StreamAnalyticsResult
         {
             Success = true,
             Results = new List<Dictionary<string, object>>
             {
-                new() { ["prediction"] = random.NextDouble() * 100, ["confidence"] = 0.88 }
+                new() { ["prediction"] = Random.Shared.NextDouble() * 100, ["confidence"] = 0.88 }
             },
             QueryTime = DateTimeOffset.UtcNow
         });
@@ -246,7 +246,7 @@ public class StreamAnalyticsStrategy : IoTAnalyticsStrategyBase
 
     public override Task<StreamAnalyticsResult> AnalyzeStreamAsync(StreamAnalyticsQuery query, CancellationToken ct = default)
     {
-        var random = new Random();
+        var random = Random.Shared;
         return Task.FromResult(new StreamAnalyticsResult
         {
             Success = true,
@@ -256,10 +256,10 @@ public class StreamAnalyticsStrategy : IoTAnalyticsStrategyBase
                 {
                     ["windowStart"] = DateTimeOffset.UtcNow.Add(-query.WindowSize),
                     ["windowEnd"] = DateTimeOffset.UtcNow,
-                    ["count"] = random.Next(50, 200),
-                    ["avg"] = random.NextDouble() * 100,
-                    ["min"] = random.NextDouble() * 50,
-                    ["max"] = random.NextDouble() * 150
+                    ["count"] = Random.Shared.Next(50, 200),
+                    ["avg"] = Random.Shared.NextDouble() * 100,
+                    ["min"] = Random.Shared.NextDouble() * 50,
+                    ["max"] = Random.Shared.NextDouble() * 150
                 }
             },
             QueryTime = DateTimeOffset.UtcNow
@@ -315,24 +315,24 @@ public class PatternRecognitionStrategy : IoTAnalyticsStrategyBase
 
     public override Task<PatternDetectionResult> DetectPatternsAsync(PatternDetectionRequest request, CancellationToken ct = default)
     {
-        var random = new Random();
+        var random = Random.Shared;
         var patterns = new List<DetectedPattern>();
 
         var patternTypes = new[] { "periodic", "trend", "spike", "level-shift", "seasonality" };
-        var count = random.Next(1, 4);
+        var count = Random.Shared.Next(1, 4);
 
         for (int i = 0; i < count; i++)
         {
             patterns.Add(new DetectedPattern
             {
-                PatternType = patternTypes[random.Next(patternTypes.Length)],
-                StartTime = DateTimeOffset.UtcNow.AddHours(-random.Next(1, 24)),
+                PatternType = patternTypes[Random.Shared.Next(patternTypes.Length)],
+                StartTime = DateTimeOffset.UtcNow.AddHours(-Random.Shared.Next(1, 24)),
                 EndTime = DateTimeOffset.UtcNow,
-                Confidence = 0.7 + random.NextDouble() * 0.25,
+                Confidence = 0.7 + Random.Shared.NextDouble() * 0.25,
                 Attributes = new Dictionary<string, object>
                 {
-                    ["duration"] = $"{random.Next(5, 60)}m",
-                    ["occurrences"] = random.Next(1, 10)
+                    ["duration"] = $"{Random.Shared.Next(5, 60)}m",
+                    ["occurrences"] = Random.Shared.Next(1, 10)
                 }
             });
         }
@@ -358,9 +358,9 @@ public class PredictiveMaintenanceStrategy : IoTAnalyticsStrategyBase
 
     public override Task<AnomalyDetectionResult> DetectAnomaliesAsync(AnomalyDetectionRequest request, CancellationToken ct = default)
     {
-        var random = new Random();
+        var random = Random.Shared;
         // Check for maintenance-related anomalies
-        var hasAnomaly = random.NextDouble() > 0.7;
+        var hasAnomaly = Random.Shared.NextDouble() > 0.7;
 
         return Task.FromResult(new AnomalyDetectionResult
         {
@@ -385,8 +385,8 @@ public class PredictiveMaintenanceStrategy : IoTAnalyticsStrategyBase
 
     public override Task<PredictionResult> PredictAsync(PredictionRequest request, CancellationToken ct = default)
     {
-        var random = new Random();
-        var daysToFailure = random.Next(7, 90);
+        var random = Random.Shared;
+        var daysToFailure = Random.Shared.Next(7, 90);
 
         return Task.FromResult(new PredictionResult
         {
@@ -402,13 +402,13 @@ public class PredictiveMaintenanceStrategy : IoTAnalyticsStrategyBase
                     UpperBound = daysToFailure + 10
                 }
             },
-            Confidence = 0.75 + random.NextDouble() * 0.2
+            Confidence = 0.75 + Random.Shared.NextDouble() * 0.2
         });
     }
 
     public override Task<StreamAnalyticsResult> AnalyzeStreamAsync(StreamAnalyticsQuery query, CancellationToken ct = default)
     {
-        var random = new Random();
+        var random = Random.Shared;
         return Task.FromResult(new StreamAnalyticsResult
         {
             Success = true,
@@ -416,9 +416,9 @@ public class PredictiveMaintenanceStrategy : IoTAnalyticsStrategyBase
             {
                 new()
                 {
-                    ["health_score"] = random.Next(70, 100),
-                    ["maintenance_recommended"] = random.NextDouble() > 0.8,
-                    ["estimated_rul_days"] = random.Next(30, 180)
+                    ["health_score"] = Random.Shared.Next(70, 100),
+                    ["maintenance_recommended"] = Random.Shared.NextDouble() > 0.8,
+                    ["estimated_rul_days"] = Random.Shared.Next(30, 180)
                 }
             },
             QueryTime = DateTimeOffset.UtcNow
