@@ -22,6 +22,8 @@ public class UltimateBlockchainPlugin : BlockchainProviderPluginBase
     private readonly List<Block> _blockchain = new();
     private readonly object _blockchainLock = new();
     private long _nextBlockNumber = 1;
+    private readonly string _journalPath;
+    private readonly SemaphoreSlim _journalLock = new(1, 1);
 
     /// <summary>
     /// Creates a new UltimateBlockchain plugin instance.
@@ -31,8 +33,23 @@ public class UltimateBlockchainPlugin : BlockchainProviderPluginBase
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
-        // Initialize with genesis block
-        InitializeGenesisBlock();
+        // Set journal path in a well-known location
+        var dataDir = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "DataWarehouse",
+            "Blockchain");
+        Directory.CreateDirectory(dataDir);
+        _journalPath = Path.Combine(dataDir, "blockchain-journal.jsonl");
+
+        // Restore from journal if exists, otherwise create genesis
+        if (File.Exists(_journalPath))
+        {
+            RestoreFromJournal();
+        }
+        else
+        {
+            InitializeGenesisBlock();
+        }
     }
 
     /// <summary>
@@ -54,7 +71,108 @@ public class UltimateBlockchainPlugin : BlockchainProviderPluginBase
 
             _blockchain.Add(genesisBlock);
             _logger.LogInformation("Blockchain initialized with genesis block");
+
+            // Persist genesis block to journal
+            _ = PersistBlockAsync(genesisBlock, CancellationToken.None);
         }
+    }
+
+    /// <summary>
+    /// Restore blockchain state from journal file.
+    /// </summary>
+    private void RestoreFromJournal()
+    {
+        lock (_blockchainLock)
+        {
+            try
+            {
+                _logger.LogInformation("Restoring blockchain from journal: {Path}", _journalPath);
+
+                var lines = File.ReadAllLines(_journalPath);
+                foreach (var line in lines)
+                {
+                    if (string.IsNullOrWhiteSpace(line)) continue;
+
+                    var block = System.Text.Json.JsonSerializer.Deserialize<BlockJournalEntry>(line);
+                    if (block == null) continue;
+
+                    var restoredBlock = new Block
+                    {
+                        BlockNumber = block.BlockNumber,
+                        PreviousHash = block.PreviousHash,
+                        Timestamp = block.Timestamp,
+                        Transactions = block.Transactions,
+                        MerkleRoot = block.MerkleRoot,
+                        Hash = block.Hash
+                    };
+
+                    _blockchain.Add(restoredBlock);
+
+                    // Restore anchors to lookup dictionary
+                    foreach (var anchor in restoredBlock.Transactions)
+                    {
+                        _anchors[anchor.ObjectId] = anchor;
+                    }
+                }
+
+                _nextBlockNumber = _blockchain.Count > 0 ? _blockchain[^1].BlockNumber + 1 : 1;
+
+                _logger.LogInformation("Restored {Count} blocks from journal", _blockchain.Count);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to restore from journal, initializing fresh blockchain");
+                _blockchain.Clear();
+                _anchors.Clear();
+                InitializeGenesisBlock();
+            }
+        }
+    }
+
+    /// <summary>
+    /// Persist block to journal (append-only).
+    /// </summary>
+    private async Task PersistBlockAsync(Block block, CancellationToken ct)
+    {
+        await _journalLock.WaitAsync(ct);
+        try
+        {
+            var entry = new BlockJournalEntry
+            {
+                BlockNumber = block.BlockNumber,
+                PreviousHash = block.PreviousHash,
+                Timestamp = block.Timestamp,
+                Transactions = block.Transactions,
+                MerkleRoot = block.MerkleRoot,
+                Hash = block.Hash
+            };
+
+            var json = System.Text.Json.JsonSerializer.Serialize(entry);
+            await File.AppendAllLinesAsync(_journalPath, new[] { json }, ct);
+
+            _logger.LogDebug("Persisted block {BlockNumber} to journal", block.BlockNumber);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to persist block {BlockNumber} to journal", block.BlockNumber);
+        }
+        finally
+        {
+            _journalLock.Release();
+        }
+    }
+
+    /// <summary>
+    /// Journal entry format for persistence.
+    /// </summary>
+    private class BlockJournalEntry
+    {
+        public long BlockNumber { get; set; }
+        public string PreviousHash { get; set; } = string.Empty;
+        public DateTimeOffset Timestamp { get; set; }
+        public List<BlockchainAnchor> Transactions { get; set; } = new();
+        public string MerkleRoot { get; set; } = string.Empty;
+        public string Hash { get; set; } = string.Empty;
     }
 
     /// <inheritdoc/>
@@ -156,6 +274,9 @@ public class UltimateBlockchainPlugin : BlockchainProviderPluginBase
                 _logger.LogInformation(
                     "Created block {BlockNumber} with {TxCount} transactions, Merkle root: {MerkleRoot}",
                     blockNumber, newBlock.Transactions.Count, merkleRoot);
+
+                // Persist to journal asynchronously
+                _ = PersistBlockAsync(newBlock, ct);
             }
 
             return Task.FromResult(BatchAnchorResult.CreateSuccess(

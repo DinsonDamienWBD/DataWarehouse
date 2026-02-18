@@ -217,7 +217,7 @@ public sealed class FixedBlockDeduplicationStrategy : DeduplicationStrategyBase
         if (!_objectMaps.TryGetValue(objectId, out var blockMap))
             return null;
 
-        var memoryStream = new MemoryStream();
+        var memoryStream = new MemoryStream(blockMap.BlockHashes.Count * _blockSize);
 
         foreach (var hashString in blockMap.BlockHashes)
         {

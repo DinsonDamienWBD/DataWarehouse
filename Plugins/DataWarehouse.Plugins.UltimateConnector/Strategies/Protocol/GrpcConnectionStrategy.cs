@@ -24,7 +24,14 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Protocol
         public override ConnectorCategory Category => ConnectorCategory.Protocol;
 
         /// <inheritdoc/>
-        public override ConnectionStrategyCapabilities Capabilities => new();
+        public override ConnectionStrategyCapabilities Capabilities => new()
+        {
+            SupportsStreaming = true,
+            SupportsCompression = true,
+            RequiresAuthentication = false,
+            SupportsSsl = true,
+            MaxConcurrentConnections = 1000
+        };
 
         /// <inheritdoc/>
         public override string SemanticDescription =>

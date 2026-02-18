@@ -19,7 +19,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.CloudPlatform
         public AzureEventHubConnectionStrategy(ILogger? logger = null) : base(logger) { }
         protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct)
         {
-            var namespace_ = GetConfiguration<string>(config, "Namespace", null!);
+            var namespace_ = GetConfiguration<string>(config, "Namespace", string.Empty);
             var endpoint = $"https://{namespace_}.servicebus.windows.net";
             var httpClient = new HttpClient { BaseAddress = new Uri(endpoint), Timeout = config.Timeout };
             return new DefaultConnectionHandle(httpClient, new Dictionary<string, object> { ["Namespace"] = namespace_, ["Endpoint"] = endpoint });

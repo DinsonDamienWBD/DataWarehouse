@@ -659,7 +659,7 @@ namespace DataWarehouse.SDK.Security
             var json = System.Text.Json.JsonSerializer.Serialize(this);
             var jsonBytes = System.Text.Encoding.UTF8.GetBytes(json);
 
-            using var ms = new MemoryStream();
+            using var ms = new MemoryStream(5 + 4 + 4 + jsonBytes.Length);
             using var writer = new BinaryWriter(ms);
 
             writer.Write(MagicBytes);

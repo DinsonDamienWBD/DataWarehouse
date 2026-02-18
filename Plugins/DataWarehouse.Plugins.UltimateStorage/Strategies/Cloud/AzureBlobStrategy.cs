@@ -214,16 +214,17 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Cloud
 
             SignRequest(request);
 
-            var response = await _httpClient!.SendAsync(request, ct);
+            var response = await _httpClient!.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, ct);
             response.EnsureSuccessStatusCode();
 
-            var ms = new MemoryStream(65536);
-            await response.Content.CopyToAsync(ms, ct);
-            ms.Position = 0;
+            // Get content length for statistics
+            var contentLength = response.Content.Headers.ContentLength ?? 0;
 
-            // Update statistics
-            IncrementBytesRetrieved(ms.Length);
-            IncrementOperationCounter(StorageOperationType.Retrieve);
+            // Stream directly without full materialization to avoid OOM on large objects
+            var stream = await response.Content.ReadAsStreamAsync(ct);
+
+            // Wrap in a tracking stream to update statistics when consumed
+            var trackingStream = new StreamWithStatistics(stream, contentLength, this);
 
             // Auto tier transition if enabled
             if (_autoTierTransition)
@@ -231,7 +232,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Cloud
                 _ = AutoTransitionTierAsync(key, ct);
             }
 
-            return ms;
+            return trackingStream;
         }
 
         protected override async Task DeleteAsyncCore(string key, CancellationToken ct)
@@ -676,6 +677,83 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Cloud
         }
 
         protected override int GetMaxKeyLength() => 1024; // Azure Blob Storage max key length
+
+        /// <summary>
+        /// Stream wrapper that updates statistics when data is read.
+        /// Prevents OOM by streaming large objects without full materialization.
+        /// </summary>
+        private class StreamWithStatistics : Stream
+        {
+            private readonly Stream _innerStream;
+            private readonly long _expectedLength;
+            private readonly AzureBlobStrategy _strategy;
+            private long _bytesRead = 0;
+            private bool _statsUpdated = false;
+
+            public StreamWithStatistics(Stream innerStream, long expectedLength, AzureBlobStrategy strategy)
+            {
+                _innerStream = innerStream;
+                _expectedLength = expectedLength;
+                _strategy = strategy;
+            }
+
+            public override bool CanRead => _innerStream.CanRead;
+            public override bool CanSeek => _innerStream.CanSeek;
+            public override bool CanWrite => false;
+            public override long Length => _innerStream.Length;
+            public override long Position
+            {
+                get => _innerStream.Position;
+                set => _innerStream.Position = value;
+            }
+
+            public override int Read(byte[] buffer, int offset, int count)
+            {
+                var read = _innerStream.Read(buffer, offset, count);
+                _bytesRead += read;
+                return read;
+            }
+
+            public override async Task<int> ReadAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken)
+            {
+                var read = await _innerStream.ReadAsync(buffer, offset, count, cancellationToken);
+                _bytesRead += read;
+                return read;
+            }
+
+            public override void Flush() => _innerStream.Flush();
+            public override long Seek(long offset, SeekOrigin origin) => _innerStream.Seek(offset, origin);
+            public override void SetLength(long value) => throw new NotSupportedException();
+            public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
+
+            protected override void Dispose(bool disposing)
+            {
+                if (disposing)
+                {
+                    UpdateStatistics();
+                    _innerStream.Dispose();
+                }
+                base.Dispose(disposing);
+            }
+
+            public override async ValueTask DisposeAsync()
+            {
+                UpdateStatistics();
+                await _innerStream.DisposeAsync();
+                await base.DisposeAsync();
+            }
+
+            private void UpdateStatistics()
+            {
+                if (!_statsUpdated)
+                {
+                    _statsUpdated = true;
+                    var actualBytes = _bytesRead > 0 ? _bytesRead : _expectedLength;
+                    _strategy.IncrementBytesRetrieved(actualBytes);
+                    _strategy.IncrementOperationCounter(StorageOperationType.Retrieve);
+                }
+            }
+        }
 
         #endregion
     }
