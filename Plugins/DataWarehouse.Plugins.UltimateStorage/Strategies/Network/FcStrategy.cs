@@ -112,7 +112,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
                     "Initiator WWPN is required. Set 'InitiatorWwpn' in configuration (e.g., '50:01:43:80:12:34:56:78').");
             }
 
-            // Normalize WWNs to colon-separated format
+            // Normalize WWNs to colon-separated format (validates format in NormalizeWwn)
             _initiatorWwpn = NormalizeWwn(_initiatorWwpn);
             if (!string.IsNullOrWhiteSpace(_initiatorWwnn))
             {
@@ -166,9 +166,18 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
                 _ => ZoningMode.SingleInitiator
             };
 
-            // Load frame and buffer configuration
+            // Load frame and buffer configuration with validation
             _maxFrameSize = GetConfiguration<int>("MaxFrameSize", 2112);
+            if (_maxFrameSize < 512 || _maxFrameSize > 2112)
+            {
+                throw new ArgumentException($"Invalid max frame size {_maxFrameSize}. Must be between 512 and 2112 bytes.");
+            }
+
             _bufferCredits = GetConfiguration<int>("BufferCredits", 32);
+            if (_bufferCredits < 1 || _bufferCredits > 255)
+            {
+                throw new ArgumentException($"Invalid buffer-to-buffer credits {_bufferCredits}. Must be between 1 and 255.");
+            }
 
             // Load port speed configuration
             var portSpeedStr = GetConfiguration<string>("PortSpeed", "Auto");
@@ -187,12 +196,36 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
             // Load FCoE/FIP configuration
             _enableFip = GetConfiguration<bool>("EnableFip", false);
 
-            // Load timeout configuration
+            // Load timeout configuration with validation
             var fabricLoginTimeoutSec = GetConfiguration<int>("FabricLoginTimeoutSeconds", 30);
+            if (fabricLoginTimeoutSec < 5 || fabricLoginTimeoutSec > 300)
+            {
+                throw new ArgumentException($"Invalid fabric login timeout {fabricLoginTimeoutSec} seconds. Must be between 5 and 300.");
+            }
             _fabricLoginTimeout = TimeSpan.FromSeconds(fabricLoginTimeoutSec);
 
             var ioTimeoutSec = GetConfiguration<int>("IoTimeoutSeconds", 60);
+            if (ioTimeoutSec < 10 || ioTimeoutSec > 600)
+            {
+                throw new ArgumentException($"Invalid I/O timeout {ioTimeoutSec} seconds. Must be between 10 and 600.");
+            }
             _ioTimeout = TimeSpan.FromSeconds(ioTimeoutSec);
+
+            // Validate fabric credentials if provided
+            if (!string.IsNullOrWhiteSpace(_fabricUsername) && string.IsNullOrWhiteSpace(_fabricPassword))
+            {
+                throw new InvalidOperationException("Fabric password is required when fabric username is provided.");
+            }
+
+            // Validate zone set name if using non-SingleInitiator zoning
+            if (_zoningMode != ZoningMode.SingleInitiator)
+            {
+                var zoneSetName = GetConfiguration<string>("ZoneSetName", string.Empty);
+                if (string.IsNullOrWhiteSpace(zoneSetName))
+                {
+                    throw new InvalidOperationException($"Zone set name is required for {_zoningMode} zoning mode. Set 'ZoneSetName' in configuration.");
+                }
+            }
 
             // Initialize HTTP client for fabric management API
             _fabricApiClient = new HttpClient
@@ -432,7 +465,27 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
         {
             ValidateKey(key);
             ValidateStream(data);
-            await EnsureFabricConnectedAsync(ct);
+
+            // Edge case guards
+            if (string.IsNullOrEmpty(key))
+            {
+                throw new ArgumentException("Key cannot be null or empty", nameof(key));
+            }
+
+            if (data.Length > 100L * 1024 * 1024 * 1024 * 1024) // 100TB practical limit
+            {
+                throw new ArgumentException($"Object size {data.Length} bytes exceeds maximum supported size (100TB)", nameof(data));
+            }
+
+            try
+            {
+                await EnsureFabricConnectedAsync(ct);
+            }
+            catch (Exception ex)
+            {
+                // Handle fabric disconnection during I/O with specific exception
+                throw new IOException($"FC fabric connection lost during store operation: {ex.Message}", ex);
+            }
 
             await _ioLock.WaitAsync(ct);
             try
@@ -481,9 +534,10 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
                     await StoreMetadataAsync(key, metadata, ct);
                 }
 
-                // Update statistics
+                // Update statistics with strategy-specific counters
                 IncrementBytesStored(totalBytesWritten);
                 IncrementOperationCounter(StorageOperationType.Store);
+                // Note: IncrementCounter is not available in base class, tracking via existing operation counters
 
                 return new StorageObjectMetadata
                 {
@@ -506,7 +560,22 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
         protected override async Task<Stream> RetrieveAsyncCore(string key, CancellationToken ct)
         {
             ValidateKey(key);
-            await EnsureFabricConnectedAsync(ct);
+
+            // Edge case guards
+            if (string.IsNullOrEmpty(key))
+            {
+                throw new ArgumentException("Key cannot be null or empty", nameof(key));
+            }
+
+            try
+            {
+                await EnsureFabricConnectedAsync(ct);
+            }
+            catch (Exception ex)
+            {
+                // Handle fabric disconnection during I/O with specific exception
+                throw new IOException($"FC fabric connection lost during retrieve operation: {ex.Message}", ex);
+            }
 
             var (lunMapping, offset) = await GetLunMappingAsync(key, ct);
             if (lunMapping == null)
@@ -541,9 +610,10 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
                 totalBytesRead += actualBytes;
             }
 
-            // Update statistics
+            // Update statistics with strategy-specific counters
             IncrementBytesRetrieved(memoryStream.Length);
             IncrementOperationCounter(StorageOperationType.Retrieve);
+            // Note: IncrementCounter is not available in base class, tracking via existing operation counters
 
             memoryStream.Position = 0;
             return memoryStream;

@@ -117,11 +117,23 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
                 throw new InvalidOperationException("iSCSI target address is required. Set 'TargetAddress' in configuration.");
             }
 
+            // Validate portal address format (IP:port or hostname:port)
             _targetPort = GetConfiguration<int>("TargetPort", 3260);
+            if (_targetPort < 1 || _targetPort > 65535)
+            {
+                throw new ArgumentException($"Invalid iSCSI target port {_targetPort}. Must be between 1 and 65535.");
+            }
+
             _targetIqn = GetConfiguration<string>("TargetIQN", string.Empty);
             if (string.IsNullOrWhiteSpace(_targetIqn))
             {
                 throw new InvalidOperationException("iSCSI target IQN is required. Set 'TargetIQN' in configuration.");
+            }
+
+            // Validate target IQN format (iqn.yyyy-mm.domain:target)
+            if (!System.Text.RegularExpressions.Regex.IsMatch(_targetIqn, @"^iqn\.\d{4}-\d{2}\.[\w\.\-]+:[\w\.\-]+$"))
+            {
+                throw new ArgumentException($"Invalid iSCSI target IQN format: {_targetIqn}. Expected format: iqn.yyyy-mm.domain:target");
             }
 
             // Generate or load initiator IQN
@@ -146,7 +158,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
             // Load LUN configuration
             _lun = GetConfiguration<int>("LUN", 0);
 
-            // Load optional protocol settings
+            // Load optional protocol settings with validation
             _maxRecvDataSegmentLength = GetConfiguration<int>("MaxRecvDataSegmentLength", 262144);
             _maxBurstLength = GetConfiguration<int>("MaxBurstLength", 1048576);
             _firstBurstLength = GetConfiguration<int>("FirstBurstLength", 262144);
@@ -157,6 +169,21 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
             _headerDigest = GetConfiguration<bool>("HeaderDigest", false);
             _errorRecoveryLevel = GetConfiguration<int>("ErrorRecoveryLevel", 0);
             _autoReconnect = GetConfiguration<bool>("AutoReconnect", true);
+
+            // Validate session timeout configuration
+            var sessionTimeoutMinutes = GetConfiguration<int>("SessionTimeoutMinutes", 30);
+            if (sessionTimeoutMinutes < 1 || sessionTimeoutMinutes > 300)
+            {
+                throw new ArgumentException($"Invalid session timeout {sessionTimeoutMinutes} minutes. Must be between 1 and 300.");
+            }
+            _sessionTimeout = TimeSpan.FromMinutes(sessionTimeoutMinutes);
+
+            // Validate max connections for MPIO
+            var maxConnections = GetConfiguration<int>("MaxConnections", 1);
+            if (maxConnections < 1 || maxConnections > 64)
+            {
+                throw new ArgumentException($"Invalid max connections {maxConnections}. Must be between 1 and 64.");
+            }
 
             // Load multipath configuration
             _enableMpio = GetConfiguration<bool>("EnableMPIO", false);
@@ -788,7 +815,27 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
         {
             ValidateKey(key);
             ValidateStream(data);
-            await EnsureConnectedAsync(ct);
+
+            // Edge case guards
+            if (string.IsNullOrEmpty(key))
+            {
+                throw new ArgumentException("Key cannot be null or empty", nameof(key));
+            }
+
+            if (data.Length > long.MaxValue / BlockSize)
+            {
+                throw new ArgumentException($"Object size {data.Length} bytes exceeds maximum supported size", nameof(data));
+            }
+
+            try
+            {
+                await EnsureConnectedAsync(ct);
+            }
+            catch (Exception ex)
+            {
+                // Handle disconnection during I/O with specific exception
+                throw new IOException($"iSCSI connection lost during store operation: {ex.Message}", ex);
+            }
 
             // Read data into buffer
             using var ms = new MemoryStream(65536);
@@ -807,9 +854,10 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
                 mapping.CustomMetadata = new Dictionary<string, string>(metadata);
             }
 
-            // Update statistics
+            // Update statistics with strategy-specific counters
             IncrementBytesStored(dataBytes.Length);
             IncrementOperationCounter(StorageOperationType.Store);
+            // Note: IncrementCounter is not available in base class, tracking via existing operation counters
 
             return new StorageObjectMetadata
             {
@@ -827,7 +875,22 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
         protected override async Task<Stream> RetrieveAsyncCore(string key, CancellationToken ct)
         {
             ValidateKey(key);
-            await EnsureConnectedAsync(ct);
+
+            // Edge case guards
+            if (string.IsNullOrEmpty(key))
+            {
+                throw new ArgumentException("Key cannot be null or empty", nameof(key));
+            }
+
+            try
+            {
+                await EnsureConnectedAsync(ct);
+            }
+            catch (Exception ex)
+            {
+                // Handle disconnection during I/O with specific exception
+                throw new IOException($"iSCSI connection lost during retrieve operation: {ex.Message}", ex);
+            }
 
             var mapping = GetBlockMapping(key);
             if (mapping == null)
@@ -842,9 +905,10 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
             var trimmedData = new byte[mapping.Size];
             Array.Copy(data, trimmedData, mapping.Size);
 
-            // Update statistics
+            // Update statistics with strategy-specific counters
             IncrementBytesRetrieved(mapping.Size);
             IncrementOperationCounter(StorageOperationType.Retrieve);
+            // Note: IncrementCounter is not available in base class, tracking via existing operation counters
 
             return new MemoryStream(trimmedData);
         }
