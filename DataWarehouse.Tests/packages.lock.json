@@ -1409,6 +1409,36 @@
         "resolved": "4.4.0",
         "contentHash": "YhEdSQUsTx+C8m8Bw7ar5/VesXvCFMItyZF7G1AUY+OM0VPZUOeAVpJ4Wl6fydBGUYZxojTDR3I6Bj/+BPkJNA=="
       },
+      "Serilog": {
+        "type": "Transitive",
+        "resolved": "4.3.1",
+        "contentHash": "savYe7h5yRlkqBVOwP8cIRDOdqKiPmYCU4W87JH38sBmcKD5EBoXvQIw6bNEvZ/pTe1gsiye3VFCzBsoppGkXQ=="
+      },
+      "Serilog.Extensions.Logging": {
+        "type": "Transitive",
+        "resolved": "10.0.0",
+        "contentHash": "vx0kABKl2dWbBhhqAfTOk53/i8aV/5VaT3a6il9gn72Wqs2pM7EK2OB6No6xdqK2IaY6Zf9gdjLuK9BVa2rT+Q==",
+        "dependencies": {
+          "Microsoft.Extensions.Logging": "10.0.0",
+          "Serilog": "4.2.0"
+        }
+      },
+      "Serilog.Sinks.Console": {
+        "type": "Transitive",
+        "resolved": "6.1.1",
+        "contentHash": "8jbqgjUyZlfCuSTaJk6lOca465OndqOz3KZP6Cryt/IqZYybyBu7GP0fE/AXBzrrQB3EBmQntBFAvMVz1COvAA==",
+        "dependencies": {
+          "Serilog": "4.0.0"
+        }
+      },
+      "Serilog.Sinks.File": {
+        "type": "Transitive",
+        "resolved": "7.0.0",
+        "contentHash": "fKL7mXv7qaiNBUC71ssvn/dU0k9t0o45+qm2XgKAlSt19xF+ijjxyA3R6HmCgfKEKwfcfkwWjayuQtRueZFkYw==",
+        "dependencies": {
+          "Serilog": "4.2.0"
+        }
+      },
       "SharpCompress": {
         "type": "Transitive",
         "resolved": "0.45.1",
@@ -1750,6 +1780,18 @@
           "Microsoft.Extensions.Logging.Abstractions": "[10.0.3, )"
         }
       },
+      "datawarehouse.launcher": {
+        "type": "Project",
+        "dependencies": {
+          "DataWarehouse.Kernel": "[1.0.0, )",
+          "DataWarehouse.SDK": "[1.0.0, )",
+          "DataWarehouse.Shared": "[1.0.0, )",
+          "Serilog": "[4.3.1, )",
+          "Serilog.Extensions.Logging": "[10.0.0, )",
+          "Serilog.Sinks.Console": "[6.1.1, )",
+          "Serilog.Sinks.File": "[7.0.0, )"
+        }
+      },
       "datawarehouse.plugins.raft": {
         "type": "Project",
         "dependencies": {
@@ -1761,6 +1803,12 @@
         "dependencies": {
           "DataWarehouse.SDK": "[1.0.0, )",
           "Microsoft.Extensions.Logging.Abstractions": "[10.0.3, )"
+        }
+      },
+      "datawarehouse.plugins.transcoding.media": {
+        "type": "Project",
+        "dependencies": {
+          "DataWarehouse.SDK": "[1.0.0, )"
         }
       },
       "datawarehouse.plugins.ultimateaccesscontrol": {
@@ -1903,6 +1951,13 @@
           "System.Device.Gpio": "[3.2.0, )",
           "System.IO.Hashing": "[10.0.3, )",
           "System.Management": "[10.0.3, )"
+        }
+      },
+      "datawarehouse.shared": {
+        "type": "Project",
+        "dependencies": {
+          "DataWarehouse.SDK": "[1.0.0, )",
+          "YamlDotNet": "[16.3.0, )"
         }
       }
     }

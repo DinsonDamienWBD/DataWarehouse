@@ -3,6 +3,7 @@ using System.Security.Cryptography;
 using System.Text;
 using DataWarehouse.SDK.Contracts.Media;
 using DataWarehouse.SDK.Utilities;
+using DataWarehouse.Plugins.Transcoding.Media.Execution;
 
 namespace DataWarehouse.Plugins.Transcoding.Media.Strategies.Video;
 
@@ -95,8 +96,6 @@ internal sealed class H264CodecStrategy : MediaStrategyBase
     protected override async Task<Stream> TranscodeAsyncCore(
         Stream inputStream, TranscodeOptions options, CancellationToken cancellationToken)
     {
-        var outputStream = new MemoryStream();
-
         var sourceBytes = await ReadStreamFullyAsync(inputStream, cancellationToken).ConfigureAwait(false);
 
         // Determine encoder: prefer hardware when available, fallback to software
@@ -118,12 +117,19 @@ internal sealed class H264CodecStrategy : MediaStrategyBase
         // Build FFmpeg arguments
         var ffmpegArgs = BuildFfmpegArguments(encoder, preset, profile, crf, resolution, frameRate, audioCodec, options);
 
-        // Write transcoding package with FFmpeg arguments and source data
-        await WriteTranscodePackageAsync(outputStream, ffmpegArgs, sourceBytes, encoder, cancellationToken)
-            .ConfigureAwait(false);
-
-        outputStream.Position = 0;
-        return outputStream;
+        // Execute FFmpeg or generate package fallback
+        return await FfmpegTranscodeHelper.ExecuteOrPackageAsync(
+            ffmpegArgs,
+            sourceBytes,
+            async () =>
+            {
+                var outputStream = new MemoryStream();
+                await WriteTranscodePackageAsync(outputStream, ffmpegArgs, sourceBytes, encoder, cancellationToken)
+                    .ConfigureAwait(false);
+                outputStream.Position = 0;
+                return outputStream;
+            },
+            cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>

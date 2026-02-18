@@ -5,6 +5,7 @@ using System.Text;
 using System.Text.Json;
 using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Utilities;
+using DataWarehouse.Plugins.Transcoding.Media.Execution;
 
 namespace DataWarehouse.Plugins.Transcoding.Media;
 
@@ -152,6 +153,7 @@ public class MediaTranscodingPlugin : MediaTranscodingPluginBase
     private string? _imageMagickPath;
     private bool _ffmpegAvailable;
     private bool _imageMagickAvailable;
+    private FfmpegExecutor? _ffmpegExecutor;
 
     /// <summary>
     /// Event raised when transcoding progress updates.
@@ -2460,6 +2462,20 @@ public class MediaTranscodingPlugin : MediaTranscodingPluginBase
         // Detect FFmpeg
         _ffmpegPath = await FindExecutableAsync("ffmpeg", ct);
         _ffmpegAvailable = !string.IsNullOrEmpty(_ffmpegPath);
+
+        // Initialize FFmpeg executor if FFmpeg is available
+        if (_ffmpegAvailable && _ffmpegPath != null)
+        {
+            try
+            {
+                _ffmpegExecutor = new FfmpegExecutor(_ffmpegPath);
+            }
+            catch (FfmpegNotFoundException)
+            {
+                _ffmpegAvailable = false;
+                _ffmpegExecutor = null;
+            }
+        }
 
         // Detect ImageMagick
         _imageMagickPath = await FindExecutableAsync("magick", ct) ??

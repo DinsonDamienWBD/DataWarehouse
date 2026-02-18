@@ -2,6 +2,7 @@ using System.Security.Cryptography;
 using System.Text;
 using DataWarehouse.SDK.Contracts.Media;
 using DataWarehouse.SDK.Utilities;
+using DataWarehouse.Plugins.Transcoding.Media.Execution;
 
 namespace DataWarehouse.Plugins.Transcoding.Media.Strategies.Video;
 
@@ -95,11 +96,18 @@ internal sealed class H265CodecStrategy : MediaStrategyBase
 
         var ffmpegArgs = BuildFfmpegArguments(encoder, crf, resolution, frameRate, audioCodec, options);
 
-        await WriteTranscodePackageAsync(outputStream, "H265", ffmpegArgs, sourceBytes, encoder, cancellationToken)
-            .ConfigureAwait(false);
-
-        outputStream.Position = 0;
-        return outputStream;
+        return await FfmpegTranscodeHelper.ExecuteOrPackageAsync(
+            ffmpegArgs,
+            sourceBytes,
+            async () =>
+            {
+                var outputStream = new MemoryStream();
+                await WriteTranscodePackageAsync(outputStream, "H265", ffmpegArgs, sourceBytes, encoder, cancellationToken)
+                    .ConfigureAwait(false);
+                outputStream.Position = 0;
+                return outputStream;
+            },
+            cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>
