@@ -19,6 +19,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Standard
     public sealed class Raid0Strategy : SdkRaidStrategyBase
     {
         private readonly int _chunkSize;
+        private CancellationTokenSource? _rebuildCancellation;
 
         public Raid0Strategy(int chunkSize = 64 * 1024)
         {
@@ -26,6 +27,36 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Standard
         }
 
         public override RaidLevel Level => RaidLevel.Raid0;
+
+        protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
+        {
+            // Validate configuration
+            if (_chunkSize < 4096 || _chunkSize > 1024 * 1024)
+                throw new ArgumentException($"Chunk size must be between 4KB and 1MB, got {_chunkSize}");
+
+            if ((_chunkSize & (_chunkSize - 1)) != 0)
+                throw new ArgumentException($"Chunk size must be a power of 2, got {_chunkSize}");
+
+            return Task.CompletedTask;
+        }
+
+        public override async Task<RaidHealth> CheckHealthAsync(
+            IEnumerable<DiskInfo> disks,
+            CancellationToken cancellationToken = default)
+        {
+            IncrementCounter("raid0.health_check");
+            return await base.CheckHealthAsync(disks, cancellationToken);
+        }
+
+        protected override Task ShutdownAsyncCore(CancellationToken cancellationToken)
+        {
+            // Cancel any ongoing rebuild operations (though RAID 0 doesn't support rebuild)
+            _rebuildCancellation?.Cancel();
+            _rebuildCancellation?.Dispose();
+            _rebuildCancellation = null;
+
+            return Task.CompletedTask;
+        }
 
         public override RaidCapabilities Capabilities => new RaidCapabilities(
             RedundancyLevel: 0,
@@ -68,8 +99,13 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Standard
             long offset,
             CancellationToken cancellationToken = default)
         {
+            if (data.Length == 0) return;
+
             var diskList = disks.ToList();
             ValidateDiskConfiguration(diskList);
+
+            if (offset < 0)
+                throw new ArgumentOutOfRangeException(nameof(offset), "Offset cannot be negative");
 
             var dataBytes = data.ToArray();
             var chunks = SplitIntoChunks(dataBytes, _chunkSize);
@@ -85,6 +121,8 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Standard
             }
 
             await Task.WhenAll(writeTasks);
+            IncrementCounter("raid0.write");
+            IncrementCounter("raid0.bytes_written");
         }
 
         public override async Task<ReadOnlyMemory<byte>> ReadAsync(
@@ -93,8 +131,15 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Standard
             int length,
             CancellationToken cancellationToken = default)
         {
+            if (length == 0) return ReadOnlyMemory<byte>.Empty;
+
             var diskList = disks.ToList();
             ValidateDiskConfiguration(diskList);
+
+            if (offset < 0)
+                throw new ArgumentOutOfRangeException(nameof(offset), "Offset cannot be negative");
+            if (length < 0)
+                throw new ArgumentOutOfRangeException(nameof(length), "Length cannot be negative");
 
             var result = new byte[length];
             var chunksNeeded = (int)Math.Ceiling((double)length / _chunkSize);
@@ -118,6 +163,8 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Standard
                 position += copyLength;
             }
 
+            IncrementCounter("raid0.read");
+            IncrementCounter("raid0.bytes_read");
             return result;
         }
 
@@ -217,6 +264,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Standard
     public sealed class Raid1Strategy : SdkRaidStrategyBase
     {
         private readonly int _chunkSize;
+        private CancellationTokenSource? _rebuildCancellation;
 
         public Raid1Strategy(int chunkSize = 64 * 1024)
         {
@@ -224,6 +272,44 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Standard
         }
 
         public override RaidLevel Level => RaidLevel.Raid1;
+
+        protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
+        {
+            if (_chunkSize < 4096 || _chunkSize > 1024 * 1024)
+                throw new ArgumentException($"Chunk size must be between 4KB and 1MB, got {_chunkSize}");
+
+            if ((_chunkSize & (_chunkSize - 1)) != 0)
+                throw new ArgumentException($"Chunk size must be a power of 2, got {_chunkSize}");
+
+            return Task.CompletedTask;
+        }
+
+        public override async Task<RaidHealth> CheckHealthAsync(
+            IEnumerable<DiskInfo> disks,
+            CancellationToken cancellationToken = default)
+        {
+            IncrementCounter("raid1.health_check");
+            return await base.CheckHealthAsync(disks, cancellationToken);
+        }
+
+        protected override async Task ShutdownAsyncCore(CancellationToken cancellationToken)
+        {
+            // Cancel any ongoing rebuild operations
+            if (_rebuildCancellation != null)
+            {
+                _rebuildCancellation.Cancel();
+                try
+                {
+                    await Task.Delay(TimeSpan.FromSeconds(5), cancellationToken);
+                }
+                catch (OperationCanceledException)
+                {
+                    // Graceful shutdown interrupted
+                }
+                _rebuildCancellation.Dispose();
+                _rebuildCancellation = null;
+            }
+        }
 
         public override RaidCapabilities Capabilities => new RaidCapabilities(
             RedundancyLevel: 1, // Can lose n-1 disks
@@ -262,8 +348,13 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Standard
             long offset,
             CancellationToken cancellationToken = default)
         {
+            if (data.Length == 0) return;
+
             var diskList = disks.ToList();
             ValidateDiskConfiguration(diskList);
+
+            if (offset < 0)
+                throw new ArgumentOutOfRangeException(nameof(offset), "Offset cannot be negative");
 
             var dataBytes = data.ToArray();
 
@@ -274,6 +365,8 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Standard
                 .ToList();
 
             await Task.WhenAll(writeTasks);
+            IncrementCounter("raid1.write");
+            IncrementCounter("raid1.bytes_written");
         }
 
         public override async Task<ReadOnlyMemory<byte>> ReadAsync(
@@ -282,8 +375,15 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Standard
             int length,
             CancellationToken cancellationToken = default)
         {
+            if (length == 0) return ReadOnlyMemory<byte>.Empty;
+
             var diskList = disks.ToList();
             ValidateDiskConfiguration(diskList);
+
+            if (offset < 0)
+                throw new ArgumentOutOfRangeException(nameof(offset), "Offset cannot be negative");
+            if (length < 0)
+                throw new ArgumentOutOfRangeException(nameof(length), "Length cannot be negative");
 
             // Read from the first healthy disk (could implement load balancing)
             var healthyDisk = diskList.FirstOrDefault(d => d.HealthStatus == SdkDiskHealthStatus.Healthy);
@@ -291,6 +391,8 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Standard
                 throw new InvalidOperationException("No healthy disks available for read operation");
 
             var data = await ReadFromDiskAsync(healthyDisk, offset, length, cancellationToken);
+            IncrementCounter("raid1.read");
+            IncrementCounter("raid1.bytes_read");
             return data;
         }
 
@@ -311,31 +413,49 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Standard
 
             var startTime = DateTime.UtcNow;
 
-            // Copy all data from a healthy mirror to the target disk
-            const int bufferSize = 1024 * 1024; // 1MB chunks
-            for (long offset = 0; offset < totalBytes; offset += bufferSize)
+            _rebuildCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+
+            try
             {
-                cancellationToken.ThrowIfCancellationRequested();
-
-                var length = (int)Math.Min(bufferSize, totalBytes - offset);
-                var data = await ReadFromDiskAsync(sourceDisk, offset, length, cancellationToken);
-                await WriteToDiskAsync(targetDisk, data, offset, cancellationToken);
-
-                bytesRebuilt += length;
-
-                if (progressCallback != null)
+                // Copy all data from a healthy mirror to the target disk
+                const int bufferSize = 1024 * 1024; // 1MB chunks
+                for (long offset = 0; offset < totalBytes; offset += bufferSize)
                 {
-                    var elapsed = DateTime.UtcNow - startTime;
-                    var speed = bytesRebuilt / elapsed.TotalSeconds;
-                    var remaining = (long)((totalBytes - bytesRebuilt) / speed);
+                    _rebuildCancellation.Token.ThrowIfCancellationRequested();
 
-                    progressCallback.Report(new RebuildProgress(
-                        PercentComplete: (double)bytesRebuilt / totalBytes,
-                        BytesRebuilt: bytesRebuilt,
-                        TotalBytes: totalBytes,
-                        EstimatedTimeRemaining: TimeSpan.FromSeconds(remaining),
-                        CurrentSpeed: (long)speed));
+                    var length = (int)Math.Min(bufferSize, totalBytes - offset);
+                    var data = await ReadFromDiskAsync(sourceDisk, offset, length, _rebuildCancellation.Token);
+                    await WriteToDiskAsync(targetDisk, data, offset, _rebuildCancellation.Token);
+
+                    bytesRebuilt += length;
+                    IncrementCounter("raid1.rebuild_bytes");
+
+                    if (progressCallback != null)
+                    {
+                        var elapsed = DateTime.UtcNow - startTime;
+                        var speed = elapsed.TotalSeconds > 0 ? bytesRebuilt / elapsed.TotalSeconds : 0;
+                        var remaining = speed > 0 ? (long)((totalBytes - bytesRebuilt) / speed) : 0;
+
+                        progressCallback.Report(new RebuildProgress(
+                            PercentComplete: (double)bytesRebuilt / totalBytes,
+                            BytesRebuilt: bytesRebuilt,
+                            TotalBytes: totalBytes,
+                            EstimatedTimeRemaining: TimeSpan.FromSeconds(remaining),
+                            CurrentSpeed: (long)speed));
+                    }
                 }
+
+                IncrementCounter("raid1.rebuild_complete");
+            }
+            catch (OperationCanceledException)
+            {
+                IncrementCounter("raid1.rebuild_cancelled");
+                throw;
+            }
+            finally
+            {
+                _rebuildCancellation?.Dispose();
+                _rebuildCancellation = null;
             }
         }
 
@@ -407,6 +527,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Standard
     {
         private readonly int _chunkSize;
         private readonly ReedSolomon _reedSolomon;
+        private CancellationTokenSource? _rebuildCancellation;
 
         public Raid5Strategy(int chunkSize = 64 * 1024)
         {
@@ -415,6 +536,43 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Standard
         }
 
         public override RaidLevel Level => RaidLevel.Raid5;
+
+        protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
+        {
+            if (_chunkSize < 4096 || _chunkSize > 1024 * 1024)
+                throw new ArgumentException($"Chunk size must be between 4KB and 1MB, got {_chunkSize}");
+
+            if ((_chunkSize & (_chunkSize - 1)) != 0)
+                throw new ArgumentException($"Chunk size must be a power of 2, got {_chunkSize}");
+
+            return Task.CompletedTask;
+        }
+
+        public override async Task<RaidHealth> CheckHealthAsync(
+            IEnumerable<DiskInfo> disks,
+            CancellationToken cancellationToken = default)
+        {
+            IncrementCounter("raid5.health_check");
+            return await base.CheckHealthAsync(disks, cancellationToken);
+        }
+
+        protected override async Task ShutdownAsyncCore(CancellationToken cancellationToken)
+        {
+            if (_rebuildCancellation != null)
+            {
+                _rebuildCancellation.Cancel();
+                try
+                {
+                    await Task.Delay(TimeSpan.FromSeconds(5), cancellationToken);
+                }
+                catch (OperationCanceledException)
+                {
+                    // Graceful shutdown interrupted
+                }
+                _rebuildCancellation.Dispose();
+                _rebuildCancellation = null;
+            }
+        }
 
         public override RaidCapabilities Capabilities => new RaidCapabilities(
             RedundancyLevel: 1,
@@ -459,8 +617,13 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Standard
             long offset,
             CancellationToken cancellationToken = default)
         {
+            if (data.Length == 0) return;
+
             var diskList = disks.ToList();
             ValidateDiskConfiguration(diskList);
+
+            if (offset < 0)
+                throw new ArgumentOutOfRangeException(nameof(offset), "Offset cannot be negative");
 
             var dataBytes = data.ToArray();
             var diskCount = diskList.Count;
@@ -476,6 +639,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Standard
 
                 // Calculate XOR parity
                 var parity = CalculateXorParity(stripeChunks.Select(c => (ReadOnlyMemory<byte>)c));
+                IncrementCounter("raid5.parity_compute");
 
                 // Write data chunks
                 for (int i = 0; i < stripeChunks.Count; i++)
@@ -492,6 +656,8 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Standard
             }
 
             await Task.WhenAll(writeTasks);
+            IncrementCounter("raid5.write");
+            IncrementCounter("raid5.bytes_written");
         }
 
         public override async Task<ReadOnlyMemory<byte>> ReadAsync(
@@ -500,8 +666,15 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Standard
             int length,
             CancellationToken cancellationToken = default)
         {
+            if (length == 0) return ReadOnlyMemory<byte>.Empty;
+
             var diskList = disks.ToList();
             ValidateDiskConfiguration(diskList);
+
+            if (offset < 0)
+                throw new ArgumentOutOfRangeException(nameof(offset), "Offset cannot be negative");
+            if (length < 0)
+                throw new ArgumentOutOfRangeException(nameof(length), "Length cannot be negative");
 
             var result = new byte[length];
             var diskCount = diskList.Count;
@@ -509,6 +682,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Standard
             var stripesNeeded = (int)Math.Ceiling((double)length / (_chunkSize * dataDisksCount));
 
             var position = 0;
+            var hadReconstruction = false;
 
             for (int stripeIdx = 0; stripeIdx < stripesNeeded && position < length; stripeIdx++)
             {
@@ -550,6 +724,8 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Standard
                     var parityDisk = diskList[stripeInfo.ParityDisks[0]];
                     var parity = await ReadFromDiskAsync(parityDisk, stripeOffset, _chunkSize, cancellationToken);
                     chunks[failedDiskIndex] = ReconstructFromParity(chunks, parity.ToArray(), failedDiskIndex);
+                    hadReconstruction = true;
+                    IncrementCounter("raid5.parity_reconstruct");
                 }
 
                 // Copy chunks to result
@@ -560,6 +736,11 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Standard
                     position += copyLength;
                 }
             }
+
+            IncrementCounter("raid5.read");
+            IncrementCounter("raid5.bytes_read");
+            if (hadReconstruction)
+                IncrementCounter("raid5.degraded_read");
 
             return result;
         }
@@ -737,6 +918,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Standard
     {
         private readonly int _chunkSize;
         private readonly ReedSolomon _reedSolomon;
+        private CancellationTokenSource? _rebuildCancellation;
 
         public Raid6Strategy(int chunkSize = 64 * 1024)
         {
@@ -745,6 +927,43 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Standard
         }
 
         public override RaidLevel Level => RaidLevel.Raid6;
+
+        protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
+        {
+            if (_chunkSize < 4096 || _chunkSize > 1024 * 1024)
+                throw new ArgumentException($"Chunk size must be between 4KB and 1MB, got {_chunkSize}");
+
+            if ((_chunkSize & (_chunkSize - 1)) != 0)
+                throw new ArgumentException($"Chunk size must be a power of 2, got {_chunkSize}");
+
+            return Task.CompletedTask;
+        }
+
+        public override async Task<RaidHealth> CheckHealthAsync(
+            IEnumerable<DiskInfo> disks,
+            CancellationToken cancellationToken = default)
+        {
+            IncrementCounter("raid6.health_check");
+            return await base.CheckHealthAsync(disks, cancellationToken);
+        }
+
+        protected override async Task ShutdownAsyncCore(CancellationToken cancellationToken)
+        {
+            if (_rebuildCancellation != null)
+            {
+                _rebuildCancellation.Cancel();
+                try
+                {
+                    await Task.Delay(TimeSpan.FromSeconds(5), cancellationToken);
+                }
+                catch (OperationCanceledException)
+                {
+                    // Graceful shutdown interrupted
+                }
+                _rebuildCancellation.Dispose();
+                _rebuildCancellation = null;
+            }
+        }
 
         public override RaidCapabilities Capabilities => new RaidCapabilities(
             RedundancyLevel: 2,
@@ -790,8 +1009,13 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Standard
             long offset,
             CancellationToken cancellationToken = default)
         {
+            if (data.Length == 0) return;
+
             var diskList = disks.ToList();
             ValidateDiskConfiguration(diskList);
+
+            if (offset < 0)
+                throw new ArgumentOutOfRangeException(nameof(offset), "Offset cannot be negative");
 
             var dataBytes = data.ToArray();
             var diskCount = diskList.Count;
@@ -824,6 +1048,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Standard
 
             // Encode to generate parity shards
             rs.Encode(shards.AsSpan());
+            IncrementCounter("raid6.parity_compute");
 
             // Write all shards to disks
             var stripeInfo = CalculateStripe(offset / _chunkSize, diskCount);
@@ -845,6 +1070,8 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Standard
             writeTasks.Add(WriteToDiskAsync(diskList[qParityDisk], shards[dataDisksCount + 1], offset, cancellationToken));
 
             await Task.WhenAll(writeTasks);
+            IncrementCounter("raid6.write");
+            IncrementCounter("raid6.bytes_written");
         }
 
         public override async Task<ReadOnlyMemory<byte>> ReadAsync(
@@ -853,8 +1080,15 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Standard
             int length,
             CancellationToken cancellationToken = default)
         {
+            if (length == 0) return ReadOnlyMemory<byte>.Empty;
+
             var diskList = disks.ToList();
             ValidateDiskConfiguration(diskList);
+
+            if (offset < 0)
+                throw new ArgumentOutOfRangeException(nameof(offset), "Offset cannot be negative");
+            if (length < 0)
+                throw new ArgumentOutOfRangeException(nameof(length), "Length cannot be negative");
 
             var diskCount = diskList.Count;
             var dataDisksCount = diskCount - 2;
@@ -916,6 +1150,9 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Standard
             {
                 var rs = new ReedSolomon(dataDisksCount, 2);
                 rs.Decode(shards.AsSpan(), shardPresent.AsSpan());
+                IncrementCounter("raid6.parity_reconstruct");
+                if (failedCount > 1)
+                    IncrementCounter("raid6.dual_failure_recover");
             }
 
             // Assemble result
@@ -927,6 +1164,11 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Standard
                 Array.Copy(shards[i], 0, result, position, copyLength);
                 position += copyLength;
             }
+
+            IncrementCounter("raid6.read");
+            IncrementCounter("raid6.bytes_read");
+            if (failedCount > 0)
+                IncrementCounter("raid6.degraded_read");
 
             return result;
         }
@@ -1065,6 +1307,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Standard
     public sealed class Raid10Strategy : SdkRaidStrategyBase
     {
         private readonly int _chunkSize;
+        private CancellationTokenSource? _rebuildCancellation;
 
         public Raid10Strategy(int chunkSize = 64 * 1024)
         {
@@ -1072,6 +1315,43 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Standard
         }
 
         public override RaidLevel Level => RaidLevel.Raid10;
+
+        protected override Task InitializeAsyncCore(CancellationToken cancellationToken)
+        {
+            if (_chunkSize < 4096 || _chunkSize > 1024 * 1024)
+                throw new ArgumentException($"Chunk size must be between 4KB and 1MB, got {_chunkSize}");
+
+            if ((_chunkSize & (_chunkSize - 1)) != 0)
+                throw new ArgumentException($"Chunk size must be a power of 2, got {_chunkSize}");
+
+            return Task.CompletedTask;
+        }
+
+        public override async Task<RaidHealth> CheckHealthAsync(
+            IEnumerable<DiskInfo> disks,
+            CancellationToken cancellationToken = default)
+        {
+            IncrementCounter("raid10.health_check");
+            return await base.CheckHealthAsync(disks, cancellationToken);
+        }
+
+        protected override async Task ShutdownAsyncCore(CancellationToken cancellationToken)
+        {
+            if (_rebuildCancellation != null)
+            {
+                _rebuildCancellation.Cancel();
+                try
+                {
+                    await Task.Delay(TimeSpan.FromSeconds(5), cancellationToken);
+                }
+                catch (OperationCanceledException)
+                {
+                    // Graceful shutdown interrupted
+                }
+                _rebuildCancellation.Dispose();
+                _rebuildCancellation = null;
+            }
+        }
 
         public override RaidCapabilities Capabilities => new RaidCapabilities(
             RedundancyLevel: 1, // Per mirror pair
@@ -1119,11 +1399,16 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Standard
             long offset,
             CancellationToken cancellationToken = default)
         {
+            if (data.Length == 0) return;
+
             var diskList = disks.ToList();
             ValidateDiskConfiguration(diskList);
 
             if (diskList.Count % 2 != 0)
                 throw new ArgumentException("RAID 10 requires an even number of disks");
+
+            if (offset < 0)
+                throw new ArgumentOutOfRangeException(nameof(offset), "Offset cannot be negative");
 
             var dataBytes = data.ToArray();
             var mirrorPairs = diskList.Count / 2;
@@ -1144,6 +1429,8 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Standard
             }
 
             await Task.WhenAll(writeTasks);
+            IncrementCounter("raid10.write");
+            IncrementCounter("raid10.bytes_written");
         }
 
         public override async Task<ReadOnlyMemory<byte>> ReadAsync(
@@ -1152,16 +1439,24 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Standard
             int length,
             CancellationToken cancellationToken = default)
         {
+            if (length == 0) return ReadOnlyMemory<byte>.Empty;
+
             var diskList = disks.ToList();
             ValidateDiskConfiguration(diskList);
 
             if (diskList.Count % 2 != 0)
                 throw new ArgumentException("RAID 10 requires an even number of disks");
 
+            if (offset < 0)
+                throw new ArgumentOutOfRangeException(nameof(offset), "Offset cannot be negative");
+            if (length < 0)
+                throw new ArgumentOutOfRangeException(nameof(length), "Length cannot be negative");
+
             var result = new byte[length];
             var mirrorPairs = diskList.Count / 2;
             var chunksNeeded = (int)Math.Ceiling((double)length / _chunkSize);
             var position = 0;
+            var hadFailover = false;
 
             for (int i = 0; i < chunksNeeded && position < length; i++)
             {
@@ -1184,18 +1479,26 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Standard
                     {
                         // Fall back to secondary
                         chunk = await ReadFromDiskAsync(secondaryDisk, chunkOffset, chunkLength, cancellationToken);
+                        hadFailover = true;
+                        IncrementCounter("raid10.failover_read");
                     }
                 }
                 else
                 {
                     // Primary failed, use secondary
                     chunk = await ReadFromDiskAsync(secondaryDisk, chunkOffset, chunkLength, cancellationToken);
+                    hadFailover = true;
                 }
 
                 var copyLength = Math.Min(chunk.Length, result.Length - position);
                 Array.Copy(chunk, 0, result, position, copyLength);
                 position += copyLength;
             }
+
+            IncrementCounter("raid10.read");
+            IncrementCounter("raid10.bytes_read");
+            if (hadFailover)
+                IncrementCounter("raid10.degraded_read");
 
             return result;
         }
