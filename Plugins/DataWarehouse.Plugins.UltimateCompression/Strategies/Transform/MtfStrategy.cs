@@ -1,5 +1,8 @@
 using System;
 using System.IO;
+using System.Threading;
+using System.Threading.Tasks;
+using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Contracts.Compression;
 using SdkCompressionLevel = DataWarehouse.SDK.Contracts.Compression.CompressionLevel;
 
@@ -27,6 +30,12 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Transform
     /// </remarks>
     public sealed class MtfStrategy : CompressionStrategyBase
     {
+        private const int MinAlphabetSize = 2;
+        private const int MaxAlphabetSize = 65536;
+        private const int MaxInputSize = 100 * 1024 * 1024; // 100MB
+
+        private int _alphabetSize = 256;
+
         /// <summary>
         /// Initializes a new instance of the <see cref="MtfStrategy"/> class
         /// with the default compression level.
@@ -53,10 +62,71 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Transform
         };
 
         /// <inheritdoc/>
+        protected override async Task InitializeAsyncCore(CancellationToken cancellationToken)
+        {
+            // Validate alphabet size configuration
+            if (_alphabetSize < MinAlphabetSize || _alphabetSize > MaxAlphabetSize)
+                throw new ArgumentException($"Alphabet size must be between {MinAlphabetSize} and {MaxAlphabetSize}. Got: {_alphabetSize}");
+
+            await base.InitializeAsyncCore(cancellationToken).ConfigureAwait(false);
+        }
+
+        /// <inheritdoc/>
+        protected override async Task ShutdownAsyncCore(CancellationToken cancellationToken)
+        {
+            // No resources to clean up for MTF
+            await base.ShutdownAsyncCore(cancellationToken).ConfigureAwait(false);
+        }
+
+        /// <inheritdoc/>
+        protected override async ValueTask DisposeAsyncCore()
+        {
+            // Clean disposal pattern
+            await base.DisposeAsyncCore().ConfigureAwait(false);
+        }
+
+        /// <summary>
+        /// Performs health check by verifying round-trip encoding with test data.
+        /// </summary>
+        public async Task<StrategyHealthCheckResult> CheckHealthAsync(CancellationToken ct = default)
+        {
+            return await GetCachedHealthAsync(async (cancellationToken) =>
+            {
+                try
+                {
+                    // Round-trip test with known data
+                    var testData = new byte[] { 1, 1, 2, 2, 3, 3, 1, 1 };
+                    var encoded = CompressCore(testData);
+                    var decoded = DecompressCore(encoded);
+
+                    if (testData.Length != decoded.Length)
+                        return new StrategyHealthCheckResult(false, "Round-trip length mismatch");
+
+                    for (int i = 0; i < testData.Length; i++)
+                    {
+                        if (testData[i] != decoded[i])
+                            return new StrategyHealthCheckResult(false, "Round-trip data mismatch");
+                    }
+
+                    return new StrategyHealthCheckResult(true);
+                }
+                catch (Exception ex)
+                {
+                    return new StrategyHealthCheckResult(false, $"Health check failed: {ex.Message}");
+                }
+            }, TimeSpan.FromSeconds(60), ct).ConfigureAwait(false);
+        }
+
+        /// <inheritdoc/>
         protected override byte[] CompressCore(byte[] input)
         {
+            IncrementCounter("mtf.encode");
+
             if (input == null || input.Length == 0)
                 return Array.Empty<byte>();
+
+            if (input.Length > MaxInputSize)
+                throw new ArgumentException($"Input size exceeds maximum of {MaxInputSize} bytes");
 
             var output = new byte[input.Length];
             var alphabet = InitializeAlphabet();
@@ -79,8 +149,13 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Transform
         /// <inheritdoc/>
         protected override byte[] DecompressCore(byte[] input)
         {
+            IncrementCounter("mtf.decode");
+
             if (input == null || input.Length == 0)
                 return Array.Empty<byte>();
+
+            if (input.Length > MaxInputSize)
+                throw new ArgumentException($"Input size exceeds maximum of {MaxInputSize} bytes");
 
             var output = new byte[input.Length];
             var alphabet = InitializeAlphabet();

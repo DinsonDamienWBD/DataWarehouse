@@ -1,6 +1,9 @@
 using System;
 using System.IO;
 using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
+using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Contracts.Compression;
 using SdkCompressionLevel = DataWarehouse.SDK.Contracts.Compression.CompressionLevel;
 
@@ -24,7 +27,11 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Transform
     /// </remarks>
     public sealed class BwtStrategy : CompressionStrategyBase
     {
-        private const int MaxBlockSize = 900000; // BWT is expensive O(n log n), limit block size
+        private const int MinBlockSize = 256;
+        private const int MaxBlockSize = 10 * 1024 * 1024; // 10MB - BWT is expensive O(n log n)
+        private const int MaxInputSize = 100 * 1024 * 1024; // 100MB overall limit
+
+        private int _blockSize = 900000;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="BwtStrategy"/> class
@@ -52,14 +59,72 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Transform
         };
 
         /// <inheritdoc/>
+        protected override async Task InitializeAsyncCore(CancellationToken cancellationToken)
+        {
+            // Validate block size configuration
+            if (_blockSize < MinBlockSize || _blockSize > MaxBlockSize)
+                throw new ArgumentException($"Block size must be between {MinBlockSize} and {MaxBlockSize} bytes. Got: {_blockSize}");
+
+            await base.InitializeAsyncCore(cancellationToken).ConfigureAwait(false);
+        }
+
+        /// <inheritdoc/>
+        protected override async Task ShutdownAsyncCore(CancellationToken cancellationToken)
+        {
+            // No resources to clean up for BWT
+            await base.ShutdownAsyncCore(cancellationToken).ConfigureAwait(false);
+        }
+
+        /// <inheritdoc/>
+        protected override async ValueTask DisposeAsyncCore()
+        {
+            // Clean disposal pattern
+            await base.DisposeAsyncCore().ConfigureAwait(false);
+        }
+
+        /// <summary>
+        /// Performs health check by verifying round-trip transformation with test data.
+        /// </summary>
+        public async Task<StrategyHealthCheckResult> CheckHealthAsync(CancellationToken ct = default)
+        {
+            return await GetCachedHealthAsync(async (cancellationToken) =>
+            {
+                try
+                {
+                    // Round-trip test with known data
+                    var testData = new byte[] { 1, 2, 3, 1, 2, 3, 4, 5, 6 };
+                    var transformed = CompressCore(testData);
+                    var reversed = DecompressCore(transformed);
+
+                    if (testData.Length != reversed.Length)
+                        return new StrategyHealthCheckResult(false, "Round-trip length mismatch");
+
+                    for (int i = 0; i < testData.Length; i++)
+                    {
+                        if (testData[i] != reversed[i])
+                            return new StrategyHealthCheckResult(false, "Round-trip data mismatch");
+                    }
+
+                    return new StrategyHealthCheckResult(true);
+                }
+                catch (Exception ex)
+                {
+                    return new StrategyHealthCheckResult(false, $"Health check failed: {ex.Message}");
+                }
+            }, TimeSpan.FromSeconds(60), ct).ConfigureAwait(false);
+        }
+
+        /// <inheritdoc/>
         protected override byte[] CompressCore(byte[] input)
         {
+            IncrementCounter("bwt.transform");
+
             if (input == null || input.Length == 0)
                 return Array.Empty<byte>();
 
             // Limit input size to prevent excessive memory usage
-            if (input.Length > MaxBlockSize)
-                throw new ArgumentException($"BWT input size limited to {MaxBlockSize} bytes", nameof(input));
+            if (input.Length > MaxInputSize)
+                throw new ArgumentException($"BWT input size limited to {MaxInputSize} bytes", nameof(input));
 
             int n = input.Length;
             var rotations = new int[n];
@@ -107,14 +172,23 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Transform
         /// <inheritdoc/>
         protected override byte[] DecompressCore(byte[] input)
         {
+            IncrementCounter("bwt.inverse");
+
             if (input == null || input.Length <= 4)
                 return Array.Empty<byte>();
+
+            if (input.Length > MaxInputSize)
+                throw new ArgumentException($"Input size exceeds maximum of {MaxInputSize} bytes");
 
             using var inputStream = new MemoryStream(input);
             using var reader = new BinaryReader(inputStream);
 
             // Read header
             int primaryIndex = reader.ReadInt32();
+
+            // Validate primary index
+            if (primaryIndex < 0 || primaryIndex >= input.Length - 4)
+                throw new InvalidDataException($"Corrupted BWT header: invalid primary index {primaryIndex}");
             int n = input.Length - 4;
             var lastColumn = reader.ReadBytes(n);
 

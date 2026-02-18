@@ -1,6 +1,9 @@
 using System;
 using System.IO;
 using System.Text;
+using System.Threading;
+using System.Threading.Tasks;
+using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Contracts.Compression;
 
 namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Archive
@@ -23,6 +26,12 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Archive
     {
         private const int BlockSize = 512;
         private const string DefaultFileName = "data.bin";
+        private const int MaxFileNameLength = 100; // TAR header limit
+        private const long MaxArchiveSize = 8L * 1024 * 1024 * 1024; // 8GB
+        private const int MaxInputSize = 100 * 1024 * 1024; // 100MB per entry
+
+        private int _maxFileNameLength = MaxFileNameLength;
+        private long _maxArchiveSize = MaxArchiveSize;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="TarStrategy"/> class
@@ -50,8 +59,75 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Archive
         };
 
         /// <inheritdoc/>
+        protected override async Task InitializeAsyncCore(CancellationToken cancellationToken)
+        {
+            // Validate TAR configuration parameters
+            if (_maxFileNameLength < 1 || _maxFileNameLength > MaxFileNameLength)
+                throw new ArgumentException($"Max file name length must be between 1 and {MaxFileNameLength}. Got: {_maxFileNameLength}");
+
+            if (_maxArchiveSize < BlockSize || _maxArchiveSize > MaxArchiveSize)
+                throw new ArgumentException($"Max archive size must be between {BlockSize} and {MaxArchiveSize}. Got: {_maxArchiveSize}");
+
+            await base.InitializeAsyncCore(cancellationToken).ConfigureAwait(false);
+        }
+
+        /// <inheritdoc/>
+        protected override async Task ShutdownAsyncCore(CancellationToken cancellationToken)
+        {
+            // No resources to clean up for TAR
+            await base.ShutdownAsyncCore(cancellationToken).ConfigureAwait(false);
+        }
+
+        /// <inheritdoc/>
+        protected override async ValueTask DisposeAsyncCore()
+        {
+            // Clean disposal pattern
+            await base.DisposeAsyncCore().ConfigureAwait(false);
+        }
+
+        /// <summary>
+        /// Performs health check by verifying round-trip archiving with test data.
+        /// </summary>
+        public async Task<StrategyHealthCheckResult> CheckHealthAsync(CancellationToken ct = default)
+        {
+            return await GetCachedHealthAsync(async (cancellationToken) =>
+            {
+                try
+                {
+                    // Round-trip test with known data
+                    var testData = new byte[] { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 };
+                    var archived = CompressCore(testData);
+                    var extracted = DecompressCore(archived);
+
+                    if (testData.Length != extracted.Length)
+                        return new StrategyHealthCheckResult(false, "Round-trip length mismatch");
+
+                    for (int i = 0; i < testData.Length; i++)
+                    {
+                        if (testData[i] != extracted[i])
+                            return new StrategyHealthCheckResult(false, "Round-trip data mismatch");
+                    }
+
+                    return new StrategyHealthCheckResult(true);
+                }
+                catch (Exception ex)
+                {
+                    return new StrategyHealthCheckResult(false, $"Health check failed: {ex.Message}");
+                }
+            }, TimeSpan.FromSeconds(60), ct).ConfigureAwait(false);
+        }
+
+        /// <inheritdoc/>
         protected override byte[] CompressCore(byte[] input)
         {
+            IncrementCounter("tar.archive");
+
+            if (input == null || input.Length == 0)
+                return Array.Empty<byte>();
+
+            if (input.Length > MaxInputSize)
+                throw new ArgumentException($"Input size exceeds maximum of {MaxInputSize} bytes");
+
             using var output = new MemoryStream(input.Length + 256);
 
             // Write TAR header
@@ -152,6 +228,14 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Archive
         /// <inheritdoc/>
         protected override byte[] DecompressCore(byte[] input)
         {
+            IncrementCounter("tar.extract");
+
+            if (input == null || input.Length == 0)
+                return Array.Empty<byte>();
+
+            if (input.Length > MaxInputSize)
+                throw new ArgumentException($"Input size exceeds maximum of {MaxInputSize} bytes");
+
             using var stream = new MemoryStream(input);
 
             // Read TAR header

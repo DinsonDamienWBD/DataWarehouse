@@ -1,6 +1,9 @@
 using System;
 using System.IO;
 using System.IO.Compression;
+using System.Threading;
+using System.Threading.Tasks;
+using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Contracts.Compression;
 using SysCompressionLevel = System.IO.Compression.CompressionLevel;
 
@@ -22,6 +25,13 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Archive
     public sealed class ZipStrategy : CompressionStrategyBase
     {
         private const string DefaultEntryName = "data.bin";
+        private const int MaxEntryCount = 65535; // ZIP64 supports more, but limit for safety
+        private const long MaxUncompressedSize = 4L * 1024 * 1024 * 1024; // 4GB for standard ZIP
+        private const int MaxInputSize = 100 * 1024 * 1024; // 100MB per entry
+
+        private SDK.Contracts.Compression.CompressionLevel _compressionMethod = SDK.Contracts.Compression.CompressionLevel.Default;
+        private int _maxEntryCount = MaxEntryCount;
+        private long _maxUncompressedSize = MaxUncompressedSize;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="ZipStrategy"/> class
@@ -49,8 +59,75 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Archive
         };
 
         /// <inheritdoc/>
+        protected override async Task InitializeAsyncCore(CancellationToken cancellationToken)
+        {
+            // Validate ZIP configuration parameters
+            if (_maxEntryCount < 1 || _maxEntryCount > MaxEntryCount)
+                throw new ArgumentException($"Max entry count must be between 1 and {MaxEntryCount}. Got: {_maxEntryCount}");
+
+            if (_maxUncompressedSize < 1 || _maxUncompressedSize > MaxUncompressedSize)
+                throw new ArgumentException($"Max uncompressed size must be between 1 and {MaxUncompressedSize}. Got: {_maxUncompressedSize}");
+
+            await base.InitializeAsyncCore(cancellationToken).ConfigureAwait(false);
+        }
+
+        /// <inheritdoc/>
+        protected override async Task ShutdownAsyncCore(CancellationToken cancellationToken)
+        {
+            // No resources to clean up for ZIP
+            await base.ShutdownAsyncCore(cancellationToken).ConfigureAwait(false);
+        }
+
+        /// <inheritdoc/>
+        protected override async ValueTask DisposeAsyncCore()
+        {
+            // Clean disposal pattern
+            await base.DisposeAsyncCore().ConfigureAwait(false);
+        }
+
+        /// <summary>
+        /// Performs health check by verifying round-trip ZIP compression with test data.
+        /// </summary>
+        public async Task<StrategyHealthCheckResult> CheckHealthAsync(CancellationToken ct = default)
+        {
+            return await GetCachedHealthAsync(async (cancellationToken) =>
+            {
+                try
+                {
+                    // Round-trip test with known data
+                    var testData = new byte[] { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 };
+                    var compressed = CompressCore(testData);
+                    var decompressed = DecompressCore(compressed);
+
+                    if (testData.Length != decompressed.Length)
+                        return new StrategyHealthCheckResult(false, "Round-trip length mismatch");
+
+                    for (int i = 0; i < testData.Length; i++)
+                    {
+                        if (testData[i] != decompressed[i])
+                            return new StrategyHealthCheckResult(false, "Round-trip data mismatch");
+                    }
+
+                    return new StrategyHealthCheckResult(true);
+                }
+                catch (Exception ex)
+                {
+                    return new StrategyHealthCheckResult(false, $"Health check failed: {ex.Message}");
+                }
+            }, TimeSpan.FromSeconds(60), ct).ConfigureAwait(false);
+        }
+
+        /// <inheritdoc/>
         protected override byte[] CompressCore(byte[] input)
         {
+            IncrementCounter("zip.compress");
+
+            if (input == null || input.Length == 0)
+                return Array.Empty<byte>();
+
+            if (input.Length > MaxInputSize)
+                throw new ArgumentException($"Input size exceeds maximum of {MaxInputSize} bytes");
+
             using var output = new MemoryStream(input.Length + 256);
 
             using (var archive = new ZipArchive(output, ZipArchiveMode.Create, leaveOpen: true))
@@ -69,6 +146,14 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Archive
         /// <inheritdoc/>
         protected override byte[] DecompressCore(byte[] input)
         {
+            IncrementCounter("zip.decompress");
+
+            if (input == null || input.Length == 0)
+                return Array.Empty<byte>();
+
+            if (input.Length > MaxInputSize)
+                throw new ArgumentException($"Input size exceeds maximum of {MaxInputSize} bytes");
+
             using var inputStream = new MemoryStream(input);
             using var archive = new ZipArchive(inputStream, ZipArchiveMode.Read);
 
