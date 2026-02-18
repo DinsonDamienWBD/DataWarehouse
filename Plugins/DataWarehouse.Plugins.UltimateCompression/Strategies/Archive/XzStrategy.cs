@@ -1,5 +1,8 @@
 using System;
 using System.IO;
+using System.Threading;
+using System.Threading.Tasks;
+using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Contracts.Compression;
 using SharpCompress.Compressors.Xz;
 using SharpCompress.Compressors.LZMA;
@@ -23,6 +26,13 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Archive
     /// </remarks>
     public sealed class XzStrategy : CompressionStrategyBase
     {
+        private const int MinDictionarySize = 4 * 1024; // 4KB
+        private const int MaxDictionarySize = 1536 * 1024 * 1024; // 1.5GB (LZMA2 max)
+        private const int MaxInputSize = 100 * 1024 * 1024; // 100MB
+
+        private int _dictionarySize = 8 * 1024 * 1024; // 8MB default
+        private string _integrityCheckType = "CRC64"; // CRC32, CRC64, SHA-256
+
         /// <summary>
         /// Initializes a new instance of the <see cref="XzStrategy"/> class
         /// with the default compression level.
@@ -49,8 +59,75 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Archive
         };
 
         /// <inheritdoc/>
+        protected override async Task InitializeAsyncCore(CancellationToken cancellationToken)
+        {
+            // Validate XZ configuration parameters
+            if (_dictionarySize < MinDictionarySize || _dictionarySize > MaxDictionarySize)
+                throw new ArgumentException($"Dictionary size must be between {MinDictionarySize} and {MaxDictionarySize} bytes. Got: {_dictionarySize}");
+
+            if (_integrityCheckType != "CRC32" && _integrityCheckType != "CRC64" && _integrityCheckType != "SHA-256")
+                throw new ArgumentException($"Integrity check type must be CRC32, CRC64, or SHA-256. Got: {_integrityCheckType}");
+
+            await base.InitializeAsyncCore(cancellationToken).ConfigureAwait(false);
+        }
+
+        /// <inheritdoc/>
+        protected override async Task ShutdownAsyncCore(CancellationToken cancellationToken)
+        {
+            // No resources to clean up for XZ
+            await base.ShutdownAsyncCore(cancellationToken).ConfigureAwait(false);
+        }
+
+        /// <inheritdoc/>
+        protected override async ValueTask DisposeAsyncCore()
+        {
+            // Clean disposal pattern
+            await base.DisposeAsyncCore().ConfigureAwait(false);
+        }
+
+        /// <summary>
+        /// Performs health check by verifying round-trip XZ compression with test data.
+        /// </summary>
+        public async Task<StrategyHealthCheckResult> CheckHealthAsync(CancellationToken ct = default)
+        {
+            return await GetCachedHealthAsync(async (cancellationToken) =>
+            {
+                try
+                {
+                    // Round-trip test with known data
+                    var testData = new byte[] { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 };
+                    var compressed = CompressCore(testData);
+                    var decompressed = DecompressCore(compressed);
+
+                    if (testData.Length != decompressed.Length)
+                        return new StrategyHealthCheckResult(false, "Round-trip length mismatch");
+
+                    for (int i = 0; i < testData.Length; i++)
+                    {
+                        if (testData[i] != decompressed[i])
+                            return new StrategyHealthCheckResult(false, "Round-trip data mismatch");
+                    }
+
+                    return new StrategyHealthCheckResult(true);
+                }
+                catch (Exception ex)
+                {
+                    return new StrategyHealthCheckResult(false, $"Health check failed: {ex.Message}");
+                }
+            }, TimeSpan.FromSeconds(60), ct).ConfigureAwait(false);
+        }
+
+        /// <inheritdoc/>
         protected override byte[] CompressCore(byte[] input)
         {
+            IncrementCounter("xz.compress");
+
+            if (input == null || input.Length == 0)
+                return Array.Empty<byte>();
+
+            if (input.Length > MaxInputSize)
+                throw new ArgumentException($"Input size exceeds maximum of {MaxInputSize} bytes");
+
             using var inputStream = new MemoryStream(input);
             using var output = new MemoryStream(input.Length + 256);
 
@@ -71,6 +148,18 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Archive
         /// <inheritdoc/>
         protected override byte[] DecompressCore(byte[] input)
         {
+            IncrementCounter("xz.decompress");
+
+            if (input == null || input.Length == 0)
+                return Array.Empty<byte>();
+
+            if (input.Length > MaxInputSize)
+                throw new ArgumentException($"Input size exceeds maximum of {MaxInputSize} bytes");
+
+            // Validate XZ header (magic bytes: 0xFD, '7', 'z', 'X', 'Z', 0x00)
+            if (input.Length < 6 || input[0] != 0xFD || input[1] != 0x37 || input[2] != 0x7A || input[3] != 0x58 || input[4] != 0x5A || input[5] != 0x00)
+                throw new InvalidDataException("Corrupted XZ header: invalid magic bytes");
+
             using var inputStream = new MemoryStream(input);
             using var xzStream = new XZStream(inputStream);
             using var output = new MemoryStream(input.Length + 256);

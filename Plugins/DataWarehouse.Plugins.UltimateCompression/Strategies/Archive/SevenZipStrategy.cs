@@ -1,5 +1,8 @@
 using System;
 using System.IO;
+using System.Threading;
+using System.Threading.Tasks;
+using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Contracts.Compression;
 using SharpCompress.Compressors.LZMA;
 using SdkCompressionLevel = DataWarehouse.SDK.Contracts.Compression.CompressionLevel;
@@ -22,6 +25,13 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Archive
     public sealed class SevenZipStrategy : CompressionStrategyBase
     {
         private const uint MagicHeader = 0x377A4C5A; // '7zLZ'
+        private const int MinDictionarySize = 64 * 1024; // 64KB
+        private const int MaxDictionarySize = 1536 * 1024 * 1024; // 1.5GB
+        private const int MaxInputSize = 100 * 1024 * 1024; // 100MB
+
+        private int _dictionarySize = 8 * 1024 * 1024; // 8MB default
+        private bool _solidMode = false;
+        private bool _headerEncryption = false;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="SevenZipStrategy"/> class
@@ -49,8 +59,72 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Archive
         };
 
         /// <inheritdoc/>
+        protected override async Task InitializeAsyncCore(CancellationToken cancellationToken)
+        {
+            // Validate 7-Zip configuration parameters
+            if (_dictionarySize < MinDictionarySize || _dictionarySize > MaxDictionarySize)
+                throw new ArgumentException($"Dictionary size must be between {MinDictionarySize} and {MaxDictionarySize} bytes. Got: {_dictionarySize}");
+
+            await base.InitializeAsyncCore(cancellationToken).ConfigureAwait(false);
+        }
+
+        /// <inheritdoc/>
+        protected override async Task ShutdownAsyncCore(CancellationToken cancellationToken)
+        {
+            // No resources to clean up for 7-Zip
+            await base.ShutdownAsyncCore(cancellationToken).ConfigureAwait(false);
+        }
+
+        /// <inheritdoc/>
+        protected override async ValueTask DisposeAsyncCore()
+        {
+            // Clean disposal pattern
+            await base.DisposeAsyncCore().ConfigureAwait(false);
+        }
+
+        /// <summary>
+        /// Performs health check by verifying round-trip 7-Zip compression with test data.
+        /// </summary>
+        public async Task<StrategyHealthCheckResult> CheckHealthAsync(CancellationToken ct = default)
+        {
+            return await GetCachedHealthAsync(async (cancellationToken) =>
+            {
+                try
+                {
+                    // Round-trip test with known data
+                    var testData = new byte[] { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 };
+                    var compressed = CompressCore(testData);
+                    var decompressed = DecompressCore(compressed);
+
+                    if (testData.Length != decompressed.Length)
+                        return new StrategyHealthCheckResult(false, "Round-trip length mismatch");
+
+                    for (int i = 0; i < testData.Length; i++)
+                    {
+                        if (testData[i] != decompressed[i])
+                            return new StrategyHealthCheckResult(false, "Round-trip data mismatch");
+                    }
+
+                    return new StrategyHealthCheckResult(true);
+                }
+                catch (Exception ex)
+                {
+                    return new StrategyHealthCheckResult(false, $"Health check failed: {ex.Message}");
+                }
+            }, TimeSpan.FromSeconds(60), ct).ConfigureAwait(false);
+        }
+
+        /// <inheritdoc/>
         protected override byte[] CompressCore(byte[] input)
         {
+            IncrementCounter("7zip.compress");
+
+            if (input == null || input.Length == 0)
+                return Array.Empty<byte>();
+
+            if (input.Length > MaxInputSize)
+                throw new ArgumentException($"Input size exceeds maximum of {MaxInputSize} bytes");
+
             using var output = new MemoryStream(input.Length + 256);
             using var writer = new BinaryWriter(output);
 
@@ -91,13 +165,21 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Archive
         /// <inheritdoc/>
         protected override byte[] DecompressCore(byte[] input)
         {
+            IncrementCounter("7zip.decompress");
+
+            if (input == null || input.Length == 0)
+                return Array.Empty<byte>();
+
+            if (input.Length > MaxInputSize)
+                throw new ArgumentException($"Input size exceeds maximum of {MaxInputSize} bytes");
+
             using var stream = new MemoryStream(input);
             using var reader = new BinaryReader(stream);
 
             // Read and validate header
             uint magic = reader.ReadUInt32();
             if (magic != MagicHeader)
-                throw new InvalidDataException("Invalid 7-Zip stream header.");
+                throw new InvalidDataException("Invalid 7-Zip stream header: corrupted magic bytes");
 
             int originalLength = reader.ReadInt32();
             int compressedLength = reader.ReadInt32();
