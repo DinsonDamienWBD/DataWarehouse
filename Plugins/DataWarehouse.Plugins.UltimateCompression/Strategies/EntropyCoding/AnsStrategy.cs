@@ -87,7 +87,7 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.EntropyCoding
             var encTable = BuildEncodingTable(normalized);
 
             // Encode data (backwards for ANS)
-            var compressedData = new MemoryStream();
+            var compressedData = new MemoryStream(65536);
             uint state = TableSize;
 
             for (int i = input.Length - 1; i >= 0; i--)

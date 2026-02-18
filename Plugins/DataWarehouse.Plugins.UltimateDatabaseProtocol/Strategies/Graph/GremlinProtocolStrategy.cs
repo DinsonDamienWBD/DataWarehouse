@@ -185,7 +185,7 @@ public sealed class GremlinProtocolStrategy : DatabaseProtocolStrategyBase
 
         // Read response
         var buffer = new byte[64 * 1024];
-        var responseBuilder = new MemoryStream();
+        var responseBuilder = new MemoryStream(65536);
 
         WebSocketReceiveResult result;
         do
@@ -664,7 +664,7 @@ public sealed class NeptuneGremlinProtocolStrategy : DatabaseProtocolStrategyBas
 
         // Read response
         var buffer = new byte[64 * 1024];
-        var responseBuilder = new MemoryStream();
+        var responseBuilder = new MemoryStream(65536);
 
         WebSocketReceiveResult result;
         do

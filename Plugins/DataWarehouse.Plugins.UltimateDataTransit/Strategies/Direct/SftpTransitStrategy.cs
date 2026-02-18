@@ -103,7 +103,7 @@ internal sealed class SftpTransitStrategy : DataTransitStrategyBase
                     PercentComplete = 5
                 });
 
-                using var tempStream = new MemoryStream();
+                using var tempStream = new MemoryStream(65536);
 
                 await Task.Run(() =>
                 {
@@ -208,7 +208,7 @@ internal sealed class SftpTransitStrategy : DataTransitStrategyBase
         CancellationToken ct)
     {
         // Buffer the stream for hashing
-        using var buffered = new MemoryStream();
+        using var buffered = new MemoryStream(65536);
         var buffer = new byte[81920];
         long totalRead = 0;
         int bytesRead;

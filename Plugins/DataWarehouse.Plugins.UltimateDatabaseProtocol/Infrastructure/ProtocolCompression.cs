@@ -582,7 +582,7 @@ internal sealed class GZipCompressionProvider : ICompressionProvider
 {
     public byte[] Compress(ReadOnlySpan<byte> data, CompressionLevel level)
     {
-        using var output = new MemoryStream();
+        using var output = new MemoryStream(65536);
         using (var gzip = new GZipStream(output, level, leaveOpen: true))
         {
             gzip.Write(data);
@@ -594,7 +594,7 @@ internal sealed class GZipCompressionProvider : ICompressionProvider
     {
         using var input = new MemoryStream(data.ToArray());
         using var gzip = new GZipStream(input, CompressionMode.Decompress);
-        using var output = new MemoryStream();
+        using var output = new MemoryStream(65536);
         gzip.CopyTo(output);
         return output.ToArray();
     }
@@ -613,7 +613,7 @@ internal sealed class DeflateCompressionProvider : ICompressionProvider
 {
     public byte[] Compress(ReadOnlySpan<byte> data, CompressionLevel level)
     {
-        using var output = new MemoryStream();
+        using var output = new MemoryStream(65536);
         using (var deflate = new DeflateStream(output, level, leaveOpen: true))
         {
             deflate.Write(data);
@@ -625,7 +625,7 @@ internal sealed class DeflateCompressionProvider : ICompressionProvider
     {
         using var input = new MemoryStream(data.ToArray());
         using var deflate = new DeflateStream(input, CompressionMode.Decompress);
-        using var output = new MemoryStream();
+        using var output = new MemoryStream(65536);
         deflate.CopyTo(output);
         return output.ToArray();
     }
@@ -644,7 +644,7 @@ internal sealed class BrotliCompressionProvider : ICompressionProvider
 {
     public byte[] Compress(ReadOnlySpan<byte> data, CompressionLevel level)
     {
-        using var output = new MemoryStream();
+        using var output = new MemoryStream(65536);
         using (var brotli = new BrotliStream(output, level, leaveOpen: true))
         {
             brotli.Write(data);
@@ -656,7 +656,7 @@ internal sealed class BrotliCompressionProvider : ICompressionProvider
     {
         using var input = new MemoryStream(data.ToArray());
         using var brotli = new BrotliStream(input, CompressionMode.Decompress);
-        using var output = new MemoryStream();
+        using var output = new MemoryStream(65536);
         brotli.CopyTo(output);
         return output.ToArray();
     }

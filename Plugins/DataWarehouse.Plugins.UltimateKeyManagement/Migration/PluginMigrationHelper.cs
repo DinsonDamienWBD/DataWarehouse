@@ -556,7 +556,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Migration
         public byte[] GetKey(string keyId)
         {
             // Sync bridge: obsolete sync API wrapper
-            return Task.Run(() => GetKeyAsync(keyId, new ShimSecurityContext())).GetAwaiter().GetResult();
+            return Task.Run(() => GetKeyAsync(keyId, new ShimSecurityContext())).Result;
         }
 
         public async Task<byte[]> GetKeyAsync(string keyId, ISecurityContext context)

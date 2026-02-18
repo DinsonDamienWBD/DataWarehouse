@@ -166,7 +166,7 @@ public sealed class DeltaSyncPlugin : DataManagementPluginBase
         if (delta == null)
             throw new ArgumentNullException(nameof(delta));
 
-        var resultStream = new MemoryStream();
+        var resultStream = new MemoryStream((int)baseStream.Length);
         var baseData = new byte[baseStream.Length];
         await baseStream.ReadExactlyAsync(baseData, 0, (int)baseStream.Length, ct);
 

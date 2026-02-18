@@ -143,7 +143,7 @@ internal sealed class FtpTransitStrategy : DataTransitStrategyBase
                     PercentComplete = 5
                 });
 
-                using var downloadStream = new MemoryStream();
+                using var downloadStream = new MemoryStream(65536);
                 var downloadSuccess = await sourceClient.DownloadStream(downloadStream, sourcePath, token: cts.Token);
 
                 if (!downloadSuccess)

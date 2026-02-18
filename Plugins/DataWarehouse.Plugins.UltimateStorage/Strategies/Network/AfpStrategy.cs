@@ -872,7 +872,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
                 catch
                 {
                     // Clean up on failure
-                    try { await AfpCloseForkAsync(forkRefNum, ct); } catch { }
+                    try { await AfpCloseForkAsync(forkRefNum, ct); } catch { /* Best-effort cleanup — failure is non-fatal */ }
                     throw;
                 }
             }
@@ -932,7 +932,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
             }
             catch
             {
-                try { await AfpCloseForkAsync(forkRefNum, ct); } catch { }
+                try { await AfpCloseForkAsync(forkRefNum, ct); } catch { /* Best-effort cleanup — failure is non-fatal */ }
                 throw;
             }
         }

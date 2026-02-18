@@ -1173,7 +1173,10 @@ public sealed class BackgroundProcessor : FeatureStrategyBase
         if (_processorTask != null)
         {
             try { await _processorTask; }
-            catch (OperationCanceledException) { }
+            catch (OperationCanceledException)
+            {
+                /* Cancellation is expected during shutdown */
+            }
         }
 
         _isRunning = false;
@@ -1421,7 +1424,10 @@ public sealed class ScheduledTasks : FeatureStrategyBase
         if (_schedulerTask != null)
         {
             try { await _schedulerTask; }
-            catch (OperationCanceledException) { }
+            catch (OperationCanceledException)
+            {
+                /* Cancellation is expected during shutdown */
+            }
         }
 
         _isRunning = false;

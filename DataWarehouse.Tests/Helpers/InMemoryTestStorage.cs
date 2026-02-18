@@ -49,7 +49,7 @@ public sealed class InMemoryTestStorage
         ArgumentNullException.ThrowIfNull(data);
         ct.ThrowIfCancellationRequested();
 
-        using var ms = new MemoryStream();
+        using var ms = new MemoryStream(65536);
         await data.CopyToAsync(ms, ct);
         _store[key] = ms.ToArray();
     }

@@ -84,7 +84,7 @@ internal sealed class VvcCodecStrategy : MediaStrategyBase
     protected override async Task<Stream> TranscodeAsyncCore(
         Stream inputStream, TranscodeOptions options, CancellationToken cancellationToken)
     {
-        var outputStream = new MemoryStream();
+        var outputStream = new MemoryStream(1024 * 1024);
         var sourceBytes = await ReadStreamFullyAsync(inputStream, cancellationToken).ConfigureAwait(false);
 
         var qp = DefaultQp;
@@ -107,7 +107,7 @@ internal sealed class VvcCodecStrategy : MediaStrategyBase
             sourceBytes,
             async () =>
             {
-                var outputStream = new MemoryStream();
+                var outputStream = new MemoryStream(1024 * 1024);
                 await WriteTranscodePackageAsync(outputStream, ffmpegArgs, sourceBytes, encoderAvailability, cancellationToken)
                     .ConfigureAwait(false);
                 outputStream.Position = 0;
@@ -289,7 +289,7 @@ internal sealed class VvcCodecStrategy : MediaStrategyBase
         if (stream is MemoryStream ms && ms.TryGetBuffer(out var buffer))
             return buffer.ToArray();
 
-        using var copy = new MemoryStream();
+        using var copy = new MemoryStream(65536);
         await stream.CopyToAsync(copy, cancellationToken).ConfigureAwait(false);
         return copy.ToArray();
     }

@@ -312,7 +312,7 @@ Return JSON:
                     prediction.RecommendedIntervalMinutes = intervalElem.GetInt32();
             }
         }
-        catch { }
+        catch { /* Parsing failure — return prediction with defaults */ }
 
         return prediction;
     }
@@ -788,7 +788,7 @@ Return JSON:
                     recommendation.Reasoning = reasonElem.GetString();
             }
         }
-        catch { }
+        catch { /* Parsing failure — return recommendation with defaults */ }
 
         return recommendation;
     }

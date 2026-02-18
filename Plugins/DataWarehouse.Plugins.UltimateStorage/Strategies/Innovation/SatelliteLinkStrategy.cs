@@ -66,7 +66,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
                     if (bundles != null) foreach (var bundle in bundles) _uploadQueue.Enqueue(bundle);
                 }
             }
-            catch { }
+            catch { /* Persistence failure is non-fatal */ }
         }
 
         private async Task SaveQueueAsync(CancellationToken ct)
@@ -78,7 +78,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
                 var json = System.Text.Json.JsonSerializer.Serialize(bundles);
                 await File.WriteAllTextAsync(queueFile, json, ct);
             }
-            catch { }
+            catch { /* Persistence failure is non-fatal */ }
         }
 
         protected override async ValueTask DisposeCoreAsync()

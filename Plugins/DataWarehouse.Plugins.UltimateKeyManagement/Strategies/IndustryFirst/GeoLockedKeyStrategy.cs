@@ -430,7 +430,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.IndustryFirst
             byte[] providerId,
             ECDsa signingKey)
         {
-            using var ms = new MemoryStream();
+            using var ms = new MemoryStream(4096);
             using var writer = new BinaryWriter(ms);
 
             writer.Write(DateTime.UtcNow.Ticks);
@@ -612,7 +612,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.IndustryFirst
                         _currentKeyId = _keys.Keys.First();
                 }
             }
-            catch { }
+            catch { /* Deserialization failure — start with empty state */ }
         }
 
         private async Task PersistKeysToStorage()

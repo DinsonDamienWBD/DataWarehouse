@@ -76,9 +76,9 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Emerging
 
         private static void CompressBlock(BinaryWriter writer, byte[] input, int offset, int count)
         {
-            var literals = new MemoryStream();
-            var matches = new MemoryStream();
-            var commands = new MemoryStream();
+            var literals = new MemoryStream(65536);
+            var matches = new MemoryStream(65536);
+            var commands = new MemoryStream(65536);
 
             var hashTable = new Dictionary<uint, List<int>>();
             int pos = 0;

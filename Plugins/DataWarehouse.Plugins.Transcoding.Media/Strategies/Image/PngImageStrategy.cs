@@ -74,7 +74,7 @@ internal sealed class PngImageStrategy : MediaStrategyBase
         Stream inputStream, TranscodeOptions options, CancellationToken cancellationToken)
     {
         var sourceBytes = await ReadStreamFullyAsync(inputStream, cancellationToken).ConfigureAwait(false);
-        var outputStream = new MemoryStream();
+        var outputStream = new MemoryStream(1024 * 1024);
 
         var compressionLevel = DetermineCompressionLevel(options);
         var interlaced = options.VideoCodec?.Equals("png-interlaced", StringComparison.OrdinalIgnoreCase) ?? false;
@@ -163,7 +163,7 @@ internal sealed class PngImageStrategy : MediaStrategyBase
         Stream videoStream, TimeSpan timeOffset, int width, int height, CancellationToken cancellationToken)
     {
         var sourceBytes = await ReadStreamFullyAsync(videoStream, cancellationToken).ConfigureAwait(false);
-        var outputStream = new MemoryStream();
+        var outputStream = new MemoryStream(1024 * 1024);
 
         using var writer = new BinaryWriter(outputStream, Encoding.UTF8, leaveOpen: true);
 
@@ -374,7 +374,7 @@ internal sealed class PngImageStrategy : MediaStrategyBase
             _ => System.IO.Compression.CompressionLevel.SmallestSize
         };
 
-        using var output = new MemoryStream();
+        using var output = new MemoryStream(4096);
         using (var deflate = new System.IO.Compression.DeflateStream(output, level, leaveOpen: true))
         {
             deflate.Write(sourceData, 0, sourceData.Length);
@@ -391,7 +391,7 @@ internal sealed class PngImageStrategy : MediaStrategyBase
         if (stream is MemoryStream ms && ms.TryGetBuffer(out var buffer))
             return buffer.ToArray();
 
-        using var copy = new MemoryStream();
+        using var copy = new MemoryStream(65536);
         await stream.CopyToAsync(copy, cancellationToken).ConfigureAwait(false);
         return copy.ToArray();
     }

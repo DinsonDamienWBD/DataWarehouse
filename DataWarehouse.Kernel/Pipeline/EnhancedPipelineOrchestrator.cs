@@ -935,7 +935,7 @@ public sealed class EnhancedPipelineOrchestrator : IPipelineOrchestrator
 
         // Buffer input for fan-out
         byte[] data;
-        using (var buffer = new MemoryStream())
+        using (var buffer = new MemoryStream(65536))
         {
             await input.CopyToAsync(buffer, ct);
             data = buffer.ToArray();
@@ -1364,7 +1364,7 @@ public sealed class EnhancedPipelineOrchestrator : IPipelineOrchestrator
 
         // Buffer the input for fan-out (each terminal needs a copy)
         byte[] data;
-        using (var buffer = new MemoryStream())
+        using (var buffer = new MemoryStream(65536))
         {
             await input.CopyToAsync(buffer, ct);
             data = buffer.ToArray();

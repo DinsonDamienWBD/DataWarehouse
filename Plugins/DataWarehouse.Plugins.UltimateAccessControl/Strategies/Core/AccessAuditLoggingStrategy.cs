@@ -26,7 +26,7 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Core
     /// - Anomaly detection integration
     /// </para>
     /// </remarks>
-    public sealed class AccessAuditLoggingStrategy : AccessControlStrategyBase, IDisposable
+    public sealed class AccessAuditLoggingStrategy : AccessControlStrategyBase, IDisposable, IAsyncDisposable
     {
         private readonly ConcurrentQueue<AuditLogEntry> _logQueue = new();
         private readonly ConcurrentDictionary<string, AuditLogEntry> _recentLogs = new();
@@ -734,13 +734,32 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Core
             _flushTimer?.Dispose();
             _retentionTimer?.Dispose();
 
-            // Sync bridge: Dispose cannot be async without IAsyncDisposable
-            Task.Run(() => ForceFlushAsync()).GetAwaiter().GetResult();
+            // Sync dispose: must flush synchronously
+            ForceFlushAsync().Wait();
 
             foreach (var destination in _destinations.OfType<IDisposable>())
             {
                 destination.Dispose();
             }
+        }
+
+        /// <inheritdoc/>
+        protected override async ValueTask DisposeAsyncCore()
+        {
+            if (_disposed) return;
+            _disposed = true;
+
+            _flushTimer?.Dispose();
+            _retentionTimer?.Dispose();
+
+            await ForceFlushAsync().ConfigureAwait(false);
+
+            foreach (var destination in _destinations.OfType<IDisposable>())
+            {
+                destination.Dispose();
+            }
+
+            await base.DisposeAsyncCore().ConfigureAwait(false);
         }
     }
 

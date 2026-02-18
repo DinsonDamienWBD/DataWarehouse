@@ -229,7 +229,7 @@ public sealed class PowerCappingStrategy : SustainabilityStrategyBase
                     return maxPowerUw / 1_000_000.0;
                 }
             }
-            catch { }
+            catch { /* RAPL read failure — use estimation */ }
         }
 
         // Estimate based on processor count

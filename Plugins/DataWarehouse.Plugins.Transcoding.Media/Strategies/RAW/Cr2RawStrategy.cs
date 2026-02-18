@@ -83,7 +83,7 @@ internal sealed class Cr2RawStrategy : MediaStrategyBase
         Stream inputStream, TranscodeOptions options, CancellationToken cancellationToken)
     {
         var sourceBytes = await ReadStreamFullyAsync(inputStream, cancellationToken).ConfigureAwait(false);
-        var outputStream = new MemoryStream();
+        var outputStream = new MemoryStream(1024 * 1024);
 
         ValidateCr2Format(sourceBytes);
 
@@ -210,7 +210,7 @@ internal sealed class Cr2RawStrategy : MediaStrategyBase
         Stream videoStream, TimeSpan timeOffset, int width, int height, CancellationToken cancellationToken)
     {
         var sourceBytes = await ReadStreamFullyAsync(videoStream, cancellationToken).ConfigureAwait(false);
-        var outputStream = new MemoryStream();
+        var outputStream = new MemoryStream(1024 * 1024);
 
         // Extract embedded JPEG for thumbnail generation
         var embeddedJpeg = ExtractEmbeddedJpeg(sourceBytes);
@@ -468,7 +468,7 @@ internal sealed class Cr2RawStrategy : MediaStrategyBase
         if (stream is MemoryStream ms && ms.TryGetBuffer(out var buffer))
             return buffer.ToArray();
 
-        using var copy = new MemoryStream();
+        using var copy = new MemoryStream(65536);
         await stream.CopyToAsync(copy, cancellationToken).ConfigureAwait(false);
         return copy.ToArray();
     }

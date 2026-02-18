@@ -453,7 +453,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Specialized
             else
             {
                 // Read binary response into memory stream
-                resultStream = new MemoryStream();
+                resultStream = new MemoryStream(65536);
                 await response.Content.CopyToAsync(resultStream, ct);
                 resultStream.Position = 0;
             }

@@ -94,7 +94,7 @@ internal sealed class ShuffleStrategy : ComputeRuntimeStrategyBase
                             stdin: data, timeout: GetEffectiveTimeout(task), cancellationToken: ct);
                         partitionOutputs[idx] = result.StandardOutput;
                     }
-                    finally { try { File.Delete(codePath); } catch { } }
+                    finally { try { File.Delete(codePath); } catch { /* Best-effort cleanup — failure is non-fatal */ } }
                 });
 
             // Merge outputs in partition order

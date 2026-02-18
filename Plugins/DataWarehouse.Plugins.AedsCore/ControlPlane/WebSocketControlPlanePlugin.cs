@@ -3,6 +3,7 @@ using DataWarehouse.SDK.Distribution;
 using DataWarehouse.SDK.Hosting;
 using DataWarehouse.SDK.Primitives;
 using Microsoft.Extensions.Logging;
+using System.Buffers;
 using System.Net.WebSockets;
 using System.Runtime.CompilerServices;
 using System.Text;
@@ -177,59 +178,65 @@ public class WebSocketControlPlanePlugin : ControlPlaneTransportPluginBase
     /// </summary>
     private async Task RunReceiveLoopAsync(CancellationToken ct)
     {
-        var buffer = new byte[8192];
-
-        while (!ct.IsCancellationRequested)
+        var buffer = ArrayPool<byte>.Shared.Rent(8192);
+        try
         {
-            try
+            while (!ct.IsCancellationRequested)
             {
-                if (_webSocket == null || _webSocket.State != WebSocketState.Open)
+                try
                 {
-                    await Task.Delay(TimeSpan.FromSeconds(1), ct);
-                    continue;
-                }
-
-                var messageBuilder = new StringBuilder();
-                WebSocketReceiveResult result;
-
-                do
-                {
-                    result = await _webSocket.ReceiveAsync(new ArraySegment<byte>(buffer), ct);
-
-                    if (result.MessageType == WebSocketMessageType.Close)
+                    if (_webSocket == null || _webSocket.State != WebSocketState.Open)
                     {
-                        _logger.LogWarning("WebSocket close frame received");
-                        await ReconnectAsync(Config!, ct);
-                        break;
+                        await Task.Delay(TimeSpan.FromSeconds(1), ct);
+                        continue;
                     }
 
-                    if (result.MessageType == WebSocketMessageType.Text)
+                    var messageBuilder = new StringBuilder();
+                    WebSocketReceiveResult result;
+
+                    do
                     {
-                        var text = Encoding.UTF8.GetString(buffer, 0, result.Count);
-                        messageBuilder.Append(text);
+                        result = await _webSocket.ReceiveAsync(new ArraySegment<byte>(buffer), ct);
+
+                        if (result.MessageType == WebSocketMessageType.Close)
+                        {
+                            _logger.LogWarning("WebSocket close frame received");
+                            await ReconnectAsync(Config!, ct);
+                            break;
+                        }
+
+                        if (result.MessageType == WebSocketMessageType.Text)
+                        {
+                            var text = Encoding.UTF8.GetString(buffer, 0, result.Count);
+                            messageBuilder.Append(text);
+                        }
+                    }
+                    while (!result.EndOfMessage && !ct.IsCancellationRequested);
+
+                    if (result.MessageType == WebSocketMessageType.Text && messageBuilder.Length > 0)
+                    {
+                        _lastMessageReceived = DateTimeOffset.UtcNow;
+                        await ProcessReceivedMessageAsync(messageBuilder.ToString(), ct);
                     }
                 }
-                while (!result.EndOfMessage && !ct.IsCancellationRequested);
-
-                if (result.MessageType == WebSocketMessageType.Text && messageBuilder.Length > 0)
+                catch (WebSocketException ex)
                 {
-                    _lastMessageReceived = DateTimeOffset.UtcNow;
-                    await ProcessReceivedMessageAsync(messageBuilder.ToString(), ct);
+                    _logger.LogError(ex, "WebSocket receive error, triggering reconnection");
+                    await ReconnectAsync(Config!, ct);
+                }
+                catch (OperationCanceledException)
+                {
+                    break;
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Receive loop error");
                 }
             }
-            catch (WebSocketException ex)
-            {
-                _logger.LogError(ex, "WebSocket receive error, triggering reconnection");
-                await ReconnectAsync(Config!, ct);
-            }
-            catch (OperationCanceledException)
-            {
-                break;
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Receive loop error");
-            }
+        }
+        finally
+        {
+            ArrayPool<byte>.Shared.Return(buffer);
         }
     }
 

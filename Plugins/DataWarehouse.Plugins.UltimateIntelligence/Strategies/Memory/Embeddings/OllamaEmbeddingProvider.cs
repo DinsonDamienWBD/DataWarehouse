@@ -292,7 +292,7 @@ public sealed class OllamaEmbeddingProvider : EmbeddingProviderBase
                         break;
                 }
             }
-            catch { }
+            catch { /* JSON parsing failure — continue polling */ }
         }
     }
 

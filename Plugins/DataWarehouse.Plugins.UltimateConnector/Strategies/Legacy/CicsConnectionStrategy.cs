@@ -1,4 +1,5 @@
 using System;
+using System.Buffers;
 using System.Collections.Generic;
 using System.Net.Sockets;
 using System.Text;
@@ -44,9 +45,16 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Legacy
             await stream.WriteAsync(commandBytes, ct);
             await stream.FlushAsync(ct);
             // Read response
-            var buffer = new byte[8192];
-            var bytesRead = await stream.ReadAsync(buffer, ct);
-            return encoding.GetString(buffer, 0, bytesRead);
+            var buffer = ArrayPool<byte>.Shared.Rent(8192);
+            try
+            {
+                var bytesRead = await stream.ReadAsync(buffer, ct);
+                return encoding.GetString(buffer, 0, bytesRead);
+            }
+            finally
+            {
+                ArrayPool<byte>.Shared.Return(buffer);
+            }
         }
 
         public override Task<string> TranslateCommandAsync(IConnectionHandle handle, string modernCommand, CancellationToken ct = default)

@@ -367,7 +367,7 @@ public sealed class KernelKnowledgeObjectHandler : IDisposable
 
         foreach (var sub in _subscriptions)
         {
-            try { sub.Dispose(); } catch { }
+            try { sub.Dispose(); } catch { /* Best-effort cleanup — failure is non-fatal */ }
         }
         _subscriptions.Clear();
     }

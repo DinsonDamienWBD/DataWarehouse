@@ -353,7 +353,7 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Watermarking
 
         private byte[] SerializePayload(WatermarkPayload payload)
         {
-            using var ms = new MemoryStream();
+            using var ms = new MemoryStream(4096);
             using var writer = new BinaryWriter(ms);
 
             writer.Write(payload.WatermarkId);

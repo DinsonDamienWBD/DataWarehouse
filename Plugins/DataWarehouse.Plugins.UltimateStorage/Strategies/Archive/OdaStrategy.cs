@@ -892,7 +892,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Archive
                 {
                     await UnloadCartridgeAsync(CancellationToken.None);
                 }
-                catch { }
+                catch { /* Best-effort cleanup — failure is non-fatal */ }
             }
 
             // Save catalog

@@ -126,7 +126,7 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Domain
         private static void EncodeAcgtBlock(BinaryWriter writer, byte[] input, int offset, int count)
         {
             // Pack 4 nucleotides per byte (2 bits each)
-            using var bitStream = new MemoryStream();
+            using var bitStream = new MemoryStream(65536);
             var bitWriter = new BitPackWriter(bitStream);
 
             // First pass: encode case information (1 bit per byte)
@@ -183,7 +183,7 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Domain
             }
 
             // Encode data
-            using var bitStream = new MemoryStream();
+            using var bitStream = new MemoryStream(65536);
             var bitWriter = new BitPackWriter(bitStream);
 
             for (int i = 0; i < count; i++)

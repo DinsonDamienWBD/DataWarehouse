@@ -396,7 +396,7 @@ Return JSON:
                     optimization.Reasoning = reason.GetString();
             }
         }
-        catch { }
+        catch { /* Parsing failure — return optimization with defaults */ }
 
         return optimization;
     }
@@ -748,7 +748,7 @@ Return JSON:
                     update.Recommendations = recs.EnumerateArray().Select(e => e.GetString() ?? "").ToList();
             }
         }
-        catch { }
+        catch { /* Parsing failure — return update with defaults */ }
 
         return update;
     }
@@ -777,7 +777,7 @@ Return JSON:
                     prediction.Confidence = conf.GetDouble();
             }
         }
-        catch { }
+        catch { /* Parsing failure — return prediction with defaults */ }
 
         return prediction;
     }
@@ -929,7 +929,7 @@ Return JSON:
                     optimization.ImplementationPriority = ip.GetString();
             }
         }
-        catch { }
+        catch { /* Parsing failure — return optimization with defaults */ }
 
         return optimization;
     }

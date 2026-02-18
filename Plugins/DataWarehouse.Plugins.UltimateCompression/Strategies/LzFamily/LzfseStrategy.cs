@@ -71,8 +71,8 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.LzFamily
             int pos = 0;
 
             // Collect tokens: literals and matches
-            using var literalBuf = new MemoryStream();
-            using var tokenBuf = new MemoryStream();
+            using var literalBuf = new MemoryStream(65536);
+            using var tokenBuf = new MemoryStream(65536);
             var tokenWriter = new BinaryWriter(tokenBuf);
 
             while (pos < input.Length)

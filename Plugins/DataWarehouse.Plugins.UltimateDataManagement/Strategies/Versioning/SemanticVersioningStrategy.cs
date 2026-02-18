@@ -571,7 +571,7 @@ public sealed class SemanticVersioningStrategy : VersioningStrategyBase
     {
         ct.ThrowIfCancellationRequested();
 
-        using var ms = new MemoryStream();
+        using var ms = new MemoryStream(65536);
         data.CopyTo(ms);
         var bytes = ms.ToArray();
 

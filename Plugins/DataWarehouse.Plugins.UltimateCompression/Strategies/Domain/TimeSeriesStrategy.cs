@@ -79,7 +79,7 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Domain
             writer.Write(valueCount);
 
             // Compress using Gorilla algorithm
-            using var bitStream = new MemoryStream();
+            using var bitStream = new MemoryStream(65536);
             var bitWriter = new GorillaWriter(bitStream);
 
             if (valueCount > 0)

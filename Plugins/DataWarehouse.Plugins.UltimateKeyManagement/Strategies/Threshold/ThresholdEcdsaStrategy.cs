@@ -764,7 +764,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Threshold
 
         private byte[] ComputeCommitment(ECPoint r, ECPoint gamma)
         {
-            using var ms = new MemoryStream();
+            using var ms = new MemoryStream(4096);
             ms.Write(r.GetEncoded(false));
             ms.Write(gamma.GetEncoded(false));
             return SHA256.HashData(ms.ToArray());
@@ -831,7 +831,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Threshold
                 var tag = new byte[16];
                 aes.Encrypt(nonce, dataKey, ciphertext, tag);
 
-                using var ms = new MemoryStream();
+                using var ms = new MemoryStream(4096);
                 var ephemeralBytes = ephemeralPublic.GetEncoded(false);
                 ms.Write(BitConverter.GetBytes(ephemeralBytes.Length));
                 ms.Write(ephemeralBytes);
@@ -959,7 +959,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Threshold
                         _currentKeyId = _keys.Keys.First();
                 }
             }
-            catch { }
+            catch { /* Deserialization failure — start with empty state */ }
         }
 
         private async Task PersistKeysToStorage()

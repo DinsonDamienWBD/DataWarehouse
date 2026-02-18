@@ -1,4 +1,5 @@
 using System;
+using System.Buffers;
 using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.Net.Sockets;
@@ -107,8 +108,17 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Healthcare
                 // Extract pixel data tag (7FE0,0010)
                 if (tag == 0x7FE00010)
                 {
-                    pixelData = new byte[length];
-                    Array.Copy(dicomData, offset, pixelData, 0, Math.Min(length, (uint)(dicomData.Length - offset)));
+                    var buffer = ArrayPool<byte>.Shared.Rent((int)length);
+                    try
+                    {
+                        Array.Copy(dicomData, offset, buffer, 0, Math.Min((int)length, dicomData.Length - offset));
+                        pixelData = new byte[length];
+                        Array.Copy(buffer, pixelData, (int)length);
+                    }
+                    finally
+                    {
+                        ArrayPool<byte>.Shared.Return(buffer);
+                    }
                 }
                 else if (length > 0 && length < 1024) // Only parse reasonable-length text tags
                 {

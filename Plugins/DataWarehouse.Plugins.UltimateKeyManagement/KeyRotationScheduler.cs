@@ -10,7 +10,7 @@ using DataWarehouse.SDK.Utilities;
 
 namespace DataWarehouse.Plugins.UltimateKeyManagement
 {
-    public class KeyRotationScheduler : IDisposable
+    public class KeyRotationScheduler : IDisposable, IAsyncDisposable
     {
         private readonly ConcurrentDictionary<string, IKeyStoreStrategy> _strategies;
         private readonly ConcurrentDictionary<string, KeyRotationPolicy> _policies;
@@ -320,9 +320,22 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement
 
             _disposed = true;
 
-            // Sync bridge: Dispose cannot be async without IAsyncDisposable
-            Task.Run(() => StopAsync()).GetAwaiter().GetResult();
+            // Call async dispose and block (safer than GetAwaiter().GetResult())
+            DisposeAsync().AsTask().Wait();
 
+            _shutdownCts.Dispose();
+
+            GC.SuppressFinalize(this);
+        }
+
+        public async ValueTask DisposeAsync()
+        {
+            if (_disposed)
+                return;
+
+            _disposed = true;
+
+            await StopAsync().ConfigureAwait(false);
             _shutdownCts.Dispose();
 
             GC.SuppressFinalize(this);

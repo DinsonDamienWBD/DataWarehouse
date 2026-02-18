@@ -194,7 +194,7 @@ namespace DataWarehouse.Tests.Storage
 
             // Act
             using var stream = await storage.OpenReadStreamAsync("stream/test.bin");
-            using var ms = new MemoryStream();
+            using var ms = new MemoryStream(data.Length);
             await stream.CopyToAsync(ms);
 
             // Assert

@@ -103,7 +103,7 @@ public sealed class ChromaVectorStore : ProductionVectorStoreBase
                 return;
             }
         }
-        catch { }
+        catch { /* Collection fetch failure — may need to create */ }
 
         if (_options.AutoCreateCollection)
         {

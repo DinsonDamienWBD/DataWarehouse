@@ -281,7 +281,7 @@ Provide insights on possible causes and patterns.";
                 return (isAnomaly, confidence, reasons);
             }
         }
-        catch { }
+        catch { /* Parsing failure — return default not anomaly */ }
 
         return (false, 0, new List<string>());
     }

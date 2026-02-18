@@ -194,7 +194,7 @@ public sealed class ExtendedAttributes
         if (names.Count == 0)
             return Array.Empty<byte>();
 
-        using var ms = new MemoryStream();
+        using var ms = new MemoryStream(4096);
 
         foreach (var name in names)
         {

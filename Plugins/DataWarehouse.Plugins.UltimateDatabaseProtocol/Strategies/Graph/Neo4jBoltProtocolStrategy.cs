@@ -407,7 +407,7 @@ public sealed class Neo4jBoltProtocolStrategy : DatabaseProtocolStrategyBase
 
     private async Task SendRunMessageAsync(string query, IReadOnlyDictionary<string, object?> parameters, Dictionary<string, object> extra, CancellationToken ct)
     {
-        using var ms = new MemoryStream();
+        using var ms = new MemoryStream(4096);
 
         // Structure marker: TINY_STRUCT + 3 fields
         ms.WriteByte(TinyStruct | 3);
@@ -427,7 +427,7 @@ public sealed class Neo4jBoltProtocolStrategy : DatabaseProtocolStrategyBase
 
     private async Task SendPullMessageAsync(long n, CancellationToken ct)
     {
-        using var ms = new MemoryStream();
+        using var ms = new MemoryStream(4096);
 
         ms.WriteByte(TinyStruct | 1);
         ms.WriteByte(MsgPull);
@@ -441,7 +441,7 @@ public sealed class Neo4jBoltProtocolStrategy : DatabaseProtocolStrategyBase
 
     private async Task SendMessageAsync(byte signature, Dictionary<string, object> fields, CancellationToken ct)
     {
-        using var ms = new MemoryStream();
+        using var ms = new MemoryStream(4096);
 
         ms.WriteByte(TinyStruct | 1);
         ms.WriteByte(signature);
@@ -477,7 +477,7 @@ public sealed class Neo4jBoltProtocolStrategy : DatabaseProtocolStrategyBase
     private async Task<(byte signature, Dictionary<string, object> metadata)> ReadMessageAsync(CancellationToken ct)
     {
         // Read chunked message
-        using var ms = new MemoryStream();
+        using var ms = new MemoryStream(4096);
 
         while (true)
         {

@@ -1585,7 +1585,7 @@ public sealed class DataMarketplacePlugin : PlatformPluginBase
 
     private byte[] ExportChargebackToCsv(ChargebackReport report)
     {
-        using var ms = new MemoryStream();
+        using var ms = new MemoryStream(4096);
         using var writer = new StreamWriter(ms);
 
         // Header

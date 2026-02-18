@@ -118,7 +118,7 @@ public class Http3DataPlanePlugin : DataPlaneTransportPluginBase
                 var contentLength = response.Content.Headers.ContentLength ?? 0;
                 var responseStream = await response.Content.ReadAsStreamAsync(cts.Token);
 
-                var buffer = new MemoryStream();
+                var buffer = new MemoryStream((int)(contentLength > 0 ? contentLength : 65536));
                 long bytesTransferred = 0;
 
                 var chunkBuffer = new byte[config.ChunkSizeBytes];
@@ -214,7 +214,7 @@ public class Http3DataPlanePlugin : DataPlaneTransportPluginBase
                 var contentLength = response.Content.Headers.ContentLength ?? 0;
                 var responseStream = await response.Content.ReadAsStreamAsync(cts.Token);
 
-                var buffer = new MemoryStream();
+                var buffer = new MemoryStream((int)(contentLength > 0 ? contentLength : 65536));
                 long bytesTransferred = 0;
 
                 var chunkBuffer = new byte[config.ChunkSizeBytes];

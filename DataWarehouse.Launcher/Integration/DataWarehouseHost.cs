@@ -108,7 +108,10 @@ public sealed class DataWarehouseHost : IAsyncDisposable, IServerHost
             {
                 _logger.LogWarning("Embedded instance did not stop within timeout");
             }
-            catch (OperationCanceledException) { }
+            catch (OperationCanceledException)
+            {
+                /* Cancellation is expected during shutdown */
+            }
         }
         _embeddedTask = null;
         _embeddedCts?.Dispose();

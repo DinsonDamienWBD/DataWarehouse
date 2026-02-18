@@ -217,7 +217,7 @@ public sealed class XmlDocumentRegenerationStrategy : RegenerationStrategyBase
                 XDocument.Parse(xmlPart);
                 return xmlPart;
             }
-            catch { }
+            catch { /* Parsing failure — try other formats */ }
         }
 
         // Find root element
@@ -229,7 +229,7 @@ public sealed class XmlDocumentRegenerationStrategy : RegenerationStrategyBase
                 XDocument.Parse(rootMatch.Value);
                 return rootMatch.Value;
             }
-            catch { }
+            catch { /* Parsing failure — try other formats */ }
         }
 
         // Try to find any well-formed fragment

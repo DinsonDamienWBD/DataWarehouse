@@ -444,7 +444,7 @@ public sealed class WinFspCacheManager : IDisposable
         {
             FlushAllWriteBuffersAsync().Wait(TimeSpan.FromSeconds(10));
         }
-        catch { }
+        catch { /* Best-effort flush — failure is non-fatal */ }
 
         _flushLock.Dispose();
         _cts.Dispose();

@@ -1300,7 +1300,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
                     if (_lockToken != null)
                     {
                         // Sync bridge: Dispose cannot be async without IAsyncDisposable
-                        Task.Run(() => _strategy.ReleaseLockAsync(_resourceUrl, _lockToken, CancellationToken.None)).GetAwaiter().GetResult();
+                        Task.Run(() => _strategy.ReleaseLockAsync(_resourceUrl, _lockToken, CancellationToken.None)).Wait();
                     }
                 }
                 _disposed = true;

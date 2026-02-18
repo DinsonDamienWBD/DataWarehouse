@@ -110,7 +110,7 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Transform
             try
             {
                 // Start with a reasonable output buffer size
-                var output = new MemoryStream();
+                var output = new MemoryStream(65536);
                 var buffer = new byte[64 * 1024]; // 64KB buffer
                 int inputOffset = 0;
 

@@ -68,7 +68,7 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.LzFamily
             Array.Fill(head, -1);
 
             int pos = 0;
-            var literals = new MemoryStream();
+            var literals = new MemoryStream(65536);
 
             while (pos < input.Length)
             {

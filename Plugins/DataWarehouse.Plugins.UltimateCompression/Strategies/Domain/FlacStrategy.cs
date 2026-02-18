@@ -197,7 +197,7 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Domain
 
         private static void RiceEncode(BinaryWriter writer, int[] residuals, int riceParam)
         {
-            using var bitStream = new MemoryStream();
+            using var bitStream = new MemoryStream(65536);
             var bits = new BitWriter(bitStream);
 
             foreach (int r in residuals)

@@ -139,7 +139,7 @@ internal sealed class Http3TransitStrategy : DataTransitStrategyBase
             }
 
             // Stream data through hashing buffer and POST to destination
-            using var buffer = new MemoryStream();
+            using var buffer = new MemoryStream(65536);
             var readBuffer = new byte[81920];
             int bytesRead;
 

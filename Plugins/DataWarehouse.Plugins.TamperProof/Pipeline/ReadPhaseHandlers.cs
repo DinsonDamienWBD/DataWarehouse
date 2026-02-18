@@ -5,6 +5,7 @@ using DataWarehouse.SDK.Contracts;
 using DataWarehouse.SDK.Contracts.TamperProof;
 using DataWarehouse.Plugins.TamperProof.Services;
 using Microsoft.Extensions.Logging;
+using System.Buffers;
 
 namespace DataWarehouse.Plugins.TamperProof;
 
@@ -278,7 +279,7 @@ public static class ReadPhaseHandlers
                             };
                         }
 
-                        using var ms = new MemoryStream();
+                        using var ms = new MemoryStream(65536);
                         await stream.CopyToAsync(ms, ct);
                         var shardData = ms.ToArray();
 
@@ -439,7 +440,7 @@ public static class ReadPhaseHandlers
                             };
                         }
 
-                        using var ms = new MemoryStream();
+                        using var ms = new MemoryStream(65536);
                         await stream.CopyToAsync(ms, ct);
                         var shardData = ms.ToArray();
 
@@ -739,9 +740,18 @@ public static class ReadPhaseHandlers
                     var length = Math.Min(shardSize, wormData.Length - start);
                     if (length > 0)
                     {
-                        var shard = new byte[length];
-                        Array.Copy(wormData, start, shard, 0, length);
-                        shards.Add(shard);
+                        var shard = ArrayPool<byte>.Shared.Rent(length);
+                        try
+                        {
+                            Array.Copy(wormData, start, shard, 0, length);
+                            var shardCopy = new byte[length];
+                            Array.Copy(shard, shardCopy, length);
+                            shards.Add(shardCopy);
+                        }
+                        finally
+                        {
+                            ArrayPool<byte>.Shared.Return(shard);
+                        }
                     }
                 }
 
@@ -850,7 +860,7 @@ public static class ReadPhaseHandlers
                 using var inputStream = new MemoryStream(currentData);
                 using var outputStream = await orchestrator.ReversePipelineAsync(inputStream, ct);
 
-                using var resultMs = new MemoryStream();
+                using var resultMs = new MemoryStream(currentData.Length);
                 await outputStream.CopyToAsync(resultMs, ct);
                 currentData = resultMs.ToArray();
 

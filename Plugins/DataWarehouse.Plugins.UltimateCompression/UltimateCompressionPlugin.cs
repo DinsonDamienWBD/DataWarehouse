@@ -160,7 +160,7 @@ namespace DataWarehouse.Plugins.UltimateCompression
         public override async Task<Stream> OnWriteAsync(Stream input, IKernelContext context, Dictionary<string, object> args, CancellationToken ct = default)
         {
             // Read input stream to byte array
-            using var ms = new MemoryStream();
+            using var ms = new MemoryStream(65536);
             await input.CopyToAsync(ms, ct);
             var data = ms.ToArray();
 
@@ -179,7 +179,7 @@ namespace DataWarehouse.Plugins.UltimateCompression
         public override async Task<Stream> OnReadAsync(Stream stored, IKernelContext context, Dictionary<string, object> args, CancellationToken ct = default)
         {
             // Read stored stream to byte array
-            using var ms = new MemoryStream();
+            using var ms = new MemoryStream(65536);
             await stored.CopyToAsync(ms, ct);
             var data = ms.ToArray();
 

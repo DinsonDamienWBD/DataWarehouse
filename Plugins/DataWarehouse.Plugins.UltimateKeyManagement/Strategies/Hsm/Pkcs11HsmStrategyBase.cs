@@ -624,7 +624,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Hsm
                     }
                     _session.Dispose();
                 }
-                catch { }
+                catch { /* Best-effort cleanup — failure is non-fatal */ }
                 _session = null;
             }
 
@@ -634,7 +634,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Hsm
                 {
                     _pkcs11Library.Dispose();
                 }
-                catch { }
+                catch { /* Best-effort cleanup — failure is non-fatal */ }
                 _pkcs11Library = null;
             }
 

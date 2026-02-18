@@ -88,7 +88,7 @@ internal sealed class Vp9CodecStrategy : MediaStrategyBase
     protected override async Task<Stream> TranscodeAsyncCore(
         Stream inputStream, TranscodeOptions options, CancellationToken cancellationToken)
     {
-        var outputStream = new MemoryStream();
+        var outputStream = new MemoryStream(1024 * 1024);
         var sourceBytes = await ReadStreamFullyAsync(inputStream, cancellationToken).ConfigureAwait(false);
 
         var cqLevel = DefaultCqLevel;
@@ -110,7 +110,7 @@ internal sealed class Vp9CodecStrategy : MediaStrategyBase
             sourceBytes,
             async () =>
             {
-                var outputStream = new MemoryStream();
+                var outputStream = new MemoryStream(1024 * 1024);
                 await WriteTranscodePackageAsync(outputStream, ffmpegArgs, sourceBytes, useTwoPass, cancellationToken)
                     .ConfigureAwait(false);
                 outputStream.Position = 0;
@@ -148,7 +148,7 @@ internal sealed class Vp9CodecStrategy : MediaStrategyBase
         Stream videoStream, TimeSpan timeOffset, int width, int height, CancellationToken cancellationToken)
     {
         var sourceBytes = await ReadStreamFullyAsync(videoStream, cancellationToken).ConfigureAwait(false);
-        var outputStream = new MemoryStream();
+        var outputStream = new MemoryStream(1024 * 1024);
 
         var ffmpegArgs = $"-i pipe:0 -ss {timeOffset.TotalSeconds:F3} -vframes 1 " +
                          $"-vf scale={width}:{height} -f image2 -c:v mjpeg -q:v 2 pipe:1";
@@ -313,7 +313,7 @@ internal sealed class Vp9CodecStrategy : MediaStrategyBase
         if (stream is MemoryStream ms && ms.TryGetBuffer(out var buffer))
             return buffer.ToArray();
 
-        using var copy = new MemoryStream();
+        using var copy = new MemoryStream(65536);
         await stream.CopyToAsync(copy, cancellationToken).ConfigureAwait(false);
         return copy.ToArray();
     }

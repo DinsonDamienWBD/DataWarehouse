@@ -168,7 +168,7 @@ Return JSON with predicted files:
                 }
             }
         }
-        catch { }
+        catch { /* Parsing failure — return predictions collected so far */ }
         return predictions;
     }
 }
@@ -349,7 +349,7 @@ Return JSON:
                 }
             }
         }
-        catch { }
+        catch { /* Parsing failure — return results collected so far */ }
 
         return (risks, healthScore);
     }

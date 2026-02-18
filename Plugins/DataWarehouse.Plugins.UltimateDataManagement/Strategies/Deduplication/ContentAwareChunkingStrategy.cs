@@ -90,7 +90,7 @@ public sealed class ContentAwareChunkingStrategy : DeduplicationStrategyBase
         var sw = Stopwatch.StartNew();
 
         // Read data
-        using var memoryStream = new MemoryStream();
+        using var memoryStream = new MemoryStream(65536);
         await data.CopyToAsync(memoryStream, ct);
         var dataBytes = memoryStream.ToArray();
         var totalSize = dataBytes.Length;

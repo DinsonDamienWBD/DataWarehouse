@@ -73,6 +73,12 @@ public sealed class BitLockerIntegration : IDisposable
                     };
                 }
 
+                // Validate drive letter to prevent WMI injection
+                if (driveLetter.Length != 1 || !IsValidDriveLetter(driveLetter[0]))
+                {
+                    throw new ArgumentException($"Invalid drive letter: {driveLetter}", nameof(volumePath));
+                }
+
                 using var searcher = new ManagementObjectSearcher(
                     "root\\CIMV2\\Security\\MicrosoftVolumeEncryption",
                     $"SELECT * FROM Win32_EncryptableVolume WHERE DriveLetter = '{driveLetter}:'");
@@ -293,6 +299,12 @@ public sealed class BitLockerIntegration : IDisposable
         if (string.IsNullOrEmpty(driveLetter))
             return protectors;
 
+        // Validate drive letter to prevent WMI injection
+        if (driveLetter.Length != 1 || !IsValidDriveLetter(driveLetter[0]))
+        {
+            throw new ArgumentException($"Invalid drive letter: {driveLetter}", nameof(volumePath));
+        }
+
         try
         {
             using var searcher = new ManagementObjectSearcher(
@@ -441,6 +453,13 @@ public sealed class BitLockerIntegration : IDisposable
 
         return string.Empty;
     }
+
+    /// <summary>
+    /// Validates that a character is a valid drive letter (A-Z, case insensitive).
+    /// </summary>
+    /// <param name="letter">Character to validate.</param>
+    /// <returns>True if the character is a valid drive letter; otherwise, false.</returns>
+    private static bool IsValidDriveLetter(char letter) => letter is >= 'A' and <= 'Z' or >= 'a' and <= 'z';
 
     private static BitLockerStatus ParseBitLockerVolume(ManagementObject volume, string driveLetter)
     {

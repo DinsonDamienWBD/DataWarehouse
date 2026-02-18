@@ -1,4 +1,5 @@
 using System;
+using System.Buffers;
 using System.Collections.Generic;
 using System.IO;
 using DataWarehouse.SDK.Contracts.Compression;
@@ -74,13 +75,20 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Emerging
                 int offset = i * BlockSize;
                 int count = Math.Min(BlockSize, input.Length - offset);
 
-                byte[] blockData = new byte[count];
-                Array.Copy(input, offset, blockData, 0, count);
+                var blockData = ArrayPool<byte>.Shared.Rent(count);
+                try
+                {
+                    Array.Copy(input, offset, blockData, 0, count);
 
-                byte[] compressed = CompressBlock(blockData);
+                    byte[] compressed = CompressBlock(blockData.AsSpan(0, count).ToArray());
 
-                writer.Write(compressed.Length);
-                writer.Write(compressed);
+                    writer.Write(compressed.Length);
+                    writer.Write(compressed);
+                }
+                finally
+                {
+                    ArrayPool<byte>.Shared.Return(blockData);
+                }
             }
 
             return output.ToArray();

@@ -28,7 +28,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Import
         protected override Task<Stream> RetrieveAsyncCore(string key, CancellationToken ct)
         {
             IncrementOperationCounter(StorageOperationType.Retrieve);
-            return Task.FromResult<Stream>(new MemoryStream());
+            return Task.FromResult<Stream>(new MemoryStream(0));
         }
 
         protected override Task DeleteAsyncCore(string key, CancellationToken ct) { IncrementOperationCounter(StorageOperationType.Delete); return Task.CompletedTask; }

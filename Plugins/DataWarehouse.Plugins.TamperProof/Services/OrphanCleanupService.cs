@@ -12,7 +12,7 @@ namespace DataWarehouse.Plugins.TamperProof.Services;
 /// Handles cleanup of expired orphans (with compliance awareness) and recovery linking
 /// of orphans that have matching successful retry transactions.
 /// </summary>
-internal class OrphanCleanupService : IDisposable
+internal class OrphanCleanupService : IDisposable, IAsyncDisposable
 {
     private readonly ILogger<OrphanCleanupService> _logger;
     private readonly TimeSpan _scanInterval;
@@ -494,8 +494,8 @@ internal class OrphanCleanupService : IDisposable
         {
             try
             {
-                // Sync bridge: Dispose cannot be async without IAsyncDisposable
-                Task.Run(() => StopAsync()).GetAwaiter().GetResult();
+                // Call async dispose and block (safer than GetAwaiter().GetResult())
+                DisposeAsync().AsTask().Wait();
             }
             catch (Exception ex)
             {
@@ -506,6 +506,25 @@ internal class OrphanCleanupService : IDisposable
         }
 
         _disposed = true;
+    }
+
+    /// <inheritdoc/>
+    public async ValueTask DisposeAsync()
+    {
+        if (_disposed) return;
+
+        try
+        {
+            await StopAsync().ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Error stopping orphan cleanup service during async disposal");
+        }
+
+        _cts?.Dispose();
+        _disposed = true;
+        GC.SuppressFinalize(this);
     }
 }
 

@@ -85,7 +85,7 @@ internal sealed class KtxTextureStrategy : MediaStrategyBase
         Stream inputStream, TranscodeOptions options, CancellationToken cancellationToken)
     {
         var sourceBytes = await ReadStreamFullyAsync(inputStream, cancellationToken).ConfigureAwait(false);
-        var outputStream = new MemoryStream();
+        var outputStream = new MemoryStream(1024 * 1024);
 
         var supercompression = DetermineSupercompression(options);
         var targetWidth = options.TargetResolution?.Width ?? 1024;
@@ -168,7 +168,7 @@ internal sealed class KtxTextureStrategy : MediaStrategyBase
         Stream videoStream, TimeSpan timeOffset, int width, int height, CancellationToken cancellationToken)
     {
         var sourceBytes = await ReadStreamFullyAsync(videoStream, cancellationToken).ConfigureAwait(false);
-        var outputStream = new MemoryStream();
+        var outputStream = new MemoryStream(1024 * 1024);
 
         using var writer = new BinaryWriter(outputStream, Encoding.UTF8, leaveOpen: true);
         writer.Write(Encoding.UTF8.GetBytes("KTXTHUMB"));
@@ -497,7 +497,7 @@ internal sealed class KtxTextureStrategy : MediaStrategyBase
         if (stream is MemoryStream ms && ms.TryGetBuffer(out var buffer))
             return buffer.ToArray();
 
-        using var copy = new MemoryStream();
+        using var copy = new MemoryStream(65536);
         await stream.CopyToAsync(copy, cancellationToken).ConfigureAwait(false);
         return copy.ToArray();
     }

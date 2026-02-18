@@ -1063,7 +1063,7 @@ namespace DataWarehouse.SDK.Security
         public virtual byte[] GetKey(string keyId)
         {
             // Sync bridge: obsolete sync API wrapper
-            return Task.Run(() => GetKeyAsync(keyId, CreateSystemContext())).GetAwaiter().GetResult();
+            return Task.Run(() => GetKeyAsync(keyId, CreateSystemContext())).Result;
         }
 
         /// <summary>

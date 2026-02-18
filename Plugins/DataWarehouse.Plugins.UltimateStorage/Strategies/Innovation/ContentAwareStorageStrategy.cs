@@ -355,7 +355,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
 
         private byte[] CompressData(byte[] data)
         {
-            using var output = new MemoryStream();
+            using var output = new MemoryStream(65536);
             using (var gzip = new System.IO.Compression.GZipStream(output, System.IO.Compression.CompressionLevel.Optimal))
             {
                 gzip.Write(data, 0, data.Length);
@@ -367,7 +367,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
         {
             using var input = new MemoryStream(data);
             using var gzip = new System.IO.Compression.GZipStream(input, System.IO.Compression.CompressionMode.Decompress);
-            using var output = new MemoryStream();
+            using var output = new MemoryStream(65536);
             gzip.CopyTo(output);
             return output.ToArray();
         }

@@ -94,7 +94,7 @@ public class QuicDataPlanePlugin : DataPlaneTransportPluginBase
 
                 stream.CompleteWrites();
 
-                var buffer = new MemoryStream();
+                var buffer = new MemoryStream(65536);
                 long bytesTransferred = 0;
                 long totalBytes = 0;
 
@@ -181,7 +181,7 @@ public class QuicDataPlanePlugin : DataPlaneTransportPluginBase
 
                 stream.CompleteWrites();
 
-                var buffer = new MemoryStream();
+                var buffer = new MemoryStream(65536);
                 long bytesTransferred = 0;
                 long totalBytes = 0;
 
@@ -381,7 +381,7 @@ public class QuicDataPlanePlugin : DataPlaneTransportPluginBase
 
             stream.CompleteWrites();
 
-            var buffer = new MemoryStream();
+            var buffer = new MemoryStream(4096);
             var chunkBuffer = new byte[1024];
             int bytesRead;
 
@@ -464,6 +464,14 @@ public class QuicDataPlanePlugin : DataPlaneTransportPluginBase
                     _logger.LogDebug("Creating new QUIC connection to {ServerUrl}", _serverUrl);
 
                     var uri = new Uri(_serverUrl);
+
+                    // Check VerifySslCertificates configuration option (default: true)
+                    var verifySsl = true;
+                    if (config.Options?.TryGetValue("VerifySslCertificates", out var verifySslValue) == true)
+                    {
+                        verifySsl = bool.Parse(verifySslValue);
+                    }
+
                     var options = new QuicClientConnectionOptions
                     {
                         RemoteEndPoint = new System.Net.DnsEndPoint(uri.Host, uri.Port > 0 ? uri.Port : 443),
@@ -477,7 +485,17 @@ public class QuicDataPlanePlugin : DataPlaneTransportPluginBase
                             {
                                 new System.Net.Security.SslApplicationProtocol("aeds-quic")
                             },
-                            RemoteCertificateValidationCallback = (sender, cert, chain, errors) => true
+                            RemoteCertificateValidationCallback = (sender, cert, chain, errors) =>
+                            {
+                                if (!verifySsl)
+                                {
+                                    _logger.LogWarning("SSL certificate validation is disabled for {ServerUrl}. This should only be used in development/testing.", _serverUrl);
+                                    return true;
+                                }
+
+                                // Production certificate validation
+                                return errors == System.Net.Security.SslPolicyErrors.None;
+                            }
                         }
                     };
 

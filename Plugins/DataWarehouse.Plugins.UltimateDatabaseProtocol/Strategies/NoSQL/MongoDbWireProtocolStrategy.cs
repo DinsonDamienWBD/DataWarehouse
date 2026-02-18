@@ -500,7 +500,7 @@ public sealed class MongoDbWireProtocolStrategy : DatabaseProtocolStrategyBase
     private byte[] SerializeToBson(Dictionary<string, object> document)
     {
         // Simplified BSON serialization
-        using var ms = new MemoryStream();
+        using var ms = new MemoryStream(4096);
         using var writer = new BinaryWriter(ms);
 
         // Placeholder for document length

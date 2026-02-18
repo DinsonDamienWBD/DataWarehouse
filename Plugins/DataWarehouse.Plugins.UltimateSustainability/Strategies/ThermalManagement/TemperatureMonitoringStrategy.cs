@@ -91,7 +91,7 @@ public sealed class TemperatureMonitoringStrategy : SustainabilityStrategyBase
                         {
                             zone.CurrentTempC = int.Parse(File.ReadAllText(tempPath).Trim()) / 1000.0;
                         }
-                        catch { }
+                        catch { /* Temperature read failure — use previous value */ }
                     }
                 }
                 else

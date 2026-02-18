@@ -115,7 +115,7 @@ internal sealed class ProtocolMorphingStrategy : SdkInterface.InterfaceStrategyB
                 if (root.TryGetProperty("query", out _))
                     return "graphql";
             }
-            catch { }
+            catch { /* Parsing failure — default to REST */ }
         }
 
         return "rest";

@@ -552,7 +552,7 @@ public class HmacSha3_256Provider : IHashProvider
     /// <inheritdoc />
     public byte[] ComputeHash(Stream data)
     {
-        using var ms = new MemoryStream();
+        using var ms = new MemoryStream(4096);
         data.CopyTo(ms);
         return ComputeHmac(ms.ToArray());
     }
@@ -560,7 +560,7 @@ public class HmacSha3_256Provider : IHashProvider
     /// <inheritdoc />
     public async Task<byte[]> ComputeHashAsync(Stream data, CancellationToken ct = default)
     {
-        using var ms = new MemoryStream();
+        using var ms = new MemoryStream(4096);
         await data.CopyToAsync(ms, ct);
         return ComputeHmac(ms.ToArray());
     }
@@ -650,7 +650,7 @@ public class HmacSha3_384Provider : IHashProvider
     /// <inheritdoc />
     public byte[] ComputeHash(Stream data)
     {
-        using var ms = new MemoryStream();
+        using var ms = new MemoryStream(4096);
         data.CopyTo(ms);
         return ComputeHmac(ms.ToArray());
     }
@@ -658,7 +658,7 @@ public class HmacSha3_384Provider : IHashProvider
     /// <inheritdoc />
     public async Task<byte[]> ComputeHashAsync(Stream data, CancellationToken ct = default)
     {
-        using var ms = new MemoryStream();
+        using var ms = new MemoryStream(4096);
         await data.CopyToAsync(ms, ct);
         return ComputeHmac(ms.ToArray());
     }
@@ -745,7 +745,7 @@ public class HmacSha3_512Provider : IHashProvider
     /// <inheritdoc />
     public byte[] ComputeHash(Stream data)
     {
-        using var ms = new MemoryStream();
+        using var ms = new MemoryStream(4096);
         data.CopyTo(ms);
         return ComputeHmac(ms.ToArray());
     }
@@ -753,7 +753,7 @@ public class HmacSha3_512Provider : IHashProvider
     /// <inheritdoc />
     public async Task<byte[]> ComputeHashAsync(Stream data, CancellationToken ct = default)
     {
-        using var ms = new MemoryStream();
+        using var ms = new MemoryStream(4096);
         await data.CopyToAsync(ms, ct);
         return ComputeHmac(ms.ToArray());
     }

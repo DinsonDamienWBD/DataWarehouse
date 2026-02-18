@@ -296,7 +296,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Hardware
                     out TkCreation _);
 
                 // Serialize the sealed object (public + private)
-                using var ms = new MemoryStream();
+                using var ms = new MemoryStream(4096);
                 using var writer = new BinaryWriter(ms);
 
                 var publicBytes = sealedPublic.GetTpmRepresentation();
@@ -384,7 +384,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Hardware
         private byte[] ComputePcrDigest(Tpm2bDigest[] pcrValues)
         {
             // Concatenate all PCR values and hash them
-            using var ms = new MemoryStream();
+            using var ms = new MemoryStream(4096);
             foreach (var pcr in pcrValues)
             {
                 ms.Write(pcr.buffer, 0, pcr.buffer.Length);

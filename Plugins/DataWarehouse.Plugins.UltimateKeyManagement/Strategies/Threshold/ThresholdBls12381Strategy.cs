@@ -472,7 +472,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Threshold
             var result = new byte[96];
 
             // Deterministic derivation based on point and scalar
-            using var ms = new MemoryStream();
+            using var ms = new MemoryStream(4096);
             ms.Write(point);
             ms.Write(scalar.ToByteArrayUnsigned());
 
@@ -530,7 +530,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Threshold
             var zPad = new byte[64];
 
             // msg_prime = Z_pad || msg || I2OSP(len_in_bytes, 2) || I2OSP(0, 1) || DST_prime
-            using var ms = new MemoryStream();
+            using var ms = new MemoryStream(4096);
             ms.Write(zPad);
             ms.Write(message);
             ms.Write(BitConverter.GetBytes((short)lenInBytes).Reverse().ToArray());
@@ -701,7 +701,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Threshold
                 var tag = new byte[16];
                 aes.Encrypt(nonce, dataKey, ciphertext, tag);
 
-                using var ms = new MemoryStream();
+                using var ms = new MemoryStream(4096);
                 ms.Write(BitConverter.GetBytes(ephemeralPoint.Length));
                 ms.Write(ephemeralPoint);
                 ms.Write(nonce);
@@ -826,7 +826,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Threshold
                         _currentKeyId = _keys.Keys.First();
                 }
             }
-            catch { }
+            catch { /* Deserialization failure — start with empty state */ }
         }
 
         private async Task PersistKeysToStorage()

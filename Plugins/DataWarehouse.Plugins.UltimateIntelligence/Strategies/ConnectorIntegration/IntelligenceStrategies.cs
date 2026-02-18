@@ -1703,7 +1703,7 @@ Return JSON: {{""estimatedCost"": 0, ""estimatedRows"": 0, ""operations"": [], "
                 };
             }
         }
-        catch { }
+        catch { /* Parsing failure — return default valid result */ }
         return new QueryValidationResult { IsValid = true };
     }
 
@@ -1740,7 +1740,7 @@ Return JSON: {{""estimatedCost"": 0, ""estimatedRows"": 0, ""operations"": [], "
                 };
             }
         }
-        catch { }
+        catch { /* Parsing failure — return default empty plan */ }
         return new QueryExplainPlan();
     }
 
@@ -2048,7 +2048,7 @@ public sealed class LegacyBehavioralModelingStrategy : FeatureStrategyBase
                 return doc.RootElement.EnumerateObject().ToDictionary(p => p.Name, p => (object)p.Value.ToString());
             }
         }
-        catch { }
+        catch { /* Parsing failure — return raw content */ }
         return new Dictionary<string, object> { ["raw"] = response.Content ?? "" };
     }
 
@@ -2112,7 +2112,7 @@ Return JSON: {{""operationName"": ""X"", ""httpMethod"": ""GET"", ""suggestedPat
                 };
             }
         }
-        catch { }
+        catch { /* Parsing failure — return null */ }
         return null;
     }
 
@@ -2157,7 +2157,7 @@ Return JSON: {{""operationName"": ""X"", ""httpMethod"": ""GET"", ""suggestedPat
                 };
             }
         }
-        catch { }
+        catch { /* Parsing failure — return empty model */ }
         return new StateMachineModel();
     }
 
@@ -2190,7 +2190,7 @@ Return JSON: {{""operationName"": ""X"", ""httpMethod"": ""GET"", ""suggestedPat
                     });
             }
         }
-        catch { }
+        catch { /* Parsing failure — return patterns collected so far */ }
         return patterns;
     }
 
@@ -2508,7 +2508,7 @@ public sealed class SmartQuotaTradingStrategy : FeatureStrategyBase
                 return doc.RootElement.EnumerateArray().Select(e => e.GetString() ?? "").Where(s => !string.IsNullOrEmpty(s)).ToList();
             }
         }
-        catch { }
+        catch { /* Parsing failure — return empty list */ }
         return new List<string>();
     }
 
@@ -2836,7 +2836,7 @@ public sealed class ApiArchaeologistStrategy : FeatureStrategyBase
 
                 await Task.Delay(options.DelayBetweenProbesMs, ct);
             }
-            catch { }
+            catch { /* Probe failure is expected for invalid parameters */ }
         }
 
         return discovered;
@@ -2882,10 +2882,10 @@ public sealed class ApiArchaeologistStrategy : FeatureStrategyBase
                         }
                     }
                 }
-                catch { }
+                catch { /* AI inference failure — skip */ }
             }
         }
-        catch { }
+        catch { /* HTTP request failure is expected */ }
 
         return fields;
     }
@@ -2936,7 +2936,7 @@ public sealed class ApiArchaeologistStrategy : FeatureStrategyBase
                 }
                 await Task.Delay(options.DelayBetweenProbesMs, ct);
             }
-            catch { }
+            catch { /* Probe failure is expected for invalid parameters */ }
         }
 
         return limits;
@@ -3254,7 +3254,7 @@ Return JSON array with predictions and confidence:
                 }
             }
         }
-        catch { }
+        catch { /* Parsing failure — return predictions collected so far */ }
 
         return predictions;
     }

@@ -428,7 +428,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Decentralized
             // Read the downloaded file
             if (File.Exists(filePath))
             {
-                var resultStream = new MemoryStream();
+                var resultStream = new MemoryStream(65536);
                 using (var fileStream = File.OpenRead(filePath))
                 {
                     await fileStream.CopyToAsync(resultStream, 81920, ct);

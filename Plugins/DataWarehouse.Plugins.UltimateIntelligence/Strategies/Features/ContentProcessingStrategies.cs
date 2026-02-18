@@ -196,7 +196,7 @@ public sealed class ContentExtractionStrategy : FeatureStrategyBase
                     return Regex.Replace(xml, @"<[^>]+>", " ").Replace("  ", " ").Trim();
                 }
             }
-            catch { }
+            catch { /* ZIP extraction failure — fall back to AI */ }
         }
 
         return await ExtractWithAIAsync(content, "Microsoft Word document", ct);
@@ -231,7 +231,7 @@ public sealed class ContentExtractionStrategy : FeatureStrategyBase
                 if (result.Length > 0)
                     return result.ToString().Trim();
             }
-            catch { }
+            catch { /* ZIP extraction failure — fall back to AI */ }
         }
 
         return await ExtractWithAIAsync(content, "Microsoft Excel spreadsheet", ct);
@@ -267,7 +267,7 @@ public sealed class ContentExtractionStrategy : FeatureStrategyBase
                 if (result.Length > 0)
                     return result.ToString().Trim();
             }
-            catch { }
+            catch { /* ZIP extraction failure — fall back to AI */ }
         }
 
         return await ExtractWithAIAsync(content, "Microsoft PowerPoint presentation", ct);
@@ -417,7 +417,7 @@ public sealed class ContentExtractionStrategy : FeatureStrategyBase
                     if (modifiedMatch.Success) metadata["modified"] = modifiedMatch.Groups[1].Value;
                 }
             }
-            catch { }
+            catch { /* ZIP extraction failure — return empty metadata */ }
         }
 
         return metadata;
@@ -730,7 +730,7 @@ CONTENT TO SUMMARIZE:
                 };
             }
         }
-        catch { }
+        catch { /* Parsing failure — return simple summary */ }
 
         return new MultiLevelSummary
         {
@@ -761,7 +761,7 @@ CONTENT TO SUMMARIZE:
                 };
             }
         }
-        catch { }
+        catch { /* Parsing failure — return simple summary */ }
 
         return new CollectionSummary
         {

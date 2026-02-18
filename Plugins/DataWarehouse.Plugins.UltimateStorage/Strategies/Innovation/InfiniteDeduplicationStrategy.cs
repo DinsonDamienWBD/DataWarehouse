@@ -597,7 +597,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
             using var decryptor = aes.CreateDecryptor();
             using var ms = new MemoryStream(encryptedData, 16, encryptedData.Length - 16);
             using var cs = new CryptoStream(ms, decryptor, CryptoStreamMode.Read);
-            using var result = new MemoryStream();
+            using var result = new MemoryStream(65536);
 
             cs.CopyTo(result);
             return result.ToArray();

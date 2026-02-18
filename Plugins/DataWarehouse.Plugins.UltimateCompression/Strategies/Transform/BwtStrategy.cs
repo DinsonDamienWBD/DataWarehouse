@@ -95,7 +95,7 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Transform
             }
 
             // Create final output with header: primary index (4 bytes) + transformed data
-            using var result = new MemoryStream();
+            using var result = new MemoryStream(65536);
             using var writer = new BinaryWriter(result);
 
             writer.Write(primaryIndex);
@@ -243,7 +243,7 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Transform
         {
             private readonly Stream _baseStream;
             private readonly bool _leaveOpen;
-            private MemoryStream _decompressedBuffer = new MemoryStream();
+            private MemoryStream _decompressedBuffer = new MemoryStream(65536);
             private bool _initialized;
 
             public BwtDecompressionStream(Stream input, bool leaveOpen)

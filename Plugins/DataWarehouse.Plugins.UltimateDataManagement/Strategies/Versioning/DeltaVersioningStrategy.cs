@@ -397,7 +397,7 @@ public sealed class DeltaVersioningStrategy : VersioningStrategyBase
     {
         ct.ThrowIfCancellationRequested();
 
-        using var ms = new MemoryStream();
+        using var ms = new MemoryStream(65536);
         data.CopyTo(ms);
         var bytes = ms.ToArray();
 
@@ -589,7 +589,7 @@ public sealed class DeltaVersioningStrategy : VersioningStrategyBase
     /// </summary>
     private byte[] ComputeDelta(byte[] source, byte[] target)
     {
-        using var ms = new MemoryStream();
+        using var ms = new MemoryStream(65536);
         using var writer = new BinaryWriter(ms);
 
         // Build index of source blocks using rolling hash

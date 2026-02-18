@@ -682,7 +682,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Privacy
                 aes.Encrypt(nonce, dataKey, ciphertext, tag);
 
                 // Combine: ephemeralPublic || nonce || tag || ciphertext
-                using var ms = new MemoryStream();
+                using var ms = new MemoryStream(4096);
                 var ephemeralBytes = ephemeralPublic.GetEncoded(false);
                 ms.Write(BitConverter.GetBytes(ephemeralBytes.Length));
                 ms.Write(ephemeralBytes);
@@ -1737,7 +1737,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Privacy
         private void ComputeCircuitHash()
         {
             using var sha = SHA256.Create();
-            using var ms = new MemoryStream();
+            using var ms = new MemoryStream(4096);
             using var writer = new BinaryWriter(ms);
 
             writer.Write(_gates.Length);
@@ -1794,7 +1794,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Privacy
         /// </summary>
         public byte[] Serialize()
         {
-            using var ms = new MemoryStream();
+            using var ms = new MemoryStream(4096);
             using var writer = new BinaryWriter(ms);
 
             writer.Write(TotalWires);

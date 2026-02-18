@@ -1236,7 +1236,7 @@ public sealed class FallbackTestSuite : IIntelligenceTestSuite
             {
                 _ = strategy.SearchAsync("test", ct: ct).Result;
             }
-            catch { }
+            catch { /* Failure is expected — testing recovery */ }
 
             // Strategy should still report statistics
             var stats = strategy.GetStatistics();

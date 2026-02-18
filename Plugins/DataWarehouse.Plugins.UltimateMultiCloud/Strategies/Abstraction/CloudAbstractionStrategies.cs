@@ -375,13 +375,13 @@ public sealed class AwsStorageAbstraction : ICloudStorageAbstraction
 
     public async Task<Stream> ReadAsync(string path, CancellationToken ct)
     {
-        if (_s3Client == null) return new MemoryStream();
+        if (_s3Client == null) return new MemoryStream(0);
 
         var parts = path.Split('/', 2);
         if (parts.Length != 2) throw new ArgumentException("Path must be in format: bucket/key");
 
         var response = await _s3Client.GetObjectAsync(parts[0], parts[1], ct);
-        var memoryStream = new MemoryStream();
+        var memoryStream = new MemoryStream(65536);
         await response.ResponseStream.CopyToAsync(memoryStream, ct);
         memoryStream.Position = 0;
         return memoryStream;
@@ -451,7 +451,7 @@ public sealed class AzureStorageAbstraction : ICloudStorageAbstraction
 
     public async Task<Stream> ReadAsync(string path, CancellationToken ct)
     {
-        if (_blobServiceClient == null) return new MemoryStream();
+        if (_blobServiceClient == null) return new MemoryStream(0);
 
         var parts = path.Split('/', 2);
         if (parts.Length != 2) throw new ArgumentException("Path must be in format: container/blob");
@@ -460,7 +460,7 @@ public sealed class AzureStorageAbstraction : ICloudStorageAbstraction
         var blobClient = containerClient.GetBlobClient(parts[1]);
 
         var response = await blobClient.DownloadStreamingAsync(cancellationToken: ct);
-        var memoryStream = new MemoryStream();
+        var memoryStream = new MemoryStream(65536);
         await response.Value.Content.CopyToAsync(memoryStream, ct);
         memoryStream.Position = 0;
         return memoryStream;
@@ -525,12 +525,12 @@ public sealed class GcpStorageAbstraction : ICloudStorageAbstraction
 
     public async Task<Stream> ReadAsync(string path, CancellationToken ct)
     {
-        if (_storageClient == null) return new MemoryStream();
+        if (_storageClient == null) return new MemoryStream(0);
 
         var parts = path.Split('/', 2);
         if (parts.Length != 2) throw new ArgumentException("Path must be in format: bucket/object");
 
-        var memoryStream = new MemoryStream();
+        var memoryStream = new MemoryStream(65536);
         await _storageClient.DownloadObjectAsync(parts[0], parts[1], memoryStream, cancellationToken: ct);
         memoryStream.Position = 0;
         return memoryStream;

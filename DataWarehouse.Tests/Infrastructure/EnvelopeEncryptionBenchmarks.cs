@@ -192,7 +192,7 @@ namespace DataWarehouse.Tests.Infrastructure
             // Warmup
             for (int i = 0; i < WarmupIterations; i++)
             {
-                operation().GetAwaiter().GetResult();
+                operation().Wait();
             }
 
             var timings = new double[iterations];
@@ -201,7 +201,7 @@ namespace DataWarehouse.Tests.Infrastructure
             for (int i = 0; i < iterations; i++)
             {
                 sw.Restart();
-                operation().GetAwaiter().GetResult();
+                operation().Wait();
                 sw.Stop();
                 timings[i] = sw.Elapsed.TotalMilliseconds;
             }

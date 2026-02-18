@@ -84,7 +84,7 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.EntropyCoding
             WriteFrequencyTable(output, normalized);
 
             // Encode data
-            var compressedData = new MemoryStream();
+            var compressedData = new MemoryStream(65536);
             uint state = RansL;
 
             for (int i = 0; i < input.Length; i++)

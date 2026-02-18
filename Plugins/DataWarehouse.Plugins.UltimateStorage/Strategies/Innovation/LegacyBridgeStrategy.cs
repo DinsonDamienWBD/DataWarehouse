@@ -53,7 +53,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
                     if (records != null) foreach (var kvp in records) _records[kvp.Key] = kvp.Value;
                 }
             }
-            catch { }
+            catch { /* Persistence failure is non-fatal */ }
         }
 
         private async Task SaveRecordsAsync(CancellationToken ct)
@@ -64,7 +64,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
                 var json = System.Text.Json.JsonSerializer.Serialize(_records.ToDictionary(kvp => kvp.Key, kvp => kvp.Value));
                 await File.WriteAllTextAsync(path, json, ct);
             }
-            catch { }
+            catch { /* Persistence failure is non-fatal */ }
         }
 
         protected override async ValueTask DisposeCoreAsync()

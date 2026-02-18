@@ -89,7 +89,7 @@ public sealed class GpuPowerManagementStrategy : SustainabilityStrategyBase
                 }
             }
         }
-        catch { }
+        catch { /* GPU discovery failure is non-fatal */ }
     }
 
     private void MonitorGpus()

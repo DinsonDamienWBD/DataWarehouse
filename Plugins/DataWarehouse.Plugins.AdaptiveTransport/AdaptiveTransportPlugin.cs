@@ -3,6 +3,7 @@ using DataWarehouse.SDK.Contracts.Hierarchy;
 using DataWarehouse.SDK.Contracts.IntelligenceAware;
 using DataWarehouse.SDK.Primitives;
 using DataWarehouse.SDK.Utilities;
+using System.Buffers;
 using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Net;
@@ -496,7 +497,17 @@ public sealed class AdaptiveTransportPlugin : StreamingPluginBase
                         SslApplicationProtocol.Http3
                     },
                     TargetHost = host,
-                    RemoteCertificateValidationCallback = (_, _, _, _) => true // In production: proper validation
+                    RemoteCertificateValidationCallback = (sender, cert, chain, errors) =>
+                    {
+                        if (!_config.VerifySslCertificates)
+                        {
+                            // Log warning about disabled certificate validation
+                            return true;
+                        }
+
+                        // Production certificate validation
+                        return errors == System.Net.Security.SslPolicyErrors.None;
+                    }
                 }
             };
 
@@ -636,7 +647,8 @@ public sealed class AdaptiveTransportPlugin : StreamingPluginBase
     private byte[] CreateReliablePacket(Guid transferId, int sequence, int totalChunks, byte[] payload)
     {
         // Packet format: [TransferID:16][Sequence:4][Total:4][PayloadLength:4][Payload:N][Checksum:4]
-        var packet = new byte[16 + 4 + 4 + 4 + payload.Length + 4];
+        var packetSize = 16 + 4 + 4 + 4 + payload.Length + 4;
+        var packet = ArrayPool<byte>.Shared.Rent(packetSize);
         var offset = 0;
 
         // Transfer ID
@@ -663,7 +675,12 @@ public sealed class AdaptiveTransportPlugin : StreamingPluginBase
         var checksum = ComputeCrc32(packet.AsSpan(0, offset));
         Buffer.BlockCopy(BitConverter.GetBytes(checksum), 0, packet, offset, 4);
 
-        return packet;
+        // Copy to exact size array (packet will be returned to pool by caller)
+        var result = new byte[packetSize];
+        Buffer.BlockCopy(packet, 0, result, 0, packetSize);
+        ArrayPool<byte>.Shared.Return(packet);
+
+        return result;
     }
 
     private async Task ReceiveAcksAsync(UdpClient client, ConcurrentDictionary<int, bool> acked, int totalChunks, CancellationToken ct)
@@ -2120,6 +2137,12 @@ public sealed class AdaptiveTransportConfig
         TransportProtocol.ReliableUdp,
         TransportProtocol.StoreForward
     };
+
+    /// <summary>
+    /// Whether to verify SSL/TLS certificates. When false, certificate validation is bypassed.
+    /// Default is true. Should only be set to false in development/testing environments.
+    /// </summary>
+    public bool VerifySslCertificates { get; set; } = true;
 }
 
 #endregion

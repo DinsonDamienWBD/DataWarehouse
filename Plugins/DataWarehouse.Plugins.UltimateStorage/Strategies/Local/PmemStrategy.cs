@@ -528,7 +528,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Local
                 }
                 catch
                 {
-                    try { File.Delete(tempPath); } catch { }
+                    try { File.Delete(tempPath); } catch { /* Best-effort cleanup — failure is non-fatal */ }
                     throw;
                 }
             }
@@ -588,7 +588,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Local
                 }
                 catch
                 {
-                    try { File.Delete(tempPath); } catch { }
+                    try { File.Delete(tempPath); } catch { /* Best-effort cleanup — failure is non-fatal */ }
                     throw;
                 }
             }

@@ -207,7 +207,7 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.LzFamily
                 }
 
                 // Read remaining compressed data
-                using var compressedStream = new MemoryStream();
+                using var compressedStream = new MemoryStream(65536);
                 _input.CopyTo(compressedStream);
                 var compressed = compressedStream.ToArray();
 

@@ -1,4 +1,5 @@
 using System;
+using System.Buffers;
 using System.Collections.Generic;
 using System.IO;
 using System.IO.Compression;
@@ -77,7 +78,7 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Domain
             int blockCount = (input.Length + BlockSize - 1) / BlockSize;
             writer.Write(blockCount);
 
-            var allResiduals = new MemoryStream();
+            var allResiduals = new MemoryStream(65536);
 
             for (int b = 0; b < blockCount; b++)
             {
@@ -132,7 +133,7 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Domain
 
             // Decompress residuals
             using var deflate = new DeflateStream(stream, System.IO.Compression.CompressionMode.Decompress, leaveOpen: true);
-            using var residualStream = new MemoryStream();
+            using var residualStream = new MemoryStream(65536);
             deflate.CopyTo(residualStream);
             byte[] residualData = residualStream.ToArray();
 
@@ -145,11 +146,18 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Domain
                 int length = Math.Min(BlockSize, originalLength - dataOffset);
 
                 byte mode = residualData[residualOffset++];
-                var residual = new byte[length];
-                Array.Copy(residualData, residualOffset, residual, 0, length);
-                residualOffset += length;
+                var residual = ArrayPool<byte>.Shared.Rent(length);
+                try
+                {
+                    Array.Copy(residualData, residualOffset, residual, 0, length);
+                    residualOffset += length;
 
-                ReconstructBlock(result, dataOffset, length, stride, mode, residual);
+                    ReconstructBlock(result, dataOffset, length, stride, mode, residual);
+                }
+                finally
+                {
+                    ArrayPool<byte>.Shared.Return(residual);
+                }
             }
 
             return result;
@@ -160,7 +168,8 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Domain
         /// </summary>
         private static byte[] PredictBlock(byte[] data, int offset, int length, int stride, byte mode)
         {
-            var residual = new byte[length];
+            var residual = ArrayPool<byte>.Shared.Rent(length);
+            var result = new byte[length];
 
             for (int i = 0; i < length; i++)
             {
@@ -180,7 +189,9 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Domain
                 residual[i] = (byte)(actual - predicted);
             }
 
-            return residual;
+            Array.Copy(residual, result, length);
+            ArrayPool<byte>.Shared.Return(residual);
+            return result;
         }
 
         /// <summary>

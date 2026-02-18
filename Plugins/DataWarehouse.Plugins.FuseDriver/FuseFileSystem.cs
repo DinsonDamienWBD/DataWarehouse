@@ -244,7 +244,7 @@ public sealed class FuseFileSystem : IDisposable
         if (data == null || data.Length == 0)
         {
             // FUSE API requires synchronous callbacks
-            data = Task.Run(() => LoadFromStorageAsync(path)).GetAwaiter().GetResult();
+            data = Task.Run(() => LoadFromStorageAsync(path)).Result;
             if (data == null)
             {
                 return 0; // EOF
@@ -366,7 +366,7 @@ public sealed class FuseFileSystem : IDisposable
         if (handle.IsDirty && handle.Node != null)
         {
             // FUSE API requires synchronous callbacks
-            Task.Run(() => SaveToStorageAsync(path, handle.Node.Data ?? Array.Empty<byte>())).GetAwaiter().GetResult();
+            Task.Run(() => SaveToStorageAsync(path, handle.Node.Data ?? Array.Empty<byte>())).Wait();
         }
 
         return 0;
@@ -468,7 +468,7 @@ public sealed class FuseFileSystem : IDisposable
 
         // Delete from storage
         // FUSE API requires synchronous callbacks
-        Task.Run(() => DeleteFromStorageAsync(path)).GetAwaiter().GetResult();
+        Task.Run(() => DeleteFromStorageAsync(path)).Wait();
 
         return 0;
     }
@@ -910,7 +910,7 @@ public sealed class FuseFileSystem : IDisposable
         if (handle.IsDirty)
         {
             // FUSE API requires synchronous callbacks
-            Task.Run(() => SaveToStorageAsync(path, handle.Node.Data ?? Array.Empty<byte>())).GetAwaiter().GetResult();
+            Task.Run(() => SaveToStorageAsync(path, handle.Node.Data ?? Array.Empty<byte>())).Wait();
             handle.IsDirty = false;
         }
 
@@ -1685,7 +1685,7 @@ public sealed class FuseFileSystem : IDisposable
         foreach (var handle in _openHandles.Values.Where(h => h.IsDirty && h.Node != null))
         {
             // FUSE API requires synchronous callbacks
-            Task.Run(() => SaveToStorageAsync(handle.Node!.Path, handle.Node.Data ?? Array.Empty<byte>())).GetAwaiter().GetResult();
+            Task.Run(() => SaveToStorageAsync(handle.Node!.Path, handle.Node.Data ?? Array.Empty<byte>())).Wait();
         }
 
         _openHandles.Clear();
@@ -1796,7 +1796,7 @@ public sealed class FuseFileSystem : IDisposable
         {
             var uri = new Uri($"dw://fuse{path}");
             using var stream = await _storageProvider.LoadAsync(uri);
-            using var ms = new MemoryStream();
+            using var ms = new MemoryStream(65536);
             await stream.CopyToAsync(ms);
             return ms.ToArray();
         }

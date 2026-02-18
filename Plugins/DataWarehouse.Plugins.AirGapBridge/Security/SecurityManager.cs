@@ -225,7 +225,7 @@ public sealed class SecurityManager : IDisposable
     [Obsolete("Use EncryptDataAsync instead")]
     public byte[] EncryptData(byte[] data, byte[] deviceKey)
     {
-        return Task.Run(() => EncryptDataAsync(data, deviceKey)).GetAwaiter().GetResult();
+        return Task.Run(() => EncryptDataAsync(data, deviceKey)).Result;
     }
 
     /// <summary>
@@ -289,7 +289,7 @@ public sealed class SecurityManager : IDisposable
     [Obsolete("Use DecryptDataAsync instead")]
     public byte[] DecryptData(byte[] encryptedData, byte[] deviceKey)
     {
-        return Task.Run(() => DecryptDataAsync(encryptedData, deviceKey)).GetAwaiter().GetResult();
+        return Task.Run(() => DecryptDataAsync(encryptedData, deviceKey)).Result;
     }
 
     #endregion

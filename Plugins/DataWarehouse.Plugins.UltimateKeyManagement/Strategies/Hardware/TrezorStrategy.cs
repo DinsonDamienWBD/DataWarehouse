@@ -592,7 +592,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Hardware
         private byte[] BuildCipherKeyValueMessage(uint[] path, string keyName, byte[] value, bool encrypt)
         {
             // Simplified protobuf-like encoding for CipherKeyValue
-            var ms = new MemoryStream();
+            var ms = new MemoryStream(4096);
             var writer = new BinaryWriter(ms);
 
             // Field 1: path (repeated uint32, packed)
@@ -630,7 +630,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Hardware
 
         private byte[] BuildGetPublicKeyMessage(uint[] path)
         {
-            var ms = new MemoryStream();
+            var ms = new MemoryStream(4096);
             var writer = new BinaryWriter(ms);
 
             // Field 1: path (repeated uint32)

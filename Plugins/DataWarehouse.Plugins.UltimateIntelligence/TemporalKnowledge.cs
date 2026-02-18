@@ -2756,7 +2756,7 @@ public sealed class TemporalTiering
     private static byte[] CompressKnowledge(TemporalKnowledgeEntry knowledge)
     {
         var json = JsonSerializer.Serialize(knowledge);
-        using var output = new MemoryStream();
+        using var output = new MemoryStream(65536);
         using (var gzip = new System.IO.Compression.GZipStream(output, System.IO.Compression.CompressionLevel.Optimal))
         {
             var bytes = Encoding.UTF8.GetBytes(json);
@@ -2781,7 +2781,7 @@ public sealed class TemporalTiering
             if (compressed.Length >= 2 && compressed[0] == 0x1f && compressed[1] == 0x8b)
             {
                 using var gzip = new System.IO.Compression.GZipStream(input, System.IO.Compression.CompressionMode.Decompress);
-                using var output = new MemoryStream();
+                using var output = new MemoryStream(65536);
                 gzip.CopyTo(output);
                 var json = Encoding.UTF8.GetString(output.ToArray());
                 return JsonSerializer.Deserialize<TemporalKnowledgeEntry>(json);

@@ -19,7 +19,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement
     /// Ultimate Key Management plugin with Intelligence integration for key rotation prediction
     /// and security recommendations.
     /// </summary>
-    public class UltimateKeyManagementPlugin : SecurityPluginBase, IKeyStoreRegistry, IDisposable
+    public class UltimateKeyManagementPlugin : SecurityPluginBase, IKeyStoreRegistry, IDisposable, IAsyncDisposable
     {
         private readonly ConcurrentDictionary<string, IKeyStore> _keyStores = new();
         private readonly ConcurrentDictionary<string, IEnvelopeKeyStore> _envelopeKeyStores = new();
@@ -644,8 +644,8 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement
                 if (_disposed) return;
                 _disposed = true;
 
-                // Sync bridge: Dispose cannot be async without IAsyncDisposable
-                Task.Run(() => StopAsync()).GetAwaiter().GetResult();
+                // Sync dispose: must stop synchronously
+                StopAsync().Wait();
 
                 foreach (var strategy in _strategies.Values)
                 {
@@ -660,6 +660,28 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement
                 _envelopeKeyStores.Clear();
             }
             base.Dispose(disposing);
+        }
+
+        protected override async ValueTask DisposeAsyncCore()
+        {
+            if (_disposed) return;
+            _disposed = true;
+
+            await StopAsync().ConfigureAwait(false);
+
+            foreach (var strategy in _strategies.Values)
+            {
+                if (strategy is IDisposable disposable)
+                {
+                    disposable.Dispose();
+                }
+            }
+
+            _strategies.Clear();
+            _keyStores.Clear();
+            _envelopeKeyStores.Clear();
+
+            await base.DisposeAsyncCore().ConfigureAwait(false);
         }
     }
 }
